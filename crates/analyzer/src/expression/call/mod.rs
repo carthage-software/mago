@@ -205,6 +205,35 @@ fn get_function_like_target<'ctx, 'arena>(
     span: Span,
     inferred_return_type: Option<Box<TUnion>>,
 ) -> Result<Option<InvocationTarget<'ctx>>, AnalysisError> {
+    get_function_like_target_inner(context, function_like, alternative, span, inferred_return_type, false)
+}
+
+pub(super) fn get_function_like_target_with_skip<'ctx, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    function_like: FunctionLikeIdentifier,
+    alternative: Option<FunctionLikeIdentifier>,
+    span: Span,
+    inferred_return_type: Option<Box<TUnion>>,
+    skip_error_on_not_found: bool,
+) -> Result<Option<InvocationTarget<'ctx>>, AnalysisError> {
+    get_function_like_target_inner(
+        context,
+        function_like,
+        alternative,
+        span,
+        inferred_return_type,
+        skip_error_on_not_found,
+    )
+}
+
+fn get_function_like_target_inner<'ctx, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    function_like: FunctionLikeIdentifier,
+    alternative: Option<FunctionLikeIdentifier>,
+    span: Span,
+    inferred_return_type: Option<Box<TUnion>>,
+    skip_error_on_not_found: bool,
+) -> Result<Option<InvocationTarget<'ctx>>, AnalysisError> {
     let mut identifier = function_like;
     let original_class_for_method_context =
         if let FunctionLikeIdentifier::Method(class_name, _) = function_like { Some(class_name) } else { None };
@@ -250,31 +279,33 @@ fn get_function_like_target<'ctx, 'arena>(
         });
 
     let Some(metadata) = metadata else {
-        let title_str = function_like.title_kind_str();
-        let kind_str = function_like.kind_str();
-        let name_str = function_like.as_string();
+        if !skip_error_on_not_found {
+            let title_str = function_like.title_kind_str();
+            let kind_str = function_like.kind_str();
+            let name_str = function_like.as_string();
 
-        let issue = if let Some(alt_id) = alternative {
-            let alt_name_str = alt_id.as_string();
+            let issue = if let Some(alt_id) = alternative {
+                let alt_name_str = alt_id.as_string();
 
-            Issue::error(format!(
-                "Could not find definition for {kind_str} `{name_str}` (also tried as `{alt_name_str}` in a broader scope)."
-            )).with_annotation(
-                Annotation::primary(span).with_message(format!("Attempted to use {kind_str} `{name_str}` which is undefined")),
-            ).with_note(
-                format!("Neither `{name_str}` (e.g., in current namespace) nor `{alt_name_str}` (e.g., global fallback) could be resolved."),
-            )
-        } else {
-            Issue::error(format!("{title_str} `{name_str}` could not be found.")).with_annotation(
-                Annotation::primary(span).with_message(format!("Undefined {kind_str} `{name_str}` called here")),
-            )
-        };
+                Issue::error(format!(
+                    "Could not find definition for {kind_str} `{name_str}` (also tried as `{alt_name_str}` in a broader scope)."
+                )).with_annotation(
+                    Annotation::primary(span).with_message(format!("Attempted to use {kind_str} `{name_str}` which is undefined")),
+                ).with_note(
+                    format!("Neither `{name_str}` (e.g., in current namespace) nor `{alt_name_str}` (e.g., global fallback) could be resolved."),
+                )
+            } else {
+                Issue::error(format!("{title_str} `{name_str}` could not be found.")).with_annotation(
+                    Annotation::primary(span).with_message(format!("Undefined {kind_str} `{name_str}` called here")),
+                )
+            };
 
-        context.collector.report_with_code(
-            IssueCode::NonExistentFunction,
-            issue.with_note("This often means the function/method is misspelled, not imported correctly (e.g., missing `use` statement for namespaced functions), or not defined/autoloaded.")
-                .with_help(format!("Check for typos in `{name_str}`. Verify namespace imports if applicable, and ensure the {kind_str} is defined and accessible."))
-        );
+            context.collector.report_with_code(
+                IssueCode::NonExistentFunction,
+                issue.with_note("This often means the function/method is misspelled, not imported correctly (e.g., missing `use` statement for namespaced functions), or not defined/autoloaded.")
+                    .with_help(format!("Check for typos in `{name_str}`. Verify namespace imports if applicable, and ensure the {kind_str} is defined and accessible."))
+            );
+        }
 
         return Ok(None);
     };

@@ -7,6 +7,7 @@ use ahash::HashSet;
 
 use mago_algebra::clause::Clause;
 use mago_atom::AtomMap;
+use mago_atom::AtomSet;
 use mago_codex::assertion::Assertion;
 use mago_codex::context::ScopeContext;
 use mago_codex::ttype::TType;
@@ -98,6 +99,8 @@ pub struct BlockContext<'ctx> {
     pub inside_variable_reference: bool,
     pub clauses: Vec<Rc<Clause>>,
     pub reconciled_expression_clauses: Vec<Rc<Clause>>,
+    pub known_functions: AtomSet,
+    pub known_constants: AtomSet,
     pub break_types: Vec<BreakContext>,
     pub finally_scope: Option<Rc<RefCell<FinallyScope>>>,
     pub has_returned: bool,
@@ -172,6 +175,8 @@ impl<'ctx> BlockContext<'ctx> {
             has_returned: false,
             clauses: Vec::new(),
             reconciled_expression_clauses: Vec::new(),
+            known_functions: AtomSet::default(),
+            known_constants: AtomSet::default(),
             break_types: Vec::new(),
             inside_loop: false,
             finally_scope: None,

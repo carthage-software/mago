@@ -43,7 +43,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Clone<'arena> {
 
             match atomic_type {
                 TAtomic::Object(object) => match object {
-                    TObject::Any => {
+                    TObject::Any | TObject::WithProperties(_) | TObject::HasMethod(_) | TObject::HasProperty(_) => {
                         has_cloneable_object = true;
                     }
                     TObject::Enum(_) => {
@@ -57,9 +57,6 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Clone<'arena> {
                         } else {
                             has_cloneable_object = true;
                         }
-                    }
-                    TObject::WithProperties(_) => {
-                        has_cloneable_object = true;
                     }
                 },
                 TAtomic::GenericParameter(parameter) => {

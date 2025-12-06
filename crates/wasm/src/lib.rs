@@ -118,6 +118,7 @@ pub fn run(code: String, settings_js: JsValue) -> Result<JsValue, JsValue> {
         check_closure_missing_type_hints: s.check_closure_missing_type_hints,
         check_arrow_function_missing_type_hints: s.check_arrow_function_missing_type_hints,
         register_super_globals: s.register_super_globals,
+        trust_existence_checks: s.trust_existence_checks,
         ..Default::default()
     };
 
@@ -217,6 +218,7 @@ pub fn analyze(code: String, php_version: String) -> Result<JsValue, JsValue> {
         check_closure_missing_type_hints: true,
         check_arrow_function_missing_type_hints: true,
         register_super_globals: true,
+        trust_existence_checks: true,
         ..Default::default()
     };
 

@@ -156,6 +156,70 @@ pub fn resolve_instance_properties<'ctx, 'ast, 'arena>(
 
                 continue;
             }
+            TObject::HasMethod(has_method) => {
+                let all_properties_match = property_names.iter().all(|prop_name| {
+                    let prop_name_without_dollar = atom(prop_name.trim_start_matches('$'));
+                    type_has_property_assertion(has_method.intersection_types.as_deref(), &prop_name_without_dollar)
+                });
+
+                if all_properties_match {
+                    for prop_name in &property_names {
+                        result.properties.push(ResolvedProperty {
+                            property_span: None,
+                            property_name: *prop_name,
+                            declaring_class_id: None,
+                            property_type: get_mixed(),
+                            is_magic: false,
+                        });
+                    }
+                } else {
+                    result.has_ambiguous_path = true;
+                    if !block_context.inside_isset {
+                        report_ambiguous_access(
+                            context,
+                            property_selector,
+                            object_expression.span(),
+                            object_type.get_id(),
+                        );
+                    }
+                }
+
+                continue;
+            }
+            TObject::HasProperty(has_property) => {
+                let all_properties_match = property_names.iter().all(|prop_name| {
+                    let prop_name_without_dollar = atom(prop_name.trim_start_matches('$'));
+                    has_property.has_property(&prop_name_without_dollar)
+                        || type_has_property_assertion(
+                            has_property.intersection_types.as_deref(),
+                            &prop_name_without_dollar,
+                        )
+                });
+
+                if all_properties_match {
+                    for prop_name in &property_names {
+                        result.properties.push(ResolvedProperty {
+                            property_span: None,
+                            property_name: *prop_name,
+                            declaring_class_id: None,
+                            property_type: get_mixed(),
+                            is_magic: false,
+                        });
+                    }
+                } else {
+                    result.has_ambiguous_path = true;
+                    if !block_context.inside_isset {
+                        report_ambiguous_access(
+                            context,
+                            property_selector,
+                            object_expression.span(),
+                            object_type.get_id(),
+                        );
+                    }
+                }
+
+                continue;
+            }
             TObject::WithProperties(object) => {
                 for prop_name in &property_names {
                     let key = atom(prop_name.trim_start_matches('$'));
@@ -334,6 +398,24 @@ fn find_property_in_class<'ctx, 'ast, 'arena>(
                 declaring_class_id: Some(declaring_class_id),
                 property_type: get_mixed(),
                 is_magic: true,
+            }));
+        }
+
+        let prop_str: &str = prop_name.as_ref();
+        let prop_name_without_dollar = atom(prop_str.trim_start_matches('$'));
+        let has_property_assertion = if let TObject::Named(named_object) = object {
+            type_has_property_assertion(named_object.get_intersection_types(), &prop_name_without_dollar)
+        } else {
+            false
+        };
+
+        if has_property_assertion {
+            return Ok(Some(ResolvedProperty {
+                property_span: None,
+                property_name: *prop_name,
+                declaring_class_id: None,
+                property_type: get_mixed(),
+                is_magic: false,
             }));
         }
 
@@ -789,4 +871,19 @@ pub(super) fn report_magic_property_without_get_set_method(
             format!("Add a `public function {magic_method_name}()` to the `{classname}` class to handle magic property access.")
         ),
     );
+}
+
+fn type_has_property_assertion(intersection_types: Option<&[TAtomic]>, property_name: &Atom) -> bool {
+    intersection_types.is_some_and(|types| {
+        types.iter().any(|atomic| match atomic {
+            TAtomic::Object(TObject::HasProperty(has_property)) => {
+                has_property.has_property(property_name)
+                    || type_has_property_assertion(has_property.intersection_types.as_deref(), property_name)
+            }
+            TAtomic::Object(TObject::HasMethod(has_method)) => {
+                type_has_property_assertion(has_method.intersection_types.as_deref(), property_name)
+            }
+            _ => false,
+        })
+    })
 }

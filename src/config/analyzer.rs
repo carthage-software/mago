@@ -119,6 +119,18 @@ pub struct AnalyzerConfiguration {
 
     /// Whether to perform heuristic checks.
     pub perform_heuristic_checks: bool,
+
+    /// Trust symbol existence checks to narrow types.
+    ///
+    /// When enabled, conditional checks like `method_exists()`, `property_exists()`,
+    /// `function_exists()`, and `defined()` will narrow the type within the conditional block,
+    /// suppressing errors for symbols that are verified to exist at runtime.
+    ///
+    /// When disabled, these checks are ignored and the analyzer requires explicit type hints,
+    /// which is stricter but may produce more false positives for dynamic code.
+    ///
+    /// Defaults to `true`.
+    pub trust_existence_checks: bool,
 }
 
 impl AnalyzerConfiguration {
@@ -146,6 +158,7 @@ impl AnalyzerConfiguration {
                 ColorChoice::Auto => std::io::stdout().is_terminal(),
             },
             diff: enable_diff,
+            trust_existence_checks: self.trust_existence_checks,
         }
     }
 }
@@ -174,6 +187,7 @@ impl Default for AnalyzerConfiguration {
             check_closure_missing_type_hints: defaults.check_closure_missing_type_hints,
             check_arrow_function_missing_type_hints: defaults.check_arrow_function_missing_type_hints,
             register_super_globals: defaults.register_super_globals,
+            trust_existence_checks: defaults.trust_existence_checks,
         }
     }
 }

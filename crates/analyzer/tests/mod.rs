@@ -313,6 +313,8 @@ test_case!(instanceof_assertion);
 test_case!(type_narrowing_external);
 test_case!(post_narrowing_check);
 test_case!(data_transformer_type);
+test_case!(symbol_existence_assertions);
+test_case!(symbol_existence_edge_cases);
 
 // Github Issues
 test_case!(issue_659);

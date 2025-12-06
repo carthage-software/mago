@@ -1,8 +1,10 @@
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 
+use mago_atom::Atom;
 use mago_atom::atom;
 use mago_codex::assertion::Assertion;
+use mago_codex::identifier::method::MethodIdentifier;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::array::TArray;
@@ -112,6 +114,28 @@ pub(crate) fn reconcile(
                     negated,
                     span,
                     assertion.has_equality(),
+                ));
+            }
+            TAtomic::Object(TObject::HasMethod(has_method)) => {
+                return Some(reconcile_has_method(
+                    context,
+                    assertion,
+                    existing_var_type,
+                    key,
+                    &has_method.method,
+                    negated,
+                    span,
+                ));
+            }
+            TAtomic::Object(TObject::HasProperty(has_property)) => {
+                return Some(reconcile_has_property(
+                    context,
+                    assertion,
+                    existing_var_type,
+                    key,
+                    &has_property.property,
+                    negated,
+                    span,
                 ));
             }
             TAtomic::Iterable(TIterable { key_type, value_type, intersection_types: None }) => {
@@ -2201,6 +2225,175 @@ fn reconcile_has_nonnull_entry_for_key(
 
     new_var_type.types = Cow::Owned(acceptable_types);
     new_var_type
+}
+
+/// Reconciles a `HasMethod` assertion.
+///
+/// When `method_exists($obj, 'methodName')` returns true, we know the object has that method.
+/// This creates a `HasMethod` type that tracks the known method.
+fn reconcile_has_method(
+    context: &mut Context<'_, '_>,
+    assertion: &Assertion,
+    existing_var_type: &TUnion,
+    key: Option<&String>,
+    method_name: &Atom,
+    negated: bool,
+    span: Option<&Span>,
+) -> TUnion {
+    if existing_var_type.is_mixed() {
+        return wrap_atomic(TAtomic::Object(TObject::new_has_method(*method_name)));
+    }
+
+    let mut acceptable_types = Vec::new();
+    let mut did_remove_type = false;
+
+    for atomic in existing_var_type.types.as_ref() {
+        match atomic {
+            TAtomic::Object(TObject::Any | TObject::WithProperties(_)) => {
+                acceptable_types.push(TAtomic::Object(TObject::new_has_method(*method_name)));
+                did_remove_type = true;
+            }
+            TAtomic::Object(TObject::Named(named_object)) => {
+                let class_name = named_object.get_name();
+                let method_id = MethodIdentifier::new(class_name, *method_name);
+                if context.codebase.method_identifier_exists(&method_id)
+                    || context.codebase.get_declaring_method_identifier(&method_id) != method_id
+                {
+                    acceptable_types.push(atomic.clone());
+                } else {
+                    let mut new_named = named_object.clone();
+                    new_named.add_intersection_type(TAtomic::Object(TObject::new_has_method(*method_name)));
+                    acceptable_types.push(TAtomic::Object(TObject::Named(new_named)));
+                    did_remove_type = true;
+                }
+            }
+            TAtomic::Object(TObject::Enum(_)) => {
+                acceptable_types.push(atomic.clone());
+            }
+            TAtomic::Object(TObject::HasMethod(has_method)) => {
+                let mut new_has_method = has_method.clone();
+                new_has_method.add_intersection_type(TAtomic::Object(TObject::new_has_method(*method_name)));
+                acceptable_types.push(TAtomic::Object(TObject::HasMethod(new_has_method)));
+            }
+            TAtomic::Object(TObject::HasProperty(has_property)) => {
+                let mut new_has_property = has_property.clone();
+                new_has_property.add_intersection_type(TAtomic::Object(TObject::new_has_method(*method_name)));
+                acceptable_types.push(TAtomic::Object(TObject::HasProperty(new_has_property)));
+            }
+            TAtomic::GenericParameter(generic_parameter) => {
+                did_remove_type = true;
+                if let Some(atomic) = map_concrete_generic_constraint(generic_parameter, |constraint| {
+                    reconcile_has_method(context, assertion, constraint, None, method_name, negated, None)
+                }) {
+                    acceptable_types.push(atomic);
+                }
+            }
+            TAtomic::Variable { .. } => {
+                acceptable_types.push(atomic.clone());
+                did_remove_type = true;
+            }
+            TAtomic::Mixed(_) => {
+                acceptable_types.push(TAtomic::Object(TObject::new_has_method(*method_name)));
+                did_remove_type = true;
+            }
+            _ => {
+                did_remove_type = true;
+            }
+        }
+    }
+
+    get_acceptable_type(
+        context,
+        acceptable_types,
+        did_remove_type,
+        key,
+        span,
+        existing_var_type,
+        assertion,
+        negated,
+        true,
+        existing_var_type.clone(),
+    )
+}
+
+/// Reconciles a `HasProperty` assertion.
+///
+/// When `property_exists($obj, 'propertyName')` returns true, we know the object has that property.
+/// This creates a `HasProperty` type that tracks the known property.
+fn reconcile_has_property(
+    context: &mut Context<'_, '_>,
+    assertion: &Assertion,
+    existing_var_type: &TUnion,
+    key: Option<&String>,
+    property_name: &Atom,
+    negated: bool,
+    span: Option<&Span>,
+) -> TUnion {
+    if existing_var_type.is_mixed() {
+        return wrap_atomic(TAtomic::Object(TObject::new_has_property(*property_name)));
+    }
+
+    let mut acceptable_types = Vec::new();
+    let mut did_remove_type = false;
+
+    for atomic in existing_var_type.types.as_ref() {
+        match atomic {
+            TAtomic::Object(TObject::Enum(_)) => {
+                did_remove_type = true;
+            }
+            TAtomic::Object(TObject::Any | TObject::WithProperties(_)) => {
+                acceptable_types.push(TAtomic::Object(TObject::new_has_property(*property_name)));
+                did_remove_type = true;
+            }
+            TAtomic::Object(TObject::Named(named_object)) => {
+                let mut new_named = named_object.clone();
+                new_named.add_intersection_type(TAtomic::Object(TObject::new_has_property(*property_name)));
+                acceptable_types.push(TAtomic::Object(TObject::Named(new_named)));
+            }
+            TAtomic::Object(TObject::HasMethod(has_method)) => {
+                let mut new_has_method = has_method.clone();
+                new_has_method.add_intersection_type(TAtomic::Object(TObject::new_has_property(*property_name)));
+                acceptable_types.push(TAtomic::Object(TObject::HasMethod(new_has_method)));
+            }
+            TAtomic::Object(TObject::HasProperty(has_property)) => {
+                let mut new_has_property = has_property.clone();
+                new_has_property.add_intersection_type(TAtomic::Object(TObject::new_has_property(*property_name)));
+                acceptable_types.push(TAtomic::Object(TObject::HasProperty(new_has_property)));
+            }
+            TAtomic::GenericParameter(generic_parameter) => {
+                did_remove_type = true;
+                if let Some(atomic) = map_concrete_generic_constraint(generic_parameter, |constraint| {
+                    reconcile_has_property(context, assertion, constraint, None, property_name, negated, None)
+                }) {
+                    acceptable_types.push(atomic);
+                }
+            }
+            TAtomic::Variable { .. } => {
+                acceptable_types.push(atomic.clone());
+                did_remove_type = true;
+            }
+            TAtomic::Mixed(_) => {
+                acceptable_types.push(TAtomic::Object(TObject::new_has_property(*property_name)));
+                did_remove_type = true;
+            }
+            _ => {
+                did_remove_type = true;
+            }
+        }
+    }
+
+    get_acceptable_type(
+        context,
+        acceptable_types,
+        did_remove_type,
+        key,
+        span,
+        existing_var_type,
+        assertion,
+        negated,
+        true,
+        existing_var_type.clone(),
+    )
 }
 
 pub(crate) fn get_acceptable_type(

@@ -1,3 +1,4 @@
+use mago_atom::atom;
 use mago_codex::ttype::expander;
 use mago_codex::ttype::expander::TypeExpansionOptions;
 use mago_codex::ttype::get_mixed;
@@ -17,7 +18,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ConstantAccess<'arena> {
     fn analyze<'ctx>(
         &self,
         context: &mut Context<'ctx, 'arena>,
-        _block_context: &mut BlockContext<'ctx>,
+        block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
         let name = context.resolved_names.get(self);
@@ -27,24 +28,30 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ConstantAccess<'arena> {
             context.codebase.get_constant(name).or_else(|| context.codebase.get_constant(unqualified_name));
 
         let Some(constant_metadata) = constant_metadata else {
-            context.collector.report_with_code(
-                IssueCode::NonExistentConstant,
-                Issue::error(format!(
-                    "Undefined constant: `{name}`."
-                ))
-                .with_annotation(
-                    Annotation::primary(self.span())
-                        .with_message(format!("Constant `{name}` is not defined."))
-                )
-                .with_note(
-                    "The constant might be misspelled, not defined, or not imported."
-                )
-                .with_help(
-                    format!(
-                        "Define the constant `{name}` using `define()` or `const`, or check for typos and ensure it's available in this scope."
+            let is_known = block_context.known_constants.contains(&atom(name));
+
+            if !is_known {
+                context.collector.report_with_code(
+                    IssueCode::NonExistentConstant,
+                    Issue::error(format!(
+                        "Undefined constant: `{name}`."
+                    ))
+                    .with_annotation(
+                        Annotation::primary(self.span())
+                            .with_message(format!("Constant `{name}` is not defined."))
                     )
-                ),
-            );
+                    .with_note(
+                        "The constant might be misspelled, not defined, or not imported."
+                    )
+                    .with_help(
+                        format!(
+                            "Define the constant `{name}` using `define()` or `const`, or check for typos and ensure it's available in this scope."
+                        )
+                    ),
+                );
+            } else {
+                artifacts.set_expression_type(self, get_mixed());
+            }
 
             return Ok(());
         };

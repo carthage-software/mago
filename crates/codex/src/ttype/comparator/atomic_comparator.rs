@@ -361,6 +361,7 @@ pub fn is_contained_by(
 
                 true
             }
+            TObject::HasMethod(_) | TObject::HasProperty(_) => false,
         };
     }
 

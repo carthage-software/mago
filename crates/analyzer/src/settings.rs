@@ -119,6 +119,18 @@ pub struct Settings {
     /// Enables a diffing mode for incremental analysis, used by integrations like LSPs.
     /// This avoids re-analyzing unchanged code in the same session. Defaults to `false`.
     pub diff: bool,
+
+    /// Trust symbol existence checks to narrow types.
+    ///
+    /// When enabled, conditional checks like `method_exists()`, `property_exists()`,
+    /// `function_exists()`, and `defined()` will narrow the type within the conditional block,
+    /// suppressing errors for symbols that are verified to exist at runtime.
+    ///
+    /// When disabled, these checks are ignored and the analyzer requires explicit type hints,
+    /// which is stricter but may produce more false positives for dynamic code.
+    ///
+    /// Defaults to `true`.
+    pub trust_existence_checks: bool,
 }
 
 impl Default for Settings {
@@ -150,6 +162,7 @@ impl Settings {
             check_arrow_function_missing_type_hints: false,
             register_super_globals: true,
             diff: false,
+            trust_existence_checks: true,
         }
     }
 }

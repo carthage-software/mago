@@ -32,6 +32,7 @@ use crate::reconciler::assertion_reconciler;
 use crate::reconciler::reconcile_keyed_types;
 use crate::utils::conditional;
 use crate::utils::expression::is_derived_access_path;
+use crate::utils::symbol_existence::extract_function_constant_existence;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for Conditional<'arena> {
     fn analyze<'ctx>(
@@ -148,6 +149,8 @@ pub(super) fn analyze_conditional<'ctx, 'ast, 'arena>(
         }
     }
 
+    extract_function_constant_existence(condition, artifacts, &mut if_block_context, false);
+
     if_scope.negated_clauses =
         negate_or_synthesize(if_clauses, condition, context.get_assertion_context_from_block(block_context), artifacts);
 
@@ -220,6 +223,9 @@ pub(super) fn analyze_conditional<'ctx, 'ast, 'arena>(
         .map(Rc::new)
         .collect();
     }
+
+    // Extract function_exists/defined assertions for the "else" branch.
+    extract_function_constant_existence(condition, artifacts, &mut else_block_context, true);
 
     let was_inside_general_use = else_block_context.inside_general_use;
     else_block_context.inside_general_use = true;

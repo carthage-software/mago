@@ -179,19 +179,30 @@ pub fn resolve_method_targets<'ctx, 'ast, 'arena>(
 
                 if resolved_methods.is_empty() {
                     if let Some(classname) = obj_type.get_name() {
-                        if resolved_magic_call_method.is_empty() {
-                            report_non_existent_method(context, object.span(), selector.span(), classname, method_name);
-                        } else {
-                            report_non_documented_method(
-                                context,
-                                object.span(),
-                                selector.span(),
-                                classname,
-                                method_name,
-                            );
-                        }
+                        let method_name_str: &str = method_name.as_ref();
+                        let has_method_assertion = type_has_method_assertion(obj_type, method_name_str);
 
-                        result.has_invalid_target = true;
+                        if !has_method_assertion {
+                            if resolved_magic_call_method.is_empty() {
+                                report_non_existent_method(
+                                    context,
+                                    object.span(),
+                                    selector.span(),
+                                    classname,
+                                    method_name,
+                                );
+                            } else {
+                                report_non_documented_method(
+                                    context,
+                                    object.span(),
+                                    selector.span(),
+                                    classname,
+                                    method_name,
+                                );
+                            }
+
+                            result.has_invalid_target = true;
+                        }
                     } else {
                         // ambiguous
                     }
@@ -290,7 +301,14 @@ pub fn get_method_ids_from_object<'ctx, 'ast, 'arena, 'object>(
 
     let Some(name) = object_type.get_name() else {
         result.has_ambiguous_target = true;
-        report_call_on_ambiguous_object(context, object.span(), selector.span());
+
+        if !has_magic_call {
+            let method_name_str: &str = method_name.as_ref();
+            let has_method_assertion = type_has_method_assertion(object_type, method_name_str);
+            if !has_method_assertion {
+                report_call_on_ambiguous_object(context, object.span(), selector.span());
+            }
+        }
 
         return ids;
     };
@@ -653,4 +671,35 @@ pub(super) fn report_dynamic_static_method_call(
         IssueCode::DynamicStaticMethodCall,
         issue.with_help(format!("Call this method statically instead: `{}::{}`.", classname, method_name)),
     );
+}
+
+/// Checks if a type has a known method assertion for the given method name.
+///
+/// This checks for `HasMethod` types or intersection types containing them.
+/// Comparison is case-insensitive since PHP method names are case-insensitive.
+fn type_has_method_assertion(object_type: &TObject, method_name: &str) -> bool {
+    match object_type {
+        TObject::HasMethod(has_method) => {
+            if has_method.has_method(method_name) {
+                return true;
+            }
+
+            has_method.intersection_types.as_ref().is_some_and(|types| {
+                types.iter().any(|atomic| {
+                    if let TAtomic::Object(obj) = atomic { type_has_method_assertion(obj, method_name) } else { false }
+                })
+            })
+        }
+        TObject::HasProperty(has_property) => has_property.intersection_types.as_ref().is_some_and(|types| {
+            types.iter().any(|atomic| {
+                if let TAtomic::Object(obj) = atomic { type_has_method_assertion(obj, method_name) } else { false }
+            })
+        }),
+        TObject::Named(named_object) => named_object.get_intersection_types().is_some_and(|intersection_types| {
+            intersection_types.iter().any(|atomic| {
+                if let TAtomic::Object(obj) = atomic { type_has_method_assertion(obj, method_name) } else { false }
+            })
+        }),
+        _ => false,
+    }
 }

@@ -60,6 +60,9 @@ pub(crate) fn reconcile(
                     assertion.has_equality(),
                 ));
             }
+            TAtomic::Object(TObject::HasMethod(_) | TObject::HasProperty(_)) => {
+                return Some(existing_var_type.clone());
+            }
             TAtomic::Object(TObject::Named(subtracting_named))
                 if existing_var_type
                     .types

@@ -129,6 +129,7 @@ impl<'ctx, 'arena> Context<'ctx, 'arena> {
             resolved_names: self.resolved_names,
             codebase: self.codebase,
             this_class_name,
+            trust_existence_checks: self.settings.trust_existence_checks,
         }
     }
 

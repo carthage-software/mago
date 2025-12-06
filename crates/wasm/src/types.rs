@@ -135,6 +135,7 @@ pub struct WasmAnalyzerSettings {
     pub check_closure_missing_type_hints: bool,
     pub check_arrow_function_missing_type_hints: bool,
     pub register_super_globals: bool,
+    pub trust_existence_checks: bool,
 }
 
 #[derive(Debug, Deserialize, Default)]

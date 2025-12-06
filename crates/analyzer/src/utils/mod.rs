@@ -11,6 +11,7 @@ pub mod expression;
 pub mod misc;
 pub mod missing_type_hints;
 pub mod php_emulation;
+pub mod symbol_existence;
 pub mod template;
 
 /// Generates a diff between two complex types if both are complex.

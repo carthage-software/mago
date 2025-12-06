@@ -1,3 +1,4 @@
+use mago_atom::ascii_lowercase_atom;
 use mago_atom::atom;
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::ttype::TType;
@@ -17,6 +18,7 @@ use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
 use crate::expression::call::analyze_invocation_targets;
 use crate::expression::call::get_function_like_target;
+use crate::expression::call::get_function_like_target_with_skip;
 use crate::invocation::InvocationArgumentsSource;
 use crate::invocation::InvocationTarget;
 
@@ -65,7 +67,11 @@ pub(super) fn resolve_targets<'ctx, 'arena>(
             None
         };
 
-        let target = get_function_like_target(context, identifier, alternative, expression.span(), None)?;
+        let lowercased_name = ascii_lowercase_atom(&name);
+        let skip_error = block_context.known_functions.contains(&lowercased_name);
+
+        let target =
+            get_function_like_target_with_skip(context, identifier, alternative, expression.span(), None, skip_error)?;
 
         return Ok(if let Some(t) = target { (vec![t], false) } else { (vec![], false) });
     }

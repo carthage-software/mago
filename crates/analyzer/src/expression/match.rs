@@ -30,6 +30,7 @@ use crate::formula::get_formula;
 use crate::formula::negate_or_synthesize;
 use crate::reconciler::reconcile_keyed_types;
 use crate::utils::expression::get_expression_id;
+use crate::utils::symbol_existence::extract_function_constant_existence;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for Match<'arena> {
     fn analyze<'ctx>(
@@ -335,6 +336,10 @@ impl<'anlyz, 'ctx, 'ast, 'arena> MatchAnalyzer<'anlyz, 'ctx, 'ast, 'arena> {
                 false,
                 false,
             );
+        }
+
+        for condition in expression_arm.conditions.iter() {
+            extract_function_constant_existence(condition, self.artifacts, &mut arm_body_context, false);
         }
 
         expression_arm.expression.analyze(self.context, &mut arm_body_context, self.artifacts)?;

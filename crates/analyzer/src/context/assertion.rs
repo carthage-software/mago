@@ -11,4 +11,5 @@ pub struct AssertionContext<'ctx, 'arena> {
     pub arena: &'arena Bump,
     pub codebase: &'ctx CodebaseMetadata,
     pub this_class_name: Option<Atom>,
+    pub trust_existence_checks: bool,
 }

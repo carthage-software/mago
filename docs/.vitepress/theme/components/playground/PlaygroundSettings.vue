@@ -106,6 +106,11 @@ const analyzerOptions = [
     label: 'Register superglobals',
     description: 'Make $_GET, $_POST, $_SERVER etc. available without global keyword',
   },
+  {
+    key: 'trustExistenceChecks',
+    label: 'Trust existence checks',
+    description: 'Narrow types based on method_exists(), property_exists(), function_exists(), and defined()',
+  },
 ];
 
 const rulesByCategory = computed(() => {

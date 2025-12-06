@@ -398,7 +398,7 @@ pub fn get_class_name_from_atomic(codebase: &CodebaseMetadata, atomic: &TAtomic)
                         codebase.is_enum_or_final_class(&named_object.name),
                     )
                 }
-                TObject::WithProperties(_) => {
+                TObject::WithProperties(_) | TObject::HasMethod(_) | TObject::HasProperty(_) => {
                     let origin = if let Some(class_string) = active_class_string {
                         ResolutionOrigin::SpecificClassLikeString(class_string.clone())
                     } else {

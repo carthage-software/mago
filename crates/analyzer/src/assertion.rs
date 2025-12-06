@@ -326,6 +326,28 @@ fn scrape_special_function_call_assertions(
                 ))))],
             )),
             "count" => Some((0, vec![Assertion::HasAtLeastCount(1)])),
+            "method_exists" if assertion_context.trust_existence_checks => {
+                let method_name = function_call
+                    .argument_list
+                    .arguments
+                    .get(1)
+                    .map(|argument| argument.value())
+                    .and_then(|expr| artifacts.get_expression_type(expr))
+                    .and_then(|ty| ty.get_single_literal_string_value())?;
+
+                Some((0, vec![Assertion::IsType(TAtomic::Object(TObject::new_has_method(atom(method_name))))]))
+            }
+            "property_exists" if assertion_context.trust_existence_checks => {
+                let property_name = function_call
+                    .argument_list
+                    .arguments
+                    .get(1)
+                    .map(|argument| argument.value())
+                    .and_then(|expr| artifacts.get_expression_type(expr))
+                    .and_then(|ty| ty.get_single_literal_string_value())?;
+
+                Some((0, vec![Assertion::IsType(TAtomic::Object(TObject::new_has_property(atom(property_name))))]))
+            }
             "in_array" => {
                 let should_strict_check = function_call
                     .argument_list

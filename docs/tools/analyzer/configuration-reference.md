@@ -59,6 +59,7 @@ These flags control specific, powerful analysis capabilities.
 | `check-closure-missing-type-hints`    | `false` | When `true`, checks closures for missing type hints when `check-missing-type-hints` is enabled.      |
 | `check-arrow-function-missing-type-hints` | `false` | When `true`, checks arrow functions for missing type hints when `check-missing-type-hints` is enabled. |
 | `register-super-globals`              | `true`  | Automatically register PHP superglobals (e.g., `$_GET`, `$_POST`) for analysis.                      |
+| `trust-existence-checks`              | `true`  | When `true`, narrows types based on `method_exists()`, `property_exists()`, `function_exists()`, and `defined()` checks. |
 
 ## Exception filtering
 
@@ -106,4 +107,113 @@ In this example:
 Use `unchecked-exceptions` when you want to ignore an entire category of exceptions, such as logic errors that indicate programming mistakes rather than runtime issues.
 
 Use `unchecked-exception-classes` when you want to ignore a specific exception but still want to track its parent or sibling exceptions.
+:::
+
+## Strict mode
+
+The analyzer can be configured to be more or less strict depending on your project's needs. This section describes how to configure the analyzer for maximum strictness.
+
+### Maximum strictness configuration
+
+For the strictest possible analysis, use the following configuration:
+
+```toml
+[analyzer]
+# Enable all checks
+find-unused-expressions = true
+find-unused-definitions = true
+analyze-dead-code = true
+check-throws = true
+perform-heuristic-checks = true
+check-missing-type-hints = true
+check-closure-missing-type-hints = true
+check-arrow-function-missing-type-hints = true
+
+# Enable strict checks
+strict-list-index-checks = true
+no-boolean-literal-comparison = true
+
+# Disable lenient behaviors
+allow-possibly-undefined-array-keys = false
+trust-existence-checks = false
+```
+
+### Strictness options explained
+
+#### Type hint enforcement
+
+| Option | Strict Value | Effect |
+| :----- | :----------- | :----- |
+| `check-missing-type-hints` | `true` | Reports missing type hints on function parameters, return types, and class properties. |
+| `check-closure-missing-type-hints` | `true` | Also checks closures for missing type hints (requires `check-missing-type-hints`). |
+| `check-arrow-function-missing-type-hints` | `true` | Also checks arrow functions for missing type hints (requires `check-missing-type-hints`). |
+
+#### Array access strictness
+
+| Option | Strict Value | Effect |
+| :----- | :----------- | :----- |
+| `allow-possibly-undefined-array-keys` | `false` | Reports errors when accessing array keys that may not exist. |
+| `strict-list-index-checks` | `true` | Requires list indices to be provably non-negative (`int<0, max>`). |
+
+#### Runtime check behavior
+
+| Option | Strict Value | Effect |
+| :----- | :----------- | :----- |
+| `trust-existence-checks` | `false` | Ignores `method_exists()`, `property_exists()` checks; requires explicit type hints. |
+
+When `trust-existence-checks` is enabled (the default), the analyzer narrows types based on runtime existence checks:
+
+```php
+function process(object $obj): mixed
+{
+    // With trust-existence-checks = true (default):
+    // No warning - method existence is verified at runtime
+    if (method_exists($obj, 'toArray')) {
+        return $obj->toArray();
+    }
+
+    // With trust-existence-checks = false:
+    // Warning reported - explicit type hints required
+    return null;
+}
+```
+
+#### Code quality checks
+
+| Option | Strict Value | Effect |
+| :----- | :----------- | :----- |
+| `find-unused-expressions` | `true` | Reports expressions whose results are discarded (e.g., `$a + $b;`). |
+| `find-unused-definitions` | `true` | Reports unused private methods, variables, and other definitions. |
+| `analyze-dead-code` | `true` | Analyzes and reports on unreachable code paths. |
+| `perform-heuristic-checks` | `true` | Enables additional heuristic checks for common mistakes. |
+| `no-boolean-literal-comparison` | `true` | Disallows comparisons like `$a === true` or `$b == false`. |
+
+#### Exception handling
+
+| Option | Strict Value | Effect |
+| :----- | :----------- | :----- |
+| `check-throws` | `true` | Reports unhandled exceptions not caught or documented with `@throws`. |
+
+### Lenient mode
+
+For a more lenient analysis (useful for legacy codebases or gradual adoption), use:
+
+```toml
+[analyzer]
+# Disable strict checks
+check-missing-type-hints = false
+strict-list-index-checks = false
+no-boolean-literal-comparison = false
+
+# Enable lenient behaviors
+allow-possibly-undefined-array-keys = true
+trust-existence-checks = true
+
+# Optionally disable some checks
+check-throws = false
+perform-heuristic-checks = false
+```
+
+:::tip Gradual adoption
+When introducing Mago to an existing codebase, start with lenient settings and a [baseline](/fundamentals/baseline). Gradually enable stricter options as you improve the codebase.
 :::

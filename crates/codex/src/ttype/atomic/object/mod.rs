@@ -10,11 +10,15 @@ use crate::ttype::TType;
 use crate::ttype::TypeRef;
 use crate::ttype::atomic::TAtomic;
 use crate::ttype::atomic::object::r#enum::TEnum;
+use crate::ttype::atomic::object::has_method::TObjectHasMethod;
+use crate::ttype::atomic::object::has_property::TObjectHasProperty;
 use crate::ttype::atomic::object::named::TNamedObject;
 use crate::ttype::atomic::object::with_properties::TObjectWithProperties;
 use crate::ttype::union::TUnion;
 
 pub mod r#enum;
+pub mod has_method;
+pub mod has_property;
 pub mod named;
 pub mod with_properties;
 
@@ -31,6 +35,10 @@ pub enum TObject {
     Enum(TEnum),
     /// Represents an object documented via `object{...}` doc comment
     WithProperties(TObjectWithProperties),
+    /// Represents an object with a known method from `method_exists()` check.
+    HasMethod(TObjectHasMethod),
+    /// Represents an object with a known property from `property_exists()` check.
+    HasProperty(TObjectHasProperty),
 }
 
 impl TObject {
@@ -74,6 +82,18 @@ impl TObject {
         TObject::Enum(TEnum::new_case(name, case))
     }
 
+    /// Creates a new `TObject` representing an object with a known method.
+    #[inline]
+    pub const fn new_has_method(method: Atom) -> Self {
+        TObject::HasMethod(TObjectHasMethod::new(method))
+    }
+
+    /// Creates a new `TObject` representing an object with a known property.
+    #[inline]
+    pub const fn new_has_property(property: Atom) -> Self {
+        TObject::HasProperty(TObjectHasProperty::new(property))
+    }
+
     /// Checks if this represents the generic `object` type.
     #[inline]
     pub const fn is_any(&self) -> bool {
@@ -98,6 +118,42 @@ impl TObject {
         matches!(self, TObject::Named(_) | TObject::Enum(_))
     }
 
+    /// Checks if this is a `HasMethod` variant.
+    #[inline]
+    pub const fn is_has_method(&self) -> bool {
+        matches!(self, TObject::HasMethod(_))
+    }
+
+    /// Checks if this is a `HasProperty` variant.
+    #[inline]
+    pub const fn is_has_property(&self) -> bool {
+        matches!(self, TObject::HasProperty(_))
+    }
+
+    /// Returns a reference to the `TObjectHasMethod` data if this is a `HasMethod` variant.
+    #[inline]
+    pub const fn get_has_method_type(&self) -> Option<&TObjectHasMethod> {
+        if let TObject::HasMethod(data) = self { Some(data) } else { None }
+    }
+
+    /// Returns a mutable reference to the `TObjectHasMethod` data if this is a `HasMethod` variant.
+    #[inline]
+    pub fn get_has_method_type_mut(&mut self) -> Option<&mut TObjectHasMethod> {
+        if let TObject::HasMethod(data) = self { Some(data) } else { None }
+    }
+
+    /// Returns a reference to the `TObjectHasProperty` data if this is a `HasProperty` variant.
+    #[inline]
+    pub const fn get_has_property_type(&self) -> Option<&TObjectHasProperty> {
+        if let TObject::HasProperty(data) = self { Some(data) } else { None }
+    }
+
+    /// Returns a mutable reference to the `TObjectHasProperty` data if this is a `HasProperty` variant.
+    #[inline]
+    pub fn get_has_property_type_mut(&mut self) -> Option<&mut TObjectHasProperty> {
+        if let TObject::HasProperty(data) = self { Some(data) } else { None }
+    }
+
     /// Returns a reference to the `NamedObject` data if this is a `Named` variant.
     #[inline]
     pub const fn get_named_object_type(&self) -> Option<&TNamedObject> {
@@ -106,7 +162,7 @@ impl TObject {
 
     /// Returns a mutable reference to the `NamedObject` data if this is a `Named` variant.
     #[inline]
-    pub const fn get_named_object_type_mut(&mut self) -> Option<&mut TNamedObject> {
+    pub fn get_named_object_type_mut(&mut self) -> Option<&mut TNamedObject> {
         if let TObject::Named(data) = self { Some(data) } else { None }
     }
 
@@ -118,7 +174,7 @@ impl TObject {
 
     /// Returns a mutable reference to the `Enum` data if this is an `Enum` variant.
     #[inline]
-    pub const fn get_enum_type_mut(&mut self) -> Option<&mut TEnum> {
+    pub fn get_enum_type_mut(&mut self) -> Option<&mut TEnum> {
         if let TObject::Enum(data) = self { Some(data) } else { None }
     }
 
@@ -126,10 +182,9 @@ impl TObject {
     #[inline]
     pub const fn get_name(&self) -> Option<&Atom> {
         match self {
-            TObject::Any => None,
+            TObject::Any | TObject::WithProperties(_) | TObject::HasMethod(_) | TObject::HasProperty(_) => None,
             TObject::Enum(enum_object) => Some(&enum_object.name),
             TObject::Named(named_object) => Some(&named_object.name),
-            TObject::WithProperties(_) => None,
         }
     }
 
@@ -142,11 +197,13 @@ impl TObject {
         }
     }
 
-    /// Returns a slice of the additional intersection types (`&B&S`) if this is a `Named` object type.
+    /// Returns a slice of the additional intersection types if this supports them.
     #[inline]
     pub fn get_intersection_types(&self) -> Option<&[TAtomic]> {
         match self {
             TObject::Named(named_object) => named_object.get_intersection_types(),
+            TObject::HasMethod(has_method) => has_method.get_intersection_types(),
+            TObject::HasProperty(has_property) => has_property.get_intersection_types(),
             _ => None,
         }
     }
@@ -156,6 +213,8 @@ impl TType for TObject {
     fn get_child_nodes<'a>(&'a self) -> Vec<TypeRef<'a>> {
         match self {
             TObject::Any => vec![],
+            TObject::HasMethod(has_method) => has_method.get_child_nodes(),
+            TObject::HasProperty(has_property) => has_property.get_child_nodes(),
             TObject::Enum(ttype) => ttype.get_child_nodes(),
             TObject::Named(ttype) => ttype.get_child_nodes(),
             TObject::WithProperties(ttype) => ttype.get_child_nodes(),
@@ -163,12 +222,19 @@ impl TType for TObject {
     }
 
     fn can_be_intersected(&self) -> bool {
-        matches!(self, TObject::Named(_))
+        match self {
+            TObject::Named(named_object) => named_object.can_be_intersected(),
+            TObject::HasMethod(has_method) => has_method.can_be_intersected(),
+            TObject::HasProperty(has_property) => has_property.can_be_intersected(),
+            _ => false,
+        }
     }
 
     fn get_intersection_types(&self) -> Option<&[TAtomic]> {
         match self {
             TObject::Named(named_object) => named_object.get_intersection_types(),
+            TObject::HasMethod(has_method) => has_method.get_intersection_types(),
+            TObject::HasProperty(has_property) => has_property.get_intersection_types(),
             _ => None,
         }
     }
@@ -176,6 +242,8 @@ impl TType for TObject {
     fn get_intersection_types_mut(&mut self) -> Option<&mut Vec<TAtomic>> {
         match self {
             TObject::Named(named_object) => named_object.get_intersection_types_mut(),
+            TObject::HasMethod(has_method) => has_method.get_intersection_types_mut(),
+            TObject::HasProperty(has_property) => has_property.get_intersection_types_mut(),
             _ => None,
         }
     }
@@ -183,6 +251,8 @@ impl TType for TObject {
     fn has_intersection_types(&self) -> bool {
         match self {
             TObject::Named(named_object) => named_object.has_intersection_types(),
+            TObject::HasMethod(has_method) => has_method.has_intersection_types(),
+            TObject::HasProperty(has_property) => has_property.has_intersection_types(),
             _ => false,
         }
     }
@@ -190,6 +260,8 @@ impl TType for TObject {
     fn add_intersection_type(&mut self, intersection_type: TAtomic) -> bool {
         match self {
             TObject::Named(named_object) => named_object.add_intersection_type(intersection_type),
+            TObject::HasMethod(has_method) => has_method.add_intersection_type(intersection_type),
+            TObject::HasProperty(has_property) => has_property.add_intersection_type(intersection_type),
             _ => false,
         }
     }
@@ -197,6 +269,8 @@ impl TType for TObject {
     fn needs_population(&self) -> bool {
         match self {
             TObject::Any => false,
+            TObject::HasMethod(has_method) => has_method.needs_population(),
+            TObject::HasProperty(has_property) => has_property.needs_population(),
             TObject::Enum(enum_object) => enum_object.needs_population(),
             TObject::Named(named_object) => named_object.needs_population(),
             TObject::WithProperties(shaped_object) => shaped_object.needs_population(),
@@ -206,6 +280,8 @@ impl TType for TObject {
     fn is_expandable(&self) -> bool {
         match self {
             TObject::Any => false,
+            TObject::HasMethod(has_method) => has_method.is_expandable(),
+            TObject::HasProperty(has_property) => has_property.is_expandable(),
             TObject::Enum(enum_object) => enum_object.is_expandable(),
             TObject::Named(named_object) => named_object.is_expandable(),
             TObject::WithProperties(shaped_object) => shaped_object.is_expandable(),
@@ -215,6 +291,8 @@ impl TType for TObject {
     fn is_complex(&self) -> bool {
         match self {
             TObject::Any => false,
+            TObject::HasMethod(has_method) => has_method.is_complex(),
+            TObject::HasProperty(has_property) => has_property.is_complex(),
             TObject::Enum(enum_object) => enum_object.is_complex(),
             TObject::Named(named_object) => named_object.is_complex(),
             TObject::WithProperties(shaped_object) => shaped_object.is_complex(),
@@ -224,6 +302,8 @@ impl TType for TObject {
     fn get_id(&self) -> Atom {
         match self {
             TObject::Any => atom("object"),
+            TObject::HasMethod(has_method) => has_method.get_id(),
+            TObject::HasProperty(has_property) => has_property.get_id(),
             TObject::Enum(enum_object) => enum_object.get_id(),
             TObject::Named(named_object) => named_object.get_id(),
             TObject::WithProperties(shaped_object) => shaped_object.get_id(),
@@ -233,6 +313,8 @@ impl TType for TObject {
     fn get_pretty_id_with_indent(&self, indent: usize) -> Atom {
         match self {
             TObject::Any => atom("object"),
+            TObject::HasMethod(has_method) => has_method.get_pretty_id_with_indent(indent),
+            TObject::HasProperty(has_property) => has_property.get_pretty_id_with_indent(indent),
             TObject::Enum(enum_object) => enum_object.get_pretty_id_with_indent(indent),
             TObject::Named(named_object) => named_object.get_pretty_id_with_indent(indent),
             TObject::WithProperties(shaped_object) => shaped_object.get_pretty_id_with_indent(indent),

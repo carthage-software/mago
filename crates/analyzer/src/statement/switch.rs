@@ -47,6 +47,7 @@ use crate::statement::analyze_statements;
 use crate::utils::expression::get_expression_id;
 use crate::utils::expression::get_root_expression_id;
 use crate::utils::misc::check_for_paradox;
+use crate::utils::symbol_existence::extract_function_constant_existence;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for Switch<'arena> {
     fn analyze<'ctx>(
@@ -545,6 +546,10 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
                 case_block_context.clauses =
                     BlockContext::remove_reconciled_clause_refs(&case_block_context.clauses, &changed_var_ids).0;
             }
+        }
+
+        if let Some(case_condition) = switch_case.expression() {
+            extract_function_constant_existence(case_condition, self.artifacts, &mut case_block_context, false);
         }
 
         if !case_clauses.is_empty()
