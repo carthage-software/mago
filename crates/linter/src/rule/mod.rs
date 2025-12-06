@@ -262,6 +262,7 @@ define_rules! {
     TaintedDataToSink(tainted_data_to_sink @ TaintedDataToSinkRule),
     SensitiveParameter(sensitive_parameter @ SensitiveParameterRule),
     ParameterType(parameter_type @ ParameterTypeRule),
+    PropertyName(property_name @ PropertyNameRule),
     PropertyType(property_type @ PropertyTypeRule),
     NoUnsafeFinally(no_unsafe_finally @ NoUnsafeFinallyRule),
     StrictAssertions(strict_assertions @ StrictAssertionsRule),

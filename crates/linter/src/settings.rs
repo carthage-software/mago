@@ -142,6 +142,7 @@ pub struct RulesSettings {
     pub tainted_data_to_sink: RuleSettings<TaintedDataToSinkConfig>,
     pub sensitive_parameter: RuleSettings<SensitiveParameterConfig>,
     pub parameter_type: RuleSettings<ParameterTypeConfig>,
+    pub property_name: RuleSettings<PropertyNameConfig>,
     pub property_type: RuleSettings<PropertyTypeConfig>,
     pub no_unsafe_finally: RuleSettings<NoUnsafeFinallyConfig>,
     pub strict_assertions: RuleSettings<StrictAssertionsConfig>,
