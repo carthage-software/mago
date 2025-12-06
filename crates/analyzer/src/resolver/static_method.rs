@@ -122,7 +122,7 @@ fn resolve_method_from_classname<'ctx, 'arena>(
                 return (false, None);
             };
 
-            if !from_instance && !is_relative && defining_class_metadata.kind.is_interface() {
+            if !from_instance && !is_relative && defining_class_metadata.kind.is_interface() && !has_magic_static_call {
                 report_static_call_on_interface(
                     context,
                     &defining_class_metadata.original_name,
