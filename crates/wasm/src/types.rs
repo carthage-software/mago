@@ -117,7 +117,7 @@ pub struct WasmRuleInfo {
     pub category: String,
 }
 
-#[derive(Debug, Deserialize, Default)]
+#[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct WasmAnalyzerSettings {
     pub find_unused_expressions: bool,
@@ -136,6 +136,29 @@ pub struct WasmAnalyzerSettings {
     pub check_arrow_function_missing_type_hints: bool,
     pub register_super_globals: bool,
     pub trust_existence_checks: bool,
+}
+
+impl Default for WasmAnalyzerSettings {
+    fn default() -> Self {
+        Self {
+            find_unused_expressions: false,
+            find_unused_definitions: false,
+            analyze_dead_code: false,
+            memoize_properties: false,
+            allow_possibly_undefined_array_keys: false,
+            check_throws: false,
+            unchecked_exceptions: Vec::new(),
+            unchecked_exception_classes: Vec::new(),
+            perform_heuristic_checks: false,
+            strict_list_index_checks: false,
+            no_boolean_literal_comparison: false,
+            check_missing_type_hints: false,
+            check_closure_missing_type_hints: false,
+            check_arrow_function_missing_type_hints: false,
+            register_super_globals: true,
+            trust_existence_checks: true,
+        }
+    }
 }
 
 #[derive(Debug, Deserialize, Default)]

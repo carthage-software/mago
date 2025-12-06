@@ -41,6 +41,7 @@ export function createPlaygroundState(initialCode = DEFAULT_CODE) {
         checkClosureMissingTypeHints: false,
         checkArrowFunctionMissingTypeHints: false,
         registerSuperGlobals: true,
+        trustExistenceChecks: true,
       },
       linter: {
         disabledRules: [],
@@ -117,7 +118,11 @@ export function createPlaygroundState(initialCode = DEFAULT_CODE) {
       if (data.c) state.code = data.c;
       if (data.v) state.settings.phpVersion = data.v;
       if (data.a) {
-        Object.assign(state.settings.analyzer, data.a);
+        for (const key of Object.keys(state.settings.analyzer)) {
+          if (key in data.a) {
+            state.settings.analyzer[key] = data.a[key];
+          }
+        }
       }
 
       if (data.l && data.l.d) {
