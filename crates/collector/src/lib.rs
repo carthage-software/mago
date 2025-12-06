@@ -418,14 +418,21 @@ impl<'ctx, 'arena> Collector<'ctx, 'arena> {
         kind: PragmaKind,
         issue_code: &str,
     ) -> Option<&mut Pragma<'arena>> {
+        if self.pragmas.is_empty() {
+            return None;
+        }
+
         let issue_start_line = self.file.line_number(issue_span.start.offset);
 
         let mut best_match_index = None;
 
         for (i, pragma) in self.pragmas.iter().enumerate() {
-            let resolved_pragma_code = self.aliases.get(pragma.code).copied().unwrap_or(pragma.code);
+            if pragma.kind != kind {
+                continue;
+            }
 
-            if pragma.kind != kind || resolved_pragma_code != issue_code {
+            let resolved_pragma_code = self.aliases.get(pragma.code).copied().unwrap_or(pragma.code);
+            if resolved_pragma_code != issue_code {
                 continue;
             }
 
