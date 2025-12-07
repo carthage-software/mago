@@ -9,6 +9,10 @@ on:
 env:
   CICD_INTERMEDIATES_DIR: "_cd-intermediates"
 
+permissions:
+  contents: write
+  discussions: write
+
 jobs:
   crate_metadata:
     name: extract crate metadata
