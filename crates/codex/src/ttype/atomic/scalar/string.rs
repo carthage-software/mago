@@ -211,6 +211,17 @@ impl TString {
         }
     }
 
+    /// Returns the known literal string value as an Atom, if available.
+    /// This is more efficient than `get_known_literal_value()` when the Atom is needed,
+    /// as it avoids re-interning the string.
+    #[inline]
+    pub fn get_known_literal_atom(&self) -> Option<Atom> {
+        match &self.literal {
+            Some(TStringLiteral::Value(s)) => Some(*s),
+            _ => None,
+        }
+    }
+
     /// Checks if the string is guaranteed to be numeric.
     #[inline]
     pub const fn is_known_numeric(&self) -> bool {

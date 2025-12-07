@@ -21,6 +21,8 @@ use mago_atom::concat_atom;
 use mago_atom::i64_atom;
 
 use crate::ttype::TType;
+use crate::ttype::atomic::TAtomic;
+use crate::ttype::atomic::scalar::TScalar;
 
 /// Represents an integer type in a static analysis context, which can be either a
 /// specific known value or a range of possible values.
@@ -775,83 +777,147 @@ impl TInteger {
 
         Some(TInteger::from_bounds(Some(narrowed_lower), new_upper_bound))
     }
-
-    /// Combines a list of `TInteger` types into the smallest possible set of disjoint types
-    /// that collectively cover all inputs.
-    ///
-    /// # Logic
-    ///
-    /// This function uses an "interval merging" algorithm. It converts all input types to
-    /// `(min, max)` intervals, sorts them, and then merges any that overlap or are adjacent.
-    pub fn combine(types: &[TInteger]) -> Vec<TInteger> {
+    /// Combines a list of `TInteger` types into the smallest possible set of disjoint types.
+    /// Returns `Vec<TAtomic>` directly to avoid intermediate allocations.
+    pub fn combine(types: Vec<TInteger>) -> Vec<TAtomic> {
         if types.is_empty() {
-            return vec![];
+            return Vec::new();
         }
 
-        if types.iter().any(TInteger::is_unspecified) {
-            return vec![TInteger::Unspecified];
-        }
+        let mut min_from = i64::MAX;
+        let mut max_to = i64::MIN;
+        let mut has_unspecified_literal = false;
+        let mut has_unspecified = false;
+        let mut has_from = false;
+        let mut has_to = false;
+        let mut finite_count = 0;
 
-        // If there's an UnspecifiedLiteral, it absorbs all Literal values
-        if types.iter().any(TInteger::is_unspecified_literal) {
-            let mut result = vec![TInteger::UnspecifiedLiteral];
-            // Keep non-literal types
-            for t in types {
-                if !t.is_literal() && !t.is_unspecified_literal() {
-                    result.push(*t);
+        for t in &types {
+            match *t {
+                TInteger::Unspecified => {
+                    has_unspecified = true;
+                    break;
                 }
+                TInteger::UnspecifiedLiteral => has_unspecified_literal = true,
+                TInteger::From(f) => {
+                    has_from = true;
+                    if f < min_from {
+                        min_from = f;
+                    }
+                }
+                TInteger::To(t) => {
+                    has_to = true;
+                    if t > max_to {
+                        max_to = t;
+                    }
+                }
+                _ => finite_count += 1,
             }
-            return result;
         }
 
-        if types.iter().all(TInteger::is_literal) {
-            return types.to_vec();
+        if has_unspecified {
+            return vec![TAtomic::Scalar(TScalar::Integer(TInteger::Unspecified))];
         }
 
-        let mut intervals: Vec<(i64, i64)> = types
-            .iter()
-            .map(|tint| match *tint {
-                TInteger::Literal(v) => (v, v),
-                TInteger::From(f) => (f, i64::MAX),
-                TInteger::To(t) => (i64::MIN, t),
-                TInteger::Range(f, t) => (f, t),
-                TInteger::Unspecified => (i64::MIN, i64::MAX),
-                TInteger::UnspecifiedLiteral => (i64::MIN, i64::MAX), // Should not reach here, but handle it
-            })
-            .collect();
+        if has_from && has_to && max_to.saturating_add(1) >= min_from {
+            return vec![TAtomic::Scalar(TScalar::Integer(TInteger::Unspecified))];
+        }
 
-        intervals.sort_unstable_by_key(|k| k.0);
+        let capacity = if has_from || has_to { finite_count.min(8) } else { finite_count + 2 };
 
-        let mut merged: Vec<(i64, i64)> = Vec::with_capacity(intervals.len());
-        merged.push(intervals[0]);
+        let mut intervals: Vec<(i64, i64)> = Vec::with_capacity(capacity);
+        if has_to {
+            intervals.push((i64::MIN, max_to));
+        }
 
-        for current in intervals.iter().skip(1) {
-            // SAFETY: we know `merged` is has at least 1 item.
-            let last = unsafe { merged.last_mut().unwrap_unchecked() };
+        if has_from {
+            intervals.push((min_from, i64::MAX));
+        }
 
-            if current.0 <= last.1.saturating_add(1) {
-                last.1 = max(last.1, current.1);
+        for t in types {
+            match t {
+                TInteger::Literal(v) => {
+                    if has_unspecified_literal {
+                        continue;
+                    }
+                    if has_from && v >= min_from {
+                        continue;
+                    }
+                    if has_to && v <= max_to {
+                        continue;
+                    }
+                    intervals.push((v, v));
+                }
+                TInteger::Range(s, e) => {
+                    if has_from && s >= min_from {
+                        continue;
+                    }
+                    if has_to && e <= max_to {
+                        continue;
+                    }
+
+                    let start = if has_to && s <= max_to { max_to.saturating_add(1) } else { s };
+                    let end = if has_from && e >= min_from { min_from.saturating_sub(1) } else { e };
+
+                    if start <= end {
+                        intervals.push((start, end));
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        if intervals.is_empty() {
+            return if has_unspecified_literal {
+                vec![TAtomic::Scalar(TScalar::Integer(TInteger::UnspecifiedLiteral))]
             } else {
-                merged.push(*current);
+                Vec::new()
+            };
+        }
+
+        intervals.sort_unstable_by(|a, b| a.0.cmp(&b.0));
+
+        let mut merged = Vec::with_capacity(intervals.len() + 1);
+        if has_unspecified_literal {
+            merged.push(TAtomic::Scalar(TScalar::Integer(TInteger::UnspecifiedLiteral)));
+        }
+
+        // SAFETY: we verified !intervals.is_empty()
+        let (mut curr_start, mut curr_end) = unsafe { *intervals.get_unchecked(0) };
+
+        for i in 1..intervals.len() {
+            let (next_start, next_end) = unsafe { *intervals.get_unchecked(i) };
+
+            if next_start <= curr_end.saturating_add(1) {
+                if next_end > curr_end {
+                    curr_end = next_end;
+                }
+            } else {
+                merged.push(Self::internal_to_atomic(curr_start, curr_end));
+                curr_start = next_start;
+                curr_end = next_end;
             }
         }
 
+        merged.push(Self::internal_to_atomic(curr_start, curr_end));
         merged
-            .into_iter()
-            .map(|(min, max)| {
-                if min == i64::MIN && max == i64::MAX {
-                    TInteger::Unspecified
-                } else if min == i64::MIN {
-                    TInteger::To(max)
-                } else if max == i64::MAX {
-                    TInteger::From(min)
-                } else if min == max {
-                    TInteger::Literal(min)
-                } else {
-                    TInteger::Range(min, max)
-                }
-            })
-            .collect()
+    }
+
+    #[inline(always)]
+    fn internal_to_atomic(min: i64, max: i64) -> TAtomic {
+        let integer = if min == i64::MIN && max == i64::MAX {
+            TInteger::Unspecified
+        } else if min == i64::MIN {
+            TInteger::To(max)
+        } else if max == i64::MAX {
+            TInteger::From(min)
+        } else if min == max {
+            TInteger::Literal(min)
+        } else {
+            TInteger::Range(min, max)
+        };
+
+        TAtomic::Scalar(TScalar::Integer(integer))
     }
 }
 

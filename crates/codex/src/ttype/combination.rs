@@ -14,39 +14,121 @@ use crate::ttype::atomic::derived::TDerived;
 use crate::ttype::atomic::scalar::int::TInteger;
 use crate::ttype::union::TUnion;
 
+bitflags::bitflags! {
+    /// Compact bitflags for boolean state in TypeCombination.
+    /// This reduces struct size and enables single-cycle multi-flag checks.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+    pub struct CombinationFlags: u32 {
+        const HAS_OBJECT_TOP_TYPE           = 1 << 0;
+        const LIST_ARRAY_SOMETIMES_FILLED   = 1 << 1;
+        const LIST_ARRAY_ALWAYS_FILLED      = 1 << 2;
+        const KEYED_ARRAY_SOMETIMES_FILLED  = 1 << 3;
+        const KEYED_ARRAY_ALWAYS_FILLED     = 1 << 4;
+        const HAS_EMPTY_ARRAY               = 1 << 5;
+        const HAS_KEYED_ARRAY               = 1 << 6;
+        const GENERIC_MIXED                 = 1 << 7;
+        const HAS_MIXED                     = 1 << 8;
+        const RESOURCE                      = 1 << 9;
+        const OPEN_RESOURCE                 = 1 << 10;
+        const CLOSED_RESOURCE               = 1 << 11;
+
+        // Tristate encoding: 2 bits each (None=neither set, Some(false)=SET only, Some(true)=SET+VALUE)
+        const FALSY_MIXED_SET               = 1 << 12;
+        const FALSY_MIXED_VALUE             = 1 << 13;
+        const TRUTHY_MIXED_SET              = 1 << 14;
+        const TRUTHY_MIXED_VALUE            = 1 << 15;
+        const NONNULL_MIXED_SET             = 1 << 16;
+        const NONNULL_MIXED_VALUE           = 1 << 17;
+        const MIXED_FROM_LOOP_ISSET_SET     = 1 << 18;
+        const MIXED_FROM_LOOP_ISSET_VALUE   = 1 << 19;
+    }
+}
+
+impl CombinationFlags {
+    /// Get a tristate value (Option<bool>) from two bits.
+    #[inline]
+    pub fn get_tristate(self, set_bit: Self, value_bit: Self) -> Option<bool> {
+        if self.contains(set_bit) { Some(self.contains(value_bit)) } else { None }
+    }
+
+    /// Set a tristate value (Option<bool>) using two bits.
+    #[inline]
+    pub fn set_tristate(&mut self, set_bit: Self, value_bit: Self, value: Option<bool>) {
+        match value {
+            None => {
+                self.remove(set_bit);
+                self.remove(value_bit);
+            }
+            Some(false) => {
+                self.insert(set_bit);
+                self.remove(value_bit);
+            }
+            Some(true) => {
+                self.insert(set_bit);
+                self.insert(value_bit);
+            }
+        }
+    }
+
+    #[inline]
+    pub fn falsy_mixed(self) -> Option<bool> {
+        self.get_tristate(Self::FALSY_MIXED_SET, Self::FALSY_MIXED_VALUE)
+    }
+
+    #[inline]
+    pub fn set_falsy_mixed(&mut self, value: Option<bool>) {
+        self.set_tristate(Self::FALSY_MIXED_SET, Self::FALSY_MIXED_VALUE, value);
+    }
+
+    #[inline]
+    pub fn truthy_mixed(self) -> Option<bool> {
+        self.get_tristate(Self::TRUTHY_MIXED_SET, Self::TRUTHY_MIXED_VALUE)
+    }
+
+    #[inline]
+    pub fn set_truthy_mixed(&mut self, value: Option<bool>) {
+        self.set_tristate(Self::TRUTHY_MIXED_SET, Self::TRUTHY_MIXED_VALUE, value);
+    }
+
+    #[inline]
+    pub fn nonnull_mixed(self) -> Option<bool> {
+        self.get_tristate(Self::NONNULL_MIXED_SET, Self::NONNULL_MIXED_VALUE)
+    }
+
+    #[inline]
+    pub fn set_nonnull_mixed(&mut self, value: Option<bool>) {
+        self.set_tristate(Self::NONNULL_MIXED_SET, Self::NONNULL_MIXED_VALUE, value);
+    }
+
+    #[inline]
+    pub fn mixed_from_loop_isset(self) -> Option<bool> {
+        self.get_tristate(Self::MIXED_FROM_LOOP_ISSET_SET, Self::MIXED_FROM_LOOP_ISSET_VALUE)
+    }
+
+    #[inline]
+    pub fn set_mixed_from_loop_isset(&mut self, value: Option<bool>) {
+        self.set_tristate(Self::MIXED_FROM_LOOP_ISSET_SET, Self::MIXED_FROM_LOOP_ISSET_VALUE, value);
+    }
+}
+
 #[derive(Debug)]
 pub struct TypeCombination {
+    pub flags: CombinationFlags,
     pub value_types: AtomMap<TAtomic>,
-    pub has_object_top_type: bool,
     pub enum_names: HashSet<(Atom, Option<Atom>)>,
     pub object_type_params: AtomMap<(Atom, Vec<TUnion>)>,
     pub object_static: AtomMap<bool>,
     pub list_array_counts: Option<HashSet<usize>>,
-    pub list_array_sometimes_filled: bool,
-    pub list_array_always_filled: bool,
-    pub keyed_array_sometimes_filled: bool,
-    pub keyed_array_always_filled: bool,
-    pub has_empty_array: bool,
-    pub has_keyed_array: bool,
     pub keyed_array_entries: BTreeMap<ArrayKey, (bool, TUnion)>,
     pub list_array_entries: BTreeMap<usize, (bool, TUnion)>,
     pub keyed_array_parameters: Option<(TUnion, TUnion)>,
     pub list_array_parameter: Option<TUnion>,
     pub sealed_arrays: Vec<TArray>,
-    pub falsy_mixed: Option<bool>,
-    pub truthy_mixed: Option<bool>,
-    pub nonnull_mixed: Option<bool>,
-    pub generic_mixed: bool,
-    pub has_mixed: bool,
-    pub mixed_from_loop_isset: Option<bool>,
-    pub integers: HashSet<TInteger>,
+    pub integers: Vec<TInteger>,
     pub literal_strings: AtomSet,
-    pub literal_floats: HashSet<OrderedFloat<f64>>,
+    pub literal_floats: Vec<OrderedFloat<f64>>,
     pub class_string_types: AtomMap<TAtomic>,
     pub derived_types: HashSet<TDerived>,
-    pub resource: bool,
-    pub open_resource: bool,
-    pub closed_resource: bool,
 }
 
 impl Default for TypeCombination {
@@ -57,38 +139,25 @@ impl Default for TypeCombination {
 
 impl TypeCombination {
     pub fn new() -> Self {
+        let flags = CombinationFlags::LIST_ARRAY_ALWAYS_FILLED | CombinationFlags::KEYED_ARRAY_ALWAYS_FILLED;
+
         Self {
+            flags,
             value_types: AtomMap::default(),
-            has_object_top_type: false,
             object_type_params: AtomMap::default(),
             object_static: AtomMap::default(),
             list_array_counts: Some(HashSet::default()),
-            list_array_sometimes_filled: false,
-            list_array_always_filled: true,
-            keyed_array_sometimes_filled: false,
-            keyed_array_always_filled: true,
-            has_empty_array: false,
-            has_keyed_array: false,
             keyed_array_entries: BTreeMap::new(),
             list_array_entries: BTreeMap::new(),
             keyed_array_parameters: None,
             list_array_parameter: None,
             sealed_arrays: Vec::new(),
-            falsy_mixed: None,
-            truthy_mixed: None,
-            nonnull_mixed: None,
-            generic_mixed: false,
-            has_mixed: false,
-            mixed_from_loop_isset: None,
             literal_strings: AtomSet::default(),
-            integers: HashSet::default(),
-            literal_floats: HashSet::default(),
+            integers: Vec::new(),
+            literal_floats: Vec::new(),
             class_string_types: AtomMap::default(),
             enum_names: HashSet::default(),
             derived_types: HashSet::default(),
-            resource: false,
-            open_resource: false,
-            closed_resource: false,
         }
     }
 
@@ -96,12 +165,13 @@ impl TypeCombination {
     pub fn is_simple(&self) -> bool {
         if self.value_types.len() == 1
             && self.sealed_arrays.is_empty()
-            && !self.has_keyed_array
-            && !self.has_empty_array
-            && !self.resource
-            && !self.open_resource
-            && !self.closed_resource
-            && let (None, None) = (&self.keyed_array_parameters, &self.list_array_parameter)
+            && !self.flags.contains(CombinationFlags::HAS_KEYED_ARRAY)
+            && !self.flags.contains(CombinationFlags::HAS_EMPTY_ARRAY)
+            && !self.flags.intersects(
+                CombinationFlags::RESOURCE | CombinationFlags::OPEN_RESOURCE | CombinationFlags::CLOSED_RESOURCE,
+            )
+            && self.keyed_array_parameters.is_none()
+            && self.list_array_parameter.is_none()
         {
             return self.object_type_params.is_empty()
                 && self.enum_names.is_empty()

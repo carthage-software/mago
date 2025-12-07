@@ -3,9 +3,7 @@ use std::sync::LazyLock;
 use ahash::HashSet;
 
 use mago_atom::Atom;
-use mago_atom::AtomSet;
 use mago_atom::atom;
-use mago_atom::concat_atom;
 
 static ATOM_FALSE: LazyLock<Atom> = LazyLock::new(|| atom("false"));
 static ATOM_TRUE: LazyLock<Atom> = LazyLock::new(|| atom("true"));
@@ -39,6 +37,7 @@ use crate::ttype::atomic::scalar::float::TFloat;
 use crate::ttype::atomic::scalar::int::TInteger;
 use crate::ttype::atomic::scalar::string::TString;
 use crate::ttype::atomic::scalar::string::TStringLiteral;
+use crate::ttype::combination::CombinationFlags;
 use crate::ttype::combination::TypeCombination;
 use crate::ttype::combine_union_types;
 use crate::ttype::comparator::ComparisonResult;
@@ -64,11 +63,22 @@ pub fn combine(types: Vec<TAtomic>, codebase: &CodebaseMetadata, overwrite_empty
         scrape_type_properties(atomic, &mut combination, codebase, overwrite_empty_array);
     }
 
-    let is_falsy_mixed = combination.falsy_mixed.unwrap_or(false);
-    let is_truthy_mixed = combination.truthy_mixed.unwrap_or(false);
-    let is_nonnull_mixed = combination.nonnull_mixed.unwrap_or(false);
+    combination.integers.sort_unstable();
+    combination.integers.dedup();
+    combination.literal_floats.sort_unstable();
+    combination.literal_floats.dedup();
 
-    if is_falsy_mixed || is_nonnull_mixed || combination.generic_mixed || is_truthy_mixed {
+    finalize_sealed_arrays(&mut combination.sealed_arrays, codebase);
+
+    let is_falsy_mixed = combination.flags.falsy_mixed().unwrap_or(false);
+    let is_truthy_mixed = combination.flags.truthy_mixed().unwrap_or(false);
+    let is_nonnull_mixed = combination.flags.nonnull_mixed().unwrap_or(false);
+
+    if is_falsy_mixed
+        || is_nonnull_mixed
+        || combination.flags.contains(CombinationFlags::GENERIC_MIXED)
+        || is_truthy_mixed
+    {
         return vec![TAtomic::Mixed(TMixed::new().with_is_non_null(is_nonnull_mixed).with_truthiness(
             if is_truthy_mixed && !is_falsy_mixed {
                 TMixedTruthiness::Truthy
@@ -78,7 +88,7 @@ pub fn combine(types: Vec<TAtomic>, codebase: &CodebaseMetadata, overwrite_empty
                 TMixedTruthiness::Undetermined
             },
         ))];
-    } else if combination.has_mixed {
+    } else if combination.flags.contains(CombinationFlags::HAS_MIXED) {
         return vec![TAtomic::Mixed(TMixed::new())];
     }
 
@@ -104,15 +114,25 @@ pub fn combine(types: Vec<TAtomic>, codebase: &CodebaseMetadata, overwrite_empty
         combination.value_types.insert(*ATOM_BOOL, TAtomic::Scalar(TScalar::bool()));
     }
 
-    let mut new_types = Vec::new();
+    let estimated_capacity = combination.derived_types.len()
+        + combination.integers.len().min(10)
+        + combination.literal_floats.len()
+        + combination.enum_names.len()
+        + combination.value_types.len()
+        + combination.sealed_arrays.len()
+        + 5;
+
+    let mut new_types = Vec::with_capacity(estimated_capacity);
     for derived_type in combination.derived_types {
         new_types.push(TAtomic::Derived(derived_type));
     }
 
-    if combination.resource {
+    if combination.flags.contains(CombinationFlags::RESOURCE) {
         new_types.push(TAtomic::Resource(TResource { closed: None }));
     } else {
-        match (combination.open_resource, combination.closed_resource) {
+        let open = combination.flags.contains(CombinationFlags::OPEN_RESOURCE);
+        let closed = combination.flags.contains(CombinationFlags::CLOSED_RESOURCE);
+        match (open, closed) {
             (true, true) => {
                 new_types.push(TAtomic::Resource(TResource { closed: None }));
             }
@@ -130,7 +150,7 @@ pub fn combine(types: Vec<TAtomic>, codebase: &CodebaseMetadata, overwrite_empty
 
     let mut arrays = vec![];
 
-    if combination.has_keyed_array {
+    if combination.flags.contains(CombinationFlags::HAS_KEYED_ARRAY) {
         arrays.push(TArray::Keyed(TKeyedArray {
             known_items: if combination.keyed_array_entries.is_empty() {
                 None
@@ -142,7 +162,7 @@ pub fn combine(types: Vec<TAtomic>, codebase: &CodebaseMetadata, overwrite_empty
             } else {
                 None
             },
-            non_empty: combination.keyed_array_always_filled,
+            non_empty: combination.flags.contains(CombinationFlags::KEYED_ARRAY_ALWAYS_FILLED),
         }));
     }
 
@@ -154,7 +174,7 @@ pub fn combine(types: Vec<TAtomic>, codebase: &CodebaseMetadata, overwrite_empty
                 Some(combination.list_array_entries)
             },
             element_type: Box::new(list_parameter),
-            non_empty: combination.list_array_always_filled,
+            non_empty: combination.flags.contains(CombinationFlags::LIST_ARRAY_ALWAYS_FILLED),
             known_count: None,
         }));
     }
@@ -163,7 +183,7 @@ pub fn combine(types: Vec<TAtomic>, codebase: &CodebaseMetadata, overwrite_empty
         arrays.push(array);
     }
 
-    if arrays.is_empty() && combination.has_empty_array {
+    if arrays.is_empty() && combination.flags.contains(CombinationFlags::HAS_EMPTY_ARRAY) {
         arrays.push(TArray::Keyed(TKeyedArray { known_items: None, parameters: None, non_empty: false }));
     }
 
@@ -179,13 +199,7 @@ pub fn combine(types: Vec<TAtomic>, codebase: &CodebaseMetadata, overwrite_empty
         new_types.push(generic_object);
     }
 
-    new_types.extend(
-        combination
-            .literal_strings
-            .into_iter()
-            .map(|s| TAtomic::Scalar(TScalar::literal_string(s)))
-            .collect::<Vec<_>>(),
-    );
+    new_types.extend(combination.literal_strings.into_iter().map(|s| TAtomic::Scalar(TScalar::literal_string(s))));
 
     if combination.value_types.contains_key(&*ATOM_STRING)
         && combination.value_types.contains_key(&*ATOM_FLOAT)
@@ -200,15 +214,8 @@ pub fn combine(types: Vec<TAtomic>, codebase: &CodebaseMetadata, overwrite_empty
         new_types.push(TAtomic::Scalar(TScalar::Generic));
     }
 
-    new_types.extend(combine_integers(combination.integers));
-
-    new_types.extend(
-        combination
-            .literal_floats
-            .into_iter()
-            .map(|f| TAtomic::Scalar(TScalar::literal_float(f.into())))
-            .collect::<Vec<_>>(),
-    );
+    new_types.extend(TInteger::combine(combination.integers));
+    new_types.extend(combination.literal_floats.into_iter().map(|f| TAtomic::Scalar(TScalar::literal_float(f.into()))));
 
     for (enum_name, enum_case) in combination.enum_names {
         if combination.value_types.contains_key(&enum_name) {
@@ -226,11 +233,12 @@ pub fn combine(types: Vec<TAtomic>, codebase: &CodebaseMetadata, overwrite_empty
     let mut has_never = combination.value_types.contains_key(&*ATOM_NEVER);
 
     let combination_value_type_count = combination.value_types.len();
+    let mixed_from_loop_isset = combination.flags.mixed_from_loop_isset().unwrap_or(false);
 
     for (_, atomic) in combination.value_types {
         let tc = if has_never { 1 } else { 0 };
         if atomic.is_mixed()
-            && combination.mixed_from_loop_isset.unwrap_or(false)
+            && mixed_from_loop_isset
             && (combination_value_type_count > (tc + 1) || new_types.len() > tc)
         {
             continue;
@@ -257,22 +265,70 @@ pub fn combine(types: Vec<TAtomic>, codebase: &CodebaseMetadata, overwrite_empty
     new_types
 }
 
+fn finalize_sealed_arrays(arrays: &mut Vec<TArray>, codebase: &CodebaseMetadata) {
+    if arrays.len() <= 1 {
+        return;
+    }
+
+    arrays.sort_unstable_by_key(|a| match a {
+        TArray::List(list) => list.known_elements.as_ref().map_or(0, |e| e.len()),
+        TArray::Keyed(keyed) => keyed.known_items.as_ref().map_or(0, |i| i.len()),
+    });
+
+    let mut keep = vec![true; arrays.len()];
+
+    for i in 0..arrays.len() {
+        if !keep[i] {
+            continue;
+        }
+
+        for j in (i + 1)..arrays.len() {
+            if !keep[j] {
+                continue;
+            }
+
+            if is_array_contained_by_array(codebase, &arrays[i], &arrays[j], false, &mut ComparisonResult::new()) {
+                keep[i] = false;
+                break;
+            }
+
+            if is_array_contained_by_array(codebase, &arrays[j], &arrays[i], false, &mut ComparisonResult::new()) {
+                keep[j] = false;
+            }
+        }
+    }
+
+    let mut write = 0;
+    for read in 0..arrays.len() {
+        if keep[read] {
+            if write != read {
+                arrays.swap(write, read);
+            }
+            write += 1;
+        }
+    }
+
+    arrays.truncate(write);
+}
+
 fn scrape_type_properties(
     atomic: TAtomic,
     combination: &mut TypeCombination,
     codebase: &CodebaseMetadata,
     overwrite_empty_array: bool,
 ) {
+    if combination.flags.contains(CombinationFlags::GENERIC_MIXED) {
+        return;
+    }
+
     if let TAtomic::Mixed(mixed) = atomic {
         if mixed.is_isset_from_loop() {
-            // If we already have a broader mixed type, this specific one adds no info.
-            if combination.generic_mixed {
+            if combination.flags.contains(CombinationFlags::GENERIC_MIXED) {
                 return; // Exit early, existing state is sufficient or broader
             }
 
-            // If we haven't specifically recorded 'mixed_from_loop_isset' before, mark it now.
-            if combination.mixed_from_loop_isset.is_none() {
-                combination.mixed_from_loop_isset = Some(true);
+            if combination.flags.mixed_from_loop_isset().is_none() {
+                combination.flags.set_mixed_from_loop_isset(Some(true));
             }
 
             combination.value_types.insert(*ATOM_MIXED, atomic);
@@ -280,132 +336,137 @@ fn scrape_type_properties(
             return;
         }
 
-        combination.has_mixed = true;
+        combination.flags.insert(CombinationFlags::HAS_MIXED);
 
         if mixed.is_vanilla() {
-            combination.falsy_mixed = Some(false);
-            combination.truthy_mixed = Some(false);
-            combination.mixed_from_loop_isset = Some(false);
-            combination.generic_mixed = true;
+            combination.flags.set_falsy_mixed(Some(false));
+            combination.flags.set_truthy_mixed(Some(false));
+            combination.flags.set_mixed_from_loop_isset(Some(false));
+            combination.flags.insert(CombinationFlags::GENERIC_MIXED);
 
             return;
         }
 
         if mixed.is_truthy() {
-            if combination.generic_mixed {
+            if combination.flags.contains(CombinationFlags::GENERIC_MIXED) {
                 return;
             }
 
-            combination.mixed_from_loop_isset = Some(false);
+            combination.flags.set_mixed_from_loop_isset(Some(false));
 
-            if combination.falsy_mixed.unwrap_or(false) {
-                combination.generic_mixed = true;
-                combination.falsy_mixed = Some(false);
+            if combination.flags.falsy_mixed().unwrap_or(false) {
+                combination.flags.insert(CombinationFlags::GENERIC_MIXED);
+                combination.flags.set_falsy_mixed(Some(false));
                 return;
             }
 
-            if combination.truthy_mixed.is_some() {
+            if combination.flags.truthy_mixed().is_some() {
                 return;
             }
 
             for existing_value_type in combination.value_types.values() {
                 if !existing_value_type.is_truthy() {
-                    combination.generic_mixed = true;
+                    combination.flags.insert(CombinationFlags::GENERIC_MIXED);
                     return;
                 }
             }
 
-            combination.truthy_mixed = Some(true);
+            combination.flags.set_truthy_mixed(Some(true));
         } else {
-            combination.truthy_mixed = Some(false);
+            combination.flags.set_truthy_mixed(Some(false));
         }
 
         if mixed.is_falsy() {
-            if combination.generic_mixed {
+            if combination.flags.contains(CombinationFlags::GENERIC_MIXED) {
                 return;
             }
 
-            combination.mixed_from_loop_isset = Some(false);
+            combination.flags.set_mixed_from_loop_isset(Some(false));
 
-            if combination.truthy_mixed.unwrap_or(false) {
-                combination.generic_mixed = true;
-                combination.truthy_mixed = Some(false);
+            if combination.flags.truthy_mixed().unwrap_or(false) {
+                combination.flags.insert(CombinationFlags::GENERIC_MIXED);
+                combination.flags.set_truthy_mixed(Some(false));
                 return;
             }
 
-            if combination.falsy_mixed.is_some() {
+            if combination.flags.falsy_mixed().is_some() {
                 return;
             }
 
             for existing_value_type in combination.value_types.values() {
                 if !existing_value_type.is_falsy() {
-                    combination.generic_mixed = true;
+                    combination.flags.insert(CombinationFlags::GENERIC_MIXED);
                     return;
                 }
             }
 
-            combination.falsy_mixed = Some(true);
+            combination.flags.set_falsy_mixed(Some(true));
         } else {
-            combination.falsy_mixed = Some(false);
+            combination.flags.set_falsy_mixed(Some(false));
         }
 
         if mixed.is_non_null() {
-            if combination.generic_mixed {
+            if combination.flags.contains(CombinationFlags::GENERIC_MIXED) {
                 return;
             }
 
-            combination.mixed_from_loop_isset = Some(false);
+            combination.flags.set_mixed_from_loop_isset(Some(false));
 
             if combination.value_types.contains_key(&*ATOM_NULL) {
-                combination.generic_mixed = true;
+                combination.flags.insert(CombinationFlags::GENERIC_MIXED);
                 return;
             }
 
-            if combination.falsy_mixed.unwrap_or(false) {
-                combination.falsy_mixed = Some(false);
-                combination.generic_mixed = true;
+            if combination.flags.falsy_mixed().unwrap_or(false) {
+                combination.flags.set_falsy_mixed(Some(false));
+                combination.flags.insert(CombinationFlags::GENERIC_MIXED);
                 return;
             }
 
-            if combination.nonnull_mixed.is_some() {
+            if combination.flags.nonnull_mixed().is_some() {
                 return;
             }
 
-            combination.mixed_from_loop_isset = Some(false);
-            combination.nonnull_mixed = Some(true);
+            combination.flags.set_mixed_from_loop_isset(Some(false));
+            combination.flags.set_nonnull_mixed(Some(true));
         } else {
-            combination.nonnull_mixed = Some(false);
+            combination.flags.set_nonnull_mixed(Some(false));
         }
 
         return;
     }
 
-    if combination.falsy_mixed.unwrap_or(false) {
+    if combination.flags.falsy_mixed().unwrap_or(false) {
         if !atomic.is_falsy() {
-            combination.falsy_mixed = Some(false);
-            combination.generic_mixed = true;
+            combination.flags.set_falsy_mixed(Some(false));
+            combination.flags.insert(CombinationFlags::GENERIC_MIXED);
         }
 
-        return;
-    } else if combination.truthy_mixed.unwrap_or(false) {
-        if !atomic.is_truthy() {
-            combination.truthy_mixed = Some(false);
-            combination.generic_mixed = true;
-        }
-
-        return;
-    } else if combination.nonnull_mixed.unwrap_or(false) {
-        if let TAtomic::Null = atomic {
-            combination.nonnull_mixed = Some(false);
-            combination.generic_mixed = true;
-        }
-
-        return;
-    } else if combination.has_mixed {
         return;
     }
 
-    // bool|false = bool
+    if combination.flags.truthy_mixed().unwrap_or(false) {
+        if !atomic.is_truthy() {
+            combination.flags.set_truthy_mixed(Some(false));
+            combination.flags.insert(CombinationFlags::GENERIC_MIXED);
+        }
+
+        return;
+    }
+
+    if combination.flags.nonnull_mixed().unwrap_or(false) {
+        if let TAtomic::Null = atomic {
+            combination.flags.set_nonnull_mixed(Some(false));
+            combination.flags.insert(CombinationFlags::GENERIC_MIXED);
+        }
+
+        return;
+    }
+
+    if combination.flags.contains(CombinationFlags::HAS_MIXED) {
+        return;
+    }
+
     if matches!(&atomic, TAtomic::Scalar(TScalar::Bool(bool)) if !bool.is_general())
         && combination.value_types.contains_key(&*ATOM_BOOL)
     {
@@ -416,21 +477,20 @@ fn scrape_type_properties(
         match closed {
             Some(closed) => match closed {
                 true => {
-                    combination.closed_resource = true;
+                    combination.flags.insert(CombinationFlags::CLOSED_RESOURCE);
                 }
                 false => {
-                    combination.open_resource = true;
+                    combination.flags.insert(CombinationFlags::OPEN_RESOURCE);
                 }
             },
             None => {
-                combination.resource = true;
+                combination.flags.insert(CombinationFlags::RESOURCE);
             }
         }
 
         return;
     }
 
-    // false|bool = bool
     if matches!(&atomic, TAtomic::Scalar(TScalar::Bool(bool)) if bool.is_general()) {
         combination.value_types.remove(&*ATOM_FALSE);
         combination.value_types.remove(&*ATOM_TRUE);
@@ -438,7 +498,7 @@ fn scrape_type_properties(
 
     if let TAtomic::Array(array) = atomic {
         if overwrite_empty_array && array.is_empty() {
-            combination.has_empty_array = true;
+            combination.flags.insert(CombinationFlags::HAS_EMPTY_ARRAY);
 
             return;
         }
@@ -446,22 +506,9 @@ fn scrape_type_properties(
         if !array.is_empty()
             && array.is_sealed()
             && combination.list_array_parameter.is_some()
-            && !combination.has_keyed_array
+            && !combination.flags.contains(CombinationFlags::HAS_KEYED_ARRAY)
         {
-            // If any of the existing arrays fully contains this one, skip adding it
-            if combination.sealed_arrays.iter().any(|existing_array| {
-                is_array_contained_by_array(codebase, &array, existing_array, false, &mut ComparisonResult::new())
-            }) {
-                return;
-            }
-
-            // Remove any arrays that are fully contained by this one
-            combination.sealed_arrays.retain(|existing_array| {
-                !is_array_contained_by_array(codebase, existing_array, &array, false, &mut ComparisonResult::new())
-            });
-
             combination.sealed_arrays.push(array);
-
             return;
         }
 
@@ -477,9 +524,9 @@ fn scrape_type_properties(
                             }
                         }
 
-                        combination.list_array_sometimes_filled = true;
+                        combination.flags.insert(CombinationFlags::LIST_ARRAY_SOMETIMES_FILLED);
                     } else {
-                        combination.list_array_always_filled = false;
+                        combination.flags.remove(CombinationFlags::LIST_ARRAY_ALWAYS_FILLED);
                     }
 
                     if let Some(known_elements) = known_elements {
@@ -528,7 +575,7 @@ fn scrape_type_properties(
                         }
 
                         if !has_defined_keys {
-                            combination.list_array_always_filled = false;
+                            combination.flags.remove(CombinationFlags::LIST_ARRAY_ALWAYS_FILLED);
                         }
                     } else if !overwrite_empty_array {
                         if element_type.is_never() {
@@ -559,13 +606,13 @@ fn scrape_type_properties(
                     };
                 }
                 TArray::Keyed(TKeyedArray { parameters, known_items, non_empty, .. }) => {
-                    let had_previous_keyed_array = combination.has_keyed_array;
-                    combination.has_keyed_array = true;
+                    let had_previous_keyed_array = combination.flags.contains(CombinationFlags::HAS_KEYED_ARRAY);
+                    combination.flags.insert(CombinationFlags::HAS_KEYED_ARRAY);
 
                     if non_empty {
-                        combination.keyed_array_sometimes_filled = true;
+                        combination.flags.insert(CombinationFlags::KEYED_ARRAY_SOMETIMES_FILLED);
                     } else {
-                        combination.keyed_array_always_filled = false;
+                        combination.flags.remove(CombinationFlags::KEYED_ARRAY_ALWAYS_FILLED);
                     }
 
                     if let Some(known_items) = known_items {
@@ -622,7 +669,7 @@ fn scrape_type_properties(
                         }
 
                         if !has_defined_keys {
-                            combination.keyed_array_always_filled = false;
+                            combination.flags.remove(CombinationFlags::KEYED_ARRAY_ALWAYS_FILLED);
                         }
 
                         for possibly_undefined_type_key in possibly_undefined_entries {
@@ -679,7 +726,7 @@ fn scrape_type_properties(
     // this probably won't ever happen, but the object top type
     // can eliminate variants
     if let TAtomic::Object(TObject::Any) = atomic {
-        combination.has_object_top_type = true;
+        combination.flags.insert(CombinationFlags::HAS_OBJECT_TOP_TYPE);
         combination.value_types.retain(|_, t| !matches!(t, TAtomic::Object(TObject::Named(_))));
         combination.value_types.insert(atomic.get_id(), atomic);
 
@@ -733,7 +780,7 @@ fn scrape_type_properties(
         let fq_class_name = named_object.get_name();
         let intersection_types = named_object.get_intersection_types();
 
-        if !combination.has_object_top_type {
+        if !combination.flags.contains(CombinationFlags::HAS_OBJECT_TOP_TYPE) {
             if combination.value_types.contains_key(&atomic.get_id()) {
                 return;
             }
@@ -832,9 +879,9 @@ fn scrape_type_properties(
     }
 
     if let TAtomic::Scalar(TScalar::Generic) = atomic {
-        combination.literal_strings = AtomSet::default();
-        combination.integers = HashSet::default();
-        combination.literal_floats = HashSet::default();
+        combination.literal_strings.clear();
+        combination.integers.clear();
+        combination.literal_floats.clear();
         combination.value_types.retain(|k, _| {
             k != "string"
                 && k != "bool"
@@ -854,8 +901,8 @@ fn scrape_type_properties(
             return;
         }
 
-        combination.literal_strings = AtomSet::default();
-        combination.integers = HashSet::default();
+        combination.literal_strings.clear();
+        combination.integers.clear();
         combination.value_types.retain(|k, _| k != &*ATOM_STRING && k != &*ATOM_INT);
         combination.value_types.insert(atomic.get_id(), atomic);
 
@@ -880,8 +927,8 @@ fn scrape_type_properties(
             if let TAtomic::Scalar(TScalar::String(existing_string_type)) = existing_string_type {
                 *existing_string_type = combine_string_scalars(existing_string_type, string_scalar);
             };
-        } else if let Some(value) = string_scalar.get_known_literal_value() {
-            combination.literal_strings.insert(atom(value));
+        } else if let Some(atom) = string_scalar.get_known_literal_atom() {
+            combination.literal_strings.insert(atom);
         } else {
             if string_scalar.is_truthy || string_scalar.is_non_empty || string_scalar.is_numeric {
                 for value in &combination.literal_strings {
@@ -899,14 +946,14 @@ fn scrape_type_properties(
             }
 
             combination.value_types.insert(*ATOM_STRING, TAtomic::Scalar(TScalar::String(string_scalar)));
-            combination.literal_strings = AtomSet::default();
+            combination.literal_strings.clear();
         }
 
         return;
     }
 
     if let TAtomic::Scalar(TScalar::Integer(integer)) = &atomic {
-        combination.integers.insert(*integer);
+        combination.integers.push(*integer);
 
         return;
     }
@@ -918,10 +965,10 @@ fn scrape_type_properties(
 
         match float_scalar {
             TFloat::Literal(literal_value) => {
-                combination.literal_floats.insert(*literal_value);
+                combination.literal_floats.push(*literal_value);
             }
             _ => {
-                combination.literal_floats = HashSet::default();
+                combination.literal_floats.clear();
                 combination.value_types.insert(*ATOM_FLOAT, atomic);
             }
         }
@@ -945,6 +992,8 @@ fn adjust_keyed_array_parameters(
     *existing_key_param = combine_union_types(existing_key_param, &new_key_type, codebase, overwrite_empty_array);
 }
 
+const COMBINER_KEY_STACK_BUF: usize = 256;
+
 fn get_combiner_key(name: &Atom, type_params: &[TUnion], codebase: &CodebaseMetadata) -> Atom {
     let covariants = if let Some(class_like_metadata) = codebase.get_class_like(name) {
         &class_like_metadata.template_variance
@@ -952,20 +1001,63 @@ fn get_combiner_key(name: &Atom, type_params: &[TUnion], codebase: &CodebaseMeta
         return *name;
     };
 
-    concat_atom!(
-        name.as_ref(),
-        "<",
-        type_params
-            .iter()
-            .enumerate()
-            .map(|(i, tunion)| {
-                if let Some(Variance::Covariant) = covariants.get(&i) { "*" } else { tunion.get_id().as_str() }
-            },)
-            .collect::<Vec<_>>()
-            .join(", ")
-            .as_str(),
-        ">",
-    )
+    let name_str = name.as_str();
+    let mut estimated_len = name_str.len() + 2; // name + "<" + ">"
+    for (i, tunion) in type_params.iter().enumerate() {
+        if i > 0 {
+            estimated_len += 2; // ", "
+        }
+
+        if covariants.get(&i) == Some(&Variance::Covariant) {
+            estimated_len += 1; // "*"
+        } else {
+            estimated_len += tunion.get_id().len();
+        }
+    }
+
+    if estimated_len <= COMBINER_KEY_STACK_BUF {
+        let mut buffer = [0u8; COMBINER_KEY_STACK_BUF];
+        let mut pos = 0;
+
+        buffer[pos..pos + name_str.len()].copy_from_slice(name_str.as_bytes());
+        pos += name_str.len();
+
+        buffer[pos] = b'<';
+        pos += 1;
+
+        for (i, tunion) in type_params.iter().enumerate() {
+            if i > 0 {
+                buffer[pos..pos + 2].copy_from_slice(b", ");
+                pos += 2;
+            }
+            let param_str =
+                if covariants.get(&i) == Some(&Variance::Covariant) { "*" } else { tunion.get_id().as_str() };
+            buffer[pos..pos + param_str.len()].copy_from_slice(param_str.as_bytes());
+            pos += param_str.len();
+        }
+
+        buffer[pos] = b'>';
+        pos += 1;
+
+        // SAFETY: We only write valid UTF-8 (ASCII characters and valid UTF-8 from Atom strings)
+        return atom(unsafe { std::str::from_utf8_unchecked(&buffer[..pos]) });
+    }
+
+    let mut result = String::with_capacity(estimated_len);
+    result.push_str(name_str);
+    result.push('<');
+    for (i, tunion) in type_params.iter().enumerate() {
+        if i > 0 {
+            result.push_str(", ");
+        }
+        if covariants.get(&i) == Some(&Variance::Covariant) {
+            result.push('*');
+        } else {
+            result.push_str(tunion.get_id().as_str());
+        }
+    }
+    result.push('>');
+    atom(&result)
 }
 
 fn combine_string_scalars(s1: &TString, s2: TString) -> TString {
@@ -988,12 +1080,6 @@ fn combine_string_scalars(s1: &TString, s2: TString) -> TString {
         is_non_empty: s1.is_non_empty && s2.is_non_empty,
         is_lowercase: s1.is_lowercase && s2.is_lowercase,
     }
-}
-
-fn combine_integers(types: HashSet<TInteger>) -> Vec<TAtomic> {
-    let types = types.into_iter().collect::<Vec<_>>();
-
-    TInteger::combine(&types).into_iter().map(|tint| TAtomic::Scalar(TScalar::Integer(tint))).collect()
 }
 
 #[cfg(test)]
