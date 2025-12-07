@@ -926,7 +926,7 @@ impl Default for FormatSettings {
             space_after_decrement_unary_prefix_operator: false,
             space_after_additive_unary_prefix_operator: false,
             empty_line_after_control_structure: false,
-            empty_line_after_opening_tag: false,
+            empty_line_after_opening_tag: true,
             empty_line_after_declare: true,
             empty_line_after_namespace: true,
             empty_line_after_use: true,
