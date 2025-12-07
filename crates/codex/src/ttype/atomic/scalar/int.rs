@@ -791,6 +791,7 @@ impl TInteger {
         let mut has_from = false;
         let mut has_to = false;
         let mut finite_count = 0;
+        let mut all_literals = true;
 
         for t in &types {
             match *t {
@@ -798,7 +799,9 @@ impl TInteger {
                     has_unspecified = true;
                     break;
                 }
-                TInteger::UnspecifiedLiteral => has_unspecified_literal = true,
+                TInteger::UnspecifiedLiteral => {
+                    has_unspecified_literal = true;
+                }
                 TInteger::From(f) => {
                     has_from = true;
                     if f < min_from {
@@ -811,8 +814,19 @@ impl TInteger {
                         max_to = t;
                     }
                 }
-                _ => finite_count += 1,
+                TInteger::Literal(_) => {
+                    all_literals = all_literals && !has_unspecified_literal && !has_from && !has_to;
+                    finite_count += 1;
+                }
+                TInteger::Range(_, _) => {
+                    all_literals = false;
+                    finite_count += 1;
+                }
             }
+        }
+
+        if all_literals && !has_unspecified_literal && !has_from && !has_to {
+            return types.into_iter().map(|t| TAtomic::Scalar(TScalar::Integer(t))).collect();
         }
 
         if has_unspecified {
