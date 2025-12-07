@@ -299,11 +299,12 @@ fn finalize_sealed_arrays(arrays: &mut Vec<TArray>, codebase: &CodebaseMetadata)
     }
 
     let mut write = 0;
-    for read in 0..arrays.len() {
-        if keep[read] {
+    for (read, item) in keep.iter().enumerate().take(arrays.len()) {
+        if *item {
             if write != read {
                 arrays.swap(write, read);
             }
+
             write += 1;
         }
     }
