@@ -1,0 +1,37 @@
+{
+  "require": {
+    "azjezz/psl": "^4.2",
+    "symfony/symfony": "^7.4",
+    "laravel/framework": "^12.41",
+    "google/apiclient": "^2.18",
+    "aws/aws-sdk-php": "^3.366",
+    "doctrine/orm": "^3.5",
+    "doctrine/dbal": "^4.4",
+    "twig/twig": "^3.22",
+    "react/react": "^1.0",
+    "amphp/amp": "^3.1",
+    "smarty/smarty": "^5.7",
+    "guzzlehttp/guzzle": "^7.10",
+    "nesbot/carbon": "^3.11",
+    "tempest/framework": "^2.13"
+  },
+  "require-dev": {
+    "phpunit/phpunit": "^12.5",
+    "icanhazstring/composer-unused": "^0.9.5",
+    "phparkitect/phparkitect": "^0.7.0",
+    "deptrac/deptrac": "^4.3",
+    "infection/infection": "^0.31.9",
+    "vimeo/psalm": "^6.13",
+    "phpstan/phpstan": "^2.1",
+    "nikic/php-parser": "^5.6",
+    "rector/rector": "^2.2",
+    "laminas/laminas-code": "^4.17",
+    "mockery/mockery": "^1.6"
+  },
+  "config": {
+    "allow-plugins": {
+      "symfony/flex": true,
+      "infection/extension-installer": false
+    }
+  }
+}

@@ -1,0 +1,2 @@
+[source]
+paths = ["src", "vendor"]

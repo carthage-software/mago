@@ -14,3 +14,4 @@ stubs/** linguist-vendored
 /.rustfmt.toml export-ignore
 /.typos.toml export-ignore
 /mago.toml export-ignore
+/corpus/ export-ignore

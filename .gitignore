@@ -6,3 +6,5 @@
 /vendor/
 .direnv
 .mago/
+/corpus/vendor/
+/corpus/composer.lock
