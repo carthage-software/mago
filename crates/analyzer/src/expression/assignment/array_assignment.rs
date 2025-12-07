@@ -526,6 +526,8 @@ pub(crate) fn analyze_nested_array_assignment<'ctx, 'ast, 'arena>(
 
         let new_index_type = array_target_index_type.clone().unwrap_or(Rc::new(get_non_negative_int()));
 
+        let is_last = i == array_target_expressions.len() - 1;
+
         block_context.inside_assignment = true;
 
         let mut array_expr_type = get_array_target_type_given_index(
@@ -538,11 +540,10 @@ pub(crate) fn analyze_nested_array_assignment<'ctx, 'ast, 'arena>(
             &new_index_type,
             true,
             &extended_var_id,
+            if is_last { Some(&assign_value_type) } else { None },
         );
 
         block_context.inside_assignment = false;
-
-        let is_last = i == array_target_expressions.len() - 1;
         let array_expression_type_inner = (*array_expression_type).clone();
 
         if is_last {

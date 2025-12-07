@@ -93,6 +93,7 @@ pub(crate) fn get_array_target_type_given_index<'ctx, 'arena>(
     index_type: &TUnion,
     in_assignment: bool,
     extended_var_id: &Option<String>,
+    assign_value_type: Option<&TUnion>,
 ) -> TUnion {
     let mut has_valid_expected_index = false;
 
@@ -273,6 +274,7 @@ pub(crate) fn get_array_target_type_given_index<'ctx, 'arena>(
                     index_type,
                     &mut has_valid_expected_index,
                     &mut expected_index_types,
+                    assign_value_type,
                 );
 
                 value_type = Some(add_optional_union_type(new_type, value_type.as_ref(), context.codebase));
@@ -897,6 +899,7 @@ pub(crate) fn handle_array_access_on_named_object<'ctx, 'arena>(
     index_type: &TUnion,
     has_valid_expected_index: &mut bool,
     expected_index_types: &mut Vec<TUnion>,
+    assign_value_type: Option<&TUnion>,
 ) -> TUnion {
     fn get_array_access_classes<'ctx, 'arena>(
         context: &mut Context<'ctx, 'arena>,
@@ -1017,6 +1020,41 @@ pub(crate) fn handle_array_access_on_named_object<'ctx, 'arena>(
         *has_valid_expected_index = true;
     } else {
         expected_index_types.push(expected_key_type);
+    }
+
+    // Validate the assigned value type against the expected value type
+    if let Some(assign_value_type) = assign_value_type
+        && !resulting_value_type.is_mixed()
+    {
+        let mut value_comparison_result = ComparisonResult::new();
+        let value_type_contained = is_contained_by(
+            context.codebase,
+            assign_value_type,
+            &resulting_value_type,
+            true,
+            assign_value_type.ignore_falsable_issues(),
+            false,
+            &mut value_comparison_result,
+        );
+
+        if !value_type_contained {
+            let expected_type_str = resulting_value_type.get_id();
+            let assigned_type_str = assign_value_type.get_id();
+
+            context.collector.report_with_code(
+                IssueCode::InvalidArrayAccessAssignmentValue,
+                Issue::error(format!(
+                    "Invalid value type for `ArrayAccess` assignment: expected `{expected_type_str}`, got `{assigned_type_str}`."
+                ))
+                .with_annotation(
+                    Annotation::primary(span).with_message(format!("Expected value of type `{expected_type_str}`"))
+                )
+                .with_note(format!(
+                    "The `ArrayAccess` implementation expects values of type `{expected_type_str}`, but `{assigned_type_str}` was provided."
+                ))
+                .with_help("Ensure the assigned value matches the `ArrayAccess` value type parameter."),
+            );
+        }
     }
 
     resulting_value_type.set_possibly_undefined(true, None);

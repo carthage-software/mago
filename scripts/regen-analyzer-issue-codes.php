@@ -309,6 +309,7 @@ final class AnalyzerCodeModuleGenerator
         'missing-property-type',
         'missing-constant-type',
         'missing-return-type',
+        'invalid-array-access-assignment-value',
     ];
 
     /**

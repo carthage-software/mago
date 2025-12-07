@@ -71,6 +71,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ArrayAccess<'arena> {
                 &index_type,
                 false,
                 &extended_var_id,
+                None,
             );
 
             if let Some(keyed_array_var_id) = &keyed_array_var_id {
