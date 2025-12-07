@@ -151,7 +151,9 @@ pub(crate) fn reconcile(
                     ));
                 }
             }
-            TAtomic::Array(TArray::List(TList { known_elements: None, non_empty, .. })) => {
+            TAtomic::Array(TArray::List(TList { known_elements: None, non_empty, element_type, .. }))
+                if element_type.is_placeholder() || element_type.is_mixed() =>
+            {
                 return Some(intersect_array_list(
                     context,
                     assertion,

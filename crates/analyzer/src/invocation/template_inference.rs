@@ -79,12 +79,23 @@ fn infer_templates_from_input_and_container_types(
         )
     });
 
+    let has_generic_class_string = generic_container_parts
+        .iter()
+        .any(|t| matches!(t, TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::Generic { .. }))));
+
     let residual_input_types = input_type
         .types
         .iter()
         .filter(|argument_atomic| {
             !argument_atomic.is_empty_array()
                 && !concrete_container_parts.iter().any(|container_atomic| {
+                    if has_generic_class_string
+                        && matches!(argument_atomic, TAtomic::Scalar(TScalar::ClassLikeString(_)))
+                        && matches!(container_atomic, TAtomic::Scalar(TScalar::String(_)))
+                    {
+                        return false;
+                    }
+
                     atomic_comparator::is_contained_by(
                         context.codebase,
                         argument_atomic,

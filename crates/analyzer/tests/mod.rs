@@ -315,6 +315,7 @@ test_case!(post_narrowing_check);
 test_case!(data_transformer_type);
 test_case!(symbol_existence_assertions);
 test_case!(symbol_existence_edge_cases);
+test_case!(type_assert);
 
 // Github Issues
 test_case!(issue_659);
@@ -418,6 +419,7 @@ test_case!(issue_706);
 test_case!(issue_710);
 test_case!(issue_708_part_1);
 test_case!(issue_708_part_2);
+test_case!(issue_711);
 
 #[test]
 fn test_all_test_cases_are_ran() {

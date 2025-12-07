@@ -74,6 +74,12 @@ pub fn populate_template_result_from_invocation<'ctx, 'ast, 'arena>(
         return;
     };
 
+    for (template_name, template_details) in method_context.class_like_metadata.template_types.iter() {
+        if !template_result.template_types.contains_key(template_name) {
+            template_result.template_types.insert(*template_name, template_details.clone());
+        }
+    }
+
     if let Some(type_parameters) = &instance_type.type_parameters {
         for (template_index, template_type) in type_parameters.iter().enumerate() {
             let Some(template_name) = method_context
