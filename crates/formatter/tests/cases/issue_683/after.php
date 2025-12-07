@@ -1,4 +1,5 @@
 <?php
+
 class AClass
 {
     public function run(): void
