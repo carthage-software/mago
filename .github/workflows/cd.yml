@@ -68,10 +68,10 @@ jobs:
           # Tier 1 targets:
 
           ## Windows MSVC: x86_64
-          - { target: x86_64-pc-windows-msvc, os: windows-latest, test: true }
+          - { target: x86_64-pc-windows-msvc, os: windows-latest, test: true, pgo: true }
           ## macOS: aarch64, x86_64
-          - { target: aarch64-apple-darwin, os: macos-latest, test: true }
-          - { target: x86_64-apple-darwin, os: macos-latest, test: true }
+          - { target: aarch64-apple-darwin, os: macos-latest, test: true, pgo: true }
+          - { target: x86_64-apple-darwin, os: macos-latest, test: true, pgo: true }
           ## Linux: aarch64, x86_64
           - { target: aarch64-unknown-linux-gnu, os: ubuntu-latest, test: true, debian-package: true }
           - { target: aarch64-unknown-linux-musl, os: ubuntu-latest, test: true }
@@ -126,6 +126,13 @@ jobs:
           toolchain: ${{ needs.crate_metadata.outputs.msrv }}
           targets: ${{ matrix.job.target }}
 
+      - name: install PGO tools
+        if: matrix.job.pgo
+        shell: bash
+        run: |
+          rustup component add llvm-tools-preview
+          cargo install cargo-pgo
+
       - name: install cross
         if: startsWith(matrix.job.os, 'ubuntu')
         uses: taiki-e/install-action@v2
@@ -167,9 +174,26 @@ jobs:
           cargo -V
           rustc -V
 
-      - name: build 
+      - name: setup PHP corpus for PGO profiling
+        if: matrix.job.pgo
         shell: bash
-        run: $BUILD_CMD build --locked --release --target=${{ matrix.job.target }}
+        run: |
+          cd corpus
+          composer install --ignore-platform-reqs --no-dev
+          cd ..
+
+      - name: build
+        shell: bash
+        run: |
+          if [[ "${{ matrix.job.pgo }}" == "true" ]]; then
+            cargo pgo build -- --target=${{ matrix.job.target }}
+            cargo pgo run -- -- --workspace corpus/ analyze --reporting-format count || true
+            cargo pgo run -- -- --workspace corpus/ lint --reporting-format count || true
+            cargo pgo run -- -- --workspace corpus/ fmt --check || true
+            cargo pgo optimize -- build --target=${{ matrix.job.target }}
+          else
+            $BUILD_CMD build --locked --release --target=${{ matrix.job.target }}
+          fi
 
       - name: set binary name
         id: bin
