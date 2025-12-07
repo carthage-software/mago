@@ -174,12 +174,19 @@ jobs:
           cargo -V
           rustc -V
 
+      - name: setup PHP for PGO profiling
+        if: matrix.job.pgo
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          tools: composer
+
       - name: setup PHP corpus for PGO profiling
         if: matrix.job.pgo
         shell: bash
         run: |
           cd corpus
-          composer install --ignore-platform-reqs --no-dev
+          composer install --ignore-platform-reqs
           cd ..
 
       - name: build
