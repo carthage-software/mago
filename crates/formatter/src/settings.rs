@@ -943,6 +943,18 @@ impl Default for FormatSettings {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn consistent_default() {
+        let default_settings = FormatSettings::default();
+        let default_deserialized: FormatSettings = serde_json::from_str("{}").unwrap();
+        assert_eq!(default_settings, default_deserialized);
+    }
+}
+
 /// Specifies the style of line endings.
 #[derive(Default, Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, JsonSchema)]
 pub enum EndOfLine {
