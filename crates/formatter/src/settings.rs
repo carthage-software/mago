@@ -926,7 +926,7 @@ impl Default for FormatSettings {
             space_after_decrement_unary_prefix_operator: false,
             space_after_additive_unary_prefix_operator: false,
             empty_line_after_control_structure: false,
-            empty_line_after_opening_tag: false,
+            empty_line_after_opening_tag: true,
             empty_line_after_declare: true,
             empty_line_after_namespace: true,
             empty_line_after_use: true,
@@ -940,6 +940,18 @@ impl Default for FormatSettings {
             empty_line_before_dangling_comments: true,
             separate_class_like_members: true,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn consistent_default() {
+        let default_settings = FormatSettings::default();
+        let default_deserialized: FormatSettings = serde_json::from_str("{}").unwrap();
+        assert_eq!(default_settings, default_deserialized);
     }
 }
 
