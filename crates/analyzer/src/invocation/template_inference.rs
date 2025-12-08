@@ -751,6 +751,20 @@ fn infer_templates_from_input_and_container_types(
             continue;
         }
 
+        if !container_generic.constraint.has_template_types()
+            && !union_comparator::is_contained_by(
+                context.codebase,
+                &residual_input_type,
+                &container_generic.constraint,
+                false,
+                false,
+                false,
+                &mut ComparisonResult::default(),
+            )
+        {
+            continue;
+        }
+
         let mut has_violation = false;
 
         if let Some(template_types) = template_result.template_types.get(template_parameter_name) {
