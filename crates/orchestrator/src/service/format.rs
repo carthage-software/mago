@@ -95,6 +95,53 @@ impl FormatService {
             Ok(FormatResult { changed_files })
         })
     }
+
+    /// Runs the formatter on a specific subset of files by ID.
+    ///
+    /// This method formats only the files with the given IDs, rather than all files
+    /// in the database. This is useful for formatting only staged files in git
+    /// pre-commit hooks.
+    ///
+    /// # Arguments
+    ///
+    /// * `file_ids` - Iterator of file IDs to format
+    ///
+    /// # Returns
+    ///
+    /// A [`FormatResult`] containing the formatting status for each processed file.
+    pub fn run_on_files<Iter>(self, file_ids: Iter) -> Result<FormatResult, OrchestratorError>
+    where
+        Iter: IntoIterator<Item = FileId>,
+    {
+        let context = FormatContext { php_version: self.php_version, settings: self.settings };
+
+        let pipeline = StatelessParallelPipeline::new(
+            "✨ Formatting",
+            self.database,
+            context,
+            Box::new(FormatReducer),
+            self.use_progress_bars,
+        );
+
+        pipeline.run_on_files(file_ids, |context, arena, file| {
+            let formatter = Formatter::new(arena, context.php_version, context.settings);
+            let status = match formatter.format_file(&file) {
+                Ok(formatted_content) => {
+                    if file.contents == formatted_content {
+                        FileFormatStatus::Unchanged
+                    } else {
+                        FileFormatStatus::Changed(formatted_content.to_string())
+                    }
+                }
+                Err(parse_error) => FileFormatStatus::FailedToParse(parse_error),
+            };
+
+            let mut changed_files = HashMap::with_capacity(1);
+            changed_files.insert(file.id, status);
+
+            Ok(FormatResult { changed_files })
+        })
+    }
 }
 
 impl Default for FormatResult {

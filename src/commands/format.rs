@@ -44,17 +44,20 @@ use std::process::ExitCode;
 use clap::ColorChoice;
 use clap::Parser;
 
+use mago_database::Database;
 use mago_database::DatabaseReader;
 use mago_database::change::ChangeLog;
 use mago_database::error::DatabaseError;
 use mago_database::file::File;
 use mago_orchestrator::service::format::FileFormatStatus;
+use mago_orchestrator::service::format::FormatResult;
 
 use crate::EXIT_CODE_ERROR;
 use crate::config::Configuration;
 use crate::error::Error;
 use crate::utils;
 use crate::utils::create_orchestrator;
+use crate::utils::git;
 
 /// Command for formatting PHP source files according to style rules.
 ///
@@ -100,22 +103,36 @@ pub struct FormatCommand {
     /// formats the code according to the configuration, and outputs the
     /// formatted code to standard output. This is useful for integrating
     /// with other tools or for quick formatting tasks without modifying files.
-    #[arg(long, short = 'i', conflicts_with_all = ["dry_run", "check", "path"])]
+    #[arg(long, short = 'i', conflicts_with_all = ["dry_run", "check", "path", "staged"])]
     pub stdin_input: bool,
+
+    /// Format files that are staged in git.
+    ///
+    /// This flag is designed for git pre-commit hooks. It will:
+    /// 1. Find all PHP files currently staged for commit
+    /// 2. Format those files
+    /// 3. Re-stage them so the formatted version is committed
+    ///
+    /// Fails if:
+    /// - Not in a git repository
+    /// - A staged file has unstaged changes (would cause data loss)
+    #[arg(long, short = 's', conflicts_with_all = ["dry_run", "check", "stdin_input", "path"])]
+    pub staged: bool,
 }
 
 impl FormatCommand {
     /// Executes the formatting command.
     ///
-    /// This method handles all formatting modes (in-place, check, dry-run, stdin)
+    /// This method handles all formatting modes (in-place, check, dry-run, stdin, staged)
     /// and orchestrates the complete formatting workflow:
     ///
     /// 1. **Mode Selection**: Determines which mode to use based on flags
     /// 2. **STDIN Handling**: If `--stdin-input`, reads from stdin and formats immediately
-    /// 3. **Database Loading**: Scans workspace for PHP files (unless stdin mode)
-    /// 4. **Service Creation**: Creates formatting service with configuration
-    /// 5. **Formatting**: Processes each file according to the selected mode
-    /// 6. **Reporting**: Outputs results (summary, diffs, or exit code)
+    /// 3. **Staged Handling**: If `--staged`, formats only git-staged files
+    /// 4. **Database Loading**: Scans workspace for PHP files (unless stdin mode)
+    /// 5. **Service Creation**: Creates formatting service with configuration
+    /// 6. **Formatting**: Processes each file according to the selected mode
+    /// 7. **Reporting**: Outputs results (summary, diffs, or exit code)
     ///
     /// # Arguments
     ///
@@ -134,7 +151,12 @@ impl FormatCommand {
     /// - **Check** (`--check`): Returns failure if any file needs formatting
     /// - **Dry run** (`--dry-run`): Prints diffs without modifying files
     /// - **STDIN** (`--stdin-input`): Formats input from stdin to stdout
+    /// - **Staged** (`--staged`): Formats staged files and re-stages them
     pub fn execute(self, configuration: Configuration, color_choice: ColorChoice) -> Result<ExitCode, Error> {
+        if self.staged {
+            return self.execute_staged(configuration, color_choice);
+        }
+
         let mut orchestrator = create_orchestrator(&configuration, color_choice, false, true, false);
         orchestrator.add_exclude_patterns(configuration.formatter.excludes.iter());
         if !self.path.is_empty() {
@@ -193,13 +215,7 @@ impl FormatCommand {
             return Ok(ExitCode::FAILURE);
         }
 
-        let change_log = ChangeLog::new();
-        for (file_id, new_content) in result.changed_files() {
-            let file = database.get_ref(file_id)?;
-
-            utils::apply_update(&change_log, file, new_content, self.dry_run, color_choice)?;
-        }
-
+        let change_log = to_change_log(&database, &result, self.dry_run, color_choice)?;
         database.commit(change_log, true)?;
 
         let exit_code = if self.dry_run {
@@ -222,4 +238,80 @@ impl FormatCommand {
 
         Ok(File::ephemeral(Cow::Borrowed("<stdin>"), Cow::Owned(content)))
     }
+
+    /// Executes formatting for staged files.
+    ///
+    /// This method implements the `--staged` mode for git pre-commit hooks:
+    ///
+    /// 1. Verifies we're in a git repository
+    /// 2. Gets the list of staged PHP files
+    /// 3. Checks that no staged files have unstaged changes
+    /// 4. Formats the staged files
+    /// 5. Re-stages the formatted files
+    ///
+    /// # Arguments
+    ///
+    /// * `configuration` - The configuration containing formatter settings
+    /// * `color_choice` - Whether to use colored output
+    ///
+    /// # Returns
+    ///
+    /// - `Ok(ExitCode::SUCCESS)` if formatting succeeded
+    /// - `Err(Error::NotAGitRepository)` if not in a git repository
+    /// - `Err(Error::StagedFileHasUnstagedChanges)` if a file has partial staging
+    fn execute_staged(self, configuration: Configuration, color_choice: ColorChoice) -> Result<ExitCode, Error> {
+        let workspace = &configuration.source.workspace;
+
+        let mut orchestrator = create_orchestrator(&configuration, color_choice, false, true, false);
+        orchestrator.add_exclude_patterns(configuration.formatter.excludes.iter());
+
+        let mut database = orchestrator.load_database(workspace, false, None)?;
+
+        // Get staged files that are clean (no unstaged changes), resolved to file IDs
+        let staged_file_ids = git::get_staged_clean_files(workspace, &database)?;
+        if staged_file_ids.is_empty() {
+            tracing::info!("No staged files to format.");
+            return Ok(ExitCode::SUCCESS);
+        }
+
+        let service = orchestrator.get_format_service(database.read_only());
+        let result = service.run_on_files(staged_file_ids)?;
+
+        for (file_id, parse_error) in result.parse_errors() {
+            let file = database.get_ref(file_id)?;
+            tracing::error!("Failed to parse file '{}': {parse_error}", file.name);
+        }
+
+        let changed_files_count = result.changed_files_count();
+
+        if changed_files_count == 0 {
+            tracing::info!("All staged files are already formatted.");
+            return Ok(ExitCode::SUCCESS);
+        }
+
+        let change_log = to_change_log(&database, &result, false, color_choice)?;
+        let changed_file_ids = change_log.changed_file_ids()?;
+        database.commit(change_log, true)?;
+
+        git::stage_files(workspace, &database, changed_file_ids)?;
+
+        tracing::info!("Formatted and re-staged {changed_files_count} file(s).");
+
+        Ok(ExitCode::SUCCESS)
+    }
+}
+
+fn to_change_log(
+    database: &Database<'_>,
+    format_result: &FormatResult,
+    dry_run: bool,
+    color_choice: ColorChoice,
+) -> Result<ChangeLog, Error> {
+    let change_log = ChangeLog::new();
+    for (file_id, new_content) in format_result.changed_files() {
+        let file = database.get_ref(file_id)?;
+        utils::apply_update(&change_log, file, new_content, dry_run, color_choice)?;
+    }
+
+    Ok(change_log)
 }

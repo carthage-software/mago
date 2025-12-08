@@ -37,4 +37,5 @@ mago fmt src/index.php tests/
 | `--dry-run`, `-d`     | Perform a "dry run". This will calculate and print a diff of all changes that would be made to your files without actually modifying them.                                        |
 | `--check`, `-c`       | Check if the source files are formatted correctly. This is the ideal flag for CI environments. The command will exit with code `0` if all files are formatted, and `1` otherwise. |
 | `--stdin-input`, `-i` | Read source code from `stdin`, format it, and print the result to `stdout`. This is useful for editor integrations.                                                               |
+| `--staged`, `-s`      | Format only files staged in git and re-stage them after formatting. Designed for pre-commit hooks. See the [pre-commit hooks recipe](/recipes/pre-commit-hooks.md) for details.   |
 | `--help`, `-h`        | Display help information about the `mago format` command.                                                                                                                         |

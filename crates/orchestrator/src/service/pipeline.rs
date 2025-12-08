@@ -13,6 +13,7 @@ use mago_codex::signature_builder;
 use mago_database::DatabaseReader;
 use mago_database::ReadDatabase;
 use mago_database::file::File;
+use mago_database::file::FileId;
 use mago_database::file::FileType;
 use mago_names::resolver::NameResolver;
 use mago_syntax::parser::parse_file;
@@ -323,6 +324,62 @@ where
             let progress_bar = create_progress_bar(host_files.len(), self.task_name, ProgressBarTheme::Magenta);
 
             let results: Vec<I> = host_files
+                .into_par_iter()
+                .map_init(Bump::new, |arena, file| {
+                    let context = self.shared_context.clone();
+                    let result = map_function(context, arena, file)?;
+
+                    arena.reset();
+                    progress_bar.inc(1);
+
+                    Ok(result)
+                })
+                .collect::<Result<Vec<I>, OrchestratorError>>()?;
+
+            remove_progress_bar(progress_bar);
+
+            results
+        };
+
+        self.reducer.reduce(results)
+    }
+
+    /// Executes the pipeline with a given map function on specific files by ID.
+    ///
+    /// This method processes only the files with the given IDs, rather than all
+    /// `Host` files in the database. This is useful for operations like formatting
+    /// only staged files in git pre-commit hooks.
+    ///
+    /// # Arguments
+    ///
+    /// * `file_ids` - Iterator of file IDs to process
+    /// * `map_function` - The function to apply to each file
+    pub fn run_on_files<F, Iter>(&self, file_ids: Iter, map_function: F) -> Result<R, OrchestratorError>
+    where
+        F: Fn(T, &Bump, Arc<File>) -> Result<I, OrchestratorError> + Send + Sync,
+        Iter: IntoIterator<Item = FileId>,
+    {
+        let files: Vec<_> = file_ids.into_iter().filter_map(|id| self.database.get(&id).ok()).collect();
+
+        if files.is_empty() {
+            return self.reducer.reduce(Vec::new());
+        }
+
+        let results = if !self.should_use_progress_bar {
+            files
+                .into_par_iter()
+                .map_init(Bump::new, |arena, file| {
+                    let context = self.shared_context.clone();
+                    let result = map_function(context, arena, file)?;
+
+                    arena.reset();
+                    Ok(result)
+                })
+                .collect::<Result<Vec<I>, OrchestratorError>>()?
+        } else {
+            let progress_bar = create_progress_bar(files.len(), self.task_name, ProgressBarTheme::Magenta);
+
+            let results: Vec<I> = files
                 .into_par_iter()
                 .map_init(Bump::new, |arena, file| {
                     let context = self.shared_context.clone();

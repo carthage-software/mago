@@ -213,6 +213,19 @@ pub enum Error {
     /// analysis tools, such as database loading failures, service initialization errors,
     /// or failures during parallel file processing.
     Orchestrator(OrchestratorError),
+
+    /// Not inside a git repository.
+    ///
+    /// This error occurs when attempting to use git-related features (such as
+    /// `--staged` formatting) outside of a git repository.
+    NotAGitRepository,
+
+    /// A staged file has unstaged changes.
+    ///
+    /// This error occurs when attempting to format staged files but a file has both
+    /// staged and unstaged changes. Formatting in this case could cause data loss,
+    /// so the operation is aborted. The string contains the path to the problematic file.
+    StagedFileHasUnstagedChanges(String),
 }
 
 /// Formats the error for user-friendly display.
@@ -252,6 +265,10 @@ impl std::fmt::Display for Error {
                 write!(f, "Failed to build the thread pool: {error}")
             }
             Self::Orchestrator(error) => write!(f, "Orchestrator error: {error}"),
+            Self::NotAGitRepository => write!(f, "Not inside a git repository"),
+            Self::StagedFileHasUnstagedChanges(path) => {
+                write!(f, "Cannot format staged files: '{path}' has both staged and unstaged changes")
+            }
         }
     }
 }

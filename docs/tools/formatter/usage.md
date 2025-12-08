@@ -64,4 +64,16 @@ cat src/Service.php | mago fmt --stdin-input
 This will read the code from `src/Service.php`, format it, and print the formatted code to standard
 output.
 
+## Formatting staged files (pre-commit hooks)
+
+The `--staged` flag is designed for git pre-commit hooks. It formats only the files currently staged for commit and automatically re-stages them:
+
+```bash
+mago fmt --staged
+```
+
+This is ideal for ensuring all committed code is properly formatted without affecting unstaged changes.
+
+For a complete guide on setting up pre-commit hooks, see the [pre-commit hooks recipe](/recipes/pre-commit-hooks.md).
+
 For more details on the available command-line options, see the [Command Reference](/tools/formatter/command-reference.md).

@@ -15,6 +15,7 @@ use mago_orchestrator::OrchestratorConfiguration;
 use crate::config::Configuration;
 use crate::error::Error;
 
+pub mod git;
 pub mod logger;
 pub mod progress;
 pub mod version;

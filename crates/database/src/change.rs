@@ -75,6 +75,27 @@ impl ChangeLog {
         Ok(())
     }
 
+    /// Returns a vector of all `FileId`s affected by the recorded changes.
+    ///
+    /// This includes IDs for files being added, updated, or deleted.
+    ///
+    /// # Errors
+    ///
+    /// - `DatabaseError::PoisonedLogMutex`: Returned if the internal lock was poisoned
+    pub fn changed_file_ids(&self) -> Result<Vec<FileId>, DatabaseError> {
+        let changes = self.changes.lock().map_err(|_| DatabaseError::PoisonedLogMutex)?;
+        let mut ids = Vec::new();
+        for change in changes.iter() {
+            match change {
+                Change::Add(file) => ids.push(file.id),
+                Change::Update(id, _) => ids.push(*id),
+                Change::Delete(id) => ids.push(*id),
+            }
+        }
+
+        Ok(ids)
+    }
+
     /// Consumes the change log and returns the vector of collected changes.
     ///
     /// This operation safely unwraps the underlying list of changes. It will
