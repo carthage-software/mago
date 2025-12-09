@@ -1027,7 +1027,11 @@ pub fn split_tag_content(content: &str, input_span: Span) -> Option<(TypeString,
 /// # Returns
 ///
 /// `Some(MethodTag)` if parsing is successful, `None` otherwise.
-pub fn parse_method_tag(mut content: &str, span: Span) -> Result<MethodTag, ParseError> {
+pub fn parse_method_tag(mut content: &str, mut span: Span) -> Result<MethodTag, ParseError> {
+    let (trimmed_content, leading_ws) = consume_whitespace(content);
+    content = trimmed_content;
+    span = span.subspan(leading_ws as u32, span.length());
+
     let mut is_static = false;
     let mut visibility = None;
 
