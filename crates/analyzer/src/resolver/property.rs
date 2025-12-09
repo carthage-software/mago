@@ -820,6 +820,11 @@ pub(super) fn report_non_documented_property(
     property_name: &Atom,
     for_assignment: bool,
 ) {
+    if classname.eq_ignore_ascii_case("stdClass") {
+        // Special case: we don't report undocumented properties on stdClass
+        return;
+    }
+
     let magic_method = if for_assignment { "__set" } else { "__get" };
     let access_type = if for_assignment { "write to" } else { "read from" };
 

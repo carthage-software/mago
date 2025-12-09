@@ -31,6 +31,7 @@ trait T4
     public $prop;
 }
 
+// @mago-expect analysis:missing-constructor
 class C2
 {
     // @mago-expect analysis:incompatible-property-type
@@ -141,6 +142,7 @@ trait T16
     public $prop; // Untyped
 }
 
+// @mago-expect analysis:missing-constructor
 class C8
 {
     // @mago-expect analysis:incompatible-property-type
