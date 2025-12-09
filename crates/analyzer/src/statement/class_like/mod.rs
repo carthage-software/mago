@@ -570,7 +570,7 @@ pub(crate) fn analyze_class_like<'ctx, 'ast, 'arena>(
     }
 
     if !class_like_metadata.kind.is_trait() {
-        check_abstract_method_signatures(context, class_like_metadata, declaration_span);
+        check_abstract_method_signatures(context, class_like_metadata);
         check_trait_method_conflicts(context, class_like_metadata, members);
     }
 
@@ -1345,7 +1345,6 @@ fn should_skip_enum_builtin_interface(class_like_metadata: &ClassLikeMetadata, i
 fn check_abstract_method_signatures<'ctx, 'arena>(
     context: &mut Context<'ctx, 'arena>,
     class_like_metadata: &'ctx ClassLikeMetadata,
-    _class_span: Span,
 ) {
     for (method_name_atom, overridden_method_ids) in &class_like_metadata.overridden_method_ids {
         let method_name_str = method_name_atom.as_ref();
@@ -1384,14 +1383,6 @@ fn check_abstract_method_signatures<'ctx, 'arena>(
             else {
                 continue;
             };
-
-            let Some(overridden_meta) = overridden_method.method_metadata.as_ref() else {
-                continue;
-            };
-
-            if !overridden_meta.is_abstract && !overridden_meta.is_final {
-                continue;
-            }
 
             let Some(overridden_class) = context.codebase.get_class_like(declaring_class_name_str) else {
                 continue;
