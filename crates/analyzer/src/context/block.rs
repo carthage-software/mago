@@ -6,6 +6,7 @@ use ahash::HashMap;
 use ahash::HashSet;
 
 use mago_algebra::clause::Clause;
+use mago_atom::Atom;
 use mago_atom::AtomMap;
 use mago_atom::AtomSet;
 use mago_codex::assertion::Assertion;
@@ -109,6 +110,33 @@ pub struct BlockContext<'ctx> {
     pub if_body_context: Option<Rc<RefCell<Self>>>,
     pub control_actions: HashSet<ControlAction>,
     pub possibly_thrown_exceptions: AtomMap<HashSet<Span>>,
+
+    /// Properties that are DEFINITELY initialized in ALL code paths.
+    /// Uses intersection semantics - a property must be initialized in ALL branches.
+    pub definitely_initialized_properties: HashSet<String>,
+
+    /// Properties that are POSSIBLY initialized (in at least one path).
+    /// Uses union semantics - a property initialized in ANY branch is included.
+    pub possibly_initialized_properties: HashSet<String>,
+
+    /// Methods called on $this that are DEFINITELY called in ALL code paths.
+    /// Uses intersection semantics for tracking transitive initialization.
+    pub definitely_called_methods: HashSet<Atom>,
+
+    /// Methods called on $this in at least one path.
+    /// Uses union semantics.
+    pub called_methods: HashSet<Atom>,
+
+    /// Flag indicating we're collecting initialization data (only in constructors).
+    pub collect_initializations: bool,
+
+    /// Set to true if this method calls parent::__construct().
+    /// Used to include parent constructor's property initializations.
+    pub calls_parent_constructor: bool,
+
+    /// If this method calls parent::<method>() where <method> is a class initializer,
+    /// this holds the initializer method name.
+    pub calls_parent_initializer: Option<Atom>,
 }
 
 impl BreakContext {
@@ -185,6 +213,13 @@ impl<'ctx> BlockContext<'ctx> {
             if_body_context: None,
             control_actions: HashSet::default(),
             possibly_thrown_exceptions: AtomMap::default(),
+            definitely_initialized_properties: HashSet::default(),
+            possibly_initialized_properties: HashSet::default(),
+            definitely_called_methods: HashSet::default(),
+            called_methods: HashSet::default(),
+            collect_initializations: false,
+            calls_parent_constructor: false,
+            calls_parent_initializer: None,
         };
 
         if register_super_globals {

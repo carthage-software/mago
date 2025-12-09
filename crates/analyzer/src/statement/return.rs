@@ -3,6 +3,8 @@ use std::rc::Rc;
 use mago_atom::Atom;
 use mago_atom::concat_atom;
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
+use mago_codex::metadata::class_like::ClassLikeMetadata;
+use mago_codex::metadata::property::PropertyMetadata;
 use mago_codex::metadata::property_hook::PropertyHookMetadata;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::combine_union_types;
@@ -120,6 +122,15 @@ pub fn handle_return_value<'ctx, 'arena>(
 
     block_context.has_returned = true;
     block_context.control_actions.insert(ControlAction::Return);
+
+    // Check for uninitialized properties when returning from a constructor
+    if block_context.collect_initializations
+        && let Some(FunctionLikeIdentifier::Method(class_name, method_name)) =
+            block_context.scope.get_function_like_identifier()
+        && method_name.eq_ignore_ascii_case("__construct")
+    {
+        check_constructor_early_return(context, block_context, return_span, &class_name);
+    }
 
     // Check if we're in a property hook context
     if let Some((property_name, hook_metadata)) = block_context.scope.get_property_hook() {
@@ -641,6 +652,115 @@ fn handle_property_hook_return<'ctx, 'arena>(
     );
 
     Ok(())
+}
+
+/// Check for uninitialized properties when returning early from a constructor.
+fn check_constructor_early_return<'ctx, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    block_context: &BlockContext<'ctx>,
+    return_span: Span,
+    class_name: &Atom,
+) {
+    let Some(class_like_metadata) = context.codebase.get_class_like(class_name) else {
+        return;
+    };
+
+    // Skip abstract classes, interfaces, traits, enums
+    if class_like_metadata.flags.is_abstract()
+        || class_like_metadata.kind.is_interface()
+        || class_like_metadata.kind.is_trait()
+        || class_like_metadata.kind.is_enum()
+    {
+        return;
+    }
+
+    // Check each property that needs initialization
+    for (prop_name, declaring_class) in &class_like_metadata.declaring_property_ids {
+        // Get the property metadata from the declaring class
+        let Some(declaring_meta) = context.codebase.get_class_like(declaring_class) else {
+            continue;
+        };
+        let Some(prop) = declaring_meta.properties.get(prop_name) else {
+            continue;
+        };
+
+        // Check if this property requires initialization
+        if !property_requires_constructor_initialization(prop, class_like_metadata, declaring_meta) {
+            continue;
+        }
+
+        // Check if property is initialized at this point
+        let prop_name_str = prop_name.as_str();
+        if block_context.definitely_initialized_properties.contains(prop_name_str) {
+            continue;
+        }
+
+        // Property not initialized - report error
+        let mut issue = Issue::error(format!(
+            "Property `{prop_name}` may not be initialized when returning from constructor of class `{}`.",
+            class_like_metadata.original_name
+        ))
+        .with_annotation(
+            Annotation::primary(return_span).with_message(format!("Returning without initializing `{prop_name}`")),
+        );
+
+        // Add secondary annotation if we have a span for the property
+        if let Some(prop_span) = prop.name_span.or(prop.span) {
+            issue = issue.with_annotation(Annotation::secondary(prop_span).with_message("Property declared here"));
+        }
+
+        issue = issue
+            .with_note(
+                "Typed properties without default values must be initialized in the constructor before returning.",
+            )
+            .with_help(format!("Initialize `{prop_name}` before this return statement, or provide a default value."));
+
+        context.collector.report_with_code(IssueCode::UninitializedProperty, issue);
+    }
+}
+
+/// Determines if a property requires initialization in the constructor.
+/// This is a simplified version of the check in initialization.rs, used for early return detection.
+fn property_requires_constructor_initialization(
+    property: &PropertyMetadata,
+    class_like_metadata: &ClassLikeMetadata,
+    declaring_class_metadata: &ClassLikeMetadata,
+) -> bool {
+    // Has default value - doesn't need initialization
+    if property.flags.has_default() {
+        return false;
+    }
+
+    // Promoted property - initialized via constructor parameter
+    if property.flags.is_promoted_property() {
+        return false;
+    }
+
+    // Static property - not initialized in constructor
+    if property.flags.is_static() {
+        return false;
+    }
+
+    // Virtual/hooked property - may not need backing storage
+    if property.flags.is_virtual_property() {
+        return false;
+    }
+
+    // No type declaration - PHP doesn't require initialization
+    if property.type_declaration_metadata.is_none() {
+        return false;
+    }
+
+    // If declared in a different class (inherited)
+    if declaring_class_metadata.name != class_like_metadata.name {
+        // If declaring class is a concrete class (not abstract and not a trait), it handles initialization.
+        // Traits and abstract classes don't handle initialization - the using class must do it.
+        if !declaring_class_metadata.flags.is_abstract() && !declaring_class_metadata.kind.is_trait() {
+            return false;
+        }
+    }
+
+    true
 }
 
 fn get_generator_return_type(context: &Context, return_type: &TUnion) -> Option<(TUnion, bool)> {

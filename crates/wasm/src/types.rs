@@ -136,6 +136,8 @@ pub struct WasmAnalyzerSettings {
     pub check_arrow_function_missing_type_hints: bool,
     pub register_super_globals: bool,
     pub trust_existence_checks: bool,
+    pub class_initializers: Vec<String>,
+    pub check_property_initialization: bool,
 }
 
 impl Default for WasmAnalyzerSettings {
@@ -157,6 +159,8 @@ impl Default for WasmAnalyzerSettings {
             check_arrow_function_missing_type_hints: false,
             register_super_globals: true,
             trust_existence_checks: true,
+            class_initializers: Vec::new(),
+            check_property_initialization: false,
         }
     }
 }

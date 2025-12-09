@@ -3,6 +3,7 @@ use std::rc::Rc;
 
 use ahash::HashMap;
 use ahash::HashSet;
+use mago_atom::Atom;
 
 use indexmap::IndexMap;
 use mago_algebra::assertion_set::AssertionSet;
@@ -28,6 +29,12 @@ pub struct IfScope<'ctx> {
     pub final_actions: HashSet<ControlAction>,
     pub if_actions: HashSet<ControlAction>,
     pub post_leaving_if_context: Option<BlockContext<'ctx>>,
+    /// Properties definitely initialized in ALL branches (intersection).
+    /// None = no branches processed yet. Some(set) = intersection across branches.
+    pub definitely_initialized_properties: Option<HashSet<String>>,
+    /// Methods definitely called in ALL branches (intersection).
+    /// None = no branches processed yet. Some(set) = intersection across branches.
+    pub definitely_called_methods: Option<HashSet<Atom>>,
 }
 
 impl<'ctx> IfScope<'ctx> {
@@ -47,6 +54,8 @@ impl<'ctx> IfScope<'ctx> {
             final_actions: HashSet::default(),
             if_actions: HashSet::default(),
             post_leaving_if_context: None,
+            definitely_initialized_properties: None,
+            definitely_called_methods: None,
         }
     }
 }

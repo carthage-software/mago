@@ -20,6 +20,20 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for StaticMethodCall<'arena> {
         block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
+        if block_context.collect_initializations
+            && let Expression::Parent(_) = self.class
+            && let ClassLikeMemberSelector::Identifier(method_ident) = &self.method
+        {
+            if method_ident.value.eq_ignore_ascii_case("__construct") {
+                block_context.calls_parent_constructor = true;
+            } else {
+                let method_name = mago_atom::ascii_lowercase_atom(method_ident.value);
+                if context.settings.class_initializers.contains(&method_name) {
+                    block_context.calls_parent_initializer = Some(method_name);
+                }
+            }
+        }
+
         let method_resolution =
             resolve_static_method_targets(context, block_context, artifacts, self.class, &self.method, self.span())?;
 

@@ -12,6 +12,7 @@ trait T2
     public string $prop;
 }
 
+// @mago-expect analysis:missing-constructor
 class C1
 {
     // @mago-expect analysis:incompatible-property-visibility
@@ -30,6 +31,7 @@ trait T4
     public readonly int $prop;
 }
 
+// @mago-expect analysis:missing-constructor
 class C2
 {
     // @mago-expect analysis:incompatible-property-type
@@ -48,6 +50,7 @@ trait T6
     public readonly string $prop;
 }
 
+// @mago-expect analysis:missing-constructor
 class C3
 {
     use T5, T6; // OK: Both readonly string
@@ -65,6 +68,7 @@ trait T8
     protected readonly string $prop;
 }
 
+// @mago-expect analysis:missing-constructor
 class C4
 {
     // @mago-expect analysis:incompatible-property-visibility
@@ -79,6 +83,7 @@ trait T9
     public readonly int $age;
 }
 
+// @mago-expect analysis:missing-constructor
 readonly class C5
 {
     use T9; // OK: Class is readonly
@@ -91,6 +96,7 @@ trait T10
     public readonly string $prop;
 }
 
+// @mago-expect analysis:missing-constructor
 class C6
 {
     use T10; // OK
@@ -118,6 +124,7 @@ trait T13
     public readonly int $prop2;
 }
 
+// @mago-expect analysis:missing-constructor
 class C7
 {
     use T12, T13; // OK: All properties match
@@ -145,6 +152,7 @@ trait Child
     public string $prop; // Not readonly - conflicts
 }
 
+// @mago-expect analysis:missing-constructor
 class C8
 {
     use Child;

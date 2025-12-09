@@ -2,6 +2,7 @@ use std::io::IsTerminal;
 use std::path::PathBuf;
 
 use clap::ColorChoice;
+use mago_atom::ascii_lowercase_atom;
 use mago_atom::atom;
 use mago_reporting::baseline::BaselineVariant;
 use schemars::JsonSchema;
@@ -131,6 +132,26 @@ pub struct AnalyzerConfiguration {
     ///
     /// Defaults to `true`.
     pub trust_existence_checks: bool,
+
+    /// Method names treated as class initializers (like `__construct`).
+    ///
+    /// Properties initialized in these methods count as "definitely initialized"
+    /// just like in the constructor. This is useful for frameworks that use
+    /// lifecycle methods like PHPUnit's `setUp()` or framework `boot()` methods.
+    ///
+    /// Example: `["setUp", "initialize", "boot"]`
+    ///
+    /// Defaults to empty (no additional initializers).
+    pub class_initializers: Vec<String>,
+
+    /// Enable property initialization checking (`missing-constructor`, `uninitialized-property`).
+    ///
+    /// When `false`, disables both `missing-constructor` and `uninitialized-property` issues
+    /// entirely. This is useful for projects that prefer to rely on runtime errors for
+    /// property initialization.
+    ///
+    /// Defaults to `false`.
+    pub check_property_initialization: bool,
 }
 
 impl AnalyzerConfiguration {
@@ -159,6 +180,8 @@ impl AnalyzerConfiguration {
             },
             diff: enable_diff,
             trust_existence_checks: self.trust_existence_checks,
+            class_initializers: self.class_initializers.iter().map(|s| ascii_lowercase_atom(s.as_str())).collect(),
+            check_property_initialization: self.check_property_initialization,
         }
     }
 }
@@ -188,6 +211,8 @@ impl Default for AnalyzerConfiguration {
             check_arrow_function_missing_type_hints: defaults.check_arrow_function_missing_type_hints,
             register_super_globals: defaults.register_super_globals,
             trust_existence_checks: defaults.trust_existence_checks,
+            class_initializers: vec![],
+            check_property_initialization: defaults.check_property_initialization,
         }
     }
 }

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 final class Something
 {
-    public string $name;
+    public string $name = '';
 
     public function someMethod(): void
     {

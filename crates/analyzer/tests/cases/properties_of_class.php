@@ -7,23 +7,23 @@
 // Non-final class (produces unsealed array)
 class User
 {
-    public string $name;
-    public int $age;
-    protected string $email;
-    private string $password;
+    public string $name = '';
+    public int $age = 0;
+    protected string $email = '';
+    private string $password = '';
 }
 
 // Final class (produces sealed array)
 final class Config
 {
-    public string $key;
-    public mixed $value;
+    public string $key = '';
+    public mixed $value = null;
 }
 
 // Class with inherited properties
 class Admin extends User
 {
-    public bool $isSuper;
+    public bool $isSuper = false;
 }
 
 /**

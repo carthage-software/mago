@@ -12,6 +12,7 @@ trait T2
     public int $prop;
 }
 
+// @mago-expect analysis:missing-constructor
 class C1
 {
     // @mago-expect analysis:incompatible-property-type
@@ -48,6 +49,7 @@ trait T6
     public string $prop;
 }
 
+// @mago-expect analysis:missing-constructor
 class C3
 {
     use T5, T6; // OK: Both string
@@ -57,7 +59,7 @@ class C3
 // PHP: Fatal error
 trait T7
 {
-    public ?string $prop;
+    public null|string $prop;
 }
 
 trait T8
@@ -65,6 +67,7 @@ trait T8
     public string $prop;
 }
 
+// @mago-expect analysis:missing-constructor
 class C4
 {
     // @mago-expect analysis:incompatible-property-type
@@ -83,6 +86,7 @@ trait T10
     public string|float $prop;
 }
 
+// @mago-expect analysis:missing-constructor
 class C5
 {
     // @mago-expect analysis:incompatible-property-type
@@ -101,6 +105,7 @@ trait T12
     public string|int $prop;
 }
 
+// @mago-expect analysis:missing-constructor
 class C6
 {
     use T11, T12; // OK: Same union
@@ -118,6 +123,7 @@ trait T14
     public int|string $prop; // Different order, but equivalent
 }
 
+// @mago-expect analysis:missing-constructor
 class C7
 {
     use T13, T14; // OK: Both are equivalent
@@ -153,6 +159,7 @@ trait T18
     public Exception $prop;
 }
 
+// @mago-expect analysis:missing-constructor
 class C9
 {
     // @mago-expect analysis:incompatible-property-type
@@ -171,6 +178,7 @@ trait T20
     public DateTime $prop;
 }
 
+// @mago-expect analysis:missing-constructor
 class C10
 {
     use T19, T20; // OK: Same class
@@ -188,6 +196,7 @@ trait T22
     public Countable&Traversable $prop;
 }
 
+// @mago-expect analysis:missing-constructor
 class C11
 {
     // @mago-expect analysis:incompatible-property-type

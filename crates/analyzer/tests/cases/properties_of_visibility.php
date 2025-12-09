@@ -6,20 +6,20 @@
 
 final class Entity
 {
-    public string $id;
-    public string $name;
-    protected string $internalId;
-    protected int $version;
-    private string $secret;
-    private bool $dirty;
+    public string $id = '';
+    public string $name = '';
+    protected string $internalId = '';
+    protected int $version = 0;
+    private string $secret = '';
+    private bool $dirty = false;
 }
 
 // Non-final class for unsealed array tests
 class BaseModel
 {
-    public string $id;
-    protected int $createdAt;
-    private bool $initialized;
+    public string $id = '';
+    protected int $createdAt = 0;
+    private bool $initialized = false;
 }
 
 /**

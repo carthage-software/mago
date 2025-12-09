@@ -16,7 +16,7 @@ final class UnusedTemplate
 final class UsedInProperty
 {
     /** @var T */
-    public mixed $value;
+    public mixed $value = null;
 }
 
 /**
@@ -58,7 +58,7 @@ final class IntentionallyUnused
 final class PartiallyUsed
 {
     /** @var T */
-    public mixed $value;
+    public mixed $value = null;
 }
 
 /**
@@ -89,7 +89,7 @@ final class UsedInImplements implements UsedInExtendsInterface
 abstract class UsedInExtendsBase
 {
     /** @var T */
-    public mixed $value;
+    public mixed $value = null;
 }
 
 /**

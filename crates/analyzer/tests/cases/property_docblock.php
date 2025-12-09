@@ -13,6 +13,10 @@ class T
 {
     private A|int $x;
 
+    public function __construct() {
+        $this->x = 0;
+    }
+
     public function __get(string $name): mixed
     {
         return $this->__get($name);

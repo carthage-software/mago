@@ -2,6 +2,7 @@ use std::rc::Rc;
 
 use ahash::HashMap;
 use ahash::HashSet;
+use mago_atom::Atom;
 
 use mago_algebra::assertion_set::AssertionSet;
 use mago_codex::reference::SymbolReferences;
@@ -22,6 +23,10 @@ pub struct AnalysisArtifacts {
     pub case_scopes: Vec<CaseScope>,
     pub fully_matched_switch_offsets: HashSet<u32>,
     pub inferred_parameter_types: Option<HashMap<usize, TUnion>>,
+    pub method_initialized_properties: HashMap<(Atom, Atom), HashSet<String>>,
+    pub method_calls_this_methods: HashMap<(Atom, Atom), HashSet<Atom>>,
+    pub method_calls_parent_constructor: HashMap<(Atom, Atom), bool>,
+    pub method_calls_parent_initializer: HashMap<(Atom, Atom), Atom>,
 }
 
 impl AnalysisArtifacts {
@@ -36,6 +41,10 @@ impl AnalysisArtifacts {
             loop_scope: None,
             fully_matched_switch_offsets: HashSet::default(),
             inferred_parameter_types: None,
+            method_initialized_properties: HashMap::default(),
+            method_calls_this_methods: HashMap::default(),
+            method_calls_parent_constructor: HashMap::default(),
+            method_calls_parent_initializer: HashMap::default(),
         }
     }
 

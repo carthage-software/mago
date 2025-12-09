@@ -131,6 +131,26 @@ pub struct Settings {
     ///
     /// Defaults to `true`.
     pub trust_existence_checks: bool,
+
+    /// Method names treated as class initializers (like `__construct`).
+    ///
+    /// Properties initialized in these methods count as "definitely initialized"
+    /// just like in the constructor. This is useful for frameworks that use
+    /// lifecycle methods like PHPUnit's `setUp()` or framework `boot()` methods.
+    ///
+    /// Example: `["setUp", "initialize", "boot"]`
+    ///
+    /// Defaults to empty (no additional initializers).
+    pub class_initializers: AtomSet,
+
+    /// Enable property initialization checking (`missing-constructor`, `uninitialized-property`).
+    ///
+    /// When `false`, disables both `missing-constructor` and `uninitialized-property` issues
+    /// entirely. This is useful for projects that prefer to rely on runtime errors for
+    /// property initialization.
+    ///
+    /// Defaults to `false`.
+    pub check_property_initialization: bool,
 }
 
 impl Default for Settings {
@@ -163,6 +183,8 @@ impl Settings {
             register_super_globals: true,
             diff: false,
             trust_existence_checks: true,
+            class_initializers: AtomSet::default(),
+            check_property_initialization: false,
         }
     }
 }

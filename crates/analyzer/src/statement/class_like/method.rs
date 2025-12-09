@@ -68,15 +68,35 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Method<'arena> {
         scope.set_function_like(Some(method_metadata));
         scope.set_static(self.is_static());
 
+        let mut method_block_context = BlockContext::new(scope, context.settings.register_super_globals);
+
+        method_block_context.collect_initializations = true;
+
         analyze_function_like(
             context,
             artifacts,
-            &mut BlockContext::new(scope, context.settings.register_super_globals),
+            &mut method_block_context,
             method_metadata,
             &self.parameter_list,
             FunctionLikeBody::Statements(concrete_body.statements.as_slice(), concrete_body.span()),
             None,
         )?;
+
+        let method_key = (class_like_metadata.name, lowercase_method_name);
+
+        artifacts
+            .method_initialized_properties
+            .insert(method_key, method_block_context.definitely_initialized_properties.clone());
+
+        artifacts.method_calls_this_methods.insert(method_key, method_block_context.definitely_called_methods.clone());
+
+        if method_block_context.calls_parent_constructor {
+            artifacts.method_calls_parent_constructor.insert(method_key, true);
+        }
+
+        if let Some(parent_initializer_name) = method_block_context.calls_parent_initializer {
+            artifacts.method_calls_parent_initializer.insert(method_key, parent_initializer_name);
+        }
 
         check_unused_function_template_parameters(
             context,

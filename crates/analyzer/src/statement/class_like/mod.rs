@@ -43,6 +43,7 @@ use crate::utils::missing_type_hints;
 
 pub mod constant;
 pub mod enum_case;
+pub mod initialization;
 pub mod method;
 pub mod method_signature;
 pub mod property;
@@ -640,6 +641,8 @@ pub(crate) fn analyze_class_like<'ctx, 'ast, 'arena>(
     // Check trait constant overrides AFTER constants have been analyzed
     // so we can compare their inferred values
     check_class_like_constants(context, class_like_metadata, members);
+
+    initialization::check_property_initialization(context, artifacts, class_like_metadata, declaration_span, name_span);
 
     Ok(())
 }

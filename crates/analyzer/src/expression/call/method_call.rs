@@ -1,9 +1,11 @@
+use mago_atom::Atom;
 use mago_atom::AtomMap;
 
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::identifier::method::MethodIdentifier;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_codex::metadata::function_like::FunctionLikeMetadata;
+use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::expander::StaticClassType;
 use mago_codex::ttype::get_never;
@@ -190,6 +192,15 @@ fn analyze_method_call<'ctx, 'ast, 'arena>(
         block_context.inside_nullsafe_chain = true;
     }
 
+    if block_context.collect_initializations
+        && let ClassLikeMemberSelector::Identifier(method_ident) = selector
+        && is_this_or_self_returning_chain(object, context, block_context)
+    {
+        let method_name = mago_atom::ascii_lowercase_atom(method_ident.value);
+        block_context.definitely_called_methods.insert(method_name);
+        block_context.called_methods.insert(method_name);
+    }
+
     let method_resolution =
         resolve_method_targets(context, block_context, artifacts, object, selector, is_null_safe, span)?;
 
@@ -243,6 +254,77 @@ fn analyze_method_call<'ctx, 'ast, 'arena>(
         method_resolution.encountered_mixed,
         is_null_safe && method_resolution.encountered_null,
     )
+}
+
+/// Checks if an expression ultimately derives from `$this` through a chain of method calls
+/// where each method returns `self`/`static`/the same class type.
+///
+/// This enables tracking method calls in chains like `$this->foo()->bar()->baz()`
+/// where `foo()` and `bar()` return `self` or `static`.
+fn is_this_or_self_returning_chain<'ctx, 'arena>(
+    expr: &Expression<'arena>,
+    context: &Context<'ctx, 'arena>,
+    block_context: &BlockContext<'ctx>,
+) -> bool {
+    match expr {
+        Expression::Variable(Variable::Direct(var)) if var.name == "$this" => true,
+        Expression::Call(Call::Method(method_call)) => {
+            if !is_this_or_self_returning_chain(method_call.object, context, block_context) {
+                return false;
+            }
+
+            let ClassLikeMemberSelector::Identifier(method_ident) = &method_call.method else {
+                return false;
+            };
+
+            let Some(class_like) = block_context.scope.get_class_like() else {
+                return false;
+            };
+
+            let method_name = mago_atom::ascii_lowercase_atom(method_ident.value);
+            method_returns_self_or_static(context, class_like.name, method_name)
+        }
+        Expression::Call(Call::NullSafeMethod(method_call)) => {
+            if !is_this_or_self_returning_chain(method_call.object, context, block_context) {
+                return false;
+            }
+
+            let ClassLikeMemberSelector::Identifier(method_ident) = &method_call.method else {
+                return false;
+            };
+
+            let Some(class_like) = block_context.scope.get_class_like() else {
+                return false;
+            };
+
+            let method_name = mago_atom::ascii_lowercase_atom(method_ident.value);
+            method_returns_self_or_static(context, class_like.name, method_name)
+        }
+        Expression::Parenthesized(paren) => is_this_or_self_returning_chain(paren.expression, context, block_context),
+        _ => false,
+    }
+}
+
+/// Checks if a method returns `self`, `static`, or the same class type.
+fn method_returns_self_or_static(context: &Context<'_, '_>, class_name: Atom, method_name: Atom) -> bool {
+    let method_id = MethodIdentifier::new(class_name, method_name);
+    let Some(method_meta) = context.codebase.get_method_by_id(&method_id) else {
+        return false;
+    };
+
+    if let Some(return_type_meta) = &method_meta.return_type_declaration_metadata {
+        for atomic in return_type_meta.type_union.types.iter() {
+            match atomic {
+                TAtomic::Object(TObject::Named(named_obj)) if named_obj.is_this => return true,
+                TAtomic::Object(TObject::Named(named_obj)) if named_obj.name.eq_ignore_ascii_case(&class_name) => {
+                    return true;
+                }
+                _ => {}
+            }
+        }
+    }
+
+    false
 }
 
 #[cfg(test)]

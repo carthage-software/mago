@@ -195,6 +195,16 @@ pub fn analyze<'ctx, 'arena>(
 
     artifacts.set_rc_expression_type(property_access, resulting_type);
 
+    if block_context.collect_initializations
+        && let Expression::Variable(Variable::Direct(var)) = property_access.object
+        && var.name == "$this"
+        && let ClassLikeMemberSelector::Identifier(ident) = &property_access.property
+    {
+        let property_name = format!("${}", ident.value);
+        block_context.definitely_initialized_properties.insert(property_name.clone());
+        block_context.possibly_initialized_properties.insert(property_name);
+    }
+
     Ok(())
 }
 

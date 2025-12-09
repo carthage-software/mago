@@ -111,6 +111,11 @@ const analyzerOptions = [
     label: 'Trust existence checks',
     description: 'Narrow types based on method_exists(), property_exists(), function_exists(), and defined()',
   },
+  {
+    key: 'checkPropertyInitialization',
+    label: 'Check property initialization',
+    description: 'Report uninitialized typed properties that may be accessed before assignment',
+  }
 ];
 
 const rulesByCategory = computed(() => {

@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 class Sub
 {
-    public int $a;
-    public string $b;
+    public int $a = 0;
+    public string $b = '';
 }
 
 class Worker

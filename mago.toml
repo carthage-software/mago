@@ -22,3 +22,4 @@ sensitive-parameter = { enabled = true }
 allow-possibly-undefined-array-keys = false
 find-unused-expressions = true
 no-boolean-literal-comparison = true
+check-property-initialization = true

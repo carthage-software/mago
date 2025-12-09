@@ -1,18 +1,22 @@
 <?php
 
 class A {
-    public int $number;
-    public string $str;
-    public ?string $optional;
+    public int $number = 0;
+    public string $str = '';
+    public ?string $optional = null;
 }
 
 class B {
-    public int $number;
+    public int $number = 0;
 }
 
 class Nested {
-    public int $x;
+    public int $x = 0;
     public B $b;
+
+    public function __construct() {
+        $this->b = new B();
+    }
 }
 
 /**

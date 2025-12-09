@@ -321,6 +321,17 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for If<'arena> {
             block_context.has_returned = true;
         }
 
+        // Propagate initialization results back to outer context
+        if block_context.collect_initializations {
+            if let Some(props) = if_scope.definitely_initialized_properties.take() {
+                block_context.definitely_initialized_properties.extend(props);
+            }
+
+            if let Some(methods) = if_scope.definitely_called_methods.take() {
+                block_context.definitely_called_methods.extend(methods);
+            }
+        }
+
         Ok(())
     }
 }
@@ -901,6 +912,12 @@ fn analyze_else_statements<'ctx, 'arena>(
         if_scope.redefined_variables = None;
         if_scope.reasonable_clauses = vec![];
 
+        // No else branch means we can't guarantee initialization - clear intersection sets
+        if outer_block_context.collect_initializations {
+            if_scope.definitely_initialized_properties = None;
+            if_scope.definitely_called_methods = None;
+        }
+
         return Ok(());
     }
 
@@ -1127,6 +1144,38 @@ fn update_if_scope<'ctx, 'arena>(
     newly_reconciled_variable_ids: HashSet<String>,
     update_new_variables: bool,
 ) {
+    // Handle definitely_initialized_properties with INTERSECTION semantics
+    if outer_block_context.collect_initializations {
+        let branch_initialized = std::mem::take(&mut if_block_context.definitely_initialized_properties);
+        match &mut if_scope.definitely_initialized_properties {
+            Some(existing) => {
+                // Intersection: keep only properties initialized in BOTH branches
+                existing.retain(|p| branch_initialized.contains(p));
+            }
+            None => {
+                // First branch: initialize with this branch's set
+                if_scope.definitely_initialized_properties = Some(branch_initialized);
+            }
+        }
+
+        // Union semantics for possibly_initialized
+        outer_block_context
+            .possibly_initialized_properties
+            .extend(if_block_context.possibly_initialized_properties.iter().cloned());
+
+        // Same for method calls
+        let branch_called = std::mem::take(&mut if_block_context.definitely_called_methods);
+        match &mut if_scope.definitely_called_methods {
+            Some(existing) => {
+                existing.retain(|m| branch_called.contains(m));
+            }
+            None => {
+                if_scope.definitely_called_methods = Some(branch_called);
+            }
+        }
+
+        outer_block_context.called_methods.extend(if_block_context.called_methods.iter().cloned());
+    }
     let mut redefined_variables =
         if_block_context.get_redefined_locals(&outer_block_context.locals, false, &mut HashSet::default());
 

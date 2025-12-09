@@ -67,7 +67,7 @@ abstract class AbstractLexer
      *
      * @var Token<T, V>|null
      */
-    public Token|null $lookahead;
+    public Token|null $lookahead = null;
 
     /**
      * Checks whether a given token matches the current lookahead.

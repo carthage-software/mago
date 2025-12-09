@@ -10,7 +10,7 @@ function accepts_string(string $value): void
 
 class Container
 {
-    public mixed $out;
+    public mixed $out = null;
 }
 
 // Test case 1: Simple is_string on mixed variable (should work)

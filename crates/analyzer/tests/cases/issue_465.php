@@ -7,7 +7,7 @@ class PsalmFoo
     /**
      * @var null|array{uuid: non-empty-string}
      */
-    private null|array $data;
+    private null|array $data = null;
 
     /**
      * @return non-empty-string
@@ -39,7 +39,7 @@ class PHPStanFoo
     /**
      * @var null|array{uuid: non-empty-string}
      */
-    private null|array $data;
+    private null|array $data = null;
 
     /**
      * @return non-empty-string
@@ -71,7 +71,7 @@ class GenericFoo
     /**
      * @var null|array{uuid: non-empty-string}
      */
-    private null|array $data;
+    private null|array $data = null;
 
     /**
      * @return non-empty-string

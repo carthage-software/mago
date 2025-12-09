@@ -60,6 +60,60 @@ These flags control specific, powerful analysis capabilities.
 | `check-arrow-function-missing-type-hints` | `false` | When `true`, checks arrow functions for missing type hints when `check-missing-type-hints` is enabled. |
 | `register-super-globals`              | `true`  | Automatically register PHP superglobals (e.g., `$_GET`, `$_POST`) for analysis.                      |
 | `trust-existence-checks`              | `true`  | When `true`, narrows types based on `method_exists()`, `property_exists()`, `function_exists()`, and `defined()` checks. |
+| `check-property-initialization`       | `false` | When `true`, checks that typed properties are initialized in constructors or class initializers.      |
+
+## Property initialization
+
+These options control how the analyzer checks property initialization.
+
+| Option                           | Type       | Default | Description                                                                         |
+| :------------------------------- | :--------- | :------ | :---------------------------------------------------------------------------------- |
+| `check-property-initialization`  | `bool`     | `false` | Enable/disable property initialization checking entirely.                            |
+| `class-initializers`             | `string[]` | `[]`    | Method names treated as class initializers (like `__construct`).                     |
+
+### How it works
+
+When `check-property-initialization` is enabled, the analyzer reports:
+- **`missing-constructor`**: Classes with typed properties that have no constructor to initialize them
+- **`uninitialized-property`**: Typed properties not initialized in the constructor
+
+The `class-initializers` setting allows you to specify additional methods that should be treated as initializers. Properties initialized in these methods count as "definitely initialized", just like in `__construct`. This is useful for frameworks that use lifecycle methods like:
+- PHPUnit's `setUp()` method for test classes
+- Framework-specific `boot()` or `initialize()` methods
+
+### Example
+
+```toml
+[analyzer]
+# Treat setUp as a class initializer (for PHPUnit tests)
+class-initializers = ["setUp", "initialize", "boot"]
+```
+
+With this configuration, the following code won't trigger false positives:
+
+```php
+class MyTest extends TestCase
+{
+    private string $name;
+
+    protected function setUp(): void
+    {
+        // Property initialized in setUp - no error reported
+        $this->name = "test";
+    }
+}
+```
+
+### Enabling property initialization checks
+
+Property initialization checking is disabled by default. To enable it:
+
+```toml
+[analyzer]
+check-property-initialization = true
+```
+
+This enables both `missing-constructor` and `uninitialized-property` issues.
 
 ## Exception filtering
 

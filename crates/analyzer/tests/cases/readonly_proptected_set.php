@@ -4,6 +4,10 @@ class A
 {
     public readonly string $foo;
 
+    public function __construct() {
+        $this->foo = 'initial';
+    }
+
     /**
      * @mago-expect analysis:invalid-property-write - Cannot modify a readonly property after initialization
      */

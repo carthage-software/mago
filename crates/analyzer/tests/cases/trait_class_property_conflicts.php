@@ -79,7 +79,7 @@ trait T6
 class C6
 {
     // @mago-expect analysis:incompatible-property-type
-    public string $prop;
+    public string $prop = '';
     use T6;
 }
 
@@ -113,6 +113,6 @@ trait T9
 class C8
 {
     // @mago-expect analysis:incompatible-property-visibility
-    public readonly string $prop;
+    public readonly string $prop = '';
     use T9;
 }

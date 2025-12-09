@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 interface ResponseInterface {}
+
+// @mago-expect analysis:missing-constructor
 class Response implements ResponseInterface
 {
     use Responseable;
