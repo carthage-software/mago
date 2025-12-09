@@ -31,6 +31,7 @@ indexmap = { workspace = true }
 ordered-float = { workspace = true }
 bitflags = { workspace = true }
 bumpalo = { workspace = true }
+itertools = { workspace = true }
 
 [dev-dependencies]
 criterion = { workspace = true }

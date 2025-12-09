@@ -1,3 +1,5 @@
+use itertools::Itertools;
+
 use mago_atom::Atom;
 use mago_atom::AtomSet;
 use mago_reporting::Annotation;
@@ -121,7 +123,7 @@ pub fn populate_class_like_metadata_iterative(
         metadata.declaring_method_ids.insert(*method_name, method_id);
     }
 
-    for trait_name in metadata.used_traits.iter().copied().collect::<Vec<_>>() {
+    for trait_name in metadata.used_traits.iter().copied().sorted().collect::<Vec<_>>() {
         merge_metadata_from_trait(&mut metadata, codebase, trait_name, symbol_references);
     }
 
@@ -129,7 +131,7 @@ pub fn populate_class_like_metadata_iterative(
         merge_metadata_from_parent_class_like(&mut metadata, codebase, parent_classname, symbol_references);
     }
 
-    let direct_parent_interfaces = metadata.direct_parent_interfaces.iter().copied().collect::<Vec<_>>();
+    let direct_parent_interfaces = metadata.direct_parent_interfaces.iter().copied().sorted().collect::<Vec<_>>();
     for direct_parent_interface in direct_parent_interfaces {
         merge_interface_metadata_from_parent_interface(
             &mut metadata,
@@ -139,11 +141,11 @@ pub fn populate_class_like_metadata_iterative(
         );
     }
 
-    for required_class in metadata.require_extends.iter().copied().collect::<Vec<_>>() {
+    for required_class in metadata.require_extends.iter().copied().sorted().collect::<Vec<_>>() {
         merge_metadata_from_required_class_like(&mut metadata, codebase, required_class, symbol_references);
     }
 
-    for required_interface in metadata.require_implements.iter().copied().collect::<Vec<_>>() {
+    for required_interface in metadata.require_implements.iter().copied().sorted().collect::<Vec<_>>() {
         merge_interface_metadata_from_parent_interface(&mut metadata, codebase, required_interface, symbol_references);
     }
 

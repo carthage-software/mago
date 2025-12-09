@@ -1,5 +1,6 @@
 use ahash::RandomState;
 use indexmap::IndexMap;
+use itertools::Itertools;
 
 use mago_atom::Atom;
 use mago_atom::ascii_lowercase_atom;
@@ -1602,7 +1603,7 @@ fn check_trait_property_conflicts<'ctx, 'ast, 'arena>(
     }
 
     let mut class_properties: IndexMap<Atom, &PropertyMetadata> = IndexMap::new();
-    for (property_name, property_metadata) in &class_like_metadata.properties {
+    for (property_name, property_metadata) in class_like_metadata.properties.iter().sorted_by_key(|(k, _)| *k) {
         if let Some(declaring_class) = class_like_metadata.declaring_property_ids.get(property_name)
             && declaring_class == &class_like_metadata.name
         {
@@ -1625,7 +1626,8 @@ fn check_trait_property_conflicts<'ctx, 'ast, 'arena>(
                     continue;
                 };
 
-                for (property_name, first_property) in &first_trait_metadata.properties {
+                for (property_name, first_property) in first_trait_metadata.properties.iter().sorted_by_key(|(k, _)| *k)
+                {
                     let Some(second_property) = second_trait_metadata.properties.get(property_name) else {
                         continue;
                     };
@@ -1660,7 +1662,9 @@ fn check_trait_property_conflicts<'ctx, 'ast, 'arena>(
                         continue;
                     };
 
-                    for (property_name, first_property) in &first_trait_metadata.properties {
+                    for (property_name, first_property) in
+                        first_trait_metadata.properties.iter().sorted_by_key(|(k, _)| *k)
+                    {
                         let Some(second_property) = second_trait_metadata.properties.get(property_name) else {
                             continue;
                         };
@@ -1689,7 +1693,7 @@ fn check_trait_property_conflicts<'ctx, 'ast, 'arena>(
                 continue;
             };
 
-            for (property_name, trait_property) in &first_trait_metadata.properties {
+            for (property_name, trait_property) in first_trait_metadata.properties.iter().sorted_by_key(|(k, _)| *k) {
                 let Some(class_property) = class_properties.get(property_name) else {
                     continue;
                 };

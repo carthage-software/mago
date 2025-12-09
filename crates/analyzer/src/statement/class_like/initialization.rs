@@ -1,4 +1,5 @@
 use ahash::HashSet;
+use itertools::Itertools;
 
 use mago_atom::Atom;
 use mago_atom::atom;
@@ -35,6 +36,7 @@ pub fn check_property_initialization<'ctx, 'arena>(
     let uninitialized_properties: Vec<_> = class_like_metadata
         .declaring_property_ids
         .iter()
+        .sorted_by_key(|(k, _)| *k)
         .filter_map(|(name, declaring_class)| {
             let declaring_meta = context.codebase.get_class_like(declaring_class)?;
             let prop = declaring_meta.properties.get(name)?;

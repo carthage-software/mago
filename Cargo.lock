@@ -1711,6 +1711,7 @@ dependencies = [
  "criterion",
  "derivative",
  "indexmap",
+ "itertools 0.14.0",
  "mago-atom",
  "mago-database",
  "mago-docblock",
