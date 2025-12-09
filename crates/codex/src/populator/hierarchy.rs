@@ -268,6 +268,62 @@ pub fn populate_class_like_types(
                 force_repopulation,
             );
         }
+
+        for hook in property_metadata.hooks.values_mut() {
+            if let Some(hook_return_type) = &mut hook.return_type_metadata {
+                populate_union_type(
+                    &mut hook_return_type.type_union,
+                    codebase_symbols,
+                    Some(&property_reference_source),
+                    symbol_references,
+                    force_repopulation,
+                );
+            }
+
+            let Some(hook_parameter) = hook.parameter.as_mut() else {
+                continue;
+            };
+
+            if let Some(hook_parameter_type_declaration) = &mut hook_parameter.type_declaration_metadata {
+                populate_union_type(
+                    &mut hook_parameter_type_declaration.type_union,
+                    codebase_symbols,
+                    Some(&property_reference_source),
+                    symbol_references,
+                    force_repopulation,
+                );
+            }
+
+            if let Some(hook_parameter_type) = &mut hook_parameter.type_metadata {
+                populate_union_type(
+                    &mut hook_parameter_type.type_union,
+                    codebase_symbols,
+                    Some(&property_reference_source),
+                    symbol_references,
+                    force_repopulation,
+                );
+            }
+
+            if let Some(hook_parameter_out_type) = &mut hook_parameter.out_type {
+                populate_union_type(
+                    &mut hook_parameter_out_type.type_union,
+                    codebase_symbols,
+                    Some(&property_reference_source),
+                    symbol_references,
+                    force_repopulation,
+                );
+            }
+
+            if let Some(hook_parameter_default_type) = &mut hook_parameter.default_type {
+                populate_union_type(
+                    &mut hook_parameter_default_type.type_union,
+                    codebase_symbols,
+                    Some(&property_reference_source),
+                    symbol_references,
+                    force_repopulation,
+                );
+            }
+        }
     }
 
     for v in metadata.template_types.iter_mut().flat_map(|m| m.1.iter_mut()).map(|template| &mut template.1) {
