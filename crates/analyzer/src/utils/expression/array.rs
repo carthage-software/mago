@@ -748,14 +748,14 @@ pub(crate) fn handle_array_access_on_keyed_array<'ctx, 'arena>(
                     }
 
                     if has_value_parameter { get_mixed() } else { get_null() }
-                } else if has_value_parameter && !value_parameter.is_mixed() {
+                } else if has_value_parameter {
                     // Inside isset() check on array with generic parameters - the key might exist at runtime
                     // Don't report impossible isset - just return the value type as possibly undefined
                     *has_possibly_undefined = true;
 
-                    value_parameter.into_owned()
+                    if value_parameter.is_mixed() { get_mixed() } else { value_parameter.into_owned() }
                 } else {
-                    // Inside isset() but array has NO generic parameters (or only mixed) - key definitely doesn't exist
+                    // Inside isset() but array has NO generic parameters - key definitely doesn't exist
                     // However, if we're processing a union type, check if ANY other member has this key
                     // Only report error if NONE of the union members have the key (type narrowing is valid otherwise)
                     let should_report_error = if array_like_type.types.len() > 1 {
