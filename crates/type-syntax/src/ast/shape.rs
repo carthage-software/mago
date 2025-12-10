@@ -52,6 +52,7 @@ pub struct ShapeField<'input> {
 pub struct ShapeAdditionalFields<'input> {
     pub ellipsis: Span,
     pub parameters: Option<GenericParameters<'input>>,
+    pub comma: Option<Span>,
 }
 
 impl ShapeTypeKind {
@@ -125,10 +126,12 @@ impl HasSpan for ShapeField<'_> {
 
 impl HasSpan for ShapeAdditionalFields<'_> {
     fn span(&self) -> Span {
-        match &self.parameters {
+        let span = match &self.parameters {
             Some(generics) => self.ellipsis.join(generics.span()),
             None => self.ellipsis,
-        }
+        };
+
+        if let Some(comma) = self.comma { span.join(comma) } else { span }
     }
 }
 

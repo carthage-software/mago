@@ -385,6 +385,48 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_nested_spread_singleline() {
+        // Test nested spreads on single line - this should work
+        match do_parse("array{a?: int, ...<string, array{b?: int, ...<string, int>}>}") {
+            Ok(Type::Shape(shape)) => {
+                assert_eq!(shape.fields.len(), 1);
+                assert!(shape.additional_fields.is_some());
+            }
+            res => panic!("Expected Ok(Type::Shape), got {res:?}"),
+        }
+    }
+
+    #[test]
+    fn test_parse_nested_spread_multiline() {
+        match do_parse(
+            "array{
+                a?: int,
+                ...<string, array{
+                    b?: int,
+                    ...<string, int>,
+                }>
+            }",
+        ) {
+            Ok(Type::Shape(shape)) => {
+                assert_eq!(shape.fields.len(), 1);
+                assert!(shape.additional_fields.is_some());
+            }
+            res => panic!("Expected Ok(Type::Shape), got {res:?}"),
+        }
+    }
+
+    #[test]
+    fn test_parse_spread_with_trailing_comma() {
+        match do_parse("array{a?: int, ...<string, int>,}") {
+            Ok(Type::Shape(shape)) => {
+                assert_eq!(shape.fields.len(), 1);
+                assert!(shape.additional_fields.is_some());
+            }
+            res => panic!("Expected Ok(Type::Shape), got {res:?}"),
+        }
+    }
+
+    #[test]
     fn test_parse_error_unexpected_token() {
         let result = do_parse("int|>");
         assert!(result.is_err());

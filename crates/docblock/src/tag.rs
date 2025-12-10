@@ -919,6 +919,13 @@ pub fn split_tag_content(content: &str, input_span: Span) -> Option<(TypeString,
 
         if char == '/' && iter.peek().is_some_and(|&(_, c)| c == '/') {
             if !bracket_stack.is_empty() {
+                while let Some(&(_, next_char)) = iter.peek() {
+                    if next_char == '\n' {
+                        break;
+                    }
+
+                    iter.next();
+                }
                 last_char_was_significant = true;
                 continue;
             }
