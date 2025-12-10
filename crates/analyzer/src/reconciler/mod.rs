@@ -1138,7 +1138,7 @@ where
     if parameter.constraint.is_never() { None } else { Some(TAtomic::GenericParameter(parameter)) }
 }
 
-fn map_generic_constraint_or_else<F, D>(generic_parameter: &TGenericParameter, d: D, f: F) -> Option<TAtomic>
+pub(crate) fn map_generic_constraint_or_else<F, D>(generic_parameter: &TGenericParameter, d: D, f: F) -> Option<TAtomic>
 where
     F: FnOnce(&TUnion) -> TUnion,
     D: FnOnce() -> TUnion,

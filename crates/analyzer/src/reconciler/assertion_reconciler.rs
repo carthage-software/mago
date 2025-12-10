@@ -34,6 +34,7 @@ use mago_codex::ttype::wrap_atomic;
 use mago_span::Span;
 
 use crate::context::Context;
+use crate::reconciler::map_generic_constraint_or_else;
 use crate::reconciler::negated_assertion_reconciler;
 use crate::reconciler::simple_assertion_reconciler;
 use crate::reconciler::trigger_issue_for_impossible;
@@ -840,10 +841,12 @@ fn handle_literal_equality_with_str(
         return if is_loose_equality { existing_var_type.clone() } else { TUnion::from_atomic(literal_asserted_type) };
     }
 
+    let mut acceptable_types = Vec::new();
+    let mut did_remove_type = false;
     for existing_var_atomic_type in existing_var_type.types.as_ref() {
         match existing_var_atomic_type {
             TAtomic::Scalar(TScalar::String(TString { literal: None | Some(TStringLiteral::Unspecified), .. })) => {
-                return TUnion::from_atomic(literal_asserted_type);
+                acceptable_types.push(literal_asserted_type.clone());
             }
             TAtomic::Scalar(TScalar::String(TString {
                 literal: Some(TStringLiteral::Value(existing_str)), ..
@@ -852,53 +855,80 @@ fn handle_literal_equality_with_str(
                     && let Some(key) = &key
                     && let Some(span) = span
                 {
-                    trigger_issue_for_impossible(context, old_var_type_atom, key, assertion, true, negated, span);
+                    trigger_issue_for_impossible(
+                        context,
+                        old_var_type_atom.clone(),
+                        key,
+                        assertion,
+                        true,
+                        negated,
+                        span,
+                    );
                 }
 
-                return TUnion::from_atomic(literal_asserted_type);
+                acceptable_types.push(literal_asserted_type.clone());
             }
             TAtomic::Scalar(TScalar::Float(TFloat::Literal(float_value)))
                 if is_loose_equality && float_value.to_string() == assertion_str_val =>
             {
-                return TUnion::from_atomic(existing_var_atomic_type.clone());
+                acceptable_types.push(existing_var_atomic_type.clone());
             }
             TAtomic::Scalar(TScalar::Bool(TBool { value: Some(false) }))
                 if is_loose_equality && assertion_str_val.is_empty() =>
             {
-                return TUnion::from_atomic(existing_var_atomic_type.clone());
+                acceptable_types.push(existing_var_atomic_type.clone());
             }
             TAtomic::Scalar(TScalar::Bool(TBool { value: Some(true) }))
                 if is_loose_equality && assertion_str_val == "1" =>
             {
-                return TUnion::from_atomic(existing_var_atomic_type.clone());
+                acceptable_types.push(existing_var_atomic_type.clone());
             }
             TAtomic::Scalar(TScalar::Integer(TInteger::Literal(int_value)))
                 if is_loose_equality && int_value.to_string() == assertion_str_val =>
             {
-                return TUnion::from_atomic(existing_var_atomic_type.clone());
+                acceptable_types.push(existing_var_atomic_type.clone());
             }
-            _ => {}
+            TAtomic::Scalar(TScalar::Float(TFloat::Float)) if is_loose_equality => {
+                acceptable_types.push(existing_var_atomic_type.clone());
+            }
+            TAtomic::Scalar(TScalar::Integer(TInteger::Unspecified)) if is_loose_equality => {
+                acceptable_types.push(existing_var_atomic_type.clone());
+            }
+            TAtomic::GenericParameter(generic_parameter) => {
+                did_remove_type = true;
+                let get_string_literal = || TUnion::from_atomic(literal_asserted_type.clone());
+                if let Some(atomic) =
+                    map_generic_constraint_or_else(generic_parameter, get_string_literal, |constraint| {
+                        handle_literal_equality_with_str(
+                            context,
+                            assertion,
+                            assertion_str_val,
+                            constraint,
+                            None,
+                            old_var_type_atom.clone(),
+                            None,
+                            negated,
+                        )
+                    })
+                {
+                    acceptable_types.push(atomic);
+                }
+            }
+            _ => {
+                did_remove_type = true;
+            }
         }
     }
 
-    if is_loose_equality {
-        for existing_var_atomic_type in existing_var_type.types.as_ref() {
-            match existing_var_atomic_type {
-                TAtomic::Scalar(TScalar::Float(TFloat::Float)) => {
-                    return TUnion::from_atomic(existing_var_atomic_type.clone());
-                }
-                TAtomic::Scalar(TScalar::Integer(TInteger::Unspecified)) => {
-                    return TUnion::from_atomic(existing_var_atomic_type.clone());
-                }
-                _ => {}
-            }
-        }
-    }
-
-    if let Some(key) = &key
+    if acceptable_types.is_empty()
+        && let Some(key) = &key
         && let Some(span) = span
     {
-        trigger_issue_for_impossible(context, old_var_type_atom, key, assertion, false, negated, span);
+        trigger_issue_for_impossible(context, old_var_type_atom, key, assertion, !did_remove_type, negated, span);
+    }
+
+    if !acceptable_types.is_empty() {
+        return TUnion::from_vec(acceptable_types);
     }
 
     get_never()
