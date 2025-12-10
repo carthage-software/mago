@@ -164,13 +164,11 @@ pub fn parse_array_like_type<'input>(stream: &mut TypeTokenStream<'input>) -> Re
             if !stream.is_at(TypeTokenKind::Ellipsis)? {
                 None
             } else {
-                let result = Some(ShapeAdditionalFields {
+                Some(ShapeAdditionalFields {
                     ellipsis: stream.consume()?.span,
                     parameters: parse_generic_parameters_or_none(stream)?,
                     comma: if stream.is_at(TypeTokenKind::Comma)? { Some(stream.consume()?.span) } else { None },
-                });
-
-                result
+                })
             }
         },
         right_brace: stream.eat(TypeTokenKind::RightBrace)?.span,
