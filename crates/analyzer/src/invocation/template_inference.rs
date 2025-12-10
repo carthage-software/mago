@@ -1059,7 +1059,7 @@ fn resolve_atomic_unbound_templates(atomic: &TAtomic) -> TAtomic {
             let new_array = match array {
                 TArray::List(list) => {
                     let mut new_list = list.clone();
-                    new_list.element_type = Box::new(resolve_unbound_templates_to_constraints(&list.element_type));
+                    *new_list.element_type = resolve_unbound_templates_to_constraints(&list.element_type);
                     if let Some(known_elements) = &list.known_elements {
                         let new_elements: BTreeMap<usize, (bool, TUnion)> = known_elements
                             .iter()
@@ -1080,9 +1080,7 @@ fn resolve_atomic_unbound_templates(atomic: &TAtomic) -> TAtomic {
                     if let Some(known_items) = &keyed.known_items {
                         let new_items: BTreeMap<ArrayKey, (bool, TUnion)> = known_items
                             .iter()
-                            .map(|(k, (optional, v))| {
-                                (k.clone(), (*optional, resolve_unbound_templates_to_constraints(v)))
-                            })
+                            .map(|(k, (optional, v))| (*k, (*optional, resolve_unbound_templates_to_constraints(v))))
                             .collect();
                         new_keyed.known_items = Some(new_items);
                     }
@@ -1100,7 +1098,7 @@ fn resolve_atomic_unbound_templates(atomic: &TAtomic) -> TAtomic {
                     }
                     TCallable::Signature(new_sig)
                 }
-                TCallable::Alias(alias) => TCallable::Alias(alias.clone()),
+                TCallable::Alias(alias) => TCallable::Alias(*alias),
             };
             TAtomic::Callable(new_callable)
         }
