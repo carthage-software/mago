@@ -21,6 +21,8 @@ extend-ignore-re = [
 
 [default.extend-words]
 "trivias" = "trivias"
+"invokable" = "invokable"
+"encrypter" = "encrypter"
 
 [type.rust.extend-identifiers]
 "thr" = "thr"
