@@ -3,9 +3,11 @@ use ahash::HashMap;
 use mago_codex::ttype::add_union_type;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::callable::TCallable;
+use mago_codex::ttype::cast::cast_atomic_to_callable;
 use mago_codex::ttype::comparator::ComparisonResult;
 use mago_codex::ttype::comparator::union_comparator::can_expression_types_be_identical;
 use mago_codex::ttype::comparator::union_comparator::is_contained_by;
+use mago_codex::ttype::expander::get_signature_of_function_like_identifier;
 use mago_codex::ttype::union::TUnion;
 use mago_codex::ttype::*;
 use mago_reporting::Annotation;
@@ -337,6 +339,27 @@ pub fn verify_argument_type<'ctx, 'ast, 'arena>(
     } else if !union_comparison_result.type_coerced.unwrap_or(false) {
         let types_can_be_identical =
             can_expression_types_be_identical(context.codebase, input_type, parameter_type, false, false);
+
+        if types_can_be_identical && parameter_type.is_callable() {
+            let all_inputs_are_resolvable_aliases = input_type.types.iter().all(|atomic| {
+                if matches!(atomic, TAtomic::Callable(_)) {
+                    false
+                } else if let Some(callable) = cast_atomic_to_callable(atomic, context.codebase, None) {
+                    match callable.as_ref() {
+                        TCallable::Alias(id) => {
+                            get_signature_of_function_like_identifier(id, context.codebase).is_some()
+                        }
+                        TCallable::Signature(_) => false,
+                    }
+                } else {
+                    false
+                }
+            });
+
+            if all_inputs_are_resolvable_aliases {
+                return;
+            }
+        }
 
         let kind;
         let mut issue;

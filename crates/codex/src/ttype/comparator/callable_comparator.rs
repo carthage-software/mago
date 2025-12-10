@@ -7,6 +7,7 @@ use crate::ttype::cast::cast_atomic_to_callable;
 use crate::ttype::comparator::ComparisonResult;
 use crate::ttype::comparator::union_comparator;
 use crate::ttype::expander::get_signature_of_function_like_identifier;
+use crate::ttype::union::TUnion;
 
 pub(crate) fn is_contained_by(
     codebase: &CodebaseMetadata,
@@ -74,9 +75,16 @@ pub(crate) fn is_contained_by(
 
         let mut parameter_comparison_result = ComparisonResult::new();
 
+        let container_for_comparison =
+            if container_parameter_type.accepts_null() && !input_parameter_type.accepts_null() {
+                TUnion::from_vec(container_parameter_type.get_non_nullable_types())
+            } else {
+                container_parameter_type.clone()
+            };
+
         if !union_comparator::is_contained_by(
             codebase,
-            container_parameter_type,
+            &container_for_comparison,
             input_parameter_type,
             false,
             false,

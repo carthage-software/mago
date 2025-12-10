@@ -213,10 +213,14 @@ fn add_parameter_types_to_context<'ctx, 'arena>(
             get_mixed()
         };
 
-        // Now, decide which type to use: the inferred one or the declared one.
-        let mut final_parameter_type = if let Some(inferred_map) = inferred_parameter_types.as_mut() {
-            // If an inferred type exists for this parameter index, take it.
-            // Otherwise, fall back to the type we derived from the signature.
+        let declared_type_is_specific = parameter_metadata.get_type_metadata().is_some_and(|tm| {
+            let union = &tm.type_union;
+            union.is_list() || (!union.is_mixed() && !union.is_vanilla_mixed() && !union.is_array())
+        });
+
+        let mut final_parameter_type = if declared_type_is_specific {
+            declared_parameter_type
+        } else if let Some(inferred_map) = inferred_parameter_types.as_mut() {
             inferred_map.remove(&i).unwrap_or(declared_parameter_type)
         } else {
             declared_parameter_type

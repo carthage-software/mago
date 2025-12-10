@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::collections::BTreeMap;
 
 use ahash::HashMap;
 
@@ -15,10 +16,12 @@ use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::array::TArray;
 use mago_codex::ttype::atomic::array::key::ArrayKey;
 use mago_codex::ttype::atomic::callable::TCallable;
+use mago_codex::ttype::atomic::mixed::TMixed;
 use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::atomic::object::named::TNamedObject;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::class_like_string::TClassLikeString;
+use mago_codex::ttype::cast::cast_atomic_to_callable;
 use mago_codex::ttype::comparator::ComparisonResult;
 use mago_codex::ttype::comparator::atomic_comparator;
 use mago_codex::ttype::comparator::union_comparator;
@@ -491,9 +494,9 @@ fn infer_templates_from_input_and_container_types(
                 };
 
                 for input_atomic in residual_input_type.types.as_ref() {
-                    let input_signature = match input_atomic {
+                    let (input_signature, is_cast_from_non_callable) = match input_atomic {
                         TAtomic::Callable(TCallable::Signature(argument_signature)) => {
-                            Cow::Borrowed(argument_signature)
+                            (Cow::Borrowed(argument_signature), false)
                         }
                         TAtomic::Callable(TCallable::Alias(id)) => {
                             let Some(signature) = get_signature_of_function_like_identifier(id, context.codebase)
@@ -501,9 +504,28 @@ fn infer_templates_from_input_and_container_types(
                                 continue;
                             };
 
-                            Cow::Owned(signature)
+                            (Cow::Owned(signature), false)
                         }
-                        _ => continue,
+                        other => {
+                            let Some(callable) = cast_atomic_to_callable(other, context.codebase, None) else {
+                                continue;
+                            };
+
+                            let signature = match callable.into_owned() {
+                                TCallable::Signature(sig) => sig,
+                                TCallable::Alias(id) => {
+                                    let Some(signature) =
+                                        get_signature_of_function_like_identifier(&id, context.codebase)
+                                    else {
+                                        continue;
+                                    };
+
+                                    signature
+                                }
+                            };
+
+                            (Cow::Owned(signature), true)
+                        }
                     };
 
                     let container_parameters = container_signature.get_parameters();
@@ -529,10 +551,16 @@ fn infer_templates_from_input_and_container_types(
                             continue;
                         };
 
+                        let input_param_for_inference = if is_cast_from_non_callable {
+                            Cow::Owned(resolve_unbound_templates_to_constraints(input_parameter_type))
+                        } else {
+                            Cow::Borrowed(input_parameter_type)
+                        };
+
                         infer_templates_from_input_and_container_types(
                             context,
                             container_parameter_type,
-                            input_parameter_type,
+                            &input_param_for_inference,
                             template_result,
                             InferenceOptions { infer_only_if_new: true, ..options },
                             violations,
@@ -547,10 +575,16 @@ fn infer_templates_from_input_and_container_types(
                         continue;
                     };
 
+                    let input_return_for_inference = if is_cast_from_non_callable {
+                        Cow::Owned(resolve_unbound_templates_to_constraints(input_return))
+                    } else {
+                        Cow::Borrowed(input_return)
+                    };
+
                     infer_templates_from_input_and_container_types(
                         context,
                         container_return,
-                        input_return,
+                        &input_return_for_inference,
                         template_result,
                         InferenceOptions { infer_only_if_new: false, ..options },
                         violations,
@@ -988,4 +1022,88 @@ pub fn infer_parameter_templates_from_default<'ctx, 'arena>(
         InferenceOptions { infer_only_if_new: default_type.is_callable(), argument_offset: None, source_span: None },
         &mut Vec::new(),
     );
+}
+
+/// Replaces unbound GenericParameter types with their constraint types.
+///
+/// When a callable signature has template parameters that aren't bound to concrete types,
+/// this function replaces them with their declared constraints. This is useful when using
+/// function signatures for template inference, where unbound templates should resolve to
+/// their upper bounds.
+///
+/// # Example
+///
+/// For `array_merge` with signature `(array<K, V>...): array<K, V>` where `K extends array-key`
+/// and `V extends mixed`, this function would transform the return type to `array<array-key, mixed>`.
+fn resolve_unbound_templates_to_constraints(union: &TUnion) -> TUnion {
+    let new_types: Vec<TAtomic> = union.types.iter().map(resolve_atomic_unbound_templates).collect();
+
+    TUnion::from_vec(new_types)
+}
+
+fn resolve_atomic_unbound_templates(atomic: &TAtomic) -> TAtomic {
+    match atomic {
+        TAtomic::GenericParameter(generic) => {
+            // Replace unbound template with its constraint
+            let resolved_constraint = resolve_unbound_templates_to_constraints(&generic.constraint);
+
+            if resolved_constraint.is_array_key() {
+                TAtomic::Scalar(TScalar::ArrayKey)
+            } else if resolved_constraint.is_single() {
+                resolved_constraint.get_single().clone()
+            } else {
+                TAtomic::Mixed(TMixed::new())
+            }
+        }
+        TAtomic::Array(array) => {
+            let new_array = match array {
+                TArray::List(list) => {
+                    let mut new_list = list.clone();
+                    new_list.element_type = Box::new(resolve_unbound_templates_to_constraints(&list.element_type));
+                    if let Some(known_elements) = &list.known_elements {
+                        let new_elements: BTreeMap<usize, (bool, TUnion)> = known_elements
+                            .iter()
+                            .map(|(k, (optional, v))| (*k, (*optional, resolve_unbound_templates_to_constraints(v))))
+                            .collect();
+                        new_list.known_elements = Some(new_elements);
+                    }
+                    TArray::List(new_list)
+                }
+                TArray::Keyed(keyed) => {
+                    let mut new_keyed = keyed.clone();
+                    if let Some(params) = &keyed.parameters {
+                        new_keyed.parameters = Some((
+                            Box::new(resolve_unbound_templates_to_constraints(&params.0)),
+                            Box::new(resolve_unbound_templates_to_constraints(&params.1)),
+                        ));
+                    }
+                    if let Some(known_items) = &keyed.known_items {
+                        let new_items: BTreeMap<ArrayKey, (bool, TUnion)> = known_items
+                            .iter()
+                            .map(|(k, (optional, v))| {
+                                (k.clone(), (*optional, resolve_unbound_templates_to_constraints(v)))
+                            })
+                            .collect();
+                        new_keyed.known_items = Some(new_items);
+                    }
+                    TArray::Keyed(new_keyed)
+                }
+            };
+            TAtomic::Array(new_array)
+        }
+        TAtomic::Callable(callable) => {
+            let new_callable = match callable {
+                TCallable::Signature(sig) => {
+                    let mut new_sig = sig.clone();
+                    if let Some(return_type) = &sig.return_type {
+                        new_sig.return_type = Some(Box::new(resolve_unbound_templates_to_constraints(return_type)));
+                    }
+                    TCallable::Signature(new_sig)
+                }
+                TCallable::Alias(alias) => TCallable::Alias(alias.clone()),
+            };
+            TAtomic::Callable(new_callable)
+        }
+        _ => atomic.clone(),
+    }
 }
