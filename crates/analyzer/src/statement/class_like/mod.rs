@@ -539,7 +539,16 @@ pub(crate) fn analyze_class_like<'ctx, 'ast, 'arena>(
                                 p.hooks.get(hook_name).map(|h| !h.is_abstract).unwrap_or(false)
                             }
                         })
-                        .unwrap_or(false);
+                        .unwrap_or_else(|| {
+                            class_like_metadata.all_parent_classes.iter().any(|parent_class_fqcn| {
+                                context
+                                    .codebase
+                                    .get_class_like(parent_class_fqcn)
+                                    .and_then(|parent| parent.properties.get(property_name))
+                                    .map(|prop| prop.hooks.get(hook_name).map(|h| !h.is_abstract).unwrap_or(false))
+                                    .unwrap_or(false)
+                            })
+                        });
 
                     if !is_implemented {
                         let fqcn = parent_metadata.original_name;
