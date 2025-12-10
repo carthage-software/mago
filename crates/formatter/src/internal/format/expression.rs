@@ -1005,7 +1005,7 @@ impl<'arena> Format<'arena> for CompositeString<'arena> {
 impl<'arena> Format<'arena> for DocumentString<'arena> {
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
         wrap!(f, self, DocumentString, {
-            let mut contents = vec![in f.arena; Document::String("<<<")];
+            let mut contents = vec![in f.arena; Document::LineSuffixBoundary, Document::String("<<<")];
             match self.kind {
                 DocumentKind::Heredoc => {
                     contents.push(Document::String(self.label));
