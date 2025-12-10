@@ -625,6 +625,7 @@ impl TAtomic {
             TAtomic::Callable(_)
                 | TAtomic::Scalar(TScalar::String(_))
                 | TAtomic::Array(TArray::List(_))
+                | TAtomic::Array(TArray::Keyed(_))
                 | TAtomic::Object(TObject::Named(_))
         )
     }

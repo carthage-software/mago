@@ -19,6 +19,11 @@ pub(crate) fn is_contained_by(
     };
 
     let Some(input_callable) = cast_atomic_to_callable(input_type_part, codebase, None) else {
+        if input_type_part.can_be_callable() {
+            atomic_comparison_result.type_coerced = Some(true);
+            atomic_comparison_result.type_coerced_from_nested_mixed = Some(true);
+        }
+
         return false;
     };
 

@@ -434,6 +434,7 @@ test_case!(issue_716);
 test_case!(issue_717);
 test_case!(issue_718);
 test_case!(issue_719);
+test_case!(issue_721);
 test_case!(issue_722);
 
 #[test]

@@ -527,6 +527,20 @@ pub(crate) fn can_be_identical<'a>(
         return true;
     }
 
+    if matches!(first_part, TAtomic::Callable(_))
+        && !matches!(second_part, TAtomic::Callable(_))
+        && second_part.can_be_callable()
+    {
+        return true;
+    }
+
+    if matches!(second_part, TAtomic::Callable(_))
+        && !matches!(first_part, TAtomic::Callable(_))
+        && first_part.can_be_callable()
+    {
+        return true;
+    }
+
     if let (TAtomic::Object(TObject::Enum(first_enum)), TAtomic::Object(TObject::Enum(second_enum))) =
         (first_part, second_part)
         && first_enum.name == second_enum.name

@@ -11,6 +11,8 @@ use crate::misc::GenericParent;
 use crate::ttype::TType;
 use crate::ttype::atomic::TAtomic;
 use crate::ttype::atomic::array::TArray;
+use crate::ttype::atomic::array::key::ArrayKey;
+use crate::ttype::atomic::array::keyed::TKeyedArray;
 use crate::ttype::atomic::array::list::TList;
 use crate::ttype::atomic::callable::TCallable;
 use crate::ttype::atomic::object::TObject;
@@ -69,6 +71,16 @@ pub fn cast_atomic_to_callable<'a>(
 
     if let TAtomic::Array(TArray::List(TList { known_elements: Some(known_elements), .. })) = atomic {
         return handle_array_callable(known_elements, codebase, template_result);
+    }
+
+    if let TAtomic::Array(TArray::Keyed(TKeyedArray { known_items: Some(known_items), .. })) = atomic {
+        let key_0 = ArrayKey::Integer(0);
+        let key_1 = ArrayKey::Integer(1);
+
+        if let (Some(class_item), Some(method_item)) = (known_items.get(&key_0), known_items.get(&key_1)) {
+            let known_elements = BTreeMap::from([(0, class_item.clone()), (1, method_item.clone())]);
+            return handle_array_callable(&known_elements, codebase, template_result);
+        }
     }
 
     None

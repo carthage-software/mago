@@ -3,6 +3,7 @@ use mago_atom::atom;
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::atomic::callable::TCallable;
+use mago_codex::ttype::atomic::callable::TCallableSignature;
 use mago_codex::ttype::cast::cast_atomic_to_callable;
 use mago_codex::ttype::template::TemplateResult;
 use mago_reporting::Annotation;
@@ -118,6 +119,12 @@ pub(super) fn resolve_targets<'ctx, 'arena>(
                     }
                 }
             };
+        } else if atomic.can_be_callable() {
+            targets.push(InvocationTarget::Callable {
+                signature: TCallableSignature::mixed(false),
+                span: expression.span(),
+                source: None,
+            });
         } else {
             let type_name = atomic.get_id();
 

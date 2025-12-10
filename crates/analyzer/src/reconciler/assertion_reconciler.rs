@@ -321,6 +321,14 @@ pub(crate) fn intersect_atomic_with_atomic(
         return Some(second_type.clone());
     }
 
+    if matches!(second_type, TAtomic::Callable(_)) && first_type.can_be_callable() {
+        return Some(first_type.clone());
+    }
+
+    if matches!(first_type, TAtomic::Callable(_)) && second_type.can_be_callable() {
+        return Some(second_type.clone());
+    }
+
     match (first_type, second_type) {
         (TAtomic::Object(TObject::Enum(first_enum)), TAtomic::Object(TObject::Enum(second_enum))) => {
             if context.codebase.is_instance_of(&first_enum.name, &second_enum.name)
