@@ -447,6 +447,32 @@ fn expand_use<'arena>(
 ) -> std::vec::Vec<ExpandedUseItem<'arena>> {
     let mut expanded_items = std::vec::Vec::new();
 
+    /// Extract namespace and name from a UseItem by splitting its full name path.
+    fn extract_namespace_and_name_from_item<'arena>(
+        f: &mut FormatterState<'_, 'arena>,
+        item: &'arena UseItem<'arena>,
+        mut namespace: Vec<'arena, &'arena str>,
+    ) -> (Vec<'arena, &'arena str>, &'arena str) {
+        let mut parts = item.name.value().split("\\").collect_in::<Vec<_>>(f.arena);
+        // SAFETY: split always returns at least one element
+        let name = unsafe { parts.pop().unwrap_unchecked() };
+        namespace.extend(parts);
+        (namespace, name)
+    }
+
+    /// Extract namespace and name from a grouped list (TypedList or MixedList).
+    /// The namespace is the list's namespace appended to the current namespace,
+    /// and the name is extracted from the first item.
+    fn extract_namespace_and_name_from_grouped_list<'arena>(
+        list_namespace: &'arena str,
+        first_item_name: Option<&'arena str>,
+        mut namespace: Vec<'arena, &'arena str>,
+    ) -> (Vec<'arena, &'arena str>, &'arena str) {
+        namespace.push(list_namespace);
+        let name = first_item_name.unwrap_or("");
+        (namespace, name)
+    }
+
     fn expand_items<'arena>(
         f: &mut FormatterState<'_, 'arena>,
         items: &'arena UseItems<'arena>,
@@ -464,16 +490,11 @@ fn expand_use<'arena>(
                     }
                 } else {
                     // Extract namespace and name from first item for sorting
-                    let (namespace, name) = if let Some(first_item) = seq.items.first() {
-                        let mut parts = first_item.name.value().split("\\").collect_in::<Vec<_>>(f.arena);
-                        // SAFETY: split always returns at least one element
-                        let name = unsafe { parts.pop().unwrap_unchecked() };
-                        let mut namespace = current_namespace.clone();
-                        namespace.extend(parts);
-                        (namespace, name)
-                    } else {
-                        (current_namespace, "")
-                    };
+                    let (namespace, name) = seq
+                        .items
+                        .first()
+                        .map(|item| extract_namespace_and_name_from_item(f, item, current_namespace.clone()))
+                        .unwrap_or((current_namespace, ""));
                     expanded_items.push(ExpandedUseItem { use_type, namespace, name, alias: None, original_node });
                 }
             }
@@ -491,16 +512,11 @@ fn expand_use<'arena>(
                     }
                 } else {
                     // Extract namespace and name from first item for sorting
-                    let (namespace, name) = if let Some(first_item) = seq.items.first() {
-                        let mut parts = first_item.name.value().split("\\").collect_in::<Vec<_>>(f.arena);
-                        // SAFETY: split always returns at least one element
-                        let name = unsafe { parts.pop().unwrap_unchecked() };
-                        let mut namespace = current_namespace.clone();
-                        namespace.extend(parts);
-                        (namespace, name)
-                    } else {
-                        (current_namespace, "")
-                    };
+                    let (namespace, name) = seq
+                        .items
+                        .first()
+                        .map(|item| extract_namespace_and_name_from_item(f, item, current_namespace.clone()))
+                        .unwrap_or((current_namespace, ""));
                     expanded_items.push(ExpandedUseItem {
                         use_type: Some(&seq.r#type),
                         namespace,
@@ -526,17 +542,12 @@ fn expand_use<'arena>(
                     }
                 } else {
                     // Extract namespace and name from first item for sorting
-                    let (namespace, name) = if let Some(first_item) = list.items.first() {
-                        let mut namespace = current_namespace.clone();
-                        namespace.push(list.namespace.value());
-                        // For grouped items, the name should be just the item name (not a full path)
-                        let name = first_item.name.value();
-                        (namespace, name)
-                    } else {
-                        let mut namespace = current_namespace.clone();
-                        namespace.push(list.namespace.value());
-                        (namespace, "")
-                    };
+                    // For grouped items, the name should be just the item name (not a full path)
+                    let (namespace, name) = extract_namespace_and_name_from_grouped_list(
+                        list.namespace.value(),
+                        list.items.first().map(|item| item.name.value()),
+                        current_namespace,
+                    );
                     expanded_items.push(ExpandedUseItem {
                         use_type: Some(&list.r#type),
                         namespace,
@@ -562,17 +573,12 @@ fn expand_use<'arena>(
                     }
                 } else {
                     // Extract namespace and name from first item for sorting
-                    let (namespace, name) = if let Some(first_item) = list.items.first() {
-                        let mut namespace = current_namespace.clone();
-                        namespace.push(list.namespace.value());
-                        // For grouped items, the name should be just the item name (not a full path)
-                        let name = first_item.item.name.value();
-                        (namespace, name)
-                    } else {
-                        let mut namespace = current_namespace.clone();
-                        namespace.push(list.namespace.value());
-                        (namespace, "")
-                    };
+                    // For grouped items, the name should be just the item name (not a full path)
+                    let (namespace, name) = extract_namespace_and_name_from_grouped_list(
+                        list.namespace.value(),
+                        list.items.first().map(|item| item.item.name.value()),
+                        current_namespace,
+                    );
                     expanded_items.push(ExpandedUseItem {
                         use_type: list.items.first().and_then(|item| item.r#type.as_ref()),
                         namespace,
