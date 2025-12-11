@@ -463,14 +463,18 @@ fn expand_use<'arena>(
                         expand_single_item(f, item, current_namespace.clone(), use_type, expanded_items, original_node);
                     }
                 } else {
-                    // If not expanding, create *one* ExpandedUseItem for the entire sequence.
-                    expanded_items.push(ExpandedUseItem {
-                        use_type,
-                        namespace: current_namespace,
-                        name: "", // We don't need name/alias when not expanding.
-                        alias: None,
-                        original_node,
-                    });
+                    // Extract namespace and name from first item for sorting
+                    let (namespace, name) = if let Some(first_item) = seq.items.first() {
+                        let mut parts = first_item.name.value().split("\\").collect_in::<Vec<_>>(f.arena);
+                        // SAFETY: split always returns at least one element
+                        let name = unsafe { parts.pop().unwrap_unchecked() };
+                        let mut namespace = current_namespace.clone();
+                        namespace.extend(parts);
+                        (namespace, name)
+                    } else {
+                        (current_namespace, "")
+                    };
+                    expanded_items.push(ExpandedUseItem { use_type, namespace, name, alias: None, original_node });
                 }
             }
             UseItems::TypedSequence(seq) => {
@@ -486,10 +490,21 @@ fn expand_use<'arena>(
                         );
                     }
                 } else {
+                    // Extract namespace and name from first item for sorting
+                    let (namespace, name) = if let Some(first_item) = seq.items.first() {
+                        let mut parts = first_item.name.value().split("\\").collect_in::<Vec<_>>(f.arena);
+                        // SAFETY: split always returns at least one element
+                        let name = unsafe { parts.pop().unwrap_unchecked() };
+                        let mut namespace = current_namespace.clone();
+                        namespace.extend(parts);
+                        (namespace, name)
+                    } else {
+                        (current_namespace, "")
+                    };
                     expanded_items.push(ExpandedUseItem {
-                        use_type,
-                        namespace: current_namespace,
-                        name: "", // We don't need name/alias when not expanding.
+                        use_type: Some(&seq.r#type),
+                        namespace,
+                        name,
                         alias: None,
                         original_node,
                     });
@@ -510,10 +525,22 @@ fn expand_use<'arena>(
                         );
                     }
                 } else {
+                    // Extract namespace and name from first item for sorting
+                    let (namespace, name) = if let Some(first_item) = list.items.first() {
+                        let mut namespace = current_namespace.clone();
+                        namespace.push(list.namespace.value());
+                        // For grouped items, the name should be just the item name (not a full path)
+                        let name = first_item.name.value();
+                        (namespace, name)
+                    } else {
+                        let mut namespace = current_namespace.clone();
+                        namespace.push(list.namespace.value());
+                        (namespace, "")
+                    };
                     expanded_items.push(ExpandedUseItem {
-                        use_type,
-                        namespace: current_namespace,
-                        name: "", // We don't need name/alias when not expanding.
+                        use_type: Some(&list.r#type),
+                        namespace,
+                        name,
                         alias: None,
                         original_node,
                     });
@@ -534,10 +561,22 @@ fn expand_use<'arena>(
                         );
                     }
                 } else {
+                    // Extract namespace and name from first item for sorting
+                    let (namespace, name) = if let Some(first_item) = list.items.first() {
+                        let mut namespace = current_namespace.clone();
+                        namespace.push(list.namespace.value());
+                        // For grouped items, the name should be just the item name (not a full path)
+                        let name = first_item.item.name.value();
+                        (namespace, name)
+                    } else {
+                        let mut namespace = current_namespace.clone();
+                        namespace.push(list.namespace.value());
+                        (namespace, "")
+                    };
                     expanded_items.push(ExpandedUseItem {
-                        use_type,
-                        namespace: current_namespace,
-                        name: "", // We don't need name/alias when not expanding.
+                        use_type: list.items.first().and_then(|item| item.r#type.as_ref()),
+                        namespace,
+                        name,
                         alias: None,
                         original_node,
                     });
