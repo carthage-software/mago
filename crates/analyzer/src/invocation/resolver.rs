@@ -1,6 +1,5 @@
 use std::borrow::Cow;
 
-use ahash::HashMap;
 use either::Either;
 
 use mago_atom::AtomMap;
@@ -49,15 +48,20 @@ pub fn resolve_invocation_type<'ctx, 'ast, 'arena>(
                 && !template_types.is_empty()
             {
                 for (template_name, _) in template_types {
-                    if template_result.lower_bounds.get(template_name).is_none() {
+                    let has_bound_for_this_parent = template_result
+                        .lower_bounds
+                        .get(template_name)
+                        .and_then(|bounds| bounds.get(&generic_parent))
+                        .is_some_and(|bounds| !bounds.is_empty());
+
+                    if !has_bound_for_this_parent {
                         let mut owned_template_result = template_result.into_owned();
-                        owned_template_result.lower_bounds.insert(
-                            *template_name,
-                            HashMap::from_iter([(
-                                generic_parent,
-                                vec![TemplateBound::new(get_never(), 1, None, None)],
-                            )]),
-                        );
+
+                        owned_template_result
+                            .lower_bounds
+                            .entry(*template_name)
+                            .or_default()
+                            .insert(generic_parent, vec![TemplateBound::new(get_never(), 1, None, None)]);
 
                         template_result = Cow::Owned(owned_template_result);
                     }
