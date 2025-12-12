@@ -37,6 +37,7 @@ use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
 use crate::heuristic;
+use crate::plugin::context::HookContext;
 use crate::statement::attributes::AttributeTarget;
 use crate::statement::attributes::analyze_attributes;
 use crate::statement::class_like::method_signature::SignatureCompatibilityIssue;
@@ -275,6 +276,15 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Class<'arena> {
             return Ok(());
         };
 
+        // Call plugin on_enter_class hooks
+        if context.plugin_registry.has_class_hooks() {
+            let mut hook_context = HookContext::new(context.codebase, block_context, artifacts);
+            context.plugin_registry.on_enter_class(self, class_like_metadata, &mut hook_context)?;
+            for reported in hook_context.take_issues() {
+                context.collector.report_with_code(reported.code, reported.issue);
+            }
+        }
+
         analyze_class_like(
             context,
             artifacts,
@@ -287,6 +297,15 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Class<'arena> {
         )?;
 
         heuristic::check_class_like(class_like_metadata, self.members.as_slice(), context);
+
+        // Call plugin on_leave_class hooks
+        if context.plugin_registry.has_class_hooks() {
+            let mut hook_context = HookContext::new(context.codebase, block_context, artifacts);
+            context.plugin_registry.on_leave_class(self, class_like_metadata, &mut hook_context)?;
+            for reported in hook_context.take_issues() {
+                context.collector.report_with_code(reported.code, reported.issue);
+            }
+        }
 
         Ok(())
     }
@@ -314,6 +333,15 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Interface<'arena> {
             return Ok(());
         };
 
+        // Call plugin on_enter_interface hooks
+        if context.plugin_registry.has_interface_hooks() {
+            let mut hook_context = HookContext::new(context.codebase, block_context, artifacts);
+            context.plugin_registry.on_enter_interface(self, class_like_metadata, &mut hook_context)?;
+            for reported in hook_context.take_issues() {
+                context.collector.report_with_code(reported.code, reported.issue);
+            }
+        }
+
         analyze_class_like(
             context,
             artifacts,
@@ -326,6 +354,15 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Interface<'arena> {
         )?;
 
         heuristic::check_class_like(class_like_metadata, self.members.as_slice(), context);
+
+        // Call plugin on_leave_interface hooks
+        if context.plugin_registry.has_interface_hooks() {
+            let mut hook_context = HookContext::new(context.codebase, block_context, artifacts);
+            context.plugin_registry.on_leave_interface(self, class_like_metadata, &mut hook_context)?;
+            for reported in hook_context.take_issues() {
+                context.collector.report_with_code(reported.code, reported.issue);
+            }
+        }
 
         Ok(())
     }
@@ -353,6 +390,15 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Trait<'arena> {
             return Ok(());
         };
 
+        // Call plugin on_enter_trait hooks
+        if context.plugin_registry.has_trait_hooks() {
+            let mut hook_context = HookContext::new(context.codebase, block_context, artifacts);
+            context.plugin_registry.on_enter_trait(self, class_like_metadata, &mut hook_context)?;
+            for reported in hook_context.take_issues() {
+                context.collector.report_with_code(reported.code, reported.issue);
+            }
+        }
+
         analyze_class_like(
             context,
             artifacts,
@@ -365,6 +411,15 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Trait<'arena> {
         )?;
 
         heuristic::check_class_like(class_like_metadata, self.members.as_slice(), context);
+
+        // Call plugin on_leave_trait hooks
+        if context.plugin_registry.has_trait_hooks() {
+            let mut hook_context = HookContext::new(context.codebase, block_context, artifacts);
+            context.plugin_registry.on_leave_trait(self, class_like_metadata, &mut hook_context)?;
+            for reported in hook_context.take_issues() {
+                context.collector.report_with_code(reported.code, reported.issue);
+            }
+        }
 
         Ok(())
     }
@@ -392,6 +447,15 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Enum<'arena> {
             return Ok(());
         };
 
+        // Call plugin on_enter_enum hooks
+        if context.plugin_registry.has_enum_hooks() {
+            let mut hook_context = HookContext::new(context.codebase, block_context, artifacts);
+            context.plugin_registry.on_enter_enum(self, class_like_metadata, &mut hook_context)?;
+            for reported in hook_context.take_issues() {
+                context.collector.report_with_code(reported.code, reported.issue);
+            }
+        }
+
         analyze_class_like(
             context,
             artifacts,
@@ -404,6 +468,15 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Enum<'arena> {
         )?;
 
         heuristic::check_class_like(class_like_metadata, self.members.as_slice(), context);
+
+        // Call plugin on_leave_enum hooks
+        if context.plugin_registry.has_enum_hooks() {
+            let mut hook_context = HookContext::new(context.codebase, block_context, artifacts);
+            context.plugin_registry.on_leave_enum(self, class_like_metadata, &mut hook_context)?;
+            for reported in hook_context.take_issues() {
+                context.collector.report_with_code(reported.code, reported.issue);
+            }
+        }
 
         Ok(())
     }

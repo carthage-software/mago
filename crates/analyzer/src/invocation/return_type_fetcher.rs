@@ -8,7 +8,6 @@ use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::invocation::Invocation;
 use crate::invocation::resolver::resolve_invocation_type;
-use crate::invocation::special_function_like_handler::handle_special_functions;
 
 pub fn fetch_invocation_return_type<'ctx, 'ast, 'arena>(
     context: &mut Context<'ctx, 'arena>,
@@ -18,8 +17,23 @@ pub fn fetch_invocation_return_type<'ctx, 'ast, 'arena>(
     template_result: &TemplateResult,
     parameters: &AtomMap<TUnion>,
 ) -> TUnion {
-    if let Some(return_type) = handle_special_functions(context, block_context, artifacts, invocation) {
-        return return_type;
+    // Try to get a custom return type from plugins
+    if let Some(identifier) = invocation.target.get_function_like_identifier()
+        && let Some(result) = context.plugin_registry.get_function_like_return_type(
+            context.codebase,
+            block_context,
+            artifacts,
+            identifier,
+            invocation,
+        )
+    {
+        for reported_issue in result.issues {
+            context.collector.report_with_code(reported_issue.code, reported_issue.issue);
+        }
+
+        if let Some(ty) = result.return_type {
+            return ty;
+        }
     }
 
     let mut resulting_type = if let Some(return_type) = invocation.target.get_return_type().cloned() {

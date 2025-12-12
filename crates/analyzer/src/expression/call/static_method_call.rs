@@ -11,6 +11,8 @@ use crate::expression::call::analyze_invocation_targets;
 use crate::invocation::InvocationArgumentsSource;
 use crate::invocation::InvocationTarget;
 use crate::invocation::MethodTargetContext;
+use crate::plugin::ExpressionHookResult;
+use crate::plugin::context::HookContext;
 use crate::resolver::static_method::resolve_static_method_targets;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for StaticMethodCall<'arena> {
@@ -20,6 +22,25 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for StaticMethodCall<'arena> {
         block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
+        if context.plugin_registry.has_static_method_call_hooks() {
+            let mut hook_context = HookContext::new(context.codebase, block_context, artifacts);
+            let result = context.plugin_registry.before_static_method_call(self, &mut hook_context)?;
+            for reported in hook_context.take_issues() {
+                context.collector.report_with_code(reported.code, reported.issue);
+            }
+
+            match result {
+                ExpressionHookResult::Continue => {}
+                ExpressionHookResult::Skip => {
+                    return Ok(());
+                }
+                ExpressionHookResult::SkipWithType(ty) => {
+                    artifacts.set_expression_type(&self.span(), ty);
+                    return Ok(());
+                }
+            }
+        }
+
         if block_context.collect_initializations
             && let Expression::Parent(_) = self.class
             && let ClassLikeMemberSelector::Identifier(method_ident) = &self.method
@@ -79,7 +100,17 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for StaticMethodCall<'arena> {
             method_resolution.has_invalid_target,
             method_resolution.encountered_mixed,
             false,
-        )
+        )?;
+
+        if context.plugin_registry.has_static_method_call_hooks() {
+            let mut hook_context = HookContext::new(context.codebase, block_context, artifacts);
+            context.plugin_registry.after_static_method_call(self, &mut hook_context)?;
+            for reported in hook_context.take_issues() {
+                context.collector.report_with_code(reported.code, reported.issue);
+            }
+        }
+
+        Ok(())
     }
 }
 

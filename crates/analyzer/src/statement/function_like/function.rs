@@ -10,6 +10,7 @@ use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
 use crate::heuristic;
+use crate::plugin::context::HookContext;
 use crate::statement::attributes::AttributeTarget;
 use crate::statement::attributes::analyze_attributes;
 use crate::statement::function_like::FunctionLikeBody;
@@ -44,6 +45,15 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Function<'arena> {
             ));
         };
 
+        // Call plugin on_enter_function hooks
+        if context.plugin_registry.has_function_decl_hooks() {
+            let mut hook_context = HookContext::new(context.codebase, block_context, artifacts);
+            context.plugin_registry.on_enter_function(self, function_metadata, &mut hook_context)?;
+            for reported in hook_context.take_issues() {
+                context.collector.report_with_code(reported.code, reported.issue);
+            }
+        }
+
         let mut scope = ScopeContext::new();
         scope.set_class_like(block_context.scope.get_class_like());
         scope.set_function_like(Some(function_metadata));
@@ -57,6 +67,15 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Function<'arena> {
             FunctionLikeBody::Statements(self.body.statements.as_slice(), self.body.span()),
             None,
         )?;
+
+        // Call plugin on_leave_function hooks
+        if context.plugin_registry.has_function_decl_hooks() {
+            let mut hook_context = HookContext::new(context.codebase, block_context, artifacts);
+            context.plugin_registry.on_leave_function(self, function_metadata, &mut hook_context)?;
+            for reported in hook_context.take_issues() {
+                context.collector.report_with_code(reported.code, reported.issue);
+            }
+        }
 
         check_unused_function_template_parameters(
             context,

@@ -229,7 +229,7 @@ fn property_requires_initialization(
     property: &PropertyMetadata,
     class_like_metadata: &ClassLikeMetadata,
     declaring_class_metadata: &ClassLikeMetadata,
-    _context: &Context<'_, '_>,
+    context: &Context<'_, '_>,
 ) -> bool {
     // Has default value - doesn't need initialization
     if property.flags.has_default() {
@@ -253,6 +253,11 @@ fn property_requires_initialization(
 
     // No type declaration - PHP doesn't require initialization
     if property.type_declaration_metadata.is_none() {
+        return false;
+    }
+
+    // Check if any plugin considers this property initialized
+    if context.plugin_registry.is_property_initialized(declaring_class_metadata, property) {
         return false;
     }
 

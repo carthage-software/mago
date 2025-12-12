@@ -7,6 +7,7 @@ use ahash::HashSet;
 use bumpalo::Bump;
 use mago_analyzer::Analyzer;
 use mago_analyzer::analysis_result::AnalysisResult;
+use mago_analyzer::plugin::PluginRegistry;
 use mago_analyzer::settings::Settings;
 use mago_atom::AtomSet;
 use mago_codex::metadata::CodebaseMetadata;
@@ -19,6 +20,7 @@ use mago_prelude::Prelude;
 use mago_syntax::parser::parse_file;
 
 static PRELUDE: LazyLock<Prelude> = LazyLock::new(Prelude::build);
+static PLUGIN_REGISTRY: LazyLock<PluginRegistry> = LazyLock::new(PluginRegistry::with_library_providers);
 
 #[derive(Debug, Clone)]
 pub struct TestCase<'a> {
@@ -71,6 +73,7 @@ fn run_test_case_inner(config: TestCase) {
             check_property_initialization: true,
             ..Default::default()
         },
+        &PLUGIN_REGISTRY,
     );
 
     let analysis_run_result = analyzer.analyze(program, &mut analysis_result);

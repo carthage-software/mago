@@ -23,6 +23,8 @@ use crate::context::scope::var_has_root;
 use crate::error::AnalysisError;
 use crate::formula::get_formula;
 use crate::heuristic;
+use crate::plugin::ExpressionHookResult;
+use crate::plugin::context::HookContext;
 use crate::reconciler::reconcile_keyed_types;
 use crate::statement::attributes::AttributeTarget;
 use crate::statement::attributes::analyze_attributes;
@@ -60,6 +62,25 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Expression<'arena> {
         block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
+        if context.plugin_registry.has_expression_hooks() {
+            let mut hook_context = HookContext::new(context.codebase, block_context, artifacts);
+            let expression_hook_result = context.plugin_registry.before_expression(self, &mut hook_context)?;
+            for reported in hook_context.take_issues() {
+                context.collector.report_with_code(reported.code, reported.issue);
+            }
+
+            match expression_hook_result {
+                ExpressionHookResult::Continue => {}
+                ExpressionHookResult::Skip => {
+                    return Ok(());
+                }
+                ExpressionHookResult::SkipWithType(ty) => {
+                    artifacts.set_expression_type(self, ty);
+                    return Ok(());
+                }
+            }
+        }
+
         let result = match self {
             Expression::Parenthesized(expr) => expr.analyze(context, block_context, artifacts),
             Expression::Literal(expr) => expr.analyze(context, block_context, artifacts),
@@ -190,6 +211,27 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Expression<'arena> {
         };
 
         result?;
+
+        if context.plugin_registry.has_expression_hooks() {
+            let mut hook_context = HookContext::new(context.codebase, block_context, artifacts);
+            context.plugin_registry.after_expression(self, &mut hook_context)?;
+            for reported in hook_context.take_issues() {
+                context.collector.report_with_code(reported.code, reported.issue);
+            }
+        }
+
+        if context.settings.check_throws && context.plugin_registry.has_expression_throw_providers() {
+            let exceptions = context.plugin_registry.get_expression_thrown_exceptions(
+                context.codebase,
+                block_context,
+                artifacts,
+                self,
+            );
+
+            for exception in exceptions {
+                block_context.possibly_thrown_exceptions.entry(exception).or_default().insert(self.span());
+            }
+        }
 
         Ok(())
     }

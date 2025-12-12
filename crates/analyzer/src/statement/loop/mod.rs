@@ -355,7 +355,7 @@ fn analyze<'ctx, 'ast, 'arena>(
 
             continue_context.inside_loop_expressions = false;
 
-            Ok((loop_scope, continue_context))
+            Result::<_, AnalysisError>::Ok((loop_scope, continue_context))
         });
 
         (loop_scope, continue_context) = result?;

@@ -15,12 +15,16 @@ use crate::artifacts::AnalysisArtifacts;
 use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
+use crate::plugin::PluginRegistry;
+use crate::plugin::context::HookContext;
+use crate::plugin::hook::HookAction;
 use crate::settings::Settings;
 use crate::statement::analyze_statements;
 
 pub mod analysis_result;
 pub mod code;
 pub mod error;
+pub mod plugin;
 pub mod settings;
 
 mod analyzable;
@@ -40,13 +44,14 @@ mod visibility;
 
 const COLLECTOR_CATEGORIES: &[&str] = &["analysis", "analyzer", "analyser"];
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct Analyzer<'ctx, 'ast, 'arena> {
     pub arena: &'arena Bump,
     pub source_file: &'ctx File,
     pub resolved_names: &'ast ResolvedNames<'arena>,
     pub codebase: &'ctx CodebaseMetadata,
     pub settings: Settings,
+    pub plugin_registry: &'ctx PluginRegistry,
 }
 
 impl<'ctx, 'ast, 'arena> Analyzer<'ctx, 'ast, 'arena> {
@@ -56,8 +61,9 @@ impl<'ctx, 'ast, 'arena> Analyzer<'ctx, 'ast, 'arena> {
         resolved_names: &'ast ResolvedNames<'arena>,
         codebase: &'ctx CodebaseMetadata,
         settings: Settings,
+        plugin_registry: &'ctx PluginRegistry,
     ) -> Self {
-        Self { arena, source_file, resolved_names, codebase, settings }
+        Self { arena, source_file, resolved_names, codebase, settings, plugin_registry }
     }
 
     pub fn analyze(
@@ -93,14 +99,55 @@ impl<'ctx, 'ast, 'arena> Analyzer<'ctx, 'ast, 'arena> {
             statements[0].span(),
             program.trivia.as_slice(),
             collector,
+            self.plugin_registry,
         );
 
         let mut block_context = BlockContext::new(ScopeContext::new(), context.settings.register_super_globals);
         let mut artifacts = AnalysisArtifacts::new();
 
+        if self.plugin_registry.has_program_hooks() {
+            let mut hook_context = HookContext::new(context.codebase, &mut block_context, &mut artifacts);
+
+            if let HookAction::Skip =
+                self.plugin_registry.before_program(self.source_file, program, &mut hook_context)?
+            {
+                for reported in hook_context.take_issues() {
+                    context.collector.report_with_code(reported.code, reported.issue);
+                }
+
+                context.finish(artifacts, analysis_result);
+
+                #[cfg(not(target_arch = "wasm32"))]
+                {
+                    analysis_result.time_in_analysis = start_time.elapsed();
+                }
+
+                return Ok(());
+            }
+
+            for reported in hook_context.take_issues() {
+                context.collector.report_with_code(reported.code, reported.issue);
+            }
+        }
+
         analyze_statements(statements, &mut context, &mut block_context, &mut artifacts)?;
 
+        // Call after_program hooks
+        if self.plugin_registry.has_program_hooks() {
+            let mut hook_context = HookContext::new(context.codebase, &mut block_context, &mut artifacts);
+            self.plugin_registry.after_program(self.source_file, program, &mut hook_context)?;
+            for reported in hook_context.take_issues() {
+                context.collector.report_with_code(reported.code, reported.issue);
+            }
+        }
+
         context.finish(artifacts, analysis_result);
+
+        // Filter issues through registered issue filter hooks
+        if self.plugin_registry.has_issue_filter_hooks() {
+            analysis_result.issues =
+                self.plugin_registry.filter_issues(self.source_file, std::mem::take(&mut analysis_result.issues));
+        }
 
         #[cfg(not(target_arch = "wasm32"))]
         {
@@ -130,6 +177,7 @@ mod tests {
     use crate::Analyzer;
     use crate::analysis_result::AnalysisResult;
     use crate::code::IssueCode;
+    use crate::plugin::PluginRegistry;
     use crate::settings::Settings;
 
     #[derive(Debug, Clone)]
@@ -190,8 +238,11 @@ mod tests {
 
         populate_codebase(&mut codebase, &mut symbol_references, AtomSet::default(), HashSet::default());
 
+        let plugin_registry = PluginRegistry::with_library_providers();
+
         let mut analysis_result = AnalysisResult::new(symbol_references);
-        let analyzer = Analyzer::new(&arena, &source_file, &resolved_names, &codebase, config.settings);
+        let analyzer =
+            Analyzer::new(&arena, &source_file, &resolved_names, &codebase, config.settings, &plugin_registry);
 
         let analysis_run_result = analyzer.analyze(program, &mut analysis_result);
 

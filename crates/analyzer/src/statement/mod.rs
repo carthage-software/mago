@@ -1,7 +1,6 @@
 use ahash::HashSet;
 
 use mago_atom::Atom;
-
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::identifier::method::MethodIdentifier;
 use mago_names::kind::NameKind;
@@ -17,6 +16,8 @@ use crate::artifacts::AnalysisArtifacts;
 use crate::code::IssueCode;
 use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
+use crate::plugin::HookAction;
+use crate::plugin::context::HookContext;
 use crate::utils::docblock::populate_docblock_variables;
 use crate::utils::expression::get_function_like_id_from_call;
 
@@ -43,6 +44,23 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Statement<'arena> {
     ) -> Result<(), AnalysisError> {
         let last_statement_span = context.statement_span;
         context.statement_span = self.span();
+
+        // Call plugin before_statement hooks
+        if context.plugin_registry.has_statement_hooks() {
+            let mut hook_context = HookContext::new(context.codebase, block_context, artifacts);
+            if let HookAction::Skip = context.plugin_registry.before_statement(self, &mut hook_context)? {
+                for reported in hook_context.take_issues() {
+                    context.collector.report_with_code(reported.code, reported.issue);
+                }
+
+                context.statement_span = last_statement_span;
+                return Ok(());
+            }
+
+            for reported in hook_context.take_issues() {
+                context.collector.report_with_code(reported.code, reported.issue);
+            }
+        }
 
         let should_populate_docblock_variables = matches!(
             self,
@@ -172,6 +190,15 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Statement<'arena> {
             && context.settings.find_unused_expressions
         {
             detect_unused_statement_expressions(expression.expression, self, context, artifacts);
+        }
+
+        // Call plugin after_statement hooks
+        if context.plugin_registry.has_statement_hooks() {
+            let mut hook_context = HookContext::new(context.codebase, block_context, artifacts);
+            context.plugin_registry.after_statement(self, &mut hook_context)?;
+            for reported in hook_context.take_issues() {
+                context.collector.report_with_code(reported.code, reported.issue);
+            }
         }
 
         context.statement_span = last_statement_span;

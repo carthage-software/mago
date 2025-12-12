@@ -28,6 +28,8 @@ use crate::invocation::MethodTargetContext;
 use crate::invocation::post_process::post_invocation_process;
 use crate::invocation::return_type_fetcher::fetch_invocation_return_type;
 use crate::invocation::template_result::populate_template_result_from_invocation;
+use crate::plugin::ExpressionHookResult;
+use crate::plugin::context::HookContext;
 use crate::resolver::method::resolve_method_targets;
 use crate::utils::expression::get_expression_id;
 use crate::visibility::check_method_visibility;
@@ -39,6 +41,25 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for MethodCall<'arena> {
         block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
+        if context.plugin_registry.has_method_call_hooks() {
+            let mut hook_context = HookContext::new(context.codebase, block_context, artifacts);
+            let result = context.plugin_registry.before_method_call(self, &mut hook_context)?;
+            for reported in hook_context.take_issues() {
+                context.collector.report_with_code(reported.code, reported.issue);
+            }
+
+            match result {
+                ExpressionHookResult::Continue => {}
+                ExpressionHookResult::Skip => {
+                    return Ok(());
+                }
+                ExpressionHookResult::SkipWithType(ty) => {
+                    artifacts.set_expression_type(&self.span(), ty);
+                    return Ok(());
+                }
+            }
+        }
+
         analyze_method_call(
             context,
             block_context,
@@ -48,7 +69,17 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for MethodCall<'arena> {
             &self.argument_list,
             false, // is_nullsafe
             self.span(),
-        )
+        )?;
+
+        if context.plugin_registry.has_method_call_hooks() {
+            let mut hook_context = HookContext::new(context.codebase, block_context, artifacts);
+            context.plugin_registry.after_method_call(self, &mut hook_context)?;
+            for reported in hook_context.take_issues() {
+                context.collector.report_with_code(reported.code, reported.issue);
+            }
+        }
+
+        Ok(())
     }
 }
 
@@ -59,6 +90,25 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for NullSafeMethodCall<'arena> {
         block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
+        if context.plugin_registry.has_nullsafe_method_call_hooks() {
+            let mut hook_context = HookContext::new(context.codebase, block_context, artifacts);
+            let result = context.plugin_registry.before_nullsafe_method_call(self, &mut hook_context)?;
+            for reported in hook_context.take_issues() {
+                context.collector.report_with_code(reported.code, reported.issue);
+            }
+
+            match result {
+                ExpressionHookResult::Continue => {}
+                ExpressionHookResult::Skip => {
+                    return Ok(());
+                }
+                ExpressionHookResult::SkipWithType(ty) => {
+                    artifacts.set_expression_type(&self.span(), ty);
+                    return Ok(());
+                }
+            }
+        }
+
         analyze_method_call(
             context,
             block_context,
@@ -68,7 +118,17 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for NullSafeMethodCall<'arena> {
             &self.argument_list,
             true, // is_nullsafe
             self.span(),
-        )
+        )?;
+
+        if context.plugin_registry.has_nullsafe_method_call_hooks() {
+            let mut hook_context = HookContext::new(context.codebase, block_context, artifacts);
+            context.plugin_registry.after_nullsafe_method_call(self, &mut hook_context)?;
+            for reported in hook_context.take_issues() {
+                context.collector.report_with_code(reported.code, reported.issue);
+            }
+        }
+
+        Ok(())
     }
 }
 

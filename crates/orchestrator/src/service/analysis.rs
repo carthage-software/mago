@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use std::time::Duration;
 
 use ahash::HashMap;
@@ -6,6 +7,7 @@ use bumpalo::Bump;
 
 use mago_analyzer::Analyzer;
 use mago_analyzer::analysis_result::AnalysisResult;
+use mago_analyzer::plugin::PluginRegistry;
 use mago_analyzer::settings::Settings;
 use mago_atom::AtomSet;
 use mago_codex::metadata::CodebaseMetadata;
@@ -36,6 +38,7 @@ pub struct AnalysisService {
     use_progress_bars: bool,
     incremental: Option<IncrementalAnalysis>,
     file_states: HashMap<FileId, FileState>,
+    plugin_registry: Arc<PluginRegistry>,
 }
 
 impl std::fmt::Debug for AnalysisService {
@@ -48,6 +51,7 @@ impl std::fmt::Debug for AnalysisService {
             .field("use_progress_bars", &self.use_progress_bars)
             .field("incremental", &self.incremental)
             .field("file_states", &format!("{} tracked files", self.file_states.len()))
+            .field("plugin_registry", &self.plugin_registry)
             .finish()
     }
 }
@@ -59,6 +63,7 @@ impl AnalysisService {
         symbol_references: SymbolReferences,
         settings: Settings,
         use_progress_bars: bool,
+        plugin_registry: Arc<PluginRegistry>,
     ) -> Self {
         Self {
             database,
@@ -68,6 +73,7 @@ impl AnalysisService {
             use_progress_bars,
             incremental: None,
             file_states: HashMap::default(),
+            plugin_registry,
         }
     }
 
@@ -128,7 +134,8 @@ impl AnalysisService {
 
         // Run the analyzer
         let mut analysis_result = AnalysisResult::new(self.symbol_references);
-        let analyzer = Analyzer::new(&arena, file, &resolved_names, &self.codebase, self.settings);
+        let analyzer =
+            Analyzer::new(&arena, file, &resolved_names, &self.codebase, self.settings, &self.plugin_registry);
 
         if let Err(err) = analyzer.analyze(program, &mut analysis_result) {
             issues.push(Issue::error(format!("Analysis error: {}", err)));
@@ -201,8 +208,9 @@ impl AnalysisService {
             self.incremental = Some(inc);
         }
 
+        let plugin_registry = Arc::clone(&self.plugin_registry);
         let (analysis_result, codebase, symbol_references) =
-            pipeline.run(|settings, arena, source_file, codebase| {
+            pipeline.run(move |settings, arena, source_file, codebase| {
                 let mut analysis_result = AnalysisResult::new(SymbolReferences::new());
 
                 let (program, parsing_error) = parse_file(arena, &source_file);
@@ -213,7 +221,8 @@ impl AnalysisService {
                 }
 
                 let semantics_checker = SemanticsChecker::new(settings.version);
-                let analyzer = Analyzer::new(arena, &source_file, &resolved_names, &codebase, settings);
+                let analyzer =
+                    Analyzer::new(arena, &source_file, &resolved_names, &codebase, settings, &plugin_registry);
 
                 analysis_result.issues.extend(semantics_checker.check(&source_file, program, &resolved_names));
                 analyzer.analyze(program, &mut analysis_result)?;
@@ -293,8 +302,9 @@ impl AnalysisService {
             self.incremental = Some(inc);
         }
 
+        let plugin_registry = Arc::clone(&self.plugin_registry);
         let (analysis_result, codebase, symbol_references, new_file_states) =
-            pipeline.run(|settings, arena, source_file, codebase| {
+            pipeline.run(move |settings, arena, source_file, codebase| {
                 let mut analysis_result = AnalysisResult::new(SymbolReferences::new());
 
                 let (program, parsing_error) = parse_file(arena, &source_file);
@@ -305,7 +315,8 @@ impl AnalysisService {
                 }
 
                 let semantics_checker = SemanticsChecker::new(settings.version);
-                let analyzer = Analyzer::new(arena, &source_file, &resolved_names, &codebase, settings);
+                let analyzer =
+                    Analyzer::new(arena, &source_file, &resolved_names, &codebase, settings, &plugin_registry);
 
                 analysis_result.issues.extend(semantics_checker.check(&source_file, program, &resolved_names));
                 analyzer.analyze(program, &mut analysis_result)?;

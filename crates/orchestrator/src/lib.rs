@@ -35,8 +35,11 @@
 use std::borrow::Cow;
 use std::path::Path;
 use std::path::PathBuf;
+use std::sync::Arc;
+use std::sync::OnceLock;
 
 use bumpalo::Bump;
+use mago_analyzer::plugin::PluginRegistry;
 use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::reference::SymbolReferences;
 use mago_database::Database;
@@ -77,6 +80,8 @@ pub mod service;
 pub struct Orchestrator<'a> {
     /// Configuration for all operations.
     pub config: OrchestratorConfiguration<'a>,
+    /// Plugin registry for the analyzer, lazily initialized.
+    plugin_registry: OnceLock<Arc<PluginRegistry>>,
 }
 
 impl<'a> Orchestrator<'a> {
@@ -86,7 +91,19 @@ impl<'a> Orchestrator<'a> {
     ///
     /// * `config` - The configuration specifying PHP version, paths, tool settings, etc.
     pub fn new(config: OrchestratorConfiguration<'a>) -> Self {
-        Self { config }
+        Self { config, plugin_registry: OnceLock::new() }
+    }
+
+    /// Gets the analyzer plugin registry, initializing it if necessary.
+    ///
+    /// This method returns a shared reference to the plugin registry used by the analysis service.
+    /// If the registry has not been initialized yet, it creates a new one with built-in library providers.
+    ///
+    /// # Returns
+    ///
+    /// An `Arc` pointing to the `PluginRegistry`.
+    pub fn get_analyzer_plugin_registry(&self) -> Arc<PluginRegistry> {
+        Arc::clone(self.plugin_registry.get_or_init(|| Arc::new(PluginRegistry::with_library_providers())))
     }
 
     /// Adds additional exclusion patterns to the orchestrator's configuration.
@@ -258,6 +275,7 @@ impl<'a> Orchestrator<'a> {
             symbol_references,
             self.config.analyzer_settings.clone(),
             self.config.use_progress_bars,
+            self.get_analyzer_plugin_registry(),
         );
 
         if let Some(incremental) = incremental {

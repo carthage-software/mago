@@ -1118,7 +1118,7 @@ fn add_conditionally_assigned_variables_to_context<'ctx, 'arena>(
             post_leaving_if_block_context.inside_negation = was_inside_negation;
         }
 
-        Ok(())
+        Result::<_, AnalysisError>::Ok(())
     });
 
     result?;

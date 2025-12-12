@@ -22,6 +22,7 @@ use crate::artifacts::AnalysisArtifacts;
 use crate::code::IssueCode;
 use crate::context::assertion::AssertionContext;
 use crate::context::block::BlockContext;
+use crate::plugin::PluginRegistry;
 use crate::settings::Settings;
 
 pub mod assertion;
@@ -41,6 +42,7 @@ pub struct Context<'ctx, 'arena> {
     pub(super) scope: NamespaceScope,
     pub(super) collector: Collector<'ctx, 'arena>,
     pub(super) statement_span: Span,
+    pub(super) plugin_registry: &'ctx PluginRegistry,
 }
 
 impl<'ctx, 'arena> Context<'ctx, 'arena> {
@@ -53,6 +55,7 @@ impl<'ctx, 'arena> Context<'ctx, 'arena> {
         statement_span: Span,
         comments: &'arena [Trivia<'arena>],
         collector: Collector<'ctx, 'arena>,
+        plugin_registry: &'ctx PluginRegistry,
     ) -> Self {
         Self {
             arena,
@@ -65,6 +68,7 @@ impl<'ctx, 'arena> Context<'ctx, 'arena> {
             scope: NamespaceScope::default(),
             statement_span,
             collector,
+            plugin_registry,
         }
     }
 

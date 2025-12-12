@@ -6,7 +6,9 @@
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::collections::HashSet;
+use std::sync::Arc;
 
+use mago_analyzer::plugin::PluginRegistry;
 use wasm_bindgen::prelude::*;
 
 use mago_analyzer::settings::Settings as AnalyzerSettings;
@@ -125,12 +127,14 @@ pub fn run(code: String, settings_js: JsValue) -> Result<JsValue, JsValue> {
         ..Default::default()
     };
 
+    let plugin_registry = Arc::new(PluginRegistry::with_library_providers());
     let analysis_service = AnalysisService::new(
         prelude.database.read_only(),
         prelude.metadata,
         prelude.symbol_references,
         analyzer_settings,
         false,
+        plugin_registry,
     );
 
     let analyzer_issues = analysis_service.oneshot(file_id);
@@ -225,12 +229,14 @@ pub fn analyze(code: String, php_version: String) -> Result<JsValue, JsValue> {
         ..Default::default()
     };
 
+    let plugin_registry = Arc::new(PluginRegistry::with_library_providers());
     let service = AnalysisService::new(
         prelude.database.read_only(),
         prelude.metadata,
         prelude.symbol_references,
         settings,
         false,
+        plugin_registry,
     );
 
     let issues = service.oneshot(file_id);

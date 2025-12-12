@@ -151,6 +151,8 @@ pub fn post_invocation_process<'ctx, 'ast, 'arena>(
                 }
             }
         }
+
+        collect_plugin_throw_types(context, block_context, artifacts, invoication, identifier);
     }
 
     if !apply_assertions {
@@ -198,6 +200,18 @@ pub fn post_invocation_process<'ctx, 'ast, 'arena>(
         &metadata.assertions,
         template_result,
         parameters,
+    );
+
+    apply_plugin_assertions(
+        context,
+        block_context,
+        artifacts,
+        invoication,
+        identifier,
+        this_variable,
+        template_result,
+        parameters,
+        range,
     );
 
     Ok(())
@@ -331,7 +345,7 @@ fn resolve_invocation_assertion<'ctx, 'ast, 'arena>(
     artifacts: &mut AnalysisArtifacts,
     invocation: &Invocation<'ctx, 'ast, 'arena>,
     this_variable: Option<&str>,
-    assertions: &BTreeMap<Atom, Disjunction<Assertion>>,
+    assertions: &BTreeMap<Atom, Conjunction<Assertion>>,
     template_result: &TemplateResult,
     parameters: &AtomMap<TUnion>,
 ) -> IndexMap<String, AssertionSet> {
@@ -743,4 +757,100 @@ fn get_argument_for_parameter<'ctx, 'ast, 'arena>(
     );
 
     (Some(argument_expression), argument_id)
+}
+
+fn collect_plugin_throw_types<'ctx, 'ast, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    block_context: &mut BlockContext<'ctx>,
+    artifacts: &AnalysisArtifacts,
+    invocation: &Invocation<'ctx, 'ast, 'arena>,
+    identifier: &FunctionLikeIdentifier,
+) {
+    let exceptions = match identifier {
+        FunctionLikeIdentifier::Function(name) => context.plugin_registry.get_function_thrown_exceptions(
+            context.codebase,
+            block_context,
+            artifacts,
+            name,
+            invocation,
+        ),
+        FunctionLikeIdentifier::Method(class_name, method_name) => {
+            context.plugin_registry.get_method_thrown_exceptions(
+                context.codebase,
+                block_context,
+                artifacts,
+                class_name,
+                method_name,
+                invocation,
+            )
+        }
+        FunctionLikeIdentifier::Closure(_, _) => return,
+    };
+
+    for exception in exceptions {
+        block_context.possibly_thrown_exceptions.entry(exception).or_default().insert(invocation.span);
+    }
+}
+
+fn apply_plugin_assertions<'ctx, 'ast, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    block_context: &mut BlockContext<'ctx>,
+    artifacts: &mut AnalysisArtifacts,
+    invocation: &Invocation<'ctx, 'ast, 'arena>,
+    identifier: &FunctionLikeIdentifier,
+    this_variable: Option<&str>,
+    template_result: &TemplateResult,
+    parameters: &AtomMap<TUnion>,
+    range: (u32, u32),
+) {
+    let Some(assertions) = context.plugin_registry.get_function_like_assertions(
+        context.codebase,
+        block_context,
+        artifacts,
+        identifier,
+        invocation,
+    ) else {
+        return;
+    };
+
+    let resolved_if_true_assertions = resolve_invocation_assertion(
+        context,
+        block_context,
+        artifacts,
+        invocation,
+        this_variable,
+        &assertions.if_true,
+        template_result,
+        parameters,
+    );
+
+    for (variable, assertion_set) in resolved_if_true_assertions {
+        artifacts.if_true_assertions.entry(range).or_default().entry(variable).or_default().extend(assertion_set);
+    }
+
+    let resolved_if_false_assertions = resolve_invocation_assertion(
+        context,
+        block_context,
+        artifacts,
+        invocation,
+        this_variable,
+        &assertions.if_false,
+        template_result,
+        parameters,
+    );
+
+    for (variable, assertion_set) in resolved_if_false_assertions {
+        artifacts.if_false_assertions.entry(range).or_default().entry(variable).or_default().extend(assertion_set);
+    }
+
+    apply_assertion_to_call_context(
+        context,
+        block_context,
+        artifacts,
+        invocation,
+        this_variable,
+        &assertions.type_assertions,
+        template_result,
+        parameters,
+    );
 }

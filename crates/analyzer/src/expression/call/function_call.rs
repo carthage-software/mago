@@ -22,6 +22,8 @@ use crate::expression::call::get_function_like_target;
 use crate::expression::call::get_function_like_target_with_skip;
 use crate::invocation::InvocationArgumentsSource;
 use crate::invocation::InvocationTarget;
+use crate::plugin::ExpressionHookResult;
+use crate::plugin::context::HookContext;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for FunctionCall<'arena> {
     fn analyze<'ctx>(
@@ -30,6 +32,25 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for FunctionCall<'arena> {
         block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
+        if context.plugin_registry.has_function_call_hooks() {
+            let mut hook_context = HookContext::new(context.codebase, block_context, artifacts);
+            let result = context.plugin_registry.before_function_call(self, &mut hook_context)?;
+            for reported in hook_context.take_issues() {
+                context.collector.report_with_code(reported.code, reported.issue);
+            }
+
+            match result {
+                ExpressionHookResult::Continue => {}
+                ExpressionHookResult::Skip => {
+                    return Ok(());
+                }
+                ExpressionHookResult::SkipWithType(ty) => {
+                    artifacts.set_expression_type(&self.span(), ty);
+                    return Ok(());
+                }
+            }
+        }
+
         let mut template_result = TemplateResult::default();
         let (invocation_targets, encountered_invalid_targets) =
             resolve_targets(context, block_context, artifacts, self.function, &mut template_result)?;
@@ -46,7 +67,17 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for FunctionCall<'arena> {
             encountered_invalid_targets,
             false,
             false,
-        )
+        )?;
+
+        if context.plugin_registry.has_function_call_hooks() {
+            let mut hook_context = HookContext::new(context.codebase, block_context, artifacts);
+            context.plugin_registry.after_function_call(self, &mut hook_context)?;
+            for reported in hook_context.take_issues() {
+                context.collector.report_with_code(reported.code, reported.issue);
+            }
+        }
+
+        Ok(())
     }
 }
 
