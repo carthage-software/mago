@@ -110,6 +110,24 @@ pub fn is_contained_by(
         }
     }
 
+    if inside_assertion
+        && let TAtomic::GenericParameter(TGenericParameter {
+            parameter_name: container_param_name,
+            defining_entity: container_entity,
+            ..
+        }) = container_type_part
+        && let TAtomic::GenericParameter(TGenericParameter {
+            parameter_name: input_param_name,
+            defining_entity: input_entity,
+            ..
+        }) = input_type_part
+    {
+        // Different template parameters are not contained by each other during assertion reconciliation
+        if input_param_name != container_param_name || input_entity != container_entity {
+            return false;
+        }
+    }
+
     if container_type_part.is_vanilla_mixed() || container_type_part.is_templated_as_vanilla_mixed() {
         return true;
     }
@@ -372,9 +390,23 @@ pub fn is_contained_by(
         return false;
     }
 
-    if let TAtomic::GenericParameter(TGenericParameter { constraint: container_constraint, .. }) = container_type_part
-        && let TAtomic::GenericParameter(TGenericParameter { constraint: input_constraint, .. }) = input_type_part
+    if let TAtomic::GenericParameter(TGenericParameter {
+        parameter_name: container_param_name,
+        defining_entity: container_entity,
+        constraint: container_constraint,
+        ..
+    }) = container_type_part
+        && let TAtomic::GenericParameter(TGenericParameter {
+            parameter_name: input_param_name,
+            defining_entity: input_entity,
+            constraint: input_constraint,
+            ..
+        }) = input_type_part
     {
+        if inside_assertion && (input_param_name != container_param_name || input_entity != container_entity) {
+            return false;
+        }
+
         return union_comparator::is_contained_by(
             codebase,
             input_constraint,

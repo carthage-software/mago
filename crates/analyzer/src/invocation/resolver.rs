@@ -44,27 +44,52 @@ pub fn resolve_invocation_type<'ctx, 'ast, 'arena>(
                 }
             };
 
-            if let Some(template_types) = invocation.target.get_template_types()
-                && !template_types.is_empty()
-            {
-                for (template_name, _) in template_types {
-                    let has_bound_for_this_parent = template_result
-                        .lower_bounds
-                        .get(template_name)
-                        .and_then(|bounds| bounds.get(&generic_parent))
-                        .is_some_and(|bounds| !bounds.is_empty());
+            let method_templates = invocation.target.get_template_types().unwrap_or(&[]);
 
-                    if !has_bound_for_this_parent {
-                        let mut owned_template_result = template_result.into_owned();
+            let all_template_names: Vec<_> = method_templates
+                .iter()
+                .map(|(name, _)| *name)
+                .chain(template_result.template_types.keys().copied())
+                .collect();
 
-                        owned_template_result
+            for template_name in all_template_names {
+                let has_bound_for_method = template_result
+                    .lower_bounds
+                    .get(&template_name)
+                    .and_then(|bounds| bounds.get(&generic_parent))
+                    .is_some_and(|bounds| !bounds.is_empty());
+
+                let method_parents: Vec<_> = method_templates
+                    .iter()
+                    .filter(|(name, _)| name == &template_name)
+                    .flat_map(|(_, constraints)| constraints.iter().map(|(parent, _)| parent))
+                    .collect();
+
+                let result_parents: Vec<_> = template_result
+                    .template_types
+                    .get(&template_name)
+                    .map(|v| v.iter().map(|(parent, _)| parent).collect())
+                    .unwrap_or_default();
+
+                let has_bound_for_template_parent =
+                    method_parents.iter().chain(result_parents.iter()).any(|constraint_parent| {
+                        template_result
                             .lower_bounds
-                            .entry(*template_name)
-                            .or_default()
-                            .insert(generic_parent, vec![TemplateBound::new(get_never(), 1, None, None)]);
+                            .get(&template_name)
+                            .and_then(|bounds| bounds.get(*constraint_parent))
+                            .is_some_and(|bounds| !bounds.is_empty())
+                    });
 
-                        template_result = Cow::Owned(owned_template_result);
-                    }
+                if !has_bound_for_method && !has_bound_for_template_parent {
+                    let mut owned_template_result = template_result.into_owned();
+
+                    owned_template_result
+                        .lower_bounds
+                        .entry(template_name)
+                        .or_default()
+                        .insert(generic_parent, vec![TemplateBound::new(get_never(), 1, None, None)]);
+
+                    template_result = Cow::Owned(owned_template_result);
                 }
             }
         }
