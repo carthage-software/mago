@@ -441,6 +441,7 @@ test_case!(issue_722);
 test_case!(issue_725);
 test_case!(issue_728_symfony_reference);
 test_case!(issue_736);
+test_case!(issue_737);
 
 #[test]
 fn test_all_test_cases_are_ran() {

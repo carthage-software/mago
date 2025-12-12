@@ -572,6 +572,104 @@ pub(crate) fn can_be_identical<'a>(
         return keyed_arrays_can_be_identical(first_array, second_array, codebase, inside_assertion);
     }
 
+    if let (TAtomic::Array(TArray::Keyed(keyed_array)), TAtomic::Array(TArray::List(list)))
+    | (TAtomic::Array(TArray::List(list)), TAtomic::Array(TArray::Keyed(keyed_array))) = (first_part, second_part)
+    {
+        if let Some(known_items) = &keyed_array.known_items {
+            for (key, _) in known_items.iter() {
+                if key.is_string() {
+                    return false;
+                }
+            }
+        }
+
+        if let Some((key_type, _)) = keyed_array.parameters.as_ref()
+            && !key_type.has_int()
+        {
+            return false;
+        }
+
+        let list_has_known_elements = list.known_elements.as_ref().is_some_and(|e| !e.is_empty());
+        let list_element_is_never = list.element_type.is_never();
+
+        if let Some((_, keyed_val_type)) = keyed_array.parameters.as_ref() {
+            if list_has_known_elements && list_element_is_never {
+                for (_, (_, list_elem_type)) in list.known_elements.as_ref().unwrap().iter() {
+                    if union_comparator::can_expression_types_be_identical(
+                        codebase,
+                        keyed_val_type.as_ref(),
+                        list_elem_type,
+                        inside_assertion,
+                        false,
+                    ) {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+
+            return union_comparator::can_expression_types_be_identical(
+                codebase,
+                keyed_val_type.as_ref(),
+                list.element_type.as_ref(),
+                inside_assertion,
+                false,
+            );
+        }
+
+        if let Some(known_items) = &keyed_array.known_items {
+            if known_items.is_empty() {
+                return true;
+            }
+
+            if let Some(known_elements) = &list.known_elements {
+                if known_elements.is_empty() {
+                    // Fall through to check against general element type
+                } else {
+                    for (_, (_, keyed_item_type)) in known_items.iter() {
+                        for (_, (_, list_elem_type)) in known_elements.iter() {
+                            if union_comparator::can_expression_types_be_identical(
+                                codebase,
+                                keyed_item_type,
+                                list_elem_type,
+                                inside_assertion,
+                                false,
+                            ) {
+                                return true;
+                            }
+                        }
+                    }
+
+                    return false;
+                }
+            }
+
+            if !list_element_is_never {
+                for (_, (_, keyed_item_type)) in known_items.iter() {
+                    if union_comparator::can_expression_types_be_identical(
+                        codebase,
+                        keyed_item_type,
+                        list.element_type.as_ref(),
+                        inside_assertion,
+                        false,
+                    ) {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+
+            // If list element is never and has no known elements, keyed array can't be a list
+            return false;
+        }
+
+        // If keyed array has neither parameters nor known_items, it's an empty array
+        // which can be a list
+        return true;
+    }
+
     if let (TAtomic::Scalar(TScalar::Integer(first_integer)), TAtomic::Scalar(TScalar::Integer(second_integer))) =
         (first_part, second_part)
         && !first_integer.is_of_literal_origin()
