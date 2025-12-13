@@ -1460,6 +1460,9 @@ pub fn cast_type_to_string<'ctx, 'arena>(
             }
             TAtomic::Object(object) => {
                 let class_like_name = match object {
+                    TObject::HasMethod(has_method) if has_method.has_method("__toString") => {
+                        return Ok(get_string());
+                    }
                     TObject::Any | TObject::WithProperties(_) | TObject::HasMethod(_) | TObject::HasProperty(_) => {
                         context.collector.report_with_code(
                             IssueCode::InvalidTypeCast,
