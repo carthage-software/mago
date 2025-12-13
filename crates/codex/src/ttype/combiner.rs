@@ -926,12 +926,35 @@ fn scrape_type_properties(
     if let TAtomic::Scalar(TScalar::String(mut string_scalar)) = atomic {
         if let Some(existing_string_type) = combination.value_types.get_mut(&*ATOM_STRING) {
             if let TAtomic::Scalar(TScalar::String(existing_string_type)) = existing_string_type {
-                *existing_string_type = combine_string_scalars(existing_string_type, string_scalar);
+                if let Some(lit_atom) = string_scalar.get_known_literal_atom() {
+                    let lit_value = lit_atom.as_str();
+                    let is_incompatible = (existing_string_type.is_numeric && !str_is_numeric(lit_value))
+                        || (existing_string_type.is_truthy && (lit_value.is_empty() || lit_value == "0"))
+                        || (existing_string_type.is_non_empty && lit_value.is_empty())
+                        || (existing_string_type.is_lowercase && lit_value.chars().any(|c| c.is_uppercase()));
+
+                    if is_incompatible {
+                        combination.literal_strings.insert(lit_atom);
+                    } else {
+                        *existing_string_type = combine_string_scalars(existing_string_type, string_scalar);
+                    }
+                } else {
+                    *existing_string_type = combine_string_scalars(existing_string_type, string_scalar);
+                }
             };
         } else if let Some(atom) = string_scalar.get_known_literal_atom() {
             combination.literal_strings.insert(atom);
         } else {
-            if string_scalar.is_truthy || string_scalar.is_non_empty || string_scalar.is_numeric {
+            // When we have a constrained string type (like numeric-string) and literals,
+            // we need to decide whether to merge them or keep them separate.
+            // If the non-literal is numeric-string, keep non-numeric literals separate.
+            let mut literals_to_keep = Vec::new();
+
+            if string_scalar.is_truthy
+                || string_scalar.is_non_empty
+                || string_scalar.is_numeric
+                || string_scalar.is_lowercase
+            {
                 for value in &combination.literal_strings {
                     if value.is_empty() {
                         string_scalar.is_non_empty = false;
@@ -942,12 +965,23 @@ fn scrape_type_properties(
                         string_scalar.is_truthy = false;
                     }
 
-                    string_scalar.is_numeric = string_scalar.is_numeric && str_is_numeric(value);
+                    // If the string is numeric but the literal is not, keep the literal separate
+                    if string_scalar.is_numeric && !str_is_numeric(value) {
+                        literals_to_keep.push(*value);
+                    } else {
+                        string_scalar.is_numeric = string_scalar.is_numeric && str_is_numeric(value);
+                    }
+
+                    string_scalar.is_lowercase = string_scalar.is_lowercase && value.chars().all(|c| !c.is_uppercase());
                 }
             }
 
             combination.value_types.insert(*ATOM_STRING, TAtomic::Scalar(TScalar::String(string_scalar)));
+
             combination.literal_strings.clear();
+            for lit in literals_to_keep {
+                combination.literal_strings.insert(lit);
+            }
         }
 
         return;

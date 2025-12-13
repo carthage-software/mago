@@ -87,10 +87,9 @@ impl TString {
         is_numeric: bool,
         is_truthy: bool,
         mut is_non_empty: bool,
-        mut is_lowercase: bool,
+        is_lowercase: bool,
     ) -> Self {
         is_non_empty |= is_numeric || is_truthy;
-        is_lowercase |= is_numeric;
 
         Self { literal, is_numeric, is_truthy, is_non_empty, is_lowercase }
     }
@@ -278,8 +277,8 @@ impl TString {
             literal: if retain_literal { self.literal.clone() } else { None },
             is_numeric: true,
             is_truthy: self.is_truthy,
-            is_non_empty: true,
-            is_lowercase: true, // Numeric strings are considered lowercase
+            is_non_empty: true, // Numeric strings are always non-empty
+            is_lowercase: self.is_lowercase,
         }
     }
 }
