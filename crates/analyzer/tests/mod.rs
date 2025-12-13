@@ -35,6 +35,7 @@ test_case!(accessing_undefined_class_constant);
 test_case!(argument_count);
 test_case!(array_list_reconciliation);
 test_case!(array_shape_fields);
+test_case!(assert_concrete_to_template_type);
 test_case!(assert_generic_array_key_is_array_key);
 test_case!(bare_identifier_in_array_access);
 test_case!(by_reference_invalidation);

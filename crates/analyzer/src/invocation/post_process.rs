@@ -412,6 +412,7 @@ fn resolve_invocation_assertion<'ctx, 'ast, 'arena>(
                         if always_redundant
                             && let Some(asserted_type) = &asserted_type
                             && !asserted_type.is_mixed()
+                            && !resolved_assertion_type.has_template()
                         {
                             let mut comparison_result = ComparisonResult::default();
                             let is_subtype = is_contained_by(
