@@ -83,6 +83,16 @@ pub(super) fn print_argument_list<'arena>(
         Document::Array(contents)
     };
 
+    if !force_break {
+        let args = argument_list.arguments.as_slice();
+        for (i, arg) in args.iter().enumerate() {
+            if i < args.len() - 1 && f.has_comment(arg.span(), CommentFlags::Trailing | CommentFlags::Line) {
+                force_break = true;
+                break;
+            }
+        }
+    }
+
     let mut contents = vec![in f.arena; clone_in_arena(f.arena, &left_parenthesis)];
 
     // First, run all the decision functions with unformatted arguments

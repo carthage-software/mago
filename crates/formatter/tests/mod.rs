@@ -167,6 +167,7 @@ test_case!(symfony_form_builder);
 // A special test case for regressions in the Psl codebase
 test_case!(psl_regressions);
 test_case!(psl_regressions_2);
+test_case!(psl_regressions_3);
 
 // GitHub issue test cases
 test_case!(issue_122);
