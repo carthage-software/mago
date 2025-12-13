@@ -443,6 +443,7 @@ test_case!(issue_728_symfony_reference);
 test_case!(issue_729);
 test_case!(issue_731);
 test_case!(issue_733);
+test_case!(issue_735);
 test_case!(issue_736);
 test_case!(issue_737);
 test_case!(issue_739);

@@ -18,6 +18,7 @@ pub fn register_library_providers(registry: &mut PluginRegistry) {
     registry.register_function_provider(stdlib::array::ArrayMergeProvider);
     registry.register_function_provider(stdlib::array::CompactProvider);
     registry.register_method_provider(stdlib::closure::ClosureGetCurrentProvider);
+    registry.register_method_provider(stdlib::r#enum::EnumCasesProvider);
 
     registry.register_function_provider(psl::type_::ShapeProvider);
     registry.register_function_provider(psl::type_::OptionalProvider);
