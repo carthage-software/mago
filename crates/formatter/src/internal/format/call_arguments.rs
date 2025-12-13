@@ -12,11 +12,13 @@ use crate::internal::format::call_node::CallLikeNode;
 use crate::internal::format::format_token;
 use crate::internal::format::misc;
 use crate::internal::format::misc::is_breaking_expression;
+use crate::internal::format::misc::is_expandable_expression;
 use crate::internal::format::misc::is_simple_expression;
 use crate::internal::format::misc::is_simple_single_line_expression;
 use crate::internal::format::misc::is_string_word_type;
 use crate::internal::format::misc::should_hug_expression;
 use crate::internal::utils::could_expand_value;
+use crate::internal::utils::unwrap_parenthesized;
 use crate::internal::utils::will_break;
 
 pub(super) fn print_call_arguments<'arena>(
@@ -445,6 +447,12 @@ pub fn should_break_all_arguments(f: &FormatterState, argument_list: &ArgumentLi
         return true;
     }
 
+    if argument_list.arguments.len() >= 2
+        && argument_list.arguments.iter().any(|a| is_call_with_wrapping_arrow_function(a.value()))
+    {
+        return true;
+    }
+
     false
 }
 
@@ -524,6 +532,43 @@ fn should_inline_breaking_arguments<'arena>(
         }
         _ => false,
     }
+}
+
+/// Checks if an expression is a method/function call with an arrow function argument
+/// that has a conditional body which will be wrapped in parentheses.
+#[inline]
+fn is_call_with_wrapping_arrow_function<'arena>(expr: &'arena Expression<'arena>) -> bool {
+    let Expression::Call(call) = expr else {
+        return false;
+    };
+
+    let args = call.get_argument_list().arguments.as_slice();
+    if args.len() != 1 {
+        return false;
+    }
+
+    let Expression::ArrowFunction(arrow) = args[0].value() else {
+        return false;
+    };
+
+    let body = unwrap_parenthesized(arrow.expression);
+
+    if let Expression::Conditional(conditional) = body {
+        if let Some(then) = conditional.then {
+            return is_expandable_expression(then, false)
+                || is_expandable_expression(conditional.r#else, false)
+                || then.is_conditional()
+                || conditional.r#else.is_conditional();
+        }
+
+        return true;
+    }
+
+    if let Expression::Binary(binary) = body {
+        return is_expandable_expression(binary.lhs, false) || is_expandable_expression(binary.rhs, false);
+    }
+
+    false
 }
 
 /// * Reference <https://github.com/prettier/prettier/blob/3.3.3/src/language-js/print/call-arguments.js#L247-L272>

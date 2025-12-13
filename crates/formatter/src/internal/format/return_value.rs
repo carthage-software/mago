@@ -106,7 +106,12 @@ fn should_wrap_return_value<'arena>(f: &mut FormatterState<'_, 'arena>, value: &
             true
         }
         Expression::Conditional(conditional) => match conditional.then {
-            Some(then) => then.is_conditional() && conditional.r#else.is_conditional(),
+            Some(then) => {
+                is_expandable_expression(then, false)
+                    || is_expandable_expression(conditional.r#else, false)
+                    || then.is_conditional()
+                    || conditional.r#else.is_conditional()
+            }
             _ => true,
         },
         _ => false,
