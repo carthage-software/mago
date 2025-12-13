@@ -110,6 +110,15 @@ pub(super) fn analyze_conditional<'ctx, 'ast, 'arena>(
         'outer: for key in keys {
             for mixed_var_id in &mixed_variables {
                 if is_derived_access_path(&key, mixed_var_id) {
+                    let has_explicit_type_assertion = clause
+                        .possibilities
+                        .get(&key)
+                        .is_some_and(|assertions| assertions.values().any(|a| !matches!(a, Assertion::Truthy)));
+
+                    if has_explicit_type_assertion {
+                        continue;
+                    }
+
                     *clause = Clause::new(
                         Default::default(),
                         condition.span(),
