@@ -541,6 +541,7 @@ pub(crate) fn analyze_nested_array_assignment<'ctx, 'ast, 'arena>(
             true,
             &extended_var_id,
             if is_last { Some(&assign_value_type) } else { None },
+            false,
         );
 
         block_context.inside_assignment = false;

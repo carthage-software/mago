@@ -11,6 +11,7 @@ use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
 use crate::utils::expression::array::get_array_target_type_given_index;
+use crate::utils::expression::expression_is_nullsafe;
 use crate::utils::expression::get_array_access_id;
 use crate::utils::expression::get_expression_id;
 
@@ -72,6 +73,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ArrayAccess<'arena> {
                 false,
                 &extended_var_id,
                 None,
+                container_type.is_nullable() && expression_is_nullsafe(self.array),
             );
 
             if let Some(keyed_array_var_id) = &keyed_array_var_id {

@@ -14,6 +14,7 @@ use crate::invocation::MethodTargetContext;
 use crate::plugin::ExpressionHookResult;
 use crate::plugin::context::HookContext;
 use crate::resolver::static_method::resolve_static_method_targets;
+use crate::utils::expression::expression_is_nullsafe;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for StaticMethodCall<'arena> {
     fn analyze<'ctx>(
@@ -99,7 +100,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for StaticMethodCall<'arena> {
             None,
             method_resolution.has_invalid_target,
             method_resolution.encountered_mixed,
-            false,
+            expression_is_nullsafe(self.class),
         )?;
 
         if context.plugin_registry.has_static_method_call_hooks() {

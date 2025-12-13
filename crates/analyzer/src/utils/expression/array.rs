@@ -94,6 +94,7 @@ pub(crate) fn get_array_target_type_given_index<'ctx, 'arena>(
     in_assignment: bool,
     extended_var_id: &Option<String>,
     assign_value_type: Option<&TUnion>,
+    is_array_like_nullsafe: bool,
 ) -> TUnion {
     let mut has_valid_expected_index = false;
 
@@ -142,7 +143,11 @@ pub(crate) fn get_array_target_type_given_index<'ctx, 'arena>(
             );
         }
 
-        if array_like_type.is_nullable() && !array_like_type.ignore_nullable_issues() && !in_assignment {
+        if array_like_type.is_nullable()
+            && !array_like_type.ignore_nullable_issues()
+            && !in_assignment
+            && !is_array_like_nullsafe
+        {
             context.collector.report_with_code(
                 IssueCode::PossiblyNullArrayAccess,
                 Issue::warning("Cannot perform array access on possibly `null` value.")
@@ -388,6 +393,10 @@ pub(crate) fn get_array_target_type_given_index<'ctx, 'arena>(
             }
             if array_like_type.ignore_falsable_issues() {
                 value_type.set_ignore_falsable_issues(true);
+            }
+
+            if is_array_like_nullsafe {
+                value_type = value_type.as_nullable();
             }
 
             // Report warning for possibly undefined array keys when accessing union types

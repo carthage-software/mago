@@ -19,6 +19,31 @@ use crate::utils::misc::unwrap_expression;
 pub mod array;
 pub mod variable;
 
+/// Checks if an expression is using nullsafe access anywhere in its chain.
+///
+/// Given an expression, this function recursively checks if any part of the expression
+/// involves nullsafe access (i.e., `?->`). It handles various expression types including
+/// array accesses, method calls, property accesses, and parenthesized expressions.
+#[inline]
+pub(crate) const fn expression_is_nullsafe(expr: &'_ Expression<'_>) -> bool {
+    match expr {
+        Expression::ArrayAccess(array_access) => expression_is_nullsafe(array_access.array),
+        Expression::Call(Call::NullSafeMethod(_)) => true,
+        Expression::Call(Call::Method(method_call)) => expression_is_nullsafe(method_call.object),
+        Expression::Call(Call::StaticMethod(static_method_call)) => expression_is_nullsafe(static_method_call.class),
+        Expression::Access(Access::NullSafeProperty(_)) => true,
+        Expression::Access(Access::Property(property_access)) => expression_is_nullsafe(property_access.object),
+        Expression::Access(Access::StaticProperty(static_property_access)) => {
+            expression_is_nullsafe(static_property_access.class)
+        }
+        // PHP is weird..
+        // - https://github.com/php/php-src/issues/20684
+        // - https://github.com/php/php-src/pull/20685
+        Expression::Parenthesized(parenthesized) => expression_is_nullsafe(parenthesized.expression),
+        _ => false,
+    }
+}
+
 pub const fn expression_has_logic<'ast, 'arena>(expression: &'ast Expression<'arena>) -> bool {
     match unwrap_expression(expression) {
         Expression::Binary(binary) => {

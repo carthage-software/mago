@@ -23,6 +23,7 @@ use crate::code::IssueCode;
 use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
+use crate::utils::expression::expression_is_nullsafe;
 
 /// Describes the origin and nature of a class name resolution.
 ///
@@ -321,8 +322,11 @@ pub fn resolve_classnames_from_expression<'ctx, 'arena>(
             for atomic in expression_type.map(|u| u.types.iter()).unwrap_or_default() {
                 if let Some(resolved_classname) = get_class_name_from_atomic(context.codebase, atomic) {
                     possible_types.push(resolved_classname);
+                } else if expression_is_nullsafe(expression) && atomic.is_null() {
+                    // Special case: nullsafe operator resulting in null type is ignored for class name resolution.
                 } else {
                     possible_types.push(ResolvedClassname::invalid());
+
                     context.collector.report_with_code(
                         IssueCode::InvalidClassStringExpression,
                         Issue::error(format!(

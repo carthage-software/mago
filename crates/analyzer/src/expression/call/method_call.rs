@@ -31,6 +31,7 @@ use crate::invocation::template_result::populate_template_result_from_invocation
 use crate::plugin::ExpressionHookResult;
 use crate::plugin::context::HookContext;
 use crate::resolver::method::resolve_method_targets;
+use crate::utils::expression::expression_is_nullsafe;
 use crate::utils::expression::get_expression_id;
 use crate::visibility::check_method_visibility;
 
@@ -245,6 +246,8 @@ fn analyze_method_call<'ctx, 'ast, 'arena>(
     is_null_safe: bool,
     span: Span,
 ) -> Result<(), AnalysisError> {
+    let is_null_safe = is_null_safe || expression_is_nullsafe(object);
+
     // When using nullsafe operator, mark that we're in a nullsafe chain
     // This propagates to all subsequent accesses in the chain and persists
     // through the entire expression evaluation

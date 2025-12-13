@@ -774,6 +774,7 @@ fn analyze_destructuring<'ctx, 'ast, 'arena>(
                         false,
                         &None,
                         None,
+                        false,
                     )
                 };
 
@@ -809,6 +810,7 @@ fn analyze_destructuring<'ctx, 'ast, 'arena>(
                         false,
                         &None,
                         None,
+                        false,
                     )
                 };
 
