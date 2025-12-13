@@ -1,4 +1,5 @@
 pub mod explicit_octal;
+pub mod instanceof_stringable;
 pub mod literal_named_argument;
 pub mod no_empty;
 pub mod no_hash_emoji;
@@ -13,6 +14,7 @@ pub mod tagged_todo;
 pub mod valid_docblock;
 
 pub use explicit_octal::*;
+pub use instanceof_stringable::*;
 pub use literal_named_argument::*;
 pub use no_empty::*;
 pub use no_hash_emoji::*;

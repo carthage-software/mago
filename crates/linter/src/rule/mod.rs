@@ -223,6 +223,7 @@ define_rules! {
     NoAliasFunction(no_alias_function @ NoAliasFunctionRule),
     LowercaseTypeHint(lowercase_type_hint @ LowercaseTypeHintRule),
     IdentityComparison(identity_comparison @ IdentityComparisonRule),
+    InstanceofStringable(instanceof_stringable @ InstanceofStringableRule),
     InterfaceName(interface_name @ InterfaceNameRule),
     InvalidOpenTag(invalid_open_tag @ InvalidOpenTagRule),
     FunctionName(function_name @ FunctionNameRule),

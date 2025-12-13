@@ -102,6 +102,7 @@ pub struct RulesSettings {
     pub no_alias_function: RuleSettings<NoAliasFunctionConfig>,
     pub lowercase_type_hint: RuleSettings<LowercaseTypeHintConfig>,
     pub identity_comparison: RuleSettings<IdentityComparisonConfig>,
+    pub instanceof_stringable: RuleSettings<InstanceofStringableConfig>,
     pub interface_name: RuleSettings<InterfaceNameConfig>,
     pub invalid_open_tag: RuleSettings<InvalidOpenTagConfig>,
     pub function_name: RuleSettings<FunctionNameConfig>,
