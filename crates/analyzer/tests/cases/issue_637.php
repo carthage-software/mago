@@ -3,6 +3,7 @@
 /**
  * @param array<int, string> $array
  * @mago-expect analysis:redundant-condition
+ * @mago-expect analysis:redundant-type-comparison
  */
 function foo(array $array): void
 {
@@ -16,6 +17,7 @@ function foo(array $array): void
 /**
  * @param array<string, string> $assoc
  * @mago-expect analysis:redundant-condition
+ * @mago-expect analysis:redundant-type-comparison
  */
 function bar(array $assoc): void
 {

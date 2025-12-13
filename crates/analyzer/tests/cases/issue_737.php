@@ -31,6 +31,7 @@ function string_keys_vs_list(array $a): void
 function int_keys_vs_list(array $a): void
 {
     // @mago-expect analysis:redundant-condition
+    // @mago-expect analysis:redundant-type-comparison
     if (array_is_list($a)) {
         echo 'always true - this is already a list shape';
     }
@@ -94,6 +95,7 @@ function mixed_keys_vs_list(array $a): void
 function empty_shape_vs_list(array $a): void
 {
     // @mago-expect analysis:redundant-condition
+    // @mago-expect analysis:redundant-type-comparison
     if (array_is_list($a)) {
         echo 'always true - empty array is a list';
     }
@@ -103,6 +105,7 @@ function empty_shape_vs_list(array $a): void
 function list_vs_list(array $a): void
 {
     // @mago-expect analysis:redundant-condition
+    // @mago-expect analysis:redundant-type-comparison
     if (array_is_list($a)) {
         echo 'always true';
     }
@@ -112,6 +115,7 @@ function list_vs_list(array $a): void
 function non_empty_list_vs_list(array $a): void
 {
     // @mago-expect analysis:redundant-condition
+    // @mago-expect analysis:redundant-type-comparison
     if (array_is_list($a)) {
         echo 'always true';
     }
@@ -121,6 +125,7 @@ function non_empty_list_vs_list(array $a): void
 function list_with_known_elements(array $a): void
 {
     // @mago-expect analysis:redundant-condition
+    // @mago-expect analysis:redundant-type-comparison
     if (array_is_list($a)) {
         echo 'always true';
     }

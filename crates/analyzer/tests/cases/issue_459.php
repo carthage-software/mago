@@ -67,7 +67,7 @@ function process_assertions(A|B $obj): string
 {
     return match (true) {
         is_instance_of_a($obj) => $obj->getFoo(),
-        is_instance_of_b($obj) => match (true) {
+        is_instance_of_b($obj) => match (true) { // @mago-expect analysis:redundant-type-comparison
             is_instance_of_d($obj) => $obj->getBaz(),
             default => $obj->getBar(),
         },

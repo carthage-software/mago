@@ -15,6 +15,7 @@ function is_array_key(mixed $k): bool
  */
 function x(mixed $k): mixed
 {
+    // @mago-expect analysis:redundant-type-comparison
     assert(is_array_key($k), 'its array key');
 
     return $k;

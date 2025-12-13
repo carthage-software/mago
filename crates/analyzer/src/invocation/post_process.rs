@@ -20,7 +20,9 @@ use mago_codex::ttype::TType;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::bool::TBool;
+use mago_codex::ttype::comparator::ComparisonResult;
 use mago_codex::ttype::comparator::union_comparator::can_expression_types_be_identical;
+use mago_codex::ttype::comparator::union_comparator::is_contained_by;
 use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::get_never;
 use mago_codex::ttype::template::TemplateResult;
@@ -367,12 +369,18 @@ fn resolve_invocation_assertion<'ctx, 'ast, 'arena>(
                 let mut any_possible = false;
                 let mut has_resolved_types = false;
                 let mut all_negated = true;
+                let mut always_redundant = true;
 
                 for variable_assertion in variable_assertions {
                     all_negated = all_negated && variable_assertion.is_negation();
 
+                    if variable_assertion.has_equality() {
+                        always_redundant = false;
+                    }
+
                     let Some(assertion_atomic) = variable_assertion.get_type() else {
                         add_and_assertion(&mut new_variable_possibilities, variable_assertion.clone());
+                        always_redundant = false;
 
                         continue;
                     };
@@ -401,10 +409,33 @@ fn resolve_invocation_assertion<'ctx, 'ast, 'arena>(
                             any_possible = true;
                         }
 
+                        if always_redundant
+                            && let Some(asserted_type) = &asserted_type
+                            && !asserted_type.is_mixed()
+                        {
+                            let mut comparison_result = ComparisonResult::default();
+                            let is_subtype = is_contained_by(
+                                context.codebase,
+                                asserted_type,
+                                &resolved_assertion_type,
+                                false,
+                                false,
+                                false,
+                                &mut comparison_result,
+                            );
+
+                            if !is_subtype {
+                                always_redundant = false;
+                            }
+                        } else {
+                            always_redundant = false;
+                        }
+
                         for resolved_atomic in resolved_assertion_type.types.into_owned() {
                             resolved_or_clause.push(variable_assertion.with_type(resolved_atomic));
                         }
                     } else if let Some(asserted_type) = &asserted_type {
+                        always_redundant = false;
                         match variable_assertion {
                             Assertion::IsType(_) => {
                                 if !can_expression_types_be_identical(
@@ -478,7 +509,7 @@ fn resolve_invocation_assertion<'ctx, 'ast, 'arena>(
                 }
 
                 if has_resolved_types
-                    && !any_possible
+                    && (!any_possible || always_redundant)
                     && let Some(asserted_type) = &asserted_type
                 {
                     let asserted_type_id = asserted_type.get_id();
@@ -488,7 +519,7 @@ fn resolve_invocation_assertion<'ctx, 'ast, 'arena>(
                         .collect::<Vec<_>>()
                         .join("|");
 
-                    if all_negated {
+                    if all_negated || always_redundant {
                         context.collector.report_with_code(
                             IssueCode::RedundantTypeComparison,
                             Issue::warning(format!(

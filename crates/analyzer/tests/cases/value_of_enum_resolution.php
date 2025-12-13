@@ -46,7 +46,7 @@ class EnumValueType implements TypeInterface
     ) {}
 
     /**
-     * @psalm-assert-if-true value-of<T> $value
+     * @psalm-assert-if-true =value-of<T> $value
      */
     public function matches(mixed $value): bool
     {
