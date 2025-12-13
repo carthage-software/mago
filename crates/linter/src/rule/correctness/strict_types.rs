@@ -142,12 +142,21 @@ impl LintRule for StrictTypesRule {
         }
 
         if !found {
+            let annotation_span = program
+                .statements
+                .iter()
+                .find_map(|s| match s {
+                    Statement::OpeningTag(tag) => Some(tag.span()),
+                    _ => None,
+                })
+                .unwrap_or_else(|| program.span());
+
             let issue = Issue::new(
                 self.cfg.level(),
                 "Missing `declare(strict_types=1);` statement at the beginning of the file.",
             )
             .with_code(self.meta.code)
-            .with_annotation(Annotation::primary(program.span()))
+            .with_annotation(Annotation::primary(annotation_span))
             .with_note("The `strict_types` directive enforces strict type checking, which can prevent subtle bugs.")
             .with_help("Add `declare(strict_types=1);` at the top of your file.");
 

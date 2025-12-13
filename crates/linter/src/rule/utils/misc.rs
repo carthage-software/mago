@@ -1,4 +1,22 @@
+use mago_span::HasSpan;
+use mago_span::Span;
 use mago_syntax::ast::*;
+
+/// Returns the minimal span for a class-like node (just keyword + name).
+///
+/// For named classes/traits/enums/interfaces, this returns the span from the keyword to the name.
+/// For anonymous classes, this returns just the `class` keyword span.
+#[inline]
+pub fn get_class_like_header_span(node: Node<'_, '_>) -> Span {
+    match node {
+        Node::Class(class) => class.class.span().join(class.name.span()),
+        Node::Trait(r#trait) => r#trait.r#trait.span().join(r#trait.name.span()),
+        Node::Enum(r#enum) => r#enum.r#enum.span().join(r#enum.name.span()),
+        Node::Interface(interface) => interface.interface.span().join(interface.name.span()),
+        Node::AnonymousClass(class) => class.class.span(),
+        _ => node.span(),
+    }
+}
 
 #[inline]
 pub fn get_single_return_statement<'ast, 'arena>(block: &'ast Block<'arena>) -> Option<&'ast Return<'arena>> {

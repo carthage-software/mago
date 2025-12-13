@@ -5,7 +5,6 @@ use serde::Serialize;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_reporting::Level;
-use mago_span::HasSpan;
 use mago_syntax::ast::ClassLikeMember;
 use mago_syntax::ast::Node;
 use mago_syntax::ast::NodeKind;
@@ -15,6 +14,7 @@ use crate::context::LintContext;
 use crate::requirements::RuleRequirements;
 use crate::rule::Config;
 use crate::rule::LintRule;
+use crate::rule::utils::misc::get_class_like_header_span;
 use crate::rule_meta::RuleMeta;
 use crate::settings::RuleSettings;
 
@@ -126,7 +126,7 @@ impl LintRule for TooManyEnumCasesRule {
                 Issue::new(self.cfg.level, "Enum has too many cases.")
                     .with_code(self.meta.code)
                     .with_annotation(
-                        Annotation::primary(r#enum.span()).with_message(format!(
+                        Annotation::primary(get_class_like_header_span(node)).with_message(format!(
                             "Enum has {cases} cases, which exceeds the threshold of {}.",
                             self.cfg.threshold
                         ))

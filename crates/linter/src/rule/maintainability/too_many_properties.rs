@@ -5,7 +5,6 @@ use serde::Serialize;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_reporting::Level;
-use mago_span::HasSpan;
 use mago_syntax::ast::ClassLikeMember;
 use mago_syntax::ast::Node;
 use mago_syntax::ast::NodeKind;
@@ -16,6 +15,7 @@ use crate::context::LintContext;
 use crate::requirements::RuleRequirements;
 use crate::rule::Config;
 use crate::rule::LintRule;
+use crate::rule::utils::misc::get_class_like_header_span;
 use crate::rule_meta::RuleMeta;
 use crate::settings::RuleSettings;
 
@@ -128,17 +128,13 @@ impl LintRule for TooManyPropertiesRule {
             ctx.collector.report(
                 Issue::new(self.cfg.level, format!("{kind} has too many properties."))
                     .with_code(self.meta.code)
-                    .with_annotation(Annotation::primary(node.span()).with_message(format!(
+                    .with_annotation(Annotation::primary(get_class_like_header_span(node)).with_message(format!(
                         "{kind} has {properties} properties, which exceeds the threshold of {}.",
                         self.cfg.threshold
                     )))
                     .with_note("Having a large number of properties can make classes harder to understand and maintain.")
                     .with_help("Try reducing the number of properties, or consider grouping related properties into a single object.")
             );
-
-            // If this structure has too many props, we don't need to check the nested structures.
-        } else {
-            // Continue checking nested structures, if any.
         }
     }
 }
