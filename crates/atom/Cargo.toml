@@ -16,4 +16,3 @@ workspace = true
 ustr = { workspace = true }
 itoa = { workspace = true }
 ryu = { workspace = true }
-schemars = { workspace = true }
