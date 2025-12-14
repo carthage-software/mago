@@ -26,21 +26,63 @@ use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
 
-#[inline]
+/// Iteratively collects all operands in a string concatenation chain.
+///
+/// For `"a" . "b" . "c"`, this returns `["a", "b", "c"]` instead of recursing through the nested binary nodes.
+/// This avoids stack overflow on deeply nested concatenations.
+fn collect_concat_operands<'a, 'arena>(binary: &'a Binary<'arena>) -> Vec<&'a Expression<'arena>> {
+    let mut operands = Vec::new();
+    let mut stack: Vec<&Expression<'arena>> = vec![&binary.rhs, &binary.lhs];
+
+    while let Some(expr) = stack.pop() {
+        if let Expression::Binary(inner_binary) = expr
+            && matches!(&inner_binary.operator, BinaryOperator::StringConcat(_))
+        {
+            stack.push(inner_binary.rhs);
+            stack.push(inner_binary.lhs);
+            continue;
+        }
+
+        operands.push(expr);
+    }
+
+    operands
+}
+
+/// Analyzes a string concatenation operation using an iterative approach to avoid stack overflow.
+///
+/// Instead of recursively calling analyze on each operand (which would recurse back into this
+/// function for nested concatenations), we:
+/// 1. Flatten the concatenation chain into a list of leaf operands
+/// 2. Analyze each leaf operand (non-concat expressions don't cause deep recursion)
+/// 3. Validate and compute the result type by folding left-to-right
+#[inline(never)]
 pub fn analyze_string_concat_operation<'ctx, 'arena>(
     binary: &Binary<'arena>,
     context: &mut Context<'ctx, 'arena>,
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
 ) -> Result<(), AnalysisError> {
-    binary.lhs.analyze(context, block_context, artifacts)?;
-    binary.rhs.analyze(context, block_context, artifacts)?;
+    let operands = collect_concat_operands(binary);
 
-    analyze_string_concat_operand(context, artifacts, binary.lhs, "Left")?;
-    analyze_string_concat_operand(context, artifacts, binary.rhs, "Right")?;
+    for operand in &operands {
+        operand.analyze(context, block_context, artifacts)?;
+    }
 
-    let result_type = concat_operands(binary.lhs, binary.rhs, artifacts);
+    let len = operands.len();
+    for (i, operand) in operands.iter().enumerate() {
+        let side = if i == 0 {
+            "Left"
+        } else if i == len - 1 {
+            "Right"
+        } else {
+            "Middle"
+        };
 
+        analyze_string_concat_operand(context, artifacts, operand, side)?;
+    }
+
+    let result_type = fold_concat_operands(&operands, artifacts);
     artifacts.expression_types.insert(get_expression_range(binary), Rc::new(result_type));
 
     Ok(())
@@ -334,25 +376,50 @@ fn analyze_string_concat_operand<'ctx, 'ast, 'arena>(
     Ok(())
 }
 
-fn concat_operands<'ast, 'arena>(
-    left: &'ast Expression<'arena>,
-    right: &'ast Expression<'arena>,
-    artifacts: &mut AnalysisArtifacts,
-) -> TUnion {
-    let left_type = artifacts.get_expression_type(left);
-    let right_type = artifacts.get_expression_type(right);
+/// Folds multiple operands into a single result type by concatenating left-to-right.
+///
+/// This is used by the iterative concat analysis to compute the final type from
+/// a flattened list of operands.
+fn fold_concat_operands<'ast, 'arena>(operands: &[&'ast Expression<'arena>], artifacts: &AnalysisArtifacts) -> TUnion {
+    if operands.is_empty() {
+        return get_string();
+    }
 
-    let (left_strings, right_strings) = match (left_type, right_type) {
-        (Some(left_type), Some(right_type)) => (get_operand_strings(left_type), get_operand_strings(right_type)),
-        (Some(left_type), None) => (get_operand_strings(left_type), vec![TString::general()]),
-        (None, Some(right_type)) => (vec![TString::general()], get_operand_strings(right_type)),
-        (None, None) => {
-            return get_string();
-        }
+    // Get strings for the first operand
+    let first_type = artifacts.get_expression_type(operands[0]);
+    let mut current_strings = match first_type {
+        Some(t) => get_operand_strings(t),
+        None => vec![TString::general()],
     };
 
-    // Determine if we can take the fast path. The fast path is possible only if there are
-    // no specific literal values that need to be concatenated at runtime.
+    // Fold each subsequent operand
+    for operand in &operands[1..] {
+        let operand_type = artifacts.get_expression_type(*operand);
+        let operand_strings = match operand_type {
+            Some(t) => get_operand_strings(t),
+            None => vec![TString::general()],
+        };
+
+        current_strings = concat_string_lists(current_strings, &operand_strings);
+    }
+
+    if current_strings.is_empty() {
+        return get_string();
+    }
+
+    if current_strings.iter().all(|s| !s.is_literal_origin()) {
+        let is_non_empty = current_strings.iter().any(|s| s.is_non_empty);
+        let is_truthy = current_strings.iter().all(|s| s.is_truthy);
+        let is_lowercase = current_strings.iter().all(|s| s.is_lowercase);
+
+        return get_string_with_props(false, is_truthy, is_non_empty, is_lowercase);
+    }
+
+    TUnion::new(current_strings.into_iter().map(|string| TAtomic::Scalar(TScalar::String(string))).collect())
+}
+
+/// Concatenates two lists of string types, producing all possible combinations.
+fn concat_string_lists(left_strings: Vec<TString>, right_strings: &[TString]) -> Vec<TString> {
     let has_literals =
         left_strings.iter().any(|s| s.literal.is_some()) || right_strings.iter().any(|s| s.literal.is_some());
 
@@ -361,12 +428,12 @@ fn concat_operands<'ast, 'arena>(
         let is_truthy = left_strings.iter().all(|s| s.is_truthy) || right_strings.iter().all(|s| s.is_truthy);
         let is_lowercase = left_strings.iter().all(|s| s.is_lowercase) && right_strings.iter().all(|s| s.is_lowercase);
 
-        return get_string_with_props(false, is_truthy, is_non_empty, is_lowercase);
+        return vec![TString::general_with_props(false, is_truthy, is_non_empty, is_lowercase)];
     }
 
-    let mut result_strings = vec![];
+    let mut result_strings = Vec::new();
     for left_string in left_strings {
-        for right_string in &right_strings {
+        for right_string in right_strings {
             let mut resulting_string = TString::general();
             resulting_string.is_non_empty = left_string.is_non_empty || right_string.is_non_empty;
             resulting_string.is_truthy = left_string.is_truthy || right_string.is_truthy;
@@ -385,19 +452,7 @@ fn concat_operands<'ast, 'arena>(
         }
     }
 
-    if result_strings.is_empty() {
-        return get_string();
-    }
-
-    if result_strings.iter().all(|s| !s.is_literal_origin()) {
-        let is_non_empty = result_strings.iter().any(|s| s.is_non_empty);
-        let is_truthy = result_strings.iter().all(|s| s.is_truthy);
-        let is_lowercase = result_strings.iter().all(|s| s.is_lowercase);
-
-        return get_string_with_props(false, is_truthy, is_non_empty, is_lowercase);
-    }
-
-    TUnion::new(result_strings.into_iter().map(|string| TAtomic::Scalar(TScalar::String(string))).collect())
+    result_strings
 }
 
 #[inline]
