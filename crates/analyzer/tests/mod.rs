@@ -444,6 +444,7 @@ test_case!(issue_725);
 test_case!(issue_728_symfony_reference);
 test_case!(issue_729);
 test_case!(issue_731);
+test_case!(issue_732);
 test_case!(issue_733);
 test_case!(issue_735);
 test_case!(issue_736);

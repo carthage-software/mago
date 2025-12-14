@@ -273,6 +273,8 @@ pub fn resolve_classnames_from_expression<'ctx, 'arena>(
         }
         Expression::Parent(parent_keyword) => {
             if let Some(self_meta) = block_context.scope.get_class_like() {
+                let mut found_parent = false;
+
                 if let Some(parent_metadata) =
                     self_meta.direct_parent_class.as_ref().and_then(|id| context.codebase.get_class_like(id))
                 {
@@ -281,7 +283,19 @@ pub fn resolve_classnames_from_expression<'ctx, 'arena>(
                     classname.intersections = get_intersections_from_metadata(context, self_meta);
 
                     possible_types.push(classname);
-                } else {
+                    found_parent = true;
+                }
+
+                if !found_parent && self_meta.kind.is_trait() && !self_meta.require_extends.is_empty() {
+                    let mut intersections = get_intersections_from_metadata(context, self_meta);
+                    // SAFETY: we know that there is at least one intersection here.
+                    let mut parent_classname = unsafe { intersections.pop().unwrap_unchecked() };
+                    parent_classname.intersections = intersections;
+                    possible_types.push(parent_classname);
+                    found_parent = true;
+                }
+
+                if !found_parent {
                     context.collector.report_with_code(
                         IssueCode::InvalidParentType,
                         Issue::error(format!(
