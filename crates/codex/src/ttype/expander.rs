@@ -369,10 +369,12 @@ fn expand_object(named_object: &mut TObject, codebase: &CodebaseMetadata, option
                     named_object.is_this = true;
                 }
             }
-            StaticClassType::Name(static_class_name) => {
+            StaticClassType::Name(static_class_name)
+                if !is_this || codebase.is_instance_of(static_class_name, &name) =>
+            {
                 if let TObject::Named(named_object) = named_object {
                     named_object.name = *static_class_name;
-                    named_object.is_this = options.function_is_final;
+                    named_object.is_this = false;
                 }
             }
             _ => {}
