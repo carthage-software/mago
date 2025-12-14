@@ -326,6 +326,7 @@ test_case!(symbol_existence_assertions);
 test_case!(symbol_existence_edge_cases);
 test_case!(type_assert);
 test_case!(string_callable_template_inference);
+test_case!(clear_narrowed_prop_after_call);
 
 // Github Issues
 test_case!(issue_659);

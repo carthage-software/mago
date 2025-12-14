@@ -60,6 +60,7 @@ pub fn post_invocation_process<'ctx, 'ast, 'arena>(
     apply_assertions: bool,
 ) -> Result<(), AnalysisError> {
     update_by_reference_argument_types(context, block_context, artifacts, invoication, template_result, parameters)?;
+    clear_object_argument_property_narrowings(context, block_context, invoication);
 
     let Some(identifier) = invoication.target.get_function_like_identifier() else {
         return Ok(());
@@ -339,6 +340,62 @@ fn update_by_reference_argument_types<'ctx, 'ast, 'arena>(
     }
 
     Ok(())
+}
+
+/// Clears narrowed property types for object arguments passed to an invocation.
+///
+/// When an object is passed to a method or function, its properties could be modified.
+/// This function removes any narrowed property types for object arguments to prevent
+/// false positives from the analyzer assuming properties remain unchanged after the call.
+fn clear_object_argument_property_narrowings<'ctx, 'ast, 'arena>(
+    context: &Context<'ctx, 'arena>,
+    block_context: &mut BlockContext<'ctx>,
+    invocation: &Invocation<'ctx, 'ast, 'arena>,
+) {
+    let arguments = invocation.arguments_source.get_arguments();
+
+    for argument in arguments {
+        let Some(expression) = argument.value() else {
+            continue;
+        };
+
+        let Some(argument_id) = get_expression_id(
+            expression,
+            block_context.scope.get_class_like_name(),
+            context.resolved_names,
+            Some(context.codebase),
+        ) else {
+            continue;
+        };
+
+        let Some(existing_type) = block_context.locals.get(&argument_id).cloned() else {
+            continue;
+        };
+
+        if !existing_type.has_object_type() {
+            continue;
+        }
+
+        let keys_to_remove: Vec<_> = block_context
+            .locals
+            .keys()
+            .filter(|var_id| {
+                if *var_id == &argument_id {
+                    return false;
+                }
+                if !var_id.starts_with(&argument_id) {
+                    return false;
+                }
+                let after_root = &var_id[argument_id.len()..];
+                after_root.starts_with("->") || after_root.starts_with("[")
+            })
+            .cloned()
+            .collect();
+
+        for key in keys_to_remove {
+            block_context.locals.remove(&key);
+        }
+    }
 }
 
 fn resolve_invocation_assertion<'ctx, 'ast, 'arena>(
