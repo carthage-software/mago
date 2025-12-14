@@ -64,7 +64,6 @@ pub struct ClassLikeMetadata {
     pub appearing_method_ids: AtomMap<MethodIdentifier>,
     pub inheritable_method_ids: AtomMap<MethodIdentifier>,
     pub overridden_method_ids: AtomMap<HashMap<Atom, MethodIdentifier>>,
-    pub potential_declaring_method_ids: AtomMap<HashMap<String, bool>>,
     pub properties: AtomMap<PropertyMetadata>,
     pub appearing_property_ids: AtomMap<Atom>,
     pub declaring_property_ids: AtomMap<Atom>,
@@ -125,7 +124,6 @@ impl ClassLikeMetadata {
             static_pseudo_methods: AtomSet::default(),
             overridden_method_ids: AtomMap::default(),
             overridden_property_ids: AtomMap::default(),
-            potential_declaring_method_ids: AtomMap::default(),
             properties: AtomMap::default(),
             template_variance: HashMap::default(),
             template_type_extends_count: AtomMap::default(),
@@ -207,12 +205,6 @@ impl ClassLikeMetadata {
     #[inline]
     pub fn has_appearing_method(&self, method: &Atom) -> bool {
         self.appearing_method_ids.contains_key(method)
-    }
-
-    /// Returns a reference to a specific method's potential declaring method id strings.
-    #[inline]
-    pub fn get_potential_declaring_method_id(&self, method: &Atom) -> Option<&HashMap<String, bool>> {
-        self.potential_declaring_method_ids.get(method)
     }
 
     /// Returns a vector of property names.
@@ -360,12 +352,6 @@ impl ClassLikeMetadata {
             .insert(*parent_method_id.get_class_name(), parent_method_id)
     }
 
-    /// Adds a potential declaring method id string to the map for a method. Initializes map if needed.
-    #[inline]
-    pub fn add_potential_declaring_method(&mut self, method: Atom, potential_method_id_str: String) {
-        self.potential_declaring_method_ids.entry(method).or_default().insert(potential_method_id_str, true);
-    }
-
     /// Adds or updates a property's metadata. Returns the previous metadata if the property existed.
     #[inline]
     pub fn add_property(&mut self, name: Atom, property_metadata: PropertyMetadata) -> Option<PropertyMetadata> {
@@ -472,7 +458,6 @@ impl ClassLikeMetadata {
         self.declaring_method_ids.shrink_to_fit();
         self.inheritable_method_ids.shrink_to_fit();
         self.overridden_method_ids.shrink_to_fit();
-        self.potential_declaring_method_ids.shrink_to_fit();
         self.attributes.shrink_to_fit();
         self.constants.shrink_to_fit();
         self.enum_cases.shrink_to_fit();
