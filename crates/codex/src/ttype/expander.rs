@@ -370,7 +370,9 @@ fn expand_object(named_object: &mut TObject, codebase: &CodebaseMetadata, option
                 }
             }
             StaticClassType::Name(static_class_name)
-                if !is_this || codebase.is_instance_of(static_class_name, &name) =>
+                if name_str_lc == "static"
+                    || name_str_lc == "$this"
+                    || codebase.is_instance_of(static_class_name, &name) =>
             {
                 if let TObject::Named(named_object) = named_object {
                     named_object.name = *static_class_name;
@@ -1192,7 +1194,7 @@ mod tests {
 
         assert!(actual.types.iter().any(|t| {
             if let TAtomic::Object(TObject::Named(named)) = t {
-                named.name == ascii_lowercase_atom("foo") && named.is_this
+                named.name == ascii_lowercase_atom("foo") && !named.is_this
             } else {
                 false
             }
