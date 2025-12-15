@@ -1164,7 +1164,7 @@ fn update_if_scope<'ctx, 'arena>(
         // Union semantics for possibly_initialized
         outer_block_context
             .possibly_initialized_properties
-            .extend(if_block_context.possibly_initialized_properties.iter().cloned());
+            .extend(if_block_context.possibly_initialized_properties.iter().copied());
 
         // Same for method calls
         let branch_called = std::mem::take(&mut if_block_context.definitely_called_methods);
@@ -1177,7 +1177,7 @@ fn update_if_scope<'ctx, 'arena>(
             }
         }
 
-        outer_block_context.called_methods.extend(if_block_context.called_methods.iter().cloned());
+        outer_block_context.called_methods.extend(if_block_context.called_methods.iter().copied());
     }
     let mut redefined_variables =
         if_block_context.get_redefined_locals(&outer_block_context.locals, false, &mut AtomSet::default());
