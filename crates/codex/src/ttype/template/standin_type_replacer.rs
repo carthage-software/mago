@@ -1010,10 +1010,10 @@ fn find_matching_atomic_types_for_template(
                     {
                         *depth += 1;
 
-                        let constraint_object =
-                            TAtomic::Object(TObject::Named(TNamedObject::new(*base_as_value).with_type_parameters(
-                                Some(extended_parameters.clone().into_iter().map(|(_, v)| v).collect::<Vec<_>>()),
-                            )));
+                        let constraint_object = TAtomic::Object(TObject::Named(
+                            TNamedObject::new(*base_as_value)
+                                .with_type_parameters(Some(extended_parameters.values().cloned().collect::<Vec<_>>())),
+                        ));
 
                         matching_atomic_types.push(TAtomic::Scalar(TScalar::ClassLikeString(
                             TClassLikeString::OfType {
@@ -1048,11 +1048,10 @@ fn find_matching_atomic_types_for_template(
                 }
 
                 if let Some(extended_parameters) = class_metadata.template_extended_parameters.get(&base_name) {
-                    matching_atomic_types.push(TAtomic::Object(TObject::Named(
-                        TNamedObject::new(input_name).with_type_parameters(Some(
-                            extended_parameters.clone().into_iter().map(|(_, v)| v).collect::<Vec<TUnion>>(),
-                        )),
-                    )));
+                    matching_atomic_types
+                        .push(TAtomic::Object(TObject::Named(TNamedObject::new(input_name).with_type_parameters(
+                            Some(extended_parameters.values().cloned().collect::<Vec<TUnion>>()),
+                        ))));
                     continue;
                 }
             }

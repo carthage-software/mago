@@ -212,7 +212,9 @@ pub fn analyze_logical_and_operation<'ctx, 'arena>(
             if_body_context_inner
                 .conditionally_referenced_variable_ids
                 .extend(block_context.conditionally_referenced_variable_ids.iter().copied());
-            if_body_context_inner.assigned_variable_ids.extend(block_context.assigned_variable_ids.iter().map(|(k, v)| (*k, *v)));
+            if_body_context_inner
+                .assigned_variable_ids
+                .extend(block_context.assigned_variable_ids.iter().map(|(k, v)| (*k, *v)));
             if_body_context_inner.reconciled_expression_clauses.extend(partitioned_clauses.1);
         } else {
             block_context.locals = left_block_context.locals;
@@ -509,7 +511,9 @@ pub fn analyze_logical_or_operation<'ctx, 'arena>(
         if_body_context_inner
             .conditionally_referenced_variable_ids
             .extend(block_context.conditionally_referenced_variable_ids.iter().copied());
-        if_body_context_inner.assigned_variable_ids.extend(block_context.assigned_variable_ids.iter().map(|(k, v)| (*k, *v)));
+        if_body_context_inner
+            .assigned_variable_ids
+            .extend(block_context.assigned_variable_ids.iter().map(|(k, v)| (*k, *v)));
     }
 
     artifacts.set_expression_type(binary, result_type);

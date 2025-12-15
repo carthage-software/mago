@@ -190,7 +190,7 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
 
         if let Some(redefined_vars) = self.redefined_variables {
             possibly_redefined_vars.retain(|k, _| !redefined_vars.contains_key(k));
-            self.block_context.locals.extend(redefined_vars.clone());
+            self.block_context.locals.extend(redefined_vars.iter().map(|(k, v)| (*k, v.clone())));
         }
 
         for (var_id, var_type) in possibly_redefined_vars {

@@ -91,7 +91,7 @@ pub fn register_anonymous_class<'ctx, 'arena>(
         .map(|(name, definition)| (*name, definition.clone()))
         .collect::<TemplateConstraintList>();
 
-    let type_aliases = class_like_metadata.type_aliases.keys().cloned().collect::<AtomSet>();
+    let type_aliases = class_like_metadata.type_aliases.keys().copied().collect::<AtomSet>();
     let imported_aliases = class_like_metadata
         .imported_type_aliases
         .iter()
@@ -133,7 +133,7 @@ pub fn register_class<'ctx, 'arena>(
         .collect::<TemplateConstraintList>();
 
     let name = class_like_metadata.name;
-    let type_aliases = class_like_metadata.type_aliases.keys().cloned().collect::<AtomSet>();
+    let type_aliases = class_like_metadata.type_aliases.keys().copied().collect::<AtomSet>();
     let imported_aliases = class_like_metadata
         .imported_type_aliases
         .iter()
@@ -175,7 +175,7 @@ pub fn register_interface<'ctx, 'arena>(
         .collect::<TemplateConstraintList>();
 
     let name = class_like_metadata.name;
-    let type_aliases = class_like_metadata.type_aliases.keys().cloned().collect::<AtomSet>();
+    let type_aliases = class_like_metadata.type_aliases.keys().copied().collect::<AtomSet>();
     let imported_aliases = class_like_metadata
         .imported_type_aliases
         .iter()
@@ -217,7 +217,7 @@ pub fn register_trait<'ctx, 'arena>(
         .collect::<TemplateConstraintList>();
 
     let name = class_like_metadata.name;
-    let type_aliases = class_like_metadata.type_aliases.keys().cloned().collect::<AtomSet>();
+    let type_aliases = class_like_metadata.type_aliases.keys().copied().collect::<AtomSet>();
     let imported_aliases = class_like_metadata
         .imported_type_aliases
         .iter()
@@ -259,7 +259,7 @@ pub fn register_enum<'ctx, 'arena>(
         .collect::<TemplateConstraintList>();
 
     let name = class_like_metadata.name;
-    let type_aliases = class_like_metadata.type_aliases.keys().cloned().collect::<AtomSet>();
+    let type_aliases = class_like_metadata.type_aliases.keys().copied().collect::<AtomSet>();
     let imported_aliases = class_like_metadata
         .imported_type_aliases
         .iter()

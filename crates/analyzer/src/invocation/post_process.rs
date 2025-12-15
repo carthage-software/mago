@@ -245,7 +245,7 @@ fn apply_assertion_to_call_context<'ctx, 'ast, 'arena>(
         return;
     }
 
-    let referenced_variable_ids: AtomSet = type_assertions.keys().cloned().collect();
+    let referenced_variable_ids: AtomSet = type_assertions.keys().copied().collect();
     let mut changed_variable_ids: AtomSet = AtomSet::default();
     let mut active_type_assertions = IndexMap::new();
     for (variable, type_assertion) in &type_assertions {

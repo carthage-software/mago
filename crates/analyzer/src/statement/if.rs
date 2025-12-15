@@ -113,7 +113,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for If<'arena> {
         });
 
         for clause in &mut if_clauses {
-            let keys = clause.possibilities.keys().cloned().collect::<Vec<Atom>>();
+            let keys = clause.possibilities.keys().copied().collect::<Vec<Atom>>();
             mixed_variables.retain(|i| !keys.contains(i));
 
             'outer: for key in keys {
@@ -432,7 +432,9 @@ fn analyze_if_statement_block<'ctx, 'arena>(
     }
 
     if_block_context.reconciled_expression_clauses = vec![];
-    outer_block_context.variables_possibly_in_scope.extend(if_block_context.variables_possibly_in_scope.iter().copied());
+    outer_block_context
+        .variables_possibly_in_scope
+        .extend(if_block_context.variables_possibly_in_scope.iter().copied());
 
     let old_if_block_context = if_block_context.clone();
     let assigned_variable_ids = std::mem::take(&mut if_block_context.assigned_variable_ids);
@@ -469,7 +471,7 @@ fn analyze_if_statement_block<'ctx, 'arena>(
     inherit_branch_context_properties(context, outer_block_context, &if_block_context);
 
     if !has_leaving_statements {
-        let new_assigned_variable_ids_keys = new_assigned_variable_ids.keys().cloned().collect::<Vec<Atom>>();
+        let new_assigned_variable_ids_keys = new_assigned_variable_ids.keys().copied().collect::<Vec<Atom>>();
 
         update_if_scope(
             context,
@@ -615,7 +617,7 @@ fn analyze_else_if_clause<'ctx, 'ast, 'arena>(
     });
 
     for clause in &mut else_if_clauses {
-        let keys = clause.possibilities.keys().cloned().collect::<Vec<Atom>>();
+        let keys = clause.possibilities.keys().copied().collect::<Vec<Atom>>();
         mixed_variables.retain(|i| !keys.contains(i));
 
         'outer: for key in keys {
@@ -716,7 +718,7 @@ fn analyze_else_if_clause<'ctx, 'ast, 'arena>(
         find_satisfying_assignments(negated_if_clauses.as_slice(), None, &mut AtomSet::default());
 
     let all_negated_variables =
-        HashSet::from_iter(negated_else_if_types.keys().cloned().chain(if_scope.negated_types.keys().cloned()));
+        HashSet::from_iter(negated_else_if_types.keys().copied().chain(if_scope.negated_types.keys().copied()));
 
     for negated_variable_id in all_negated_variables {
         if let Some(negated_variable_type_assertions) = negated_else_if_types.get(&negated_variable_id) {
@@ -1052,7 +1054,7 @@ fn analyze_else_statements<'ctx, 'arena>(
     }
 
     if !if_scope.negated_types.is_empty() {
-        let variables_to_update = if_scope.negated_types.keys().cloned().collect::<AtomSet>();
+        let variables_to_update = if_scope.negated_types.keys().copied().collect::<AtomSet>();
 
         outer_block_context.update(
             context,

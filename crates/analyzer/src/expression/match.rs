@@ -429,7 +429,7 @@ impl<'anlyz, 'ctx, 'ast, 'arena> MatchAnalyzer<'anlyz, 'ctx, 'ast, 'arena> {
             inherit_branch_context_properties(self.context, self.block_context, ctx);
 
             all_redefined_vars.extend(
-                ctx.get_redefined_locals(&self.block_context.locals, false, &mut AtomSet::default()).keys().cloned(),
+                ctx.get_redefined_locals(&self.block_context.locals, false, &mut AtomSet::default()).keys().copied(),
             );
         }
 
@@ -447,7 +447,7 @@ impl<'anlyz, 'ctx, 'ast, 'arena> MatchAnalyzer<'anlyz, 'ctx, 'ast, 'arena> {
         }
 
         for ctx in &reachable_contexts {
-            self.block_context.variables_possibly_in_scope.extend(ctx.variables_possibly_in_scope.iter().cloned());
+            self.block_context.variables_possibly_in_scope.extend(ctx.variables_possibly_in_scope.iter().copied());
         }
     }
 

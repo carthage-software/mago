@@ -620,7 +620,7 @@ fn scrape_type_properties(
                         let has_existing_entries =
                             !combination.keyed_array_entries.is_empty() || had_previous_keyed_array;
                         let mut possibly_undefined_entries =
-                            combination.keyed_array_entries.keys().cloned().collect::<HashSet<_>>();
+                            combination.keyed_array_entries.keys().copied().collect::<HashSet<_>>();
 
                         let mut has_defined_keys = false;
 

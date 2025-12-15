@@ -199,7 +199,7 @@ pub(super) fn analyze_conditional<'ctx, 'ast, 'arena>(
 
         block_context
             .conditionally_referenced_variable_ids
-            .extend(if_block_context.conditionally_referenced_variable_ids.iter().cloned());
+            .extend(if_block_context.conditionally_referenced_variable_ids.iter().copied());
     }
 
     else_block_context.clauses =
@@ -241,9 +241,9 @@ pub(super) fn analyze_conditional<'ctx, 'ast, 'arena>(
     r#else.analyze(context, &mut else_block_context, artifacts)?;
     else_block_context.inside_general_use = was_inside_general_use;
 
-    let if_assigned_variables = if_block_context.assigned_variable_ids.keys().cloned().collect::<AtomSet>();
-    let else_assigned_variables = else_block_context.assigned_variable_ids.keys().cloned().collect::<AtomSet>();
-    let assigned_variables = if_assigned_variables.intersection(&else_assigned_variables).cloned().collect::<AtomSet>();
+    let if_assigned_variables = if_block_context.assigned_variable_ids.keys().copied().collect::<AtomSet>();
+    let else_assigned_variables = else_block_context.assigned_variable_ids.keys().copied().collect::<AtomSet>();
+    let assigned_variables = if_assigned_variables.intersection(&else_assigned_variables).copied().collect::<AtomSet>();
 
     for assigned_variable in assigned_variables {
         let Some(if_type) = if_block_context.locals.get(&assigned_variable) else {
