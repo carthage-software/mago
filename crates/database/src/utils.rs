@@ -1,11 +1,20 @@
 use std::borrow::Cow;
+use std::fs::File as StdFile;
+use std::io::Read;
 use std::path::Path;
 
 use crate::error::DatabaseError;
 use crate::file::File;
 use crate::file::FileType;
 
-const MAXIMUM_FILE_SIZE: usize = 1024 * 1024 * 1024;
+/// The used hint for pre-allocating file content buffer.
+///
+/// File sizes larger than this will still be handled correctly,
+/// but usually files are smaller than this.
+const FILE_SIZE_HINT: usize = 12 * 1024;
+
+/// The maximum allowed file size (256 MiB).
+const MAXIMUM_FILE_SIZE: usize = 256 * 1024 * 1024;
 
 /// Reads a file from disk and constructs a `File` object.
 ///
@@ -24,20 +33,23 @@ const MAXIMUM_FILE_SIZE: usize = 1024 * 1024 * 1024;
 ///
 /// Returns a [`DatabaseError::IOError`] if the file cannot be read from the filesystem.
 pub(crate) fn read_file(workspace: &Path, path: &Path, file_type: FileType) -> Result<File, DatabaseError> {
-    let logical_name = path.strip_prefix(workspace).unwrap_or(path).to_string_lossy().to_string();
+    let mut bytes = Vec::with_capacity(FILE_SIZE_HINT);
+    let mut file = StdFile::open(path)?;
+    file.read_to_end(&mut bytes)?;
 
-    let bytes = std::fs::read(path)?;
     if bytes.len() > MAXIMUM_FILE_SIZE {
         return Err(DatabaseError::FileTooLarge(path.to_path_buf(), bytes.len(), MAXIMUM_FILE_SIZE));
     }
 
-    let contents = match str::from_utf8(&bytes) {
-        Ok(s) => s.to_string(),
-        Err(e) => {
+    let logical_name = path.strip_prefix(workspace).unwrap_or(path).to_string_lossy().to_string();
+    let contents = match simdutf8::basic::from_utf8(&bytes) {
+        Ok(..) => unsafe {
+            // SAFETY: We just validated it with simdutf8, no need to check again.
+            String::from_utf8_unchecked(bytes)
+        },
+        Err(_) => {
             let warning_message = format!(
-                "File `{}` contains invalid UTF-8 at byte {}. Lossy conversion applied, which may cause undefined behavior.",
-                logical_name,
-                e.valid_up_to()
+                "File `{logical_name}` contains invalid UTF-8. Lossy conversion applied, which may cause undefined behavior.",
             );
 
             match file_type {

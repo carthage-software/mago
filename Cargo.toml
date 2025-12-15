@@ -114,6 +114,7 @@ xxhash-rust = { version = "0.8", features = ["xxh3"] }
 atty = "0.2"
 serde-sarif = "0.8"
 schemars = { version = "1.1", features = ["preserve_order"] }
+simdutf8 = { version = "0.1.5" }
 
 [dependencies]
 mago-atom = { workspace = true }

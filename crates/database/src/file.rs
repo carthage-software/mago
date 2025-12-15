@@ -107,6 +107,7 @@ impl File {
     /// # Errors
     ///
     /// Returns a [`DatabaseError::IOError`] if the file cannot be read from the disk.
+    #[inline(always)]
     pub fn read(workspace: &Path, path: &Path, file_type: FileType) -> Result<Self, DatabaseError> {
         read_file(workspace, path, file_type)
     }
