@@ -74,8 +74,8 @@ impl PropertyConflict {
     fn describe(&self) -> String {
         match self {
             PropertyConflict::Visibility(r1, w1, r2, w2) => {
-                let p1_vis = if r1 == w1 { format!("{}", r1) } else { format!("{} {}(set)", r1, w1) };
-                let p2_vis = if r2 == w2 { format!("{}", r2) } else { format!("{} {}(set)", r2, w2) };
+                let p1_vis = if r1 == w1 { r1.to_string() } else { format!("{} {}(set)", r1, w1) };
+                let p2_vis = if r2 == w2 { r2.to_string() } else { format!("{} {}(set)", r2, w2) };
                 format!("visibility differs ({} vs {})", p1_vis, p2_vis)
             }
             PropertyConflict::Static(s1, s2) => {
