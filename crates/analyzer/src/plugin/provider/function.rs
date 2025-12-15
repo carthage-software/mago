@@ -1,5 +1,6 @@
 //! Function return type provider trait.
 
+use mago_atom::starts_with_ignore_case;
 use mago_codex::ttype::union::TUnion;
 
 use crate::plugin::context::InvocationInfo;
@@ -39,12 +40,8 @@ impl FunctionTarget {
         match self {
             FunctionTarget::Exact(target) => name.eq_ignore_ascii_case(target),
             FunctionTarget::ExactMultiple(targets) => targets.iter().any(|target| name.eq_ignore_ascii_case(target)),
-            FunctionTarget::Prefix(prefix) => {
-                name.len() >= prefix.len() && name.as_bytes()[..prefix.len()].eq_ignore_ascii_case(prefix.as_bytes())
-            }
-            FunctionTarget::Namespace(ns) => {
-                name.len() >= ns.len() && name.as_bytes()[..ns.len()].eq_ignore_ascii_case(ns.as_bytes())
-            }
+            FunctionTarget::Prefix(prefix) => starts_with_ignore_case(name, prefix),
+            FunctionTarget::Namespace(ns) => starts_with_ignore_case(name, ns),
         }
     }
 

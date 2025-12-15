@@ -1,3 +1,4 @@
+use mago_atom::starts_with_ignore_case;
 use regex::Regex;
 use std::collections::HashMap;
 use std::sync::LazyLock;
@@ -13,7 +14,7 @@ pub fn matches_patterxn(fqn: &str, pattern: &str, is_namespace: bool) -> bool {
     if !pattern.contains('*') {
         if is_namespace {
             let ns_pattern = pattern.trim_end_matches('\\');
-            if !fqn.to_ascii_lowercase().starts_with(&ns_pattern.to_ascii_lowercase()) {
+            if !starts_with_ignore_case(fqn, ns_pattern) {
                 return false;
             }
 

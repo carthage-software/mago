@@ -9,6 +9,7 @@ use serde::Serialize;
 use mago_atom::Atom;
 use mago_atom::AtomSet;
 use mago_atom::atom;
+use mago_atom::starts_with_ignore_case;
 use mago_fixer::SafetyClassification;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
@@ -302,10 +303,7 @@ mod utils {
 
         if decl.import_type == ImportType::ClassOrNamespace {
             let prefix = concat_atom!(decl.fqn, "\\");
-            if used_fqns
-                .iter()
-                .any(|used| used.as_str().to_ascii_lowercase().starts_with(&prefix.as_str().to_ascii_lowercase()))
-            {
+            if used_fqns.iter().any(|used| starts_with_ignore_case(used.as_str(), prefix.as_str())) {
                 return true;
             }
         }

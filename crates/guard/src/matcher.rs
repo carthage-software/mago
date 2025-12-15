@@ -3,6 +3,8 @@
 //! This module provides a replacement for regex-based matching to improve performance
 //! by using a segment-based matching approach.
 
+use mago_atom::starts_with_ignore_case;
+
 /// The separator for namespace segments.
 pub const SEPARATOR: char = '\\';
 
@@ -33,7 +35,7 @@ pub fn matches(fqcn: &str, pattern: &str, is_constant: bool, treat_as_namespace:
 
         // if pattern ends with separator, it's a namespace match
         if treat_as_namespace || pattern.ends_with(SEPARATOR) {
-            if !f.to_ascii_lowercase().starts_with(&p.to_ascii_lowercase()) {
+            if !starts_with_ignore_case(f, p) {
                 return false;
             }
 
