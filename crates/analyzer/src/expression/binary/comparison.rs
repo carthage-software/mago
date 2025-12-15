@@ -117,7 +117,7 @@ pub fn analyze_comparison_operation<'ctx, 'arena>(
         let lhs_is_array = lhs_type.is_array();
         let rhs_is_array = rhs_type.is_array();
 
-        if lhs_is_array && !rhs_is_array && !rhs_type.is_null() {
+        if lhs_is_array && !rhs_type.has_array() && !rhs_type.is_null() {
             context.collector.report_with_code(
                 IssueCode::InvalidOperand,
                 Issue::warning(format!(
@@ -130,8 +130,9 @@ pub fn analyze_comparison_operation<'ctx, 'arena>(
                 .with_note("PHP's comparison rules for arrays against other types can be non-obvious (e.g., an array is usually considered 'greater' than non-null scalars).")
                 .with_help("Ensure both operands are of comparable types or explicitly cast/convert them before comparison if this behavior is not intended."),
             );
+
             reported_general_invalid_operand = true;
-        } else if !lhs_is_array && rhs_is_array && !lhs_type.is_null() {
+        } else if !lhs_type.has_array() && rhs_is_array && !lhs_type.is_null() {
             context.collector.report_with_code(
                 IssueCode::InvalidOperand,
                 Issue::warning(format!(
@@ -144,6 +145,7 @@ pub fn analyze_comparison_operation<'ctx, 'arena>(
                 .with_note("PHP's comparison rules for arrays against other types can be non-obvious.")
                 .with_help("Ensure both operands are of comparable types or explicitly cast/convert them before comparison if this behavior is not intended."),
             );
+
             reported_general_invalid_operand = true;
         }
     }
