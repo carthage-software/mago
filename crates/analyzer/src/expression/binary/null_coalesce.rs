@@ -2,7 +2,11 @@ use std::borrow::Cow;
 use std::rc::Rc;
 
 use mago_algebra::find_satisfying_assignments;
+use mago_atom::Atom;
+use mago_atom::atom;
+use mago_codex::assertion::Assertion;
 use mago_codex::ttype::TType;
+use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::combine_union_types;
 use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::union::TUnion;
@@ -56,7 +60,7 @@ pub fn analyze_null_coalesce_operation<'ctx, 'arena>(
         return Ok(());
     };
 
-    let result_type: TUnion;
+    let mut result_type: TUnion;
     let mut rhs_is_never = false;
 
     let is_static_var = matches!(
@@ -127,6 +131,36 @@ pub fn analyze_null_coalesce_operation<'ctx, 'arena>(
         result_type = combine_union_types(&non_null_lhs_type, &rhs_type, context.codebase, false);
     }
 
+    // Check if clauses guarantee non-null result from OR assertion
+    // If we have assert($x !== null || $y !== null), then $x ?? $y cannot be null
+    if result_type.is_nullable()
+        && let (Some(lhs_var), Some(rhs_var)) = (get_variable_name(binary.lhs), get_variable_name(binary.rhs))
+    {
+        for clause in block_context.clauses.iter() {
+            if clause.possibilities.len() == 2
+                && clause.possibilities.contains_key(&lhs_var)
+                && clause.possibilities.contains_key(&rhs_var)
+            {
+                let lhs_not_null = clause.possibilities.get(&lhs_var).is_some_and(|assertions| {
+                    assertions.values().any(|a| {
+                        matches!(a, Assertion::IsNotIdentical(TAtomic::Null) | Assertion::IsNotType(TAtomic::Null))
+                    })
+                });
+
+                let rhs_not_null = clause.possibilities.get(&rhs_var).is_some_and(|assertions| {
+                    assertions.values().any(|a| {
+                        matches!(a, Assertion::IsNotIdentical(TAtomic::Null) | Assertion::IsNotType(TAtomic::Null))
+                    })
+                });
+
+                if lhs_not_null && rhs_not_null {
+                    result_type = result_type.to_non_nullable();
+                    break;
+                }
+            }
+        }
+    }
+
     artifacts.expression_types.insert(get_expression_range(binary), Rc::new(result_type));
 
     if rhs_is_never {
@@ -162,4 +196,11 @@ pub fn analyze_null_coalesce_operation<'ctx, 'arena>(
     }
 
     Ok(())
+}
+
+fn get_variable_name<'arena>(expr: &Expression<'arena>) -> Option<Atom> {
+    match unwrap_expression(expr) {
+        Expression::Variable(Variable::Direct(var)) => Some(atom(var.name)),
+        _ => None,
+    }
 }

@@ -661,9 +661,13 @@ fn resolve_invocation_assertion<'ctx, 'ast, 'arena>(
                         }
                     };
 
-                    let clauses = saturate_clauses(
-                        block_context.clauses.iter().map(Rc::as_ref).chain(clauses.unwrap_or_default().iter()),
-                    );
+                    let new_clauses = clauses.unwrap_or_default();
+
+                    for clause in new_clauses.iter() {
+                        block_context.clauses.push(Rc::new(clause.clone()));
+                    }
+
+                    let clauses = saturate_clauses(block_context.clauses.iter().map(Rc::as_ref));
 
                     let (truths, _) = find_satisfying_assignments(&clauses, None, &mut Default::default());
                     for (variable, assertions) in truths {
