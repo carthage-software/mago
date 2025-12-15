@@ -134,8 +134,6 @@ pub fn analyze_null_coalesce_operation<'ctx, 'arena>(
         let if_clauses =
             get_formula(binary.lhs.span(), binary.lhs.span(), binary.lhs, assertion_context, artifacts).unwrap();
 
-        let conditional_context_clauses = if_clauses.clone().into_iter().map(Rc::new).collect::<Vec<_>>();
-
         let mut if_scope = IfScope::new();
         let (if_conditional_scope, _) =
             conditional::analyze(context, block_context.clone(), artifacts, &mut if_scope, binary.lhs, false)?;
@@ -143,7 +141,7 @@ pub fn analyze_null_coalesce_operation<'ctx, 'arena>(
         let mut conditionally_referenced_variable_ids = if_conditional_scope.conditionally_referenced_variable_ids;
 
         let (reconcilable_if_types, active_if_types) = find_satisfying_assignments(
-            conditional_context_clauses.into_iter().map(|rc| (*rc).clone()).collect::<Vec<_>>().as_slice(),
+            &if_clauses,
             Some(binary.lhs.span()),
             &mut conditionally_referenced_variable_ids,
         );

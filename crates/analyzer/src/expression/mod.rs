@@ -301,13 +301,7 @@ pub fn find_expression_logic_issues<'ctx, 'arena>(
         .map(|c| {
             let keys = c.possibilities.keys().copied().collect::<Vec<mago_atom::Atom>>();
 
-            let mut new_mixed_var_ids = vec![];
-            for i in mixed_var_ids.clone() {
-                if !keys.contains(i) {
-                    new_mixed_var_ids.push(i);
-                }
-            }
-            mixed_var_ids = new_mixed_var_ids;
+            mixed_var_ids.retain(|i| !keys.contains(i));
 
             for key in &keys {
                 for mixed_var_id in &mixed_var_ids {

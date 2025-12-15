@@ -432,7 +432,7 @@ fn analyze_if_statement_block<'ctx, 'arena>(
     }
 
     if_block_context.reconciled_expression_clauses = vec![];
-    outer_block_context.variables_possibly_in_scope.extend(if_block_context.variables_possibly_in_scope.clone());
+    outer_block_context.variables_possibly_in_scope.extend(if_block_context.variables_possibly_in_scope.iter().copied());
 
     let old_if_block_context = if_block_context.clone();
     let assigned_variable_ids = std::mem::take(&mut if_block_context.assigned_variable_ids);
@@ -875,7 +875,7 @@ fn analyze_else_if_clause<'ctx, 'ast, 'arena>(
         if let Some(loop_scope) = artifacts.loop_scope.as_mut() {
             if has_leaving_statements {
                 if !has_continue_statement && !has_break_statement {
-                    if_scope.new_variables_possibly_in_scope.extend(variables_possibly_in_scope.clone());
+                    if_scope.new_variables_possibly_in_scope.extend(variables_possibly_in_scope.iter().copied());
                     if_scope.possibly_assigned_variable_ids.extend(possibly_assigned_variable_ids);
                 }
 
@@ -1075,13 +1075,13 @@ fn analyze_else_statements<'ctx, 'arena>(
         if has_leaving_statements {
             if let Some(loop_scope) = artifacts.loop_scope.as_mut() {
                 if !has_continue_statement && !has_break_statement {
-                    if_scope.new_variables_possibly_in_scope.extend(variables_possibly_in_scope.clone());
+                    if_scope.new_variables_possibly_in_scope.extend(variables_possibly_in_scope.iter().copied());
                 }
 
                 loop_scope.variables_possibly_in_scope.extend(variables_possibly_in_scope);
             }
         } else {
-            if_scope.new_variables_possibly_in_scope.extend(variables_possibly_in_scope.clone());
+            if_scope.new_variables_possibly_in_scope.extend(variables_possibly_in_scope.iter().copied());
             if_scope.possibly_assigned_variable_ids.extend(new_possibly_assigned_variable_ids);
         }
     }
