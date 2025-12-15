@@ -948,9 +948,13 @@ impl<'input, 'arena> Lexer<'input, 'arena> {
         from: Position,
         to: Position,
     ) -> Option<Result<Token<'arena>, SyntaxError>> {
-        let string = String::from_utf8_lossy(v);
+        // SAFETY: The input bytes are guaranteed to be valid UTF-8 because:
+        // 1. File contents are validated via simdutf8 during database loading
+        // 2. Invalid UTF-8 is converted lossily before reaching the lexer
+        // 3. All byte slices here are subslices of the validated input
+        let string = unsafe { std::str::from_utf8_unchecked(v) };
 
-        Some(Ok(Token { kind, value: self.arena.alloc_str(&string), span: Span::new(self.file_id(), from, to) }))
+        Some(Ok(Token { kind, value: self.arena.alloc_str(string), span: Span::new(self.file_id(), from, to) }))
     }
 
     #[inline]
