@@ -1,6 +1,5 @@
-use ahash::HashSet;
-
 use mago_atom::Atom;
+use mago_atom::AtomSet;
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::identifier::method::MethodIdentifier;
 use mago_names::kind::NameKind;
@@ -202,7 +201,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Statement<'arena> {
         }
 
         context.statement_span = last_statement_span;
-        block_context.conditionally_referenced_variable_ids = HashSet::default();
+        block_context.conditionally_referenced_variable_ids = AtomSet::default();
 
         Ok(())
     }

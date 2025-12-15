@@ -1,7 +1,7 @@
 use std::ops::Deref;
 use std::rc::Rc;
 
-use ahash::HashSet;
+use mago_atom::AtomSet;
 
 use mago_algebra::clause::Clause;
 use mago_algebra::find_satisfying_assignments;
@@ -90,21 +90,21 @@ pub(super) fn analyze_conditional<'ctx, 'ast, 'arena>(
         vec![]
     });
 
-    let mut mixed_variables = HashSet::default();
+    let mut mixed_variables = AtomSet::default();
     for (variable_id, variable_type) in block_context.locals.iter() {
         if variable_type.is_mixed() {
-            mixed_variables.insert(variable_id.clone());
+            mixed_variables.insert(*variable_id);
         }
     }
 
     for variable_id in &block_context.variables_possibly_in_scope {
         if !block_context.locals.contains_key(variable_id) {
-            mixed_variables.insert(variable_id.clone());
+            mixed_variables.insert(*variable_id);
         }
     }
 
     for clause in &mut if_clauses {
-        let keys = clause.possibilities.keys().cloned().collect::<Vec<String>>();
+        let keys = clause.possibilities.keys().copied().collect::<Vec<mago_atom::Atom>>();
         mixed_variables.retain(|i| !keys.contains(i));
 
         'outer: for key in keys {
@@ -166,7 +166,7 @@ pub(super) fn analyze_conditional<'ctx, 'ast, 'arena>(
     if_scope.negated_types = find_satisfying_assignments(
         saturate_clauses(block_context.clauses.iter().map(Rc::deref).chain(if_scope.negated_clauses.iter())).as_slice(),
         None,
-        &mut HashSet::default(),
+        &mut AtomSet::default(),
     )
     .0;
 
@@ -177,7 +177,7 @@ pub(super) fn analyze_conditional<'ctx, 'ast, 'arena>(
     );
 
     if !reconcilable_if_types.is_empty() {
-        let mut changed_variable_ids = HashSet::default();
+        let mut changed_variable_ids = AtomSet::default();
 
         reconcile_keyed_types(
             context,
@@ -209,7 +209,7 @@ pub(super) fn analyze_conditional<'ctx, 'ast, 'arena>(
             .collect::<Vec<_>>();
 
     if !if_scope.negated_types.is_empty() {
-        let mut changed_variable_ids = HashSet::default();
+        let mut changed_variable_ids = AtomSet::default();
 
         reconcile_keyed_types(
             context,
@@ -241,10 +241,9 @@ pub(super) fn analyze_conditional<'ctx, 'ast, 'arena>(
     r#else.analyze(context, &mut else_block_context, artifacts)?;
     else_block_context.inside_general_use = was_inside_general_use;
 
-    let if_assigned_variables = if_block_context.assigned_variable_ids.keys().cloned().collect::<HashSet<_>>();
-    let else_assigned_variables = else_block_context.assigned_variable_ids.keys().cloned().collect::<HashSet<_>>();
-    let assigned_variables =
-        if_assigned_variables.intersection(&else_assigned_variables).cloned().collect::<HashSet<_>>();
+    let if_assigned_variables = if_block_context.assigned_variable_ids.keys().cloned().collect::<AtomSet>();
+    let else_assigned_variables = else_block_context.assigned_variable_ids.keys().cloned().collect::<AtomSet>();
+    let assigned_variables = if_assigned_variables.intersection(&else_assigned_variables).cloned().collect::<AtomSet>();
 
     for assigned_variable in assigned_variables {
         let Some(if_type) = if_block_context.locals.get(&assigned_variable) else {
@@ -262,19 +261,19 @@ pub(super) fn analyze_conditional<'ctx, 'ast, 'arena>(
     }
 
     let if_redefined_variables = if_block_context
-        .get_redefined_locals(&block_context.locals, false, &mut HashSet::default())
+        .get_redefined_locals(&block_context.locals, false, &mut AtomSet::default())
         .keys()
         .cloned()
-        .collect::<HashSet<_>>();
+        .collect::<AtomSet>();
 
     let else_redefined_variables = else_block_context
-        .get_redefined_locals(&block_context.locals, false, &mut HashSet::default())
+        .get_redefined_locals(&block_context.locals, false, &mut AtomSet::default())
         .keys()
         .cloned()
-        .collect::<HashSet<_>>();
+        .collect::<AtomSet>();
 
     let redefined_variable_ids =
-        if_redefined_variables.intersection(&else_redefined_variables).cloned().collect::<HashSet<_>>();
+        if_redefined_variables.intersection(&else_redefined_variables).cloned().collect::<AtomSet>();
 
     for redefined_variable_id in redefined_variable_ids {
         let if_type = if_block_context.locals.get(&redefined_variable_id);
@@ -341,7 +340,7 @@ pub(super) fn analyze_conditional<'ctx, 'ast, 'arena>(
             context,
             &Assertion::Truthy,
             Some(condition_type.as_ref()),
-            Some(&"".to_string()),
+            Some(""),
             block_context.inside_loop,
             Some(&condition.span()),
             false,

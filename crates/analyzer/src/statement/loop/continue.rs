@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-use ahash::HashSet;
+use mago_atom::AtomSet;
 
 use mago_codex::ttype::TType;
 use mago_codex::ttype::add_optional_union_type;
@@ -117,7 +117,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Continue<'arena> {
             loop_scope.final_actions.insert(ControlAction::Continue);
         }
 
-        let mut removed_var_ids = HashSet::default();
+        let mut removed_var_ids = AtomSet::default();
         let redefined_vars =
             block_context.get_redefined_locals(&loop_scope.parent_context_variables, false, &mut removed_var_ids);
 
@@ -135,7 +135,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Continue<'arena> {
 
         for (var_id, var_type) in redefined_vars {
             loop_scope.possibly_redefined_loop_variables.insert(
-                var_id.clone(),
+                var_id,
                 add_optional_union_type(
                     var_type,
                     loop_scope.possibly_redefined_loop_variables.get(&var_id),
@@ -150,7 +150,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Continue<'arena> {
                 if let Some(finally_type) = finally_scope.locals.get_mut(var_id) {
                     *finally_type = Rc::new(combine_union_types(finally_type, var_type, context.codebase, false));
                 } else {
-                    finally_scope.locals.insert(var_id.clone(), var_type.clone());
+                    finally_scope.locals.insert(*var_id, var_type.clone());
                 }
             }
         }

@@ -1,5 +1,6 @@
 use std::rc::Rc;
 
+use mago_atom::Atom;
 use mago_codex::ttype::get_mixed;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
@@ -36,7 +37,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Global<'arena> {
 
         for variable in self.variables.iter() {
             if let Some(var_id) = get_variable_id(variable) {
-                block_context.locals.insert(var_id.to_owned(), Rc::new(get_mixed()));
+                block_context.locals.insert(Atom::from(var_id), Rc::new(get_mixed()));
             }
         }
 
@@ -45,24 +46,25 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Global<'arena> {
                 continue;
             };
 
+            let var_id_atom = Atom::from(var_id);
             let is_argc_or_argv = var_id == "$argc" || var_id == "$argv";
             let global_type = get_global_variable_type(var_id).unwrap_or_else(|| Rc::new(get_mixed()));
 
-            block_context.locals.insert(var_id.to_owned(), global_type);
+            block_context.locals.insert(var_id_atom, global_type);
 
             if !is_argc_or_argv {
-                block_context.variables_possibly_in_scope.insert(var_id.to_owned());
+                block_context.variables_possibly_in_scope.insert(var_id_atom);
                 block_context.by_reference_constraints.insert(
-                    var_id.to_owned(),
+                    var_id_atom,
                     ReferenceConstraint::new(variable.span(), ReferenceConstraintSource::Global, None),
                 );
             }
 
-            block_context.references_to_external_scope.insert(var_id.to_owned());
+            block_context.references_to_external_scope.insert(var_id_atom);
 
-            if block_context.references_in_scope.contains_key(var_id) {
-                block_context.decrement_reference_count(var_id);
-                block_context.references_in_scope.remove(var_id);
+            if block_context.references_in_scope.contains_key(&var_id_atom) {
+                block_context.decrement_reference_count(&var_id_atom);
+                block_context.references_in_scope.remove(&var_id_atom);
             }
         }
 

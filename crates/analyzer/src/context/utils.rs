@@ -26,7 +26,7 @@ pub(crate) fn inherit_branch_context_properties<'ctx, 'arena>(
 ) {
     for (variable, constraint) in &source_context.by_reference_constraints {
         let Some(outer_constraint) = destination_context.by_reference_constraints.get(variable) else {
-            destination_context.by_reference_constraints.insert(variable.clone(), constraint.clone());
+            destination_context.by_reference_constraints.insert(*variable, constraint.clone());
             continue;
         };
 
@@ -36,12 +36,12 @@ pub(crate) fn inherit_branch_context_properties<'ctx, 'arena>(
         }
 
         let Some(constraint_type) = constraint.constraint_type.as_ref() else {
-            destination_context.by_reference_constraints.insert(variable.clone(), constraint.clone());
+            destination_context.by_reference_constraints.insert(*variable, constraint.clone());
             continue;
         };
 
         let Some(outer_constraint_type) = outer_constraint.constraint_type.as_ref() else {
-            destination_context.by_reference_constraints.insert(variable.clone(), constraint.clone());
+            destination_context.by_reference_constraints.insert(*variable, constraint.clone());
             continue;
         };
 
@@ -82,7 +82,7 @@ pub(crate) fn inherit_branch_context_properties<'ctx, 'arena>(
                 )),
             );
         } else {
-            destination_context.by_reference_constraints.insert(variable.clone(), constraint.clone());
+            destination_context.by_reference_constraints.insert(*variable, constraint.clone());
         }
     }
 

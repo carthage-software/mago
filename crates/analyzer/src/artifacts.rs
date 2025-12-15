@@ -3,6 +3,8 @@ use std::rc::Rc;
 use ahash::HashMap;
 use ahash::HashSet;
 use mago_atom::Atom;
+use mago_atom::AtomMap;
+use mago_atom::AtomSet;
 
 use mago_algebra::assertion_set::AssertionSet;
 use mago_codex::reference::SymbolReferences;
@@ -15,15 +17,15 @@ use crate::context::scope::loop_scope::LoopScope;
 #[derive(Debug, Clone)]
 pub struct AnalysisArtifacts {
     pub expression_types: HashMap<(u32, u32), Rc<TUnion>>,
-    pub if_true_assertions: HashMap<(u32, u32), HashMap<String, AssertionSet>>,
-    pub if_false_assertions: HashMap<(u32, u32), HashMap<String, AssertionSet>>,
+    pub if_true_assertions: HashMap<(u32, u32), AtomMap<AssertionSet>>,
+    pub if_false_assertions: HashMap<(u32, u32), AtomMap<AssertionSet>>,
     pub inferred_return_types: Vec<Rc<TUnion>>,
     pub symbol_references: SymbolReferences,
     pub loop_scope: Option<LoopScope>,
     pub case_scopes: Vec<CaseScope>,
     pub fully_matched_switch_offsets: HashSet<u32>,
     pub inferred_parameter_types: Option<HashMap<usize, TUnion>>,
-    pub method_initialized_properties: HashMap<(Atom, Atom), HashSet<String>>,
+    pub method_initialized_properties: HashMap<(Atom, Atom), AtomSet>,
     pub method_calls_this_methods: HashMap<(Atom, Atom), HashSet<Atom>>,
     pub method_calls_parent_constructor: HashMap<(Atom, Atom), bool>,
     pub method_calls_parent_initializer: HashMap<(Atom, Atom), Atom>,

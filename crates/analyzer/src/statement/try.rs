@@ -3,10 +3,9 @@ use std::collections::BTreeMap;
 use std::collections::btree_map::Entry;
 use std::rc::Rc;
 
-use ahash::HashMap;
-use ahash::HashSet;
 use ahash::HashSetExt;
 
+use mago_atom::Atom;
 use mago_atom::AtomMap;
 use mago_atom::AtomSet;
 use mago_atom::ascii_lowercase_atom;
@@ -83,10 +82,10 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
 
         let newly_assigned_variable_ids = std::mem::take(&mut block_context.assigned_variable_ids);
         block_context.assigned_variable_ids.extend(assigned_variable_ids);
-        block_context.assigned_variable_ids.extend(newly_assigned_variable_ids.iter().map(|(v, u)| (v.clone(), *u)));
+        block_context.assigned_variable_ids.extend(newly_assigned_variable_ids.iter().map(|(v, u)| (*v, *u)));
 
         for (variable_id, variable_type) in std::mem::take(&mut block_context.locals) {
-            match try_block_context.locals.entry(variable_id.clone()) {
+            match try_block_context.locals.entry(variable_id) {
                 Entry::Occupied(mut occupied_entry) => {
                     let combined_type = ttype::combine_union_types(
                         occupied_entry.get(),
@@ -119,7 +118,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
 
                     *existing_type = Rc::new(combined_type);
                 } else {
-                    mutable_try_scope.locals.insert(variable_id.clone(), variable_type.clone());
+                    mutable_try_scope.locals.insert(*variable_id, variable_type.clone());
                 }
             }
         }
@@ -210,9 +209,10 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
                         .collect(),
                 );
 
-                catch_block_context.locals.insert(catch_variable.name.to_owned(), Rc::new(exception_type));
-                catch_block_context.remove_variable_from_conflicting_clauses(context, catch_variable.name, None);
-                catch_block_context.variables_possibly_in_scope.insert(catch_variable.name.to_owned());
+                let catch_var_name = Atom::from(catch_variable.name);
+                catch_block_context.locals.insert(catch_var_name, Rc::new(exception_type));
+                catch_block_context.remove_variable_from_conflicting_clauses(context, &catch_var_name, None);
+                catch_block_context.variables_possibly_in_scope.insert(catch_var_name);
             }
 
             let old_catch_assigned_variable_ids = std::mem::take(&mut catch_block_context.assigned_variable_ids);
@@ -252,7 +252,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
                 definitely_newly_assigned_var_ids = new_catch_assigned_variables_ids
                     .iter()
                     .filter(|(key, _)| definitely_newly_assigned_var_ids.contains_key(*key))
-                    .map(|(key, value)| (key.clone(), *value))
+                    .map(|(key, value)| (*key, *value))
                     .collect();
 
                 let end_action_only =
@@ -260,10 +260,10 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
 
                 for (variable_id, variable_type) in &catch_block_context.locals {
                     if end_action_only {
-                        block_context.locals.insert(variable_id.clone(), variable_type.clone());
+                        block_context.locals.insert(*variable_id, variable_type.clone());
                     } else if let Some(existing_type) = block_context.locals.get(variable_id) {
                         block_context.locals.insert(
-                            variable_id.clone(),
+                            *variable_id,
                             Rc::new(ttype::combine_union_types(
                                 existing_type.as_ref(),
                                 variable_type.as_ref(),
@@ -295,7 +295,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
                         finally_variable_type
                     };
 
-                    finally_scope.locals.insert(variable_id.clone(), Rc::new(resulting_type));
+                    finally_scope.locals.insert(*variable_id, Rc::new(resulting_type));
                 }
             }
         }
@@ -316,8 +316,8 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
             };
 
             let mut finally_block_context = block_context.clone();
-            finally_block_context.assigned_variable_ids = HashMap::default();
-            finally_block_context.possibly_assigned_variable_ids = HashSet::default();
+            finally_block_context.assigned_variable_ids = AtomMap::default();
+            finally_block_context.possibly_assigned_variable_ids = AtomSet::default();
             finally_block_context.locals = finally_scope.locals;
 
             analyze_statements(

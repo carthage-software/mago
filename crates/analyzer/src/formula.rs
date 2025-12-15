@@ -1,10 +1,11 @@
-use ahash::HashMap;
 use indexmap::IndexMap;
 
 use mago_algebra::assertion_set::AssertionSet;
 use mago_algebra::clause::Clause;
 use mago_algebra::disjoin_clauses;
 use mago_algebra::negate_formula;
+use mago_atom::Atom;
+use mago_atom::AtomMap;
 use mago_codex::assertion::Assertion;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::scalar::TScalar;
@@ -225,10 +226,9 @@ pub fn get_formula(
             let mut clauses = Vec::new();
 
             for assertions in scraped_assertions {
-                for (mut var, anded_types) in assertions {
-                    if var.starts_with('=') {
-                        var = var[1..].to_string();
-                    }
+                for (var, anded_types) in assertions {
+                    let var =
+                        if let Some(stripped) = var.as_str().strip_prefix('=') { Atom::from(stripped) } else { var };
 
                     for orred_types in anded_types {
                         let has_equality = orred_types.first().is_some_and(|t| t.has_equality());
@@ -240,7 +240,7 @@ pub fn get_formula(
                         clauses.push(Clause::new(
                             {
                                 let mut map = IndexMap::new();
-                                map.insert(var.clone(), mapped_orred_types);
+                                map.insert(var, mapped_orred_types);
                                 map
                             },
                             conditional_object_id,
@@ -372,7 +372,7 @@ fn get_formula_from_assertions(
     conditional_object_id: Span,
     creating_object_id: Span,
     conditional: &Expression,
-    anded_assertions: Vec<HashMap<String, AssertionSet>>,
+    anded_assertions: Vec<AtomMap<AssertionSet>>,
 ) -> Option<Vec<Clause>> {
     let mut clauses = Vec::new();
     for assertions in anded_assertions {
@@ -387,7 +387,7 @@ fn get_formula_from_assertions(
                     {
                         let mut map = IndexMap::new();
                         map.insert(
-                            var_id.clone(),
+                            var_id,
                             orred_types.into_iter().map(|a| (a.to_hash(), a)).collect::<IndexMap<_, _>>(),
                         );
                         map
@@ -407,7 +407,8 @@ fn get_formula_from_assertions(
     }
 
     let conditional_span = conditional.span();
-    let conditional_ref = format!("*{}-{}", conditional_span.start.offset, conditional_span.end.offset);
+    let conditional_ref =
+        Atom::from(format!("*{}-{}", conditional_span.start.offset, conditional_span.end.offset).as_str());
 
     Some(vec![Clause::new(
         {
@@ -482,13 +483,13 @@ fn handle_binary_and_operation(
 
 pub fn remove_clauses_with_mixed_variables(
     clauses: Vec<Clause>,
-    mut mixed_var_ids: Vec<&String>,
+    mut mixed_var_ids: Vec<&Atom>,
     cond_object_id: Span,
 ) -> Vec<Clause> {
     clauses
         .into_iter()
         .map(|c| {
-            let keys = c.possibilities.keys().collect::<Vec<_>>();
+            let keys = c.possibilities.keys().copied().collect::<Vec<Atom>>();
 
             let mut new_mixed_var_ids = vec![];
             for i in &mixed_var_ids {
@@ -498,7 +499,7 @@ pub fn remove_clauses_with_mixed_variables(
             }
 
             mixed_var_ids = new_mixed_var_ids;
-            for key in keys {
+            for key in &keys {
                 for mixed_var_id in &mixed_var_ids {
                     if var_has_root(key, mixed_var_id) {
                         return Clause::new(IndexMap::new(), cond_object_id, cond_object_id, Some(true), None, None);

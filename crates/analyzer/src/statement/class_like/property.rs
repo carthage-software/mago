@@ -1,5 +1,6 @@
 use std::rc::Rc;
 
+use mago_atom::Atom;
 use mago_atom::atom;
 use mago_codex::context::ScopeContext;
 use mago_codex::ttype::atomic::TAtomic;
@@ -152,7 +153,7 @@ fn analyze_property_hook<'ctx, 'arena>(
 
     if let Some(class_like_metadata) = parent_block_context.scope.get_class_like() {
         let this_type = wrap_atomic(TAtomic::Object(get_this_type(context, class_like_metadata, None)));
-        hook_block_context.locals.insert("$this".to_string(), Rc::new(this_type));
+        hook_block_context.locals.insert(Atom::from("$this"), Rc::new(this_type));
         add_properties_to_hook_context(context, &mut hook_block_context, class_like_metadata)?;
     }
 
@@ -162,8 +163,8 @@ fn analyze_property_hook<'ctx, 'arena>(
             .parameter_list
             .as_ref()
             .and_then(|p| p.parameters.first())
-            .map(|p| p.variable.name.to_string())
-            .unwrap_or_else(|| "$value".to_string());
+            .map(|p| Atom::from(p.variable.name))
+            .unwrap_or_else(|| Atom::from("$value"));
 
         hook_block_context.locals.insert(param_name, Rc::new(value_type));
     }
@@ -232,7 +233,7 @@ fn add_properties_to_hook_context<'ctx, 'arena>(
 
         let property_type = property.type_metadata.as_ref().map(|t| t.type_union.clone()).unwrap_or_else(get_mixed);
         let raw_name = property_name.strip_prefix("$").unwrap_or(property_name);
-        hook_block_context.locals.insert(format!("$this->{raw_name}"), Rc::new(property_type));
+        hook_block_context.locals.insert(Atom::from(&format!("$this->{raw_name}")), Rc::new(property_type));
     }
 
     Ok(())

@@ -2,13 +2,13 @@ use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::rc::Rc;
 
-use ahash::HashMap;
 use ahash::HashSet;
 
 use mago_algebra::clause::Clause;
 use mago_atom::Atom;
 use mago_atom::AtomMap;
 use mago_atom::AtomSet;
+use mago_atom::atom;
 use mago_codex::assertion::Assertion;
 use mago_codex::context::ScopeContext;
 use mago_codex::ttype::TType;
@@ -54,34 +54,34 @@ pub struct ReferenceConstraint {
 #[derive(Clone, Debug)]
 pub struct BlockContext<'ctx> {
     pub scope: ScopeContext<'ctx>,
-    pub locals: BTreeMap<String, Rc<TUnion>>,
-    pub static_locals: HashSet<String>,
-    pub variables_possibly_in_scope: HashSet<String>,
-    pub conditionally_referenced_variable_ids: HashSet<String>,
-    pub assigned_variable_ids: HashMap<String, u32>,
-    pub possibly_assigned_variable_ids: HashSet<String>,
+    pub locals: BTreeMap<Atom, Rc<TUnion>>,
+    pub static_locals: AtomSet,
+    pub variables_possibly_in_scope: AtomSet,
+    pub conditionally_referenced_variable_ids: AtomSet,
+    pub assigned_variable_ids: AtomMap<u32>,
+    pub possibly_assigned_variable_ids: AtomSet,
 
     /// Maps variable names to the number of times they have been referenced in the current scope.
     ///
     /// This might not contain all variables in `locals`, as it is only updated when a variable is referenced.
-    pub referenced_counts: HashMap<String, u32>,
+    pub referenced_counts: AtomMap<u32>,
 
     /// Maps variable names to the local variable that they reference.
     ///
     /// All keys and values in this map are guaranteed to be set in `locals`.
-    pub references_in_scope: HashMap<String, String>,
+    pub references_in_scope: AtomMap<Atom>,
 
     /// Set of references to variables in another scope. These references will be marked as used if they are assigned to.
-    pub references_to_external_scope: HashSet<String>,
+    pub references_to_external_scope: AtomSet,
 
     /// A set of references that might still be in scope from a scope likely to cause confusion. This applies
     /// to references set inside a loop or if statement, since it's easy to forget about PHP's weird scope
     /// rules, and assigning to a reference will change the referenced variable rather than shadowing it.
-    pub references_possibly_from_confusing_scope: HashSet<String>,
+    pub references_possibly_from_confusing_scope: AtomSet,
 
     /// A map of variable names to their reference constraints,
     /// where the key is the variable name and the value is the reference constraint.
-    pub by_reference_constraints: HashMap<String, ReferenceConstraint>,
+    pub by_reference_constraints: AtomMap<ReferenceConstraint>,
 
     pub inside_conditional: bool,
     pub inside_isset: bool,
@@ -105,7 +105,7 @@ pub struct BlockContext<'ctx> {
     pub break_types: Vec<BreakContext>,
     pub finally_scope: Option<Rc<RefCell<FinallyScope>>>,
     pub has_returned: bool,
-    pub parent_conflicting_clause_variables: HashSet<String>,
+    pub parent_conflicting_clause_variables: AtomSet,
     pub loop_bounds: (u32, u32),
     pub if_body_context: Option<Rc<RefCell<Self>>>,
     pub control_actions: HashSet<ControlAction>,
@@ -113,11 +113,11 @@ pub struct BlockContext<'ctx> {
 
     /// Properties that are DEFINITELY initialized in ALL code paths.
     /// Uses intersection semantics - a property must be initialized in ALL branches.
-    pub definitely_initialized_properties: HashSet<String>,
+    pub definitely_initialized_properties: AtomSet,
 
     /// Properties that are POSSIBLY initialized (in at least one path).
     /// Uses union semantics - a property initialized in ANY branch is included.
-    pub possibly_initialized_properties: HashSet<String>,
+    pub possibly_initialized_properties: AtomSet,
 
     /// Methods called on $this that are DEFINITELY called in ALL code paths.
     /// Uses intersection semantics for tracking transitive initialization.
@@ -176,16 +176,16 @@ impl<'ctx> BlockContext<'ctx> {
         let mut block_context = Self {
             scope,
             locals: BTreeMap::new(),
-            static_locals: HashSet::default(),
-            variables_possibly_in_scope: HashSet::default(),
-            conditionally_referenced_variable_ids: HashSet::default(),
-            assigned_variable_ids: HashMap::default(),
-            possibly_assigned_variable_ids: HashSet::default(),
-            referenced_counts: HashMap::default(),
-            references_in_scope: HashMap::default(),
-            references_to_external_scope: HashSet::default(),
-            references_possibly_from_confusing_scope: HashSet::default(),
-            by_reference_constraints: HashMap::default(),
+            static_locals: AtomSet::default(),
+            variables_possibly_in_scope: AtomSet::default(),
+            conditionally_referenced_variable_ids: AtomSet::default(),
+            assigned_variable_ids: AtomMap::default(),
+            possibly_assigned_variable_ids: AtomSet::default(),
+            referenced_counts: AtomMap::default(),
+            references_in_scope: AtomMap::default(),
+            references_to_external_scope: AtomSet::default(),
+            references_possibly_from_confusing_scope: AtomSet::default(),
+            by_reference_constraints: AtomMap::default(),
             inside_conditional: false,
             inside_isset: false,
             inside_unset: false,
@@ -208,13 +208,13 @@ impl<'ctx> BlockContext<'ctx> {
             break_types: Vec::new(),
             inside_loop: false,
             finally_scope: None,
-            parent_conflicting_clause_variables: HashSet::default(),
+            parent_conflicting_clause_variables: AtomSet::default(),
             loop_bounds: (0, 0),
             if_body_context: None,
             control_actions: HashSet::default(),
             possibly_thrown_exceptions: AtomMap::default(),
-            definitely_initialized_properties: HashSet::default(),
-            possibly_initialized_properties: HashSet::default(),
+            definitely_initialized_properties: AtomSet::default(),
+            possibly_initialized_properties: AtomSet::default(),
             definitely_called_methods: HashSet::default(),
             called_methods: HashSet::default(),
             collect_initializations: false,
@@ -224,7 +224,7 @@ impl<'ctx> BlockContext<'ctx> {
 
         if register_super_globals {
             for (var_name, var_type) in get_super_globals() {
-                block_context.locals.insert(var_name.to_owned(), var_type);
+                block_context.locals.insert(atom(var_name), var_type);
             }
         }
 
@@ -245,21 +245,21 @@ impl<'ctx> BlockContext<'ctx> {
             if !self.references_in_scope.contains_key(reference_id)
                 && !self.references_to_external_scope.contains(reference_id)
             {
-                self.references_possibly_from_confusing_scope.insert(reference_id.to_owned());
+                self.references_possibly_from_confusing_scope.insert(*reference_id);
             }
         }
 
         self.references_possibly_from_confusing_scope
-            .extend(confusing_scope_context.references_possibly_from_confusing_scope.iter().cloned());
+            .extend(confusing_scope_context.references_possibly_from_confusing_scope.iter().copied());
     }
 
     pub fn get_redefined_locals(
         &self,
-        new_locals: &BTreeMap<String, Rc<TUnion>>,
+        new_locals: &BTreeMap<Atom, Rc<TUnion>>,
         include_new_vars: bool,
-        removed_vars: &mut HashSet<String>,
-    ) -> HashMap<String, TUnion> {
-        let mut redefined_vars = HashMap::default();
+        removed_vars: &mut AtomSet,
+    ) -> AtomMap<TUnion> {
+        let mut redefined_vars = AtomMap::default();
 
         let mut var_ids = self.locals.keys().collect::<Vec<_>>();
         var_ids.extend(new_locals.keys());
@@ -268,21 +268,21 @@ impl<'ctx> BlockContext<'ctx> {
             if let Some(this_type) = self.locals.get(var_id) {
                 if let Some(new_type) = new_locals.get(var_id) {
                     if new_type != this_type {
-                        redefined_vars.insert(var_id.clone(), (**this_type).clone());
+                        redefined_vars.insert(*var_id, (**this_type).clone());
                     }
                 } else if include_new_vars {
-                    redefined_vars.insert(var_id.clone(), (**this_type).clone());
+                    redefined_vars.insert(*var_id, (**this_type).clone());
                 }
             } else {
-                removed_vars.insert(var_id.clone());
+                removed_vars.insert(*var_id);
             }
         }
 
         redefined_vars
     }
 
-    pub fn get_new_or_updated_locals(original_context: &Self, new_context: &Self) -> HashSet<String> {
-        let mut redefined_var_ids = HashSet::default();
+    pub fn get_new_or_updated_locals(original_context: &Self, new_context: &Self) -> AtomSet {
+        let mut redefined_var_ids = AtomSet::default();
 
         for (var_id, new_type) in &new_context.locals {
             if let Some(original_type) = original_context.locals.get(var_id) {
@@ -290,10 +290,10 @@ impl<'ctx> BlockContext<'ctx> {
                     != new_context.assigned_variable_ids.get(var_id).unwrap_or(&0)
                     || original_type != new_type
                 {
-                    redefined_var_ids.insert(var_id.clone());
+                    redefined_var_ids.insert(*var_id);
                 }
             } else {
-                redefined_var_ids.insert(var_id.clone());
+                redefined_var_ids.insert(*var_id);
             }
         }
 
@@ -302,7 +302,7 @@ impl<'ctx> BlockContext<'ctx> {
 
     pub fn remove_reconciled_clause_refs(
         clauses: &Vec<Rc<Clause>>,
-        changed_var_ids: &HashSet<String>,
+        changed_var_ids: &AtomSet,
     ) -> (Vec<Rc<Clause>>, Vec<Rc<Clause>>) {
         let mut included_clauses = Vec::new();
         let mut rejected_clauses = Vec::new();
@@ -328,10 +328,7 @@ impl<'ctx> BlockContext<'ctx> {
         (included_clauses, rejected_clauses)
     }
 
-    pub fn remove_reconciled_clauses(
-        clauses: &Vec<Clause>,
-        changed_var_ids: &HashSet<String>,
-    ) -> (Vec<Clause>, Vec<Clause>) {
+    pub fn remove_reconciled_clauses(clauses: &Vec<Clause>, changed_var_ids: &AtomSet) -> (Vec<Clause>, Vec<Clause>) {
         let mut included_clauses = Vec::new();
         let mut rejected_clauses = Vec::new();
 
@@ -356,7 +353,7 @@ impl<'ctx> BlockContext<'ctx> {
 
     pub(crate) fn filter_clauses<'arena>(
         context: &mut Context<'ctx, 'arena>,
-        remove_var_id: &str,
+        remove_var_id: &Atom,
         clauses: Vec<Rc<Clause>>,
         new_type: Option<&TUnion>,
     ) -> Vec<Rc<Clause>> {
@@ -425,18 +422,18 @@ impl<'ctx> BlockContext<'ctx> {
     pub(crate) fn remove_variable_from_conflicting_clauses<'arena>(
         &mut self,
         context: &mut Context<'ctx, 'arena>,
-        remove_var_id: &str,
+        remove_var_id: &Atom,
         new_type: Option<&TUnion>,
     ) {
         self.clauses = BlockContext::filter_clauses(context, remove_var_id, self.clauses.clone(), new_type);
 
-        self.parent_conflicting_clause_variables.insert(remove_var_id.to_owned());
+        self.parent_conflicting_clause_variables.insert(*remove_var_id);
     }
 
     pub(crate) fn remove_descendants<'arena>(
         &mut self,
         context: &mut Context<'ctx, 'arena>,
-        remove_var_id: &str,
+        remove_var_id: &Atom,
         existing_type: &TUnion,
         new_type: Option<&TUnion>,
     ) {
@@ -452,7 +449,7 @@ impl<'ctx> BlockContext<'ctx> {
             },
         );
 
-        let keys = self.locals.keys().cloned().collect::<Vec<_>>();
+        let keys = self.locals.keys().copied().collect::<Vec<_>>();
 
         for var_id in keys {
             if var_has_root(&var_id, remove_var_id) {
@@ -486,7 +483,7 @@ impl<'ctx> BlockContext<'ctx> {
         // A variable is conditionally referenced if it's part of an access chain
         // (i.e., its suffix was stripped) and the base variable is not `$this`.
         if stripped_var != "$this" || stripped_var != var_name {
-            self.conditionally_referenced_variable_ids.insert(var_name.to_owned());
+            self.conditionally_referenced_variable_ids.insert(atom(var_name));
         }
     }
 
@@ -495,28 +492,30 @@ impl<'ctx> BlockContext<'ctx> {
     #[must_use]
     pub fn has_variable(&mut self, var_name: &str) -> bool {
         self.add_conditionally_referenced_variable(var_name);
-        self.locals.contains_key(var_name)
+        self.locals.contains_key(&atom(var_name))
     }
 
     pub(crate) fn remove_variable<'arena>(
         &mut self,
-        var_name: &String,
+        var_name: &str,
         remove_descendants: bool,
         context: &mut Context<'ctx, 'arena>,
     ) {
-        if let Some(existing_type) = self.locals.remove(var_name)
+        let var_atom = atom(var_name);
+        if let Some(existing_type) = self.locals.remove(&var_atom)
             && remove_descendants
         {
-            self.remove_descendants(context, var_name, &existing_type, None);
+            self.remove_descendants(context, &var_atom, &existing_type, None);
         }
 
-        self.assigned_variable_ids.remove(var_name);
-        self.possibly_assigned_variable_ids.remove(var_name);
-        self.conditionally_referenced_variable_ids.remove(var_name);
+        self.assigned_variable_ids.remove(&var_atom);
+        self.possibly_assigned_variable_ids.remove(&var_atom);
+        self.conditionally_referenced_variable_ids.remove(&var_atom);
     }
 
-    pub fn remove_possible_reference(&mut self, remove_var_id: &String) {
-        if let Some(reference_count) = self.referenced_counts.get(remove_var_id)
+    pub fn remove_possible_reference(&mut self, remove_var_id: &str) {
+        let remove_var_atom = atom(remove_var_id);
+        if let Some(reference_count) = self.referenced_counts.get(&remove_var_atom)
             && *reference_count > 0
         {
             // If a referenced variable goes out of scope, we need to update the references.
@@ -524,8 +523,8 @@ impl<'ctx> BlockContext<'ctx> {
             // so we pick the first one and make the rest of the references point to it.
             let mut references = vec![];
             for (reference, referenced) in &self.references_in_scope {
-                if referenced == remove_var_id {
-                    references.push(reference.to_owned());
+                if *referenced == remove_var_atom {
+                    references.push(*reference);
                 }
             }
 
@@ -543,23 +542,23 @@ impl<'ctx> BlockContext<'ctx> {
             if !references.is_empty() {
                 let first_reference = references.remove(0);
                 if !references.is_empty() {
-                    self.referenced_counts.insert(first_reference.to_owned(), references.len() as u32);
+                    self.referenced_counts.insert(first_reference, references.len() as u32);
                     for reference in references {
-                        self.references_in_scope.insert(reference.to_owned(), first_reference.to_owned());
+                        self.references_in_scope.insert(reference, first_reference);
                     }
                 }
             }
         }
 
-        if self.references_in_scope.contains_key(remove_var_id) {
+        if self.references_in_scope.contains_key(&remove_var_atom) {
             self.decrement_reference_count(remove_var_id);
         }
 
-        self.locals.remove(remove_var_id);
-        self.variables_possibly_in_scope.remove(remove_var_id);
-        self.assigned_variable_ids.remove(remove_var_id);
-        self.possibly_assigned_variable_ids.remove(remove_var_id);
-        self.conditionally_referenced_variable_ids.remove(remove_var_id);
+        self.locals.remove(&remove_var_atom);
+        self.variables_possibly_in_scope.remove(&remove_var_atom);
+        self.assigned_variable_ids.remove(&remove_var_atom);
+        self.possibly_assigned_variable_ids.remove(&remove_var_atom);
+        self.conditionally_referenced_variable_ids.remove(&remove_var_atom);
     }
 
     pub fn update(
@@ -568,15 +567,15 @@ impl<'ctx> BlockContext<'ctx> {
         start_block_context: &Self,
         end_block_context: &mut Self,
         has_leaving_statements: bool,
-        vars_to_update: HashSet<String>,
-        updated_vars: &mut HashSet<String>,
+        vars_to_update: AtomSet,
+        updated_vars: &mut AtomSet,
     ) {
         for (variable_id, old_type) in &start_block_context.locals {
             if !vars_to_update.contains(variable_id) {
                 continue;
             }
 
-            let new_type = if !has_leaving_statements && end_block_context.has_variable(variable_id) {
+            let new_type = if !has_leaving_statements && end_block_context.has_variable(variable_id.as_str()) {
                 end_block_context.locals.get(variable_id).cloned()
             } else {
                 None
@@ -584,8 +583,8 @@ impl<'ctx> BlockContext<'ctx> {
 
             let Some(existing_type) = self.locals.get(variable_id).map(|rc| rc.as_ref()).cloned() else {
                 if let Some(new_type) = new_type {
-                    self.locals.insert(variable_id.clone(), new_type);
-                    updated_vars.insert(variable_id.clone());
+                    self.locals.insert(*variable_id, new_type);
+                    updated_vars.insert(*variable_id);
                 }
 
                 continue;
@@ -599,14 +598,14 @@ impl<'ctx> BlockContext<'ctx> {
             };
 
             let resulting_type = if should_substitute {
-                updated_vars.insert(variable_id.clone());
+                updated_vars.insert(*variable_id);
 
                 substitute_types(context, existing_type, old_type, new_type.as_deref())
             } else {
                 existing_type
             };
 
-            self.locals.insert(variable_id.clone(), Rc::new(resulting_type));
+            self.locals.insert(*variable_id, Rc::new(resulting_type));
         }
     }
 
@@ -614,11 +613,12 @@ impl<'ctx> BlockContext<'ctx> {
     /// be done before $ref_id is changed to no longer reference its currently referenced variable,
     /// for example by unsetting, reassigning to another reference, or being shadowed by a global.
     pub fn decrement_reference_count(&mut self, ref_id: &str) -> bool {
-        let Some(ref_id) = self.references_in_scope.get(ref_id) else {
+        let ref_atom = atom(ref_id);
+        let Some(ref_target) = self.references_in_scope.get(&ref_atom) else {
             return false;
         };
 
-        let Some(reference_count) = self.referenced_counts.get_mut(ref_id) else {
+        let Some(reference_count) = self.referenced_counts.get_mut(ref_target) else {
             return false;
         };
 
@@ -715,7 +715,7 @@ pub fn subtract_union_types<'ctx, 'arena>(
     result
 }
 
-fn should_keep_clause(clause: &Rc<Clause>, remove_var_id: &str, new_type: Option<&TUnion>) -> bool {
+fn should_keep_clause(clause: &Rc<Clause>, remove_var_id: &Atom, new_type: Option<&TUnion>) -> bool {
     if let Some(possibilities) = clause.possibilities.get(remove_var_id) {
         if possibilities.len() == 1
             && let Some((_, Assertion::IsType(assertion_type))) = possibilities.first()

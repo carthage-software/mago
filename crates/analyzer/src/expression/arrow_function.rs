@@ -1,5 +1,6 @@
 use ahash::HashSet;
 
+use mago_atom::ascii_lowercase_atom;
 use mago_codex::context::ScopeContext;
 
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
@@ -58,17 +59,19 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ArrowFunction<'arena> {
                 continue;
             }
 
-            if inner_block_context.variables_possibly_in_scope.contains(variable) {
+            let variable_atom = ascii_lowercase_atom(variable);
+
+            if inner_block_context.variables_possibly_in_scope.contains(&variable_atom) {
                 continue;
             }
 
             block_context.add_conditionally_referenced_variable(variable);
 
-            if let Some(existing_type) = block_context.locals.get(variable).cloned() {
-                inner_block_context.locals.insert(variable.to_string(), existing_type);
+            if let Some(existing_type) = block_context.locals.get(&variable_atom).cloned() {
+                inner_block_context.locals.insert(variable_atom, existing_type);
             }
 
-            inner_block_context.variables_possibly_in_scope.insert(variable.to_string());
+            inner_block_context.variables_possibly_in_scope.insert(variable_atom);
         }
 
         // Check for missing type hints

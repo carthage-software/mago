@@ -1,5 +1,7 @@
-use ahash::HashSet;
+use std::collections::HashSet;
+
 use itertools::Itertools;
+use mago_atom::AtomSet;
 
 use mago_atom::Atom;
 use mago_atom::atom;
@@ -66,7 +68,7 @@ pub fn check_property_initialization<'ctx, 'arena>(
 
         let still_uninitialized: Vec<_> = uninitialized_properties
             .iter()
-            .filter(|(prop_name, _)| !initialized_by_initializers.contains(prop_name.as_str()))
+            .filter(|(prop_name, _)| !initialized_by_initializers.contains(prop_name))
             .cloned()
             .collect();
 
@@ -128,11 +130,9 @@ pub fn check_property_initialization<'ctx, 'arena>(
             let still_uninitialized_inherited: Vec<_> = inherited_uninitialized
                 .iter()
                 .filter(|(prop_name, _)| {
-                    let prop_name_str = prop_name.as_str();
-
                     // Already known to be initialized by class initializers or inherited constructor?
-                    if initialized_by_initializers.contains(prop_name_str)
-                        || initialized_by_inherited_constructor.contains(prop_name_str)
+                    if initialized_by_initializers.contains(prop_name)
+                        || initialized_by_inherited_constructor.contains(prop_name)
                     {
                         return false;
                     }
@@ -172,7 +172,7 @@ pub fn check_property_initialization<'ctx, 'arena>(
         // For own properties with inherited constructor, check if class initializers initialize them
         // Report each one that is NOT initialized by class initializers
         for (prop_name, prop_metadata) in &own_uninitialized {
-            if !initialized_by_initializers.contains(prop_name.as_str()) {
+            if !initialized_by_initializers.contains(prop_name) {
                 // Get the declaring class for this property
                 let declaring_class = class_like_metadata.declaring_property_ids.get(prop_name).copied();
                 report_uninitialized_property(
@@ -208,7 +208,7 @@ pub fn check_property_initialization<'ctx, 'arena>(
     // Report uninitialized properties
     for (prop_name, prop_metadata) in &uninitialized_properties {
         // prop_name from declaring_property_ids already includes $ prefix
-        if !definitely_initialized.contains(prop_name.as_str()) {
+        if !definitely_initialized.contains(prop_name) {
             // Get the declaring class for this property
             let declaring_class = class_like_metadata.declaring_property_ids.get(prop_name).copied();
             report_uninitialized_property(
@@ -304,8 +304,8 @@ fn compute_transitive_initializations(
     method_name: Atom,
     class_is_final: bool,
     trust_all_methods: bool,
-) -> HashSet<String> {
-    let mut all_initialized = HashSet::default();
+) -> AtomSet {
+    let mut all_initialized = AtomSet::default();
 
     let mut work_queue: Vec<(Atom, Atom, bool, bool, Atom)> =
         vec![(class_name, method_name, class_is_final, trust_all_methods, class_name)];
@@ -332,20 +332,19 @@ fn compute_transitive_initializations(
             if let Some(props) = artifacts.method_initialized_properties.get(&method_key) {
                 if current_class != origin_class {
                     if let Some(origin_meta) = context.codebase.get_class_like(&origin_class) {
-                        for prop_name_str in props {
-                            let prop_atom = Atom::from(prop_name_str.as_str());
+                        for prop_name in props {
                             let is_inherited = origin_meta
                                 .declaring_property_ids
-                                .get(&prop_atom)
+                                .get(prop_name)
                                 .map(|declaring_class| *declaring_class != origin_class)
                                 .unwrap_or(true);
                             if is_inherited {
-                                all_initialized.insert(prop_name_str.clone());
+                                all_initialized.insert(*prop_name);
                             }
                         }
                     }
                 } else {
-                    all_initialized.extend(props.iter().cloned());
+                    all_initialized.extend(props.iter().copied());
                 }
             }
 
@@ -403,8 +402,8 @@ fn compute_class_initializer_initializations(
     artifacts: &AnalysisArtifacts,
     context: &Context<'_, '_>,
     class_like_metadata: &ClassLikeMetadata,
-) -> HashSet<String> {
-    let mut all_initialized = HashSet::default();
+) -> AtomSet {
+    let mut all_initialized = AtomSet::default();
 
     // No class initializers configured
     if context.settings.class_initializers.is_empty() {
@@ -450,17 +449,15 @@ fn compute_class_initializer_initializations(
                     true,
                 );
 
-                for prop_name_str in initialized {
-                    let prop_atom = Atom::from(prop_name_str.as_str());
-
+                for prop_name in initialized {
                     let is_inherited = class_like_metadata
                         .declaring_property_ids
-                        .get(&prop_atom)
+                        .get(&prop_name)
                         .map(|declaring_class| *declaring_class != class_name)
                         .unwrap_or(true);
 
                     if is_inherited {
-                        all_initialized.insert(prop_name_str);
+                        all_initialized.insert(prop_name);
                     }
                 }
             }
@@ -516,7 +513,7 @@ fn compute_class_initializer_initializations(
             if parent_has_initializer {
                 for (prop_name, declaring_class) in &parent_meta.declaring_property_ids {
                     if *declaring_class == *parent_name {
-                        all_initialized.insert(prop_name.to_string());
+                        all_initialized.insert(*prop_name);
                     }
                 }
             }
@@ -581,9 +578,8 @@ fn check_parent_constructor_initializes(
                     return true;
                 }
 
-                let prop_name_str = prop_name.as_str();
                 if let Some(init_props) = constructor_initialized
-                    && init_props.contains(prop_name_str)
+                    && init_props.contains(*prop_name)
                 {
                     return true;
                 }

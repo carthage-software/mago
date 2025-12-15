@@ -98,7 +98,7 @@ pub fn analyze_function_like<'ctx, 'ast, 'arena>(
         && let Some(class_like_metadata) = block_context.scope.get_class_like()
     {
         block_context.locals.insert(
-            "$this".to_string(),
+            Atom::from("$this"),
             Rc::new(wrap_atomic(TAtomic::Object(get_this_type(
                 context,
                 class_like_metadata,
@@ -119,7 +119,7 @@ pub fn analyze_function_like<'ctx, 'ast, 'arena>(
 
             for variable in global.variables.iter() {
                 if let Some(var_id) = get_variable_id(variable) {
-                    block_context.conditionally_referenced_variable_ids.insert(var_id.to_string());
+                    block_context.conditionally_referenced_variable_ids.insert(Atom::from(var_id));
                 }
             }
         }
@@ -238,7 +238,7 @@ fn add_parameter_types_to_context<'ctx, 'arena>(
                 .unwrap_or_else(|| final_parameter_type.clone());
 
             block_context.by_reference_constraints.insert(
-                parameter_variable_str.to_string(),
+                parameter_variable_str,
                 ReferenceConstraint::new(
                     parameter_metadata.span,
                     ReferenceConstraintSource::Parameter,
@@ -275,7 +275,7 @@ fn add_parameter_types_to_context<'ctx, 'arena>(
             final_parameter_type
         };
 
-        block_context.locals.insert(parameter_variable_str.to_string(), Rc::new(final_parameter_type));
+        block_context.locals.insert(parameter_variable_str, Rc::new(final_parameter_type));
     }
 
     Ok(())
@@ -368,7 +368,7 @@ fn add_properties_to_context<'ctx, 'arena>(
         let raw_property_name = property_name.strip_prefix("$").unwrap_or(property_name);
 
         let expression_id = if property_metadata.flags.is_static() {
-            format!("{}::${raw_property_name}", class_like_metadata.name)
+            Atom::from(&format!("{}::${raw_property_name}", class_like_metadata.name))
         } else {
             let this_type = get_this_type(context, class_like_metadata, Some(function_like_metadata));
 
@@ -380,7 +380,7 @@ fn add_properties_to_context<'ctx, 'arena>(
                 property_class_metadata,
             );
 
-            format!("$this->{raw_property_name}")
+            Atom::from(&format!("$this->{raw_property_name}"))
         };
 
         expander::expand_union(

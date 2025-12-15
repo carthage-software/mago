@@ -359,7 +359,7 @@ fn involves_static_variable<'ctx, 'ast, 'arena>(
     expr: &'ast Expression<'arena>,
     block_context: &BlockContext<'ctx>,
 ) -> bool {
-    matches!(unwrap_expression(expr), Expression::Variable(Variable::Direct(var)) if block_context.static_locals.contains(var.name))
+    matches!(unwrap_expression(expr), Expression::Variable(Variable::Direct(var)) if block_context.static_locals.contains(&mago_atom::atom(var.name)))
 }
 
 /// Checks a single operand of a comparison operation for problematic types.

@@ -4,6 +4,9 @@ use std::rc::Rc;
 use ahash::HashMap;
 use ahash::HashSet;
 use indexmap::IndexMap;
+use mago_atom::Atom;
+use mago_atom::AtomMap;
+use mago_atom::AtomSet;
 
 use mago_algebra::clause::Clause;
 use mago_codex::ttype::TType;
@@ -65,13 +68,13 @@ struct SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
     context: &'anlyz mut Context<'ctx, 'arena>,
     block_context: &'anlyz mut BlockContext<'ctx>,
     artifacts: &'anlyz mut AnalysisArtifacts,
-    new_locals: Option<BTreeMap<String, Rc<TUnion>>>,
-    redefined_variables: Option<HashMap<String, Rc<TUnion>>>,
-    possibly_redefined_variables: Option<BTreeMap<String, TUnion>>,
+    new_locals: Option<BTreeMap<Atom, Rc<TUnion>>>,
+    redefined_variables: Option<AtomMap<Rc<TUnion>>>,
+    possibly_redefined_variables: Option<BTreeMap<Atom, TUnion>>,
     leftover_statements: Vec<Statement<'arena>>,
     leftover_case_equality_expression: Option<Expression<'arena>>,
     negated_clauses: Vec<Clause>,
-    new_assigned_variable_ids: HashMap<String, u32>,
+    new_assigned_variable_ids: AtomMap<u32>,
     last_case_exit_type: ControlAction,
     case_exit_types: HashMap<usize, ControlAction>,
     case_actions: HashMap<usize, HashSet<ControlAction>>,
@@ -96,7 +99,7 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
             leftover_statements: vec![],
             leftover_case_equality_expression: None,
             negated_clauses: vec![],
-            new_assigned_variable_ids: HashMap::default(),
+            new_assigned_variable_ids: AtomMap::default(),
             last_case_exit_type: ControlAction::Break,
             case_exit_types: HashMap::default(),
             case_actions: HashMap::default(),
@@ -193,7 +196,7 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
         for (var_id, var_type) in possibly_redefined_vars {
             if let Some(context_type) = self.block_context.locals.get(&var_id).cloned() {
                 self.block_context.locals.insert(
-                    var_id.clone(),
+                    var_id,
                     Rc::new(combine_union_types(&var_type, &context_type, self.context.codebase, false)),
                 );
             }
@@ -204,7 +207,7 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
             let final_else_clauses: Vec<_> =
                 final_else_context.clauses.iter().map(|c| (**c).clone()).chain(self.negated_clauses).collect();
 
-            let mut final_else_referenced_ids = HashSet::default();
+            let mut final_else_referenced_ids = AtomSet::default();
             let (reconcilable_types, _) =
                 mago_algebra::find_satisfying_assignments(&final_else_clauses, None, &mut final_else_referenced_ids);
 
@@ -214,7 +217,7 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
                     &reconcilable_types,
                     Default::default(),
                     &mut final_else_context,
-                    &mut HashSet::default(),
+                    &mut AtomSet::default(),
                     &final_else_referenced_ids,
                     &switch.span(),
                     false,
@@ -240,7 +243,7 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
         switch: &Switch,
         switch_condition: &'ast Expression<'arena>,
         condition_is_synthetic: bool,
-        switch_var_id: &String,
+        switch_var_id: &Atom,
         switch_case: &'ast SwitchCase<'arena>,
         previous_empty_cases: &Vec<&'ast SwitchExpressionCase<'arena>>,
         original_block_context: &BlockContext<'ctx>,
@@ -516,11 +519,11 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
         let (reconcilable_if_types, _) = mago_algebra::find_satisfying_assignments(
             &case_block_context.clauses.iter().map(|v| v.as_ref().clone()).collect::<Vec<_>>(),
             None,
-            &mut HashSet::default(),
+            &mut AtomSet::default(),
         );
 
         if !reconcilable_if_types.is_empty() {
-            let mut changed_var_ids = HashSet::default();
+            let mut changed_var_ids = AtomSet::default();
 
             reconcile_keyed_types(
                 self.context,
@@ -528,11 +531,7 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
                 IndexMap::new(),
                 &mut case_block_context,
                 &mut changed_var_ids,
-                &if !switch_case.is_default() {
-                    HashSet::from_iter([switch_var_id.clone()])
-                } else {
-                    HashSet::default()
-                },
+                &if !switch_case.is_default() { AtomSet::from_iter([*switch_var_id]) } else { AtomSet::default() },
                 &switch_case.span(),
                 true,
                 false,
@@ -587,7 +586,7 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
             if let Some(ref mut possibly_redefined_var_ids) = self.possibly_redefined_variables {
                 for (var_id, var_type) in break_vars {
                     possibly_redefined_var_ids.insert(
-                        var_id.clone(),
+                        *var_id,
                         combine_optional_union_types(
                             Some(var_type),
                             possibly_redefined_var_ids.get(var_id),
@@ -600,7 +599,7 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
                     break_vars
                         .iter()
                         .filter(|(var_id, _)| self.block_context.locals.contains_key(*var_id))
-                        .map(|(k, v)| (k.clone(), v.clone()))
+                        .map(|(k, v)| (*k, v.clone()))
                         .collect(),
                 );
             }
@@ -610,7 +609,7 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
                     if let Some(break_var_type) = break_vars.get(&var_id) {
                         if case_block_context.locals.contains_key(&var_id) {
                             new_locals.insert(
-                                var_id.clone(),
+                                var_id,
                                 Rc::new(combine_union_types(break_var_type, &var_type, self.context.codebase, false)),
                             );
                         } else {
@@ -626,7 +625,7 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
                 for (var_id, var_type) in redefined_vars.clone() {
                     if let Some(break_var_type) = break_vars.get(&var_id) {
                         redefined_vars.insert(
-                            var_id.clone(),
+                            var_id,
                             Rc::new(combine_union_types(break_var_type, &var_type, self.context.codebase, false)),
                         );
                     } else {
@@ -649,14 +648,14 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
             return Ok(());
         }
 
-        let mut removed_var_ids = HashSet::default();
+        let mut removed_var_ids = AtomSet::default();
         let case_redefined_vars =
             case_block_context.get_redefined_locals(&original_block_context.locals, false, &mut removed_var_ids);
 
         if let Some(possibly_redefined_var_ids) = &mut self.possibly_redefined_variables {
             for (var_id, var_type) in &case_redefined_vars {
                 possibly_redefined_var_ids.insert(
-                    var_id.clone(),
+                    *var_id,
                     combine_optional_union_types(
                         Some(var_type),
                         possibly_redefined_var_ids.get(var_id),
@@ -678,7 +677,7 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
             for (var_id, var_type) in redefined_vars.clone() {
                 if let Some(break_var_type) = case_redefined_vars.get(&var_id) {
                     redefined_vars.insert(
-                        var_id.clone(),
+                        var_id,
                         Rc::new(combine_union_types(break_var_type, &var_type, self.context.codebase, false)),
                     );
                 } else {
@@ -693,7 +692,7 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
             for (var_id, var_type) in new_locals.clone() {
                 if let Some(existing_var_type) = case_block_context.locals.get(&var_id) {
                     new_locals.insert(
-                        var_id.clone(),
+                        var_id,
                         Rc::new(combine_union_types(existing_var_type, &var_type, self.context.codebase, false)),
                     );
                 } else {
@@ -718,7 +717,7 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
         &mut self,
         switch: &Switch<'arena>,
         subject_type: &Rc<TUnion>,
-    ) -> (bool, String, Option<String>, Expression<'arena>) {
+    ) -> (bool, Atom, Option<Atom>, Expression<'arena>) {
         if let Some(id) = get_expression_id(
             switch.expression,
             self.block_context.scope.get_class_like_name(),
@@ -727,10 +726,11 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
         ) {
             (false, id, get_root_expression_id(switch.expression), switch.expression.clone())
         } else {
-            let subject_id = format!("{}{}", Self::SYNTHETIC_SWITCH_VAR_PREFIX, switch.expression.span().start.offset);
-            self.block_context.locals.insert(subject_id.clone(), subject_type.clone());
+            let subject_id =
+                Atom::from(&format!("{}{}", Self::SYNTHETIC_SWITCH_VAR_PREFIX, switch.expression.span().start.offset));
+            self.block_context.locals.insert(subject_id, subject_type.clone());
             let subject_for_conditions =
-                new_synthetic_variable(self.context.arena, &subject_id, switch.expression.span());
+                new_synthetic_variable(self.context.arena, subject_id.as_str(), switch.expression.span());
 
             (true, subject_id, None, subject_for_conditions)
         }

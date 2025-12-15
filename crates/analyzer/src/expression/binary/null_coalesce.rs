@@ -1,7 +1,6 @@
 use std::borrow::Cow;
 use std::rc::Rc;
 
-use ahash::HashSet;
 use mago_algebra::find_satisfying_assignments;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::combine_union_types;
@@ -62,7 +61,7 @@ pub fn analyze_null_coalesce_operation<'ctx, 'arena>(
 
     let is_static_var = matches!(
         unwrap_expression(binary.lhs),
-        Expression::Variable(Variable::Direct(var)) if block_context.static_locals.contains(var.name)
+        Expression::Variable(Variable::Direct(var)) if block_context.static_locals.contains(&mago_atom::atom(var.name))
     );
 
     if lhs_type.is_null() && !is_static_var {
@@ -149,7 +148,7 @@ pub fn analyze_null_coalesce_operation<'ctx, 'arena>(
             &mut conditionally_referenced_variable_ids,
         );
 
-        let mut changed_variable_ids = HashSet::default();
+        let mut changed_variable_ids = mago_atom::AtomSet::default();
 
         reconcile_keyed_types(
             context,

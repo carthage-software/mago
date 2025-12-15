@@ -304,7 +304,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Unset<'arena> {
 
                 let rc = Rc::new(TUnion::from_vec(atomics));
 
-                block_context.locals.insert(array_id.clone(), rc.clone());
+                block_context.locals.insert(array_id, rc.clone());
                 block_context.remove_variable_from_conflicting_clauses(context, &array_id, Some(rc.as_ref()));
             };
         }

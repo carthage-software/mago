@@ -19,7 +19,7 @@ pub struct Clause {
     pub condition_span: Span,
     pub span: Span,
     pub hash: u32,
-    pub possibilities: IndexMap<String, IndexMap<u64, Assertion>>,
+    pub possibilities: IndexMap<Atom, IndexMap<u64, Assertion>>,
     pub wedge: bool,
     pub reconcilable: bool,
     pub generated: bool,
@@ -39,7 +39,7 @@ impl Hash for Clause {
 
 impl Clause {
     pub fn new(
-        possibilities: IndexMap<String, IndexMap<u64, Assertion>>,
+        possibilities: IndexMap<Atom, IndexMap<u64, Assertion>>,
         condition_span: Span,
         span: Span,
         wedge: Option<bool>,
@@ -57,7 +57,7 @@ impl Clause {
         }
     }
 
-    pub fn remove_possibilities(&self, var_id: &String) -> Option<Clause> {
+    pub fn remove_possibilities(&self, var_id: &Atom) -> Option<Clause> {
         let mut possibilities = self.possibilities.clone();
 
         possibilities.shift_remove(var_id);
@@ -76,7 +76,7 @@ impl Clause {
         ))
     }
 
-    pub fn add_possibility(&self, var_id: String, new_possibility: IndexMap<u64, Assertion>) -> Clause {
+    pub fn add_possibility(&self, var_id: Atom, new_possibility: IndexMap<u64, Assertion>) -> Clause {
         let mut possibilities = self.possibilities.clone();
 
         possibilities.insert(var_id, new_possibility);
@@ -104,13 +104,13 @@ impl Clause {
         })
     }
 
-    pub fn get_impossibilities(&self) -> BTreeMap<String, Vec<Assertion>> {
+    pub fn get_impossibilities(&self) -> BTreeMap<Atom, Vec<Assertion>> {
         self.possibilities
             .iter()
             .filter_map(|(variable, possibility)| {
                 let negations: Vec<Assertion> = possibility.values().map(Assertion::get_negation).collect();
 
-                if !negations.is_empty() { Some((variable.clone(), negations)) } else { None }
+                if !negations.is_empty() { Some((*variable, negations)) } else { None }
             })
             .collect()
     }
@@ -130,7 +130,7 @@ impl Clause {
 
             is_first_clause = false;
 
-            let var_name = if var_id.starts_with('*') { atom("<expr>") } else { atom(var_id) };
+            let var_name = if var_id.starts_with('*') { atom("<expr>") } else { *var_id };
 
             let mut clause_result = empty_atom();
             let mut is_first_part_in_clause = true;
@@ -169,7 +169,7 @@ impl Clause {
 
 #[inline]
 fn get_hash(
-    possibilities: &IndexMap<String, IndexMap<u64, Assertion>>,
+    possibilities: &IndexMap<Atom, IndexMap<u64, Assertion>>,
     clause_span: Span,
     wedge: bool,
     reconcilable: bool,

@@ -36,13 +36,13 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Throw<'arena> {
                         let resulting_type =
                             combine_union_types(previous_type.as_ref(), finally_type.as_ref(), context.codebase, false);
 
-                        finally_scope.locals.insert(variable.clone(), Rc::new(resulting_type));
+                        finally_scope.locals.insert(*variable, Rc::new(resulting_type));
                     }
                     None => {
                         let mut resulting_type = (**previous_type).clone();
                         resulting_type.set_possibly_undefined_from_try(true);
 
-                        finally_scope.locals.insert(variable.clone(), Rc::new(resulting_type));
+                        finally_scope.locals.insert(*variable, Rc::new(resulting_type));
                     }
                 };
             }

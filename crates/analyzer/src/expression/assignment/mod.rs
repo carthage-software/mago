@@ -4,6 +4,7 @@ use indexmap::IndexMap;
 
 use mago_algebra::clause::Clause;
 use mago_algebra::disjoin_clauses;
+use mago_atom::Atom;
 use mago_codex::assertion::Assertion;
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::ttype::TType;
@@ -89,8 +90,8 @@ pub fn analyze_assignment<'ctx, 'ast, 'arena>(
     let mut existing_target_type = None;
     if let Some(target_variable_id) = &target_variable_id {
         block_context.conditionally_referenced_variable_ids.remove(target_variable_id);
-        block_context.assigned_variable_ids.insert(target_variable_id.clone(), target_expression.span().start.offset);
-        block_context.possibly_assigned_variable_ids.insert(target_variable_id.clone());
+        block_context.assigned_variable_ids.insert(*target_variable_id, target_expression.span().start.offset);
+        block_context.possibly_assigned_variable_ids.insert(*target_variable_id);
 
         existing_target_type = block_context.locals.get(target_variable_id).cloned();
     }
@@ -100,7 +101,7 @@ pub fn analyze_assignment<'ctx, 'ast, 'arena>(
         && is_closure_expression(source_expression)
         && let Some(preliminary_type) = get_closure_expression_type(source_expression)
     {
-        block_context.locals.insert(target_variable_id.clone(), Rc::new(preliminary_type));
+        block_context.locals.insert(*target_variable_id, Rc::new(preliminary_type));
     }
 
     if let Some(source_expression) = source_expression {
@@ -269,7 +270,7 @@ pub(crate) fn assign_to_expression<'ctx, 'ast, 'arena>(
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     target_expression: &'ast Expression<'arena>,
-    target_expression_id: Option<String>,
+    target_expression_id: Option<Atom>,
     source_expression: Option<&'ast Expression<'arena>>,
     mut source_type: TUnion,
     destructuring: bool,
@@ -376,9 +377,7 @@ fn analyze_reference_assignment<'ctx, 'ast, 'arena>(
         return Ok(());
     };
 
-    if !block_context.locals.contains_key(&referenced_variable_id) {
-        block_context.locals.insert(referenced_variable_id.clone(), Rc::new(get_mixed()));
-    }
+    block_context.locals.entry(referenced_variable_id).or_insert_with(|| Rc::new(get_mixed()));
 
     if block_context.references_in_scope.contains_key(&target_variable_id) {
         block_context.decrement_reference_count(&target_variable_id);
@@ -388,11 +387,11 @@ fn analyze_reference_assignment<'ctx, 'ast, 'arena>(
     // old reference, so it's no longer potentially from a confusing scope.
     block_context.references_possibly_from_confusing_scope.remove(&target_variable_id);
     block_context.add_conditionally_referenced_variable(&target_variable_id);
-    block_context.references_in_scope.insert(target_variable_id.clone(), referenced_variable_id.clone());
-    block_context.referenced_counts.entry(referenced_variable_id.clone()).and_modify(|count| *count += 1).or_insert(1);
+    block_context.references_in_scope.insert(target_variable_id, referenced_variable_id);
+    block_context.referenced_counts.entry(referenced_variable_id).and_modify(|count| *count += 1).or_insert(1);
 
     if referenced_variable_id.contains('[') || referenced_variable_id.contains("->") {
-        block_context.references_to_external_scope.insert(target_variable_id.clone());
+        block_context.references_to_external_scope.insert(target_variable_id);
     }
 
     Ok(())
@@ -405,7 +404,7 @@ pub fn analyze_assignment_to_variable<'ctx, 'arena>(
     variable_span: Span,
     source_expression: Option<&Expression<'arena>>,
     mut assigned_type: TUnion,
-    variable_id: &str,
+    variable_id: &Atom,
     destructuring: bool,
 ) {
     if let Some(constraint) = block_context.by_reference_constraints.get(variable_id) {
@@ -611,7 +610,7 @@ pub fn analyze_assignment_to_variable<'ctx, 'arena>(
         );
     }
 
-    block_context.locals.insert(variable_id.to_owned(), Rc::new(assigned_type));
+    block_context.locals.insert(*variable_id, Rc::new(assigned_type));
 }
 
 fn analyze_destructuring<'ctx, 'ast, 'arena>(
@@ -910,7 +909,7 @@ fn handle_assignment_with_boolean_logic<'ctx, 'arena>(
     artifacts: &mut AnalysisArtifacts,
     variable_expression_id: Span,
     source_expression: &Expression<'arena>,
-    variable_id: &str,
+    variable_id: &Atom,
 ) {
     let Some(right_clauses) = get_formula(
         source_expression.span(),
@@ -927,7 +926,7 @@ fn handle_assignment_with_boolean_logic<'ctx, 'arena>(
         BlockContext::filter_clauses(context, variable_id, right_clauses.into_iter().map(Rc::new).collect(), None);
 
     let mut possibilities = IndexMap::default();
-    possibilities.insert(variable_id.to_owned(), IndexMap::from([(Assertion::Falsy.to_hash(), Assertion::Falsy)]));
+    possibilities.insert(*variable_id, IndexMap::from([(Assertion::Falsy.to_hash(), Assertion::Falsy)]));
 
     block_context.clauses.extend(
         disjoin_clauses(

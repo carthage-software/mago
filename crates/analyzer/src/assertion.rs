@@ -1,7 +1,7 @@
-use ahash::HashMap;
-
 use mago_algebra::assertion_set::AssertionSet;
 use mago_algebra::assertion_set::negate_assertion_set;
+use mago_atom::Atom;
+use mago_atom::AtomMap;
 use mago_atom::ascii_lowercase_atom;
 use mago_atom::atom;
 use mago_codex::assertion::Assertion;
@@ -35,8 +35,8 @@ pub fn scrape_assertions(
     expression: &Expression,
     artifacts: &AnalysisArtifacts,
     assertion_context: AssertionContext<'_, '_>,
-) -> Vec<HashMap<String, AssertionSet>> {
-    let mut if_types = HashMap::default();
+) -> Vec<AtomMap<AssertionSet>> {
+    let mut if_types = AtomMap::default();
 
     if let Some(var_name) = get_expression_id(
         expression,
@@ -50,7 +50,7 @@ pub fn scrape_assertions(
     match unwrap_expression(expression) {
         Expression::UnaryPrefix(UnaryPrefix { operator: UnaryPrefixOperator::Not(_), operand }) => {
             let assertions = scrape_assertions(operand, artifacts, assertion_context);
-            let mut negated_assertions = HashMap::default();
+            let mut negated_assertions = AtomMap::default();
             for assertion in assertions {
                 for (var_name, assertion_set) in assertion {
                     negated_assertions
@@ -212,21 +212,21 @@ pub fn scrape_assertions(
     if if_types.is_empty() { vec![] } else { vec![if_types] }
 }
 
-fn process_custom_assertions(expression_span: Span, artifacts: &AnalysisArtifacts) -> HashMap<String, AssertionSet> {
+fn process_custom_assertions(expression_span: Span, artifacts: &AnalysisArtifacts) -> AtomMap<AssertionSet> {
     let mut if_true_assertions = artifacts
         .if_true_assertions
         .get(&(expression_span.start.offset, expression_span.end.offset))
         .cloned()
-        .unwrap_or(HashMap::default());
+        .unwrap_or(AtomMap::default());
 
     let if_false_assertions = artifacts
         .if_false_assertions
         .get(&(expression_span.start.offset, expression_span.end.offset))
         .cloned()
-        .unwrap_or(HashMap::default());
+        .unwrap_or(AtomMap::default());
 
     if if_true_assertions.is_empty() && if_false_assertions.is_empty() {
-        return HashMap::default();
+        return AtomMap::default();
     }
 
     for if_false_assertion in if_false_assertions {
@@ -243,8 +243,8 @@ fn scrape_special_function_call_assertions(
     assertion_context: AssertionContext<'_, '_>,
     artifacts: &AnalysisArtifacts,
     function_call: &FunctionCall,
-) -> HashMap<String, AssertionSet> {
-    let mut if_types = HashMap::default();
+) -> AtomMap<AssertionSet> {
+    let mut if_types = AtomMap::default();
 
     let Expression::Identifier(function_identifier) = function_call.function else {
         return if_types;
@@ -434,7 +434,7 @@ pub(super) fn scrape_equality_assertions(
     right: &Expression,
     artifacts: &AnalysisArtifacts,
     assertion_context: AssertionContext<'_, '_>,
-) -> Vec<HashMap<String, AssertionSet>> {
+) -> Vec<AtomMap<AssertionSet>> {
     if let Some(assertions) = scrape_class_constant_equality_assertions(
         left,
         right,
@@ -447,7 +447,7 @@ pub(super) fn scrape_equality_assertions(
 
     match resolve_count_comparison(left, right, artifacts, assertion_context) {
         (None, Some(number_on_right)) => {
-            let mut if_types = HashMap::default();
+            let mut if_types = AtomMap::default();
 
             if let Some(array_variable_id) = get_first_argument_expression_id(assertion_context, left) {
                 if number_on_right == 0 {
@@ -460,7 +460,7 @@ pub(super) fn scrape_equality_assertions(
             return if if_types.is_empty() { vec![] } else { vec![if_types] };
         }
         (Some(number_on_left), None) => {
-            let mut if_types = HashMap::default();
+            let mut if_types = AtomMap::default();
 
             if let Some(array_variable_id) = get_first_argument_expression_id(assertion_context, right) {
                 if number_on_left == 0 {
@@ -517,7 +517,7 @@ fn scrape_inequality_assertions(
     right: &Expression,
     artifacts: &AnalysisArtifacts,
     assertion_context: AssertionContext<'_, '_>,
-) -> Vec<HashMap<String, AssertionSet>> {
+) -> Vec<AtomMap<AssertionSet>> {
     if let Some(assertions) = scrape_class_constant_equality_assertions(
         left,
         right,
@@ -530,7 +530,7 @@ fn scrape_inequality_assertions(
 
     match resolve_count_comparison(left, right, artifacts, assertion_context) {
         (None, Some(number_on_right)) => {
-            let mut if_types = HashMap::default();
+            let mut if_types = AtomMap::default();
 
             if let Some(array_variable_id) = get_first_argument_expression_id(assertion_context, left) {
                 if number_on_right == 0 {
@@ -546,7 +546,7 @@ fn scrape_inequality_assertions(
             return if if_types.is_empty() { vec![] } else { vec![if_types] };
         }
         (Some(number_on_left), None) => {
-            let mut if_types = HashMap::default();
+            let mut if_types = AtomMap::default();
 
             if let Some(array_variable_id) = get_first_argument_expression_id(assertion_context, right) {
                 if number_on_left == 0 {
@@ -608,7 +608,7 @@ fn scrape_class_constant_equality_assertions(
     artifacts: &AnalysisArtifacts,
     assertion_context: AssertionContext<'_, '_>,
     negated: bool,
-) -> Option<Vec<HashMap<String, AssertionSet>>> {
+) -> Option<Vec<AtomMap<AssertionSet>>> {
     let left_class_part = is_class_constant_access(left);
     let right_class_part = is_class_constant_access(right);
 
@@ -670,7 +670,7 @@ fn scrape_class_constant_equality_assertions(
         return None;
     }
 
-    let mut if_types = HashMap::default();
+    let mut if_types = AtomMap::default();
     if_types.insert(variable_id, vec![assertions]);
     Some(vec![if_types])
 }
@@ -706,8 +706,8 @@ fn get_empty_array_equality_assertions(
     right: &Expression,
     assertion_context: AssertionContext<'_, '_>,
     null_position: OtherValuePosition,
-) -> Vec<HashMap<String, AssertionSet>> {
-    let mut if_types = HashMap::default();
+) -> Vec<AtomMap<AssertionSet>> {
+    let mut if_types = AtomMap::default();
     let base_conditional = match null_position {
         OtherValuePosition::Left => right,
         OtherValuePosition::Right => left,
@@ -737,8 +737,8 @@ fn get_empty_array_inequality_assertions(
     right: &Expression,
     assertion_context: AssertionContext<'_, '_>,
     null_position: OtherValuePosition,
-) -> Vec<HashMap<String, AssertionSet>> {
-    let mut if_types = HashMap::default();
+) -> Vec<AtomMap<AssertionSet>> {
+    let mut if_types = AtomMap::default();
     let base_conditional = match null_position {
         OtherValuePosition::Left => right,
         OtherValuePosition::Right => left,
@@ -768,7 +768,7 @@ fn get_enum_case_equality_assertions(
     assertion_context: AssertionContext<'_, '_>,
     artifacts: &AnalysisArtifacts,
     enum_case_position: OtherValuePosition,
-) -> Vec<HashMap<String, AssertionSet>> {
+) -> Vec<AtomMap<AssertionSet>> {
     let (variable_expression, Some(enum_case_type)) = (match enum_case_position {
         OtherValuePosition::Left => (right, artifacts.get_expression_type(left)),
         OtherValuePosition::Right => (left, artifacts.get_expression_type(right)),
@@ -776,7 +776,7 @@ fn get_enum_case_equality_assertions(
         return vec![];
     };
 
-    let mut if_types = HashMap::default();
+    let mut if_types = AtomMap::default();
 
     let var_name = get_expression_id(
         variable_expression,
@@ -798,7 +798,7 @@ fn get_enum_case_inequality_assertions(
     assertion_context: AssertionContext<'_, '_>,
     artifacts: &AnalysisArtifacts,
     enum_case_position: OtherValuePosition,
-) -> Vec<HashMap<String, AssertionSet>> {
+) -> Vec<AtomMap<AssertionSet>> {
     let (variable_expression, Some(enum_case_type)) = (match enum_case_position {
         OtherValuePosition::Left => (right, artifacts.get_expression_type(left)),
         OtherValuePosition::Right => (left, artifacts.get_expression_type(right)),
@@ -806,7 +806,7 @@ fn get_enum_case_inequality_assertions(
         return vec![];
     };
 
-    let mut if_types = HashMap::default();
+    let mut if_types = AtomMap::default();
 
     let var_name = get_expression_id(
         variable_expression,
@@ -827,8 +827,8 @@ fn get_null_equality_assertions(
     right: &Expression,
     assertion_context: AssertionContext<'_, '_>,
     null_position: OtherValuePosition,
-) -> Vec<HashMap<String, AssertionSet>> {
-    let mut if_types = HashMap::default();
+) -> Vec<AtomMap<AssertionSet>> {
+    let mut if_types = AtomMap::default();
     let base_conditional = match null_position {
         OtherValuePosition::Left => right,
         OtherValuePosition::Right => left,
@@ -853,8 +853,8 @@ fn get_null_inequality_assertions(
     right: &Expression,
     assertion_context: AssertionContext<'_, '_>,
     null_position: OtherValuePosition,
-) -> Vec<HashMap<String, AssertionSet>> {
-    let mut if_types = HashMap::default();
+) -> Vec<AtomMap<AssertionSet>> {
+    let mut if_types = AtomMap::default();
     let base_conditional = match null_position {
         OtherValuePosition::Left => right,
         OtherValuePosition::Right => left,
@@ -904,8 +904,8 @@ fn get_false_inquality_assertions(
     right: &Expression,
     assertion_context: AssertionContext<'_, '_>,
     false_position: OtherValuePosition,
-) -> Vec<HashMap<String, AssertionSet>> {
-    let mut if_types = HashMap::default();
+) -> Vec<AtomMap<AssertionSet>> {
+    let mut if_types = AtomMap::default();
     let base_conditional = match false_position {
         OtherValuePosition::Left => right,
         OtherValuePosition::Right => left,
@@ -930,8 +930,8 @@ fn get_true_inquality_assertions(
     right: &Expression,
     assertion_context: AssertionContext<'_, '_>,
     true_position: OtherValuePosition,
-) -> Vec<HashMap<String, AssertionSet>> {
-    let mut if_types = HashMap::default();
+) -> Vec<AtomMap<AssertionSet>> {
+    let mut if_types = AtomMap::default();
     let base_conditional = match true_position {
         OtherValuePosition::Left => right,
         OtherValuePosition::Right => left,
@@ -957,10 +957,10 @@ fn scrape_lesser_than_assertions(
     right: &Expression,
     artifacts: &AnalysisArtifacts,
     assertion_context: AssertionContext<'_, '_>,
-) -> Vec<HashMap<String, AssertionSet>> {
+) -> Vec<AtomMap<AssertionSet>> {
     match resolve_count_comparison(left, right, artifacts, assertion_context) {
         (None, Some(number_on_right)) => {
-            let mut if_types = HashMap::default();
+            let mut if_types = AtomMap::default();
 
             if let Some(array_variable_id) = get_first_argument_expression_id(assertion_context, left) {
                 let maximum_count = if matches!(operator, BinaryOperator::LessThan(_)) {
@@ -984,7 +984,7 @@ fn scrape_lesser_than_assertions(
             return if if_types.is_empty() { vec![] } else { vec![if_types] };
         }
         (Some(number_on_left), None) => {
-            let mut if_types = HashMap::default();
+            let mut if_types = AtomMap::default();
 
             if let Some(array_variable_id) = get_first_argument_expression_id(assertion_context, right) {
                 let minimum_count = if matches!(operator, BinaryOperator::LessThan(_)) {
@@ -1013,7 +1013,7 @@ fn scrape_lesser_than_assertions(
         return vec![];
     }
 
-    let mut if_types = HashMap::default();
+    let mut if_types = AtomMap::default();
 
     let left_id = get_expression_id(
         left,
@@ -1114,10 +1114,10 @@ fn scrape_greater_than_assertions(
     right: &Expression,
     artifacts: &AnalysisArtifacts,
     assertion_context: AssertionContext<'_, '_>,
-) -> Vec<HashMap<String, AssertionSet>> {
+) -> Vec<AtomMap<AssertionSet>> {
     match resolve_count_comparison(left, right, artifacts, assertion_context) {
         (None, Some(number_on_right)) => {
-            let mut if_types = HashMap::default();
+            let mut if_types = AtomMap::default();
 
             if let Some(array_variable_id) = get_first_argument_expression_id(assertion_context, left) {
                 let minimum_count = if matches!(operator, BinaryOperator::GreaterThan(_)) {
@@ -1136,7 +1136,7 @@ fn scrape_greater_than_assertions(
             return if if_types.is_empty() { vec![] } else { vec![if_types] };
         }
         (Some(number_on_left), None) => {
-            let mut if_types = HashMap::default();
+            let mut if_types = AtomMap::default();
 
             if let Some(array_variable_id) = get_first_argument_expression_id(assertion_context, right) {
                 let maximum_count = if matches!(operator, BinaryOperator::GreaterThan(_)) {
@@ -1170,7 +1170,7 @@ fn scrape_greater_than_assertions(
         return vec![];
     }
 
-    let mut if_types = HashMap::default();
+    let mut if_types = AtomMap::default();
 
     // Generate assertions for the left variable based on the right variable's type.
     // For an expression `$a > $b`, this asserts `$a` is greater than the lower bound of `$b`.
@@ -1270,8 +1270,8 @@ fn scrape_instanceof_assertions(
     right: &Expression,
     artifacts: &AnalysisArtifacts,
     context: AssertionContext<'_, '_>,
-) -> Vec<HashMap<String, AssertionSet>> {
-    let mut if_types = HashMap::default();
+) -> Vec<AtomMap<AssertionSet>> {
+    let mut if_types = AtomMap::default();
 
     let variable_id = get_expression_id(left, context.this_class_name, context.resolved_names, Some(context.codebase));
 
@@ -1428,8 +1428,8 @@ fn get_true_equality_assertions(
     artifacts: &AnalysisArtifacts,
     assertion_context: AssertionContext<'_, '_>,
     true_position: OtherValuePosition,
-) -> Vec<HashMap<String, AssertionSet>> {
-    let mut if_types = HashMap::default();
+) -> Vec<AtomMap<AssertionSet>> {
+    let mut if_types = AtomMap::default();
     let base_conditional = match true_position {
         OtherValuePosition::Left => right,
         OtherValuePosition::Right => left,
@@ -1513,8 +1513,8 @@ fn get_false_equality_assertions(
     right: &Expression,
     assertion_context: AssertionContext<'_, '_>,
     false_position: OtherValuePosition,
-) -> Vec<HashMap<String, AssertionSet>> {
-    let mut if_types = HashMap::default();
+) -> Vec<AtomMap<AssertionSet>> {
+    let mut if_types = AtomMap::default();
     let base_conditional = match false_position {
         OtherValuePosition::Left => right,
         OtherValuePosition::Right => left,
@@ -1547,8 +1547,8 @@ fn get_typed_value_equality_assertions(
     artifacts: &AnalysisArtifacts,
     assertion_context: AssertionContext<'_, '_>,
     typed_value_position: OtherValuePosition,
-) -> Vec<HashMap<String, AssertionSet>> {
-    let mut if_types = HashMap::default();
+) -> Vec<AtomMap<AssertionSet>> {
+    let mut if_types = AtomMap::default();
 
     let var_name;
     let other_value_var_name;
@@ -1635,8 +1635,8 @@ fn get_typed_value_inequality_assertions(
     artifacts: &AnalysisArtifacts,
     assertion_context: AssertionContext<'_, '_>,
     typed_value_position: OtherValuePosition,
-) -> Vec<HashMap<String, AssertionSet>> {
-    let mut if_types = HashMap::default();
+) -> Vec<AtomMap<AssertionSet>> {
+    let mut if_types = AtomMap::default();
 
     let var_name;
     let other_value_var_name;
@@ -1715,7 +1715,7 @@ fn get_typed_value_inequality_assertions(
 fn get_first_argument_expression_id(
     assertion_context: AssertionContext<'_, '_>,
     expression: &Expression,
-) -> Option<String> {
+) -> Option<Atom> {
     let Expression::Call(Call::Function(FunctionCall { argument_list, .. })) = expression else {
         return None;
     };

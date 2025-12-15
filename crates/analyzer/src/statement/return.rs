@@ -115,7 +115,7 @@ pub fn handle_return_value<'ctx, 'arena>(
             if let Some(finally_type) = finally_scope.locals.get_mut(var_id) {
                 *finally_type = Rc::new(combine_union_types(finally_type, var_type, context.codebase, false));
             } else {
-                finally_scope.locals.insert(var_id.clone(), var_type.clone());
+                finally_scope.locals.insert(*var_id, var_type.clone());
             }
         }
     }
@@ -690,8 +690,7 @@ fn check_constructor_early_return<'ctx, 'arena>(
         }
 
         // Check if property is initialized at this point
-        let prop_name_str = prop_name.as_str();
-        if block_context.definitely_initialized_properties.contains(prop_name_str) {
+        if block_context.definitely_initialized_properties.contains(prop_name) {
             continue;
         }
 

@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 
+use mago_atom::Atom;
 use mago_atom::atom;
 
 use mago_codex::metadata::class_like::ClassLikeMetadata;
@@ -92,7 +93,7 @@ pub(crate) fn get_array_target_type_given_index<'ctx, 'arena>(
     array_like_type: &TUnion,
     index_type: &TUnion,
     in_assignment: bool,
-    extended_var_id: &Option<String>,
+    extended_var_id: &Option<Atom>,
     assign_value_type: Option<&TUnion>,
     is_array_like_nullsafe: bool,
 ) -> TUnion {
@@ -113,7 +114,7 @@ pub(crate) fn get_array_target_type_given_index<'ctx, 'arena>(
             Issue::error(format!(
                 "Cannot use `null` as an array index to access element{}.",
                 match extended_var_id {
-                    Some(var) => "of variable ".to_string() + var,
+                    Some(var) => "of variable ".to_string() + var.as_str(),
                     None => "".to_string(),
                 }
             ))
@@ -132,7 +133,7 @@ pub(crate) fn get_array_target_type_given_index<'ctx, 'arena>(
                 Issue::warning(format!(
                     "Possibly using `null` as an array index to access element{}.",
                     match extended_var_id {
-                        Some(var) => "of variable ".to_string() + var,
+                        Some(var) => "of variable ".to_string() + var.as_str(),
                         None => "".to_string(),
                     }
                 ))

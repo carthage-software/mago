@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 use std::rc::Rc;
 
+use mago_atom::Atom;
 use mago_atom::atom;
 use mago_codex::ttype::add_union_type;
 use mago_codex::ttype::atomic::TAtomic;
@@ -85,7 +86,7 @@ pub(crate) fn analyze<'ctx, 'ast, 'arena>(
         artifacts,
         array_target_expressions,
         assign_value_type,
-        root_var_id.clone(),
+        root_var_id,
         &mut root_array_type,
         &mut current_type,
     )?;
@@ -127,7 +128,7 @@ pub(crate) fn analyze<'ctx, 'ast, 'arena>(
 
     let root_array_type = Rc::new(root_array_type);
     if let Some(root_var_id) = &root_var_id {
-        block_context.locals.insert(root_var_id.clone(), root_array_type.clone());
+        block_context.locals.insert(*root_var_id, root_array_type.clone());
     }
 
     artifacts.set_rc_expression_type(&root_array_expression, root_array_type);
@@ -459,14 +460,14 @@ pub(crate) fn analyze_nested_array_assignment<'ctx, 'ast, 'arena>(
     artifacts: &mut AnalysisArtifacts,
     mut array_target_expressions: Vec<ArrayTarget<'ast, 'arena>>,
     assign_value_type: TUnion,
-    root_var_id: Option<String>,
+    root_var_id: Option<Atom>,
     root_type: &mut TUnion,
     last_array_expr_type: &mut TUnion,
 ) -> Result<Option<&'ast Expression<'arena>>, AnalysisError> {
-    let mut var_id_additions = Vec::new();
+    let mut var_id_additions: Vec<String> = Vec::new();
     let mut last_array_expression_index = None;
-    let mut extended_var_id = None;
-    let mut parent_var_id: Option<String> = None;
+    let mut extended_var_id: Option<Atom> = None;
+    let mut parent_var_id: Option<Atom> = None;
     let mut full_var_id = true;
 
     array_target_expressions.reverse();
@@ -557,25 +558,26 @@ pub(crate) fn analyze_nested_array_assignment<'ctx, 'ast, 'arena>(
         artifacts.set_expression_type(array_target.get_array(), array_expression_type_inner.clone());
 
         if let Some(root_var_id) = &root_var_id {
-            extended_var_id = Some(root_var_id.to_owned() + &var_id_additions.join("").to_string());
+            let combined = format!("{}{}", root_var_id.as_str(), var_id_additions.join(""));
+            extended_var_id = Some(Atom::from(&combined));
 
             if let Some(parent_var_id) = &parent_var_id {
-                if full_var_id && parent_var_id.contains("[$") {
-                    block_context.locals.insert(parent_var_id.clone(), Rc::new(array_expression_type_inner.clone()));
-                    block_context.possibly_assigned_variable_ids.insert(parent_var_id.clone());
+                if full_var_id && parent_var_id.as_str().contains("[$") {
+                    block_context.locals.insert(*parent_var_id, Rc::new(array_expression_type_inner.clone()));
+                    block_context.possibly_assigned_variable_ids.insert(*parent_var_id);
                 }
             } else {
                 *root_type = array_expression_type_inner.clone();
 
-                block_context.locals.insert(root_var_id.clone(), Rc::new(array_expression_type_inner.clone()));
-                block_context.possibly_assigned_variable_ids.insert(root_var_id.clone());
+                block_context.locals.insert(*root_var_id, Rc::new(array_expression_type_inner.clone()));
+                block_context.possibly_assigned_variable_ids.insert(*root_var_id);
             }
         }
 
         *last_array_expr_type = array_expr_type;
         last_array_expression_index = array_target.get_index();
 
-        parent_var_id.clone_from(&extended_var_id);
+        parent_var_id = extended_var_id;
     }
 
     array_target_expressions.reverse();
@@ -585,10 +587,11 @@ pub(crate) fn analyze_nested_array_assignment<'ctx, 'ast, 'arena>(
     if let Some(root_var_id) = &root_var_id
         && artifacts.get_expression_type(first_array_target.get_array()).is_some()
     {
-        let extended_var_id = root_var_id.clone() + var_id_additions.join("").as_str();
+        let combined = format!("{}{}", root_var_id.as_str(), var_id_additions.join(""));
+        let extended_var_id = Atom::from(&combined);
 
-        if full_var_id && extended_var_id.contains("[$") {
-            block_context.locals.insert(extended_var_id.clone(), Rc::new(assign_value_type.clone()));
+        if full_var_id && extended_var_id.as_str().contains("[$") {
+            block_context.locals.insert(extended_var_id, Rc::new(assign_value_type.clone()));
             block_context.possibly_assigned_variable_ids.insert(extended_var_id);
         }
     }
@@ -614,11 +617,12 @@ pub(crate) fn analyze_nested_array_assignment<'ctx, 'ast, 'arena>(
             Some(context.codebase),
         )
         .map(|var_var_id| {
-            format!("{}{}", var_var_id, unsafe {
+            let combined = format!("{}{}", var_var_id, unsafe {
                 // SAFETY: This is safe because we can guarantee `var_id_additions` is not empty,
                 // so `last()` will always return `Some`.
                 var_id_additions.last().unwrap_unchecked()
-            })
+            });
+            Atom::from(&combined)
         });
 
         array_expr_type = update_type_with_key_values(
@@ -633,10 +637,10 @@ pub(crate) fn analyze_nested_array_assignment<'ctx, 'ast, 'arena>(
         last_array_expression_index = array_target.get_index();
 
         if let Some(array_expr_id) = &array_expr_id
-            && array_expr_id.contains("[$")
+            && array_expr_id.as_str().contains("[$")
         {
-            block_context.locals.insert(array_expr_id.clone(), Rc::new(array_expr_type.clone()));
-            block_context.possibly_assigned_variable_ids.insert(array_expr_id.clone());
+            block_context.locals.insert(*array_expr_id, Rc::new(array_expr_type.clone()));
+            block_context.possibly_assigned_variable_ids.insert(*array_expr_id);
         }
 
         let array_type = artifacts.get_expression_type(array_target.get_array()).cloned().unwrap_or_else(get_mixed);

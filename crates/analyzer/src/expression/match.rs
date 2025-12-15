@@ -1,9 +1,9 @@
 use std::ops::Deref;
 use std::rc::Rc;
 
-use ahash::HashSet;
-
 use mago_algebra::saturate_clauses;
+use mago_atom::Atom;
+use mago_atom::AtomSet;
 use mago_atom::atom;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::combine_optional_union_types;
@@ -126,7 +126,7 @@ impl<'anlyz, 'ctx, 'ast, 'arena> MatchAnalyzer<'anlyz, 'ctx, 'ast, 'arena> {
         let last_expression_arm_index = expression_arms.len().saturating_sub(1);
         let mut previous_arms_executed = ArmExecutionStatus::Never;
 
-        let mut changed_variables = HashSet::default();
+        let mut changed_variables = AtomSet::default();
         let mut is_exhaustive = false;
         for (i, expression_arm) in expression_arms.iter().enumerate() {
             is_exhaustive = is_exhaustive || {
@@ -159,7 +159,7 @@ impl<'anlyz, 'ctx, 'ast, 'arena> MatchAnalyzer<'anlyz, 'ctx, 'ast, 'arena> {
                 }
             }
 
-            let mut else_referenced_ids = HashSet::default();
+            let mut else_referenced_ids = AtomSet::default();
             let (reconcilable_else_types, _) = mago_algebra::find_satisfying_assignments(
                 &running_else_context.clauses.iter().map(|c| (**c).clone()).collect::<Vec<_>>(),
                 None,
@@ -229,7 +229,7 @@ impl<'anlyz, 'ctx, 'ast, 'arena> MatchAnalyzer<'anlyz, 'ctx, 'ast, 'arena> {
         Ok(())
     }
 
-    fn get_subject_info(&mut self, subject_type: &Rc<TUnion>) -> (bool, String, Expression<'arena>) {
+    fn get_subject_info(&mut self, subject_type: &Rc<TUnion>) -> (bool, Atom, Expression<'arena>) {
         if let Some(id) = get_expression_id(
             self.stmt.expression,
             self.block_context.scope.get_class_like_name(),
@@ -238,11 +238,12 @@ impl<'anlyz, 'ctx, 'ast, 'arena> MatchAnalyzer<'anlyz, 'ctx, 'ast, 'arena> {
         ) {
             (false, id, self.stmt.expression.clone())
         } else {
-            let subject_id =
+            let subject_id_str =
                 format!("{}{}", Self::SYNTHETIC_MATCH_VAR_PREFIX, self.stmt.expression.span().start.offset);
-            self.block_context.locals.insert(subject_id.clone(), subject_type.clone());
+            let subject_id = Atom::from(&subject_id_str);
+            self.block_context.locals.insert(subject_id, subject_type.clone());
             let subject_for_conditions =
-                new_synthetic_variable(self.context.arena, &subject_id, self.stmt.expression.span());
+                new_synthetic_variable(self.context.arena, &subject_id_str, self.stmt.expression.span());
 
             (true, subject_id, subject_for_conditions)
         }
@@ -317,7 +318,7 @@ impl<'anlyz, 'ctx, 'ast, 'arena> MatchAnalyzer<'anlyz, 'ctx, 'ast, 'arena> {
                 .map(Rc::new)
                 .collect();
 
-        let mut arm_referenced_ids = HashSet::default();
+        let mut arm_referenced_ids = AtomSet::default();
         let (reconcilable_types, active_types) = mago_algebra::find_satisfying_assignments(
             &combined_clauses.iter().map(|c| (**c).clone()).collect::<Vec<_>>(),
             None,
@@ -330,7 +331,7 @@ impl<'anlyz, 'ctx, 'ast, 'arena> MatchAnalyzer<'anlyz, 'ctx, 'ast, 'arena> {
                 &reconcilable_types,
                 active_types,
                 &mut arm_body_context,
-                &mut HashSet::default(),
+                &mut AtomSet::default(),
                 &arm_referenced_ids,
                 &arm_condition.span(),
                 false,
@@ -423,12 +424,12 @@ impl<'anlyz, 'ctx, 'ast, 'arena> MatchAnalyzer<'anlyz, 'ctx, 'ast, 'arena> {
             return;
         }
 
-        let mut all_redefined_vars: HashSet<String> = HashSet::default();
+        let mut all_redefined_vars: AtomSet = AtomSet::default();
         for ctx in &reachable_contexts {
             inherit_branch_context_properties(self.context, self.block_context, ctx);
 
             all_redefined_vars.extend(
-                ctx.get_redefined_locals(&self.block_context.locals, false, &mut HashSet::default()).keys().cloned(),
+                ctx.get_redefined_locals(&self.block_context.locals, false, &mut AtomSet::default()).keys().cloned(),
             );
         }
 

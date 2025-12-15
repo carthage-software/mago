@@ -83,7 +83,7 @@ pub fn get_docblock_variables<'ctx, 'arena>(
     block_context: &BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     allow_tracing: bool,
-) -> Vec<(Option<String>, TUnion, Span)> {
+) -> Vec<(Option<mago_atom::Atom>, TUnion, Span)> {
     let Some(elements) = context.get_parsed_docblock().map(|document| document.elements) else {
         return vec![];
     };
@@ -98,7 +98,8 @@ pub fn get_docblock_variables<'ctx, 'arena>(
         .filter_map(|tag| {
             if allow_tracing && let TagKind::PsalmTrace = tag.kind {
                 let variable_name = tag.description.trim();
-                match block_context.locals.get(variable_name) {
+                let variable_atom = mago_atom::atom(variable_name);
+                match block_context.locals.get(&variable_atom) {
                     Some(variable_type) => {
                         let variable_type_str = variable_type.get_id();
 
@@ -146,7 +147,7 @@ pub fn get_docblock_variables<'ctx, 'arena>(
             let tag_content = tag.description;
 
             let var_tag = parse_var_tag(tag_content, tag.description_span).ok()?;
-            let variable_name = var_tag.variable.map(|v| v.to_string());
+            let variable_name = var_tag.variable.map(|v| mago_atom::Atom::from(&v.name));
             let type_string = var_tag.type_string;
 
             match get_type_from_string(
@@ -242,7 +243,7 @@ pub fn get_type_from_var_docblock<'ctx, 'arena>(
 pub fn insert_variable_from_docblock<'ctx, 'arena>(
     context: &mut Context<'ctx, 'arena>,
     block_context: &mut BlockContext<'ctx>,
-    variable_name: String,
+    variable_name: mago_atom::Atom,
     variable_type: TUnion,
     variable_type_span: Span,
     override_existing: bool,

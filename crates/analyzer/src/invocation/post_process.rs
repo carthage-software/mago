@@ -1,7 +1,6 @@
 use std::collections::BTreeMap;
 use std::rc::Rc;
 
-use ahash::HashSet;
 use indexmap::IndexMap;
 
 use mago_algebra::assertion_set::AssertionSet;
@@ -13,6 +12,7 @@ use mago_algebra::find_satisfying_assignments;
 use mago_algebra::saturate_clauses;
 use mago_atom::Atom;
 use mago_atom::AtomMap;
+use mago_atom::AtomSet;
 use mago_codex::assertion::Assertion;
 
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
@@ -245,11 +245,11 @@ fn apply_assertion_to_call_context<'ctx, 'ast, 'arena>(
         return;
     }
 
-    let referenced_variable_ids: HashSet<String> = type_assertions.keys().cloned().collect();
-    let mut changed_variable_ids: HashSet<String> = HashSet::default();
+    let referenced_variable_ids: AtomSet = type_assertions.keys().cloned().collect();
+    let mut changed_variable_ids: AtomSet = AtomSet::default();
     let mut active_type_assertions = IndexMap::new();
     for (variable, type_assertion) in &type_assertions {
-        active_type_assertions.insert(variable.clone(), (1..type_assertion.len()).collect());
+        active_type_assertions.insert(*variable, (1..type_assertion.len()).collect());
     }
 
     reconciler::reconcile_keyed_types(
@@ -308,7 +308,7 @@ fn update_by_reference_argument_types<'ctx, 'ast, 'arena>(
                     block_context,
                     artifacts,
                     argument,
-                    Some(argument_id.clone()),
+                    Some(argument_id),
                     Some(argument),
                     new_type.clone(),
                     false,
@@ -383,10 +383,10 @@ fn clear_object_argument_property_narrowings<'ctx, 'ast, 'arena>(
                 if *var_id == &argument_id {
                     return false;
                 }
-                if !var_id.starts_with(&argument_id) {
+                if !var_id.starts_with(argument_id.as_str()) {
                     return false;
                 }
-                let after_root = &var_id[argument_id.len()..];
+                let after_root = &var_id.as_str()[argument_id.len()..];
                 after_root.starts_with("->") || after_root.starts_with("[")
             })
             .cloned()
@@ -407,8 +407,8 @@ fn resolve_invocation_assertion<'ctx, 'ast, 'arena>(
     assertions: &BTreeMap<Atom, Conjunction<Assertion>>,
     template_result: &TemplateResult,
     parameters: &AtomMap<TUnion>,
-) -> IndexMap<String, AssertionSet> {
-    let mut type_assertions: IndexMap<String, AssertionSet> = IndexMap::new();
+) -> IndexMap<Atom, AssertionSet> {
+    let mut type_assertions: IndexMap<Atom, AssertionSet> = IndexMap::new();
     if assertions.is_empty() {
         return type_assertions;
     }
@@ -698,7 +698,7 @@ fn resolve_invocation_assertion<'ctx, 'ast, 'arena>(
 /// * `this_variable`: The name of the variable holding the object instance (`$this`), if any.
 ///
 /// # Returns
-/// A tuple `(Option<&'a Expression>, Option<String>)`.
+/// A tuple `(Option<&'a Expression>, Option<Atom>)`.
 /// * If a special target is resolved, the tuple is `(None, Some(resolved_id))`.
 /// * If a regular argument is found, it returns the result from `get_argument_for_parameter`.
 /// * If nothing is found, it returns `(None, None)`.
@@ -708,7 +708,7 @@ fn resolve_argument_or_special_target<'ctx, 'ast, 'arena>(
     invocation: &Invocation<'ctx, 'ast, 'arena>,
     parameter_name: &Atom,
     this_variable: Option<&str>,
-) -> (Option<&'ast Expression<'arena>>, Option<String>) {
+) -> (Option<&'ast Expression<'arena>>, Option<Atom>) {
     // First, check if the name refers to a special assertion target like `$this->...`
     if let Some(resolved_id) = resolve_special_assertion_target(block_context, parameter_name, this_variable) {
         return (None, Some(resolved_id));
@@ -732,23 +732,23 @@ fn resolve_argument_or_special_target<'ctx, 'ast, 'arena>(
 /// * `this_variable`: The name of the variable holding the object instance (`$this`), if any.
 ///
 /// # Returns
-/// * `Some(String)`: If the target is a special `$this` or `self` reference, containing the resolved variable ID.
+/// * `Some(Atom)`: If the target is a special `$this` or `self` reference, containing the resolved variable ID.
 /// * `None`: If the target is not a special reference and should be treated as a regular parameter.
 fn resolve_special_assertion_target<'ctx>(
     block_context: &BlockContext<'ctx>,
     target_name: &Atom,
     this_variable: Option<&str>,
-) -> Option<String> {
+) -> Option<Atom> {
     if let Some(this_variable) = this_variable
         && target_name.starts_with("$this")
     {
-        return Some(target_name.replacen("$this", this_variable, 1));
+        return Some(Atom::from(&target_name.replacen("$this", this_variable, 1)));
     }
 
     if let Some(class) = block_context.scope.get_class_like_name()
         && target_name.starts_with("self::")
     {
-        return Some(target_name.replacen("self::", &class, 1));
+        return Some(Atom::from(&target_name.replacen("self::", class.as_str(), 1)));
     }
 
     None
@@ -772,14 +772,14 @@ fn resolve_special_assertion_target<'ctx>(
 /// # Returns
 /// A tuple containing:
 /// * `Option<&'a Expression>`: The argument's expression AST node, if found.
-/// * `Option<String>`: The unique ID of the argument expression (e.g., a variable name), if it can be determined.
+/// * `Option<Atom>`: The unique ID of the argument expression (e.g., a variable name), if it can be determined.
 fn get_argument_for_parameter<'ctx, 'ast, 'arena>(
     context: &mut Context<'ctx, 'arena>,
     block_context: &mut BlockContext<'ctx>,
     invocation: &Invocation<'ctx, 'ast, 'arena>,
     mut parameter_offset: Option<usize>,
     mut parameter_name: Option<Atom>,
-) -> (Option<&'ast Expression<'arena>>, Option<String>) {
+) -> (Option<&'ast Expression<'arena>>, Option<Atom>) {
     // If neither name nor offset is provided, we can't do anything.
     if parameter_name.is_none() && parameter_offset.is_none() {
         return (None, None);

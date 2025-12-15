@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 use std::rc::Rc;
 
 use ahash::HashSet;
@@ -8,6 +9,8 @@ use mago_algebra::clause::Clause;
 use mago_algebra::find_satisfying_assignments;
 use mago_algebra::negate_formula;
 use mago_algebra::saturate_clauses;
+use mago_atom::Atom;
+use mago_atom::AtomSet;
 use mago_atom::atom;
 
 use mago_codex::ttype;
@@ -177,7 +180,7 @@ fn analyze<'ctx, 'ast, 'arena>(
         0
     };
 
-    let mut always_assigned_before_loop_body_variables = HashSet::default();
+    let mut always_assigned_before_loop_body_variables = AtomSet::default();
 
     let mut pre_condition_clauses = Vec::new();
 
@@ -383,7 +386,7 @@ fn analyze<'ctx, 'ast, 'arena>(
                     // set the variables to whatever the while/foreach loop expects them to be
                     if let Some(pre_loop_context_type) = pre_loop_context.locals.get(&variable_id) {
                         if continue_context_type != *pre_loop_context_type {
-                            different_from_pre_loop_types.insert(variable_id.clone());
+                            different_from_pre_loop_types.insert(variable_id);
                             has_changes = true;
                         }
                     } else {
@@ -395,7 +398,7 @@ fn analyze<'ctx, 'ast, 'arena>(
 
                         // widen the foreach context type with the initial context type
                         continue_context.locals.insert(
-                            variable_id.clone(),
+                            variable_id,
                             Rc::new(combine_union_types(
                                 &continue_context_type,
                                 parent_context_type,
@@ -406,7 +409,7 @@ fn analyze<'ctx, 'ast, 'arena>(
 
                         pre_loop_context.remove_variable_from_conflicting_clauses(context, &variable_id, None);
 
-                        loop_parent_context.possibly_assigned_variable_ids.insert(variable_id.clone());
+                        loop_parent_context.possibly_assigned_variable_ids.insert(variable_id);
                     }
 
                     if let Some(loop_context_type) = loop_context.locals.get(&variable_id) {
@@ -416,7 +419,7 @@ fn analyze<'ctx, 'ast, 'arena>(
 
                         // widen the foreach context type with the initial context type
                         continue_context.locals.insert(
-                            variable_id.clone(),
+                            variable_id,
                             Rc::new(combine_union_types(&continue_context_type, loop_context_type, codebase, false)),
                         );
 
@@ -429,7 +432,7 @@ fn analyze<'ctx, 'ast, 'arena>(
                     }
 
                     if !is_do {
-                        variables_to_remove.push(variable_id.clone());
+                        variables_to_remove.push(variable_id);
                     }
                 }
             }
@@ -487,7 +490,7 @@ fn analyze<'ctx, 'ast, 'arena>(
                         true
                     } {
                         if let Some(pre_loop_context_type) = pre_loop_context_type {
-                            continue_context.locals.insert(variable_id.clone(), pre_loop_context_type.clone());
+                            continue_context.locals.insert(*variable_id, pre_loop_context_type.clone());
                         } else {
                             continue_context.locals.remove(variable_id);
                         }
@@ -583,7 +586,7 @@ fn analyze<'ctx, 'ast, 'arena>(
                     };
                 }
 
-                loop_parent_context.possibly_assigned_variable_ids.insert(variable_id.clone());
+                loop_parent_context.possibly_assigned_variable_ids.insert(*variable_id);
             }
 
             inner_do_context = Some(inner_do_context_inner);
@@ -598,7 +601,7 @@ fn analyze<'ctx, 'ast, 'arena>(
                     ));
                 }
 
-                loop_parent_context.possibly_assigned_variable_ids.insert(variable_id.clone());
+                loop_parent_context.possibly_assigned_variable_ids.insert(*variable_id);
             }
         }
     }
@@ -607,7 +610,7 @@ fn analyze<'ctx, 'ast, 'arena>(
         if let Some(loop_context_type) = loop_context.locals.get(variable_id) {
             if loop_context_type != variable_type {
                 loop_parent_context.locals.insert(
-                    variable_id.clone(),
+                    *variable_id,
                     Rc::new(combine_union_types(variable_type, loop_context_type, codebase, always_enters_loop)),
                 );
 
@@ -626,11 +629,11 @@ fn analyze<'ctx, 'ast, 'arena>(
                 if continue_context_type.is_mixed() {
                     *continue_context_type = Rc::new((**continue_context_type).clone());
 
-                    loop_parent_context.locals.insert(variable_id.clone(), continue_context_type.clone());
+                    loop_parent_context.locals.insert(variable_id, continue_context_type.clone());
                     loop_parent_context.remove_variable_from_conflicting_clauses(context, &variable_id, None);
                 } else if continue_context_type != &variable_type {
                     loop_parent_context.locals.insert(
-                        variable_id.clone(),
+                        variable_id,
                         Rc::new(combine_union_types(
                             &variable_type,
                             continue_context_type,
@@ -656,10 +659,10 @@ fn analyze<'ctx, 'ast, 'arena>(
             negate_formula(pre_condition_clauses.into_iter().flatten().collect()).unwrap_or_default();
 
         let (negated_pre_condition_types, _) =
-            find_satisfying_assignments(negated_pre_condition_clauses.iter().as_slice(), None, &mut HashSet::default());
+            find_satisfying_assignments(negated_pre_condition_clauses.iter().as_slice(), None, &mut AtomSet::default());
 
         if !negated_pre_condition_types.is_empty() {
-            let mut changed_variable_ids = HashSet::default();
+            let mut changed_variable_ids = AtomSet::default();
 
             reconcile_keyed_types(
                 context,
@@ -667,7 +670,7 @@ fn analyze<'ctx, 'ast, 'arena>(
                 IndexMap::new(),
                 &mut continue_context,
                 &mut changed_variable_ids,
-                &HashSet::default(),
+                &AtomSet::default(),
                 &unsafe {
                     // SAFETY: we know that pre_conditions is not empty, so we can safely
                     // get the span of the first pre_condition.
@@ -680,7 +683,7 @@ fn analyze<'ctx, 'ast, 'arena>(
             for variable_id in changed_variable_ids {
                 if let Some(reconciled_type) = continue_context.locals.get(&variable_id) {
                     if loop_parent_context.locals.contains_key(&variable_id) {
-                        loop_parent_context.locals.insert(variable_id.clone(), reconciled_type.clone());
+                        loop_parent_context.locals.insert(variable_id, reconciled_type.clone());
                     }
 
                     loop_parent_context.remove_variable_from_conflicting_clauses(context, &variable_id, None);
@@ -700,12 +703,12 @@ fn analyze<'ctx, 'ast, 'arena>(
                 if let Some(possibly_defined_type) = loop_scope.possibly_defined_loop_parent_variables.get(variable_id)
                 {
                     loop_parent_context.locals.insert(
-                        variable_id.clone(),
+                        *variable_id,
                         Rc::new(combine_union_types(variable_type, possibly_defined_type, codebase, true)),
                     );
                 }
             } else {
-                loop_parent_context.locals.insert(variable_id.clone(), variable_type.clone());
+                loop_parent_context.locals.insert(*variable_id, variable_type.clone());
             }
         }
     }
@@ -720,10 +723,7 @@ fn analyze<'ctx, 'ast, 'arena>(
     Ok((continue_context, loop_scope))
 }
 
-fn get_assignment_map_depth(
-    first_variable_id: &String,
-    assignment_map: &mut BTreeMap<String, HashSet<String>>,
-) -> usize {
+fn get_assignment_map_depth(first_variable_id: &Atom, assignment_map: &mut BTreeMap<Atom, BTreeSet<Atom>>) -> usize {
     let Some(assignment_variable_ids) = assignment_map.remove(first_variable_id) else {
         return 0;
     };
@@ -753,7 +753,7 @@ fn apply_pre_condition_to_loop_context<'ctx, 'arena>(
     artifacts: &mut AnalysisArtifacts,
     is_do: bool,
     first_application: bool,
-) -> Result<HashSet<String>, AnalysisError> {
+) -> Result<AtomSet, AnalysisError> {
     let pre_condition_span = pre_condition.span();
     let pre_referenced_variable_ids = std::mem::take(&mut loop_context.conditionally_referenced_variable_ids);
 
@@ -804,7 +804,7 @@ fn apply_pre_condition_to_loop_context<'ctx, 'arena>(
             &reconcilable_while_types,
             active_while_types,
             loop_context,
-            &mut HashSet::default(),
+            &mut AtomSet::default(),
             &new_referenced_variable_ids,
             &pre_condition_span,
             first_application,
@@ -813,7 +813,7 @@ fn apply_pre_condition_to_loop_context<'ctx, 'arena>(
     }
 
     if is_do {
-        return Ok(HashSet::default());
+        return Ok(AtomSet::default());
     }
 
     if !loop_context.clauses.is_empty() {
@@ -840,13 +840,13 @@ fn update_loop_scope_contexts<'ctx, 'arena>(
         loop_context.locals = pre_outer_context.locals.clone();
     } else {
         for (variable_id, variable_type) in &loop_scope.redefined_loop_variables {
-            continue_context.locals.insert(variable_id.clone(), Rc::new(variable_type.clone()));
+            continue_context.locals.insert(*variable_id, Rc::new(variable_type.clone()));
         }
 
         for (variable_id, variable_type) in &loop_scope.possibly_redefined_loop_variables {
             if continue_context.has_variable(variable_id) {
                 continue_context.locals.insert(
-                    variable_id.clone(),
+                    *variable_id,
                     Rc::new(combine_union_types(
                         unsafe {
                             // SAFETY: we know that variable_id exists in continue_context.locals.
@@ -890,7 +890,7 @@ fn analyze_iterator<'ctx, 'ast, 'arena>(
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     iterator: &'ast Expression<'arena>,
-    iterator_variable_id: Option<&String>,
+    iterator_variable_id: Option<&Atom>,
     foreach: &'ast Foreach<'arena>,
 ) -> Result<(bool, TUnion, TUnion), AnalysisError> {
     let was_inside_general_use = block_context.inside_general_use;

@@ -4,6 +4,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use mago_atom::Atom;
+use mago_atom::atom;
 use mago_codex::context::ScopeContext;
 use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
@@ -69,7 +70,7 @@ impl<'a, 'b, 'c> ProviderContext<'a, 'b, 'c> {
 
     #[inline]
     pub fn get_variable_type(&self, name: &str) -> Option<&Rc<TUnion>> {
-        self.block_context.locals.get(name)
+        self.block_context.locals.get(&atom(name))
     }
 
     #[inline]
@@ -158,7 +159,7 @@ impl<'ctx, 'a> HookContext<'ctx, 'a> {
     /// Get the type of a variable.
     #[inline]
     pub fn get_variable_type(&self, name: &str) -> Option<&Rc<TUnion>> {
-        self.block_context.locals.get(name)
+        self.block_context.locals.get(&atom(name))
     }
 
     /// Get the current scope context.
@@ -210,7 +211,7 @@ impl<'ctx, 'a> HookContext<'ctx, 'a> {
     /// Set the type of a variable.
     #[inline]
     pub fn set_variable_type(&mut self, name: &str, ty: TUnion) {
-        self.block_context.locals.insert(name.to_owned(), Rc::new(ty));
+        self.block_context.locals.insert(atom(name), Rc::new(ty));
     }
 
     /// Get mutable access to the analysis artifacts.

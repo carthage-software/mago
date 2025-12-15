@@ -200,8 +200,8 @@ pub fn analyze<'ctx, 'arena>(
         && var.name == "$this"
         && let ClassLikeMemberSelector::Identifier(ident) = &property_access.property
     {
-        let property_name = format!("${}", ident.value);
-        block_context.definitely_initialized_properties.insert(property_name.clone());
+        let property_name = mago_atom::Atom::from(format!("${}", ident.value).as_str());
+        block_context.definitely_initialized_properties.insert(property_name);
         block_context.possibly_initialized_properties.insert(property_name);
     }
 

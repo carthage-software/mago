@@ -1,5 +1,6 @@
 use ahash::HashSet;
 
+use mago_atom::Atom;
 use mago_codex::ttype::get_mixed;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
@@ -112,7 +113,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Foreach<'arena> {
         value_type.set_by_reference(is_by_reference);
 
         if is_by_reference && let Expression::Variable(Variable::Direct(direct_variable)) = value_expression {
-            loop_block_context.references_to_external_scope.remove(direct_variable.name);
+            loop_block_context.references_to_external_scope.remove(&Atom::from(direct_variable.name));
         };
 
         let assigned = assign_to_expression(
@@ -142,7 +143,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Foreach<'arena> {
         }
 
         if is_by_reference && let Expression::Variable(Variable::Direct(direct_variable)) = value_expression {
-            loop_block_context.references_to_external_scope.insert(direct_variable.name.to_string());
+            loop_block_context.references_to_external_scope.insert(Atom::from(direct_variable.name));
         };
 
         let loop_scope = LoopScope::new(self.span(), block_context.locals.clone(), None);

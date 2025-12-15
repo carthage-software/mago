@@ -1,10 +1,11 @@
 use std::rc::Rc;
 
-use ahash::HashMap;
 use ahash::HashSet;
+use mago_atom::AtomMap;
 
 use mago_algebra::find_satisfying_assignments;
 use mago_algebra::saturate_clauses;
+use mago_atom::AtomSet;
 use mago_codex::ttype::combine_union_types;
 use mago_codex::ttype::get_bool;
 use mago_codex::ttype::get_false;
@@ -69,7 +70,7 @@ pub fn analyze_logical_and_operation<'ctx, 'arena>(
 
     for (var_id, var_type) in &left_block_context.locals {
         if left_block_context.assigned_variable_ids.contains_key(var_id) {
-            block_context.locals.insert(var_id.clone(), var_type.clone());
+            block_context.locals.insert(*var_id, var_type.clone());
         }
     }
 
@@ -98,14 +99,14 @@ pub fn analyze_logical_and_operation<'ctx, 'arena>(
         &mut left_referenced_var_ids,
     );
 
-    let mut changed_var_ids = HashSet::default();
+    let mut changed_var_ids = AtomSet::default();
     let mut right_block_context;
     if !left_assertions.is_empty() {
         right_block_context = block_context.clone();
 
         // Don't report issues when applying LHS assertions to prepare RHS context
         // Issues will be reported when actually analyzing the RHS expression
-        let empty_referenced_vars = HashSet::default();
+        let empty_referenced_vars = AtomSet::default();
 
         reconciler::reconcile_keyed_types(
             context,
@@ -245,12 +246,12 @@ pub fn analyze_logical_or_operation<'ctx, 'arena>(
         left_referenced_var_ids = if_conditional_scope.conditionally_referenced_variable_ids;
     } else {
         let pre_referenced_var_ids = block_context.conditionally_referenced_variable_ids.clone();
-        block_context.conditionally_referenced_variable_ids = HashSet::default();
+        block_context.conditionally_referenced_variable_ids = AtomSet::default();
 
         let pre_assigned_var_ids = block_context.assigned_variable_ids.clone();
 
         left_block_context = block_context.clone();
-        left_block_context.assigned_variable_ids = HashMap::default();
+        left_block_context.assigned_variable_ids = AtomMap::default();
 
         let tmp_if_body_block_context = left_block_context.if_body_context;
         left_block_context.if_body_context = None;
@@ -266,12 +267,11 @@ pub fn analyze_logical_or_operation<'ctx, 'arena>(
         let cloned_vars = block_context.locals.clone();
         for (var_id, left_type) in &left_block_context.locals {
             if let Some(context_type) = cloned_vars.get(var_id) {
-                block_context.locals.insert(
-                    var_id.clone(),
-                    Rc::new(combine_union_types(context_type, left_type, context.codebase, false)),
-                );
+                block_context
+                    .locals
+                    .insert(*var_id, Rc::new(combine_union_types(context_type, left_type, context.codebase, false)));
             } else if left_block_context.assigned_variable_ids.contains_key(var_id) {
-                block_context.locals.insert(var_id.clone(), left_type.clone());
+                block_context.locals.insert(*var_id, left_type.clone());
             }
         }
 
@@ -332,7 +332,7 @@ pub fn analyze_logical_or_operation<'ctx, 'arena>(
         &mut left_referenced_var_ids,
     );
 
-    let mut changed_var_ids = HashSet::default();
+    let mut changed_var_ids = AtomSet::default();
     let mut right_block_context = block_context.clone();
 
     let result_type: TUnion;
@@ -373,10 +373,10 @@ pub fn analyze_logical_or_operation<'ctx, 'arena>(
         }
 
         let pre_referenced_var_ids = right_block_context.conditionally_referenced_variable_ids.clone();
-        right_block_context.conditionally_referenced_variable_ids = HashSet::default();
+        right_block_context.conditionally_referenced_variable_ids = AtomSet::default();
 
         let pre_assigned_var_ids = right_block_context.assigned_variable_ids.clone();
-        right_block_context.assigned_variable_ids = HashMap::default();
+        right_block_context.assigned_variable_ids = AtomMap::default();
 
         let tmp_if_body_context = right_block_context.if_body_context;
         right_block_context.if_body_context = None;
@@ -454,7 +454,7 @@ pub fn analyze_logical_or_operation<'ctx, 'arena>(
 
         let mut clauses_for_right_analysis = BlockContext::remove_reconciled_clauses(
             &clauses_for_right_analysis,
-            &right_assigned_var_ids.into_keys().collect::<HashSet<_>>(),
+            &right_assigned_var_ids.into_keys().collect::<AtomSet>(),
         )
         .0;
 
@@ -469,7 +469,7 @@ pub fn analyze_logical_or_operation<'ctx, 'arena>(
         );
 
         if !right_type_assertions.is_empty() {
-            let mut right_changed_var_ids = HashSet::default();
+            let mut right_changed_var_ids = AtomSet::default();
 
             reconciler::reconcile_keyed_types(
                 context,

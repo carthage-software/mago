@@ -1,4 +1,3 @@
-use ahash::HashSet;
 use indexmap::IndexMap;
 
 use mago_algebra::clause::Clause;
@@ -300,17 +299,17 @@ pub fn find_expression_logic_issues<'ctx, 'arena>(
     expression_clauses = expression_clauses
         .into_iter()
         .map(|c| {
-            let keys = &c.possibilities.keys().collect::<Vec<&String>>();
+            let keys = c.possibilities.keys().copied().collect::<Vec<mago_atom::Atom>>();
 
             let mut new_mixed_var_ids = vec![];
             for i in mixed_var_ids.clone() {
-                if !keys.contains(&i) {
+                if !keys.contains(i) {
                     new_mixed_var_ids.push(i);
                 }
             }
             mixed_var_ids = new_mixed_var_ids;
 
-            for key in keys {
+            for key in &keys {
                 for mixed_var_id in &mixed_var_ids {
                     if var_has_root(key, mixed_var_id) {
                         return Clause::new(
@@ -347,7 +346,7 @@ pub fn find_expression_logic_issues<'ctx, 'arena>(
         &reconcilable_if_types,
         active_if_types,
         &mut if_block_context,
-        &mut HashSet::default(),
+        &mut mago_atom::AtomSet::default(),
         &cond_referenced_var_ids,
         &expression_span,
         true,

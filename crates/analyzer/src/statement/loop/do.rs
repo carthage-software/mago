@@ -1,5 +1,5 @@
-use ahash::HashSet;
 use indexmap::IndexMap;
+use mago_atom::AtomSet;
 
 use mago_algebra::clause::Clause;
 use mago_algebra::find_satisfying_assignments;
@@ -116,7 +116,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for DoWhile<'arena> {
         let (negated_while_types, _) = find_satisfying_assignments(
             saturate_clauses(&clauses_to_simplify).as_slice(),
             None,
-            &mut HashSet::default(),
+            &mut AtomSet::default(),
         );
 
         if !negated_while_types.is_empty() {
@@ -125,8 +125,8 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for DoWhile<'arena> {
                 &negated_while_types,
                 IndexMap::new(),
                 &mut inner_loop_block_context,
-                &mut HashSet::default(),
-                &HashSet::default(),
+                &mut AtomSet::default(),
+                &AtomSet::default(),
                 &self.condition.span(),
                 true,
                 false,

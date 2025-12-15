@@ -1,10 +1,12 @@
 use std::ops::Deref;
 use std::rc::Rc;
 
-use ahash::HashMap;
 use ahash::HashSet;
 use indexmap::IndexMap;
 use itertools::Itertools;
+use mago_atom::Atom;
+use mago_atom::AtomMap;
+use mago_atom::AtomSet;
 
 use mago_algebra::clause::Clause;
 use mago_algebra::disjoin_clauses;
@@ -74,7 +76,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for If<'arena> {
         let mut mixed_variables = vec![];
         for (variable_id, variable_type) in if_block_context.locals.iter() {
             if variable_type.is_mixed() && block_context.locals.contains_key(variable_id) {
-                mixed_variables.push(variable_id.clone());
+                mixed_variables.push(*variable_id);
             }
         }
 
@@ -111,7 +113,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for If<'arena> {
         });
 
         for clause in &mut if_clauses {
-            let keys = clause.possibilities.keys().cloned().collect::<Vec<String>>();
+            let keys = clause.possibilities.keys().cloned().collect::<Vec<Atom>>();
             mixed_variables.retain(|i| !keys.contains(i));
 
             'outer: for key in keys {
@@ -179,10 +181,10 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for If<'arena> {
             saturate_clauses(block_context.clauses.iter().map(Rc::deref).chain(if_scope.negated_clauses.iter()));
 
         if_scope.negated_types =
-            find_satisfying_assignments(all_negated_clauses.iter().as_slice(), None, &mut HashSet::default()).0;
+            find_satisfying_assignments(all_negated_clauses.iter().as_slice(), None, &mut AtomSet::default()).0;
 
         let mut temporary_else_context = post_if_block_context.clone();
-        let mut changed_variable_ids: HashSet<String> = HashSet::default();
+        let mut changed_variable_ids: AtomSet = AtomSet::default();
 
         if !if_scope.negated_types.is_empty() {
             reconcile_keyed_types(
@@ -191,15 +193,15 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for If<'arena> {
                 IndexMap::new(),
                 &mut temporary_else_context,
                 &mut changed_variable_ids,
-                &HashSet::default(),
+                &AtomSet::default(),
                 &self.condition.span(),
                 false,
                 false,
             );
         }
 
-        let pre_assignment_else_redefined_locals: HashMap<String, TUnion> = temporary_else_context
-            .get_redefined_locals(&if_block_context.locals, true, &mut HashSet::default())
+        let pre_assignment_else_redefined_locals: AtomMap<TUnion> = temporary_else_context
+            .get_redefined_locals(&if_block_context.locals, true, &mut AtomSet::default())
             .into_iter()
             .filter(|(k, _)| changed_variable_ids.contains(k))
             .collect();
@@ -271,7 +273,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for If<'arena> {
 
         if let Some(redefined_variables) = if_scope.redefined_variables {
             for (variable_id, variable_type) in redefined_variables {
-                block_context.locals.insert(variable_id.clone(), Rc::new(variable_type));
+                block_context.locals.insert(variable_id, Rc::new(variable_type));
 
                 if !if_scope.reasonable_clauses.is_empty() {
                     if_scope.reasonable_clauses = BlockContext::filter_clauses(
@@ -314,7 +316,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for If<'arena> {
                 block_context.remove_descendants(context, &variable_id, &existing_type, Some(&new_type));
             }
 
-            block_context.locals.insert(variable_id.clone(), Rc::new(new_type));
+            block_context.locals.insert(variable_id, Rc::new(new_type));
         }
 
         if has_returned {
@@ -354,7 +356,7 @@ fn analyze_if_statement_block<'ctx, 'arena>(
     mut if_block_context: BlockContext<'ctx>,
     outer_block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
-    pre_assignment_else_redefined_locals: &HashMap<String, TUnion>,
+    pre_assignment_else_redefined_locals: &AtomMap<TUnion>,
     if_statement: &If<'arena>,
 ) -> Result<(), AnalysisError> {
     let mut conditionally_referenced_variable_ids = if_block_context.conditionally_referenced_variable_ids.clone();
@@ -365,7 +367,7 @@ fn analyze_if_statement_block<'ctx, 'arena>(
     );
 
     if outer_block_context.clauses.iter().any(|clause| !clause.possibilities.is_empty()) {
-        let mut omit_keys = HashSet::default();
+        let mut omit_keys = AtomSet::default();
         for clause in outer_block_context.clauses.iter() {
             omit_keys.extend(clause.possibilities.keys());
         }
@@ -373,15 +375,15 @@ fn analyze_if_statement_block<'ctx, 'arena>(
         let (outer_truthes, _) = find_satisfying_assignments(
             outer_block_context.clauses.iter().map(Rc::as_ref).cloned().collect_vec().as_slice(),
             None,
-            &mut HashSet::default(),
+            &mut AtomSet::default(),
         );
 
-        omit_keys.retain(|key| !outer_truthes.contains_key(*key));
+        omit_keys.retain(|key| !outer_truthes.contains_key(key));
         conditionally_referenced_variable_ids.retain(|key| !omit_keys.contains(key));
     }
 
     if !reconcilable_if_types.is_empty() {
-        let mut changed_variable_ids = HashSet::default();
+        let mut changed_variable_ids = AtomSet::default();
 
         reconcile_keyed_types(
             context,
@@ -396,7 +398,7 @@ fn analyze_if_statement_block<'ctx, 'arena>(
         );
 
         for (variable_id, _) in reconcilable_if_types.iter() {
-            if_block_context.variables_possibly_in_scope.insert(variable_id.clone());
+            if_block_context.variables_possibly_in_scope.insert(*variable_id);
         }
 
         if !changed_variable_ids.is_empty() {
@@ -416,7 +418,7 @@ fn analyze_if_statement_block<'ctx, 'arena>(
                         && !changed_variable_ids.contains(variable_id)
                         && !conditionally_referenced_variable_ids.contains(variable_id)
                     {
-                        variables_to_remove.push(variable_id.clone());
+                        variables_to_remove.push(*variable_id);
                     }
                 }
             }
@@ -467,7 +469,7 @@ fn analyze_if_statement_block<'ctx, 'arena>(
     inherit_branch_context_properties(context, outer_block_context, &if_block_context);
 
     if !has_leaving_statements {
-        let new_assigned_variable_ids_keys = new_assigned_variable_ids.keys().cloned().collect::<Vec<String>>();
+        let new_assigned_variable_ids_keys = new_assigned_variable_ids.keys().cloned().collect::<Vec<Atom>>();
 
         update_if_scope(
             context,
@@ -512,9 +514,9 @@ fn analyze_if_statement_block<'ctx, 'arena>(
         let variables_to_update = if_scope
             .negated_types
             .keys()
-            .filter(|key| pre_assignment_else_redefined_locals.contains_key(*key))
+            .filter(|key| pre_assignment_else_redefined_locals.contains_key(key))
             .cloned()
-            .collect::<HashSet<String>>();
+            .collect::<AtomSet>();
 
         outer_block_context.update(
             context,
@@ -532,7 +534,7 @@ fn analyze_if_statement_block<'ctx, 'arena>(
             .iter()
             .filter(|id| !outer_block_context.variables_possibly_in_scope.contains(*id))
             .cloned()
-            .collect::<HashSet<String>>();
+            .collect::<AtomSet>();
 
         if let Some(loop_scope) = artifacts.loop_scope.as_mut() {
             if !has_continue_statement && !has_break_statement {
@@ -569,7 +571,7 @@ fn analyze_else_if_clause<'ctx, 'ast, 'arena>(
     let mut mixed_variables = vec![];
     for (variable_id, variable_type) in else_if_block_context.locals.iter() {
         if variable_type.is_mixed() && outer_block_context.locals.contains_key(variable_id) {
-            mixed_variables.push(variable_id.clone());
+            mixed_variables.push(*variable_id);
         }
     }
 
@@ -613,7 +615,7 @@ fn analyze_else_if_clause<'ctx, 'ast, 'arena>(
     });
 
     for clause in &mut else_if_clauses {
-        let keys = clause.possibilities.keys().cloned().collect::<Vec<String>>();
+        let keys = clause.possibilities.keys().cloned().collect::<Vec<Atom>>();
         mixed_variables.retain(|i| !keys.contains(i));
 
         'outer: for key in keys {
@@ -684,16 +686,15 @@ fn analyze_else_if_clause<'ctx, 'ast, 'arena>(
 
     if entry_clauses.iter().any(|clause| !clause.possibilities.is_empty()) {
         let omit_keys =
-            entry_clauses.iter().flat_map(|clause| clause.possibilities.keys()).cloned().collect::<HashSet<String>>();
+            entry_clauses.iter().flat_map(|clause| clause.possibilities.keys()).cloned().collect::<AtomSet>();
 
         let (outer_truthes, _) = find_satisfying_assignments(
             outer_block_context.clauses.iter().map(Rc::as_ref).cloned().collect_vec().as_slice(),
             None,
-            &mut HashSet::default(),
+            &mut AtomSet::default(),
         );
 
-        let omit_keys =
-            omit_keys.into_iter().filter(|key| !outer_truthes.contains_key(key)).collect::<HashSet<String>>();
+        let omit_keys = omit_keys.into_iter().filter(|key| !outer_truthes.contains_key(key)).collect::<AtomSet>();
 
         conditionally_referenced_variable_ids.retain(|key| !omit_keys.contains(key));
     }
@@ -712,7 +713,7 @@ fn analyze_else_if_clause<'ctx, 'ast, 'arena>(
     );
 
     let (negated_else_if_types, _) =
-        find_satisfying_assignments(negated_if_clauses.as_slice(), None, &mut HashSet::default());
+        find_satisfying_assignments(negated_if_clauses.as_slice(), None, &mut AtomSet::default());
 
     let all_negated_variables =
         HashSet::from_iter(negated_else_if_types.keys().cloned().chain(if_scope.negated_types.keys().cloned()));
@@ -721,7 +722,7 @@ fn analyze_else_if_clause<'ctx, 'ast, 'arena>(
         if let Some(negated_variable_type_assertions) = negated_else_if_types.get(&negated_variable_id) {
             if let Some(negated_elseif_type_assertions) = if_scope.negated_types.swap_remove(&negated_variable_id) {
                 if_scope.negated_types.insert(
-                    negated_variable_id.clone(),
+                    negated_variable_id,
                     negated_variable_type_assertions
                         .iter()
                         .cloned()
@@ -729,12 +730,12 @@ fn analyze_else_if_clause<'ctx, 'ast, 'arena>(
                         .collect(),
                 );
             } else {
-                if_scope.negated_types.insert(negated_variable_id.clone(), negated_variable_type_assertions.clone());
+                if_scope.negated_types.insert(negated_variable_id, negated_variable_type_assertions.clone());
             }
         }
     }
 
-    let mut newly_reconciled_variable_ids = HashSet::default();
+    let mut newly_reconciled_variable_ids = AtomSet::default();
     if !reconcilable_else_if_types.is_empty() {
         reconcile_keyed_types(
             context,
@@ -765,7 +766,7 @@ fn analyze_else_if_clause<'ctx, 'ast, 'arena>(
                         && !newly_reconciled_variable_ids.contains(variable_id)
                         && !conditionally_referenced_variable_ids.contains(variable_id)
                     {
-                        variables_to_remove.push(variable_id.clone());
+                        variables_to_remove.push(*variable_id);
                     }
                 }
             }
@@ -852,8 +853,8 @@ fn analyze_else_if_clause<'ctx, 'ast, 'arena>(
                 &negated_else_if_types,
                 IndexMap::new(),
                 &mut implied_outer_context,
-                &mut HashSet::default(),
-                &HashSet::default(),
+                &mut AtomSet::default(),
+                &AtomSet::default(),
                 &else_if_clause.0.span(),
                 false,
                 false,
@@ -867,7 +868,7 @@ fn analyze_else_if_clause<'ctx, 'ast, 'arena>(
             .iter()
             .filter(|id| !outer_block_context.variables_possibly_in_scope.contains(*id))
             .cloned()
-            .collect::<HashSet<String>>();
+            .collect::<AtomSet>();
 
         let possibly_assigned_variable_ids = new_possibly_assigned_variable_ids;
 
@@ -938,13 +939,13 @@ fn analyze_else_statements<'ctx, 'arena>(
     let (else_types, _) = find_satisfying_assignments(
         else_block_context.clauses.iter().map(Rc::deref).cloned().collect_vec().as_slice(),
         None,
-        &mut HashSet::default(),
+        &mut AtomSet::default(),
     );
 
     let mut original_context = else_block_context.clone();
 
     if !else_types.is_empty() {
-        let mut changed_variable_ids = HashSet::default();
+        let mut changed_variable_ids = AtomSet::default();
 
         reconcile_keyed_types(
             context,
@@ -952,7 +953,7 @@ fn analyze_else_statements<'ctx, 'arena>(
             IndexMap::new(),
             else_block_context,
             &mut changed_variable_ids,
-            &HashSet::default(),
+            &AtomSet::default(),
             &else_span,
             false,
             false,
@@ -977,7 +978,7 @@ fn analyze_else_statements<'ctx, 'arena>(
                 if is_derived_access_path(variable_id, changed_variable_id)
                     && !changed_variable_ids.contains(variable_id)
                 {
-                    variables_to_remove.push(variable_id.clone());
+                    variables_to_remove.push(*variable_id);
                 }
             }
         }
@@ -1051,7 +1052,7 @@ fn analyze_else_statements<'ctx, 'arena>(
     }
 
     if !if_scope.negated_types.is_empty() {
-        let variables_to_update = if_scope.negated_types.keys().cloned().collect::<HashSet<String>>();
+        let variables_to_update = if_scope.negated_types.keys().cloned().collect::<AtomSet>();
 
         outer_block_context.update(
             context,
@@ -1069,7 +1070,7 @@ fn analyze_else_statements<'ctx, 'arena>(
             .iter()
             .filter(|&id| !outer_block_context.variables_possibly_in_scope.contains(id))
             .cloned()
-            .collect::<HashSet<String>>();
+            .collect::<AtomSet>();
 
         if has_leaving_statements {
             if let Some(loop_scope) = artifacts.loop_scope.as_mut() {
@@ -1096,7 +1097,7 @@ fn add_conditionally_assigned_variables_to_context<'ctx, 'arena>(
     post_leaving_if_block_context: &mut BlockContext<'ctx>,
     post_if_block_context: &mut BlockContext<'ctx>,
     condition: &Expression<'arena>,
-    assigned_in_conditional_variable_ids: &HashMap<String, u32>,
+    assigned_in_conditional_variable_ids: &AtomMap<u32>,
 ) -> Result<(), AnalysisError> {
     if assigned_in_conditional_variable_ids.is_empty() {
         return Ok(());
@@ -1127,7 +1128,7 @@ fn add_conditionally_assigned_variables_to_context<'ctx, 'arena>(
 
     for variable_id in assigned_in_conditional_variable_ids.keys() {
         if let Some(variable_type) = post_leaving_if_block_context.locals.get(variable_id) {
-            post_if_block_context.locals.insert(variable_id.clone(), variable_type.clone());
+            post_if_block_context.locals.insert(*variable_id, variable_type.clone());
         }
     }
 
@@ -1139,9 +1140,9 @@ fn update_if_scope<'ctx, 'arena>(
     if_scope: &mut IfScope<'ctx>,
     if_block_context: &mut BlockContext<'ctx>,
     outer_block_context: &mut BlockContext<'ctx>,
-    new_assigned_variable_ids: HashMap<String, u32>,
-    new_possibly_assigned_variable_ids: HashSet<String>,
-    newly_reconciled_variable_ids: HashSet<String>,
+    new_assigned_variable_ids: AtomMap<u32>,
+    new_possibly_assigned_variable_ids: AtomSet,
+    newly_reconciled_variable_ids: AtomSet,
     update_new_variables: bool,
 ) {
     // Handle definitely_initialized_properties with INTERSECTION semantics
@@ -1177,14 +1178,14 @@ fn update_if_scope<'ctx, 'arena>(
         outer_block_context.called_methods.extend(if_block_context.called_methods.iter().cloned());
     }
     let mut redefined_variables =
-        if_block_context.get_redefined_locals(&outer_block_context.locals, false, &mut HashSet::default());
+        if_block_context.get_redefined_locals(&outer_block_context.locals, false, &mut AtomSet::default());
 
     match &mut if_scope.new_variables {
         Some(new_variables) => {
             let mut to_remove = vec![];
             for (new_variable, new_variable_type) in new_variables.iter_mut() {
                 if !if_block_context.has_variable(new_variable) {
-                    to_remove.push(new_variable.clone());
+                    to_remove.push(*new_variable);
                 } else if let Some(variable_type) = if_block_context.locals.get(new_variable) {
                     *new_variable_type = combine_union_types(new_variable_type, variable_type, context.codebase, false);
                 } else {
@@ -1203,19 +1204,19 @@ fn update_if_scope<'ctx, 'arena>(
                         .locals
                         .iter()
                         .filter(|(variable_id, _)| !outer_block_context.locals.contains_key(*variable_id))
-                        .map(|(variable_id, variable_type)| (variable_id.clone(), variable_type.as_ref().clone()))
+                        .map(|(variable_id, variable_type)| (*variable_id, variable_type.as_ref().clone()))
                         .collect(),
                 );
             }
         }
     }
 
-    let mut possibly_redefined_variables = HashMap::default();
+    let mut possibly_redefined_variables = AtomMap::default();
     for (variable_id, variable_type) in redefined_variables.iter() {
         if new_possibly_assigned_variable_ids.contains(variable_id)
             || !newly_reconciled_variable_ids.contains(variable_id)
         {
-            possibly_redefined_variables.insert(variable_id.clone(), variable_type.clone());
+            possibly_redefined_variables.insert(*variable_id, variable_type.clone());
         }
     }
 
@@ -1232,10 +1233,10 @@ fn update_if_scope<'ctx, 'arena>(
 
     match &mut if_scope.redefined_variables {
         Some(redefined_scope_variables) => {
-            let mut variables_to_remove: Vec<String> = vec![];
+            let mut variables_to_remove: Vec<Atom> = vec![];
             for (redefined_variable, variable_type) in redefined_scope_variables.iter_mut() {
                 let Some(redefined_type) = redefined_variables.remove(redefined_variable) else {
-                    variables_to_remove.push(redefined_variable.clone());
+                    variables_to_remove.push(*redefined_variable);
                     continue;
                 };
 

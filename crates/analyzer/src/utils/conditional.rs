@@ -1,9 +1,9 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use ahash::HashMap;
-use ahash::HashSet;
 use indexmap::IndexMap;
+use mago_atom::AtomMap;
+use mago_atom::AtomSet;
 
 use mago_codex::ttype::TType;
 use mago_codex::ttype::union::TUnion;
@@ -38,7 +38,7 @@ pub(crate) fn analyze<'ctx, 'arena>(
     if !if_scope.negated_clauses.is_empty() {
         entry_clauses.extend(if_scope.negated_clauses.iter().cloned());
 
-        let mut changed_var_ids = HashSet::default();
+        let mut changed_var_ids = AtomSet::default();
 
         if !if_scope.negated_types.is_empty() {
             let mut tmp_context = outer_context.clone();
@@ -49,7 +49,7 @@ pub(crate) fn analyze<'ctx, 'arena>(
                 IndexMap::new(),
                 &mut tmp_context,
                 &mut changed_var_ids,
-                &HashSet::default(),
+                &AtomSet::default(),
                 &condition.span(),
                 check_for_paradoxes,
                 false,
@@ -101,8 +101,8 @@ pub(crate) fn analyze<'ctx, 'arena>(
     let mut conditionally_referenced_variable_ids;
     let assigned_in_conditional_variable_ids;
     if internally_applied_if_cond_expr != condition || externally_applied_if_cond_expr != condition {
-        if_conditional_context.assigned_variable_ids = HashMap::default();
-        if_conditional_context.conditionally_referenced_variable_ids = HashSet::default();
+        if_conditional_context.assigned_variable_ids = AtomMap::default();
+        if_conditional_context.conditionally_referenced_variable_ids = AtomSet::default();
 
         let was_inside_conditional = if_conditional_context.inside_conditional;
         if_conditional_context.inside_conditional = true;
@@ -127,7 +127,7 @@ pub(crate) fn analyze<'ctx, 'arena>(
                 && !conditionally_referenced_variable_ids.contains(k)
                 && !assigned_in_conditional_variable_ids.contains_key(k)
         })
-        .collect::<HashSet<_>>();
+        .collect::<AtomSet>();
 
     if check_for_paradoxes && let Some(condition_type) = artifacts.get_rc_expression_type(condition) {
         handle_paradoxical_condition(context, condition, condition_type);

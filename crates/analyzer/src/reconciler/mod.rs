@@ -3,13 +3,14 @@ use std::collections::BTreeMap;
 use std::rc::Rc;
 use std::sync::LazyLock;
 
-use ahash::HashMap;
 use ahash::HashSet;
 use indexmap::IndexMap;
 use regex::Regex;
 
 use mago_algebra::assertion_set::AssertionSet;
 use mago_atom::Atom;
+use mago_atom::AtomMap;
+use mago_atom::AtomSet;
 use mago_atom::atom;
 use mago_atom::concat_atom;
 use mago_codex::assertion::Assertion;
@@ -52,11 +53,11 @@ mod macros;
 
 pub fn reconcile_keyed_types<'ctx, 'arena>(
     context: &mut Context<'ctx, 'arena>,
-    new_types: &IndexMap<String, AssertionSet>,
-    mut active_new_types: IndexMap<String, HashSet<usize>>,
+    new_types: &IndexMap<Atom, AssertionSet>,
+    mut active_new_types: IndexMap<Atom, HashSet<usize>>,
     block_context: &mut BlockContext<'ctx>,
-    changed_var_ids: &mut HashSet<String>,
-    referenced_var_ids: &HashSet<String>,
+    changed_var_ids: &mut AtomSet,
+    referenced_var_ids: &AtomSet,
     span: &Span,
     can_report_issues: bool,
     negated: bool,
@@ -65,7 +66,7 @@ pub fn reconcile_keyed_types<'ctx, 'arena>(
         return;
     }
 
-    let mut reference_graph: HashMap<String, HashSet<String>> = HashMap::default();
+    let mut reference_graph: AtomMap<AtomSet> = AtomMap::default();
     if !block_context.references_in_scope.is_empty() {
         // PHP behaves oddly when passing an array containing references: https://bugs.php.net/bug.php?id=20993
         // To work around the issue, if there are any references, we have to recreate the array and fix the
@@ -73,25 +74,25 @@ pub fn reconcile_keyed_types<'ctx, 'arena>(
         // required for some unclear reason, just cloning elements of the existing array doesn't work properly.
         let old_locals = std::mem::take(&mut block_context.locals);
 
-        let mut cloned_references = HashSet::default();
+        let mut cloned_references: AtomSet = AtomSet::default();
         for (reference, referenced) in &block_context.references_in_scope {
             if cloned_references.contains(referenced) {
-                block_context.locals.insert(referenced.to_owned(), old_locals[referenced].clone());
-                cloned_references.insert(reference.to_owned());
+                block_context.locals.insert(*referenced, old_locals[referenced].clone());
+                cloned_references.insert(*reference);
             }
         }
 
         block_context.locals.extend(old_locals);
         for (reference, referenced) in &block_context.references_in_scope {
-            reference_graph.entry(reference.to_owned()).or_default().insert(referenced.to_owned());
+            reference_graph.entry(*reference).or_default().insert(*referenced);
 
             let referenced_graph = reference_graph.get(referenced).cloned().unwrap_or_default();
             for existing_referenced in referenced_graph {
-                reference_graph.entry(existing_referenced.to_owned()).or_default().insert(reference.to_owned());
-                reference_graph.entry(reference.to_owned()).or_default().insert(existing_referenced.to_owned());
+                reference_graph.entry(existing_referenced).or_default().insert(*reference);
+                reference_graph.entry(*reference).or_default().insert(existing_referenced);
             }
 
-            reference_graph.entry(referenced.to_owned()).or_default().insert(reference.to_owned());
+            reference_graph.entry(*referenced).or_default().insert(*reference);
         }
     }
 
@@ -102,7 +103,8 @@ pub fn reconcile_keyed_types<'ctx, 'arena>(
     add_nested_assertions(&mut new_types, &mut active_new_types, block_context);
 
     for (key, new_type_parts) in &new_types {
-        if key.contains("::") && !key.contains('$') && !key.contains('[') {
+        let key_str = key.as_str();
+        if key_str.contains("::") && !key_str.contains('$') && !key_str.contains('[') {
             continue;
         }
 
@@ -113,7 +115,7 @@ pub fn reconcile_keyed_types<'ctx, 'arena>(
         let mut has_truthy_or_falsy_or_empty = false;
         let mut has_count_check = false;
         let mut has_empty = false;
-        let is_real = old_new_types.get(key).unwrap_or(&Vec::new()).eq(new_type_parts);
+        let is_real = old_new_types.get(key).is_some_and(|v| v.eq(new_type_parts));
         let mut is_equality = is_real;
 
         for new_type_part_parts in new_type_parts {
@@ -143,7 +145,7 @@ pub fn reconcile_keyed_types<'ctx, 'arena>(
         let mut result_type = block_context.locals.get(key).map(|t| t.as_ref().clone()).or_else(|| {
             get_value_for_key(
                 context,
-                key.clone(),
+                *key,
                 block_context,
                 &new_types,
                 has_isset,
@@ -164,7 +166,7 @@ pub fn reconcile_keyed_types<'ctx, 'arena>(
                     context,
                     assertion,
                     result_type.as_ref(),
-                    Some(key),
+                    Some(key_str),
                     inside_loop,
                     Some(span),
                     can_report_issues
@@ -192,46 +194,46 @@ pub fn reconcile_keyed_types<'ctx, 'arena>(
         let type_changed =
             if let Some(before_adjustment) = &before_adjustment { &result_type != before_adjustment } else { true };
 
-        let key_parts = break_up_path_into_parts(key);
+        let key_parts = break_up_path_into_parts(key_str);
         if type_changed {
-            changed_var_ids.insert(key.clone());
+            changed_var_ids.insert(*key);
 
-            if key.ends_with(']') && !has_inverted_isset && !has_inverted_key_exists && !has_empty && !is_equality {
+            if key_str.ends_with(']') && !has_inverted_isset && !has_inverted_key_exists && !has_empty && !is_equality {
                 adjust_array_type(key_parts.clone(), block_context, changed_var_ids, &result_type);
-            } else if key != "$this" {
-                let mut removable_keys = Vec::new();
+            } else if key_str != "$this" {
+                let mut removable_keys: Vec<Atom> = Vec::new();
                 for (new_key, _) in block_context.locals.iter() {
-                    if new_key.eq(key) {
+                    if new_key == key {
                         continue;
                     }
 
                     if is_real && !new_types.contains_key(new_key) && var_has_root(new_key, key) {
                         if let Some(references_map) = reference_graph.get(new_key) {
-                            let references_to_fix = references_map.iter().cloned().collect::<Vec<_>>();
+                            let references_to_fix = references_map.iter().copied().collect::<Vec<_>>();
 
                             match references_to_fix.len() {
                                 0 => {}
                                 1 => {
-                                    let reference_to_fix = &references_to_fix[0];
-                                    reference_graph.remove(reference_to_fix);
-                                    block_context.references_in_scope.remove(reference_to_fix);
+                                    let reference_to_fix = references_to_fix[0];
+                                    reference_graph.remove(&reference_to_fix);
+                                    block_context.references_in_scope.remove(&reference_to_fix);
                                 }
                                 _ => {
                                     for reference in &references_to_fix {
-                                        if let Some(innset_set) = reference_graph.get_mut(reference) {
-                                            innset_set.remove(new_key);
+                                        if let Some(inner_set) = reference_graph.get_mut(reference) {
+                                            inner_set.remove(new_key);
                                         }
                                     }
 
                                     if let Some(new_primary_reference) = reference_graph
                                         .get(&references_to_fix[0])
-                                        .and_then(|inner_set| inner_set.iter().next().cloned())
+                                        .and_then(|inner_set| inner_set.iter().next().copied())
                                     {
                                         block_context.references_in_scope.remove(&new_primary_reference);
 
                                         for (_, referenced_value) in block_context.references_in_scope.iter_mut() {
-                                            if referenced_value == new_key {
-                                                *referenced_value = new_primary_reference.clone();
+                                            if *referenced_value == *new_key {
+                                                *referenced_value = new_primary_reference;
                                             }
                                         }
                                     }
@@ -240,7 +242,7 @@ pub fn reconcile_keyed_types<'ctx, 'arena>(
                         }
 
                         reference_graph.remove(new_key);
-                        removable_keys.push(new_key.clone());
+                        removable_keys.push(*new_key);
                         block_context.references_in_scope.remove(new_key);
                     }
                 }
@@ -250,22 +252,23 @@ pub fn reconcile_keyed_types<'ctx, 'arena>(
                 }
             }
         } else if !has_negation && !has_truthy_or_falsy_or_empty && !has_isset {
-            changed_var_ids.insert(key.clone());
+            changed_var_ids.insert(*key);
         }
 
         if !has_object_array_access {
-            block_context.locals.insert(key.clone(), Rc::new(result_type));
+            block_context.locals.insert(*key, Rc::new(result_type));
         }
 
+        let key_parts_0_atom = atom(&key_parts[0]);
         if let Some(existing_type) = block_context.locals.get(key).cloned()
             && !did_type_exist
-            && reference_graph.contains_key(&key_parts[0])
+            && reference_graph.contains_key(&key_parts_0_atom)
         {
             // If key is new, create references for other variables that reference the root variable.
             let mut reference_key_parts = key_parts.clone();
-            for reference in reference_graph[&key_parts[0]].iter() {
-                reference_key_parts[0] = reference.clone();
-                let reference_key = reference_key_parts.join("");
+            for reference in reference_graph[&key_parts_0_atom].iter() {
+                reference_key_parts[0] = reference.as_str().to_owned();
+                let reference_key = atom(&reference_key_parts.join(""));
                 block_context.locals.insert(reference_key, existing_type.clone());
             }
         }
@@ -275,7 +278,7 @@ pub fn reconcile_keyed_types<'ctx, 'arena>(
 fn adjust_array_type<'ctx>(
     mut key_parts: Vec<String>,
     context: &mut BlockContext<'ctx>,
-    changed_var_ids: &mut HashSet<String>,
+    changed_var_ids: &mut AtomSet,
     result_type: &TUnion,
 ) {
     key_parts.pop();
@@ -298,8 +301,9 @@ fn adjust_array_type<'ctx>(
     };
 
     let base_key = key_parts.join("");
+    let base_key_atom = atom(&base_key);
 
-    let mut existing_type = if let Some(existing_type) = context.locals.get(&base_key) {
+    let mut existing_type = if let Some(existing_type) = context.locals.get(&base_key_atom) {
         (**existing_type).clone()
     } else {
         return;
@@ -336,7 +340,7 @@ fn adjust_array_type<'ctx>(
             }
         }
 
-        changed_var_ids.insert(format!("{}[{}]", base_key, array_key.clone()));
+        changed_var_ids.insert(concat_atom!(&base_key, "[", &array_key, "]"));
 
         if let Some(last_part) = key_parts.last()
             && last_part == "]"
@@ -345,7 +349,7 @@ fn adjust_array_type<'ctx>(
         }
     }
 
-    context.locals.insert(base_key, Rc::new(existing_type));
+    context.locals.insert(base_key_atom, Rc::new(existing_type));
 }
 
 fn refine_array_key(key_type: &TUnion) -> TUnion {
@@ -385,17 +389,18 @@ static INTEGER_REGEX: LazyLock<Regex> = LazyLock::new(|| unsafe {
 });
 
 fn add_nested_assertions<'ctx>(
-    new_types: &mut IndexMap<String, AssertionSet>,
-    active_new_types: &mut IndexMap<String, HashSet<usize>>,
+    new_types: &mut IndexMap<Atom, AssertionSet>,
+    active_new_types: &mut IndexMap<Atom, HashSet<usize>>,
     context: &BlockContext<'ctx>,
 ) {
     let mut keys_to_remove = vec![];
 
     'outer: for (nk, new_type) in new_types.clone() {
-        if (nk.contains('[') || nk.contains("->"))
+        let nk_str = nk.as_str();
+        if (nk_str.contains('[') || nk_str.contains("->"))
             && (new_type[0][0] == Assertion::IsEqualIsset || new_type[0][0] == Assertion::IsIsset)
         {
-            let mut key_parts = break_up_path_into_parts(&nk);
+            let mut key_parts = break_up_path_into_parts(nk_str);
             key_parts.reverse();
 
             let mut nesting = 0;
@@ -411,7 +416,8 @@ fn add_nested_assertions<'ctx>(
                 }
             };
 
-            let base_key_set = if let Some(base_key_type) = context.locals.get(&base_key) {
+            let base_key_atom = atom(&base_key);
+            let base_key_set = if let Some(base_key_type) = context.locals.get(&base_key_atom) {
                 !base_key_type.is_nullable()
             } else {
                 false
@@ -419,8 +425,8 @@ fn add_nested_assertions<'ctx>(
 
             if !base_key_set {
                 new_types.insert(
-                    base_key.clone(),
-                    if let Some(mut existing_entry) = new_types.get(&base_key).cloned() {
+                    base_key_atom,
+                    if let Some(mut existing_entry) = new_types.get(&base_key_atom).cloned() {
                         existing_entry.push(vec![Assertion::IsEqualIsset]);
                         existing_entry
                     } else {
@@ -439,8 +445,9 @@ fn add_nested_assertions<'ctx>(
                     key_parts.pop();
 
                     let new_base_key = base_key.clone() + "[" + array_key.as_str() + "]";
+                    let base_key_atom = atom(&base_key);
 
-                    let entry = new_types.entry(base_key.clone()).or_default();
+                    let entry = new_types.entry(base_key_atom).or_default();
 
                     let new_key = if array_key.starts_with('\'') {
                         Some(ArrayKey::String(atom(&array_key[1..(array_key.len() - 1)])))
@@ -465,10 +472,10 @@ fn add_nested_assertions<'ctx>(
                             });
 
                             if only_isset_assertions {
-                                keys_to_remove.push(nk.clone());
+                                keys_to_remove.push(nk);
 
                                 if nesting == 0 && base_key_set && active_new_types.swap_remove(&nk).is_some() {
-                                    active_new_types.entry(base_key.clone()).or_default().insert(entry.len() - 1);
+                                    active_new_types.entry(base_key_atom).or_default().insert(entry.len() - 1);
                                 }
 
                                 continue 'outer;
@@ -494,9 +501,10 @@ fn add_nested_assertions<'ctx>(
                     };
 
                     let new_base_key = base_key.clone() + "->" + property_name.as_str();
+                    let base_key_atom = atom(&base_key);
 
-                    if !new_types.contains_key(&base_key) {
-                        new_types.insert(base_key.clone(), vec![vec![Assertion::IsIsset]]);
+                    if !new_types.contains_key(&base_key_atom) {
+                        new_types.insert(base_key_atom, vec![vec![Assertion::IsIsset]]);
                     }
 
                     base_key = new_base_key;
@@ -611,9 +619,9 @@ pub fn break_up_path_into_parts(path: &str) -> Vec<String> {
 
 fn get_value_for_key<'ctx>(
     context: &mut Context<'_, '_>,
-    key: String,
+    key: Atom,
     block_context: &mut BlockContext<'ctx>,
-    new_assertions: &IndexMap<String, AssertionSet>,
+    new_assertions: &IndexMap<Atom, AssertionSet>,
     has_isset: bool,
     has_inverted_isset: bool,
     has_inverted_key_exists: bool,
@@ -621,7 +629,8 @@ fn get_value_for_key<'ctx>(
     inside_loop: bool,
     has_object_array_access: &mut bool,
 ) -> Option<TUnion> {
-    let mut key_parts = break_up_path_into_parts(&key);
+    let key_str = key.as_str();
+    let mut key_parts = break_up_path_into_parts(key_str);
     if key_parts.is_empty() {
         return None;
     }
@@ -652,7 +661,8 @@ fn get_value_for_key<'ctx>(
         }
     };
 
-    if !block_context.locals.contains_key(&base_key) {
+    let base_key_atom = atom(&base_key);
+    if let std::collections::btree_map::Entry::Vacant(e) = block_context.locals.entry(base_key_atom) {
         if base_key.contains("::") {
             let base_key_parts = &base_key.split("::").collect::<Vec<&str>>();
             let fq_class_name = &base_key_parts[0];
@@ -670,7 +680,7 @@ fn get_value_for_key<'ctx>(
                     Cow::Owned(t) => t,
                 });
 
-                block_context.locals.insert(base_key.clone(), class_constant);
+                e.insert(class_constant);
             } else {
                 return None;
             }
@@ -679,8 +689,9 @@ fn get_value_for_key<'ctx>(
         }
     }
 
+    let mut base_key_atom = atom(&base_key);
     while let Some(divider) = key_parts.pop() {
-        let base_key_type = block_context.locals.get(&base_key)?;
+        let base_key_type = block_context.locals.get(&base_key_atom)?;
 
         if divider == "[" {
             let array_key = key_parts.pop()?;
@@ -702,8 +713,9 @@ fn get_value_for_key<'ctx>(
             };
 
             let new_base_key = base_key.clone() + "[" + array_key.as_str() + "]";
+            let new_base_key_atom = atom(&new_base_key);
 
-            if !block_context.locals.contains_key(&new_base_key) {
+            if !block_context.locals.contains_key(&new_base_key_atom) {
                 let mut new_base_type: Option<Rc<TUnion>> = None;
                 let mut atomic_types = base_key_type.types.clone().into_owned();
 
@@ -754,9 +766,9 @@ fn get_value_for_key<'ctx>(
                             }
 
                             if (has_isset || has_inverted_isset || has_inverted_key_exists)
-                                && new_assertions.contains_key(&new_base_key)
+                                && new_assertions.contains_key(&new_base_key_atom)
                             {
-                                if has_inverted_isset && new_base_key.eq(&key) {
+                                if has_inverted_isset && new_base_key_atom == key {
                                     new_base_type_candidate =
                                         add_union_type(new_base_type_candidate, &get_null(), context.codebase, false);
                                 }
@@ -788,9 +800,9 @@ fn get_value_for_key<'ctx>(
                                 get_iterable_value_parameter(&existing_key_type_part, context.codebase)?;
 
                             if (has_isset || has_inverted_isset || has_inverted_key_exists)
-                                && new_assertions.contains_key(&new_base_key)
+                                && new_assertions.contains_key(&new_base_key_atom)
                             {
-                                if has_inverted_isset && new_base_key.eq(&key) {
+                                if has_inverted_isset && new_base_key_atom == key {
                                     new_base_type_candidate =
                                         add_union_type(new_base_type_candidate, &get_null(), context.codebase, false);
                                 }
@@ -805,7 +817,7 @@ fn get_value_for_key<'ctx>(
                     } else if let TAtomic::Object(TObject::Named(_named_object)) = &existing_key_type_part {
                         if has_isset || has_inverted_isset || has_inverted_key_exists {
                             *has_object_array_access = true;
-                            block_context.locals.remove(&new_base_key);
+                            block_context.locals.remove(&new_base_key_atom);
 
                             return None;
                         }
@@ -822,16 +834,18 @@ fn get_value_for_key<'ctx>(
                     });
 
                     new_base_type = Some(resulting_type.clone());
-                    block_context.locals.insert(new_base_key.clone(), resulting_type);
+                    block_context.locals.insert(new_base_key_atom, resulting_type);
                 }
             }
 
             base_key = new_base_key;
+            base_key_atom = new_base_key_atom;
         } else if divider == "->" || divider == "::$" {
             let property_name = key_parts.pop()?;
             let new_base_key = base_key.clone() + "->" + property_name.as_str();
+            let new_base_key_atom = atom(&new_base_key);
 
-            if !block_context.locals.contains_key(&new_base_key) {
+            if !block_context.locals.contains_key(&new_base_key_atom) {
                 let mut new_base_type: Option<Rc<TUnion>> = None;
                 let mut atomic_types = base_key_type.types.clone().into_owned();
 
@@ -871,17 +885,18 @@ fn get_value_for_key<'ctx>(
                     ));
 
                     new_base_type = Some(resulting_type.clone());
-                    block_context.locals.insert(new_base_key.clone(), resulting_type);
+                    block_context.locals.insert(new_base_key_atom, resulting_type);
                 }
             }
 
             base_key = new_base_key;
+            base_key_atom = new_base_key_atom;
         } else {
             return None;
         }
     }
 
-    block_context.locals.get(&base_key).map(|t| (**t).clone())
+    block_context.locals.get(&base_key_atom).map(|t| (**t).clone())
 }
 
 fn get_property_type(context: &Context<'_, '_>, classlike_name: &Atom, property_name_str: &str) -> Option<TUnion> {
@@ -914,7 +929,7 @@ fn get_property_type(context: &Context<'_, '_>, classlike_name: &Atom, property_
 pub(crate) fn trigger_issue_for_impossible(
     context: &mut Context<'_, '_>,
     old_var_type_string: Atom,
-    key: &String,
+    key: &str,
     assertion: &Assertion,
     redundant: bool,
     negated: bool,
@@ -960,7 +975,7 @@ fn report_impossible_issue(
     context: &mut Context<'_, '_>,
     assertion: &Assertion,
     assertion_atom: Atom,
-    key: &String,
+    key: &str,
     span: &Span,
     old_var_type_string: Atom,
 ) {
@@ -1038,7 +1053,7 @@ fn report_redundant_issue(
     context: &mut Context<'_, '_>,
     assertion: &Assertion,
     assertion_atom: Atom,
-    key: &String,
+    key: &str,
     span: &Span,
     old_var_type_string: Atom,
 ) {

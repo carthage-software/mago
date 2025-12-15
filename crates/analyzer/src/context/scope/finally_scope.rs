@@ -1,11 +1,12 @@
 use std::collections::BTreeMap;
 use std::rc::Rc;
 
+use mago_atom::Atom;
 use mago_codex::ttype::union::TUnion;
 
 #[derive(Clone, Debug)]
 pub struct FinallyScope {
-    pub locals: BTreeMap<String, Rc<TUnion>>,
+    pub locals: BTreeMap<Atom, Rc<TUnion>>,
 }
 
 impl FinallyScope {

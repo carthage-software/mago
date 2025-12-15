@@ -80,7 +80,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ArrayAccess<'arena> {
                 let can_store_result = block_context.inside_assignment || !container_type.is_mixed();
 
                 if !block_context.inside_isset && can_store_result && keyed_array_var_id.contains("[$") {
-                    block_context.locals.insert(keyed_array_var_id.clone(), Rc::new(access_type.clone()));
+                    block_context.locals.insert(*keyed_array_var_id, Rc::new(access_type.clone()));
                 }
             }
 

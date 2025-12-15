@@ -1,6 +1,7 @@
 use std::rc::Rc;
 
 use ahash::HashMap;
+use mago_atom::ascii_lowercase_atom;
 
 use mago_codex::context::ScopeContext;
 
@@ -109,18 +110,19 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Closure<'arena> {
 
                 variable_spans.insert(variable, variable_span);
 
+                let variable_atom = ascii_lowercase_atom(variable);
                 let mut variable_type =
-                    block_context.locals.get(variable).cloned().unwrap_or_else(|| Rc::new(get_mixed()));
+                    block_context.locals.get(&variable_atom).cloned().unwrap_or_else(|| Rc::new(get_mixed()));
 
                 if is_by_reference {
                     let inner_variable_type = Rc::make_mut(&mut variable_type);
                     inner_variable_type.set_by_reference(true);
 
-                    inner_block_context.references_to_external_scope.insert(variable.to_string());
+                    inner_block_context.references_to_external_scope.insert(variable_atom);
                 }
 
-                inner_block_context.locals.insert(variable.to_string(), variable_type.clone());
-                inner_block_context.variables_possibly_in_scope.insert(variable.to_string());
+                inner_block_context.locals.insert(variable_atom, variable_type.clone());
+                inner_block_context.variables_possibly_in_scope.insert(variable_atom);
 
                 for (variable_id, variable_type) in block_context.locals.iter() {
                     let Some(stripped_variable_id) = variable_id.strip_prefix(variable) else {
@@ -128,8 +130,8 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Closure<'arena> {
                     };
 
                     if stripped_variable_id.starts_with('[') || stripped_variable_id.starts_with('-') {
-                        inner_block_context.locals.insert(variable_id.to_string(), variable_type.clone());
-                        inner_block_context.variables_possibly_in_scope.insert(variable_id.to_string());
+                        inner_block_context.locals.insert(*variable_id, variable_type.clone());
+                        inner_block_context.variables_possibly_in_scope.insert(*variable_id);
                     }
                 }
             }

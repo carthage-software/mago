@@ -4,6 +4,7 @@ use ahash::HashMap;
 
 use mago_atom::Atom;
 use mago_atom::atom;
+use mago_atom::concat_atom;
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::ttype::atomic::TAtomic;
@@ -68,19 +69,19 @@ pub fn get_member_selector_id<'ast, 'arena>(
     this_class_name: Option<Atom>,
     resolved_names: &'ast ResolvedNames<'arena>,
     codebase: Option<&CodebaseMetadata>,
-) -> Option<String> {
+) -> Option<Atom> {
     match selector {
-        ClassLikeMemberSelector::Identifier(local_identifier) => Some(local_identifier.value.to_string()),
-        ClassLikeMemberSelector::Variable(variable) => get_variable_id(variable).map(|s| s.to_string()),
-        ClassLikeMemberSelector::Expression(class_like_member_expression_selector) => Some(format!(
-            "{{{}}}",
-            get_expression_id(
+        ClassLikeMemberSelector::Identifier(local_identifier) => Some(atom(local_identifier.value)),
+        ClassLikeMemberSelector::Variable(variable) => get_variable_id(variable).map(atom),
+        ClassLikeMemberSelector::Expression(class_like_member_expression_selector) => {
+            let expr_id = get_expression_id(
                 class_like_member_expression_selector.expression,
                 this_class_name,
                 resolved_names,
                 codebase,
-            )?
-        )),
+            )?;
+            Some(concat_atom!("{", expr_id.as_str(), "}"))
+        }
     }
 }
 
@@ -89,18 +90,18 @@ pub fn get_constant_selector_id<'ast, 'arena>(
     this_class_name: Option<Atom>,
     resolved_names: &'ast ResolvedNames<'arena>,
     codebase: Option<&CodebaseMetadata>,
-) -> Option<String> {
+) -> Option<Atom> {
     match selector {
-        ClassLikeConstantSelector::Identifier(local_identifier) => Some(local_identifier.value.to_string()),
-        ClassLikeConstantSelector::Expression(class_like_member_expression_selector) => Some(format!(
-            "{{{}}}",
-            get_expression_id(
+        ClassLikeConstantSelector::Identifier(local_identifier) => Some(atom(local_identifier.value)),
+        ClassLikeConstantSelector::Expression(class_like_member_expression_selector) => {
+            let expr_id = get_expression_id(
                 class_like_member_expression_selector.expression,
                 this_class_name,
                 resolved_names,
                 codebase,
-            )?
-        )),
+            )?;
+            Some(concat_atom!("{", expr_id.as_str(), "}"))
+        }
     }
 }
 
@@ -110,7 +111,7 @@ pub fn get_expression_id<'ast, 'arena>(
     this_class_name: Option<Atom>,
     resolved_names: &'ast ResolvedNames<'arena>,
     codebase: Option<&CodebaseMetadata>,
-) -> Option<String> {
+) -> Option<Atom> {
     get_extended_expression_id(expression, this_class_name, resolved_names, codebase, false)
 }
 
@@ -120,7 +121,7 @@ fn get_extended_expression_id<'ast, 'arena>(
     resolved_names: &'ast ResolvedNames<'arena>,
     codebase: Option<&CodebaseMetadata>,
     solve_identifiers: bool,
-) -> Option<String> {
+) -> Option<Atom> {
     let expression = unwrap_expression(expression);
 
     if let Expression::Assignment(assignment) = expression {
@@ -131,7 +132,7 @@ fn get_extended_expression_id<'ast, 'arena>(
         Expression::UnaryPrefix(UnaryPrefix { operator: UnaryPrefixOperator::Reference(_), operand }) => {
             return get_expression_id(operand, this_class_name, resolved_names, codebase);
         }
-        Expression::Variable(variable) => get_variable_id(variable)?.to_string(),
+        Expression::Variable(variable) => atom(get_variable_id(variable)?),
         Expression::Access(access) => match access {
             Access::Property(property_access) => get_property_access_expression_id(
                 property_access.object,
@@ -172,7 +173,7 @@ fn get_extended_expression_id<'ast, 'arena>(
                     codebase,
                 )?;
 
-                format!("{class}::{constant}")
+                concat_atom!(class.as_str(), "::", constant.as_str())
             }
         },
         Expression::ArrayAccess(array_access) => {
@@ -180,29 +181,29 @@ fn get_extended_expression_id<'ast, 'arena>(
         }
         Expression::Self_(_) => {
             if let Some(class_name) = this_class_name {
-                class_name.to_string()
+                class_name
             } else {
-                "self".to_string()
+                atom("self")
             }
         }
         Expression::Parent(_) if solve_identifiers => {
             if let Some(class_name) = this_class_name {
-                class_name.to_string()
+                class_name
             } else {
-                "parent".to_string()
+                atom("parent")
             }
         }
         Expression::Static(_) if solve_identifiers => {
             if let Some(class_name) = this_class_name {
-                class_name.to_string()
+                class_name
             } else {
-                "static".to_string()
+                atom("static")
             }
         }
         Expression::Identifier(identifier) if solve_identifiers => {
             let identifier_id = resolved_names.get(&identifier);
 
-            identifier_id.to_string()
+            atom(identifier_id)
         }
         _ => return None,
     })
@@ -215,11 +216,15 @@ pub fn get_property_access_expression_id<'ast, 'arena>(
     this_class_name: Option<Atom>,
     resolved_names: &'ast ResolvedNames<'arena>,
     codebase: Option<&CodebaseMetadata>,
-) -> Option<String> {
+) -> Option<Atom> {
     let object = get_expression_id(object_expression, this_class_name, resolved_names, codebase)?;
     let property = get_member_selector_id(selector, this_class_name, resolved_names, codebase)?;
 
-    Some(if is_null_safe { format!("{object}?->{property}") } else { format!("{object}->{property}") })
+    Some(if is_null_safe {
+        concat_atom!(object.as_str(), "?->", property.as_str())
+    } else {
+        concat_atom!(object.as_str(), "->", property.as_str())
+    })
 }
 
 pub fn get_static_property_access_expression_id<'ast, 'arena>(
@@ -228,11 +233,11 @@ pub fn get_static_property_access_expression_id<'ast, 'arena>(
     this_class_name: Option<Atom>,
     resolved_names: &'ast ResolvedNames<'arena>,
     codebase: Option<&CodebaseMetadata>,
-) -> Option<String> {
+) -> Option<Atom> {
     let class = get_extended_expression_id(class_expr, this_class_name, resolved_names, codebase, true)?;
     let property = get_variable_id(property)?;
 
-    Some(format!("{class}::{property}"))
+    Some(concat_atom!(class.as_str(), "::", property))
 }
 
 #[inline]
@@ -241,18 +246,18 @@ pub fn get_array_access_id<'ast, 'arena>(
     this_class_name: Option<Atom>,
     resolved_names: &'ast ResolvedNames<'arena>,
     codebase: Option<&CodebaseMetadata>,
-) -> Option<String> {
+) -> Option<Atom> {
     let array = get_expression_id(array_access.array, this_class_name, resolved_names, codebase)?;
     let index = get_index_id(array_access.index, this_class_name, resolved_names, codebase)?;
 
-    Some(format!("{array}[{index}]"))
+    Some(concat_atom!(array.as_str(), "[", index.as_str(), "]"))
 }
 
-pub fn get_root_expression_id<'ast, 'arena>(expression: &'ast Expression<'arena>) -> Option<String> {
+pub fn get_root_expression_id<'ast, 'arena>(expression: &'ast Expression<'arena>) -> Option<Atom> {
     let expression = unwrap_expression(expression);
 
     match expression {
-        Expression::Variable(Variable::Direct(variable)) => Some(variable.name.to_string()),
+        Expression::Variable(Variable::Direct(variable)) => Some(atom(variable.name)),
         Expression::ArrayAccess(array_access) => get_root_expression_id(array_access.array),
         Expression::Access(access) => match access {
             Access::Property(access) => get_root_expression_id(access.object),
@@ -269,10 +274,10 @@ pub fn get_index_id<'ast, 'arena>(
     this_class_name: Option<Atom>,
     resolved_names: &'ast ResolvedNames<'arena>,
     codebase: Option<&CodebaseMetadata>,
-) -> Option<String> {
+) -> Option<Atom> {
     Some(match expression {
-        Expression::Literal(Literal::String(literal_string)) => literal_string.raw.to_string(),
-        Expression::Literal(Literal::Integer(literal_integer)) => literal_integer.raw.to_string(),
+        Expression::Literal(Literal::String(literal_string)) => atom(literal_string.raw),
+        Expression::Literal(Literal::Integer(literal_integer)) => atom(literal_integer.raw),
         _ => return get_expression_id(expression, this_class_name, resolved_names, codebase),
     })
 }
@@ -349,7 +354,7 @@ pub fn get_method_id_from_call<'ast, 'arena>(
 ///   or if it does but is not followed by a recognized access operator character,
 ///   or if `derived_path` is identical to `base_path`).
 #[inline]
-pub fn is_derived_access_path(derived_path: &str, base_path: &str) -> bool {
-    derived_path.starts_with(base_path)
-        && derived_path.chars().nth(base_path.len()).is_some_and(|c| c == ':' || c == '-' || c == '[')
+pub fn is_derived_access_path(derived_path: &Atom, base_path: &Atom) -> bool {
+    derived_path.as_str().starts_with(base_path.as_str())
+        && derived_path.as_str().chars().nth(base_path.len()).is_some_and(|c| c == ':' || c == '-' || c == '[')
 }

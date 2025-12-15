@@ -1,5 +1,6 @@
 use std::rc::Rc;
 
+use mago_atom::atom;
 use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::get_null;
 use mago_codex::ttype::union::TUnion;
@@ -114,10 +115,10 @@ fn read_variable<'ctx, 'arena>(
 ) -> Rc<TUnion> {
     let _ = block_context.has_variable(variable_name);
 
-    let variable_type = match block_context.locals.get(variable_name) {
+    let variable_type = match block_context.locals.get(&atom(variable_name)) {
         Some(variable_type) => variable_type.clone(),
         None => {
-            if block_context.variables_possibly_in_scope.contains(variable_name) {
+            if block_context.variables_possibly_in_scope.contains(&atom(variable_name)) {
                 context.collector.report_with_code(
                     IssueCode::PossiblyUndefinedVariable,
                     Issue::warning(format!(
@@ -154,6 +155,7 @@ fn read_variable<'ctx, 'arena>(
 
                 // This variable does not currently exist, but is being referenced.
                 // therefore, we need to analyze it as if it was being assigned `null`.
+                let variable_atom = atom(variable_name);
                 assignment::analyze_assignment_to_variable(
                     context,
                     block_context,
@@ -161,7 +163,7 @@ fn read_variable<'ctx, 'arena>(
                     variable_span,
                     None,
                     get_null(),
-                    variable_name,
+                    &variable_atom,
                     false,
                 );
 
@@ -235,22 +237,23 @@ fn read_variable<'ctx, 'arena>(
 }
 
 fn find_similar_variable_names<'ctx>(context: &BlockContext<'ctx>, target: &str) -> Vec<String> {
-    let mut suggestions: Vec<(usize, &String)> = Vec::new();
+    let mut suggestions: Vec<(usize, &str)> = Vec::new();
 
     for local in context.locals.keys() {
-        if local.is_empty() {
+        let local_str = local.as_str();
+        if local_str.is_empty() {
             continue;
         }
 
-        let distance = strsim::levenshtein(target, local);
+        let distance = strsim::levenshtein(target, local_str);
 
         if distance > 0 && distance <= 3 {
-            suggestions.push((distance, local));
+            suggestions.push((distance, local_str));
         }
     }
 
     suggestions.sort_by_key(|k| k.0);
-    suggestions.into_iter().map(|(_, name)| name).cloned().collect()
+    suggestions.into_iter().map(|(_, name)| name.to_owned()).collect()
 }
 
 fn generate_confusable_character_note(variable_name: &str) -> Option<String> {

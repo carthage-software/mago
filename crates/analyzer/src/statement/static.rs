@@ -1,5 +1,6 @@
 use std::rc::Rc;
 
+use mago_atom::Atom;
 use mago_codex::ttype::get_mixed;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
@@ -66,10 +67,11 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Static<'arena> {
                 self.items.len() == 1,
             );
 
+            let variable_name_atom = Atom::from(variable.name);
             let variable_type = match (inferred_type, docblock_type) {
                 (Some(inferred_type), Some((docblock_type, docblock_type_span))) => {
                     block_context.by_reference_constraints.insert(
-                        variable.name.to_owned(),
+                        variable_name_atom,
                         ReferenceConstraint::new(
                             docblock_type_span,
                             ReferenceConstraintSource::Static,
@@ -91,7 +93,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Static<'arena> {
                 }
                 (None, Some((docblock_type, docblock_type_span))) => {
                     block_context.by_reference_constraints.insert(
-                        variable.name.to_owned(),
+                        variable_name_atom,
                         ReferenceConstraint::new(
                             docblock_type_span,
                             ReferenceConstraintSource::Static,
@@ -105,9 +107,9 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Static<'arena> {
                 (None, None) => Rc::new(get_mixed()),
             };
 
-            block_context.locals.insert(variable.name.to_owned(), variable_type);
-            block_context.assigned_variable_ids.insert(variable.name.to_owned(), item.span().start.offset);
-            block_context.static_locals.insert(variable.name.to_owned());
+            block_context.locals.insert(variable_name_atom, variable_type);
+            block_context.assigned_variable_ids.insert(variable_name_atom, item.span().start.offset);
+            block_context.static_locals.insert(variable_name_atom);
         }
 
         Ok(())

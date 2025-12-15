@@ -5,6 +5,8 @@ use ahash::HashSetExt;
 use indexmap::IndexMap;
 use itertools::Itertools;
 
+use mago_atom::Atom;
+use mago_atom::AtomSet;
 use mago_codex::assertion::Assertion;
 use mago_span::Span;
 
@@ -14,8 +16,8 @@ use crate::clause::Clause;
 pub mod assertion_set;
 pub mod clause;
 
-pub type SatisfyingAssignments = IndexMap<String, AssertionSet>;
-pub type ActiveTruths = IndexMap<String, HashSet<usize>>;
+pub type SatisfyingAssignments = IndexMap<Atom, AssertionSet>;
+pub type ActiveTruths = IndexMap<Atom, HashSet<usize>>;
 
 /// Reduces a set of CNF clauses by exhaustively applying logical simplification rules.
 ///
@@ -152,7 +154,7 @@ pub fn saturate_clauses<'a>(clauses: impl IntoIterator<Item = &'a Clause>) -> Ve
                                 added_clauses.push(updated_clause);
                             }
                         } else {
-                            let updated_clause = clause_b.add_possibility(clause_var.clone(), clause_var_possibilities);
+                            let updated_clause = clause_b.add_possibility(*clause_var, clause_var_possibilities);
                             added_clauses.push(updated_clause);
                         }
                     }
@@ -235,17 +237,17 @@ pub fn saturate_clauses<'a>(clauses: impl IntoIterator<Item = &'a Clause>) -> Ve
                     }
 
                     if !common_negated_keys.is_empty() {
-                        let mut new_possibilities: IndexMap<String, IndexMap<u64, Assertion>> = IndexMap::default();
+                        let mut new_possibilities: IndexMap<Atom, IndexMap<u64, Assertion>> = IndexMap::default();
 
                         for (var_id, possibilities) in &clause_a.possibilities {
                             if !common_negated_keys.contains(var_id) {
-                                new_possibilities.entry(var_id.clone()).or_default().extend(possibilities.clone());
+                                new_possibilities.entry(*var_id).or_default().extend(possibilities.clone());
                             }
                         }
 
                         for (var_id, possibilities) in &clause_b.possibilities {
                             if !common_negated_keys.contains(var_id) {
-                                new_possibilities.entry(var_id.clone()).or_default().extend(possibilities.clone());
+                                new_possibilities.entry(*var_id).or_default().extend(possibilities.clone());
                             }
                         }
 
@@ -300,18 +302,18 @@ pub fn saturate_clauses<'a>(clauses: impl IntoIterator<Item = &'a Clause>) -> Ve
 pub fn find_satisfying_assignments(
     clauses: &[Clause],
     creating_conditional_id: Option<Span>,
-    conditionally_referenced_var_ids: &mut HashSet<String>,
+    conditionally_referenced_var_ids: &mut AtomSet,
 ) -> (SatisfyingAssignments, ActiveTruths) {
-    let mut truths: IndexMap<String, AssertionSet> = IndexMap::default();
-    let mut active_truths: IndexMap<String, HashSet<usize>> = IndexMap::default();
+    let mut truths: IndexMap<Atom, AssertionSet> = IndexMap::default();
+    let mut active_truths: IndexMap<Atom, HashSet<usize>> = IndexMap::default();
 
     for clause in clauses {
         // Populate referenced variables from all non-generated clauses.
         if !clause.generated {
             for var_id in clause.possibilities.keys() {
                 // We only care about actual variables, not temporary expression placeholders.
-                if !var_id.starts_with('*') {
-                    conditionally_referenced_var_ids.insert(var_id.clone());
+                if !var_id.as_str().starts_with('*') {
+                    conditionally_referenced_var_ids.insert(*var_id);
                 }
             }
         }
@@ -325,19 +327,19 @@ pub fn find_satisfying_assignments(
 
         // Extract the single variable and its possible assertions.
         let (variable_id, possible_types) = clause.possibilities.iter().next().unwrap();
-        if variable_id.starts_with('*') {
+        if variable_id.as_str().starts_with('*') {
             continue;
         }
 
         let assertions = possible_types.values().cloned().collect::<Vec<_>>();
-        let truth_entry = truths.entry(variable_id.clone()).or_default();
+        let truth_entry = truths.entry(*variable_id).or_default();
         let new_truth_index = truth_entry.len();
         truth_entry.push(assertions);
 
         if let Some(creating_conditional_id) = creating_conditional_id
             && creating_conditional_id == clause.condition_span
         {
-            active_truths.entry(variable_id.clone()).or_default().insert(new_truth_index);
+            active_truths.entry(*variable_id).or_default().insert(new_truth_index);
         }
     }
 
@@ -420,7 +422,7 @@ pub fn disjoin_clauses(
 
             let mut possibilities = left_clause.possibilities.clone();
             for (var, possible_types) in &right_clause.possibilities {
-                possibilities.entry(var.clone()).or_default().extend(possible_types.clone());
+                possibilities.entry(*var).or_default().extend(possible_types.clone());
             }
 
             // If a combined clause contains `A` and `!A`, it's a tautology (always true)
@@ -529,7 +531,7 @@ fn group_impossibilities(mut clauses: Vec<Clause>) -> Option<Vec<Clause>> {
             for impossible_type in impossible_types.iter() {
                 let mut seed_clause_possibilities = IndexMap::new();
                 seed_clause_possibilities
-                    .insert(var.clone(), IndexMap::from([(impossible_type.to_hash(), impossible_type.clone())]));
+                    .insert(*var, IndexMap::from([(impossible_type.to_hash(), impossible_type.clone())]));
 
                 let seed_clause =
                     Clause::new(seed_clause_possibilities, clause.condition_span, clause.span, None, None, None);
@@ -583,7 +585,7 @@ fn group_impossibilities(mut clauses: Vec<Clause>) -> Option<Vec<Clause>> {
                     let mut new_clause_possibilities = grouped_clause.possibilities.clone();
 
                     new_clause_possibilities
-                        .entry(var.clone())
+                        .entry(var)
                         .or_insert_with(IndexMap::new)
                         .insert(impossible_type.to_hash(), impossible_type);
 
