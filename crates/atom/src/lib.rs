@@ -163,10 +163,40 @@ pub fn ascii_lowercase_constant_name_atom(name: &str) -> Atom {
 #[inline]
 #[must_use]
 pub fn ascii_lowercase_atom(s: &str) -> Atom {
-    if s.is_ascii() && !s.bytes().any(|b| b.is_ascii_uppercase()) {
+    let bytes = s.as_bytes();
+
+    // Fast path: single pass to check if already lowercase ASCII
+    // This combines the is_ascii() and any(is_ascii_uppercase) checks into one iteration
+    let mut needs_lowercasing = false;
+    let mut is_ascii = true;
+    for &b in bytes {
+        if b > 127 {
+            is_ascii = false;
+            break;
+        }
+        if b.is_ascii_uppercase() {
+            needs_lowercasing = true;
+        }
+    }
+
+    // If it's ASCII and already lowercase, return as-is
+    if is_ascii && !needs_lowercasing {
         return atom(s);
     }
 
+    // Fast path for ASCII-only strings: use simple byte manipulation
+    if is_ascii && s.len() <= STACK_BUF_SIZE {
+        let mut stack_buf = [0u8; STACK_BUF_SIZE];
+        for (i, &b) in bytes.iter().enumerate() {
+            stack_buf[i] = b.to_ascii_lowercase();
+        }
+        return atom(
+            // SAFETY: ASCII lowercase of ASCII bytes is valid UTF-8
+            unsafe { std::str::from_utf8_unchecked(&stack_buf[..s.len()]) },
+        );
+    }
+
+    // Non-ASCII path: handle Unicode lowercasing
     if s.len() <= STACK_BUF_SIZE {
         let mut stack_buf = [0u8; STACK_BUF_SIZE];
         let mut index = 0;
@@ -174,14 +204,14 @@ pub fn ascii_lowercase_atom(s: &str) -> Atom {
         for c in s.chars() {
             for lower_c in c.to_lowercase() {
                 let mut char_buf = [0u8; 4];
-                let bytes = lower_c.encode_utf8(&mut char_buf).as_bytes();
+                let encoded = lower_c.encode_utf8(&mut char_buf).as_bytes();
 
-                if index + bytes.len() > STACK_BUF_SIZE {
+                if index + encoded.len() > STACK_BUF_SIZE {
                     return atom(&s.to_lowercase());
                 }
 
-                stack_buf[index..index + bytes.len()].copy_from_slice(bytes);
-                index += bytes.len();
+                stack_buf[index..index + encoded.len()].copy_from_slice(encoded);
+                index += encoded.len();
             }
         }
 
