@@ -417,7 +417,7 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
                     self.context.arena,
                     switch_condition,
                     case_condition,
-                    previous_empty_cases.clone().into_iter().map(|c| c.expression).collect::<Vec<_>>(),
+                    previous_empty_cases.iter().map(|c| c.expression).collect::<Vec<_>>(),
                 )
             } else if switch_condition_type.is_true() {
                 case_condition.clone()

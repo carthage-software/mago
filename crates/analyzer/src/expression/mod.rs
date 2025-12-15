@@ -333,7 +333,7 @@ pub fn find_expression_logic_issues<'ctx, 'arena>(
     // this will see whether any of the clauses in set A conflict with the clauses in set B
     check_for_paradox(&mut context.collector, &block_context.clauses, &expression_clauses, expression_span);
 
-    expression_clauses.extend(block_context.clauses.iter().map(|v| (**v).clone()).collect::<Vec<_>>());
+    expression_clauses.extend(block_context.clauses.iter().map(|v| (**v).clone()));
 
     let (reconcilable_if_types, active_if_types) = find_satisfying_assignments(
         expression_clauses.iter().as_slice(),
