@@ -170,11 +170,8 @@ pub fn reconcile_keyed_types<'ctx, 'arena>(
                     inside_loop,
                     Some(span),
                     can_report_issues
-                        && if referenced_var_ids.contains(key) && active_new_types.contains_key(key) {
-                            active_new_types.get(key).is_some_and(|active_new_type| active_new_type.get(&i).is_some())
-                        } else {
-                            false
-                        },
+                        && referenced_var_ids.contains(key)
+                        && active_new_types.get(key).is_some_and(|active_new_type| active_new_type.contains(&i)),
                     negated,
                 );
 
