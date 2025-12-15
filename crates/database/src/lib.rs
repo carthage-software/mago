@@ -205,7 +205,7 @@ impl<'a> Database<'a> {
         {
             file.contents = new_contents;
             file.size = file.contents.len() as u32;
-            file.lines = line_starts(file.contents.as_ref()).collect();
+            file.lines = line_starts(file.contents.as_ref());
             return true;
         }
         false

@@ -87,7 +87,7 @@ impl File {
     ) -> Self {
         let id = FileId::new(&name);
         let size = contents.len() as u32;
-        let lines = line_starts(contents.as_ref()).collect::<Vec<_>>();
+        let lines = line_starts(contents.as_ref());
 
         Self { id, name, path, file_type, contents, size, lines }
     }
@@ -233,12 +233,23 @@ impl std::fmt::Display for FileId {
     }
 }
 
-/// Returns an iterator over the starting byte offsets of each line in `source`.
+/// Returns a vec over the starting byte offsets of each line in `source`.
 #[inline]
-pub(crate) fn line_starts(source: &str) -> impl Iterator<Item = u32> + '_ {
+pub(crate) fn line_starts(source: &str) -> Vec<u32> {
+    // Heuristic: Average line of code is ~40 bytes.
+    const LINE_WIDTH_HEURISTIC: usize = 40;
+
     let bytes = source.as_bytes();
 
-    std::iter::once(0)
-        .chain(memchr::memchr_iter(b'\n', bytes).map(|i| if i > 0 && bytes[i - 1] == b'\r' { i } else { i + 1 }))
-        .map(|i| i as u32)
+    // Pre-allocate to avoid calling `realloc` thousands of times per file.
+    let mut lines = Vec::with_capacity(bytes.len() / LINE_WIDTH_HEURISTIC);
+    lines.push(0);
+
+    for pos in memchr::memchr_iter(b'\n', bytes) {
+        let next_start = if pos > 0 && bytes[pos - 1] == b'\r' { pos } else { pos + 1 };
+
+        lines.push(next_start as u32);
+    }
+
+    lines
 }
