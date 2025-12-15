@@ -622,7 +622,7 @@ pub fn sort_use_items<'arena>(
     items: impl Iterator<Item = &'arena UseItem<'arena>>,
 ) -> std::vec::Vec<&'arena UseItem<'arena>> {
     let mut items = items.collect::<std::vec::Vec<_>>();
-    items.sort_by(|a, b| a.name.value().to_lowercase().cmp(&b.name.value().to_lowercase()));
+    items.sort_by_cached_key(|item| item.name.value().to_lowercase());
     items
 }
 
@@ -630,9 +630,9 @@ pub fn sort_maybe_typed_use_items<'arena>(
     items: impl Iterator<Item = &'arena MaybeTypedUseItem<'arena>>,
 ) -> std::vec::Vec<&'arena MaybeTypedUseItem<'arena>> {
     let mut items = items.collect::<std::vec::Vec<_>>();
-    items.sort_by(|a, b| {
-        let a_type_order = match &a.r#type {
-            None => 0,
+    items.sort_by_cached_key(|item| {
+        let type_order = match &item.r#type {
+            None => 0u8,
             Some(ty) => {
                 if ty.is_function() {
                     1
@@ -642,22 +642,7 @@ pub fn sort_maybe_typed_use_items<'arena>(
             }
         };
 
-        let b_type_order = match &b.r#type {
-            None => 0,
-            Some(ty) => {
-                if ty.is_function() {
-                    1
-                } else {
-                    2
-                }
-            }
-        };
-
-        if a_type_order != b_type_order {
-            return a_type_order.cmp(&b_type_order);
-        }
-
-        a.item.name.value().to_lowercase().cmp(&b.item.name.value().to_lowercase())
+        (type_order, item.item.name.value().to_lowercase())
     });
 
     items
