@@ -1,5 +1,8 @@
 //! Method return type provider trait.
 
+use mago_atom::Atom;
+use mago_atom::ascii_lowercase_atom;
+use mago_atom::concat_atom;
 use mago_codex::ttype::union::TUnion;
 
 use crate::plugin::context::InvocationInfo;
@@ -39,7 +42,7 @@ impl MethodTarget {
 
         if self.class.ends_with('*') {
             let prefix = &self.class[..self.class.len() - 1];
-            class_name.to_lowercase().starts_with(&prefix.to_lowercase())
+            ascii_lowercase_atom(class_name).as_str().starts_with(ascii_lowercase_atom(prefix).as_str())
         } else {
             class_name.eq_ignore_ascii_case(self.class)
         }
@@ -52,7 +55,7 @@ impl MethodTarget {
 
         if self.method.ends_with('*') {
             let prefix = &self.method[..self.method.len() - 1];
-            method_name.to_lowercase().starts_with(&prefix.to_lowercase())
+            ascii_lowercase_atom(method_name).as_str().starts_with(ascii_lowercase_atom(prefix).as_str())
         } else {
             method_name.eq_ignore_ascii_case(self.method)
         }
@@ -62,9 +65,13 @@ impl MethodTarget {
         !self.class.contains('*') && !self.method.contains('*')
     }
 
-    pub fn index_key(&self) -> Option<String> {
+    pub fn index_key(&self) -> Option<Atom> {
         if self.is_exact() {
-            Some(format!("{}::{}", self.class.to_lowercase(), self.method.to_lowercase()))
+            Some(concat_atom!(
+                ascii_lowercase_atom(self.class).as_str(),
+                "::",
+                ascii_lowercase_atom(self.method).as_str()
+            ))
         } else {
             None
         }
