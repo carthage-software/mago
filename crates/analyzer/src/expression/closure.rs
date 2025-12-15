@@ -1,7 +1,7 @@
 use std::rc::Rc;
 
 use ahash::HashMap;
-use mago_atom::ascii_lowercase_atom;
+use mago_atom::atom;
 
 use mago_codex::context::ScopeContext;
 
@@ -110,7 +110,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Closure<'arena> {
 
                 variable_spans.insert(variable, variable_span);
 
-                let variable_atom = ascii_lowercase_atom(variable);
+                let variable_atom = atom(variable);
                 let mut variable_type =
                     block_context.locals.get(&variable_atom).cloned().unwrap_or_else(|| Rc::new(get_mixed()));
 

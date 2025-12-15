@@ -1,6 +1,6 @@
 use ahash::HashSet;
 
-use mago_atom::ascii_lowercase_atom;
+use mago_atom::atom;
 use mago_codex::context::ScopeContext;
 
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
@@ -59,7 +59,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ArrowFunction<'arena> {
                 continue;
             }
 
-            let variable_atom = ascii_lowercase_atom(variable);
+            let variable_atom = atom(variable);
 
             if inner_block_context.variables_possibly_in_scope.contains(&variable_atom) {
                 continue;
