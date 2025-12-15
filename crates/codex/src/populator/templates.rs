@@ -64,7 +64,7 @@ pub fn extend_type(
 
     let mut extended_types = Vec::new();
 
-    let mut worklist = extended_type.types.clone().into_owned();
+    let mut worklist = extended_type.types.to_vec();
     while let Some(atomic_type) = worklist.pop() {
         if let TAtomic::GenericParameter(TGenericParameter {
             parameter_name,
@@ -74,7 +74,7 @@ pub fn extend_type(
             && let Some(extended_parameters) = template_extended_parameters.get(defining_entity)
             && let Some(referenced_type) = extended_parameters.get(parameter_name)
         {
-            extended_types.extend(referenced_type.types.clone().into_owned());
+            extended_types.extend(referenced_type.types.iter().cloned());
             continue;
         }
 

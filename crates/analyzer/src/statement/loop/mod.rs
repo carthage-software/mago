@@ -1006,8 +1006,8 @@ fn analyze_iterator<'ctx, 'ast, 'arena>(
                 has_valid_iterable_type = true;
                 has_at_least_one_entry = false;
 
-                collected_key_atomics.extend(iterable.key_type.types.clone().into_owned());
-                collected_value_atomics.extend(iterable.value_type.types.clone().into_owned());
+                collected_key_atomics.extend(iterable.key_type.types.iter().cloned());
+                collected_value_atomics.extend(iterable.value_type.types.iter().cloned());
             }
             TAtomic::Object(object) => {
                 let (obj_key_type, obj_value_type) = match object {

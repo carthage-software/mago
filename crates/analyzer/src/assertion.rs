@@ -786,7 +786,7 @@ fn get_enum_case_equality_assertions(
     );
 
     if let Some(var_name) = var_name {
-        if_types.insert(var_name, vec![vec![Assertion::IsType(enum_case_type.clone().get_single_owned())]]);
+        if_types.insert(var_name, vec![vec![Assertion::IsType(enum_case_type.get_single().clone())]]);
     }
 
     vec![if_types]
@@ -816,7 +816,7 @@ fn get_enum_case_inequality_assertions(
     );
 
     if let Some(var_name) = var_name {
-        if_types.insert(var_name, vec![vec![Assertion::IsNotType(enum_case_type.clone().get_single_owned())]]);
+        if_types.insert(var_name, vec![vec![Assertion::IsNotType(enum_case_type.get_single().clone())]]);
     }
 
     vec![if_types]

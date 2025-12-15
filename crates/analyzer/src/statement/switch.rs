@@ -605,13 +605,14 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
             }
 
             if let Some(ref mut new_locals) = self.new_locals {
-                for (var_id, var_type) in new_locals.clone() {
+                let var_ids: Vec<_> = new_locals.keys().copied().collect();
+                for var_id in var_ids {
                     if let Some(break_var_type) = break_vars.get(&var_id) {
                         if case_block_context.locals.contains_key(&var_id) {
-                            new_locals.insert(
-                                var_id,
-                                Rc::new(combine_union_types(break_var_type, &var_type, self.context.codebase, false)),
-                            );
+                            let var_type = new_locals.get(&var_id).unwrap();
+                            let combined =
+                                Rc::new(combine_union_types(break_var_type, var_type, self.context.codebase, false));
+                            new_locals.insert(var_id, combined);
                         } else {
                             new_locals.remove(&var_id);
                         }
@@ -622,12 +623,13 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
             }
 
             if let Some(ref mut redefined_vars) = self.redefined_variables {
-                for (var_id, var_type) in redefined_vars.clone() {
+                let var_ids: Vec<_> = redefined_vars.keys().copied().collect();
+                for var_id in var_ids {
                     if let Some(break_var_type) = break_vars.get(&var_id) {
-                        redefined_vars.insert(
-                            var_id,
-                            Rc::new(combine_union_types(break_var_type, &var_type, self.context.codebase, false)),
-                        );
+                        let var_type = redefined_vars.get(&var_id).unwrap();
+                        let combined =
+                            Rc::new(combine_union_types(break_var_type, var_type, self.context.codebase, false));
+                        redefined_vars.insert(var_id, combined);
                     } else {
                         redefined_vars.remove(&var_id);
                     }
@@ -674,12 +676,12 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
         }
 
         if let Some(redefined_vars) = &mut self.redefined_variables {
-            for (var_id, var_type) in redefined_vars.clone() {
+            let var_ids: Vec<_> = redefined_vars.keys().copied().collect();
+            for var_id in var_ids {
                 if let Some(break_var_type) = case_redefined_vars.get(&var_id) {
-                    redefined_vars.insert(
-                        var_id,
-                        Rc::new(combine_union_types(break_var_type, &var_type, self.context.codebase, false)),
-                    );
+                    let var_type = redefined_vars.get(&var_id).unwrap();
+                    let combined = Rc::new(combine_union_types(break_var_type, var_type, self.context.codebase, false));
+                    redefined_vars.insert(var_id, combined);
                 } else {
                     redefined_vars.remove(&var_id);
                 }
@@ -689,12 +691,13 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
         }
 
         if let Some(new_locals) = &mut self.new_locals {
-            for (var_id, var_type) in new_locals.clone() {
+            let var_ids: Vec<_> = new_locals.keys().copied().collect();
+            for var_id in var_ids {
                 if let Some(existing_var_type) = case_block_context.locals.get(&var_id) {
-                    new_locals.insert(
-                        var_id,
-                        Rc::new(combine_union_types(existing_var_type, &var_type, self.context.codebase, false)),
-                    );
+                    let var_type = new_locals.get(&var_id).unwrap();
+                    let combined =
+                        Rc::new(combine_union_types(existing_var_type, var_type, self.context.codebase, false));
+                    new_locals.insert(var_id, combined);
                 } else {
                     new_locals.remove(&var_id);
                 }

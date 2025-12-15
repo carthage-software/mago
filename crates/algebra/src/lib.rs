@@ -241,13 +241,19 @@ pub fn saturate_clauses<'a>(clauses: impl IntoIterator<Item = &'a Clause>) -> Ve
 
                         for (var_id, possibilities) in &clause_a.possibilities {
                             if !common_negated_keys.contains(var_id) {
-                                new_possibilities.entry(*var_id).or_default().extend(possibilities.clone());
+                                new_possibilities
+                                    .entry(*var_id)
+                                    .or_default()
+                                    .extend(possibilities.iter().map(|(&k, v)| (k, v.clone())));
                             }
                         }
 
                         for (var_id, possibilities) in &clause_b.possibilities {
                             if !common_negated_keys.contains(var_id) {
-                                new_possibilities.entry(*var_id).or_default().extend(possibilities.clone());
+                                new_possibilities
+                                    .entry(*var_id)
+                                    .or_default()
+                                    .extend(possibilities.iter().map(|(&k, v)| (k, v.clone())));
                             }
                         }
 
@@ -422,7 +428,7 @@ pub fn disjoin_clauses(
 
             let mut possibilities = left_clause.possibilities.clone();
             for (var, possible_types) in &right_clause.possibilities {
-                possibilities.entry(*var).or_default().extend(possible_types.clone());
+                possibilities.entry(*var).or_default().extend(possible_types.iter().map(|(&k, v)| (k, v.clone())));
             }
 
             // If a combined clause contains `A` and `!A`, it's a tautology (always true)
@@ -563,10 +569,10 @@ fn group_impossibilities(mut clauses: Vec<Clause>) -> Option<Vec<Clause>> {
 
     while let Some(clause) = clauses.pop() {
         let mut new_clauses = Vec::with_capacity(seed_clauses.len() * 4);
-        for grouped_clause in &seed_clauses {
-            let clause_impossibilities = clause.get_impossibilities();
+        let clause_impossibilities = clause.get_impossibilities();
 
-            for (var, impossible_types) in clause_impossibilities {
+        for grouped_clause in &seed_clauses {
+            for (var, impossible_types) in &clause_impossibilities {
                 'next: for impossible_type in impossible_types {
                     complexity += 1;
                     if complexity > MAX_COMPLEXITY {
@@ -574,9 +580,9 @@ fn group_impossibilities(mut clauses: Vec<Clause>) -> Option<Vec<Clause>> {
                         return None;
                     }
 
-                    if let Some(new_insert_value) = grouped_clause.possibilities.get(&var) {
+                    if let Some(new_insert_value) = grouped_clause.possibilities.get(var) {
                         for (_, a) in new_insert_value {
-                            if a.is_negation_of(&impossible_type) {
+                            if a.is_negation_of(impossible_type) {
                                 break 'next;
                             }
                         }
@@ -585,9 +591,9 @@ fn group_impossibilities(mut clauses: Vec<Clause>) -> Option<Vec<Clause>> {
                     let mut new_clause_possibilities = grouped_clause.possibilities.clone();
 
                     new_clause_possibilities
-                        .entry(var)
+                        .entry(*var)
                         .or_insert_with(IndexMap::new)
-                        .insert(impossible_type.to_hash(), impossible_type);
+                        .insert(impossible_type.to_hash(), impossible_type.clone());
 
                     new_clauses.push(Clause::new(
                         new_clause_possibilities,

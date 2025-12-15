@@ -717,7 +717,7 @@ fn get_value_for_key<'ctx>(
 
             if !block_context.locals.contains_key(&new_base_key_atom) {
                 let mut new_base_type: Option<Rc<TUnion>> = None;
-                let mut atomic_types = base_key_type.types.clone().into_owned();
+                let mut atomic_types = base_key_type.types.to_vec();
 
                 atomic_types.reverse();
                 while let Some(existing_key_type_part) = atomic_types.pop() {
@@ -847,7 +847,7 @@ fn get_value_for_key<'ctx>(
 
             if !block_context.locals.contains_key(&new_base_key_atom) {
                 let mut new_base_type: Option<Rc<TUnion>> = None;
-                let mut atomic_types = base_key_type.types.clone().into_owned();
+                let mut atomic_types = base_key_type.types.to_vec();
 
                 while let Some(existing_key_type_part) = atomic_types.pop() {
                     if let TAtomic::GenericParameter(TGenericParameter { constraint, .. }) = existing_key_type_part {

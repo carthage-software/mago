@@ -717,8 +717,8 @@ pub fn combine_union_types(
     } else if type_1.is_vanilla_mixed() && type_2.is_vanilla_mixed() {
         get_mixed()
     } else {
-        let mut all_atomic_types = type_1.types.clone().into_owned();
-        all_atomic_types.extend(type_2.types.clone().into_owned());
+        let mut all_atomic_types = type_1.types.to_vec();
+        all_atomic_types.extend(type_2.types.iter().cloned());
 
         let mut result = TUnion::from_vec(combiner::combine(all_atomic_types, codebase, overwrite_empty_array));
 
@@ -1122,7 +1122,7 @@ pub fn get_array_parameters(array_type: &TArray, codebase: &CodebaseMetadata) ->
             let mut value_param;
 
             if let Some((key_param, value_p)) = &keyed_data.parameters {
-                key_types.extend(key_param.types.clone().into_owned());
+                key_types.extend(key_param.types.iter().cloned());
                 value_param = (**value_p).clone();
             } else {
                 key_types.push(TAtomic::Never);

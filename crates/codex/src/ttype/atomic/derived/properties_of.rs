@@ -121,7 +121,7 @@ impl TPropertiesOf {
                             if let Some((_, existing_union)) = known_items.get_mut(&key) {
                                 for atomic in type_metadata.type_union.types.iter() {
                                     if !existing_union.types.contains(atomic) {
-                                        let mut types = existing_union.types.clone().into_owned();
+                                        let mut types = existing_union.types.to_vec();
                                         types.push(atomic.clone());
                                         *existing_union = TUnion::from_vec(types);
                                     }
@@ -167,7 +167,7 @@ impl TPropertiesOf {
                     if !name_types.is_empty() {
                         let name_key = ArrayKey::String(atom("name"));
                         if let Some((_, existing_union)) = known_items.get_mut(&name_key) {
-                            let mut types = existing_union.types.clone().into_owned();
+                            let mut types = existing_union.types.to_vec();
                             types.extend(name_types);
                             *existing_union = TUnion::from_vec(types);
                         } else {
@@ -179,7 +179,7 @@ impl TPropertiesOf {
                     if !value_types.is_empty() {
                         let value_key = ArrayKey::String(atom("value"));
                         if let Some((_, existing_union)) = known_items.get_mut(&value_key) {
-                            let mut types = existing_union.types.clone().into_owned();
+                            let mut types = existing_union.types.to_vec();
                             types.extend(value_types);
                             *existing_union = TUnion::from_vec(types);
                         } else {

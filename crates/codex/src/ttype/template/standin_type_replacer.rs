@@ -87,7 +87,7 @@ pub fn replace(
     argument_span: Option<Span>,
     options: StandinOptions<'_>,
 ) -> TUnion {
-    let mut original_parameter_atomics = parameter_type.types.clone().into_owned();
+    let mut original_parameter_atomics = parameter_type.types.to_vec();
     let mut new_parameter_atomics = Vec::with_capacity(original_parameter_atomics.len());
 
     let mut argument_type = argument_type.cloned();
@@ -524,7 +524,7 @@ fn handle_template_param_standin(
     }
 
     if template_type.get_id() == normalized_key {
-        return template_type.types.clone().into_owned();
+        return template_type.types.to_vec();
     }
 
     let mut replacement_type = template_type.clone();
