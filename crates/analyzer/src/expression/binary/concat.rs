@@ -72,11 +72,11 @@ pub fn analyze_string_concat_operation<'ctx, 'arena>(
     let len = operands.len();
     for (i, operand) in operands.iter().enumerate() {
         let side = if i == 0 {
-            "Left"
+            "left"
         } else if i == len - 1 {
-            "Right"
+            "right"
         } else {
-            "Middle"
+            "middle"
         };
 
         analyze_string_concat_operand(context, artifacts, operand, side)?;
@@ -104,7 +104,7 @@ fn analyze_string_concat_operand<'ctx, 'ast, 'arena>(
             IssueCode::NullOperand,
             Issue::error(format!(
                 "Implicit conversion of `null` to empty string for {} operand in string concatenation.",
-                side.to_ascii_lowercase()
+                side
             ))
             .with_annotation(Annotation::primary(operand.span()).with_message("Operand is `null` here"))
             .with_note("Using `null` in string concatenation results in an empty string `''`.")
@@ -121,7 +121,7 @@ fn analyze_string_concat_operand<'ctx, 'ast, 'arena>(
             IssueCode::FalseOperand,
             Issue::error(format!(
                 "Implicit conversion of `false` to empty string for {} operand in string concatenation.",
-                side.to_ascii_lowercase()
+                side
             ))
             .with_annotation(Annotation::primary(operand.span()).with_message("Operand is `false` here"))
             .with_note("Using `false` in string concatenation results in an empty string `''`.")
@@ -136,7 +136,7 @@ fn analyze_string_concat_operand<'ctx, 'ast, 'arena>(
             IssueCode::PossiblyNullOperand,
             Issue::warning(format!(
                 "Possibly null {} operand used in string concatenation (type `{}`).",
-                side.to_ascii_lowercase(),
+                side,
                 operand_type.get_id()
             ))
             .with_annotation(Annotation::primary(operand.span()).with_message("This might be `null`"))
@@ -150,7 +150,7 @@ fn analyze_string_concat_operand<'ctx, 'ast, 'arena>(
             IssueCode::PossiblyFalseOperand,
             Issue::warning(format!(
                 "Possibly false {} operand used in string concatenation (type `{}`).",
-                side.to_ascii_lowercase(),
+                side,
                 operand_type.get_id()
             ))
             .with_annotation(Annotation::primary(operand.span()).with_message("This might be `false`"))
@@ -194,7 +194,7 @@ fn analyze_string_concat_operand<'ctx, 'ast, 'arena>(
                             IssueCode::InvalidOperand,
                             Issue::error(format!(
                                 "Invalid {} operand: template parameter `{}` constraint `{}` is not compatible with string concatenation.",
-                                side.to_ascii_lowercase(),
+                                side,
                                 parameter.parameter_name,
                                 parameter.constraint.get_id()
                             ))
@@ -215,7 +215,7 @@ fn analyze_string_concat_operand<'ctx, 'ast, 'arena>(
                             IssueCode::InvalidOperand,
                             Issue::error(format!(
                                 "Invalid {} operand: cannot determine if generic `object` is stringable.",
-                                side.to_ascii_lowercase()
+                                side
                             ))
                             .with_annotation(
                                 Annotation::primary(operand.span())
@@ -239,7 +239,7 @@ fn analyze_string_concat_operand<'ctx, 'ast, 'arena>(
                         IssueCode::ImplicitToStringCast,
                         Issue::warning(format!(
                             "Implicit conversion to `string` for {} operand via `{}::__toString()`.",
-                            side.to_ascii_lowercase(),
+                            side,
                             class_like_name
                         ))
                         .with_annotation(Annotation::primary(operand.span())
@@ -254,7 +254,7 @@ fn analyze_string_concat_operand<'ctx, 'ast, 'arena>(
                             IssueCode::InvalidOperand,
                             Issue::error(format!(
                                 "Invalid {} operand: object of type `{}` cannot be converted to `string`.",
-                                side.to_ascii_lowercase(),
+                                side,
                                 operand_atomic_type.get_id()
                             ))
                             .with_annotation(Annotation::primary(operand.span())
@@ -276,7 +276,7 @@ fn analyze_string_concat_operand<'ctx, 'ast, 'arena>(
                         IssueCode::ArrayToStringConversion,
                         Issue::error(format!(
                             "Invalid {} operand: cannot use type `array` in string concatenation.",
-                            side.to_ascii_lowercase()
+                            side
                         ))
                         .with_annotation(Annotation::primary(operand.span()).with_message("Cannot concatenate with an `array`"))
                         .with_note("PHP raises an `E_WARNING` or `E_NOTICE` and uses the literal string 'Array' when an array is used in string context.")
@@ -293,7 +293,7 @@ fn analyze_string_concat_operand<'ctx, 'ast, 'arena>(
                     IssueCode::ImplicitResourceToStringCast,
                     Issue::warning(format!(
                         "Implicit conversion of `resource` to string for {} operand.",
-                        side.to_ascii_lowercase()
+                        side
                     ))
                     .with_annotation(Annotation::primary(operand.span()).with_message("Resource implicitly converted to string"))
                     .with_note("PHP converts resources to the string format 'Resource id #[id]' when used in string context.")
@@ -308,7 +308,7 @@ fn analyze_string_concat_operand<'ctx, 'ast, 'arena>(
                         IssueCode::MixedOperand,
                         Issue::error(format!(
                             "Invalid {} operand: type `{}` cannot be reliably used in string concatenation.",
-                            side.to_ascii_lowercase(),
+                            side,
                             operand_atomic_type.get_id()
                         ))
                         .with_annotation(Annotation::primary(operand.span()).with_message("Operand has `mixed` type"))
@@ -328,7 +328,7 @@ fn analyze_string_concat_operand<'ctx, 'ast, 'arena>(
                         Issue::error(format!(
                             "Invalid type `{}` for {} operand in string concatenation.",
                              operand_atomic_type.get_id(),
-                             side.to_ascii_lowercase()
+                             side
                         ))
                         .with_annotation(Annotation::primary(operand.span()).with_message("Invalid type for concatenation"))
                         .with_help("Ensure the operand is a string, number, null, false, resource, or an object with `__toString`."),
@@ -349,7 +349,7 @@ fn analyze_string_concat_operand<'ctx, 'ast, 'arena>(
             IssueCode::InvalidOperand,
             Issue::error(format!(
                 "Invalid type `{}` for {} operand in string concatenation.",
-                operand_type.get_id(), side.to_ascii_lowercase()
+                operand_type.get_id(), side
             ))
             .with_annotation(Annotation::primary(operand.span()).with_message("Invalid type for concatenation"))
             .with_note("Operands in string concatenation must be strings, numbers, null, false, resources, or objects implementing `__toString`.")
@@ -361,7 +361,7 @@ fn analyze_string_concat_operand<'ctx, 'ast, 'arena>(
             Issue::warning(format!(
                 "Possibly invalid type `{}` for {} operand in string concatenation.",
                 operand_type.get_id(),
-                side.to_ascii_lowercase()
+                side
             ))
             .with_annotation(
                 Annotation::primary(operand.span()).with_message("Operand type might be invalid for concatenation"),
