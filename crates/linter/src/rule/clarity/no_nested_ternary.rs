@@ -54,7 +54,7 @@ impl LintRule for NoNestedTernaryRule {
 
                 In PHP 8.0 and later, the ternary operator (`? :`) is non-associative. Before PHP 8.0, it was left-associative, which is now deprecated. Most other programming languages treat it as right-associative. This inconsistency across versions and languages can make nested ternaries hard to reason about, even when using parentheses.
             "},
-            good_example: indoc! {r#"
+            good_example: indoc! {r"
                 <?php
 
                 if ($user->isAdmin()) {
@@ -62,12 +62,12 @@ impl LintRule for NoNestedTernaryRule {
                 } else {
                     $allowed = $user->isEditor();
                 }
-            "#},
-            bad_example: indoc! {r#"
+            "},
+            bad_example: indoc! {r"
                 <?php
 
                 $allowed = $user->isAdmin() ? true : ($user->isEditor() ? true : false);
-            "#},
+            "},
             category: Category::Clarity,
 
             requirements: RuleRequirements::None,
@@ -86,7 +86,7 @@ impl LintRule for NoNestedTernaryRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let Node::Conditional(expr) = node else {
             return;
         };

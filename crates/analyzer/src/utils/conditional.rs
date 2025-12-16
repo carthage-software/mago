@@ -219,9 +219,9 @@ fn get_definitely_evaluated_expression_inside_if<'ast, 'arena>(
     condition
 }
 
-pub fn handle_paradoxical_condition<'ctx, 'ast, 'arena, T: HasSpan>(
-    context: &mut Context<'ctx, 'arena>,
-    expression: &'ast T,
+pub fn handle_paradoxical_condition<T: HasSpan>(
+    context: &mut Context<'_, '_>,
+    expression: &T,
     expression_type: &TUnion,
 ) {
     let type_id = expression_type.get_id();

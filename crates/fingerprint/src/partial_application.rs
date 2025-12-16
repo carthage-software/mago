@@ -16,7 +16,7 @@ impl Fingerprintable for PartialApplication<'_> {
             PartialApplication::Function(partial) => partial.fingerprint_with_hasher(hasher, resolved_names, options),
             PartialApplication::Method(partial) => partial.fingerprint_with_hasher(hasher, resolved_names, options),
             PartialApplication::StaticMethod(partial) => {
-                partial.fingerprint_with_hasher(hasher, resolved_names, options)
+                partial.fingerprint_with_hasher(hasher, resolved_names, options);
             }
         }
     }

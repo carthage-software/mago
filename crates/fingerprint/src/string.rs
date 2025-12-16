@@ -13,7 +13,9 @@ impl Fingerprintable for CompositeString<'_> {
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
     ) {
-        use CompositeString::*;
+        use CompositeString::Document;
+        use CompositeString::Interpolated;
+        use CompositeString::ShellExecute;
 
         match self {
             ShellExecute(s) => s.fingerprint_with_hasher(hasher, resolved_names, options),
@@ -61,7 +63,7 @@ impl Fingerprintable for DocumentString<'_> {
         match self.kind {
             DocumentKind::Heredoc => "heredoc".hash(hasher),
             DocumentKind::Nowdoc => "nowdoc".hash(hasher),
-        };
+        }
         self.label.hash(hasher);
         self.indentation.fingerprint_with_hasher(hasher, resolved_names, options);
         for part in self.parts.iter() {
@@ -77,7 +79,10 @@ impl Fingerprintable for DocumentIndentation {
         _resolved_names: &ResolvedNames,
         _options: &FingerprintOptions<'_>,
     ) {
-        use DocumentIndentation::*;
+        use DocumentIndentation::Mixed;
+        use DocumentIndentation::None;
+        use DocumentIndentation::Tab;
+        use DocumentIndentation::Whitespace;
 
         match self {
             None => "no_indent".hash(hasher),
@@ -107,7 +112,9 @@ impl Fingerprintable for StringPart<'_> {
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
     ) {
-        use StringPart::*;
+        use StringPart::BracedExpression;
+        use StringPart::Expression;
+        use StringPart::Literal;
 
         match self {
             Literal(l) => l.fingerprint_with_hasher(hasher, resolved_names, options),

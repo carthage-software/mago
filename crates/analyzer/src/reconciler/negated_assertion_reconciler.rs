@@ -336,7 +336,7 @@ fn handle_literal_negated_equality(
                                 .difference(assertion_integer, false)
                                 .into_iter()
                                 .map(|remaining_integer| TAtomic::Scalar(TScalar::Integer(remaining_integer))),
-                        )
+                        );
                     }
                     _ => {
                         acceptable_types.push(existing_atomic_type);

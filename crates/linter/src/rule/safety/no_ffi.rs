@@ -56,13 +56,13 @@ impl LintRule for NoFfiRule {
 
                 If you are confident in your use of FFI and understand the risks, you can disable this rule in your Mago configuration.
             "},
-            good_example: indoc! {r#"
+            good_example: indoc! {r"
                 <?php
 
                 // Using a safe alternative to FFI
                 $data = 'some data';
                 $hash = hash('sha256', $data);
-            "#},
+            "},
             bad_example: indoc! {r#"
                 <?php
 
@@ -90,7 +90,7 @@ impl LintRule for NoFfiRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let identifier = match node {
             Node::StaticMethodCall(static_method_call) => {
                 if let Expression::Identifier(identifier) = static_method_call.class {
@@ -123,7 +123,7 @@ impl LintRule for NoFfiRule {
             ctx.collector.report(
                 Issue::new(
                     self.cfg.level(),
-                    format!("Potentially unsafe use of FFI class `{}`.", class_name),
+                    format!("Potentially unsafe use of FFI class `{class_name}`."),
                 )
                 .with_code(self.meta.code)
                 .with_annotation(Annotation::primary(identifier.span())

@@ -355,8 +355,7 @@ fn is_backing_store_access(object_expr: &Expression, prop_name: &Atom, block_con
     block_context
         .scope
         .get_property_hook()
-        .map(|(hook_prop_name, hook_meta)| hook_prop_name == *prop_name && hook_meta.is_set())
-        .unwrap_or(false)
+        .is_some_and(|(hook_prop_name, hook_meta)| hook_prop_name == *prop_name && hook_meta.is_set())
 }
 
 /// Finds a property in a class, gets its type, and handles template localization.
@@ -617,8 +616,8 @@ fn update_template_types(
 }
 
 /// Reports an error for a property access on a `null` or `void` value.
-fn report_access_on_null<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+fn report_access_on_null<'ctx>(
+    context: &mut Context<'ctx, '_>,
     block_context: &BlockContext<'ctx>,
     object_span: Span,
     operator_span: Span,
@@ -699,10 +698,10 @@ fn report_access_on_null<'ctx, 'arena>(
     }
 }
 
-fn report_redundant_nullsafe<'ctx, 'ast, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+fn report_redundant_nullsafe<'arena>(
+    context: &mut Context<'_, 'arena>,
     operator_span: Span,
-    object_expr: &'ast Expression<'arena>,
+    object_expr: &Expression<'arena>,
     object_type: &TUnion,
 ) {
     let object_type_str = object_type.get_id();
@@ -752,10 +751,10 @@ fn report_ambiguous_access(
 ) {
     context.collector.report_with_code(
         IssueCode::AmbiguousObjectPropertyAccess,
-        Issue::warning(format!("Cannot statically verify property access on a generic `{}` type.", object_type))
+        Issue::warning(format!("Cannot statically verify property access on a generic `{object_type}` type."))
             .with_annotation(Annotation::primary(selector.span()).with_message("Accessing property here"))
             .with_annotation(
-                Annotation::secondary(object_span).with_message(format!("This expression has type `{}`", object_type)),
+                Annotation::secondary(object_span).with_message(format!("This expression has type `{object_type}`")),
             )
             .with_help("Provide a more specific type hint for the object (e.g., `MyClass`) for robust analysis."),
     );

@@ -194,7 +194,7 @@ fn report_invalid_target<'ctx, 'arena>(
     flags: AttributeFlags,
 ) {
     let attribute_name = metadata.original_name;
-    let short_attribute_name = attribute_name.split("\\").last().unwrap_or(attribute_name.as_str());
+    let short_attribute_name = attribute_name.split('\\').next_back().unwrap_or(attribute_name.as_str());
     let allowed_targets = flags.get_target_names().join(", ");
 
     context.collector.report_with_code(

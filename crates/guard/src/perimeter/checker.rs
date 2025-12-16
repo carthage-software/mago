@@ -107,12 +107,11 @@ fn check_allowed(
         if let (Some(src_idx), Some(tgt_idx)) = (source_layer_index, target_layer_index) {
             if src_idx >= tgt_idx {
                 return None;
-            } else {
-                return Some(BreachReason::Layering {
-                    source_layer: ctx.settings.perimeter.layering[src_idx].clone(),
-                    target_layer: ctx.settings.perimeter.layering[tgt_idx].clone(),
-                });
             }
+            return Some(BreachReason::Layering {
+                source_layer: ctx.settings.perimeter.layering[src_idx].clone(),
+                target_layer: ctx.settings.perimeter.layering[tgt_idx].clone(),
+            });
         }
     }
 

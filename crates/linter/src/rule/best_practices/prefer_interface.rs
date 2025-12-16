@@ -52,7 +52,7 @@ impl LintRule for PreferInterfaceRule {
             description: indoc! {"
                 Detects when an implementation class is used instead of the interface.
             "},
-            good_example: indoc! {r#"
+            good_example: indoc! {r"
                 <?php
 
                 use Symfony\Component\Serializer\SerializerInterface;
@@ -64,8 +64,8 @@ impl LintRule for PreferInterfaceRule {
                         $this->serializer = $serializer;
                     }
                 }
-            "#},
-            bad_example: indoc! {r#"
+            "},
+            bad_example: indoc! {r"
                 <?php
 
                 use Symfony\Component\Serializer\Serializer;
@@ -77,7 +77,7 @@ impl LintRule for PreferInterfaceRule {
                         $this->serializer = $serializer;
                     }
                 }
-            "#},
+            "},
             category: Category::BestPractices,
 
             requirements: RuleRequirements::Integration(Integration::Symfony),
@@ -96,17 +96,17 @@ impl LintRule for PreferInterfaceRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let Node::Hint(Hint::Identifier(identifier)) = node else {
             return;
         };
 
         let fqcn = ctx.lookup_name(identifier);
-        for (implementation, interface) in IMPLEMENTATION_TO_INTERFACE.iter() {
+        for (implementation, interface) in &IMPLEMENTATION_TO_INTERFACE {
             if fqcn == *implementation {
                 let issue = Issue::new(
                     self.cfg.level(),
-                    format!("Use the interface `{}` instead of the implementation `{}`.", interface, implementation),
+                    format!("Use the interface `{interface}` instead of the implementation `{implementation}`."),
                 )
                 .with_code(self.meta.code)
                 .with_annotation(

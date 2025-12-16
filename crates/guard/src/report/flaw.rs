@@ -81,7 +81,7 @@ impl From<StructuralFlaw> for Issue {
 impl fmt::Display for FlawKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::MustBeNamed { pattern } => write!(f, "Name does not match pattern `{}`", pattern),
+            Self::MustBeNamed { pattern } => write!(f, "Name does not match pattern `{pattern}`"),
             Self::MustBeFinal => write!(f, "This must be declared as `final`"),
             Self::MustNotBeFinal => write!(f, "This must not be declared as `final`"),
             Self::MustBeAbstract => write!(f, "This must be declared as `abstract`"),
@@ -89,20 +89,24 @@ impl fmt::Display for FlawKind {
             Self::MustBeReadonly => write!(f, "This must be declared as `readonly`"),
             Self::MustNotBeReadonly => write!(f, "This must not be declared as `readonly`"),
             Self::MustImplement { expected } => {
-                write!(f, "Does not implement required interface(s): {}", expected)
+                write!(f, "Does not implement required interface(s): {expected}")
             }
             Self::MustExtend { expected } => {
-                write!(f, "Does not extend required base class: {}", expected)
+                write!(f, "Does not extend required base class: {expected}")
             }
             Self::MustUseTrait { expected } => {
-                write!(f, "Does not use required trait(s): {}", expected)
+                write!(f, "Does not use required trait(s): {expected}")
             }
             Self::MustUseAttribute { expected } => {
-                write!(f, "Does not use required attribute(s): {}", expected)
+                write!(f, "Does not use required attribute(s): {expected}")
             }
             Self::MustBe { allowed } => {
-                let allowed_str = allowed.iter().map(|s| s.as_str()).collect::<Vec<_>>().join(", ");
-                write!(f, "This namespace should only contain: {}", allowed_str)
+                let allowed_str = allowed
+                    .iter()
+                    .map(super::super::settings::StructuralSymbolKind::as_str)
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                write!(f, "This namespace should only contain: {allowed_str}")
             }
         }
     }

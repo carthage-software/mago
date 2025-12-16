@@ -130,11 +130,11 @@ pub struct BlockContext<'ctx> {
     /// Flag indicating we're collecting initialization data (only in constructors).
     pub collect_initializations: bool,
 
-    /// Set to true if this method calls parent::__construct().
+    /// Set to true if this method calls `parent::`__`construct()`.
     /// Used to include parent constructor's property initializations.
     pub calls_parent_constructor: bool,
 
-    /// If this method calls parent::<method>() where <method> is a class initializer,
+    /// If this method calls `parent::`<method>() where <method> is a class initializer,
     /// this holds the initializer method name.
     pub calls_parent_initializer: Option<Atom>,
 }
@@ -370,7 +370,7 @@ impl<'ctx> BlockContext<'ctx> {
             let keep_clause = should_keep_clause(&clause, remove_var_id, new_type);
 
             if keep_clause {
-                clauses_to_keep.push(clause.clone())
+                clauses_to_keep.push(clause.clone());
             } else {
                 other_clauses.push(clause);
             }
@@ -528,15 +528,13 @@ impl<'ctx> BlockContext<'ctx> {
                 }
             }
 
-            for reference in references.iter() {
+            for reference in &references {
                 self.references_in_scope.remove(reference);
             }
 
             debug_assert!(
                 !references.is_empty(),
-                "No references found for variable {}, even though it has a reference count of {}",
-                remove_var_id,
-                reference_count
+                "No references found for variable {remove_var_id}, even though it has a reference count of {reference_count}"
             );
 
             if !references.is_empty() {
@@ -581,7 +579,7 @@ impl<'ctx> BlockContext<'ctx> {
                 None
             };
 
-            let Some(existing_type) = self.locals.get(variable_id).map(|rc| rc.as_ref()).cloned() else {
+            let Some(existing_type) = self.locals.get(variable_id).map(std::convert::AsRef::as_ref).cloned() else {
                 if let Some(new_type) = new_type {
                     self.locals.insert(*variable_id, new_type);
                     updated_vars.insert(*variable_id);
@@ -609,8 +607,8 @@ impl<'ctx> BlockContext<'ctx> {
         }
     }
 
-    /// Decrement the reference count of the variable that $ref_id is referring to. This needs to
-    /// be done before $ref_id is changed to no longer reference its currently referenced variable,
+    /// Decrement the reference count of the variable that $`ref_id` is referring to. This needs to
+    /// be done before $`ref_id` is changed to no longer reference its currently referenced variable,
     /// for example by unsetting, reassigning to another reference, or being shadowed by a global.
     pub fn decrement_reference_count(&mut self, ref_id: &str) -> bool {
         let ref_atom = atom(ref_id);
@@ -643,8 +641,8 @@ impl std::fmt::Display for ReferenceConstraintSource {
     }
 }
 
-fn substitute_types<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+fn substitute_types(
+    context: &mut Context<'_, '_>,
     existing_type: TUnion,
     old_type: TUnion,
     new_type: Option<&TUnion>,
@@ -678,11 +676,7 @@ fn substitute_types<'ctx, 'arena>(
 /// # Returns
 ///
 /// A new `TUnion` representing `existing_type - type_to_remove`.
-pub fn subtract_union_types<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
-    existing_type: TUnion,
-    type_to_remove: TUnion,
-) -> TUnion {
+pub fn subtract_union_types(context: &mut Context<'_, '_>, existing_type: TUnion, type_to_remove: TUnion) -> TUnion {
     if existing_type == type_to_remove {
         return get_never();
     }

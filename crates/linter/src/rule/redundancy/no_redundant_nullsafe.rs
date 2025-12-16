@@ -59,7 +59,7 @@ impl LintRule for NoRedundantNullsafeRule {
                 In both scenarios, the surrounding language construct (`??` or `isset()`) already handles `null` values safely,
                 making the `?->` operator superfluous and the code unnecessarily verbose.
             "},
-            good_example: indoc! {r#"
+            good_example: indoc! {r"
                 <?php
 
                 $name = $user->name ?? 'Guest';
@@ -67,8 +67,8 @@ impl LintRule for NoRedundantNullsafeRule {
                 if (isset($user->profile)) {
                     // Do something with $user->profile
                 }
-            "#},
-            bad_example: indoc! {r#"
+            "},
+            bad_example: indoc! {r"
                 <?php
 
                 $name = $user?->name ?? 'Guest';
@@ -76,7 +76,7 @@ impl LintRule for NoRedundantNullsafeRule {
                 if (isset($user?->profile)) {
                     // Do something with $user->profile
                 }
-            "#},
+            "},
             category: Category::Redundancy,
 
             requirements: RuleRequirements::None,
@@ -95,7 +95,7 @@ impl LintRule for NoRedundantNullsafeRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         match node {
             Node::Binary(Binary { lhs, operator: BinaryOperator::NullCoalesce(op), .. }) => {
                 let Expression::Access(Access::NullSafeProperty(null_safe)) = lhs else {

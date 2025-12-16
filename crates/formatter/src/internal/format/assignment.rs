@@ -425,7 +425,7 @@ fn should_break_after_operator<'arena>(
 
     if is_poorly_breakable_member_or_call_chain(f, rhs_expression) {
         return true;
-    };
+    }
 
     false
 }

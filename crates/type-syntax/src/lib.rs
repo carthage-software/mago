@@ -13,7 +13,7 @@ pub mod lexer;
 pub mod parser;
 pub mod token;
 
-/// Parses a string representation of a PHPDoc type into an Abstract Syntax Tree (AST).
+/// Parses a string representation of a `PHPDoc` type into an Abstract Syntax Tree (AST).
 ///
 /// This is the main entry point for the type parser. It takes the type string
 /// and its original `Span` (representing its location within the source file)
@@ -864,7 +864,7 @@ mod tests {
                     _ => {
                         panic!("Expected min to be a LiteralIntType, got `{}`", r.min)
                     }
-                };
+                }
 
                 match r.max {
                     IntOrKeyword::Int(literal_int_type) => {
@@ -873,7 +873,7 @@ mod tests {
                     _ => {
                         panic!("Expected max to be a LiteralIntType, got `{}`", r.max)
                     }
-                };
+                }
             }
             res => panic!("Expected Ok(Type::IntRange), got {res:?}"),
         }
@@ -887,7 +887,7 @@ mod tests {
                     _ => {
                         panic!("Expected min to be a Keyword, got `{}`", r.min)
                     }
-                };
+                }
 
                 match r.max {
                     IntOrKeyword::Int(literal_int_type) => {
@@ -896,7 +896,7 @@ mod tests {
                     _ => {
                         panic!("Expected max to be a LiteralIntType, got `{}`", r.max)
                     }
-                };
+                }
             }
             res => panic!("Expected Ok(Type::IntRange), got {res:?}"),
         }
@@ -910,7 +910,7 @@ mod tests {
                     _ => {
                         panic!("Expected min to be a Keyword, got `{}`", r.min)
                     }
-                };
+                }
 
                 match r.max {
                     IntOrKeyword::Keyword(keyword) => {
@@ -919,7 +919,7 @@ mod tests {
                     _ => {
                         panic!("Expected max to be a Keyword, got `{}`", r.max)
                     }
-                };
+                }
             }
             res => panic!("Expected Ok(Type::IntRange), got {res:?}"),
         }
@@ -1339,7 +1339,7 @@ mod tests {
         ];
 
         for keyword in keywords {
-            let input = format!("array{{{}: string}}", keyword);
+            let input = format!("array{{{keyword}: string}}");
             match do_parse(&input) {
                 Ok(Type::Shape(shape)) => {
                     assert_eq!(shape.fields.len(), 1);
@@ -1348,11 +1348,10 @@ mod tests {
                             shape.fields[0].key.as_ref().map(|k| &k.key),
                             Some(ShapeKey::String { value, .. }) if *value == keyword
                         ),
-                        "Failed for keyword: {}",
-                        keyword
+                        "Failed for keyword: {keyword}"
                     );
                 }
-                res => panic!("Expected Ok(Type::Shape) for keyword '{}', got {res:?}", keyword),
+                res => panic!("Expected Ok(Type::Shape) for keyword '{keyword}', got {res:?}"),
             }
         }
     }

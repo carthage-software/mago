@@ -54,16 +54,16 @@ impl LintRule for NoRequestVariableRule {
 
                 Use `$_GET`, `$_POST`, or `$_COOKIE` instead for better clarity.
             "},
-            good_example: indoc! {r#"
+            good_example: indoc! {r"
                 <?php
 
                 $identifier = $_GET['id'];
-            "#},
-            bad_example: indoc! {r#"
+            "},
+            bad_example: indoc! {r"
                 <?php
 
                 $identifier = $_REQUEST['id'];
-            "#},
+            "},
             category: Category::Safety,
 
             requirements: RuleRequirements::None,
@@ -82,7 +82,7 @@ impl LintRule for NoRequestVariableRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let Node::DirectVariable(direct_variable) = node else {
             return;
         };

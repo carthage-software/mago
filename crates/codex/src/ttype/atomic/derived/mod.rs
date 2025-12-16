@@ -78,7 +78,7 @@ impl TDerived {
 }
 
 impl TType for TDerived {
-    fn get_child_nodes<'a>(&'a self) -> Vec<TypeRef<'a>> {
+    fn get_child_nodes(&self) -> Vec<TypeRef<'_>> {
         match self {
             TDerived::KeyOf(ttype) => ttype.get_child_nodes(),
             TDerived::ValueOf(ttype) => ttype.get_child_nodes(),

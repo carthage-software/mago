@@ -105,7 +105,7 @@ impl LintRule for AmbiguousFunctionCallRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         if ctx.scope.get_namespace().is_empty() {
             return;
         }

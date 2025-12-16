@@ -97,8 +97,8 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Return<'arena> {
     }
 }
 
-pub fn handle_return_value<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+pub fn handle_return_value<'ctx>(
+    context: &mut Context<'ctx, '_>,
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     return_value: Option<&Expression>,
@@ -235,47 +235,43 @@ pub fn handle_return_value<'ctx, 'arena>(
         };
 
     if function_like_metadata.flags.has_yield() {
-        match get_generator_return_type(context, &expected_return_type) {
-            Some((return_type, is_from_generator)) => {
-                if !is_from_generator {
-                    let inferred_return_type_str = inferred_return_type.get_id();
-                    let expected_return_type_str = expected_return_type.get_id();
+        if let Some((return_type, is_from_generator)) = get_generator_return_type(context, &expected_return_type) {
+            if !is_from_generator {
+                let inferred_return_type_str = inferred_return_type.get_id();
+                let expected_return_type_str = expected_return_type.get_id();
 
-                    let type_declaration_span = function_like_metadata
-                        .return_type_metadata
-                        .as_ref()
-                        .map(|signature| signature.span)
-                        .unwrap_or_else(|| function_like_metadata.span);
+                let type_declaration_span = function_like_metadata
+                    .return_type_metadata
+                    .as_ref()
+                    .map_or_else(|| function_like_metadata.span, |signature| signature.span);
 
-                    if let Some(return_value) = return_value {
-                        context.collector.report_with_code(
-                            IssueCode::HiddenGeneratorReturn,
-                            Issue::warning(format!(
-                                "The value returned by generator function `{function_name}` may be inaccessible to callers.",
+                if let Some(return_value) = return_value {
+                    context.collector.report_with_code(
+                        IssueCode::HiddenGeneratorReturn,
+                        Issue::warning(format!(
+                            "The value returned by generator function `{function_name}` may be inaccessible to callers.",
+                        ))
+                        .with_annotation(
+                            Annotation::primary(return_value.span()).with_message(format!(
+                                "This return statement provides a final value of type `{inferred_return_type_str}` for the generator.",
+                            )),
+                        )
+                        .with_annotation(
+                            Annotation::secondary(type_declaration_span).with_message(format!(
+                                "Function is declared to return `{expected_return_type_str}`, which hides `Generator::getReturn()`."
                             ))
-                            .with_annotation(
-                                Annotation::primary(return_value.span()).with_message(format!(
-                                    "This return statement provides a final value of type `{inferred_return_type_str}` for the generator.",
-                                )),
-                            )
-                            .with_annotation(
-                                Annotation::secondary(type_declaration_span).with_message(format!(
-                                    "Function is declared to return `{expected_return_type_str}`, which hides `Generator::getReturn()`."
-                                ))
-                            )
-                            .with_note("Generators can provide a final value via `Generator::getReturn()`.")
-                            .with_note(format!("However, the type hint `{expected_return_type_str}` prevents callers from safely accessing this method."))
-                            .with_note(format!("Thus, this specific returned value (type `{inferred_return_type_str}`) is effectively inaccessible."))
-                            .with_help("Change return hint to `Generator<..., R>` or remove `return <value>` if unused."),
-                        );
-                    }
+                        )
+                        .with_note("Generators can provide a final value via `Generator::getReturn()`.")
+                        .with_note(format!("However, the type hint `{expected_return_type_str}` prevents callers from safely accessing this method."))
+                        .with_note(format!("Thus, this specific returned value (type `{inferred_return_type_str}`) is effectively inaccessible."))
+                        .with_help("Change return hint to `Generator<..., R>` or remove `return <value>` if unused."),
+                    );
                 }
+            }
 
-                expected_return_type = return_type;
-            }
-            None => {
-                // ignore this, it will be handled by the `yield` analyzer
-            }
+            expected_return_type = return_type;
+        } else {
+            // ignore this, it will be handled by the `yield` analyzer
         }
     } else if return_value.is_some() {
         artifacts.inferred_return_types.push(inferred_return_type.clone());
@@ -519,8 +515,8 @@ pub fn handle_return_value<'ctx, 'arena>(
     Ok(())
 }
 
-fn handle_property_hook_return<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+fn handle_property_hook_return<'ctx>(
+    context: &mut Context<'ctx, '_>,
     block_context: &BlockContext<'ctx>,
     return_value: Option<&Expression>,
     mut inferred_return_type: Rc<TUnion>,
@@ -545,8 +541,7 @@ fn handle_property_hook_return<'ctx, 'arena>(
             static_class_type: block_context
                 .scope
                 .get_class_like_name()
-                .map(StaticClassType::Name)
-                .unwrap_or(StaticClassType::None),
+                .map_or(StaticClassType::None, StaticClassType::Name),
             ..Default::default()
         },
     );
@@ -655,8 +650,8 @@ fn handle_property_hook_return<'ctx, 'arena>(
 }
 
 /// Check for uninitialized properties when returning early from a constructor.
-fn check_constructor_early_return<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+fn check_constructor_early_return<'ctx>(
+    context: &mut Context<'ctx, '_>,
     block_context: &BlockContext<'ctx>,
     return_span: Span,
     class_name: &Atom,
@@ -805,7 +800,7 @@ mod tests {
 
     test_analysis! {
         name = empty_return_from_generator,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             /**
@@ -817,12 +812,12 @@ mod tests {
                 yield $array['key'] ?? 'default';
                 return;
             }
-        "#}
+        "}
     }
 
     test_analysis! {
         name = hidden_return_from_generator,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             /**
@@ -835,7 +830,7 @@ mod tests {
 
                 return 123;
             }
-        "#},
+        "},
         issues = [
             IssueCode::HiddenGeneratorReturn,
         ]
@@ -843,7 +838,7 @@ mod tests {
 
     test_analysis! {
         name = return_from_generator,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             /**
@@ -874,7 +869,7 @@ mod tests {
 
                 return 'final value';
             }
-        "#},
+        "},
         issues = [
             // Traversable: K and V not used in interface body
             IssueCode::UnusedTemplateParameter,
@@ -887,7 +882,7 @@ mod tests {
 
     test_analysis! {
         name = invalid_return_from_generator,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             /**
@@ -910,7 +905,7 @@ mod tests {
 
                 return 'final value 2';
             }
-        "#},
+        "},
         issues = [
             IssueCode::InvalidReturnStatement,
             // Generator stub: all 4 template params unused
@@ -923,7 +918,7 @@ mod tests {
 
     test_analysis! {
         name = key_of_and_value_of,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             class A
@@ -997,23 +992,23 @@ mod tests {
 
                 return null;
             }
-        "#},
+        "},
     }
 
     test_analysis! {
         name = return_no_value_from_untyped_functions,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             function foo() {
                 return;
             }
-        "#},
+        "},
     }
 
     test_analysis! {
         name = return_class_string_array,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             class A {}
@@ -1029,23 +1024,23 @@ mod tests {
                     A::class => B::class,
                 ];
             }
-        "#},
+        "},
     }
 
     test_analysis! {
         name = return_no_value_from_typed_void_functions,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             function foo(): void {
                 return;
             }
-        "#},
+        "},
     }
 
     test_analysis! {
         name = return_no_value_from_mixed_docblock_typed_functions,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             /**
@@ -1054,12 +1049,12 @@ mod tests {
             function foo() {
                 return;
             }
-        "#},
+        "},
     }
 
     test_analysis! {
         name = return_no_value_from_null_docblock_typed_functions,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             /**
@@ -1068,7 +1063,7 @@ mod tests {
             function foo() {
                 return;
             }
-        "#},
+        "},
     }
 
     test_analysis! {
@@ -1091,7 +1086,7 @@ mod tests {
 
     test_analysis! {
         name = expanding_this,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             /**
@@ -1118,12 +1113,12 @@ mod tests {
                     return $this;
                 }
             }
-        "#},
+        "},
     }
 
     test_analysis! {
         name = complex_type_return,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             interface Foo {}
@@ -1165,12 +1160,12 @@ mod tests {
                     ['a', 'b', 'c'],
                 ]; // string[][]
             }
-        "#},
+        "},
     }
 
     test_analysis! {
         name = ignore_falsable_return,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             /** @ignore-falsable-return */
@@ -1188,12 +1183,12 @@ mod tests {
             {
                 return get_foo() ?: 'baz';
             }
-        "#},
+        "},
     }
 
     test_analysis! {
         name = ignore_nullable_return,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             /** @ignore-nullable-return */
@@ -1211,12 +1206,12 @@ mod tests {
             {
                 return get_foo() ?? 'baz';
             }
-        "#},
+        "},
     }
 
     test_analysis! {
         name = resolve_nested_generics_through_inheritance,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             declare(strict_types=1);
@@ -1357,7 +1352,7 @@ mod tests {
             {
                 return new ScalarType();
             }
-        "#},
+        "},
         issues = [
             // TypeInterface: T is only used in @assert annotation, not in property/param/return
             IssueCode::UnusedTemplateParameter,

@@ -50,9 +50,9 @@ impl std::fmt::Display for ObjectProperties<'_> {
         write!(f, "{{")?;
         for (i, field) in self.fields.iter().enumerate() {
             if i > 0 {
-                write!(f, ", {}", field)?;
+                write!(f, ", {field}")?;
             } else {
-                write!(f, "{}", field)?;
+                write!(f, "{field}")?;
             }
         }
 

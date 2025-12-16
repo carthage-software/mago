@@ -365,7 +365,7 @@ impl<T> From<T> for TString
 where
     T: AsRef<str>,
 {
-    /// Converts any type that can be referenced as a string slice into a `known_literal` StringScalar.
+    /// Converts any type that can be referenced as a string slice into a `known_literal` `StringScalar`.
     /// Derives properties from the literal value.
     fn from(value: T) -> Self {
         Self::known_literal(atom(value.as_ref()))

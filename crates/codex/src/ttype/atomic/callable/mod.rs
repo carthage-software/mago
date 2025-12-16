@@ -202,7 +202,7 @@ impl TCallable {
 }
 
 impl TType for TCallable {
-    fn get_child_nodes<'a>(&'a self) -> Vec<TypeRef<'a>> {
+    fn get_child_nodes(&self) -> Vec<TypeRef<'_>> {
         let mut children = Vec::new();
 
         if let TCallable::Signature(signature) = self {
@@ -227,7 +227,7 @@ impl TType for TCallable {
                     || signature
                         .parameters
                         .iter()
-                        .any(|param| param.get_type_signature().is_some_and(|ty| ty.needs_population()))
+                        .any(|param| param.get_type_signature().is_some_and(super::super::TType::needs_population))
             }
             TCallable::Alias(_) => false,
         }
@@ -241,7 +241,7 @@ impl TType for TCallable {
                     || signature
                         .parameters
                         .iter()
-                        .any(|param| param.get_type_signature().is_some_and(|ty| ty.is_expandable()))
+                        .any(|param| param.get_type_signature().is_some_and(super::super::TType::is_expandable))
             }
         }
     }
@@ -255,7 +255,7 @@ impl TType for TCallable {
                     || signature
                         .parameters
                         .iter()
-                        .any(|param| param.get_type_signature().is_some_and(|ty| ty.is_complex()))
+                        .any(|param| param.get_type_signature().is_some_and(super::super::TType::is_complex))
             }
         }
     }

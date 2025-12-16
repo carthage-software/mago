@@ -1,4 +1,4 @@
-//! iterator_to_array() return type provider.
+//! `iterator_to_array()` return type provider.
 
 use std::rc::Rc;
 

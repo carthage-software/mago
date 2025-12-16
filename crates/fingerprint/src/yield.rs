@@ -12,7 +12,9 @@ impl Fingerprintable for Yield<'_> {
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
     ) {
-        use Yield::*;
+        use Yield::From;
+        use Yield::Pair;
+        use Yield::Value;
 
         match self {
             Value(y) => y.fingerprint_with_hasher(hasher, resolved_names, options),

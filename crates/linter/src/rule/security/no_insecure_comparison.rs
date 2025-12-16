@@ -49,26 +49,26 @@ impl LintRule for NoInsecureComparisonRule {
         const META: RuleMeta = RuleMeta {
             name: "No Insecure Comparison",
             code: "no-insecure-comparison",
-            description: indoc! {r#"
+            description: indoc! {r"
                 Detects insecure comparison of passwords or tokens using `==`, `!=`, `===`, or `!==`.
 
                 These operators are vulnerable to timing attacks, which can expose sensitive information.
                 Instead, use `hash_equals` for comparing strings or `password_verify` for validating hashes.
-            "#},
-            good_example: indoc! {r#"
+            "},
+            good_example: indoc! {r"
                 <?php
 
                 if (hash_equals($storedToken, $userToken)) {
                     // Valid token
                 }
-            "#},
-            bad_example: indoc! {r#"
+            "},
+            bad_example: indoc! {r"
                 <?php
 
                 if ($storedToken == $userToken) {
                     // Vulnerable to timing attacks
                 }
-            "#},
+            "},
             category: Category::Security,
 
             requirements: RuleRequirements::None,
@@ -87,7 +87,7 @@ impl LintRule for NoInsecureComparisonRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let Node::Binary(binary) = node else {
             return;
         };
@@ -136,7 +136,7 @@ impl LintRule for NoInsecureComparisonRule {
 
 #[inline]
 #[must_use]
-const fn is_simple_literal<'ast, 'arena>(expr: &'ast Expression<'arena>) -> bool {
+const fn is_simple_literal(expr: &Expression<'_>) -> bool {
     match expr {
         Expression::Parenthesized(parenthesized) => is_simple_literal(parenthesized.expression),
         Expression::Literal(literal) => {

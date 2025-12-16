@@ -52,7 +52,7 @@ impl LintRule for NoRedundantFinalRule {
             description: indoc! {"
                 Detects redundant `final` modifiers on methods in final classes or enum methods.
             "},
-            good_example: indoc! {r#"
+            good_example: indoc! {r"
                 <?php
 
                 final class Foo {
@@ -60,8 +60,8 @@ impl LintRule for NoRedundantFinalRule {
                         // ...
                     }
                 }
-            "#},
-            bad_example: indoc! {r#"
+            "},
+            bad_example: indoc! {r"
                 <?php
 
                 final class Foo {
@@ -69,7 +69,7 @@ impl LintRule for NoRedundantFinalRule {
                         // ...
                     }
                 }
-            "#},
+            "},
             category: Category::Redundancy,
 
             requirements: RuleRequirements::None,
@@ -88,7 +88,7 @@ impl LintRule for NoRedundantFinalRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let (members, is_enum) = match node {
             Node::Class(class) => {
                 if !class.modifiers.contains_final() {

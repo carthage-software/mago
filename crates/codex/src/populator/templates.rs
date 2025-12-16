@@ -14,7 +14,10 @@ use crate::ttype::union::TUnion;
 pub fn extend_template_parameters(metadata: &mut ClassLikeMetadata, parent_metadata: &ClassLikeMetadata) {
     let parent_name = parent_metadata.name;
 
-    if !parent_metadata.template_types.is_empty() {
+    if parent_metadata.template_types.is_empty() {
+        // Inherit the parent's extended parameters map directly.
+        metadata.extend_template_extended_parameters(parent_metadata.template_extended_parameters.clone());
+    } else {
         metadata.template_extended_parameters.entry(parent_name).or_default();
 
         if let Some(parent_offsets) = metadata.template_extended_offsets.get(&parent_name).cloned() {
@@ -43,13 +46,10 @@ pub fn extend_template_parameters(metadata: &mut ClassLikeMetadata, parent_metad
 
             metadata.extend_template_extended_parameters(parent_metadata.template_extended_parameters.clone());
         }
-    } else {
-        // Inherit the parent's extended parameters map directly.
-        metadata.extend_template_extended_parameters(parent_metadata.template_extended_parameters.clone());
     }
 }
 
-/// Resolves a TUnion that might contain generic parameters, using the provided
+/// Resolves a `TUnion` that might contain generic parameters, using the provided
 /// extended parameter map.
 ///
 /// Example: If `extended_type` is `T` (generic param) and `template_extended_parameters`

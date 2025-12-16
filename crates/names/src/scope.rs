@@ -112,7 +112,7 @@ impl NamespaceScope {
         match &r#use.items {
             UseItems::Sequence(use_item_sequence) => {
                 for use_item in use_item_sequence.items.iter() {
-                    let name = use_item.name.value().trim_start_matches("\\");
+                    let name = use_item.name.value().trim_start_matches('\\');
                     let alias = use_item.alias.as_ref().map(|alias_node| alias_node.identifier.value);
 
                     // Add as a default (class/namespace) alias
@@ -127,7 +127,7 @@ impl NamespaceScope {
                 };
 
                 for use_item in typed_use_item_sequence.items.iter() {
-                    let name = use_item.name.value().trim_start_matches("\\");
+                    let name = use_item.name.value().trim_start_matches('\\');
                     let alias = use_item.alias.as_ref().map(|alias_node| alias_node.identifier.value);
 
                     // Add with the determined kind (Function or Constant)
@@ -142,7 +142,7 @@ impl NamespaceScope {
                 };
 
                 // Get the common namespace prefix for the group
-                let prefix = (typed_use_item_list.namespace.value()).trim_start_matches("\\");
+                let prefix = (typed_use_item_list.namespace.value()).trim_start_matches('\\');
 
                 for use_item in typed_use_item_list.items.iter() {
                     let name_part = use_item.name.value();
@@ -157,7 +157,7 @@ impl NamespaceScope {
             }
             UseItems::MixedList(mixed_use_item_list) => {
                 // Get the common namespace prefix for the group
-                let prefix = (mixed_use_item_list.namespace.value()).trim_start_matches("\\");
+                let prefix = (mixed_use_item_list.namespace.value()).trim_start_matches('\\');
 
                 for mixed_use_item in mixed_use_item_list.items.iter() {
                     // Determine the kind for *this specific item* within the mixed list
@@ -187,13 +187,13 @@ impl NamespaceScope {
     ///
     /// * `kind` - The type of alias (`NameKind::Default`, `NameKind::Function`, `NameKind::Constant`).
     /// * `name` - The fully qualified name being imported (e.g., "App\\Models\\User").
-    /// * `alias` - An optional explicit alias name (e.g., "UserModel"). If `None`, the alias
+    /// * `alias` - An optional explicit alias name (e.g., "`UserModel`"). If `None`, the alias
     ///   is derived from the last part of the `name` (e.g., "User" from "App\\Models\\User").
     ///
     /// The alias name (explicit or derived) is stored lowercase as the key.
     #[inline]
     pub fn add(&mut self, kind: NameKind, name: impl AsRef<str>, alias: Option<impl AsRef<str>>) {
-        self.add_str(kind, name.as_ref(), alias.as_ref().map(|a| a.as_ref()))
+        self.add_str(kind, name.as_ref(), alias.as_ref().map(std::convert::AsRef::as_ref));
     }
 
     /// non-generic version of `add` that takes a string slice.
@@ -291,7 +291,7 @@ impl NamespaceScope {
     /// * `None` if no explicit rule resolves the name.
     #[inline]
     pub fn resolve_alias(&self, kind: NameKind, name: impl AsRef<str>) -> Option<String> {
-        self.resolve_alias_str(kind, name.as_ref()).map(|cow| cow.into_owned())
+        self.resolve_alias_str(kind, name.as_ref()).map(std::borrow::Cow::into_owned)
     }
 
     /// non-generic version of `resolve_alias` that takes a string slice.

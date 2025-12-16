@@ -146,7 +146,7 @@ mod tests {
 
     test_analysis! {
         name = accessing_generic_property,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             /**
@@ -169,12 +169,12 @@ mod tests {
             function read_entries(Collection $collection, int $key): null|string {
                 return $collection->items[$key] ?? null;
             }
-        "#}
+        "}
     }
 
     test_analysis! {
         name = accessing_enum_properties,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             enum Color: string {
@@ -196,12 +196,12 @@ mod tests {
             function get_color_value(Color $color): string {
                 return $color->value;
             }
-        "#}
+        "}
     }
 
     test_analysis! {
         name = redundant_nullsafe_property_access,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             class Foo {
@@ -211,7 +211,7 @@ mod tests {
             function test(Foo $foo): void {
                 echo $foo?->bar;
             }
-        "#},
+        "},
         issues = [
             IssueCode::RedundantNullsafeOperator,
         ]
@@ -219,7 +219,7 @@ mod tests {
 
     test_analysis! {
         name = accessing_property_on_null,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             class Foo {
@@ -229,7 +229,7 @@ mod tests {
             function test(?Foo $foo): void {
                 echo $foo->bar;
             }
-        "#},
+        "},
         issues = [
             IssueCode::PossiblyNullPropertyAccess,
         ]
@@ -237,7 +237,7 @@ mod tests {
 
     test_analysis! {
         name = accessing_property_on_null_inside_coalescing,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             class Foo {
@@ -249,7 +249,7 @@ mod tests {
 
                 echo $bar;
             }
-        "#},
+        "},
     }
 
     test_analysis! {
@@ -271,7 +271,7 @@ mod tests {
 
     test_analysis! {
         name = accessing_property_on_nullsafe,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             class Foo {
@@ -281,19 +281,19 @@ mod tests {
             function test(?Foo $foo): void {
                 echo $foo?->bar;
             }
-        "#},
+        "},
         issues = []
     }
 
     test_analysis! {
         name = accessing_property_on_mixed,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             function test(mixed $value): void {
                 echo $value->bar;
             }
-        "#},
+        "},
         issues = [
             IssueCode::MixedPropertyAccess,
             IssueCode::MixedArgument,
@@ -302,13 +302,13 @@ mod tests {
 
     test_analysis! {
         name = accessing_property_on_non_object,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             function test(int $value): void {
                 echo $value->bar;
             }
-        "#},
+        "},
         issues = [
             IssueCode::InvalidPropertyAccess,
         ]
@@ -316,7 +316,7 @@ mod tests {
 
     test_analysis! {
         name = accessing_non_existent_property,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             class Foo {
@@ -328,7 +328,7 @@ mod tests {
             function test(Foo $foo): void {
                 i_take_null($foo->baz);
             }
-        "#},
+        "},
         issues = [
             IssueCode::NonExistentProperty,
             IssueCode::MixedArgument,
@@ -337,7 +337,7 @@ mod tests {
 
     test_analysis! {
         name = accessing_property_on_generic_object,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             /**
@@ -358,12 +358,12 @@ mod tests {
             function test(GenericClass $generic): int {
                 return $generic->value;
             }
-        "#}
+        "}
     }
 
     test_analysis! {
         name = property_access_definite_null_error,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             function test(): null {
@@ -371,7 +371,7 @@ mod tests {
                 $value = $obj->property;
                 return $value;
             }
-        "#},
+        "},
         issues = [
             IssueCode::NullPropertyAccess,
         ]
@@ -431,13 +431,13 @@ mod tests {
 
     test_analysis! {
         name = property_access_on_generic_object_type_error,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             function get_prop(object $obj): mixed {
                 return $obj->some_property;
             }
-        "#},
+        "},
         issues = [IssueCode::AmbiguousObjectPropertyAccess]
     }
 
@@ -455,7 +455,7 @@ mod tests {
 
     test_analysis! {
         name = property_access_on_interface_variable,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             interface MyInterface {}
@@ -463,7 +463,7 @@ mod tests {
             function get_prop_from_interface(MyInterface $iface): null {
                 return $iface->some_prop;
             }
-        "#},
+        "},
         issues = [
             IssueCode::NonExistentProperty,
             IssueCode::MixedReturnStatement,
@@ -472,7 +472,7 @@ mod tests {
 
     test_analysis! {
         name = property_access_on_enum_variable,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             enum X {}
@@ -480,7 +480,7 @@ mod tests {
             function get_prop_from_enum(X $x): null {
                 return $x->some_prop;
             }
-        "#},
+        "},
         issues = [
             IssueCode::NonExistentProperty,
         ]
@@ -488,7 +488,7 @@ mod tests {
 
     test_analysis! {
         name = property_access_on_final_class_variable,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             final class X {}
@@ -496,7 +496,7 @@ mod tests {
             function get_prop_from_final_class(X $x): null {
                 return $x->some_prop;
             }
-        "#},
+        "},
         issues = [
             IssueCode::NonExistentProperty,
         ]
@@ -535,14 +535,14 @@ mod tests {
 
     test_analysis! {
         name = property_access_on_void_function_result,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             function returns_void(): void {}
 
             $result = returns_void();
             echo $result->property;
-        "#},
+        "},
         issues = [
             IssueCode::NullPropertyAccess,
         ]
@@ -550,7 +550,7 @@ mod tests {
 
     test_analysis! {
         name = property_access_multiple_selectors,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             class a
@@ -587,12 +587,12 @@ mod tests {
             {
                 return $o->{$p};
             }
-        "#},
+        "},
     }
 
     test_analysis! {
         name = accessing_non_existent_class_property,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             function example($class): void {
@@ -600,7 +600,7 @@ mod tests {
                     $class->bar;
                 }
             }
-        "#},
+        "},
         issues = [
             IssueCode::NonExistentClassLike,
             IssueCode::UnusedStatement,

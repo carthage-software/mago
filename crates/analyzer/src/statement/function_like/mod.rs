@@ -113,9 +113,8 @@ pub fn analyze_function_like<'ctx, 'ast, 'arena>(
             let Statement::Global(global) = statement else {
                 if statement.is_noop() {
                     continue;
-                } else {
-                    break;
                 }
+                break;
             };
 
             for variable in global.variables.iter() {
@@ -165,8 +164,7 @@ pub fn analyze_function_like<'ctx, 'ast, 'arena>(
             "Ensure all code paths end with a `return` statement. You may need to add `return null;` to the paths that currently don't return a value.".to_string()
         } else {
             format!(
-                "Add a `return` statement that provides a value of type '{}' to all paths, or change the function's return type to '{}|null' and return `null` explicitly.",
-                expected_return_type_id, expected_return_type_id
+                "Add a `return` statement that provides a value of type '{expected_return_type_id}' to all paths, or change the function's return type to '{expected_return_type_id}|null' and return `null` explicitly."
             )
         };
 
@@ -178,7 +176,7 @@ pub fn analyze_function_like<'ctx, 'ast, 'arena>(
             })
             .with_annotation(
                 Annotation::primary(function_metadata.name_span.unwrap_or(function_metadata.span))
-                    .with_message(format!("This function is declared to return '{}'...", expected_return_type_id)),
+                    .with_message(format!("This function is declared to return '{expected_return_type_id}'...")),
             )
             .with_annotation(
                 Annotation::secondary(body.span()).with_message("...but this path can exit without returning a value."),
@@ -282,8 +280,8 @@ fn add_parameter_types_to_context<'ctx, 'arena>(
     Ok(())
 }
 
-fn expand_type_metadata<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+fn expand_type_metadata<'ctx>(
+    context: &mut Context<'ctx, '_>,
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     function_like_metadata: &FunctionLikeMetadata,
@@ -325,8 +323,8 @@ fn expand_type_metadata<'ctx, 'arena>(
     signature_union
 }
 
-fn add_properties_to_context<'ctx, 'arena>(
-    context: &Context<'ctx, 'arena>,
+fn add_properties_to_context<'ctx>(
+    context: &Context<'ctx, '_>,
     block_context: &mut BlockContext<'ctx>,
     class_like_metadata: &'ctx ClassLikeMetadata,
     function_like_metadata: &'ctx FunctionLikeMetadata,
@@ -338,14 +336,14 @@ fn add_properties_to_context<'ctx, 'arena>(
     for (property_name, declaring_class) in &class_like_metadata.declaring_property_ids {
         let Some(property_class_metadata) = context.codebase.get_class_like(declaring_class) else {
             return Err(AnalysisError::InternalError(
-                format!("Could not load property class metadata for `{}`.", declaring_class),
+                format!("Could not load property class metadata for `{declaring_class}`."),
                 class_like_metadata.span,
             ));
         };
 
         let Some(property_metadata) = property_class_metadata.properties.get(property_name) else {
             return Err(AnalysisError::InternalError(
-                format!("Could not load property metadata for `{}`.", property_name),
+                format!("Could not load property metadata for `{property_name}`."),
                 class_like_metadata.span,
             ));
         };
@@ -409,10 +407,10 @@ fn add_properties_to_context<'ctx, 'arena>(
 /// Constructs the `$this` type for instance methods/hooks.
 ///
 /// This handles:
-/// - Enum types (returns TEnum)
+/// - Enum types (returns `TEnum`)
 /// - Class template parameters (preserves generics)
 /// - Required interfaces and parent classes (intersection types)
-/// - Method-level where constraints (when function_like_metadata is provided)
+/// - Method-level where constraints (when `function_like_metadata` is provided)
 pub fn get_this_type(
     context: &Context<'_, '_>,
     class_like_metadata: &ClassLikeMetadata,
@@ -486,7 +484,7 @@ pub fn get_this_type(
 
     TObject::Named(TNamedObject {
         name: class_like_metadata.original_name,
-        type_parameters: if !type_parameters.is_empty() { Some(type_parameters) } else { None },
+        type_parameters: if type_parameters.is_empty() { None } else { Some(type_parameters) },
         is_this: true,
         intersection_types: if intersections.is_empty() { None } else { Some(intersections) },
         remapped_parameters: false,
@@ -542,8 +540,8 @@ fn add_symbol_references(
     }
 }
 
-fn check_thrown_types<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+fn check_thrown_types<'ctx>(
+    context: &mut Context<'ctx, '_>,
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     function_like_metadata: &'ctx FunctionLikeMetadata,
@@ -562,17 +560,16 @@ fn check_thrown_types<'ctx, 'arena>(
         return Ok(());
     };
 
-    let (function_kind, function_name) = match function_like_metadata.kind.is_method() {
-        true => {
-            let Some(class_like_metadata) = block_context.scope.get_class_like() else {
-                return Ok(());
-            };
+    let (function_kind, function_name) = if function_like_metadata.kind.is_method() {
+        let Some(class_like_metadata) = block_context.scope.get_class_like() else {
+            return Ok(());
+        };
 
-            let name = concat_atom!(&class_like_metadata.original_name, "::", function_name);
+        let name = concat_atom!(&class_like_metadata.original_name, "::", function_name);
 
-            ("method", name)
-        }
-        false => ("function", *function_name),
+        ("method", name)
+    } else {
+        ("function", *function_name)
     };
 
     let expected_throw_types = context
@@ -610,8 +607,7 @@ fn check_thrown_types<'ctx, 'arena>(
             continue;
         }
 
-        let mut issue =
-            Issue::error(format!("Potentially unhandled exception `{}` in `{}`.", thrown_type, function_name));
+        let mut issue = Issue::error(format!("Potentially unhandled exception `{thrown_type}` in `{function_name}`."));
 
         for span in thrown_spans {
             issue = issue.with_annotation(Annotation::primary(*span).with_message("Exception may be thrown here"));
@@ -620,14 +616,13 @@ fn check_thrown_types<'ctx, 'arena>(
         issue = issue
             .with_annotation(
                 Annotation::secondary(function_like_metadata.span)
-                    .with_message(format!("This {function_kind} does not declare that it throws `{}`", thrown_type)),
+                    .with_message(format!("This {function_kind} does not declare that it throws `{thrown_type}`")),
             )
             .with_note(format!(
                 "All possible exceptions must be caught or declared in a `@throws` tag in the {function_kind}'s docblock.",
             ))
             .with_help(format!(
-                "You can add `@throws {}` to the {function_kind}'s docblock or wrap the throwing code in a `try-catch` block.",
-                thrown_type
+                "You can add `@throws {thrown_type}` to the {function_kind}'s docblock or wrap the throwing code in a `try-catch` block."
             ));
 
         context.collector.report_with_code(IssueCode::UnhandledThrownType, issue);
@@ -709,8 +704,8 @@ fn type_contains_function_template_param(
 /// A template parameter is considered "used" if it appears in:
 /// - A parameter type
 /// - The return type
-pub fn check_unused_function_template_parameters<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+pub fn check_unused_function_template_parameters<'ctx>(
+    context: &mut Context<'ctx, '_>,
     function_like_metadata: &'ctx FunctionLikeMetadata,
     name_span: Span,
     kind_str: &str,

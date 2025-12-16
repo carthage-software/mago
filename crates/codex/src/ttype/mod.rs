@@ -52,12 +52,12 @@ pub enum TypeRef<'a> {
 /// A trait to be implemented by all types in the type system.
 pub trait TType {
     /// Returns a vector of child type nodes that this type contains.
-    fn get_child_nodes<'a>(&'a self) -> Vec<TypeRef<'a>> {
+    fn get_child_nodes(&self) -> Vec<TypeRef<'_>> {
         vec![]
     }
 
     /// Returns a vector of all child type nodes, including nested ones.
-    fn get_all_child_nodes<'a>(&'a self) -> Vec<TypeRef<'a>> {
+    fn get_all_child_nodes(&self) -> Vec<TypeRef<'_>> {
         let mut child_nodes = self.get_child_nodes();
         let mut all_child_nodes = vec![];
 
@@ -1060,8 +1060,7 @@ pub fn get_iterable_parameters(atomic: &TAtomic, codebase: &CodebaseMetadata) ->
                         get_iterator_method_return_type(codebase, name, "current"),
                     )
                 {
-                    let contains_generic_param =
-                        |t: &TUnion| t.types.iter().any(|atomic| atomic.is_generic_parameter());
+                    let contains_generic_param = |t: &TUnion| t.types.iter().any(atomic::TAtomic::is_generic_parameter);
 
                     if !key_type.is_mixed()
                         && !value_type.is_mixed()

@@ -384,7 +384,7 @@ fn scan_class_like<'ctx, 'arena>(
                 }
             }
         }
-    };
+    }
 
     if (class_like_metadata.kind.is_class() || class_like_metadata.kind.is_enum())
         && let Some(implemented_interfaces) = implements
@@ -859,7 +859,7 @@ fn scan_class_like<'ctx, 'arena>(
                             .with_help(typing_error.help()),
                     );
                 }
-            };
+            }
         }
 
         for method_tag in &docblock.methods {

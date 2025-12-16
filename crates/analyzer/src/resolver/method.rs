@@ -606,21 +606,20 @@ pub(super) fn report_magic_call_without_call_method(
     context.collector.report_with_code(
         IssueCode::MissingMagicMethod,
         Issue::error(format!(
-            "Call to documented magic method `{}()` on a class that cannot handle it.",
-            method_name
+            "Call to documented magic method `{method_name}()` on a class that cannot handle it."
         ))
         .with_annotation(
             Annotation::primary(selector_span)
                 .with_message("This magic method is documented but cannot be called"),
         )
         .with_annotation(
-            Annotation::secondary(obj_span).with_message(format!("Class `{}` is missing the `{}` method", classname, magic_method_name)),
+            Annotation::secondary(obj_span).with_message(format!("Class `{classname}` is missing the `{magic_method_name}` method")),
         )
         .with_note(
             format!("The class `{classname}` has a `@method` tag for `{method_name}` but does not have a `{magic_method_name}` method to handle the call. This will cause a fatal `Error` at runtime.")
         )
         .with_help(
-            format!("Add a `{}` method to the `{}` class to handle calls to magic methods.", magic_method_name, classname)
+            format!("Add a `{magic_method_name}` method to the `{classname}` class to handle calls to magic methods.")
         ),
     );
 }
@@ -634,13 +633,13 @@ pub(super) fn report_dynamic_static_method_call(
     has_magic_call: bool,
 ) {
     let mut issue =
-        Issue::error(format!("Cannot call magic static method `{}::{}` on an instance.", classname, method_name))
+        Issue::error(format!("Cannot call magic static method `{classname}::{method_name}` on an instance."))
             .with_annotation(
                 Annotation::primary(selector_span)
                     .with_message("This magic method is static and must be called statically"),
             )
             .with_annotation(
-                Annotation::secondary(obj_span).with_message(format!("Called on an instance of `{}`", classname)),
+                Annotation::secondary(obj_span).with_message(format!("Called on an instance of `{classname}`")),
             );
 
     if has_magic_call {
@@ -669,7 +668,7 @@ pub(super) fn report_dynamic_static_method_call(
 
     context.collector.report_with_code(
         IssueCode::DynamicStaticMethodCall,
-        issue.with_help(format!("Call this method statically instead: `{}::{}`.", classname, method_name)),
+        issue.with_help(format!("Call this method statically instead: `{classname}::{method_name}`.")),
     );
 }
 

@@ -149,7 +149,7 @@ pub(super) fn resolve_targets<'ctx, 'arena>(
                         encountered_invalid_targets = true;
                     }
                 }
-            };
+            }
         } else if atomic.can_be_callable() {
             targets.push(InvocationTarget::Callable {
                 signature: TCallableSignature::mixed(false),
@@ -188,7 +188,7 @@ mod tests {
 
     test_analysis! {
         name = call_simple_addition,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             function add(int $a, int $b): int {
@@ -196,7 +196,7 @@ mod tests {
             }
 
             $result = add(5, 10);
-        "#}
+        "}
     }
 
     test_analysis! {
@@ -270,7 +270,7 @@ mod tests {
 
     test_analysis! {
         name = call_wrong_argument_type_int_for_string,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             function needs_string(string $s): void {
@@ -278,7 +278,7 @@ mod tests {
             }
 
             needs_string(123);
-        "#},
+        "},
         issues = [IssueCode::InvalidArgument]
     }
 
@@ -298,13 +298,13 @@ mod tests {
 
     test_analysis! {
         name = call_too_few_arguments,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             function requires_two(int $a, int $b): void {}
 
             requires_two(1);
-        "#},
+        "},
         issues = [
             IssueCode::TooFewArguments,
         ]
@@ -312,13 +312,13 @@ mod tests {
 
     test_analysis! {
         name = call_too_many_arguments,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             function accepts_one(int $a): void {}
 
             accepts_one(1, 2);
-        "#},
+        "},
         issues = [
             IssueCode::TooManyArguments,
         ]
@@ -326,13 +326,13 @@ mod tests {
 
     test_analysis! {
         name = call_null_for_non_nullable_string,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             function needs_string(string $s): void {}
 
             needs_string(null);
-        "#},
+        "},
         issues = [
             IssueCode::NullArgument,
         ]
@@ -340,7 +340,7 @@ mod tests {
 
     test_analysis! {
         name = call_nullable_for_non_nullable_string,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             function needs_string(string $s): void {}
@@ -349,7 +349,7 @@ mod tests {
             }
 
             needs_string(get_string_or_null());
-        "#},
+        "},
         issues = [
             IssueCode::PossiblyNullArgument,
         ]
@@ -357,13 +357,13 @@ mod tests {
 
     test_analysis! {
         name = call_false_for_non_falsable_string,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             function needs_string(string $s): void {}
 
             needs_string(false);
-        "#},
+        "},
         issues = [
             IssueCode::FalseArgument,
         ]
@@ -371,7 +371,7 @@ mod tests {
 
     test_analysis! {
         name = call_falsable_for_non_falsable_string,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             function needs_string(string $s): void {}
@@ -380,7 +380,7 @@ mod tests {
             }
 
             needs_string(get_string_or_false());
-        "#},
+        "},
         issues = [
             IssueCode::PossiblyFalseArgument,
         ]
@@ -494,7 +494,7 @@ mod tests {
 
     test_analysis! {
         name = call_array_element_type_mismatch,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             /**
@@ -510,7 +510,7 @@ mod tests {
             }
 
             main_list_of_ints([1, 2, 3]);
-        "#},
+        "},
         issues = [IssueCode::InvalidArgument]
     }
 
@@ -538,7 +538,7 @@ mod tests {
 
     test_analysis! {
         name = call_non_empty_list_constraint_violation,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             /**
@@ -554,13 +554,13 @@ mod tests {
             }
 
             main_list_can_be_empty([]); // Definitely empty
-        "#},
+        "},
         issues = [IssueCode::PossiblyInvalidArgument]
     }
 
     test_analysis! {
         name = call_non_empty_array_key_type_mismatch,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             /**
@@ -576,13 +576,13 @@ mod tests {
             }
 
             main_array_int_keys([0 => 1, 1 => 2]);
-        "#},
+        "},
         issues = [IssueCode::InvalidArgument]
     }
 
     test_analysis! {
         name = call_union_param_invalid_type,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             /**
@@ -598,13 +598,13 @@ mod tests {
             }
 
             main_bool_arg(true);
-        "#},
+        "},
         issues = [IssueCode::InvalidArgument]
     }
 
     test_analysis! {
         name = call_template_callable_param_mismatch,
-        code = indoc!{r#"
+        code = indoc!{r"
             <?php
 
             /**
@@ -630,13 +630,13 @@ mod tests {
             main_template_callable_mismatch(
                 string_to_int(...)
             );
-        "#},
+        "},
         issues = [IssueCode::PossiblyInvalidArgument]
     }
 
     test_analysis! {
         name = map_twice,
-        code = indoc!{r#"
+        code = indoc!{r"
             <?php
 
             /**
@@ -676,12 +676,12 @@ mod tests {
                     $input,
                 );
             }
-        "#}
+        "}
     }
 
     test_analysis! {
         name = call_with_generic_constraints,
-        code = indoc!{r#"
+        code = indoc!{r"
             <?php
 
             /**
@@ -751,12 +751,12 @@ mod tests {
                     ),
                 );
             }
-        "#},
+        "},
     }
 
     test_analysis! {
         name = conditional_returns,
-        code = indoc!{r#"
+        code = indoc!{r"
             <?php
 
             /**
@@ -792,12 +792,12 @@ mod tests {
             $f = $a + $b + $c + $d + $e; // 5 + 6 + 7 + 8 + 9 = 20
 
             i_take_20($f); // no error, $f is 20
-        "#},
+        "},
     }
 
     test_analysis! {
         name = call_capture_groups,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             /**
@@ -890,7 +890,7 @@ mod tests {
                     string_type(...),
                 ));
             }
-        "#},
+        "},
         issues = [
             // TypeInterface: T is not used in interface body
             IssueCode::UnusedTemplateParameter,
@@ -899,7 +899,7 @@ mod tests {
 
     test_analysis! {
         name = member_reference_argument,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             class ChangeKind {
@@ -923,12 +923,12 @@ mod tests {
             foo('update');           // OK (starts with 'U')
             foo(ChangeKind::RENAME); // OK (ends with 'ME')
             foo('rename');           // OK (ends with 'ME')
-        "#},
+        "},
     }
 
     test_analysis! {
         name = iterable_for_traversable_or_array,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             /**
@@ -960,7 +960,7 @@ mod tests {
             function iter_as_array(iterable $input): array {
                 return as_array($input);
             }
-        "#},
+        "},
         issues = [
             // Traversable: K and V not used in interface body
             IssueCode::UnusedTemplateParameter,
@@ -970,7 +970,7 @@ mod tests {
 
     test_analysis! {
         name = invalid_member_reference_argument,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             class ChangeKind {
@@ -993,7 +993,7 @@ mod tests {
             foo(ChangeKind::REMOVE); // Error: 'remove' does not match any pattern
             foo('remove');           // Error: 'remove' does not match any pattern
             foo('unknown');          // Error: 'unknown' does not match any pattern
-        "#},
+        "},
         issues = [
             IssueCode::InvalidArgument,
             IssueCode::InvalidArgument,
@@ -1005,7 +1005,7 @@ mod tests {
 
     test_analysis! {
         name = enum_member_reference_argument,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             enum ChangeKind {
@@ -1026,12 +1026,12 @@ mod tests {
             foo(ChangeKind::ADD);    // OK (literal matches)
             foo(ChangeKind::UPDATE); // OK (starts with 'U')
             foo(ChangeKind::RENAME); // OK (ends with 'ME')
-        "#},
+        "},
     }
 
     test_analysis! {
         name = invalid_enum_member_reference_argument,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             enum ChangeKind {
@@ -1051,7 +1051,7 @@ mod tests {
 
             foo(ChangeKind::MOVE);   // Error: 'move' does not match any pattern
             foo(ChangeKind::REMOVE); // Error: 'remove' does not match any pattern
-        "#},
+        "},
         issues = [
             IssueCode::PossiblyInvalidArgument,
             IssueCode::PossiblyInvalidArgument,
@@ -1060,7 +1060,7 @@ mod tests {
 
     test_analysis! {
         name = type_logic_sanity_test,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             interface A {}
@@ -1117,6 +1117,6 @@ mod tests {
 
                 return $bAndA;
             }
-        "#},
+        "},
     }
 }

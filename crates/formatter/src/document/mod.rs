@@ -430,13 +430,13 @@ pub(crate) fn print_document_to_string<'arena>(arena: &'arena Bump, document: &D
         }
         Document::Line(line) => {
             if line.literal {
-                buffer.push_str("literalLine")
+                buffer.push_str("literalLine");
             } else if line.hard {
-                buffer.push_str("hardline")
+                buffer.push_str("hardline");
             } else if line.soft {
-                buffer.push_str("softline")
+                buffer.push_str("softline");
             } else {
-                buffer.push_str("line")
+                buffer.push_str("line");
             }
         }
         Document::LineSuffix(docs) => {

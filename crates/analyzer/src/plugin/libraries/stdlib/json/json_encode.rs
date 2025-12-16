@@ -1,4 +1,4 @@
-//! json_encode() return type provider.
+//! `json_encode()` return type provider.
 
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::scalar::TScalar;

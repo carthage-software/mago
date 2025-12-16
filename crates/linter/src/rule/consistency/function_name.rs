@@ -59,18 +59,18 @@ impl LintRule for FunctionNameRule {
 
                 Function names should be in camel case or snake case, depending on the configuration.
             "},
-            good_example: indoc! {r#"
+            good_example: indoc! {r"
                 <?php
 
                 function my_function() {}
-            "#},
-            bad_example: indoc! {r#"
+            "},
+            bad_example: indoc! {r"
                 <?php
 
                 function MyFunction() {}
 
                 function My_Function() {}
-            "#},
+            "},
             category: Category::Consistency,
 
             requirements: RuleRequirements::None,
@@ -89,7 +89,7 @@ impl LintRule for FunctionNameRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let Node::Function(function) = node else { return };
 
         let name = function.name.value;
@@ -100,20 +100,19 @@ impl LintRule for FunctionNameRule {
                 ctx.collector.report(
                     Issue::new(
                         self.cfg.level(),
-                        format!("Function name `{}` should be in either camel case or snake case.", name),
+                        format!("Function name `{name}` should be in either camel case or snake case."),
                     )
                     .with_code(self.meta.code)
                     .with_annotation(
                         Annotation::primary(function.name.span())
-                            .with_message(format!("Function `{}` is declared here", name)),
+                            .with_message(format!("Function `{name}` is declared here")),
                     )
                     .with_annotation(
                         Annotation::secondary(function.span())
-                            .with_message(format!("Function `{}` is defined here", fqfn)),
+                            .with_message(format!("Function `{fqfn}` is defined here")),
                     )
                     .with_note(format!(
-                        "The function name `{}` does not follow either camel case or snake naming convention.",
-                        name
+                        "The function name `{name}` does not follow either camel case or snake naming convention."
                     ))
                     .with_help(format!(
                         "Consider renaming it to `{}` or `{}` to adhere to the naming convention.",
@@ -125,17 +124,17 @@ impl LintRule for FunctionNameRule {
         } else if self.cfg.camel {
             if !is_camel_case(name) {
                 ctx.collector.report(
-                    Issue::new(self.cfg.level(), format!("Function name `{}` should be in camel case.", name))
+                    Issue::new(self.cfg.level(), format!("Function name `{name}` should be in camel case."))
                         .with_code(self.meta.code)
                         .with_annotation(
                             Annotation::primary(function.name.span())
-                                .with_message(format!("Function `{}` is declared here", name)),
+                                .with_message(format!("Function `{name}` is declared here")),
                         )
                         .with_annotation(
                             Annotation::secondary(function.span())
-                                .with_message(format!("Function `{}` is defined here", fqfn)),
+                                .with_message(format!("Function `{fqfn}` is defined here")),
                         )
-                        .with_note(format!("The function name `{}` does not follow camel naming convention.", name))
+                        .with_note(format!("The function name `{name}` does not follow camel naming convention."))
                         .with_help(format!(
                             "Consider renaming it to `{}` to adhere to the naming convention.",
                             to_camel_case(name)
@@ -144,17 +143,17 @@ impl LintRule for FunctionNameRule {
             }
         } else if !is_snake_case(name) {
             ctx.collector.report(
-                Issue::new(self.cfg.level(), format!("Function name `{}` should be in snake case.", name))
+                Issue::new(self.cfg.level(), format!("Function name `{name}` should be in snake case."))
                     .with_code(self.meta.code)
                     .with_annotation(
                         Annotation::primary(function.name.span())
-                            .with_message(format!("Function `{}` is declared here", name)),
+                            .with_message(format!("Function `{name}` is declared here")),
                     )
                     .with_annotation(
                         Annotation::secondary(function.span())
-                            .with_message(format!("Function `{}` is defined here", fqfn)),
+                            .with_message(format!("Function `{fqfn}` is defined here")),
                     )
-                    .with_note(format!("The function name `{}` does not follow snake naming convention.", name))
+                    .with_note(format!("The function name `{name}` does not follow snake naming convention."))
                     .with_help(format!(
                         "Consider renaming it to `{}` to adhere to the naming convention.",
                         to_snake_case(name)

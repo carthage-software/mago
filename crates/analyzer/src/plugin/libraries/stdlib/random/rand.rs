@@ -1,4 +1,4 @@
-//! rand() and mt_rand() return type provider.
+//! `rand()` and `mt_rand()` return type provider.
 
 use mago_codex::ttype::get_int_range;
 use mago_codex::ttype::union::TUnion;

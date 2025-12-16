@@ -196,7 +196,7 @@ impl FunctionLikeMetadata {
         }
     }
 
-    /// Returns the kind of function-like (Function, Method, Closure, ArrowFunction).
+    /// Returns the kind of function-like (Function, Method, Closure, `ArrowFunction`).
     #[inline]
     pub fn get_kind(&self) -> FunctionLikeKind {
         self.kind
@@ -280,7 +280,7 @@ impl FunctionLikeMetadata {
     /// Determines if this function/method needs docblock inheritance.
     ///
     /// Returns `true` if:
-    /// - The method has an explicit `@inheritDoc` or `@inheritDocs` tag (INHERITS_DOCS flag set), OR
+    /// - The method has an explicit `@inheritDoc` or `@inheritDocs` tag (`INHERITS_DOCS` flag set), OR
     /// - The method has NO docblock at all (implicit inheritance)
     ///
     /// Returns `false` otherwise (method has a docblock but no @inheritDoc).

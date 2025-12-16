@@ -66,8 +66,7 @@ impl From<BoundaryBreach> for Issue {
         match breach.reason {
             BreachReason::Layering { source_layer, target_layer } => {
                 issue = issue.with_note("Layering Rule Conflict").with_note(format!(
-                    "The `{}` layer is not allowed to depend on the `{}` layer.",
-                    source_layer, target_layer
+                    "The `{source_layer}` layer is not allowed to depend on the `{target_layer}` layer."
                 ));
             }
             BreachReason::NoMatchingRule => {
@@ -76,14 +75,13 @@ impl From<BoundaryBreach> for Issue {
                     .with_note("No rule was found that explicitly allows this dependency.");
             }
             BreachReason::ForbiddenByRule { rule_namespaces } => {
-                let namespaces = rule_namespaces.iter().map(|ns| format!("`{}`", ns)).collect::<Vec<_>>().join(", ");
+                let namespaces = rule_namespaces.iter().map(|ns| format!("`{ns}`")).collect::<Vec<_>>().join(", ");
 
                 issue = issue.with_note("Dependency forbidden by architectural rules").with_note(format!(
-                    "The following rule(s) were evaluated but none permitted this dependency: {}.",
-                    namespaces
+                    "The following rule(s) were evaluated but none permitted this dependency: {namespaces}."
                 ));
             }
-        };
+        }
 
         issue.with_help("Update your guard configuration to allow this dependency or refactor the code to remove it.")
     }
@@ -108,7 +106,7 @@ impl fmt::Display for BreachVector {
             Self::Attribute => "attribute usage",
         };
 
-        write!(f, "{}", description)
+        write!(f, "{description}")
     }
 }
 

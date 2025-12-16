@@ -1,7 +1,7 @@
 use crate::metadata::class_like::ClassLikeMetadata;
 
 /// Inherits property declarations and appearances from a parent class-like.
-/// Updates declaring_property_ids, appearing_property_ids, etc.
+/// Updates `declaring_property_ids`, `appearing_property_ids`, etc.
 pub fn inherit_properties_from_parent(metadata: &mut ClassLikeMetadata, parent_metadata: &ClassLikeMetadata) {
     let classlike_name = metadata.name;
     let is_trait = metadata.kind.is_trait();

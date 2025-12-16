@@ -140,12 +140,12 @@ pub fn analyze_and_store_argument_type<'ctx, 'arena>(
 }
 
 /// Verifies an argument's type against the expected parameter type.
-pub fn verify_argument_type<'ctx, 'ast, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+pub fn verify_argument_type<'arena>(
+    context: &mut Context<'_, 'arena>,
     input_type: &TUnion,
     parameter_type: &TUnion,
     argument_offset: usize,
-    input_expression: &'ast Expression<'arena>,
+    input_expression: &Expression<'arena>,
     invocation_target: &InvocationTarget<'_>,
 ) {
     let target_kind_str = invocation_target.guess_kind();
@@ -412,11 +412,7 @@ pub fn verify_argument_type<'ctx, 'ast, 'arena>(
 }
 
 /// Gets the element type when unpacking an argument with the spread operator.
-pub fn get_unpacked_argument_type<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
-    argument_value_type: &TUnion,
-    span: Span,
-) -> TUnion {
+pub fn get_unpacked_argument_type(context: &mut Context<'_, '_>, argument_value_type: &TUnion, span: Span) -> TUnion {
     let mut potential_element_types = Vec::new();
     let mut reported_an_error = false;
 

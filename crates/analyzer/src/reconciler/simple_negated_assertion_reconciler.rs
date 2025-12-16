@@ -261,7 +261,7 @@ pub(crate) fn reconcile(
                     _ => {
                         atomics.push(existing_atomic.clone());
                     }
-                };
+                }
             }
 
             let new_var_type = existing_var_type.clone_with_types(atomics);
@@ -536,20 +536,20 @@ fn subtract_string(
         } else if let TAtomic::Scalar(TScalar::ArrayKey) = atomic {
             did_remove_type = true;
 
-            if !is_equality {
-                acceptable_types.push(TAtomic::Scalar(TScalar::int()));
-            } else {
+            if is_equality {
                 acceptable_types.push(atomic);
+            } else {
+                acceptable_types.push(TAtomic::Scalar(TScalar::int()));
             }
         } else if let TAtomic::Scalar(TScalar::Generic) = atomic {
             did_remove_type = true;
 
-            if !is_equality {
+            if is_equality {
+                acceptable_types.push(atomic);
+            } else {
                 acceptable_types.push(TAtomic::Scalar(TScalar::int()));
                 acceptable_types.push(TAtomic::Scalar(TScalar::float()));
                 acceptable_types.push(TAtomic::Scalar(TScalar::bool()));
-            } else {
-                acceptable_types.push(atomic);
             }
         } else if atomic.is_any_string() {
             did_remove_type = true;
@@ -560,11 +560,11 @@ fn subtract_string(
         } else if let TAtomic::Scalar(TScalar::Numeric) = atomic {
             did_remove_type = true;
 
-            if !is_equality {
+            if is_equality {
+                acceptable_types.push(atomic);
+            } else {
                 acceptable_types.push(TAtomic::Scalar(TScalar::int()));
                 acceptable_types.push(TAtomic::Scalar(TScalar::float()));
-            } else {
-                acceptable_types.push(atomic);
             }
         } else {
             acceptable_types.push(atomic);
@@ -619,33 +619,33 @@ fn subtract_int(
         } else if let TAtomic::Scalar(TScalar::ArrayKey) = atomic {
             did_remove_type = true;
 
-            if !is_equality {
-                acceptable_types.push(TAtomic::Scalar(TScalar::string()));
-            } else {
+            if is_equality {
                 acceptable_types.push(atomic);
+            } else {
+                acceptable_types.push(TAtomic::Scalar(TScalar::string()));
             }
         } else if let TAtomic::Scalar(TScalar::Generic) = atomic {
             did_remove_type = true;
 
-            if !is_equality {
+            if is_equality {
+                acceptable_types.push(atomic);
+            } else {
                 acceptable_types.push(TAtomic::Scalar(TScalar::string()));
                 acceptable_types.push(TAtomic::Scalar(TScalar::float()));
                 acceptable_types.push(TAtomic::Scalar(TScalar::bool()));
-            } else {
-                acceptable_types.push(atomic);
             }
         } else if let TAtomic::Scalar(TScalar::Integer(existing_integer)) = atomic {
             did_remove_type = true;
 
-            if !is_equality {
+            if is_equality {
+                acceptable_types.push(atomic);
+            } else {
                 acceptable_types.extend(
                     existing_integer
                         .difference(*integer_to_subtract, false)
                         .into_iter()
                         .map(|i| TAtomic::Scalar(TScalar::Integer(i))),
                 );
-            } else {
-                acceptable_types.push(atomic);
             }
         } else if atomic.is_int() {
             did_remove_type = true;
@@ -703,12 +703,12 @@ fn subtract_float(
 
             did_remove_type = true;
         } else if let TAtomic::Scalar(TScalar::Generic) = atomic {
-            if !is_equality {
+            if is_equality {
+                acceptable_types.push(atomic);
+            } else {
                 acceptable_types.push(TAtomic::Scalar(TScalar::string()));
                 acceptable_types.push(TAtomic::Scalar(TScalar::int()));
                 acceptable_types.push(TAtomic::Scalar(TScalar::bool()));
-            } else {
-                acceptable_types.push(atomic);
             }
 
             did_remove_type = true;
@@ -1494,7 +1494,7 @@ fn reconcile_no_nonnull_entry_for_key(existing_var_type: &TUnion, key_name: &Arr
 ///
 /// 1. Expanding `list{bool, bool}` to all concrete combinations: `[true,true]`, `[true,false]`, `[false,true]`, `[false,false]`
 /// 2. Removing the specific combination `[true,true]`
-/// 3. Returning the remaining combinations as separate TList objects
+/// 3. Returning the remaining combinations as separate `TList` objects
 ///
 /// # Arguments
 ///
@@ -1579,7 +1579,7 @@ fn generate_all_combinations(existing_elements: &BTreeMap<usize, (bool, TUnion)>
         }
     }
 
-    let expected_combinations = element_types.iter().map(|types| types.len()).product::<usize>();
+    let expected_combinations = element_types.iter().map(std::vec::Vec::len).product::<usize>();
     let mut all_combinations = Vec::with_capacity(expected_combinations);
 
     // Generate cartesian product of all possible element combinations

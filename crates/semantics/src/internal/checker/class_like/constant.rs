@@ -106,7 +106,7 @@ pub fn check_class_like_constant<'ast, 'arena>(
             Issue::error("Typed class constants are only available in PHP 8.3 and above.")
                 .with_annotation(Annotation::primary(type_hint.span()).with_message("Type hint used here.")),
         );
-    };
+    }
 
     for item in class_like_constant.items.iter() {
         let item_name = item.name.value;

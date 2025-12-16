@@ -39,7 +39,7 @@ fn bench_non_expandable(c: &mut Criterion) {
             let mut t = get_int();
             expand_union(black_box(&codebase), black_box(&mut t), black_box(&options));
             t
-        })
+        });
     });
 
     c.bench_function("non_expandable_string", |b| {
@@ -47,7 +47,7 @@ fn bench_non_expandable(c: &mut Criterion) {
             let mut t = get_string();
             expand_union(black_box(&codebase), black_box(&mut t), black_box(&options));
             t
-        })
+        });
     });
 }
 
@@ -60,7 +60,7 @@ fn bench_simple_self_expansion(c: &mut Criterion) {
             let mut t = make_self_object();
             expand_union(black_box(&codebase), black_box(&mut t), black_box(&options));
             t
-        })
+        });
     });
 }
 
@@ -77,7 +77,7 @@ fn bench_union_expansion(c: &mut Criterion) {
             ]);
             expand_union(black_box(&codebase), black_box(&mut t), black_box(&options));
             t
-        })
+        });
     });
 
     c.bench_function("union_5_types_with_self", |b| {
@@ -91,7 +91,7 @@ fn bench_union_expansion(c: &mut Criterion) {
             ]);
             expand_union(black_box(&codebase), black_box(&mut t), black_box(&options));
             t
-        })
+        });
     });
 }
 
@@ -105,7 +105,7 @@ fn bench_nested_array(c: &mut Criterion) {
             let mut t = TUnion::from_atomic(TAtomic::Array(TArray::List(list)));
             expand_union(black_box(&codebase), black_box(&mut t), black_box(&options));
             t
-        })
+        });
     });
 
     c.bench_function("nested_list_3_deep", |b| {
@@ -116,7 +116,7 @@ fn bench_nested_array(c: &mut Criterion) {
             let mut t = TUnion::from_atomic(TAtomic::Array(TArray::List(outer)));
             expand_union(black_box(&codebase), black_box(&mut t), black_box(&options));
             t
-        })
+        });
     });
 }
 
@@ -133,7 +133,7 @@ fn bench_generic_object(c: &mut Criterion) {
             let mut t = TUnion::from_atomic(TAtomic::Object(TObject::Named(named)));
             expand_union(black_box(&codebase), black_box(&mut t), black_box(&options));
             t
-        })
+        });
     });
 
     c.bench_function("generic_object_3_params", |b| {
@@ -145,7 +145,7 @@ fn bench_generic_object(c: &mut Criterion) {
             let mut t = TUnion::from_atomic(TAtomic::Object(TObject::Named(named)));
             expand_union(black_box(&codebase), black_box(&mut t), black_box(&options));
             t
-        })
+        });
     });
 }
 
@@ -158,7 +158,7 @@ fn bench_already_expanded(c: &mut Criterion) {
             let mut t = make_named_object("Foo");
             expand_union(black_box(&codebase), black_box(&mut t), black_box(&options));
             t
-        })
+        });
     });
 }
 

@@ -54,16 +54,16 @@ impl LintRule for AssertDescriptionRule {
 
                 Assert functions should have a description to make it easier to understand the purpose of the assertion.
             "},
-            good_example: indoc! {r###"
+            good_example: indoc! {r"
                 <?php
 
                 assert($user->isActivated(), 'User MUST be activated at this point.');
-            "###},
-            bad_example: indoc! {r###"
+            "},
+            bad_example: indoc! {r"
                 <?php
 
                 assert($user->isActivated());
-            "###},
+            "},
             category: Category::Correctness,
 
             requirements: RuleRequirements::None,
@@ -82,7 +82,7 @@ impl LintRule for AssertDescriptionRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let Node::FunctionCall(function_call) = node else {
             return;
         };

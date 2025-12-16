@@ -86,7 +86,7 @@ impl FunctionLikeIdentifier {
         match self {
             FunctionLikeIdentifier::Function(fn_name) => fn_name.to_string(),
             FunctionLikeIdentifier::Method(fq_classlike_name, method_name) => {
-                format!("{}::{}", fq_classlike_name, method_name)
+                format!("{fq_classlike_name}::{method_name}")
             }
             FunctionLikeIdentifier::Closure(file_id, position) => {
                 format!("{}:{}", file_id, position.offset)

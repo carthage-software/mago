@@ -90,7 +90,7 @@ impl LintRule for ExplicitNullableParamRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let Node::FunctionLikeParameter(function_like_parameter) = node else {
             return;
         };
@@ -115,12 +115,12 @@ impl LintRule for ExplicitNullableParamRule {
 
         let issue = Issue::new(
             self.cfg.level(),
-            format!("Parameter `{}` is implicitly nullable and relies on a deprecated feature.", parameter_name),
+            format!("Parameter `{parameter_name}` is implicitly nullable and relies on a deprecated feature."),
         )
         .with_code(self.meta.code)
         .with_annotation(
             Annotation::primary(function_like_parameter.span())
-                .with_message(format!("Parameter `{}` is declared here", parameter_name)),
+                .with_message(format!("Parameter `{parameter_name}` is declared here")),
         )
         .with_note("Updating this will future-proof your code and align it with PHP 8.4 standards.")
         .with_help("Consider using an explicit nullable type hint or replacing the default value.");

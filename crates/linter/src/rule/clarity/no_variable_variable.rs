@@ -48,26 +48,26 @@ impl LintRule for NoVariableVariableRule {
         const META: RuleMeta = RuleMeta {
             name: "No Variable Variable",
             code: "no-variable-variable",
-            description: indoc! {r#"
+            description: indoc! {r"
                 Discourages usage of PHP's variable variables feature.
 
                 Variable variables can make code harder to read and maintain, as they introduce a level of indirection that can confuse readers and complicate static analysis.
-            "#},
-            good_example: indoc! {r#"
+            "},
+            good_example: indoc! {r"
                 <?php
 
                 $foo = 'bar';
 
                 echo $foo; // Outputs 'bar'
-            "#},
-            bad_example: indoc! {r#"
+            "},
+            bad_example: indoc! {r"
                 <?php
 
                 $foo = 'bar';
                 $varName = 'foo';
 
                 echo $$varName; // Outputs 'bar'
-            "#},
+            "},
             category: Category::Clarity,
             requirements: RuleRequirements::None,
         };
@@ -85,7 +85,7 @@ impl LintRule for NoVariableVariableRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let Node::Variable(variable) = node else {
             return;
         };

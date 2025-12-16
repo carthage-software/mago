@@ -52,18 +52,18 @@ impl LintRule for MiddlewareInRoutesRule {
         const META: RuleMeta = RuleMeta {
             name: "Middleware In Routes",
             code: "middleware-in-routes",
-            description: indoc! {r#"
+            description: indoc! {r"
                 This rule warns against applying middlewares in controllers.
 
                 Middlewares should be applied in the routes file, not in the controller.
-            "#},
-            good_example: indoc! {r#"
+            "},
+            good_example: indoc! {r"
                 <?php
 
                 // routes/web.php
                 Route::get('/user', 'UserController@index')->middleware('auth');
-            "#},
-            bad_example: indoc! {r#"
+            "},
+            bad_example: indoc! {r"
                 <?php
 
                 namespace App\Http\Controllers;
@@ -75,7 +75,7 @@ impl LintRule for MiddlewareInRoutesRule {
                         $this->middleware('auth');
                     }
                 }
-            "#},
+            "},
             category: Category::BestPractices,
 
             requirements: RuleRequirements::Integration(Integration::Laravel),
@@ -94,7 +94,7 @@ impl LintRule for MiddlewareInRoutesRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let Node::MethodCall(call @ MethodCall { object, method, .. }) = node else {
             return;
         };

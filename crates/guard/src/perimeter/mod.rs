@@ -45,7 +45,7 @@ impl DependenciesGuardWalker {
 
 impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for DependenciesGuardWalker {
     fn walk_in_namespace(&mut self, namespace: &'ast Namespace<'arena>, context: &mut GuardContext<'ctx, 'arena>) {
-        context.set_current_namespace(namespace.name.as_ref().map(|n| n.value()));
+        context.set_current_namespace(namespace.name.as_ref().map(mago_syntax::ast::Identifier::value));
     }
 
     fn walk_out_namespace(&mut self, _namespace: &'ast Namespace<'arena>, context: &mut GuardContext<'ctx, 'arena>) {

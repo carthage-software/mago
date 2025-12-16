@@ -64,7 +64,7 @@ impl LintRule for PropertyNameRule {
 
                 Property names should be in camel case or snake case, depending on the configuration.
             "},
-            good_example: indoc! {r#"
+            good_example: indoc! {r"
                 <?php
 
                 final class Foo {
@@ -74,8 +74,8 @@ impl LintRule for PropertyNameRule {
                         public int $myPromotedProperty,
                     ) {}
                 }
-            "#},
-            bad_example: indoc! {r#"
+            "},
+            bad_example: indoc! {r"
                 <?php
 
                 final class Foo {
@@ -85,7 +85,7 @@ impl LintRule for PropertyNameRule {
                         public int $My_Promoted_Property,
                     ) {}
                 }
-            "#},
+            "},
             category: Category::Consistency,
             requirements: RuleRequirements::None,
         };
@@ -103,7 +103,7 @@ impl LintRule for PropertyNameRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         match node {
             Node::PropertyItem(property_item) => {
                 self.check_property_item(ctx, property_item);
@@ -143,15 +143,14 @@ impl PropertyNameRule {
                 ctx.collector.report(
                     Issue::new(
                         self.cfg.level(),
-                        format!("Property name `{}` should be in either camel case or snake case.", name),
+                        format!("Property name `{name}` should be in either camel case or snake case."),
                     )
                     .with_code(self.meta.code)
                     .with_annotation(
-                        Annotation::primary(span).with_message(format!("Property `{}` is declared here", name)),
+                        Annotation::primary(span).with_message(format!("Property `{name}` is declared here")),
                     )
                     .with_note(format!(
-                        "The property name `{}` does not follow either camel case or snake naming convention.",
-                        name
+                        "The property name `{name}` does not follow either camel case or snake naming convention."
                     ))
                     .with_help(format!(
                         "Consider renaming it to `${}` or `${}` to adhere to the naming convention.",
@@ -166,12 +165,12 @@ impl PropertyNameRule {
 
         if self.cfg.camel && !is_camel_case(name_without_dollar) {
             ctx.collector.report(
-                Issue::new(self.cfg.level(), format!("Property name `{}` should be in camel case.", name))
+                Issue::new(self.cfg.level(), format!("Property name `{name}` should be in camel case."))
                     .with_code(self.meta.code)
                     .with_annotation(
-                        Annotation::primary(span).with_message(format!("Property `{}` is declared here", name)),
+                        Annotation::primary(span).with_message(format!("Property `{name}` is declared here")),
                     )
-                    .with_note(format!("The property name `{}` does not follow camel naming convention.", name))
+                    .with_note(format!("The property name `{name}` does not follow camel naming convention."))
                     .with_help(format!(
                         "Consider renaming it to `${}` to adhere to the naming convention.",
                         to_camel_case(name_without_dollar)
@@ -179,12 +178,12 @@ impl PropertyNameRule {
             );
         } else if !self.cfg.camel && !is_snake_case(name_without_dollar) {
             ctx.collector.report(
-                Issue::new(self.cfg.level(), format!("Property name `{}` should be in snake case.", name))
+                Issue::new(self.cfg.level(), format!("Property name `{name}` should be in snake case."))
                     .with_code(self.meta.code)
                     .with_annotation(
-                        Annotation::primary(span).with_message(format!("Property `{}` is declared here", name)),
+                        Annotation::primary(span).with_message(format!("Property `{name}` is declared here")),
                     )
-                    .with_note(format!("The property name `{}` does not follow snake naming convention.", name))
+                    .with_note(format!("The property name `{name}` does not follow snake naming convention."))
                     .with_help(format!(
                         "Consider renaming it to `${}` to adhere to the naming convention.",
                         to_snake_case(name_without_dollar)

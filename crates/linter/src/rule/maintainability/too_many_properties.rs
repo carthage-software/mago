@@ -51,28 +51,28 @@ impl LintRule for TooManyPropertiesRule {
         const META: RuleMeta = RuleMeta {
             name: "Too Many Properties",
             code: "too-many-properties",
-            description: indoc::indoc! {r#"
+            description: indoc::indoc! {r"
                 Detects class-like structures with too many properties.
 
                 This rule checks the number of properties in classes, traits, and interfaces.
                 If the number of properties exceeds a configurable threshold, an issue is reported.
-            "#},
-            good_example: indoc::indoc! {r#"
+            "},
+            good_example: indoc::indoc! {r"
                 <?php
 
                 class SimpleClass {
                     public $a;
                     public $b;
                 }
-            "#},
-            bad_example: indoc::indoc! {r#"
+            "},
+            bad_example: indoc::indoc! {r"
                 <?php
 
                 class ComplexClass {
                     public $a; public $b; public $c; public $d; public $e;
                     public $f; public $g; public $h; public $i; public $j; public $k;
                 }
-            "#},
+            "},
             category: Category::Maintainability,
 
             requirements: RuleRequirements::None,
@@ -91,7 +91,7 @@ impl LintRule for TooManyPropertiesRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let members = match node {
             Node::Class(c) => c.members.as_slice(),
             Node::Trait(t) => t.members.as_slice(),

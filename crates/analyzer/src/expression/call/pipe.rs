@@ -77,12 +77,12 @@ mod tests {
 
     test_analysis! {
         name = pipe_expression_exact_args,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             function do_nothing(int $_a): void { return; }
 
             123 |> do_nothing(...);
-        "#},
+        "},
     }
 }

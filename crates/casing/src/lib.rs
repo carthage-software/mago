@@ -187,13 +187,7 @@ pub fn to_snake_case(non_snake_case_string: &str) -> String {
     let mut result: String = String::with_capacity(non_snake_case_string.len() * 2);
 
     for char_with_index in non_snake_case_string.trim_end_matches(|c: char| !c.is_alphanumeric()).char_indices() {
-        if !char_with_index.1.is_alphanumeric() {
-            if !first_character && !last_separator {
-                first_character = true;
-                last_separator = true;
-                result.push('_');
-            }
-        } else {
+        if char_with_index.1.is_alphanumeric() {
             first_character = false;
             if !last_separator
                 && !first_character
@@ -208,6 +202,10 @@ pub fn to_snake_case(non_snake_case_string: &str) -> String {
             }
 
             result.push(char_with_index.1.to_ascii_lowercase());
+        } else if !first_character && !last_separator {
+            first_character = true;
+            last_separator = true;
+            result.push('_');
         }
     }
     result

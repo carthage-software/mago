@@ -62,12 +62,12 @@ impl LintRule for NoUnescapedOutputRule {
                 ?>
                 <a href="<?php echo esc_url( $user_provided_url ); ?>">Link</a>
             "#},
-            bad_example: indoc! {r#"
+            bad_example: indoc! {r"
                 <?php
 
                 // This is a major XSS vulnerability.
                 echo $_GET['user_comment'];
-            "#},
+            "},
             category: Category::Security,
             requirements: RuleRequirements::Integration(Integration::WordPress),
         };
@@ -85,7 +85,7 @@ impl LintRule for NoUnescapedOutputRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         match node {
             Node::Echo(echo) => {
                 // Check each expression in the echo statement
@@ -113,7 +113,8 @@ impl LintRule for NoUnescapedOutputRule {
                 // Check printf function - only flag if it has exactly one argument (the format string)
                 if function_call.argument_list.arguments.len() == 1
                     && function_call_matches(ctx, function_call, "printf")
-                    && let Some(first_arg) = function_call.argument_list.arguments.first().map(|arg| arg.value())
+                    && let Some(first_arg) =
+                        function_call.argument_list.arguments.first().map(mago_syntax::ast::Argument::value)
                     && needs_escaping_with_context(first_arg, Some(ctx))
                 {
                     self.report_unescaped_output(ctx, first_arg.span(), "printf function");
@@ -125,10 +126,10 @@ impl LintRule for NoUnescapedOutputRule {
 }
 
 impl NoUnescapedOutputRule {
-    fn report_unescaped_output<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, span: mago_span::Span, context: &str) {
+    fn report_unescaped_output(&self, ctx: &mut LintContext<'_, '_>, span: mago_span::Span, context: &str) {
         let issue = Issue::new(self.cfg.level(), "All output should be escaped to prevent XSS vulnerabilities")
             .with_code(self.meta.code)
-            .with_annotation(Annotation::primary(span).with_message(format!("Unescaped output in {}", context)))
+            .with_annotation(Annotation::primary(span).with_message(format!("Unescaped output in {context}")))
             .with_note("Unescaped data can lead to Cross-Site Scripting vulnerabilities")
             .with_help("Use `esc_html()`, `esc_attr()`, `esc_url()`, etc.");
 
@@ -177,7 +178,7 @@ fn needs_escaping_with_context(expr: &Expression, ctx: Option<&LintContext>) -> 
     }
 }
 
-/// Check if a function call is a WordPress escaping function
+/// Check if a function call is a `WordPress` escaping function
 fn is_escaping_function_call(ctx: &LintContext, function_call: &FunctionCall) -> bool {
     let escaping_functions = [
         "esc_html",
@@ -202,7 +203,7 @@ fn is_escaping_function_call(ctx: &LintContext, function_call: &FunctionCall) ->
     false
 }
 
-/// Check if a function name is a WordPress escaping function (fallback without context)
+/// Check if a function name is a `WordPress` escaping function (fallback without context)
 fn is_escaping_function(name: &str) -> bool {
     matches!(
         name,

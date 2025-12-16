@@ -57,7 +57,7 @@ impl LintRule for StrictAssertionsRule {
                 Assertions should use strict comparison methods, such as `assertSame` or `assertNotSame`
                 instead of `assertEquals` or `assertNotEquals`.
             "},
-            good_example: indoc! {r#"
+            good_example: indoc! {r"
                 <?php
 
                 declare(strict_types=1);
@@ -71,8 +71,8 @@ impl LintRule for StrictAssertionsRule {
                         $this->assertSame(42, 42);
                     }
                 }
-            "#},
-            bad_example: indoc! {r#"
+            "},
+            bad_example: indoc! {r"
                 <?php
 
                 declare(strict_types=1);
@@ -86,7 +86,7 @@ impl LintRule for StrictAssertionsRule {
                         $this->assertEquals(42, 42);
                     }
                 }
-            "#},
+            "},
             category: Category::Correctness,
             requirements: RuleRequirements::Integration(Integration::PHPUnit),
         };
@@ -104,7 +104,7 @@ impl LintRule for StrictAssertionsRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let Node::Method(method) = node else {
             return;
         };
@@ -170,9 +170,7 @@ impl LintRule for StrictAssertionsRule {
 const fn is_non_bool_or_null_scalar(expr: &Expression<'_>) -> bool {
     matches!(
         expr,
-        Expression::Literal(Literal::Integer(_))
-            | Expression::Literal(Literal::Float(_))
-            | Expression::Literal(Literal::String(_))
+        Expression::Literal(Literal::Integer(_) | Literal::Float(_) | Literal::String(_))
             | Expression::CompositeString(_)
     )
 }
@@ -186,7 +184,7 @@ mod tests {
     test_lint_success! {
         name = variable_comparison_not_flagged,
         rule = StrictAssertionsRule,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             use PHPUnit\Framework\TestCase;
@@ -198,13 +196,13 @@ mod tests {
                     $this->assertEquals($expected, $actual);
                 }
             }
-        "#}
+        "}
     }
 
     test_lint_success! {
         name = method_call_not_flagged,
         rule = StrictAssertionsRule,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             use PHPUnit\Framework\TestCase;
@@ -216,13 +214,13 @@ mod tests {
                     self::assertEquals(Money::EUR('100'), $result);
                 }
             }
-        "#}
+        "}
     }
 
     test_lint_success! {
         name = static_variable_comparison_not_flagged,
         rule = StrictAssertionsRule,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             use PHPUnit\Framework\TestCase;
@@ -234,13 +232,13 @@ mod tests {
                     static::assertNotEquals($obj1, $obj2);
                 }
             }
-        "#}
+        "}
     }
 
     test_lint_success! {
         name = null_comparison_not_flagged,
         rule = StrictAssertionsRule,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             use PHPUnit\Framework\TestCase;
@@ -252,13 +250,13 @@ mod tests {
                     $this->assertEquals(null, $value);
                 }
             }
-        "#}
+        "}
     }
 
     test_lint_success! {
         name = bool_comparison_not_flagged,
         rule = StrictAssertionsRule,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             use PHPUnit\Framework\TestCase;
@@ -271,14 +269,14 @@ mod tests {
                     self::assertEquals(false, $other);
                 }
             }
-        "#}
+        "}
     }
 
     test_lint_failure! {
         name = integer_literal_flagged,
         rule = StrictAssertionsRule,
         count = 1,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             use PHPUnit\Framework\TestCase;
@@ -290,14 +288,14 @@ mod tests {
                     $this->assertEquals(42, $result);
                 }
             }
-        "#}
+        "}
     }
 
     test_lint_failure! {
         name = string_literal_flagged,
         rule = StrictAssertionsRule,
         count = 1,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             use PHPUnit\Framework\TestCase;
@@ -309,14 +307,14 @@ mod tests {
                     self::assertEquals('foo', $bar);
                 }
             }
-        "#}
+        "}
     }
 
     test_lint_failure! {
         name = float_literal_flagged,
         rule = StrictAssertionsRule,
         count = 1,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             use PHPUnit\Framework\TestCase;
@@ -328,14 +326,14 @@ mod tests {
                     static::assertEquals(3.14, $value);
                 }
             }
-        "#}
+        "}
     }
 
     test_lint_failure! {
         name = literal_in_second_position_flagged,
         rule = StrictAssertionsRule,
         count = 1,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             use PHPUnit\Framework\TestCase;
@@ -347,14 +345,14 @@ mod tests {
                     $this->assertEquals($result, 42);
                 }
             }
-        "#}
+        "}
     }
 
     test_lint_failure! {
         name = assert_not_equals_with_literal_flagged,
         rule = StrictAssertionsRule,
         count = 1,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             use PHPUnit\Framework\TestCase;
@@ -366,14 +364,14 @@ mod tests {
                     $this->assertNotEquals(42, $value);
                 }
             }
-        "#}
+        "}
     }
 
     test_lint_failure! {
         name = multiple_literal_assertions_flagged,
         rule = StrictAssertionsRule,
         count = 3,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             use PHPUnit\Framework\TestCase;
@@ -387,6 +385,6 @@ mod tests {
                     static::assertNotEquals(1.5, $c);
                 }
             }
-        "#}
+        "}
     }
 }

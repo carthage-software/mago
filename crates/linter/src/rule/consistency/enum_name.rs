@@ -55,18 +55,18 @@ impl LintRule for EnumNameRule {
 
                 Enum names should be in class case, also known as PascalCase.
             "},
-            good_example: indoc! {r#"
+            good_example: indoc! {r"
                 <?php
 
                 enum MyEnum {}
-            "#},
-            bad_example: indoc! {r#"
+            "},
+            bad_example: indoc! {r"
                 <?php
 
                 enum my_enum {}
                 enum myEnum {}
                 enum MY_ENUM {}
-            "#},
+            "},
             category: Category::Consistency,
 
             requirements: RuleRequirements::None,
@@ -85,7 +85,7 @@ impl LintRule for EnumNameRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let Node::Enum(r#enum) = node else {
             return;
         };
@@ -95,16 +95,15 @@ impl LintRule for EnumNameRule {
 
         if !is_class_case(name) {
             ctx.collector.report(
-                Issue::new(self.cfg.level(), format!("Enum name `{}` should be in class case.", name))
+                Issue::new(self.cfg.level(), format!("Enum name `{name}` should be in class case."))
                     .with_code(self.meta.code)
                     .with_annotation(
-                        Annotation::primary(r#enum.name.span())
-                            .with_message(format!("Enum `{}` is declared here", name)),
+                        Annotation::primary(r#enum.name.span()).with_message(format!("Enum `{name}` is declared here")),
                     )
                     .with_annotation(
-                        Annotation::secondary(r#enum.span()).with_message(format!("Enum `{}` is defined here", fqcn)),
+                        Annotation::secondary(r#enum.span()).with_message(format!("Enum `{fqcn}` is defined here")),
                     )
-                    .with_note(format!("The enum name `{}` does not follow class naming convention.", name))
+                    .with_note(format!("The enum name `{name}` does not follow class naming convention."))
                     .with_help(format!(
                         "Consider renaming it to `{}` to adhere to the naming convention.",
                         to_class_case(name)

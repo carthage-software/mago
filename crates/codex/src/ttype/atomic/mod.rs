@@ -145,7 +145,9 @@ impl TAtomic {
     pub fn is_object_type(&self) -> bool {
         match self {
             TAtomic::Object(_) => true,
-            TAtomic::Callable(callable) => callable.get_signature().is_none_or(|signature| signature.is_closure()),
+            TAtomic::Callable(callable) => {
+                callable.get_signature().is_none_or(callable::TCallableSignature::is_closure)
+            }
             TAtomic::GenericParameter(parameter) => parameter.is_constrained_as_objecty(),
             _ => false,
         }
@@ -175,7 +177,7 @@ impl TAtomic {
                 TObject::Enum(r#enum) => object_names.push(r#enum.get_name()),
                 _ => {}
             }
-        };
+        }
 
         for intersection_type in self.get_intersection_types().unwrap_or_default() {
             object_names.extend(intersection_type.get_all_object_names());
@@ -246,14 +248,14 @@ impl TAtomic {
 
     pub fn get_list_element_type(&self) -> Option<&TUnion> {
         match self {
-            TAtomic::Array(array) => array.get_list().map(|list| list.get_element_type()),
+            TAtomic::Array(array) => array.get_list().map(array::list::TList::get_element_type),
             _ => None,
         }
     }
 
     #[inline]
     pub fn is_non_empty_list(&self) -> bool {
-        matches!(self, TAtomic::Array(array) if array.get_list().is_some_and(|list| list.is_non_empty()))
+        matches!(self, TAtomic::Array(array) if array.get_list().is_some_and(array::list::TList::is_non_empty))
     }
 
     #[inline]
@@ -267,7 +269,7 @@ impl TAtomic {
     }
 
     pub fn is_non_empty_keyed_array(&self) -> bool {
-        matches!(self, TAtomic::Array(array) if array.get_keyed().is_some_and(|keyed_array| keyed_array.is_non_empty()))
+        matches!(self, TAtomic::Array(array) if array.get_keyed().is_some_and(array::keyed::TKeyedArray::is_non_empty))
     }
 
     #[inline]
@@ -624,8 +626,7 @@ impl TAtomic {
             self,
             TAtomic::Callable(_)
                 | TAtomic::Scalar(TScalar::String(_))
-                | TAtomic::Array(TArray::List(_))
-                | TAtomic::Array(TArray::Keyed(_))
+                | TAtomic::Array(TArray::List(_) | TArray::Keyed(_))
                 | TAtomic::Object(TObject::Named(_))
         )
     }
@@ -770,7 +771,7 @@ impl TAtomic {
 }
 
 impl TType for TAtomic {
-    fn get_child_nodes<'a>(&'a self) -> Vec<TypeRef<'a>> {
+    fn get_child_nodes(&self) -> Vec<TypeRef<'_>> {
         match self {
             TAtomic::Array(ttype) => ttype.get_child_nodes(),
             TAtomic::Callable(ttype) => ttype.get_child_nodes(),
@@ -1093,10 +1094,10 @@ pub fn populate_atomic_type(
             if let Some(reference_source) = reference_source {
                 match reference_source {
                     ReferenceSource::Symbol(in_signature, a) => {
-                        symbol_references.add_symbol_reference_to_symbol(*a, name, *in_signature)
+                        symbol_references.add_symbol_reference_to_symbol(*a, name, *in_signature);
                     }
                     ReferenceSource::ClassLikeMember(in_signature, a, b) => {
-                        symbol_references.add_class_member_reference_to_symbol((*a, *b), name, *in_signature)
+                        symbol_references.add_class_member_reference_to_symbol((*a, *b), name, *in_signature);
                     }
                 }
             }
@@ -1146,46 +1147,43 @@ pub fn populate_atomic_type(
                 if let Some(reference_source) = reference_source {
                     match reference_source {
                         ReferenceSource::Symbol(in_signature, a) => {
-                            symbol_references.add_symbol_reference_to_symbol(*a, *name, *in_signature)
+                            symbol_references.add_symbol_reference_to_symbol(*a, *name, *in_signature);
                         }
                         ReferenceSource::ClassLikeMember(in_signature, a, b) => {
-                            symbol_references.add_class_member_reference_to_symbol((*a, *b), *name, *in_signature)
+                            symbol_references.add_class_member_reference_to_symbol((*a, *b), *name, *in_signature);
                         }
                     }
                 }
 
                 if let Some(symbol_kind) = codebase_symbols.get_kind(&ascii_lowercase_atom(name)) {
-                    match symbol_kind {
-                        SymbolKind::Enum => {
-                            *unpopulated_atomic = TAtomic::Object(TObject::new_enum(*name));
-                        }
-                        _ => {
-                            let intersection_types = intersection_types.take().map(|intersection_types| {
-                                intersection_types
-                                    .into_iter()
-                                    .map(|mut intersection_type| {
-                                        populate_atomic_type(
-                                            &mut intersection_type,
-                                            codebase_symbols,
-                                            reference_source,
-                                            symbol_references,
-                                            force,
-                                        );
+                    if symbol_kind == SymbolKind::Enum {
+                        *unpopulated_atomic = TAtomic::Object(TObject::new_enum(*name));
+                    } else {
+                        let intersection_types = intersection_types.take().map(|intersection_types| {
+                            intersection_types
+                                .into_iter()
+                                .map(|mut intersection_type| {
+                                    populate_atomic_type(
+                                        &mut intersection_type,
+                                        codebase_symbols,
+                                        reference_source,
+                                        symbol_references,
+                                        force,
+                                    );
 
-                                        intersection_type
-                                    })
-                                    .collect::<Vec<_>>()
-                            });
+                                    intersection_type
+                                })
+                                .collect::<Vec<_>>()
+                        });
 
-                            let mut named_object = TNamedObject::new(*name).with_type_parameters(parameters.clone());
-                            if let Some(intersection_types) = intersection_types {
-                                for intersection_type in intersection_types {
-                                    named_object.add_intersection_type(intersection_type);
-                                }
+                        let mut named_object = TNamedObject::new(*name).with_type_parameters(parameters.clone());
+                        if let Some(intersection_types) = intersection_types {
+                            for intersection_type in intersection_types {
+                                named_object.add_intersection_type(intersection_type);
                             }
-
-                            *unpopulated_atomic = TAtomic::Object(TObject::Named(named_object));
                         }
+
+                        *unpopulated_atomic = TAtomic::Object(TObject::Named(named_object));
                     }
                 }
             }

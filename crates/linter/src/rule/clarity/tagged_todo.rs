@@ -58,18 +58,18 @@ impl LintRule for TaggedTodoRule {
                 can be difficult to track and may be forgotten. Tagging TODOs with a user or issue reference
                 makes it easier to track progress and ensures that tasks are not forgotten.
             "},
-            good_example: indoc! {r#"
+            good_example: indoc! {r"
                 <?php
 
                 // TODO(@azjezz) This is a valid TODO comment.
                 // TODO(azjezz) This is a valid TODO comment.
                 // TODO(#123) This is a valid TODO comment.
-            "#},
-            bad_example: indoc! {r#"
+            "},
+            bad_example: indoc! {r"
                 <?php
 
                 // TODO: This is an invalid TODO comment.
-            "#},
+            "},
             category: Category::Clarity,
 
             requirements: RuleRequirements::None,
@@ -88,7 +88,7 @@ impl LintRule for TaggedTodoRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let Node::Program(program) = node else {
             return;
         };

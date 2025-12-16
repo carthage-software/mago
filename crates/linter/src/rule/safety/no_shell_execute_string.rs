@@ -51,16 +51,16 @@ impl LintRule for NoShellExecuteStringRule {
             description: indoc! {"
                 Detects the use of shell execute strings (`...`) in PHP code.
             "},
-            good_example: indoc! {r#"
+            good_example: indoc! {r"
                 <?php
 
                 $output = shell_exec('ls -l');
-            "#},
-            bad_example: indoc! {r#"
+            "},
+            bad_example: indoc! {r"
                 <?php
 
                 $output = `ls -l`;
-            "#},
+            "},
             category: Category::Safety,
 
             requirements: RuleRequirements::None,
@@ -79,7 +79,7 @@ impl LintRule for NoShellExecuteStringRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let Node::ShellExecuteString(shell_execute_string) = node else {
             return;
         };

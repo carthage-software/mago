@@ -271,7 +271,10 @@ impl TInteger {
     /// - A specific container (e.g., `Literal`, `Range`) cannot hold an `Unspecified` type.
     #[inline]
     pub const fn contains(&self, input: TInteger) -> bool {
-        use TInteger::*;
+        use TInteger::From;
+        use TInteger::Literal;
+        use TInteger::Range;
+        use TInteger::To;
 
         // Rule: An `Unspecified` container can hold any input type.
         if self.is_unspecified() {
@@ -679,7 +682,7 @@ impl TInteger {
             _ => {
                 res.push(*self);
             }
-        };
+        }
 
         res
     }
@@ -986,13 +989,18 @@ impl Add for TInteger {
     type Output = TInteger;
 
     fn add(self, other: TInteger) -> TInteger {
-        use TInteger::*;
+        use TInteger::From;
+        use TInteger::Literal;
+        use TInteger::Range;
+        use TInteger::To;
+        use TInteger::Unspecified;
+        use TInteger::UnspecifiedLiteral;
 
         match (self, other) {
             (Unspecified, _) | (_, Unspecified) => Unspecified,
-            (UnspecifiedLiteral, UnspecifiedLiteral)
-            | (UnspecifiedLiteral, Literal(_))
-            | (Literal(_), UnspecifiedLiteral) => UnspecifiedLiteral,
+            (UnspecifiedLiteral | Literal(_), UnspecifiedLiteral) | (UnspecifiedLiteral, Literal(_)) => {
+                UnspecifiedLiteral
+            }
             (UnspecifiedLiteral, _) | (_, UnspecifiedLiteral) => Unspecified,
             (Literal(l1), Literal(l2)) => Literal(l1.saturating_add(l2)),
             (Literal(l), From(f)) | (From(f), Literal(l)) => From(l.saturating_add(f)),
@@ -1012,13 +1020,18 @@ impl Sub for TInteger {
     type Output = TInteger;
 
     fn sub(self, other: TInteger) -> TInteger {
-        use TInteger::*;
+        use TInteger::From;
+        use TInteger::Literal;
+        use TInteger::Range;
+        use TInteger::To;
+        use TInteger::Unspecified;
+        use TInteger::UnspecifiedLiteral;
 
         match (self, other) {
             (Unspecified, _) | (_, Unspecified) => Unspecified,
-            (UnspecifiedLiteral, UnspecifiedLiteral)
-            | (UnspecifiedLiteral, Literal(_))
-            | (Literal(_), UnspecifiedLiteral) => UnspecifiedLiteral,
+            (UnspecifiedLiteral | Literal(_), UnspecifiedLiteral) | (UnspecifiedLiteral, Literal(_)) => {
+                UnspecifiedLiteral
+            }
             (UnspecifiedLiteral, _) | (_, UnspecifiedLiteral) => Unspecified,
             (Literal(l1), Literal(l2)) => Literal(l1.saturating_sub(l2)),
             (From(f), Literal(l)) => From(f.saturating_sub(l)),
@@ -1040,13 +1053,18 @@ impl Mul for TInteger {
     type Output = TInteger;
 
     fn mul(self, other: TInteger) -> TInteger {
-        use TInteger::*;
+        use TInteger::From;
+        use TInteger::Literal;
+        use TInteger::Range;
+        use TInteger::To;
+        use TInteger::Unspecified;
+        use TInteger::UnspecifiedLiteral;
 
         match (self, other) {
             (Unspecified, _) | (_, Unspecified) => Unspecified,
-            (UnspecifiedLiteral, UnspecifiedLiteral)
-            | (UnspecifiedLiteral, Literal(_))
-            | (Literal(_), UnspecifiedLiteral) => UnspecifiedLiteral,
+            (UnspecifiedLiteral | Literal(_), UnspecifiedLiteral) | (UnspecifiedLiteral, Literal(_)) => {
+                UnspecifiedLiteral
+            }
             (UnspecifiedLiteral, _) | (_, UnspecifiedLiteral) => Unspecified,
             (Literal(l1), Literal(l2)) => Literal(l1.saturating_mul(l2)),
             (Literal(0), _) | (_, Literal(0)) => Literal(0),
@@ -1104,18 +1122,17 @@ impl Div for TInteger {
     type Output = TInteger;
 
     fn div(self, rhs: Self) -> Self::Output {
-        use TInteger::*;
+        use TInteger::From;
+        use TInteger::Literal;
+        use TInteger::Range;
+        use TInteger::To;
+        use TInteger::Unspecified;
+        use TInteger::UnspecifiedLiteral;
 
         match (self, rhs) {
             (Unspecified, _) | (_, Unspecified) => Unspecified,
-            (UnspecifiedLiteral, UnspecifiedLiteral)
-            | (UnspecifiedLiteral, Literal(_))
-            | (Literal(_), UnspecifiedLiteral) => {
-                if rhs.can_be_zero() {
-                    Unspecified
-                } else {
-                    UnspecifiedLiteral
-                }
+            (UnspecifiedLiteral | Literal(_), UnspecifiedLiteral) | (UnspecifiedLiteral, Literal(_)) => {
+                if rhs.can_be_zero() { Unspecified } else { UnspecifiedLiteral }
             }
             (UnspecifiedLiteral, _) | (_, UnspecifiedLiteral) => Unspecified,
             (_, rhs) if rhs.can_be_zero() => Unspecified,
@@ -1214,17 +1231,16 @@ impl Rem for TInteger {
     type Output = TInteger;
 
     fn rem(self, rhs: Self) -> Self::Output {
-        use TInteger::*;
+        use TInteger::From;
+        use TInteger::Literal;
+        use TInteger::Range;
+        use TInteger::To;
+        use TInteger::Unspecified;
+        use TInteger::UnspecifiedLiteral;
 
         match (self, rhs) {
-            (UnspecifiedLiteral, UnspecifiedLiteral)
-            | (UnspecifiedLiteral, Literal(_))
-            | (Literal(_), UnspecifiedLiteral) => {
-                if rhs.can_be_zero() {
-                    Unspecified
-                } else {
-                    UnspecifiedLiteral
-                }
+            (UnspecifiedLiteral | Literal(_), UnspecifiedLiteral) | (UnspecifiedLiteral, Literal(_)) => {
+                if rhs.can_be_zero() { Unspecified } else { UnspecifiedLiteral }
             }
             (UnspecifiedLiteral, _) | (_, UnspecifiedLiteral) => Unspecified,
             (Unspecified, other) => match other {
@@ -1274,7 +1290,7 @@ impl Rem for TInteger {
                     Literal(l1 % l2)
                 }
             }
-            (_, Literal(1)) | (_, Literal(-1)) => Literal(0),
+            (_, Literal(1 | -1)) => Literal(0),
             (Literal(l), From(f)) => {
                 if f > 0 {
                     if l >= 0 {
@@ -1358,12 +1374,14 @@ impl BitAnd for TInteger {
     /// combinations result in `Unspecified` because the resulting set of
     /// possible values is not guaranteed to be a continuous range.
     fn bitand(self, rhs: Self) -> Self::Output {
-        use TInteger::*;
+        use TInteger::Literal;
+        use TInteger::Unspecified;
+        use TInteger::UnspecifiedLiteral;
         match (self, rhs) {
             (Literal(l1), Literal(l2)) => Literal(l1 & l2),
-            (UnspecifiedLiteral, UnspecifiedLiteral)
-            | (UnspecifiedLiteral, Literal(_))
-            | (Literal(_), UnspecifiedLiteral) => UnspecifiedLiteral,
+            (UnspecifiedLiteral | Literal(_), UnspecifiedLiteral) | (UnspecifiedLiteral, Literal(_)) => {
+                UnspecifiedLiteral
+            }
             _ => Unspecified,
         }
     }
@@ -1377,12 +1395,14 @@ impl BitOr for TInteger {
     /// The operation is only computed for two `Literal` values. All other
     /// combinations result in `Unspecified`.
     fn bitor(self, rhs: Self) -> Self::Output {
-        use TInteger::*;
+        use TInteger::Literal;
+        use TInteger::Unspecified;
+        use TInteger::UnspecifiedLiteral;
         match (self, rhs) {
             (Literal(l1), Literal(l2)) => Literal(l1 | l2),
-            (UnspecifiedLiteral, UnspecifiedLiteral)
-            | (UnspecifiedLiteral, Literal(_))
-            | (Literal(_), UnspecifiedLiteral) => UnspecifiedLiteral,
+            (UnspecifiedLiteral | Literal(_), UnspecifiedLiteral) | (UnspecifiedLiteral, Literal(_)) => {
+                UnspecifiedLiteral
+            }
             _ => Unspecified,
         }
     }
@@ -1396,12 +1416,14 @@ impl BitXor for TInteger {
     /// The operation is only computed for two `Literal` values. All other
     /// combinations result in `Unspecified`.
     fn bitxor(self, rhs: Self) -> Self::Output {
-        use TInteger::*;
+        use TInteger::Literal;
+        use TInteger::Unspecified;
+        use TInteger::UnspecifiedLiteral;
         match (self, rhs) {
             (Literal(l1), Literal(l2)) => Literal(l1 ^ l2),
-            (UnspecifiedLiteral, UnspecifiedLiteral)
-            | (UnspecifiedLiteral, Literal(_))
-            | (Literal(_), UnspecifiedLiteral) => UnspecifiedLiteral,
+            (UnspecifiedLiteral | Literal(_), UnspecifiedLiteral) | (UnspecifiedLiteral, Literal(_)) => {
+                UnspecifiedLiteral
+            }
             _ => Unspecified,
         }
     }
@@ -1415,7 +1437,12 @@ impl Shl<TInteger> for TInteger {
     /// This is computed precisely if the shift amount (`rhs`) is a non-negative `Literal`.
     /// Otherwise, the result is `Unspecified`.
     fn shl(self, rhs: TInteger) -> Self::Output {
-        use TInteger::*;
+        use TInteger::From;
+        use TInteger::Literal;
+        use TInteger::Range;
+        use TInteger::To;
+        use TInteger::Unspecified;
+        use TInteger::UnspecifiedLiteral;
         // We can only calculate the result if the shift amount is a known literal.
         if let Literal(shift_amount) = rhs {
             // Shifts must be non-negative and less than the bit width of i64.
@@ -1458,7 +1485,12 @@ impl Shr for TInteger {
     /// This is computed precisely if the shift amount (`rhs`) is a non-negative `Literal`.
     /// Otherwise, the result is `Unspecified`.
     fn shr(self, rhs: TInteger) -> Self::Output {
-        use TInteger::*;
+        use TInteger::From;
+        use TInteger::Literal;
+        use TInteger::Range;
+        use TInteger::To;
+        use TInteger::Unspecified;
+        use TInteger::UnspecifiedLiteral;
 
         if let Literal(shift_amount) = rhs {
             if !(0..64).contains(&shift_amount) {

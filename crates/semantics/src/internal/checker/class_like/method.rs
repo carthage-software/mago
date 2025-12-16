@@ -433,7 +433,7 @@ pub fn check_method<'ast, 'arena>(
                 _ => {}
             }
         }
-    };
+    }
 
     if !method_name.eq_ignore_ascii_case("__construct") {
         check_for_promoted_properties_outside_constructor(&method.parameter_list, context);

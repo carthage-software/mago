@@ -56,11 +56,11 @@ impl LintRule for NoNoopRule {
 
                 echo "Hello, world!";
             "#},
-            bad_example: indoc! {r#"
+            bad_example: indoc! {r"
                 <?php
 
                 ;
-            "#},
+            "},
             category: Category::Redundancy,
             requirements: RuleRequirements::None,
         };
@@ -91,7 +91,7 @@ impl LintRule for NoNoopRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let statements = match node {
             Node::Program(node) => node.statements.as_slice(),
             Node::Block(node) => node.statements.as_slice(),

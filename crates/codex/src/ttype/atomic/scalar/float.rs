@@ -22,7 +22,7 @@ pub enum TFloat {
 }
 
 impl TFloat {
-    /// Creates a new FloatScalar from an optional float value.
+    /// Creates a new `FloatScalar` from an optional float value.
     #[inline]
     pub fn new(value: Option<f64>) -> Self {
         match value {
@@ -84,7 +84,7 @@ impl TFloat {
 
     /// Checks if this float type is contained by another float type.
     ///
-    /// Type hierarchy: Literal(v) ⊂ UnspecifiedLiteral ⊂ Float
+    /// Type hierarchy: Literal(v) ⊂ `UnspecifiedLiteral` ⊂ Float
     #[inline]
     pub fn contains(&self, other: TFloat) -> bool {
         match (self, other) {
@@ -107,7 +107,7 @@ impl Default for TFloat {
 }
 
 impl From<f64> for TFloat {
-    /// Creates a new FloatScalar from a float value.
+    /// Creates a new `FloatScalar` from a float value.
     fn from(value: f64) -> Self {
         Self::literal(value)
     }

@@ -7,7 +7,7 @@ use crate::metadata::CodebaseMetadata;
 use crate::metadata::class_like::ClassLikeMetadata;
 
 /// Inherits method declarations and appearances from a parent class-like.
-/// Updates declaring_method_ids, appearing_method_ids, etc.
+/// Updates `declaring_method_ids`, `appearing_method_ids`, etc.
 pub fn inherit_methods_from_parent(
     metadata: &mut ClassLikeMetadata,
     parent_metadata: &ClassLikeMetadata,
@@ -19,7 +19,7 @@ pub fn inherit_methods_from_parent(
     let reverse_alias_map: Option<HashMap<Atom, Vec<Atom>>> = if parent_is_trait && !metadata.trait_alias_map.is_empty()
     {
         let mut map: HashMap<Atom, Vec<Atom>> = HashMap::default();
-        for (original, alias) in metadata.get_trait_alias_map().iter() {
+        for (original, alias) in metadata.get_trait_alias_map() {
             map.entry(*original).or_default().push(*alias);
         }
         Some(map)

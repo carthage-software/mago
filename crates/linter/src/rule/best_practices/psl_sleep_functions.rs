@@ -60,19 +60,19 @@ impl LintRule for PslSleepFunctionsRule {
                 Psl sleep functions are preferred because they are type-safe, provide more consistent behavior,
                 and allow other tasks within the event loop to continue executing while the current Fiber pauses.
             "},
-            good_example: indoc! {r#"
+            good_example: indoc! {r"
                 <?php
 
                 use Psl\Async;
                 use Psl\DateTime;
 
                 Async\sleep(DateTime\Duration::seconds(1));
-            "#},
-            bad_example: indoc! {r#"
+            "},
+            bad_example: indoc! {r"
                 <?php
 
                 sleep(1);
-            "#},
+            "},
             category: Category::BestPractices,
 
             requirements: RuleRequirements::Integration(Integration::Psl),
@@ -91,7 +91,7 @@ impl LintRule for PslSleepFunctionsRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let Node::FunctionCall(function_call) = node else {
             return;
         };

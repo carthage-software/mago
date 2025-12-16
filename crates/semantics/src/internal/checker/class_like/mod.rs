@@ -17,7 +17,7 @@ mod method;
 mod property;
 
 #[inline]
-pub fn check_class<'ctx, 'ast, 'arena>(class: &'ast Class<'arena>, context: &mut Context<'ctx, 'ast, 'arena>) {
+pub fn check_class<'ast, 'arena>(class: &'ast Class<'arena>, context: &mut Context<'_, 'ast, 'arena>) {
     let class_name = class.name.value;
     let class_fqcn = context.get_name(&class.name.span.start);
 
@@ -275,10 +275,7 @@ pub fn check_class<'ctx, 'ast, 'arena>(class: &'ast Class<'arena>, context: &mut
 }
 
 #[inline]
-pub fn check_interface<'ctx, 'ast, 'arena>(
-    interface: &'ast Interface<'arena>,
-    context: &mut Context<'ctx, 'ast, 'arena>,
-) {
+pub fn check_interface<'ast, 'arena>(interface: &'ast Interface<'arena>, context: &mut Context<'_, 'ast, 'arena>) {
     let interface_name = interface.name.value;
     let interface_fqcn = context.get_name(&interface.name.span.start);
 
@@ -578,7 +575,7 @@ pub fn check_interface<'ctx, 'ast, 'arena>(
                             }
                         }
                     }
-                };
+                }
 
                 check_property(
                     property,
@@ -600,7 +597,7 @@ pub fn check_interface<'ctx, 'ast, 'arena>(
                     }
                 }
 
-                for visibility in non_public_read_visibility.iter() {
+                for visibility in &non_public_read_visibility {
                     let visibility_name = visibility.get_keyword().value;
 
                     context.report(
@@ -634,7 +631,7 @@ pub fn check_interface<'ctx, 'ast, 'arena>(
 }
 
 #[inline]
-pub fn check_trait<'ctx, 'ast, 'arena>(r#trait: &'ast Trait<'arena>, context: &mut Context<'ctx, 'ast, 'arena>) {
+pub fn check_trait<'ast, 'arena>(r#trait: &'ast Trait<'arena>, context: &mut Context<'_, 'ast, 'arena>) {
     let class_like_name = r#trait.name.value;
     let class_like_fqcn = context.get_name(&r#trait.name.span.start);
 
@@ -727,7 +724,7 @@ pub fn check_trait<'ctx, 'ast, 'arena>(r#trait: &'ast Trait<'arena>, context: &m
 }
 
 #[inline]
-pub fn check_enum<'ctx, 'ast, 'arena>(r#enum: &'ast Enum<'arena>, context: &mut Context<'ctx, 'ast, 'arena>) {
+pub fn check_enum<'ast, 'arena>(r#enum: &'ast Enum<'arena>, context: &mut Context<'_, 'ast, 'arena>) {
     if !context.version.is_supported(Feature::Enums) {
         context.report(
             Issue::error("Enums are only available in PHP 8.1 and above.")
@@ -895,9 +892,9 @@ pub fn check_enum<'ctx, 'ast, 'arena>(r#enum: &'ast Enum<'arena>, context: &mut 
 }
 
 #[inline]
-pub fn check_anonymous_class<'ctx, 'ast, 'arena>(
+pub fn check_anonymous_class<'ast, 'arena>(
     anonymous_class: &'ast AnonymousClass<'arena>,
-    context: &mut Context<'ctx, 'ast, 'arena>,
+    context: &mut Context<'_, 'ast, 'arena>,
 ) {
     let mut last_final = None;
     let mut last_readonly = None;
@@ -1093,13 +1090,13 @@ pub fn check_anonymous_class<'ctx, 'ast, 'arena>(
 }
 
 #[inline]
-pub fn check_members<'ctx, 'ast, 'arena>(
+pub fn check_members<'ast, 'arena>(
     members: &'ast Sequence<ClassLikeMember<'arena>>,
     class_like_span: Span,
     class_like_kind: &str,
     class_like_name: &str,
     class_like_fqcn: &str,
-    context: &mut Context<'ctx, 'ast, 'arena>,
+    context: &mut Context<'_, 'ast, 'arena>,
 ) {
     let mut method_names: Vec<(Span, String)> = vec![];
     let mut constant_names: Vec<(bool, std::string::String, Span)> = vec![];
@@ -1202,13 +1199,13 @@ pub fn check_members<'ctx, 'ast, 'arena>(
                             if let Some((is_promoted, _, span)) =
                                 property_names.iter().find(|(_, name, _)| item_name.eq(*name))
                             {
-                                let message = if !*is_promoted {
+                                let message = if *is_promoted {
                                     format!(
-                                        "promoted property `{class_like_name}::{item_name}` has already been defined as a property"
+                                        "promoted property `{class_like_name}::{item_name}` has already been defined"
                                     )
                                 } else {
                                     format!(
-                                        "promoted property `{class_like_name}::{item_name}` has already been defined"
+                                        "promoted property `{class_like_name}::{item_name}` has already been defined as a property"
                                     )
                                 };
 
@@ -1304,9 +1301,8 @@ pub fn check_members<'ctx, 'ast, 'arena>(
                     }
 
                     continue;
-                } else {
-                    constant_names.push((false, case_name.to_string(), enum_case.item.name().span()));
                 }
+                constant_names.push((false, case_name.to_string(), enum_case.item.name().span()));
             }
             _ => {}
         }

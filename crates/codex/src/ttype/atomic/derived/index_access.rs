@@ -114,7 +114,7 @@ impl TIndexAccess {
 }
 
 impl TType for TIndexAccess {
-    fn get_child_nodes<'a>(&'a self) -> Vec<TypeRef<'a>> {
+    fn get_child_nodes(&self) -> Vec<TypeRef<'_>> {
         vec![TypeRef::Union(&self.target_type), TypeRef::Union(&self.index_type)]
     }
 

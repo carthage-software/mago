@@ -141,7 +141,7 @@ impl<'de> Deserialize<'de> for Integration {
 
         struct IntegrationVisitor;
 
-        impl<'de> Visitor<'de> for IntegrationVisitor {
+        impl Visitor<'_> for IntegrationVisitor {
             type Value = Integration;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {

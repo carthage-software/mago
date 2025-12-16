@@ -53,14 +53,14 @@ impl LintRule for OptionalParamOrderRule {
             description: indoc! {"                Detects optional parameters defined before required parameters in function-like declarations.
                 Such parameter order is considered deprecated; required parameters should precede optional parameters.
             "},
-            good_example: indoc! {r#"                <?php
+            good_example: indoc! {r"                <?php
 
                 function foo(string $required, ?string $optional = null): void {}
-            "#},
-            bad_example: indoc! {r#"                <?php
+            "},
+            bad_example: indoc! {r"                <?php
 
                 function foo(?string $optional = null, string $required): void {}
-            "#},
+            "},
             category: Category::Deprecation,
             requirements: RuleRequirements::PHPVersion(PHPVersionRange::from(PHPVersion::PHP80)),
         };
@@ -78,7 +78,7 @@ impl LintRule for OptionalParamOrderRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let Node::FunctionLikeParameterList(function_like_parameter_list) = node else {
             return;
         };
@@ -104,7 +104,7 @@ impl LintRule for OptionalParamOrderRule {
                 )
                 .with_annotations(optional_parameters.iter().map(|(opt_name, opt_span)| {
                     Annotation::secondary(*opt_span)
-                        .with_message(format!("Optional parameter `{}` defined here", opt_name))
+                        .with_message(format!("Optional parameter `{opt_name}` defined here"))
                 }))
                 .with_note("Parameters after an optional one are implicitly required.")
                 .with_note("Defining optional parameters before required ones has been deprecated since PHP 8.0.")

@@ -110,13 +110,13 @@ mod tests {
 
     #[test]
     fn test_order_is_not_important() {
-        let code = r#"
+        let code = r"
             <?php
 
             interface DateTimeInterface {}
 
             class DateTime implements DateTimeInterface {}
-        "#;
+        ";
 
         let codebase = create_test_codebase(code);
 
@@ -160,14 +160,14 @@ mod tests {
 
     #[test]
     fn test_union_order_with_multiple_coercible_types() {
-        let code = r#"
+        let code = r"
             <?php
 
             interface A {}
             interface B {}
 
             class C implements A, B {}
-        "#;
+        ";
 
         let codebase = create_test_codebase(code);
 
@@ -198,12 +198,12 @@ mod tests {
 
     #[test]
     fn test_union_order_with_non_coercible_types() {
-        let code = r#"
+        let code = r"
             <?php
 
             class Foo {}
             class Bar {}
-        "#;
+        ";
 
         let codebase = create_test_codebase(code);
 
@@ -228,13 +228,13 @@ mod tests {
 
     #[test]
     fn test_union_order_with_mixed_coercion() {
-        let code = r#"
+        let code = r"
             <?php
 
             interface ParentInterface {}
             class Child implements ParentInterface {}
             class Unrelated {}
-        "#;
+        ";
 
         let codebase = create_test_codebase(code);
 

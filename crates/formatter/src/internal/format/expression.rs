@@ -863,7 +863,7 @@ impl<'arena> Format<'arena> for Match<'arena> {
                 BraceStyle::NextLine => {
                     contents.push(Document::Line(Line::default()));
                 }
-            };
+            }
 
             contents.push(format_token(f, self.left_brace, "{"));
 

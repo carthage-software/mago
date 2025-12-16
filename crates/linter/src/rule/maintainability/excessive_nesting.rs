@@ -55,12 +55,12 @@ impl LintRule for ExcessiveNestingRule {
         const META: RuleMeta = RuleMeta {
             name: "Excessive Nesting",
             code: "excessive-nesting",
-            description: indoc! {r#"
+            description: indoc! {r"
                 Checks if the nesting level in any block exceeds a configurable threshold.
 
                 Deeply nested code is harder to read, understand, and maintain.
                 Consider refactoring to use early returns, helper methods, or clearer control flow.
-            "#},
+            "},
             good_example: indoc! {r#"
                 <?php
 
@@ -109,7 +109,7 @@ impl LintRule for ExcessiveNestingRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let Node::Program(program) = node else {
             return;
         };

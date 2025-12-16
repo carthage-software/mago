@@ -1,4 +1,4 @@
-//! UnitEnum::cases() return type provider.
+//! `UnitEnum::cases()` return type provider.
 
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::array::TArray;
@@ -56,10 +56,10 @@ impl MethodReturnTypeProvider for EnumCasesProvider {
             case: None,
         })));
 
-        if !class_metadata.enum_cases.is_empty() {
-            Some(TUnion::from_atomic(TAtomic::Array(TArray::List(TList::new_non_empty(Box::new(enum_type))))))
-        } else {
+        if class_metadata.enum_cases.is_empty() {
             Some(TUnion::from_atomic(TAtomic::Array(TArray::List(TList::new(Box::new(enum_type))))))
+        } else {
+            Some(TUnion::from_atomic(TAtomic::Array(TArray::List(TList::new_non_empty(Box::new(enum_type))))))
         }
     }
 }

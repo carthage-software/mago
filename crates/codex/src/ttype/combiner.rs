@@ -204,7 +204,7 @@ pub fn combine(types: Vec<TAtomic>, codebase: &CodebaseMetadata, overwrite_empty
     if combination.value_types.contains_key(&*ATOM_STRING)
         && combination.value_types.contains_key(&*ATOM_FLOAT)
         && combination.value_types.contains_key(&*ATOM_BOOL)
-        && combination.integers.iter().any(|integer| integer.is_unspecified())
+        && combination.integers.iter().any(super::atomic::scalar::int::TInteger::is_unspecified)
     {
         combination.integers.clear();
         combination.value_types.remove(&*ATOM_STRING);
@@ -236,7 +236,7 @@ pub fn combine(types: Vec<TAtomic>, codebase: &CodebaseMetadata, overwrite_empty
     let mixed_from_loop_isset = combination.flags.mixed_from_loop_isset().unwrap_or(false);
 
     for (_, atomic) in combination.value_types {
-        let tc = if has_never { 1 } else { 0 };
+        let tc = usize::from(has_never);
         if atomic.is_mixed()
             && mixed_from_loop_isset
             && (combination_value_type_count > (tc + 1) || new_types.len() > tc)
@@ -271,8 +271,8 @@ fn finalize_sealed_arrays(arrays: &mut Vec<TArray>, codebase: &CodebaseMetadata)
     }
 
     arrays.sort_unstable_by_key(|a| match a {
-        TArray::List(list) => list.known_elements.as_ref().map_or(0, |e| e.len()),
-        TArray::Keyed(keyed) => keyed.known_items.as_ref().map_or(0, |i| i.len()),
+        TArray::List(list) => list.known_elements.as_ref().map_or(0, std::collections::BTreeMap::len),
+        TArray::Keyed(keyed) => keyed.known_items.as_ref().map_or(0, std::collections::BTreeMap::len),
     });
 
     let mut keep = vec![true; arrays.len()];
@@ -476,14 +476,13 @@ fn scrape_type_properties(
 
     if let TAtomic::Resource(TResource { closed }) = atomic {
         match closed {
-            Some(closed) => match closed {
-                true => {
+            Some(closed) => {
+                if closed {
                     combination.flags.insert(CombinationFlags::CLOSED_RESOURCE);
-                }
-                false => {
+                } else {
                     combination.flags.insert(CombinationFlags::OPEN_RESOURCE);
                 }
-            },
+            }
             None => {
                 combination.flags.insert(CombinationFlags::RESOURCE);
             }
@@ -580,7 +579,7 @@ fn scrape_type_properties(
                         }
                     } else if !overwrite_empty_array {
                         if element_type.is_never() {
-                            for (_, (pu, _)) in combination.list_array_entries.iter_mut() {
+                            for (pu, _) in combination.list_array_entries.values_mut() {
                                 *pu = true;
                             }
                         } else {
@@ -660,7 +659,7 @@ fn scrape_type_properties(
                                     };
 
                                 combination.keyed_array_entries.insert(candidate_item_name, new_item_value_type);
-                            };
+                            }
 
                             possibly_undefined_entries.remove(&candidate_item_name);
 
@@ -685,7 +684,7 @@ fn scrape_type_properties(
                             Some((_, value_param)) => value_param.is_never(),
                             None => true,
                         } {
-                            for (_, (tu, _)) in combination.keyed_array_entries.iter_mut() {
+                            for (tu, _) in combination.keyed_array_entries.values_mut() {
                                 *tu = true;
                             }
                         } else {
@@ -781,11 +780,9 @@ fn scrape_type_properties(
         let fq_class_name = named_object.get_name();
         let intersection_types = named_object.get_intersection_types();
 
-        if !combination.flags.contains(CombinationFlags::HAS_OBJECT_TOP_TYPE) {
-            if combination.value_types.contains_key(&atomic.get_id()) {
-                return;
-            }
-        } else {
+        if combination.flags.contains(CombinationFlags::HAS_OBJECT_TOP_TYPE) {
+            return;
+        } else if combination.value_types.contains_key(&atomic.get_id()) {
             return;
         }
 
@@ -931,7 +928,7 @@ fn scrape_type_properties(
                     let is_incompatible = (existing_string_type.is_numeric && !str_is_numeric(lit_value))
                         || (existing_string_type.is_truthy && (lit_value.is_empty() || lit_value == "0"))
                         || (existing_string_type.is_non_empty && lit_value.is_empty())
-                        || (existing_string_type.is_lowercase && lit_value.chars().any(|c| c.is_uppercase()));
+                        || (existing_string_type.is_lowercase && lit_value.chars().any(char::is_uppercase));
 
                     if is_incompatible {
                         combination.literal_strings.insert(lit_atom);
@@ -941,7 +938,7 @@ fn scrape_type_properties(
                 } else {
                     *existing_string_type = combine_string_scalars(existing_string_type, string_scalar);
                 }
-            };
+            }
         } else if let Some(atom) = string_scalar.get_known_literal_atom() {
             combination.literal_strings.insert(atom);
         } else {
@@ -998,14 +995,11 @@ fn scrape_type_properties(
             return;
         }
 
-        match float_scalar {
-            TFloat::Literal(literal_value) => {
-                combination.literal_floats.push(*literal_value);
-            }
-            _ => {
-                combination.literal_floats.clear();
-                combination.value_types.insert(*ATOM_FLOAT, atomic);
-            }
+        if let TFloat::Literal(literal_value) = float_scalar {
+            combination.literal_floats.push(*literal_value);
+        } else {
+            combination.literal_floats.clear();
+            combination.value_types.insert(*ATOM_FLOAT, atomic);
         }
 
         return;

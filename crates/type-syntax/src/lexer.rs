@@ -272,7 +272,7 @@ impl<'input> TypeLexer<'input> {
             [b'/', b'/', ..] => self.read_single_line_comment(),
             [b'.', start_of_number!(), ..] => self.read_decimal(),
             [start_of_number!(), ..] => self.read_number(),
-            [quote @ b'\'' | quote @ b'"', ..] => self.read_literal_string(quote),
+            [quote @ (b'\'' | b'"'), ..] => self.read_literal_string(quote),
             [b'\\', start_of_identifier!(), ..] => self.read_fully_qualified_identifier(),
             [start_of_identifier!(), ..] => self.read_identifier(),
             [b'$', start_of_identifier!(), ..] => {
@@ -551,17 +551,16 @@ impl<'input> TypeLexer<'input> {
                     length += 1;
                 }
                 [b'\\', ..] => {
-                    if !last_was_slash {
-                        length += 1;
-                        slashes += 1;
-                        last_was_slash = true;
-                    } else {
+                    if last_was_slash {
                         length -= 1;
                         slashes -= 1;
                         last_was_slash = false;
 
                         break;
                     }
+                    length += 1;
+                    slashes += 1;
+                    last_was_slash = true;
                 }
                 _ => {
                     break;

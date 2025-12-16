@@ -50,9 +50,9 @@ impl TObjectWithProperties {
 }
 
 impl TType for TObjectWithProperties {
-    fn get_child_nodes<'a>(&'a self) -> Vec<TypeRef<'a>> {
+    fn get_child_nodes(&self) -> Vec<TypeRef<'_>> {
         let mut children = vec![];
-        for (_, (_, item_type)) in self.known_properties.iter() {
+        for (_, item_type) in self.known_properties.values() {
             children.push(TypeRef::Union(item_type));
         }
 
@@ -76,10 +76,10 @@ impl TType for TObjectWithProperties {
         string += "object{";
         let mut first = true;
         for (key, (indefinite, item_type)) in &self.known_properties {
-            if !first {
-                string += ", ";
-            } else {
+            if first {
                 first = false;
+            } else {
+                string += ", ";
             }
 
             string += key.as_ref();

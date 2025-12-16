@@ -16,20 +16,12 @@ pub trait StatementHook: Provider {
     ///
     /// Return `HookAction::Continue` to proceed with normal analysis, or
     /// `HookAction::Skip` to skip analysis of this statement.
-    fn before_statement<'ast, 'arena>(
-        &self,
-        _stmt: &'ast Statement<'arena>,
-        _context: &mut HookContext<'_, '_>,
-    ) -> HookResult<HookAction> {
+    fn before_statement(&self, _stmt: &Statement<'_>, _context: &mut HookContext<'_, '_>) -> HookResult<HookAction> {
         Ok(HookAction::Continue)
     }
 
     /// Called after a statement has been analyzed.
-    fn after_statement<'ast, 'arena>(
-        &self,
-        _stmt: &'ast Statement<'arena>,
-        _context: &mut HookContext<'_, '_>,
-    ) -> HookResult<()> {
+    fn after_statement(&self, _stmt: &Statement<'_>, _context: &mut HookContext<'_, '_>) -> HookResult<()> {
         Ok(())
     }
 }

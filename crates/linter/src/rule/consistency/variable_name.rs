@@ -65,14 +65,14 @@ impl LintRule for VariableNameRule {
 
                 Variable names should be in camel case or snake case, depending on the configuration.
             "},
-            good_example: indoc! {r#"
+            good_example: indoc! {r"
                 <?php
 
                 $my_variable = 1;
 
                 function foo($my_param) {}
-            "#},
-            bad_example: indoc! {r#"
+            "},
+            bad_example: indoc! {r"
                 <?php
 
                 $MyVariable = 1;
@@ -80,7 +80,7 @@ impl LintRule for VariableNameRule {
                 $My_Variable = 2;
 
                 function foo($MyParam) {}
-            "#},
+            "},
             category: Category::Consistency,
             requirements: RuleRequirements::None,
         };
@@ -98,7 +98,7 @@ impl LintRule for VariableNameRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         match node {
             Node::Assignment(assignment) => {
                 self.check_assignment(ctx, assignment);
@@ -152,15 +152,14 @@ impl VariableNameRule {
                 ctx.collector.report(
                     Issue::new(
                         self.cfg.level(),
-                        format!("Variable name `{}` should be in either camel case or snake case.", name),
+                        format!("Variable name `{name}` should be in either camel case or snake case."),
                     )
                     .with_code(self.meta.code)
                     .with_annotation(
-                        Annotation::primary(span).with_message(format!("Variable `{}` is declared here", name)),
+                        Annotation::primary(span).with_message(format!("Variable `{name}` is declared here")),
                     )
                     .with_note(format!(
-                        "The variable name `{}` does not follow either camel case or snake naming convention.",
-                        name
+                        "The variable name `{name}` does not follow either camel case or snake naming convention."
                     ))
                     .with_help(format!(
                         "Consider renaming it to `${}` or `${}` to adhere to the naming convention.",
@@ -175,12 +174,12 @@ impl VariableNameRule {
 
         if self.cfg.camel && !is_camel_case(name_without_dollar) {
             ctx.collector.report(
-                Issue::new(self.cfg.level(), format!("Variable name `{}` should be in camel case.", name))
+                Issue::new(self.cfg.level(), format!("Variable name `{name}` should be in camel case."))
                     .with_code(self.meta.code)
                     .with_annotation(
-                        Annotation::primary(span).with_message(format!("Variable `{}` is declared here", name)),
+                        Annotation::primary(span).with_message(format!("Variable `{name}` is declared here")),
                     )
-                    .with_note(format!("The variable name `{}` does not follow camel naming convention.", name))
+                    .with_note(format!("The variable name `{name}` does not follow camel naming convention."))
                     .with_help(format!(
                         "Consider renaming it to `${}` to adhere to the naming convention.",
                         to_camel_case(name_without_dollar)
@@ -188,12 +187,12 @@ impl VariableNameRule {
             );
         } else if !self.cfg.camel && !is_snake_case(name_without_dollar) {
             ctx.collector.report(
-                Issue::new(self.cfg.level(), format!("Variable name `{}` should be in snake case.", name))
+                Issue::new(self.cfg.level(), format!("Variable name `{name}` should be in snake case."))
                     .with_code(self.meta.code)
                     .with_annotation(
-                        Annotation::primary(span).with_message(format!("Variable `{}` is declared here", name)),
+                        Annotation::primary(span).with_message(format!("Variable `{name}` is declared here")),
                     )
-                    .with_note(format!("The variable name `{}` does not follow snake naming convention.", name))
+                    .with_note(format!("The variable name `{name}` does not follow snake naming convention."))
                     .with_help(format!(
                         "Consider renaming it to `${}` to adhere to the naming convention.",
                         to_snake_case(name_without_dollar)

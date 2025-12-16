@@ -121,10 +121,10 @@ impl TKeyedArray {
 }
 
 impl TType for TKeyedArray {
-    fn get_child_nodes<'a>(&'a self) -> Vec<TypeRef<'a>> {
+    fn get_child_nodes(&self) -> Vec<TypeRef<'_>> {
         let mut children = vec![];
         if let Some(known_items) = self.known_items.as_ref() {
-            for (_, (_, item_type)) in known_items.iter() {
+            for (_, item_type) in known_items.values() {
                 children.push(TypeRef::Union(item_type));
             }
         }
@@ -185,10 +185,10 @@ impl TType for TKeyedArray {
             string += "array{";
             let mut first = true;
             for (key, (indefinite, item_type)) in items {
-                if !first {
-                    string += ", ";
-                } else {
+                if first {
                     first = false;
+                } else {
+                    string += ", ";
                 }
 
                 string += &key.to_string();

@@ -52,16 +52,16 @@ impl LintRule for NoTrailingSpaceRule {
                 Detects trailing whitespace at the end of comments. Trailing whitespace can cause unnecessary
                 diffs and formatting issues, so it is recommended to remove it.
             "},
-            good_example: indoc! {r#"
+            good_example: indoc! {r"
                 <?php
 
                 // This is a good comment.
-            "#},
-            bad_example: indoc! {r#"
+            "},
+            bad_example: indoc! {r"
                 <?php
 
                 // This is a comment with trailing whitespace.  
-            "#},
+            "},
             category: Category::Consistency,
             requirements: RuleRequirements::None,
         };
@@ -79,7 +79,7 @@ impl LintRule for NoTrailingSpaceRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let Node::Program(program) = node else {
             return;
         };
@@ -93,7 +93,7 @@ impl LintRule for NoTrailingSpaceRule {
             let lines = trivia.value.lines().collect::<Vec<_>>();
 
             let mut offset = 0;
-            for line in lines.iter() {
+            for line in &lines {
                 let trimmed = line.trim_end();
                 let trimmed_length = trimmed.len();
                 let trailing_whitespace_length = line.len() - trimmed_length;

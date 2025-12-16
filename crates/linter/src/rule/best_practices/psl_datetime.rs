@@ -59,16 +59,16 @@ impl LintRule for PslDatetimeRule {
 
                 Psl DateTime classes and functions are preferred because they are type-safe and provide more consistent behavior.
             "},
-            good_example: indoc! {r#"
+            good_example: indoc! {r"
                 <?php
 
                 $dateTime = new Psl\DateTime\DateTime();
-            "#},
-            bad_example: indoc! {r#"
+            "},
+            bad_example: indoc! {r"
                 <?php
 
                 $dateTime = new DateTime();
-            "#},
+            "},
             category: Category::BestPractices,
 
             requirements: RuleRequirements::Integration(Integration::Psl),
@@ -87,7 +87,7 @@ impl LintRule for PslDatetimeRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let identifier = match node {
             Node::FunctionCall(function_call) => {
                 let Expression::Identifier(identifier) = function_call.function else {

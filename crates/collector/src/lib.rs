@@ -133,6 +133,11 @@ impl<'ctx, 'arena> Collector<'ctx, 'arena> {
     /// When set, only pragmas for codes in this list will be required to be fulfilled.
     /// Pragmas for codes not in this list will not trigger "unfulfilled" warnings.
     /// This is useful when using filters like `--only` to check specific rules.
+    ///
+    /// # Panics
+    ///
+    /// Panics if any string allocated in the arena is not valid UTF-8. This should never
+    /// happen with valid issue codes.
     #[inline]
     pub fn set_active_codes(&mut self, codes: &[String]) {
         self.active_codes = Some(
@@ -232,7 +237,7 @@ impl<'ctx, 'arena> Collector<'ctx, 'arena> {
     /// as individually reported issues.
     #[inline]
     pub fn extend(&mut self, issues: impl IntoIterator<Item = Issue>) {
-        for issue in issues.into_iter() {
+        for issue in issues {
             self.report(issue);
         }
     }

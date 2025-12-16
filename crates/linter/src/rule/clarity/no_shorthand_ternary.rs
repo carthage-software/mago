@@ -82,7 +82,7 @@ impl LintRule for NoShorthandTernaryRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let issue = match node {
             Node::Conditional(Conditional { then: None, .. }) => {
                 Issue::new(self.cfg.level(), "Use of the shorthand ternary operator.")

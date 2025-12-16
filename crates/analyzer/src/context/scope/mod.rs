@@ -18,7 +18,7 @@ pub fn var_has_root(var_id: &Atom, root_var_id: &Atom) -> bool {
     }
 
     let after_root = &var_id[root_var_id.len()..];
-    after_root.starts_with("->") || after_root.starts_with("::") || after_root.starts_with("[")
+    after_root.starts_with("->") || after_root.starts_with("::") || after_root.starts_with('[')
 }
 
 #[cfg(test)]

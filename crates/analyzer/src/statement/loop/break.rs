@@ -43,8 +43,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Break<'arena> {
                                 "Expected an integer literal here, found an expression of type `{}`.",
                                 artifacts
                                     .get_expression_type(expression)
-                                    .map(|union| union.get_id().as_str())
-                                    .unwrap_or_else(|| "unknown")
+                                    .map_or_else(|| "unknown", |union| union.get_id().as_str())
                             )),
                         ),
                     );
@@ -71,7 +70,8 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Break<'arena> {
         let mut leaving_switch = true;
         let mut leaving_loop = false;
         if let Some(loop_scope) = loop_scope_ref {
-            if block_context.break_types.last().is_some_and(|last_break_type| last_break_type.is_switch()) && levels < 2
+            if block_context.break_types.last().is_some_and(crate::context::block::BreakContext::is_switch)
+                && levels < 2
             {
                 loop_scope.final_actions.insert(ControlAction::LeaveSwitch);
             } else {
@@ -89,7 +89,10 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Break<'arena> {
                     var_id,
                     Rc::new(add_optional_union_type(
                         var_type,
-                        loop_scope.possibly_redefined_loop_parent_variables.get(&var_id).map(|rc| rc.as_ref()),
+                        loop_scope
+                            .possibly_redefined_loop_parent_variables
+                            .get(&var_id)
+                            .map(std::convert::AsRef::as_ref),
                         context.codebase,
                     )),
                 );

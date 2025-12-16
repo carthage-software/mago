@@ -51,27 +51,27 @@ impl LintRule for NoDebugSymbolsRule {
         const META: RuleMeta = RuleMeta {
             name: "No Debug Symbols",
             code: "no-debug-symbols",
-            description: indoc! {r#"
+            description: indoc! {r"
                 Flags calls to debug functions like `var_dump`, `print_r`, `dd`, etc.
 
                 These functions are useful for debugging, but they should not be committed to
                 version control as they can expose sensitive information and are generally not
                 intended for production environments.
-            "#},
-            good_example: indoc! {r#"
+            "},
+            good_example: indoc! {r"
                 <?php
 
                 // Production-safe code
                 error_log('Processing user request.');
-            "#},
-            bad_example: indoc! {r#"
+            "},
+            bad_example: indoc! {r"
                 <?php
 
                 function process_request(array $data) {
                     var_dump($data); // Debug call that should be removed
                     // ...
                 }
-            "#},
+            "},
             category: Category::Security,
 
             requirements: RuleRequirements::None,
@@ -88,7 +88,7 @@ impl LintRule for NoDebugSymbolsRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let Node::FunctionCall(function_call) = node else {
             return;
         };
@@ -100,7 +100,7 @@ impl LintRule for NoDebugSymbolsRule {
             return;
         }
 
-        for debug_function in DEBUG_FUNCTIONS.iter() {
+        for debug_function in &DEBUG_FUNCTIONS {
             if !function_call_matches(ctx, function_call, debug_function) {
                 continue;
             }

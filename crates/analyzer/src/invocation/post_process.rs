@@ -49,11 +49,11 @@ use crate::reconciler;
 use crate::reconciler::assertion_reconciler::intersect_union_with_union;
 use crate::utils::expression::get_expression_id;
 
-pub fn post_invocation_process<'ctx, 'ast, 'arena>(
+pub fn post_invocation_process<'ctx, 'arena>(
     context: &mut Context<'ctx, 'arena>,
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
-    invoication: &Invocation<'ctx, 'ast, 'arena>,
+    invoication: &Invocation<'ctx, '_, 'arena>,
     this_variable: Option<&str>,
     template_result: &TemplateResult,
     parameters: &AtomMap<TUnion>,
@@ -72,9 +72,7 @@ pub fn post_invocation_process<'ctx, 'ast, 'arena>(
 
     let (callable_kind_str, full_callable_name) = match identifier {
         FunctionLikeIdentifier::Function(name) => ("function", format!("`{name}`")),
-        FunctionLikeIdentifier::Method(class_name, method_name) => {
-            ("method", format!("`{}::{}`", class_name, method_name))
-        }
+        FunctionLikeIdentifier::Method(class_name, method_name) => ("method", format!("`{class_name}::{method_name}`")),
         FunctionLikeIdentifier::Closure(file_id, position) => (
             "closure",
             format!(
@@ -220,11 +218,11 @@ pub fn post_invocation_process<'ctx, 'ast, 'arena>(
     Ok(())
 }
 
-fn apply_assertion_to_call_context<'ctx, 'ast, 'arena>(
+fn apply_assertion_to_call_context<'ctx, 'arena>(
     context: &mut Context<'ctx, 'arena>,
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
-    invocation: &Invocation<'ctx, 'ast, 'arena>,
+    invocation: &Invocation<'ctx, '_, 'arena>,
     this_variable: Option<&str>,
     assertions: &BTreeMap<Atom, Conjunction<Assertion>>,
     template_result: &TemplateResult,
@@ -265,11 +263,11 @@ fn apply_assertion_to_call_context<'ctx, 'ast, 'arena>(
     );
 }
 
-fn update_by_reference_argument_types<'ctx, 'ast, 'arena>(
+fn update_by_reference_argument_types<'ctx, 'arena>(
     context: &mut Context<'ctx, 'arena>,
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
-    invocation: &Invocation<'ctx, 'ast, 'arena>,
+    invocation: &Invocation<'ctx, '_, 'arena>,
     template_result: &TemplateResult,
     parameters: &AtomMap<TUnion>,
 ) -> Result<(), AnalysisError> {
@@ -293,8 +291,9 @@ fn update_by_reference_argument_types<'ctx, 'ast, 'arena>(
                 .get_out_type()
                 .or_else(|| parameter_ref.get_type())
                 .cloned()
-                .map(|new_type| resolve_invocation_type(context, invocation, template_result, parameters, new_type))
-                .unwrap_or_else(get_mixed);
+                .map_or_else(get_mixed, |new_type| {
+                    resolve_invocation_type(context, invocation, template_result, parameters, new_type)
+                });
 
             new_type.set_by_reference(true);
 
@@ -347,10 +346,10 @@ fn update_by_reference_argument_types<'ctx, 'ast, 'arena>(
 /// When an object is passed to a method or function, its properties could be modified.
 /// This function removes any narrowed property types for object arguments to prevent
 /// false positives from the analyzer assuming properties remain unchanged after the call.
-fn clear_object_argument_property_narrowings<'ctx, 'ast, 'arena>(
+fn clear_object_argument_property_narrowings<'ctx, 'arena>(
     context: &Context<'ctx, 'arena>,
     block_context: &mut BlockContext<'ctx>,
-    invocation: &Invocation<'ctx, 'ast, 'arena>,
+    invocation: &Invocation<'ctx, '_, 'arena>,
 ) {
     let arguments = invocation.arguments_source.get_arguments();
 
@@ -387,9 +386,9 @@ fn clear_object_argument_property_narrowings<'ctx, 'ast, 'arena>(
                     return false;
                 }
                 let after_root = &var_id.as_str()[argument_id.len()..];
-                after_root.starts_with("->") || after_root.starts_with("[")
+                after_root.starts_with("->") || after_root.starts_with('[')
             })
-            .cloned()
+            .copied()
             .collect();
 
         for key in keys_to_remove {
@@ -398,11 +397,11 @@ fn clear_object_argument_property_narrowings<'ctx, 'ast, 'arena>(
     }
 }
 
-fn resolve_invocation_assertion<'ctx, 'ast, 'arena>(
+fn resolve_invocation_assertion<'ctx, 'arena>(
     context: &mut Context<'ctx, 'arena>,
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
-    invocation: &Invocation<'ctx, 'ast, 'arena>,
+    invocation: &Invocation<'ctx, '_, 'arena>,
     this_variable: Option<&str>,
     assertions: &BTreeMap<Atom, Conjunction<Assertion>>,
     template_result: &TemplateResult,
@@ -523,33 +522,30 @@ fn resolve_invocation_assertion<'ctx, 'ast, 'arena>(
                                 }
                             }
                             Assertion::IsIdentical(_) => {
-                                let intersection = match intersect_union_with_union(
-                                    context,
-                                    asserted_type,
-                                    &resolved_assertion_type,
-                                ) {
-                                    Some(intersection) => intersection,
-                                    None => {
-                                        let asserted_type_id = asserted_type.get_id();
-                                        let expected_type_id = resolved_assertion_type.get_id();
+                                let intersection = if let Some(intersection) =
+                                    intersect_union_with_union(context, asserted_type, &resolved_assertion_type)
+                                {
+                                    intersection
+                                } else {
+                                    let asserted_type_id = asserted_type.get_id();
+                                    let expected_type_id = resolved_assertion_type.get_id();
 
-                                        context.collector.report_with_code(
-                                            IssueCode::ImpossibleTypeComparison,
-                                            Issue::error(format!(
-                                                "Impossible type assertion: `{assertion_variable}` of type `{asserted_type_id}` can never be identical to `{expected_type_id}`."
-                                            ))
-                                            .with_annotation(
-                                                Annotation::primary(invocation.span)
-                                                    .with_message(format!("Argument `{assertion_variable}` has type `{asserted_type_id}`")),
-                                            )
-                                            .with_note(format!(
-                                                "The assertion expects `{assertion_variable}` to be identical to `{expected_type_id}`, but no value of type `{asserted_type_id}` can satisfy this."
-                                            ))
-                                            .with_help("Check that the correct variable is being passed, or update the assertion type."),
-                                        );
+                                    context.collector.report_with_code(
+                                        IssueCode::ImpossibleTypeComparison,
+                                        Issue::error(format!(
+                                            "Impossible type assertion: `{assertion_variable}` of type `{asserted_type_id}` can never be identical to `{expected_type_id}`."
+                                        ))
+                                        .with_annotation(
+                                            Annotation::primary(invocation.span)
+                                                .with_message(format!("Argument `{assertion_variable}` has type `{asserted_type_id}`")),
+                                        )
+                                        .with_note(format!(
+                                            "The assertion expects `{assertion_variable}` to be identical to `{expected_type_id}`, but no value of type `{asserted_type_id}` can satisfy this."
+                                        ))
+                                        .with_help("Check that the correct variable is being passed, or update the assertion type."),
+                                    );
 
-                                        get_never()
-                                    }
+                                    get_never()
                                 };
 
                                 for intersection_atomic in intersection.types.into_owned() {
@@ -663,7 +659,7 @@ fn resolve_invocation_assertion<'ctx, 'ast, 'arena>(
 
                     let new_clauses = clauses.unwrap_or_default();
 
-                    for clause in new_clauses.iter() {
+                    for clause in &new_clauses {
                         block_context.clauses.push(Rc::new(clause.clone()));
                     }
 
@@ -675,7 +671,7 @@ fn resolve_invocation_assertion<'ctx, 'ast, 'arena>(
                     }
                 }
             }
-        };
+        }
     }
 
     type_assertions
@@ -738,8 +734,8 @@ fn resolve_argument_or_special_target<'ctx, 'ast, 'arena>(
 /// # Returns
 /// * `Some(Atom)`: If the target is a special `$this` or `self` reference, containing the resolved variable ID.
 /// * `None`: If the target is not a special reference and should be treated as a regular parameter.
-fn resolve_special_assertion_target<'ctx>(
-    block_context: &BlockContext<'ctx>,
+fn resolve_special_assertion_target(
+    block_context: &BlockContext<'_>,
     target_name: &Atom,
     this_variable: Option<&str>,
 ) -> Option<Atom> {
@@ -852,11 +848,11 @@ fn get_argument_for_parameter<'ctx, 'ast, 'arena>(
     (Some(argument_expression), argument_id)
 }
 
-fn collect_plugin_throw_types<'ctx, 'ast, 'arena>(
+fn collect_plugin_throw_types<'ctx, 'arena>(
     context: &mut Context<'ctx, 'arena>,
     block_context: &mut BlockContext<'ctx>,
     artifacts: &AnalysisArtifacts,
-    invocation: &Invocation<'ctx, 'ast, 'arena>,
+    invocation: &Invocation<'ctx, '_, 'arena>,
     identifier: &FunctionLikeIdentifier,
 ) {
     let exceptions = match identifier {
@@ -885,11 +881,11 @@ fn collect_plugin_throw_types<'ctx, 'ast, 'arena>(
     }
 }
 
-fn apply_plugin_assertions<'ctx, 'ast, 'arena>(
+fn apply_plugin_assertions<'ctx, 'arena>(
     context: &mut Context<'ctx, 'arena>,
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
-    invocation: &Invocation<'ctx, 'ast, 'arena>,
+    invocation: &Invocation<'ctx, '_, 'arena>,
     identifier: &FunctionLikeIdentifier,
     this_variable: Option<&str>,
     template_result: &TemplateResult,

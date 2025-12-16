@@ -147,9 +147,8 @@ impl StrictBaseline {
                 continue;
             };
 
-            let file = match read_database.get(&primary_annotation.span.file_id) {
-                Ok(file) => file,
-                Err(_) => continue,
+            let Ok(file) = read_database.get(&primary_annotation.span.file_id) else {
+                continue;
             };
 
             let normalized_path = normalize_path(&file.name);
@@ -184,18 +183,15 @@ impl StrictBaseline {
     pub fn filter_issues(&self, issues: IssueCollection, read_database: &ReadDatabase) -> IssueCollection {
         let mut filtered_issues = Vec::new();
 
-        for issue in issues.into_iter() {
+        for issue in issues {
             let Some(primary_annotation) = issue.annotations.iter().find(|a| a.is_primary()) else {
                 filtered_issues.push(issue);
                 continue;
             };
 
-            let file = match read_database.get(&primary_annotation.span.file_id) {
-                Ok(file) => file,
-                Err(_) => {
-                    filtered_issues.push(issue);
-                    continue;
-                }
+            let Ok(file) = read_database.get(&primary_annotation.span.file_id) else {
+                filtered_issues.push(issue);
+                continue;
             };
 
             let normalized_path = normalize_path(&file.name);
@@ -303,9 +299,8 @@ impl LooseBaseline {
                 continue;
             };
 
-            let file = match read_database.get(&primary_annotation.span.file_id) {
-                Ok(file) => file,
-                Err(_) => continue,
+            let Ok(file) = read_database.get(&primary_annotation.span.file_id) else {
+                continue;
             };
 
             let normalized_path = normalize_path(&file.name);
@@ -336,18 +331,15 @@ impl LooseBaseline {
 
         let mut filtered_issues = Vec::new();
 
-        for issue in issues.into_iter() {
+        for issue in issues {
             let Some(primary_annotation) = issue.annotations.iter().find(|a| a.is_primary()) else {
                 filtered_issues.push(issue);
                 continue;
             };
 
-            let file = match read_database.get(&primary_annotation.span.file_id) {
-                Ok(file) => file,
-                Err(_) => {
-                    filtered_issues.push(issue);
-                    continue;
-                }
+            let Ok(file) = read_database.get(&primary_annotation.span.file_id) else {
+                filtered_issues.push(issue);
+                continue;
             };
 
             let normalized_path = normalize_path(&file.name);

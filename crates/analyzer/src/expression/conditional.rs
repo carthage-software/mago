@@ -91,7 +91,7 @@ pub(super) fn analyze_conditional<'ctx, 'ast, 'arena>(
     });
 
     let mut mixed_variables = AtomSet::default();
-    for (variable_id, variable_type) in block_context.locals.iter() {
+    for (variable_id, variable_type) in &block_context.locals {
         if variable_type.is_mixed() {
             mixed_variables.insert(*variable_id);
         }
@@ -134,7 +134,7 @@ pub(super) fn analyze_conditional<'ctx, 'ast, 'arena>(
         }
     }
 
-    let entry_clauses = block_context.clauses.to_vec();
+    let entry_clauses = block_context.clauses.clone();
 
     if_clauses = saturate_clauses(&if_clauses);
     let mut conditional_context_clauses = if entry_clauses.is_empty() {
@@ -263,25 +263,25 @@ pub(super) fn analyze_conditional<'ctx, 'ast, 'arena>(
     let if_redefined_variables = if_block_context
         .get_redefined_locals(&block_context.locals, false, &mut AtomSet::default())
         .keys()
-        .cloned()
+        .copied()
         .collect::<AtomSet>();
 
     let else_redefined_variables = else_block_context
         .get_redefined_locals(&block_context.locals, false, &mut AtomSet::default())
         .keys()
-        .cloned()
+        .copied()
         .collect::<AtomSet>();
 
     let redefined_variable_ids =
-        if_redefined_variables.intersection(&else_redefined_variables).cloned().collect::<AtomSet>();
+        if_redefined_variables.intersection(&else_redefined_variables).copied().collect::<AtomSet>();
 
     for redefined_variable_id in redefined_variable_ids {
         let if_type = if_block_context.locals.get(&redefined_variable_id);
         let else_type = else_block_context.locals.get(&redefined_variable_id);
 
         let combined_type = combine_optional_union_types(
-            if_type.map(|rc| rc.as_ref()),
-            else_type.map(|rc| rc.as_ref()),
+            if_type.map(std::convert::AsRef::as_ref),
+            else_type.map(std::convert::AsRef::as_ref),
             context.codebase,
         );
 

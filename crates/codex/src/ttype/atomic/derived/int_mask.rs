@@ -67,12 +67,12 @@ impl TIntMask {
 }
 
 impl TType for TIntMask {
-    fn get_child_nodes<'a>(&'a self) -> Vec<TypeRef<'a>> {
+    fn get_child_nodes(&self) -> Vec<TypeRef<'_>> {
         self.values.iter().map(TypeRef::Union).collect()
     }
 
     fn needs_population(&self) -> bool {
-        self.values.iter().any(|v| v.needs_population())
+        self.values.iter().any(crate::ttype::TType::needs_population)
     }
 
     fn is_expandable(&self) -> bool {

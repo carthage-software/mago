@@ -56,7 +56,7 @@ fn detect_circular_type_reference(
     None
 }
 
-/// Recursively checks a TUnion for circular type alias references.
+/// Recursively checks a `TUnion` for circular type alias references.
 fn check_union_for_circular_refs(
     type_union: &TUnion,
     all_aliases: &mago_atom::AtomMap<TypeMetadata>,
@@ -65,18 +65,14 @@ fn check_union_for_circular_refs(
 ) -> Option<Vec<String>> {
     let nodes = type_union.get_all_child_nodes();
     for node in nodes {
-        match node {
-            TypeRef::Atomic(TAtomic::Reference(TReference::Symbol { name, .. })) => {
-                if let Some(referenced_type) = all_aliases.get(name)
-                    && let Some(cycle) =
-                        detect_circular_type_reference(*name, referenced_type, all_aliases, visiting, path)
-                {
-                    return Some(cycle);
-                }
+        if let TypeRef::Atomic(TAtomic::Reference(TReference::Symbol { name, .. })) = node {
+            if let Some(referenced_type) = all_aliases.get(name)
+                && let Some(cycle) = detect_circular_type_reference(*name, referenced_type, all_aliases, visiting, path)
+            {
+                return Some(cycle);
             }
-            _ => {
-                // Other types are not relevant for circular reference detection
-            }
+        } else {
+            // Other types are not relevant for circular reference detection
         }
     }
 
@@ -171,21 +167,20 @@ pub fn populate_class_like_metadata_iterative(
                 metadata.type_aliases.insert(local_name, alias_metadata);
             } else {
                 metadata.issues.push(
-                    Issue::error(format!("Type alias `{}` not found in class `{}`", imported_type, source_class_name))
+                    Issue::error(format!("Type alias `{imported_type}` not found in class `{source_class_name}`"))
                         .with_code("invalid-import-type")
                         .with_annotation(Annotation::primary(import_span))
                         .with_help(format!(
-                            "Ensure that class `{}` defines a `@type {}` alias",
-                            source_class_name, imported_type
+                            "Ensure that class `{source_class_name}` defines a `@type {imported_type}` alias"
                         )),
                 );
             }
         } else if !codebase.symbols.contains(&source_class_name) {
             metadata.issues.push(
-                Issue::error(format!("Class `{}` not found for type import", source_class_name))
+                Issue::error(format!("Class `{source_class_name}` not found for type import"))
                     .with_code("unknown-class-in-import-type")
                     .with_annotation(Annotation::primary(import_span))
-                    .with_help(format!("Ensure that class `{}` is defined and scanned", source_class_name)),
+                    .with_help(format!("Ensure that class `{source_class_name}` is defined and scanned")),
             );
         }
     }

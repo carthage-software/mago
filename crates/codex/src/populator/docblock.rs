@@ -80,19 +80,19 @@ fn should_inherit_docblock_type(
             );
 
             return !child_contained_in_parent_docblock;
-        } else {
-            let parent_docblock_contained_in_child = union_comparator::is_contained_by(
-                codebase,
-                parent_docblock_type,
-                child_native,
-                false,
-                false,
-                false,
-                &mut ComparisonResult::new(),
-            );
-
-            return !parent_docblock_contained_in_child;
         }
+
+        let parent_docblock_contained_in_child = union_comparator::is_contained_by(
+            codebase,
+            parent_docblock_type,
+            child_native,
+            false,
+            false,
+            false,
+            &mut ComparisonResult::new(),
+        );
+
+        return !parent_docblock_contained_in_child;
     };
 
     if covariant {
@@ -373,7 +373,7 @@ pub fn inherit_method_docblocks(codebase: &mut CodebaseMetadata) {
         };
 
         if should_inherit_return && let Some((type_union, span)) = substituted_return_type {
-            child_method.return_type_metadata = Some(TypeMetadata::from_docblock(type_union, span))
+            child_method.return_type_metadata = Some(TypeMetadata::from_docblock(type_union, span));
         }
 
         for (i, substituted_param) in substituted_param_types.into_iter().enumerate() {

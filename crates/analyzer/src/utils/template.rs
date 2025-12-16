@@ -158,7 +158,7 @@ pub fn get_template_types_for_class_member(
 /// Recursively resolves the concrete type for a specific template parameter within a class hierarchy.
 ///
 /// This function traces template parameter substitutions through class extensions. For example,
-/// if ClassC<U> extends ClassB<U>, and ClassB<T> extends ClassA<T>, calling this function
+/// if `ClassC`<U> extends `ClassB`<U>, and `ClassB`<T> extends `ClassA`<T>, calling this function
 /// to find the type for `T` in the context of `ClassC<int>` would first look up `T` in `ClassB`'s
 /// context (finding `U`), and then recursively look up `U` in `ClassC`'s context, ultimately
 /// resolving to `int`.

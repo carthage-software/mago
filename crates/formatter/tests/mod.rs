@@ -265,9 +265,8 @@ fn test_all_test_cases_are_ran() {
         }
 
         assert!(
-            test_case_file.contains(&format!("test_case!({}", file_name)),
-            "Directory '{}' was not found as a test case",
-            file_name
+            test_case_file.contains(&format!("test_case!({file_name}")),
+            "Directory '{file_name}' was not found as a test case"
         );
     }
 }

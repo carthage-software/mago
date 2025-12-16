@@ -43,7 +43,7 @@ impl<'input, 'arena> TokenStream<'input, 'arena> {
             buffer: VecDeque::new(),
             trivia: Vec::new_in(arena),
             position,
-            state: Default::default(),
+            state: State::default(),
         }
     }
 

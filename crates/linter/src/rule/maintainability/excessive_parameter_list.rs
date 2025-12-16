@@ -50,25 +50,25 @@ impl LintRule for ExcessiveParameterListRule {
         const META: RuleMeta = RuleMeta {
             name: "Excessive Parameter List",
             code: "excessive-parameter-list",
-            description: indoc! {r#"
+            description: indoc! {r"
                 Detects functions, closures, and methods with too many parameters.
 
                 If the number of parameters exceeds a configurable threshold, an issue is reported.
-            "#},
-            good_example: indoc! {r#"
+            "},
+            good_example: indoc! {r"
                 <?php
 
                 function processOrder($orderId, $userId, $total, $status, $date) {
                     return true;
                 }
-            "#},
-            bad_example: indoc! {r#"
+            "},
+            bad_example: indoc! {r"
                 <?php
 
                 function createUser($name, $email, $password, $age, $country, $city, $zipCode) {
                     return true;
                 }
-            "#},
+            "},
             category: Category::Maintainability,
             requirements: RuleRequirements::None,
         };
@@ -86,7 +86,7 @@ impl LintRule for ExcessiveParameterListRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let Node::FunctionLikeParameterList(parameter_list) = node else {
             return;
         };

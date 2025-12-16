@@ -173,7 +173,7 @@ fn infer_templates_from_input_and_container_types(
                                                     input_value_type.as_ref(),
                                                     context.codebase,
                                                     false,
-                                                ))
+                                                ));
                                             }
                                         }
                                     }
@@ -281,7 +281,7 @@ fn infer_templates_from_input_and_container_types(
                                 let mut matched_input_keys: HashSet<ArrayKey> = HashSet::default();
 
                                 if let Some(container_elements) = &container_list.known_elements {
-                                    for (container_index, (_, container_element)) in container_elements.iter() {
+                                    for (container_index, (_, container_element)) in container_elements {
                                         if let Some(known_items) = &input_keyed_array.known_items {
                                             let key = ArrayKey::Integer(*container_index as i64);
                                             if let Some((_, input_element)) = known_items.get(&key) {
@@ -329,7 +329,7 @@ fn infer_templates_from_input_and_container_types(
                                         };
 
                                     if let Some(known_input_items) = &input_keyed_array.known_items {
-                                        for (input_key, (_, input_item)) in known_input_items.iter() {
+                                        for (input_key, (_, input_item)) in known_input_items {
                                             if !matched_input_keys.contains(input_key) {
                                                 input_value_type = Cow::Owned(add_union_type(
                                                     input_item.clone(),
@@ -355,7 +355,7 @@ fn infer_templates_from_input_and_container_types(
                                 let mut matched_input_indices: HashSet<usize> = HashSet::default();
 
                                 if let Some(known_items) = &container_array.known_items {
-                                    for (container_key, (_, container_item)) in known_items.iter() {
+                                    for (container_key, (_, container_item)) in known_items {
                                         match container_key {
                                             ArrayKey::Integer(i) if *i >= 0 => {
                                                 let idx = *i as usize;
@@ -410,7 +410,7 @@ fn infer_templates_from_input_and_container_types(
                                     let mut input_value_type = Some(Cow::Borrowed(&input_params.1));
 
                                     if let Some(known_input_elements) = &input_list.known_elements {
-                                        for (input_index, (_, input_element)) in known_input_elements.iter() {
+                                        for (input_index, (_, input_element)) in known_input_elements {
                                             if !matched_input_indices.contains(input_index) {
                                                 let int_key = ArrayKey::Integer(*input_index as i64);
 
@@ -698,7 +698,7 @@ fn infer_templates_from_input_and_container_types(
                         .lower_bounds
                         .get(parameter_name)
                         .and_then(|map| map.get(defining_entity))
-                        .is_none_or(|bounds| bounds.is_empty());
+                        .is_none_or(std::vec::Vec::is_empty);
 
                 let mut input_objects = vec![];
                 for input_atomic in residual_input_type.types.iter() {
@@ -779,7 +779,7 @@ fn infer_templates_from_input_and_container_types(
                 .lower_bounds
                 .get(template_parameter_name)
                 .and_then(|map| map.get(&container_generic.defining_entity))
-                .is_none_or(|bounds| bounds.is_empty());
+                .is_none_or(std::vec::Vec::is_empty);
 
         if !should_add_bound {
             continue;
@@ -847,7 +847,7 @@ fn infer_templates_from_input_and_container_types(
             .lower_bounds
             .get(&template_parameter_name)
             .and_then(|map| map.get(&defining_entity))
-            .is_none_or(|bounds| bounds.is_empty());
+            .is_none_or(std::vec::Vec::is_empty);
 
         if is_unresolved {
             violations.push(TemplateInferenceViolation {
@@ -869,8 +869,8 @@ fn infer_templates_from_input_and_container_types(
     }
 }
 
-pub fn infer_templates_for_method_call<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+pub fn infer_templates_for_method_call<'ctx>(
+    context: &mut Context<'ctx, '_>,
     object_type: &TNamedObject,
     method_target_context: &MethodTargetContext<'ctx>,
     method_metadata: &'ctx MethodMetadata,
@@ -950,8 +950,8 @@ pub fn infer_templates_for_method_call<'ctx, 'arena>(
 /// * `argument_span`: The source code location of the argument, for error reporting.
 /// * `is_callable_argument`: A flag indicating if the argument is a callable, which
 ///   can influence inference strategy.
-pub fn infer_parameter_templates_from_argument<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+pub fn infer_parameter_templates_from_argument(
+    context: &mut Context<'_, '_>,
     parameter_type: &TUnion,
     argument_type: &TUnion,
     template_result: &mut TemplateResult,
@@ -1008,8 +1008,8 @@ pub fn infer_parameter_templates_from_argument<'ctx, 'arena>(
 /// * `parameter_type`: The declared type of the parameter (the "container").
 /// * `default_type`: The type of the parameter's default value (the "input").
 /// * `template_result`: The map where inferred template types are stored.
-pub fn infer_parameter_templates_from_default<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+pub fn infer_parameter_templates_from_default(
+    context: &mut Context<'_, '_>,
     parameter_type: &TUnion,
     default_type: &TUnion,
     template_result: &mut TemplateResult,
@@ -1024,7 +1024,7 @@ pub fn infer_parameter_templates_from_default<'ctx, 'arena>(
     );
 }
 
-/// Replaces unbound GenericParameter types with their constraint types.
+/// Replaces unbound `GenericParameter` types with their constraint types.
 ///
 /// When a callable signature has template parameters that aren't bound to concrete types,
 /// this function replaces them with their declared constraints. This is useful when using

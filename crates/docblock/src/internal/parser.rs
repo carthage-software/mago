@@ -50,7 +50,7 @@ pub fn parse_document<'arena>(
         }
     }
 
-    Ok(Document { elements, span })
+    Ok(Document { span, elements })
 }
 
 fn is_indented_line(content: &str) -> bool {
@@ -91,7 +91,7 @@ fn parse_tag<'arena>(
     let description_part;
     let description_start;
     if let (Some(char_pos), Some(byte_pos)) = (next_whitespace_char_pos, next_whitespace_byte_pos) {
-        tag_name = &content[1..1 + char_pos];
+        tag_name = &content[1..=char_pos];
         let whitespace_char = content.chars().nth(byte_pos).unwrap();
         let after_whitespace_byte_pos = byte_pos + whitespace_char.len_utf8();
         description_part = &content[after_whitespace_byte_pos..];
@@ -119,12 +119,11 @@ fn parse_tag<'arena>(
                     || content.starts_with("```")
                 {
                     break;
-                } else {
-                    description.push('\n');
-                    description.push_str(content);
-                    end_span = *span;
-                    i += 1;
                 }
+                description.push('\n');
+                description.push_str(content);
+                end_span = *span;
+                i += 1;
             }
             Token::EmptyLine { .. } => {
                 break;
@@ -176,14 +175,13 @@ fn parse_code_block<'arena>(
                     end_span = *span;
                     i += 1;
                     break;
-                } else {
-                    if !code_content.is_empty() {
-                        code_content.push('\n');
-                    }
-                    code_content.push_str(content);
-                    end_span = *span;
-                    i += 1;
                 }
+                if !code_content.is_empty() {
+                    code_content.push('\n');
+                }
+                code_content.push_str(content);
+                end_span = *span;
+                i += 1;
             }
             Token::EmptyLine { span } => {
                 code_content.push('\n');
@@ -225,15 +223,15 @@ fn parse_indented_code<'arena>(
                 let current_indent_len = content.chars().take_while(|c| c.is_whitespace()).count();
                 if current_indent_len < indent_len {
                     break;
-                } else {
-                    let line_content = &content[indent_len..];
-                    if !code_content.is_empty() {
-                        code_content.push('\n');
-                    }
-                    code_content.push_str(line_content);
-                    end_span = *span;
-                    i += 1;
                 }
+
+                let line_content = &content[indent_len..];
+                if !code_content.is_empty() {
+                    code_content.push('\n');
+                }
+                code_content.push_str(line_content);
+                end_span = *span;
+                i += 1;
             }
             Token::EmptyLine { span } => {
                 code_content.push('\n');
@@ -274,14 +272,13 @@ fn parse_text<'arena>(
                     || is_indented_line(content)
                 {
                     break;
-                } else {
-                    if !text_content.is_empty() {
-                        text_content.push('\n');
-                    }
-                    text_content.push_str(content);
-                    end_span = *span;
-                    i += 1;
                 }
+                if !text_content.is_empty() {
+                    text_content.push('\n');
+                }
+                text_content.push_str(content);
+                end_span = *span;
+                i += 1;
             }
             Token::EmptyLine { .. } => {
                 break;
@@ -306,11 +303,11 @@ fn parse_text_segments<'arena>(
     let mut segments = Vec::new_in(arena);
     let mut char_indices = text_content.char_indices().peekable();
 
-    while let Some((start_pos, ch)) = char_indices.peek().cloned() {
+    while let Some((start_pos, ch)) = char_indices.peek().copied() {
         if ch == '`' {
             let is_start = start_pos == 0;
             let is_prev_whitespace = if start_pos > 0 {
-                text_content[..start_pos].chars().next_back().map(|c| c.is_ascii_whitespace()).unwrap_or(false)
+                text_content[..start_pos].chars().next_back().is_some_and(|c| c.is_ascii_whitespace())
             } else {
                 false
             };
@@ -340,9 +337,8 @@ fn parse_text_segments<'arena>(
                             char_indices.next();
                         }
                         break;
-                    } else {
-                        char_indices.next();
                     }
+                    char_indices.next();
                 }
 
                 if let Some(code_end_pos) = code_end_pos {
@@ -364,7 +360,7 @@ fn parse_text_segments<'arena>(
         if text_content[start_pos..].starts_with("{@") {
             let is_start = start_pos == 0;
             let is_prev_whitespace = if start_pos > 0 {
-                text_content[..start_pos].chars().next_back().map(|c| c.is_ascii_whitespace()).unwrap_or(false)
+                text_content[..start_pos].chars().next_back().is_some_and(|c| c.is_ascii_whitespace())
             } else {
                 false
             };
@@ -399,11 +395,11 @@ fn parse_text_segments<'arena>(
         let paragraph_start_pos = start_pos;
         let mut paragraph_end_pos = start_pos;
 
-        while let Some((idx, ch)) = char_indices.peek().cloned() {
+        while let Some((idx, ch)) = char_indices.peek().copied() {
             let is_code_start = ch == '`' && {
                 let is_start = idx == 0;
                 let is_prev_whitespace = if idx > 0 {
-                    text_content[..idx].chars().next_back().map(|c| c.is_ascii_whitespace()).unwrap_or(false)
+                    text_content[..idx].chars().next_back().is_some_and(|c| c.is_ascii_whitespace())
                 } else {
                     false
                 };
@@ -414,7 +410,7 @@ fn parse_text_segments<'arena>(
             let is_tag_start = text_content[idx..].starts_with("{@") && {
                 let is_start = idx == 0;
                 let is_prev_whitespace = if idx > 0 {
-                    text_content[..idx].chars().next_back().map(|c| c.is_ascii_whitespace()).unwrap_or(false)
+                    text_content[..idx].chars().next_back().is_some_and(|c| c.is_ascii_whitespace())
                 } else {
                     false
                 };
@@ -424,10 +420,9 @@ fn parse_text_segments<'arena>(
 
             if is_code_start || is_tag_start {
                 break;
-            } else {
-                char_indices.next();
-                paragraph_end_pos = idx + ch.len_utf8();
             }
+            char_indices.next();
+            paragraph_end_pos = idx + ch.len_utf8();
         }
 
         let paragraph_content = &text_content[paragraph_start_pos..paragraph_end_pos];
@@ -438,7 +433,7 @@ fn parse_text_segments<'arena>(
     Ok(segments)
 }
 
-fn parse_inline_tag<'arena>(tag_content: &'arena str, span: Span) -> Result<Tag<'arena>, ParseError> {
+fn parse_inline_tag(tag_content: &str, span: Span) -> Result<Tag<'_>, ParseError> {
     let mut parts = tag_content.trim().splitn(2, char::is_whitespace);
     let name = parts.next().unwrap_or("");
     let description = parts.next().unwrap_or("");

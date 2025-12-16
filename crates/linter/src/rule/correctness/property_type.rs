@@ -61,22 +61,22 @@ impl LintRule for PropertyTypeRule {
             description: indoc! {"
                 Detects class-like properties that are missing a type hint.
             "},
-            good_example: indoc! {r#"
+            good_example: indoc! {r"
                 <?php
 
                 class Foo
                 {
                     public int $bar;
                 }
-            "#},
-            bad_example: indoc! {r#"
+            "},
+            bad_example: indoc! {r"
                 <?php
 
                 class Foo
                 {
                     public $bar;
                 }
-            "#},
+            "},
             category: Category::Correctness,
             requirements: RuleRequirements::PHPVersion(PHPVersionRange::from(PHPVersion::PHP74)),
         };
@@ -94,7 +94,7 @@ impl LintRule for PropertyTypeRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let members = match node {
             Node::Class(class) => class.members.as_slice(),
             Node::Trait(r#trait) => r#trait.members.as_slice(),

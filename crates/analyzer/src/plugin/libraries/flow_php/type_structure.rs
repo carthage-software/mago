@@ -1,4 +1,4 @@
-//! Flow\Types\DSL\type_structure() return type provider.
+//! `Flow\Types\DSL\type_structure()` return type provider.
 
 use std::collections::BTreeMap;
 
@@ -77,7 +77,7 @@ impl FunctionReturnTypeProvider for TypeStructureProvider {
                 .get_expression_type(argument)
                 .and_then(|union| union.get_single_bool())
                 .filter(|boolean| !boolean.is_general())
-                .map(|boolean| boolean.is_true())?
+                .map(mago_codex::ttype::atomic::scalar::bool::TBool::is_true)?
         } else {
             false
         };

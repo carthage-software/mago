@@ -61,7 +61,7 @@ impl LintRule for InstanceofStringableRule {
 
                 Since PHP 8.0, all classes with `__toString()` automatically implement the `Stringable` interface.
             "},
-            good_example: indoc! {r#"
+            good_example: indoc! {r"
                 <?php
 
                 function stringify(mixed $value): string {
@@ -71,8 +71,8 @@ impl LintRule for InstanceofStringableRule {
 
                     return '';
                 }
-            "#},
-            bad_example: indoc! {r#"
+            "},
+            bad_example: indoc! {r"
                 <?php
 
                 function stringify(mixed $value): string {
@@ -82,7 +82,7 @@ impl LintRule for InstanceofStringableRule {
 
                     return '';
                 }
-            "#},
+            "},
             category: Category::Clarity,
             requirements: RuleRequirements::PHPVersion(PHPVersionRange::from(PHPVersion::PHP80)),
         };
@@ -100,7 +100,7 @@ impl LintRule for InstanceofStringableRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let Node::Binary(binary) = node else { return };
 
         if !matches!(binary.operator, BinaryOperator::And(_)) {
@@ -195,7 +195,7 @@ mod tests {
     test_lint_success! {
         name = instanceof_stringable_is_preferred,
         rule = InstanceofStringableRule,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             function stringify(mixed $value): string {
@@ -205,78 +205,78 @@ mod tests {
 
                 return '';
             }
-        "#}
+        "}
     }
 
     test_lint_failure! {
         name = is_object_and_method_exists_detected,
         rule = InstanceofStringableRule,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             if (is_object($x) && method_exists($x, '__toString')) {
                 echo (string) $x;
             }
-        "#}
+        "}
     }
 
     test_lint_failure! {
         name = reversed_order_detected,
         rule = InstanceofStringableRule,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             if (method_exists($x, '__toString') && is_object($x)) {
                 echo (string) $x;
             }
-        "#}
+        "}
     }
 
     test_lint_failure! {
         name = case_insensitive_method_name_uppercase,
         rule = InstanceofStringableRule,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             if (is_object($x) && method_exists($x, '__TOSTRING')) {
                 echo (string) $x;
             }
-        "#}
+        "}
     }
 
     test_lint_failure! {
         name = case_insensitive_method_name_lowercase,
         rule = InstanceofStringableRule,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             if (is_object($x) && method_exists($x, '__tostring')) {
                 echo (string) $x;
             }
-        "#}
+        "}
     }
 
     test_lint_success! {
         name = different_method_name_not_flagged,
         rule = InstanceofStringableRule,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             if (is_object($x) && method_exists($x, 'serialize')) {
                 echo $x->serialize();
             }
-        "#}
+        "}
     }
 
     test_lint_success! {
         name = different_variables_not_flagged,
         rule = InstanceofStringableRule,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             if (is_object($x) && method_exists($y, '__toString')) {
                 echo (string) $y;
             }
-        "#}
+        "}
     }
 }

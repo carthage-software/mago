@@ -29,7 +29,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for MagicConstant<'arena> {
     ) -> Result<(), AnalysisError> {
         let constant_type = match self {
             MagicConstant::Line(_) => {
-                get_literal_int(context.source_file.line_number(self.start_position().offset()) as i64 + 1)
+                get_literal_int(i64::from(context.source_file.line_number(self.start_position().offset())) + 1)
             }
             MagicConstant::File(_) => {
                 if let Some(path) = context.source_file.path.as_deref().and_then(|p| p.to_str()) {
@@ -69,12 +69,12 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for MagicConstant<'arena> {
             }
             MagicConstant::Class(_) => {
                 if let Some(class_like) = block_context.scope.get_class_like() {
-                    if !class_like.kind.is_trait() {
+                    if class_like.kind.is_trait() {
+                        get_class_string()
+                    } else {
                         TUnion::from_atomic(TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::literal(
                             class_like.original_name,
                         ))))
-                    } else {
-                        get_class_string()
                     }
                 } else {
                     get_string()

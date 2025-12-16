@@ -12,7 +12,7 @@ pub use parameter::*;
 use super::returns_generator;
 
 /// Helper function to check if an expression contains $this
-fn contains_this_in_expression<'arena>(expression: &Expression<'arena>) -> Option<Span> {
+fn contains_this_in_expression(expression: &Expression<'_>) -> Option<Span> {
     // Check if this expression is $this
     if let Expression::Variable(Variable::Direct(var)) = expression
         && var.name == "$this"
@@ -66,7 +66,7 @@ fn contains_this_in_expression<'arena>(expression: &Expression<'arena>) -> Optio
 }
 
 /// Helper function to check if a block contains $this
-fn contains_this_in_block<'arena>(block: &Block<'arena>) -> Option<Span> {
+fn contains_this_in_block(block: &Block<'_>) -> Option<Span> {
     for statement in block.statements.iter() {
         if let Some(span) = contains_this_in_statement(statement) {
             return Some(span);
@@ -76,7 +76,7 @@ fn contains_this_in_block<'arena>(block: &Block<'arena>) -> Option<Span> {
 }
 
 /// Helper function to check if a statement contains $this
-fn contains_this_in_statement<'arena>(statement: &Statement<'arena>) -> Option<Span> {
+fn contains_this_in_statement(statement: &Statement<'_>) -> Option<Span> {
     match statement {
         Statement::Block(block) => contains_this_in_block(block),
         Statement::Expression(expression) => contains_this_in_expression(expression.expression),

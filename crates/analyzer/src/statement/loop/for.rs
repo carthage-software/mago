@@ -39,7 +39,7 @@ mod tests {
 
     test_analysis! {
         name = for_loop_is_entered_al_least_once,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             /**
@@ -58,6 +58,6 @@ mod tests {
 
                 return $result;
             }
-        "#},
+        "},
     }
 }

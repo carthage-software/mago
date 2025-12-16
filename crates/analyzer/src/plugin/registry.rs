@@ -136,7 +136,7 @@ impl PluginRegistry {
             }
             FunctionTarget::Namespace(ns) => {
                 let ns_lower = ns.to_lowercase();
-                let ns_pattern = if ns_lower.ends_with('\\') { ns_lower } else { format!("{}\\", ns_lower) };
+                let ns_pattern = if ns_lower.ends_with('\\') { ns_lower } else { format!("{ns_lower}\\") };
                 self.function_namespace.push((ascii_lowercase_atom(&ns_pattern), index));
             }
         }
@@ -243,7 +243,7 @@ impl PluginRegistry {
             }
             FunctionTarget::Namespace(ns) => {
                 let ns_lower = ns.to_lowercase();
-                let ns_pattern = if ns_lower.ends_with('\\') { ns_lower } else { format!("{}\\", ns_lower) };
+                let ns_pattern = if ns_lower.ends_with('\\') { ns_lower } else { format!("{ns_lower}\\") };
                 self.function_assertion_namespace.push((ascii_lowercase_atom(&ns_pattern), index));
             }
         }
@@ -295,7 +295,7 @@ impl PluginRegistry {
             }
             FunctionTarget::Namespace(ns) => {
                 let ns_lower = ns.to_lowercase();
-                let ns_pattern = if ns_lower.ends_with('\\') { ns_lower } else { format!("{}\\", ns_lower) };
+                let ns_pattern = if ns_lower.ends_with('\\') { ns_lower } else { format!("{ns_lower}\\") };
                 self.function_throw_namespace.push((ascii_lowercase_atom(&ns_pattern), index));
             }
         }
@@ -421,10 +421,10 @@ impl PluginRegistry {
         !self.method_throw_providers.is_empty()
     }
 
-    pub fn before_program<'ast, 'arena>(
+    pub fn before_program(
         &self,
         file: &File,
-        program: &'ast Program<'arena>,
+        program: &Program<'_>,
         context: &mut HookContext<'_, '_>,
     ) -> PluginResult<HookAction> {
         for hook in &self.program_hooks {
@@ -435,10 +435,10 @@ impl PluginRegistry {
         Ok(HookAction::Continue)
     }
 
-    pub fn after_program<'ast, 'arena>(
+    pub fn after_program(
         &self,
         file: &File,
-        program: &'ast Program<'arena>,
+        program: &Program<'_>,
         context: &mut HookContext<'_, '_>,
     ) -> PluginResult<()> {
         for hook in &self.program_hooks {
@@ -447,9 +447,9 @@ impl PluginRegistry {
         Ok(())
     }
 
-    pub fn before_statement<'ast, 'arena>(
+    pub fn before_statement(
         &self,
-        stmt: &'ast Statement<'arena>,
+        stmt: &Statement<'_>,
         context: &mut HookContext<'_, '_>,
     ) -> PluginResult<HookAction> {
         for hook in &self.statement_hooks {
@@ -460,20 +460,16 @@ impl PluginRegistry {
         Ok(HookAction::Continue)
     }
 
-    pub fn after_statement<'ast, 'arena>(
-        &self,
-        stmt: &'ast Statement<'arena>,
-        context: &mut HookContext<'_, '_>,
-    ) -> PluginResult<()> {
+    pub fn after_statement(&self, stmt: &Statement<'_>, context: &mut HookContext<'_, '_>) -> PluginResult<()> {
         for hook in &self.statement_hooks {
             hook.after_statement(stmt, context)?;
         }
         Ok(())
     }
 
-    pub fn before_expression<'ast, 'arena>(
+    pub fn before_expression(
         &self,
-        expr: &'ast Expression<'arena>,
+        expr: &Expression<'_>,
         context: &mut HookContext<'_, '_>,
     ) -> PluginResult<ExpressionHookResult> {
         for hook in &self.expression_hooks {
@@ -485,20 +481,16 @@ impl PluginRegistry {
         Ok(ExpressionHookResult::Continue)
     }
 
-    pub fn after_expression<'ast, 'arena>(
-        &self,
-        expr: &'ast Expression<'arena>,
-        context: &mut HookContext<'_, '_>,
-    ) -> PluginResult<()> {
+    pub fn after_expression(&self, expr: &Expression<'_>, context: &mut HookContext<'_, '_>) -> PluginResult<()> {
         for hook in &self.expression_hooks {
             hook.after_expression(expr, context)?;
         }
         Ok(())
     }
 
-    pub fn before_function_call<'ast, 'arena>(
+    pub fn before_function_call(
         &self,
-        call: &'ast FunctionCall<'arena>,
+        call: &FunctionCall<'_>,
         context: &mut HookContext<'_, '_>,
     ) -> PluginResult<ExpressionHookResult> {
         for hook in &self.function_call_hooks {
@@ -510,20 +502,16 @@ impl PluginRegistry {
         Ok(ExpressionHookResult::Continue)
     }
 
-    pub fn after_function_call<'ast, 'arena>(
-        &self,
-        call: &'ast FunctionCall<'arena>,
-        context: &mut HookContext<'_, '_>,
-    ) -> PluginResult<()> {
+    pub fn after_function_call(&self, call: &FunctionCall<'_>, context: &mut HookContext<'_, '_>) -> PluginResult<()> {
         for hook in &self.function_call_hooks {
             hook.after_function_call(call, context)?;
         }
         Ok(())
     }
 
-    pub fn before_method_call<'ast, 'arena>(
+    pub fn before_method_call(
         &self,
-        call: &'ast MethodCall<'arena>,
+        call: &MethodCall<'_>,
         context: &mut HookContext<'_, '_>,
     ) -> PluginResult<ExpressionHookResult> {
         for hook in &self.method_call_hooks {
@@ -535,20 +523,16 @@ impl PluginRegistry {
         Ok(ExpressionHookResult::Continue)
     }
 
-    pub fn after_method_call<'ast, 'arena>(
-        &self,
-        call: &'ast MethodCall<'arena>,
-        context: &mut HookContext<'_, '_>,
-    ) -> PluginResult<()> {
+    pub fn after_method_call(&self, call: &MethodCall<'_>, context: &mut HookContext<'_, '_>) -> PluginResult<()> {
         for hook in &self.method_call_hooks {
             hook.after_method_call(call, context)?;
         }
         Ok(())
     }
 
-    pub fn before_static_method_call<'ast, 'arena>(
+    pub fn before_static_method_call(
         &self,
-        call: &'ast StaticMethodCall<'arena>,
+        call: &StaticMethodCall<'_>,
         context: &mut HookContext<'_, '_>,
     ) -> PluginResult<ExpressionHookResult> {
         for hook in &self.static_method_call_hooks {
@@ -560,9 +544,9 @@ impl PluginRegistry {
         Ok(ExpressionHookResult::Continue)
     }
 
-    pub fn after_static_method_call<'ast, 'arena>(
+    pub fn after_static_method_call(
         &self,
-        call: &'ast StaticMethodCall<'arena>,
+        call: &StaticMethodCall<'_>,
         context: &mut HookContext<'_, '_>,
     ) -> PluginResult<()> {
         for hook in &self.static_method_call_hooks {
@@ -571,9 +555,9 @@ impl PluginRegistry {
         Ok(())
     }
 
-    pub fn before_nullsafe_method_call<'ast, 'arena>(
+    pub fn before_nullsafe_method_call(
         &self,
-        call: &'ast NullSafeMethodCall<'arena>,
+        call: &NullSafeMethodCall<'_>,
         context: &mut HookContext<'_, '_>,
     ) -> PluginResult<ExpressionHookResult> {
         for hook in &self.nullsafe_method_call_hooks {
@@ -585,9 +569,9 @@ impl PluginRegistry {
         Ok(ExpressionHookResult::Continue)
     }
 
-    pub fn after_nullsafe_method_call<'ast, 'arena>(
+    pub fn after_nullsafe_method_call(
         &self,
-        call: &'ast NullSafeMethodCall<'arena>,
+        call: &NullSafeMethodCall<'_>,
         context: &mut HookContext<'_, '_>,
     ) -> PluginResult<()> {
         for hook in &self.nullsafe_method_call_hooks {
@@ -596,9 +580,9 @@ impl PluginRegistry {
         Ok(())
     }
 
-    pub fn on_enter_class<'ast, 'arena>(
+    pub fn on_enter_class(
         &self,
-        class: &'ast Class<'arena>,
+        class: &Class<'_>,
         metadata: &ClassLikeMetadata,
         context: &mut HookContext<'_, '_>,
     ) -> PluginResult<()> {
@@ -608,9 +592,9 @@ impl PluginRegistry {
         Ok(())
     }
 
-    pub fn on_leave_class<'ast, 'arena>(
+    pub fn on_leave_class(
         &self,
-        class: &'ast Class<'arena>,
+        class: &Class<'_>,
         metadata: &ClassLikeMetadata,
         context: &mut HookContext<'_, '_>,
     ) -> PluginResult<()> {
@@ -620,9 +604,9 @@ impl PluginRegistry {
         Ok(())
     }
 
-    pub fn on_enter_interface<'ast, 'arena>(
+    pub fn on_enter_interface(
         &self,
-        interface: &'ast Interface<'arena>,
+        interface: &Interface<'_>,
         metadata: &ClassLikeMetadata,
         context: &mut HookContext<'_, '_>,
     ) -> PluginResult<()> {
@@ -632,9 +616,9 @@ impl PluginRegistry {
         Ok(())
     }
 
-    pub fn on_leave_interface<'ast, 'arena>(
+    pub fn on_leave_interface(
         &self,
-        interface: &'ast Interface<'arena>,
+        interface: &Interface<'_>,
         metadata: &ClassLikeMetadata,
         context: &mut HookContext<'_, '_>,
     ) -> PluginResult<()> {
@@ -644,9 +628,9 @@ impl PluginRegistry {
         Ok(())
     }
 
-    pub fn on_enter_trait<'ast, 'arena>(
+    pub fn on_enter_trait(
         &self,
-        trait_: &'ast Trait<'arena>,
+        trait_: &Trait<'_>,
         metadata: &ClassLikeMetadata,
         context: &mut HookContext<'_, '_>,
     ) -> PluginResult<()> {
@@ -656,9 +640,9 @@ impl PluginRegistry {
         Ok(())
     }
 
-    pub fn on_leave_trait<'ast, 'arena>(
+    pub fn on_leave_trait(
         &self,
-        trait_: &'ast Trait<'arena>,
+        trait_: &Trait<'_>,
         metadata: &ClassLikeMetadata,
         context: &mut HookContext<'_, '_>,
     ) -> PluginResult<()> {
@@ -668,9 +652,9 @@ impl PluginRegistry {
         Ok(())
     }
 
-    pub fn on_enter_enum<'ast, 'arena>(
+    pub fn on_enter_enum(
         &self,
-        enum_: &'ast Enum<'arena>,
+        enum_: &Enum<'_>,
         metadata: &ClassLikeMetadata,
         context: &mut HookContext<'_, '_>,
     ) -> PluginResult<()> {
@@ -680,9 +664,9 @@ impl PluginRegistry {
         Ok(())
     }
 
-    pub fn on_leave_enum<'ast, 'arena>(
+    pub fn on_leave_enum(
         &self,
-        enum_: &'ast Enum<'arena>,
+        enum_: &Enum<'_>,
         metadata: &ClassLikeMetadata,
         context: &mut HookContext<'_, '_>,
     ) -> PluginResult<()> {
@@ -692,9 +676,9 @@ impl PluginRegistry {
         Ok(())
     }
 
-    pub fn on_enter_function<'ast, 'arena>(
+    pub fn on_enter_function(
         &self,
-        function: &'ast Function<'arena>,
+        function: &Function<'_>,
         metadata: &FunctionLikeMetadata,
         context: &mut HookContext<'_, '_>,
     ) -> PluginResult<()> {
@@ -704,9 +688,9 @@ impl PluginRegistry {
         Ok(())
     }
 
-    pub fn on_leave_function<'ast, 'arena>(
+    pub fn on_leave_function(
         &self,
-        function: &'ast Function<'arena>,
+        function: &Function<'_>,
         metadata: &FunctionLikeMetadata,
         context: &mut HookContext<'_, '_>,
     ) -> PluginResult<()> {
@@ -763,13 +747,13 @@ impl PluginRegistry {
         indices
     }
 
-    pub fn get_function_like_return_type<'ctx, 'ast, 'arena>(
+    pub fn get_function_like_return_type<'ctx>(
         &self,
         codebase: &'ctx CodebaseMetadata,
         block_context: &BlockContext<'ctx>,
         artifacts: &AnalysisArtifacts,
         function_like: &FunctionLikeIdentifier,
-        invocation: &Invocation<'ctx, 'ast, 'arena>,
+        invocation: &Invocation<'ctx, '_, '_>,
     ) -> Option<ProviderResult> {
         match function_like {
             FunctionLikeIdentifier::Function(name) => {
@@ -787,13 +771,13 @@ impl PluginRegistry {
         }
     }
 
-    pub fn get_function_return_type<'ctx, 'ast, 'arena>(
+    pub fn get_function_return_type<'ctx>(
         &self,
         codebase: &'ctx CodebaseMetadata,
         block_context: &BlockContext<'ctx>,
         artifacts: &AnalysisArtifacts,
         function_name: &str,
-        invocation: &Invocation<'ctx, 'ast, 'arena>,
+        invocation: &Invocation<'ctx, '_, '_>,
     ) -> ProviderResult {
         let indices = self.get_function_provider_indices(function_name);
         let mut all_issues = Vec::new();
@@ -813,14 +797,14 @@ impl PluginRegistry {
         ProviderResult { return_type: None, issues: all_issues }
     }
 
-    pub fn get_method_return_type<'ctx, 'ast, 'arena>(
+    pub fn get_method_return_type<'ctx>(
         &self,
         codebase: &'ctx CodebaseMetadata,
         block_context: &BlockContext<'ctx>,
         artifacts: &AnalysisArtifacts,
         class_name: &str,
         method_name: &str,
-        invocation: &Invocation<'ctx, 'ast, 'arena>,
+        invocation: &Invocation<'ctx, '_, '_>,
     ) -> ProviderResult {
         let indices = self.get_method_provider_indices(class_name, method_name);
         let mut all_issues = Vec::new();
@@ -927,13 +911,13 @@ impl PluginRegistry {
         indices
     }
 
-    pub fn get_function_like_assertions<'ctx, 'ast, 'arena>(
+    pub fn get_function_like_assertions<'ctx>(
         &self,
         codebase: &'ctx CodebaseMetadata,
         block_context: &BlockContext<'ctx>,
         artifacts: &AnalysisArtifacts,
         function_like: &FunctionLikeIdentifier,
-        invocation: &Invocation<'ctx, 'ast, 'arena>,
+        invocation: &Invocation<'ctx, '_, '_>,
     ) -> Option<InvocationAssertions> {
         match function_like {
             FunctionLikeIdentifier::Function(name) => {
@@ -947,13 +931,13 @@ impl PluginRegistry {
     }
 
     /// Get assertions for a function invocation from registered providers.
-    pub fn get_function_assertions<'ctx, 'ast, 'arena>(
+    pub fn get_function_assertions<'ctx>(
         &self,
         codebase: &'ctx CodebaseMetadata,
         block_context: &BlockContext<'ctx>,
         artifacts: &AnalysisArtifacts,
         function_name: &str,
-        invocation: &Invocation<'ctx, 'ast, 'arena>,
+        invocation: &Invocation<'ctx, '_, '_>,
     ) -> Option<InvocationAssertions> {
         if self.function_assertion_providers.is_empty() {
             return None;
@@ -977,14 +961,14 @@ impl PluginRegistry {
     }
 
     /// Get assertions for a method invocation from registered providers.
-    pub fn get_method_assertions<'ctx, 'ast, 'arena>(
+    pub fn get_method_assertions<'ctx>(
         &self,
         codebase: &'ctx CodebaseMetadata,
         block_context: &BlockContext<'ctx>,
         artifacts: &AnalysisArtifacts,
         class_name: &str,
         method_name: &str,
-        invocation: &Invocation<'ctx, 'ast, 'arena>,
+        invocation: &Invocation<'ctx, '_, '_>,
     ) -> Option<InvocationAssertions> {
         if self.method_assertion_providers.is_empty() {
             return None;
@@ -1072,12 +1056,12 @@ impl PluginRegistry {
     }
 
     /// Get thrown exception class names for an expression from registered providers.
-    pub fn get_expression_thrown_exceptions<'ctx, 'ast, 'arena>(
+    pub fn get_expression_thrown_exceptions<'ctx>(
         &self,
         codebase: &'ctx CodebaseMetadata,
         block_context: &BlockContext<'ctx>,
         artifacts: &AnalysisArtifacts,
-        expression: &'ast mago_syntax::ast::Expression<'arena>,
+        expression: &mago_syntax::ast::Expression<'_>,
     ) -> AtomSet {
         let mut exceptions = AtomSet::default();
 
@@ -1090,13 +1074,13 @@ impl PluginRegistry {
     }
 
     /// Get thrown exception class names for a function invocation from registered providers.
-    pub fn get_function_thrown_exceptions<'ctx, 'ast, 'arena>(
+    pub fn get_function_thrown_exceptions<'ctx>(
         &self,
         codebase: &'ctx CodebaseMetadata,
         block_context: &BlockContext<'ctx>,
         artifacts: &AnalysisArtifacts,
         function_name: &str,
-        invocation: &Invocation<'ctx, 'ast, 'arena>,
+        invocation: &Invocation<'ctx, '_, '_>,
     ) -> AtomSet {
         let mut exceptions = AtomSet::default();
         let indices = self.get_function_throw_provider_indices(function_name);
@@ -1112,14 +1096,14 @@ impl PluginRegistry {
     }
 
     /// Get thrown exception class names for a method invocation from registered providers.
-    pub fn get_method_thrown_exceptions<'ctx, 'ast, 'arena>(
+    pub fn get_method_thrown_exceptions<'ctx>(
         &self,
         codebase: &'ctx CodebaseMetadata,
         block_context: &BlockContext<'ctx>,
         artifacts: &AnalysisArtifacts,
         class_name: &str,
         method_name: &str,
-        invocation: &Invocation<'ctx, 'ast, 'arena>,
+        invocation: &Invocation<'ctx, '_, '_>,
     ) -> AtomSet {
         let mut exceptions = AtomSet::default();
         let indices = self.get_method_throw_provider_indices(class_name, method_name);

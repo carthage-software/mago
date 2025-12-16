@@ -119,7 +119,7 @@ impl<'a> Orchestrator<'a> {
     where
         T: AsRef<str> + 'a,
     {
-        self.config.excludes.extend(patterns.map(|p| p.as_ref()));
+        self.config.excludes.extend(patterns.map(std::convert::AsRef::as_ref));
     }
 
     /// Sets new source paths and moves the old paths to the includes list.

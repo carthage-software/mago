@@ -60,7 +60,7 @@ impl LintRule for KanDefectRule {
                   - https://github.com/phpmetrics/PhpMetrics/blob/c43217cd7783bbd54d0b8c1dd43f697bc36ef79d/src/Hal/Metric/Class_/Complexity/KanDefectVisitor.php
                   - https://phpmetrics.org/
             "#},
-            good_example: indoc::indoc! {r#"
+            good_example: indoc::indoc! {r"
                 <?php
 
                 function handleRequest($request) {
@@ -88,8 +88,8 @@ impl LintRule for KanDefectRule {
                 function formatResponse($data) {
                     return ['status' => 'success', 'data' => $data];
                 }
-            "#},
-            bad_example: indoc::indoc! {r#"
+            "},
+            bad_example: indoc::indoc! {r"
                 <?php
 
                 function handleRequest($request) {
@@ -158,7 +158,7 @@ impl LintRule for KanDefectRule {
 
                     return ['status' => 'success'];
                 }
-            "#},
+            "},
             category: Category::Maintainability,
             requirements: RuleRequirements::None,
         };
@@ -183,7 +183,7 @@ impl LintRule for KanDefectRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let kind = match node.kind() {
             NodeKind::Class => "Class",
             NodeKind::Trait => "Trait",
@@ -214,7 +214,7 @@ impl LintRule for KanDefectRule {
 }
 
 #[inline]
-fn get_kan_defect_of_node<'ast, 'arena>(node: Node<'ast, 'arena>) -> f64 {
+fn get_kan_defect_of_node(node: Node<'_, '_>) -> f64 {
     let (select_count, while_count, if_count) = collect_defect_factors(node);
 
     calculate_kan_defect(select_count, while_count, if_count)
@@ -226,7 +226,7 @@ const fn calculate_kan_defect(select: usize, r#while: usize, r#if: usize) -> f64
 }
 
 #[inline]
-fn collect_defect_factors<'ast, 'arena>(node: Node<'ast, 'arena>) -> (usize, usize, usize) {
+fn collect_defect_factors(node: Node<'_, '_>) -> (usize, usize, usize) {
     let mut select_count = 0;
     let mut while_count = 0;
     let mut if_count = 0;

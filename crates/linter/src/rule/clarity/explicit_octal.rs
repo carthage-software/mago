@@ -53,16 +53,16 @@ impl LintRule for ExplicitOctalRule {
             description: indoc! {"
                 Detects implicit octal numeral notation and suggests replacing it with explicit octal numeral notation.
             "},
-            good_example: indoc! {r#"
+            good_example: indoc! {r"
                 <?php
 
                 $a = 0o123;
-            "#},
-            bad_example: indoc! {r#"
+            "},
+            bad_example: indoc! {r"
                 <?php
 
                 $a = 0123;
-            "#},
+            "},
             category: Category::Clarity,
             requirements: RuleRequirements::PHPVersion(PHPVersionRange::from(PHPVersion::PHP81)),
         };
@@ -80,7 +80,7 @@ impl LintRule for ExplicitOctalRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let Node::LiteralInteger(literal_integer) = node else {
             return;
         };

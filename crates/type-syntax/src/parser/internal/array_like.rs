@@ -106,11 +106,10 @@ pub fn parse_array_like_type<'input>(stream: &mut TypeTokenStream<'input>) -> Re
                                 if stream.lookahead(i + 1)?.is_some_and(|t| t.kind == TypeTokenKind::Colon) {
                                     found_key = true;
                                     break;
-                                } else {
-                                    // If the question mark is not followed by a colon,
-                                    // it could be part of the key.
-                                    continue;
                                 }
+                                // If the question mark is not followed by a colon,
+                                // it could be part of the key.
+                                continue;
                             }
                             // If we find any of these tokens, what came before must have
                             // been a full value type, not a key.
@@ -161,14 +160,14 @@ pub fn parse_array_like_type<'input>(stream: &mut TypeTokenStream<'input>) -> Re
             fields
         },
         additional_fields: {
-            if !stream.is_at(TypeTokenKind::Ellipsis)? {
-                None
-            } else {
+            if stream.is_at(TypeTokenKind::Ellipsis)? {
                 Some(ShapeAdditionalFields {
                     ellipsis: stream.consume()?.span,
                     parameters: parse_generic_parameters_or_none(stream)?,
                     comma: if stream.is_at(TypeTokenKind::Comma)? { Some(stream.consume()?.span) } else { None },
                 })
+            } else {
+                None
             }
         },
         right_brace: stream.eat(TypeTokenKind::RightBrace)?.span,

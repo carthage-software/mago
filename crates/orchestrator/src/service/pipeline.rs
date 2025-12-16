@@ -27,7 +27,7 @@ use std::fmt::Debug;
 
 /// A trait that defines the final "reduce" step of a parallel computation.
 ///
-/// In a MapReduce pattern, after the "map" phase generates results for each input,
+/// In a `MapReduce` pattern, after the "map" phase generates results for each input,
 /// the `Reducer` is responsible for aggregating all intermediate results into a
 /// single, final output value.
 pub trait Reducer<T, R>: Debug {
@@ -42,7 +42,7 @@ pub trait Reducer<T, R>: Debug {
     /// # Returns
     ///
     /// Returns a tuple of `(result, codebase, symbol_references)` where the codebase
-    /// and symbol_references are returned after being used by the reducer.
+    /// and `symbol_references` are returned after being used by the reducer.
     fn reduce(
         &self,
         codebase: CodebaseMetadata,
@@ -309,18 +309,7 @@ where
             return self.reducer.reduce(Vec::new());
         }
 
-        let results = if !self.should_use_progress_bar {
-            host_files
-                .into_par_iter()
-                .map_init(Bump::new, |arena, file| {
-                    let context = self.shared_context.clone();
-                    let result = map_function(context, arena, file)?;
-
-                    arena.reset();
-                    Ok(result)
-                })
-                .collect::<Result<Vec<I>, OrchestratorError>>()?
-        } else {
+        let results = if self.should_use_progress_bar {
             let progress_bar = create_progress_bar(host_files.len(), self.task_name, ProgressBarTheme::Magenta);
 
             let results: Vec<I> = host_files
@@ -339,6 +328,17 @@ where
             remove_progress_bar(progress_bar);
 
             results
+        } else {
+            host_files
+                .into_par_iter()
+                .map_init(Bump::new, |arena, file| {
+                    let context = self.shared_context.clone();
+                    let result = map_function(context, arena, file)?;
+
+                    arena.reset();
+                    Ok(result)
+                })
+                .collect::<Result<Vec<I>, OrchestratorError>>()?
         };
 
         self.reducer.reduce(results)
@@ -365,18 +365,7 @@ where
             return self.reducer.reduce(Vec::new());
         }
 
-        let results = if !self.should_use_progress_bar {
-            files
-                .into_par_iter()
-                .map_init(Bump::new, |arena, file| {
-                    let context = self.shared_context.clone();
-                    let result = map_function(context, arena, file)?;
-
-                    arena.reset();
-                    Ok(result)
-                })
-                .collect::<Result<Vec<I>, OrchestratorError>>()?
-        } else {
+        let results = if self.should_use_progress_bar {
             let progress_bar = create_progress_bar(files.len(), self.task_name, ProgressBarTheme::Magenta);
 
             let results: Vec<I> = files
@@ -395,6 +384,17 @@ where
             remove_progress_bar(progress_bar);
 
             results
+        } else {
+            files
+                .into_par_iter()
+                .map_init(Bump::new, |arena, file| {
+                    let context = self.shared_context.clone();
+                    let result = map_function(context, arena, file)?;
+
+                    arena.reset();
+                    Ok(result)
+                })
+                .collect::<Result<Vec<I>, OrchestratorError>>()?
         };
 
         self.reducer.reduce(results)

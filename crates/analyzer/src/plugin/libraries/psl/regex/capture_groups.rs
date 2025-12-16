@@ -1,4 +1,4 @@
-//! Psl\Regex\capture_groups() return type provider.
+//! `Psl\Regex\capture_groups()` return type provider.
 
 use std::collections::BTreeMap;
 
@@ -28,7 +28,7 @@ static META: ProviderMeta = ProviderMeta::new(
 
 /// Provider for the `Psl\Regex\capture_groups()` function.
 ///
-/// Returns a TypeInterface with an array type that has keys for each capture group.
+/// Returns a `TypeInterface` with an array type that has keys for each capture group.
 #[derive(Default)]
 pub struct CaptureGroupsProvider;
 

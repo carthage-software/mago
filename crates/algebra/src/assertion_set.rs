@@ -146,7 +146,7 @@ pub fn and_assertion_sets(set_a: AssertionSet, set_b: AssertionSet) -> Assertion
 /// Calculates a stable hash for a disjunctive clause (an `Or<Assertion>`).
 fn hash_disjunction(disjunction: &Disjunction<Assertion>) -> u64 {
     let mut hasher = AHasher::default();
-    let mut assertion_hashes: Vec<_> = disjunction.iter().map(|a| a.to_hash()).collect();
+    let mut assertion_hashes: Vec<_> = disjunction.iter().map(mago_codex::assertion::Assertion::to_hash).collect();
     assertion_hashes.sort_unstable();
     assertion_hashes.hash(&mut hasher);
     hasher.finish()

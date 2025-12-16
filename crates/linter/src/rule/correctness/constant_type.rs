@@ -63,7 +63,7 @@ impl LintRule for ConstantTypeRule {
             description: indoc! {"
                 Detects class constants that are missing a type hint.
             "},
-            good_example: indoc! {r#"
+            good_example: indoc! {r"
                 <?php
 
                 declare(strict_types=1);
@@ -81,8 +81,8 @@ impl LintRule for ConstantTypeRule {
 
                     // ...
                 }
-            "#},
-            bad_example: indoc! {r#"
+            "},
+            bad_example: indoc! {r"
                 <?php
 
                 declare(strict_types=1);
@@ -100,7 +100,7 @@ impl LintRule for ConstantTypeRule {
 
                     // ...
                 }
-            "#},
+            "},
             category: Category::Correctness,
             requirements: RuleRequirements::PHPVersion(PHPVersionRange::from(PHPVersion::PHP83)),
         };
@@ -118,7 +118,7 @@ impl LintRule for ConstantTypeRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let Node::ClassLikeConstant(class_like_constant) = node else {
             return;
         };
@@ -132,14 +132,14 @@ impl LintRule for ConstantTypeRule {
         let constant_name = item.name.value;
 
         ctx.collector.report(
-            Issue::new(self.cfg.level(), format!("Class constant `{}` is missing a type hint.", constant_name))
+            Issue::new(self.cfg.level(), format!("Class constant `{constant_name}` is missing a type hint."))
                 .with_code(self.meta.code)
                 .with_annotation(
                     Annotation::primary(class_like_constant.span())
-                        .with_message(format!("Class constant `{}` is defined here", constant_name)),
+                        .with_message(format!("Class constant `{constant_name}` is defined here")),
                 )
                 .with_note("Adding a type hint to constants improves code readability and helps prevent type errors.")
-                .with_help(format!("Consider specifying a type hint for `{}`.", constant_name)),
+                .with_help(format!("Consider specifying a type hint for `{constant_name}`.")),
         );
     }
 }

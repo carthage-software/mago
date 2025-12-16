@@ -690,135 +690,135 @@ pub(crate) fn handle_array_access_on_keyed_array<'ctx, 'arena>(
                 }
 
                 return expression_type;
-            } else {
-                if in_assignment && !has_value_parameter {
-                    // In an assignment to a non-existent key, the value before assignment is effectively null.
-                    // This allows upstream logic to promote it to an array.
-                    return get_null();
-                }
+            }
 
-                // This is a read access to a non-existent key.
-                if context.settings.allow_possibly_undefined_array_keys && has_value_parameter {
-                    *has_possibly_undefined = true;
+            if in_assignment && !has_value_parameter {
+                // In an assignment to a non-existent key, the value before assignment is effectively null.
+                // This allows upstream logic to promote it to an array.
+                return get_null();
+            }
 
-                    return value_parameter.into_owned();
-                }
+            // This is a read access to a non-existent key.
+            if context.settings.allow_possibly_undefined_array_keys && has_value_parameter {
+                *has_possibly_undefined = true;
 
-                let result = if in_assignment && has_value_parameter && !value_parameter.is_mixed() {
-                    // Assignment to a new key on an array with explicit generic parameters - allow it without error
-                    // This handles cases like $_SERVER (which has ...<non-empty-string, string>)
-                    // But NOT unsealed arrays with just `...` (which have mixed as value type)
-                    value_parameter.into_owned()
-                } else if !block_context.inside_isset {
-                    // Check if we're in a union type and if ANY other member has this key
-                    let key_exists_in_other_variant = if array_like_type.types.len() > 1 {
-                        array_like_type.types.iter().any(|atomic_type| {
-                            if let TAtomic::Array(TArray::Keyed(other_keyed)) = atomic_type {
-                                if let Some(other_known_items) = other_keyed.get_known_items() {
-                                    other_known_items.contains_key(&array_key)
-                                } else {
-                                    // Array with generic parameters might have any key
-                                    other_keyed.get_generic_parameters().is_some()
-                                }
+                return value_parameter.into_owned();
+            }
+
+            let result = if in_assignment && has_value_parameter && !value_parameter.is_mixed() {
+                // Assignment to a new key on an array with explicit generic parameters - allow it without error
+                // This handles cases like $_SERVER (which has ...<non-empty-string, string>)
+                // But NOT unsealed arrays with just `...` (which have mixed as value type)
+                value_parameter.into_owned()
+            } else if !block_context.inside_isset {
+                // Check if we're in a union type and if ANY other member has this key
+                let key_exists_in_other_variant = if array_like_type.types.len() > 1 {
+                    array_like_type.types.iter().any(|atomic_type| {
+                        if let TAtomic::Array(TArray::Keyed(other_keyed)) = atomic_type {
+                            if let Some(other_known_items) = other_keyed.get_known_items() {
+                                other_known_items.contains_key(&array_key)
                             } else {
-                                false
+                                // Array with generic parameters might have any key
+                                other_keyed.get_generic_parameters().is_some()
                             }
-                        })
-                    } else {
-                        false
-                    };
-
-                    if !key_exists_in_other_variant {
-                        // Key doesn't exist in any variant - report error
-                        context.collector.report_with_code(
-                            IssueCode::UndefinedStringArrayIndex,
-                            Issue::error(format!(
-                                "Undefined array key {} accessed on `{}`.",
-                                array_key,
-                                keyed_array.get_id()
-                            ))
-                            .with_annotation(
-                                Annotation::primary(span)
-                                    .with_message(format!("Key {array_key} does not exist."))
-                            )
-                            .with_note(
-                                "Attempting to access a non-existent string key will raise a warning/notice at runtime."
-                            )
-                            .with_help(
-                                format!(
-                                    "Ensure the key {array_key} exists before accessing it, or use `isset()` or the null coalesce operator (`??`) to handle potential missing keys."
-                                )
-                            ),
-                        );
-                    } else {
-                        // Key exists in some but not all variants - mark as possibly undefined
-                        // Don't report warning here - it will be reported at the union level to avoid duplicates
-                        *has_possibly_undefined = true;
-                        *key_in_other_variant = true;
-                    }
-
-                    if has_value_parameter { get_mixed() } else { get_null() }
-                } else if has_value_parameter {
-                    // Inside isset() check on array with generic parameters - the key might exist at runtime
-                    // Don't report impossible isset - just return the value type as possibly undefined
-                    *has_possibly_undefined = true;
-
-                    if value_parameter.is_mixed() { get_mixed() } else { value_parameter.into_owned() }
+                        } else {
+                            false
+                        }
+                    })
                 } else {
-                    // Inside isset() but array has NO generic parameters - key definitely doesn't exist
-                    // However, if we're processing a union type, check if ANY other member has this key
-                    // Only report error if NONE of the union members have the key (type narrowing is valid otherwise)
-                    let should_report_error = if array_like_type.types.len() > 1 {
-                        // This is a union type - check if any other atomic type has this key
-                        !array_like_type.types.iter().any(|atomic_type| {
-                            if let TAtomic::Array(TArray::Keyed(other_keyed)) = atomic_type {
-                                if let Some(other_known_items) = other_keyed.get_known_items() {
-                                    other_known_items.contains_key(&array_key)
-                                } else {
-                                    // Array with generic parameters might have any key
-                                    other_keyed.get_generic_parameters().is_some()
-                                }
-                            } else {
-                                false
-                            }
-                        })
-                    } else {
-                        // Not a union, always report if key doesn't exist
-                        true
-                    };
-
-                    if should_report_error {
-                        context.collector.report_with_code(
-                            IssueCode::ImpossibleNonnullEntryCheck,
-                            Issue::warning(format!(
-                                "Impossible `isset` check on key `{}` accessed on `{}`.",
-                                array_key,
-                                keyed_array.get_id()
-                            ))
-                            .with_annotation(
-                                Annotation::primary(span)
-                                    .with_message(format!("`isset` on key `{array_key}` will always be false here."))
-                            )
-                            .with_note(
-                                format!(
-                                    "The analysis determined that the key `{array_key}` definitely does not exist in this array, so checking `isset` is unnecessary."
-                                )
-                            )
-                            .with_help(
-                                "Remove the redundant `isset` check."
-                            ),
-                        );
-                    }
-
-                    get_mixed()
+                    false
                 };
 
-                // since we're emitting a very specific error
-                // we don't want to emit another error afterwards
-                *has_valid_expected_index = true;
+                if !key_exists_in_other_variant {
+                    // Key doesn't exist in any variant - report error
+                    context.collector.report_with_code(
+                        IssueCode::UndefinedStringArrayIndex,
+                        Issue::error(format!(
+                            "Undefined array key {} accessed on `{}`.",
+                            array_key,
+                            keyed_array.get_id()
+                        ))
+                        .with_annotation(
+                            Annotation::primary(span)
+                                .with_message(format!("Key {array_key} does not exist."))
+                        )
+                        .with_note(
+                            "Attempting to access a non-existent string key will raise a warning/notice at runtime."
+                        )
+                        .with_help(
+                            format!(
+                                "Ensure the key {array_key} exists before accessing it, or use `isset()` or the null coalesce operator (`??`) to handle potential missing keys."
+                            )
+                        ),
+                    );
+                } else {
+                    // Key exists in some but not all variants - mark as possibly undefined
+                    // Don't report warning here - it will be reported at the union level to avoid duplicates
+                    *has_possibly_undefined = true;
+                    *key_in_other_variant = true;
+                }
 
-                return result;
-            }
+                if has_value_parameter { get_mixed() } else { get_null() }
+            } else if has_value_parameter {
+                // Inside isset() check on array with generic parameters - the key might exist at runtime
+                // Don't report impossible isset - just return the value type as possibly undefined
+                *has_possibly_undefined = true;
+
+                if value_parameter.is_mixed() { get_mixed() } else { value_parameter.into_owned() }
+            } else {
+                // Inside isset() but array has NO generic parameters - key definitely doesn't exist
+                // However, if we're processing a union type, check if ANY other member has this key
+                // Only report error if NONE of the union members have the key (type narrowing is valid otherwise)
+                let should_report_error = if array_like_type.types.len() > 1 {
+                    // This is a union type - check if any other atomic type has this key
+                    !array_like_type.types.iter().any(|atomic_type| {
+                        if let TAtomic::Array(TArray::Keyed(other_keyed)) = atomic_type {
+                            if let Some(other_known_items) = other_keyed.get_known_items() {
+                                other_known_items.contains_key(&array_key)
+                            } else {
+                                // Array with generic parameters might have any key
+                                other_keyed.get_generic_parameters().is_some()
+                            }
+                        } else {
+                            false
+                        }
+                    })
+                } else {
+                    // Not a union, always report if key doesn't exist
+                    true
+                };
+
+                if should_report_error {
+                    context.collector.report_with_code(
+                        IssueCode::ImpossibleNonnullEntryCheck,
+                        Issue::warning(format!(
+                            "Impossible `isset` check on key `{}` accessed on `{}`.",
+                            array_key,
+                            keyed_array.get_id()
+                        ))
+                        .with_annotation(
+                            Annotation::primary(span)
+                                .with_message(format!("`isset` on key `{array_key}` will always be false here."))
+                        )
+                        .with_note(
+                            format!(
+                                "The analysis determined that the key `{array_key}` definitely does not exist in this array, so checking `isset` is unnecessary."
+                            )
+                        )
+                        .with_help(
+                            "Remove the redundant `isset` check."
+                        ),
+                    );
+                }
+
+                get_mixed()
+            };
+
+            // since we're emitting a very specific error
+            // we don't want to emit another error afterwards
+            *has_valid_expected_index = true;
+
+            return result;
         }
 
         let possible_keys: Vec<ArrayKey> = index_type.types.iter().filter_map(|atomic| atomic.to_array_key()).collect();

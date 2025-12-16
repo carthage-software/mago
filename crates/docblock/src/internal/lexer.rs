@@ -14,31 +14,7 @@ pub fn tokenize<'a>(comment: &'a str, span: Span) -> Result<Vec<Token<'a>>, Pars
 
     let content = &comment[3..(comment.len() - 2)];
 
-    if !content.contains('\n') {
-        if content.is_empty() {
-            return Ok(Vec::new());
-        }
-
-        let content = if let Some(content) = content.strip_prefix(' ') {
-            content_start += 1; // Adjust start position to skip leading space
-            content
-        } else {
-            content
-        };
-
-        let content = if let Some(content) = content.strip_suffix(' ') {
-            content_end -= 1; // Adjust end position to skip trailing space
-            content
-        } else {
-            content
-        };
-
-        if content.is_empty() {
-            return Ok(Vec::new());
-        }
-
-        Ok(vec![Token::Line { content, span: span.subspan(content_start, content_end) }])
-    } else {
+    if content.contains('\n') {
         let lines_with_positions: Vec<(&'a str, u32)> = content
             .split('\n')
             .map(|line| {
@@ -91,6 +67,30 @@ pub fn tokenize<'a>(comment: &'a str, span: Span) -> Result<Vec<Token<'a>>, Pars
         }
 
         Ok(comment_lines)
+    } else {
+        if content.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let content = if let Some(content) = content.strip_prefix(' ') {
+            content_start += 1; // Adjust start position to skip leading space
+            content
+        } else {
+            content
+        };
+
+        let content = if let Some(content) = content.strip_suffix(' ') {
+            content_end -= 1; // Adjust end position to skip trailing space
+            content
+        } else {
+            content
+        };
+
+        if content.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        Ok(vec![Token::Line { content, span: span.subspan(content_start, content_end) }])
     }
 }
 
@@ -199,11 +199,11 @@ mod tests {
 
     #[test]
     fn test_lex_multi_line_comment() {
-        let comment = r#"/**
+        let comment = r"/**
                 * This is a multi-line comment.
                 * It has multiple lines.
                 * Each line starts with an asterisk.
-                */"#;
+                */";
 
         let span = Span::new(FileId::zero(), Position::new(0), Position::new(comment.len() as u32));
 
@@ -284,11 +284,11 @@ mod tests {
 
     #[test]
     fn test_lex_multi_line_comment_inconsistent_indentation() {
-        let comment = r#"/**
+        let comment = r"/**
         * This is a multi-line comment.
             * It has multiple lines.
         * Each line starts with an asterisk.
-        */"#;
+        */";
 
         let span = Span::new(FileId::zero(), Position::new(0), Position::new(comment.len() as u32));
 
@@ -316,11 +316,11 @@ mod tests {
 
     #[test]
     fn test_lex_multi_line_comment_missing_asterisk() {
-        let comment = r#"/**
+        let comment = r"/**
         * This is a multi-line comment.
         It has multiple lines.
         * Each line starts with an asterisk.
-        */"#;
+        */";
 
         let span = Span::new(FileId::zero(), Position::new(0), Position::new(comment.len() as u32));
 
@@ -348,11 +348,11 @@ mod tests {
 
     #[test]
     fn test_lex_multi_line_comment_missing_whitespace_after_asterisk() {
-        let comment = r#"/**
+        let comment = r"/**
         * This is a multi-line comment.
         *It has multiple lines.
         * Each line starts with an asterisk.
-        */"#;
+        */";
 
         let span = Span::new(FileId::zero(), Position::new(0), Position::new(comment.len() as u32));
 
@@ -378,7 +378,7 @@ mod tests {
         }
     }
 
-    /// ref: https://github.com/carthage-software/mago/issues/345
+    /// ref: <https://github.com/carthage-software/mago/issues/345>
     #[test]
     fn test_lex_multi_line_comment_crlf_with_multibyte_char() {
         let comment = "/**\r\n * blah blah ‰©\r\n */";
@@ -399,7 +399,7 @@ mod tests {
                 assert_eq!(sliced, expected_content);
             }
             Err(e) => {
-                panic!("Failed to tokenize comment with CRLF endings: {:?}", e);
+                panic!("Failed to tokenize comment with CRLF endings: {e:?}");
             }
         }
     }

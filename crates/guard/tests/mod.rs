@@ -36,9 +36,7 @@ fn test_guard(name: &'static str, code: &'static str, settings: Settings) -> For
 
     let arena = Bump::new();
     let (program, parse_issues) = parse_file(&arena, source_file);
-    if parse_issues.is_some() {
-        panic!("Test '{}' failed during parsing:\n{:#?}", name, parse_issues);
-    }
+    assert!(parse_issues.is_none(), "Test '{name}' failed during parsing:\n{parse_issues:#?}");
 
     let resolver = NameResolver::new(&arena);
     let resolved_names = resolver.resolve(program);
@@ -53,13 +51,13 @@ fn test_guard(name: &'static str, code: &'static str, settings: Settings) -> For
 
 #[test]
 pub fn test_extends_violation() {
-    let code = indoc! {r#"
+    let code = indoc! {r"
         <?php
         namespace App\Core {}
         namespace App\Module {
             class MyClass extends \App\Core\BaseClass {}
         }
-    "#};
+    "};
     let settings = Settings::default(); // Deny by default
     let result = test_guard("extends_violation", code, settings);
     assert_eq!(result.boundary_breaches.len(), 1);
@@ -68,7 +66,7 @@ pub fn test_extends_violation() {
 
 #[test]
 pub fn test_implements_violation() {
-    let code = indoc! {r#"
+    let code = indoc! {r"
         <?php
 
         namespace App\Core {}
@@ -76,7 +74,7 @@ pub fn test_implements_violation() {
         namespace App\Module {
             class MyClass implements \App\Core\MyInterface {}
         }
-    "#};
+    "};
 
     let settings = Settings::default();
     let result = test_guard("implements_violation", code, settings);
@@ -87,14 +85,14 @@ pub fn test_implements_violation() {
 // Test for UsageKind::ReturnType
 #[test]
 pub fn test_return_type_violation() {
-    let code = indoc! {r#"
+    let code = indoc! {r"
         <?php
 
         namespace App\Core {}
         namespace App\Module {
             function my_function(): \App\Core\MyType {}
         }
-    "#};
+    "};
 
     let settings = Settings::default();
     let result = test_guard("return_type_violation", code, settings);
@@ -105,7 +103,7 @@ pub fn test_return_type_violation() {
 
 #[test]
 pub fn test_instantiation_violation() {
-    let code = indoc! {r#"
+    let code = indoc! {r"
         <?php
 
         namespace App\Core {}
@@ -113,7 +111,7 @@ pub fn test_instantiation_violation() {
         namespace App\Module {
             new \App\Core\MyClass();
         }
-    "#};
+    "};
 
     let settings = Settings::default();
     let result = test_guard("instantiation_violation", code, settings);
@@ -123,7 +121,7 @@ pub fn test_instantiation_violation() {
 
 #[test]
 pub fn test_static_method_call_violation() {
-    let code = indoc! {r#"
+    let code = indoc! {r"
         <?php
 
         namespace App\Core { class Helper { public static function do() {} } }
@@ -131,7 +129,7 @@ pub fn test_static_method_call_violation() {
         namespace App\Module {
             \App\Core\Helper::do();
         }
-    "#};
+    "};
 
     let settings = Settings::default();
     let result = test_guard("static_method_call_violation", code, settings);
@@ -141,7 +139,7 @@ pub fn test_static_method_call_violation() {
 
 #[test]
 pub fn test_interface_dependency_violation() {
-    let code = indoc! {r#"
+    let code = indoc! {r"
         <?php
 
         namespace App\Core { interface ServiceInterface {} }
@@ -149,7 +147,7 @@ pub fn test_interface_dependency_violation() {
         namespace App\Module {
             class MyService implements \App\Core\ServiceInterface {}
         }
-    "#};
+    "};
     let settings = Settings::default();
     let result = test_guard("interface_dependency_violation", code, settings);
 
@@ -159,7 +157,7 @@ pub fn test_interface_dependency_violation() {
 
 #[test]
 pub fn test_trait_dependency_violation() {
-    let code = indoc! {r#"
+    let code = indoc! {r"
         <?php
 
         namespace App\Core { trait MyTrait {} }
@@ -167,7 +165,7 @@ pub fn test_trait_dependency_violation() {
         namespace App\Module {
             class MyClass { use \App\Core\MyTrait; }
         }
-    "#};
+    "};
 
     let settings = Settings::default();
     let result = test_guard("trait_dependency_violation", code, settings);
@@ -177,7 +175,7 @@ pub fn test_trait_dependency_violation() {
 
 #[test]
 pub fn test_enum_dependency_violation() {
-    let code = indoc! {r#"
+    let code = indoc! {r"
         <?php
 
         namespace App\Core {
@@ -187,7 +185,7 @@ pub fn test_enum_dependency_violation() {
         namespace App\Module {
             function test(\App\Core\MyEnum $e) {}
         }
-    "#};
+    "};
 
     let settings = Settings {
         perimeter: PerimeterSettings {
@@ -207,7 +205,7 @@ pub fn test_enum_dependency_violation() {
 
 #[test]
 pub fn test_const_dependency_violation() {
-    let code = indoc! {r#"
+    let code = indoc! {r"
         <?php
 
         namespace App\Core {
@@ -217,7 +215,7 @@ pub fn test_const_dependency_violation() {
         namespace App\Module {
             $a = \App\Core\MY_CONST;
         }
-    "#};
+    "};
 
     let settings = Settings::default();
     let result = test_guard("const_dependency_violation", code, settings);
@@ -228,7 +226,7 @@ pub fn test_const_dependency_violation() {
 
 #[test]
 pub fn test_native_type_is_allowed() {
-    let code = indoc! {r#"
+    let code = indoc! {r"
         <?php
 
         namespace App\Module;
@@ -239,7 +237,7 @@ pub fn test_native_type_is_allowed() {
         function test(DateTime $d): Exception {
             throw new Exception();
         }
-    "#};
+    "};
 
     let settings = Settings {
         perimeter: PerimeterSettings {
@@ -257,7 +255,7 @@ pub fn test_native_type_is_allowed() {
 
 #[test]
 pub fn test_union_type_violation() {
-    let code = indoc! {r#"
+    let code = indoc! {r"
         <?php
 
         namespace App\Core {
@@ -275,7 +273,7 @@ pub fn test_union_type_violation() {
             function test(A|B $ab) {
             }
         }
-    "#};
+    "};
 
     let settings = Settings {
         perimeter: PerimeterSettings {
@@ -297,7 +295,7 @@ pub fn test_union_type_violation() {
 
 #[test]
 pub fn test_intersection_type_violation() {
-    let code = indoc! {r#"
+    let code = indoc! {r"
         <?php
 
         namespace App\Core {
@@ -313,7 +311,7 @@ pub fn test_intersection_type_violation() {
 
             function test(\App\Core\A&B $ab) {}
         }
-    "#};
+    "};
 
     let settings = Settings {
         perimeter: PerimeterSettings {
@@ -334,7 +332,7 @@ pub fn test_intersection_type_violation() {
 
 #[test]
 pub fn test_multiple_allowed_types_rule() {
-    let code = indoc! {r#"
+    let code = indoc! {r"
         <?php
 
         namespace App\Vendor {
@@ -355,7 +353,7 @@ pub fn test_multiple_allowed_types_rule() {
                 }
             }
         }
-    "#};
+    "};
 
     let settings = Settings {
         perimeter: PerimeterSettings {
@@ -378,7 +376,7 @@ pub fn test_multiple_allowed_types_rule() {
 
 #[test]
 pub fn test_global_namespace_dependency_violation() {
-    let code = indoc! {r#"
+    let code = indoc! {r"
         <?php
 
         namespace { class GlobalClass {} }
@@ -386,7 +384,7 @@ pub fn test_global_namespace_dependency_violation() {
         namespace App\Module {
             function test(\GlobalClass $g) {}
         }
-    "#};
+    "};
 
     let settings = Settings {
         perimeter: PerimeterSettings {
@@ -406,7 +404,7 @@ pub fn test_global_namespace_dependency_violation() {
 
 #[test]
 pub fn test_ddd() {
-    let code = indoc! {r#"
+    let code = indoc! {r"
         <?php
 
         namespace Symfony\Component\HttpFoundation {
@@ -470,7 +468,7 @@ pub fn test_ddd() {
                 }
             }
         }
-    "#};
+    "};
 
     let settings = Settings {
         perimeter: PerimeterSettings {

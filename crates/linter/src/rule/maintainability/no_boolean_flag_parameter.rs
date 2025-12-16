@@ -48,13 +48,13 @@ impl LintRule for NoBooleanFlagParameterRule {
         const META: RuleMeta = RuleMeta {
             name: "No Boolean Flag Parameter",
             code: "no-boolean-flag-parameter",
-            description: indoc! {r#"
+            description: indoc! {r"
                 Flags function-like parameters that use a boolean type.
 
                 Boolean flag parameters can indicate a violation of the Single Responsibility Principle (SRP).
                 Refactor by extracting the flag logic into its own class or method.
-            "#},
-            good_example: indoc! {r#"
+            "},
+            good_example: indoc! {r"
                 <?php
 
                 function get_difference(string $a, string $b): string {
@@ -64,14 +64,14 @@ impl LintRule for NoBooleanFlagParameterRule {
                 function get_difference_case_insensitive(string $a, string $b): string {
                     // ...
                 }
-            "#},
-            bad_example: indoc! {r#"
+            "},
+            bad_example: indoc! {r"
                 <?php
 
                 function get_difference(string $a, string $b, bool $ignore_case): string {
                     // ...
                 }
-            "#},
+            "},
             category: Category::Maintainability,
 
             requirements: RuleRequirements::None,
@@ -90,7 +90,7 @@ impl LintRule for NoBooleanFlagParameterRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let Node::FunctionLikeParameter(parameter) = node else {
             return;
         };

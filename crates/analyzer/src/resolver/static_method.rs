@@ -256,10 +256,10 @@ fn resolve_method_from_classname<'ctx, 'arena>(
             result.has_invalid_target = true;
 
             if !could_method_ever_exist {
-                if !call_static_could_exist {
-                    report_non_existent_method(context, class_span, method_span, &fq_class_id, &method_name);
-                } else {
+                if call_static_could_exist {
                     report_non_documented_method(context, class_span, method_span, &fq_class_id, &method_name);
+                } else {
+                    report_non_existent_method(context, class_span, method_span, &fq_class_id, &method_name);
                 }
             }
         } else {
@@ -393,7 +393,9 @@ fn get_metadata_object<'ctx>(
 
     TObject::Named(TNamedObject {
         name: class_like_metadata.original_name,
-        type_parameters: if !class_like_metadata.template_types.is_empty() {
+        type_parameters: if class_like_metadata.template_types.is_empty() {
+            None
+        } else {
             Some(
                 class_like_metadata
                     .template_types
@@ -423,8 +425,6 @@ fn get_metadata_object<'ctx>(
                     })
                     .collect::<Vec<_>>(),
             )
-        } else {
-            None
         },
         is_this: true,
         intersection_types: if intersections.is_empty() { None } else { Some(intersections) },

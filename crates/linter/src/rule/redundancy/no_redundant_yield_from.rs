@@ -55,22 +55,22 @@ impl LintRule for NoRedundantYieldFromRule {
                 Using `yield from` with a single-element array literal creates unnecessary
                 overhead in the generated opcodes. Direct `yield` is simpler and more efficient.
             "},
-            good_example: indoc! {r#"
+            good_example: indoc! {r"
                 <?php
 
                 function gen(): Generator {
                     yield 1;
                     yield 'foo' => new stdClass();
                 }
-            "#},
-            bad_example: indoc! {r#"
+            "},
+            bad_example: indoc! {r"
                 <?php
 
                 function gen(): Generator {
                     yield from [1];
                     yield from ['foo' => new stdClass()];
                 }
-            "#},
+            "},
             category: Category::Redundancy,
             requirements: RuleRequirements::None,
         };
@@ -87,7 +87,7 @@ impl LintRule for NoRedundantYieldFromRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let Node::YieldFrom(yield_from) = node else {
             return;
         };
@@ -143,7 +143,7 @@ impl LintRule for NoRedundantYieldFromRule {
                     plan.delete(legacy_array.right_parenthesis.to_range(), SafetyClassification::Safe);
                 }
                 _ => unreachable!("Already filtered out non-array literals"),
-            };
+            }
         });
     }
 }
@@ -159,64 +159,64 @@ mod tests {
     test_lint_success! {
         name = direct_yield_is_fine,
         rule = NoRedundantYieldFromRule,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             function gen() {
                 yield 1;
                 yield 'key' => 2;
             }
-        "#}
+        "}
     }
 
     test_lint_success! {
         name = yield_from_multi_element_array_is_fine,
         rule = NoRedundantYieldFromRule,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             function gen() {
                 yield from [1, 2, 3];
                 yield from array(4, 5, 6);
             }
-        "#}
+        "}
     }
 
     test_lint_success! {
         name = yield_from_variable_is_fine,
         rule = NoRedundantYieldFromRule,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             function gen($iterator) {
                 yield from $iterator;
             }
-        "#}
+        "}
     }
 
     test_lint_success! {
         name = yield_from_function_call_is_fine,
         rule = NoRedundantYieldFromRule,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             function gen() {
                 yield from getItems();
             }
-        "#}
+        "}
     }
 
     test_lint_success! {
         name = yield_from_empty_array_is_fine,
         rule = NoRedundantYieldFromRule,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             function gen() {
                 yield from [];
                 yield from array();
             }
-        "#}
+        "}
     }
 
     // Failure cases - SHOULD produce lint issues
@@ -224,80 +224,80 @@ mod tests {
     test_lint_failure! {
         name = yield_from_single_value_array,
         rule = NoRedundantYieldFromRule,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             function gen() {
                 yield from [1];
             }
-        "#}
+        "}
     }
 
     test_lint_failure! {
         name = yield_from_single_value_legacy_array,
         rule = NoRedundantYieldFromRule,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             function gen() {
                 yield from array(1);
             }
-        "#}
+        "}
     }
 
     test_lint_failure! {
         name = yield_from_single_keyed_array,
         rule = NoRedundantYieldFromRule,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             function gen() {
                 yield from ['foo' => 'bar'];
             }
-        "#}
+        "}
     }
 
     test_lint_failure! {
         name = yield_from_single_keyed_legacy_array,
         rule = NoRedundantYieldFromRule,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             function gen() {
                 yield from array('foo' => 'bar');
             }
-        "#}
+        "}
     }
 
     test_lint_failure! {
         name = yield_from_single_complex_value,
         rule = NoRedundantYieldFromRule,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             function gen() {
                 yield from [new stdClass()];
             }
-        "#}
+        "}
     }
 
     test_lint_failure! {
         name = yield_from_single_keyed_complex_value,
         rule = NoRedundantYieldFromRule,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             function gen() {
                 yield from ['key' => new stdClass()];
             }
-        "#}
+        "}
     }
 
     test_lint_failure! {
         name = multiple_single_element_yield_from,
         rule = NoRedundantYieldFromRule,
         count = 3,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             function gen() {
@@ -305,18 +305,18 @@ mod tests {
                 yield from array(2);
                 yield from ['key' => 3];
             }
-        "#}
+        "}
     }
 
     test_lint_failure! {
         name = yield_from_single_numeric_key,
         rule = NoRedundantYieldFromRule,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             function gen() {
                 yield from [0 => 'value'];
             }
-        "#}
+        "}
     }
 }

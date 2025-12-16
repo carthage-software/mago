@@ -105,7 +105,7 @@ pub(super) fn is_intersection_shallowly_contained_by(
                         return true;
                     }
                 }
-            };
+            }
 
             return false;
         }

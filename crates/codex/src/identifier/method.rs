@@ -37,7 +37,7 @@ impl MethodIdentifier {
         &self.method_name
     }
 
-    /// Converts the identifier to a human-readable string "ClassName::methodName".
+    /// Converts the identifier to a human-readable string "`ClassName::methodName`".
     #[inline]
     pub fn as_string(&self) -> String {
         format!("{}::{}", self.class_name, self.method_name)

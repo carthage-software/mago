@@ -3,7 +3,7 @@ use mago_syntax::ast::*;
 use crate::context::LintContext;
 use crate::scope::ClassLikeScope;
 
-pub fn is_within_controller<'ctx, 'arena>(context: &LintContext<'ctx, 'arena>) -> bool {
+pub fn is_within_controller(context: &LintContext<'_, '_>) -> bool {
     let Some(ClassLikeScope::Class(classname)) = context.scope.get_class_like_scope() else {
         return false;
     };
@@ -11,7 +11,7 @@ pub fn is_within_controller<'ctx, 'arena>(context: &LintContext<'ctx, 'arena>) -
     classname.ends_with("Controller")
 }
 
-pub fn is_this<'ast, 'arena>(expression: &'ast Expression<'arena>) -> bool {
+pub fn is_this(expression: &Expression<'_>) -> bool {
     if let Expression::Variable(Variable::Direct(var)) = expression {
         var.name.eq_ignore_ascii_case("$this")
     } else {
@@ -19,7 +19,7 @@ pub fn is_this<'ast, 'arena>(expression: &'ast Expression<'arena>) -> bool {
     }
 }
 
-pub fn is_method_named<'ast, 'arena>(member: &'ast ClassLikeMemberSelector<'arena>, name: &str) -> bool {
+pub fn is_method_named(member: &ClassLikeMemberSelector<'_>, name: &str) -> bool {
     match member {
         ClassLikeMemberSelector::Identifier(method) => method.value.eq_ignore_ascii_case(name),
         _ => false,

@@ -6,7 +6,7 @@ use crate::context::LintContext;
 /// Checks if a `FunctionCall` could possibly refer to one of the names in a given slice.
 ///
 /// This is the primary utility for checking a function call against a list of known
-/// function names (e.g., all `assert*` methods in PHPUnit). It correctly handles
+/// function names (e.g., all `assert*` methods in `PHPUnit`). It correctly handles
 /// namespace resolution by checking against the function's fully qualified name
 /// (if imported via `use function`), its namespaced name, and its global fallback.
 ///
@@ -14,9 +14,9 @@ use crate::context::LintContext;
 ///
 /// Returns `Some(name)` with the **first matching name from the input slice** if a
 /// potential resolution matches, or `None` if no match is found.
-pub fn function_call_matches_any<'ctx, 'ast, 'arena, 'name>(
-    context: &LintContext<'ctx, 'arena>,
-    call: &'ast FunctionCall<'arena>,
+pub fn function_call_matches_any<'arena, 'name>(
+    context: &LintContext<'_, 'arena>,
+    call: &FunctionCall<'arena>,
     names: &[&'name str],
 ) -> Option<&'name str> {
     function_name_matches_any(context, call.function, names)
@@ -27,19 +27,19 @@ pub fn function_call_matches_any<'ctx, 'ast, 'arena, 'name>(
 /// This is a convenience wrapper around `function_call_matches_any` for checking
 /// against a single function name.
 #[inline]
-pub fn function_call_matches<'ctx, 'ast, 'arena, 'name>(
-    context: &LintContext<'ctx, 'arena>,
-    call: &'ast FunctionCall<'arena>,
-    name: &'name str,
+pub fn function_call_matches<'arena>(
+    context: &LintContext<'_, 'arena>,
+    call: &FunctionCall<'arena>,
+    name: &str,
 ) -> bool {
     function_call_matches_any(context, call, std::slice::from_ref(&name)).is_some()
 }
 
 /// The internal implementation that checks if a function name `Expression`
 /// could resolve to one of the provided names.
-fn function_name_matches_any<'ctx, 'ast, 'arena, 'name>(
-    context: &LintContext<'ctx, 'arena>,
-    function: &'ast Expression<'arena>,
+fn function_name_matches_any<'arena, 'name>(
+    context: &LintContext<'_, 'arena>,
+    function: &Expression<'arena>,
     names: &[&'name str],
 ) -> Option<&'name str> {
     let Expression::Identifier(function_identifier) = function else {

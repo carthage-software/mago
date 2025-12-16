@@ -12,8 +12,8 @@ use crate::symbol::SymbolIdentifier;
 /// Format: `(old_start, old_length, line_offset, column_offset)`
 /// - `old_start`: Starting byte offset in the old version
 /// - `old_length`: Length of the changed region in bytes
-/// - `line_offset`: Line number change (new_line - old_line)
-/// - `column_offset`: Column number change (new_column - old_column)
+/// - `line_offset`: Line number change (`new_line` - `old_line`)
+/// - `column_offset`: Column number change (`new_column` - `old_column`)
 pub type DiffHunk = (usize, usize, isize, isize);
 
 /// Represents a range of deleted code.

@@ -57,7 +57,7 @@ impl LintRule for NoEmptyCommentRule {
                 Detects empty comments in the codebase. Empty comments are not useful and should be removed
                 to keep the codebase clean and maintainable.
             "},
-            good_example: indoc! {r#"
+            good_example: indoc! {r"
                 <?php
 
                 // This is a useful comment.
@@ -67,14 +67,14 @@ impl LintRule for NoEmptyCommentRule {
                 /**
                  * This is a docblock.
                  */
-            "#},
-            bad_example: indoc! {r#"
+            "},
+            bad_example: indoc! {r"
                 <?php
 
                 //
                 #
                 /**/
-            "#},
+            "},
             category: Category::Redundancy,
 
             requirements: RuleRequirements::None,
@@ -93,7 +93,7 @@ impl LintRule for NoEmptyCommentRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let Node::Program(program) = node else {
             return;
         };

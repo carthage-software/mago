@@ -101,7 +101,7 @@ mod tests {
 
     test_analysis! {
         name = using_generic_parameter_as_index,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             /**
@@ -120,6 +120,6 @@ mod tests {
 
                 return $old;
             }
-        "#},
+        "},
     }
 }

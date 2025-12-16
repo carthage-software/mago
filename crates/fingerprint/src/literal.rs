@@ -13,7 +13,12 @@ impl Fingerprintable for Literal<'_> {
         _resolved_names: &ResolvedNames,
         _options: &FingerprintOptions<'_>,
     ) {
-        use Literal::*;
+        use Literal::False;
+        use Literal::Float;
+        use Literal::Integer;
+        use Literal::Null;
+        use Literal::String;
+        use Literal::True;
 
         match self {
             True(_) => "true".hash(hasher),

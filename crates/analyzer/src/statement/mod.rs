@@ -257,10 +257,10 @@ pub fn analyze_statements<'ctx, 'arena>(
 }
 
 /// Checks statement expressions for unused results or lack of side effects.
-fn detect_unused_statement_expressions<'ctx, 'ast, 'arena>(
+fn detect_unused_statement_expressions<'ast, 'arena>(
     expression: &'ast Expression<'arena>,
     statement: &'ast Statement<'arena>,
-    context: &mut Context<'ctx, 'arena>,
+    context: &mut Context<'_, 'arena>,
     artifacts: &mut AnalysisArtifacts,
 ) {
     if let Some((issue_kind, name)) = has_unused_must_use(expression, context, artifacts) {
@@ -307,7 +307,7 @@ fn detect_unused_statement_expressions<'ctx, 'ast, 'arena>(
             let name = context.resolved_names.get(function_name);
 
             let Some(function) = context.codebase.get_function(name).or_else(|| {
-                if !function_name.is_local() { None } else { context.codebase.get_function(unqualified_name) }
+                if function_name.is_local() { context.codebase.get_function(unqualified_name) } else { None }
             }) else {
                 return;
             };
@@ -345,9 +345,9 @@ fn detect_unused_statement_expressions<'ctx, 'ast, 'arena>(
 
 /// Checks if an expression is a call to a `@must-use` function/method
 /// and returns the appropriate issue kind and the name identifier if the result is unused.
-fn has_unused_must_use<'ctx, 'ast, 'arena>(
-    expression: &'ast Expression<'arena>,
-    context: &Context<'ctx, 'arena>,
+fn has_unused_must_use<'arena>(
+    expression: &Expression<'arena>,
+    context: &Context<'_, 'arena>,
     artifacts: &AnalysisArtifacts,
 ) -> Option<(IssueCode, Atom)> {
     let call_expression = match expression {

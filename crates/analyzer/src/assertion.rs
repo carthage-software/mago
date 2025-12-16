@@ -261,7 +261,7 @@ fn scrape_special_function_call_assertions(
                     .argument_list
                     .arguments
                     .get(1)
-                    .map(|argument| argument.value())
+                    .map(mago_syntax::ast::Argument::value)
                     .and_then(|array_key| get_expression_array_key(artifacts, array_key))
                 {
                     (0, vec![Assertion::HasArrayKey(array_key)])
@@ -274,7 +274,7 @@ fn scrape_special_function_call_assertions(
                     .argument_list
                     .arguments
                     .get(0)
-                    .map(|argument| argument.value())
+                    .map(mago_syntax::ast::Argument::value)
                     .and_then(|expr| artifacts.get_expression_type(expr))
                 else {
                     return if_types;
@@ -309,7 +309,7 @@ fn scrape_special_function_call_assertions(
                 .argument_list
                 .arguments
                 .first()
-                .map(|argument| argument.value())
+                .map(mago_syntax::ast::Argument::value)
                 .and_then(|array_key| get_expression_array_key(artifacts, array_key))
                 .map(|key| (1, vec![Assertion::HasArrayKey(key)])),
             "is_countable" => Some((0, vec![Assertion::Countable])),
@@ -331,7 +331,7 @@ fn scrape_special_function_call_assertions(
                     .argument_list
                     .arguments
                     .get(1)
-                    .map(|argument| argument.value())
+                    .map(mago_syntax::ast::Argument::value)
                     .and_then(|expr| artifacts.get_expression_type(expr))
                     .and_then(|ty| ty.get_single_literal_string_value())?;
 
@@ -342,7 +342,7 @@ fn scrape_special_function_call_assertions(
                     .argument_list
                     .arguments
                     .get(1)
-                    .map(|argument| argument.value())
+                    .map(mago_syntax::ast::Argument::value)
                     .and_then(|expr| artifacts.get_expression_type(expr))
                     .and_then(|ty| ty.get_single_literal_string_value())?;
 
@@ -354,7 +354,7 @@ fn scrape_special_function_call_assertions(
                     .arguments
                     .get(2)
                     .and_then(|argument| artifacts.get_expression_type(argument.value()))
-                    .is_some_and(|ty| ty.is_true());
+                    .is_some_and(mago_codex::ttype::union::TUnion::is_true);
 
                 if !should_strict_check {
                     return None;
@@ -364,7 +364,7 @@ fn scrape_special_function_call_assertions(
                     .argument_list
                     .arguments
                     .get(1)
-                    .map(|argument| argument.value())
+                    .map(mago_syntax::ast::Argument::value)
                     .and_then(|expr| artifacts.get_expression_type(expr))?;
 
                 let mut value_types = None;
@@ -419,7 +419,7 @@ fn scrape_special_function_call_assertions(
         .argument_list
         .arguments
         .get(argument_variable_id_position)
-        .map(|argument| argument.value())
+        .map(mago_syntax::ast::Argument::value)
         .and_then(extract_expression_id)
     {
         if_types.insert(first_argument_variable_id, vec![function_assertions]);
@@ -475,7 +475,7 @@ pub(super) fn scrape_equality_assertions(
         _ => {
             // Continue to check for other conditions
         }
-    };
+    }
 
     if let Some(null_position) = has_null_variable(left, right, artifacts) {
         return get_null_equality_assertions(left, right, assertion_context, null_position);
@@ -564,7 +564,7 @@ fn scrape_inequality_assertions(
         _ => {
             // Continue to check for other conditions
         }
-    };
+    }
 
     if let Some(null_position) = has_null_variable(left, right, artifacts) {
         return get_null_inequality_assertions(left, right, assertion_context, null_position);
@@ -1342,7 +1342,7 @@ fn scrape_instanceof_assertions(
                     }
                 }
             }
-        };
+        }
     }
 
     if if_types.is_empty() { vec![] } else { vec![if_types] }
@@ -1387,12 +1387,12 @@ fn get_comparison_literal_operand(
 fn get_expression_integer_value(artifacts: &AnalysisArtifacts, expression: &Expression) -> Option<TInteger> {
     artifacts
         .get_expression_type(expression)
-        .and_then(|t| t.get_single_int())
+        .and_then(mago_codex::ttype::union::TUnion::get_single_int)
         .filter(|integer| !integer.is_unspecified())
 }
 
 fn get_expression_array_key(artifacts: &AnalysisArtifacts, expression: &Expression) -> Option<ArrayKey> {
-    artifacts.get_expression_type(expression).and_then(|t| t.get_single_array_key())
+    artifacts.get_expression_type(expression).and_then(mago_codex::ttype::union::TUnion::get_single_array_key)
 }
 
 fn is_count_or_size_of_call(expression: &Expression, assertion_context: AssertionContext<'_, '_>) -> bool {
@@ -1625,7 +1625,7 @@ fn get_typed_value_equality_assertions(
         if_types.insert(other_value_var_name, vec![orred_types]);
     }
 
-    if !if_types.is_empty() { vec![if_types] } else { vec![] }
+    if if_types.is_empty() { vec![] } else { vec![if_types] }
 }
 
 fn get_typed_value_inequality_assertions(
@@ -1708,7 +1708,7 @@ fn get_typed_value_inequality_assertions(
         }
     }
 
-    if !if_types.is_empty() { vec![if_types] } else { vec![] }
+    if if_types.is_empty() { vec![] } else { vec![if_types] }
 }
 
 #[inline]
@@ -1741,7 +1741,7 @@ pub fn has_enum_case_comparison(
     if let Expression::Access(Access::ClassConstant(class_constant_access)) = unwrap_expression(right)
         && artifacts
             .get_expression_type(class_constant_access)
-            .is_some_and(|expression_type| expression_type.is_single_enum_case())
+            .is_some_and(mago_codex::ttype::union::TUnion::is_single_enum_case)
     {
         return Some(OtherValuePosition::Right);
     }
@@ -1749,7 +1749,7 @@ pub fn has_enum_case_comparison(
     if let Expression::Access(Access::ClassConstant(class_constant_access)) = unwrap_expression(left)
         && artifacts
             .get_expression_type(class_constant_access)
-            .is_some_and(|expression_type| expression_type.is_single_enum_case())
+            .is_some_and(mago_codex::ttype::union::TUnion::is_single_enum_case)
     {
         return Some(OtherValuePosition::Left);
     }

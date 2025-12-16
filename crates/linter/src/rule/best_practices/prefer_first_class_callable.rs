@@ -52,25 +52,25 @@ impl LintRule for PreferFirstClassCallableRule {
         const META: RuleMeta = RuleMeta {
             name: "Prefer First Class Callable",
             code: "prefer-first-class-callable",
-            description: indoc! {r#"
+            description: indoc! {r"
                 Promotes the use of first-class callable syntax (`...`) for creating closures.
 
                 This rule identifies closures and arrow functions that do nothing but forward their arguments to another function or method.
                 In such cases, the more concise and modern first-class callable syntax, introduced in PHP 8.1, can be used instead.
                 This improves readability by reducing boilerplate code.
-            "#},
-            good_example: indoc! {r#"
+            "},
+            good_example: indoc! {r"
                 <?php
 
                 $names = ['Alice', 'Bob', 'Charlie'];
                 $uppercased_names = array_map(strtoupper(...), $names);
-            "#},
-            bad_example: indoc! {r#"
+            "},
+            bad_example: indoc! {r"
                 <?php
 
                 $names = ['Alice', 'Bob', 'Charlie'];
                 $uppercased_names = array_map(fn($name) => strtoupper($name), $names);
-            "#},
+            "},
             category: Category::BestPractices,
             requirements: RuleRequirements::PHPVersion(PHPVersionRange::from(PHPVersion::PHP81)),
         };
@@ -87,7 +87,7 @@ impl LintRule for PreferFirstClassCallableRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         if let Node::ArrowFunction(arrow_function) = node {
             let Expression::Call(call) = arrow_function.expression else {
                 return;
@@ -114,7 +114,7 @@ impl LintRule for PreferFirstClassCallableRule {
                 p.delete(span.to_end(call.start_position()).to_range(), SafetyClassification::PotentiallyUnsafe);
                 p.replace(call.get_argument_list().span().to_range(), "(...)", SafetyClassification::PotentiallyUnsafe);
             });
-        };
+        }
 
         if let Node::Closure(closure) = node {
             let Some(return_stmt) = get_single_return_statement(&closure.body) else {

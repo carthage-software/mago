@@ -49,24 +49,24 @@ impl LintRule for NoEmptyLoopRule {
         const META: RuleMeta = RuleMeta {
             name: "No Empty Loop",
             code: "no-empty-loop",
-            description: indoc! {r#"
+            description: indoc! {r"
                 Detects loops (`for`, `foreach`, `while`, `do-while`) that have an empty body. An empty
                 loop body does not perform any actions and is likely a mistake or redundant code.
-            "#},
-            good_example: indoc! {r#"
+            "},
+            good_example: indoc! {r"
                 <?php
 
                 foreach ($items as $item) {
                     process($item);
                 }
-            "#},
-            bad_example: indoc! {r#"
+            "},
+            bad_example: indoc! {r"
                 <?php
 
                 while (should_wait()) {
                     // Empty loop body
                 }
-            "#},
+            "},
             category: Category::Redundancy,
 
             requirements: RuleRequirements::None,
@@ -85,7 +85,7 @@ impl LintRule for NoEmptyLoopRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let is_empty = match node {
             Node::For(for_loop) => match &for_loop.body {
                 ForBody::Statement(stmt) => is_statement_empty(stmt),

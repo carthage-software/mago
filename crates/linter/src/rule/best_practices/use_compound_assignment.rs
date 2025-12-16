@@ -57,18 +57,18 @@ impl LintRule for UseCompoundAssignmentRule {
                 concatenation (`.=`), it can also be more performant as it avoids
                 creating an intermediate copy of the string.
             "},
-            good_example: indoc! {r#"
+            good_example: indoc! {r"
                 <?php
 
                 $count += 1;
                 $message .= ' Hello';
-            "#},
-            bad_example: indoc! {r#"
+            "},
+            bad_example: indoc! {r"
                 <?php
 
                 $count = $count + 1;
                 $message = $message . ' Hello';
-            "#},
+            "},
             category: Category::BestPractices,
 
             requirements: RuleRequirements::None,
@@ -87,7 +87,7 @@ impl LintRule for UseCompoundAssignmentRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let Node::Assignment(assignment) = node else {
             return;
         };
@@ -118,7 +118,7 @@ impl LintRule for UseCompoundAssignmentRule {
                     .with_message("This can be written more concisely"),
             )
             .with_note("Using operators like `+=` or `.=` is more idiomatic and can be faster, especially for string concatenation.")
-            .with_help(format!("Use the `{}` operator instead.", compound_op_str));
+            .with_help(format!("Use the `{compound_op_str}` operator instead."));
 
         ctx.collector.propose(issue, |plan| {
             let replacement_span = assignment.operator.span().join(binary.operator.span());

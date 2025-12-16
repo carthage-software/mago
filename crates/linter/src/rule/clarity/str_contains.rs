@@ -60,7 +60,7 @@ impl LintRule for StrContainsRule {
                 replacing them with `str_contains($a, $b)` or `!str_contains($a, $b)` for improved readability
                 and intent clarity.
             "},
-            good_example: indoc! {r#"
+            good_example: indoc! {r"
                 <?php
 
                 $a = 'hello world';
@@ -69,8 +69,8 @@ impl LintRule for StrContainsRule {
                 if (str_contains($a, $b)) {
                     echo 'Found';
                 }
-            "#},
-            bad_example: indoc! {r#"
+            "},
+            bad_example: indoc! {r"
                 <?php
 
                 $a = 'hello world';
@@ -79,7 +79,7 @@ impl LintRule for StrContainsRule {
                 if (strpos($a, $b) !== false) {
                     echo 'Found';
                 }
-            "#},
+            "},
             category: Category::Clarity,
             requirements: RuleRequirements::PHPVersion(PHPVersionRange::from(PHPVersion::PHP80)),
         };
@@ -97,7 +97,7 @@ impl LintRule for StrContainsRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let Node::Binary(binary) = node else { return };
 
         // Check if this is a comparison with false
@@ -187,12 +187,12 @@ impl LintRule for StrContainsRule {
                 // Replace entire binary expression with !str_contains(...)
                 if left {
                     // strpos(...) === false
-                    plan.replace(function_span.to_range(), format!("!{}", STR_CONTAINS), SafetyClassification::Safe);
+                    plan.replace(function_span.to_range(), format!("!{STR_CONTAINS}"), SafetyClassification::Safe);
                     plan.delete(binary.operator.span().join(binary.rhs.span()).to_range(), SafetyClassification::Safe);
                 } else {
                     // false === strpos(...)
                     plan.delete(binary.lhs.span().join(binary.operator.span()).to_range(), SafetyClassification::Safe);
-                    plan.replace(function_span.to_range(), format!("!{}", STR_CONTAINS), SafetyClassification::Safe);
+                    plan.replace(function_span.to_range(), format!("!{STR_CONTAINS}"), SafetyClassification::Safe);
                 }
             } else {
                 // For !== false, just replace with str_contains
@@ -220,7 +220,7 @@ mod tests {
     test_lint_success! {
         name = str_contains_is_preferred,
         rule = StrContainsRule,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             $haystack = 'hello world';
@@ -233,86 +233,86 @@ mod tests {
             if (!str_contains($haystack, 'foo')) {
                 echo 'Not found';
             }
-        "#}
+        "}
     }
 
     test_lint_failure! {
         name = strpos_not_identical_false_should_use_str_contains,
         rule = StrContainsRule,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             if (strpos('hello', 'world') !== false) {
                 echo 'Found';
             }
-        "#}
+        "}
     }
 
     test_lint_failure! {
         name = strpos_identical_false_should_use_negated_str_contains,
         rule = StrContainsRule,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             if (strpos('hello', 'world') === false) {
                 echo 'Not found';
             }
-        "#}
+        "}
     }
 
     test_lint_failure! {
         name = strpos_loose_equal_false_warns_about_unsafe_comparison,
         rule = StrContainsRule,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             if (strpos('hello', 'world') == false) {
                 echo 'Not found';
             }
-        "#}
+        "}
     }
 
     test_lint_failure! {
         name = strpos_not_equal_false_warns_about_unsafe_comparison,
         rule = StrContainsRule,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             if (strpos('hello', 'world') != false) {
                 echo 'Found';
             }
-        "#}
+        "}
     }
 
     test_lint_failure! {
         name = strpos_angled_not_equal_false_warns_about_unsafe_comparison,
         rule = StrContainsRule,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             if (strpos('hello', 'world') <> false) {
                 echo 'Found';
             }
-        "#}
+        "}
     }
 
     test_lint_failure! {
         name = false_on_left_side_also_detected,
         rule = StrContainsRule,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             if (false !== strpos('hello', 'world')) {
                 echo 'Found';
             }
-        "#}
+        "}
     }
 
     test_lint_failure! {
         name = multiple_strpos_comparisons_strict_and_loose,
         rule = StrContainsRule,
         count = 4,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             // Strict - can be safely replaced
@@ -334,6 +334,6 @@ mod tests {
             if (strpos($g, $h) != false) {
                 echo 'Maybe found';
             }
-        "#}
+        "}
     }
 }

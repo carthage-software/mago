@@ -1,4 +1,4 @@
-//! array_merge() return type provider.
+//! `array_merge()` return type provider.
 
 use std::collections::BTreeMap;
 
@@ -94,7 +94,7 @@ impl FunctionReturnTypeProvider for ArrayMergeProvider {
                         }
 
                         if let Some(ref items) = keyed.known_items {
-                            for (key, value) in items.iter() {
+                            for (key, value) in items {
                                 merged_items.insert(*key, value.clone());
                             }
                         }

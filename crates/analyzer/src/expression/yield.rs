@@ -76,7 +76,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for YieldValue<'arena> {
                 value_type.get_id()
             ))
             .with_annotation(
-                Annotation::primary(self.value.as_ref().map_or_else(|| self.span(), |val| val.span()))
+                Annotation::primary(self.value.as_ref().map_or_else(|| self.span(), mago_span::HasSpan::span))
                     .with_message(format!("This expression yields type `{}`", value_type.get_id())),
             )
             .with_note("The type of the value yielded must be assignable to the value type declared in the Generator's return type hint.")
@@ -366,8 +366,8 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for YieldFrom<'arena> {
     }
 }
 
-fn get_current_generator_parameters<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+fn get_current_generator_parameters<'ctx>(
+    context: &mut Context<'ctx, '_>,
     block_context: &mut BlockContext<'ctx>,
     yield_span: Span,
 ) -> Option<(TUnion, TUnion, TUnion, TUnion)> {
@@ -407,8 +407,8 @@ fn get_current_generator_parameters<'ctx, 'arena>(
                 sent = Some(add_optional_union_type(s, sent.as_ref(), context.codebase));
                 r#return = Some(add_optional_union_type(r, r#return.as_ref(), context.codebase));
             }
-            None => match get_iterable_parameters(atomic_iterable, context.codebase) {
-                Some((mut k, mut v)) => {
+            None => {
+                if let Some((mut k, mut v)) = get_iterable_parameters(atomic_iterable, context.codebase) {
                     // Expand the key and value types to resolve any references like Color::*
                     expander::expand_union(context.codebase, &mut k, &TypeExpansionOptions::default());
                     expander::expand_union(context.codebase, &mut v, &TypeExpansionOptions::default());
@@ -417,34 +417,33 @@ fn get_current_generator_parameters<'ctx, 'arena>(
                     value = Some(add_optional_union_type(v, value.as_ref(), context.codebase));
                     sent = Some(get_mixed());
                     r#return = Some(get_mixed());
-                }
-                None => {
+                } else {
                     context.collector.report_with_code(
-                        IssueCode::InvalidGeneratorReturnType,
-                        Issue::error(format!(
-                            "Declared return type `{}` for generator function `{}` is not a valid Generator or iterable type.",
-                            iterable_type.get_id(),
-                            function.name.map_or_else(|| "current", |id| id.as_str())
-                        ))
-                        .with_annotation(
-                            Annotation::primary(return_type_metadata.span)
-                                .with_message(format!("Declared return type is `{}`", iterable_type.get_id())),
-                        )
-                        .with_annotation(
-                            Annotation::secondary(yield_span)
-                                .with_message("`yield` used in a generator function with an invalid return type")
-                        )
-                        .with_note(
-                            "Functions containing `yield` are generators. Their return type hint must be `Generator`, `Iterator`, `Traversable`, or `iterable`."
-                        )
-                        .with_help(
-                            "Adjust the return type hint to a valid Generator signature (e.g., `Generator<K, V, S, R>`) or a compatible iterable type.",
-                        ),
-                    );
+                    IssueCode::InvalidGeneratorReturnType,
+                    Issue::error(format!(
+                        "Declared return type `{}` for generator function `{}` is not a valid Generator or iterable type.",
+                        iterable_type.get_id(),
+                        function.name.map_or_else(|| "current", |id| id.as_str())
+                    ))
+                    .with_annotation(
+                        Annotation::primary(return_type_metadata.span)
+                            .with_message(format!("Declared return type is `{}`", iterable_type.get_id())),
+                    )
+                    .with_annotation(
+                        Annotation::secondary(yield_span)
+                            .with_message("`yield` used in a generator function with an invalid return type")
+                    )
+                    .with_note(
+                        "Functions containing `yield` are generators. Their return type hint must be `Generator`, `Iterator`, `Traversable`, or `iterable`."
+                    )
+                    .with_help(
+                        "Adjust the return type hint to a valid Generator signature (e.g., `Generator<K, V, S, R>`) or a compatible iterable type.",
+                    ),
+                );
 
                     return None;
                 }
-            },
+            }
         }
     }
 

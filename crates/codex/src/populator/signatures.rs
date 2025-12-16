@@ -26,10 +26,10 @@ pub fn populate_function_like_metadata(
     for attribute_metadata in metadata.get_attributes() {
         match reference_source {
             ReferenceSource::Symbol(_, a) => {
-                symbol_references.add_symbol_reference_to_symbol(*a, attribute_metadata.name, true)
+                symbol_references.add_symbol_reference_to_symbol(*a, attribute_metadata.name, true);
             }
             ReferenceSource::ClassLikeMember(_, a, b) => {
-                symbol_references.add_class_member_reference_to_symbol((*a, *b), attribute_metadata.name, true)
+                symbol_references.add_class_member_reference_to_symbol((*a, *b), attribute_metadata.name, true);
             }
         }
     }
@@ -88,7 +88,7 @@ pub fn populate_function_like_metadata(
         for attribute_metadata in &parameter_metadata.attributes {
             match reference_source {
                 ReferenceSource::Symbol(in_signature, a) => {
-                    symbol_references.add_symbol_reference_to_symbol(*a, attribute_metadata.name, *in_signature)
+                    symbol_references.add_symbol_reference_to_symbol(*a, attribute_metadata.name, *in_signature);
                 }
                 ReferenceSource::ClassLikeMember(in_signature, a, b) => symbol_references
                     .add_class_member_reference_to_symbol((*a, *b), attribute_metadata.name, *in_signature),

@@ -31,6 +31,12 @@ pub struct ClassLikeConstantItem<'arena> {
 }
 
 impl<'arena> ClassLikeConstant<'arena> {
+    /// Returns the first item in this class-like constant declaration.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the constant declaration has no items. This indicates a bug in the parser,
+    /// as valid PHP class constants must have at least one item.
     pub fn first_item(&self) -> &ClassLikeConstantItem<'arena> {
         self.items
             .first()

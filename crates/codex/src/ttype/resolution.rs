@@ -178,7 +178,7 @@ impl TypeResolutionContext {
     ///
     /// # Returns
     ///
-    /// `Some` containing a reference to (source_class, original_name) if found, `None` otherwise.
+    /// `Some` containing a reference to (`source_class`, `original_name`) if found, `None` otherwise.
     pub fn get_imported_type_alias(&self, name: &Atom) -> Option<&(Atom, Atom)> {
         self.imported_type_aliases.get(name)
     }

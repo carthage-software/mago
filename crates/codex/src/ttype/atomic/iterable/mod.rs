@@ -75,7 +75,7 @@ impl TIterable {
 }
 
 impl TType for TIterable {
-    fn get_child_nodes<'a>(&'a self) -> Vec<TypeRef<'a>> {
+    fn get_child_nodes(&self) -> Vec<TypeRef<'_>> {
         let mut children = vec![TypeRef::Union(&self.key_type), TypeRef::Union(&self.value_type)];
 
         if let Some(intersection_types) = &self.intersection_types {

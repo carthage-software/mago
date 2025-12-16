@@ -104,11 +104,20 @@ impl HasSpan for CallableTypeParameter<'_> {
     fn span(&self) -> Span {
         let start = match &self.parameter_type {
             Some(parameter_type) => parameter_type.span(),
-            None => self.equals.or(self.ellipsis).or(self.variable.as_ref().map(|v| v.span())).or(self.comma).unwrap(),
+            None => self
+                .equals
+                .or(self.ellipsis)
+                .or(self.variable.as_ref().map(mago_span::HasSpan::span))
+                .or(self.comma)
+                .unwrap(),
         };
 
-        let end =
-            self.comma.or(self.variable.as_ref().map(|v| v.span())).or(self.ellipsis).or(self.equals).unwrap_or(start);
+        let end = self
+            .comma
+            .or(self.variable.as_ref().map(mago_span::HasSpan::span))
+            .or(self.ellipsis)
+            .or(self.equals)
+            .unwrap_or(start);
 
         start.join(end)
     }

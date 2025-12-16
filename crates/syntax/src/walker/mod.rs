@@ -1375,10 +1375,10 @@ generate_ast_walker! {
             Expression::Literal(literal) => walker.walk_literal_expression(literal, context),
             Expression::CompositeString(string) => walker.walk_composite_string(string, context),
             Expression::Assignment(assignment) => {
-                walker.walk_assignment(assignment, context)
+                walker.walk_assignment(assignment, context);
             }
             Expression::Conditional(conditional) => {
-                walker.walk_conditional(conditional, context)
+                walker.walk_conditional(conditional, context);
             }
             Expression::Array(array) => walker.walk_array(array, context),
             Expression::LegacyArray(legacy_array) => walker.walk_legacy_array(legacy_array, context),
@@ -1386,7 +1386,7 @@ generate_ast_walker! {
             Expression::ArrayAccess(array_access) => walker.walk_array_access(array_access, context),
             Expression::ArrayAppend(array_append) => walker.walk_array_append(array_append, context),
             Expression::AnonymousClass(anonymous_class) => {
-                walker.walk_anonymous_class(anonymous_class, context)
+                walker.walk_anonymous_class(anonymous_class, context);
             }
             Expression::Closure(closure) => walker.walk_closure(closure, context),
             Expression::ArrowFunction(arrow_function) => walker.walk_arrow_function(arrow_function, context),
@@ -1447,7 +1447,7 @@ generate_ast_walker! {
     }
 
     'arena Parenthesized as parenthesized => {
-        walker.walk_expression(parenthesized.expression, context)
+        walker.walk_expression(parenthesized.expression, context);
     }
 
     'arena Literal as literal_expression => {
@@ -1516,9 +1516,9 @@ generate_ast_walker! {
             StringPart::Literal(literal) => walker.walk_literal_string_part(literal, context),
             StringPart::Expression(expression) => walker.walk_expression(expression, context),
             StringPart::BracedExpression(braced_expression_string_part) => {
-                walker.walk_braced_expression_string_part(braced_expression_string_part, context)
+                walker.walk_braced_expression_string_part(braced_expression_string_part, context);
             }
-        };
+        }
     }
 
     'arena LiteralStringPart as literal_string_part => {
@@ -1722,7 +1722,7 @@ generate_ast_walker! {
             Identifier::Local(local_identifier) => walker.walk_local_identifier(local_identifier, context),
             Identifier::Qualified(qualified_identifier) => walker.walk_qualified_identifier(qualified_identifier, context),
             Identifier::FullyQualified(fully_qualified_identifier) => walker.walk_fully_qualified_identifier(fully_qualified_identifier, context),
-        };
+        }
     }
 
     'arena LocalIdentifier as local_identifier => {

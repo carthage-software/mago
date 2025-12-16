@@ -299,19 +299,19 @@ mod tests {
     #[test]
     fn test_specificity_calculation_exact_file() {
         let spec = DatabaseLoader::calculate_pattern_specificity("src/b.php");
-        assert!(spec >= 2000, "Exact file should have high specificity, got {}", spec);
+        assert!(spec >= 2000, "Exact file should have high specificity, got {spec}");
     }
 
     #[test]
     fn test_specificity_calculation_directory() {
         let spec = DatabaseLoader::calculate_pattern_specificity("src/");
-        assert!((100..1000).contains(&spec), "Directory should have moderate specificity, got {}", spec);
+        assert!((100..1000).contains(&spec), "Directory should have moderate specificity, got {spec}");
     }
 
     #[test]
     fn test_specificity_calculation_glob() {
         let spec = DatabaseLoader::calculate_pattern_specificity("src/*.php");
-        assert!(spec < 100, "Glob pattern should have low specificity, got {}", spec);
+        assert!(spec < 100, "Glob pattern should have low specificity, got {spec}");
     }
 
     #[test]

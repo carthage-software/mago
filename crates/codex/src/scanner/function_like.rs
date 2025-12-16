@@ -567,7 +567,7 @@ fn scan_function_like_docblock<'ctx, 'arena>(
                     .with_note(typing_error.note())
                     .with_help(typing_error.help()),
             ),
-        };
+        }
     }
 
     for thrown in docblock.throws {

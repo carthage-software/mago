@@ -251,8 +251,7 @@ pub fn validate_method_signature_compatibility(
 const fn is_visibility_narrowed(child_visibility: Visibility, parent_visibility: Visibility) -> bool {
     matches!(
         (parent_visibility, child_visibility),
-        (Visibility::Public, Visibility::Protected)
-            | (Visibility::Public, Visibility::Private)
+        (Visibility::Public, Visibility::Protected | Visibility::Private)
             | (Visibility::Protected, Visibility::Private)
     )
 }

@@ -270,7 +270,7 @@ pub fn analyze_arithmetic_operation<'ctx, 'arena>(
                     ),
                 );
 
-                if !pair_result_atomics.iter().any(|a| a.is_mixed()) {
+                if !pair_result_atomics.iter().any(mago_codex::ttype::atomic::TAtomic::is_mixed) {
                     pair_result_atomics.push(TAtomic::Mixed(TMixed::new()));
                 }
                 if !left_atomic.is_mixed() {
@@ -457,14 +457,14 @@ pub fn analyze_arithmetic_operation<'ctx, 'arena>(
         );
     }
 
-    let final_type = if !result_atomic_types.is_empty() {
-        TUnion::from_vec(combiner::combine(result_atomic_types, context.codebase, false))
-    } else {
+    let final_type = if result_atomic_types.is_empty() {
         // No valid pairs found, and potentially errors issued.
         // Psalm often defaults to mixed here if operands were invalid.
         // If errors were due to null/false operands handled initially, use the type set there.
         // Otherwise, default to mixed.
         get_mixed()
+    } else {
+        TUnion::from_vec(combiner::combine(result_atomic_types, context.codebase, false))
     };
 
     assign_arithmetic_type(artifacts, final_type, binary);
@@ -473,11 +473,7 @@ pub fn analyze_arithmetic_operation<'ctx, 'arena>(
 }
 
 #[inline]
-fn is_arithmetic_compatible_generic<'ctx, 'arena>(
-    context: &Context<'ctx, 'arena>,
-    union: &TUnion,
-    other_union: &TUnion,
-) -> bool {
+fn is_arithmetic_compatible_generic(context: &Context<'_, '_>, union: &TUnion, other_union: &TUnion) -> bool {
     if !union.is_single() {
         return false;
     }
@@ -504,20 +500,11 @@ fn is_arithmetic_compatible_generic<'ctx, 'arena>(
 }
 
 #[inline]
-pub fn assign_arithmetic_type<'ast, 'arena>(
-    artifacts: &mut AnalysisArtifacts,
-    cond_type: TUnion,
-    binary: &'ast Binary<'arena>,
-) {
+pub fn assign_arithmetic_type(artifacts: &mut AnalysisArtifacts, cond_type: TUnion, binary: &Binary<'_>) {
     artifacts.set_expression_type(binary, cond_type);
 }
 
-fn determine_numeric_result<'ast, 'arena>(
-    op: &'ast BinaryOperator<'arena>,
-    left: &TAtomic,
-    right: &TAtomic,
-    in_loop: bool,
-) -> Vec<TAtomic> {
+fn determine_numeric_result(op: &BinaryOperator<'_>, left: &TAtomic, right: &TAtomic, in_loop: bool) -> Vec<TAtomic> {
     if in_loop
         && (matches!(left, TAtomic::Scalar(TScalar::Integer(_)))
             || matches!(right, TAtomic::Scalar(TScalar::Integer(_))))
@@ -571,12 +558,9 @@ fn determine_numeric_result<'ast, 'arena>(
     }
 }
 
-fn calculate_int_arithmetic<'ast, 'arena>(
-    op: &'ast BinaryOperator<'arena>,
-    left: TInteger,
-    right: TInteger,
-) -> Option<TInteger> {
-    use TInteger::*;
+fn calculate_int_arithmetic(op: &BinaryOperator<'_>, left: TInteger, right: TInteger) -> Option<TInteger> {
+    use TInteger::Literal;
+    use TInteger::Unspecified;
 
     let result = match op {
         BinaryOperator::Addition(_) => left + right,
@@ -604,9 +588,7 @@ fn calculate_int_arithmetic<'ast, 'arena>(
                     Unspecified
                 } else {
                     match r_val.try_into() {
-                        Ok(exponent_u32) => {
-                            l_val.checked_pow(exponent_u32).map(TInteger::Literal).unwrap_or(Unspecified)
-                        }
+                        Ok(exponent_u32) => l_val.checked_pow(exponent_u32).map_or(Unspecified, TInteger::Literal),
                         Err(_) => Unspecified,
                     }
                 }

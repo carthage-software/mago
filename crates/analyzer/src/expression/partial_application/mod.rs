@@ -76,12 +76,12 @@ fn find_parameter_index_by_name(
 ///
 /// # Returns
 ///
-/// A TAtomic::Callable containing the new closure signature with only placeholder parameters
+/// A `TAtomic::Callable` containing the new closure signature with only placeholder parameters
 /// and all template types replaced with their inferred concrete types
-fn create_closure_from_partial_application<'a>(
+fn create_closure_from_partial_application(
     callable_signature: TCallableSignature,
     argument_list: &PartialArgumentList<'_>,
-    original_parameters: &[InvocationTargetParameter<'a>],
+    original_parameters: &[InvocationTargetParameter<'_>],
     template_result: &TemplateResult,
     codebase: &CodebaseMetadata,
 ) -> TAtomic {

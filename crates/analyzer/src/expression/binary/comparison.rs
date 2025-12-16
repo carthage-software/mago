@@ -150,7 +150,9 @@ pub fn analyze_comparison_operation<'ctx, 'arena>(
         }
     }
 
-    let result_type = if !reported_general_invalid_operand {
+    let result_type = if reported_general_invalid_operand {
+        get_bool()
+    } else {
         match binary.operator {
             BinaryOperator::LessThan(_) => {
                 if is_always_less_than(lhs_type, rhs_type) {
@@ -337,8 +339,6 @@ pub fn analyze_comparison_operation<'ctx, 'arena>(
             }
             _ => get_bool(),
         }
-    } else {
-        get_bool()
     };
 
     artifacts.expression_types.insert(get_expression_range(binary), Rc::new(result_type));
@@ -347,7 +347,7 @@ pub fn analyze_comparison_operation<'ctx, 'arena>(
 }
 
 /// Attempts to extract a boolean literal from an expression, looking through parentheses.
-fn get_boolean_literal<'ast, 'arena>(expr: &'ast Expression<'arena>) -> Option<bool> {
+fn get_boolean_literal(expr: &Expression<'_>) -> Option<bool> {
     match expr {
         Expression::Literal(Literal::True(_)) => Some(true),
         Expression::Literal(Literal::False(_)) => Some(false),
@@ -357,16 +357,13 @@ fn get_boolean_literal<'ast, 'arena>(expr: &'ast Expression<'arena>) -> Option<b
 }
 
 /// Checks if an expression involves a static variable.
-fn involves_static_variable<'ctx, 'ast, 'arena>(
-    expr: &'ast Expression<'arena>,
-    block_context: &BlockContext<'ctx>,
-) -> bool {
+fn involves_static_variable(expr: &Expression<'_>, block_context: &BlockContext<'_>) -> bool {
     matches!(unwrap_expression(expr), Expression::Variable(Variable::Direct(var)) if block_context.static_locals.contains(&mago_atom::atom(var.name)))
 }
 
 /// Checks a single operand of a comparison operation for problematic types.
-fn check_comparison_operand<'ctx, 'ast, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+fn check_comparison_operand<'ast, 'arena>(
+    context: &mut Context<'_, 'arena>,
     operand: &'ast Expression<'arena>,
     operand_type: &TUnion,
     side: &'static str,
@@ -436,10 +433,10 @@ fn check_comparison_operand<'ctx, 'ast, 'arena>(
 }
 
 /// Helper to report redundant comparison issues.
-fn report_redundant_comparison<'ctx, 'ast, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+fn report_redundant_comparison<'arena>(
+    context: &mut Context<'_, 'arena>,
     artifacts: &mut AnalysisArtifacts,
-    binary: &'ast Binary<'arena>,
+    binary: &Binary<'arena>,
     comparison_description: &str,
     result_value_str: &str,
 ) {

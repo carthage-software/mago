@@ -51,22 +51,22 @@ impl LintRule for NoRedundantWriteVisibilityRule {
             description: indoc! {"
                 Detects redundant write visibility modifiers on properties.
                 "},
-            good_example: indoc! {r#"
+            good_example: indoc! {r"
                 <?php
 
                 final class User
                 {
                     public $name;
                 }
-            "#},
-            bad_example: indoc! {r#"
+            "},
+            bad_example: indoc! {r"
                 <?php
 
                 final class User
                 {
                     public public(set) $name;
                 }
-            "#},
+            "},
             category: Category::Redundancy,
 
             requirements: RuleRequirements::None,
@@ -85,7 +85,7 @@ impl LintRule for NoRedundantWriteVisibilityRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let Node::Property(property) = node else {
             return;
         };

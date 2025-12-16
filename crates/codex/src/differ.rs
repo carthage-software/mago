@@ -18,7 +18,7 @@ use crate::signature::FileSignature;
 ///
 /// # Arguments
 ///
-/// * `file_id` - The identifier of the file being compared (used for diff_map)
+/// * `file_id` - The identifier of the file being compared (used for `diff_map`)
 /// * `old_signature` - The previous file signature (None if this is a new file)
 /// * `new_signature` - The current file signature
 ///
@@ -81,7 +81,7 @@ fn mark_all_as_changed(signature: &FileSignature) -> CodebaseDiff {
 /// Adapted from Hakana's implementation, but uses a single fingerprint hash per symbol
 /// instead of separate signature/body hashes. Any hash change triggers re-analysis.
 ///
-/// See: https://github.com/slackhq/hakana/blob/35890f99ded7897e4203a896fd1636bda300bad6/src/orchestrator/ast_differ.rs#L10-L13
+/// See: <https://github.com/slackhq/hakana/blob/35890f99ded7897e4203a896fd1636bda300bad6/src/orchestrator/ast_differ.rs#L10-L13>
 ///
 /// # Arguments
 ///
@@ -134,11 +134,11 @@ fn myers_diff(file_id: FileId, old_signature: &FileSignature, new_signature: &Fi
                     match class_diff_elem {
                         AstDiffElem::Keep(a_child, b_child) => {
                             // Check if the child's hash changed
-                            if a_child.hash != b_child.hash {
+                            if a_child.hash == b_child.hash {
+                                keep.insert((a.name, a_child.name));
+                            } else {
                                 has_child_change = true;
                                 changed.insert((a.name, a_child.name));
-                            } else {
-                                keep.insert((a.name, a_child.name));
                             }
 
                             // Track position changes for issue mapping
@@ -216,7 +216,7 @@ fn myers_diff(file_id: FileId, old_signature: &FileSignature, new_signature: &Fi
 
 /// Type alias for the Myers diff trace structure.
 ///
-/// - Vec<HashMap<isize, usize>>: The trace of the search path
+/// - Vec<`HashMap`<isize, usize>>: The trace of the search path
 /// - usize: Final position in the old sequence
 /// - usize: Final position in the new sequence
 type DiffTrace = (Vec<HashMap<isize, usize>>, usize, usize);
@@ -224,8 +224,8 @@ type DiffTrace = (Vec<HashMap<isize, usize>>, usize, usize);
 /// Implements the Myers diff algorithm.
 ///
 /// Borrows from:
-/// - https://github.com/nikic/PHP-Parser/blob/master/lib/PhpParser/Internal/Differ.php
-/// - https://github.com/slackhq/hakana/blob/35890f99ded7897e4203a896fd1636bda300bad6/src/orchestrator/ast_differ.rs#L151-L159
+/// - <https://github.com/nikic/PHP-Parser/blob/master/lib/PhpParser/Internal/Differ.php>
+/// - <https://github.com/slackhq/hakana/blob/35890f99ded7897e4203a896fd1636bda300bad6/src/orchestrator/ast_differ.rs#L151-L159>
 ///
 /// Myers, Eugene W. "An O(ND) difference algorithm and its variations."
 /// Algorithmica 1.1 (1986): 251-266.
@@ -272,11 +272,11 @@ fn calculate_trace(a_nodes: &[DefSignatureNode], b_nodes: &[DefSignatureNode]) -
     Err("Myers diff algorithm failed to converge")
 }
 
-/// Checks if two DefSignatureNode instances can be matched for diffing.
+/// Checks if two `DefSignatureNode` instances can be matched for diffing.
 ///
 /// Two nodes are considered matchable if they have the same:
 /// - name
-/// - is_function flag
+/// - `is_function` flag
 ///
 /// We don't check hash here because we want to match nodes even if their
 /// content changed. The hash difference will be detected later to determine

@@ -54,7 +54,7 @@ impl LintRule for NoUnsafeFinallyRule {
                 Control flow statements in `finally` blocks override control flows from `try` and `catch` blocks,
                 leading to unexpected behavior.
             "},
-            good_example: indoc! {r#"
+            good_example: indoc! {r"
                 <?php
 
                 function example(): int {
@@ -64,8 +64,8 @@ impl LintRule for NoUnsafeFinallyRule {
                         // no control flow statements
                     }
                 }
-            "#},
-            bad_example: indoc! {r#"
+            "},
+            bad_example: indoc! {r"
                 <?php
 
                 function example(): int {
@@ -75,7 +75,7 @@ impl LintRule for NoUnsafeFinallyRule {
                         return 42; // Unsafe control flow statement in finally block
                     }
                 }
-            "#},
+            "},
             category: Category::Safety,
 
             requirements: RuleRequirements::None,
@@ -94,7 +94,7 @@ impl LintRule for NoUnsafeFinallyRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let Node::Try(r#try) = node else {
             return;
         };
@@ -115,7 +115,7 @@ impl LintRule for NoUnsafeFinallyRule {
                 .with_code(self.meta.code)
                 .with_annotation(
                     Annotation::primary(control_flow.span())
-                        .with_message(format!("Control flow statement `{}` in `finally` block.", kind)),
+                        .with_message(format!("Control flow statement `{kind}` in `finally` block.")),
                 )
                 .with_annotation(
                     Annotation::secondary(r#try.span())

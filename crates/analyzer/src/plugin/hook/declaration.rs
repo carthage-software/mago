@@ -15,9 +15,9 @@ use crate::plugin::provider::Provider;
 /// and modify analysis state.
 pub trait ClassDeclarationHook: Provider {
     /// Called when entering a class declaration.
-    fn on_enter_class<'ast, 'arena>(
+    fn on_enter_class(
         &self,
-        _class: &'ast Class<'arena>,
+        _class: &Class<'_>,
         _metadata: &ClassLikeMetadata,
         _context: &mut HookContext<'_, '_>,
     ) -> HookResult<()> {
@@ -25,9 +25,9 @@ pub trait ClassDeclarationHook: Provider {
     }
 
     /// Called when leaving a class declaration.
-    fn on_leave_class<'ast, 'arena>(
+    fn on_leave_class(
         &self,
-        _class: &'ast Class<'arena>,
+        _class: &Class<'_>,
         _metadata: &ClassLikeMetadata,
         _context: &mut HookContext<'_, '_>,
     ) -> HookResult<()> {
@@ -38,9 +38,9 @@ pub trait ClassDeclarationHook: Provider {
 /// Hook trait for intercepting interface declaration analysis.
 pub trait InterfaceDeclarationHook: Provider {
     /// Called when entering an interface declaration.
-    fn on_enter_interface<'ast, 'arena>(
+    fn on_enter_interface(
         &self,
-        _interface: &'ast Interface<'arena>,
+        _interface: &Interface<'_>,
         _metadata: &ClassLikeMetadata,
         _context: &mut HookContext<'_, '_>,
     ) -> HookResult<()> {
@@ -48,9 +48,9 @@ pub trait InterfaceDeclarationHook: Provider {
     }
 
     /// Called when leaving an interface declaration.
-    fn on_leave_interface<'ast, 'arena>(
+    fn on_leave_interface(
         &self,
-        _interface: &'ast Interface<'arena>,
+        _interface: &Interface<'_>,
         _metadata: &ClassLikeMetadata,
         _context: &mut HookContext<'_, '_>,
     ) -> HookResult<()> {
@@ -61,9 +61,9 @@ pub trait InterfaceDeclarationHook: Provider {
 /// Hook trait for intercepting trait declaration analysis.
 pub trait TraitDeclarationHook: Provider {
     /// Called when entering a trait declaration.
-    fn on_enter_trait<'ast, 'arena>(
+    fn on_enter_trait(
         &self,
-        _trait_: &'ast Trait<'arena>,
+        _trait_: &Trait<'_>,
         _metadata: &ClassLikeMetadata,
         _context: &mut HookContext<'_, '_>,
     ) -> HookResult<()> {
@@ -71,9 +71,9 @@ pub trait TraitDeclarationHook: Provider {
     }
 
     /// Called when leaving a trait declaration.
-    fn on_leave_trait<'ast, 'arena>(
+    fn on_leave_trait(
         &self,
-        _trait_: &'ast Trait<'arena>,
+        _trait_: &Trait<'_>,
         _metadata: &ClassLikeMetadata,
         _context: &mut HookContext<'_, '_>,
     ) -> HookResult<()> {
@@ -84,9 +84,9 @@ pub trait TraitDeclarationHook: Provider {
 /// Hook trait for intercepting enum declaration analysis.
 pub trait EnumDeclarationHook: Provider {
     /// Called when entering an enum declaration.
-    fn on_enter_enum<'ast, 'arena>(
+    fn on_enter_enum(
         &self,
-        _enum_: &'ast Enum<'arena>,
+        _enum_: &Enum<'_>,
         _metadata: &ClassLikeMetadata,
         _context: &mut HookContext<'_, '_>,
     ) -> HookResult<()> {
@@ -94,9 +94,9 @@ pub trait EnumDeclarationHook: Provider {
     }
 
     /// Called when leaving an enum declaration.
-    fn on_leave_enum<'ast, 'arena>(
+    fn on_leave_enum(
         &self,
-        _enum_: &'ast Enum<'arena>,
+        _enum_: &Enum<'_>,
         _metadata: &ClassLikeMetadata,
         _context: &mut HookContext<'_, '_>,
     ) -> HookResult<()> {
@@ -111,9 +111,9 @@ pub trait EnumDeclarationHook: Provider {
 /// and modify analysis state.
 pub trait FunctionDeclarationHook: Provider {
     /// Called when entering a function declaration.
-    fn on_enter_function<'ast, 'arena>(
+    fn on_enter_function(
         &self,
-        _function: &'ast Function<'arena>,
+        _function: &Function<'_>,
         _metadata: &FunctionLikeMetadata,
         _context: &mut HookContext<'_, '_>,
     ) -> HookResult<()> {
@@ -121,9 +121,9 @@ pub trait FunctionDeclarationHook: Provider {
     }
 
     /// Called when leaving a function declaration.
-    fn on_leave_function<'ast, 'arena>(
+    fn on_leave_function(
         &self,
-        _function: &'ast Function<'arena>,
+        _function: &Function<'_>,
         _metadata: &FunctionLikeMetadata,
         _context: &mut HookContext<'_, '_>,
     ) -> HookResult<()> {

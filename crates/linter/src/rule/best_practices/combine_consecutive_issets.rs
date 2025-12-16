@@ -49,27 +49,27 @@ impl LintRule for CombineConsecutiveIssetsRule {
         const META: RuleMeta = RuleMeta {
             name: "Combine Consecutive Issets",
             code: "combine-consecutive-issets",
-            description: indoc! {r#"
+            description: indoc! {r"
                 Suggests combining consecutive calls to `isset()` when they are joined by a logical AND.
 
                 For example, `isset($a) && isset($b)` can be turned into `isset($a, $b)`, which is more concise
                 and avoids repeated function calls. If one or both `isset()` calls are wrapped in parentheses,
                 the rule will still warn, but it will not attempt an automated fix.
-            "#},
-            good_example: indoc! {r#"
+            "},
+            good_example: indoc! {r"
                 <?php
 
                 if (isset($a, $b)) {
                     // ...
                 }
-            "#},
-            bad_example: indoc! {r#"
+            "},
+            bad_example: indoc! {r"
                 <?php
 
                 if (isset($a) && isset($b)) {
                     // ...
                 }
-            "#},
+            "},
             category: Category::BestPractices,
 
             requirements: RuleRequirements::None,
@@ -87,7 +87,7 @@ impl LintRule for CombineConsecutiveIssetsRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let Node::Binary(binary) = node else {
             return;
         };

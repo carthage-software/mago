@@ -55,7 +55,7 @@ impl LintRule for ConstantNameRule {
 
                 Constant names should be in constant case, also known as UPPER_SNAKE_CASE.
             "},
-            good_example: indoc! {r#"
+            good_example: indoc! {r"
                 <?php
 
                 const MY_CONSTANT = 42;
@@ -63,8 +63,8 @@ impl LintRule for ConstantNameRule {
                 class MyClass {
                     public const int MY_CONSTANT = 42;
                 }
-            "#},
-            bad_example: indoc! {r#"
+            "},
+            bad_example: indoc! {r"
                 <?php
 
                 const myConstant = 42;
@@ -76,7 +76,7 @@ impl LintRule for ConstantNameRule {
                     public const int my_constant = 42;
                     public const int My_Constant = 42;
                 }
-            "#},
+            "},
             category: Category::Consistency,
 
             requirements: RuleRequirements::None,
@@ -95,30 +95,26 @@ impl LintRule for ConstantNameRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         match node {
             Node::Constant(constant) => {
                 for item in constant.items.iter() {
                     let name = item.name.value;
                     if !is_constant_case(name) {
                         ctx.collector.report(
-                            Issue::new(
-                                self.cfg.level(),
-                                format!("Constant name `{}` should be in constant case.", name),
-                            )
-                            .with_code(self.meta.code)
-                            .with_annotation(
-                                Annotation::primary(item.name.span())
-                                    .with_message(format!("Constant item `{}` is declared here", name)),
-                            )
-                            .with_note(format!(
-                                "The constant name `{}` does not follow constant naming convention.",
-                                name
-                            ))
-                            .with_help(format!(
-                                "Consider renaming it to `{}` to adhere to the naming convention.",
-                                to_constant_case(name)
-                            )),
+                            Issue::new(self.cfg.level(), format!("Constant name `{name}` should be in constant case."))
+                                .with_code(self.meta.code)
+                                .with_annotation(
+                                    Annotation::primary(item.name.span())
+                                        .with_message(format!("Constant item `{name}` is declared here")),
+                                )
+                                .with_note(format!(
+                                    "The constant name `{name}` does not follow constant naming convention."
+                                ))
+                                .with_help(format!(
+                                    "Consider renaming it to `{}` to adhere to the naming convention.",
+                                    to_constant_case(name)
+                                )),
                         );
                     }
                 }
@@ -129,23 +125,19 @@ impl LintRule for ConstantNameRule {
 
                     if !is_constant_case(name) {
                         ctx.collector.report(
-                            Issue::new(
-                                self.cfg.level(),
-                                format!("Constant name `{}` should be in constant case.", name),
-                            )
-                            .with_code(self.meta.code)
-                            .with_annotation(
-                                Annotation::primary(item.name.span())
-                                    .with_message(format!("Constant item `{}` is declared here", name)),
-                            )
-                            .with_note(format!(
-                                "The constant name `{}` does not follow constant naming convention.",
-                                name
-                            ))
-                            .with_help(format!(
-                                "Consider renaming it to `{}` to adhere to the naming convention.",
-                                to_constant_case(name)
-                            )),
+                            Issue::new(self.cfg.level(), format!("Constant name `{name}` should be in constant case."))
+                                .with_code(self.meta.code)
+                                .with_annotation(
+                                    Annotation::primary(item.name.span())
+                                        .with_message(format!("Constant item `{name}` is declared here")),
+                                )
+                                .with_note(format!(
+                                    "The constant name `{name}` does not follow constant naming convention."
+                                ))
+                                .with_help(format!(
+                                    "Consider renaming it to `{}` to adhere to the naming convention.",
+                                    to_constant_case(name)
+                                )),
                         );
                     }
                 }

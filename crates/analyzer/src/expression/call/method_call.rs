@@ -165,7 +165,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for NullSafeMethodCall<'arena> {
 ///
 /// A `Result` containing the `TUnion` type of the method's return value. If the method
 /// is not visible, it returns the `never` type.
-pub fn analyze_implicit_method_call<'ctx, 'ast, 'arena>(
+pub fn analyze_implicit_method_call<'ctx, 'arena>(
     context: &mut Context<'ctx, 'arena>,
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
@@ -174,7 +174,7 @@ pub fn analyze_implicit_method_call<'ctx, 'ast, 'arena>(
     method_identifier: MethodIdentifier,
     class_like_metadata: &'ctx ClassLikeMetadata,
     method_metadata: &'ctx FunctionLikeMetadata,
-    arguments_source: Option<InvocationArgumentsSource<'ast, 'arena>>,
+    arguments_source: Option<InvocationArgumentsSource<'_, 'arena>>,
     span: Span,
 ) -> Result<TUnion, AnalysisError> {
     if !check_method_visibility(
@@ -484,7 +484,7 @@ mod tests {
 
     test_analysis! {
         name = method_call_on_undefined_variable,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             declare(strict_types=1);
@@ -493,7 +493,7 @@ mod tests {
             {
                 $mixed->someMethod();
             }
-        "#},
+        "},
         issues = [
             IssueCode::UndefinedVariable,
             IssueCode::MixedMethodAccess
@@ -502,7 +502,7 @@ mod tests {
 
     test_analysis! {
         name = method_call_on_non_object,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             declare(strict_types=1);
@@ -512,7 +512,7 @@ mod tests {
                 $non_object = 42;
                 $non_object->someMethod();
             }
-        "#},
+        "},
         issues = [
             IssueCode::InvalidMethodAccess
         ]
@@ -520,7 +520,7 @@ mod tests {
 
     test_analysis! {
         name = method_call_on_generic_parameter,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             class A
@@ -548,12 +548,12 @@ mod tests {
             {
                 return $object->getString();
             }
-        "#},
+        "},
     }
 
     test_analysis! {
         name = ambiguous_object_method_call,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             declare(strict_types=1);
@@ -562,7 +562,7 @@ mod tests {
             {
                 $obj->someMethod();
             }
-        "#},
+        "},
         issues = [
             IssueCode::AmbiguousObjectMethodAccess
         ]
@@ -570,7 +570,7 @@ mod tests {
 
     test_analysis! {
         name = template_resolution,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             /**
@@ -594,12 +594,12 @@ mod tests {
             {
                 return $type->assert($value);
             }
-        "#},
+        "},
     }
 
     test_analysis! {
         name = intersection_read_write_calls,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             interface ReadHandle {
@@ -625,12 +625,12 @@ mod tests {
                 }
                 return $result;
             }
-        "#},
+        "},
     }
 
     test_analysis! {
         name = intersection_template_resolution,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             interface MockObject
@@ -678,7 +678,7 @@ mod tests {
                     $this->service = $this->createMockTwo(ServiceInterface::class);
                 }
             }
-        "#},
+        "},
     }
 
     test_analysis! {
@@ -711,7 +711,7 @@ mod tests {
 
     test_analysis! {
         name = calling_method_on_parent_class,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             /**
@@ -763,7 +763,7 @@ mod tests {
                     return $this->filings->getValues();
                 }
             }
-        "#},
+        "},
         issues = [
             // ReadableCollection: TKey not used in interface body
             IssueCode::UnusedTemplateParameter,
@@ -772,7 +772,7 @@ mod tests {
 
     test_analysis! {
         name = where_constraints,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             interface Stringable
@@ -873,12 +873,12 @@ mod tests {
 
             take_string($g->value); // OK
             take_int($h->value); // OK
-        "#},
+        "},
     }
 
     test_analysis! {
         name = where_constraints_violation,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             /**
@@ -904,7 +904,7 @@ mod tests {
 
             $a = new Box(['foo', 123]);
             $a->toString(); // violation of @where constraint
-        "#},
+        "},
         issues = [
             IssueCode::WhereConstraintViolation
         ]

@@ -11,7 +11,7 @@ use mago_syntax::walker::MutWalker;
 use crate::signature::DefSignatureNode;
 use crate::signature::FileSignature;
 
-/// Builds a FileSignature from a Program AST using the walker pattern.
+/// Builds a `FileSignature` from a Program AST using the walker pattern.
 ///
 /// # Arguments
 ///
@@ -21,7 +21,7 @@ use crate::signature::FileSignature;
 ///
 /// # Returns
 ///
-/// A FileSignature containing all top-level definitions with their hashes and positions.
+/// A `FileSignature` containing all top-level definitions with their hashes and positions.
 pub fn build_file_signature<'arena>(
     file: &File,
     program: &'arena Program<'arena>,
@@ -89,7 +89,7 @@ impl<'file, 'arena> SignatureBuilder<'file, 'arena> {
     }
 }
 
-impl<'ast, 'file, 'arena> MutWalker<'ast, 'arena, ()> for SignatureBuilder<'file, 'arena> {
+impl<'ast, 'arena> MutWalker<'ast, 'arena, ()> for SignatureBuilder<'_, 'arena> {
     fn walk_in_class(&mut self, class: &'ast Class<'arena>, _context: &mut ()) {
         let span = class.span();
         let name = self.resolved_names.get(&class.name);

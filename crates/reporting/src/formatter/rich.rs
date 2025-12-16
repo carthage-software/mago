@@ -185,7 +185,7 @@ impl<'a> Files<'a> for DatabaseFiles<'_> {
 
 fn codespan_line_start(lines: &[u32], size: u32, line_index: usize) -> Result<usize, Error> {
     match line_index.cmp(&lines.len()) {
-        Ordering::Less => Ok(lines.get(line_index).cloned().expect("failed despite previous check") as usize),
+        Ordering::Less => Ok(lines.get(line_index).copied().expect("failed despite previous check") as usize),
         Ordering::Equal => Ok(size as usize),
         Ordering::Greater => Err(Error::LineTooLarge { given: line_index, max: lines.len() - 1 }),
     }

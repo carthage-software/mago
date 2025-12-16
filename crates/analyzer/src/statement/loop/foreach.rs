@@ -114,7 +114,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Foreach<'arena> {
 
         if is_by_reference && let Expression::Variable(Variable::Direct(direct_variable)) = value_expression {
             loop_block_context.references_to_external_scope.remove(&Atom::from(direct_variable.name));
-        };
+        }
 
         let assigned = assign_to_expression(
             context,
@@ -144,7 +144,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Foreach<'arena> {
 
         if is_by_reference && let Expression::Variable(Variable::Direct(direct_variable)) = value_expression {
             loop_block_context.references_to_external_scope.insert(Atom::from(direct_variable.name));
-        };
+        }
 
         let loop_scope = LoopScope::new(self.span(), block_context.locals.clone(), None);
 
@@ -184,7 +184,7 @@ mod tests {
 
     test_analysis! {
         name = foreach_basic,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             namespace X;
@@ -322,7 +322,7 @@ mod tests {
 
                 return $max;
             }
-        "#}
+        "}
     }
 
     test_analysis! {

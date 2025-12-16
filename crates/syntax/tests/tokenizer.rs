@@ -301,7 +301,7 @@ fn test_unterminated_multiple_comment() {
     let expected = vec![TokenKind::OpenTag, TokenKind::Whitespace];
 
     match test_lexer(code, expected) {
-        Ok(_) => panic!("expected error"),
+        Ok(()) => panic!("expected error"),
         Err(SyntaxError::UnexpectedEndOfFile(_, position)) => {
             assert_eq!(position.offset, 14);
         }
@@ -315,7 +315,7 @@ fn test_unterminated_docblock_comment() {
     let expected = vec![TokenKind::OpenTag, TokenKind::Whitespace];
 
     match test_lexer(code, expected) {
-        Ok(_) => panic!("expected error"),
+        Ok(()) => panic!("expected error"),
         Err(SyntaxError::UnexpectedEndOfFile(_, position)) => {
             assert_eq!(position.offset, 15);
         }
@@ -414,7 +414,7 @@ fn test_single_line_comments() -> Result<(), SyntaxError> {
 fn test_keywords() -> Result<(), SyntaxError> {
     let mut code: Vec<u8> = vec![b'<', b'?', b'p', b'h', b'p', b' '];
     let mut expected = vec![TokenKind::OpenTag, TokenKind::Whitespace];
-    for (value, kind) in KEYWORD_TYPES.iter() {
+    for (value, kind) in &KEYWORD_TYPES {
         code.extend(value.to_vec());
         code.extend(b" ");
 
@@ -895,7 +895,7 @@ fn test_double_quote_string() -> Result<(), SyntaxError> {
 
 #[test]
 fn test_escape() -> Result<(), SyntaxError> {
-    let code = r##"<?= "\033]8;;{$attr['href']}\033\\{$value}\033]8;;\033\\" . FOO;"##;
+    let code = r#"<?= "\033]8;;{$attr['href']}\033\\{$value}\033]8;;\033\\" . FOO;"#;
 
     let expected = vec![
         TokenKind::EchoTag,
@@ -928,7 +928,7 @@ fn test_escape() -> Result<(), SyntaxError> {
 
 #[test]
 fn test_sep_literal_num() -> Result<(), SyntaxError> {
-    let code = r##"<?= 1_200;"##;
+    let code = r"<?= 1_200;";
 
     let expected = vec![TokenKind::EchoTag, TokenKind::Whitespace, TokenKind::LiteralInteger, TokenKind::Semicolon];
 
@@ -939,7 +939,7 @@ fn test_sep_literal_num() -> Result<(), SyntaxError> {
 
 #[test]
 fn test_escape_in_string() -> Result<(), SyntaxError> {
-    let code = r##"<?= "$foo->bar\nvar";"##;
+    let code = r#"<?= "$foo->bar\nvar";"#;
 
     let expected = vec![
         TokenKind::EchoTag,
@@ -961,7 +961,7 @@ fn test_escape_in_string() -> Result<(), SyntaxError> {
 
 #[test]
 fn test_dynamic_array_key_in_string_interpolation() -> Result<(), SyntaxError> {
-    let code = r##"<?= "{$a["foo_$n"]}";"##;
+    let code = r#"<?= "{$a["foo_$n"]}";"#;
     let expected = vec![
         TokenKind::EchoTag,
         TokenKind::Whitespace,
@@ -987,7 +987,7 @@ fn test_dynamic_array_key_in_string_interpolation() -> Result<(), SyntaxError> {
 
 #[test]
 fn test_braced_dynamic_array_key_in_string_interpolation() -> Result<(), SyntaxError> {
-    let code = r##"<?= "{$a["foo_{$n}"]}";"##;
+    let code = r#"<?= "{$a["foo_{$n}"]}";"#;
     let expected = vec![
         TokenKind::EchoTag,
         TokenKind::Whitespace,
@@ -1015,7 +1015,7 @@ fn test_braced_dynamic_array_key_in_string_interpolation() -> Result<(), SyntaxE
 
 #[test]
 fn test_braced_string_interpolation() -> Result<(), SyntaxError> {
-    let code = r##"<?= "a {$a} b";"##;
+    let code = r#"<?= "a {$a} b";"#;
     let expected = vec![
         TokenKind::EchoTag,
         TokenKind::Whitespace,
@@ -1036,7 +1036,7 @@ fn test_braced_string_interpolation() -> Result<(), SyntaxError> {
 
 #[test]
 fn test_use_fully_qualified() -> Result<(), SyntaxError> {
-    let code = r##"<?php use \Foo\{Bar,Baz};"##;
+    let code = r"<?php use \Foo\{Bar,Baz};";
     let expected = vec![
         TokenKind::OpenTag,
         TokenKind::Whitespace,
@@ -1083,7 +1083,7 @@ fn test_lexer(code: &[u8], expected_kinds: Vec<TokenKind>) -> Result<(), SyntaxE
     }
 
     let mut found = String::new();
-    for token in tokens.iter() {
+    for token in &tokens {
         let length = token.span.end.offset - token.span.start.offset;
         assert_eq!(length as usize, token.value.len());
 

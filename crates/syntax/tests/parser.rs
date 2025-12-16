@@ -14,7 +14,7 @@ mod runner {
 
         let (_program, error) = parse_file(&arena, &file);
         if let Some(parse_error) = error {
-            panic!("Test case '{}' failed to parse. Error: {}", name, parse_error);
+            panic!("Test case '{name}' failed to parse. Error: {parse_error}");
         }
     }
 
@@ -193,31 +193,30 @@ mod runner {
                     let expression_kind = Node::Expression(expr)
                         .children()
                         .first()
-                        .map(|t| t.kind().to_string())
-                        .unwrap_or_else(|| "<unknown>".to_string());
+                        .map_or_else(|| "<unknown>".to_string(), |t| t.kind().to_string());
 
-                    panic!("unsupported expression kind for formatting: {}", expression_kind);
+                    panic!("unsupported expression kind for formatting: {expression_kind}");
                 }
             }
         }
 
-        let code = format!("<?php {};", expression);
+        let code = format!("<?php {expression};");
         let arena = Bump::new();
         let file = File::ephemeral(Cow::Borrowed(name), Cow::Owned(code));
 
         let (program, error) = parse_file(&arena, &file);
         if let Some(parse_error) = error {
-            panic!("Test case '{}' failed to parse. Error: {}", name, parse_error);
+            panic!("Test case '{name}' failed to parse. Error: {parse_error}");
         }
 
         let statement = program.statements.get(1).expect("Expected an expression statement here");
         let Statement::Expression(expression) = statement else {
-            panic!("Expected an expression statement, found `{:#?}`", statement);
+            panic!("Expected an expression statement, found `{statement:#?}`");
         };
 
         let formatted_ast = format_expression(expression.expression);
 
-        assert_eq!(formatted_ast, expected, "Test case '{}' failed. Expression does not match expected output.", name);
+        assert_eq!(formatted_ast, expected, "Test case '{name}' failed. Expression does not match expected output.");
     }
 }
 

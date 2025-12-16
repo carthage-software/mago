@@ -35,8 +35,8 @@ pub fn str_is_numeric(input: &str) -> bool {
 
 /// Increments an alphanumeric string.
 ///
-/// Rust implementation based on PHP's str_increment function from php-src:
-/// https://github.com/php/php-src/blob/1de16c7f15f3f927bf7e7c26b3a6b1bd5803b1cc/ext/standard/string.c#L1227
+/// Rust implementation based on PHP's `str_increment` function from php-src:
+/// <https://github.com/php/php-src/blob/1de16c7f15f3f927bf7e7c26b3a6b1bd5803b1cc/ext/standard/string.c#L1227>
 ///
 /// # Arguments
 ///
@@ -111,8 +111,8 @@ pub fn str_increment(input: &str) -> Option<String> {
 
 /// Decrements an alphanumeric string.
 ///
-/// Rust implementation based on PHP's str_decrement function from php-src:
-/// https://github.com/php/php-src/blob/1de16c7f15f3f927bf7e7c26b3a6b1bd5803b1cc/ext/standard/string.c#L1283
+/// Rust implementation based on PHP's `str_decrement` function from php-src:
+/// <https://github.com/php/php-src/blob/1de16c7f15f3f927bf7e7c26b3a6b1bd5803b1cc/ext/standard/string.c#L1283>
 ///
 /// # Arguments
 ///

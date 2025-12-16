@@ -58,6 +58,11 @@ pub static GLOBAL_PROGRESS_MANAGER: LazyLock<MultiProgress> = LazyLock::new(Mult
 ///
 /// A fully configured [`ProgressBar`] ready to use. Call `inc(1)` to increment progress,
 /// and [`remove_progress_bar`] when done.
+///
+/// # Panics
+///
+/// Panics if the progress bar template string is invalid. This should never happen
+/// as templates are hardcoded constants.
 pub fn create_progress_bar(length: usize, prefix: &'static str, theme: ProgressBarTheme) -> ProgressBar {
     let pb = GLOBAL_PROGRESS_MANAGER.add(ProgressBar::new(length as u64));
     pb.set_style(

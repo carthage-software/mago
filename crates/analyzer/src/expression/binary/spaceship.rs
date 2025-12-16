@@ -117,9 +117,9 @@ pub fn analyze_spaceship_operation<'ctx, 'arena>(
     Ok(())
 }
 
-fn check_spaceship_operand<'ctx, 'ast, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
-    operand: &'ast Expression<'arena>,
+fn check_spaceship_operand<'arena>(
+    context: &mut Context<'_, 'arena>,
+    operand: &Expression<'arena>,
     operand_type: &TUnion,
     side: &'static str,
 ) -> Result<(), AnalysisError> {

@@ -55,7 +55,7 @@ impl LintRule for PreferStaticClosureRule {
 
                 Static closures don't bind `$this`, making them more memory-efficient and their intent clearer.
             "},
-            good_example: indoc! {r#"
+            good_example: indoc! {r"
                 <?php
 
                 class Foo {
@@ -72,8 +72,8 @@ impl LintRule for PreferStaticClosureRule {
                         };
                     }
                 }
-            "#},
-            bad_example: indoc! {r#"
+            "},
+            bad_example: indoc! {r"
                 <?php
 
                 class Foo {
@@ -87,7 +87,7 @@ impl LintRule for PreferStaticClosureRule {
                         };
                     }
                 }
-            "#},
+            "},
             category: Category::BestPractices,
             requirements: RuleRequirements::None,
         };
@@ -104,7 +104,7 @@ impl LintRule for PreferStaticClosureRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         // Must be inside a class to have $this available
         if ctx.scope.get_class_like_scope().is_none() {
             return;
@@ -145,11 +145,10 @@ impl LintRule for PreferStaticClosureRule {
 impl PreferStaticClosureRule {
     fn report_issue(&self, ctx: &mut LintContext, keyword_span: Span, kind: &str) {
         let issue =
-            Issue::new(self.cfg.level(), format!("This {} does not use `$this` and should be declared static.", kind))
+            Issue::new(self.cfg.level(), format!("This {kind} does not use `$this` and should be declared static."))
                 .with_code(self.meta.code)
                 .with_annotation(
-                    Annotation::primary(keyword_span)
-                        .with_message(format!("add `static` before this {} keyword", kind)),
+                    Annotation::primary(keyword_span).with_message(format!("add `static` before this {kind} keyword")),
                 )
                 .with_note("Static closures are more memory-efficient and make it clear that `$this` is not used.")
                 .with_help(format!(
@@ -165,7 +164,7 @@ impl PreferStaticClosureRule {
     }
 }
 
-fn contains_this_reference<'ast, 'arena>(node: Node<'ast, 'arena>) -> bool {
+fn contains_this_reference(node: Node<'_, '_>) -> bool {
     // Check current node
     if let Node::Expression(Expression::Variable(Variable::Direct(var))) = node
         && var.name == "$this"
@@ -206,7 +205,7 @@ mod tests {
     test_lint_success! {
         name = closure_uses_this_directly,
         rule = PreferStaticClosureRule,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             class Foo {
@@ -218,13 +217,13 @@ mod tests {
                     };
                 }
             }
-        "#}
+        "}
     }
 
     test_lint_success! {
         name = arrow_function_uses_this_directly,
         rule = PreferStaticClosureRule,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             class Foo {
@@ -234,13 +233,13 @@ mod tests {
                     $fn = fn() => $this->value;
                 }
             }
-        "#}
+        "}
     }
 
     test_lint_success! {
         name = nested_arrow_function_uses_this,
         rule = PreferStaticClosureRule,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             class Foo {
@@ -250,13 +249,13 @@ mod tests {
                     $fn = fn() => fn() => $this->value;
                 }
             }
-        "#}
+        "}
     }
 
     test_lint_success! {
         name = nested_closure_uses_this,
         rule = PreferStaticClosureRule,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             class Foo {
@@ -270,13 +269,13 @@ mod tests {
                     };
                 }
             }
-        "#}
+        "}
     }
 
     test_lint_success! {
         name = mixed_nested_closures_use_this,
         rule = PreferStaticClosureRule,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             class Foo {
@@ -294,13 +293,13 @@ mod tests {
                     };
                 }
             }
-        "#}
+        "}
     }
 
     test_lint_success! {
         name = deeply_nested_closures_use_this,
         rule = PreferStaticClosureRule,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             class Foo {
@@ -310,13 +309,13 @@ mod tests {
                     $fn = fn() => fn() => fn() => $this->value;
                 }
             }
-        "#}
+        "}
     }
 
     test_lint_success! {
         name = already_static_closure,
         rule = PreferStaticClosureRule,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             class Foo {
@@ -326,13 +325,13 @@ mod tests {
                     };
                 }
             }
-        "#}
+        "}
     }
 
     test_lint_success! {
         name = already_static_arrow_function,
         rule = PreferStaticClosureRule,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             class Foo {
@@ -340,25 +339,25 @@ mod tests {
                     $fn = static fn($x) => $x * 2;
                 }
             }
-        "#}
+        "}
     }
 
     test_lint_success! {
         name = outside_class_context,
         rule = PreferStaticClosureRule,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             function foo() {
                 $fn = fn($x) => $x * 2;
             }
-        "#}
+        "}
     }
 
     test_lint_success! {
         name = anonymous_class_has_own_this,
         rule = PreferStaticClosureRule,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             class Foo {
@@ -376,13 +375,13 @@ mod tests {
                     };
                 }
             }
-        "#}
+        "}
     }
 
     test_lint_failure! {
         name = closure_does_not_use_this,
         rule = PreferStaticClosureRule,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             class Foo {
@@ -392,13 +391,13 @@ mod tests {
                     };
                 }
             }
-        "#}
+        "}
     }
 
     test_lint_failure! {
         name = arrow_function_does_not_use_this,
         rule = PreferStaticClosureRule,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             class Foo {
@@ -406,14 +405,14 @@ mod tests {
                     $fn = fn($x) => $x * 2;
                 }
             }
-        "#}
+        "}
     }
 
     test_lint_failure! {
         name = nested_closures_do_not_use_this,
         rule = PreferStaticClosureRule,
         count = 2,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             class Foo {
@@ -421,14 +420,14 @@ mod tests {
                     $fn = fn() => fn($x) => $x * 2;
                 }
             }
-        "#}
+        "}
     }
 
     test_lint_failure! {
         name = multiple_closures_without_this,
         rule = PreferStaticClosureRule,
         count = 3,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             class Foo {
@@ -438,13 +437,13 @@ mod tests {
                     $fn3 = fn($x) => $x - 1;
                 }
             }
-        "#}
+        "}
     }
 
     test_lint_failure! {
         name = outer_closure_static_but_nested_not,
         rule = PreferStaticClosureRule,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             class Foo {
@@ -452,6 +451,6 @@ mod tests {
                     $fn = static fn() => fn($x) => $x * 2;
                 }
             }
-        "#}
+        "}
     }
 }

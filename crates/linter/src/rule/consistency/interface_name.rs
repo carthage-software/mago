@@ -55,18 +55,18 @@ impl LintRule for InterfaceNameRule {
 
                 Interface names should be in class case and suffixed with `Interface`, depending on the configuration.
             "},
-            good_example: indoc! {r#"
+            good_example: indoc! {r"
                 <?php
 
                 interface MyInterface {}
-            "#},
-            bad_example: indoc! {r#"
+            "},
+            bad_example: indoc! {r"
                 <?php
 
                 interface myInterface {}
                 interface my_interface {}
                 interface MY_INTERFACE {}
-            "#},
+            "},
             category: Category::Consistency,
 
             requirements: RuleRequirements::None,
@@ -85,7 +85,7 @@ impl LintRule for InterfaceNameRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let Node::Interface(interface) = node else {
             return;
         };
@@ -96,17 +96,17 @@ impl LintRule for InterfaceNameRule {
 
         if !is_class_case(name) {
             issues.push(
-                Issue::new(self.cfg.level(), format!("Interface name `{}` should be in class case.", name))
+                Issue::new(self.cfg.level(), format!("Interface name `{name}` should be in class case."))
                     .with_code(self.meta.code)
                     .with_annotation(
                         Annotation::primary(interface.name.span())
-                            .with_message(format!("Interface `{}` is declared here", name)),
+                            .with_message(format!("Interface `{name}` is declared here")),
                     )
                     .with_annotation(
                         Annotation::secondary(interface.span())
-                            .with_message(format!("Interface `{}` is defined here", fqcn)),
+                            .with_message(format!("Interface `{fqcn}` is defined here")),
                     )
-                    .with_note(format!("The interface name `{}` does not follow class naming convention.", name))
+                    .with_note(format!("The interface name `{name}` does not follow class naming convention."))
                     .with_help(format!(
                         "Consider renaming it to `{}` to adhere to the naming convention.",
                         mago_casing::to_class_case(name)
@@ -116,20 +116,19 @@ impl LintRule for InterfaceNameRule {
 
         if self.cfg.psr && !name.ends_with("Interface") {
             issues.push(
-                Issue::new(self.cfg.level(), format!("Interface name `{}` should be suffixed with `Interface`.", name))
+                Issue::new(self.cfg.level(), format!("Interface name `{name}` should be suffixed with `Interface`."))
                     .with_code(self.meta.code)
                     .with_annotation(
                         Annotation::primary(interface.name.span())
-                            .with_message(format!("Interface `{}` is declared here", name)),
+                            .with_message(format!("Interface `{name}` is declared here")),
                     )
                     .with_annotation(
                         Annotation::secondary(interface.span())
-                            .with_message(format!("Interface `{}` is defined here", fqcn)),
+                            .with_message(format!("Interface `{fqcn}` is defined here")),
                     )
-                    .with_note(format!("The interface name `{}` does not follow PSR naming convention.", name))
+                    .with_note(format!("The interface name `{name}` does not follow PSR naming convention."))
                     .with_help(format!(
-                        "Consider renaming it to `{}Interface` to adhere to the naming convention.",
-                        name
+                        "Consider renaming it to `{name}Interface` to adhere to the naming convention."
                     )),
             );
         }

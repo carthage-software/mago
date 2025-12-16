@@ -91,7 +91,7 @@ impl LintRule for PreferViewArrayRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let Node::MethodCall(call @ MethodCall { object, method, .. }) = node else {
             return;
         };

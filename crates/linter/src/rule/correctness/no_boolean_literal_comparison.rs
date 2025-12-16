@@ -60,25 +60,25 @@ impl LintRule for NoBooleanLiteralComparisonRule {
         const META: RuleMeta = RuleMeta {
             name: "No Boolean Literal Comparison",
             code: "no-boolean-literal-comparison",
-            description: indoc! {r#"
+            description: indoc! {r"
                 Disallows comparisons where a boolean literal is used as an operand.
 
                 Comparing with a boolean literal (`true` or `false`) is redundant and can often be simplified.
                 For example, `if ($x === true)` is equivalent to the more concise `if ($x)`, and
                 `if ($y !== false)` is the same as `if ($y)`.
-            "#},
-            good_example: indoc! {r#"
+            "},
+            good_example: indoc! {r"
                 <?php
 
                 if ($x) { /* ... */ }
                 if (!$y) { /* ... */ }
-            "#},
-            bad_example: indoc! {r#"
+            "},
+            bad_example: indoc! {r"
                 <?php
 
                 if ($x === true) { /* ... */ }
                 if ($y != false) { /* ... */ }
-            "#},
+            "},
             category: Category::Correctness,
 
             requirements: RuleRequirements::None,
@@ -95,7 +95,7 @@ impl LintRule for NoBooleanLiteralComparisonRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let Node::Binary(binary) = node else {
             return;
         };
@@ -127,7 +127,7 @@ impl LintRule for NoBooleanLiteralComparisonRule {
             .with_code(self.meta.code)
             .with_annotation(
                 Annotation::primary(binary.span())
-                    .with_message(format!("This comparison with `{}` is redundant", literal_str)),
+                    .with_message(format!("This comparison with `{literal_str}` is redundant")),
             )
             .with_note("Comparing a value directly to `true` or `false` is verbose and can be simplified.")
             .with_help(help_message);
@@ -137,7 +137,7 @@ impl LintRule for NoBooleanLiteralComparisonRule {
 }
 
 /// Attempts to extract a boolean literal from an expression, looking through parentheses.
-fn get_boolean_literal<'ast, 'arena>(expr: &'ast Expression<'arena>) -> Option<bool> {
+fn get_boolean_literal(expr: &Expression<'_>) -> Option<bool> {
     match expr {
         Expression::Literal(Literal::True(_)) => Some(true),
         Expression::Literal(Literal::False(_)) => Some(false),

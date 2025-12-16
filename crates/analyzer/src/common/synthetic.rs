@@ -11,7 +11,7 @@ pub fn new_synthetic_call<'arena>(arena: &'arena Bump, f: &str, expression: Expr
         function: arena.alloc(Expression::Literal(Literal::String(LiteralString {
             kind: Some(LiteralStringKind::SingleQuoted),
             span: Span::zero(),
-            raw: arena.alloc_str(&format!("'{}'", f)),
+            raw: arena.alloc_str(&format!("'{f}'")),
             value: Some(arena.alloc_str(f)),
         }))),
         argument_list: ArgumentList {

@@ -45,7 +45,7 @@ pub(crate) const fn expression_is_nullsafe(expr: &'_ Expression<'_>) -> bool {
     }
 }
 
-pub const fn expression_has_logic<'ast, 'arena>(expression: &'ast Expression<'arena>) -> bool {
+pub const fn expression_has_logic(expression: &Expression<'_>) -> bool {
     match unwrap_expression(expression) {
         Expression::Binary(binary) => {
             binary.operator.is_instanceof()
@@ -126,7 +126,7 @@ fn get_extended_expression_id<'ast, 'arena>(
 
     if let Expression::Assignment(assignment) = expression {
         return get_expression_id(assignment.lhs, this_class_name, resolved_names, codebase);
-    };
+    }
 
     Some(match expression {
         Expression::UnaryPrefix(UnaryPrefix { operator: UnaryPrefixOperator::Reference(_), operand }) => {
@@ -253,7 +253,7 @@ pub fn get_array_access_id<'ast, 'arena>(
     Some(concat_atom!(array.as_str(), "[", index.as_str(), "]"))
 }
 
-pub fn get_root_expression_id<'ast, 'arena>(expression: &'ast Expression<'arena>) -> Option<Atom> {
+pub fn get_root_expression_id(expression: &Expression<'_>) -> Option<Atom> {
     let expression = unwrap_expression(expression);
 
     match expression {
@@ -317,8 +317,8 @@ pub fn get_static_functionlike_id_from_call<'ast, 'arena>(
     }
 }
 
-pub fn get_method_id_from_call<'ast, 'arena>(
-    call: &'ast Call<'arena>,
+pub fn get_method_id_from_call(
+    call: &Call<'_>,
     expression_types: &HashMap<(u32, u32), Rc<TUnion>>,
 ) -> Option<FunctionLikeIdentifier> {
     match call {

@@ -51,8 +51,8 @@ pub mod simple_negated_assertion_reconciler;
 
 mod macros;
 
-pub fn reconcile_keyed_types<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+pub fn reconcile_keyed_types<'ctx>(
+    context: &mut Context<'ctx, '_>,
     new_types: &IndexMap<Atom, AssertionSet>,
     mut active_new_types: IndexMap<Atom, HashSet<usize>>,
     block_context: &mut BlockContext<'ctx>,
@@ -199,7 +199,7 @@ pub fn reconcile_keyed_types<'ctx, 'arena>(
                 adjust_array_type(key_parts.clone(), block_context, changed_var_ids, &result_type);
             } else if key_str != "$this" {
                 let mut removable_keys: Vec<Atom> = Vec::new();
-                for (new_key, _) in block_context.locals.iter() {
+                for new_key in block_context.locals.keys() {
                     if new_key == key {
                         continue;
                     }
@@ -228,7 +228,7 @@ pub fn reconcile_keyed_types<'ctx, 'arena>(
                                     {
                                         block_context.references_in_scope.remove(&new_primary_reference);
 
-                                        for (_, referenced_value) in block_context.references_in_scope.iter_mut() {
+                                        for referenced_value in block_context.references_in_scope.values_mut() {
                                             if *referenced_value == *new_key {
                                                 *referenced_value = new_primary_reference;
                                             }
@@ -263,7 +263,7 @@ pub fn reconcile_keyed_types<'ctx, 'arena>(
         {
             // If key is new, create references for other variables that reference the root variable.
             let mut reference_key_parts = key_parts.clone();
-            for reference in reference_graph[&key_parts_0_atom].iter() {
+            for reference in &reference_graph[&key_parts_0_atom] {
                 reference_key_parts[0] = reference.as_str().to_owned();
                 let reference_key = atom(&reference_key_parts.join(""));
                 block_context.locals.insert(reference_key, existing_type.clone());
@@ -272,9 +272,9 @@ pub fn reconcile_keyed_types<'ctx, 'arena>(
     }
 }
 
-fn adjust_array_type<'ctx>(
+fn adjust_array_type(
     mut key_parts: Vec<String>,
-    context: &mut BlockContext<'ctx>,
+    context: &mut BlockContext<'_>,
     changed_var_ids: &mut AtomSet,
     result_type: &TUnion,
 ) {
@@ -385,10 +385,10 @@ static INTEGER_REGEX: LazyLock<Regex> = LazyLock::new(|| unsafe {
     Regex::new(r"^[0-9]+$").unwrap_unchecked()
 });
 
-fn add_nested_assertions<'ctx>(
+fn add_nested_assertions(
     new_types: &mut IndexMap<Atom, AssertionSet>,
     active_new_types: &mut IndexMap<Atom, HashSet<usize>>,
-    context: &BlockContext<'ctx>,
+    context: &BlockContext<'_>,
 ) {
     let mut keys_to_remove = vec![];
 
@@ -521,7 +521,7 @@ fn add_nested_assertions<'ctx>(
 
 pub fn break_up_path_into_parts(path: &str) -> Vec<String> {
     if path.is_empty() {
-        return vec!["".to_string()];
+        return vec![String::new()];
     }
 
     let mut parts: Vec<String> = Vec::with_capacity(path.len() / 4 + 1);
@@ -614,10 +614,10 @@ pub fn break_up_path_into_parts(path: &str) -> Vec<String> {
     parts
 }
 
-fn get_value_for_key<'ctx>(
+fn get_value_for_key(
     context: &mut Context<'_, '_>,
     key: Atom,
-    block_context: &mut BlockContext<'ctx>,
+    block_context: &mut BlockContext<'_>,
     new_assertions: &IndexMap<Atom, AssertionSet>,
     has_isset: bool,
     has_inverted_isset: bool,
@@ -957,14 +957,14 @@ pub(crate) fn trigger_issue_for_impossible(
         }
 
         if not_operator {
-            report_impossible_issue(context, assertion, assertion_atom, key, span, old_var_type_string)
+            report_impossible_issue(context, assertion, assertion_atom, key, span, old_var_type_string);
         } else {
-            report_redundant_issue(context, assertion, assertion_atom, key, span, old_var_type_string)
+            report_redundant_issue(context, assertion, assertion_atom, key, span, old_var_type_string);
         }
     } else if not_operator {
-        report_redundant_issue(context, assertion, assertion_atom, key, span, old_var_type_string)
+        report_redundant_issue(context, assertion, assertion_atom, key, span, old_var_type_string);
     } else {
-        report_impossible_issue(context, assertion, assertion_atom, key, span, old_var_type_string)
+        report_impossible_issue(context, assertion, assertion_atom, key, span, old_var_type_string);
     }
 }
 

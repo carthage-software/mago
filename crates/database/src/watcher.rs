@@ -97,7 +97,7 @@ impl<'a> DatabaseWatcher<'a> {
             })
             .collect();
 
-        let extensions: HashSet<String> = config.extensions.iter().map(|s| s.to_string()).collect();
+        let extensions: HashSet<String> = config.extensions.iter().map(std::string::ToString::to_string).collect();
         let workspace = config.workspace.as_ref().to_path_buf();
 
         let mut watcher = RecommendedWatcher::new(
@@ -369,11 +369,11 @@ impl<'a> DatabaseWatcher<'a> {
     pub fn into_database(self) -> Database<'a> {
         let mut md = ManuallyDrop::new(self);
         md.stop();
-        unsafe { std::ptr::read(&md.database) }
+        unsafe { std::ptr::read(&raw const md.database) }
     }
 }
 
-impl<'a> Drop for DatabaseWatcher<'a> {
+impl Drop for DatabaseWatcher<'_> {
     fn drop(&mut self) {
         self.stop();
     }

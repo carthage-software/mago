@@ -1,4 +1,4 @@
-//! random_bytes() return type provider.
+//! `random_bytes()` return type provider.
 
 use mago_codex::ttype::get_empty_string;
 use mago_codex::ttype::get_non_empty_string;

@@ -146,7 +146,7 @@ pub struct Settings {
     ///
     /// Properties initialized in these methods count as "definitely initialized"
     /// just like in the constructor. This is useful for frameworks that use
-    /// lifecycle methods like PHPUnit's `setUp()` or framework `boot()` methods.
+    /// lifecycle methods like `PHPUnit`'s `setUp()` or framework `boot()` methods.
     ///
     /// Example: `["setUp", "initialize", "boot"]`
     ///

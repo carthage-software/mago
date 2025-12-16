@@ -42,23 +42,22 @@ pub(crate) fn read_file(workspace: &Path, path: &Path, file_type: FileType) -> R
     }
 
     let logical_name = path.strip_prefix(workspace).unwrap_or(path).to_string_lossy().to_string();
-    let contents = match simdutf8::basic::from_utf8(&bytes) {
-        Ok(..) => unsafe {
+    let contents = if simdutf8::basic::from_utf8(&bytes).is_ok() {
+        unsafe {
             // SAFETY: We just validated it with simdutf8, no need to check again.
             String::from_utf8_unchecked(bytes)
-        },
-        Err(_) => {
-            let warning_message = format!(
-                "File `{logical_name}` contains invalid UTF-8. Lossy conversion applied, which may cause undefined behavior.",
-            );
-
-            match file_type {
-                FileType::Host => tracing::warn!("{}", warning_message),
-                FileType::Vendored | FileType::Builtin => tracing::info!("{}", warning_message),
-            }
-
-            String::from_utf8_lossy(&bytes).into_owned()
         }
+    } else {
+        let warning_message = format!(
+            "File `{logical_name}` contains invalid UTF-8. Lossy conversion applied, which may cause undefined behavior.",
+        );
+
+        match file_type {
+            FileType::Host => tracing::warn!("{}", warning_message),
+            FileType::Vendored | FileType::Builtin => tracing::info!("{}", warning_message),
+        }
+
+        String::from_utf8_lossy(&bytes).into_owned()
     };
 
     Ok(File::new(Cow::Owned(logical_name), file_type, Some(path.to_path_buf()), Cow::Owned(contents)))

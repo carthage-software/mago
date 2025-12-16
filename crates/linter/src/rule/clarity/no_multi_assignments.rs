@@ -48,21 +48,21 @@ impl LintRule for NoMultiAssignmentsRule {
         const META: RuleMeta = RuleMeta {
             name: "No Multi Assignments",
             code: "no-multi-assignments",
-            description: indoc! {r#"
+            description: indoc! {r"
                 Flags any instances of multiple assignments in a single statement. This can lead to
                 confusion and unexpected behavior, and is generally considered poor practice.
-            "#},
-            good_example: indoc! {r#"
+            "},
+            good_example: indoc! {r"
                 <?php
 
                 $b = 0;
                 $a = $b;
-            "#},
-            bad_example: indoc! {r#"
+            "},
+            bad_example: indoc! {r"
                 <?php
 
                 $a = $b = 0;
-            "#},
+            "},
             category: Category::Clarity,
 
             requirements: RuleRequirements::None,
@@ -81,7 +81,7 @@ impl LintRule for NoMultiAssignmentsRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let Node::Assignment(assignment) = node else {
             return;
         };

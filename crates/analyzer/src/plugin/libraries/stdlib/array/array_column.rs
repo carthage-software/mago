@@ -1,4 +1,4 @@
-//! array_column() return type provider.
+//! `array_column()` return type provider.
 
 use std::borrow::Cow;
 
@@ -27,7 +27,7 @@ static META: ProviderMeta = ProviderMeta::new(
 
 /// Provider for the `array_column()` function.
 ///
-/// Returns typed arrays based on the column_key and index_key arguments.
+/// Returns typed arrays based on the `column_key` and `index_key` arguments.
 #[derive(Default)]
 pub struct ArrayColumnProvider;
 
@@ -61,13 +61,13 @@ impl FunctionReturnTypeProvider for ArrayColumnProvider {
         let column_key_argument = invocation.get_argument(1, &["column_key"])?;
         let column_key_type = context.get_expression_type(column_key_argument)?;
 
-        let column_type = if !column_key_type.is_null() {
+        let column_type = if column_key_type.is_null() {
+            TUnion::from_atomic(TAtomic::Object(TObject::Named(obj.clone())))
+        } else {
             let column_key_property_name = column_key_type.get_single_literal_string_value()?;
             let column_key_property = class_like.properties.get(&concat_atom!("$", column_key_property_name))?;
 
             column_key_property.type_metadata.as_ref()?.type_union.clone()
-        } else {
-            TUnion::from_atomic(TAtomic::Object(TObject::Named(obj.clone())))
         };
 
         let index_key_argument = invocation.get_argument(2, &["index_key"]);
@@ -81,10 +81,12 @@ impl FunctionReturnTypeProvider for ArrayColumnProvider {
 
             if let Some(index_key_property) = index_key_property {
                 index_type = match index_key_property.type_metadata.as_ref()?.type_union.get_single() {
-                    TAtomic::Scalar(scalar @ TScalar::ArrayKey)
-                    | TAtomic::Scalar(scalar @ TScalar::Integer(_))
-                    | TAtomic::Scalar(scalar @ TScalar::String(_))
-                    | TAtomic::Scalar(scalar @ TScalar::ClassLikeString(_)) => Some(scalar),
+                    TAtomic::Scalar(
+                        scalar @ (TScalar::ArrayKey
+                        | TScalar::Integer(_)
+                        | TScalar::String(_)
+                        | TScalar::ClassLikeString(_)),
+                    ) => Some(scalar),
                     _ => None,
                 };
             }

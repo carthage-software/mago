@@ -170,7 +170,7 @@ mod tests {
 
     test_analysis! {
         name = write_protected_static_property_from_child,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
             class ParentClass { protected static int $prop = 1; }
             class ChildClass extends ParentClass {
@@ -179,12 +179,12 @@ mod tests {
                     parent::$prop = $val + 1;
                 }
             }
-        "#},
+        "},
     }
 
     test_analysis! {
         name = write_private_static_property_from_same_class,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
             class PrivateWriteTest {
                 private static int $value = 0;
@@ -192,7 +192,7 @@ mod tests {
                     self::$value = $new;
                 }
             }
-        "#},
+        "},
     }
 
     test_analysis! {
@@ -209,11 +209,11 @@ mod tests {
 
     test_analysis! {
         name = write_to_undefined_static_property,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
             class MyClass {}
             MyClass::$undefined = 'new';
-        "#},
+        "},
         issues = [
             IssueCode::NonExistentProperty,
         ]
@@ -221,11 +221,11 @@ mod tests {
 
     test_analysis! {
         name = write_private_static_property_from_outside,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
             class PrivateWrite { private static int $value = 0; }
             PrivateWrite::$value = 1;
-        "#},
+        "},
         issues = [
             IssueCode::InvalidPropertyRead,
         ]
@@ -233,11 +233,11 @@ mod tests {
 
     test_analysis! {
         name = write_protected_static_property_from_outside,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
             class MyClass { protected static int $prop = 1; }
             MyClass::$prop = 500;
-        "#},
+        "},
         issues = [
             IssueCode::InvalidPropertyRead,
         ]

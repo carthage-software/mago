@@ -30,21 +30,18 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Throw<'arena> {
         if let Some(scope) = block_context.finally_scope.as_ref() {
             let mut finally_scope = scope.borrow_mut();
 
-            for (variable, previous_type) in block_context.locals.iter() {
-                match finally_scope.locals.get_mut(variable) {
-                    Some(finally_type) => {
-                        let resulting_type =
-                            combine_union_types(previous_type.as_ref(), finally_type.as_ref(), context.codebase, false);
+            for (variable, previous_type) in &block_context.locals {
+                if let Some(finally_type) = finally_scope.locals.get_mut(variable) {
+                    let resulting_type =
+                        combine_union_types(previous_type.as_ref(), finally_type.as_ref(), context.codebase, false);
 
-                        finally_scope.locals.insert(*variable, Rc::new(resulting_type));
-                    }
-                    None => {
-                        let mut resulting_type = (**previous_type).clone();
-                        resulting_type.set_possibly_undefined_from_try(true);
+                    finally_scope.locals.insert(*variable, Rc::new(resulting_type));
+                } else {
+                    let mut resulting_type = (**previous_type).clone();
+                    resulting_type.set_possibly_undefined_from_try(true);
 
-                        finally_scope.locals.insert(*variable, Rc::new(resulting_type));
-                    }
-                };
+                    finally_scope.locals.insert(*variable, Rc::new(resulting_type));
+                }
             }
         }
 

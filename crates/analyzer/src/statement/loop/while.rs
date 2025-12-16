@@ -47,7 +47,7 @@ mod tests {
 
     test_analysis! {
         name = condition_is_too_complex,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             function is_special_case(int $id, int $count, float $score, float $threshold, bool $is_active, bool $is_admin, string $name, string $role, string $permission, string $category): bool {
@@ -74,7 +74,7 @@ mod tests {
 
                 return true;
             }
-        "#},
+        "},
         issues = [
             IssueCode::ConditionIsTooComplex,
         ],

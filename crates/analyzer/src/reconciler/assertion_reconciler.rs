@@ -39,8 +39,8 @@ use crate::reconciler::negated_assertion_reconciler;
 use crate::reconciler::simple_assertion_reconciler;
 use crate::reconciler::trigger_issue_for_impossible;
 
-pub fn reconcile<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+pub fn reconcile(
+    context: &mut Context<'_, '_>,
     assertion: &Assertion,
     existing_var_type: Option<&TUnion>,
     key: Option<&str>,
@@ -400,12 +400,12 @@ fn intersect_list_arrays(context: &mut Context<'_, '_>, first_list: &TList, seco
         (Some(first_list_known_elements), Some(second_list_known_elements)) => {
             let mut second_list_known_elements = second_list_known_elements.clone();
 
-            for (second_key, second_value) in second_list_known_elements.iter_mut() {
+            for (second_key, second_value) in &mut second_list_known_elements {
                 if let Some(first_value) = first_list_known_elements.get(second_key) {
                     second_value.0 = second_value.0 && first_value.0;
-                    second_value.1 = intersect_union_with_union(context, &first_value.1, &second_value.1)?
+                    second_value.1 = intersect_union_with_union(context, &first_value.1, &second_value.1)?;
                 } else if !first_list.element_type.is_never() {
-                    second_value.1 = intersect_union_with_union(context, &first_list.element_type, &second_value.1)?
+                    second_value.1 = intersect_union_with_union(context, &first_list.element_type, &second_value.1)?;
                 } else {
                     // if the second list entry key is always defined, the intersection is impossible
                     if !second_value.0 {
@@ -428,8 +428,8 @@ fn intersect_list_arrays(context: &mut Context<'_, '_>, first_list: &TList, seco
         (None, Some(second_known_elements)) => {
             let mut second_known_elements = second_known_elements.clone();
 
-            for (_, second_value) in second_known_elements.iter_mut() {
-                second_value.1 = intersect_union_with_union(context, &second_value.1, &first_list.element_type)?
+            for second_value in second_known_elements.values_mut() {
+                second_value.1 = intersect_union_with_union(context, &second_value.1, &first_list.element_type)?;
             }
 
             if let Some(element_type) = element_type {
@@ -446,8 +446,8 @@ fn intersect_list_arrays(context: &mut Context<'_, '_>, first_list: &TList, seco
         (Some(first_known_elements), None) => {
             let mut first_known_elements = first_known_elements.clone();
 
-            for (_, first_value) in first_known_elements.iter_mut() {
-                first_value.1 = intersect_union_with_union(context, &first_value.1, &second_list.element_type)?
+            for first_value in first_known_elements.values_mut() {
+                first_value.1 = intersect_union_with_union(context, &first_value.1, &second_list.element_type)?;
             }
 
             if let Some(element_type) = element_type {
@@ -527,7 +527,7 @@ fn intersect_keyed_arrays(
         (None, Some(second_known_items)) => {
             let mut second_known_items = second_known_items.clone();
 
-            for (_, second_value) in second_known_items.iter_mut() {
+            for second_value in second_known_items.values_mut() {
                 if let Some(first_parameters) = &first_keyed_array.parameters {
                     second_value.1 = intersect_union_with_union(context, &second_value.1, &first_parameters.1)?;
                 } else if second_keyed_array.parameters.is_none() && !second_value.0 {
@@ -544,7 +544,7 @@ fn intersect_keyed_arrays(
         (Some(first_known_items), None) => {
             let mut first_known_items = first_known_items.clone();
 
-            for (_, first_value) in first_known_items.iter_mut() {
+            for first_value in first_known_items.values_mut() {
                 if let Some(second_params) = &second_keyed_array.parameters {
                     first_value.1 = intersect_union_with_union(context, &first_value.1, &second_params.1)?;
                 } else if first_keyed_array.parameters.is_none() && !first_value.0 {
@@ -601,7 +601,7 @@ fn intersect_contained_atomic_with_another(
 ) -> Option<TAtomic> {
     if let TAtomic::Object(TObject::Enum(TEnum { case: Some(_), .. })) = sub_atomic {
         return Some(sub_atomic.clone());
-    };
+    }
 
     let TAtomic::Object(TObject::Named(named_object)) = sub_atomic else {
         return Some(sub_atomic.clone());
@@ -1245,10 +1245,10 @@ fn handle_literal_equality_with_bool(
                 }
             }
             TAtomic::Null if is_loose_equality => {
-                if !assertion_bool_val {
-                    acceptable_types.push(existing_var_atomic_type.clone());
-                } else {
+                if assertion_bool_val {
                     did_remove_type = true;
+                } else {
+                    acceptable_types.push(existing_var_atomic_type.clone());
                 }
             }
             TAtomic::Scalar(TScalar::Integer(TInteger::Unspecified)) if is_loose_equality => {

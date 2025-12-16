@@ -423,10 +423,10 @@ pub(crate) fn intersect_resource(
     for atomic in existing_var_type.types.as_ref() {
         match atomic {
             TAtomic::Resource(existing_resource) => match (existing_resource.closed, resource_to_intersection.closed) {
-                (Some(true), Some(true)) | (Some(false), Some(false)) | (None, None) | (Some(_), None) => {
+                (Some(true), Some(true)) | (Some(false), Some(false)) | (None | Some(_), None) => {
                     acceptable_types.push(TAtomic::Resource(*existing_resource));
                 }
-                (None, Some(true) | Some(false)) => {
+                (None, Some(true | false)) => {
                     did_remove_type = true;
 
                     acceptable_types.push(TAtomic::Resource(*resource_to_intersection));
@@ -605,7 +605,7 @@ fn intersect_array_list(
         match atomic {
             TAtomic::Array(TArray::Keyed(TKeyedArray { known_items, parameters, non_empty })) => {
                 if let Some(known_items) = known_items {
-                    for (k, _) in known_items.iter() {
+                    for k in known_items.keys() {
                         if !k.is_integer() {
                             did_remove_type = true;
                             continue 'outer;
@@ -1008,7 +1008,7 @@ fn intersect_string(
             TAtomic::Scalar(TScalar::ClassLikeString(_)) if !is_numeric => {
                 acceptable_types.push(atomic.clone());
             }
-            TAtomic::Mixed(_) | TAtomic::Scalar(TScalar::Generic) | TAtomic::Scalar(TScalar::ArrayKey) => {
+            TAtomic::Mixed(_) | TAtomic::Scalar(TScalar::Generic | TScalar::ArrayKey) => {
                 return get_string_with_props(is_numeric, is_truthy, is_non_empty, is_lowercase);
             }
             TAtomic::GenericParameter(generic_parameter) => {
@@ -1107,7 +1107,7 @@ fn intersect_bool(
                     did_remove_type = true;
                 }
             }
-            TAtomic::Mixed(_) | TAtomic::Scalar(TScalar::Generic) | TAtomic::Scalar(TScalar::ArrayKey) => {
+            TAtomic::Mixed(_) | TAtomic::Scalar(TScalar::Generic | TScalar::ArrayKey) => {
                 return TUnion::from_atomic(TAtomic::Scalar(TScalar::Bool(*boolean)));
             }
             TAtomic::GenericParameter(generic_parameter) => {
@@ -1183,7 +1183,7 @@ fn intersect_float(
             TAtomic::Scalar(TScalar::Float(_)) => {
                 acceptable_types.push(TAtomic::Scalar(TScalar::Float(*float)));
             }
-            TAtomic::Mixed(_) | TAtomic::Scalar(TScalar::Generic) | TAtomic::Scalar(TScalar::Numeric) => {
+            TAtomic::Mixed(_) | TAtomic::Scalar(TScalar::Generic | TScalar::Numeric) => {
                 return get_float();
             }
             TAtomic::GenericParameter(generic_parameter) => {
@@ -1255,10 +1255,7 @@ fn intersect_int(
             TAtomic::Scalar(TScalar::Integer(_)) => {
                 acceptable_types.push(TAtomic::Scalar(TScalar::Integer(*integer)));
             }
-            TAtomic::Mixed(_)
-            | TAtomic::Scalar(TScalar::Generic)
-            | TAtomic::Scalar(TScalar::ArrayKey)
-            | TAtomic::Scalar(TScalar::Numeric) => {
+            TAtomic::Mixed(_) | TAtomic::Scalar(TScalar::Generic | TScalar::ArrayKey | TScalar::Numeric) => {
                 return get_union_from_integer(integer);
             }
             TAtomic::GenericParameter(generic_parameter) => {
@@ -1419,11 +1416,11 @@ fn reconcile_isset(
         if let TAtomic::Null = atomic {
             did_remove_type = true;
         } else if let TAtomic::Mixed(mixed) = atomic {
-            if !mixed.is_non_null() {
+            if mixed.is_non_null() {
+                acceptable_types.push(TAtomic::Mixed(mixed));
+            } else {
                 acceptable_types.push(TAtomic::Mixed(mixed.with_is_non_null(true)));
                 did_remove_type = true;
-            } else {
-                acceptable_types.push(TAtomic::Mixed(mixed));
             }
         } else {
             acceptable_types.push(atomic);

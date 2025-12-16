@@ -103,7 +103,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Unset<'arena> {
 
                         atomics.push(atomic);
                         continue;
-                    };
+                    }
 
                     let TAtomic::Array(array) = atomic else {
                         atomics.push(atomic);
@@ -182,12 +182,12 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Unset<'arena> {
                                 } else {
                                     let index = *index as i64;
 
-                                    if index != *target_index {
-                                        true
-                                    } else {
+                                    if index == *target_index {
                                         element_removed = true;
 
                                         false
+                                    } else {
+                                        true
                                     }
                                 }
                             });

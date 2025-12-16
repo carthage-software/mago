@@ -18,9 +18,9 @@ use crate::scanner::ttype::get_type_metadata_from_type_string;
 use crate::ttype::resolution::TypeResolutionContext;
 
 #[inline]
-pub fn scan_constant<'ctx, 'arena>(
+pub fn scan_constant<'arena>(
     constant: &'arena Constant<'arena>,
-    context: &mut Context<'ctx, 'arena>,
+    context: &mut Context<'_, 'arena>,
     type_context: TypeResolutionContext,
     scope: &NamespaceScope,
 ) -> Vec<ConstantMetadata> {
@@ -52,9 +52,9 @@ pub fn scan_constant<'ctx, 'arena>(
 }
 
 #[inline]
-pub fn scan_defined_constant<'ctx, 'arena>(
+pub fn scan_defined_constant<'arena>(
     define: &'arena FunctionCall<'arena>,
-    context: &mut Context<'ctx, 'arena>,
+    context: &mut Context<'_, 'arena>,
     type_context: TypeResolutionContext,
     scope: &NamespaceScope,
 ) -> Option<ConstantMetadata> {

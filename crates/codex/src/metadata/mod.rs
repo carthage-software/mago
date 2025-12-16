@@ -73,7 +73,7 @@ pub struct CodebaseMetadata {
     pub safe_symbols: AtomSet,
     /// Set of specific members `(SymbolFQCN, MemberName)` that are considered safe/validated.
     pub safe_symbol_members: HashSet<(Atom, Atom)>,
-    /// Each FileSignature contains a hierarchical tree of DefSignatureNode representing
+    /// Each `FileSignature` contains a hierarchical tree of `DefSignatureNode` representing
     /// top-level symbols (classes, functions, constants) and their nested members (methods, properties).
     pub file_signatures: HashMap<FileId, FileSignature>,
 }
@@ -284,7 +284,7 @@ impl CodebaseMetadata {
         self.function_likes.get(&identifier)
     }
 
-    /// Retrieves method metadata by MethodIdentifier.
+    /// Retrieves method metadata by `MethodIdentifier`.
     #[inline]
     pub fn get_method_by_id(&self, method_id: &MethodIdentifier) -> Option<&FunctionLikeMetadata> {
         let lowercase_class = ascii_lowercase_atom(method_id.get_class_name());
@@ -490,7 +490,7 @@ impl CodebaseMetadata {
         match self.symbols.get_kind(&lowercase_name) {
             Some(SymbolKind::Class) => self.class_likes.get(&lowercase_name).is_some_and(|meta| !meta.flags.is_final()),
             Some(SymbolKind::Enum) => false,
-            Some(SymbolKind::Interface) | Some(SymbolKind::Trait) | None => true,
+            Some(SymbolKind::Interface | SymbolKind::Trait) | None => true,
         }
     }
 
@@ -740,7 +740,7 @@ impl CodebaseMetadata {
 
         unsafe {
             write!(writer, "class@anonymous:{}-{}:{}", span.file_id, span.start.offset, span.end.offset)
-                .unwrap_unchecked()
+                .unwrap_unchecked();
         };
 
         let written_len = buffer.iter().position(|&b| b == 0).unwrap_or(buffer.len());
@@ -762,7 +762,7 @@ impl CodebaseMetadata {
     ///
     /// # Returns
     ///
-    /// A reference to the FileSignature if it exists, or `None` if the file has no signature.
+    /// A reference to the `FileSignature` if it exists, or `None` if the file has no signature.
     #[inline]
     pub fn get_file_signature(&self, file_id: &FileId) -> Option<&FileSignature> {
         self.file_signatures.get(file_id)
@@ -777,7 +777,7 @@ impl CodebaseMetadata {
     ///
     /// # Returns
     ///
-    /// The previous FileSignature if it existed.
+    /// The previous `FileSignature` if it existed.
     #[inline]
     pub fn set_file_signature(&mut self, file_id: FileId, signature: FileSignature) -> Option<FileSignature> {
         self.file_signatures.insert(file_id, signature)
@@ -791,7 +791,7 @@ impl CodebaseMetadata {
     ///
     /// # Returns
     ///
-    /// The removed FileSignature if it existed.
+    /// The removed `FileSignature` if it existed.
     #[inline]
     pub fn remove_file_signature(&mut self, file_id: &FileId) -> Option<FileSignature> {
         self.file_signatures.remove(file_id)

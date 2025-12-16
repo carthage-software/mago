@@ -74,7 +74,7 @@ impl StructuralGuardWalker {
 
 impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for StructuralGuardWalker {
     fn walk_in_namespace(&mut self, namespace: &'ast Namespace<'arena>, context: &mut GuardContext<'ctx, 'arena>) {
-        context.set_current_namespace(namespace.name.as_ref().map(|n| n.value()));
+        context.set_current_namespace(namespace.name.as_ref().map(mago_syntax::ast::Identifier::value));
     }
 
     fn walk_out_namespace(&mut self, _namespace: &'ast Namespace<'arena>, context: &mut GuardContext<'ctx, 'arena>) {
@@ -200,7 +200,7 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
                     .collect();
 
                 if !Self::satisfies_inheritance_constraint(
-                    &extended_fqns.iter().map(|s| s.as_ref()).collect::<Vec<_>>(),
+                    &extended_fqns.iter().map(std::convert::AsRef::as_ref).collect::<Vec<_>>(),
                     must_extends,
                 ) {
                     structural_flaws.push(StructuralFlaw {
@@ -223,7 +223,7 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
                     .collect();
 
                 if !Self::satisfies_inheritance_constraint(
-                    &implemented_fqns.iter().map(|s| s.as_ref()).collect::<Vec<_>>(),
+                    &implemented_fqns.iter().map(std::convert::AsRef::as_ref).collect::<Vec<_>>(),
                     must_implement,
                 ) {
                     structural_flaws.push(StructuralFlaw {
@@ -249,7 +249,7 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
                     .collect();
 
                 if !Self::satisfies_inheritance_constraint(
-                    &used_fqns.iter().map(|s| s.as_ref()).collect::<Vec<_>>(),
+                    &used_fqns.iter().map(std::convert::AsRef::as_ref).collect::<Vec<_>>(),
                     must_use_traits,
                 ) {
                     structural_flaws.push(StructuralFlaw {
@@ -271,7 +271,7 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
                     .collect();
 
                 if !Self::satisfies_inheritance_constraint(
-                    &used_attributes.iter().map(|s| s.as_ref()).collect::<Vec<_>>(),
+                    &used_attributes.iter().map(std::convert::AsRef::as_ref).collect::<Vec<_>>(),
                     must_use_attributes,
                 ) {
                     structural_flaws.push(StructuralFlaw {
@@ -328,7 +328,7 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
                     .collect();
 
                 if !Self::satisfies_inheritance_constraint(
-                    &extended_fqns.iter().map(|s| s.as_ref()).collect::<Vec<_>>(),
+                    &extended_fqns.iter().map(std::convert::AsRef::as_ref).collect::<Vec<_>>(),
                     must_extends,
                 ) {
                     structural_flaws.push(StructuralFlaw {
@@ -350,7 +350,7 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
                     .collect();
 
                 if !Self::satisfies_inheritance_constraint(
-                    &used_attributes.iter().map(|s| s.as_ref()).collect::<Vec<_>>(),
+                    &used_attributes.iter().map(std::convert::AsRef::as_ref).collect::<Vec<_>>(),
                     must_use_attributes,
                 ) {
                     structural_flaws.push(StructuralFlaw {
@@ -405,7 +405,7 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
                     .collect();
 
                 if !Self::satisfies_inheritance_constraint(
-                    &implemented_fqns.iter().map(|s| s.as_ref()).collect::<Vec<_>>(),
+                    &implemented_fqns.iter().map(std::convert::AsRef::as_ref).collect::<Vec<_>>(),
                     must_implement,
                 ) {
                     structural_flaws.push(StructuralFlaw {
@@ -427,7 +427,7 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
                     .collect();
 
                 if !Self::satisfies_inheritance_constraint(
-                    &used_attributes.iter().map(|s| s.as_ref()).collect::<Vec<_>>(),
+                    &used_attributes.iter().map(std::convert::AsRef::as_ref).collect::<Vec<_>>(),
                     must_use_attributes,
                 ) {
                     structural_flaws.push(StructuralFlaw {
@@ -487,7 +487,7 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
                     .collect();
 
                 if !Self::satisfies_inheritance_constraint(
-                    &used_fqns.iter().map(|s| s.as_ref()).collect::<Vec<_>>(),
+                    &used_fqns.iter().map(std::convert::AsRef::as_ref).collect::<Vec<_>>(),
                     must_use_traits,
                 ) {
                     structural_flaws.push(StructuralFlaw {
@@ -509,7 +509,7 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
                     .collect();
 
                 if !Self::satisfies_inheritance_constraint(
-                    &used_attributes.iter().map(|s| s.as_ref()).collect::<Vec<_>>(),
+                    &used_attributes.iter().map(std::convert::AsRef::as_ref).collect::<Vec<_>>(),
                     must_use_attributes,
                 ) {
                     structural_flaws.push(StructuralFlaw {
@@ -565,7 +565,7 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
                     .collect();
 
                 if !Self::satisfies_inheritance_constraint(
-                    &used_attributes.iter().map(|s| s.as_ref()).collect::<Vec<_>>(),
+                    &used_attributes.iter().map(std::convert::AsRef::as_ref).collect::<Vec<_>>(),
                     must_use_attribute,
                 ) {
                     structural_flaws.push(StructuralFlaw {
@@ -622,7 +622,7 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
                         .collect();
 
                     if !Self::satisfies_inheritance_constraint(
-                        &used_attributes.iter().map(|s| s.as_ref()).collect::<Vec<_>>(),
+                        &used_attributes.iter().map(std::convert::AsRef::as_ref).collect::<Vec<_>>(),
                         must_use_attributes,
                     ) {
                         structural_flaws.push(StructuralFlaw {

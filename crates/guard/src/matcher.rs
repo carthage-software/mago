@@ -53,9 +53,8 @@ pub fn matches(fqcn: &str, pattern: &str, is_constant: bool, treat_as_namespace:
                 (None, None) => f == p,
                 _ => false,
             };
-        } else {
-            return f.eq_ignore_ascii_case(p);
         }
+        return f.eq_ignore_ascii_case(p);
     }
 
     let fqcn = fqcn.trim_matches(SEPARATOR);

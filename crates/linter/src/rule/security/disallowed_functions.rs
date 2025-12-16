@@ -58,14 +58,14 @@ impl LintRule for DisallowedFunctionsRule {
         const META: RuleMeta = RuleMeta {
             name: "Disallowed Functions",
             code: "disallowed-functions",
-            description: indoc! {r#"
+            description: indoc! {r"
                 Flags calls to functions that are disallowed via rule configuration.
 
                 You can specify which functions or extensions should be disallowed through the
                 `functions` or `extensions` options. This helps enforce coding standards,
                 security restrictions, or the usage of preferred alternatives.
-            "#},
-            good_example: indoc! {r#"
+            "},
+            good_example: indoc! {r"
                 <?php
 
                 function allowed_function(): void {
@@ -73,12 +73,12 @@ impl LintRule for DisallowedFunctionsRule {
                 }
 
                 allowed_function(); // Not flagged
-            "#},
-            bad_example: indoc! {r#"
+            "},
+            bad_example: indoc! {r"
                 <?php
 
                 curl_init(); // Error: part of a disallowed extension
-            "#},
+            "},
             category: Category::Security,
 
             requirements: RuleRequirements::None,
@@ -95,13 +95,13 @@ impl LintRule for DisallowedFunctionsRule {
         Self { meta: Self::meta(), cfg: settings.config.clone() }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let Node::FunctionCall(function_call) = node else {
             return;
         };
 
         // Check explicit disallowed functions
-        for function_name in self.cfg.functions.iter() {
+        for function_name in &self.cfg.functions {
             if !function_call_matches(ctx, function_call, function_name) {
                 continue;
             }
@@ -125,8 +125,8 @@ impl LintRule for DisallowedFunctionsRule {
         }
 
         // Check disallowed extensions
-        for (extension, functions) in EXTENSION_FUNCTIONS.iter() {
-            for function_name in functions.iter() {
+        for (extension, functions) in &EXTENSION_FUNCTIONS {
+            for function_name in *functions {
                 if !function_call_matches(ctx, function_call, function_name) {
                     continue;
                 }

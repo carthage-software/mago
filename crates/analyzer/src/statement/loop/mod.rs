@@ -113,8 +113,8 @@ fn analyze_for_or_while_loop<'ctx, 'ast, 'arena>(
     Ok(())
 }
 
-fn inherit_loop_block_context<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+fn inherit_loop_block_context<'ctx>(
+    context: &mut Context<'ctx, '_>,
     block_context: &mut BlockContext<'ctx>,
     loop_block_context: BlockContext<'ctx>,
     inner_loop_block_context: BlockContext<'ctx>,
@@ -129,10 +129,7 @@ fn inherit_loop_block_context<'ctx, 'arena>(
 
     inherit_branch_context_properties(context, block_context, &inner_loop_block_context);
 
-    if !can_leave_loop {
-        block_context.control_actions.insert(ControlAction::End);
-        block_context.has_returned = true;
-    } else {
+    if can_leave_loop {
         for (variable, variable_type) in inner_loop_block_context.locals {
             if !always_enters_loop {
                 block_context.variables_possibly_in_scope.insert(variable);
@@ -151,6 +148,9 @@ fn inherit_loop_block_context<'ctx, 'arena>(
                 );
             }
         }
+    } else {
+        block_context.control_actions.insert(ControlAction::End);
+        block_context.has_returned = true;
     }
 
     if can_leave_loop {
@@ -186,7 +186,10 @@ fn analyze<'ctx, 'ast, 'arena>(
 
     let codebase = context.codebase;
 
-    if !pre_conditions.is_empty() {
+    if pre_conditions.is_empty() {
+        always_assigned_before_loop_body_variables =
+            BlockContext::get_new_or_updated_locals(loop_parent_context, loop_context);
+    } else {
         let assertion_context = context.get_assertion_context_from_block(loop_context);
 
         let mut complex_conditions = vec![];
@@ -199,7 +202,7 @@ fn analyze<'ctx, 'ast, 'arena>(
                     vec![]
                 });
 
-            pre_condition_clauses.push(clauses)
+            pre_condition_clauses.push(clauses);
         }
 
         let statements_span = match (statements.first(), statements.last()) {
@@ -232,9 +235,6 @@ fn analyze<'ctx, 'ast, 'arena>(
                 );
             }
         }
-    } else {
-        always_assigned_before_loop_body_variables =
-            BlockContext::get_new_or_updated_locals(loop_parent_context, loop_context);
     }
 
     let final_actions = ControlAction::from_statements(statements.iter().collect(), vec![], Some(artifacts), true);
@@ -737,7 +737,7 @@ fn get_assignment_map_depth(first_variable_id: &Atom, assignment_map: &mut BTree
         }
 
         if depth > max_depth {
-            max_depth = depth
+            max_depth = depth;
         }
     }
 
@@ -829,16 +829,14 @@ fn apply_pre_condition_to_loop_context<'ctx, 'arena>(
     Ok(always_assigned_before_loop_body_variables)
 }
 
-fn update_loop_scope_contexts<'ctx, 'arena>(
+fn update_loop_scope_contexts<'ctx>(
     loop_scope: &mut LoopScope,
     loop_context: &mut BlockContext<'ctx>,
     continue_context: &mut BlockContext<'ctx>,
     pre_outer_context: &BlockContext<'ctx>,
-    context: &Context<'ctx, 'arena>,
+    context: &Context<'ctx, '_>,
 ) {
-    if !loop_scope.final_actions.contains(&ControlAction::Continue) {
-        loop_context.locals = pre_outer_context.locals.clone();
-    } else {
+    if loop_scope.final_actions.contains(&ControlAction::Continue) {
         for (variable_id, variable_type) in &loop_scope.redefined_loop_variables {
             continue_context.locals.insert(*variable_id, Rc::new(variable_type.clone()));
         }
@@ -859,6 +857,8 @@ fn update_loop_scope_contexts<'ctx, 'arena>(
                 );
             }
         }
+    } else {
+        loop_context.locals = pre_outer_context.locals.clone();
     }
 }
 

@@ -52,12 +52,12 @@ impl LintRule for NoEvalRule {
                 Detects unsafe uses of the `eval` construct.
                 The `eval` construct executes arbitrary code, which can be a major security risk if not used carefully.
             "},
-            good_example: indoc! {r#"
+            good_example: indoc! {r"
                 <?php
 
                 // Safe alternative to eval
                 $result = json_decode($jsonString);
-            "#},
+            "},
             bad_example: indoc! {r#"
                 <?php
 
@@ -81,7 +81,7 @@ impl LintRule for NoEvalRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let Node::EvalConstruct(eval_construct) = node else {
             return;
         };
@@ -116,12 +116,12 @@ mod tests {
     test_lint_success! {
         name = json_decode_is_safe,
         rule = NoEvalRule,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             $result = json_decode($jsonString);
             echo $result;
-        "#}
+        "}
     }
 
     test_lint_success! {
@@ -162,44 +162,44 @@ mod tests {
     test_lint_failure! {
         name = eval_with_variable_fails,
         rule = NoEvalRule,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             $code = '$a = 1 + 2;';
             eval($code);
-        "#}
+        "}
     }
 
     test_lint_failure! {
         name = eval_in_condition_fails,
         rule = NoEvalRule,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             if ($needsEval) {
                 eval($userInput);
             }
-        "#}
+        "}
     }
 
     test_lint_failure! {
         name = multiple_evals_detected,
         rule = NoEvalRule,
         count = 3,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             eval($code1);
             eval($code2);
             eval($code3);
-        "#}
+        "}
     }
 
     test_lint_failure! {
         name = nested_eval_counted,
         rule = NoEvalRule,
         count = 2,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             function dangerous() {
@@ -209,6 +209,6 @@ mod tests {
                     eval('$y = 2;');
                 }
             }
-        "#}
+        "}
     }
 }

@@ -67,7 +67,7 @@ impl LintRule for UseSpecificAssertionsRule {
                 Using specific assertions like `assertNull`, `assertTrue`, and `assertFalse`
                 provides clearer error messages and makes test intent more explicit.
             "},
-            good_example: indoc! {r#"
+            good_example: indoc! {r"
                 <?php
 
                 declare(strict_types=1);
@@ -83,8 +83,8 @@ impl LintRule for UseSpecificAssertionsRule {
                         $this->assertFalse($condition);
                     }
                 }
-            "#},
-            bad_example: indoc! {r#"
+            "},
+            bad_example: indoc! {r"
                 <?php
 
                 declare(strict_types=1);
@@ -100,7 +100,7 @@ impl LintRule for UseSpecificAssertionsRule {
                         $this->assertEquals(false, $condition);
                     }
                 }
-            "#},
+            "},
             category: Category::Correctness,
             requirements: RuleRequirements::Integration(Integration::PHPUnit),
         };
@@ -118,7 +118,7 @@ impl LintRule for UseSpecificAssertionsRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let Node::Method(method) = node else {
             return;
         };
@@ -164,7 +164,7 @@ impl LintRule for UseSpecificAssertionsRule {
             .with_code(self.meta.code)
             .with_annotation(
                 Annotation::primary(reference.span())
-                    .with_message(format!("This can be simplified to `{}`.", specific_assertion)),
+                    .with_message(format!("This can be simplified to `{specific_assertion}`.")),
             )
             .with_help(format!(
                 "Replace `{}(...)` with `{}(...)` for a more specific assertion.",
@@ -277,7 +277,7 @@ mod tests {
     test_lint_success! {
         name = specific_assertions_not_flagged,
         rule = UseSpecificAssertionsRule,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             use PHPUnit\Framework\TestCase;
@@ -291,13 +291,13 @@ mod tests {
                     $this->assertFalse($condition);
                 }
             }
-        "#}
+        "}
     }
 
     test_lint_success! {
         name = non_null_bool_literals_not_flagged,
         rule = UseSpecificAssertionsRule,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             use PHPUnit\Framework\TestCase;
@@ -310,13 +310,13 @@ mod tests {
                     self::assertSame('foo', $bar);
                 }
             }
-        "#}
+        "}
     }
 
     test_lint_success! {
         name = variable_comparisons_not_flagged,
         rule = UseSpecificAssertionsRule,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             use PHPUnit\Framework\TestCase;
@@ -328,14 +328,14 @@ mod tests {
                     $this->assertEquals($expected, $actual);
                 }
             }
-        "#}
+        "}
     }
 
     test_lint_failure! {
         name = assert_equals_null_first_position,
         rule = UseSpecificAssertionsRule,
         count = 1,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             use PHPUnit\Framework\TestCase;
@@ -347,14 +347,14 @@ mod tests {
                     $this->assertEquals(null, $value);
                 }
             }
-        "#}
+        "}
     }
 
     test_lint_failure! {
         name = assert_equals_null_second_position,
         rule = UseSpecificAssertionsRule,
         count = 1,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             use PHPUnit\Framework\TestCase;
@@ -366,14 +366,14 @@ mod tests {
                     self::assertEquals($value, null);
                 }
             }
-        "#}
+        "}
     }
 
     test_lint_failure! {
         name = assert_same_null,
         rule = UseSpecificAssertionsRule,
         count = 1,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             use PHPUnit\Framework\TestCase;
@@ -385,14 +385,14 @@ mod tests {
                     static::assertSame(null, $value);
                 }
             }
-        "#}
+        "}
     }
 
     test_lint_failure! {
         name = assert_not_equals_null,
         rule = UseSpecificAssertionsRule,
         count = 1,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             use PHPUnit\Framework\TestCase;
@@ -404,14 +404,14 @@ mod tests {
                     $this->assertNotEquals(null, $value);
                 }
             }
-        "#}
+        "}
     }
 
     test_lint_failure! {
         name = assert_not_same_null,
         rule = UseSpecificAssertionsRule,
         count = 1,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             use PHPUnit\Framework\TestCase;
@@ -423,14 +423,14 @@ mod tests {
                     self::assertNotSame($value, null);
                 }
             }
-        "#}
+        "}
     }
 
     test_lint_failure! {
         name = assert_equals_true,
         rule = UseSpecificAssertionsRule,
         count = 1,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             use PHPUnit\Framework\TestCase;
@@ -442,14 +442,14 @@ mod tests {
                     $this->assertEquals(true, $flag);
                 }
             }
-        "#}
+        "}
     }
 
     test_lint_failure! {
         name = assert_same_true_second_position,
         rule = UseSpecificAssertionsRule,
         count = 1,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             use PHPUnit\Framework\TestCase;
@@ -461,14 +461,14 @@ mod tests {
                     self::assertSame($result, true);
                 }
             }
-        "#}
+        "}
     }
 
     test_lint_failure! {
         name = assert_equals_false,
         rule = UseSpecificAssertionsRule,
         count = 1,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             use PHPUnit\Framework\TestCase;
@@ -480,14 +480,14 @@ mod tests {
                     $this->assertEquals(false, $flag);
                 }
             }
-        "#}
+        "}
     }
 
     test_lint_failure! {
         name = assert_same_false,
         rule = UseSpecificAssertionsRule,
         count = 1,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             use PHPUnit\Framework\TestCase;
@@ -499,14 +499,14 @@ mod tests {
                     static::assertSame(false, $value);
                 }
             }
-        "#}
+        "}
     }
 
     test_lint_failure! {
         name = multiple_specific_assertions,
         rule = UseSpecificAssertionsRule,
         count = 3,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             use PHPUnit\Framework\TestCase;
@@ -520,6 +520,6 @@ mod tests {
                     static::assertEquals(false, $c);
                 }
             }
-        "#}
+        "}
     }
 }

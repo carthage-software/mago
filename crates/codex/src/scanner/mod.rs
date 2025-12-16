@@ -155,7 +155,7 @@ impl<'ctx, 'arena> MutWalker<'arena, 'arena, Context<'ctx, 'arena>> for Scanner 
         self.template_constraints.push({
             let mut constraints: TemplateConstraintList = vec![];
             for (template_name, template_constraints) in &metadata.template_types {
-                constraints.push((*template_name, template_constraints.to_vec()));
+                constraints.push((*template_name, template_constraints.clone()));
             }
 
             constraints
@@ -190,7 +190,7 @@ impl<'ctx, 'arena> MutWalker<'arena, 'arena, Context<'ctx, 'arena>> for Scanner 
         self.template_constraints.push({
             let mut constraints: TemplateConstraintList = vec![];
             for (template_name, template_constraints) in &metadata.template_types {
-                constraints.push((*template_name, template_constraints.to_vec()));
+                constraints.push((*template_name, template_constraints.clone()));
             }
 
             constraints
@@ -230,7 +230,7 @@ impl<'ctx, 'arena> MutWalker<'arena, 'arena, Context<'ctx, 'arena>> for Scanner 
         self.template_constraints.push({
             let mut constraints: TemplateConstraintList = vec![];
             for (template_name, template_constraints) in &metadata.template_types {
-                constraints.push((*template_name, template_constraints.to_vec()));
+                constraints.push((*template_name, template_constraints.clone()));
             }
 
             constraints
@@ -450,7 +450,7 @@ impl<'ctx, 'arena> MutWalker<'arena, 'arena, Context<'ctx, 'arena>> for Scanner 
         self.template_constraints.push({
             let mut constraints: TemplateConstraintList = vec![];
             for (template_name, template_constraints) in &function_like_metadata.template_types {
-                constraints.push((*template_name, template_constraints.to_vec()));
+                constraints.push((*template_name, template_constraints.clone()));
             }
 
             constraints
@@ -496,7 +496,7 @@ impl<'ctx, 'arena> MutWalker<'arena, 'arena, Context<'ctx, 'arena>> for Scanner 
     }
 }
 
-fn finalize_class_like<'ctx, 'arena>(scanner: &mut Scanner, context: &mut Context<'ctx, 'arena>) {
+fn finalize_class_like(scanner: &mut Scanner, context: &mut Context<'_, '_>) {
     let has_constructor = scanner.has_constructor;
     scanner.has_constructor = false;
 

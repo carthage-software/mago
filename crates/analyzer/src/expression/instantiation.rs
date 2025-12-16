@@ -56,7 +56,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Instantiation<'arena> {
         if classnames.len() > 1 {
             let possible_class_names_str = classnames
                 .iter()
-                .map(|classname| classname.fqcn.map(|id| id.as_str()).unwrap_or("<unknown>"))
+                .map(|classname| classname.fqcn.map_or("<unknown>", |id| id.as_str()))
                 .collect::<Vec<_>>()
                 .join(", ");
 
@@ -349,7 +349,7 @@ fn analyze_class_instantiation<'ctx, 'arena>(
         }
 
         let mut resolved_template_types = vec![];
-        for (template_name, base_type) in metadata.template_types.iter() {
+        for (template_name, base_type) in &metadata.template_types {
             let template_type = if let Some(lower_bounds) =
                 template_result.get_lower_bounds_for_class_like(template_name, &metadata.name)
             {
@@ -498,7 +498,7 @@ mod tests {
 
     test_analysis! {
         name = templated_class_instantiation,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             /**
@@ -538,7 +538,7 @@ mod tests {
 
             $collection = new Collection(['age' => 30]);
             i_take_string_collection($collection); // error
-        "#},
+        "},
         issues = [
             IssueCode::InvalidArgument, // expected Collection<string, string>, got Collection<string, int>
         ],
@@ -546,7 +546,7 @@ mod tests {
 
     test_analysis! {
         name = ambiguous_instantiation_target,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             class A {}
@@ -561,7 +561,7 @@ mod tests {
 
                 return $instance;
             }
-        "#},
+        "},
         issues = [
             IssueCode::AmbiguousInstantiationTarget, // `new $instance` could be A, B, C, or <unknown>
             IssueCode::UnsafeInstantiation, // `A` is not final
@@ -572,13 +572,13 @@ mod tests {
 
     test_analysis! {
         name = instantiation_of_interface,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             interface MyInterface {}
 
             $a = new MyInterface();
-        "#},
+        "},
         issues = [
             IssueCode::InterfaceInstantiation,
             IssueCode::ImpossibleAssignment, // $a becomes never
@@ -587,13 +587,13 @@ mod tests {
 
     test_analysis! {
         name = instantiation_of_trait,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             trait MyTrait {}
 
             $a = new MyTrait();
-        "#},
+        "},
         issues = [
             IssueCode::TraitInstantiation,
             IssueCode::ImpossibleAssignment, // $a becomes never
@@ -602,13 +602,13 @@ mod tests {
 
     test_analysis! {
         name = instantiation_of_enum,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             enum MyEnum {}
 
             $a = new MyEnum();
-        "#},
+        "},
         issues = [
             IssueCode::EnumInstantiation,
             IssueCode::ImpossibleAssignment, // $a becomes never
@@ -617,13 +617,13 @@ mod tests {
 
     test_analysis! {
         name = instantiation_of_abstract_class,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             abstract class MyAbstractClass {}
 
             $a = new MyAbstractClass();
-        "#},
+        "},
         issues = [
             IssueCode::AbstractInstantiation,
             IssueCode::ImpossibleAssignment, // $a becomes never
@@ -632,11 +632,11 @@ mod tests {
 
     test_analysis! {
         name = instantiation_self_outside_class,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             $a = new self();
-        "#},
+        "},
         issues = [
             IssueCode::SelfOutsideClassScope,
             IssueCode::ImpossibleAssignment, // $a becomes never
@@ -645,11 +645,11 @@ mod tests {
 
     test_analysis! {
         name = instantiation_static_outside_class,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             $a = new static();
-        "#},
+        "},
         issues = [
             IssueCode::StaticOutsideClassScope,
             IssueCode::ImpossibleAssignment, // $a becomes never
@@ -658,11 +658,11 @@ mod tests {
 
     test_analysis! {
         name = instantiation_parent_outside_class,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             $a = new parent();
-        "#},
+        "},
         issues = [
             IssueCode::ParentOutsideClassScope,
             IssueCode::ImpossibleAssignment, // $a becomes never
@@ -671,11 +671,11 @@ mod tests {
 
     test_analysis! {
         name = instantiation_of_undefined_class,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             $a = new NonExistentClass();
-        "#},
+        "},
         issues = [
             IssueCode::NonExistentClass,
             IssueCode::ImpossibleAssignment, // $a becomes never
@@ -684,13 +684,13 @@ mod tests {
 
     test_analysis! {
         name = instantiation_from_invalid_expression_type,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             $className = 123; // Not a class string
 
             $a = new $className();
-        "#},
+        "},
         issues = [
             IssueCode::InvalidClassStringExpression,
             IssueCode::ImpossibleAssignment, // `$a` becomes never
@@ -699,14 +699,14 @@ mod tests {
 
     test_analysis! {
         name = instantiation_from_general_string_variable,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             /** @param string $className */
             function create_instance(string $className) {
                 return new $className();
             }
-        "#},
+        "},
         issues = [
             IssueCode::UnknownClassInstantiation, // `new $className()` could be any object
         ]
@@ -714,13 +714,13 @@ mod tests {
 
     test_analysis! {
         name = instantiation_from_mixed_variable,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
             /** @param mixed $className */
             function create_instance_mixed($className) {
                 return new $className();
             }
-        "#},
+        "},
         issues = [
             IssueCode::UnknownClassInstantiation, // `new $className()` could be any object
         ]
@@ -728,29 +728,29 @@ mod tests {
 
     test_analysis! {
         name = instantiation_too_many_args_no_constructor,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
             class NoConstructor {}
             $a = new NoConstructor(1, 2, 3);
-        "#},
+        "},
         issues = [IssueCode::TooManyArguments]
     }
 
     test_analysis! {
         name = instantiation_too_many_args_with_constructor,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
             class WithConstructor {
                 public function __construct(int $a, int $b) {}
             }
             $a = new WithConstructor(1, 2, 3);
-        "#},
+        "},
         issues = [IssueCode::TooManyArguments]
     }
 
     test_analysis! {
         name = instantiation_with_child_constructor,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             class Base {
@@ -762,7 +762,7 @@ mod tests {
             }
 
             $a = new Child(1);
-        "#},
+        "},
         issues = [
             IssueCode::InvalidArgument,
         ]
@@ -770,7 +770,7 @@ mod tests {
 
     test_analysis! {
         name = instantiation_with_parent_constructor,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             class Base {
@@ -781,12 +781,12 @@ mod tests {
             }
 
             $a = new Child(1);
-        "#}
+        "}
     }
 
     test_analysis! {
         name = resolve_nested_type_parameters,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             /**
@@ -815,12 +815,12 @@ mod tests {
             function get_box_of_box_of_box(): Box {
                 return new Box(new Box(new Box(42)));
             }
-        "#},
+        "},
     }
 
     test_analysis! {
         name = handles_recursive_type,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             /** @template T */
@@ -831,12 +831,12 @@ mod tests {
                     return new Example();
                 }
             }
-        "#},
+        "},
     }
 
     test_analysis! {
         name = self_is_static_in_final_class,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             /**
@@ -863,6 +863,6 @@ mod tests {
                     return new self(); // `self` is same as `static` since the class is final
                 }
             }
-        "#},
+        "},
     }
 }

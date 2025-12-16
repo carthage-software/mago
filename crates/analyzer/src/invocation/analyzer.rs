@@ -41,9 +41,9 @@ use crate::invocation::template_result::populate_template_result_from_invocation
 use crate::invocation::template_result::refine_template_result_for_function_like;
 
 /// Finds the parameter that corresponds to a given argument.
-fn get_parameter_of_argument<'invocation, 'ast, 'arena>(
+fn get_parameter_of_argument<'invocation>(
     parameters: &[InvocationTargetParameter<'invocation>],
-    argument: &InvocationArgument<'ast, 'arena>,
+    argument: &InvocationArgument<'_, '_>,
     mut argument_offset: usize,
 ) -> Option<(usize, InvocationTargetParameter<'invocation>)> {
     // Handle both named arguments and named placeholders
@@ -68,7 +68,9 @@ fn find_named_parameter_offset(
 
 /// Adjusts argument offset for variadic parameters.
 fn adjust_offset_for_variadic(parameters: &[InvocationTargetParameter<'_>], argument_offset: usize) -> usize {
-    if argument_offset >= parameters.len() && parameters.last().is_some_and(|last_param| last_param.is_variadic()) {
+    if argument_offset >= parameters.len()
+        && parameters.last().is_some_and(super::InvocationTargetParameter::is_variadic)
+    {
         parameters.len() - 1
     } else {
         argument_offset
@@ -76,11 +78,11 @@ fn adjust_offset_for_variadic(parameters: &[InvocationTargetParameter<'_>], argu
 }
 
 /// Analyzes and verifies arguments passed to a function, method, or callable.
-pub fn analyze_invocation<'ctx, 'ast, 'arena>(
+pub fn analyze_invocation<'ctx, 'arena>(
     context: &mut Context<'ctx, 'arena>,
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
-    invocation: &Invocation<'ctx, 'ast, 'arena>,
+    invocation: &Invocation<'ctx, '_, 'arena>,
     calling_class_like: Option<(Atom, Option<&TAtomic>)>,
     template_result: &mut TemplateResult,
     parameter_types: &mut AtomMap<TUnion>,
@@ -101,7 +103,7 @@ pub fn analyze_invocation<'ctx, 'ast, 'arena>(
             unpacked_arguments.push(argument);
         } else if argument.is_placeholder() {
             non_closure_arguments.push((offset, argument));
-        } else if matches!(argument.value(), Some(Expression::Closure(_)) | Some(Expression::ArrowFunction(_))) {
+        } else if matches!(argument.value(), Some(Expression::Closure(_) | Expression::ArrowFunction(_))) {
             closure_arguments.push((offset, argument));
         } else {
             non_closure_arguments.push((offset, argument));
@@ -281,7 +283,19 @@ pub fn analyze_invocation<'ctx, 'ast, 'arena>(
                         .with_help("Remove one of the duplicate named arguments."),
                     );
                 } else if let Some(previous_span) = assigned_parameters_by_position.get(&parameter_offset) {
-                    if !parameter_ref.is_variadic() {
+                    if parameter_ref.is_variadic() {
+                        context.collector.report_with_code(
+                            IssueCode::NamedArgumentAfterPositional,
+                             Issue::warning(format!(
+                                "Named argument `${}` for {} `{}` targets a variadic parameter that has already captured positional arguments.",
+                                named_argument.name.value, target_kind_str, target_name_str
+                            ))
+                            .with_annotation(Annotation::primary(named_argument.name.span()).with_message("Named argument for variadic parameter"))
+                            .with_annotation(Annotation::secondary(*previous_span).with_message("Positional arguments already captured by variadic here"))
+                            .with_note("Mixing positional and named arguments for the same variadic parameter can be confusing and may lead to unexpected behavior depending on PHP version and argument unpacking.")
+                            .with_help("Consider providing all arguments for the variadic parameter either positionally or via unpacking a named array."),
+                        );
+                    } else {
                         context.collector.report_with_code(
                             IssueCode::NamedArgumentOverridesPositional,
                             Issue::error(format!(
@@ -296,18 +310,6 @@ pub fn analyze_invocation<'ctx, 'ast, 'arena>(
                                     .with_message("Parameter already filled by positional argument here"),
                             )
                             .with_help("Provide the argument either positionally or by name, but not both."),
-                        );
-                    } else {
-                        context.collector.report_with_code(
-                            IssueCode::NamedArgumentAfterPositional,
-                             Issue::warning(format!(
-                                "Named argument `${}` for {} `{}` targets a variadic parameter that has already captured positional arguments.",
-                                named_argument.name.value, target_kind_str, target_name_str
-                            ))
-                            .with_annotation(Annotation::primary(named_argument.name.span()).with_message("Named argument for variadic parameter"))
-                            .with_annotation(Annotation::secondary(*previous_span).with_message("Positional arguments already captured by variadic here"))
-                            .with_note("Mixing positional and named arguments for the same variadic parameter can be confusing and may lead to unexpected behavior depending on PHP version and argument unpacking.")
-                            .with_help("Consider providing all arguments for the variadic parameter either positionally or via unpacking a named array."),
                         );
                     }
                     assigned_parameters_by_name.insert(named_argument.name.value, named_argument.name.span());
@@ -357,7 +359,8 @@ pub fn analyze_invocation<'ctx, 'ast, 'arena>(
             let argument_name = named_argument.name.value;
 
             // For variadic functions, allow extra named arguments
-            let has_variadic_parameter = parameter_refs.last().is_some_and(|p| p.is_variadic());
+            let has_variadic_parameter =
+                parameter_refs.last().is_some_and(super::InvocationTargetParameter::is_variadic);
 
             if !has_variadic_parameter {
                 context.collector.report_with_code(
@@ -381,7 +384,7 @@ pub fn analyze_invocation<'ctx, 'ast, 'arena>(
                         } else {
                             let available_params: Vec<_> = parameter_refs
                                 .iter()
-                                .filter_map(|p| p.get_name())
+                                .filter_map(super::InvocationTargetParameter::get_name)
                                 .map(|n| n.0.trim_start_matches('$'))
                                 .collect();
                             format!("Available parameters are: `{}`.", available_params.join("`, `"))
@@ -423,7 +426,7 @@ pub fn analyze_invocation<'ctx, 'ast, 'arena>(
             );
 
             let default_type =
-                unused_parameter.get_default_type().map(Cow::Borrowed).unwrap_or_else(|| Cow::Owned(get_mixed()));
+                unused_parameter.get_default_type().map_or_else(|| Cow::Owned(get_mixed()), Cow::Borrowed);
 
             infer_parameter_templates_from_default(context, &parameter_type, &default_type, template_result);
 
@@ -556,7 +559,7 @@ pub fn analyze_invocation<'ctx, 'ast, 'arena>(
                 let all_arguments = invocation.arguments_source.get_arguments();
                 let mut current_parameter_position = 0;
 
-                for argument in all_arguments.into_iter() {
+                for argument in all_arguments {
                     if argument.is_unpacked() {
                         let Some(argument_expression) = argument.value() else {
                             continue;
@@ -680,7 +683,7 @@ pub fn analyze_invocation<'ctx, 'ast, 'arena>(
         issue = issue.with_help("Provide all required arguments.");
         context.collector.report_with_code(IssueCode::TooFewArguments, issue);
     } else if has_too_many_arguments
-        || (!parameter_refs.last().is_some_and(|p| p.is_variadic())
+        || (!parameter_refs.last().is_some_and(super::InvocationTargetParameter::is_variadic)
             && number_of_provided_parameters > max_params
             && max_params > 0)
     {
@@ -688,8 +691,7 @@ pub fn analyze_invocation<'ctx, 'ast, 'arena>(
             .arguments_source
             .get_arguments()
             .get(max_params)
-            .map(|arg| arg.span())
-            .unwrap_or_else(|| invocation.arguments_source.span());
+            .map_or_else(|| invocation.arguments_source.span(), mago_span::HasSpan::span);
 
         let main_message = match invocation.arguments_source {
             InvocationArgumentsSource::PipeInput(_) => format!(
@@ -730,8 +732,8 @@ pub fn analyze_invocation<'ctx, 'ast, 'arena>(
 }
 
 /// Gets the effective parameter type, expanding class-relative types based on call context.
-fn get_parameter_type<'ctx, 'arena>(
-    context: &Context<'ctx, 'arena>,
+fn get_parameter_type<'ctx>(
+    context: &Context<'ctx, '_>,
     invocation_target_parameter: Option<InvocationTargetParameter<'_>>,
     base_class_metadata: Option<&'ctx ClassLikeMetadata>,
     calling_class_like_metadata: Option<&'ctx ClassLikeMetadata>,
@@ -793,7 +795,7 @@ fn validate_unpacked_argument_elements<'ctx, 'arena>(
         match array {
             TArray::List(list) => {
                 if let Some(known_elements) = &list.known_elements {
-                    for (array_index, (_, element_type)) in known_elements.iter() {
+                    for (array_index, (_, element_type)) in known_elements {
                         let parameter_position = starting_parameter_position + array_index;
                         if parameter_position >= parameter_refs.len() {
                             break;
@@ -933,7 +935,7 @@ fn validate_keyed_array_elements<'ctx, 'arena>(
         return;
     };
 
-    for (array_key, (_, element_type)) in known_items.iter() {
+    for (array_key, (_, element_type)) in known_items {
         let parameter_name = match array_key {
             ArrayKey::String(key_str) => concat_atom!("$", key_str),
             ArrayKey::Integer(key_int) => {
@@ -998,7 +1000,8 @@ fn validate_keyed_array_elements<'ctx, 'arena>(
             let argument_name = key_str.as_str();
 
             // For variadic functions, allow extra named arguments
-            let has_variadic_parameter = parameter_refs.last().is_some_and(|p| p.is_variadic());
+            let has_variadic_parameter =
+                parameter_refs.last().is_some_and(super::InvocationTargetParameter::is_variadic);
 
             if !has_variadic_parameter {
                 context.collector.report_with_code(

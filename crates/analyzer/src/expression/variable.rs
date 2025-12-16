@@ -106,8 +106,8 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for NestedVariable<'arena> {
     }
 }
 
-fn read_variable<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+fn read_variable<'ctx>(
+    context: &mut Context<'ctx, '_>,
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     variable_name: &str,
@@ -236,7 +236,7 @@ fn read_variable<'ctx, 'arena>(
     variable_type
 }
 
-fn find_similar_variable_names<'ctx>(context: &BlockContext<'ctx>, target: &str) -> Vec<String> {
+fn find_similar_variable_names(context: &BlockContext<'_>, target: &str) -> Vec<String> {
     let mut suggestions: Vec<(usize, &str)> = Vec::new();
 
     for local in context.locals.keys() {

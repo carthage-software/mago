@@ -37,7 +37,27 @@ impl Fingerprintable for UnaryPrefixOperator<'_> {
         _resolved_names: &ResolvedNames,
         _options: &FingerprintOptions<'_>,
     ) {
-        use UnaryPrefixOperator::*;
+        use UnaryPrefixOperator::ArrayCast;
+        use UnaryPrefixOperator::BinaryCast;
+        use UnaryPrefixOperator::BitwiseNot;
+        use UnaryPrefixOperator::BoolCast;
+        use UnaryPrefixOperator::BooleanCast;
+        use UnaryPrefixOperator::DoubleCast;
+        use UnaryPrefixOperator::ErrorControl;
+        use UnaryPrefixOperator::FloatCast;
+        use UnaryPrefixOperator::IntCast;
+        use UnaryPrefixOperator::IntegerCast;
+        use UnaryPrefixOperator::Negation;
+        use UnaryPrefixOperator::Not;
+        use UnaryPrefixOperator::ObjectCast;
+        use UnaryPrefixOperator::Plus;
+        use UnaryPrefixOperator::PreDecrement;
+        use UnaryPrefixOperator::PreIncrement;
+        use UnaryPrefixOperator::RealCast;
+        use UnaryPrefixOperator::Reference;
+        use UnaryPrefixOperator::StringCast;
+        use UnaryPrefixOperator::UnsetCast;
+        use UnaryPrefixOperator::VoidCast;
 
         match self {
             ErrorControl(_) => "@".hash(hasher),
@@ -68,7 +88,8 @@ impl Fingerprintable for UnaryPostfixOperator {
         _resolved_names: &ResolvedNames,
         _options: &FingerprintOptions<'_>,
     ) {
-        use UnaryPostfixOperator::*;
+        use UnaryPostfixOperator::PostDecrement;
+        use UnaryPostfixOperator::PostIncrement;
 
         match self {
             PostIncrement(_) => "++".hash(hasher),

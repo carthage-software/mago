@@ -138,8 +138,8 @@ impl HasSpan for ShapeAdditionalFields<'_> {
 impl std::fmt::Display for ShapeKey<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ShapeKey::String { value, .. } => write!(f, "{}", value),
-            ShapeKey::Integer { value, .. } => write!(f, "{}", value),
+            ShapeKey::String { value, .. } => write!(f, "{value}"),
+            ShapeKey::Integer { value, .. } => write!(f, "{value}"),
         }
     }
 }

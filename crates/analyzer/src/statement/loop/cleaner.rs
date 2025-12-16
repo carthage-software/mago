@@ -17,7 +17,7 @@ impl<'ast, 'arena> Walker<'ast, 'arena, AnalysisArtifacts> for TypeCleaningWalke
     }
 }
 
-pub fn clean_nodes<'ast, 'arena>(stmts: &'ast [Statement<'arena>], artifacts: &mut AnalysisArtifacts) {
+pub fn clean_nodes(stmts: &[Statement<'_>], artifacts: &mut AnalysisArtifacts) {
     for stmt in stmts {
         TypeCleaningWalker.walk_statement(stmt, artifacts);
     }

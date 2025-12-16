@@ -282,7 +282,7 @@ impl TClassLikeString {
 }
 
 impl TType for TClassLikeString {
-    fn get_child_nodes<'a>(&'a self) -> Vec<TypeRef<'a>> {
+    fn get_child_nodes(&self) -> Vec<TypeRef<'_>> {
         let mut children = vec![];
 
         if let Some(constraint) = self.constraint() {

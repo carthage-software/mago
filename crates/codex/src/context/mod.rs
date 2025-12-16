@@ -118,7 +118,7 @@ impl<'ctx> ScopeContext<'ctx> {
 
     /// Returns the property hook context, if available.
     ///
-    /// Returns a tuple of (property_name, hook_metadata) when analyzing a property hook body.
+    /// Returns a tuple of (`property_name`, `hook_metadata`) when analyzing a property hook body.
     #[inline]
     pub fn get_property_hook(&self) -> Option<(Atom, &'ctx PropertyHookMetadata)> {
         self.property_hook

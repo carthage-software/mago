@@ -15,8 +15,8 @@ use crate::context::Context;
 /// A constant should only be reported as missing a type hint if:
 /// 1. It has no type hint
 /// 2. Typed class constants are supported in the target PHP version
-pub fn check_constant_type_hint<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+pub fn check_constant_type_hint<'arena>(
+    context: &mut Context<'_, 'arena>,
     class_like_constant: &ClassLikeConstant<'arena>,
 ) {
     if !context.settings.check_missing_type_hints
@@ -52,8 +52,8 @@ pub fn check_constant_type_hint<'ctx, 'arena>(
 /// 2. It is not prefixed with `$_` (ignored by convention)
 /// 3. It would be safe to add a type hint (i.e., no parent class/trait has the same property without a type hint)
 /// 4. Typed properties are supported in the target PHP version
-pub fn check_property_type_hint<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+pub fn check_property_type_hint<'arena>(
+    context: &mut Context<'_, 'arena>,
     class_like_metadata: &ClassLikeMetadata,
     property: &Property<'arena>,
 ) {
@@ -120,8 +120,8 @@ pub fn check_property_type_hint<'ctx, 'arena>(
 /// 3. The method is not overriding a parent method (where adding a type hint might cause issues)
 /// 4. If it's a closure/arrow function parameter, the corresponding ignore setting is not enabled
 /// 5. Typed parameters are supported in the target PHP version
-pub fn check_parameter_type_hint<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+pub fn check_parameter_type_hint<'arena>(
+    context: &mut Context<'_, 'arena>,
     class_like_metadata: Option<&ClassLikeMetadata>,
     function_like_metadata: &FunctionLikeMetadata,
     parameter: &FunctionLikeParameter<'arena>,
@@ -174,8 +174,8 @@ pub fn check_parameter_type_hint<'ctx, 'arena>(
 /// 3. If it's a method, it's not overriding a parent method
 /// 4. If it's a closure/arrow function, the corresponding ignore setting is not enabled
 /// 5. Return type hints are supported in the target PHP version
-pub fn check_return_type_hint<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+pub fn check_return_type_hint<'arena>(
+    context: &mut Context<'_, 'arena>,
     class_like_metadata: Option<&ClassLikeMetadata>,
     function_like_metadata: &FunctionLikeMetadata,
     function_name: &str,
@@ -216,14 +216,14 @@ pub fn check_return_type_hint<'ctx, 'arena>(
     }
 
     context.collector.report(
-        Issue::warning(format!("Function `{}` is missing a return type hint.", function_name))
+        Issue::warning(format!("Function `{function_name}` is missing a return type hint."))
             .with_code(IssueCode::MissingReturnType.as_str())
             .with_annotation(
                 Annotation::primary(span)
-                    .with_message(format!("Function `{}` declared here without a return type hint", function_name)),
+                    .with_message(format!("Function `{function_name}` declared here without a return type hint")),
             )
             .with_note("Return type hints improve code readability and help prevent type-related errors.")
-            .with_help(format!("Consider adding a return type hint to function `{}`.", function_name)),
+            .with_help(format!("Consider adding a return type hint to function `{function_name}`.")),
     );
 }
 

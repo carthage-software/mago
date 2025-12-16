@@ -55,18 +55,18 @@ impl LintRule for RequirePregQuoteDelimiterRule {
                 failing to provide the second argument will prevent that character from being escaped,
                 which can break the regular expression.
             "},
-            good_example: indoc! {r#"
+            good_example: indoc! {r"
                 <?php
 
                 // The delimiter is provided, ensuring it gets escaped if necessary.
                 $pattern = '/' . preg_quote( $user_input, '/' ) . '/';
-            "#},
-            bad_example: indoc! {r#"
+            "},
+            bad_example: indoc! {r"
                 <?php
 
                 // If $user_input contains '/', the regex will be invalid.
                 $pattern = '/' . preg_quote( $user_input ) . '/';
-            "#},
+            "},
             category: Category::Security,
             requirements: RuleRequirements::None,
         };
@@ -84,7 +84,7 @@ impl LintRule for RequirePregQuoteDelimiterRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let Node::FunctionCall(function_call) = node else {
             return;
         };

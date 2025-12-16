@@ -58,17 +58,17 @@ impl LintRule for NoRolesAsCapabilitiesRule {
                 granular capability (e.g., `'edit_posts'`). Checking against specific capabilities is a
                 core security principle in WordPress.
             "},
-            good_example: indoc! {r#"
+            good_example: indoc! {r"
                 <?php
 
                 if ( current_user_can( 'edit_posts' ) ) { /* ... */ }
-            "#},
-            bad_example: indoc! {r#"
+            "},
+            bad_example: indoc! {r"
                 <?php
 
                 // This check is brittle and will fail if roles are customized.
                 if ( current_user_can( 'editor' ) ) { /* ... */ }
-            "#},
+            "},
             category: Category::Security,
             requirements: RuleRequirements::Integration(Integration::WordPress),
         };
@@ -86,7 +86,7 @@ impl LintRule for NoRolesAsCapabilitiesRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let Node::FunctionCall(function_call) = node else {
             return;
         };
@@ -109,7 +109,7 @@ impl LintRule for NoRolesAsCapabilitiesRule {
                     .with_code(self.meta.code)
                     .with_annotation(
                         Annotation::primary(first_arg.value.span())
-                            .with_message(format!("Role '{}' used instead of capability", role_name)),
+                            .with_message(format!("Role '{role_name}' used instead of capability")),
                     )
                     .with_note("Checking against specific capabilities instead of roles makes code more flexible and secure.")
                     .with_help("Use `'edit_posts'`, `'manage_options'`, etc. instead of roles like `'administrator'` or `'editor'`.");
@@ -119,7 +119,7 @@ impl LintRule for NoRolesAsCapabilitiesRule {
     }
 }
 
-/// Check if a string is a known WordPress role
+/// Check if a string is a known `WordPress` role
 fn is_wordpress_role(role: &str) -> bool {
     matches!(
         role,

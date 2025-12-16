@@ -50,20 +50,20 @@ impl LintRule for IdentityComparisonRule {
             description: indoc! {"
                 Detects equality and inequality comparisons that should use identity comparison operators.
             "},
-            good_example: indoc! {r#"
+            good_example: indoc! {r"
                 <?php
 
                 if ($a === $b) {
                     echo '$a is same as $b';
                 }
-            "#},
-            bad_example: indoc! {r#"
+            "},
+            bad_example: indoc! {r"
                 <?php
 
                 if ($a == $b) {
                     echo '$a is same as $b';
                 }
-            "#},
+            "},
             category: Category::Correctness,
 
             requirements: RuleRequirements::None,
@@ -82,7 +82,7 @@ impl LintRule for IdentityComparisonRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let Node::Binary(binary) = node else {
             return;
         };

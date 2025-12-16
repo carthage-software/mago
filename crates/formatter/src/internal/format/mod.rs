@@ -653,7 +653,7 @@ impl<'arena> Format<'arena> for ClassLikeConstant<'arena> {
             if let Some(attributes) = misc::print_attribute_list_sequence(f, &self.attribute_lists) {
                 contents.push(attributes);
                 contents.push(Document::Line(Line::hard()));
-            };
+            }
 
             if !self.modifiers.is_empty() {
                 contents.extend(print_modifiers(f, &self.modifiers));

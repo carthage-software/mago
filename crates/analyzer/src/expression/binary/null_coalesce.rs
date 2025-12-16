@@ -124,7 +124,7 @@ pub fn analyze_null_coalesce_operation<'ctx, 'arena>(
         block_context.has_returned &= has_returned;
 
         let rhs_type =
-            artifacts.get_expression_type(&binary.rhs).map(Cow::Borrowed).unwrap_or_else(|| Cow::Owned(get_mixed()));
+            artifacts.get_expression_type(&binary.rhs).map_or_else(|| Cow::Owned(get_mixed()), Cow::Borrowed);
 
         rhs_is_never = rhs_type.is_never();
 
@@ -136,7 +136,7 @@ pub fn analyze_null_coalesce_operation<'ctx, 'arena>(
     if result_type.is_nullable()
         && let (Some(lhs_var), Some(rhs_var)) = (get_variable_name(binary.lhs), get_variable_name(binary.rhs))
     {
-        for clause in block_context.clauses.iter() {
+        for clause in &block_context.clauses {
             if clause.possibilities.len() == 2
                 && clause.possibilities.contains_key(&lhs_var)
                 && clause.possibilities.contains_key(&rhs_var)
@@ -198,7 +198,7 @@ pub fn analyze_null_coalesce_operation<'ctx, 'arena>(
     Ok(())
 }
 
-fn get_variable_name<'arena>(expr: &Expression<'arena>) -> Option<Atom> {
+fn get_variable_name(expr: &Expression<'_>) -> Option<Atom> {
     match unwrap_expression(expr) {
         Expression::Variable(Variable::Direct(var)) => Some(atom(var.name)),
         _ => None,

@@ -23,10 +23,10 @@ pub trait ExpressionThrowTypeProvider: Provider {
     ///
     /// Returns a set of fully qualified exception class names.
     /// Returns an empty set if the expression doesn't throw.
-    fn get_thrown_exceptions<'ast, 'arena>(
+    fn get_thrown_exceptions(
         &self,
         context: &ProviderContext<'_, '_, '_>,
-        expression: &'ast Expression<'arena>,
+        expression: &Expression<'_>,
     ) -> HashSet<Atom>;
 }
 

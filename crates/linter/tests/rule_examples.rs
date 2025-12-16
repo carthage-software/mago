@@ -28,18 +28,16 @@ fn test_all_rule_examples() {
 
         let bad_result = test_code_snippet(rule_code, rule_meta.bad_example, true);
         if let Err(e) = bad_result {
-            failures.push(format!("Rule '{}': Bad example issue - {}", rule_code, e));
+            failures.push(format!("Rule '{rule_code}': Bad example issue - {e}"));
         }
 
         let good_result = test_code_snippet(rule_code, rule_meta.good_example, false);
         if let Err(e) = good_result {
-            failures.push(format!("Rule '{}': Good example issue - {}", rule_code, e));
+            failures.push(format!("Rule '{rule_code}': Good example issue - {e}"));
         }
     }
 
-    if !failures.is_empty() {
-        panic!("\n\n{} rule example(s) failed:\n\n{}\n\n", failures.len(), failures.join("\n"));
-    }
+    assert!(failures.is_empty(), "\n\n{} rule example(s) failed:\n\n{}\n\n", failures.len(), failures.join("\n"));
 }
 
 /// Test a code snippet and verify it produces (or doesn't produce) issues
@@ -51,7 +49,7 @@ fn test_code_snippet(rule_code: &str, code: &str, should_have_issues: bool) -> R
     let (program, parse_error) = parse_file(&arena, &file);
 
     if let Some(err) = parse_error {
-        return Err(format!("Parse error: {:?}", err));
+        return Err(format!("Parse error: {err:?}"));
     }
 
     let resolver = NameResolver::new(&arena);
@@ -75,7 +73,7 @@ fn test_code_snippet(rule_code: &str, code: &str, should_have_issues: bool) -> R
     let php_version = settings.php_version;
     let registry = RuleRegistry::build(&settings, Some(&[rule_code.to_string()]), true);
     if registry.rules().is_empty() {
-        return Err(format!("No rules found for code '{}'", rule_code));
+        return Err(format!("No rules found for code '{rule_code}'"));
     }
 
     let linter = Linter::from_registry(&arena, std::sync::Arc::new(registry), php_version);

@@ -30,7 +30,7 @@ pub type PostScanCallback = Box<dyn FnOnce(&mut CodebaseMetadata, &SymbolReferen
 /// File state tracked for incremental analysis
 #[derive(Debug, Clone, Copy)]
 pub struct FileState {
-    /// Content hash of the file (xxhash3_64)
+    /// Content hash of the file (`xxhash3_64`)
     pub content_hash: u64,
 }
 

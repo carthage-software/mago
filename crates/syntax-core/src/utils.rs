@@ -9,6 +9,11 @@ use crate::number_separator;
 /// # Returns
 ///
 /// An `Option` containing the parsed `&'arena str` or `None` if the input is invalid.
+///
+/// # Panics
+///
+/// Panics if internal assumptions about character parsing are violated (e.g., invalid hex or octal digits
+/// after validation). This should not occur with valid PHP strings.
 pub fn parse_literal_string_in<'arena>(
     arena: &'arena Bump,
     s: &'arena str,
@@ -142,6 +147,11 @@ pub fn parse_literal_string_in<'arena>(
 ///
 /// This function is similar to `parse_literal_string_in`, but it allocates the result on the heap instead of in an arena.
 /// It is recommended to use `parse_literal_string_in` when possible for better performance in contexts where an arena is available.
+///
+/// # Panics
+///
+/// Panics if internal assumptions about character parsing are violated (e.g., invalid hex or octal digits
+/// after validation). This should not occur with valid PHP strings.
 #[inline]
 pub fn parse_literal_string(s: &str, quote_char: Option<char>, has_quote: bool) -> Option<String> {
     if s.is_empty() {
@@ -231,15 +241,14 @@ pub fn parse_literal_string(s: &str, quote_char: Option<char>, has_quote: bool) 
                     }
                 }
 
-                if !hex_chars.is_empty() {
-                    match u8::from_str_radix(&hex_chars, 16) {
-                        Ok(byte_val) => result.push(byte_val as char),
-                        Err(_) => {
-                            return None;
-                        }
-                    }
-                } else {
+                if hex_chars.is_empty() {
                     return None;
+                }
+                match u8::from_str_radix(&hex_chars, 16) {
+                    Ok(byte_val) => result.push(byte_val as char),
+                    Err(_) => {
+                        return None;
+                    }
                 }
             }
             c if quote_char == Some('"') && c.is_ascii_digit() => {
@@ -279,7 +288,7 @@ pub fn parse_literal_string(s: &str, quote_char: Option<char>, has_quote: bool) 
 
 #[inline]
 pub fn parse_literal_float(value: &str) -> Option<f64> {
-    let source = value.replace("_", "");
+    let source = value.replace('_', "");
 
     source.parse::<f64>().ok()
 }
@@ -316,13 +325,13 @@ pub fn parse_literal_integer(value: &str) -> Option<u64> {
         }
 
         let digit = match c.to_digit(radix) {
-            Some(d) => d as u128,
+            Some(d) => u128::from(d),
             None => return None,
         };
 
         has_digits = true;
 
-        result = match result.checked_mul(radix as u128) {
+        result = match result.checked_mul(u128::from(radix)) {
             Some(r) => r,
             None => return Some(u64::MAX),
         };
@@ -337,7 +346,7 @@ pub fn parse_literal_integer(value: &str) -> Option<u64> {
     }
 
     // Clamp the result to u64::MAX if it's too large.
-    Some(if result > u64::MAX as u128 { u64::MAX } else { result as u64 })
+    Some(if result > u128::from(u64::MAX) { u64::MAX } else { result as u64 })
 }
 
 #[inline]

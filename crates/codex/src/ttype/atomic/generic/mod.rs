@@ -92,7 +92,7 @@ impl TGenericParameter {
 }
 
 impl TType for TGenericParameter {
-    fn get_child_nodes<'a>(&'a self) -> Vec<TypeRef<'a>> {
+    fn get_child_nodes(&self) -> Vec<TypeRef<'_>> {
         let children = vec![TypeRef::Union(&self.constraint)];
 
         if let Some(intersection_types) = &self.intersection_types {

@@ -62,18 +62,18 @@ impl LintRule for ArrayStyleRule {
                 or vice versa, depending on the configuration. The short array style is more concise and
                 is the preferred way to define arrays in PHP.
             "},
-            good_example: indoc! {r#"
+            good_example: indoc! {r"
                 <?php
 
                 // By default, `style` is 'short', so this snippet is valid:
                 $arr = [1, 2, 3];
-            "#},
-            bad_example: indoc! {r#"
+            "},
+            bad_example: indoc! {r"
                 <?php
 
                 // By default, 'short' is enforced, so array(...) triggers a warning:
                 $arr = array(1, 2, 3);
-            "#},
+            "},
             category: Category::Consistency,
 
             requirements: RuleRequirements::None,
@@ -92,7 +92,7 @@ impl LintRule for ArrayStyleRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         match node {
             Node::LegacyArray(arr) if ArrayStyleOption::Short == self.cfg.style => {
                 let issue = Issue::new(self.cfg.level(), "Short array style `[..]` is preferred over `array(..)`.")

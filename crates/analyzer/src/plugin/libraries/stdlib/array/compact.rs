@@ -1,4 +1,4 @@
-//! compact() return type provider.
+//! `compact()` return type provider.
 
 use std::collections::BTreeMap;
 
@@ -63,7 +63,7 @@ impl FunctionReturnTypeProvider for CompactProvider {
                 None => continue,
             };
 
-            let variable_id = format!("${}", variable_name);
+            let variable_id = format!("${variable_name}");
             if let Some(variable_type) = context.get_variable_type(&variable_id) {
                 let key = ArrayKey::String(Atom::from(variable_name));
                 known_items.insert(key, (false, (**variable_type).clone()));

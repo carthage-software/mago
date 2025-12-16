@@ -293,9 +293,9 @@ impl<'ctx, 'arena> FormatterState<'ctx, 'arena> {
 
                 if let Some(Node::Access(_)) = grand_parent_node {
                     return true;
-                } else {
-                    return false;
                 }
+
+                return false;
             }
         };
 
@@ -392,9 +392,9 @@ impl<'ctx, 'arena> FormatterState<'ctx, 'arena> {
 
             if let Expression::Instantiation(instantiation) = expression {
                 return self.instantiation_needs_parens(instantiation);
-            } else {
-                return self.callee_expression_need_parenthesis(expression, false);
             }
+
+            return self.callee_expression_need_parenthesis(expression, false);
         }
 
         if let Node::Instantiation(_) = self.parent_node() {

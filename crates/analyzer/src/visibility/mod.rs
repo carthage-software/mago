@@ -28,8 +28,8 @@ use crate::context::block::BlockContext;
 ///
 /// `true` if the method is visible, `false` otherwise. An error is reported to the
 /// context buffer if the method is not visible.
-pub fn check_method_visibility<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+pub fn check_method_visibility<'ctx>(
+    context: &mut Context<'ctx, '_>,
     block_context: &BlockContext<'ctx>,
     fqcn: &str,
     method_name: &str,
@@ -58,8 +58,7 @@ pub fn check_method_visibility<'ctx, 'arena>(
         let declaring_class_name = context
             .codebase
             .get_class_like(&declaring_class)
-            .map(|metadata| metadata.original_name)
-            .unwrap_or_else(|| declaring_class);
+            .map_or_else(|| declaring_class, |metadata| metadata.original_name);
 
         let issue_title =
             format!("Cannot access {} method `{}::{}`.", visibility.as_str(), declaring_class_name, method_name);
@@ -84,8 +83,8 @@ pub fn check_method_visibility<'ctx, 'arena>(
 
 /// Checks if a property is readable from the current scope and reports a detailed
 /// error if it is not.
-pub fn check_property_read_visibility<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+pub fn check_property_read_visibility<'ctx>(
+    context: &mut Context<'ctx, '_>,
     block_context: &BlockContext<'ctx>,
     fqcn: &str,
     property_name: &str,
@@ -116,8 +115,7 @@ pub fn check_property_read_visibility<'ctx, 'arena>(
         context.collector.report_with_code(
             IssueCode::InvalidPropertyRead,
             Issue::error(format!(
-                "Cannot read from write-only property `{}::{}`.",
-                class_name, property_name
+                "Cannot read from write-only property `{class_name}::{property_name}`."
             ))
             .with_annotation(
                 Annotation::primary(member_span.unwrap_or(access_span))
@@ -125,7 +123,7 @@ pub fn check_property_read_visibility<'ctx, 'arena>(
             )
             .with_annotation(
                 Annotation::secondary(declaring_class_metadata.name_span.unwrap_or(declaring_class_metadata.span))
-                    .with_message(format!("Property is defined as write-only via a `@property-write` tag on class `{}`", class_name)),
+                    .with_message(format!("Property is defined as write-only via a `@property-write` tag on class `{class_name}`")),
             )
             .with_note("Properties defined with `@property-write` are 'magic' properties that can be assigned to, but not read from.")
             .with_help("If this property should be readable, change its docblock definition from `@property-write` to `@property`."),
@@ -143,8 +141,7 @@ pub fn check_property_read_visibility<'ctx, 'arena>(
         context.collector.report_with_code(
             IssueCode::InvalidPropertyRead,
             Issue::error(format!(
-                "Cannot read from write-only property `{}::{}` - property only has a set hook.",
-                class_name, property_name
+                "Cannot read from write-only property `{class_name}::{property_name}` - property only has a set hook."
             ))
             .with_annotation(Annotation::primary(member_span.unwrap_or(access_span)).with_message("Read access here"))
             .with_annotation(
@@ -188,8 +185,8 @@ pub fn check_property_read_visibility<'ctx, 'arena>(
     is_visible
 }
 
-pub fn check_property_write_visibility<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+pub fn check_property_write_visibility<'ctx>(
+    context: &mut Context<'ctx, '_>,
     block_context: &BlockContext<'ctx>,
     fqcn: &str,
     property_name: &str,
@@ -223,8 +220,7 @@ pub fn check_property_write_visibility<'ctx, 'arena>(
         context.collector.report_with_code(
             IssueCode::InvalidPropertyWrite,
             Issue::error(format!(
-                "Cannot write to read-only property `{}::{}` - property only has a get hook.",
-                class_name, property_name
+                "Cannot write to read-only property `{class_name}::{property_name}` - property only has a get hook."
             ))
             .with_annotation(Annotation::primary(member_span.unwrap_or(access_span)).with_message("Write access here"))
             .with_annotation(
@@ -332,8 +328,8 @@ fn can_initialize_readonly_property(
         })
 }
 
-fn report_visibility_issue<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+fn report_visibility_issue<'ctx>(
+    context: &mut Context<'ctx, '_>,
     block_context: &BlockContext<'ctx>,
     code: IssueCode,
     title: String,
@@ -374,8 +370,8 @@ fn report_visibility_issue<'ctx, 'arena>(
     context.collector.report_with_code(code, issue);
 }
 
-fn report_readonly_issue<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+fn report_readonly_issue<'ctx>(
+    context: &mut Context<'ctx, '_>,
     block_context: &BlockContext<'ctx>,
     code: IssueCode,
     access_span: Span,

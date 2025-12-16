@@ -94,7 +94,7 @@ impl LintRule for NoRedundantBlockRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let statements = match node {
             Node::Program(program) => program.statements.as_slice(),
             Node::Block(block) => block.statements.as_slice(),

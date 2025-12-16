@@ -98,7 +98,7 @@ fn is_valid_class_string(str: &str) -> bool {
         return false;
     }
 
-    let mut i = if bytes[0] == b'\\' { 1 } else { 0 };
+    let mut i = usize::from(bytes[0] == b'\\');
     if i >= len {
         return false;
     }

@@ -50,12 +50,12 @@ impl LintRule for CyclomaticComplexityRule {
         const META: RuleMeta = RuleMeta {
             name: "Cyclomatic Complexity",
             code: "cyclomatic-complexity",
-            description: indoc! {r#"
+            description: indoc! {r"
                 Checks the cyclomatic complexity of classes, traits, enums, interfaces, functions, and closures.
 
                 Cyclomatic complexity is a measure of the number of linearly independent paths through a program's source code.
-            "#},
-            good_example: indoc! {r#"
+            "},
+            good_example: indoc! {r"
                 <?php
 
                 function validateUser($user) {
@@ -85,8 +85,8 @@ impl LintRule for CyclomaticComplexityRule {
                 function hasRequiredFields($user) {
                     return isset($user['name']) && isset($user['email']);
                 }
-            "#},
-            bad_example: indoc! {r#"
+            "},
+            bad_example: indoc! {r"
                 <?php
 
                 function validateUser($user) {
@@ -155,7 +155,7 @@ impl LintRule for CyclomaticComplexityRule {
 
                     return true;
                 }
-            "#},
+            "},
             category: Category::Maintainability,
             requirements: RuleRequirements::None,
         };
@@ -179,7 +179,7 @@ impl LintRule for CyclomaticComplexityRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         match node {
             Node::Class(n) => self.check_class_like("Class", n.members.as_slice(), n.span(), ctx),
             Node::Trait(n) => self.check_class_like("Trait", n.members.as_slice(), n.span(), ctx),
@@ -239,9 +239,7 @@ impl CyclomaticComplexityRule {
 }
 
 #[inline]
-fn get_cyclomatic_complexity_of_class_like_members<'ast, 'arena>(
-    class_like_members: &'ast [ClassLikeMember<'arena>],
-) -> usize {
+fn get_cyclomatic_complexity_of_class_like_members(class_like_members: &[ClassLikeMember<'_>]) -> usize {
     let mut cyclomatic_complexity = 0;
     for member in class_like_members {
         let ClassLikeMember::Method(method) = member else {
@@ -259,7 +257,7 @@ fn get_cyclomatic_complexity_of_class_like_members<'ast, 'arena>(
 }
 
 #[inline]
-fn get_cyclomatic_complexity_of_method<'ast, 'arena>(method: &'ast Method<'arena>) -> Option<usize> {
+fn get_cyclomatic_complexity_of_method(method: &Method<'_>) -> Option<usize> {
     if is_method_setter_or_getter(method) {
         return None;
     }
@@ -268,7 +266,7 @@ fn get_cyclomatic_complexity_of_method<'ast, 'arena>(method: &'ast Method<'arena
 }
 
 #[inline]
-fn get_cyclomatic_complexity_of_node<'ast, 'arena>(node: Node<'ast, 'arena>) -> usize {
+fn get_cyclomatic_complexity_of_node(node: Node<'_, '_>) -> usize {
     let mut number = 0;
 
     for child in node.children() {

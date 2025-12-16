@@ -4,7 +4,7 @@ use mago_syntax::ast::*;
 
 #[inline]
 #[must_use]
-pub fn is_user_input<'ast, 'arena>(expression: &'ast Expression<'arena>) -> bool {
+pub fn is_user_input(expression: &Expression<'_>) -> bool {
     match expression {
         Expression::Parenthesized(parenthesized) => is_user_input(parenthesized.expression),
         Expression::Assignment(assignment) => is_user_input(assignment.rhs),
@@ -29,7 +29,7 @@ pub fn is_user_input<'ast, 'arena>(expression: &'ast Expression<'arena>) -> bool
 
 #[inline]
 #[must_use]
-pub fn is_variable_user_input<'ast, 'arena>(variable: &'ast Variable<'arena>) -> bool {
+pub fn is_variable_user_input(variable: &Variable<'_>) -> bool {
     match variable {
         Variable::Direct(direct_variable) => {
             let name = direct_variable.name;
@@ -49,7 +49,7 @@ pub fn is_variable_user_input<'ast, 'arena>(variable: &'ast Variable<'arena>) ->
 
 #[inline]
 #[must_use]
-pub fn get_password<'ast, 'arena>(expr: &'ast Expression<'arena>) -> Option<Span> {
+pub fn get_password(expr: &Expression<'_>) -> Option<Span> {
     match expr {
         Expression::Parenthesized(parenthesized) => get_password(parenthesized.expression),
         Expression::Literal(Literal::String(literal_string)) if is_password_literal(literal_string) => {
@@ -82,7 +82,7 @@ pub fn get_password<'ast, 'arena>(expr: &'ast Expression<'arena>) -> Option<Span
 
 #[inline]
 #[must_use]
-pub fn get_password_from_selector<'ast, 'arena>(selector: &'ast ClassLikeMemberSelector<'arena>) -> Option<Span> {
+pub fn get_password_from_selector(selector: &ClassLikeMemberSelector<'_>) -> Option<Span> {
     match selector {
         ClassLikeMemberSelector::Identifier(local_identifier) => {
             if is_password(local_identifier.value) {
@@ -100,9 +100,7 @@ pub fn get_password_from_selector<'ast, 'arena>(selector: &'ast ClassLikeMemberS
 
 #[inline]
 #[must_use]
-pub fn get_password_from_constant_selector<'ast, 'arena>(
-    selector: &'ast ClassLikeConstantSelector<'arena>,
-) -> Option<Span> {
+pub fn get_password_from_constant_selector(selector: &ClassLikeConstantSelector<'_>) -> Option<Span> {
     match selector {
         ClassLikeConstantSelector::Identifier(local_identifier) => {
             if is_password(local_identifier.value) {
@@ -119,7 +117,7 @@ pub fn get_password_from_constant_selector<'ast, 'arena>(
 
 #[inline]
 #[must_use]
-pub fn get_password_from_variable<'ast, 'arena>(variable: &'ast Variable<'arena>) -> Option<Span> {
+pub fn get_password_from_variable(variable: &Variable<'_>) -> Option<Span> {
     match variable {
         Variable::Direct(direct_variable) => {
             if is_password(&direct_variable.name[1..]) {
@@ -152,14 +150,14 @@ pub fn is_password_literal<'arena>(literal: &'arena LiteralString<'arena>) -> bo
 #[inline]
 #[must_use]
 pub fn is_password(mut str: &str) -> bool {
-    if str.starts_with("$") {
+    if str.starts_with('$') {
         str = &str[1..];
     }
 
     if str.starts_with("get") {
         str = &str[3..];
 
-        if str.starts_with("_") {
+        if str.starts_with('_') {
             str = &str[1..];
         }
     }

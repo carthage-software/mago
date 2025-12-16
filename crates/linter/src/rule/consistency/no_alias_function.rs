@@ -55,18 +55,18 @@ impl LintRule for NoAliasFunctionRule {
                 and suggests calling the canonical (original) function name instead.
                 This is primarily for consistency and clarity.
             "},
-            good_example: indoc! {r###"
+            good_example: indoc! {r#"
                 <?php
 
                 // 'disk_free_space' is the proper name instead of 'diskfreespace'
                 $freeSpace = disk_free_space("/");
-            "###},
-            bad_example: indoc! {r###"
+            "#},
+            bad_example: indoc! {r#"
                 <?php
 
                 // 'diskfreespace' is an alias for 'disk_free_space'
                 $freeSpace = diskfreespace("/");
-            "###},
+            "#},
             category: Category::Consistency,
 
             requirements: RuleRequirements::None,
@@ -85,12 +85,12 @@ impl LintRule for NoAliasFunctionRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let Node::FunctionCall(function_call) = node else {
             return;
         };
 
-        for (function_name, original_name) in ALIAS_TO_FUNCTION.iter() {
+        for (function_name, original_name) in &ALIAS_TO_FUNCTION {
             if !function_call_matches(ctx, function_call, function_name) {
                 continue;
             }

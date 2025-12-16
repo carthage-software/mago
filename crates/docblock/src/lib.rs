@@ -265,11 +265,11 @@ mod tests {
     #[test]
     fn test_unclosed_code_block() {
         let arena = Bump::new();
-        let phpdoc = r#"/**
+        let phpdoc = r"/**
             * This is a doc block with unclosed code block
             * ```
             * Some code here
-            */"#;
+            */";
         let span = Span::new(FileId::zero(), Position::new(0), Position::new(phpdoc.len() as u32));
 
         let result = parse_phpdoc_with_span(&arena, phpdoc, span);
@@ -311,11 +311,11 @@ mod tests {
     #[test]
     fn test_malformed_code_block() {
         let arena = Bump::new();
-        let phpdoc = r#"/**
+        let phpdoc = r"/**
             * ```
             * Some code here
             * Incorrect closing
-            */"#;
+            */";
         let span = Span::new(FileId::zero(), Position::new(0), Position::new(phpdoc.len() as u32));
 
         let result = parse_phpdoc_with_span(&arena, phpdoc, span);
@@ -358,10 +358,10 @@ mod tests {
     fn test_inconsistent_indentation() {
         // Test case for ParseError::InconsistentIndentation
         let arena = Bump::new();
-        let phpdoc = r#"/**
+        let phpdoc = r"/**
     * This is a doc block
       * With inconsistent indentation
-    */"#;
+    */";
         let span = Span::new(FileId::zero(), Position::new(0), Position::new(phpdoc.len() as u32));
 
         let result = parse_phpdoc_with_span(&arena, phpdoc, span);
@@ -393,10 +393,10 @@ mod tests {
     #[test]
     fn test_missing_asterisk() {
         let arena = Bump::new();
-        let phpdoc = r#"/**
+        let phpdoc = r"/**
      This line is missing an asterisk
      * This line is fine
-     */"#;
+     */";
         let span = Span::new(FileId::zero(), Position::new(0), Position::new(phpdoc.len() as u32));
 
         let result = parse_phpdoc_with_span(&arena, phpdoc, span);
@@ -429,9 +429,9 @@ mod tests {
     #[test]
     fn test_missing_whitespace_after_asterisk() {
         let arena = Bump::new();
-        let phpdoc = r#"/**
+        let phpdoc = r"/**
      *This line is missing a space after asterisk
-     */"#;
+     */";
         let span = Span::new(FileId::zero(), Position::new(0), Position::new(phpdoc.len() as u32));
 
         let result = parse_phpdoc_with_span(&arena, phpdoc, span);
@@ -674,9 +674,9 @@ mod tests {
     #[test]
     fn test_long_description_with_missing_asterisk() {
         let arena = Bump::new();
-        let phpdoc = r#"/** @var string[] this is a really long description
+        let phpdoc = r"/** @var string[] this is a really long description
             that spans multiple lines, and demonstrates how the parser handles
-            docblocks with multiple descriptions, and missing astricks*/"#;
+            docblocks with multiple descriptions, and missing astricks*/";
         let span = Span::new(FileId::zero(), Position::new(0), Position::new(phpdoc.len() as u32));
         let document = parse_phpdoc_with_span(&arena, phpdoc, span).expect("Failed to parse PHPDoc");
 
@@ -702,11 +702,11 @@ mod tests {
     #[test]
     fn test_code_indent_using_non_ascii_chars() {
         let arena = Bump::new();
-        let phpdoc = r#"/**
+        let phpdoc = r"/**
         *    └─ comment 2
         *       └─ comment 4
         *    └─ comment 3
-        */"#;
+        */";
 
         let span = Span::new(FileId::zero(), Position::new(0), Position::new(phpdoc.len() as u32));
         let document = parse_phpdoc_with_span(&arena, phpdoc, span).expect("Failed to parse PHPDoc");

@@ -64,8 +64,7 @@ impl<'arena> ResolvedNames<'arena> {
     pub fn is_imported<T: HasPosition>(&self, position: &T) -> bool {
         self.names
             .get(&position.offset()) // Get Option<(StringIdentifier, bool)>
-            .map(|(_, imported)| *imported) // Extract the bool flag
-            .unwrap_or(false) // Default to false if position not found
+            .is_some_and(|(_, imported)| *imported) // Default to false if position not found
     }
 
     /// Inserts a resolution result into the map (intended for internal use).

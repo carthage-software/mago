@@ -51,7 +51,7 @@ impl LintRule for NoRedundantMethodOverrideRule {
             description: indoc! {"
                 Detects methods that override a parent method but only call the parent method with the same arguments.
             "},
-            good_example: indoc! {r#"
+            good_example: indoc! {r"
                 <?php
 
                 class Parent
@@ -71,8 +71,8 @@ impl LintRule for NoRedundantMethodOverrideRule {
                         echo 'Additional logic here';
                     }
                 }
-            "#},
-            bad_example: indoc! {r#"
+            "},
+            bad_example: indoc! {r"
                 <?php
 
                 class Parent
@@ -90,7 +90,7 @@ impl LintRule for NoRedundantMethodOverrideRule {
                         parent::foo();
                     }
                 }
-            "#},
+            "},
             category: Category::Redundancy,
 
             requirements: RuleRequirements::None,
@@ -109,7 +109,7 @@ impl LintRule for NoRedundantMethodOverrideRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let Node::Method(method) = node else {
             return;
         };

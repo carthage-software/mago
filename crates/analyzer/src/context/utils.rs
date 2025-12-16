@@ -19,8 +19,8 @@ use crate::context::block::BlockContext;
 /// * `context`: The current analysis context, used for reporting issues.
 /// * `destination_context`: The context into which properties are being merged.
 /// * `source_context`: The context from which properties are being inherited.
-pub(crate) fn inherit_branch_context_properties<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+pub(crate) fn inherit_branch_context_properties<'ctx>(
+    context: &mut Context<'ctx, '_>,
     destination_context: &mut BlockContext<'ctx>,
     source_context: &BlockContext<'ctx>,
 ) {
@@ -45,7 +45,7 @@ pub(crate) fn inherit_branch_context_properties<'ctx, 'arena>(
             continue;
         };
 
-        if !union_comparator::is_contained_by(
+        if union_comparator::is_contained_by(
             context.codebase,
             constraint_type,
             outer_constraint_type,
@@ -54,6 +54,8 @@ pub(crate) fn inherit_branch_context_properties<'ctx, 'arena>(
             false,
             &mut ComparisonResult::default(),
         ) {
+            destination_context.by_reference_constraints.insert(*variable, constraint.clone());
+        } else {
             let constraint_type_str = constraint_type.get_id();
             let outer_constraint_type_str = outer_constraint_type.get_id();
 
@@ -64,14 +66,12 @@ pub(crate) fn inherit_branch_context_properties<'ctx, 'arena>(
                 ))
                 .with_annotation(
                     Annotation::secondary(outer_constraint.constraint_span).with_message(format!(
-                        "An existing constraint requires this variable to be of type `{}`...",
-                        outer_constraint_type_str
+                        "An existing constraint requires this variable to be of type `{outer_constraint_type_str}`..."
                     )),
                 )
                 .with_annotation(
                     Annotation::primary(constraint.constraint_span).with_message(format!(
-                        "...but this branch imposes a conflicting constraint of `{}`.",
-                        constraint_type_str
+                        "...but this branch imposes a conflicting constraint of `{constraint_type_str}`."
                     )),
                 )
                 .with_note(
@@ -81,8 +81,6 @@ pub(crate) fn inherit_branch_context_properties<'ctx, 'arena>(
                     "Refactor the code to ensure that `{variable}` adheres to a single, compatible type constraint across all execution paths.",
                 )),
             );
-        } else {
-            destination_context.by_reference_constraints.insert(*variable, constraint.clone());
         }
     }
 

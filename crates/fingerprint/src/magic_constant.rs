@@ -58,8 +58,7 @@ mod tests {
             for j in (i + 1)..fingerprints.len() {
                 assert_ne!(
                     fingerprints[i], fingerprints[j],
-                    "Magic constants at index {} and {} have the same fingerprint",
-                    i, j
+                    "Magic constants at index {i} and {j} have the same fingerprint"
                 );
             }
         }

@@ -55,7 +55,7 @@ impl TObject {
     /// The `known_properties` map defines specific types for certain keys (`Atom`), where the `bool` indicates if the property is optional.
     #[inline]
     pub const fn new_with_properties(sealed: bool, known_properties: BTreeMap<Atom, (bool, TUnion)>) -> Self {
-        TObject::WithProperties(TObjectWithProperties { sealed, known_properties })
+        TObject::WithProperties(TObjectWithProperties { known_properties, sealed })
     }
 
     /// Creates a new `Object` representing a specific named object type (default flags).
@@ -210,7 +210,7 @@ impl TObject {
 }
 
 impl TType for TObject {
-    fn get_child_nodes<'a>(&'a self) -> Vec<TypeRef<'a>> {
+    fn get_child_nodes(&self) -> Vec<TypeRef<'_>> {
         match self {
             TObject::Any => vec![],
             TObject::HasMethod(has_method) => has_method.get_child_nodes(),

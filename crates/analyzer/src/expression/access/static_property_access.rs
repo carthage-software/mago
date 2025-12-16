@@ -115,7 +115,7 @@ mod tests {
 
     test_analysis! {
         name = read_protected_static_property_from_child,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
             class ParentClass { protected static int $prop = 1; }
             class ChildClass extends ParentClass {
@@ -126,12 +126,12 @@ mod tests {
             /** @param int $_i */
             function i_take_int(int $_i): void {}
             i_take_int(ChildClass::getValue());
-        "#},
+        "},
     }
 
     test_analysis! {
         name = read_private_static_property_from_same_class,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
             class PrivateTest {
                 private static int $secret = 42;
@@ -139,7 +139,7 @@ mod tests {
                     return self::$secret;
                 }
             }
-        "#},
+        "},
     }
 
     test_analysis! {
@@ -168,11 +168,11 @@ mod tests {
 
     test_analysis! {
         name = read_undefined_static_property,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
             class MyClass {}
             echo MyClass::$non_existent;
-        "#},
+        "},
         issues = [
             IssueCode::NonExistentProperty,
         ]
@@ -180,11 +180,11 @@ mod tests {
 
     test_analysis! {
         name = read_private_static_property_from_outside,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
             class MyClass { private static int $secret = 1; }
             echo MyClass::$secret;
-        "#},
+        "},
         issues = [
             IssueCode::InvalidPropertyRead,
             IssueCode::NoValue,
@@ -193,7 +193,7 @@ mod tests {
 
     test_analysis! {
         name = read_private_static_property_from_parent_in_child,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
             class P { private static int $secret = 1; }
             class C extends P {
@@ -201,7 +201,7 @@ mod tests {
                     return self::$secret;
                 }
             }
-        "#},
+        "},
         issues = [
             IssueCode::NonExistentProperty,
         ]
@@ -209,11 +209,11 @@ mod tests {
 
     test_analysis! {
         name = read_protected_static_property_from_outside,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
             class MyClass { protected static int $prop = 1; }
             echo MyClass::$prop;
-        "#},
+        "},
         issues = [
             IssueCode::InvalidPropertyRead,
             IssueCode::NoValue,
@@ -222,11 +222,11 @@ mod tests {
 
     test_analysis! {
         name = read_instance_property_statically,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
             class HasInstanceProp { public int $instance_prop = 1; }
             echo HasInstanceProp::$instance_prop;
-        "#},
+        "},
         issues = [
             IssueCode::InvalidStaticPropertyAccess,
             IssueCode::NoValue,
@@ -235,11 +235,11 @@ mod tests {
 
     test_analysis! {
         name = read_static_property_on_interface,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
             interface MyInterface {}
             echo MyInterface::$some_prop;
-        "#},
+        "},
         issues = [
             IssueCode::NonExistentProperty,
         ]
@@ -247,11 +247,11 @@ mod tests {
 
     test_analysis! {
         name = read_static_property_on_enum,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
             enum MyEnum {}
             echo MyEnum::$some_prop;
-        "#},
+        "},
         issues = [
             IssueCode::NonExistentProperty,
         ]
@@ -281,7 +281,7 @@ mod tests {
 
     test_analysis! {
         name = static_property_reconciliation,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             class A
@@ -299,6 +299,6 @@ mod tests {
                     return self::$foo;
                 }
             }
-        "#},
+        "},
     }
 }

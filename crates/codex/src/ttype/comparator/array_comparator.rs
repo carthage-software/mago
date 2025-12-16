@@ -64,7 +64,7 @@ pub(crate) fn is_array_contained_by_array(
                     return true;
                 };
 
-                for (_, (is_optional, _)) in known_elements.iter() {
+                for (is_optional, _) in known_elements.values() {
                     if !*is_optional {
                         return false;
                     }
@@ -79,7 +79,7 @@ pub(crate) fn is_array_contained_by_array(
                     return true;
                 };
 
-                for (_, (is_optional, _)) in known_items.iter() {
+                for (is_optional, _) in known_items.values() {
                     if !*is_optional {
                         return false;
                     }

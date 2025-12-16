@@ -104,12 +104,11 @@ impl<'anlyz, 'ctx, 'ast, 'arena> MatchAnalyzer<'anlyz, 'ctx, 'ast, 'arena> {
             return Ok(());
         }
 
-        let subject_type = match self.artifacts.get_rc_expression_type(&self.stmt.expression).cloned() {
-            Some(t) => t,
-            None => {
-                self.report_unknown_subject_type();
-                Rc::new(get_mixed())
-            }
+        let subject_type = if let Some(t) = self.artifacts.get_rc_expression_type(&self.stmt.expression).cloned() {
+            t
+        } else {
+            self.report_unknown_subject_type();
+            Rc::new(get_mixed())
         };
 
         if subject_type.is_never() {
@@ -437,7 +436,7 @@ impl<'anlyz, 'ctx, 'ast, 'arena> MatchAnalyzer<'anlyz, 'ctx, 'ast, 'arena> {
             let mut final_type: Option<TUnion> = None;
 
             for arm_context in &reachable_contexts {
-                let arm_type = arm_context.locals.get(&var_id).map(|rc| rc.as_ref());
+                let arm_type = arm_context.locals.get(&var_id).map(std::convert::AsRef::as_ref);
                 final_type = Some(combine_optional_union_types(final_type.as_ref(), arm_type, self.context.codebase));
             }
 

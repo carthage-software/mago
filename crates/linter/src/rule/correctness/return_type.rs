@@ -65,20 +65,20 @@ impl LintRule for ReturnTypeRule {
             description: indoc! {"
                 Detects functions, methods, closures, and arrow functions that are missing a return type hint.
             "},
-            good_example: indoc! {r#"
+            good_example: indoc! {r"
                 <?php
 
                 function foo(): int {
                     return 42;
                 }
-            "#},
-            bad_example: indoc! {r#"
+            "},
+            bad_example: indoc! {r"
                 <?php
 
                 function foo() {
                     return 42;
                 }
-            "#},
+            "},
             category: Category::Correctness,
             requirements: RuleRequirements::PHPVersion(PHPVersionRange::from(PHPVersion::PHP70)),
         };
@@ -97,7 +97,7 @@ impl LintRule for ReturnTypeRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         match node {
             Node::Function(function) => {
                 if function.return_type_hint.is_some() {
@@ -108,17 +108,14 @@ impl LintRule for ReturnTypeRule {
                 let function_fqn = ctx.lookup_name(&function.name);
 
                 ctx.collector.report(
-                    Issue::new(
-                        self.cfg.level(),
-                        format!("Function `{}` is missing a return type hint.", function_name),
-                    )
-                    .with_code(self.meta.code)
-                    .with_annotation(
-                        Annotation::primary(function.span())
-                            .with_message(format!("Function `{}` defined here", function_fqn)),
-                    )
-                    .with_note("Type hints improve code readability and help prevent type-related errors.")
-                    .with_help(format!("Consider adding a return type hint to function `{}`.", function_name)),
+                    Issue::new(self.cfg.level(), format!("Function `{function_name}` is missing a return type hint."))
+                        .with_code(self.meta.code)
+                        .with_annotation(
+                            Annotation::primary(function.span())
+                                .with_message(format!("Function `{function_fqn}` defined here")),
+                        )
+                        .with_note("Type hints improve code readability and help prevent type-related errors.")
+                        .with_help(format!("Consider adding a return type hint to function `{function_name}`.")),
                 );
             }
             Node::Closure(closure) => {

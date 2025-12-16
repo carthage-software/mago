@@ -301,7 +301,7 @@ impl FixPlan {
     ///
     /// The updated `FixPlan` instance.
     pub fn insert(&mut self, offset: u32, text: impl Into<String>, safety: SafetyClassification) {
-        self.operation(FixOperation::Insert { offset, text: text.into(), safety_classification: safety })
+        self.operation(FixOperation::Insert { offset, text: text.into(), safety_classification: safety });
     }
 
     /// Adds a replacement operation to the plan.
@@ -319,7 +319,7 @@ impl FixPlan {
     ///
     /// The updated `FixPlan` instance.
     pub fn replace(&mut self, range: Range<u32>, text: impl Into<String>, safety: SafetyClassification) {
-        self.operation(FixOperation::Replace { range, text: text.into(), safety_classification: safety })
+        self.operation(FixOperation::Replace { range, text: text.into(), safety_classification: safety });
     }
 
     /// Adds a deletion operation to the plan.
@@ -336,7 +336,7 @@ impl FixPlan {
     ///
     /// The updated `FixPlan` instance.
     pub fn delete(&mut self, range: Range<u32>, safety: SafetyClassification) {
-        self.operation(FixOperation::Delete { range, safety_classification: safety })
+        self.operation(FixOperation::Delete { range, safety_classification: safety });
     }
 
     /// Merges another `FixPlan` into this one.

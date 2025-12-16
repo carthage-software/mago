@@ -153,7 +153,7 @@ pub struct ComposerPackage {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub r#type: Option<ComposerPackageType>,
 
-    /// Package version, see https://getcomposer.org/doc/04-schema.md#version for more info on valid schemes
+    /// Package version, see <https://getcomposer.org/doc/04-schema.md#version> for more info on valid schemes
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub version: Option<ComposerPackageVersion>,
 }
@@ -234,7 +234,7 @@ pub struct ComposerPackageConfig {
     #[serde(rename = "allow-plugins", default, skip_serializing_if = "Option::is_none")]
     pub allow_plugins: Option<ComposerPackageConfigAllowPlugins>,
 
-    /// If true, the Composer autoloader will check for APCu and use it to cache found/not-found classes when the extension is enabled, defaults to false
+    /// If true, the Composer autoloader will check for `APCu` and use it to cache found/not-found classes when the extension is enabled, defaults to false
     #[serde(rename = "apcu-autoloader", default, skip_serializing_if = "Option::is_none")]
     pub apcu_autoloader: Option<bool>,
 
@@ -321,7 +321,7 @@ pub struct ComposerPackageConfig {
     #[serde(rename = "data-dir", default, skip_serializing_if = "Option::is_none")]
     pub data_dir: Option<String>,
 
-    /// Defaults to `false`. If set to true all HTTPS URLs will be tried with HTTP instead and no network level encryption is performed. Enabling this is a security risk and is NOT recommended. The better way is to enable the php_openssl extension in php.ini
+    /// Defaults to `false`. If set to true all HTTPS URLs will be tried with HTTP instead and no network level encryption is performed. Enabling this is a security risk and is NOT recommended. The better way is to enable the `php_openssl` extension in php.ini
     #[serde(rename = "disable-tls", default, skip_serializing_if = "Option::is_none")]
     pub disable_tls: Option<bool>,
 
@@ -385,7 +385,7 @@ pub struct ComposerPackageConfig {
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     pub platform: HashMap<String, ComposerPackageConfigPlatformValue>,
 
-    /// Defaults to "php-only" which checks only the PHP version. Setting to true will also check the presence of required PHP extensions. If set to false, Composer will not create and require a platform_check.php file as part of the autoloader bootstrap
+    /// Defaults to "php-only" which checks only the PHP version. Setting to true will also check the presence of required PHP extensions. If set to false, Composer will not create and require a `platform_check.php` file as part of the autoloader bootstrap
     #[serde(rename = "platform-check", default, skip_serializing_if = "Option::is_none")]
     pub platform_check: Option<ComposerPackageConfigPlatformCheck>,
 
@@ -710,67 +710,67 @@ pub enum ComposerPackageRepositoriesObjectValue {
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
 pub struct ComposerPackageScripts {
-    /// Occurs after the autoloader is dumped, contains one or more Class::method callables or shell commands
+    /// Occurs after the autoloader is dumped, contains one or more `Class::method` callables or shell commands
     #[serde(rename = "post-autoload-dump", default, skip_serializing_if = "Option::is_none")]
     pub post_autoload_dump: Option<ComposerPackageScriptsCallback>,
 
-    /// Occurs after the create-project command is executed, contains one or more Class::method callables or shell commands
+    /// Occurs after the create-project command is executed, contains one or more `Class::method` callables or shell commands
     #[serde(rename = "post-create-project-cmd", default, skip_serializing_if = "Option::is_none")]
     pub post_create_project_cmd: Option<ComposerPackageScriptsCallback>,
 
-    /// Occurs after the install command is executed, contains one or more Class::method callables or shell commands
+    /// Occurs after the install command is executed, contains one or more `Class::method` callables or shell commands
     #[serde(rename = "post-install-cmd", default, skip_serializing_if = "Option::is_none")]
     pub post_install_cmd: Option<ComposerPackageScriptsCallback>,
 
-    /// Occurs after a package is installed, contains one or more Class::method callables or shell commands
+    /// Occurs after a package is installed, contains one or more `Class::method` callables or shell commands
     #[serde(rename = "post-package-install", default, skip_serializing_if = "Option::is_none")]
     pub post_package_install: Option<ComposerPackageScriptsCallback>,
 
-    /// Occurs after a package has been uninstalled, contains one or more Class::method callables or shell commands
+    /// Occurs after a package has been uninstalled, contains one or more `Class::method` callables or shell commands
     #[serde(rename = "post-package-uninstall", default, skip_serializing_if = "Option::is_none")]
     pub post_package_uninstall: Option<ComposerPackageScriptsCallback>,
 
-    /// Occurs after a package is updated, contains one or more Class::method callables or shell commands
+    /// Occurs after a package is updated, contains one or more `Class::method` callables or shell commands
     #[serde(rename = "post-package-update", default, skip_serializing_if = "Option::is_none")]
     pub post_package_update: Option<ComposerPackageScriptsCallback>,
 
-    /// Occurs after the root-package is installed, contains one or more Class::method callables or shell commands
+    /// Occurs after the root-package is installed, contains one or more `Class::method` callables or shell commands
     #[serde(rename = "post-root-package-install", default, skip_serializing_if = "Option::is_none")]
     pub post_root_package_install: Option<ComposerPackageScriptsCallback>,
 
-    /// Occurs after the status command is executed, contains one or more Class::method callables or shell commands
+    /// Occurs after the status command is executed, contains one or more `Class::method` callables or shell commands
     #[serde(rename = "post-status-cmd", default, skip_serializing_if = "Option::is_none")]
     pub post_status_cmd: Option<ComposerPackageScriptsCallback>,
 
-    /// Occurs after the update command is executed, contains one or more Class::method callables or shell commands
+    /// Occurs after the update command is executed, contains one or more `Class::method` callables or shell commands
     #[serde(rename = "post-update-cmd", default, skip_serializing_if = "Option::is_none")]
     pub post_update_cmd: Option<ComposerPackageScriptsCallback>,
 
-    /// Occurs before the autoloader is dumped, contains one or more Class::method callables or shell commands
+    /// Occurs before the autoloader is dumped, contains one or more `Class::method` callables or shell commands
     #[serde(rename = "pre-autoload-dump", default, skip_serializing_if = "Option::is_none")]
     pub pre_autoload_dump: Option<ComposerPackageScriptsCallback>,
 
-    /// Occurs before the install command is executed, contains one or more Class::method callables or shell commands
+    /// Occurs before the install command is executed, contains one or more `Class::method` callables or shell commands
     #[serde(rename = "pre-install-cmd", default, skip_serializing_if = "Option::is_none")]
     pub pre_install_cmd: Option<ComposerPackageScriptsCallback>,
 
-    /// Occurs before a package is installed, contains one or more Class::method callables or shell commands
+    /// Occurs before a package is installed, contains one or more `Class::method` callables or shell commands
     #[serde(rename = "pre-package-install", default, skip_serializing_if = "Option::is_none")]
     pub pre_package_install: Option<ComposerPackageScriptsCallback>,
 
-    /// Occurs before a package has been uninstalled, contains one or more Class::method callables or shell commands
+    /// Occurs before a package has been uninstalled, contains one or more `Class::method` callables or shell commands
     #[serde(rename = "pre-package-uninstall", default, skip_serializing_if = "Option::is_none")]
     pub pre_package_uninstall: Option<ComposerPackageScriptsCallback>,
 
-    /// Occurs before a package is updated, contains one or more Class::method callables or shell commands
+    /// Occurs before a package is updated, contains one or more `Class::method` callables or shell commands
     #[serde(rename = "pre-package-update", default, skip_serializing_if = "Option::is_none")]
     pub pre_package_update: Option<ComposerPackageScriptsCallback>,
 
-    /// Occurs before the status command is executed, contains one or more Class::method callables or shell commands
+    /// Occurs before the status command is executed, contains one or more `Class::method` callables or shell commands
     #[serde(rename = "pre-status-cmd", default, skip_serializing_if = "Option::is_none")]
     pub pre_status_cmd: Option<ComposerPackageScriptsCallback>,
 
-    /// Occurs before the update command is executed, contains one or more Class::method callables or shell commands
+    /// Occurs before the update command is executed, contains one or more `Class::method` callables or shell commands
     #[serde(rename = "pre-update-cmd", default, skip_serializing_if = "Option::is_none")]
     pub pre_update_cmd: Option<ComposerPackageScriptsCallback>,
 }
@@ -800,7 +800,7 @@ pub struct ComposerPackageSupport {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub forum: Option<String>,
 
-    /// IRC channel for support, as irc://server/channel
+    /// IRC channel for support, as <irc://server/channel>
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub irc: Option<String>,
 

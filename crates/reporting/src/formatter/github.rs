@@ -65,7 +65,7 @@ impl Formatter for GithubFormatter {
             // we must use `%0A` instead of `\n`.
             //
             // see: https://github.com/actions/toolkit/issues/193
-            let message = long_message(issue, true).replace("\n", "%0A");
+            let message = long_message(issue, true).replace('\n', "%0A");
 
             writeln!(writer, "::{level} {properties}::{message}")?;
         }

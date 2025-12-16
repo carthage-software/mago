@@ -12,7 +12,16 @@ impl Fingerprintable for Construct<'_> {
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
     ) {
-        use Construct::*;
+        use Construct::Die;
+        use Construct::Empty;
+        use Construct::Eval;
+        use Construct::Exit;
+        use Construct::Include;
+        use Construct::IncludeOnce;
+        use Construct::Isset;
+        use Construct::Print;
+        use Construct::Require;
+        use Construct::RequireOnce;
 
         match self {
             Isset(c) => c.fingerprint_with_hasher(hasher, resolved_names, options),

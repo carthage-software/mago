@@ -41,8 +41,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Continue<'arena> {
                                 "Expected an integer literal here, found an expression of type `{}`.",
                                 artifacts
                                     .get_expression_type(expression)
-                                    .map(|union| union.get_id().as_str())
-                                    .unwrap_or_else(|| "unknown")
+                                    .map_or_else(|| "unknown", |union| union.get_id().as_str())
                             )),
                         ),
                     );
@@ -111,7 +110,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Continue<'arena> {
             return Ok(());
         };
 
-        if block_context.break_types.last().is_some_and(|last_break_type| last_break_type.is_switch()) && levels < 2 {
+        if block_context.break_types.last().is_some_and(crate::context::block::BreakContext::is_switch) && levels < 2 {
             loop_scope.final_actions.insert(ControlAction::LeaveSwitch);
         } else {
             loop_scope.final_actions.insert(ControlAction::Continue);

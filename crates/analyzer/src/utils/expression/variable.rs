@@ -23,7 +23,7 @@ struct VariableScanner<'arena> {
 
 impl<'ast, 'arena> MutWalker<'ast, 'arena, ()> for VariableScanner<'arena> {
     #[inline]
-    fn walk_in_direct_variable(&mut self, direct_variable: &'ast DirectVariable<'arena>, _: &mut ()) {
+    fn walk_in_direct_variable(&mut self, direct_variable: &'ast DirectVariable<'arena>, (): &mut ()) {
         self.variables.insert((direct_variable.name, direct_variable.span));
     }
 

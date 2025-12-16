@@ -99,7 +99,7 @@ pub fn replace(union: &TUnion, template_result: &TemplateResult, codebase: &Code
                                     parameter_name: *parameter_name,
                                     constraint: Box::new(first_atomic_type.clone()),
                                     defining_entity: *defining_entity,
-                                })))
+                                })));
                         }
                     }
 
@@ -154,7 +154,7 @@ fn replace_template_parameter(
         };
 
         if let Some(intersection_types) = intersection_types
-            && template_type_inner.types.iter().any(|atomic| atomic.can_be_intersected())
+            && template_type_inner.types.iter().any(super::super::TType::can_be_intersected)
         {
             let replaced_intersection_parts: Vec<TAtomic> = intersection_types
                 .iter()

@@ -95,18 +95,15 @@ pub fn get_formula(
                     return (false, true);
                 }
 
-                artifacts
-                    .get_expression_type(expr)
-                    .map(|t| {
-                        if t.is_true() {
-                            (true, false)
-                        } else if t.is_false() {
-                            (false, true)
-                        } else {
-                            (false, false)
-                        }
-                    })
-                    .unwrap_or((false, false))
+                artifacts.get_expression_type(expr).map_or((false, false), |t| {
+                    if t.is_true() {
+                        (true, false)
+                    } else if t.is_false() {
+                        (false, true)
+                    } else {
+                        (false, false)
+                    }
+                })
             };
 
             let is_identical = matches!(binary.operator, BinaryOperator::Identical(_));
@@ -149,18 +146,18 @@ pub fn get_formula(
                             Some(true),
                             Some(false),
                         )]);
-                    } else {
-                        let formula = get_formula(
-                            conditional_object_id,
-                            creating_object_id,
-                            binary.rhs,
-                            assertion_context,
-                            artifacts,
-                        )?;
-
-                        let should_negate = if is_identical { left_is_false } else { left_is_true };
-                        return if should_negate { negate_formula(formula) } else { Some(formula) };
                     }
+
+                    let formula = get_formula(
+                        conditional_object_id,
+                        creating_object_id,
+                        binary.rhs,
+                        assertion_context,
+                        artifacts,
+                    )?;
+
+                    let should_negate = if is_identical { left_is_false } else { left_is_true };
+                    return if should_negate { negate_formula(formula) } else { Some(formula) };
                 }
                 (_, true) => {
                     if let Some(var_name) = get_expression_id(
@@ -197,18 +194,18 @@ pub fn get_formula(
                             Some(true),
                             Some(false),
                         )]);
-                    } else {
-                        let formula = get_formula(
-                            conditional_object_id,
-                            creating_object_id,
-                            binary.lhs,
-                            assertion_context,
-                            artifacts,
-                        )?;
-
-                        let should_negate = if is_identical { right_is_false } else { right_is_true };
-                        return if should_negate { negate_formula(formula) } else { Some(formula) };
                     }
+
+                    let formula = get_formula(
+                        conditional_object_id,
+                        creating_object_id,
+                        binary.lhs,
+                        assertion_context,
+                        artifacts,
+                    )?;
+
+                    let should_negate = if is_identical { right_is_false } else { right_is_true };
+                    return if should_negate { negate_formula(formula) } else { Some(formula) };
                 }
                 _ => {}
             }
@@ -231,7 +228,8 @@ pub fn get_formula(
                         if let Some(stripped) = var.as_str().strip_prefix('=') { Atom::from(stripped) } else { var };
 
                     for orred_types in anded_types {
-                        let has_equality = orred_types.first().is_some_and(|t| t.has_equality());
+                        let has_equality =
+                            orred_types.first().is_some_and(mago_codex::assertion::Assertion::has_equality);
                         let mapped_orred_types = orred_types
                             .into_iter()
                             .map(|orred_type| (orred_type.to_hash(), orred_type))
@@ -397,7 +395,7 @@ fn get_formula_from_assertions(
                     Some(false),
                     Some(true),
                     Some(has_equality),
-                ))
+                ));
             }
         }
     }

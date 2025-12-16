@@ -157,7 +157,7 @@ pub fn find_control_flows_in_statement<'ast, 'arena>(
                             r#break.level,
                             Some(Expression::Literal(Literal::Integer(LiteralInteger { value: Some(1), .. }))) | None
                         ) {
-                            controls.push(control)
+                            controls.push(control);
                         }
                     }
                     _ => controls.push(control),

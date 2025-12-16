@@ -18,20 +18,16 @@ pub trait FunctionCallHook: Provider {
     /// Return `ExpressionHookResult::Continue` to proceed with normal analysis,
     /// `ExpressionHookResult::Skip` to skip analysis (type will be `mixed`), or
     /// `ExpressionHookResult::SkipWithType(ty)` to skip with a custom return type.
-    fn before_function_call<'ast, 'arena>(
+    fn before_function_call(
         &self,
-        _call: &'ast FunctionCall<'arena>,
+        _call: &FunctionCall<'_>,
         _context: &mut HookContext<'_, '_>,
     ) -> HookResult<ExpressionHookResult> {
         Ok(ExpressionHookResult::Continue)
     }
 
     /// Called after a function call has been analyzed.
-    fn after_function_call<'ast, 'arena>(
-        &self,
-        _call: &'ast FunctionCall<'arena>,
-        _context: &mut HookContext<'_, '_>,
-    ) -> HookResult<()> {
+    fn after_function_call(&self, _call: &FunctionCall<'_>, _context: &mut HookContext<'_, '_>) -> HookResult<()> {
         Ok(())
     }
 }
@@ -47,20 +43,16 @@ pub trait MethodCallHook: Provider {
     /// Return `ExpressionHookResult::Continue` to proceed with normal analysis,
     /// `ExpressionHookResult::Skip` to skip analysis (type will be `mixed`), or
     /// `ExpressionHookResult::SkipWithType(ty)` to skip with a custom return type.
-    fn before_method_call<'ast, 'arena>(
+    fn before_method_call(
         &self,
-        _call: &'ast MethodCall<'arena>,
+        _call: &MethodCall<'_>,
         _context: &mut HookContext<'_, '_>,
     ) -> HookResult<ExpressionHookResult> {
         Ok(ExpressionHookResult::Continue)
     }
 
     /// Called after a method call has been analyzed.
-    fn after_method_call<'ast, 'arena>(
-        &self,
-        _call: &'ast MethodCall<'arena>,
-        _context: &mut HookContext<'_, '_>,
-    ) -> HookResult<()> {
+    fn after_method_call(&self, _call: &MethodCall<'_>, _context: &mut HookContext<'_, '_>) -> HookResult<()> {
         Ok(())
     }
 }
@@ -68,18 +60,18 @@ pub trait MethodCallHook: Provider {
 /// Hook trait for intercepting static method call analysis.
 pub trait StaticMethodCallHook: Provider {
     /// Called before a static method call is analyzed.
-    fn before_static_method_call<'ast, 'arena>(
+    fn before_static_method_call(
         &self,
-        _call: &'ast StaticMethodCall<'arena>,
+        _call: &StaticMethodCall<'_>,
         _context: &mut HookContext<'_, '_>,
     ) -> HookResult<ExpressionHookResult> {
         Ok(ExpressionHookResult::Continue)
     }
 
     /// Called after a static method call has been analyzed.
-    fn after_static_method_call<'ast, 'arena>(
+    fn after_static_method_call(
         &self,
-        _call: &'ast StaticMethodCall<'arena>,
+        _call: &StaticMethodCall<'_>,
         _context: &mut HookContext<'_, '_>,
     ) -> HookResult<()> {
         Ok(())
@@ -89,18 +81,18 @@ pub trait StaticMethodCallHook: Provider {
 /// Hook trait for intercepting nullsafe method call analysis.
 pub trait NullSafeMethodCallHook: Provider {
     /// Called before a nullsafe method call is analyzed.
-    fn before_nullsafe_method_call<'ast, 'arena>(
+    fn before_nullsafe_method_call(
         &self,
-        _call: &'ast NullSafeMethodCall<'arena>,
+        _call: &NullSafeMethodCall<'_>,
         _context: &mut HookContext<'_, '_>,
     ) -> HookResult<ExpressionHookResult> {
         Ok(ExpressionHookResult::Continue)
     }
 
     /// Called after a nullsafe method call has been analyzed.
-    fn after_nullsafe_method_call<'ast, 'arena>(
+    fn after_nullsafe_method_call(
         &self,
-        _call: &'ast NullSafeMethodCall<'arena>,
+        _call: &NullSafeMethodCall<'_>,
         _context: &mut HookContext<'_, '_>,
     ) -> HookResult<()> {
         Ok(())

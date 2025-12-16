@@ -40,7 +40,7 @@ fn bench_union_simple_comparison(c: &mut Criterion) {
                 false,
                 &mut result,
             ))
-        })
+        });
     });
 
     c.bench_function("is_contained_by_int_in_mixed", |b| {
@@ -57,7 +57,7 @@ fn bench_union_simple_comparison(c: &mut Criterion) {
                 false,
                 &mut result,
             ))
-        })
+        });
     });
 
     c.bench_function("is_contained_by_int_in_string", |b| {
@@ -74,7 +74,7 @@ fn bench_union_simple_comparison(c: &mut Criterion) {
                 false,
                 &mut result,
             ))
-        })
+        });
     });
 }
 
@@ -102,7 +102,7 @@ fn bench_union_multi_type_comparison(c: &mut Criterion) {
                 false,
                 &mut result,
             ))
-        })
+        });
     });
 
     c.bench_function("is_contained_by_5_type_union", |b| {
@@ -132,7 +132,7 @@ fn bench_union_multi_type_comparison(c: &mut Criterion) {
                 false,
                 &mut result,
             ))
-        })
+        });
     });
 }
 
@@ -154,7 +154,7 @@ fn bench_integer_comparison(c: &mut Criterion) {
                 false,
                 &mut result,
             ))
-        })
+        });
     });
 
     c.bench_function("is_contained_by_range_in_range", |b| {
@@ -171,7 +171,7 @@ fn bench_integer_comparison(c: &mut Criterion) {
                 false,
                 &mut result,
             ))
-        })
+        });
     });
 
     c.bench_function("is_contained_by_int_in_union_of_ints", |b| {
@@ -194,7 +194,7 @@ fn bench_integer_comparison(c: &mut Criterion) {
                 false,
                 &mut result,
             ))
-        })
+        });
     });
 }
 
@@ -216,7 +216,7 @@ fn bench_array_comparison(c: &mut Criterion) {
                 false,
                 &mut result,
             ))
-        })
+        });
     });
 
     c.bench_function("is_contained_by_tuple_in_list", |b| {
@@ -238,7 +238,7 @@ fn bench_array_comparison(c: &mut Criterion) {
                 false,
                 &mut result,
             ))
-        })
+        });
     });
 
     c.bench_function("is_contained_by_keyed_in_keyed", |b| {
@@ -266,7 +266,7 @@ fn bench_array_comparison(c: &mut Criterion) {
                 false,
                 &mut result,
             ))
-        })
+        });
     });
 }
 
@@ -290,7 +290,7 @@ fn bench_object_comparison(c: &mut Criterion) {
                 false,
                 &mut result,
             ))
-        })
+        });
     });
 
     c.bench_function("is_contained_by_object_different", |b| {
@@ -309,7 +309,7 @@ fn bench_object_comparison(c: &mut Criterion) {
                 false,
                 &mut result,
             ))
-        })
+        });
     });
 
     c.bench_function("is_contained_by_generic_object", |b| {
@@ -332,11 +332,11 @@ fn bench_object_comparison(c: &mut Criterion) {
                 false,
                 &mut result,
             ))
-        })
+        });
     });
 }
 
-/// Benchmark can_expression_types_be_identical
+/// Benchmark `can_expression_types_be_identical`
 fn bench_can_be_identical(c: &mut Criterion) {
     let codebase = CodebaseMetadata::new();
 
@@ -347,7 +347,7 @@ fn bench_can_be_identical(c: &mut Criterion) {
             std::hint::black_box(union_comparator::can_expression_types_be_identical(
                 &codebase, &type1, &type2, false, false,
             ))
-        })
+        });
     });
 
     c.bench_function("can_be_identical_different_types", |b| {
@@ -357,7 +357,7 @@ fn bench_can_be_identical(c: &mut Criterion) {
             std::hint::black_box(union_comparator::can_expression_types_be_identical(
                 &codebase, &type1, &type2, false, false,
             ))
-        })
+        });
     });
 
     c.bench_function("can_be_identical_5_type_unions", |b| {
@@ -379,7 +379,7 @@ fn bench_can_be_identical(c: &mut Criterion) {
             std::hint::black_box(union_comparator::can_expression_types_be_identical(
                 &codebase, &type1, &type2, false, false,
             ))
-        })
+        });
     });
 }
 

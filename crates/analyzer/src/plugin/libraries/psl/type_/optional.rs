@@ -1,4 +1,4 @@
-//! Psl\Type\optional() return type provider.
+//! `Psl\Type\optional()` return type provider.
 
 use mago_atom::atom;
 use mago_codex::ttype::atomic::TAtomic;
@@ -21,7 +21,7 @@ static META: ProviderMeta = ProviderMeta::new(
 
 /// Provider for the `Psl\Type\optional()` function.
 ///
-/// Returns a TypeInterface with the inner type marked as possibly undefined.
+/// Returns a `TypeInterface` with the inner type marked as possibly undefined.
 #[derive(Default)]
 pub struct OptionalProvider;
 

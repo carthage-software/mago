@@ -73,7 +73,7 @@ impl TValueOf {
                     };
 
                     if class_like_metadata.kind.is_enum() {
-                        for (_, case_metadata) in class_like_metadata.enum_cases.iter() {
+                        for (_, case_metadata) in &class_like_metadata.enum_cases {
                             if let Some(case_value_type) = case_metadata.value_type.as_ref() {
                                 value_types.push(case_value_type.clone());
                             }
@@ -126,7 +126,7 @@ impl TValueOf {
 }
 
 impl TType for TValueOf {
-    fn get_child_nodes<'a>(&'a self) -> Vec<TypeRef<'a>> {
+    fn get_child_nodes(&self) -> Vec<TypeRef<'_>> {
         vec![TypeRef::Union(&self.0)]
     }
 

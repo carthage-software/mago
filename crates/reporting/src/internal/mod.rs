@@ -140,7 +140,7 @@ impl Expandable<ExpandedIssue> for Issue {
 impl Expandable<ExpandedIssueCollection> for IssueCollection {
     fn expand(&self, database: &ReadDatabase) -> Result<ExpandedIssueCollection, DatabaseError> {
         let mut expanded_issues = Vec::new();
-        for issue in self.issues.iter() {
+        for issue in &self.issues {
             expanded_issues.push(issue.expand(database)?);
         }
 

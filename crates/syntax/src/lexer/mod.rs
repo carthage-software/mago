@@ -1146,17 +1146,17 @@ fn matches_literal_double_quote_string(input: &Input) -> bool {
             // Skip an escape sequence: assume that the backslash and the escaped character form a pair.
             pos += 2;
             continue;
-        } else {
-            // Check for variable interpolation or complex expression start:
-            // If two-byte sequences match either "$" followed by a start-of-identifier or "{" and "$", then return false.
-            if pos + 1 < total {
-                let next = *input.read_at(pos + 1);
-                if (byte == b'$' && (is_start_of_identifier(&next) || next == b'{')) || (byte == b'{' && next == b'$') {
-                    return false;
-                }
-            }
-            pos += 1;
         }
+
+        // Check for variable interpolation or complex expression start:
+        // If two-byte sequences match either "$" followed by a start-of-identifier or "{" and "$", then return false.
+        if pos + 1 < total {
+            let next = *input.read_at(pos + 1);
+            if (byte == b'$' && (is_start_of_identifier(&next) || next == b'{')) || (byte == b'{' && next == b'$') {
+                return false;
+            }
+        }
+        pos += 1;
     }
 }
 
@@ -1341,9 +1341,9 @@ fn read_until_end_of_variable_interpolation(input: &Input, from: usize) -> u32 {
                     offset += 1;
                     if nesting == 0 {
                         break;
-                    } else {
-                        nesting -= 1;
                     }
+
+                    nesting -= 1;
                 } else if *b == b'[' {
                     offset += 1;
                     nesting += 1;
@@ -1410,9 +1410,9 @@ fn read_until_end_of_brace_interpolation(input: &Input, from: usize) -> u32 {
                 offset += 1;
                 if nesting == 0 {
                     break;
-                } else {
-                    nesting -= 1;
                 }
+
+                nesting -= 1;
             }
             b'{' => {
                 offset += 1;

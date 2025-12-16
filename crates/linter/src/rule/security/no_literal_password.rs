@@ -52,16 +52,16 @@ impl LintRule for NoLiteralPasswordRule {
         const META: RuleMeta = RuleMeta {
             name: "No Literal Password",
             code: "no-literal-password",
-            description: indoc! {r#"
+            description: indoc! {r"
                 Detects the use of literal values for passwords or sensitive data.
                 Storing passwords or sensitive information as literals in code is a security risk
                 and should be avoided. Use environment variables or secure configuration management instead.
-            "#},
-            good_example: indoc! {r#"
+            "},
+            good_example: indoc! {r"
                 <?php
 
                 $password = getenv('DB_PASSWORD');
-            "#},
+            "},
             bad_example: indoc! {r#"
                 <?php
 
@@ -93,14 +93,14 @@ impl LintRule for NoLiteralPasswordRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         match node {
             Node::Assignment(assignment) => {
                 let Some(password) = get_password(assignment.lhs) else {
                     return;
                 };
 
-                check(password, assignment.rhs, ctx, self)
+                check(password, assignment.rhs, ctx, self);
             }
             Node::ArrayElement(array_element) => {
                 let ArrayElement::KeyValue(kv) = array_element else {
@@ -116,28 +116,28 @@ impl LintRule for NoLiteralPasswordRule {
                     return;
                 }
 
-                check(kv.key.span(), kv.value, ctx, self)
+                check(kv.key.span(), kv.value, ctx, self);
             }
             Node::ConstantItem(constant_item) => {
                 if !is_password(constant_item.name.value) {
                     return;
                 }
 
-                check(constant_item.name.span, &constant_item.value, ctx, self)
+                check(constant_item.name.span, &constant_item.value, ctx, self);
             }
             Node::ClassLikeConstantItem(class_like_constant_item) => {
                 if !is_password(class_like_constant_item.name.value) {
                     return;
                 }
 
-                check(class_like_constant_item.name.span, &class_like_constant_item.value, ctx, self)
+                check(class_like_constant_item.name.span, &class_like_constant_item.value, ctx, self);
             }
             Node::PropertyConcreteItem(property_concrete_item) => {
                 if !is_password(&property_concrete_item.variable.name[1..]) {
                     return;
                 }
 
-                check(property_concrete_item.variable.span, &property_concrete_item.value, ctx, self)
+                check(property_concrete_item.variable.span, &property_concrete_item.value, ctx, self);
             }
             Node::FunctionLikeParameter(function_like_parameter) => {
                 let Some(default_value) = function_like_parameter.default_value.as_ref() else {
@@ -148,14 +148,14 @@ impl LintRule for NoLiteralPasswordRule {
                     return;
                 }
 
-                check(function_like_parameter.variable.span, &default_value.value, ctx, self)
+                check(function_like_parameter.variable.span, &default_value.value, ctx, self);
             }
             Node::NamedArgument(named_argument) => {
                 if !is_password(named_argument.name.value) {
                     return;
                 }
 
-                check(named_argument.name.span, &named_argument.value, ctx, self)
+                check(named_argument.name.span, &named_argument.value, ctx, self);
             }
             _ => {}
         }

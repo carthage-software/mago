@@ -1,4 +1,4 @@
-//! array_filter() return type provider.
+//! `array_filter()` return type provider.
 
 use mago_codex::assertion::Assertion;
 use mago_codex::ttype::get_array_parameters;

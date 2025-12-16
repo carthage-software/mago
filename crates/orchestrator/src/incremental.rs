@@ -168,13 +168,12 @@ impl IncrementalAnalysis {
         metadata: &mut CodebaseMetadata,
     ) {
         // Get invalid symbols with propagation through reference graph
-        let (invalid_symbols, partially_invalid) = match references.get_invalid_symbols(&diff) {
-            Some(result) => result,
-            None => {
-                // Propagation too expensive (>5000 steps), skip incremental
-                tracing::warn!("Invalidation cascade too expensive (>5000 steps), falling back to full analysis");
-                return;
-            }
+        let (invalid_symbols, partially_invalid) = if let Some(result) = references.get_invalid_symbols(&diff) {
+            result
+        } else {
+            // Propagation too expensive (>5000 steps), skip incremental
+            tracing::warn!("Invalidation cascade too expensive (>5000 steps), falling back to full analysis");
+            return;
         };
 
         // Mark all symbols in 'keep' set as safe (unless invalidated by cascade)

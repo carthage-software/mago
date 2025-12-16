@@ -74,30 +74,30 @@ impl PropertyConflict {
     fn describe(&self) -> String {
         match self {
             PropertyConflict::Visibility(r1, w1, r2, w2) => {
-                let p1_vis = if r1 == w1 { r1.to_string() } else { format!("{} {}(set)", r1, w1) };
-                let p2_vis = if r2 == w2 { r2.to_string() } else { format!("{} {}(set)", r2, w2) };
-                format!("visibility differs ({} vs {})", p1_vis, p2_vis)
+                let p1_vis = if r1 == w1 { r1.to_string() } else { format!("{r1} {w1}(set)") };
+                let p2_vis = if r2 == w2 { r2.to_string() } else { format!("{r2} {w2}(set)") };
+                format!("visibility differs ({p1_vis} vs {p2_vis})")
             }
             PropertyConflict::Static(s1, s2) => {
                 let p1_mod = if *s1 { "static" } else { "instance" };
                 let p2_mod = if *s2 { "static" } else { "instance" };
-                format!("static modifier differs ({} vs {})", p1_mod, p2_mod)
+                format!("static modifier differs ({p1_mod} vs {p2_mod})")
             }
             PropertyConflict::Readonly(r1, r2) => {
                 let p1_mod = if *r1 { "readonly" } else { "not readonly" };
                 let p2_mod = if *r2 { "readonly" } else { "not readonly" };
-                format!("readonly modifier differs ({} vs {})", p1_mod, p2_mod)
+                format!("readonly modifier differs ({p1_mod} vs {p2_mod})")
             }
             PropertyConflict::Type(t1, t2) => match (t1, t2) {
-                (Some(type1), Some(type2)) => format!("type declaration differs ({} vs {})", type1, type2),
-                (Some(type1), None) => format!("type declaration differs ({} vs untyped)", type1),
-                (None, Some(type2)) => format!("type declaration differs (untyped vs {})", type2),
+                (Some(type1), Some(type2)) => format!("type declaration differs ({type1} vs {type2})"),
+                (Some(type1), None) => format!("type declaration differs ({type1} vs untyped)"),
+                (None, Some(type2)) => format!("type declaration differs (untyped vs {type2})"),
                 (None, None) => unreachable!(),
             },
             PropertyConflict::Default(d1, d2) => match (d1, d2) {
-                (Some(def1), Some(def2)) => format!("default value differs ({} vs {})", def1, def2),
-                (Some(def1), None) => format!("default value differs ({} vs no default)", def1),
-                (None, Some(def2)) => format!("default value differs (no default vs {})", def2),
+                (Some(def1), Some(def2)) => format!("default value differs ({def1} vs {def2})"),
+                (Some(def1), None) => format!("default value differs ({def1} vs no default)"),
+                (None, Some(def2)) => format!("default value differs (no default vs {def2})"),
                 (None, None) => unreachable!(),
             },
             PropertyConflict::HookedProperty => {
@@ -149,8 +149,8 @@ fn type_contains_template_param(type_union: &TUnion, param_name: Atom, defining_
 /// - A method parameter type
 /// - A method return type
 /// - An `@extends`, `@implements`, or `@use` annotation
-fn check_unused_template_parameters<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+fn check_unused_template_parameters<'ctx>(
+    context: &mut Context<'ctx, '_>,
     class_like_metadata: &'ctx ClassLikeMetadata,
 ) {
     if !context.settings.find_unused_definitions {
@@ -617,7 +617,7 @@ pub(crate) fn analyze_class_like<'ctx, 'ast, 'arena>(
                             if p.hooks.is_empty() {
                                 true
                             } else {
-                                p.hooks.get(hook_name).map(|h| !h.is_abstract).unwrap_or(false)
+                                p.hooks.get(hook_name).is_some_and(|h| !h.is_abstract)
                             }
                         })
                         .unwrap_or_else(|| {
@@ -626,8 +626,7 @@ pub(crate) fn analyze_class_like<'ctx, 'ast, 'arena>(
                                     .codebase
                                     .get_class_like(parent_class_fqcn)
                                     .and_then(|parent| parent.properties.get(property_name))
-                                    .map(|prop| prop.hooks.get(hook_name).map(|h| !h.is_abstract).unwrap_or(false))
-                                    .unwrap_or(false)
+                                    .is_some_and(|prop| prop.hooks.get(hook_name).is_some_and(|h| !h.is_abstract))
                             })
                         });
 
@@ -928,84 +927,77 @@ fn check_class_like_implements<'ctx, 'arena>(
         let implemented_type_str = context.resolved_names.get(&implemented_type);
         let implemented_interface_metadata = context.codebase.get_class_like(implemented_type_str);
 
-        match implemented_interface_metadata {
-            Some(implemented_metadata) => {
-                let implemented_name = implemented_metadata.original_name;
-                let implemented_kind_str = implemented_metadata.kind.as_str();
-                let implemented_class_span = implemented_metadata.name_span.unwrap_or(implemented_metadata.span);
-                let implemented_kind_prefix =
-                    if implemented_metadata.kind.is_class() || implemented_metadata.kind.is_trait() {
-                        "a"
-                    } else {
-                        "an"
-                    };
+        if let Some(implemented_metadata) = implemented_interface_metadata {
+            let implemented_name = implemented_metadata.original_name;
+            let implemented_kind_str = implemented_metadata.kind.as_str();
+            let implemented_class_span = implemented_metadata.name_span.unwrap_or(implemented_metadata.span);
+            let implemented_kind_prefix =
+                if implemented_metadata.kind.is_class() || implemented_metadata.kind.is_trait() { "a" } else { "an" };
 
-                if !implemented_metadata.kind.is_interface() {
-                    context.collector.report_with_code(
-                        IssueCode::InvalidImplement,
-                        Issue::error(format!("{using_kind_capitalized} `{using_name}` cannot implement non-interface type `{implemented_name}`"))
-                            .with_annotation(Annotation::primary(implemented_type.span())
-                                .with_message(format!("...because it is {implemented_kind_prefix} {implemented_kind_str}, not an interface")))
-                            .with_annotation(Annotation::secondary(implemented_class_span)
-                                .with_message(format!("`{implemented_name}` is defined as {implemented_kind_prefix} {implemented_kind_str} here")))
-                            .with_note("The `implements` keyword is exclusively for implementing interfaces.")
-                            .with_help("To inherit from a class, use `extends`. To use a trait, use `use`."),
-                    );
-
-                    continue;
-                }
-
-                if implemented_metadata.flags.is_enum_interface() && !class_like_metadata.kind.is_enum() {
-                    context.collector.report_with_code(
-                        IssueCode::InvalidImplement,
-                        Issue::error(format!("{using_kind_capitalized} `{using_name}` cannot implement enum-only interface `{implemented_name}`"))
-                            .with_annotation(Annotation::primary(using_class_span).with_message(format!("This {using_kind_str} is not an enum...")))
-                            .with_annotation(Annotation::secondary(implemented_type.span()).with_message("...but it implements an interface restricted to enums"))
-                            .with_annotation(Annotation::secondary(implemented_class_span).with_message("This interface is marked with `@enum-interface` here"))
-                            .with_note("An interface marked with `@enum-interface` can only be implemented by enums.")
-                            .with_help(format!("To resolve this, either change `{using_name}` to be an enum, or implement a different, non-enum interface.")),
-                    );
-                }
-
-                if !class_like_metadata.is_permitted_to_inherit(implemented_metadata) {
-                    context.collector.report_with_code(
-                        IssueCode::InvalidImplement,
-                        Issue::error(format!("{using_kind_capitalized} `{using_name}` is not permitted to implement `{implemented_name}`"))
-                             .with_annotation(Annotation::primary(implemented_type.span()).with_message("This implementation is restricted"))
-                            .with_annotation(Annotation::secondary(implemented_class_span)
-                                .with_message(format!("The `@inheritors` annotation on this interface does not include `{using_name}`")))
-                            .with_note("The `@inheritors` annotation on an interface restricts which types are allowed to implement it.")
-                            .with_help(format!("To allow this, add `{using_name}` to the list in the `@inheritors` PHPDoc tag for `{implemented_name}`.")),
-                    );
-                }
-
-                let actual_parameters_count = class_like_metadata
-                    .template_type_implements_count
-                    .get(&implemented_metadata.name)
-                    .copied()
-                    .unwrap_or(0);
-
-                check_template_parameters(
-                    context,
-                    class_like_metadata,
-                    implemented_metadata,
-                    actual_parameters_count,
-                    InheritanceKind::Implements(implemented_type.span()),
-                );
-
-                check_interface_method_signatures(context, class_like_metadata, implemented_metadata);
-            }
-            None => {
-                let implemented_name = implemented_type.value();
-
+            if !implemented_metadata.kind.is_interface() {
                 context.collector.report_with_code(
-                    IssueCode::NonExistentClassLike,
-                    Issue::error(format!("{using_kind_capitalized} `{using_name}` cannot implement unknown type `{implemented_name}`"))
-                        .with_annotation(Annotation::primary(implemented_type.span()).with_message("This type could not be found"))
-                        .with_note("Mago could not find a definition for this interface. The `implements` keyword is for interfaces only.")
-                        .with_help("Ensure the name is correct, including its namespace, and that it is properly defined and autoloadable."),
+                    IssueCode::InvalidImplement,
+                    Issue::error(format!("{using_kind_capitalized} `{using_name}` cannot implement non-interface type `{implemented_name}`"))
+                        .with_annotation(Annotation::primary(implemented_type.span())
+                            .with_message(format!("...because it is {implemented_kind_prefix} {implemented_kind_str}, not an interface")))
+                        .with_annotation(Annotation::secondary(implemented_class_span)
+                            .with_message(format!("`{implemented_name}` is defined as {implemented_kind_prefix} {implemented_kind_str} here")))
+                        .with_note("The `implements` keyword is exclusively for implementing interfaces.")
+                        .with_help("To inherit from a class, use `extends`. To use a trait, use `use`."),
+                );
+
+                continue;
+            }
+
+            if implemented_metadata.flags.is_enum_interface() && !class_like_metadata.kind.is_enum() {
+                context.collector.report_with_code(
+                    IssueCode::InvalidImplement,
+                    Issue::error(format!("{using_kind_capitalized} `{using_name}` cannot implement enum-only interface `{implemented_name}`"))
+                        .with_annotation(Annotation::primary(using_class_span).with_message(format!("This {using_kind_str} is not an enum...")))
+                        .with_annotation(Annotation::secondary(implemented_type.span()).with_message("...but it implements an interface restricted to enums"))
+                        .with_annotation(Annotation::secondary(implemented_class_span).with_message("This interface is marked with `@enum-interface` here"))
+                        .with_note("An interface marked with `@enum-interface` can only be implemented by enums.")
+                        .with_help(format!("To resolve this, either change `{using_name}` to be an enum, or implement a different, non-enum interface.")),
                 );
             }
+
+            if !class_like_metadata.is_permitted_to_inherit(implemented_metadata) {
+                context.collector.report_with_code(
+                    IssueCode::InvalidImplement,
+                    Issue::error(format!("{using_kind_capitalized} `{using_name}` is not permitted to implement `{implemented_name}`"))
+                         .with_annotation(Annotation::primary(implemented_type.span()).with_message("This implementation is restricted"))
+                        .with_annotation(Annotation::secondary(implemented_class_span)
+                            .with_message(format!("The `@inheritors` annotation on this interface does not include `{using_name}`")))
+                        .with_note("The `@inheritors` annotation on an interface restricts which types are allowed to implement it.")
+                        .with_help(format!("To allow this, add `{using_name}` to the list in the `@inheritors` PHPDoc tag for `{implemented_name}`.")),
+                );
+            }
+
+            let actual_parameters_count = class_like_metadata
+                .template_type_implements_count
+                .get(&implemented_metadata.name)
+                .copied()
+                .unwrap_or(0);
+
+            check_template_parameters(
+                context,
+                class_like_metadata,
+                implemented_metadata,
+                actual_parameters_count,
+                InheritanceKind::Implements(implemented_type.span()),
+            );
+
+            check_interface_method_signatures(context, class_like_metadata, implemented_metadata);
+        } else {
+            let implemented_name = implemented_type.value();
+
+            context.collector.report_with_code(
+                IssueCode::NonExistentClassLike,
+                Issue::error(format!("{using_kind_capitalized} `{using_name}` cannot implement unknown type `{implemented_name}`"))
+                    .with_annotation(Annotation::primary(implemented_type.span()).with_message("This type could not be found"))
+                    .with_note("Mago could not find a definition for this interface. The `implements` keyword is for interfaces only.")
+                    .with_help("Ensure the name is correct, including its namespace, and that it is properly defined and autoloadable."),
+            );
         }
     }
 }
@@ -1156,8 +1148,8 @@ impl HasSpan for InheritanceKind {
     }
 }
 
-fn check_template_parameters<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+fn check_template_parameters<'ctx>(
+    context: &mut Context<'ctx, '_>,
     class_like_metadata: &'ctx ClassLikeMetadata,
     parent_metadata: &'ctx ClassLikeMetadata,
     actual_parameters_count: usize,
@@ -1263,7 +1255,11 @@ fn check_template_parameters<'ctx, 'arena>(
 
             let extended_type_str = extended_type.get_id();
 
-            if parent_metadata.template_variance.get(&i).is_some_and(|variance| variance.is_invariant()) {
+            if parent_metadata
+                .template_variance
+                .get(&i)
+                .is_some_and(mago_codex::ttype::template::variance::Variance::is_invariant)
+            {
                 for extended_type_atomic in extended_type.types.as_ref() {
                     let TAtomic::GenericParameter(generic_parameter) = extended_type_atomic else {
                         continue;
@@ -1280,7 +1276,7 @@ fn check_template_parameters<'ctx, 'arena>(
                     if class_like_metadata
                         .template_variance
                         .get(&local_offset)
-                        .is_some_and(|variance| variance.is_covariant())
+                        .is_some_and(mago_codex::ttype::template::variance::Variance::is_covariant)
                     {
                         let child_template_name = generic_parameter.parameter_name;
 
@@ -1327,7 +1323,12 @@ fn check_template_parameters<'ctx, 'arena>(
                 }
             }
 
-            if !template_type.is_mixed() {
+            if template_type.is_mixed() {
+                previous_extended_types
+                    .entry(*template_name)
+                    .or_default()
+                    .push((GenericParent::ClassLike(class_like_metadata.name), extended_type));
+            } else {
                 let mut template_result = TemplateResult::new(previous_extended_types.clone(), Default::default());
                 let mut replaced_template_type = standin_type_replacer::replace(
                     &template_type,
@@ -1345,7 +1346,12 @@ fn check_template_parameters<'ctx, 'arena>(
                     &TypeExpansionOptions { self_class: Some(class_like_metadata.original_name), ..Default::default() },
                 );
 
-                if !is_type_compatible(context.codebase, &extended_type, &replaced_template_type) {
+                if is_type_compatible(context.codebase, &extended_type, &replaced_template_type) {
+                    previous_extended_types
+                        .entry(*template_name)
+                        .or_default()
+                        .push((GenericParent::ClassLike(class_like_metadata.name), extended_type));
+                } else {
                     let replaced_type_str = replaced_template_type.get_id();
 
                     context.collector.report_with_code(
@@ -1363,17 +1369,7 @@ fn check_template_parameters<'ctx, 'arena>(
                         ))
                         .with_help("Change the provided type to be compatible with the template constraint."),
                     );
-                } else {
-                    previous_extended_types
-                        .entry(*template_name)
-                        .or_default()
-                        .push((GenericParent::ClassLike(class_like_metadata.name), extended_type));
                 }
-            } else {
-                previous_extended_types
-                    .entry(*template_name)
-                    .or_default()
-                    .push((GenericParent::ClassLike(class_like_metadata.name), extended_type));
             }
 
             i += 1;
@@ -1382,7 +1378,7 @@ fn check_template_parameters<'ctx, 'arena>(
 }
 
 /// Checks if this is the same method that was inherited (not overridden).
-/// Example: StringBox extends Box and inherits Box::setValue without overriding it.
+/// Example: `StringBox` extends Box and inherits `Box::setValue` without overriding it.
 #[inline]
 fn should_skip_same_method(appearing_fqcn: &str, overridden_fqcn: &str) -> bool {
     ascii_lowercase_atom(appearing_fqcn) == ascii_lowercase_atom(overridden_fqcn)
@@ -1433,8 +1429,8 @@ fn should_skip_enum_builtin_interface(class_like_metadata: &ClassLikeMetadata, i
     class_like_metadata.kind.is_enum() && (interface_fqcn == "backedenum" || interface_fqcn == "unitenum")
 }
 
-fn check_abstract_method_signatures<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+fn check_abstract_method_signatures<'ctx>(
+    context: &mut Context<'ctx, '_>,
     class_like_metadata: &'ctx ClassLikeMetadata,
 ) {
     for (method_name_atom, overridden_method_ids) in &class_like_metadata.overridden_method_ids {
@@ -1459,7 +1455,7 @@ fn check_abstract_method_signatures<'ctx, 'arena>(
             continue;
         };
 
-        for (parent_fqcn, parent_declaring_method_id) in overridden_method_ids.iter() {
+        for (parent_fqcn, parent_declaring_method_id) in overridden_method_ids {
             let parent_fqcn_str = parent_fqcn.as_ref();
 
             let declaring_class_name = parent_declaring_method_id.get_class_name();
@@ -1539,7 +1535,7 @@ fn check_trait_method_conflicts<'ctx, 'ast, 'arena>(
 ) {
     let mut trait_uses: Vec<(&'ast TraitUse<'arena>, Vec<Atom>)> = Vec::new();
 
-    for member in members.iter() {
+    for member in members {
         if let ClassLikeMember::TraitUse(trait_use) = member {
             let mut trait_names = Vec::new();
             for trait_name_id in trait_use.trait_names.iter() {
@@ -1681,7 +1677,7 @@ fn check_trait_property_conflicts<'ctx, 'ast, 'arena>(
 ) {
     let mut trait_uses: Vec<(&'ast TraitUse<'arena>, Vec<Atom>)> = Vec::new();
 
-    for member in members.iter() {
+    for member in members {
         if let ClassLikeMember::TraitUse(trait_use) = member {
             let mut trait_names = Vec::new();
             for trait_name_id in trait_use.trait_names.iter() {
@@ -1962,11 +1958,10 @@ fn report_trait_property_conflict(
     context.collector.report_with_code(
         issue_code,
         Issue::error(format!(
-            "Property `{}` is defined differently in `{}` and `{}` used by `{}`: {}",
-            property_name, trait1_name, trait2_name, class_name, conflict_description
+            "Property `{property_name}` is defined differently in `{trait1_name}` and `{trait2_name}` used by `{class_name}`: {conflict_description}"
         ))
         .with_annotation(Annotation::primary(conflict_span).with_message("Conflicting property definitions"))
-        .with_note(format!("In PHP, this will cause a fatal error: '{} and {} define the same property ({}) in the composition of {}. However, the definition differs and is considered incompatible.'", trait1_name, trait2_name, property_name, class_name))
+        .with_note(format!("In PHP, this will cause a fatal error: '{trait1_name} and {trait2_name} define the same property ({property_name}) in the composition of {class_name}. However, the definition differs and is considered incompatible.'"))
         .with_help("Ensure both sources define the property identically (same visibility, type, default value, and modifiers), or use only one source."),
     );
 }
@@ -2022,8 +2017,8 @@ fn apply_template_substitution_to_method(
     substituted_method
 }
 
-fn check_interface_method_signatures<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+fn check_interface_method_signatures<'ctx>(
+    context: &mut Context<'ctx, '_>,
     class_like_metadata: &'ctx ClassLikeMetadata,
     interface_metadata: &'ctx ClassLikeMetadata,
 ) {
@@ -2087,8 +2082,8 @@ fn check_interface_method_signatures<'ctx, 'arena>(
     }
 }
 
-fn report_signature_compatibility_issue<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+fn report_signature_compatibility_issue<'ctx>(
+    context: &mut Context<'ctx, '_>,
     child_class: &'ctx ClassLikeMetadata,
     parent_class: &'ctx ClassLikeMetadata,
     method_name: &Atom,
@@ -2107,21 +2102,20 @@ fn report_signature_compatibility_issue<'ctx, 'arena>(
         SignatureCompatibilityIssue::FinalMethodOverride => {
             context.collector.report_with_code(
                 IssueCode::OverrideFinalMethod,
-                Issue::error(format!("Cannot override final method `{}::{}()`", parent_name, method_name))
+                Issue::error(format!("Cannot override final method `{parent_name}::{method_name}()`"))
                     .with_annotation(
                         Annotation::primary(primary_span).with_message("Attempting to override final method here"),
                     )
                     .with_annotation(
                         Annotation::secondary(parent_class_span)
-                            .with_message(format!("Method `{}::{}()` is declared as final", parent_name, method_name)),
+                            .with_message(format!("Method `{parent_name}::{method_name}()` is declared as final")),
                     )
                     .with_annotation(
-                        Annotation::secondary(child_class_span).with_message(format!("In class `{}`", child_name)),
+                        Annotation::secondary(child_class_span).with_message(format!("In class `{child_name}`")),
                     )
                     .with_note("Final methods cannot be overridden in child classes or traits.")
                     .with_help(format!(
-                        "Remove the method `{}()` from `{}`, or remove the final modifier from the parent method.",
-                        method_name, child_name
+                        "Remove the method `{method_name}()` from `{child_name}`, or remove the final modifier from the parent method."
                     )),
             );
         }
@@ -2132,90 +2126,78 @@ fn report_signature_compatibility_issue<'ctx, 'arena>(
             context.collector.report_with_code(
                 IssueCode::IncompatibleStaticModifier,
                 Issue::error(format!(
-                    "Cannot make {} method `{}::{}()` {} in class `{}`",
-                    parent_modifier, parent_name, method_name, child_modifier, child_name
+                    "Cannot make {parent_modifier} method `{parent_name}::{method_name}()` {child_modifier} in class `{child_name}`"
                 ))
                 .with_annotation(
                     Annotation::primary(primary_span)
-                        .with_message(format!("This method is {} but should be {}", child_modifier, parent_modifier)),
+                        .with_message(format!("This method is {child_modifier} but should be {parent_modifier}")),
                 )
                 .with_annotation(Annotation::secondary(parent_class_span).with_message(format!(
-                    "`{}::{}()` is defined as {} here",
-                    parent_name, method_name, parent_modifier
+                    "`{parent_name}::{method_name}()` is defined as {parent_modifier} here"
                 )))
                 .with_annotation(
-                    Annotation::secondary(child_class_span).with_message(format!("In class `{}`", child_name)),
+                    Annotation::secondary(child_class_span).with_message(format!("In class `{child_name}`")),
                 )
                 .with_note("The static modifier must match exactly between parent and child methods.")
-                .with_help(format!("Change the method in `{}` to be {} like the parent.", child_name, parent_modifier)),
+                .with_help(format!("Change the method in `{child_name}` to be {parent_modifier} like the parent.")),
             );
         }
         SignatureCompatibilityIssue::VisibilityNarrowed { child_visibility, parent_visibility } => {
             context.collector.report_with_code(
                 IssueCode::IncompatibleVisibility,
                 Issue::error(format!(
-                    "Visibility of `{}::{}()` must not be narrowed from {} to {}",
-                    child_name, method_name, parent_visibility, child_visibility
+                    "Visibility of `{child_name}::{method_name}()` must not be narrowed from {parent_visibility} to {child_visibility}"
                 ))
                 .with_annotation(Annotation::primary(primary_span).with_message(format!(
-                    "Method declared as {} but should be {} or wider",
-                    child_visibility, parent_visibility
+                    "Method declared as {child_visibility} but should be {parent_visibility} or wider"
                 )))
                 .with_annotation(Annotation::secondary(parent_class_span).with_message(format!(
-                    "Parent method `{}::{}()` is declared as {} here",
-                    parent_name, method_name, parent_visibility
+                    "Parent method `{parent_name}::{method_name}()` is declared as {parent_visibility} here"
                 )))
                 .with_annotation(
-                    Annotation::secondary(child_class_span).with_message(format!("In class `{}`", child_name)),
+                    Annotation::secondary(child_class_span).with_message(format!("In class `{child_name}`")),
                 )
                 .with_note("Visibility can only be widened (e.g., protected → public) not narrowed.")
-                .with_help(format!("Change the visibility to {} or wider.", parent_visibility)),
+                .with_help(format!("Change the visibility to {parent_visibility} or wider.")),
             );
         }
         SignatureCompatibilityIssue::ParameterCountMismatch { child_required_count, parent_required_count } => {
             context.collector.report_with_code(
                 IssueCode::IncompatibleParameterCount,
                 Issue::error(format!(
-                    "`{}::{}()` must accept at least {} required parameters like `{}::{}()`",
-                    child_name, method_name, parent_required_count, parent_name, method_name
+                    "`{child_name}::{method_name}()` must accept at least {parent_required_count} required parameters like `{parent_name}::{method_name}()`"
                 ))
                 .with_annotation(Annotation::primary(primary_span).with_message(format!(
-                    "Method requires {} parameters but parent requires {}",
-                    child_required_count, parent_required_count
+                    "Method requires {child_required_count} parameters but parent requires {parent_required_count}"
                 )))
                 .with_annotation(Annotation::secondary(parent_class_span).with_message(format!(
-                    "Parent method `{}::{}()` requires {} parameters",
-                    parent_name, method_name, parent_required_count
+                    "Parent method `{parent_name}::{method_name}()` requires {parent_required_count} parameters"
                 )))
                 .with_annotation(
-                    Annotation::secondary(child_class_span).with_message(format!("In class `{}`", child_name)),
+                    Annotation::secondary(child_class_span).with_message(format!("In class `{child_name}`")),
                 )
                 .with_note("Child methods must accept at least as many required parameters as the parent.")
                 .with_help("Add optional parameters or reduce the number of required parameters in the child method."),
             );
         }
         SignatureCompatibilityIssue::IncompatibleParameterType { parameter_index, child_type, parent_type } => {
-            let param_name =
-                parent_method.parameters.get(parameter_index).map(|p| p.name.0.as_ref()).unwrap_or("unknown");
+            let param_name = parent_method.parameters.get(parameter_index).map_or("unknown", |p| p.name.0.as_ref());
 
             context.collector.report_with_code(
                 IssueCode::IncompatibleParameterType,
                 Issue::error(format!(
-                    "Parameter `{}` of `{}::{}()` expects type `{}` but parent `{}::{}()` expects type `{}`",
-                    param_name, child_name, method_name, child_type, parent_name, method_name, parent_type
+                    "Parameter `{param_name}` of `{child_name}::{method_name}()` expects type `{child_type}` but parent `{parent_name}::{method_name}()` expects type `{parent_type}`"
                 ))
                 .with_annotation(Annotation::primary(primary_span).with_message(format!(
-                    "Parameter `{}` expects type `{}` but parent expects `{}`",
-                    param_name, child_type, parent_type
+                    "Parameter `{param_name}` expects type `{child_type}` but parent expects `{parent_type}`"
                 )))
                 .with_annotation(
                     Annotation::secondary(parent_class_span).with_message(format!(
-                        "Parent method `{}::{}()` parameter defined here",
-                        parent_name, method_name
+                        "Parent method `{parent_name}::{method_name}()` parameter defined here"
                     )),
                 )
                 .with_annotation(
-                    Annotation::secondary(child_class_span).with_message(format!("In class `{}`", child_name)),
+                    Annotation::secondary(child_class_span).with_message(format!("In class `{child_name}`")),
                 )
                 .with_note("Parameter types must be contravariant: child must accept equal or wider types than parent.")
                 .with_help("Change the parameter type to be compatible with the parent method."),
@@ -2225,19 +2207,17 @@ fn report_signature_compatibility_issue<'ctx, 'arena>(
             context.collector.report_with_code(
                 IssueCode::IncompatibleReturnType,
                 Issue::error(format!(
-                    "Return type `{}` of `{}::{}()` is incompatible with parent return type `{}` of `{}::{}()`",
-                    child_type, child_name, method_name, parent_type, parent_name, method_name
+                    "Return type `{child_type}` of `{child_name}::{method_name}()` is incompatible with parent return type `{parent_type}` of `{parent_name}::{method_name}()`"
                 ))
                 .with_annotation(
                     Annotation::primary(primary_span)
-                        .with_message(format!("Returns type `{}` but parent expects `{}`", child_type, parent_type)),
+                        .with_message(format!("Returns type `{child_type}` but parent expects `{parent_type}`")),
                 )
                 .with_annotation(Annotation::secondary(parent_class_span).with_message(format!(
-                    "Parent method `{}::{}()` return type defined here",
-                    parent_name, method_name
+                    "Parent method `{parent_name}::{method_name}()` return type defined here"
                 )))
                 .with_annotation(
-                    Annotation::secondary(child_class_span).with_message(format!("In class `{}`", child_name)),
+                    Annotation::secondary(child_class_span).with_message(format!("In class `{child_name}`")),
                 )
                 .with_note("Return types must be covariant: child must return equal or narrower types than parent.")
                 .with_help("Change the return type to be compatible with the parent method."),
@@ -2267,22 +2247,18 @@ fn report_signature_compatibility_issue<'ctx, 'arena>(
                     "Parent method `{parent_name}::{method_name}()` parameter `{parent_param_name}` defined here",
                 )))
                 .with_annotation(
-                    Annotation::secondary(child_class_span).with_message(format!("In class `{}`", child_name)),
+                    Annotation::secondary(child_class_span).with_message(format!("In class `{child_name}`")),
                 )
                 .with_note("Parameter name changes can break code using named arguments.")
                 .with_help(format!(
-                    "Consider renaming the parameter to `{}` to match the parent method.",
-                    parent_param_name
+                    "Consider renaming the parameter to `{parent_param_name}` to match the parent method."
                 )),
             );
         }
     }
 }
 
-fn check_class_like_properties<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
-    class_like_metadata: &'ctx ClassLikeMetadata,
-) {
+fn check_class_like_properties<'ctx>(context: &mut Context<'ctx, '_>, class_like_metadata: &'ctx ClassLikeMetadata) {
     if class_like_metadata.kind.is_enum() {
         return;
     }
@@ -2625,7 +2601,7 @@ fn check_class_like_properties<'ctx, 'arena>(
                             Annotation::secondary(parent_property_span)
                                 .with_message("The parent property is defined here without a type"),
                         );
-                    };
+                    }
 
                     context.collector.report_with_code(IssueCode::IncompatiblePropertyType, issue
                             .with_note("Adding a type to a property that was untyped in a parent class is an incompatible change.")
@@ -2809,12 +2785,11 @@ fn check_class_like_constants<'ctx, 'arena>(
                 context.collector.report_with_code(
                     IssueCode::IncompatibleConstantOverride,
                     Issue::error(format!(
-                        "{} and {} define the same constant ({}) in the composition of {}. However, the definition differs and is considered incompatible.",
-                        class_name, trait_name, constant_name, class_name
+                        "{class_name} and {trait_name} define the same constant ({constant_name}) in the composition of {class_name}. However, the definition differs and is considered incompatible."
                     ))
                     .with_annotation(
                         Annotation::primary(item.name.span())
-                            .with_message(format!("This constant differs from trait definition ({} differ)", conflicts_str)),
+                            .with_message(format!("This constant differs from trait definition ({conflicts_str} differ)")),
                     )
                     .with_note(format!("Trait `{trait_name}` declares constant `{constant_name}`, which is inherited by `{class_name}`."))
                     .with_note("PHP requires that constants from traits match exactly in value, visibility, and finality when redeclared.")

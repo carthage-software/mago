@@ -307,7 +307,7 @@ fn expand_member_reference(
         return;
     };
 
-    for (constant_name, constant) in class_like.constants.iter() {
+    for (constant_name, constant) in &class_like.constants {
         if !member_selector.matches(constant_name) {
             continue;
         }
@@ -841,7 +841,7 @@ mod tests {
 
     #[test]
     fn test_expand_keyed_array_with_self_key() {
-        let code = r#"<?php class Foo {}"#;
+        let code = r"<?php class Foo {}";
         let codebase = create_test_codebase(code);
 
         let mut keyed = TKeyedArray::new();
@@ -867,7 +867,7 @@ mod tests {
 
     #[test]
     fn test_expand_keyed_array_with_self_value() {
-        let code = r#"<?php class Foo {}"#;
+        let code = r"<?php class Foo {}";
         let codebase = create_test_codebase(code);
 
         let mut keyed = TKeyedArray::new();
@@ -893,7 +893,7 @@ mod tests {
 
     #[test]
     fn test_expand_keyed_array_known_items() {
-        let code = r#"<?php class Foo {}"#;
+        let code = r"<?php class Foo {}";
         let codebase = create_test_codebase(code);
 
         use crate::ttype::atomic::array::key::ArrayKey;
@@ -925,7 +925,7 @@ mod tests {
 
     #[test]
     fn test_expand_list_with_self_element() {
-        let code = r#"<?php class Foo {}"#;
+        let code = r"<?php class Foo {}";
         let codebase = create_test_codebase(code);
 
         let list = TList::new(Box::new(make_self_object()));
@@ -948,7 +948,7 @@ mod tests {
 
     #[test]
     fn test_expand_list_known_elements() {
-        let code = r#"<?php class Foo {}"#;
+        let code = r"<?php class Foo {}";
         let codebase = create_test_codebase(code);
 
         use std::collections::BTreeMap;
@@ -979,7 +979,7 @@ mod tests {
 
     #[test]
     fn test_expand_nested_array() {
-        let code = r#"<?php class Foo {}"#;
+        let code = r"<?php class Foo {}";
         let codebase = create_test_codebase(code);
 
         let inner_list = TList::new(Box::new(make_self_object()));
@@ -1026,7 +1026,7 @@ mod tests {
 
     #[test]
     fn test_expand_non_empty_list() {
-        let code = r#"<?php class Foo {}"#;
+        let code = r"<?php class Foo {}";
         let codebase = create_test_codebase(code);
 
         let mut list = TList::new(Box::new(make_self_object()));
@@ -1051,7 +1051,7 @@ mod tests {
 
     #[test]
     fn test_expand_self_to_class_name() {
-        let code = r#"<?php class Foo {}"#;
+        let code = r"<?php class Foo {}";
         let codebase = create_test_codebase(code);
 
         let input = make_self_object();
@@ -1070,7 +1070,7 @@ mod tests {
 
     #[test]
     fn test_expand_static_to_class_name() {
-        let code = r#"<?php class Foo {}"#;
+        let code = r"<?php class Foo {}";
         let codebase = create_test_codebase(code);
 
         let input = make_static_object();
@@ -1089,7 +1089,7 @@ mod tests {
 
     #[test]
     fn test_expand_static_with_object_type() {
-        let code = r#"<?php class Foo {}"#;
+        let code = r"<?php class Foo {}";
         let codebase = create_test_codebase(code);
 
         let input = make_static_object();
@@ -1109,7 +1109,7 @@ mod tests {
 
     #[test]
     fn test_expand_static_with_enum_type() {
-        let code = r#"<?php enum Status { case Active; case Inactive; }"#;
+        let code = r"<?php enum Status { case Active; case Inactive; }";
         let codebase = create_test_codebase(code);
 
         let input = make_static_object();
@@ -1123,10 +1123,10 @@ mod tests {
 
     #[test]
     fn test_expand_parent_to_parent_class() {
-        let code = r#"<?php
+        let code = r"<?php
             class BaseClass {}
             class ChildClass extends BaseClass {}
-        "#;
+        ";
         let codebase = create_test_codebase(code);
 
         let input = make_parent_object();
@@ -1145,7 +1145,7 @@ mod tests {
 
     #[test]
     fn test_expand_parent_without_parent_class() {
-        let code = r#"<?php class Foo {}"#;
+        let code = r"<?php class Foo {}";
         let codebase = create_test_codebase(code);
 
         let input = make_parent_object();
@@ -1160,7 +1160,7 @@ mod tests {
 
     #[test]
     fn test_expand_this_variable() {
-        let code = r#"<?php class Foo {}"#;
+        let code = r"<?php class Foo {}";
         let codebase = create_test_codebase(code);
 
         let input = TUnion::from_atomic(TAtomic::Object(TObject::Named(TNamedObject::new_this(atom("$this")))));
@@ -1179,7 +1179,7 @@ mod tests {
 
     #[test]
     fn test_expand_this_with_final_function() {
-        let code = r#"<?php class Foo {}"#;
+        let code = r"<?php class Foo {}";
         let codebase = create_test_codebase(code);
 
         let input = make_static_object();
@@ -1203,7 +1203,7 @@ mod tests {
 
     #[test]
     fn test_expand_object_with_type_parameters() {
-        let code = r#"<?php class Container {}"#;
+        let code = r"<?php class Container {}";
         let codebase = create_test_codebase(code);
 
         let named =
@@ -1229,10 +1229,10 @@ mod tests {
 
     #[test]
     fn test_expand_object_gets_default_type_params() {
-        let code = r#"<?php
+        let code = r"<?php
             /** @template T */
             class Container {}
-        "#;
+        ";
         let codebase = create_test_codebase(code);
 
         let named = TNamedObject::new(ascii_lowercase_atom("container"));
@@ -1248,10 +1248,10 @@ mod tests {
 
     #[test]
     fn test_expand_object_intersection_from_static() {
-        let code = r#"<?php
+        let code = r"<?php
             interface Stringable {}
             class Foo implements Stringable {}
-        "#;
+        ";
         let codebase = create_test_codebase(code);
 
         let input = make_static_object();
@@ -1285,7 +1285,7 @@ mod tests {
 
     #[test]
     fn test_expand_callable_return_type() {
-        let code = r#"<?php class Foo {}"#;
+        let code = r"<?php class Foo {}";
         let codebase = create_test_codebase(code);
 
         let sig = TCallableSignature::new(false, false).with_return_type(Some(Box::new(make_self_object())));
@@ -1310,7 +1310,7 @@ mod tests {
 
     #[test]
     fn test_expand_callable_parameter_types() {
-        let code = r#"<?php class Foo {}"#;
+        let code = r"<?php class Foo {}";
         let codebase = create_test_codebase(code);
 
         let param = TCallableParameter::new(Some(Box::new(make_self_object())), false, false, false);
@@ -1337,9 +1337,9 @@ mod tests {
 
     #[test]
     fn test_expand_callable_alias_to_function() {
-        let code = r#"<?php
+        let code = r"<?php
             function myFunc(): int { return 1; }
-        "#;
+        ";
         let codebase = create_test_codebase(code);
 
         let alias = TCallable::Alias(FunctionLikeIdentifier::Function(ascii_lowercase_atom("myfunc")));
@@ -1353,11 +1353,11 @@ mod tests {
 
     #[test]
     fn test_expand_callable_alias_to_method() {
-        let code = r#"<?php
+        let code = r"<?php
             class Foo {
                 public function bar(): int { return 1; }
             }
-        "#;
+        ";
         let codebase = create_test_codebase(code);
 
         let alias =
@@ -1385,7 +1385,7 @@ mod tests {
 
     #[test]
     fn test_expand_closure_signature() {
-        let code = r#"<?php class Foo {}"#;
+        let code = r"<?php class Foo {}";
         let codebase = create_test_codebase(code);
 
         let sig = TCallableSignature::new(false, true).with_return_type(Some(Box::new(make_self_object())));
@@ -1410,7 +1410,7 @@ mod tests {
 
     #[test]
     fn test_expand_generic_parameter_constraint() {
-        let code = r#"<?php class Foo {}"#;
+        let code = r"<?php class Foo {}";
         let codebase = create_test_codebase(code);
 
         let generic = TGenericParameter::new(
@@ -1437,7 +1437,7 @@ mod tests {
 
     #[test]
     fn test_expand_nested_generic_constraint() {
-        let code = r#"<?php class Foo {} class Bar {}"#;
+        let code = r"<?php class Foo {} class Bar {}";
         let codebase = create_test_codebase(code);
 
         let container =
@@ -1471,10 +1471,10 @@ mod tests {
 
     #[test]
     fn test_expand_generic_with_intersection() {
-        let code = r#"<?php
+        let code = r"<?php
             interface Stringable {}
             class Foo {}
-        "#;
+        ";
         let codebase = create_test_codebase(code);
 
         let mut generic = TGenericParameter::new(
@@ -1504,7 +1504,7 @@ mod tests {
 
     #[test]
     fn test_expand_class_string_of_self() {
-        let code = r#"<?php class Foo {}"#;
+        let code = r"<?php class Foo {}";
         let codebase = create_test_codebase(code);
 
         let constraint = Box::new(TAtomic::Object(TObject::Named(TNamedObject::new(atom("self")))));
@@ -1524,7 +1524,7 @@ mod tests {
 
     #[test]
     fn test_expand_class_string_of_static() {
-        let code = r#"<?php class Foo {}"#;
+        let code = r"<?php class Foo {}";
         let codebase = create_test_codebase(code);
 
         let constraint = Box::new(TAtomic::Object(TObject::Named(TNamedObject::new(atom("static")))));
@@ -1544,7 +1544,7 @@ mod tests {
 
     #[test]
     fn test_expand_interface_string_of_type() {
-        let code = r#"<?php interface MyInterface {}"#;
+        let code = r"<?php interface MyInterface {}";
         let codebase = create_test_codebase(code);
 
         let constraint = Box::new(TAtomic::Object(TObject::Named(TNamedObject::new(atom("self")))));
@@ -1567,12 +1567,12 @@ mod tests {
 
     #[test]
     fn test_expand_member_reference_wildcard_constants() {
-        let code = r#"<?php
+        let code = r"<?php
             class Foo {
                 public const A = 1;
                 public const B = 2;
             }
-        "#;
+        ";
         let codebase = create_test_codebase(code);
 
         let reference = TReference::new_member(ascii_lowercase_atom("foo"), TReferenceMemberSelector::Wildcard);
@@ -1586,12 +1586,12 @@ mod tests {
 
     #[test]
     fn test_expand_member_reference_wildcard_enum_cases() {
-        let code = r#"<?php
+        let code = r"<?php
             enum Status {
                 case Active;
                 case Inactive;
             }
-        "#;
+        ";
         let codebase = create_test_codebase(code);
 
         let reference = TReference::new_member(ascii_lowercase_atom("status"), TReferenceMemberSelector::Wildcard);
@@ -1606,13 +1606,13 @@ mod tests {
 
     #[test]
     fn test_expand_member_reference_starts_with() {
-        let code = r#"<?php
+        let code = r"<?php
             class Foo {
                 public const STATUS_ACTIVE = 1;
                 public const STATUS_INACTIVE = 2;
                 public const OTHER = 3;
             }
-        "#;
+        ";
         let codebase = create_test_codebase(code);
 
         let reference =
@@ -1627,13 +1627,13 @@ mod tests {
 
     #[test]
     fn test_expand_member_reference_ends_with() {
-        let code = r#"<?php
+        let code = r"<?php
             class Foo {
                 public const READ_ERROR = 1;
                 public const WRITE_ERROR = 2;
                 public const SUCCESS = 0;
             }
-        "#;
+        ";
         let codebase = create_test_codebase(code);
 
         let reference =
@@ -1648,11 +1648,11 @@ mod tests {
 
     #[test]
     fn test_expand_member_reference_identifier_constant() {
-        let code = r#"<?php
+        let code = r"<?php
             class Foo {
                 public const BAR = 42;
             }
-        "#;
+        ";
         let codebase = create_test_codebase(code);
 
         let reference =
@@ -1667,11 +1667,11 @@ mod tests {
 
     #[test]
     fn test_expand_member_reference_identifier_enum_case() {
-        let code = r#"<?php
+        let code = r"<?php
             enum Status {
                 case Active;
             }
-        "#;
+        ";
         let codebase = create_test_codebase(code);
 
         let reference = TReference::new_member(
@@ -1702,7 +1702,7 @@ mod tests {
 
     #[test]
     fn test_expand_member_reference_unknown_member() {
-        let code = r#"<?php class Foo {}"#;
+        let code = r"<?php class Foo {}";
         let codebase = create_test_codebase(code);
 
         let reference = TReference::new_member(
@@ -1738,12 +1738,12 @@ mod tests {
 
     #[test]
     fn test_expand_member_reference_constant_with_type_metadata() {
-        let code = r#"<?php
+        let code = r"<?php
             class Foo {
                 /** @var int */
                 public const VALUE = 42;
             }
-        "#;
+        ";
         let codebase = create_test_codebase(code);
 
         let reference =
@@ -1758,7 +1758,7 @@ mod tests {
 
     #[test]
     fn test_expand_conditional_both_branches() {
-        let code = r#"<?php class Foo {} class Bar {}"#;
+        let code = r"<?php class Foo {} class Bar {}";
         let codebase = create_test_codebase(code);
 
         let conditional = TConditional::new(
@@ -1785,7 +1785,7 @@ mod tests {
 
     #[test]
     fn test_expand_conditional_with_self_in_then() {
-        let code = r#"<?php class Foo {}"#;
+        let code = r"<?php class Foo {}";
         let codebase = create_test_codebase(code);
 
         let conditional = TConditional::new(
@@ -1806,7 +1806,7 @@ mod tests {
 
     #[test]
     fn test_expand_conditional_with_self_in_otherwise() {
-        let code = r#"<?php class Foo {}"#;
+        let code = r"<?php class Foo {}";
         let codebase = create_test_codebase(code);
 
         let conditional = TConditional::new(
@@ -1827,11 +1827,11 @@ mod tests {
 
     #[test]
     fn test_expand_simple_alias() {
-        let code = r#"<?php
+        let code = r"<?php
             class Foo {
                 /** @phpstan-type MyInt = int */
             }
-        "#;
+        ";
         let codebase = create_test_codebase(code);
 
         let alias = TAlias::new(ascii_lowercase_atom("foo"), atom("MyInt"));
@@ -1845,12 +1845,12 @@ mod tests {
 
     #[test]
     fn test_expand_nested_alias() {
-        let code = r#"<?php
+        let code = r"<?php
             class Foo {
                 /** @phpstan-type Inner = int */
                 /** @phpstan-type Outer = Inner */
             }
-        "#;
+        ";
         let codebase = create_test_codebase(code);
 
         let alias = TAlias::new(ascii_lowercase_atom("foo"), atom("Outer"));
@@ -1890,11 +1890,11 @@ mod tests {
 
     #[test]
     fn test_expand_alias_with_self_inside() {
-        let code = r#"<?php
+        let code = r"<?php
             class Foo {
                 /** @phpstan-type MySelf = self */
             }
-        "#;
+        ";
         let codebase = create_test_codebase(code);
 
         let alias = TAlias::new(ascii_lowercase_atom("foo"), atom("MySelf"));
@@ -1921,12 +1921,12 @@ mod tests {
         let mut actual = input.clone();
         expand_union(&codebase, &mut actual, &TypeExpansionOptions::default());
 
-        assert!(actual.types.iter().any(|t| t.is_string()));
+        assert!(actual.types.iter().any(super::super::atomic::TAtomic::is_string));
     }
 
     #[test]
     fn test_expand_key_of_with_self() {
-        let code = r#"<?php class Foo {}"#;
+        let code = r"<?php class Foo {}";
         let codebase = create_test_codebase(code);
 
         let mut keyed = TKeyedArray::new();
@@ -1957,17 +1957,17 @@ mod tests {
         let mut actual = input.clone();
         expand_union(&codebase, &mut actual, &TypeExpansionOptions::default());
 
-        assert!(actual.types.iter().any(|t| t.is_int()));
+        assert!(actual.types.iter().any(super::super::atomic::TAtomic::is_int));
     }
 
     #[test]
     fn test_expand_value_of_enum() {
-        let code = r#"<?php
+        let code = r"<?php
             enum Status: string {
                 case Active = 'active';
                 case Inactive = 'inactive';
             }
-        "#;
+        ";
         let codebase = create_test_codebase(code);
 
         let enum_type = TUnion::from_atomic(TAtomic::Object(TObject::Enum(TEnum::new(ascii_lowercase_atom("status")))));
@@ -2008,7 +2008,7 @@ mod tests {
 
     #[test]
     fn test_expand_index_access_with_self() {
-        let code = r#"<?php class Foo {}"#;
+        let code = r"<?php class Foo {}";
         let codebase = create_test_codebase(code);
 
         use crate::ttype::atomic::array::key::ArrayKey;
@@ -2035,7 +2035,7 @@ mod tests {
 
     #[test]
     fn test_expand_iterable_key_type() {
-        let code = r#"<?php class Foo {}"#;
+        let code = r"<?php class Foo {}";
         let codebase = create_test_codebase(code);
 
         let iterable = TIterable::new(Box::new(make_self_object()), Box::new(get_int()));
@@ -2058,7 +2058,7 @@ mod tests {
 
     #[test]
     fn test_expand_iterable_value_type() {
-        let code = r#"<?php class Foo {}"#;
+        let code = r"<?php class Foo {}";
         let codebase = create_test_codebase(code);
 
         let iterable = TIterable::new(Box::new(get_int()), Box::new(make_self_object()));
@@ -2098,11 +2098,11 @@ mod tests {
 
     #[test]
     fn test_get_signature_of_method() {
-        let code = r#"<?php
+        let code = r"<?php
             class Foo {
                 public function bar(string $s): int { return 0; }
             }
-        "#;
+        ";
         let codebase = create_test_codebase(code);
 
         let id = FunctionLikeIdentifier::Method(ascii_lowercase_atom("foo"), ascii_lowercase_atom("bar"));
@@ -2126,9 +2126,9 @@ mod tests {
 
     #[test]
     fn test_get_atomic_of_function() {
-        let code = r#"<?php
+        let code = r"<?php
             function myFunc(): void {}
-        "#;
+        ";
         let codebase = create_test_codebase(code);
 
         let id = FunctionLikeIdentifier::Function(ascii_lowercase_atom("myfunc"));
@@ -2140,9 +2140,9 @@ mod tests {
 
     #[test]
     fn test_get_signature_with_parameters() {
-        let code = r#"<?php
+        let code = r"<?php
             function multiParam(int $a, string $b, ?float $c = null): bool { return true; }
-        "#;
+        ";
         let codebase = create_test_codebase(code);
 
         let id = FunctionLikeIdentifier::Function(ascii_lowercase_atom("multiparam"));
@@ -2159,7 +2159,7 @@ mod tests {
 
     #[test]
     fn test_expand_preserves_by_reference_flag() {
-        let code = r#"<?php class Foo {}"#;
+        let code = r"<?php class Foo {}";
         let codebase = create_test_codebase(code);
 
         let mut input = make_self_object();
@@ -2174,7 +2174,7 @@ mod tests {
 
     #[test]
     fn test_expand_preserves_possibly_undefined_flag() {
-        let code = r#"<?php class Foo {}"#;
+        let code = r"<?php class Foo {}";
         let codebase = create_test_codebase(code);
 
         let mut input = make_self_object();
@@ -2189,7 +2189,7 @@ mod tests {
 
     #[test]
     fn test_expand_multiple_self_in_union() {
-        let code = r#"<?php class Foo {}"#;
+        let code = r"<?php class Foo {}";
         let codebase = create_test_codebase(code);
 
         let input = TUnion::from_vec(vec![
@@ -2206,7 +2206,7 @@ mod tests {
 
     #[test]
     fn test_expand_deeply_nested_types() {
-        let code = r#"<?php class Foo {}"#;
+        let code = r"<?php class Foo {}";
         let codebase = create_test_codebase(code);
 
         let inner = TList::new(Box::new(make_self_object()));
@@ -2234,7 +2234,7 @@ mod tests {
 
     #[test]
     fn test_expand_with_all_options_disabled() {
-        let code = r#"<?php class Foo {}"#;
+        let code = r"<?php class Foo {}";
         let codebase = create_test_codebase(code);
 
         let input = make_self_object();
@@ -2259,7 +2259,7 @@ mod tests {
 
     #[test]
     fn test_expand_already_expanded_type() {
-        let code = r#"<?php class Foo {}"#;
+        let code = r"<?php class Foo {}";
         let codebase = create_test_codebase(code);
 
         let input = make_named_object("Foo");
@@ -2276,13 +2276,13 @@ mod tests {
 
     #[test]
     fn test_expand_complex_generic_class() {
-        let code = r#"<?php
+        let code = r"<?php
             /**
              * @template T
              * @template U
              */
             class Container {}
-        "#;
+        ";
         let codebase = create_test_codebase(code);
 
         let named = TNamedObject::new_with_type_parameters(

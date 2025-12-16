@@ -66,7 +66,9 @@ fn is_valid_pattern_part(part: &str) -> bool {
         return true;
     }
 
-    part.as_bytes().iter().all(|&byte| matches!(byte, part_of_identifier!() | b'*'))
+    part.as_bytes()
+        .iter()
+        .all(|&byte| matches!(byte, b'0'..=b'9' | b'a'..=b'z' | b'A'..=b'Z' | b'_' | b'\x80'..=b'\xff' | b'*'))
 }
 
 impl FromStr for NamespacePath {
@@ -131,7 +133,7 @@ impl fmt::Display for NamespacePath {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             NamespacePath::Global => write!(f, "@global"),
-            NamespacePath::Specific(s) => write!(f, "{}", s),
+            NamespacePath::Specific(s) => write!(f, "{s}"),
         }
     }
 }
@@ -139,9 +141,9 @@ impl fmt::Display for NamespacePath {
 impl fmt::Display for SymbolSelector {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            SymbolSelector::Namespace(ns) => write!(f, "{}", ns),
-            SymbolSelector::Symbol(s) => write!(f, "{}", s),
-            SymbolSelector::Pattern(s) => write!(f, "{}", s),
+            SymbolSelector::Namespace(ns) => write!(f, "{ns}"),
+            SymbolSelector::Symbol(s) => write!(f, "{s}"),
+            SymbolSelector::Pattern(s) => write!(f, "{s}"),
         }
     }
 }
@@ -152,8 +154,8 @@ impl fmt::Display for Path {
             Path::All => write!(f, "@all"),
             Path::Self_ => write!(f, "@self"),
             Path::Native => write!(f, "@native"),
-            Path::Layer(name) => write!(f, "@layer:{}", name),
-            Path::Selector(selector) => write!(f, "{}", selector),
+            Path::Layer(name) => write!(f, "@layer:{name}"),
+            Path::Selector(selector) => write!(f, "{selector}"),
         }
     }
 }

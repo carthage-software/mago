@@ -28,11 +28,7 @@ pub fn is_contained_by(
         (TAtomic::Scalar(TScalar::Integer(ci)), TAtomic::Scalar(TScalar::Integer(ii))) if ci.contains(*ii) => {
             return true;
         }
-        (
-            TAtomic::Scalar(TScalar::Float(TFloat::Float)),
-            // Special case: In PHP, an integer can be passed as a float, but not the other way around.
-            TAtomic::Scalar(TScalar::Float(_)) | TAtomic::Scalar(TScalar::Integer(_)),
-        ) => {
+        (TAtomic::Scalar(TScalar::Float(TFloat::Float)), TAtomic::Scalar(TScalar::Float(_) | TScalar::Integer(_))) => {
             return true;
         }
         (TAtomic::Scalar(TScalar::Float(container_float)), TAtomic::Scalar(TScalar::Float(input_float)))

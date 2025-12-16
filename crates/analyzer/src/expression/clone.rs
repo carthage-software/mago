@@ -71,7 +71,11 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Clone<'arena> {
                 TAtomic::Null | TAtomic::Void if object_type.ignore_nullable_issues() => {
                     continue;
                 }
-                TAtomic::Callable(callable) if callable.get_signature().is_none_or(|s| s.is_closure()) => {
+                TAtomic::Callable(callable)
+                    if callable
+                        .get_signature()
+                        .is_none_or(mago_codex::ttype::atomic::callable::TCallableSignature::is_closure) =>
+                {
                     has_cloneable_object = true;
                     continue;
                 }
@@ -136,7 +140,9 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Clone<'arena> {
             }
         }
 
-        let resulting_type = if !invalid_clone_atomics.is_empty() {
+        let resulting_type = if invalid_clone_atomics.is_empty() {
+            object_type
+        } else {
             Rc::new(if has_mixed_type {
                 get_mixed()
             } else if has_cloneable_object {
@@ -144,8 +150,6 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Clone<'arena> {
             } else {
                 get_never()
             })
-        } else {
-            object_type
         };
 
         artifacts.set_rc_expression_type(self, resulting_type);
@@ -163,7 +167,7 @@ mod tests {
 
     test_analysis! {
         name = clone_valid,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             class Example {}
@@ -171,12 +175,12 @@ mod tests {
             function get_clone(Example $example): Example {
                 return clone $example;
             }
-        "#}
+        "}
     }
 
     test_analysis! {
         name = clone_maybe_invalid_valid,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             class Example {}
@@ -184,7 +188,7 @@ mod tests {
             function get_clone(Example|string $example): Example {
                 return clone $example;
             }
-        "#},
+        "},
         issues = [
             IssueCode::PossiblyInvalidClone,
             IssueCode::InvalidReturnStatement,
@@ -193,7 +197,7 @@ mod tests {
 
     test_analysis! {
         name = clone_enum,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             enum Color { case Red; }
@@ -201,7 +205,7 @@ mod tests {
             function get_clone(Color $color): Color {
                 return clone $color;
             }
-        "#},
+        "},
         issues = [
             IssueCode::InvalidClone,
             IssueCode::NeverReturn,

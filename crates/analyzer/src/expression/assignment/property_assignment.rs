@@ -216,7 +216,7 @@ mod tests {
 
     test_analysis! {
         name = memoized_property_assignment,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             class A {
@@ -236,6 +236,6 @@ mod tests {
                     --$this->a;
                 }
             }
-        "#}
+        "}
     }
 }

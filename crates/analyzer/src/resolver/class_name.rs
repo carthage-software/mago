@@ -246,7 +246,7 @@ pub fn resolve_classnames_from_expression<'ctx, 'arena>(
                         .with_annotation(Annotation::primary(self_keyword.span()).with_message("`self` used here"))
                         .with_note("The `self` keyword refers to the current class and can only be used within a class method.")
                 );
-            };
+            }
         }
         Expression::Static(static_keyword) => {
             if let Some(self_class) = block_context.scope.get_class_like() {
@@ -353,7 +353,7 @@ pub fn resolve_classnames_from_expression<'ctx, 'arena>(
                 }
             }
         }
-    };
+    }
 
     Ok(possible_types)
 }

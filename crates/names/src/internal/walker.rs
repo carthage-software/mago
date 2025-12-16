@@ -23,7 +23,7 @@ impl<'ast, 'arena> MutWalker<'ast, 'arena, NameResolutionContext<'arena>> for Na
             self.resolved_names.insert_at(ns, ns.value(), false);
         }
 
-        context.enter_namespace(namespace.name.as_ref().map(|n| n.value()));
+        context.enter_namespace(namespace.name.as_ref().map(mago_syntax::ast::Identifier::value));
     }
 
     fn walk_in_use(&mut self, r#use: &'ast Use<'arena>, context: &mut NameResolutionContext<'arena>) {

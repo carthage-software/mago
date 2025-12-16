@@ -21,7 +21,7 @@ impl RuleRegistry {
     /// * `only` - If `Some`, only builds rules whose codes are in this list.
     pub fn build(settings: &Settings, only: Option<&[String]>, include_disabled: bool) -> Self {
         let integrations = settings.integrations;
-        let only = only.map(|codes| codes.iter().map(|s| s.to_string()).collect::<Vec<_>>());
+        let only = only.map(<[std::string::String]>::to_vec);
 
         let rules: Vec<AnyRule> = AnyRule::get_all_for(settings, only.as_deref(), include_disabled || only.is_some());
         if let Some(only) = &only

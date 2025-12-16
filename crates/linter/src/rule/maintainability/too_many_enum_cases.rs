@@ -50,12 +50,12 @@ impl LintRule for TooManyEnumCasesRule {
         const META: RuleMeta = RuleMeta {
             name: "Too Many Enum Cases",
             code: "too-many-enum-cases",
-            description: indoc::indoc! {r#"
+            description: indoc::indoc! {r"
                 Detects enums with too many cases.
 
                 This rule checks the number of cases in enums. If the number of cases exceeds a configurable threshold, an issue is reported.
-            "#},
-            good_example: indoc::indoc! {r#"
+            "},
+            good_example: indoc::indoc! {r"
                 <?php
 
                 enum SimpleEnum {
@@ -63,8 +63,8 @@ impl LintRule for TooManyEnumCasesRule {
                     case B;
                     case C;
                 }
-            "#},
-            bad_example: indoc::indoc! {r#"
+            "},
+            bad_example: indoc::indoc! {r"
                 <?php
 
                 enum LargeEnum {
@@ -90,7 +90,7 @@ impl LintRule for TooManyEnumCasesRule {
                     case T;
                     case U;
                 }
-            "#},
+            "},
             category: Category::Maintainability,
             requirements: RuleRequirements::None,
         };
@@ -108,7 +108,7 @@ impl LintRule for TooManyEnumCasesRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let r#enum = match node {
             Node::Enum(e) => e,
             _ => return,

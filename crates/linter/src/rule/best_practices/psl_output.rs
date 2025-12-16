@@ -83,7 +83,7 @@ impl LintRule for PslOutputRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let (used_directive, is_stdout) = match node {
             Node::Echo(_) => ("echo", true),
             Node::PrintConstruct(_) => ("print", true),
@@ -117,7 +117,7 @@ impl LintRule for PslOutputRule {
             )
             .with_code(self.meta.code)
             .with_annotation(
-                Annotation::primary(node.span()).with_message(format!("Using PHP's `{}`", used_directive)),
+                Annotation::primary(node.span()).with_message(format!("Using PHP's `{used_directive}`")),
             )
             .with_note("Psl output functions are preferred because they are type-safe and provide more consistent behavior.")
             .with_help(format!(

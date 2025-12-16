@@ -52,21 +52,21 @@ impl LintRule for NoAssignInConditionRule {
                 Detects assignments in conditions which can lead to unexpected behavior and make the code harder
                 to read and understand.
             "},
-            good_example: indoc! {r#"
+            good_example: indoc! {r"
                 <?php
 
                 $x = 1;
                 if ($x == 1) {
                     // ...
                 }
-            "#},
-            bad_example: indoc! {r#"
+            "},
+            bad_example: indoc! {r"
                 <?php
 
                 if ($x = 1) {
                     // ...
                 }
-            "#},
+            "},
             category: Category::Correctness,
 
             requirements: RuleRequirements::None,
@@ -91,7 +91,7 @@ impl LintRule for NoAssignInConditionRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let (condition, assignment) = match node {
             Node::If(r#if) => (&r#if.condition, get_assignment_from_expression(r#if.condition)),
             Node::While(r#while) => (&r#while.condition, get_assignment_from_expression(r#while.condition)),

@@ -16,8 +16,8 @@ use crate::code::IssueCode;
 use crate::context::Context;
 
 /// Check property initialization for a class-like.
-pub fn check_property_initialization<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+pub fn check_property_initialization<'ctx>(
+    context: &mut Context<'ctx, '_>,
     artifacts: &AnalysisArtifacts,
     class_like_metadata: &'ctx ClassLikeMetadata,
     declaration_span: Span,
@@ -69,7 +69,7 @@ pub fn check_property_initialization<'ctx, 'arena>(
         let still_uninitialized: Vec<_> = uninitialized_properties
             .iter()
             .filter(|(prop_name, _)| !initialized_by_initializers.contains(prop_name))
-            .cloned()
+            .copied()
             .collect();
 
         if !still_uninitialized.is_empty() {
@@ -89,7 +89,7 @@ pub fn check_property_initialization<'ctx, 'arena>(
                     .get(*prop_name)
                     .is_some_and(|declaring_class| *declaring_class == class_like_metadata.name)
             })
-            .cloned()
+            .copied()
             .collect();
 
         let inherited_uninitialized: Vec<_> = uninitialized_properties
@@ -100,7 +100,7 @@ pub fn check_property_initialization<'ctx, 'arena>(
                     .get(*prop_name)
                     .is_some_and(|declaring_class| *declaring_class != class_like_metadata.name)
             })
-            .cloned()
+            .copied()
             .collect();
 
         let initialized_by_initializers =
@@ -154,7 +154,7 @@ pub fn check_property_initialization<'ctx, 'arena>(
 
                     true // Still uninitialized
                 })
-                .cloned()
+                .copied()
                 .collect();
 
             if !parent_initializes && !still_uninitialized_inherited.is_empty() {
@@ -330,21 +330,18 @@ fn compute_transitive_initializations(
             let method_key = (current_class, method);
 
             if let Some(props) = artifacts.method_initialized_properties.get(&method_key) {
-                if current_class != origin_class {
-                    if let Some(origin_meta) = context.codebase.get_class_like(&origin_class) {
-                        for prop_name in props {
-                            let is_inherited = origin_meta
-                                .declaring_property_ids
-                                .get(prop_name)
-                                .map(|declaring_class| *declaring_class != origin_class)
-                                .unwrap_or(true);
-                            if is_inherited {
-                                all_initialized.insert(*prop_name);
-                            }
+                if current_class == origin_class {
+                    all_initialized.extend(props.iter().copied());
+                } else if let Some(origin_meta) = context.codebase.get_class_like(&origin_class) {
+                    for prop_name in props {
+                        let is_inherited = origin_meta
+                            .declaring_property_ids
+                            .get(prop_name)
+                            .is_none_or(|declaring_class| *declaring_class != origin_class);
+                        if is_inherited {
+                            all_initialized.insert(*prop_name);
                         }
                     }
-                } else {
-                    all_initialized.extend(props.iter().copied());
                 }
             }
 
@@ -413,7 +410,7 @@ fn compute_class_initializer_initializations(
     let class_name = class_like_metadata.name;
     let class_is_final = class_like_metadata.flags.is_final();
 
-    for initializer_name in context.settings.class_initializers.iter() {
+    for initializer_name in &context.settings.class_initializers {
         if let Some(method_id) = class_like_metadata.declaring_method_ids.get(initializer_name) {
             let declaring_class_name = *method_id.get_class_name();
 
@@ -436,7 +433,7 @@ fn compute_class_initializer_initializations(
             break;
         };
 
-        for initializer_name in context.settings.class_initializers.iter() {
+        for initializer_name in &context.settings.class_initializers {
             if let Some(method_id) = parent_meta.declaring_method_ids.get(initializer_name) {
                 let declaring_class_name = *method_id.get_class_name();
 
@@ -453,8 +450,7 @@ fn compute_class_initializer_initializations(
                     let is_inherited = class_like_metadata
                         .declaring_property_ids
                         .get(&prop_name)
-                        .map(|declaring_class| *declaring_class != class_name)
-                        .unwrap_or(true);
+                        .is_none_or(|declaring_class| *declaring_class != class_name);
 
                     if is_inherited {
                         all_initialized.insert(prop_name);
@@ -652,7 +648,7 @@ fn report_uninitialized_property(
     let mut issue =
         Issue::error(format!("Property `{prop_name}` is not initialized in the constructor of class `{class_name}`."));
 
-    let is_inherited = declaring_class.map(|decl| decl != class_like_metadata.name).unwrap_or(false);
+    let is_inherited = declaring_class.is_some_and(|decl| decl != class_like_metadata.name);
 
     if let Some(span) = prop_span {
         let message = if is_inherited

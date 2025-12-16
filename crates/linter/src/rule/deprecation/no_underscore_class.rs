@@ -55,16 +55,16 @@ impl LintRule for NoUnderscoreClassRule {
 
                 Such names are considered deprecated; a more descriptive identifier is recommended.
             "},
-            good_example: indoc! {r#"
+            good_example: indoc! {r"
                 <?php
 
                 class MyService {}
-            "#},
-            bad_example: indoc! {r#"
+            "},
+            bad_example: indoc! {r"
                 <?php
 
                 class _ {}
-            "#},
+            "},
             category: Category::Deprecation,
             requirements: RuleRequirements::PHPVersion(PHPVersionRange::from(PHPVersion::PHP84)),
         };
@@ -82,7 +82,7 @@ impl LintRule for NoUnderscoreClassRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         match node {
             Node::Class(class) => {
                 if class.name.value != "_" {

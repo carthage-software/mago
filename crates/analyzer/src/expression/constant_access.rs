@@ -14,7 +14,7 @@ use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
 
-impl<'ast, 'arena> Analyzable<'ast, 'arena> for ConstantAccess<'arena> {
+impl<'arena> Analyzable<'_, 'arena> for ConstantAccess<'arena> {
     fn analyze<'ctx>(
         &self,
         context: &mut Context<'ctx, 'arena>,
@@ -30,7 +30,9 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ConstantAccess<'arena> {
         let Some(constant_metadata) = constant_metadata else {
             let is_known = block_context.known_constants.contains(&atom(name));
 
-            if !is_known {
+            if is_known {
+                artifacts.set_expression_type(self, get_mixed());
+            } else {
                 context.collector.report_with_code(
                     IssueCode::NonExistentConstant,
                     Issue::error(format!(
@@ -49,8 +51,6 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ConstantAccess<'arena> {
                         )
                     ),
                 );
-            } else {
-                artifacts.set_expression_type(self, get_mixed());
             }
 
             return Ok(());

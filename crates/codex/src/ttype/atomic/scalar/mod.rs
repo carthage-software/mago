@@ -465,7 +465,7 @@ impl TScalar {
                 None => false,
             },
             TScalar::Float(f) => f.get_literal_value().is_some_and(|v| v == 0.0),
-            TScalar::String(s) => s.get_known_literal_value().is_some_and(|v| v.is_empty()),
+            TScalar::String(s) => s.get_known_literal_value().is_some_and(str::is_empty),
             TScalar::ClassLikeString(_) => false,
             _ => false,
         }
@@ -532,7 +532,7 @@ impl TScalar {
 }
 
 impl TType for TScalar {
-    fn get_child_nodes<'a>(&'a self) -> Vec<TypeRef<'a>> {
+    fn get_child_nodes(&self) -> Vec<TypeRef<'_>> {
         match self {
             TScalar::Bool(ttype) => ttype.get_child_nodes(),
             TScalar::Integer(ttype) => ttype.get_child_nodes(),

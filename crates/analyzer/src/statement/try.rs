@@ -129,16 +129,15 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
         let try_leaves_loop = artifacts
             .loop_scope
             .as_ref()
-            .map(|loop_scope| !loop_scope.final_actions.contains(&ControlAction::None))
-            .unwrap_or(false);
+            .is_some_and(|loop_scope| !loop_scope.final_actions.contains(&ControlAction::None));
 
-        if !all_catches_leave {
+        if all_catches_leave {
             for assigned_variable_id in newly_assigned_variable_ids.keys() {
-                block_context.remove_variable_from_conflicting_clauses(context, assigned_variable_id, None);
+                try_block_context.remove_variable_from_conflicting_clauses(context, assigned_variable_id, None);
             }
         } else {
             for assigned_variable_id in newly_assigned_variable_ids.keys() {
-                try_block_context.remove_variable_from_conflicting_clauses(context, assigned_variable_id, None);
+                block_context.remove_variable_from_conflicting_clauses(context, assigned_variable_id, None);
             }
         }
 
@@ -148,28 +147,21 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
         for (i, catch_clause) in self.catch_clauses.iter().enumerate() {
             let mut catch_block_context = original_block_context.clone();
             catch_block_context.has_returned = false;
-            for (variable_id, variable_type) in catch_block_context.locals.iter_mut() {
-                match old_block_context_locals.get(variable_id) {
-                    Some(old_type) => {
-                        *variable_type = Rc::new(ttype::combine_union_types(
-                            variable_type.as_ref(),
-                            old_type,
-                            context.codebase,
-                            false,
-                        ));
-                    }
-                    None => {
-                        let mut possibly_undefined_type = (**variable_type).clone();
-                        possibly_undefined_type.set_possibly_undefined(variable_type.possibly_undefined(), Some(true));
+            for (variable_id, variable_type) in &mut catch_block_context.locals {
+                if let Some(old_type) = old_block_context_locals.get(variable_id) {
+                    *variable_type =
+                        Rc::new(ttype::combine_union_types(variable_type.as_ref(), old_type, context.codebase, false));
+                } else {
+                    let mut possibly_undefined_type = (**variable_type).clone();
+                    possibly_undefined_type.set_possibly_undefined(variable_type.possibly_undefined(), Some(true));
 
-                        *variable_type = Rc::new(possibly_undefined_type);
-                    }
+                    *variable_type = Rc::new(possibly_undefined_type);
                 }
             }
 
             let caught_classes = get_caught_classes(context, &catch_clause.hint);
 
-            for caught in caught_classes.iter() {
+            for caught in &caught_classes {
                 if context.codebase.is_instance_of(caught, &atom("Error")) {
                     context.collector.report_with_code(
                         IssueCode::AvoidCatchingError,
@@ -188,8 +180,8 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
             }
 
             let possibly_thrown_exceptions = std::mem::take(&mut catch_block_context.possibly_thrown_exceptions);
-            for caught_class in caught_classes.iter() {
-                for (possibly_thrown_exception, _) in possibly_thrown_exceptions.iter() {
+            for caught_class in &caught_classes {
+                for possibly_thrown_exception in possibly_thrown_exceptions.keys() {
                     if possibly_thrown_exception.eq_ignore_ascii_case(caught_class)
                         || context.codebase.is_instance_of(possibly_thrown_exception, caught_class)
                     {
@@ -311,7 +303,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
                     .finally_scope
                     .take()
                     .map(|scope| scope.as_ref().clone())
-                    .map(|s| s.into_inner())
+                    .map(std::cell::RefCell::into_inner)
                     .unwrap_unchecked()
             };
 
@@ -384,14 +376,10 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
     }
 }
 
-fn get_caught_classes<'ctx, 'ast, 'arena>(context: &mut Context<'ctx, 'arena>, hint: &'ast Hint<'arena>) -> AtomSet {
+fn get_caught_classes<'arena>(context: &mut Context<'_, 'arena>, hint: &Hint<'arena>) -> AtomSet {
     let mut caught_identifiers: AtomMap<Span> = AtomMap::default();
 
-    fn walk<'ctx, 'ast, 'arena>(
-        context: &mut Context<'ctx, 'arena>,
-        hint: &'ast Hint<'arena>,
-        caught: &mut AtomMap<Span>,
-    ) {
+    fn walk<'arena>(context: &mut Context<'_, 'arena>, hint: &Hint<'arena>, caught: &mut AtomMap<Span>) {
         match hint {
             Hint::Identifier(identifier) => {
                 let name = context.resolved_names.get(identifier);
@@ -444,7 +432,7 @@ fn get_caught_classes<'ctx, 'ast, 'arena>(context: &mut Context<'ctx, 'arena>, h
 
     let throwable = atom("Throwable");
     let mut caught_classes = AtomSet::with_capacity(caught_identifiers.len());
-    for (caught_type, caught_span) in caught_identifiers.into_iter() {
+    for (caught_type, caught_span) in caught_identifiers {
         let lowercase_caught_type = ascii_lowercase_atom(&caught_type);
 
         if lowercase_caught_type == "throwable"

@@ -51,7 +51,7 @@ impl LintRule for NoRedundantFileRule {
             description: indoc! {"
                 Detects redundant files that contain no executable code or declarations.
                 "},
-            good_example: indoc! {r#"
+            good_example: indoc! {r"
                 <?php
 
                 declare(strict_types=1);
@@ -59,13 +59,13 @@ impl LintRule for NoRedundantFileRule {
                 function foo(): void {
                     return 42;
                 }
-            "#},
-            bad_example: indoc! {r#"
+            "},
+            bad_example: indoc! {r"
                 <?php
 
                 declare(strict_types=1);
                 // This file is redundant.
-            "#},
+            "},
             category: Category::Redundancy,
 
             requirements: RuleRequirements::None,
@@ -84,7 +84,7 @@ impl LintRule for NoRedundantFileRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let Node::Program(program) = node else {
             return;
         };
@@ -105,7 +105,7 @@ impl LintRule for NoRedundantFileRule {
 }
 
 #[inline]
-fn is_statement_useful<'ast, 'arena>(statement: &'ast Statement<'arena>) -> bool {
+fn is_statement_useful(statement: &Statement<'_>) -> bool {
     match statement {
         Statement::Inline(inline) => !inline.value.trim().is_empty(),
         Statement::Namespace(namespace) => {

@@ -133,7 +133,7 @@ fn analyze_array_elements<'ctx, 'arena>(
 
                 let (item_key_value, key_type) = artifacts
                     .get_expression_type(key_value_array_element.key)
-                    .map(|item_key_type| {
+                    .map_or((None, get_mixed()), |item_key_type| {
                         let key_type = if item_key_type.is_null() {
                             get_literal_string(empty_atom())
                         } else if item_key_type.is_true() {
@@ -188,8 +188,7 @@ fn analyze_array_elements<'ctx, 'arena>(
                             };
 
                         (item_key_value, key_type)
-                    })
-                    .unwrap_or((None, get_mixed()));
+                    });
 
                 (item_key_value, key_type, false, key_value_array_element.value)
             }
@@ -234,21 +233,19 @@ fn analyze_array_elements<'ctx, 'arena>(
                 variadic_array_element.value.analyze(context, block_context, artifacts)?;
                 block_context.inside_general_use = was_inside_general_use;
 
-                match artifacts.get_expression_type(&variadic_array_element.value) {
-                    Some(variadic_array_element_type) => {
-                        handle_variadic_array_element(
-                            context,
-                            &mut array_creation_info,
-                            variadic_array_element,
-                            variadic_array_element_type,
-                        );
-                    }
-                    None => {
-                        array_creation_info.can_create_objectlike = false;
-                        array_creation_info.item_key_atomic_types.push(TAtomic::Scalar(TScalar::ArrayKey));
-                        array_creation_info.item_value_atomic_types.push(TAtomic::Mixed(TMixed::new()));
-                    }
-                };
+                if let Some(variadic_array_element_type) = artifacts.get_expression_type(&variadic_array_element.value)
+                {
+                    handle_variadic_array_element(
+                        context,
+                        &mut array_creation_info,
+                        variadic_array_element,
+                        variadic_array_element_type,
+                    );
+                } else {
+                    array_creation_info.can_create_objectlike = false;
+                    array_creation_info.item_key_atomic_types.push(TAtomic::Scalar(TScalar::ArrayKey));
+                    array_creation_info.item_value_atomic_types.push(TAtomic::Mixed(TMixed::new()));
+                }
 
                 continue;
             }
@@ -344,16 +341,16 @@ fn analyze_array_elements<'ctx, 'arena>(
         }
     }
 
-    let item_key_type = if !array_creation_info.item_key_atomic_types.is_empty() {
-        Some(TUnion::from_vec(combine(array_creation_info.item_key_atomic_types, context.codebase, false)))
-    } else {
+    let item_key_type = if array_creation_info.item_key_atomic_types.is_empty() {
         None
+    } else {
+        Some(TUnion::from_vec(combine(array_creation_info.item_key_atomic_types, context.codebase, false)))
     };
 
-    let item_value_type = if !array_creation_info.item_value_atomic_types.is_empty() {
-        Some(TUnion::from_vec(combine(array_creation_info.item_value_atomic_types, context.codebase, false)))
-    } else {
+    let item_value_type = if array_creation_info.item_value_atomic_types.is_empty() {
         None
+    } else {
+        Some(TUnion::from_vec(combine(array_creation_info.item_value_atomic_types, context.codebase, false)))
     };
 
     let array_type = if !array_creation_info.property_types.is_empty() {
@@ -419,7 +416,7 @@ fn analyze_array_elements<'ctx, 'arena>(
 }
 
 fn get_numeric_key_from_string(key: &str) -> Option<i64> {
-    if key.starts_with("0") || key.starts_with("+") {
+    if key.starts_with('0') || key.starts_with('+') {
         return None;
     }
 
@@ -430,10 +427,10 @@ fn get_numeric_key_from_string(key: &str) -> Option<i64> {
     key.parse::<i64>().ok()
 }
 
-fn handle_variadic_array_element<'ctx, 'ast, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+fn handle_variadic_array_element<'arena>(
+    context: &mut Context<'_, 'arena>,
     array_creation_info: &mut ArrayCreationInfo,
-    variadic_array_element: &'ast VariadicArrayElement<'arena>,
+    variadic_array_element: &VariadicArrayElement<'arena>,
     variadic_array_element_type: &TUnion,
 ) {
     let mut all_non_empty = true;
@@ -667,7 +664,7 @@ fn handle_variadic_array_element<'ctx, 'ast, 'arena>(
                 continue;
             }
 
-            for (k, v) in array_creation_info.property_types.iter_mut() {
+            for (k, v) in &mut array_creation_info.property_types {
                 let prop_key = k.to_union();
 
                 if is_contained_by(
@@ -705,7 +702,7 @@ mod tests {
 
     test_analysis! {
         name = array_literal_empty_square_brackets,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             /**
@@ -715,12 +712,12 @@ mod tests {
 
             $empty1 = [];
             expect_empty_array($empty1);
-        "#}
+        "}
     }
 
     test_analysis! {
         name = array_literal_empty_array_keyword,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             /**
@@ -730,7 +727,7 @@ mod tests {
 
             $empty2 = array();
             expect_empty_array($empty2);
-        "#}
+        "}
     }
 
     test_analysis! {
@@ -825,7 +822,7 @@ mod tests {
 
     test_analysis! {
         name = array_literal_duplicate_literal_int_key,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             /**
@@ -835,7 +832,7 @@ mod tests {
 
             $arr = [0 => 'a', 0 => 'b'];
             expect_single_string_at_0($arr);
-        "#},
+        "},
         issues = [IssueCode::DuplicateArrayKey]
     }
 
@@ -857,7 +854,7 @@ mod tests {
 
     test_analysis! {
         name = array_literal_duplicate_coerced_key,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             /**
@@ -867,7 +864,7 @@ mod tests {
 
             $arr = [true => 'a', 1 => 'b']; // true becomes 1, so '1' is duplicated
             expect_one_string($arr);
-        "#},
+        "},
         issues = [IssueCode::DuplicateArrayKey]
     }
 
@@ -912,7 +909,7 @@ mod tests {
 
     test_analysis! {
         name = array_literal_spread_empty_array,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             /** @param array{} $_arr */
@@ -921,7 +918,7 @@ mod tests {
             $empty = [];
             $arr = [...$empty];
             expect_empty_array($arr);
-        "#}
+        "}
     }
 
     test_analysis! {
@@ -954,7 +951,7 @@ mod tests {
 
     test_analysis! {
         name = array_literal_spread_non_iterable_int,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             /** @param array<array-key, mixed> $_arr */
@@ -963,23 +960,23 @@ mod tests {
             $num = 123;
             $arr = [...$num];
             expect_empty_array($arr);
-        "#},
+        "},
         issues = [IssueCode::InvalidArrayElement]
     }
 
     test_analysis! {
         name = array_literal_missing_element,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             $arr = [1, , 3];
-        "#},
+        "},
         issues = [IssueCode::InvalidArrayElement]
     }
 
     test_analysis! {
         name = array_literal_results_in_list_type,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             /** @param list<int> $_arr */
@@ -987,7 +984,7 @@ mod tests {
 
             $arr = [10, 20, 30];
             expect_list_of_ints($arr);
-        "#}
+        "}
     }
 
     test_analysis! {
@@ -1018,7 +1015,7 @@ mod tests {
 
     test_analysis! {
         name = list_array_comparison,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             /**
@@ -1036,12 +1033,12 @@ mod tests {
 
             $list = x();
             take_list_ints($list);
-        "#}
+        "}
     }
 
     test_analysis! {
         name = create_array_using_generic_key,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             /**
@@ -1056,6 +1053,6 @@ mod tests {
             function create_array($k, $v): array {
                 return [$k => $v];
             }
-        "#},
+        "},
     }
 }

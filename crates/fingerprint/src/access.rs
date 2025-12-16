@@ -110,7 +110,7 @@ impl Fingerprintable for ClassLikeConstantSelector<'_> {
         match self {
             ClassLikeConstantSelector::Identifier(id) => id.fingerprint_with_hasher(hasher, resolved_names, options),
             ClassLikeConstantSelector::Expression(expr) => {
-                expr.fingerprint_with_hasher(hasher, resolved_names, options)
+                expr.fingerprint_with_hasher(hasher, resolved_names, options);
             }
         }
     }

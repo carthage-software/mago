@@ -22,20 +22,20 @@ pub trait ProgramHook: Provider {
     ///
     /// Return `HookAction::Continue` to proceed with normal analysis, or
     /// `HookAction::Skip` to skip analysis of this program entirely.
-    fn before_program<'ast, 'arena>(
+    fn before_program(
         &self,
         _file: &File,
-        _program: &'ast Program<'arena>,
+        _program: &Program<'_>,
         _context: &mut HookContext<'_, '_>,
     ) -> HookResult<HookAction> {
         Ok(HookAction::Continue)
     }
 
     /// Called after a program has been analyzed.
-    fn after_program<'ast, 'arena>(
+    fn after_program(
         &self,
         _file: &File,
-        _program: &'ast Program<'arena>,
+        _program: &Program<'_>,
         _context: &mut HookContext<'_, '_>,
     ) -> HookResult<()> {
         Ok(())

@@ -70,7 +70,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for UnaryPrefix<'arena> {
         match self.operator {
             // operators that always retain the type of the operand
             UnaryPrefixOperator::Reference(_) => {
-                let mut referenced_type = operand_type.map(|t| t.as_ref().clone()).unwrap_or_else(get_mixed);
+                let mut referenced_type = operand_type.map_or_else(get_mixed, |t| t.as_ref().clone());
                 referenced_type.set_by_reference(true);
 
                 artifacts.set_rc_expression_type(self, Rc::new(referenced_type));
@@ -146,7 +146,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for UnaryPrefix<'arena> {
                                     } else {
                                         // non-numeric literal string → FATAL in PHP
                                         invalid_operand_messages.push((
-                                            format!("Cannot negate non-numeric string literal `\"{}\"`", value),
+                                            format!("Cannot negate non-numeric string literal `\"{value}\"`"),
                                             operand_span,
                                         ));
                                     }
@@ -410,7 +410,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for UnaryPostfix<'arena> {
             UnaryPostfixOperator::PostDecrement(span) => {
                 decrement_operand(context, block_context, artifacts, self.operand, span)?;
             }
-        };
+        }
 
         if let Some(operand_type) = artifacts.get_rc_expression_type(&self.operand).cloned() {
             artifacts.set_rc_expression_type(self, operand_type);
@@ -494,7 +494,7 @@ fn increment_operand<'ctx, 'arena>(
                                 string_val
                             };
 
-                            let value = value.trim_start_matches("0");
+                            let value = value.trim_start_matches('0');
                             if value.is_empty() {
                                 possibilities.push(TAtomic::Scalar(TScalar::literal_int(1)));
                             } else if let Ok(value) = value.parse::<i64>() {
@@ -562,7 +562,10 @@ fn increment_operand<'ctx, 'arena>(
                 possibilities.push(TAtomic::Scalar(TScalar::literal_int(1)));
             }
             TAtomic::Callable(callable) => {
-                if callable.get_signature().is_none_or(|signature| signature.is_closure()) {
+                if callable
+                    .get_signature()
+                    .is_none_or(mago_codex::ttype::atomic::callable::TCallableSignature::is_closure)
+                {
                     context.collector.report_with_code(
                         IssueCode::InvalidOperand,
                         Issue::error("Cannot increment a closure.")
@@ -733,7 +736,7 @@ fn decrement_operand<'ctx, 'arena>(
                                     string_val
                                 };
 
-                                let value = value.trim_start_matches("0");
+                                let value = value.trim_start_matches('0');
                                 if value.is_empty() {
                                     possibilities.push(TAtomic::Scalar(TScalar::literal_int(-1)));
                                 } else if let Ok(value) = value.parse::<i64>() {
@@ -796,7 +799,10 @@ fn decrement_operand<'ctx, 'arena>(
                 possibilities.push(TAtomic::Null);
             }
             TAtomic::Callable(callable) => {
-                if callable.get_signature().is_none_or(|signature| signature.is_closure()) {
+                if callable
+                    .get_signature()
+                    .is_none_or(mago_codex::ttype::atomic::callable::TCallableSignature::is_closure)
+                {
                     context.collector.report_with_code(
                         IssueCode::InvalidOperand,
                         Issue::error("Cannot decrement a closure.")
@@ -879,11 +885,11 @@ fn decrement_operand<'ctx, 'arena>(
     Ok(resulting_type_union)
 }
 
-fn report_redundant_type_cast<'ctx, 'ast, 'arena>(
+fn report_redundant_type_cast<'ast, 'arena>(
     cast_operator: &'ast UnaryPrefixOperator,
     expression: &'ast UnaryPrefix<'arena>,
     known_type: &TUnion,
-    context: &mut Context<'ctx, 'arena>,
+    context: &mut Context<'_, 'arena>,
 ) {
     context.collector.propose_with_code(
         IssueCode::RedundantCast,
@@ -902,10 +908,10 @@ fn report_redundant_type_cast<'ctx, 'ast, 'arena>(
     );
 }
 
-fn cast_type_to_array<'ctx, 'ast, 'arena>(
+fn cast_type_to_array<'arena>(
     operand_type: &TUnion,
-    context: &mut Context<'ctx, 'arena>,
-    cast_expression: &'ast UnaryPrefix<'arena>,
+    context: &mut Context<'_, 'arena>,
+    cast_expression: &UnaryPrefix<'arena>,
 ) -> TUnion {
     if operand_type.is_never() {
         context.collector.report_with_code(
@@ -1035,10 +1041,10 @@ fn cast_type_to_array<'ctx, 'ast, 'arena>(
     TUnion::from_vec(combine(resulting_array_atomics, context.codebase, false))
 }
 
-fn cast_type_to_bool<'ctx, 'ast, 'arena>(
+fn cast_type_to_bool<'arena>(
     operand_type: &TUnion,
-    context: &mut Context<'ctx, 'arena>,
-    cast_expression: &'ast UnaryPrefix<'arena>,
+    context: &mut Context<'_, 'arena>,
+    cast_expression: &UnaryPrefix<'arena>,
 ) -> TUnion {
     if operand_type.is_never() {
         return get_never();
@@ -1087,10 +1093,10 @@ fn cast_type_to_bool<'ctx, 'ast, 'arena>(
     get_bool()
 }
 
-fn cast_type_to_float<'ctx, 'ast, 'arena>(
+fn cast_type_to_float<'arena>(
     operand_type: &TUnion,
-    context: &mut Context<'ctx, 'arena>,
-    cast_expression: &'ast UnaryPrefix<'arena>,
+    context: &mut Context<'_, 'arena>,
+    cast_expression: &UnaryPrefix<'arena>,
 ) -> TUnion {
     if operand_type.is_never() {
         return get_never();
@@ -1255,7 +1261,11 @@ fn cast_type_to_int(operand_type: &TUnion, context: &mut Context<'_, '_>) -> TUn
                 TAtomic::Scalar(TScalar::literal_int(1))
             }
             TAtomic::Object(_) => TAtomic::Scalar(TScalar::literal_int(1)),
-            TAtomic::Callable(callable) if callable.get_signature().is_none_or(|signature| signature.is_closure()) => {
+            TAtomic::Callable(callable)
+                if callable
+                    .get_signature()
+                    .is_none_or(mago_codex::ttype::atomic::callable::TCallableSignature::is_closure) =>
+            {
                 TAtomic::Scalar(TScalar::literal_int(1))
             }
             TAtomic::Never => return get_never(),
@@ -1316,10 +1326,10 @@ fn cast_type_to_int(operand_type: &TUnion, context: &mut Context<'_, '_>) -> TUn
     TUnion::from_vec(combine(possibilities, context.codebase, false))
 }
 
-fn cast_type_to_object<'ctx, 'ast, 'arena>(
+fn cast_type_to_object<'arena>(
     operand_type: &TUnion,
-    context: &mut Context<'ctx, 'arena>,
-    cast_expression: &'ast UnaryPrefix<'arena>,
+    context: &mut Context<'_, 'arena>,
+    cast_expression: &UnaryPrefix<'arena>,
 ) -> TUnion {
     let mut possibilities = vec![];
     for t in operand_type.types.as_ref() {
@@ -1341,7 +1351,11 @@ fn cast_type_to_object<'ctx, 'ast, 'arena>(
                 return get_never();
             }
             TAtomic::Never => return get_never(),
-            TAtomic::Callable(callable) if callable.get_signature().is_none_or(|signature| signature.is_closure()) => {
+            TAtomic::Callable(callable)
+                if callable
+                    .get_signature()
+                    .is_none_or(mago_codex::ttype::atomic::callable::TCallableSignature::is_closure) =>
+            {
                 possibilities.push(t.clone());
             }
             TAtomic::Object(_) => {
@@ -1376,10 +1390,10 @@ fn cast_type_to_object<'ctx, 'ast, 'arena>(
     TUnion::from_vec(combine(possibilities, context.codebase, false))
 }
 
-pub fn cast_type_to_string<'ctx, 'arena>(
+pub fn cast_type_to_string<'ctx>(
     operand_type: &TUnion,
     operand_expression_id: Option<&str>,
-    context: &mut Context<'ctx, 'arena>,
+    context: &mut Context<'ctx, '_>,
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     expression_span: Span,
@@ -1425,7 +1439,10 @@ pub fn cast_type_to_string<'ctx, 'arena>(
                 _ => TAtomic::Scalar(TScalar::string()),
             },
             TAtomic::Callable(callable) => {
-                return if callable.get_signature().is_none_or(|signature| signature.is_closure()) {
+                return if callable
+                    .get_signature()
+                    .is_none_or(mago_codex::ttype::atomic::callable::TCallableSignature::is_closure)
+                {
                     context.collector.report_with_code(
                         IssueCode::InvalidTypeCast,
                         Issue::error("Cannot cast type `Closure` to `string`.")
@@ -1612,7 +1629,7 @@ mod tests {
 
     test_analysis! {
         name = unary_increment_decrement_operators,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             /**
@@ -1654,7 +1671,7 @@ mod tests {
             $arr['c'] = ++$arr['c'];
 
             example($arr['a'], $arr['b'], $arr['c']);
-        "#}
+        "}
     }
 
     test_analysis! {
@@ -1707,7 +1724,7 @@ mod tests {
 
     test_analysis! {
         name = negate_integer_ranges,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             final readonly class Duration
@@ -1735,12 +1752,12 @@ mod tests {
                     return new Duration(-$this->hours, -$this->minutes, -$this->seconds, -$this->nanoseconds);
                 }
             }
-        "#}
+        "}
     }
 
     test_analysis! {
         name = cast_stdclass_to_array,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             class stdClass
@@ -1753,6 +1770,6 @@ mod tests {
             {
                 return (array) $obj;
             }
-        "#}
+        "}
     }
 }

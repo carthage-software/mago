@@ -136,9 +136,13 @@ impl<'ctx> InvocationTarget<'ctx> {
     /// Returns the name of a function/method if statically known,
     /// or "Closure" or "callable" for dynamic callables.
     pub fn guess_name(&self) -> String {
-        self.get_function_like_identifier().map(|id| id.as_string()).unwrap_or_else(|| {
-            if self.is_non_closure_callable() { "callable".to_string() } else { "Closure".to_string() }
-        })
+        self.get_function_like_identifier()
+            .map(mago_codex::identifier::function_like::FunctionLikeIdentifier::as_string)
+            .unwrap_or_else(
+                || {
+                    if self.is_non_closure_callable() { "callable".to_string() } else { "Closure".to_string() }
+                },
+            )
     }
 
     /// Guesses the kind of the callable target (e.g., "function", "method", "closure", "callable").

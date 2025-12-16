@@ -49,7 +49,7 @@ impl LintRule for FinalControllerRule {
         const META: RuleMeta = RuleMeta {
             name: "Final Controller",
             code: "final-controller",
-            description: indoc! {r#"
+            description: indoc! {r"
                 Enforces that controller classes are declared as `final`.
 
                 In modern MVC frameworks, controllers should be treated as entry points that orchestrate the application's response to a request. They are not designed to be extension points.
@@ -57,8 +57,8 @@ impl LintRule for FinalControllerRule {
                 Extending controllers can lead to deep inheritance chains, making the codebase rigid and difficult to maintain. It's a best practice to favor composition (injecting services for shared logic) over inheritance.
 
                 If a controller is intended as a base for others, it should be explicitly marked as `abstract`. All other concrete controllers should be `final` to prevent extension.
-            "#},
-            good_example: indoc! {r#"
+            "},
+            good_example: indoc! {r"
                 <?php
 
                 namespace App\Http\Controllers;
@@ -67,8 +67,8 @@ impl LintRule for FinalControllerRule {
                 {
                     // ...
                 }
-            "#},
-            bad_example: indoc! {r#"
+            "},
+            bad_example: indoc! {r"
                 <?php
 
                 namespace App\Http\Controllers;
@@ -77,7 +77,7 @@ impl LintRule for FinalControllerRule {
                 {
                     // ...
                 }
-            "#},
+            "},
             category: Category::BestPractices,
             requirements: RuleRequirements::Any(&[
                 RuleRequirements::Integration(Integration::Symfony),
@@ -102,7 +102,7 @@ impl LintRule for FinalControllerRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let Node::Class(class) = node else {
             return;
         };

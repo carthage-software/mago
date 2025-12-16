@@ -18,20 +18,16 @@ pub trait ExpressionHook: Provider {
     /// Return `ExpressionHookResult::Continue` to proceed with normal analysis,
     /// `ExpressionHookResult::Skip` to skip analysis (type will be `mixed`), or
     /// `ExpressionHookResult::SkipWithType(ty)` to skip with a custom type.
-    fn before_expression<'ast, 'arena>(
+    fn before_expression(
         &self,
-        _expr: &'ast Expression<'arena>,
+        _expr: &Expression<'_>,
         _context: &mut HookContext<'_, '_>,
     ) -> HookResult<ExpressionHookResult> {
         Ok(ExpressionHookResult::Continue)
     }
 
     /// Called after an expression has been analyzed.
-    fn after_expression<'ast, 'arena>(
-        &self,
-        _expr: &'ast Expression<'arena>,
-        _context: &mut HookContext<'_, '_>,
-    ) -> HookResult<()> {
+    fn after_expression(&self, _expr: &Expression<'_>, _context: &mut HookContext<'_, '_>) -> HookResult<()> {
         Ok(())
     }
 }

@@ -33,11 +33,11 @@ use crate::utils::expression::array::get_array_target_type_given_index;
 use crate::utils::expression::get_expression_id;
 use crate::utils::expression::get_index_id;
 
-pub(crate) fn analyze<'ctx, 'ast, 'arena>(
+pub(crate) fn analyze<'ctx, 'arena>(
     context: &mut Context<'ctx, 'arena>,
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
-    array_target: ArrayTarget<'ast, 'arena>,
+    array_target: ArrayTarget<'_, 'arena>,
     assign_value_type: TUnion,
 ) -> Result<(), AnalysisError> {
     let mut array_target_expressions = vec![array_target];
@@ -194,7 +194,50 @@ fn update_atomic_given_key(
         }));
     }
 
-    if !key_values.is_empty() {
+    if key_values.is_empty() {
+        let Some((array_key_type, array_value_type)) = get_iterable_parameters(&atomic_type, context.codebase) else {
+            return atomic_type;
+        };
+
+        let TAtomic::Array(array) = &mut atomic_type else {
+            return atomic_type;
+        };
+
+        let combined_value_type = add_union_type(array_value_type, current_type, context.codebase, false);
+
+        if array.is_empty() && key_type.is_none() {
+            *array = TArray::List(TList {
+                element_type: Box::new(combined_value_type),
+                known_elements: None,
+                known_count: None,
+                non_empty: true,
+            });
+        } else {
+            match array {
+                TArray::List(list) => {
+                    *list.element_type = combined_value_type;
+
+                    list.known_elements = None;
+                    list.known_count = None;
+                    list.non_empty = true;
+                }
+                TArray::Keyed(keyed_array) => {
+                    keyed_array.parameters = Some((
+                        Box::new(add_union_type(
+                            array_key_type,
+                            &key_type.unwrap_or_else(|| Rc::new(get_int())),
+                            context.codebase,
+                            false,
+                        )),
+                        Box::new(combined_value_type),
+                    ));
+
+                    keyed_array.known_items = None;
+                    keyed_array.non_empty = true;
+                }
+            }
+        }
+    } else {
         for key_value in key_values {
             if let TAtomic::Array(array) = &mut atomic_type {
                 let array_key = if let Some(str) = key_value.get_literal_string_value() {
@@ -269,56 +312,13 @@ fn update_atomic_given_key(
                 }
             }
         }
-    } else {
-        let Some((array_key_type, array_value_type)) = get_iterable_parameters(&atomic_type, context.codebase) else {
-            return atomic_type;
-        };
-
-        let TAtomic::Array(array) = &mut atomic_type else {
-            return atomic_type;
-        };
-
-        let combined_value_type = add_union_type(array_value_type, current_type, context.codebase, false);
-
-        if array.is_empty() && key_type.is_none() {
-            *array = TArray::List(TList {
-                element_type: Box::new(combined_value_type),
-                known_elements: None,
-                known_count: None,
-                non_empty: true,
-            });
-        } else {
-            match array {
-                TArray::List(list) => {
-                    *list.element_type = combined_value_type;
-
-                    list.known_elements = None;
-                    list.known_count = None;
-                    list.non_empty = true;
-                }
-                TArray::Keyed(keyed_array) => {
-                    keyed_array.parameters = Some((
-                        Box::new(add_union_type(
-                            array_key_type,
-                            &key_type.unwrap_or_else(|| Rc::new(get_int())),
-                            context.codebase,
-                            false,
-                        )),
-                        Box::new(combined_value_type),
-                    ));
-
-                    keyed_array.known_items = None;
-                    keyed_array.non_empty = true;
-                }
-            }
-        }
     }
 
     atomic_type
 }
 
-fn update_array_assignment_child_type<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+fn update_array_assignment_child_type<'ctx>(
+    context: &mut Context<'ctx, '_>,
     block_context: &mut BlockContext<'ctx>,
     key_type: Option<Rc<TUnion>>,
     value_type: TUnion,
@@ -398,12 +398,12 @@ fn update_array_assignment_child_type<'ctx, 'arena>(
                             if let Some(known_items) = existing_array.known_items.as_ref() {
                                 let indices = known_items
                                     .keys()
-                                    .map(|k| k.get_integer())
+                                    .map(mago_codex::ttype::atomic::array::key::ArrayKey::get_integer)
                                     .collect::<Option<Vec<_>>>()
                                     .unwrap_or_default();
 
                                 if indices.is_empty() || indices.iter().any(|&i| i >= 0) {
-                                    indices.last().cloned()
+                                    indices.last().copied()
                                 } else {
                                     None
                                 }
@@ -518,7 +518,7 @@ pub(crate) fn analyze_nested_array_assignment<'ctx, 'ast, 'arena>(
             array_expression_type = Rc::new(atomic);
 
             artifacts.set_rc_expression_type(array_target.get_array(), array_expression_type.clone());
-        } else if let Some(parent_var_id) = parent_var_id.to_owned()
+        } else if let Some(parent_var_id) = parent_var_id
             && let Some(scoped_type) = block_context.locals.get(&parent_var_id).cloned()
         {
             artifacts.set_rc_expression_type(array_target.get_array(), scoped_type.clone());
@@ -536,7 +536,7 @@ pub(crate) fn analyze_nested_array_assignment<'ctx, 'ast, 'arena>(
             block_context,
             array_target.span(),
             array_target.get_array().span(),
-            array_target.get_index().map(|index| index.span()),
+            array_target.get_index().map(mago_span::HasSpan::span),
             &array_expression_type,
             &new_index_type,
             true,

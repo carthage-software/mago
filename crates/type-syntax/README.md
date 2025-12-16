@@ -2,7 +2,7 @@
 
 A fast, memory-efficient Rust crate for parsing PHP docblock type strings (e.g., from `@var`, `@param`, `@return` tags) into a structured Abstract Syntax Tree (AST).
 
-Originally developed as part of the [Mago](https://mago.carthage.software) static analysis toolset, this crate provides the specialized lexer, parser, and AST definitions needed to work with PHP's docblock type syntax, including many Psalm and PHPStan extensions.
+Originally developed as part of the [Mago](https://mago.carthage.software) static analysis toolset, this crate provides the specialized lexer, parser, and AST definitions needed to work with PHP's docblock type syntax, including many Psalm and `PHPStan` extensions.
 
 ## Features
 
@@ -15,7 +15,7 @@ Originally developed as part of the [Mago](https://mago.carthage.software) stati
 
 ## Supported Syntax (Examples)
 
-This parser covers a wide range of standard PHPDoc, PHPStan, and Psalm type syntaxes:
+This parser covers a wide range of standard `PHPDoc`, `PHPStan`, and Psalm type syntaxes:
 
 - **Keywords:** `int`, `string`, `bool`, `float`, `mixed`, `null`, `void`, `never`, `object`, `resource`, `true`, `false`, `scalar`, `numeric`, `array-key`, `list`, `non-empty-list`, `non-empty-string`, `class-string`, `iterable`, `callable`, `pure-callable`, `pure-closure`, `stringable-object`, `lowercase-string`, `positive-int`, `negative-int`, `resource`, `closed-resource`, `open-resource`, `numeric-string`, `truthy-string`, etc.
 - **Literals:**
@@ -53,7 +53,7 @@ This parser covers a wide range of standard PHPDoc, PHPStan, and Psalm type synt
 - **Conditionals:**
   - `$var is string ? int : bool`
   - `T is not null ? T : mixed`
-- **KeyOf / ValueOf:** `key-of<T>`, `value-of<T>`
+- **`KeyOf` / `ValueOf`:** `key-of<T>`, `value-of<T>`
 - **Indexed Access:** `T[K]`
 - **Int Ranges:** `int<0, 100>`, `int<min, 0>`, `int<1, max>`
 - **Int Masks:** `int-mask<1, 2, 4>`, `int-mask-of<Permissions::*>`

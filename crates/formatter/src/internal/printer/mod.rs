@@ -278,9 +278,9 @@ impl<'arena> Printer<'arena> {
                 }
 
                 return should_remeasure;
-            } else {
-                should_remeasure = true;
             }
+
+            should_remeasure = true;
         }
 
         if !self.line_suffix.is_empty() {
@@ -437,7 +437,7 @@ impl<'arena> Printer<'arena> {
                 whitespace_flat_cmd.with_mode(Mode::Break),
                 content_flat_cmd.with_mode(Mode::Break),
             ]);
-        };
+        }
     }
 
     fn add_indentation(&mut self, indentation: Indentation<'arena>) -> usize {
@@ -502,7 +502,7 @@ impl<'arena> Printer<'arena> {
                         for d in group.contents.iter().rev() {
                             stack.push((group_mode, d));
                         }
-                    };
+                    }
                 }
                 Document::IfBreak(if_break_doc) => {
                     let group_mode =

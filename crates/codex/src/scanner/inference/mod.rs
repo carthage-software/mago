@@ -58,7 +58,7 @@ pub fn infer<'arena>(
     match expression {
         Expression::MagicConstant(magic_constant) => Some(match magic_constant {
             MagicConstant::Line(_) => {
-                get_literal_int(context.file.line_number(magic_constant.start_position().offset()) as i64 + 1)
+                get_literal_int(i64::from(context.file.line_number(magic_constant.start_position().offset())) + 1)
             }
             MagicConstant::File(_) => {
                 if let Some(path) = context.file.path.as_deref().and_then(|p| p.to_str()) {
@@ -99,7 +99,7 @@ pub fn infer<'arena>(
                                 str_is_numeric(value),
                                 true, // truthy
                                 true, // not empty
-                                value.chars().all(|c| c.is_lowercase()),
+                                value.chars().all(char::is_lowercase),
                             ))))
                         }
                     }
@@ -301,7 +301,7 @@ pub fn infer<'arena>(
                 };
 
                 match bits {
-                    Some(bits) => return Some(get_literal_int(bits as i64)),
+                    Some(bits) => return Some(get_literal_int(i64::from(bits))),
                     None => TAtomic::Reference(TReference::Member {
                         class_like_name: atom(class_name_str),
                         member_selector: TReferenceMemberSelector::Identifier(atom(identifier.value)),

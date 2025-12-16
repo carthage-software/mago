@@ -69,66 +69,7 @@ pub fn saturate_clauses<'a>(clauses: impl IntoIterator<Item = &'a Clause>) -> Ve
             let is_clause_a_simple = clause_a.possibilities.len() == 1
                 && clause_a.possibilities.values().next().is_some_and(|p| p.len() == 1);
 
-            if !is_clause_a_simple {
-                'inner: for clause_b in &unique_clauses {
-                    if clause_a == clause_b || !clause_b.reconcilable || clause_b.wedge {
-                        continue;
-                    }
-
-                    // Check for resolution candidates more efficiently in a single pass.
-                    if clause_a.possibilities.len() == clause_b.possibilities.len() {
-                        let mut opposing_key = None;
-                        let mut mismatch = false;
-
-                        for (key, a_possibilities) in &clause_a.possibilities {
-                            match clause_b.possibilities.get(key) {
-                                Some(b_possibilities) => {
-                                    if index_keys_match(a_possibilities, b_possibilities) {
-                                        continue;
-                                    }
-
-                                    if a_possibilities.len() == 1
-                                        && b_possibilities.len() == 1
-                                        && a_possibilities.values().next().is_some_and(|a| {
-                                            b_possibilities.values().next().is_some_and(|b| a.is_negation_of(b))
-                                        })
-                                    {
-                                        if opposing_key.is_some() {
-                                            mismatch = true;
-                                            break;
-                                        }
-                                        opposing_key = Some(key);
-                                    } else {
-                                        mismatch = true;
-                                        break;
-                                    }
-                                }
-                                None => {
-                                    mismatch = true;
-                                    break;
-                                }
-                            }
-                        }
-
-                        if mismatch {
-                            continue 'inner;
-                        }
-
-                        if let Some(key_to_remove) = opposing_key {
-                            removed_clauses.insert(*clause_a);
-                            let maybe_new_clause = clause_a.remove_possibilities(key_to_remove);
-
-                            if let Some(new_clause) = maybe_new_clause {
-                                added_clauses.push(new_clause);
-                            } else {
-                                // If removing the possibility makes the clause empty, it's a success,
-                                // but no new clause is added.
-                                continue 'outer;
-                            }
-                        }
-                    }
-                }
-            } else {
+            if is_clause_a_simple {
                 // This is unit propagation: (A) & (!A | B) => (B)
                 // `clause_a` is the unit clause (A).
                 let (clause_var, var_possibilities) = clause_a.possibilities.iter().next().unwrap();
@@ -156,6 +97,62 @@ pub fn saturate_clauses<'a>(clauses: impl IntoIterator<Item = &'a Clause>) -> Ve
                         } else {
                             let updated_clause = clause_b.add_possibility(*clause_var, clause_var_possibilities);
                             added_clauses.push(updated_clause);
+                        }
+                    }
+                }
+            } else {
+                'inner: for clause_b in &unique_clauses {
+                    if clause_a == clause_b || !clause_b.reconcilable || clause_b.wedge {
+                        continue;
+                    }
+
+                    // Check for resolution candidates more efficiently in a single pass.
+                    if clause_a.possibilities.len() == clause_b.possibilities.len() {
+                        let mut opposing_key = None;
+                        let mut mismatch = false;
+
+                        for (key, a_possibilities) in &clause_a.possibilities {
+                            if let Some(b_possibilities) = clause_b.possibilities.get(key) {
+                                if index_keys_match(a_possibilities, b_possibilities) {
+                                    continue;
+                                }
+
+                                if a_possibilities.len() == 1
+                                    && b_possibilities.len() == 1
+                                    && a_possibilities.values().next().is_some_and(|a| {
+                                        b_possibilities.values().next().is_some_and(|b| a.is_negation_of(b))
+                                    })
+                                {
+                                    if opposing_key.is_some() {
+                                        mismatch = true;
+                                        break;
+                                    }
+                                    opposing_key = Some(key);
+                                } else {
+                                    mismatch = true;
+                                    break;
+                                }
+                            } else {
+                                mismatch = true;
+                                break;
+                            }
+                        }
+
+                        if mismatch {
+                            continue 'inner;
+                        }
+
+                        if let Some(key_to_remove) = opposing_key {
+                            removed_clauses.insert(*clause_a);
+                            let maybe_new_clause = clause_a.remove_possibilities(key_to_remove);
+
+                            if let Some(new_clause) = maybe_new_clause {
+                                added_clauses.push(new_clause);
+                            } else {
+                                // If removing the possibility makes the clause empty, it's a success,
+                                // but no new clause is added.
+                                continue 'outer;
+                            }
                         }
                     }
                 }
@@ -304,6 +301,11 @@ pub fn saturate_clauses<'a>(clauses: impl IntoIterator<Item = &'a Clause>) -> Ve
 ///    truth assignments. Each inner `Vec<Assertion>` represents a disjunction (OR).
 /// 2. `ActiveTruths`: Maps a variable ID to a set of indices. These
 ///    indices point to the "active" assertions in the first map's `Vec`.
+///
+/// # Panics
+///
+/// Panics if a reconcilable clause with exactly one possibility has an empty possibilities map.
+/// This should never happen with properly constructed clauses.
 #[inline]
 pub fn find_satisfying_assignments(
     clauses: &[Clause],
@@ -533,8 +535,8 @@ fn group_impossibilities(mut clauses: Vec<Clause>) -> Option<Vec<Clause>> {
     if !clause.wedge {
         let impossibilities = clause.get_impossibilities();
 
-        for (var, impossible_types) in impossibilities.iter() {
-            for impossible_type in impossible_types.iter() {
+        for (var, impossible_types) in &impossibilities {
+            for impossible_type in impossible_types {
                 let mut seed_clause_possibilities = IndexMap::new();
                 seed_clause_possibilities
                     .insert(*var, IndexMap::from([(impossible_type.to_hash(), impossible_type.clone())]));

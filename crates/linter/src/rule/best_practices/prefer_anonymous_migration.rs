@@ -54,7 +54,7 @@ impl LintRule for PreferAnonymousMigrationRule {
                 Anonymous classes are more concise and reduce namespace pollution,
                 making them the recommended approach for migrations.
             "},
-            good_example: indoc! {r#"
+            good_example: indoc! {r"
                 <?php
 
                 use Illuminate\Database\Migrations\Migration;
@@ -77,8 +77,8 @@ impl LintRule for PreferAnonymousMigrationRule {
                 }
 
                 return new MyMigration();
-            "#},
-            bad_example: indoc! {r#"
+            "},
+            bad_example: indoc! {r"
                 <?php
 
                 use Illuminate\Database\Migrations\Migration;
@@ -99,7 +99,7 @@ impl LintRule for PreferAnonymousMigrationRule {
                         Schema::drop('flights');
                     }
                 };
-            "#},
+            "},
             category: Category::BestPractices,
             requirements: RuleRequirements::Integration(Integration::Laravel),
         };
@@ -117,7 +117,7 @@ impl LintRule for PreferAnonymousMigrationRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let Node::AnonymousClass(class) = node else {
             return;
         };

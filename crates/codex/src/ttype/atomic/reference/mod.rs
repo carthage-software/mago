@@ -115,7 +115,7 @@ impl TReference {
 }
 
 impl TType for TReference {
-    fn get_child_nodes<'a>(&'a self) -> Vec<TypeRef<'a>> {
+    fn get_child_nodes(&self) -> Vec<TypeRef<'_>> {
         let mut children = Vec::new();
         if let TReference::Symbol { parameters, intersection_types, .. } = self {
             if let Some(params) = parameters {

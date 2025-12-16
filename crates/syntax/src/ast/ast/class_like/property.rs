@@ -218,6 +218,12 @@ impl<'arena> Property<'arena> {
         }
     }
 
+    /// Returns the first variable in this property declaration.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the property declaration has no variables. This indicates a bug in the parser,
+    /// as valid PHP properties must have at least one variable.
     pub fn first_variable(&self) -> &DirectVariable<'arena> {
         self.variables()
             .first()

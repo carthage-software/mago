@@ -39,7 +39,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for FunctionPartialApplication<'aren
         let callables: Vec<TCallable> =
             resolve_function_callable_types(context, block_context, artifacts, self.function)?
                 .into_iter()
-                .map(|c| c.into_owned())
+                .map(std::borrow::Cow::into_owned)
                 .collect();
 
         let resulting_type = if self.argument_list.is_first_class_callable() {
@@ -146,18 +146,18 @@ fn resolve_function_callable_types<'ctx, 'arena, 'artifacts>(
         {
             FunctionLikeIdentifier::Function(unqualified_name)
         } else {
-            let issue = if unqualified_name != name {
+            let issue = if unqualified_name == name {
+                Issue::error(format!("Function `{name}` could not be found.")).with_annotation(
+                    Annotation::primary(expression.span())
+                        .with_message(format!("Undefined function `{name}` called here")),
+                )
+            } else {
                 Issue::error(format!(
                     "Could not find definition for function `{name}` (also tried as `{unqualified_name}` in a broader scope)."
                 )).with_annotation(
                     Annotation::primary(expression.span()).with_message(format!("Attempted to use function `{name}` which is undefined")),
                 ).with_note(
                     format!("Neither `{name}` (e.g., in current namespace) nor `{unqualified_name}` (e.g., global fallback) could be resolved."),
-                )
-            } else {
-                Issue::error(format!("Function `{name}` could not be found.")).with_annotation(
-                    Annotation::primary(expression.span())
-                        .with_message(format!("Undefined function `{name}` called here")),
                 )
             };
 
@@ -245,7 +245,7 @@ mod tests {
 
     test_analysis! {
         name = closure_creation_carries_templates,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             /**
@@ -303,7 +303,7 @@ mod tests {
                 i_take_int($tuple[1]);
                 i_take_int($tuple); // error.
             }
-        "#},
+        "},
         issues = [
             IssueCode::InvalidArgument, // `$tuple` is a tuple/list, not an `int`.
         ],

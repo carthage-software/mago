@@ -43,11 +43,11 @@ mod tests {
 
     test_analysis! {
         name = const_access_on_undefined_class,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             $_ = NonExistentClass::SOME_CONST;
-        "#},
+        "},
         issues = [
             IssueCode::NonExistentClassLike,
             IssueCode::ImpossibleAssignment,
@@ -56,11 +56,11 @@ mod tests {
 
     test_analysis! {
         name = const_access_self_outside_class,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             $_ = self::SOME_CONST;
-        "#},
+        "},
         issues = [
             IssueCode::SelfOutsideClassScope,
             IssueCode::ImpossibleAssignment,
@@ -69,11 +69,11 @@ mod tests {
 
     test_analysis! {
         name = const_access_static_outside_class,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             $_ = static::SOME_CONST;
-        "#},
+        "},
         issues = [
             IssueCode::StaticOutsideClassScope,
             IssueCode::ImpossibleAssignment,
@@ -82,11 +82,11 @@ mod tests {
 
     test_analysis! {
         name = const_access_parent_outside_class,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             $_ = parent::SOME_CONST;
-        "#},
+        "},
         issues = [
             IssueCode::ParentOutsideClassScope,
             IssueCode::ImpossibleAssignment,
@@ -95,11 +95,11 @@ mod tests {
 
     test_analysis! {
         name = const_access_dynamic_class_unknown_type,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             $const = $unknownVar::{KNOWN_CONST};
-        "#},
+        "},
         issues = [
             IssueCode::UndefinedVariable,
             IssueCode::NonExistentConstant,
@@ -110,13 +110,13 @@ mod tests {
 
     test_analysis! {
         name = const_access_dynamic_const_name_unknown_type,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             class MyClass { const C = 1; }
 
             $const = MyClass::{$unknownConstName};
-        "#},
+        "},
         issues = [
             IssueCode::UndefinedVariable,
             IssueCode::InvalidConstantSelector,
@@ -144,13 +144,13 @@ mod tests {
 
     test_analysis! {
         name = const_access_dynamic_const_name_invalid_type,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             class MyClass { const C = 1; }
             $constName = 123;
             $_ = MyClass::{$constName};
-        "#},
+        "},
         issues = [
             IssueCode::InvalidConstantSelector,
             IssueCode::ImpossibleAssignment,
@@ -172,7 +172,7 @@ mod tests {
 
     test_analysis! {
         name = const_access_on_generic_object_type,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
             class stdClass {} // stub
 
@@ -180,7 +180,7 @@ mod tests {
 
             $obj = get_some_object();
             $const = $obj::SOME_CONST;
-        "#},
+        "},
         issues = [
             IssueCode::AmbiguousClassLikeConstantAccess,
             IssueCode::MixedAssignment,
@@ -189,13 +189,13 @@ mod tests {
 
     test_analysis! {
         name = const_access_on_generic_class_string,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
             /** @param class-string $cs */
             function process_class_string(string $cs) {
                 return $cs::SOME_CONST;
             }
-        "#},
+        "},
         issues = [
             IssueCode::AmbiguousClassLikeConstantAccess,
         ]
@@ -203,11 +203,11 @@ mod tests {
 
     test_analysis! {
         name = const_access_undefined_on_enum,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
             enum Suit { case Hearts; }
             $_ = Suit::Diamonds; // Accessing 'Diamonds' like a const/case
-        "#},
+        "},
         issues = [
             IssueCode::NonExistentClassConstant,
             IssueCode::ImpossibleAssignment,
@@ -228,11 +228,11 @@ mod tests {
 
     test_analysis! {
         name = const_access_on_interface_directly,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
             interface ConstantsInterface { const MY_CONST = 42; }
             $_ = ConstantsInterface::MY_CONST;
-        "#},
+        "},
     }
 
     test_analysis! {
@@ -262,7 +262,7 @@ mod tests {
 
     test_analysis! {
         name = const_var_type,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             class NumberFormatter
@@ -336,6 +336,6 @@ mod tests {
                     }
                 }
             }
-        "#},
+        "},
     }
 }

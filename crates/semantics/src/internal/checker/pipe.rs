@@ -33,6 +33,6 @@ pub fn check_pipe(pipe: &Pipe, context: &mut Context<'_, '_, '_>) {
             .with_note("When using arrow functions with the pipe operator, the arrow function must be enclosed in parentheses to ensure correct parsing.")
             .with_help("Wrap the arrow function in parentheses, e.g., `$foo |> (fn($x) => $x + 1)`.")
             .with_link("https://externals.io/message/128473#128473"),
-        )
+        );
     }
 }

@@ -54,22 +54,22 @@ impl LintRule for NoRedundantReadonlyRule {
             description: indoc! {"
                 Detects redundant readonly modifiers on properties.
             "},
-            good_example: indoc! {r#"
+            good_example: indoc! {r"
                 <?php
 
                 readonly class User
                 {
                     public $name;
                 }
-            "#},
-            bad_example: indoc! {r#"
+            "},
+            bad_example: indoc! {r"
                 <?php
 
                 readonly class User
                 {
                     public readonly $name;
                 }
-            "#},
+            "},
             category: Category::Redundancy,
 
             requirements: RuleRequirements::None,
@@ -88,7 +88,7 @@ impl LintRule for NoRedundantReadonlyRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let Node::Class(class) = node else {
             return;
         };

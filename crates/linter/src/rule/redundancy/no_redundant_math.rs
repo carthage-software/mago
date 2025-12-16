@@ -52,15 +52,15 @@ impl LintRule for NoRedundantMathRule {
                 Detects redundant mathematical operations that can be simplified or removed.
                 Includes operations like multiplying by 1/-1, adding 0, modulo 1/-1, etc.
             "},
-            good_example: indoc! {r#"
+            good_example: indoc! {r"
                 <?php
 
                 $result = $value * 2;
                 $sum = 1 + $total;
                 $difference = $value - 1;
                 $remainder = $x % 2;
-            "#},
-            bad_example: indoc! {r#"
+            "},
+            bad_example: indoc! {r"
                 <?php
 
                 $result = $value * 1;
@@ -68,7 +68,7 @@ impl LintRule for NoRedundantMathRule {
                 $difference = $value - 0;
                 $remainder = $x % 1;
                 $negative = $value * -1;
-            "#},
+            "},
             category: Category::Redundancy,
 
             requirements: RuleRequirements::None,
@@ -87,7 +87,7 @@ impl LintRule for NoRedundantMathRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let Node::Binary(binary) = node else {
             return;
         };
@@ -140,7 +140,7 @@ impl LintRule for NoRedundantMathRule {
             },
             BinaryOperator::Multiplication(_) => {
                 match (get_expression_value(binary.lhs), get_expression_value(binary.rhs)) {
-                    values @ (Some(1), _) | values @ (_, Some(1)) => {
+                    values @ ((Some(1), _) | (_, Some(1))) => {
                         let mut issue = Issue::new(
                             self.cfg.level(),
                             "Redundant multiplication by `1`: multiplying by 1 does not change the value.",
@@ -166,7 +166,7 @@ impl LintRule for NoRedundantMathRule {
 
                         issue
                     }
-                    values @ (Some(-1), _) | values @ (_, Some(-1)) => {
+                    values @ ((Some(-1), _) | (_, Some(-1))) => {
                         let mut issue = Issue::new(
                             self.cfg.level(),
                             "Redundant multiplication by `-1`: multiplication by -1 is equivalent to negation.",
@@ -328,15 +328,15 @@ impl LintRule for NoRedundantMathRule {
 
                 let mut issue = Issue::new(
                     self.cfg.level(),
-                    format!("Redundant bitwise {} with `0`: this operation does not alter the value.", operator_name),
+                    format!("Redundant bitwise {operator_name} with `0`: this operation does not alter the value."),
                 )
                 .with_code(self.meta.code)
                 .with_annotation(
                     Annotation::primary(binary.operator.span())
-                        .with_message(format!("`$x {} 0` is equivalent to `$x`", operator_name)),
+                        .with_message(format!("`$x {operator_name} 0` is equivalent to `$x`")),
                 )
-                .with_note(format!("Bitwise {} with 0 leaves the value unchanged.", operator_name))
-                .with_help(format!("Remove the {}.", help_msg));
+                .with_note(format!("Bitwise {operator_name} with 0 leaves the value unchanged."))
+                .with_help(format!("Remove the {help_msg}."));
 
                 if !binary.rhs.is_literal() {
                     issue = issue.with_annotation(
@@ -362,7 +362,7 @@ impl LintRule for NoRedundantMathRule {
                         .with_code(self.meta.code)
                         .with_annotation(
                             Annotation::primary(binary.operator.span())
-                                .with_message(format!("`$x {} 0` is equivalent to `$x`", operator)),
+                                .with_message(format!("`$x {operator} 0` is equivalent to `$x`")),
                         )
                         .with_note("Shifting by 0 bits does not change the value.")
                         .with_help("Remove the shift by `0` operation.");
@@ -388,7 +388,7 @@ impl LintRule for NoRedundantMathRule {
 ///
 /// This function is used to evaluate the value of an expression, if possible.
 #[inline]
-fn get_expression_value<'ast, 'arena>(expression: &'ast Expression<'arena>) -> Option<isize> {
+fn get_expression_value(expression: &Expression<'_>) -> Option<isize> {
     match expression {
         Expression::Parenthesized(Parenthesized { expression, .. }) => get_expression_value(expression),
         Expression::Literal(Literal::Integer(LiteralInteger { value: Some(it), .. })) => Some(*it as isize),
@@ -450,103 +450,103 @@ mod tests {
     test_lint_success! {
         name = float_division_is_not_redundant,
         rule = NoRedundantMathRule,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             function fraction(int $x): float {
                 return (4 / 3) * $x;
             }
-        "#}
+        "}
     }
 
     test_lint_success! {
         name = complex_float_division,
         rule = NoRedundantMathRule,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             $val = 10 / 4; // 2.5
             $val2 = 5 / 2; // 2.5
-        "#}
+        "}
     }
 
     test_lint_success! {
         name = valid_arithmetic,
         rule = NoRedundantMathRule,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             $a = $x * 2;
             $b = $x + 1;
             $c = $x - 5;
             $d = $x / 2;
-        "#}
+        "}
     }
 
     test_lint_failure! {
         name = redundant_division_by_one,
         rule = NoRedundantMathRule,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             $a = $x / 1;
-        "#}
+        "}
     }
 
     test_lint_failure! {
         name = redundant_multiplication_by_one,
         rule = NoRedundantMathRule,
         count = 2,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             $a = $x * 1;
             $b = 1 * $x;
-        "#}
+        "}
     }
 
     test_lint_failure! {
         name = redundant_addition_of_zero,
         rule = NoRedundantMathRule,
         count = 2,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             $a = $x + 0;
             $b = 0 + $x;
-        "#}
+        "}
     }
 
     test_lint_failure! {
         name = redundant_subtraction_of_zero,
         rule = NoRedundantMathRule,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             $a = $x - 0;
-        "#}
+        "}
     }
 
     test_lint_failure! {
         name = redundant_modulo_one,
         rule = NoRedundantMathRule,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             $a = $x % 1;
-        "#}
+        "}
     }
 
     test_lint_failure! {
         name = redundant_negation_operations,
         rule = NoRedundantMathRule,
         count = 3,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             $a = $x * -1;
             $b = $x / -1;
             $c = $x % -1;
-        "#}
+        "}
     }
 }

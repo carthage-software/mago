@@ -40,7 +40,7 @@ where
 
     let (program, parse_error) = parse_file(&arena, &file);
     if let Some(err) = parse_error {
-        panic!("Parse error in test code: {:?}", err);
+        panic!("Parse error in test code: {err:?}");
     }
 
     let resolver = NameResolver::new(&arena);
@@ -54,9 +54,7 @@ where
     let rule_code = R::meta().code;
     let registry = RuleRegistry::build(&settings, Some(&[rule_code.to_string()]), true);
 
-    if registry.rules().is_empty() {
-        panic!("No rules loaded for code '{}'", rule_code);
-    }
+    assert!(!registry.rules().is_empty(), "No rules loaded for code '{rule_code}'");
 
     let linter = Linter::from_registry(&arena, Arc::new(registry), settings.php_version);
     let issues = linter.lint(&file, program, &resolved_names);
@@ -64,35 +62,31 @@ where
     match expected_count {
         Some(0) => {
             // Success test - should have no issues
-            if !issues.is_empty() {
-                panic!(
-                    "Test failed for rule '{}': Expected code to NOT produce lint issues, but found {} issue(s):\n{:#?}",
-                    rule_code,
-                    issues.len(),
-                    issues
-                );
-            }
+            assert!(
+                issues.is_empty(),
+                "Test failed for rule '{}': Expected code to NOT produce lint issues, but found {} issue(s):\n{:#?}",
+                rule_code,
+                issues.len(),
+                issues
+            );
         }
         Some(n) => {
             // Exact count test
-            if issues.len() != n {
-                panic!(
-                    "Test failed for rule '{}': Expected {} issue(s), but found {} issue(s):\n{:#?}",
-                    rule_code,
-                    n,
-                    issues.len(),
-                    issues
-                );
-            }
+            assert!(
+                issues.len() == n,
+                "Test failed for rule '{}': Expected {} issue(s), but found {} issue(s):\n{:#?}",
+                rule_code,
+                n,
+                issues.len(),
+                issues
+            );
         }
         None => {
             // Failure test - should have at least one issue
-            if issues.is_empty() {
-                panic!(
-                    "Test failed for rule '{}': Expected code to produce lint issues, but none were found.",
-                    rule_code
-                );
-            }
+            assert!(
+                !issues.is_empty(),
+                "Test failed for rule '{rule_code}': Expected code to produce lint issues, but none were found."
+            );
         }
     }
 }

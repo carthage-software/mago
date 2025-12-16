@@ -173,7 +173,7 @@ pub fn check_declare(declare: &Declare, context: &mut Context<'_, '_, '_>) {
                     _ => None,
                 };
 
-                if !matches!(value, Some(0) | Some(1)) {
+                if !matches!(value, Some(0 | 1)) {
                     context.report(
                         Issue::error("The `strict_types` directive must be set to either `0` or `1`.")
                             .with_annotation(

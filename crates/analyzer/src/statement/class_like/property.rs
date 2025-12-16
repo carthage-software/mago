@@ -163,8 +163,7 @@ fn analyze_property_hook<'ctx, 'arena>(
             .parameter_list
             .as_ref()
             .and_then(|p| p.parameters.first())
-            .map(|p| Atom::from(p.variable.name))
-            .unwrap_or_else(|| Atom::from("$value"));
+            .map_or_else(|| Atom::from("$value"), |p| Atom::from(p.variable.name));
 
         hook_block_context.locals.insert(param_name, Rc::new(value_type));
     }
@@ -215,11 +214,11 @@ fn get_value_type_for_set_hook(
         return type_metadata.type_union.clone();
     }
 
-    property.type_metadata.as_ref().map(|t| t.type_union.clone()).unwrap_or_else(get_mixed)
+    property.type_metadata.as_ref().map_or_else(get_mixed, |t| t.type_union.clone())
 }
 
-fn add_properties_to_hook_context<'ctx, 'arena>(
-    context: &Context<'ctx, 'arena>,
+fn add_properties_to_hook_context<'ctx>(
+    context: &Context<'ctx, '_>,
     hook_block_context: &mut BlockContext<'ctx>,
     class_like_metadata: &mago_codex::metadata::class_like::ClassLikeMetadata,
 ) -> Result<(), AnalysisError> {
@@ -231,7 +230,7 @@ fn add_properties_to_hook_context<'ctx, 'arena>(
             continue;
         }
 
-        let property_type = property.type_metadata.as_ref().map(|t| t.type_union.clone()).unwrap_or_else(get_mixed);
+        let property_type = property.type_metadata.as_ref().map_or_else(get_mixed, |t| t.type_union.clone());
         let raw_name = property_name.strip_prefix("$").unwrap_or(property_name);
         hook_block_context.locals.insert(Atom::from(&format!("$this->{raw_name}")), Rc::new(property_type));
     }

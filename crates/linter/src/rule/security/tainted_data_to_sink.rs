@@ -65,18 +65,18 @@ impl LintRule for TaintedDataToSinkRule {
                 or store data without sanitization, it could lead to Cross-Site Scripting (XSS)
                 or other injection attacks.
             "#},
-            good_example: indoc! {r#"
+            good_example: indoc! {r"
                 <?php
 
                 // Properly escape data before using a sink like `echo`
                 echo htmlspecialchars($_GET['name'] ?? '', ENT_QUOTES, 'UTF-8');
-            "#},
-            bad_example: indoc! {r#"
+            "},
+            bad_example: indoc! {r"
                 <?php
 
                 // This is considered unsafe:
                 echo $_GET['name'] ?? '';
-            "#},
+            "},
             category: Category::Security,
 
             requirements: RuleRequirements::None,
@@ -95,7 +95,7 @@ impl LintRule for TaintedDataToSinkRule {
         Self { meta: Self::meta(), cfg: settings.config.clone() }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         match node {
             Node::Echo(echo) => {
                 for value in echo.values.iter() {
@@ -111,7 +111,7 @@ impl LintRule for TaintedDataToSinkRule {
                 self.check_tainted_data_to_sink(ctx, print_construct.print.span, print_construct.value);
             }
             Node::FunctionCall(function_call) => {
-                let sinks = self.cfg.known_sink_functions.iter().map(|s| s.as_str()).collect::<Vec<&str>>();
+                let sinks = self.cfg.known_sink_functions.iter().map(mago_atom::Atom::as_str).collect::<Vec<&str>>();
                 if function_call_matches_any(ctx, function_call, &sinks).is_none() {
                     return;
                 }

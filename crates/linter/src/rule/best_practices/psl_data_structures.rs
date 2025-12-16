@@ -57,7 +57,7 @@ impl LintRule for PslDataStructuresRule {
 
                 Psl data structures are preferred because they are type-safe and provide more consistent behavior.
             "},
-            good_example: indoc! {r#"
+            good_example: indoc! {r"
                 <?php
 
                 declare(strict_types=1);
@@ -65,14 +65,14 @@ impl LintRule for PslDataStructuresRule {
                 use Psl\DataStructure\Stack;
 
                 $stack = new Stack();
-            "#},
-            bad_example: indoc! {r#"
+            "},
+            bad_example: indoc! {r"
                 <?php
 
                 declare(strict_types=1);
 
                 $stack = new SplStack();
-            "#},
+            "},
             category: Category::BestPractices,
 
             requirements: RuleRequirements::Integration(Integration::Psl),
@@ -91,7 +91,7 @@ impl LintRule for PslDataStructuresRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let Node::Instantiation(instantiation) = node else {
             return;
         };

@@ -83,7 +83,7 @@ use crate::ttype::resolution::TypeResolutionContext;
 use crate::ttype::union::TUnion;
 use crate::ttype::wrap_atomic;
 
-/// Parses a type string (typically from a PHPDoc comment) and resolves it
+/// Parses a type string (typically from a `PHPDoc` comment) and resolves it
 /// into a semantic `TUnion` type representation.
 ///
 /// This function orchestrates the two main phases:
@@ -126,8 +126,8 @@ pub fn get_type_from_string(
 }
 
 #[inline]
-pub fn get_union_from_type_ast<'i>(
-    ttype: &Type<'i>,
+pub fn get_union_from_type_ast(
+    ttype: &Type<'_>,
     scope: &NamespaceScope,
     type_context: &TypeResolutionContext,
     classname: Option<Atom>,
@@ -592,40 +592,37 @@ fn get_shape_from_ast(
             for field in &shape.fields {
                 let field_is_optional = field.is_optional();
 
-                let offset = match field.key.as_ref() {
-                    Some(field_key) => {
-                        let array_key = match field_key.key {
-                            ShapeKey::String { value, .. } => ArrayKey::String(atom(value)),
-                            ShapeKey::Integer { value, .. } => ArrayKey::Integer(value),
-                        };
+                let offset = if let Some(field_key) = field.key.as_ref() {
+                    let array_key = match field_key.key {
+                        ShapeKey::String { value, .. } => ArrayKey::String(atom(value)),
+                        ShapeKey::Integer { value, .. } => ArrayKey::Integer(value),
+                    };
 
-                        if let ArrayKey::Integer(offset) = array_key {
-                            if offset > 0 && (offset as usize) == next_offset {
-                                next_offset += 1;
+                    if let ArrayKey::Integer(offset) = array_key {
+                        if offset > 0 && (offset as usize) == next_offset {
+                            next_offset += 1;
 
-                                offset as usize
-                            } else {
-                                return Err(TypeError::InvalidType(
-                                    shape.to_string(),
-                                    "List shape keys must be sequential".to_string(),
-                                    field_key.span(),
-                                ));
-                            }
+                            offset as usize
                         } else {
                             return Err(TypeError::InvalidType(
                                 shape.to_string(),
-                                "List shape keys are expected to be integers".to_string(),
+                                "List shape keys must be sequential".to_string(),
                                 field_key.span(),
                             ));
                         }
+                    } else {
+                        return Err(TypeError::InvalidType(
+                            shape.to_string(),
+                            "List shape keys are expected to be integers".to_string(),
+                            field_key.span(),
+                        ));
                     }
-                    None => {
-                        let offset = next_offset;
+                } else {
+                    let offset = next_offset;
 
-                        next_offset += 1;
+                    next_offset += 1;
 
-                        offset
-                    }
+                    offset
                 };
 
                 let mut field_value_type = get_union_from_type_ast(&field.value, scope, type_context, classname)?;
@@ -671,28 +668,25 @@ fn get_shape_from_ast(
             for field in &shape.fields {
                 let field_is_optional = field.is_optional();
 
-                let array_key = match field.key.as_ref() {
-                    Some(field_key) => {
-                        let array_key = match field_key.key {
-                            ShapeKey::String { value, .. } => ArrayKey::String(atom(value)),
-                            ShapeKey::Integer { value, .. } => ArrayKey::Integer(value),
-                        };
+                let array_key = if let Some(field_key) = field.key.as_ref() {
+                    let array_key = match field_key.key {
+                        ShapeKey::String { value, .. } => ArrayKey::String(atom(value)),
+                        ShapeKey::Integer { value, .. } => ArrayKey::Integer(value),
+                    };
 
-                        if let ArrayKey::Integer(offset) = array_key
-                            && offset >= next_offset
-                        {
-                            next_offset = offset + 1;
-                        }
-
-                        array_key
+                    if let ArrayKey::Integer(offset) = array_key
+                        && offset >= next_offset
+                    {
+                        next_offset = offset + 1;
                     }
-                    None => {
-                        let array_key = ArrayKey::Integer(next_offset);
 
-                        next_offset += 1;
+                    array_key
+                } else {
+                    let array_key = ArrayKey::Integer(next_offset);
 
-                        array_key
-                    }
+                    next_offset += 1;
+
+                    array_key
                 };
 
                 let mut field_value_type = get_union_from_type_ast(&field.value, scope, type_context, classname)?;
@@ -723,7 +717,7 @@ fn get_callable_from_ast(
     let mut return_type = None;
 
     if let Some(specification) = &callable.specification {
-        for parameter_ast in specification.parameters.entries.iter() {
+        for parameter_ast in &specification.parameters.entries {
             let parameter_type = if let Some(parameter_type) = &parameter_ast.parameter_type {
                 get_union_from_type_ast(parameter_type, scope, type_context, classname)?
             } else {
@@ -923,8 +917,7 @@ fn get_class_string_type_from_ast(
             let mut class_strings = vec![];
             for constraint in constraint_union.types.into_owned() {
                 match constraint {
-                    TAtomic::Object(TObject::Named(_))
-                    | TAtomic::Object(TObject::Enum(_))
+                    TAtomic::Object(TObject::Named(_) | TObject::Enum(_))
                     | TAtomic::Reference(TReference::Symbol { .. }) => class_strings
                         .push(TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::of_type(kind, constraint)))),
                     TAtomic::GenericParameter(TGenericParameter {

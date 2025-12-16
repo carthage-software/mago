@@ -48,11 +48,11 @@
 //! - Iteration: Unordered
 //! - Memory: ~2x file count (maps for bidirectional lookup)
 //!
-//! ## ReadDatabase (Immutable)
+//! ## `ReadDatabase` (Immutable)
 //!
 //! - Creation: O(n log n) for sorting
 //! - Lookup by ID/name/path: O(1) average
-//! - Iteration: Deterministic, sorted by FileId
+//! - Iteration: Deterministic, sorted by `FileId`
 //! - Memory: ~3x file count (vector + 3 index maps)
 //!
 //! # Thread Safety
@@ -411,7 +411,7 @@ pub trait DatabaseReader {
     }
 }
 
-impl<'a> DatabaseReader for Database<'a> {
+impl DatabaseReader for Database<'_> {
     fn get_id(&self, name: &str) -> Option<FileId> {
         self.files.get(name).map(|f| f.id)
     }
@@ -425,7 +425,7 @@ impl<'a> DatabaseReader for Database<'a> {
 
     fn get_ref(&self, id: &FileId) -> Result<&File, DatabaseError> {
         let name = self.id_to_name.get(id).ok_or(DatabaseError::FileNotFound)?;
-        self.files.get(name).map(|file| file.as_ref()).ok_or(DatabaseError::FileNotFound)
+        self.files.get(name).map(std::convert::AsRef::as_ref).ok_or(DatabaseError::FileNotFound)
     }
 
     fn get_by_name(&self, name: &str) -> Result<Arc<File>, DatabaseError> {
@@ -459,7 +459,7 @@ impl DatabaseReader for ReadDatabase {
     fn get_ref(&self, id: &FileId) -> Result<&File, DatabaseError> {
         let index = self.id_to_index.get(id).ok_or(DatabaseError::FileNotFound)?;
 
-        self.files.get(*index).map(|file| file.as_ref()).ok_or(DatabaseError::FileNotFound)
+        self.files.get(*index).map(std::convert::AsRef::as_ref).ok_or(DatabaseError::FileNotFound)
     }
 
     fn get_by_name(&self, name: &str) -> Result<Arc<File>, DatabaseError> {

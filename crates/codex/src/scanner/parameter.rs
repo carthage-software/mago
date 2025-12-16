@@ -14,10 +14,10 @@ use crate::scanner::inference::infer;
 use crate::scanner::ttype::get_type_metadata_from_hint;
 
 #[inline]
-pub fn scan_function_like_parameter<'ctx, 'arena>(
+pub fn scan_function_like_parameter<'arena>(
     parameter: &'arena FunctionLikeParameter<'arena>,
     classname: Option<Atom>,
-    context: &mut Context<'ctx, 'arena>,
+    context: &mut Context<'_, 'arena>,
     scope: &NamespaceScope,
 ) -> FunctionLikeParameterMetadata {
     let mut flags = MetadataFlags::empty();

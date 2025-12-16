@@ -28,7 +28,7 @@ pub struct TList {
 
 impl TList {
     /// Creates new metadata for a list type with the specified general element type.
-    /// Initializes known elements/count as None, and non_empty as false.
+    /// Initializes known elements/count as None, and `non_empty` as false.
     ///
     /// # Arguments
     ///
@@ -40,12 +40,12 @@ impl TList {
 
     /// Creates new metadata for a list type with specified known elements.
     ///
-    /// If all known elements are non-optional, sets known_count accordingly.
-    /// Sets non_empty to true if any known element is non-optional.
+    /// If all known elements are non-optional, sets `known_count` accordingly.
+    /// Sets `non_empty` to true if any known element is non-optional.
     ///
     /// # Arguments
     ///
-    /// * `known_elements`: A BTreeMap mapping indices to (is_optional, TUnion) tuples.
+    /// * `known_elements`: A `BTreeMap` mapping indices to (`is_optional`, `TUnion`) tuples.
     pub fn from_known_elements(known_elements: BTreeMap<usize, (bool, TUnion)>) -> Self {
         Self {
             element_type: Box::new(get_never()),
@@ -130,10 +130,10 @@ impl TList {
 }
 
 impl TType for TList {
-    fn get_child_nodes<'a>(&'a self) -> Vec<TypeRef<'a>> {
+    fn get_child_nodes(&self) -> Vec<TypeRef<'_>> {
         let mut children = vec![];
         if let Some(known_items) = self.get_known_elements() {
-            for (_, (_, item_type)) in known_items.iter() {
+            for (_, item_type) in known_items.values() {
                 children.push(TypeRef::Union(item_type));
             }
         }
@@ -181,11 +181,11 @@ impl TType for TList {
             let mut first = true;
             let mut include_index = false;
             for (i, (optional, element_type)) in elements {
-                if !first {
-                    string += ", ";
-                } else {
+                if first {
                     first = false;
                     include_index = *i != 0;
+                } else {
+                    string += ", ";
                 }
 
                 if has_optional || include_index {

@@ -52,26 +52,26 @@ impl LintRule for SensitiveParameterRule {
         const META: RuleMeta = RuleMeta {
             name: "Sensitive Parameter",
             code: "sensitive-parameter",
-            description: indoc! {r#"
+            description: indoc! {r"
                 Requires that parameters that are likely to contain sensitive information (e.g., passwords)
                 are marked with the `#[SensitiveParameter]` attribute to prevent accidental logging or exposure.
 
                 This rule only applies to PHP 8.2 and later, as the `SensitiveParameter` attribute was introduced in PHP 8.2.
-            "#},
-            good_example: indoc! {r#"
+            "},
+            good_example: indoc! {r"
                 <?php
 
                 function login(string $username, #[SensitiveParameter] string $password): void {
                    // ...
                 }
-            "#},
-            bad_example: indoc! {r#"
+            "},
+            bad_example: indoc! {r"
                 <?php
 
                 function login(string $username, string $password): void {
                    // ...
                 }
-            "#},
+            "},
             category: Category::Security,
             requirements: RuleRequirements::PHPVersion(PHPVersionRange::from(PHPVersion::PHP82)),
         };
@@ -89,7 +89,7 @@ impl LintRule for SensitiveParameterRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let Node::FunctionLikeParameter(parameter) = node else {
             return;
         };
@@ -137,52 +137,52 @@ mod tests {
         name = password_with_sensitive_parameter_attribute,
         rule = SensitiveParameterRule,
         settings = |s: &mut Settings| s.php_version = PHPVersion::PHP82,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             function login(string $username, #[SensitiveParameter] string $password): void {
                 // ...
             }
-        "#}
+        "}
     }
 
     test_lint_success! {
         name = password_with_fqn_sensitive_parameter_attribute,
         rule = SensitiveParameterRule,
         settings = |s: &mut Settings| s.php_version = PHPVersion::PHP82,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             function login(string $username, #[\SensitiveParameter] string $password): void {
                 // ...
             }
-        "#}
+        "}
     }
 
     test_lint_success! {
         name = non_password_parameter_without_attribute,
         rule = SensitiveParameterRule,
         settings = |s: &mut Settings| s.php_version = PHPVersion::PHP82,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             function login(string $username, string $email): void {
                 // ...
             }
-        "#}
+        "}
     }
 
     test_lint_failure! {
         name = password_without_attribute,
         rule = SensitiveParameterRule,
         settings = |s: &mut Settings| s.php_version = PHPVersion::PHP82,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             function login(string $username, string $password): void {
                 // ...
             }
-        "#}
+        "}
     }
 
     test_lint_failure! {
@@ -190,38 +190,38 @@ mod tests {
         rule = SensitiveParameterRule,
         count = 2,
         settings = |s: &mut Settings| s.php_version = PHPVersion::PHP82,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             function changePassword(string $oldPassword, string $newPassword): void {
                 // ...
             }
-        "#}
+        "}
     }
 
     test_lint_failure! {
         name = password_without_attribute_on_php83,
         rule = SensitiveParameterRule,
         settings = |s: &mut Settings| s.php_version = PHPVersion::PHP83,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             function login(string $username, string $password): void {
                 // ...
             }
-        "#}
+        "}
     }
 
     test_lint_failure! {
         name = password_without_attribute_on_php84,
         rule = SensitiveParameterRule,
         settings = |s: &mut Settings| s.php_version = PHPVersion::PHP84,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             function login(string $username, string $password): void {
                 // ...
             }
-        "#}
+        "}
     }
 }

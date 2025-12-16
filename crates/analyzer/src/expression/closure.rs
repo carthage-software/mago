@@ -124,7 +124,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Closure<'arena> {
                 inner_block_context.locals.insert(variable_atom, variable_type.clone());
                 inner_block_context.variables_possibly_in_scope.insert(variable_atom);
 
-                for (variable_id, variable_type) in block_context.locals.iter() {
+                for (variable_id, variable_type) in &block_context.locals {
                     let Some(stripped_variable_id) = variable_id.strip_prefix(variable) else {
                         continue;
                     };
@@ -204,10 +204,10 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Closure<'arena> {
             if let Some(inferred_return_type) = inferred_return_type {
                 signature.return_type = Some(Box::new(inferred_return_type));
             } else if !function_metadata.flags.has_yield() {
-                if !inner_block_context.has_returned {
-                    signature.return_type = Some(Box::new(get_void()));
-                } else {
+                if inner_block_context.has_returned {
                     signature.return_type = Some(Box::new(get_never()));
+                } else {
+                    signature.return_type = Some(Box::new(get_void()));
                 }
             }
         }
@@ -238,7 +238,7 @@ mod tests {
 
     test_analysis! {
         name = inferred_closure_return_type,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             /**
@@ -251,12 +251,12 @@ mod tests {
 
             x(function (): string { return 'Hello, World!'; });
             x(function () { return 'Hello, World!'; });
-        "#}
+        "}
     }
 
     test_analysis! {
         name = closure_use,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             /**
@@ -314,7 +314,7 @@ mod tests {
                 i_take_int($tuple[1]);
                 i_take_int($tuple); // error.
             }
-        "#},
+        "},
         issues = [
             IssueCode::InvalidArgument,
         ]
@@ -322,7 +322,7 @@ mod tests {
 
     test_analysis! {
         name = get_current_closure,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             class Closure {
@@ -344,12 +344,12 @@ mod tests {
                 };
 
             echo $fibaonacci(10);
-        "#}
+        "}
     }
 
     test_analysis! {
         name = get_current_closure_inside_function,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             class Closure {
@@ -370,7 +370,7 @@ mod tests {
             }
 
             echo fibaonacci(10);
-        "#},
+        "},
         issues = [
             IssueCode::InvalidStaticMethodCall,
             IssueCode::ImpossibleAssignment,
@@ -380,7 +380,7 @@ mod tests {
 
     test_analysis! {
         name = get_current_closure_inside_method,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             class Closure {
@@ -403,7 +403,7 @@ mod tests {
             }
 
             echo (new Foo())->fibaonacci(10);
-        "#},
+        "},
         issues = [
             IssueCode::InvalidStaticMethodCall,
             IssueCode::ImpossibleAssignment,
@@ -413,7 +413,7 @@ mod tests {
 
     test_analysis! {
     name = get_current_closure_in_global_scope,
-    code = indoc! {r#"
+    code = indoc! {r"
             <?php
 
             class Closure {
@@ -424,7 +424,7 @@ mod tests {
             }
 
             $_fn = Closure::getCurrent();
-        "#},
+        "},
         issues = [
             IssueCode::InvalidStaticMethodCall,
             IssueCode::ImpossibleAssignment,

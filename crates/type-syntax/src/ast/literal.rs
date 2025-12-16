@@ -73,8 +73,8 @@ impl std::fmt::Display for LiteralFloatType<'_> {
 impl std::fmt::Display for LiteralIntOrFloatType<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            LiteralIntOrFloatType::Int(int) => write!(f, "{}", int),
-            LiteralIntOrFloatType::Float(float) => write!(f, "{}", float),
+            LiteralIntOrFloatType::Int(int) => write!(f, "{int}"),
+            LiteralIntOrFloatType::Float(float) => write!(f, "{float}"),
         }
     }
 }

@@ -25,9 +25,9 @@ use crate::context::Context;
 use crate::invocation::Invocation;
 
 /// Resolves a type resulting from an invocation.
-pub fn resolve_invocation_type<'ctx, 'ast, 'arena>(
+pub fn resolve_invocation_type<'ctx, 'arena>(
     context: &Context<'ctx, 'arena>,
-    invocation: &Invocation<'ctx, 'ast, 'arena>,
+    invocation: &Invocation<'ctx, '_, 'arena>,
     template_result: &TemplateResult,
     parameters: &AtomMap<TUnion>,
     invocation_type: TUnion,
@@ -98,9 +98,9 @@ pub fn resolve_invocation_type<'ctx, 'ast, 'arena>(
     resolve_union(context, invocation, &template_result, parameters, invocation_type)
 }
 
-fn resolve_union<'ctx, 'ast, 'arena>(
+fn resolve_union<'ctx, 'arena>(
     context: &Context<'ctx, 'arena>,
-    invocation: &Invocation<'ctx, 'ast, 'arena>,
+    invocation: &Invocation<'ctx, '_, 'arena>,
     template_result: &TemplateResult,
     parameters: &AtomMap<TUnion>,
     union_to_resolve: TUnion,
@@ -192,9 +192,9 @@ fn resolve_union<'ctx, 'ast, 'arena>(
     resulting_union
 }
 
-fn resolve_atomic<'ctx, 'ast, 'arena>(
+fn resolve_atomic<'ctx, 'arena>(
     context: &Context<'ctx, 'arena>,
-    invocation: &Invocation<'ctx, 'ast, 'arena>,
+    invocation: &Invocation<'ctx, '_, 'arena>,
     template_result: &TemplateResult,
     parameters: &AtomMap<TUnion>,
     atomic_to_resolve: TAtomic,

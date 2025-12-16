@@ -51,21 +51,21 @@ impl LintRule for TooManyMethodsRule {
         const META: RuleMeta = RuleMeta {
             name: "Too Many Methods",
             code: "too-many-methods",
-            description: indoc::indoc! {r#"
+            description: indoc::indoc! {r"
                 Detects class-like structures with too many methods.
 
                 This rule checks the number of methods in classes, traits, enums, and interfaces.
                 If the number of methods exceeds a configurable threshold, an issue is reported.
-            "#},
-            good_example: indoc::indoc! {r#"
+            "},
+            good_example: indoc::indoc! {r"
                 <?php
 
                 class SimpleClass {
                     public function a() {}
                     public function b() {}
                 }
-            "#},
-            bad_example: indoc::indoc! {r#"
+            "},
+            bad_example: indoc::indoc! {r"
                 <?php
 
                 class ComplexClass {
@@ -91,7 +91,7 @@ impl LintRule for TooManyMethodsRule {
                     public function t() {}
                     public function u() {}
                 }
-            "#},
+            "},
             category: Category::Maintainability,
             requirements: RuleRequirements::None,
         };
@@ -110,7 +110,7 @@ impl LintRule for TooManyMethodsRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let members = match node {
             Node::Class(class) => class.members.as_slice(),
             Node::Trait(r#trait) => r#trait.members.as_slice(),

@@ -54,18 +54,18 @@ impl LintRule for TraitNameRule {
                 Detects trait declarations that do not follow class naming convention.
                 Trait names should be in class case and suffixed with `Trait`, depending on the configuration.
             "},
-            good_example: indoc! {r#"
+            good_example: indoc! {r"
                 <?php
 
                 trait MyTrait {}
-            "#},
-            bad_example: indoc! {r#"
+            "},
+            bad_example: indoc! {r"
                 <?php
 
                 trait myTrait {}
                 trait my_trait {}
                 trait MY_TRAIT {}
-            "#},
+            "},
             category: Category::Consistency,
 
             requirements: RuleRequirements::None,
@@ -84,7 +84,7 @@ impl LintRule for TraitNameRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let Node::Trait(r#trait) = node else {
             return;
         };
@@ -96,16 +96,16 @@ impl LintRule for TraitNameRule {
 
         if !is_class_case(name) {
             issues.push(
-                Issue::new(self.cfg.level(), format!("Trait name `{}` should be in class case.", name))
+                Issue::new(self.cfg.level(), format!("Trait name `{name}` should be in class case."))
                     .with_code(self.meta.code)
                     .with_annotation(
                         Annotation::primary(r#trait.name.span())
-                            .with_message(format!("Trait `{}` is declared here", name)),
+                            .with_message(format!("Trait `{name}` is declared here")),
                     )
                     .with_annotation(
-                        Annotation::secondary(r#trait.span()).with_message(format!("Trait `{}` is defined here", fqcn)),
+                        Annotation::secondary(r#trait.span()).with_message(format!("Trait `{fqcn}` is defined here")),
                     )
-                    .with_note(format!("The trait name `{}` does not follow class naming convention.", name))
+                    .with_note(format!("The trait name `{name}` does not follow class naming convention."))
                     .with_help(format!(
                         "Consider renaming it to `{}` to adhere to the naming convention.",
                         mago_casing::to_class_case(name)
@@ -115,17 +115,17 @@ impl LintRule for TraitNameRule {
 
         if self.cfg.psr && !name.ends_with("Trait") {
             issues.push(
-                Issue::new(self.cfg.level(), format!("Trait name `{}` should be suffixed with `Trait`.", name))
+                Issue::new(self.cfg.level(), format!("Trait name `{name}` should be suffixed with `Trait`."))
                     .with_code(self.meta.code)
                     .with_annotation(
                         Annotation::primary(r#trait.name.span())
-                            .with_message(format!("Trait `{}` is declared here", name)),
+                            .with_message(format!("Trait `{name}` is declared here")),
                     )
                     .with_annotation(
-                        Annotation::secondary(r#trait.span()).with_message(format!("Trait `{}` is defined here", fqcn)),
+                        Annotation::secondary(r#trait.span()).with_message(format!("Trait `{fqcn}` is defined here")),
                     )
-                    .with_note(format!("The trait name `{}` does not follow PSR naming convention.", name))
-                    .with_help(format!("Consider renaming it to `{}Trait` to adhere to the naming convention.", name)),
+                    .with_note(format!("The trait name `{name}` does not follow PSR naming convention."))
+                    .with_help(format!("Consider renaming it to `{name}Trait` to adhere to the naming convention.")),
             );
         }
 

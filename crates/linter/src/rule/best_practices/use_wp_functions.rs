@@ -56,7 +56,7 @@ impl LintRule for UseWpFunctionsRule {
                 provide a consistent, secure, and reliable abstraction that works across different hosting
                 environments.
             "},
-            good_example: indoc! {r#"
+            good_example: indoc! {r"
                 <?php
 
                 // For remote requests:
@@ -67,8 +67,8 @@ impl LintRule for UseWpFunctionsRule {
                 require_once ABSPATH . 'wp-admin/includes/file.php';
                 WP_Filesystem();
                 $wp_filesystem->put_contents( '/path/to/my-file.txt', 'data' );
-            "#},
-            bad_example: indoc! {r#"
+            "},
+            bad_example: indoc! {r"
                 <?php
 
                 // For remote requests:
@@ -78,7 +78,7 @@ impl LintRule for UseWpFunctionsRule {
 
                 // For filesystem operations:
                 file_put_contents('/path/to/my-file.txt', 'data');
-            "#},
+            "},
             category: Category::BestPractices,
             requirements: RuleRequirements::Integration(Integration::WordPress),
         };
@@ -96,7 +96,7 @@ impl LintRule for UseWpFunctionsRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let Node::FunctionCall(function_call) = node else {
             return;
         };
@@ -153,14 +153,14 @@ impl LintRule for UseWpFunctionsRule {
                 }
 
                 let issue =
-                    Issue::new(self.cfg.level(), format!("Use WordPress function instead of `{}`", matched_function))
+                    Issue::new(self.cfg.level(), format!("Use WordPress function instead of `{matched_function}`"))
                         .with_code(self.meta.code)
                         .with_annotation(
                             Annotation::primary(function_call.span())
-                                .with_message(format!("Replace with `{}`", wp_function)),
+                                .with_message(format!("Replace with `{wp_function}`")),
                         )
                         .with_note("Native PHP functions lack WordPress compatibility features")
-                        .with_help(format!("Use `{}`", wp_function));
+                        .with_help(format!("Use `{wp_function}`"));
 
                 ctx.collector.report(issue);
                 return; // Only report one issue per function call

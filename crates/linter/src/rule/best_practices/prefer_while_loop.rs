@@ -52,7 +52,7 @@ impl LintRule for PreferWhileLoopRule {
                 Suggests using a `while` loop instead of a `for` loop when the `for` loop does not have any
                 initializations or increments. This can make the code more readable and concise.
             "},
-            good_example: indoc! {r#"
+            good_example: indoc! {r"
                 <?php
 
                 while ($i < 10) {
@@ -60,8 +60,8 @@ impl LintRule for PreferWhileLoopRule {
 
                     $i++;
                 }
-            "#},
-            bad_example: indoc! {r#"
+            "},
+            bad_example: indoc! {r"
                 <?php
 
                 for (; $i < 10;) {
@@ -69,7 +69,7 @@ impl LintRule for PreferWhileLoopRule {
 
                     $i++;
                 }
-            "#},
+            "},
             category: Category::BestPractices,
 
             requirements: RuleRequirements::None,
@@ -88,7 +88,7 @@ impl LintRule for PreferWhileLoopRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let Node::For(r#for) = node else {
             return;
         };

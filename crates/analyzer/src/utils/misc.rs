@@ -108,7 +108,8 @@ fn report_paradoxical_condition(
         return;
     };
 
-    let new_condition_str = conflicting_clause.iter().map(|c| c.to_string()).collect::<Vec<_>>().join(" && ");
+    let new_condition_str =
+        conflicting_clause.iter().map(std::string::ToString::to_string).collect::<Vec<_>>().join(" && ");
     let established_fact_str = original_clause.to_string();
 
     collector.report_with_code(

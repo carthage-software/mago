@@ -27,7 +27,7 @@ impl ScopeAttachmentWalker {
     /// the node's span with only whitespace in between. This method iterates through all
     /// unscoped pragmas and updates the first one that meets this criterion.
     fn assign_scope_for_node(&self, node_span: &Span, collector: &mut Collector<'_, '_>) {
-        for pragma in collector.pragmas.iter_mut() {
+        for pragma in &mut collector.pragmas {
             // Skip pragmas that already have a scope.
             if pragma.scope_span.is_some() {
                 continue;
@@ -49,7 +49,7 @@ impl ScopeAttachmentWalker {
     }
 }
 
-impl<'ast, 'arena> Walker<'ast, 'arena, Collector<'_, 'arena>> for ScopeAttachmentWalker {
+impl<'arena> Walker<'_, 'arena, Collector<'_, 'arena>> for ScopeAttachmentWalker {
     /// Visits a statement and attaches scopes for any applicable pragmas.
     fn walk_statement(&self, statement: &Statement<'arena>, collector: &mut Collector<'_, 'arena>) {
         let span = statement.span();

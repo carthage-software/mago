@@ -52,7 +52,7 @@ impl LintRule for NoProtectedInFinalRule {
             description: indoc! {"
                 Detects `protected` items in final classes or enums.
             "},
-            good_example: indoc! {r#"
+            good_example: indoc! {r"
                 <?php
 
                 final class Foo {
@@ -64,8 +64,8 @@ impl LintRule for NoProtectedInFinalRule {
                         // ...
                     }
                 }
-            "#},
-            bad_example: indoc! {r#"
+            "},
+            bad_example: indoc! {r"
                 <?php
 
                 final class Foo {
@@ -77,7 +77,7 @@ impl LintRule for NoProtectedInFinalRule {
                         // ...
                     }
                 }
-            "#},
+            "},
             category: Category::Redundancy,
             requirements: RuleRequirements::None,
         };
@@ -95,7 +95,7 @@ impl LintRule for NoProtectedInFinalRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let (members, message) = match node {
             Node::Class(class) if class.modifiers.contains_final() => {
                 if class.extends.is_some() || class.implements.is_some() {

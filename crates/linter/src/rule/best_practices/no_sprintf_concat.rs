@@ -49,26 +49,26 @@ impl LintRule for NoSprintfConcatRule {
         const META: RuleMeta = RuleMeta {
             name: "No Sprintf Concat",
             code: "no-sprintf-concat",
-            description: indoc! {r#"
+            description: indoc! {r"
                 Disallows string concatenation with the result of an `sprintf` call.
 
                 Concatenating with `sprintf` is less efficient and can be less readable than
                 incorporating the string directly into the format template. This pattern
                 creates an unnecessary intermediate string and can make the final output
                 harder to see at a glance.
-            "#},
-            good_example: indoc! {r#"
+            "},
+            good_example: indoc! {r"
                 <?php
 
                 $name = 'World';
                 $greeting = sprintf('Hello, %s!', $name);
-            "#},
-            bad_example: indoc! {r#"
+            "},
+            bad_example: indoc! {r"
                 <?php
 
                 $name = 'World';
                 $greeting = 'Hello, ' . sprintf('%s!', $name);
-            "#},
+            "},
             category: Category::BestPractices,
 
             requirements: RuleRequirements::None,
@@ -87,7 +87,7 @@ impl LintRule for NoSprintfConcatRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let Node::Binary(binary) = node else {
             return;
         };

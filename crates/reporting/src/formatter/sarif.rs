@@ -77,7 +77,7 @@ fn build_sarif_log(issues: &IssueCollection, database: &ReadDatabase) -> Result<
         .build();
 
     let mut results = Vec::new();
-    for issue in issues.issues.iter() {
+    for issue in &issues.issues {
         let sarif_result = convert_issue_to_result(issue, database)?;
         results.push(sarif_result);
     }
@@ -149,10 +149,10 @@ fn annotation_to_location(annotation: &Annotation, database: &ReadDatabase) -> R
     let artifact_location = ArtifactLocation::builder().uri(uri).build();
 
     let region = Region::builder()
-        .start_line(start_line as i64 + 1)
-        .start_column(start_column as i64 + 1)
-        .end_line(end_line as i64 + 1)
-        .end_column(end_column as i64 + 1)
+        .start_line(i64::from(start_line) + 1)
+        .start_column(i64::from(start_column) + 1)
+        .end_line(i64::from(end_line) + 1)
+        .end_column(i64::from(end_column) + 1)
         .build();
 
     let physical_location = PhysicalLocation::builder().artifact_location(artifact_location).region(region).build();

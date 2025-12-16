@@ -101,7 +101,9 @@ pub fn analyze_logical_and_operation<'ctx, 'arena>(
 
     let mut changed_var_ids = AtomSet::default();
     let mut right_block_context;
-    if !left_assertions.is_empty() {
+    if left_assertions.is_empty() {
+        right_block_context = left_block_context.clone();
+    } else {
         right_block_context = block_context.clone();
 
         // Don't report issues when applying LHS assertions to prepare RHS context
@@ -119,8 +121,6 @@ pub fn analyze_logical_and_operation<'ctx, 'arena>(
             !binary.operator.span().is_zero(),
             !block_context.inside_negation,
         );
-    } else {
-        right_block_context = left_block_context.clone()
     }
 
     let partitioned_clauses = BlockContext::remove_reconciled_clause_refs(
@@ -205,7 +205,9 @@ pub fn analyze_logical_and_operation<'ctx, 'arena>(
     if let Some(if_body_context) = &block_context.if_body_context {
         let mut if_body_context_inner = if_body_context.borrow_mut();
 
-        if !block_context.inside_negation {
+        if block_context.inside_negation {
+            block_context.locals = left_block_context.locals;
+        } else {
             block_context.locals = right_block_context.locals;
 
             if_body_context_inner.locals.extend(block_context.locals.iter().map(|(k, v)| (*k, v.clone())));
@@ -216,8 +218,6 @@ pub fn analyze_logical_and_operation<'ctx, 'arena>(
                 .assigned_variable_ids
                 .extend(block_context.assigned_variable_ids.iter().map(|(k, v)| (*k, *v)));
             if_body_context_inner.reconciled_expression_clauses.extend(partitioned_clauses.1);
-        } else {
-            block_context.locals = left_block_context.locals;
         }
     } else {
         block_context.locals = left_block_context.locals;
@@ -237,16 +237,7 @@ pub fn analyze_logical_or_operation<'ctx, 'arena>(
     let mut left_referenced_var_ids;
     let left_assigned_var_ids;
 
-    if !is_logical_or_operation(binary.lhs, 3) {
-        let mut if_scope = IfScope::default();
-
-        let (if_conditional_scope, applied_block_context) =
-            conditional::analyze(context, block_context.clone(), artifacts, &mut if_scope, binary.lhs, false)?;
-        *block_context = applied_block_context;
-
-        left_block_context = if_conditional_scope.if_body_context;
-        left_referenced_var_ids = if_conditional_scope.conditionally_referenced_variable_ids;
-    } else {
+    if is_logical_or_operation(binary.lhs, 3) {
         let pre_referenced_var_ids = block_context.conditionally_referenced_variable_ids.clone();
         block_context.conditionally_referenced_variable_ids = AtomSet::default();
 
@@ -284,6 +275,15 @@ pub fn analyze_logical_or_operation<'ctx, 'arena>(
         left_block_context.assigned_variable_ids.extend(pre_assigned_var_ids);
 
         left_referenced_var_ids.retain(|id| !left_assigned_var_ids.contains_key(id));
+    } else {
+        let mut if_scope = IfScope::default();
+
+        let (if_conditional_scope, applied_block_context) =
+            conditional::analyze(context, block_context.clone(), artifacts, &mut if_scope, binary.lhs, false)?;
+        *block_context = applied_block_context;
+
+        left_block_context = if_conditional_scope.if_body_context;
+        left_referenced_var_ids = if_conditional_scope.conditionally_referenced_variable_ids;
     }
 
     let lhs_type = match artifacts.get_rc_expression_type(&binary.lhs).cloned() {
@@ -583,9 +583,9 @@ pub fn analyze_logical_xor_operation<'ctx, 'arena>(
 /// Checks a single operand of a logical operation (like AND, OR, XOR) for problematic types.
 /// Reports errors for `mixed` and warnings for types that PHP coerces to boolean
 /// (e.g., `null`, `array`, `resource`, `object`).
-fn check_logical_operand<'ctx, 'ast, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
-    operand: &'ast Expression<'arena>,
+fn check_logical_operand<'arena>(
+    context: &mut Context<'_, 'arena>,
+    operand: &Expression<'arena>,
     operand_type: &TUnion,
     side: &'static str,
     operator_name: &'static str,
@@ -652,9 +652,9 @@ fn check_logical_operand<'ctx, 'ast, 'arena>(
 ///   - `None`: No fix offered (just report the issue)
 ///   - `Some(false)`: Remove left operand, keep right operand
 ///   - `Some(true)`: Remove right operand, keep left operand
-fn report_redundant_logical_operation<'ctx, 'ast, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
-    binary: &'ast Binary<'arena>,
+fn report_redundant_logical_operation<'arena>(
+    context: &mut Context<'_, 'arena>,
+    binary: &Binary<'arena>,
     lhs_description: &str,
     rhs_description: &str,
     result_value_str: &str,
@@ -683,7 +683,7 @@ fn report_redundant_logical_operation<'ctx, 'ast, 'arena>(
     ))
     .with_help(if side_to_remove.is_some() {
         let kept_side = if side_to_remove == Some(true) { "left" } else { "right" };
-        format!("Consider simplifying this expression to just the {} operand.", kept_side)
+        format!("Consider simplifying this expression to just the {kept_side} operand.")
     } else {
         format!("Consider simplifying this expression to {result_value_str}.")
     });
@@ -704,7 +704,7 @@ fn report_redundant_logical_operation<'ctx, 'ast, 'arena>(
 }
 
 #[inline]
-const fn is_logical_or_operation<'ast, 'arena>(expression: &'ast Expression<'arena>, max_nesting: usize) -> bool {
+const fn is_logical_or_operation(expression: &Expression<'_>, max_nesting: usize) -> bool {
     if max_nesting == 0 {
         return true;
     }

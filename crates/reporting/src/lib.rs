@@ -518,7 +518,7 @@ impl IssueCollection {
     }
 
     pub fn take_suggestions(&mut self) -> impl Iterator<Item = (FileId, FixPlan)> + '_ {
-        self.issues.iter_mut().flat_map(|issue| issue.take_suggestions())
+        self.issues.iter_mut().flat_map(Issue::take_suggestions)
     }
 
     pub fn filter_fixable(self) -> Self {
@@ -571,7 +571,7 @@ impl IssueCollection {
     pub fn to_fix_plans(self) -> HashMap<FileId, FixPlan> {
         let mut plans: HashMap<FileId, FixPlan> = HashMap::default();
         for issue in self.issues.into_iter().filter(|issue| !issue.suggestions.is_empty()) {
-            for suggestion in issue.suggestions.into_iter() {
+            for suggestion in issue.suggestions {
                 match plans.entry(suggestion.0) {
                     Entry::Occupied(mut occupied_entry) => {
                         occupied_entry.get_mut().merge(suggestion.1);

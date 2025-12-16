@@ -1,4 +1,4 @@
-//! strlen() return type provider.
+//! `strlen()` return type provider.
 
 use mago_codex::ttype::get_literal_int;
 use mago_codex::ttype::union::TUnion;

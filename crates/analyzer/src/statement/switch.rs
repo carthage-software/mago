@@ -131,7 +131,7 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
         let indexed_cases = cases.iter().enumerate().collect::<IndexMap<_, _>>();
 
         let mut last_case_index = cases.len() - 1;
-        for (i, case) in indexed_cases.iter() {
+        for (i, case) in &indexed_cases {
             if case.is_default() {
                 self.has_default_case = true;
                 last_case_index = *i;
@@ -160,7 +160,7 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
             {
                 previous_empty_cases.push(switch_case);
                 continue;
-            };
+            }
 
             let is_matching = self.analyze_case(
                 switch,
@@ -490,25 +490,19 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
             original_block_context.clauses.iter().map(|v| (**v).clone()).collect::<Vec<_>>()
         };
 
-        case_block_context.clauses = if !case_clauses.is_empty() {
-            if let Some(case_condition) = switch_case.expression() {
-                check_for_paradox(
-                    &mut self.context.collector,
-                    &entry_clauses.iter().map(|v| Rc::new(v.clone())).collect::<Vec<_>>(),
-                    &case_clauses,
-                    case_condition.span(),
-                );
+        case_block_context.clauses = if case_clauses.is_empty() {
+            entry_clauses
+        } else if let Some(case_condition) = switch_case.expression() {
+            check_for_paradox(
+                &mut self.context.collector,
+                &entry_clauses.iter().map(|v| Rc::new(v.clone())).collect::<Vec<_>>(),
+                &case_clauses,
+                case_condition.span(),
+            );
 
-                entry_clauses.extend(case_clauses.clone());
+            entry_clauses.extend(case_clauses.clone());
 
-                if entry_clauses.len() < 50 {
-                    mago_algebra::saturate_clauses(entry_clauses.iter())
-                } else {
-                    entry_clauses
-                }
-            } else {
-                entry_clauses
-            }
+            if entry_clauses.len() < 50 { mago_algebra::saturate_clauses(entry_clauses.iter()) } else { entry_clauses }
         } else {
             entry_clauses
         }
@@ -531,7 +525,7 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
                 IndexMap::new(),
                 &mut case_block_context,
                 &mut changed_var_ids,
-                &if !switch_case.is_default() { AtomSet::from_iter([*switch_var_id]) } else { AtomSet::default() },
+                &if switch_case.is_default() { AtomSet::default() } else { AtomSet::from_iter([*switch_var_id]) },
                 &switch_case.span(),
                 true,
                 false,

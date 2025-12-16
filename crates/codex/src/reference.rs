@@ -95,13 +95,13 @@ impl SymbolReferences {
     /// Counts the total number of symbol-to-symbol body references.
     #[inline]
     pub fn count_body_references(&self) -> usize {
-        self.symbol_references_to_symbols.values().map(|v| v.len()).sum()
+        self.symbol_references_to_symbols.values().map(std::collections::HashSet::len).sum()
     }
 
     /// Counts the total number of symbol-to-symbol signature references.
     #[inline]
     pub fn count_signature_references(&self) -> usize {
-        self.symbol_references_to_symbols_in_signature.values().map(|v| v.len()).sum()
+        self.symbol_references_to_symbols_in_signature.values().map(std::collections::HashSet::len).sum()
     }
 
     /// Counts how many symbols reference the given symbol.
@@ -291,16 +291,16 @@ impl SymbolReferences {
         class_member: SymbolIdentifier,
         in_signature: bool,
     ) {
-        self.add_reference_to_class_member_with_file(scope, class_member, in_signature, None)
+        self.add_reference_to_class_member_with_file(scope, class_member, in_signature, None);
     }
 
     /// Convenience method to add a reference *from* the current function context *to* a class member.
     /// Delegates to appropriate `add_*` methods based on the function context.
-    /// If file_hash is provided and the reference is from global scope, uses file-level tracking.
+    /// If `file_hash` is provided and the reference is from global scope, uses file-level tracking.
     ///
     /// # Note on Normalization
     ///
-    /// This method assumes that symbol names (class_member, function_name, class_name) are already
+    /// This method assumes that symbol names (`class_member`, `function_name`, `class_name`) are already
     /// normalized to lowercase, as they come from the codebase which stores all symbols in lowercase form.
     /// No additional normalization is performed to avoid redundant overhead.
     #[inline]
@@ -314,7 +314,7 @@ impl SymbolReferences {
         if let Some(referencing_functionlike) = scope.get_function_like_identifier() {
             match referencing_functionlike {
                 FunctionLikeIdentifier::Function(function_name) => {
-                    self.add_symbol_reference_to_class_member(function_name, class_member, in_signature)
+                    self.add_symbol_reference_to_class_member(function_name, class_member, in_signature);
                 }
                 FunctionLikeIdentifier::Method(class_name, function_name) => self
                     .add_class_member_reference_to_class_member(
@@ -326,22 +326,22 @@ impl SymbolReferences {
                     // A reference from a closure or arrow function
                     // If we have a file hash, track it at file level; otherwise use empty_atom()
                     if let Some(hash) = file_hash {
-                        self.add_file_reference_to_class_member(hash, class_member, in_signature)
+                        self.add_file_reference_to_class_member(hash, class_member, in_signature);
                     } else {
-                        self.add_symbol_reference_to_class_member(empty_atom(), class_member, in_signature)
+                        self.add_symbol_reference_to_class_member(empty_atom(), class_member, in_signature);
                     }
                 }
             }
         } else if let Some(calling_class) = scope.get_class_like_name() {
             // Reference from the class scope itself (e.g., property default)
-            self.add_symbol_reference_to_class_member(calling_class, class_member, in_signature)
+            self.add_symbol_reference_to_class_member(calling_class, class_member, in_signature);
         } else {
             // No function or class scope - this is a top-level/global reference
             // Track it at file level if we have a file hash
             if let Some(hash) = file_hash {
-                self.add_file_reference_to_class_member(hash, class_member, in_signature)
+                self.add_file_reference_to_class_member(hash, class_member, in_signature);
             } else {
-                self.add_symbol_reference_to_class_member(empty_atom(), class_member, in_signature)
+                self.add_symbol_reference_to_class_member(empty_atom(), class_member, in_signature);
             }
         }
     }
@@ -390,17 +390,17 @@ impl SymbolReferences {
         if let Some(referencing_functionlike) = scope.get_function_like_identifier() {
             match referencing_functionlike {
                 FunctionLikeIdentifier::Function(function_name) => {
-                    self.add_symbol_reference_to_symbol(function_name, symbol, in_signature)
+                    self.add_symbol_reference_to_symbol(function_name, symbol, in_signature);
                 }
                 FunctionLikeIdentifier::Method(class_name, function_name) => {
-                    self.add_class_member_reference_to_symbol((class_name, function_name), symbol, in_signature)
+                    self.add_class_member_reference_to_symbol((class_name, function_name), symbol, in_signature);
                 }
                 _ => {
                     // Ignore references from closures.
                 }
             }
         } else if let Some(calling_class) = scope.get_class_like_name() {
-            self.add_symbol_reference_to_symbol(ascii_lowercase_atom(&calling_class), symbol, in_signature)
+            self.add_symbol_reference_to_symbol(ascii_lowercase_atom(&calling_class), symbol, in_signature);
         }
     }
 

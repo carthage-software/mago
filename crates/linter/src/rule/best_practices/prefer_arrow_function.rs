@@ -59,18 +59,18 @@ impl LintRule for PreferArrowFunctionRule {
                 This rule identifies closures that consist solely of a single return statement
                 and suggests converting them to arrow functions.
             "},
-            good_example: indoc! {r#"
+            good_example: indoc! {r"
                 <?php
 
                 $a = fn($x) => $x + 1;
-            "#},
-            bad_example: indoc! {r#"
+            "},
+            bad_example: indoc! {r"
                 <?php
 
                 $a = function($x) {
                     return $x + 1;
                 };
-            "#},
+            "},
             category: Category::BestPractices,
             requirements: RuleRequirements::PHPVersion(PHPVersionRange::from(PHPVersion::PHP74)),
         };
@@ -88,7 +88,7 @@ impl LintRule for PreferArrowFunctionRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let Node::Closure(closure) = node else {
             return;
         };

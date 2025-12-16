@@ -56,12 +56,12 @@ impl LintRule for ClassNameRule {
 
                 Class names should be in class case, also known as PascalCase.
             "},
-            good_example: indoc! {r#"
+            good_example: indoc! {r"
                 <?php
 
                 class MyClass {}
-            "#},
-            bad_example: indoc! {r#"
+            "},
+            bad_example: indoc! {r"
                 <?php
 
                 class my_class {}
@@ -69,7 +69,7 @@ impl LintRule for ClassNameRule {
                 class myClass {}
 
                 class MY_CLASS {}
-            "#},
+            "},
             category: Category::Consistency,
 
             requirements: RuleRequirements::None,
@@ -88,18 +88,18 @@ impl LintRule for ClassNameRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let Node::Class(class) = node else { return };
         let mut issues = vec![];
         let name = class.name.value;
 
         if !is_class_case(name) {
-            let issue = Issue::new(self.cfg.level(), format!("Class name `{}` should be in class case.", name))
+            let issue = Issue::new(self.cfg.level(), format!("Class name `{name}` should be in class case."))
                 .with_code(self.meta.code)
                 .with_annotation(
-                    Annotation::primary(class.name.span()).with_message(format!("Class `{}` is declared here", name)),
+                    Annotation::primary(class.name.span()).with_message(format!("Class `{name}` is declared here")),
                 )
-                .with_note(format!("The class name `{}` does not follow class naming convention.", name))
+                .with_note(format!("The class name `{name}` does not follow class naming convention."))
                 .with_help(format!(
                     "Consider renaming it to `{}` to adhere to the naming convention.",
                     to_class_case(name)
@@ -114,14 +114,14 @@ impl LintRule for ClassNameRule {
             issues.push(
                 Issue::new(
                     self.cfg.level(),
-                    format!("Abstract class name `{}` should be prefixed with `Abstract`.", name),
+                    format!("Abstract class name `{name}` should be prefixed with `Abstract`."),
                 )
                 .with_code(self.meta.code)
                 .with_annotation(
-                    Annotation::primary(class.name.span()).with_message(format!("Class `{}` is declared here", name)),
+                    Annotation::primary(class.name.span()).with_message(format!("Class `{name}` is declared here")),
                 )
-                .with_note(format!("The abstract class name `{}` does not follow PSR naming convention.", name))
-                .with_help(format!("Consider renaming it to `{}` to adhere to the naming convention.", suggested_name)),
+                .with_note(format!("The abstract class name `{name}` does not follow PSR naming convention."))
+                .with_help(format!("Consider renaming it to `{suggested_name}` to adhere to the naming convention.")),
             );
         }
 

@@ -49,7 +49,7 @@ impl LintRule for NoShortOpeningTagRule {
         const META: RuleMeta = RuleMeta {
             name: "No Short Opening Tag",
             code: "no-short-opening-tag",
-            description: indoc! {r#"
+            description: indoc! {r"
                 Disallows the use of short opening tags (`<?`).
 
                 The availability of `<?` depends on the `short_open_tag` directive in `php.ini`. If
@@ -57,7 +57,7 @@ impl LintRule for NoShortOpeningTagRule {
                 exposed as plain text, which is a significant security risk. Using the full `<?php`
                 opening tag is the only guaranteed portable way to ensure your code is always
                 interpreted correctly.
-            "#},
+            "},
             good_example: indoc! {r#"
                 <?php
 
@@ -86,7 +86,7 @@ impl LintRule for NoShortOpeningTagRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let Node::ShortOpeningTag(opening_tag) = node else {
             return;
         };

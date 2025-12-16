@@ -466,7 +466,7 @@ pub fn check_property(
                         Annotation::primary(write_visibility.span()).with_message("Asymmetric visibility used here."),
                     ),
                 );
-            };
+            }
 
             for item in plain_property.items.iter() {
                 if let PropertyItem::Concrete(property_concrete_item) = &item {
@@ -764,34 +764,7 @@ pub fn check_property(
 
                     match lowered_name.as_str() {
                         "set" => {
-                            if parameter_list.parameters.len() != 1 {
-                                context.report(
-                                    Issue::error(format!(
-                                        "Hook `{}` of property `{}::{}` must accept exactly one parameter, found {}.",
-                                        name,
-                                        class_like_name,
-                                        item_name,
-                                        parameter_list.parameters.len()
-                                    ))
-                                    .with_annotation(
-                                        Annotation::primary(parameter_list.span())
-                                            .with_message("Parameters are defined here."),
-                                    )
-                                    .with_annotation(
-                                        Annotation::secondary(hook.name.span())
-                                            .with_message(format!("Hook `{name}` is declared here.")),
-                                    )
-                                    .with_annotation(
-                                        Annotation::secondary(hooked_property.item.variable().span())
-                                            .with_message(format!("Property `{item_name}` is declared here.")),
-                                    )
-                                    .with_annotation(
-                                        Annotation::secondary(class_like_span).with_message(format!(
-                                            "{class_like_kind} `{class_like_fqcn}` defined here."
-                                        )),
-                                    ),
-                                );
-                            } else {
+                            if parameter_list.parameters.len() == 1 {
                                 let first_parameter = parameter_list.parameters.first().unwrap();
                                 let first_parameter_name = first_parameter.variable.name;
 
@@ -936,6 +909,33 @@ pub fn check_property(
                                         ),
                                     );
                                 }
+                            } else {
+                                context.report(
+                                    Issue::error(format!(
+                                        "Hook `{}` of property `{}::{}` must accept exactly one parameter, found {}.",
+                                        name,
+                                        class_like_name,
+                                        item_name,
+                                        parameter_list.parameters.len()
+                                    ))
+                                    .with_annotation(
+                                        Annotation::primary(parameter_list.span())
+                                            .with_message("Parameters are defined here."),
+                                    )
+                                    .with_annotation(
+                                        Annotation::secondary(hook.name.span())
+                                            .with_message(format!("Hook `{name}` is declared here.")),
+                                    )
+                                    .with_annotation(
+                                        Annotation::secondary(hooked_property.item.variable().span())
+                                            .with_message(format!("Property `{item_name}` is declared here.")),
+                                    )
+                                    .with_annotation(
+                                        Annotation::secondary(class_like_span).with_message(format!(
+                                            "{class_like_kind} `{class_like_fqcn}` defined here."
+                                        )),
+                                    ),
+                                );
                             }
                         }
                         "get" => {
@@ -1012,5 +1012,5 @@ pub fn check_property(
                 }
             }
         }
-    };
+    }
 }

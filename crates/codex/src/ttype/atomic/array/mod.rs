@@ -78,10 +78,11 @@ impl TArray {
         match &self {
             Self::Keyed(keyed_array) => {
                 keyed_array.parameters.is_none()
-                    && keyed_array.known_items.as_ref().is_none_or(|items| items.is_empty())
+                    && keyed_array.known_items.as_ref().is_none_or(std::collections::BTreeMap::is_empty)
             }
             Self::List(list) => {
-                list.element_type.is_never() && list.known_elements.as_ref().is_none_or(|elements| elements.is_empty())
+                list.element_type.is_never()
+                    && list.known_elements.as_ref().is_none_or(std::collections::BTreeMap::is_empty)
             }
         }
     }
@@ -263,7 +264,7 @@ impl TArray {
 }
 
 impl TType for TArray {
-    fn get_child_nodes<'a>(&'a self) -> Vec<TypeRef<'a>> {
+    fn get_child_nodes(&self) -> Vec<TypeRef<'_>> {
         match self {
             TArray::Keyed(keyed_array) => keyed_array.get_child_nodes(),
             TArray::List(list) => list.get_child_nodes(),

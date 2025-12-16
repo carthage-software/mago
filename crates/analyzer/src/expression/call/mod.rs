@@ -148,40 +148,37 @@ fn analyze_invocation_targets<'ctx, 'ast, 'arena>(
         )?;
     }
 
-    let resulting_type = match resulting_type {
-        Some(resulting_type) => {
-            if encountered_invalid_targets {
-                return Ok(());
-            } else if encountered_mixed_targets {
-                get_mixed()
-            } else if should_add_null {
-                combine_union_types(&resulting_type, &get_null(), context.codebase, false)
-            } else {
-                resulting_type
-            }
+    let resulting_type = if let Some(resulting_type) = resulting_type {
+        if encountered_invalid_targets {
+            return Ok(());
+        } else if encountered_mixed_targets {
+            get_mixed()
+        } else if should_add_null {
+            combine_union_types(&resulting_type, &get_null(), context.codebase, false)
+        } else {
+            resulting_type
         }
-        None => {
-            match invocation_arguments {
-                InvocationArgumentsSource::ArgumentList(argument_list) => {
-                    argument_list.analyze(context, block_context, artifacts)?;
-                }
-                InvocationArgumentsSource::PipeInput(pipe) => {
-                    let was_inside_call = block_context.inside_call;
-                    let was_inside_general_use = block_context.inside_general_use;
-                    block_context.inside_call = true;
-                    block_context.inside_general_use = true;
-                    pipe.input.analyze(context, block_context, artifacts)?;
-                    block_context.inside_call = was_inside_call;
-                    block_context.inside_general_use = was_inside_general_use;
-                }
-                _ => {}
-            };
-
-            if encountered_mixed_targets {
-                get_mixed()
-            } else {
-                return Ok(());
+    } else {
+        match invocation_arguments {
+            InvocationArgumentsSource::ArgumentList(argument_list) => {
+                argument_list.analyze(context, block_context, artifacts)?;
             }
+            InvocationArgumentsSource::PipeInput(pipe) => {
+                let was_inside_call = block_context.inside_call;
+                let was_inside_general_use = block_context.inside_general_use;
+                block_context.inside_call = true;
+                block_context.inside_general_use = true;
+                pipe.input.analyze(context, block_context, artifacts)?;
+                block_context.inside_call = was_inside_call;
+                block_context.inside_general_use = was_inside_general_use;
+            }
+            _ => {}
+        }
+
+        if encountered_mixed_targets {
+            get_mixed()
+        } else {
+            return Ok(());
         }
     };
 
@@ -191,15 +188,14 @@ fn analyze_invocation_targets<'ctx, 'ast, 'arena>(
         block_context.has_returned = true;
         block_context.control_actions.insert(ControlAction::End);
         return Ok(());
-    } else {
-        artifacts.set_expression_type(&call_span, resulting_type);
     }
+    artifacts.set_expression_type(&call_span, resulting_type);
 
     Ok(())
 }
 
-fn get_function_like_target<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+fn get_function_like_target<'ctx>(
+    context: &mut Context<'ctx, '_>,
     function_like: FunctionLikeIdentifier,
     alternative: Option<FunctionLikeIdentifier>,
     span: Span,
@@ -208,8 +204,8 @@ fn get_function_like_target<'ctx, 'arena>(
     get_function_like_target_inner(context, function_like, alternative, span, inferred_return_type, false)
 }
 
-pub(super) fn get_function_like_target_with_skip<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+pub(super) fn get_function_like_target_with_skip<'ctx>(
+    context: &mut Context<'ctx, '_>,
     function_like: FunctionLikeIdentifier,
     alternative: Option<FunctionLikeIdentifier>,
     span: Span,
@@ -226,8 +222,8 @@ pub(super) fn get_function_like_target_with_skip<'ctx, 'arena>(
     )
 }
 
-fn get_function_like_target_inner<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+fn get_function_like_target_inner<'ctx>(
+    context: &mut Context<'ctx, '_>,
     function_like: FunctionLikeIdentifier,
     alternative: Option<FunctionLikeIdentifier>,
     span: Span,
@@ -336,12 +332,12 @@ fn get_function_like_target_inner<'ctx, 'arena>(
     Ok(Some(InvocationTarget::FunctionLike { identifier, metadata, inferred_return_type, method_context, span }))
 }
 
-fn inspect_arguments<'ctx, 'ast, 'arena>(
+fn inspect_arguments<'ctx, 'arena>(
     context: &mut Context<'ctx, 'arena>,
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     target: &InvocationTarget<'ctx>,
-    invocation_arguments: &InvocationArgumentsSource<'ast, 'arena>,
+    invocation_arguments: &InvocationArgumentsSource<'_, 'arena>,
 ) -> Result<(), AnalysisError> {
     match invocation_arguments {
         InvocationArgumentsSource::ArgumentList(argument_list) => {
@@ -357,7 +353,7 @@ fn inspect_arguments<'ctx, 'ast, 'arena>(
             block_context.inside_general_use = was_inside_general_use;
         }
         _ => {}
-    };
+    }
 
     let mut argument_annotations = vec![];
     for (idx, argument) in invocation_arguments.get_arguments().iter().enumerate() {
@@ -394,12 +390,12 @@ fn inspect_arguments<'ctx, 'ast, 'arena>(
     Ok(())
 }
 
-fn confirm_argument_type<'ctx, 'ast, 'arena>(
+fn confirm_argument_type<'ctx, 'arena>(
     context: &mut Context<'ctx, 'arena>,
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     target: &InvocationTarget<'ctx>,
-    invocation_arguments: &InvocationArgumentsSource<'ast, 'arena>,
+    invocation_arguments: &InvocationArgumentsSource<'_, 'arena>,
 ) -> Result<(), AnalysisError> {
     match invocation_arguments {
         InvocationArgumentsSource::ArgumentList(argument_list) => {
@@ -415,7 +411,7 @@ fn confirm_argument_type<'ctx, 'ast, 'arena>(
             block_context.inside_general_use = was_inside_general_use;
         }
         _ => {}
-    };
+    }
 
     let arguments = invocation_arguments.get_arguments();
 

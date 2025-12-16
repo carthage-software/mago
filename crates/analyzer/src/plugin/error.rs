@@ -25,16 +25,16 @@ impl fmt::Display for PluginError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             PluginError::InitializationFailed { name, reason } => {
-                write!(f, "Plugin '{}' failed to initialize: {}", name, reason)
+                write!(f, "Plugin '{name}' failed to initialize: {reason}")
             }
             PluginError::InvalidResult { plugin, operation, reason } => {
-                write!(f, "Plugin '{}' returned invalid result for '{}': {}", plugin, operation, reason)
+                write!(f, "Plugin '{plugin}' returned invalid result for '{operation}': {reason}")
             }
             PluginError::Configuration { plugin, reason } => {
-                write!(f, "Plugin '{}' configuration error: {}", plugin, reason)
+                write!(f, "Plugin '{plugin}' configuration error: {reason}")
             }
             PluginError::Internal { reason } => {
-                write!(f, "Internal plugin error: {}", reason)
+                write!(f, "Internal plugin error: {reason}")
             }
         }
     }

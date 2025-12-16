@@ -106,7 +106,7 @@ impl TNamedObject {
 }
 
 impl TType for TNamedObject {
-    fn get_child_nodes<'a>(&'a self) -> Vec<TypeRef<'a>> {
+    fn get_child_nodes(&self) -> Vec<TypeRef<'_>> {
         let mut children = vec![];
 
         if let Some(type_parameters) = &self.type_parameters {
@@ -160,7 +160,7 @@ impl TType for TNamedObject {
 
     fn is_complex(&self) -> bool {
         if let Some(parameters) = &self.type_parameters {
-            return parameters.iter().any(|param| param.is_complex());
+            return parameters.iter().any(crate::ttype::TType::is_complex);
         }
         false
     }
@@ -198,7 +198,7 @@ impl TType for TNamedObject {
     fn get_pretty_id_with_indent(&self, indent: usize) -> Atom {
         let mut result = self.name;
         if let Some(parameters) = self.get_type_parameters() {
-            if parameters.iter().any(|param| param.is_complex()) {
+            if parameters.iter().any(crate::ttype::TType::is_complex) {
                 // Use multiline format for complex type parameters
                 let param_indent = indent + 2;
                 let param_spaces = " ".repeat(param_indent);

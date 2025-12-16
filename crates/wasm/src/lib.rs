@@ -273,7 +273,7 @@ pub fn format(code: String, php_version: String) -> Result<String, JsValue> {
     let (program, parse_error) = parse_file(&arena, &file);
 
     if let Some(error) = parse_error {
-        return Err(JsValue::from_str(&format!("Parse error: {}", error)));
+        return Err(JsValue::from_str(&format!("Parse error: {error}")));
     }
 
     let formatter = Formatter::new(&arena, version, FormatSettings::default());

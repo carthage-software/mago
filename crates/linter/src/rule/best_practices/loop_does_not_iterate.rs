@@ -48,12 +48,12 @@ impl LintRule for LoopDoesNotIterateRule {
         const META: RuleMeta = RuleMeta {
             name: "Loop Does Not Iterate",
             code: "loop-does-not-iterate",
-            description: indoc! {r#"
+            description: indoc! {r"
                 Detects loops (for, foreach, while, do-while) that unconditionally break or return
                 before executing even a single iteration. Such loops are misleading or redundant
                 since they give the impression of iteration but never actually do so.
-            "#},
-            good_example: indoc! {r#"
+            "},
+            good_example: indoc! {r"
                 <?php
 
                 for ($i = 0; $i < 3; $i++) {
@@ -62,14 +62,14 @@ impl LintRule for LoopDoesNotIterateRule {
                         break; // This break is conditional.
                     }
                 }
-            "#},
-            bad_example: indoc! {r#"
+            "},
+            bad_example: indoc! {r"
                 <?php
 
                 for ($i = 0; $i < 3; $i++) {
                     break; // The loop never truly iterates, as this break is unconditional.
                 }
-            "#},
+            "},
             category: Category::BestPractices,
 
             requirements: RuleRequirements::None,
@@ -86,7 +86,7 @@ impl LintRule for LoopDoesNotIterateRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let terminator = match node {
             Node::For(for_loop) => match &for_loop.body {
                 ForBody::Statement(stmt) => get_loop_terminator_from_statement(stmt),
@@ -145,7 +145,7 @@ enum LoopTerminator<'ast, 'arena> {
 fn get_loop_terminator_from_statements<'ast, 'arena>(
     statements: &'ast [Statement<'arena>],
 ) -> Option<LoopTerminator<'ast, 'arena>> {
-    for statement in statements.iter() {
+    for statement in statements {
         if might_skip_terminator(statement) {
             return None;
         }
@@ -176,7 +176,7 @@ fn get_loop_terminator_from_statement<'ast, 'arena>(
 }
 
 #[inline]
-fn might_skip_terminator<'ast, 'arena>(statement: &'ast Statement<'arena>) -> bool {
+fn might_skip_terminator(statement: &Statement<'_>) -> bool {
     match statement {
         Statement::Continue(_) | Statement::Goto(_) => true,
         Statement::Block(block) => block.statements.iter().any(might_skip_terminator),

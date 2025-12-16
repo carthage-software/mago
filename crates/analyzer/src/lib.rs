@@ -226,9 +226,7 @@ mod tests {
         let source_file = File::ephemeral(Cow::Borrowed(config.name), Cow::Borrowed(config.content));
 
         let (program, parse_issues) = parse_file(&arena, &source_file);
-        if parse_issues.is_some() {
-            panic!("Test '{}' failed during parsing:\n{:#?}", config.name, parse_issues);
-        }
+        assert!(parse_issues.is_none(), "Test '{}' failed during parsing:\n{:#?}", config.name, parse_issues);
 
         let resolver = NameResolver::new(&arena);
         let resolved_names = resolver.resolve(program);
@@ -270,7 +268,7 @@ mod tests {
 
         let mut actual_issue_counts: BTreeMap<String, usize> = BTreeMap::new();
         for actual_issue in actual_issues_collected.iter() {
-            let Some(issue_code) = actual_issue.code.as_ref().cloned() else {
+            let Some(issue_code) = actual_issue.code.clone() else {
                 panic!("Analyzer returned an issue with no code: {actual_issue:?}");
             };
 

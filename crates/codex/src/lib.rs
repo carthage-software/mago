@@ -36,7 +36,7 @@ pub fn get_anonymous_class_name(span: Span) -> Atom {
 
     // SAFETY: We use `unwrap_unchecked` here because we are writing to a fixed-size buffer
     unsafe {
-        write!(writer, "class@anonymous:{}-{}:{}", span.file_id, span.start.offset, span.end.offset).unwrap_unchecked()
+        write!(writer, "class@anonymous:{}-{}:{}", span.file_id, span.start.offset, span.end.offset).unwrap_unchecked();
     };
 
     // Determine how many bytes were written by checking the length of the original buffer

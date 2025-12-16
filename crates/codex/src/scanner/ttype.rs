@@ -203,8 +203,8 @@ pub fn merge_type_preserving_nullability(
         return docblock_type;
     }
 
-    if real_type.map(|tm| tm.type_union.is_nullable()).unwrap_or(false) && !docblock_type.type_union.accepts_null() {
-        docblock_type.map_type_union(|u| u.as_nullable())
+    if real_type.is_some_and(|tm| tm.type_union.is_nullable()) && !docblock_type.type_union.accepts_null() {
+        docblock_type.map_type_union(super::super::ttype::union::TUnion::as_nullable)
     } else {
         docblock_type
     }

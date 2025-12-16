@@ -126,10 +126,10 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ArrowFunction<'arena> {
             if let Some(inferred_return_type) = inferred_return_type {
                 signature.return_type = Some(Box::new(inferred_return_type));
             } else if !function_metadata.flags.has_yield() {
-                if !inner_block_context.has_returned {
-                    signature.return_type = Some(Box::new(get_void()));
-                } else {
+                if inner_block_context.has_returned {
                     signature.return_type = Some(Box::new(get_never()));
+                } else {
+                    signature.return_type = Some(Box::new(get_void()));
                 }
             }
         }
@@ -159,7 +159,7 @@ mod tests {
 
     test_analysis! {
         name = concat_operator_test,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             function i_take_float(float $_f): void {}
@@ -195,12 +195,12 @@ mod tests {
             foreach ($floats as $f) {
                 i_take_float($f);
             }
-        "#}
+        "}
     }
 
     test_analysis! {
         name = returns_typed_closure_arrow,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             /**
@@ -212,12 +212,12 @@ mod tests {
             function foo(Closure $f, Closure $g): Closure {
                 return fn(int $x): int => $f($g($x));
             }
-        "#}
+        "}
     }
 
     test_analysis! {
         name = inferred_arrow_function_return_type,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             /**
@@ -230,12 +230,12 @@ mod tests {
 
             x(fn(): string => 'Hello, World!');
             x(fn() => 'Hello, World!');
-        "#}
+        "}
     }
 
     test_analysis! {
         name = arrow_function_returns_never,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             function i_never_return(): never {
@@ -253,12 +253,12 @@ mod tests {
             }
 
             run(fn(): never => i_never_return());
-        "#}
+        "}
     }
 
     test_analysis! {
         name = arrow_function_templates,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             function i_take_int(int $_i): void {}
@@ -324,6 +324,6 @@ mod tests {
                 i_take_int($item['before']);
                 i_take_string($item['after']);
             }
-        "#}
+        "}
     }
 }

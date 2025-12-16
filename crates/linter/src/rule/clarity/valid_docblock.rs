@@ -52,7 +52,7 @@ impl LintRule for ValidDocblockRule {
                 Checks for syntax errors in docblock comments. This rule is disabled by default because
                 it can be noisy and may not be relevant to all codebases.
             "},
-            good_example: indoc! {r#"
+            good_example: indoc! {r"
                 <?php
 
                 /**
@@ -65,8 +65,8 @@ impl LintRule for ValidDocblockRule {
                 function foo($a) {
                     return $a;
                 }
-            "#},
-            bad_example: indoc! {r#"
+            "},
+            bad_example: indoc! {r"
                 <?php
 
                 /**
@@ -79,7 +79,7 @@ impl LintRule for ValidDocblockRule {
                 function foo($a) {
                     return $a;
                 }
-            "#},
+            "},
             category: Category::Clarity,
 
             requirements: RuleRequirements::None,
@@ -98,7 +98,7 @@ impl LintRule for ValidDocblockRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let Node::Program(program) = node else {
             return;
         };

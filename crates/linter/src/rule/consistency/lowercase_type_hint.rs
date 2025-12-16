@@ -53,20 +53,20 @@ impl LintRule for LowercaseTypeHintRule {
                 in lowercase. Using uppercase or mixed case is discouraged for consistency
                 and readability.
             "},
-            good_example: indoc! {r#"
+            good_example: indoc! {r"
                 <?php
 
                 function example(int $param): void {
                     return;
                 }
-            "#},
-            bad_example: indoc! {r#"
+            "},
+            bad_example: indoc! {r"
                 <?php
 
                 function example(Int $param): VOID {
                     return;
                 }
-            "#},
+            "},
             category: Category::Consistency,
 
             requirements: RuleRequirements::None,
@@ -85,7 +85,7 @@ impl LintRule for LowercaseTypeHintRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let Node::Hint(hint) = node else {
             return;
         };

@@ -59,18 +59,18 @@ impl LintRule for YodaConditionsRule {
                 This prevents the common bug of accidentally using an assignment (`=`) instead of a comparison (`==`),
                 which would cause a fatal error in a Yoda condition instead of a silent logical bug.
             "},
-            good_example: indoc! {r#"
+            good_example: indoc! {r"
                 <?php
 
                 if ( true === $is_active ) { /* ... */ }
                 if ( 5 === $count ) { /* ... */ }
-            "#},
-            bad_example: indoc! {r#"
+            "},
+            bad_example: indoc! {r"
                 <?php
 
                 // Vulnerable to the accidental assignment bug, e.g., if ($is_active = true).
                 if ( $is_active === true ) { /* ... */ }
-            "#},
+            "},
             category: Category::BestPractices,
             requirements: RuleRequirements::None,
         };
@@ -88,7 +88,7 @@ impl LintRule for YodaConditionsRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let Node::Binary(binary) = node else {
             return;
         };

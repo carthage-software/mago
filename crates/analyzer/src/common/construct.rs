@@ -31,13 +31,13 @@ pub enum ConstructInput<'ast, 'arena> {
 /// on the `ConstructInput` enum. It dispatches to the type verifier for each
 /// provided value and correctly sets the `is_argument` flag to ensure error
 /// messages use the appropriate terminology ("argument" vs. "value").
-pub fn analyze_construct_inputs<'ctx, 'ast, 'arena>(
+pub fn analyze_construct_inputs<'ctx, 'arena>(
     context: &mut Context<'ctx, 'arena>,
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     construct_kind: &'static str,
     construct_keyword: Span,
-    inputs: ConstructInput<'ast, 'arena>,
+    inputs: ConstructInput<'_, 'arena>,
     expected_type: TUnion,
     is_variadic: bool,
     has_default: bool,
@@ -77,10 +77,8 @@ pub fn analyze_construct_inputs<'ctx, 'ast, 'arena>(
                     continue;
                 }
 
-                let input_type = artifacts
-                    .get_expression_type(argument)
-                    .map(Cow::Borrowed)
-                    .unwrap_or_else(|| Cow::Owned(get_mixed()));
+                let input_type =
+                    artifacts.get_expression_type(argument).map_or_else(|| Cow::Owned(get_mixed()), Cow::Borrowed);
 
                 verify_construct_input_type(
                     context,
@@ -98,7 +96,7 @@ pub fn analyze_construct_inputs<'ctx, 'ast, 'arena>(
             expression.analyze(context, block_context, artifacts)?;
 
             let input_type =
-                artifacts.get_expression_type(expression).map(Cow::Borrowed).unwrap_or_else(|| Cow::Owned(get_mixed()));
+                artifacts.get_expression_type(expression).map_or_else(|| Cow::Owned(get_mixed()), Cow::Borrowed);
 
             verify_construct_input_type(
                 context,
@@ -135,10 +133,8 @@ pub fn analyze_construct_inputs<'ctx, 'ast, 'arena>(
 
                 expression.analyze(context, block_context, artifacts)?;
 
-                let input_type = artifacts
-                    .get_expression_type(expression)
-                    .map(Cow::Borrowed)
-                    .unwrap_or_else(|| Cow::Owned(get_mixed()));
+                let input_type =
+                    artifacts.get_expression_type(expression).map_or_else(|| Cow::Owned(get_mixed()), Cow::Borrowed);
 
                 verify_construct_input_type(
                     context,
@@ -174,12 +170,12 @@ pub fn analyze_construct_inputs<'ctx, 'ast, 'arena>(
 /// * `construct_kind` - A string name of the construct (e.g., "echo", "exit").
 /// * `construct_keyword` - The span of the construct's keyword for highlighting.
 /// * `is_argument` - Controls terminology in errors. `true` uses "argument", `false` uses "value".
-fn verify_construct_input_type<'ctx, 'ast, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+fn verify_construct_input_type<'arena>(
+    context: &mut Context<'_, 'arena>,
     input_type: &TUnion,
     parameter_type: &TUnion,
     argument_offset: usize,
-    input_expression: &'ast Expression<'arena>,
+    input_expression: &Expression<'arena>,
     construct_kind: &'static str,
     construct_keyword: &Span,
     is_argument: bool,
@@ -300,7 +296,7 @@ fn verify_construct_input_type<'ctx, 'ast, 'arena>(
             &parameter_type_str,
             construct_keyword,
             is_argument,
-        )
+        );
     }
 }
 
@@ -313,12 +309,7 @@ fn get_ordinal(index: usize) -> Cow<'static, str> {
     }
 }
 
-fn report_missing_input<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
-    kind: &str,
-    keyword: &Span,
-    is_argument: bool,
-) {
+fn report_missing_input(context: &mut Context<'_, '_>, kind: &str, keyword: &Span, is_argument: bool) {
     let term = if is_argument { "argument" } else { "value" };
     context.collector.report_with_code(
         IssueCode::TooFewArguments,
@@ -327,8 +318,8 @@ fn report_missing_input<'ctx, 'arena>(
     );
 }
 
-fn report_too_many_inputs<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+fn report_too_many_inputs(
+    context: &mut Context<'_, '_>,
     kind: &str,
     keyword: &Span,
     input_span: Span,
@@ -345,10 +336,10 @@ fn report_too_many_inputs<'ctx, 'arena>(
     );
 }
 
-fn report_never_input<'ctx, 'ast, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+fn report_never_input<'arena>(
+    context: &mut Context<'_, 'arena>,
     kind: &str,
-    expr: &'ast Expression<'arena>,
+    expr: &Expression<'arena>,
     offset: usize,
     keyword: &Span,
     is_argument: bool,
@@ -364,10 +355,10 @@ fn report_never_input<'ctx, 'ast, 'arena>(
     );
 }
 
-fn report_null_input<'ctx, 'ast, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+fn report_null_input<'arena>(
+    context: &mut Context<'_, 'arena>,
     kind: &str,
-    expr: &'ast Expression<'arena>,
+    expr: &Expression<'arena>,
     offset: usize,
     param_type: &str,
     keyword: &Span,
@@ -386,10 +377,10 @@ fn report_null_input<'ctx, 'ast, 'arena>(
     );
 }
 
-fn report_possibly_null_input<'ctx, 'ast, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+fn report_possibly_null_input<'arena>(
+    context: &mut Context<'_, 'arena>,
     kind: &str,
-    expr: &'ast Expression<'arena>,
+    expr: &Expression<'arena>,
     offset: usize,
     in_type: &str,
     param_type: &str,
@@ -410,10 +401,10 @@ fn report_possibly_null_input<'ctx, 'ast, 'arena>(
     );
 }
 
-fn report_false_input<'ctx, 'ast, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+fn report_false_input<'arena>(
+    context: &mut Context<'_, 'arena>,
     kind: &str,
-    expr: &'ast Expression<'arena>,
+    expr: &Expression<'arena>,
     offset: usize,
     param_type: &str,
     keyword: &Span,
@@ -433,10 +424,10 @@ fn report_false_input<'ctx, 'ast, 'arena>(
     );
 }
 
-fn report_possibly_false_input<'ctx, 'ast, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+fn report_possibly_false_input<'arena>(
+    context: &mut Context<'_, 'arena>,
     kind: &str,
-    expr: &'ast Expression<'arena>,
+    expr: &Expression<'arena>,
     offset: usize,
     in_type: &str,
     param_type: &str,
@@ -458,10 +449,10 @@ fn report_possibly_false_input<'ctx, 'ast, 'arena>(
     );
 }
 
-fn report_mixed_input<'ctx, 'ast, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+fn report_mixed_input<'arena>(
+    context: &mut Context<'_, 'arena>,
     kind: &str,
-    expr: &'ast Expression<'arena>,
+    expr: &Expression<'arena>,
     offset: usize,
     in_type: &str,
     param_type: &str,
@@ -481,11 +472,11 @@ fn report_mixed_input<'ctx, 'ast, 'arena>(
     );
 }
 
-fn report_less_specific_input<'ctx, 'ast, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+fn report_less_specific_input<'arena>(
+    context: &mut Context<'_, 'arena>,
     comparison: &ComparisonResult,
     kind: &str,
-    expr: &'ast Expression<'arena>,
+    expr: &Expression<'arena>,
     offset: usize,
     in_type: &str,
     param_type: &str,
@@ -511,12 +502,12 @@ fn report_less_specific_input<'ctx, 'ast, 'arena>(
     );
 }
 
-fn report_invalid_or_possibly_invalid_input<'ctx, 'ast, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+fn report_invalid_or_possibly_invalid_input<'arena>(
+    context: &mut Context<'_, 'arena>,
     in_type: &TUnion,
     param_type: &TUnion,
     kind: &str,
-    expr: &'ast Expression<'arena>,
+    expr: &Expression<'arena>,
     offset: usize,
     in_type_str: &str,
     param_type_str: &str,

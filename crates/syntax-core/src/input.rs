@@ -262,7 +262,13 @@ impl<'a> Input<'a> {
     #[inline]
     pub fn consume_until(&mut self, search: &[u8], ignore_ascii_case: bool) -> &'a [u8] {
         let start = self.offset;
-        if !ignore_ascii_case {
+        if ignore_ascii_case {
+            while !self.has_reached_eof() && !self.is_at(search, ignore_ascii_case) {
+                self.offset += 1;
+            }
+
+            &self.bytes[start..self.offset]
+        } else {
             // For a single-byte search, use memchr.
             if search.len() == 1 {
                 if let Some(pos) = memchr(search[0], &self.bytes[self.offset..]) {
@@ -279,12 +285,6 @@ impl<'a> Input<'a> {
                 self.offset = self.length;
                 &self.bytes[start..self.length]
             }
-        } else {
-            while !self.has_reached_eof() && !self.is_at(search, ignore_ascii_case) {
-                self.offset += 1;
-            }
-
-            &self.bytes[start..self.offset]
         }
     }
 

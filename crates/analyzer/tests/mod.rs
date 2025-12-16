@@ -475,9 +475,8 @@ fn test_all_test_cases_are_ran() {
 
         let file_name = path.file_stem().unwrap().to_str().unwrap();
         assert!(
-            test_case_file.contains(&format!("test_case!({})", file_name)),
-            "File '{}' was not found as a test case",
-            file_name
+            test_case_file.contains(&format!("test_case!({file_name})")),
+            "File '{file_name}' was not found as a test case"
         );
     }
 }

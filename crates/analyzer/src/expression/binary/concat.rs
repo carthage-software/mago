@@ -89,10 +89,10 @@ pub fn analyze_string_concat_operation<'ctx, 'arena>(
 }
 
 #[inline]
-fn analyze_string_concat_operand<'ctx, 'ast, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+fn analyze_string_concat_operand<'arena>(
+    context: &mut Context<'_, 'arena>,
     artifacts: &mut AnalysisArtifacts,
-    operand: &'ast Expression<'arena>,
+    operand: &Expression<'arena>,
     side: &'static str,
 ) -> Result<(), AnalysisError> {
     let Some(operand_type) = artifacts.get_expression_type(operand) else {
@@ -103,8 +103,7 @@ fn analyze_string_concat_operand<'ctx, 'ast, 'arena>(
         context.collector.report_with_code(
             IssueCode::NullOperand,
             Issue::error(format!(
-                "Implicit conversion of `null` to empty string for {} operand in string concatenation.",
-                side
+                "Implicit conversion of `null` to empty string for {side} operand in string concatenation."
             ))
             .with_annotation(Annotation::primary(operand.span()).with_message("Operand is `null` here"))
             .with_note("Using `null` in string concatenation results in an empty string `''`.")
@@ -120,8 +119,7 @@ fn analyze_string_concat_operand<'ctx, 'ast, 'arena>(
         context.collector.report_with_code(
             IssueCode::FalseOperand,
             Issue::error(format!(
-                "Implicit conversion of `false` to empty string for {} operand in string concatenation.",
-                side
+                "Implicit conversion of `false` to empty string for {side} operand in string concatenation."
             ))
             .with_annotation(Annotation::primary(operand.span()).with_message("Operand is `false` here"))
             .with_note("Using `false` in string concatenation results in an empty string `''`.")
@@ -214,8 +212,7 @@ fn analyze_string_concat_operand<'ctx, 'ast, 'arena>(
                         context.collector.report_with_code(
                             IssueCode::InvalidOperand,
                             Issue::error(format!(
-                                "Invalid {} operand: cannot determine if generic `object` is stringable.",
-                                side
+                                "Invalid {side} operand: cannot determine if generic `object` is stringable."
                             ))
                             .with_annotation(
                                 Annotation::primary(operand.span())
@@ -238,12 +235,10 @@ fn analyze_string_concat_operand<'ctx, 'ast, 'arena>(
                     context.collector.report_with_code(
                         IssueCode::ImplicitToStringCast,
                         Issue::warning(format!(
-                            "Implicit conversion to `string` for {} operand via `{}::__toString()`.",
-                            side,
-                            class_like_name
+                            "Implicit conversion to `string` for {side} operand via `{class_like_name}::__toString()`."
                         ))
                         .with_annotation(Annotation::primary(operand.span())
-                            .with_message(format!("Object implicitly converted using `{}::__toString()`", class_like_name))
+                            .with_message(format!("Object implicitly converted using `{class_like_name}::__toString()`"))
                         )
                         .with_note("Objects implementing `__toString` are automatically converted when used in string context.")
                         .with_help("For clarity, consider explicit casting `(string) $object` or calling the `__toString` method directly."),
@@ -275,8 +270,7 @@ fn analyze_string_concat_operand<'ctx, 'ast, 'arena>(
                     context.collector.report_with_code(
                         IssueCode::ArrayToStringConversion,
                         Issue::error(format!(
-                            "Invalid {} operand: cannot use type `array` in string concatenation.",
-                            side
+                            "Invalid {side} operand: cannot use type `array` in string concatenation."
                         ))
                         .with_annotation(Annotation::primary(operand.span()).with_message("Cannot concatenate with an `array`"))
                         .with_note("PHP raises an `E_WARNING` or `E_NOTICE` and uses the literal string 'Array' when an array is used in string context.")
@@ -292,8 +286,7 @@ fn analyze_string_concat_operand<'ctx, 'ast, 'arena>(
                 context.collector.report_with_code(
                     IssueCode::ImplicitResourceToStringCast,
                     Issue::warning(format!(
-                        "Implicit conversion of `resource` to string for {} operand.",
-                        side
+                        "Implicit conversion of `resource` to string for {side} operand."
                     ))
                     .with_annotation(Annotation::primary(operand.span()).with_message("Resource implicitly converted to string"))
                     .with_note("PHP converts resources to the string format 'Resource id #[id]' when used in string context.")
@@ -380,7 +373,7 @@ fn analyze_string_concat_operand<'ctx, 'ast, 'arena>(
 ///
 /// This is used by the iterative concat analysis to compute the final type from
 /// a flattened list of operands.
-fn fold_concat_operands<'ast, 'arena>(operands: &[&'ast Expression<'arena>], artifacts: &AnalysisArtifacts) -> TUnion {
+fn fold_concat_operands(operands: &[&Expression<'_>], artifacts: &AnalysisArtifacts) -> TUnion {
     if operands.is_empty() {
         return get_string();
     }

@@ -51,13 +51,13 @@ impl LintRule for HalsteadRule {
         const META: RuleMeta = RuleMeta {
             name: "Halstead",
             code: "halstead",
-            description: indoc::indoc! {r#"
+            description: indoc::indoc! {r"
                 Computes Halstead metrics (volume, difficulty, effort) and reports if they exceed configured thresholds.
 
                 Halstead metrics are calculated by counting operators and operands in the analyzed code.
                 For more info: https://en.wikipedia.org/wiki/Halstead_complexity_measures
-            "#},
-            good_example: indoc::indoc! {r#"
+            "},
+            good_example: indoc::indoc! {r"
                 <?php
 
                 function processOrderData($orders) {
@@ -77,8 +77,8 @@ impl LintRule for HalsteadRule {
                 function applyDiscounts($totals) {
                     return array_map(fn($total) => $total > 100 ? $total * 0.9 : $total, $totals);
                 }
-            "#},
-            bad_example: indoc::indoc! {r#"
+            "},
+            bad_example: indoc::indoc! {r"
                 <?php
 
                 function processOrderData($orders) {
@@ -153,7 +153,7 @@ impl LintRule for HalsteadRule {
 
                     return $result;
                 }
-            "#},
+            "},
             category: Category::Maintainability,
             requirements: RuleRequirements::None,
         };
@@ -177,7 +177,7 @@ impl LintRule for HalsteadRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let kind = match node.kind() {
             NodeKind::PropertyHookConcreteBody => "Hook",
             NodeKind::Method => "Method",
@@ -235,7 +235,7 @@ struct HalsteadMetrics {
 }
 
 #[inline]
-fn gather_and_compute_halstead<'ast, 'arena>(node: Node<'ast, 'arena>) -> HalsteadMetrics {
+fn gather_and_compute_halstead(node: Node<'_, '_>) -> HalsteadMetrics {
     let (operators, operands) = gather_operators_and_operands(node);
 
     compute_halstead_metrics(&operators, &operands)
@@ -248,11 +248,11 @@ struct Operator(NodeKind);
 struct Operand<'arena>(&'arena str);
 
 #[inline]
-fn gather_operators_and_operands<'ast, 'arena>(node: Node<'ast, 'arena>) -> (Vec<Operator>, Vec<Operand<'arena>>) {
+fn gather_operators_and_operands<'arena>(node: Node<'_, 'arena>) -> (Vec<Operator>, Vec<Operand<'arena>>) {
     let mut operators = Vec::new();
     let mut operands = Vec::new();
 
-    fn recurse<'ast, 'arena>(n: Node<'ast, 'arena>, ops: &mut Vec<Operator>, rands: &mut Vec<Operand<'arena>>) {
+    fn recurse<'arena>(n: Node<'_, 'arena>, ops: &mut Vec<Operator>, rands: &mut Vec<Operand<'arena>>) {
         if n.is_declaration() {
             return;
         }

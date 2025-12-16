@@ -82,7 +82,7 @@ impl LintRule for NoRedundantLabelRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let Node::Program(_) = node else {
             return;
         };
@@ -96,15 +96,15 @@ impl LintRule for NoRedundantLabelRule {
 
         let gotos = node.filter_map(|node| if let Node::Goto(goto) = node { Some(goto.label.value) } else { None });
 
-        for (label_name, label_span) in labels.into_iter() {
+        for (label_name, label_span) in labels {
             if gotos.contains(&label_name) {
                 continue;
             }
 
-            let issue = Issue::new(self.cfg.level(), format!("Redundant goto label `{}`.", label_name))
+            let issue = Issue::new(self.cfg.level(), format!("Redundant goto label `{label_name}`."))
                 .with_code(self.meta.code)
                 .with_annotation(Annotation::primary(label_span).with_message("This label is declared but not used"))
-                .with_note(format!("Label `{}` is declared but not used by any `goto` statement.", label_name))
+                .with_note(format!("Label `{label_name}` is declared but not used by any `goto` statement."))
                 .with_help("Remove the redundant label.");
 
             ctx.collector.report(issue);

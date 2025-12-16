@@ -74,7 +74,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for If<'arena> {
         let post_if_block_context = if_conditional_scope.post_if_context.clone();
 
         let mut mixed_variables = vec![];
-        for (variable_id, variable_type) in if_block_context.locals.iter() {
+        for (variable_id, variable_type) in &if_block_context.locals {
             if variable_type.is_mixed() && block_context.locals.contains_key(variable_id) {
                 mixed_variables.push(*variable_id);
             }
@@ -169,7 +169,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for If<'arena> {
             }
         }
 
-        if_scope.reasonable_clauses = if_block_context.clauses.to_vec();
+        if_scope.reasonable_clauses = if_block_context.clauses.clone();
         if_scope.negated_clauses = negate_or_synthesize(
             if_clauses,
             self.condition,
@@ -280,7 +280,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for If<'arena> {
                         context,
                         &variable_id,
                         if_scope.reasonable_clauses,
-                        block_context.locals.get(&variable_id).map(|rc| rc.as_ref()),
+                        block_context.locals.get(&variable_id).map(std::convert::AsRef::as_ref),
                     );
                 }
 
@@ -368,7 +368,7 @@ fn analyze_if_statement_block<'ctx, 'arena>(
 
     if outer_block_context.clauses.iter().any(|clause| !clause.possibilities.is_empty()) {
         let mut omit_keys = AtomSet::default();
-        for clause in outer_block_context.clauses.iter() {
+        for clause in &outer_block_context.clauses {
             omit_keys.extend(clause.possibilities.keys());
         }
 
@@ -397,7 +397,7 @@ fn analyze_if_statement_block<'ctx, 'arena>(
             false,
         );
 
-        for (variable_id, _) in reconcilable_if_types.iter() {
+        for (variable_id, _) in &reconcilable_if_types {
             if_block_context.variables_possibly_in_scope.insert(*variable_id);
         }
 
@@ -413,7 +413,7 @@ fn analyze_if_statement_block<'ctx, 'arena>(
 
             let mut variables_to_remove = vec![];
             for changed_variable_id in &changed_variable_ids {
-                for (variable_id, _) in if_block_context.locals.iter() {
+                for variable_id in if_block_context.locals.keys() {
                     if is_derived_access_path(variable_id, changed_variable_id)
                         && !changed_variable_ids.contains(variable_id)
                         && !conditionally_referenced_variable_ids.contains(variable_id)
@@ -491,7 +491,7 @@ fn analyze_if_statement_block<'ctx, 'arena>(
                     context,
                     &variable_id,
                     previous_clauses,
-                    if_block_context.locals.get(&variable_id).map(|rc| rc.as_ref()),
+                    if_block_context.locals.get(&variable_id).map(std::convert::AsRef::as_ref),
                 );
             }
         }
@@ -517,7 +517,7 @@ fn analyze_if_statement_block<'ctx, 'arena>(
             .negated_types
             .keys()
             .filter(|key| pre_assignment_else_redefined_locals.contains_key(key))
-            .cloned()
+            .copied()
             .collect::<AtomSet>();
 
         outer_block_context.update(
@@ -535,7 +535,7 @@ fn analyze_if_statement_block<'ctx, 'arena>(
             .variables_possibly_in_scope
             .iter()
             .filter(|id| !outer_block_context.variables_possibly_in_scope.contains(*id))
-            .cloned()
+            .copied()
             .collect::<AtomSet>();
 
         if let Some(loop_scope) = artifacts.loop_scope.as_mut() {
@@ -571,7 +571,7 @@ fn analyze_else_if_clause<'ctx, 'ast, 'arena>(
     let assigned_in_conditional_variable_ids = if_conditional_scope.assigned_in_conditional_variable_ids;
 
     let mut mixed_variables = vec![];
-    for (variable_id, variable_type) in else_if_block_context.locals.iter() {
+    for (variable_id, variable_type) in &else_if_block_context.locals {
         if variable_type.is_mixed() && outer_block_context.locals.contains_key(variable_id) {
             mixed_variables.push(*variable_id);
         }
@@ -688,7 +688,7 @@ fn analyze_else_if_clause<'ctx, 'ast, 'arena>(
 
     if entry_clauses.iter().any(|clause| !clause.possibilities.is_empty()) {
         let omit_keys =
-            entry_clauses.iter().flat_map(|clause| clause.possibilities.keys()).cloned().collect::<AtomSet>();
+            entry_clauses.iter().flat_map(|clause| clause.possibilities.keys()).copied().collect::<AtomSet>();
 
         let (outer_truthes, _) = find_satisfying_assignments(
             outer_block_context.clauses.iter().map(Rc::as_ref).cloned().collect_vec().as_slice(),
@@ -762,8 +762,8 @@ fn analyze_else_if_clause<'ctx, 'ast, 'arena>(
             .collect();
 
             let mut variables_to_remove = vec![];
-            for (changed_variable_id, _) in reconcilable_else_if_types.iter() {
-                for (variable_id, _) in else_if_block_context.locals.iter() {
+            for (changed_variable_id, _) in &reconcilable_else_if_types {
+                for variable_id in else_if_block_context.locals.keys() {
                     if is_derived_access_path(variable_id, changed_variable_id)
                         && !newly_reconciled_variable_ids.contains(variable_id)
                         && !conditionally_referenced_variable_ids.contains(variable_id)
@@ -784,7 +784,7 @@ fn analyze_else_if_clause<'ctx, 'ast, 'arena>(
 
     analyze_statements(else_if_clause.1, context, &mut else_if_block_context, artifacts)?;
 
-    for variable_id in else_if_block_context.parent_conflicting_clause_variables.iter() {
+    for variable_id in &else_if_block_context.parent_conflicting_clause_variables {
         outer_block_context.remove_variable_from_conflicting_clauses(context, variable_id, None);
     }
 
@@ -804,21 +804,39 @@ fn analyze_else_if_clause<'ctx, 'ast, 'arena>(
     let has_continue_statement;
     let has_leaving_statements;
 
-    if !has_actions {
-        has_ending_statements = false;
-        has_break_statement = false;
-        has_continue_statement = false;
-        has_leaving_statements = false;
-    } else {
+    if has_actions {
         has_ending_statements = final_actions.len() == 1 && final_actions.contains(&ControlAction::End);
         has_break_statement = final_actions.len() == 1 && final_actions.contains(&ControlAction::Break);
         has_continue_statement = final_actions.len() == 1 && final_actions.contains(&ControlAction::Continue);
         has_leaving_statements = has_ending_statements || !final_actions.contains(&ControlAction::None);
+    } else {
+        has_ending_statements = false;
+        has_break_statement = false;
+        has_continue_statement = false;
+        has_leaving_statements = false;
     }
 
     if_scope.if_actions.extend(final_actions.iter().copied());
 
-    if !has_leaving_statements {
+    if has_leaving_statements {
+        if_scope.reasonable_clauses = vec![];
+
+        if !negated_else_if_types.is_empty() {
+            let mut implied_outer_context = else_if_block_context.clone();
+
+            reconcile_keyed_types(
+                context,
+                &negated_else_if_types,
+                IndexMap::new(),
+                &mut implied_outer_context,
+                &mut AtomSet::default(),
+                &AtomSet::default(),
+                &else_if_clause.0.span(),
+                false,
+                false,
+            );
+        }
+    } else {
         update_if_scope(
             context,
             if_scope,
@@ -844,24 +862,6 @@ fn analyze_else_if_clause<'ctx, 'ast, 'arena>(
             .map(Rc::new)
             .collect();
         }
-    } else {
-        if_scope.reasonable_clauses = vec![];
-
-        if !negated_else_if_types.is_empty() {
-            let mut implied_outer_context = else_if_block_context.clone();
-
-            reconcile_keyed_types(
-                context,
-                &negated_else_if_types,
-                IndexMap::new(),
-                &mut implied_outer_context,
-                &mut AtomSet::default(),
-                &AtomSet::default(),
-                &else_if_clause.0.span(),
-                false,
-                false,
-            );
-        }
     }
 
     if !has_ending_statements {
@@ -869,7 +869,7 @@ fn analyze_else_if_clause<'ctx, 'ast, 'arena>(
             .variables_possibly_in_scope
             .iter()
             .filter(|id| !outer_block_context.variables_possibly_in_scope.contains(*id))
-            .cloned()
+            .copied()
             .collect::<AtomSet>();
 
         let possibly_assigned_variable_ids = new_possibly_assigned_variable_ids;
@@ -972,7 +972,7 @@ fn analyze_else_statements<'ctx, 'arena>(
 
         let mut variables_to_remove = vec![];
         for changed_variable_id in &changed_variable_ids {
-            for (variable_id, _) in else_block_context.locals.iter() {
+            for variable_id in else_block_context.locals.keys() {
                 if variable_id.eq(changed_variable_id) {
                     continue;
                 }
@@ -1024,16 +1024,16 @@ fn analyze_else_statements<'ctx, 'arena>(
     let has_continue_statement;
     let has_leaving_statements;
 
-    if !has_actions {
-        has_ending_statements = false;
-        has_break_statement = false;
-        has_continue_statement = false;
-        has_leaving_statements = false;
-    } else {
+    if has_actions {
         has_ending_statements = final_actions.len() == 1 && final_actions.contains(&ControlAction::End);
         has_break_statement = final_actions.len() == 1 && final_actions.contains(&ControlAction::Break);
         has_continue_statement = final_actions.len() == 1 && final_actions.contains(&ControlAction::Continue);
         has_leaving_statements = has_ending_statements || !final_actions.contains(&ControlAction::None);
+    } else {
+        has_ending_statements = false;
+        has_break_statement = false;
+        has_continue_statement = false;
+        has_leaving_statements = false;
     }
 
     if_scope.final_actions.extend(final_actions);
@@ -1071,7 +1071,7 @@ fn analyze_else_statements<'ctx, 'arena>(
             .variables_possibly_in_scope
             .iter()
             .filter(|&id| !outer_block_context.variables_possibly_in_scope.contains(id))
-            .cloned()
+            .copied()
             .collect::<AtomSet>();
 
         if has_leaving_statements {
@@ -1137,8 +1137,8 @@ fn add_conditionally_assigned_variables_to_context<'ctx, 'arena>(
     Ok(())
 }
 
-fn update_if_scope<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+fn update_if_scope<'ctx>(
+    context: &mut Context<'ctx, '_>,
     if_scope: &mut IfScope<'ctx>,
     if_block_context: &mut BlockContext<'ctx>,
     outer_block_context: &mut BlockContext<'ctx>,
@@ -1214,7 +1214,7 @@ fn update_if_scope<'ctx, 'arena>(
     }
 
     let mut possibly_redefined_variables = AtomMap::default();
-    for (variable_id, variable_type) in redefined_variables.iter() {
+    for (variable_id, variable_type) in &redefined_variables {
         if new_possibly_assigned_variable_ids.contains(variable_id)
             || !newly_reconciled_variable_ids.contains(variable_id)
         {
@@ -1233,35 +1233,32 @@ fn update_if_scope<'ctx, 'arena>(
 
     if_scope.possibly_assigned_variable_ids.extend(new_possibly_assigned_variable_ids);
 
-    match &mut if_scope.redefined_variables {
-        Some(redefined_scope_variables) => {
-            let mut variables_to_remove: Vec<Atom> = vec![];
-            for (redefined_variable, variable_type) in redefined_scope_variables.iter_mut() {
-                let Some(redefined_type) = redefined_variables.remove(redefined_variable) else {
-                    variables_to_remove.push(*redefined_variable);
-                    continue;
-                };
+    if let Some(redefined_scope_variables) = &mut if_scope.redefined_variables {
+        let mut variables_to_remove: Vec<Atom> = vec![];
+        for (redefined_variable, variable_type) in redefined_scope_variables.iter_mut() {
+            let Some(redefined_type) = redefined_variables.remove(redefined_variable) else {
+                variables_to_remove.push(*redefined_variable);
+                continue;
+            };
 
-                *variable_type = combine_union_types(&redefined_type, variable_type, context.codebase, false);
-            }
-
-            for variable in variables_to_remove {
-                redefined_scope_variables.remove(&variable);
-            }
-
-            for (variable_id, variable_type) in possibly_redefined_variables {
-                let resulting_type = match if_scope.possibly_redefined_variables.get(&variable_id) {
-                    Some(existing_type) => combine_union_types(&variable_type, existing_type, context.codebase, false),
-                    None => variable_type,
-                };
-
-                if_scope.possibly_redefined_variables.insert(variable_id, resulting_type);
-            }
+            *variable_type = combine_union_types(&redefined_type, variable_type, context.codebase, false);
         }
-        None => {
-            if_scope.redefined_variables = Some(redefined_variables);
-            if_scope.possibly_redefined_variables = possibly_redefined_variables;
+
+        for variable in variables_to_remove {
+            redefined_scope_variables.remove(&variable);
         }
+
+        for (variable_id, variable_type) in possibly_redefined_variables {
+            let resulting_type = match if_scope.possibly_redefined_variables.get(&variable_id) {
+                Some(existing_type) => combine_union_types(&variable_type, existing_type, context.codebase, false),
+                None => variable_type,
+            };
+
+            if_scope.possibly_redefined_variables.insert(variable_id, resulting_type);
+        }
+    } else {
+        if_scope.redefined_variables = Some(redefined_variables);
+        if_scope.possibly_redefined_variables = possibly_redefined_variables;
     }
 }
 
@@ -1292,7 +1289,7 @@ mod tests {
 
     test_analysis! {
         name = conditional_negation,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             /**
@@ -1342,7 +1339,7 @@ mod tests {
 
                 return $_tmp;
             }
-        "#},
+        "},
     }
 
     test_analysis! {
@@ -1371,7 +1368,7 @@ mod tests {
 
     test_analysis! {
         name = if_narrowing_string_or_null_to_string,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
             function takes_string(string $_s): void {}
 
@@ -1380,7 +1377,7 @@ mod tests {
                     takes_string($input);
                 }
             }
-        "#},
+        "},
     }
 
     test_analysis! {
@@ -1405,7 +1402,7 @@ mod tests {
 
     test_analysis! {
         name = if_var_becomes_never_due_to_impossible_condition,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
             function takes_string(string $_s): void {}
 
@@ -1417,7 +1414,7 @@ mod tests {
                     takes_string($input);
                 }
             }
-        "#},
+        "},
         issues = [
             IssueCode::RedundantComparison,
             IssueCode::ImpossibleCondition,
@@ -1427,7 +1424,7 @@ mod tests {
 
     test_analysis! {
         name = if_var_narrowed_then_used_after_with_original_possibilities,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
             /** @param 'a'|'b' $_ab */
             function expect_a_or_b(string $_ab): void {
@@ -1446,7 +1443,7 @@ mod tests {
             /** @param 'b' $_b */
             function expect_b(string $_b): void {}
 
-        "#},
+        "},
     }
 
     test_analysis! {
@@ -1504,7 +1501,7 @@ mod tests {
 
     test_analysis! {
         name = if_array_is_not_empty_narrowing,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
             /** @param non-empty-array<int, string> $_non_empty_arr */
             function expect_non_empty_arr(array $_non_empty_arr): void {}
@@ -1515,13 +1512,13 @@ mod tests {
                     expect_non_empty_arr($input_arr);
                 }
             }
-        "#},
+        "},
         issues = []
     }
 
     test_analysis! {
         name = if_array_is_empty_narrowing,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             /** @param array{} $_empty_arr */
@@ -1533,12 +1530,12 @@ mod tests {
                     expect_empty_arr($input_arr);
                 }
             }
-        "#},
+        "},
     }
 
     test_analysis! {
         name = if_else_both_define_var_type_is_union,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
             /** @param 1|2 $_one_or_two */
             function expect_one_or_two(int $_one_or_two): void {}
@@ -1552,7 +1549,7 @@ mod tests {
 
                 expect_one_or_two($num);
             }
-        "#},
+        "},
     }
 
     test_analysis! {
@@ -1598,7 +1595,7 @@ mod tests {
 
     test_analysis! {
         name = if_else_exhaustive_literal_union,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             /** @param 'x'|'y' $_s */
@@ -1623,7 +1620,7 @@ mod tests {
                 expect_xyz($result);
                 expect_x_or_y($result);
             }
-        "#},
+        "},
         issues = [
             IssueCode::PossiblyInvalidArgument, // `expect_x_or_y` expects 'x'|'y', but $result is 'x'|'y'|'z'
         ]
@@ -1631,7 +1628,7 @@ mod tests {
 
     test_analysis! {
         name = if_or_condition_lhs,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             /** @param 'text'|'other' $_s */
@@ -1660,7 +1657,7 @@ mod tests {
             }
 
             test_or_lhs_true('text');
-        "#},
+        "},
         issues = [
             IssueCode::RedundantComparison, // `$input === 'text'` is always true
             IssueCode::ImpossibleCondition, // `if ($input === 'text')` is never executed
@@ -1688,7 +1685,7 @@ mod tests {
 
     test_analysis! {
         name = if_assignment_in_condition_nullable_string,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             function get_string_or_null(): null|string
@@ -1718,7 +1715,7 @@ mod tests {
 
                 takes_string_or_null($message);
             }
-        "#},
+        "},
         issues = []
     }
 
@@ -1754,7 +1751,7 @@ mod tests {
 
     test_analysis! {
         name = nested_if_deep_narrowing_nullable_union,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             /** @param 'target' $_s */
@@ -1770,7 +1767,7 @@ mod tests {
                     }
                 }
             }
-        "#}
+        "}
     }
 
     test_analysis! {
@@ -1892,7 +1889,7 @@ mod tests {
 
     test_analysis! {
         name = formula_generated,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             final class Tokenizer
@@ -1921,12 +1918,12 @@ mod tests {
                     }
                 }
             }
-        "#},
+        "},
     }
 
     test_analysis! {
         name = eliminate_null_from_variable,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             function get_maybe_null(): ?string {
@@ -1977,7 +1974,7 @@ mod tests {
 
                 return '';
             }
-        "#},
+        "},
     }
 
     test_analysis! {
@@ -2067,7 +2064,7 @@ mod tests {
 
     test_analysis! {
         name = if_condition_is_too_complex,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             function is_special_case(int $id, int $count, float $score, float $threshold, bool $is_active, bool $is_admin, string $name, string $role, string $permission, string $category): bool {
@@ -2094,7 +2091,7 @@ mod tests {
 
                 return false;
             }
-        "#},
+        "},
         issues = [
             IssueCode::ConditionIsTooComplex,
         ]
@@ -2102,7 +2099,7 @@ mod tests {
 
     test_analysis! {
         name = elseif_condition_is_too_complex,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             function is_special_case(int $id, int $count, float $score, float $threshold, bool $is_active, bool $is_admin, string $name, string $role, string $permission, string $category): bool {
@@ -2131,7 +2128,7 @@ mod tests {
 
                 return false;
             }
-        "#},
+        "},
         issues = [
             IssueCode::ConditionIsTooComplex,
         ]

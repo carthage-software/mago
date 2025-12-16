@@ -72,11 +72,11 @@ pub fn get_docblock_before_position<'arena>(
                 if code_between_slice.iter().all(|b| b.is_ascii_whitespace()) {
                     // It's the correct docblock!
                     return Some(trivia);
-                } else {
-                    // There was non-whitespace code between this docblock and the class.
-                    // This docblock doesn't apply. Stop searching.
-                    return None;
                 }
+
+                // There was non-whitespace code between this docblock and the class.
+                // This docblock doesn't apply. Stop searching.
+                return None;
             }
             TriviaKind::WhiteSpace => {
                 continue;

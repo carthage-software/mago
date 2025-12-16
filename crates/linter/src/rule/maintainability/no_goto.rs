@@ -53,7 +53,7 @@ impl LintRule for NoGotoRule {
                 code harder to read, understand, and maintain. It can lead to "spaghetti code"
                 and make it difficult to follow the flow of execution.
             "#},
-            good_example: indoc! {r#"
+            good_example: indoc! {r"
                 <?php
 
                 $i = 0;
@@ -63,8 +63,8 @@ impl LintRule for NoGotoRule {
                     }
                     $i++;
                 }
-            "#},
-            bad_example: indoc! {r#"
+            "},
+            bad_example: indoc! {r"
                 <?php
 
                 $i = 0;
@@ -76,7 +76,7 @@ impl LintRule for NoGotoRule {
                 $i++;
                 goto loop;
                 end:
-            "#},
+            "},
             category: Category::Maintainability,
 
             requirements: RuleRequirements::None,
@@ -95,7 +95,7 @@ impl LintRule for NoGotoRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         match node {
             Node::Goto(goto) => {
                 let issue = Issue::new(self.cfg.level, "Avoid using `goto`.")

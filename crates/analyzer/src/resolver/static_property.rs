@@ -182,7 +182,7 @@ fn find_static_property_in_class<'ctx, 'ast, 'arena>(
     }
 
     let mut property_type =
-        property_metadata.type_metadata.as_ref().map(|metadata| metadata.type_union.clone()).unwrap_or_else(get_mixed);
+        property_metadata.type_metadata.as_ref().map_or_else(get_mixed, |metadata| metadata.type_union.clone());
 
     expander::expand_union(
         context.codebase,
@@ -204,8 +204,8 @@ fn find_static_property_in_class<'ctx, 'ast, 'arena>(
     }))
 }
 
-fn report_non_existent_property<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+fn report_non_existent_property(
+    context: &mut Context<'_, '_>,
     classname: &Atom,
     property_name: &Atom,
     selector_span: Span,

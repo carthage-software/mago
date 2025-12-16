@@ -83,7 +83,7 @@ pub struct ClassLikeMetadata {
     pub attribute_flags: Option<AttributeFlags>,
     pub flags: MetadataFlags,
     pub type_aliases: AtomMap<TypeMetadata>,
-    /// Imported type aliases in the form of (from_fqcn, type_name, span)
+    /// Imported type aliases in the form of (`from_fqcn`, `type_name`, span)
     pub imported_type_aliases: AtomMap<(Atom, Atom, Span)>,
 }
 

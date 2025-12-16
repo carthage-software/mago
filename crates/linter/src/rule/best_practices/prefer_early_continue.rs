@@ -54,7 +54,7 @@ impl LintRule for PreferEarlyContinueRule {
 
                 This improves code readability by reducing nesting and making the control flow more explicit.
             "},
-            good_example: indoc! {r#"
+            good_example: indoc! {r"
                 <?php
 
                 for ($i = 0; $i < 10; $i++) {
@@ -63,8 +63,8 @@ impl LintRule for PreferEarlyContinueRule {
                     }
                     doSomething();
                 }
-            "#},
-            bad_example: indoc! {r#"
+            "},
+            bad_example: indoc! {r"
                 <?php
 
                 for ($i = 0; $i < 10; $i++) {
@@ -72,7 +72,7 @@ impl LintRule for PreferEarlyContinueRule {
                         doSomething();
                     }
                 }
-            "#},
+            "},
             category: Category::BestPractices,
             requirements: RuleRequirements::None,
         };
@@ -88,7 +88,7 @@ impl LintRule for PreferEarlyContinueRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let (if_statement, loop_span) = match node {
             Node::For(for_loop) => {
                 let body = match &for_loop.body {

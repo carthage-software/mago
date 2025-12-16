@@ -54,11 +54,11 @@ impl LintRule for NoDirectDbQueryRule {
                 bypass the WordPress object cache, which can lead to poor performance. Using high-level functions
                 like `get_posts()` is safer and more efficient.
             "},
-            good_example: indoc! {r#"
+            good_example: indoc! {r"
                 <?php
 
                 $posts = get_posts(['author' => $author_id]);
-            "#},
+            "},
             bad_example: indoc! {r#"
                 <?php
 
@@ -82,7 +82,7 @@ impl LintRule for NoDirectDbQueryRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let Node::MethodCall(method_call) = node else {
             return;
         };

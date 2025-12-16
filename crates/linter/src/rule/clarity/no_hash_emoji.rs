@@ -51,29 +51,29 @@ impl LintRule for NoHashEmojiRule {
         const META: RuleMeta = RuleMeta {
             name: "No Hash Emoji",
             code: "no-hash-emoji",
-            description: indoc! {r#"
+            description: indoc! {r"
                 Discourages usage of the `#️⃣` emoji in place of the ASCII `#`.
 
                 While PHP allows the use of emojis in comments, it is generally discouraged to use them in place
                 of the normal ASCII `#` symbol. This is because it can confuse readers and may break external
                 tools that expect the normal ASCII `#` symbol.
-            "#},
-            good_example: indoc! {r#"
+            "},
+            good_example: indoc! {r"
                 <?php
 
                 # This is a comment
 
                 #[MyAttribute]
                 class Foo {}
-            "#},
-            bad_example: indoc! {r#"
+            "},
+            bad_example: indoc! {r"
                 <?php
 
                 #️⃣ This is a comment
 
                 #️⃣[MyAttribute] <- not a valid attribute
                 class Foo {}
-            "#},
+            "},
             category: Category::Clarity,
 
             requirements: RuleRequirements::None,
@@ -92,7 +92,7 @@ impl LintRule for NoHashEmojiRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let Node::Program(program) = node else {
             return;
         };

@@ -33,7 +33,7 @@ pub fn get_single_return_statement<'ast, 'arena>(block: &'ast Block<'arena>) -> 
     Some(return_stmt)
 }
 
-pub fn is_method_setter_or_getter<'ast, 'arena>(method: &'ast Method<'arena>) -> bool {
+pub fn is_method_setter_or_getter(method: &Method<'_>) -> bool {
     let MethodBody::Concrete(block) = &method.body else {
         return false;
     };
@@ -86,7 +86,7 @@ pub fn is_method_setter_or_getter<'ast, 'arena>(method: &'ast Method<'arena>) ->
     }
 }
 
-fn is_accessing_property_of_this<'ast, 'arena>(expression: &'ast Expression<'arena>) -> bool {
+fn is_accessing_property_of_this(expression: &Expression<'_>) -> bool {
     let Expression::Access(access) = expression else {
         return false;
     };
@@ -98,7 +98,7 @@ fn is_accessing_property_of_this<'ast, 'arena>(expression: &'ast Expression<'are
     is_variable_named(property_access.object, "$this")
 }
 
-fn is_variable_named<'ast, 'arena>(expression: &'ast Expression<'arena>, name: &str) -> bool {
+fn is_variable_named(expression: &Expression<'_>, name: &str) -> bool {
     let Expression::Variable(variable) = expression else {
         return false;
     };

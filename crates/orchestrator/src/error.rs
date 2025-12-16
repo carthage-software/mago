@@ -19,10 +19,10 @@ pub enum OrchestratorError {
 impl std::fmt::Display for OrchestratorError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Database(error) => write!(f, "Database error: {}", error),
-            Self::Analysis(error) => write!(f, "Analysis error: {}", error),
+            Self::Database(error) => write!(f, "Database error: {error}"),
+            Self::Analysis(error) => write!(f, "Analysis error: {error}"),
             Self::CacheLockPoisoned => write!(f, "Cache lock poisoned"),
-            Self::General(message) => write!(f, "{}", message),
+            Self::General(message) => write!(f, "{message}"),
         }
     }
 }

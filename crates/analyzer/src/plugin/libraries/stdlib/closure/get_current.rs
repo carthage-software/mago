@@ -1,4 +1,4 @@
-//! Closure::getCurrent() return type provider.
+//! `Closure::getCurrent()` return type provider.
 
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::callable::TCallable;
@@ -85,7 +85,7 @@ impl MethodReturnTypeProvider for ClosureGetCurrentProvider {
             );
 
             return Some(get_never());
-        };
+        }
 
         let codebase = context.codebase();
 

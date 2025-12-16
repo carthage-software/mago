@@ -255,7 +255,7 @@ impl ControlAction {
                             has_non_breaking_default = true;
                         }
 
-                        let case_does_end = case_actions.iter().any(|c| c.is_exit_path());
+                        let case_does_end = case_actions.iter().any(ControlAction::is_exit_path);
                         if case_does_end {
                             has_ended = true;
                         }
@@ -361,14 +361,14 @@ impl ControlAction {
 
                             all_catches_leave = all_catches_leave && catch_actions.iter().all(|c| !c.is_none());
 
-                            if !all_catches_leave {
-                                control_actions.extend(catch_actions);
-                            } else {
+                            if all_catches_leave {
                                 all_catch_actions.extend(catch_actions);
+                            } else {
+                                control_actions.extend(catch_actions);
                             }
                         }
 
-                        if all_catches_leave && !try_statement_actions.iter().all(|c| c.is_none()) {
+                        if all_catches_leave && !try_statement_actions.iter().all(ControlAction::is_none) {
                             control_actions.extend(try_statement_actions);
                             control_actions.extend(all_catch_actions);
 
@@ -390,7 +390,7 @@ impl ControlAction {
                             return_is_exit,
                         );
 
-                        if !finally_statement_actions.iter().any(|c| c.is_none()) {
+                        if !finally_statement_actions.iter().any(ControlAction::is_none) {
                             control_actions.retain(|c| !c.is_none());
                             control_actions.extend(finally_statement_actions);
 
@@ -402,7 +402,7 @@ impl ControlAction {
                     control_actions.retain(|c| !c.is_none());
                 }
                 _ => {}
-            };
+            }
         }
 
         control_actions.insert(ControlAction::None);

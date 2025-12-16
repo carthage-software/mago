@@ -183,7 +183,7 @@ pub fn could_expand_value<'arena>(
             // If it has at least one key-value pair, we should expand it.
             if expr.elements.iter().any(|element| element.is_key_value()) {
                 return true;
-            };
+            }
 
             expr.elements.iter().any(|element| match element {
                 ArrayElement::Variadic(e) => !is_simple_single_line_expression(f, e.value),

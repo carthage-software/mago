@@ -230,7 +230,7 @@ pub fn ascii_lowercase_atom(s: &str) -> Atom {
 
 /// Checks if `haystack` starts with `prefix`, ignoring ASCII case.
 ///
-/// This function uses SIMD instructions (AVX2 on x86_64, NEON on aarch64)
+/// This function uses SIMD instructions (AVX2 on `x86_64`, NEON on aarch64)
 /// when available and beneficial for the input size.
 ///
 /// # Examples

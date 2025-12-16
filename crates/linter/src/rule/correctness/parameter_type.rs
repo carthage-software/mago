@@ -63,22 +63,22 @@ impl LintRule for ParameterTypeRule {
             description: indoc! {"
                 Detects parameters that are missing a type hint.
             "},
-            good_example: indoc! {r#"
+            good_example: indoc! {r"
                 <?php
 
                 function foo(string $bar): void
                 {
                     // ...
                 }
-            "#},
-            bad_example: indoc! {r#"
+            "},
+            bad_example: indoc! {r"
                 <?php
 
                 function foo($bar): void
                 {
                     // ...
                 }
-            "#},
+            "},
             category: Category::Correctness,
             requirements: RuleRequirements::PHPVersion(PHPVersionRange::from(PHPVersion::PHP70)),
         };
@@ -104,7 +104,7 @@ impl LintRule for ParameterTypeRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         match node {
             Node::Function(function) => {
                 for parameter in function.parameter_list.parameters.iter() {

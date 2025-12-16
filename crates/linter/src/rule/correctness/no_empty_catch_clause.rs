@@ -55,7 +55,7 @@ impl LintRule for NoEmptyCatchClauseRule {
                 potentially hiding errors that should be addressed. This practice, known as
                 "exception swallowing," can make debugging significantly more difficult.
             "#},
-            good_example: indoc! {r#"
+            good_example: indoc! {r"
                 <?php
 
                 try {
@@ -64,8 +64,8 @@ impl LintRule for NoEmptyCatchClauseRule {
                     // Handle the error, log it, or re-throw it.
                     error_log($e->getMessage());
                 }
-            "#},
-            bad_example: indoc! {r#"
+            "},
+            bad_example: indoc! {r"
                 <?php
 
                 try {
@@ -73,7 +73,7 @@ impl LintRule for NoEmptyCatchClauseRule {
                 } catch(Exception $e) {
                     // This block is empty and swallows the exception.
                 }
-            "#},
+            "},
             category: Category::Correctness,
 
             requirements: RuleRequirements::None,
@@ -92,7 +92,7 @@ impl LintRule for NoEmptyCatchClauseRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let Node::Try(try_stmt) = node else {
             return;
         };

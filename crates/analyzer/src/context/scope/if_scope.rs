@@ -38,7 +38,7 @@ pub struct IfScope<'ctx> {
     pub definitely_called_methods: Option<HashSet<Atom>>,
 }
 
-impl<'ctx> IfScope<'ctx> {
+impl IfScope<'_> {
     pub fn new() -> Self {
         Self {
             new_variables: None,

@@ -18,7 +18,7 @@ use crate::ttype::union::TUnion;
 /// Represents a key used in PHP arrays, which can be either an integer (`int`) or a string (`string`).
 ///
 /// PHP automatically casts other scalar types (float, bool, null) and resources to int or string
-/// when used as array keys. Objects used as keys usually result in errors or use spl_object_hash.
+/// when used as array keys. Objects used as keys usually result in errors or use `spl_object_hash`.
 /// This enum focuses on the valid resulting key types after potential casting.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub enum ArrayKey {

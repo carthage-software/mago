@@ -173,13 +173,13 @@ mod tests {
 
     test_analysis! {
         name = method_closure_creation_on_ambiguous_object,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
             /** @param object $obj */
             function test($obj) {
                 $_closure = $obj->method(...);
             }
-        "#},
+        "},
         issues = [
             IssueCode::AmbiguousObjectMethodAccess,
         ]
@@ -227,7 +227,7 @@ mod tests {
 
     test_analysis! {
         name = method_closure_creation_from_interface_method,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
             interface Logger { public function log(string $message): void; }
             class FileLogger implements Logger {
@@ -240,7 +240,7 @@ mod tests {
             $logger = new FileLogger();
             $closure = $logger->log(...);
             call_it($closure);
-        "#},
+        "},
     }
 
     test_analysis! {
@@ -264,12 +264,12 @@ mod tests {
 
     test_analysis! {
         name = method_closure_creation_non_existent_method,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
             class MyClass {}
             $obj = new MyClass();
             $closure = $obj->undefinedMethod(...);
-        "#},
+        "},
         issues = [
             IssueCode::NonExistentMethod,
             IssueCode::ImpossibleAssignment,
@@ -291,11 +291,11 @@ mod tests {
 
     test_analysis! {
         name = method_closure_creation_on_definitely_null,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
             $obj = null;
             $closure = $obj->method(...);
-        "#},
+        "},
         issues = [
             IssueCode::MethodAccessOnNull,
             IssueCode::ImpossibleAssignment,
@@ -304,14 +304,14 @@ mod tests {
 
     test_analysis! {
         name = method_closure_creation_on_possibly_null_object,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
             class MyClass { public function method(): void {} }
             /** @param MyClass|null $obj */
             function test($obj) {
                 $_closure = $obj->method(...);
             }
-        "#},
+        "},
         issues = [
             IssueCode::PossibleMethodAccessOnNull,
         ]
@@ -319,13 +319,13 @@ mod tests {
 
     test_analysis! {
         name = method_closure_creation_on_mixed_type,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
             /** @param mixed $obj */
             function test($obj) {
                 $_closure = $obj->method(...);
             }
-        "#},
+        "},
         issues = [
             IssueCode::MixedMethodAccess,
         ]
@@ -333,13 +333,13 @@ mod tests {
 
     test_analysis! {
         name = method_closure_creation_on_generic_object,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
             /** @param object $obj */
             function test($obj) {
                 $_closure = $obj->method(...);
             }
-        "#},
+        "},
         issues = [
             IssueCode::AmbiguousObjectMethodAccess,
         ]
@@ -361,7 +361,7 @@ mod tests {
 
     test_analysis! {
         name = method_closure_creation_with_invalid_selector_type,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
             class DynamicCaller {
                 public function methodA(): int { return 1; }
@@ -369,7 +369,7 @@ mod tests {
             $obj = new DynamicCaller();
             $methodName = 123;
             $_closure = $obj->{$methodName}(...);
-        "#},
+        "},
         issues = [
             IssueCode::InvalidMemberSelector,
             IssueCode::ImpossibleAssignment,
@@ -378,7 +378,7 @@ mod tests {
 
     test_analysis! {
         name = method_closure_creation_on_union_of_object_and_non_object,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             class MyClass { public function method(): void {} }
@@ -386,7 +386,7 @@ mod tests {
             function test(MyClass|int $val) {
                 $_closure = $val->method(...);
             }
-        "#},
+        "},
         issues = [
             IssueCode::InvalidMethodAccess,
         ]
@@ -394,7 +394,7 @@ mod tests {
 
     test_analysis! {
         name = method_closure_creation_on_union_where_one_lacks_method,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
             class ClassA { public function thing(): void {} }
             class ClassB { /* has no thing method */ }
@@ -402,7 +402,7 @@ mod tests {
             function test(ClassA|ClassB $obj) {
                 $_closure = $obj->thing(...);
             }
-        "#},
+        "},
         issues = [
             IssueCode::NonExistentMethod,
         ]

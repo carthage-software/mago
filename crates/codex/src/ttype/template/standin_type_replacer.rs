@@ -120,7 +120,7 @@ pub fn replace(
     }
 
     let mut had_template = false;
-    for atomic_type in original_parameter_atomics.iter() {
+    for atomic_type in &original_parameter_atomics {
         new_parameter_atomics.extend(handle_atomic_standin(
             atomic_type,
             template_result,
@@ -131,7 +131,7 @@ pub fn replace(
             options,
             original_parameter_atomics.len() == 1,
             &mut had_template,
-        ))
+        ));
     }
 
     if new_parameter_atomics.is_empty() {
@@ -211,7 +211,9 @@ fn handle_atomic_standin(
     let mut new_appearance_depth = options.appearance_depth;
 
     if let Some(argument_type) = argument_type {
-        if !argument_type.is_mixed() {
+        if argument_type.is_mixed() {
+            matching_input_types.push(argument_type.get_single().clone());
+        } else {
             matching_input_types = find_matching_atomic_types_for_template(
                 parameter_atomic,
                 normalized_key,
@@ -219,8 +221,6 @@ fn handle_atomic_standin(
                 argument_type,
                 &mut new_appearance_depth,
             );
-        } else {
-            matching_input_types.push(argument_type.get_single().clone());
         }
     }
 
@@ -249,7 +249,7 @@ fn handle_atomic_standin(
             argument_offset,
             argument_span,
             options.with_appearance_depth(new_appearance_depth),
-        ))
+        ));
     }
 
     atomic_types
@@ -408,7 +408,7 @@ fn replace_atomic(
                         input_arg_offset,
                         input_arg_pos,
                         StandinOptions {
-                            appearance_depth: opts.appearance_depth + if is_covariant { 0 } else { 1 },
+                            appearance_depth: opts.appearance_depth + usize::from(!is_covariant),
                             iteration_depth: opts.iteration_depth + 1,
                             ..opts
                         },
@@ -835,7 +835,7 @@ fn handle_template_param_class_standin(
     let mut atomic_types = vec![];
 
     if let Some(input_type) = if let Some(input_type) = input_type {
-        if !template_result.readonly { Some(input_type) } else { None }
+        if template_result.readonly { None } else { Some(input_type) }
     } else {
         None
     } {
@@ -902,7 +902,7 @@ fn handle_template_param_class_standin(
                     argument_offset: input_argument_offset,
                     span: input_argument_span,
                     equality_bound_classlike: None,
-                }]
+                }];
             } else {
                 template_result.lower_bounds.entry(*parameter_name).or_default().insert(
                     *defining_entity,

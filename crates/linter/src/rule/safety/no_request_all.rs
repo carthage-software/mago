@@ -62,7 +62,7 @@ impl LintRule for NoRequestAllRule {
                 Such calls retrieve all input values, including ones you might not expect or intend to handle.
                 It is recommended to use `$request->only([...])` to specify the inputs you need explicitly, ensuring better security and validation.
             "},
-            good_example: indoc! {r#"
+            good_example: indoc! {r"
                 <?php
 
                 namespace App\Http\Controllers;
@@ -82,8 +82,8 @@ impl LintRule for NoRequestAllRule {
                         // ...
                     }
                 }
-            "#},
-            bad_example: indoc! {r#"
+            "},
+            bad_example: indoc! {r"
                 <?php
 
                 namespace App\Http\Controllers;
@@ -103,7 +103,7 @@ impl LintRule for NoRequestAllRule {
                         // ...
                     }
                 }
-            "#},
+            "},
             category: Category::Safety,
 
             requirements: RuleRequirements::Integration(Integration::Laravel),
@@ -122,7 +122,7 @@ impl LintRule for NoRequestAllRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let block = match node {
             Node::Function(Function { body: block, .. }) => block,
             Node::Method(Method { body: MethodBody::Concrete(block), .. }) => block,

@@ -60,15 +60,15 @@ impl LintRule for NoRedundantUseRule {
             description: indoc! {"
                 Detects `use` statements that import items that are never used.
             "},
-            good_example: indoc! {r#"
+            good_example: indoc! {r"
                 <?php
                 namespace App;
 
                 use App\Helpers\ArrayHelper;
 
                 $result = ArrayHelper::combine([]);
-            "#},
-            bad_example: indoc! {r#"
+            "},
+            bad_example: indoc! {r"
                 <?php
                 namespace App;
 
@@ -76,7 +76,7 @@ impl LintRule for NoRedundantUseRule {
                 use App\Helpers\StringHelper; // StringHelper is not used.
 
                 $result = ArrayHelper::combine([]);
-            "#},
+            "},
             category: Category::Redundancy,
             requirements: RuleRequirements::None,
         };
@@ -93,7 +93,7 @@ impl LintRule for NoRedundantUseRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let Node::Program(program) = node else { return };
 
         let mut check_inline_mentions = false;
@@ -121,7 +121,7 @@ impl LintRule for NoRedundantUseRule {
             acc
         });
 
-        for (_, decls) in grouped_by_parent.iter() {
+        for decls in grouped_by_parent.values() {
             let total_items = decls.len();
             let unused_items: Vec<_> = decls
                 .iter()
@@ -139,11 +139,11 @@ impl LintRule for NoRedundantUseRule {
                 if total_items == 1 {
                     let unused_decl = unused_items[0];
                     let alias = utils::get_alias(unused_decl.item);
-                    let issue = Issue::new(self.cfg.level(), format!("Unused import: `{}`.", alias))
+                    let issue = Issue::new(self.cfg.level(), format!("Unused import: `{alias}`."))
                         .with_code(self.meta.code)
                         .with_annotation(
                             Annotation::primary(unused_decl.item.name.span())
-                                .with_message(format!("`{}` is imported but never used.", alias)),
+                                .with_message(format!("`{alias}` is imported but never used.")),
                         )
                         .with_annotation(
                             Annotation::secondary(use_stmt.r#use.span()).with_message("Unused `use` statement."),
@@ -178,7 +178,7 @@ impl LintRule for NoRedundantUseRule {
                     let alias = utils::get_alias(unused_decl.item);
                     issue = issue.with_annotation(
                         Annotation::primary(unused_decl.item.span())
-                            .with_message(format!("`{}` is imported but never used.", alias)),
+                            .with_message(format!("`{alias}` is imported but never used.")),
                     );
                 }
 
@@ -236,7 +236,7 @@ mod utils {
             match &use_stmt.items {
                 UseItems::Sequence(s) => {
                     let import_type = ImportType::ClassOrNamespace;
-                    for item in s.items.nodes.iter() {
+                    for item in &s.items.nodes {
                         declarations.push(UseDeclaration {
                             parent_stmt: stmt,
                             item,
@@ -247,7 +247,7 @@ mod utils {
                 }
                 UseItems::TypedSequence(s) => {
                     let import_type = if s.r#type.is_function() { ImportType::Function } else { ImportType::Constant };
-                    for item in s.items.nodes.iter() {
+                    for item in &s.items.nodes {
                         declarations.push(UseDeclaration {
                             parent_stmt: stmt,
                             item,
@@ -258,7 +258,7 @@ mod utils {
                 }
                 UseItems::MixedList(list) => {
                     let prefix = list.namespace.value();
-                    for i in list.items.nodes.iter() {
+                    for i in &list.items.nodes {
                         let import_type = match i.r#type.as_ref() {
                             Some(t) if t.is_function() => ImportType::Function,
                             Some(t) if t.is_const() => ImportType::Constant,
@@ -272,12 +272,12 @@ mod utils {
                     let prefix = list.namespace.value();
                     let import_type =
                         if list.r#type.is_function() { ImportType::Function } else { ImportType::Constant };
-                    for item in list.items.nodes.iter() {
+                    for item in &list.items.nodes {
                         let fqn = concat_atom!(prefix, "\\", item.name.value());
                         declarations.push(UseDeclaration { parent_stmt: stmt, item, import_type, fqn });
                     }
                 }
-            };
+            }
         }
     }
 
@@ -321,7 +321,7 @@ mod utils {
         }
 
         impl<'arena> MutWalker<'_, 'arena, ()> for InlineWalker<'arena> {
-            fn walk_in_inline(&mut self, inline: &'_ Inline<'arena>, _: &mut ()) {
+            fn walk_in_inline(&mut self, inline: &'_ Inline<'arena>, (): &mut ()) {
                 self.contents.push(inline.value);
             }
         }
@@ -331,7 +331,7 @@ mod utils {
         walker.contents
     }
 
-    pub(super) fn build_used_fqn_set<'arena>(ctx: &LintContext<'_, 'arena>) -> AtomSet {
+    pub(super) fn build_used_fqn_set(ctx: &LintContext<'_, '_>) -> AtomSet {
         ctx.resolved_names.all().iter().map(|(_, (fqn, _))| atom(fqn)).collect()
     }
 
@@ -372,7 +372,7 @@ mod utils {
     }
 
     fn find_range_in_mixed_list(list: &MixedUseItemList, item_to_delete: &UseItem) -> Option<Range<u32>> {
-        let Some(index) = list.items.nodes.iter().position(|i| std::ptr::eq(&i.item, item_to_delete)) else {
+        let Some(index) = list.items.nodes.iter().position(|i| std::ptr::eq(&raw const i.item, item_to_delete)) else {
             return Some(item_to_delete.span().to_range());
         };
 

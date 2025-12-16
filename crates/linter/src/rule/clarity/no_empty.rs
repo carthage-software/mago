@@ -55,13 +55,13 @@ impl LintRule for NoEmptyRule {
                 loose and counterintuitive definition of emptiness. It fails to clearly convey
                 developer's intent or expectation, making it preferable to use explicit checks.
             "},
-            good_example: indoc! {r#"
+            good_example: indoc! {r"
                 <?php
 
                 if ($myArray === []) {
                     // ...
                 }
-            "#},
+            "},
             bad_example: indoc! {r"
                 <?php
 
@@ -87,7 +87,7 @@ impl LintRule for NoEmptyRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let Node::EmptyConstruct(construct) = node else {
             return;
         };

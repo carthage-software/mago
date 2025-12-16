@@ -214,16 +214,13 @@ impl<'de> Deserialize<'de> for StructuralInheritanceConstraint {
                 } else if s.split('\\').all(is_valid_identifier_part) {
                     Ok(Self::Single(s))
                 } else {
-                    Err(de::Error::custom(format!(
-                        "Expected a valid fully qualified name or '@nothing', found '{}'",
-                        s
-                    )))
+                    Err(de::Error::custom(format!("Expected a valid fully qualified name or '@nothing', found '{s}'")))
                 }
             }
             Untagged::AllOf(items) => {
                 for item in &items {
                     if !item.split('\\').all(is_valid_identifier_part) {
-                        return Err(de::Error::custom(format!("'{}' is not a valid fully qualified name", item)));
+                        return Err(de::Error::custom(format!("'{item}' is not a valid fully qualified name")));
                     }
                 }
 
@@ -233,7 +230,7 @@ impl<'de> Deserialize<'de> for StructuralInheritanceConstraint {
                 for group in &groups {
                     for item in group {
                         if !item.split('\\').all(is_valid_identifier_part) {
-                            return Err(de::Error::custom(format!("'{}' is not a valid fully qualified name", item)));
+                            return Err(de::Error::custom(format!("'{item}' is not a valid fully qualified name")));
                         }
                     }
                 }
@@ -273,23 +270,23 @@ impl fmt::Display for StructuralInheritanceConstraint {
             // "nothing"
             Self::Nothing => write!(f, "<nothing>"),
             // "`SomeInterface`"
-            Self::Single(item) => write!(f, "`{}`", item),
+            Self::Single(item) => write!(f, "`{item}`"),
             // "`InterfaceA` and `InterfaceB`"
             Self::AllOf(items) => {
-                let formatted = items.iter().map(|item| format!("`{}`", item)).collect::<Vec<_>>().join(" and ");
-                write!(f, "{}", formatted)
+                let formatted = items.iter().map(|item| format!("`{item}`")).collect::<Vec<_>>().join(" and ");
+                write!(f, "{formatted}")
             }
             // "(`InterfaceA` and `InterfaceB`) or `InterfaceC`"
             Self::AnyOfAllOf(groups) => {
                 let formatted = groups
                     .iter()
                     .map(|group| {
-                        let inner = group.iter().map(|item| format!("`{}`", item)).collect::<Vec<_>>().join(" and ");
-                        if group.len() > 1 { format!("({})", inner) } else { inner }
+                        let inner = group.iter().map(|item| format!("`{item}`")).collect::<Vec<_>>().join(" and ");
+                        if group.len() > 1 { format!("({inner})") } else { inner }
                     })
                     .collect::<Vec<_>>()
                     .join(" or ");
-                write!(f, "{}", formatted)
+                write!(f, "{formatted}")
             }
         }
     }

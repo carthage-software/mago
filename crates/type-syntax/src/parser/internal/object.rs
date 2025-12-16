@@ -42,11 +42,10 @@ pub fn parse_object_type<'input>(stream: &mut TypeTokenStream<'input>) -> Result
                                     if stream.lookahead(i + 1)?.is_some_and(|t| t.kind == TypeTokenKind::Colon) {
                                         found_key = true;
                                         break;
-                                    } else {
-                                        // If the question mark is not followed by a colon,
-                                        // it could be part of the key.
-                                        continue;
                                     }
+                                    // If the question mark is not followed by a colon,
+                                    // it could be part of the key.
+                                    continue;
                                 }
                                 // If we find any of these tokens, what came before must have
                                 // been a full value type, not a key.

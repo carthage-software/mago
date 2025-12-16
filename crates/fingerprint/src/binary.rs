@@ -25,7 +25,35 @@ impl Fingerprintable for BinaryOperator<'_> {
         _resolved_names: &ResolvedNames,
         _options: &FingerprintOptions<'_>,
     ) {
-        use BinaryOperator::*;
+        use BinaryOperator::Addition;
+        use BinaryOperator::And;
+        use BinaryOperator::AngledNotEqual;
+        use BinaryOperator::BitwiseAnd;
+        use BinaryOperator::BitwiseOr;
+        use BinaryOperator::BitwiseXor;
+        use BinaryOperator::Division;
+        use BinaryOperator::Equal;
+        use BinaryOperator::Exponentiation;
+        use BinaryOperator::GreaterThan;
+        use BinaryOperator::GreaterThanOrEqual;
+        use BinaryOperator::Identical;
+        use BinaryOperator::Instanceof;
+        use BinaryOperator::LeftShift;
+        use BinaryOperator::LessThan;
+        use BinaryOperator::LessThanOrEqual;
+        use BinaryOperator::LowAnd;
+        use BinaryOperator::LowOr;
+        use BinaryOperator::LowXor;
+        use BinaryOperator::Modulo;
+        use BinaryOperator::Multiplication;
+        use BinaryOperator::NotEqual;
+        use BinaryOperator::NotIdentical;
+        use BinaryOperator::NullCoalesce;
+        use BinaryOperator::Or;
+        use BinaryOperator::RightShift;
+        use BinaryOperator::Spaceship;
+        use BinaryOperator::StringConcat;
+        use BinaryOperator::Subtraction;
 
         match self {
             Addition(_) => "+".hash(hasher),

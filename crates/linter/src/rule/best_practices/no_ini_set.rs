@@ -54,7 +54,7 @@ impl LintRule for NoIniSetRule {
         const META: RuleMeta = RuleMeta {
             name: "No ini_set",
             code: "no-ini-set",
-            description: indoc! {r#"
+            description: indoc! {r"
                 Enforces that ini_set is not used.
 
                 Runtime configuration changes via ini_set make application behavior unpredictable and environment-dependent. They can mask misconfigured servers, introduce subtle bugs, and lead to inconsistent behavior between development, testing, and production environments.
@@ -62,8 +62,8 @@ impl LintRule for NoIniSetRule {
                 Modern applications should rely on well-defined configuration through php.ini or framework specific configuration. This ensures that configuration is explicit, consistent, and controlled across all environments.
 
                 If a setting truly needs to vary between contexts, it should be handled at the infrastructure or framework configuration level, never by calling ini_set within the application code.
-            "#},
-            good_example: indoc! {r#"
+            "},
+            good_example: indoc! {r"
                 <?php
 
                 // In framework config files (e.g., wp-config.php), use constants.
@@ -71,14 +71,14 @@ impl LintRule for NoIniSetRule {
 
                 // Use framework-provided functions where available.
                 wp_raise_memory_limit( 'admin' );
-            "#},
-            bad_example: indoc! {r#"
+            "},
+            bad_example: indoc! {r"
                 <?php
 
                 // This can override server settings in an unpredictable way.
                 ini_set( 'display_errors', 1 );
                 ini_set( 'memory_limit', '256M' );
-            "#},
+            "},
             category: Category::BestPractices,
             requirements: RuleRequirements::None,
         };
@@ -96,7 +96,7 @@ impl LintRule for NoIniSetRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let Node::FunctionCall(function_call) = node else {
             return;
         };

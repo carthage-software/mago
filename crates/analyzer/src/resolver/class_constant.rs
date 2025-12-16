@@ -320,10 +320,7 @@ fn report_non_existent_constant<'ctx>(
 }
 
 /// Reports a warning when a constant is accessed on an ambiguous type like `object` or `class-string`.
-fn report_ambiguous_constant_access<'ctx, 'ast, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
-    class_expr: &'ast Expression<'arena>,
-) {
+fn report_ambiguous_constant_access<'arena>(context: &mut Context<'_, 'arena>, class_expr: &Expression<'arena>) {
     context.collector.report_with_code(
         IssueCode::AmbiguousClassLikeConstantAccess,
         Issue::warning("Cannot reliably determine class for constant access due to an ambiguous type.")

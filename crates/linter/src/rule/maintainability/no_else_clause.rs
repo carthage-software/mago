@@ -49,13 +49,13 @@ impl LintRule for NoElseClauseRule {
         const META: RuleMeta = RuleMeta {
             name: "No Else Clause",
             code: "no-else-clause",
-            description: indoc! {r#"
+            description: indoc! {r"
                 Flags `if` statements that include an `else` or `elseif` branch.
 
                 Using `else` or `elseif` can lead to deeply nested code and complex control flow.
                 This can often be simplified by using early returns (guard clauses), which makes
                 the code easier to read and maintain by reducing its cyclomatic complexity.
-            "#},
+            "},
             good_example: indoc! {r#"
                 <?php
 
@@ -99,7 +99,7 @@ impl LintRule for NoElseClauseRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let Node::If(if_stmt) = node else {
             return;
         };
@@ -136,14 +136,14 @@ impl LintRule for NoElseClauseRule {
         match &if_stmt.body {
             IfBody::Statement(body) => {
                 report_on_clauses(
-                    body.else_if_clauses.iter().map(|e| e.span()).collect::<Vec<_>>().as_slice(),
-                    body.else_clause.as_ref().map(|e| e.span()),
+                    body.else_if_clauses.iter().map(mago_span::HasSpan::span).collect::<Vec<_>>().as_slice(),
+                    body.else_clause.as_ref().map(mago_span::HasSpan::span),
                 );
             }
             IfBody::ColonDelimited(body) => {
                 report_on_clauses(
-                    body.else_if_clauses.iter().map(|e| e.span()).collect::<Vec<_>>().as_slice(),
-                    body.else_clause.as_ref().map(|e| e.span()),
+                    body.else_if_clauses.iter().map(mago_span::HasSpan::span).collect::<Vec<_>>().as_slice(),
+                    body.else_clause.as_ref().map(mago_span::HasSpan::span),
                 );
             }
         }

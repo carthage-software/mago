@@ -5,8 +5,8 @@ use crate::artifacts::AnalysisArtifacts;
 use crate::context::block::BlockContext;
 
 /// Extracts `function_exists` and `defined` calls from a condition expression.
-pub fn extract_function_constant_existence<'arena>(
-    expression: &Expression<'arena>,
+pub fn extract_function_constant_existence(
+    expression: &Expression<'_>,
     artifacts: &AnalysisArtifacts,
     block_context: &mut BlockContext<'_>,
     negated: bool,
@@ -62,7 +62,7 @@ fn get_first_literal_string_arg(
     argument_list
         .arguments
         .first()
-        .map(|arg| arg.value())
+        .map(mago_syntax::ast::Argument::value)
         .and_then(|expr| artifacts.get_expression_type(expr))
         .and_then(|ty| ty.get_single_literal_string_value())
         .map(|s| if constant { ascii_lowercase_constant_name_atom(s) } else { ascii_lowercase_atom(s) })

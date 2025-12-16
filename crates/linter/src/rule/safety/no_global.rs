@@ -55,21 +55,21 @@ impl LintRule for NoGlobalRule {
 
                 The `global` keyword introduces global state into your function, making it harder to reason about and test.
             "},
-            good_example: indoc! {r#"
+            good_example: indoc! {r"
                 <?php
 
                 function foo(string $bar): void {
                     // ...
                 }
-            "#},
-            bad_example: indoc! {r#"
+            "},
+            bad_example: indoc! {r"
                 <?php
 
                 function foo(): void {
                     global $bar;
                     // ...
                 }
-            "#},
+            "},
             category: Category::Safety,
 
             requirements: RuleRequirements::None,
@@ -88,7 +88,7 @@ impl LintRule for NoGlobalRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         match node {
             Node::Global(global) => {
                 let mut issue = Issue::new(self.cfg.level(), "Unsafe use of `global` keyword.")

@@ -7,7 +7,7 @@ fn get_fingerprint(code: &'static str) -> u64 {
     let arena = Bump::new();
     let file = File::ephemeral("test.php".into(), code.into());
     let (program, error) = mago_syntax::parser::parse_file(&arena, &file);
-    assert!(error.is_none(), "Parse error: {:?}", error);
+    assert!(error.is_none(), "Parse error: {error:?}");
 
     let resolved_names = mago_names::resolver::NameResolver::new(&arena).resolve(program);
     let options = FingerprintOptions::default();
@@ -23,7 +23,7 @@ fn get_fingerprint_with_options(code: &'static str, options: FingerprintOptions)
     let arena = Bump::new();
     let file = File::ephemeral("test.php".into(), code.into());
     let (program, error) = mago_syntax::parser::parse_file(&arena, &file);
-    assert!(error.is_none(), "Parse error: {:?}", error);
+    assert!(error.is_none(), "Parse error: {error:?}");
 
     let resolved_names = mago_names::resolver::NameResolver::new(&arena).resolve(program);
 

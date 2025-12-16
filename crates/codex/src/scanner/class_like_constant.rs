@@ -21,12 +21,12 @@ use crate::ttype::resolution::TypeResolutionContext;
 use crate::visibility::Visibility;
 
 #[inline]
-pub fn scan_class_like_constants<'ctx, 'arena>(
+pub fn scan_class_like_constants<'arena>(
     class_like_metadata: &mut ClassLikeMetadata,
     constant: &'arena ClassLikeConstant<'arena>,
     classname: Option<Atom>,
     type_context: &TypeResolutionContext,
-    context: &mut Context<'ctx, 'arena>,
+    context: &mut Context<'_, 'arena>,
     scope: &NamespaceScope,
 ) -> Vec<ClassLikeConstantMetadata> {
     let attributes = scan_attribute_lists(&constant.attribute_lists, context);
@@ -63,12 +63,13 @@ pub fn scan_class_like_constants<'ctx, 'arena>(
         .iter()
         .map(|item| {
             let mut meta = ClassLikeConstantMetadata::new(atom(item.name.value), item.span(), visibility, flags);
-            if let Some(type_declaration) = type_declaration.as_ref().cloned() {
+            if let Some(type_declaration) = type_declaration.clone() {
                 meta.set_type_declaration(type_declaration);
             }
 
             meta.attributes = attributes.clone();
-            meta.inferred_type = infer(context, scope, &item.value).map(|u| u.get_single_owned());
+            meta.inferred_type =
+                infer(context, scope, &item.value).map(super::super::ttype::union::TUnion::get_single_owned);
 
             if let Some(ref docblock) = docblock {
                 if docblock.is_deprecated {

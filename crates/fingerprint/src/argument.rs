@@ -93,13 +93,13 @@ impl Fingerprintable for PartialArgument<'_> {
             PartialArgument::Positional(arg) => arg.fingerprint_with_hasher(hasher, resolved_names, options),
             PartialArgument::Named(arg) => arg.fingerprint_with_hasher(hasher, resolved_names, options),
             PartialArgument::Placeholder(placeholder) => {
-                placeholder.fingerprint_with_hasher(hasher, resolved_names, options)
+                placeholder.fingerprint_with_hasher(hasher, resolved_names, options);
             }
             PartialArgument::VariadicPlaceholder(placeholder) => {
-                placeholder.fingerprint_with_hasher(hasher, resolved_names, options)
+                placeholder.fingerprint_with_hasher(hasher, resolved_names, options);
             }
             PartialArgument::NamedPlaceholder(placeholder) => {
-                placeholder.fingerprint_with_hasher(hasher, resolved_names, options)
+                placeholder.fingerprint_with_hasher(hasher, resolved_names, options);
             }
         }
     }

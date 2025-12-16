@@ -58,18 +58,18 @@ impl LintRule for StrictTypesRule {
             description: indoc! {"
                 Detects missing `declare(strict_types=1);` statement at the beginning of the file.
             "},
-            good_example: indoc! {r###"
+            good_example: indoc! {r#"
                 <?php
 
                 declare(strict_types=1);
 
                 echo "Hello, World!";
-            "###},
-            bad_example: indoc! {r###"
+            "#},
+            bad_example: indoc! {r#"
                 <?php
 
                 echo "Hello, World!";
-            "###},
+            "#},
             category: Category::Correctness,
             requirements: RuleRequirements::PHPVersion(PHPVersionRange::from(PHPVersion::PHP70)),
         };
@@ -87,7 +87,7 @@ impl LintRule for StrictTypesRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let Node::Program(program) = node else {
             return;
         };
@@ -95,16 +95,15 @@ impl LintRule for StrictTypesRule {
         let mut found = false;
         let mut has_useful_statements = false;
         for statement in program.statements.iter() {
-            let declare = match statement {
-                Statement::Declare(declare) => declare,
-                _ => {
-                    has_useful_statements |= !matches!(
-                        statement,
-                        Statement::OpeningTag(_) | Statement::ClosingTag(_) | Statement::Inline(_) | Statement::Noop(_)
-                    );
+            let declare = if let Statement::Declare(declare) = statement {
+                declare
+            } else {
+                has_useful_statements |= !matches!(
+                    statement,
+                    Statement::OpeningTag(_) | Statement::ClosingTag(_) | Statement::Inline(_) | Statement::Noop(_)
+                );
 
-                    continue;
-                }
+                continue;
             };
 
             for item in declare.items.iter() {
@@ -112,25 +111,21 @@ impl LintRule for StrictTypesRule {
                     continue;
                 }
 
-                match &item.value {
-                    Expression::Literal(Literal::Integer(integer)) => {
-                        if integer.value == Some(0) && !self.cfg.allow_disabling {
-                            let issue = Issue::new(self.cfg.level(), "The `strict_types` directive is disabled.")
-                                .with_code(self.meta.code)
-                                .with_annotation(
-                                    Annotation::primary(item.span())
-                                        .with_message("The `strict_types` is disabled here"),
-                                )
-                                .with_note("Disabling `strict_types` can lead to type safety issues.")
-                                .with_help("Consider setting `strict_types` to `1` to enforce strict typing.");
+                if let Expression::Literal(Literal::Integer(integer)) = &item.value {
+                    if integer.value == Some(0) && !self.cfg.allow_disabling {
+                        let issue = Issue::new(self.cfg.level(), "The `strict_types` directive is disabled.")
+                            .with_code(self.meta.code)
+                            .with_annotation(
+                                Annotation::primary(item.span()).with_message("The `strict_types` is disabled here"),
+                            )
+                            .with_note("Disabling `strict_types` can lead to type safety issues.")
+                            .with_help("Consider setting `strict_types` to `1` to enforce strict typing.");
 
-                            ctx.collector.report(issue);
-                        }
+                        ctx.collector.report(issue);
                     }
-                    _ => {
-                        // ignore other values, as they will be caught by the semantics checker
-                    }
-                };
+                } else {
+                    // ignore other values, as they will be caught by the semantics checker
+                }
 
                 found = true;
             }
@@ -172,23 +167,22 @@ impl LintRule for StrictTypesRule {
                 // If the first statement is a shebang.
                 if let Statement::Inline(Inline { kind: InlineKind::Shebang, value, span, .. }) = first_statement {
                     // Skip the shebang and look for the first PHP statement.
-                    first_statement = match program.statements.get(1) {
-                        Some(statement) => statement,
-                        None => {
-                            let ends_in_newline = value.ends_with('\n');
+                    first_statement = if let Some(statement) = program.statements.get(1) {
+                        statement
+                    } else {
+                        let ends_in_newline = value.ends_with('\n');
 
-                            // If there are no statements after the shebang, insert an opening tag and declare statement.
-                            let content = if ends_in_newline {
-                                "<?php\n\ndeclare(strict_types=1);\n"
-                            } else {
-                                "\n<?php\n\ndeclare(strict_types=1);\n"
-                            };
+                        // If there are no statements after the shebang, insert an opening tag and declare statement.
+                        let content = if ends_in_newline {
+                            "<?php\n\ndeclare(strict_types=1);\n"
+                        } else {
+                            "\n<?php\n\ndeclare(strict_types=1);\n"
+                        };
 
-                            // This is safe because the shebang is the only statement in the file.
-                            plan.insert(span.end.offset, content, SafetyClassification::Safe);
+                        // This is safe because the shebang is the only statement in the file.
+                        plan.insert(span.end.offset, content, SafetyClassification::Safe);
 
-                            return;
-                        }
+                        return;
                     };
                 }
 
@@ -196,10 +190,10 @@ impl LintRule for StrictTypesRule {
                     Statement::Inline(inline) => {
                         // If the first statement is an inline statement, insert the declare statement before it.
                         let starts_with_newline = inline.value.starts_with('\n');
-                        let content = if !starts_with_newline {
-                            "<?php\n\ndeclare(strict_types=1);\n\n?>\n"
-                        } else {
+                        let content = if starts_with_newline {
                             "<?php\n\ndeclare(strict_types=1);\n\n?>"
+                        } else {
+                            "<?php\n\ndeclare(strict_types=1);\n\n?>\n"
                         };
 
                         plan.insert(inline.span.start.offset, content, SafetyClassification::PotentiallyUnsafe);

@@ -59,16 +59,16 @@ impl LintRule for InvalidOpenTagRule {
                 to the browser instead of being executed. This can cause unexpected
                 behavior and potential security vulnerabilities.
             "},
-            good_example: indoc! {r#"
+            good_example: indoc! {r"
                 <?php
 
                 echo 'Hello, world!';
-            "#},
-            bad_example: indoc! {r#"
+            "},
+            bad_example: indoc! {r"
                 <php?
 
                 echo 'Hello, world!';
-            "#},
+            "},
             category: Category::Correctness,
 
             requirements: RuleRequirements::None,
@@ -87,7 +87,7 @@ impl LintRule for InvalidOpenTagRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let Node::Inline(inline_stmt) = node else {
             return;
         };

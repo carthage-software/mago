@@ -56,20 +56,20 @@ impl LintRule for NoSelfAssignmentRule {
                 For object properties, the fix is marked as potentially unsafe because reading or writing
                 properties may have side effects through magic methods (__get, __set) or property hooks (PHP 8.4+).
             "},
-            good_example: indoc! {r#"
+            good_example: indoc! {r"
                 <?php
 
                 $a = $b;
                 $this->x = $other->x;
                 $foo->bar = $baz->bar;
-            "#},
-            bad_example: indoc! {r#"
+            "},
+            bad_example: indoc! {r"
                 <?php
 
                 $a = $a;
                 $this->x = $this->x;
                 $foo->bar = $foo->bar;
-            "#},
+            "},
             category: Category::Redundancy,
             requirements: RuleRequirements::None,
         };
@@ -87,7 +87,7 @@ impl LintRule for NoSelfAssignmentRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let Node::ExpressionStatement(statement) = node else { return };
         let Expression::Assignment(assignment) = statement.expression else { return };
 

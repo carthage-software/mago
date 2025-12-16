@@ -49,7 +49,7 @@ pub struct DefSignatureNode {
 }
 
 impl DefSignatureNode {
-    /// Creates a new DefSignatureNode with the given parameters.
+    /// Creates a new `DefSignatureNode` with the given parameters.
     #[inline]
     #[allow(clippy::too_many_arguments)]
     pub fn new(
@@ -110,7 +110,7 @@ pub struct FileSignature {
 }
 
 impl FileSignature {
-    /// Creates a new empty FileSignature.
+    /// Creates a new empty `FileSignature`.
     #[inline]
     pub fn new(hash: u64) -> Self {
         Self { hash, ast_nodes: Vec::new() }

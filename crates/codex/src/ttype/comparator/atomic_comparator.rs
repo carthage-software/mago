@@ -187,9 +187,8 @@ pub fn is_contained_by(
                 if let Some(container_case) = enum_container.case.as_ref() {
                     if let Some(input_case) = enum_input.case.as_ref() {
                         return container_case == input_case;
-                    } else {
-                        return false;
                     }
+                    return false;
                 }
 
                 true
@@ -326,11 +325,10 @@ pub fn is_contained_by(
                     let property_name = concat_atom!("$", container_property_name);
 
                     let Some(declaring_class) = class_like_metadata.declaring_property_ids.get(&property_name) else {
-                        if !*container_property_indefinite {
-                            return false;
-                        } else {
+                        if *container_property_indefinite {
                             continue;
                         }
+                        return false;
                     };
 
                     let Some(declaring_class_metadata) = codebase.get_class_like(declaring_class) else {
@@ -360,7 +358,7 @@ pub fn is_contained_by(
                                 return false;
                             }
                         }
-                    };
+                    }
                 }
 
                 if container_object_with_properties.sealed {
@@ -540,21 +538,26 @@ pub(crate) fn can_be_identical<'a>(
     if matches!(
         (first_part, second_part),
         // If either part is a variable, they can be identical
-        (TAtomic::Variable(_), _) | (_, TAtomic::Variable(_)) |
-        // If either part is `mixed`, they can be identical
-        (TAtomic::Mixed(_), _) | (_, TAtomic::Mixed(_))
-        // If one is `iterable` and other is `array`, `object`, or `iterable`, they can be identical
-        | (TAtomic::Iterable(_), TAtomic::Iterable(_) | TAtomic::Array(_) | TAtomic::Object(_))
-        | (TAtomic::Array(_) | TAtomic::Object(_), TAtomic::Iterable(_))
-        // If one is `numeric` or `array-key` and other is `string`, they can be identical
-        | (TAtomic::Scalar(TScalar::Numeric | TScalar::ArrayKey), TAtomic::Scalar(TScalar::String(_)))
-        | (TAtomic::Scalar(TScalar::String(_)), TAtomic::Scalar(TScalar::Numeric | TScalar::ArrayKey))
-        // If one is `int`|`float`, and the other is `numeric`, they can be identical
-        | (TAtomic::Scalar(TScalar::Integer(_) | TScalar::Float(_) | TScalar::ArrayKey), TAtomic::Scalar(TScalar::Numeric))
-        | (TAtomic::Scalar(TScalar::Numeric), TAtomic::Scalar(TScalar::Integer(_) | TScalar::Float(_) | TScalar::ArrayKey))
-        // If one is `class-string` and other is `string`, they can be identical (class-string is a string at runtime)
-        | (TAtomic::Scalar(TScalar::ClassLikeString(_)), TAtomic::Scalar(TScalar::String(_)))
-        | (TAtomic::Scalar(TScalar::String(_)), TAtomic::Scalar(TScalar::ClassLikeString(_)))
+        (TAtomic::Variable(_) | TAtomic::Mixed(_), _)
+            | (_, TAtomic::Variable(_) | TAtomic::Mixed(_))
+            | (TAtomic::Iterable(_), TAtomic::Iterable(_) | TAtomic::Array(_) | TAtomic::Object(_))
+            | (TAtomic::Array(_) | TAtomic::Object(_), TAtomic::Iterable(_))
+            | (
+                TAtomic::Scalar(TScalar::Numeric | TScalar::ArrayKey | TScalar::ClassLikeString(_)),
+                TAtomic::Scalar(TScalar::String(_))
+            )
+            | (
+                TAtomic::Scalar(TScalar::String(_)),
+                TAtomic::Scalar(TScalar::Numeric | TScalar::ArrayKey | TScalar::ClassLikeString(_))
+            )
+            | (
+                TAtomic::Scalar(TScalar::Integer(_) | TScalar::Float(_) | TScalar::ArrayKey),
+                TAtomic::Scalar(TScalar::Numeric)
+            )
+            | (
+                TAtomic::Scalar(TScalar::Numeric),
+                TAtomic::Scalar(TScalar::Integer(_) | TScalar::Float(_) | TScalar::ArrayKey)
+            )
     ) {
         return true;
     }
@@ -608,7 +611,7 @@ pub(crate) fn can_be_identical<'a>(
     | (TAtomic::Array(TArray::List(list)), TAtomic::Array(TArray::Keyed(keyed_array))) = (first_part, second_part)
     {
         if let Some(known_items) = &keyed_array.known_items {
-            for (key, _) in known_items.iter() {
+            for key in known_items.keys() {
                 if key.is_string() {
                     return false;
                 }
@@ -626,7 +629,7 @@ pub(crate) fn can_be_identical<'a>(
 
         if let Some((_, keyed_val_type)) = keyed_array.parameters.as_ref() {
             if list_has_known_elements && list_element_is_never {
-                for (_, (_, list_elem_type)) in list.known_elements.as_ref().unwrap().iter() {
+                for (_, list_elem_type) in list.known_elements.as_ref().unwrap().values() {
                     if union_comparator::can_expression_types_be_identical(
                         codebase,
                         keyed_val_type.as_ref(),
@@ -659,8 +662,8 @@ pub(crate) fn can_be_identical<'a>(
                 if known_elements.is_empty() {
                     // Fall through to check against general element type
                 } else {
-                    for (_, (_, keyed_item_type)) in known_items.iter() {
-                        for (_, (_, list_elem_type)) in known_elements.iter() {
+                    for (_, keyed_item_type) in known_items.values() {
+                        for (_, list_elem_type) in known_elements.values() {
                             if union_comparator::can_expression_types_be_identical(
                                 codebase,
                                 keyed_item_type,
@@ -678,7 +681,7 @@ pub(crate) fn can_be_identical<'a>(
             }
 
             if !list_element_is_never {
-                for (_, (_, keyed_item_type)) in known_items.iter() {
+                for (_, keyed_item_type) in known_items.values() {
                     if union_comparator::can_expression_types_be_identical(
                         codebase,
                         keyed_item_type,
@@ -721,7 +724,7 @@ pub(crate) fn can_be_identical<'a>(
         || (allow_type_coercion && first_part.is_some_scalar() && second_part.is_some_scalar())
     {
         return true;
-    };
+    }
 
     if let TAtomic::GenericParameter(first_generic) = first_part {
         for first_constraint_part in first_generic.constraint.types.iter() {
@@ -764,7 +767,7 @@ fn keyed_arrays_can_be_identical(
 ) -> bool {
     if first_array.non_empty || second_array.non_empty {
         return match (&first_array.parameters, &second_array.parameters) {
-            (None, None) | (None, Some(_)) | (Some(_), None) => true,
+            (None | Some(_), None) | (None, Some(_)) => true,
             (Some(first_parameters), Some(second_parameters)) => {
                 union_comparator::can_expression_types_be_identical(
                     codebase,
@@ -872,10 +875,10 @@ fn keyed_arrays_can_be_identical(
             }
         }
         _ => {}
-    };
+    }
 
     match (&first_array.parameters, &second_array.parameters) {
-        (None, None) | (None, Some(_)) | (Some(_), None) => true,
+        (None | Some(_), None) | (None, Some(_)) => true,
         (Some(first_parameters), Some(second_parameters)) => {
             union_comparator::can_expression_types_be_identical(
                 codebase,

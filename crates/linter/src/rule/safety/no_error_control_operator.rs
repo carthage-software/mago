@@ -53,7 +53,7 @@ impl LintRule for NoErrorControlOperatorRule {
 
                 The error control operator suppresses errors and makes debugging more difficult.
             "},
-            good_example: indoc! {r#"
+            good_example: indoc! {r"
                 <?php
 
                 try {
@@ -61,12 +61,12 @@ impl LintRule for NoErrorControlOperatorRule {
                 } catch (Throwable $e) {
                     // Handle error
                 }
-            "#},
-            bad_example: indoc! {r#"
+            "},
+            bad_example: indoc! {r"
                 <?php
 
                 $result = @file_get_contents('example.txt');
-            "#},
+            "},
             category: Category::Safety,
 
             requirements: RuleRequirements::None,
@@ -85,7 +85,7 @@ impl LintRule for NoErrorControlOperatorRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let Node::UnaryPrefix(unary_prefix) = node else {
             return;
         };

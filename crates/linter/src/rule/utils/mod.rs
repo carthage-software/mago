@@ -15,5 +15,5 @@ pub fn format_replacements(replacements: &[&str]) -> String {
         result.push_str(replacement);
     }
 
-    format!("`{}`", result)
+    format!("`{result}`")
 }

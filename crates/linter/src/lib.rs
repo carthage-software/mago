@@ -52,7 +52,7 @@ impl<'arena> Linter<'arena> {
         }
     }
 
-    /// Creates a new Linter instance from an existing RuleRegistry.
+    /// Creates a new Linter instance from an existing `RuleRegistry`.
     ///
     /// # Arguments
     ///
@@ -60,7 +60,7 @@ impl<'arena> Linter<'arena> {
     /// * `registry` - The rule registry to use for linting.
     /// * `php_version` - The PHP version to use for linting.
     pub fn from_registry(arena: &'arena Bump, registry: Arc<RuleRegistry>, php_version: PHPVersion) -> Self {
-        Self { arena, php_version, registry }
+        Self { arena, registry, php_version }
     }
 
     pub fn rules(&self) -> &[AnyRule] {
@@ -89,7 +89,7 @@ impl<'arena> Linter<'arena> {
     }
 }
 
-fn walk<'ctx, 'ast, 'arena>(node: Node<'ast, 'arena>, ctx: &mut LintContext<'ctx, 'arena>) {
+fn walk<'arena>(node: Node<'_, 'arena>, ctx: &mut LintContext<'_, 'arena>) {
     let mut in_scope = false;
     if let Some(scope) = Scope::for_node(ctx, node) {
         ctx.scope.push(scope);

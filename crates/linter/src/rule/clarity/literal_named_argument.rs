@@ -57,28 +57,28 @@ impl LintRule for LiteralNamedArgumentRule {
         const META: RuleMeta = RuleMeta {
             name: "Literal Named Argument",
             code: "literal-named-argument",
-            description: indoc! {r#"
+            description: indoc! {r"
                 Enforces that literal values used as arguments in function or method calls
                 are passed as **named arguments**.
 
                 This improves readability by clarifying the purpose of the literal value at the call site.
                 It is particularly helpful for boolean flags, numeric constants, and `null` values
                 where the intent is often ambiguous without the parameter name.
-            "#},
-            good_example: indoc! {r#"
+            "},
+            good_example: indoc! {r"
                 <?php
 
                 function set_option(string $key, bool $enable_feature) {}
 
                 set_option(key: 'feature_x', enable_feature: true); // ✅ clear intent
-            "#},
-            bad_example: indoc! {r#"
+            "},
+            bad_example: indoc! {r"
                 <?php
 
                 function set_option(string $key, bool $enable_feature) {}
 
                 set_option('feature_x', true); // ❌ intent unclear
-            "#},
+            "},
             category: Category::Clarity,
             requirements: RuleRequirements::PHPVersion(PHPVersionRange::from(PHPVersion::PHP80)),
         };
@@ -95,7 +95,7 @@ impl LintRule for LiteralNamedArgumentRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let Node::FunctionCall(function_call) = node else {
             return;
         };
@@ -154,42 +154,42 @@ mod tests {
     test_lint_success! {
         name = first_argument_skipped_by_default,
         rule = LiteralNamedArgumentRule,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             config('app.name');
-        "#}
+        "}
     }
 
     test_lint_failure! {
         name = second_argument_checked,
         rule = LiteralNamedArgumentRule,
         count = 1,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             data_set($array, 'key');
-        "#}
+        "}
     }
 
     test_lint_failure! {
         name = first_argument_checked_when_enabled,
         rule = LiteralNamedArgumentRule,
         settings = |s: &mut crate::settings::Settings| s.rules.literal_named_argument.config.check_first_argument = true,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             config('app.name');
-        "#}
+        "}
     }
 
     test_lint_success! {
         name = named_arguments_are_fine,
         rule = LiteralNamedArgumentRule,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             set_option(key: 'foo', value: true);
-        "#}
+        "}
     }
 }

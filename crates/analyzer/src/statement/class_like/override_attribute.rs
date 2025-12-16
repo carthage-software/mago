@@ -95,8 +95,7 @@ pub fn check_override_attribute<'ctx, 'arena>(
 
         let Some(parents_metadata) = parent_class_names
             .values()
-            .filter_map(|parent_method_id| context.codebase.get_class_like(parent_method_id.get_class_name()))
-            .next()
+            .find_map(|parent_method_id| context.codebase.get_class_like(parent_method_id.get_class_name()))
         else {
             continue;
         };

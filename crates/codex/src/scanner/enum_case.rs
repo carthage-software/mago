@@ -10,9 +10,9 @@ use crate::scanner::attribute::scan_attribute_lists;
 use crate::scanner::inference::infer;
 
 #[inline]
-pub fn scan_enum_case<'ctx, 'arena>(
+pub fn scan_enum_case<'arena>(
     case: &'arena EnumCase<'arena>,
-    context: &mut Context<'ctx, 'arena>,
+    context: &mut Context<'_, 'arena>,
     scope: &NamespaceScope,
 ) -> EnumCaseMetadata {
     let span = case.span();
@@ -44,7 +44,8 @@ pub fn scan_enum_case<'ctx, 'arena>(
             let mut meta = EnumCaseMetadata::new(atom(item.name.value), item.name.span, span, flags);
 
             meta.attributes = attributes;
-            meta.value_type = infer(context, scope, &item.value).map(|u| u.get_single_owned());
+            meta.value_type =
+                infer(context, scope, &item.value).map(super::super::ttype::union::TUnion::get_single_owned);
 
             meta
         }

@@ -63,9 +63,8 @@ impl<'arena> Scope<'arena> {
                 let namespace_name = namespace
                     .name
                     .as_ref()
-                    .map(|n| n.value())
-                    .map(|n| if let Some(n) = n.strip_prefix('\\') { n } else { n })
-                    .unwrap_or("");
+                    .map(mago_syntax::ast::Identifier::value)
+                    .map_or("", |n| if let Some(n) = n.strip_prefix('\\') { n } else { n });
 
                 Scope::Namespace(namespace_name)
             }

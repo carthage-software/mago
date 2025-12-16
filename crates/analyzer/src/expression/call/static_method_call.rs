@@ -124,7 +124,7 @@ mod tests {
 
     test_analysis! {
         name = calling_non_static_method_statically_is_ok,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             class Example {
@@ -192,12 +192,12 @@ mod tests {
             $s->doWork();
             $t->doWork();
             $t->doWorkToo();
-        "#}
+        "}
     }
 
     test_analysis! {
         name = calling_static_method_on_interface_string,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             interface Example {
@@ -222,7 +222,7 @@ mod tests {
 
                 return $result;
             }
-        "#},
+        "},
         issues = [
             IssueCode::PossiblyStaticAccessOnInterface,
             IssueCode::PossiblyStaticAccessOnInterface,
@@ -231,7 +231,7 @@ mod tests {
 
     test_analysis! {
         name = calling_static_method_on_interface_name,
-        code = indoc! {r#"
+        code = indoc! {r"
             <?php
 
             interface Example {
@@ -243,7 +243,7 @@ mod tests {
             Example::doTheThing();
 
             echo Example::getSomeValue();
-        "#},
+        "},
         issues = [
             IssueCode::StaticAccessOnInterface,
             IssueCode::StaticAccessOnInterface,

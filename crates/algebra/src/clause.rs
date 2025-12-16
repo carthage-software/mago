@@ -33,7 +33,7 @@ impl PartialEq for Clause {
 
 impl Hash for Clause {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.hash.hash(state)
+        self.hash.hash(state);
     }
 }
 
@@ -99,8 +99,7 @@ impl Clause {
         other_clause.possibilities.iter().all(|(var, possible_types)| {
             self.possibilities
                 .get(var)
-                .map(|local_possibilities| possible_types.keys().all(|k| local_possibilities.contains_key(k)))
-                .unwrap_or(false)
+                .is_some_and(|local_possibilities| possible_types.keys().all(|k| local_possibilities.contains_key(k)))
         })
     }
 
@@ -110,7 +109,7 @@ impl Clause {
             .filter_map(|(variable, possibility)| {
                 let negations: Vec<Assertion> = possibility.values().map(Assertion::get_negation).collect();
 
-                if !negations.is_empty() { Some((*variable, negations)) } else { None }
+                if negations.is_empty() { None } else { Some((*variable, negations)) }
             })
             .collect()
     }

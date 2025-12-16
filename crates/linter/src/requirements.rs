@@ -28,7 +28,7 @@ impl RuleRequirements {
         match self {
             Self::PHPVersion(range) => vec![*range],
             Self::Any(requirements) | Self::All(requirements) => {
-                requirements.iter().flat_map(|req| req.php_version_ranges()).collect()
+                requirements.iter().flat_map(RuleRequirements::php_version_ranges).collect()
             }
             _ => vec![],
         }
@@ -85,7 +85,7 @@ impl RuleRequirements {
     fn dnf(&self) -> Vec<IntegrationSet> {
         match self {
             Self::Integration(i) => vec![IntegrationSet::only(*i)],
-            Self::Any(reqs) => reqs.iter().flat_map(|req| req.dnf()).collect(),
+            Self::Any(reqs) => reqs.iter().flat_map(RuleRequirements::dnf).collect(),
             Self::All(reqs) => {
                 let mut dnf = vec![IntegrationSet::empty()];
 

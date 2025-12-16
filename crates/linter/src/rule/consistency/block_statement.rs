@@ -94,7 +94,7 @@ impl LintRule for BlockStatementRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let mut report = |construct_name: &str, construct_span: Span, body_span: Span| {
             let issue = Issue::new(
                 self.cfg.level,

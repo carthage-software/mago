@@ -41,7 +41,7 @@ impl TObjectHasProperty {
 }
 
 impl TType for TObjectHasProperty {
-    fn get_child_nodes<'a>(&'a self) -> Vec<TypeRef<'a>> {
+    fn get_child_nodes(&self) -> Vec<TypeRef<'_>> {
         self.intersection_types.as_ref().map(|types| types.iter().map(TypeRef::Atomic).collect()).unwrap_or_default()
     }
 

@@ -101,7 +101,7 @@ impl TPropertiesOf {
                         needs_unsealed = true;
                     }
 
-                    for (prop_name, property_metadata) in class_like_metadata.properties.iter() {
+                    for (prop_name, property_metadata) in &class_like_metadata.properties {
                         // Filter by visibility if specified
                         if let Some(required_visibility) = visibility_filter
                             && property_metadata.read_visibility != required_visibility
@@ -215,7 +215,7 @@ impl TPropertiesOf {
 }
 
 impl TType for TPropertiesOf {
-    fn get_child_nodes<'a>(&'a self) -> Vec<TypeRef<'a>> {
+    fn get_child_nodes(&self) -> Vec<TypeRef<'_>> {
         vec![TypeRef::Union(&self.target_type)]
     }
 

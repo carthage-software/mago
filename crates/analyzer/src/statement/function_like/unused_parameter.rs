@@ -69,10 +69,10 @@ pub fn check_unused_params<'ctx, 'ast, 'arena>(
     }
 }
 
-fn report_parameter<'ctx, 'ast, 'arena>(
-    parameter: &'ast FunctionLikeParameter<'arena>,
+fn report_parameter<'arena>(
+    parameter: &FunctionLikeParameter<'arena>,
     function_like: Span,
-    context: &mut Context<'ctx, 'arena>,
+    context: &mut Context<'_, 'arena>,
     kind: &'static str,
 ) {
     if parameter.ampersand.is_some() {
@@ -127,10 +127,10 @@ pub mod utils {
         is_super_global_variable(name) || "$this" == name
     }
 
-    pub fn potentially_contains_function_call<'ctx, 'ast, 'arena>(
-        block: &'ast [Statement<'arena>],
+    pub fn potentially_contains_function_call<'arena>(
+        block: &[Statement<'arena>],
         function_name: &'static str,
-        context: &Context<'ctx, 'arena>,
+        context: &Context<'_, 'arena>,
     ) -> bool {
         let mut context = (false, context);
 
@@ -146,10 +146,10 @@ pub mod utils {
         context.0
     }
 
-    pub fn expression_potentially_contains_function_call<'ctx, 'ast, 'arena>(
-        expression: &'ast Expression<'arena>,
+    pub fn expression_potentially_contains_function_call<'arena>(
+        expression: &Expression<'arena>,
         function_name: &'static str,
-        context: &Context<'ctx, 'arena>,
+        context: &Context<'_, 'arena>,
     ) -> bool {
         let mut context = (false, context);
 
@@ -158,9 +158,9 @@ pub mod utils {
         context.0
     }
 
-    pub fn is_variable_used_in_expression<'ctx, 'ast, 'arena>(
-        expression: &'ast Expression<'arena>,
-        context: &Context<'ctx, 'arena>,
+    pub fn is_variable_used_in_expression<'arena>(
+        expression: &Expression<'arena>,
+        context: &Context<'_, 'arena>,
         variable: &'arena str,
     ) -> bool {
         use crate::statement::function_like::unused_parameter::utils::internal::VariableReference;
@@ -464,7 +464,7 @@ pub mod utils {
                 if !binary.operator.is_null_coalesce() && !binary.operator.is_logical() {
                     self.walk_expression(binary.rhs, context);
                     return;
-                };
+                }
 
                 context.2 += 1;
                 self.walk_expression(binary.rhs, context);

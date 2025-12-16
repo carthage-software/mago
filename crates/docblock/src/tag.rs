@@ -176,7 +176,7 @@ pub struct MethodTag {
     pub type_string: TypeString,
     pub description: String,
 }
-/// Parses a PHPDoc variable token and returns a structured `Variable`.
+/// Parses a `PHPDoc` variable token and returns a structured `Variable`.
 ///
 /// If `allow_property_access` is false:
 /// - Supports `$name`, `...$name`, and `&$name`.
@@ -189,18 +189,18 @@ pub struct MethodTag {
 /// The returned `Variable` stores a normalized `name` (with `$`, without leading `...` or `&`),
 /// and sets flags `is_variadic` and `is_by_reference` that can be used for display/rendering.
 ///
-/// Examples (allow_property_access = false):
-/// - "$foo"       → Some(Variable { name: "$foo", is_variadic: false, is_by_reference: false })
-/// - "&$foo"      → Some(Variable { name: "$foo", is_variadic: false, is_by_reference: true })
-/// - "...$ids"    → Some(Variable { name: "$ids", is_variadic: true, is_by_reference: false })
+/// Examples (`allow_property_access` = false):
+/// - "$foo"       → Some(Variable { name: "$foo", `is_variadic`: false, `is_by_reference`: false })
+/// - "&$foo"      → Some(Variable { name: "$foo", `is_variadic`: false, `is_by_reference`: true })
+/// - "...$ids"    → Some(Variable { name: "$ids", `is_variadic`: true, `is_by_reference`: false })
 /// - "$"          → None
 /// - "...$"       → None
 /// - "$1x"        → None
 ///
-/// Examples (allow_property_access = true):
-/// - "$foo->bar"     → Some(Variable { name: "$foo->bar", is_variadic: false, is_by_reference: false })
-/// - "$foo['key']"   → Some(Variable { name: "$foo['key']", is_variadic: false, is_by_reference: false })
-/// - "$foo->bar->baz['key']" → Some(Variable { name: "$foo->bar->baz['key']", is_variadic: false, is_by_reference: false })
+/// Examples (`allow_property_access` = true):
+/// - "$foo->bar"     → Some(Variable { name: "$foo->bar", `is_variadic`: false, `is_by_reference`: false })
+/// - "$foo['key']"   → Some(Variable { name: "$foo['key']", `is_variadic`: false, `is_by_reference`: false })
+/// - "$foo->bar->baz['key']" → Some(Variable { name: "$foo->bar->baz['key']", `is_variadic`: false, `is_by_reference`: false })
 /// - "&$foo->bar"    → None (reference not allowed with property access)
 /// - "...$foo->bar"  → None (variadic not allowed with property access)
 #[inline]
@@ -274,7 +274,7 @@ fn parse_var_ident(raw: &str, allow_property_access: bool) -> Option<Variable> {
         }
 
         // The full token should be consumed for a valid property access chain
-        let token = &raw[..1 + pos]; // Include the initial $
+        let token = &raw[..=pos]; // Include the initial $
 
         Some(Variable { name: token.to_owned(), is_variadic: false, is_by_reference: false })
     } else {
@@ -425,7 +425,7 @@ pub fn parse_where_tag(content: &str, span: Span) -> Result<WhereTag, ParseError
     let (name_part, mut rest) = content.split_at(name_end_pos);
 
     if !is_valid_identifier_start(name_part, false) {
-        return Err(ParseError::InvalidWhereTag(span, format!("Invalid template parameter name: '{}'", name_part)));
+        return Err(ParseError::InvalidWhereTag(span, format!("Invalid template parameter name: '{name_part}'")));
     }
 
     rest = rest.trim_start();
@@ -473,7 +473,7 @@ pub fn parse_param_tag(content: &str, span: Span) -> Result<ParameterTag, ParseE
             parts.next().ok_or_else(|| ParseError::InvalidParameterTag(span, "Expected parameter name".to_string()))?;
 
         let variable = parse_var_ident(raw_name, false)
-            .ok_or_else(|| ParseError::InvalidParameterTag(span, format!("Invalid parameter name: '{}'", raw_name)))?;
+            .ok_or_else(|| ParseError::InvalidParameterTag(span, format!("Invalid parameter name: '{raw_name}'")))?;
 
         let desc_start = trimmed.find(&variable.name).map_or(0, |i| i + variable.name.len());
         let description = trimmed[desc_start..].trim().to_owned();
@@ -503,7 +503,7 @@ pub fn parse_param_tag(content: &str, span: Span) -> Result<ParameterTag, ParseE
         .next()
         .ok_or_else(|| ParseError::InvalidParameterTag(span, "Expected parameter name".to_string()))?;
     let variable = parse_var_ident(raw_name, false)
-        .ok_or_else(|| ParseError::InvalidParameterTag(span, format!("Invalid parameter name: '{}'", raw_name)))?;
+        .ok_or_else(|| ParseError::InvalidParameterTag(span, format!("Invalid parameter name: '{raw_name}'")))?;
 
     let desc_start = rest_slice.find(&variable.name).map_or(0, |i| i + variable.name.len());
     let description = rest_slice[desc_start..].trim_start().to_owned();
@@ -545,7 +545,7 @@ pub fn parse_param_out_tag(content: &str, span: Span) -> Result<ParameterOutTag,
         .next()
         .ok_or_else(|| ParseError::InvalidParameterOutTag(span, "Expected parameter name".to_string()))?;
     let variable = parse_var_ident(raw_name, false)
-        .ok_or_else(|| ParseError::InvalidParameterOutTag(span, format!("Invalid parameter name: '{}'", raw_name)))?;
+        .ok_or_else(|| ParseError::InvalidParameterOutTag(span, format!("Invalid parameter name: '{raw_name}'")))?;
 
     Ok(ParameterOutTag { span, variable, type_string })
 }
@@ -635,9 +635,9 @@ pub fn parse_assertion_tag(content: &str, span: Span) -> Result<AssertionTag, Pa
     let raw_name =
         rest_parts.next().ok_or_else(|| ParseError::InvalidAssertionTag(span, "Expected variable name".to_string()))?;
     let variable = parse_var_ident(raw_name, true)
-        .ok_or_else(|| ParseError::InvalidAssertionTag(span, format!("Invalid variable name: '{}'", raw_name)))?;
+        .ok_or_else(|| ParseError::InvalidAssertionTag(span, format!("Invalid variable name: '{raw_name}'")))?;
 
-    Ok(AssertionTag { span, variable, type_string })
+    Ok(AssertionTag { span, type_string, variable })
 }
 
 /// Parses the content string of a `@var` tag.
@@ -695,7 +695,7 @@ pub fn parse_type_tag(content: &str, span: Span) -> Result<TypeTag, ParseError> 
 
     let (potential_name, _) = content.split_once(char::is_whitespace).ok_or_else(|| {
         let trimmed = content.trim();
-        ParseError::InvalidTypeTag(span, format!("Type alias name '{}' must be followed by a type definition", trimmed))
+        ParseError::InvalidTypeTag(span, format!("Type alias name '{trimmed}' must be followed by a type definition"))
     })?;
 
     let name_len = potential_name.len();
@@ -707,7 +707,7 @@ pub fn parse_type_tag(content: &str, span: Span) -> Result<TypeTag, ParseError> 
         let name = potential_name.trim();
 
         if !is_valid_identifier_start(name, false) {
-            return Err(ParseError::InvalidTypeTag(span, format!("Invalid type alias name: '{}'", name)));
+            return Err(ParseError::InvalidTypeTag(span, format!("Invalid type alias name: '{name}'")));
         }
 
         let type_start_offset = name_len + (after_name.len() - trimmed_after_name.len()) + 1;
@@ -717,7 +717,7 @@ pub fn parse_type_tag(content: &str, span: Span) -> Result<TypeTag, ParseError> 
         let name = potential_name.trim();
 
         if !is_valid_identifier_start(name, false) {
-            return Err(ParseError::InvalidTypeTag(span, format!("Invalid type alias name: '{}'", name)));
+            return Err(ParseError::InvalidTypeTag(span, format!("Invalid type alias name: '{name}'")));
         }
 
         let rest = after_name.trim_start();
@@ -750,45 +750,45 @@ pub fn parse_type_tag(content: &str, span: Span) -> Result<TypeTag, ParseError> 
 ///
 /// `Result<ImportTypeTag, ParseError>` with the parsed import type tag or an error.
 pub fn parse_import_type_tag(content: &str, span: Span) -> Result<ImportTypeTag, ParseError> {
-    let (name, rest) = content.trim_start().split_once(" ").ok_or_else(|| {
+    let (name, rest) = content.trim_start().split_once(' ').ok_or_else(|| {
         ParseError::InvalidImportTypeTag(span, "Expected type alias name and 'from' clause".to_string())
     })?;
     let name = name.trim();
     let rest = rest.trim();
 
     if !is_valid_identifier_start(name, false) {
-        return Err(ParseError::InvalidImportTypeTag(span, format!("Invalid type alias name: '{}'", name)));
+        return Err(ParseError::InvalidImportTypeTag(span, format!("Invalid type alias name: '{name}'")));
     }
 
     if rest.is_empty() {
         return Err(ParseError::InvalidImportTypeTag(span, "Missing 'from' clause".to_string()));
     }
 
-    let (from, rest) = rest.split_once(" ").ok_or_else(|| {
+    let (from, rest) = rest.split_once(' ').ok_or_else(|| {
         ParseError::InvalidImportTypeTag(span, "Expected 'from' keyword followed by class name".to_string())
     })?;
 
     if !from.eq_ignore_ascii_case("from") {
-        return Err(ParseError::InvalidImportTypeTag(span, format!("Expected 'from' keyword, found '{}'", from)));
+        return Err(ParseError::InvalidImportTypeTag(span, format!("Expected 'from' keyword, found '{from}'")));
     }
 
     if rest.is_empty() {
         return Err(ParseError::InvalidImportTypeTag(span, "Missing class name after 'from'".to_string()));
     }
 
-    let (imported_from, rest) = if let Some((imp_from, rest)) = rest.split_once(" ") {
+    let (imported_from, rest) = if let Some((imp_from, rest)) = rest.split_once(' ') {
         (imp_from.trim(), rest.trim())
     } else {
         (rest.trim(), "")
     };
 
     if !is_valid_identifier_start(imported_from, true) {
-        return Err(ParseError::InvalidImportTypeTag(span, format!("Invalid class name: '{}'", imported_from)));
+        return Err(ParseError::InvalidImportTypeTag(span, format!("Invalid class name: '{imported_from}'")));
     }
 
     let mut alias = None;
 
-    if let Some((r#as, rest)) = rest.split_once(" ")
+    if let Some((r#as, rest)) = rest.split_once(' ')
         && r#as.trim().eq_ignore_ascii_case("as")
         && !rest.is_empty()
     {
@@ -813,7 +813,7 @@ pub fn parse_property_tag(content: &str, span: Span, is_read: bool, is_write: bo
             .next()
             .ok_or_else(|| ParseError::InvalidPropertyTag(span, "Expected variable name".to_string()))?;
         let variable = parse_var_ident(var_part, false)
-            .ok_or_else(|| ParseError::InvalidPropertyTag(span, format!("Invalid variable name: '{}'", var_part)))?;
+            .ok_or_else(|| ParseError::InvalidPropertyTag(span, format!("Invalid variable name: '{var_part}'")))?;
 
         (None, variable)
     } else {
@@ -840,7 +840,7 @@ pub fn parse_property_tag(content: &str, span: Span, is_read: bool, is_write: bo
             .next()
             .ok_or_else(|| ParseError::InvalidPropertyTag(span, "Expected variable name".to_string()))?;
         let variable = parse_var_ident(var_part, false)
-            .ok_or_else(|| ParseError::InvalidPropertyTag(span, format!("Invalid variable name: '{}'", var_part)))?;
+            .ok_or_else(|| ParseError::InvalidPropertyTag(span, format!("Invalid variable name: '{var_part}'")))?;
 
         (Some(type_string), variable)
     };
@@ -995,32 +995,23 @@ pub fn split_tag_content(content: &str, input_span: Span) -> Option<(TypeString,
         return None;
     }
 
-    match split_point_rel {
-        Some(split_idx_rel) => {
-            // Split occurred
-            let type_part_slice = trimmed_content[..split_idx_rel].trim_end();
-            let rest_part_slice = trimmed_content[split_idx_rel..].trim_start();
+    if let Some(split_idx_rel) = split_point_rel {
+        // Split occurred
+        let type_part_slice = trimmed_content[..split_idx_rel].trim_end();
+        let rest_part_slice = trimmed_content[split_idx_rel..].trim_start();
 
-            // Calculate span relative to the *start* of the trimmed content
-            let type_span = Span::new(
-                input_span.file_id,
-                trimmed_start_pos,
-                trimmed_start_pos.forward(type_part_slice.len() as u32),
-            );
+        // Calculate span relative to the *start* of the trimmed content
+        let type_span =
+            Span::new(input_span.file_id, trimmed_start_pos, trimmed_start_pos.forward(type_part_slice.len() as u32));
 
-            Some((TypeString { value: type_part_slice.to_owned(), span: type_span }, rest_part_slice))
-        }
-        None => {
-            // No split, entire trimmed content is the type
-            let type_part_slice = trimmed_content;
-            let type_span = Span::new(
-                input_span.file_id,
-                trimmed_start_pos,
-                trimmed_start_pos.forward(type_part_slice.len() as u32),
-            );
+        Some((TypeString { value: type_part_slice.to_owned(), span: type_span }, rest_part_slice))
+    } else {
+        // No split, entire trimmed content is the type
+        let type_part_slice = trimmed_content;
+        let type_span =
+            Span::new(input_span.file_id, trimmed_start_pos, trimmed_start_pos.forward(type_part_slice.len() as u32));
 
-            Some((TypeString { value: type_part_slice.to_owned(), span: type_span }, ""))
-        }
+        Some((TypeString { value: type_part_slice.to_owned(), span: type_span }, ""))
     }
 }
 
@@ -1166,7 +1157,7 @@ pub fn parse_method_tag(mut content: &str, mut span: Span) -> Result<MethodTag, 
 
     let description = rest_slice[args_end..].trim();
     let arguments_split = split_args(args_str, args_span);
-    let arguments = arguments_split.iter().flat_map(|(arg, span)| parse_argument(arg, span)).collect::<Vec<_>>();
+    let arguments = arguments_split.iter().filter_map(|(arg, span)| parse_argument(arg, span)).collect::<Vec<_>>();
 
     let method = Method {
         name: name.into(),
@@ -1210,8 +1201,8 @@ fn try_consume<'a>(input: &'a str, token: &str) -> Option<(&'a str, usize)> {
 }
 
 /// Checks if the given content looks like only a method signature (no return type).
-/// e.g., "foo()" or "foo($arg)" returns true
-/// e.g., "Money foo()" or "int bar($x)" returns false
+/// e.g., "`foo()`" or "foo($arg)" returns true
+/// e.g., "Money `foo()`" or "int bar($x)" returns false
 fn looks_like_method_signature_only(content: &str) -> bool {
     let trimmed = content.trim();
     if let Some(paren_pos) = trimmed.find('(') {
@@ -1282,7 +1273,7 @@ fn parse_argument(arg_str: &str, span: &Span) -> Option<Argument> {
     let type_string =
         arg_type.map(|arg_type| TypeString { value: arg_type.into(), span: span.subspan(0, arg_type.len() as u32) });
 
-    let variable_span = span.subspan(arg_type.map(|t| 1 + t.len() as u32).unwrap_or(0), span.length());
+    let variable_span = span.subspan(arg_type.map_or(0, |t| 1 + t.len() as u32), span.length());
 
     let variable = parse_var_ident(raw_name, false)?;
 
@@ -1304,7 +1295,7 @@ const fn brackets_match(open: &char, close: &char) -> bool {
 /// Checks if the identifier is valid
 #[inline]
 fn is_valid_identifier_start(mut identifier: &str, allow_qualified: bool) -> bool {
-    if allow_qualified && identifier.starts_with("\\") {
+    if allow_qualified && identifier.starts_with('\\') {
         identifier = &identifier[1..];
     }
 
@@ -1358,11 +1349,11 @@ mod tests {
             match (got, expected) {
                 (None, None) => {}
                 (Some(v), Some(e)) => {
-                    assert_eq!(v.name, e.s, "input={}", input);
-                    assert_eq!(v.is_variadic, e.variadic, "input={}", input);
-                    assert_eq!(v.is_by_reference, e.by_ref, "input={}", input);
+                    assert_eq!(v.name, e.s, "input={input}");
+                    assert_eq!(v.is_variadic, e.variadic, "input={input}");
+                    assert_eq!(v.is_by_reference, e.by_ref, "input={input}");
                 }
-                _ => panic!("mismatch for input={}", input),
+                _ => panic!("mismatch for input={input}"),
             }
         }
     }

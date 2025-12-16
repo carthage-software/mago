@@ -1,4 +1,4 @@
-//! Psl\Type\shape() return type provider.
+//! `Psl\Type\shape()` return type provider.
 
 use std::collections::BTreeMap;
 
@@ -29,7 +29,7 @@ static META: ProviderMeta = ProviderMeta::new(
 
 /// Provider for the `Psl\Type\shape()` function.
 ///
-/// Returns a TypeInterface with the array shape inferred from the input types.
+/// Returns a `TypeInterface` with the array shape inferred from the input types.
 #[derive(Default)]
 pub struct ShapeProvider;
 
@@ -65,7 +65,7 @@ impl FunctionReturnTypeProvider for ShapeProvider {
                 .get_expression_type(argument)
                 .and_then(|union| union.get_single_bool())
                 .filter(|boolean| !boolean.is_general())
-                .map(|boolean| boolean.is_true())?
+                .map(mago_codex::ttype::atomic::scalar::bool::TBool::is_true)?
         } else {
             false // default to false if not provided
         };

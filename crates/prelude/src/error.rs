@@ -19,8 +19,8 @@ impl std::error::Error for PreludeError {
 impl std::fmt::Display for PreludeError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            PreludeError::Encode(err) => write!(f, "Prelude encoding error: {}", err),
-            PreludeError::Decode(err) => write!(f, "Prelude decoding error: {}", err),
+            PreludeError::Encode(err) => write!(f, "Prelude encoding error: {err}"),
+            PreludeError::Decode(err) => write!(f, "Prelude decoding error: {err}"),
         }
     }
 }

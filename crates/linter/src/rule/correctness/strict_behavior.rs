@@ -56,16 +56,16 @@ impl LintRule for StrictBehaviorRule {
                 Detects functions relying on loose comparison unless the `$strict` parameter is specified.
                 The use of loose comparison for these functions may lead to hard-to-debug, unexpected behaviors.
             "},
-            good_example: indoc! {r#"
+            good_example: indoc! {r"
                 <?php
 
                 in_array(1, ['foo', 'bar', 'baz'], strict: true);
-            "#},
-            bad_example: indoc! {r#"
+            "},
+            bad_example: indoc! {r"
                 <?php
 
                 in_array(1, ['foo', 'bar', 'baz']);
-            "#},
+            "},
             category: Category::Correctness,
             requirements: RuleRequirements::PHPVersion(PHPVersionRange::from(PHPVersion::PHP70)),
         };
@@ -83,7 +83,7 @@ impl LintRule for StrictBehaviorRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let Node::FunctionCall(call) = node else {
             return;
         };

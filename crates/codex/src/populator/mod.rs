@@ -21,7 +21,7 @@ use crate::ttype::union::populate_union_type;
 ///
 /// This function processes class-likes, function-likes, and constants to:
 ///
-/// - Resolve type signatures (populating TUnion and TAtomic types).
+/// - Resolve type signatures (populating `TUnion` and `TAtomic` types).
 /// - Calculate inheritance hierarchies (parent classes, interfaces, traits).
 /// - Determine method and property origins (declaring vs. appearing).
 /// - Build descendant maps for efficient lookup.
@@ -34,7 +34,7 @@ pub fn populate_codebase(
     safe_symbol_members: HashSet<SymbolIdentifier>,
 ) {
     let mut class_likes_to_repopulate = AtomSet::default();
-    for (name, metadata) in codebase.class_likes.iter() {
+    for (name, metadata) in &codebase.class_likes {
         // Repopulate if not populated OR if user-defined and not marked safe.
         if !metadata.flags.is_populated() || (metadata.flags.is_user_defined() && !safe_symbols.contains(name)) {
             class_likes_to_repopulate.insert(*name);
@@ -56,7 +56,7 @@ pub fn populate_codebase(
         hierarchy::populate_class_like_metadata_iterative(&class_name, codebase, symbol_references);
     }
 
-    for (name, function_like_metadata) in codebase.function_likes.iter_mut() {
+    for (name, function_like_metadata) in &mut codebase.function_likes {
         let force_repopulation = function_like_metadata.flags.is_user_defined() && !safe_symbols.contains(&name.0);
 
         let reference_source = if name.1.is_empty() || function_like_metadata.get_kind().is_closure() {
@@ -76,7 +76,7 @@ pub fn populate_codebase(
         );
     }
 
-    for (name, metadata) in codebase.class_likes.iter_mut() {
+    for (name, metadata) in &mut codebase.class_likes {
         let userland_force_repopulation = metadata.flags.is_user_defined() && !safe_symbols.contains(name);
 
         hierarchy::populate_class_like_types(

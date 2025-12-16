@@ -51,16 +51,16 @@ impl LintRule for NoRedundantParenthesesRule {
             description: indoc! {"
                 Detects redundant parentheses around expressions.
             "},
-            good_example: indoc! {r#"
+            good_example: indoc! {r"
                 <?php
 
                 $foo = 42;
-            "#},
-            bad_example: indoc! {r#"
+            "},
+            bad_example: indoc! {r"
                 <?php
 
                 $foo = (42);
-            "#},
+            "},
             category: Category::Redundancy,
 
             requirements: RuleRequirements::None,
@@ -92,7 +92,7 @@ impl LintRule for NoRedundantParenthesesRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let parenthesized = match node {
             Node::Parenthesized(parenthesized) => {
                 if let Expression::Parenthesized(inner) = parenthesized.expression {

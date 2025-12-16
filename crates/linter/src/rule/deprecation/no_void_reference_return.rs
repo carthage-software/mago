@@ -54,20 +54,20 @@ impl LintRule for NoVoidReferenceReturnRule {
                 Detects functions, methods, closures, arrow functions, and set property hooks that return by reference from a void function.
                 Such functions are considered deprecated; returning by reference from a void function is deprecated since PHP 8.0.
             "},
-            good_example: indoc! {r#"
+            good_example: indoc! {r"
                 <?php
 
                 function &foo(): string {
                     // ...
                 }
-            "#},
-            bad_example: indoc! {r#"
+            "},
+            bad_example: indoc! {r"
                 <?php
 
                 function &foo(): void {
                     // ...
                 }
-            "#},
+            "},
             category: Category::Deprecation,
             requirements: RuleRequirements::PHPVersion(PHPVersionRange::from(PHPVersion::PHP82)),
         };
@@ -86,7 +86,7 @@ impl LintRule for NoVoidReferenceReturnRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'ast, 'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'ast, 'arena>) {
+    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         match node {
             Node::Function(function) => {
                 let Some(amperstand) = function.ampersand.as_ref() else {
@@ -114,7 +114,7 @@ impl LintRule for NoVoidReferenceReturnRule {
 
                 if !matches!(return_type.hint, Hint::Void(_)) {
                     return;
-                };
+                }
 
                 self.report(ctx, "method", method.span(), amperstand, false);
             }
@@ -129,7 +129,7 @@ impl LintRule for NoVoidReferenceReturnRule {
 
                 if !matches!(return_type.hint, Hint::Void(_)) {
                     return;
-                };
+                }
 
                 self.report(ctx, "closure", closure.span(), amperstand, false);
             }
@@ -144,7 +144,7 @@ impl LintRule for NoVoidReferenceReturnRule {
 
                 if !matches!(return_type.hint, Hint::Void(_)) {
                     return;
-                };
+                }
 
                 self.report(ctx, "arrow function", arrow_function.span(), amperstand, false);
             }
@@ -166,17 +166,17 @@ impl LintRule for NoVoidReferenceReturnRule {
 
 impl NoVoidReferenceReturnRule {
     fn report(&self, ctx: &mut LintContext, kind: &'static str, span: Span, ampersand: &Span, is_set_hook: bool) {
-        let message = if !is_set_hook {
-            format!("Returning by reference from a void {} is deprecated since PHP 8.0.", kind)
-        } else {
+        let message = if is_set_hook {
             "Returning by reference from a set property hook is deprecated since PHP 8.0.".to_string()
+        } else {
+            format!("Returning by reference from a void {kind} is deprecated since PHP 8.0.")
         };
 
         let issue = Issue::new(self.cfg.level(), message)
             .with_code(self.meta.code)
             .with_annotation(
                 Annotation::primary(*ampersand)
-                    .with_message(format!("The `&` indicates that the {} returns by reference", kind)),
+                    .with_message(format!("The `&` indicates that the {kind} returns by reference")),
             )
             .with_annotation(Annotation::secondary(span))
             .with_help("Consider removing the `&` to comply with PHP 8.0 standards and avoid future issues.");

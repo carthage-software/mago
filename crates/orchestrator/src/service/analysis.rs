@@ -138,7 +138,7 @@ impl AnalysisService {
             Analyzer::new(&arena, file, &resolved_names, &self.codebase, self.settings, &self.plugin_registry);
 
         if let Err(err) = analyzer.analyze(program, &mut analysis_result) {
-            issues.push(Issue::error(format!("Analysis error: {}", err)));
+            issues.push(Issue::error(format!("Analysis error: {err}")));
         }
 
         issues.extend(analysis_result.issues);
