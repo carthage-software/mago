@@ -572,8 +572,10 @@ class ReflectionProperty implements Reflector
     public string $class;
 
     /**
-     * @param class-string|object $class
-     * @param string $property
+     * @template T of object
+     *
+     * @param class-string<T>|object $class
+     * @param key-of<properties-of<T>>|string $property
      *
      * @throws ReflectionException
      */
