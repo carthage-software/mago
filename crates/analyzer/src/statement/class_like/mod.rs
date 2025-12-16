@@ -673,6 +673,7 @@ pub(crate) fn analyze_class_like<'ctx, 'ast, 'arena>(
     }
 
     check_trait_property_conflicts(context, class_like_metadata, members);
+    check_readonly_class_trait_properties(context, class_like_metadata, members);
 
     if !class_like_metadata.template_types.is_empty() {
         for (template_name, _) in &class_like_metadata.template_types {
@@ -2983,6 +2984,51 @@ fn check_class_like_constants<'ctx, 'arena>(
                             .with_note("Constants implementing interface constants must have compatible types (covariance allowed).")
                             .with_help(format!("Change the type of `{constant_name}` to be compatible with `{interface_type_id}`.")),
                         );
+                }
+            }
+        }
+    }
+}
+
+/// Check that a readonly class does not use traits with non-readonly properties.
+///
+/// In PHP, a readonly class can only use traits where all properties are declared readonly.
+/// Using a trait with non-readonly properties in a readonly class causes a fatal error.
+fn check_readonly_class_trait_properties<'ctx, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    class_like_metadata: &'ctx ClassLikeMetadata,
+    members: &[ClassLikeMember<'arena>],
+) {
+    if !class_like_metadata.flags.is_readonly() {
+        return;
+    }
+
+    for member in members {
+        if let ClassLikeMember::TraitUse(trait_use) = member {
+            for trait_name_id in &trait_use.trait_names {
+                let (trait_fqcn, _) = context.scope.resolve(NameKind::Default, trait_name_id.value());
+                let trait_fqcn = Atom::from(trait_fqcn.as_str());
+
+                let Some(trait_metadata) = context.codebase.get_class_like(trait_fqcn.as_ref()) else {
+                    continue;
+                };
+
+                for (property_name, property) in &trait_metadata.properties {
+                    if !property.flags.is_readonly() {
+                        context.collector.report_with_code(
+                            IssueCode::InvalidTraitUse,
+                            Issue::error(format!(
+                                "Readonly class `{}` cannot use trait `{}` which has non-readonly property `{}`",
+                                class_like_metadata.name, trait_fqcn, property_name
+                            ))
+                            .with_annotation(Annotation::primary(trait_name_id.span()).with_message("Trait used here"))
+                            .with_note("All properties in a trait used by a readonly class must be declared readonly.")
+                            .with_help(format!(
+                                "Add the `readonly` modifier to property `{}` in trait `{}`.",
+                                property_name, trait_fqcn
+                            )),
+                        );
+                    }
                 }
             }
         }
