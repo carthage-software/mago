@@ -20,9 +20,9 @@ use crate::artifacts::AnalysisArtifacts;
 use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
-use crate::heuristic;
 use crate::statement::function_like::FunctionLikeBody;
 use crate::statement::function_like::analyze_function_like;
+use crate::statement::function_like::unused_parameter;
 use crate::utils::expression::variable::get_variables_referenced_in_expression;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for ArrowFunction<'arena> {
@@ -138,12 +138,14 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ArrowFunction<'arena> {
 
         artifacts.set_expression_type(self, resulting_closure);
 
-        heuristic::check_function_like(
-            function_metadata,
-            self.parameter_list.parameters.as_slice(),
-            FunctionLikeBody::Expression(self.expression),
-            context,
-        );
+        if context.settings.find_unused_parameters {
+            unused_parameter::check_unused_params(
+                function_metadata,
+                self.parameter_list.parameters.as_slice(),
+                FunctionLikeBody::Expression(self.expression),
+                context,
+            );
+        }
 
         Ok(())
     }

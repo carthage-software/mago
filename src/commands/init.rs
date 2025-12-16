@@ -255,8 +255,10 @@ struct InitializationAnalyzerSettings {
     check_throws: bool,
     /// Whether to allow access to potentially undefined array keys
     allow_possibly_undefined_array_keys: bool,
-    /// Whether to enable heuristic-based code quality checks
-    perform_heuristic_checks: bool,
+    /// Whether to check for missing #[Override] attributes
+    check_missing_override: bool,
+    /// Whether to find unused function/method parameters
+    find_unused_parameters: bool,
     /// Whether to track literal values of class properties
     memoize_properties: bool,
     /// Whether to enforce strict checks when accessing list elements by index
@@ -448,9 +450,13 @@ fn setup_analyzer(theme: &ColorfulTheme) -> Result<InitializationAnalyzerSetting
 
         println!("  │");
         println!("  │  {}", "Other Settings:".underline());
-        let perform_heuristic_checks = Confirm::with_theme(theme)
-            .with_prompt(" │  Enable extra heuristic checks for code quality?")
-            .default(true)
+        let check_missing_override = Confirm::with_theme(theme)
+            .with_prompt(" │  Check for missing #[Override] attributes (PHP 8.3+)?")
+            .default(false)
+            .interact()?;
+        let find_unused_parameters = Confirm::with_theme(theme)
+            .with_prompt(" │  Find unused function/method parameters?")
+            .default(false)
             .interact()?;
         let memoize_properties = Confirm::with_theme(theme)
             .with_prompt(" │  Track literal values of class properties?")
@@ -468,7 +474,8 @@ fn setup_analyzer(theme: &ColorfulTheme) -> Result<InitializationAnalyzerSetting
             analyze_dead_code,
             check_throws,
             allow_possibly_undefined_array_keys,
-            perform_heuristic_checks,
+            check_missing_override,
+            find_unused_parameters,
             memoize_properties,
             strict_list_index_checks,
             no_boolean_literal_comparison,
@@ -485,10 +492,6 @@ fn setup_analyzer(theme: &ColorfulTheme) -> Result<InitializationAnalyzerSetting
             .with_prompt(" │  Check for unhandled thrown exceptions?")
             .default(false)
             .interact()?;
-        let perform_heuristic_checks = Confirm::with_theme(theme)
-            .with_prompt(" │  Enable extra heuristic checks for code quality?")
-            .default(true)
-            .interact()?;
         println!("  ╰─");
         Ok(InitializationAnalyzerSettings {
             find_unused_definitions,
@@ -496,7 +499,8 @@ fn setup_analyzer(theme: &ColorfulTheme) -> Result<InitializationAnalyzerSetting
             analyze_dead_code: false,
             check_throws,
             allow_possibly_undefined_array_keys: true,
-            perform_heuristic_checks,
+            check_missing_override: false,
+            find_unused_parameters: false,
             memoize_properties: true,
             strict_list_index_checks: false,
             no_boolean_literal_comparison: false,
@@ -673,7 +677,8 @@ fn build_analyzer_settings_string(settings: &InitializationAnalyzerSettings) -> 
     lines.push(format!("memoize-properties = {}", settings.memoize_properties));
     lines.push(format!("allow-possibly-undefined-array-keys = {}", settings.allow_possibly_undefined_array_keys));
     lines.push(format!("check-throws = {}", settings.check_throws));
-    lines.push(format!("perform-heuristic-checks = {}", settings.perform_heuristic_checks));
+    lines.push(format!("check-missing-override = {}", settings.check_missing_override));
+    lines.push(format!("find-unused-parameters = {}", settings.find_unused_parameters));
     lines.push(format!("strict-list-index-checks = {}", settings.strict_list_index_checks));
     lines.push(format!("no-boolean-literal-comparison = {}", settings.no_boolean_literal_comparison));
     lines.push(format!("check-missing-type-hints = {}", settings.check_missing_type_hints));
@@ -695,7 +700,8 @@ mod tests {
             analyze_dead_code: false,
             check_throws: false,
             allow_possibly_undefined_array_keys: true,
-            perform_heuristic_checks: true,
+            check_missing_override: false,
+            find_unused_parameters: false,
             memoize_properties: true,
             strict_list_index_checks: false,
             no_boolean_literal_comparison: false,
@@ -757,7 +763,8 @@ mod tests {
             analyze_dead_code: true,
             check_throws: true,
             allow_possibly_undefined_array_keys: false,
-            perform_heuristic_checks: true,
+            check_missing_override: false,
+            find_unused_parameters: false,
             memoize_properties: true,
             strict_list_index_checks: true,
             no_boolean_literal_comparison: true,
@@ -810,7 +817,8 @@ mod tests {
         assert!(output.contains("memoize-properties = true"));
         assert!(output.contains("allow-possibly-undefined-array-keys = true"));
         assert!(output.contains("check-throws = false"));
-        assert!(output.contains("perform-heuristic-checks = true"));
+        assert!(output.contains("check-missing-override = false"));
+        assert!(output.contains("find-unused-parameters = false"));
         assert!(output.contains("strict-list-index-checks = false"));
         assert!(output.contains("no-boolean-literal-comparison = false"));
         assert!(output.contains("check-missing-type-hints = false"));

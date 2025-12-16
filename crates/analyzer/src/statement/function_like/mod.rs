@@ -53,6 +53,7 @@ use crate::statement::r#return::handle_return_value;
 use crate::utils::expression::get_variable_id;
 
 pub mod function;
+pub mod unused_parameter;
 
 #[derive(Debug, Clone, Copy)]
 pub enum FunctionLikeBody<'ast, 'arena> {

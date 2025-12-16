@@ -13,12 +13,12 @@ use crate::artifacts::AnalysisArtifacts;
 use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
-use crate::heuristic;
 use crate::statement::attributes::AttributeTarget;
 use crate::statement::attributes::analyze_attributes;
 use crate::statement::function_like::FunctionLikeBody;
 use crate::statement::function_like::analyze_function_like;
 use crate::statement::function_like::check_unused_function_template_parameters;
+use crate::statement::function_like::unused_parameter;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for Method<'arena> {
     fn analyze<'ctx>(
@@ -106,8 +106,10 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Method<'arena> {
             concat_atom!(&class_like_metadata.original_name, "::", &method_name),
         );
 
-        if !context.codebase.method_is_overriding(&class_like_metadata.name, &method_name) {
-            heuristic::check_function_like(
+        if context.settings.find_unused_parameters
+            && !context.codebase.method_is_overriding(&class_like_metadata.name, &method_name)
+        {
+            unused_parameter::check_unused_params(
                 method_metadata,
                 self.parameter_list.parameters.as_slice(),
                 FunctionLikeBody::Statements(concrete_body.statements.as_slice(), concrete_body.span()),

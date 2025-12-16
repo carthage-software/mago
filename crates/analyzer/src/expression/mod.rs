@@ -21,13 +21,13 @@ use crate::context::block::BlockContext;
 use crate::context::scope::var_has_root;
 use crate::error::AnalysisError;
 use crate::formula::get_formula;
-use crate::heuristic;
 use crate::plugin::ExpressionHookResult;
 use crate::plugin::context::HookContext;
 use crate::reconciler::reconcile_keyed_types;
 use crate::statement::attributes::AttributeTarget;
 use crate::statement::attributes::analyze_attributes;
 use crate::statement::class_like::analyze_class_like;
+use crate::statement::class_like::override_attribute;
 use crate::utils::misc::check_for_paradox;
 
 pub mod access;
@@ -129,7 +129,13 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Expression<'arena> {
                     anonymous_class.members.as_slice(),
                 )?;
 
-                heuristic::check_class_like(class_like_metadata, anonymous_class.members.as_slice(), context);
+                if context.settings.check_missing_override {
+                    override_attribute::check_override_attribute(
+                        class_like_metadata,
+                        anonymous_class.members.as_slice(),
+                        context,
+                    );
+                }
 
                 artifacts.set_expression_type(&self, get_named_object(class_like_metadata.name, None));
 

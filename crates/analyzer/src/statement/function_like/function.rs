@@ -9,13 +9,13 @@ use crate::artifacts::AnalysisArtifacts;
 use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
-use crate::heuristic;
 use crate::plugin::context::HookContext;
 use crate::statement::attributes::AttributeTarget;
 use crate::statement::attributes::analyze_attributes;
 use crate::statement::function_like::FunctionLikeBody;
 use crate::statement::function_like::analyze_function_like;
 use crate::statement::function_like::check_unused_function_template_parameters;
+use crate::statement::function_like::unused_parameter;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for Function<'arena> {
     fn analyze<'ctx>(
@@ -85,12 +85,14 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Function<'arena> {
             function_name,
         );
 
-        heuristic::check_function_like(
-            function_metadata,
-            self.parameter_list.parameters.as_slice(),
-            FunctionLikeBody::Statements(self.body.statements.as_slice(), self.body.span()),
-            context,
-        );
+        if context.settings.find_unused_parameters {
+            unused_parameter::check_unused_params(
+                function_metadata,
+                self.parameter_list.parameters.as_slice(),
+                FunctionLikeBody::Statements(self.body.statements.as_slice(), self.body.span()),
+                context,
+            );
+        }
 
         // Check for missing type hints
         for parameter in self.parameter_list.parameters.iter() {

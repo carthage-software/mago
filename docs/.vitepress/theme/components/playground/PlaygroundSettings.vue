@@ -72,9 +72,14 @@ const analyzerOptions = [
     description: 'Report unhandled thrown exceptions not caught or documented',
   },
   {
-    key: 'performHeuristicChecks',
-    label: 'Perform heuristic checks',
-    description: 'Identify potential issues that are not strictly type-related',
+    key: 'checkMissingOverride',
+    label: 'Check missing #[Override]',
+    description: 'Report missing #[Override] attributes on overriding methods (PHP 8.3+)',
+  },
+  {
+    key: 'findUnusedParameters',
+    label: 'Find unused parameters',
+    description: 'Report function/method parameters that are never used',
   },
   {
     key: 'strictListIndexChecks',

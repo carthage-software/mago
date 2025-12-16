@@ -8,10 +8,10 @@ use mago_syntax::ast::FunctionLikeParameter;
 
 use crate::code::IssueCode;
 use crate::context::Context;
-use crate::heuristic::unused_parameter::utils::expression_potentially_contains_function_call;
-use crate::heuristic::unused_parameter::utils::get_foreign_variable_names;
-use crate::heuristic::unused_parameter::utils::is_variable_used_in_expression;
 use crate::statement::function_like::FunctionLikeBody;
+use crate::statement::function_like::unused_parameter::utils::expression_potentially_contains_function_call;
+use crate::statement::function_like::unused_parameter::utils::get_foreign_variable_names;
+use crate::statement::function_like::unused_parameter::utils::is_variable_used_in_expression;
 
 const FUNC_GET_ARGS: &str = "func_get_args";
 
@@ -102,13 +102,13 @@ fn report_parameter<'ctx, 'ast, 'arena>(
     });
 }
 
-mod utils {
+pub mod utils {
     use ahash::HashSet;
     use mago_syntax::ast::*;
     use mago_syntax::walker::Walker;
 
     use crate::context::Context;
-    use crate::heuristic::unused_parameter::utils::internal::FunctionCallWalker;
+    use crate::statement::function_like::unused_parameter::utils::internal::FunctionCallWalker;
 
     #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
     pub struct ForeignVariable<'arena> {
@@ -163,8 +163,8 @@ mod utils {
         context: &Context<'ctx, 'arena>,
         variable: &'arena str,
     ) -> bool {
-        use crate::heuristic::unused_parameter::utils::internal::VariableReference;
-        use crate::heuristic::unused_parameter::utils::internal::VariableWalker;
+        use crate::statement::function_like::unused_parameter::utils::internal::VariableReference;
+        use crate::statement::function_like::unused_parameter::utils::internal::VariableWalker;
 
         let mut context = (Vec::default(), context, 0);
 
@@ -244,7 +244,7 @@ mod utils {
         foreign
     }
 
-    mod internal {
+    pub(super) mod internal {
         use super::is_predefined_variable;
 
         use mago_syntax::ast::*;

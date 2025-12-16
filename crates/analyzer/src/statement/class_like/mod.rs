@@ -36,7 +36,6 @@ use crate::code::IssueCode;
 use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
-use crate::heuristic;
 use crate::plugin::context::HookContext;
 use crate::statement::attributes::AttributeTarget;
 use crate::statement::attributes::analyze_attributes;
@@ -48,6 +47,7 @@ pub mod enum_case;
 pub mod initialization;
 pub mod method;
 pub mod method_signature;
+pub mod override_attribute;
 pub mod property;
 
 /// Helper function to check if a child type is compatible with (contained by) a parent type.
@@ -296,7 +296,9 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Class<'arena> {
             self.members.as_slice(),
         )?;
 
-        heuristic::check_class_like(class_like_metadata, self.members.as_slice(), context);
+        if context.settings.check_missing_override {
+            override_attribute::check_override_attribute(class_like_metadata, self.members.as_slice(), context);
+        }
 
         // Call plugin on_leave_class hooks
         if context.plugin_registry.has_class_hooks() {
@@ -353,7 +355,9 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Interface<'arena> {
             self.members.as_slice(),
         )?;
 
-        heuristic::check_class_like(class_like_metadata, self.members.as_slice(), context);
+        if context.settings.check_missing_override {
+            override_attribute::check_override_attribute(class_like_metadata, self.members.as_slice(), context);
+        }
 
         // Call plugin on_leave_interface hooks
         if context.plugin_registry.has_interface_hooks() {
@@ -410,7 +414,9 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Trait<'arena> {
             self.members.as_slice(),
         )?;
 
-        heuristic::check_class_like(class_like_metadata, self.members.as_slice(), context);
+        if context.settings.check_missing_override {
+            override_attribute::check_override_attribute(class_like_metadata, self.members.as_slice(), context);
+        }
 
         // Call plugin on_leave_trait hooks
         if context.plugin_registry.has_trait_hooks() {
@@ -467,7 +473,9 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Enum<'arena> {
             self.members.as_slice(),
         )?;
 
-        heuristic::check_class_like(class_like_metadata, self.members.as_slice(), context);
+        if context.settings.check_missing_override {
+            override_attribute::check_override_attribute(class_like_metadata, self.members.as_slice(), context);
+        }
 
         // Call plugin on_leave_enum hooks
         if context.plugin_registry.has_enum_hooks() {

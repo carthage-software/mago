@@ -118,8 +118,21 @@ pub struct AnalyzerConfiguration {
     /// Defaults to `true`.
     pub register_super_globals: bool,
 
-    /// Whether to perform heuristic checks.
-    pub perform_heuristic_checks: bool,
+    /// Check for missing `#[Override]` attributes on overriding methods.
+    ///
+    /// When enabled, the analyzer reports methods that override a parent method without
+    /// the `#[Override]` attribute (PHP 8.3+).
+    ///
+    /// Defaults to `true`.
+    pub check_missing_override: bool,
+
+    /// Find and report unused function/method parameters.
+    ///
+    /// When enabled, the analyzer reports parameters that are declared but never used
+    /// within the function body.
+    ///
+    /// Defaults to `true`.
+    pub find_unused_parameters: bool,
 
     /// Trust symbol existence checks to narrow types.
     ///
@@ -166,7 +179,8 @@ impl AnalyzerConfiguration {
             check_throws: self.check_throws,
             unchecked_exceptions: self.unchecked_exceptions.iter().map(|s| atom(s.as_str())).collect(),
             unchecked_exception_classes: self.unchecked_exception_classes.iter().map(|s| atom(s.as_str())).collect(),
-            perform_heuristic_checks: self.perform_heuristic_checks,
+            check_missing_override: self.check_missing_override,
+            find_unused_parameters: self.find_unused_parameters,
             strict_list_index_checks: self.strict_list_index_checks,
             no_boolean_literal_comparison: self.no_boolean_literal_comparison,
             check_missing_type_hints: self.check_missing_type_hints,
@@ -203,7 +217,8 @@ impl Default for AnalyzerConfiguration {
             check_throws: defaults.check_throws,
             unchecked_exceptions: vec![],
             unchecked_exception_classes: vec![],
-            perform_heuristic_checks: defaults.perform_heuristic_checks,
+            check_missing_override: defaults.check_missing_override,
+            find_unused_parameters: defaults.find_unused_parameters,
             strict_list_index_checks: defaults.strict_list_index_checks,
             no_boolean_literal_comparison: defaults.no_boolean_literal_comparison,
             check_missing_type_hints: defaults.check_missing_type_hints,

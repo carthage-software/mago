@@ -52,7 +52,8 @@ These flags control specific, powerful analysis capabilities.
 | `memoize-properties`                  | `true`  | Track the literal values of class properties. Improves type inference but may increase memory usage. |
 | `allow-possibly-undefined-array-keys` | `true`  | Allow accessing array keys that may not be defined without reporting an issue.                       |
 | `check-throws`                        | `false` | Check for unhandled thrown exceptions that are not caught or documented with `@throws`.              |
-| `perform-heuristic-checks`            | `false` | Perform extra heuristic checks for potential issues that are not strict typing errors.               |
+| `check-missing-override`              | `false` | Check for missing `#[Override]` attributes on overriding methods (PHP 8.3+).                         |
+| `find-unused-parameters`              | `false` | Find and report unused function/method parameters.                                                   |
 | `strict-list-index-checks`            | `false` | When `true`, requires any integer used as a `list` index to be provably non-negative.                |
 | `no-boolean-literal-comparison`       | `false` | When `true`, disallows direct comparison to boolean literals (e.g., `$a === true`).                  |
 | `check-missing-type-hints`            | `false` | When `true`, reports missing type hints on parameters, properties, and return types.                 |
@@ -178,7 +179,8 @@ find-unused-expressions = true
 find-unused-definitions = true
 analyze-dead-code = true
 check-throws = true
-perform-heuristic-checks = true
+check-missing-override = true
+find-unused-parameters = true
 check-missing-type-hints = true
 check-closure-missing-type-hints = true
 check-arrow-function-missing-type-hints = true
@@ -239,7 +241,8 @@ function process(object $obj): mixed
 | `find-unused-expressions` | `true` | Reports expressions whose results are discarded (e.g., `$a + $b;`). |
 | `find-unused-definitions` | `true` | Reports unused private methods, variables, and other definitions. |
 | `analyze-dead-code` | `true` | Analyzes and reports on unreachable code paths. |
-| `perform-heuristic-checks` | `true` | Enables additional heuristic checks for common mistakes. |
+| `check-missing-override` | `true` | Reports missing `#[Override]` attributes on overriding methods (PHP 8.3+). |
+| `find-unused-parameters` | `true` | Reports unused function/method parameters. |
 | `no-boolean-literal-comparison` | `true` | Disallows comparisons like `$a === true` or `$b == false`. |
 
 #### Exception handling
@@ -265,7 +268,6 @@ trust-existence-checks = true
 
 # Optionally disable some checks
 check-throws = false
-perform-heuristic-checks = false
 ```
 
 :::tip Gradual adoption

@@ -49,11 +49,21 @@ pub struct Settings {
     /// during `check_throws` analysis. Parent classes and subclasses are not affected.
     pub unchecked_exception_classes: AtomSet,
 
-    /// Perform heuristic checks to identify potential issues in the code.
+    /// Check for missing `#[Override]` attributes on overriding methods.
     ///
-    /// This includes checks that are not strictly type-related but can help catch common mistakes.
+    /// When enabled, the analyzer reports methods that override a parent method without
+    /// the `#[Override]` attribute (PHP 8.3+).
+    ///
     /// Defaults to `true`.
-    pub perform_heuristic_checks: bool,
+    pub check_missing_override: bool,
+
+    /// Find and report unused function/method parameters.
+    ///
+    /// When enabled, the analyzer reports parameters that are declared but never used
+    /// within the function body.
+    ///
+    /// Defaults to `true`.
+    pub find_unused_parameters: bool,
 
     /// Enforce strict checks when accessing list elements by index.
     ///
@@ -172,9 +182,8 @@ impl Settings {
             unchecked_exceptions: AtomSet::default(),
             unchecked_exception_classes: AtomSet::default(),
             use_colors: true,
-            // TODO(azjezz): enable heuristic checks in the future,
-            // need optimizations first
-            perform_heuristic_checks: false,
+            check_missing_override: false,
+            find_unused_parameters: false,
             strict_list_index_checks: false,
             no_boolean_literal_comparison: false,
             check_missing_type_hints: false,

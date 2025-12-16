@@ -34,7 +34,6 @@ mod common;
 mod context;
 mod expression;
 mod formula;
-mod heuristic;
 mod invocation;
 mod reconciler;
 mod resolver;
