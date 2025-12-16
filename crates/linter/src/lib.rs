@@ -10,7 +10,6 @@ use mago_syntax::ast::Node;
 use mago_syntax::ast::Program;
 
 use crate::context::LintContext;
-use crate::legacy_rule_mappings::LEGACY_RULE_CODE_MAPPINGS;
 use crate::registry::RuleRegistry;
 use crate::rule::AnyRule;
 use crate::scope::Scope;
@@ -19,7 +18,6 @@ use crate::settings::Settings;
 pub mod category;
 pub mod context;
 pub mod integration;
-pub mod legacy_rule_mappings;
 pub mod registry;
 pub mod requirements;
 pub mod rule;
@@ -76,9 +74,6 @@ impl<'arena> Linter<'arena> {
         resolved_names: &'ast ResolvedNames<'arena>,
     ) -> IssueCollection {
         let mut collector = Collector::new(self.arena, source_file, program, COLLECTOR_CATEGORIES);
-
-        // Set legacy rule code mappings for compatibility with the old linter.
-        collector.set_aliases(LEGACY_RULE_CODE_MAPPINGS);
 
         // Set active codes if --only filter was used
         if let Some(only_codes) = &self.registry.only {
