@@ -165,10 +165,25 @@ pub struct AnalyzerConfiguration {
     ///
     /// Defaults to `false`.
     pub check_property_initialization: bool,
+
+    /// **Deprecated**: Use `check-missing-override` and `find-unused-parameters` instead.
+    ///
+    /// When set to `true`, enables both `check-missing-override` and `find-unused-parameters`.
+    /// When set to `false`, disables both.
+    ///
+    /// This option is kept for backwards compatibility with existing configurations.
+    #[serde(skip_serializing)]
+    pub perform_heuristic_checks: Option<bool>,
 }
 
 impl AnalyzerConfiguration {
     pub fn to_settings(&self, php_version: PHPVersion, color_choice: ColorChoice, enable_diff: bool) -> Settings {
+        // Backwards compatibility: if perform_heuristic_checks is set, use it for both options
+        let check_missing_override =
+            self.perform_heuristic_checks.unwrap_or(self.check_missing_override);
+        let find_unused_parameters =
+            self.perform_heuristic_checks.unwrap_or(self.find_unused_parameters);
+
         Settings {
             version: php_version,
             analyze_dead_code: self.analyze_dead_code,
@@ -179,8 +194,8 @@ impl AnalyzerConfiguration {
             check_throws: self.check_throws,
             unchecked_exceptions: self.unchecked_exceptions.iter().map(|s| atom(s.as_str())).collect(),
             unchecked_exception_classes: self.unchecked_exception_classes.iter().map(|s| atom(s.as_str())).collect(),
-            check_missing_override: self.check_missing_override,
-            find_unused_parameters: self.find_unused_parameters,
+            check_missing_override,
+            find_unused_parameters,
             strict_list_index_checks: self.strict_list_index_checks,
             no_boolean_literal_comparison: self.no_boolean_literal_comparison,
             check_missing_type_hints: self.check_missing_type_hints,
@@ -228,6 +243,7 @@ impl Default for AnalyzerConfiguration {
             trust_existence_checks: defaults.trust_existence_checks,
             class_initializers: vec![],
             check_property_initialization: defaults.check_property_initialization,
+            perform_heuristic_checks: None,
         }
     }
 }
