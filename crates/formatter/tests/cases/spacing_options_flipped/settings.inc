@@ -1,4 +1,5 @@
 FormatSettings {
+    always_break_named_arguments_list: true,
     space_around_assignment_in_declare: true,
     space_within_grouping_parenthesis: true,
     space_before_hook_parameter_list_parenthesis: true,
