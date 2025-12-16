@@ -226,6 +226,8 @@ define_rules! {
     NoAliasFunction(no_alias_function @ NoAliasFunctionRule),
     LowercaseTypeHint(lowercase_type_hint @ LowercaseTypeHintRule),
     IdentityComparison(identity_comparison @ IdentityComparisonRule),
+    IneffectiveFormatIgnoreNext(ineffective_format_ignore_next @ IneffectiveFormatIgnoreNextRule),
+    IneffectiveFormatIgnoreRegion(ineffective_format_ignore_region @ IneffectiveFormatIgnoreRegionRule),
     InstanceofStringable(instanceof_stringable @ InstanceofStringableRule),
     InterfaceName(interface_name @ InterfaceNameRule),
     InvalidOpenTag(invalid_open_tag @ InvalidOpenTagRule),

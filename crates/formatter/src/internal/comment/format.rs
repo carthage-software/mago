@@ -142,7 +142,12 @@ impl<'arena> FormatterState<'_, 'arena> {
             let comment = Comment::from_trivia(self.file, trivia);
 
             if comment.end <= range.start.offset {
-                self.print_leading_comment(&mut parts, comment);
+                // Check if comment is in an ignore region - if so, preserve as-is
+                if self.get_ignore_region_for(comment.start).is_some() {
+                    self.print_preserved_leading_comment(&mut parts, comment);
+                } else {
+                    self.print_leading_comment(&mut parts, comment);
+                }
                 self.next_comment_index += 1;
             } else {
                 break;
@@ -161,8 +166,14 @@ impl<'arena> FormatterState<'_, 'arena> {
             let comment = Comment::from_trivia(self.file, trivia);
 
             if range.end.offset < comment.start && self.is_insignificant(range.end.offset, comment.start) {
-                let previous = self.print_trailing_comment(&mut parts, comment, previous_comment);
-                previous_comment = Some(previous);
+                // Check if comment is in an ignore region - if so, preserve as-is
+                if self.get_ignore_region_for(comment.start).is_some() {
+                    self.print_preserved_trailing_comment(&mut parts, comment);
+                    previous_comment = Some(comment);
+                } else {
+                    let previous = self.print_trailing_comment(&mut parts, comment, previous_comment);
+                    previous_comment = Some(previous);
+                }
                 self.next_comment_index += 1;
             } else {
                 break;
@@ -242,6 +253,73 @@ impl<'arena> FormatterState<'_, 'arena> {
         parts.push(Document::Array(vec![in self.arena; Document::Space(Space::soft()), printed]));
 
         comment.with_line_suffix(false)
+    }
+
+    /// Prints a leading comment that is within an ignore region, preserving its original formatting.
+    fn print_preserved_leading_comment(&mut self, parts: &mut Vec<'arena, Document<'arena>>, comment: Comment) {
+        // Preserve the comment exactly as-is from source
+        let preserved = self.get_source_slice(comment.start, comment.end);
+        let comment_document = if comment.is_block {
+            if self.has_newline(comment.end, /* backwards */ false) {
+                if self.has_newline(comment.start, /* backwards */ true) {
+                    Document::Array(vec![
+                        in self.arena;
+                        Document::String(preserved),
+                        Document::BreakParent,
+                        Document::Line(Line::hard()),
+                    ])
+                } else {
+                    Document::Array(vec![in self.arena; Document::String(preserved), Document::Line(Line::default())])
+                }
+            } else {
+                Document::Array(vec![in self.arena; Document::String(preserved), Document::Space(Space::soft())])
+            }
+        } else {
+            Document::Array(
+                vec![in self.arena; Document::String(preserved), Document::BreakParent, Document::Line(Line::hard())],
+            )
+        };
+
+        parts.push(comment_document);
+
+        // Check for blank lines after comment
+        if self
+            .skip_spaces(Some(comment.end), false)
+            .and_then(|idx| self.skip_newline(Some(idx), false))
+            .is_some_and(|i| self.has_newline(i, /* backwards */ false))
+        {
+            parts.push(Document::BreakParent);
+            parts.push(Document::Line(Line::hard()));
+        }
+    }
+
+    /// Prints a trailing comment that is within an ignore region, preserving its original formatting.
+    fn print_preserved_trailing_comment(&mut self, parts: &mut Vec<'arena, Document<'arena>>, comment: Comment) {
+        // Preserve the comment exactly as-is from source
+        let preserved = self.get_source_slice(comment.start, comment.end);
+
+        if self.has_newline(comment.start, /* backwards */ true) {
+            parts.push(Document::String(preserved));
+            let suffix = {
+                let mut parts = vec![in self.arena; Document::BreakParent, Document::Line(Line::hard())];
+
+                if self.is_previous_line_empty(comment.start) {
+                    parts.push(Document::Line(Line::hard()));
+                }
+
+                parts
+            };
+
+            parts.push(Document::LineSuffix(suffix));
+        } else if comment.is_inline_comment() {
+            parts.push(Document::LineSuffix(
+                vec![in self.arena; Document::Space(Space::soft()), Document::String(preserved)],
+            ));
+        } else {
+            parts.push(Document::Array(
+                vec![in self.arena; Document::Space(Space::soft()), Document::String(preserved)],
+            ));
+        }
     }
 
     #[must_use]

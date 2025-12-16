@@ -54,6 +54,68 @@ fn print_statement_slice<'ctx, 'arena>(
     let mut i = 0;
     while i < stmts.len() {
         let stmt = stmts[i];
+        let stmt_start = stmt.span().start.offset;
+
+        // Check if this statement falls within an ignore region
+        if let Some(region) = f.get_ignore_region_for(stmt_start).copied() {
+            // First, flush any pending use statements that came before the ignore region
+            if !use_statements.is_empty() {
+                parts.extend(print_use_statements(f, use_statements.as_slice()));
+                use_statements.clear();
+                parts.push(Document::Line(Line::hard()));
+            }
+
+            // Output the preserved source for this region
+            let preserved = f.get_source_slice(region.start, region.end);
+            parts.push(Document::String(preserved));
+
+            // Skip comments within the region
+            f.skip_comments_until(region.end);
+
+            // Skip all statements that fall within this region
+            while i < stmts.len() && stmts[i].span().end.offset <= region.end {
+                i += 1;
+            }
+
+            // Add newline if there are more statements
+            if i < stmts.len() {
+                parts.push(Document::Line(Line::hard()));
+                // Preserve blank line after ignore region if it existed in source
+                if f.is_next_line_empty_after_index(region.end) {
+                    parts.push(Document::Line(Line::hard()));
+                }
+            }
+            continue;
+        }
+
+        // Check if there's a format-ignore-next marker before this statement
+        if let Some(marker_start) = f.consume_ignore_next_before(stmt_start) {
+            // First, flush any pending use statements
+            if !use_statements.is_empty() {
+                parts.extend(print_use_statements(f, use_statements.as_slice()));
+                use_statements.clear();
+                parts.push(Document::Line(Line::hard()));
+            }
+
+            // Preserve the marker comment and statement as-is
+            let stmt_end = stmt.span().end.offset;
+            let preserved = f.get_source_slice(marker_start, stmt_end);
+            parts.push(Document::String(preserved));
+
+            // Skip comments within the preserved region
+            f.skip_comments_until(stmt_end);
+
+            i += 1;
+
+            // Add newline if there are more statements
+            if i < stmts.len() {
+                parts.push(Document::Line(Line::hard()));
+                if f.is_next_line_empty_after_index(stmt_end) {
+                    parts.push(Document::Line(Line::hard()));
+                }
+            }
+            continue;
+        }
 
         if let Statement::Use(use_stmt) = stmt {
             use_statements.push(use_stmt);

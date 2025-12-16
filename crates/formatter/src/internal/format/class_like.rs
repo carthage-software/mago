@@ -66,8 +66,66 @@ pub fn print_class_like_body<'arena>(
                 class_like_members.iter().collect_in::<Vec<_>>(f.arena)
             };
 
-            for (i, item) in members_to_format.iter().enumerate() {
-                let item = *item; // Dereference to get &ClassLikeMember
+            let mut i = 0;
+            let mut formatted_count = 0;
+            while i < length {
+                let item = members_to_format[i];
+                let member_start = item.span().start.offset;
+                let member_end = item.span().end.offset;
+
+                if let Some(region) = f.get_ignore_region_for(member_start).copied() {
+                    let preserved = f.get_source_slice(region.start, region.end);
+                    if formatted_count > 0 && !last_has_line_after {
+                        members.push(Document::Line(Line::hard()));
+                    }
+
+                    members.push(Document::String(preserved));
+
+                    f.skip_comments_until(region.end);
+
+                    while i < length && members_to_format[i].span().end.offset <= region.end {
+                        i += 1;
+                    }
+
+                    if i < length {
+                        members.push(Document::Line(Line::hard()));
+                        if f.is_next_line_empty_after_index(region.end) {
+                            members.push(Document::Line(Line::hard()));
+                        }
+                        last_has_line_after = true;
+                    }
+
+                    formatted_count += 1;
+                    last_member_kind = None;
+                    continue;
+                }
+
+                if let Some(marker_start) = f.consume_ignore_next_before(member_start) {
+                    let preserved = f.get_source_slice(marker_start, member_end);
+                    if formatted_count > 0 && !last_has_line_after {
+                        members.push(Document::Line(Line::hard()));
+                    }
+
+                    members.push(Document::String(preserved));
+
+                    f.skip_comments_until(member_end);
+                    i += 1;
+
+                    if i < length {
+                        members.push(Document::Line(Line::hard()));
+                        if f.is_next_line_empty_after_index(member_end) {
+                            members.push(Document::Line(Line::hard()));
+                            last_has_line_after = true;
+                        } else {
+                            last_has_line_after = false;
+                        }
+                    }
+
+                    formatted_count += 1;
+                    last_member_kind = None;
+                    continue;
+                }
+
                 let member_kind = match item {
                     ClassLikeMember::TraitUse(_) => ClassLikeMemberKind::TraitUse,
                     ClassLikeMember::Constant(_) => ClassLikeMemberKind::Constant,
@@ -76,7 +134,10 @@ pub fn print_class_like_body<'arena>(
                     ClassLikeMember::Method(_) => ClassLikeMemberKind::Method,
                 };
 
-                if i != 0 && !last_has_line_after && should_add_empty_line_before(f, member_kind, last_member_kind) {
+                if formatted_count != 0
+                    && !last_has_line_after
+                    && should_add_empty_line_before(f, member_kind, last_member_kind)
+                {
                     members.push(Document::Line(Line::hard()));
                 }
 
@@ -96,6 +157,8 @@ pub fn print_class_like_body<'arena>(
                 }
 
                 last_member_kind = Some(member_kind);
+                formatted_count += 1;
+                i += 1;
             }
 
             contents.push(Document::Indent(members));

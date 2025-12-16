@@ -28,5 +28,6 @@ This process guarantees that the output is always 100% consistent, regardless of
 ## Dive in
 
 - **[Usage](/tools/formatter/usage.md)**: learn how to run the formatter from the command line.
+- **[Format Ignore](/tools/formatter/format-ignore.md)**: learn how to selectively disable formatting for files, regions, or individual statements.
 - **[Configuration reference](/tools/formatter/configuration-reference.md)**: see all the available options to customize the formatter's behavior.
 - **[Command reference](/tools/formatter/command-reference.md)**: a detailed guide to the `mago format` command and its flags.
