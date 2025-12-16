@@ -213,6 +213,28 @@ fn analyze_class_instantiation<'ctx, 'arena>(
         return Ok(get_never());
     }
 
+    if classname.is_from_class_string() && (metadata.kind.is_interface() || metadata.kind.is_trait()) {
+        let kind_name = if metadata.kind.is_interface() { "interface" } else { "trait" };
+
+        context.collector.report_with_code(
+            IssueCode::UnsafeInstantiation,
+            Issue::warning(format!(
+                "Potentially unsafe instantiation: `class-string<{classname_str}>` may contain the {kind_name} `{classname_str}` itself, which cannot be instantiated.",
+            ))
+            .with_annotation(
+                Annotation::primary(class_expression_span)
+                    .with_message(format!(
+                        "This expression is `class-string<{classname_str}>` where `{classname_str}` is {article} {kind_name}",
+                        article = if metadata.kind.is_interface() { "an" } else { "a" }
+                    )),
+            )
+            .with_note(format!(
+                "While `class-string<{classname_str}>` usually contains a concrete class implementing the {kind_name}, it could technically be `{classname_str}::class` itself.",
+            ))
+            .with_help("Consider using a more specific type or adding runtime validation."),
+        );
+    }
+
     let mut is_impossible = false;
     if metadata.flags.is_abstract() && !classname.can_extend_static() && !classname.is_from_class_string() {
         context.collector.report_with_code(
@@ -403,7 +425,11 @@ fn analyze_class_instantiation<'ctx, 'arena>(
         );
     }
 
+    let skip_constructor_warning =
+        classname.is_from_class_string() && (metadata.kind.is_interface() || metadata.kind.is_trait());
+
     if has_inconsistent_constructor
+        && !skip_constructor_warning
         && (classname.is_static() || classname.is_from_class_string() || classname.is_object_instance())
     {
         let mut issue = if classname.is_static() {
