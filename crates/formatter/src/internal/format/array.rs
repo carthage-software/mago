@@ -174,6 +174,7 @@ pub(super) fn print_array_like<'arena>(
 
         if let Some(widths) = column_widths {
             for (i, element) in elements.into_iter().enumerate() {
+                let element_span = element.span();
                 let formatted_element = element.format(f);
                 if i == len - 1 {
                     indent_parts.push(format_row_with_alignment(f, formatted_element, &widths));
@@ -183,10 +184,14 @@ pub(super) fn print_array_like<'arena>(
                 indent_parts.push(format_row_with_alignment(f, formatted_element, &widths));
                 indent_parts.push(Document::String(","));
                 indent_parts.push(Document::Line(Line::hard()));
+                if f.is_next_line_empty(element_span) {
+                    indent_parts.push(Document::Line(Line::hard()));
+                }
             }
         } else {
             // Standard formatting without alignment
             for (i, element) in elements.into_iter().enumerate() {
+                let element_span = element.span();
                 indent_parts.push(element.format(f));
                 if i == len - 1 {
                     break;
@@ -194,6 +199,9 @@ pub(super) fn print_array_like<'arena>(
 
                 indent_parts.push(Document::String(","));
                 indent_parts.push(Document::Line(Line::default()));
+                if f.is_next_line_empty(element_span) {
+                    indent_parts.push(Document::Line(Line::hard()));
+                }
             }
         }
 
