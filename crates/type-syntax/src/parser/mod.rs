@@ -5,6 +5,11 @@ use crate::parser::internal::stream::TypeTokenStream;
 
 mod internal;
 
+/// Constructs a type AST from a lexer.
+///
+/// # Errors
+///
+/// Returns a [`ParseError`] if the type syntax is invalid.
 pub fn construct(lexer: TypeLexer<'_>) -> Result<Type<'_>, ParseError> {
     let mut stream = TypeTokenStream::new(lexer);
 

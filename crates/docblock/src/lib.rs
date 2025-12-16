@@ -13,6 +13,11 @@ pub mod document;
 pub mod error;
 pub mod tag;
 
+/// Parses a docblock from a trivia token.
+///
+/// # Errors
+///
+/// Returns a [`ParseError`] if the trivia is not a docblock comment or parsing fails.
 #[inline]
 pub fn parse_trivia<'arena>(arena: &'arena Bump, trivia: &Trivia<'arena>) -> Result<Document<'arena>, ParseError> {
     if TriviaKind::DocBlockComment != trivia.kind {
@@ -22,6 +27,11 @@ pub fn parse_trivia<'arena>(arena: &'arena Bump, trivia: &Trivia<'arena>) -> Res
     parse_phpdoc_with_span(arena, trivia.value, trivia.span)
 }
 
+/// Parses a PHPDoc comment string with an associated span.
+///
+/// # Errors
+///
+/// Returns a [`ParseError`] if tokenization or parsing fails.
 #[inline]
 pub fn parse_phpdoc_with_span<'arena>(
     arena: &'arena Bump,

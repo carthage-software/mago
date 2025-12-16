@@ -53,6 +53,11 @@ impl Prelude {
     ///
     /// This is the primary runtime function, used to load a pre-compiled prelude
     /// that was embedded in the binary. It is a very fast operation.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`PreludeError`] if deserialization fails due to corrupted or
+    /// incompatible binary data.
     pub fn decode(bytes: &[u8]) -> Result<Self, PreludeError> {
         let (prelude, _) = bincode::serde::decode_from_slice(bytes, standard())?;
 
@@ -73,6 +78,10 @@ impl Prelude {
     ///
     /// The resulting `Vec<u8>` can be saved to a file for later loading.
     /// This is only available when the `build` feature is enabled.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`PreludeError`] if serialization fails.
     #[cfg(feature = "build")]
     pub fn encode(&self) -> Result<Vec<u8>, PreludeError> {
         Ok(bincode::serde::encode_to_vec(self, standard())?)

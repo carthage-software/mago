@@ -332,9 +332,9 @@ fn parse_var_ident(raw: &str, allow_property_access: bool) -> Option<Variable> {
 /// * `covariant` - `true` if the tag was `@template-covariant`.
 /// * `contravariant` - `true` if the tag was `@template-contravariant`.
 ///
-/// # Returns
+/// # Errors
 ///
-/// A `Result` containing the parsed `TemplateTag` or a `TemplateParseError`.
+/// Returns a [`ParseError`] if the template tag syntax is invalid.
 #[inline]
 pub fn parse_template_tag(
     content: &str,
@@ -415,9 +415,9 @@ pub fn parse_template_tag(
 /// * `content` - The string slice content following `@where`.
 /// * `span` - The original `Span` of the `content` slice.
 ///
-/// # Returns
+/// # Errors
 ///
-/// `Some(WhereTag)` if parsing is successful, `None` otherwise.
+/// Returns a [`ParseError`] if the where tag syntax is invalid.
 pub fn parse_where_tag(content: &str, span: Span) -> Result<WhereTag, ParseError> {
     let name_end_pos = content.find(char::is_whitespace).ok_or_else(|| {
         ParseError::InvalidWhereTag(span, "Expected template parameter name and constraint".to_string())
@@ -459,9 +459,9 @@ pub fn parse_where_tag(content: &str, span: Span) -> Result<WhereTag, ParseError
 /// * `content` - The string slice content following `@param`.
 /// * `span` - The original `Span` of the `content` slice.
 ///
-/// # Returns
+/// # Errors
 ///
-/// `Result<ParameterTag, ParseError>` with the parsed parameter tag or an error.
+/// Returns a [`ParseError`] if the param tag syntax is invalid.
 pub fn parse_param_tag(content: &str, span: Span) -> Result<ParameterTag, ParseError> {
     let trimmed = content.trim_start();
 
@@ -518,9 +518,9 @@ pub fn parse_param_tag(content: &str, span: Span) -> Result<ParameterTag, ParseE
 /// * `content` - The string slice content following `@param-out`.
 /// * `span` - The original `Span` of the `content` slice.
 ///
-/// # Returns
+/// # Errors
 ///
-/// `Result<ParameterOutTag, ParseError>` with the parsed parameter-out tag or an error.
+/// Returns a [`ParseError`] if the param-out tag syntax is invalid.
 pub fn parse_param_out_tag(content: &str, span: Span) -> Result<ParameterOutTag, ParseError> {
     let (type_string, rest_slice) = split_tag_content(content, span)
         .ok_or_else(|| ParseError::InvalidParameterOutTag(span, "Failed to parse parameter type".to_string()))?;
@@ -557,9 +557,9 @@ pub fn parse_param_out_tag(content: &str, span: Span) -> Result<ParameterOutTag,
 /// * `content` - The string slice content following `@return`.
 /// * `span` - The original `Span` of the `content` slice.
 ///
-/// # Returns
+/// # Errors
 ///
-/// `Result<ReturnTypeTag, ParseError>` with the parsed return tag or an error.
+/// Returns a [`ParseError`] if the return tag syntax is invalid.
 pub fn parse_return_tag(content: &str, span: Span) -> Result<ReturnTypeTag, ParseError> {
     let (type_string, rest_slice) = split_tag_content(content, span)
         .ok_or_else(|| ParseError::InvalidReturnTag(span, "Failed to parse return type".to_string()))?;
@@ -581,9 +581,9 @@ pub fn parse_return_tag(content: &str, span: Span) -> Result<ReturnTypeTag, Pars
 /// * `content` - The string slice content following `@throws`.
 /// * `span` - The original `Span` of the `content` slice.
 ///
-/// # Returns
+/// # Errors
 ///
-/// `Result<ThrowsTag, ParseError>` with the parsed throws tag or an error.
+/// Returns a [`ParseError`] if the throws tag syntax is invalid.
 pub fn parse_throws_tag(content: &str, span: Span) -> Result<ThrowsTag, ParseError> {
     let (type_string, rest_slice) = split_tag_content(content, span)
         .ok_or_else(|| ParseError::InvalidThrowsTag(span, "Failed to parse exception type".to_string()))?;
@@ -610,9 +610,9 @@ pub fn parse_throws_tag(content: &str, span: Span) -> Result<ThrowsTag, ParseErr
 /// * `content` - The string slice content following the tag.
 /// * `span` - The original `Span` of the `content` slice.
 ///
-/// # Returns
+/// # Errors
 ///
-/// `Result<AssertionTag, ParseError>` with the parsed assertion tag or an error.
+/// Returns a [`ParseError`] if the assertion tag syntax is invalid.
 pub fn parse_assertion_tag(content: &str, span: Span) -> Result<AssertionTag, ParseError> {
     let (type_string, rest_slice) = split_tag_content(content, span)
         .ok_or_else(|| ParseError::InvalidAssertionTag(span, "Failed to parse assertion type".to_string()))?;
@@ -647,9 +647,9 @@ pub fn parse_assertion_tag(content: &str, span: Span) -> Result<AssertionTag, Pa
 /// * `content` - The string slice content following the tag.
 /// * `span` - The original `Span` of the `content` slice.
 ///
-/// # Returns
+/// # Errors
 ///
-/// `Result<VarTag, ParseError>` with the parsed var tag or an error.
+/// Returns a [`ParseError`] if the var tag syntax is invalid.
 pub fn parse_var_tag(content: &str, span: Span) -> Result<VarTag, ParseError> {
     let (type_string, rest_slice) = split_tag_content(content, span)
         .ok_or_else(|| ParseError::InvalidVarTag(span, "Failed to parse variable type".to_string()))?;
@@ -682,9 +682,9 @@ pub fn parse_var_tag(content: &str, span: Span) -> Result<VarTag, ParseError> {
 /// * `content` - The string slice content following the tag.
 /// * `span` - The original `Span` of the `content` slice.
 ///
-/// # Returns
+/// # Errors
 ///
-/// `Some(TypeTag)` if parsing is successful, `None` otherwise.
+/// Returns a [`ParseError`] if the type tag syntax is invalid.
 pub fn parse_type_tag(content: &str, span: Span) -> Result<TypeTag, ParseError> {
     let leading_ws = (content.len() - content.trim_start().len()) as u32;
     let content = content.trim_start();
@@ -746,9 +746,9 @@ pub fn parse_type_tag(content: &str, span: Span) -> Result<TypeTag, ParseError> 
 /// * `content` - The string slice content following the tag.
 /// * `span` - The original `Span` of the `content` slice.
 ///
-/// # Returns
+/// # Errors
 ///
-/// `Result<ImportTypeTag, ParseError>` with the parsed import type tag or an error.
+/// Returns a [`ParseError`] if the import-type tag syntax is invalid.
 pub fn parse_import_type_tag(content: &str, span: Span) -> Result<ImportTypeTag, ParseError> {
     let (name, rest) = content.trim_start().split_once(' ').ok_or_else(|| {
         ParseError::InvalidImportTypeTag(span, "Expected type alias name and 'from' clause".to_string())
@@ -804,6 +804,11 @@ pub fn parse_import_type_tag(content: &str, span: Span) -> Result<ImportTypeTag,
     Ok(ImportTypeTag { span, name: name.to_owned(), from: imported_from.to_owned(), alias })
 }
 
+/// Parses the content string of a `@property` tag.
+///
+/// # Errors
+///
+/// Returns a [`ParseError`] if the property tag syntax is invalid.
 pub fn parse_property_tag(content: &str, span: Span, is_read: bool, is_write: bool) -> Result<PropertyTag, ParseError> {
     // If we are at `$` and not `$this`, then no type is present:
     let (type_string, variable) = if content.trim_start().starts_with('$') && !content.trim_start().starts_with("$this")
@@ -1022,9 +1027,9 @@ pub fn split_tag_content(content: &str, input_span: Span) -> Option<(TypeString,
 /// * `content` - The string slice content following `@method`.
 /// * `span` - The original `Span` of the `content` slice.
 ///
-/// # Returns
+/// # Errors
 ///
-/// `Some(MethodTag)` if parsing is successful, `None` otherwise.
+/// Returns a [`ParseError`] if the method tag syntax is invalid.
 pub fn parse_method_tag(mut content: &str, mut span: Span) -> Result<MethodTag, ParseError> {
     let (trimmed_content, leading_ws) = consume_whitespace(content);
     content = trimmed_content;

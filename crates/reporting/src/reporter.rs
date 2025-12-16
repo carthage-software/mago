@@ -98,6 +98,10 @@ impl Reporter {
     ///
     /// This method applies baseline filtering, severity filtering, and sorting
     /// based on the reporter configuration, then formats and outputs the issues.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`ReportingError`] if formatting or writing the issues fails.
     pub fn report(&self, issues: IssueCollection, baseline: Option<Baseline>) -> Result<ReportStatus, ReportingError> {
         let mut writer = self.config.target.resolve();
 
@@ -157,6 +161,10 @@ impl Reporter {
     /// This method allows writing to any `Write` implementation, making it useful
     /// for testing, capturing output to strings, writing to files, or streaming
     /// over network sockets.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`ReportingError`] if formatting or writing the issues fails.
     ///
     /// # Examples
     ///

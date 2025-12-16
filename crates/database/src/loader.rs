@@ -53,6 +53,14 @@ impl<'a> DatabaseLoader<'a> {
         self.memory_sources.push((name, contents, file_type));
     }
 
+    /// Loads files from disk into the database.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`DatabaseError`] if:
+    /// - A glob pattern is invalid
+    /// - File system operations fail (reading directories, files)
+    /// - File content cannot be read as valid UTF-8
     pub fn load(mut self) -> Result<Database<'a>, DatabaseError> {
         let mut db = self.database.take().unwrap_or_else(|| Database::new(self.configuration.clone()));
 

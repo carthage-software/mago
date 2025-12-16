@@ -25,10 +25,9 @@ pub mod token;
 ///   This is crucial for ensuring all AST nodes have correct, absolute positioning.
 /// * `input` - The `&str` containing the type string to parse (e.g., `"int|string"`, `"array<int, MyClass>"`).
 ///
-/// # Returns
+/// # Errors
 ///
-/// * `Ok(Type)` containing the root of the parsed AST on success.
-/// * `Err(ParseError)` if any lexing or parsing error occurs.
+/// Returns a [`ParseError`] if any lexing or parsing error occurs.
 pub fn parse_str(span: Span, input: &str) -> Result<Type<'_>, ParseError> {
     // Create an Input anchored at the type string's original starting position.
     let input = Input::anchored_at(span.file_id, input.as_bytes(), span.start);

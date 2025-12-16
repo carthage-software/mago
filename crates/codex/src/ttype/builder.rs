@@ -110,9 +110,15 @@ use crate::ttype::wrap_atomic;
 /// # Returns
 ///
 /// * `Ok(TUnion)`: The resolved semantic type representation on success.
-/// * `Err(TypeError)`: If any parsing or (future) conversion error occurs.
-///   The `TypeError` can encapsulate errors originating from the
-///   syntax parsing phase.
+/// * `Err(TypeError)`: If any parsing or conversion error occurs.
+///
+/// # Errors
+///
+/// Returns a [`TypeError`] if:
+/// - The type string contains invalid syntax
+/// - An unsupported type construct is encountered
+/// - Type references cannot be resolved (e.g., `self` outside a class context)
+/// - Invalid type combinations are used (e.g., incompatible intersection types)
 pub fn get_type_from_string(
     type_string: &str,
     span: Span,
@@ -125,6 +131,15 @@ pub fn get_type_from_string(
     get_union_from_type_ast(&ast, scope, type_context, classname)
 }
 
+/// Converts a type AST node into a semantic `TUnion` type representation.
+///
+/// # Errors
+///
+/// Returns a [`TypeError`] if:
+/// - An unsupported type construct is encountered
+/// - Type references cannot be resolved (e.g., `self` outside a class context)
+/// - Invalid type combinations are used (e.g., incompatible intersection types)
+/// - Int range has minimum greater than maximum
 #[inline]
 pub fn get_union_from_type_ast(
     ttype: &Type<'_>,

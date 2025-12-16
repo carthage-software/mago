@@ -65,6 +65,14 @@ impl<'a> DatabaseWatcher<'a> {
         Self { database, watcher: None, watched_paths: Vec::new(), receiver: None }
     }
 
+    /// Starts watching for file changes in the configured directories.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`DatabaseError`] if:
+    /// - A glob pattern is invalid
+    /// - The file system watcher cannot be created
+    /// - Directories cannot be watched
     pub fn watch(&mut self, options: WatchOptions) -> Result<(), DatabaseError> {
         self.stop();
 
@@ -257,11 +265,11 @@ impl<'a> DatabaseWatcher<'a> {
     /// This method blocks until file changes are detected, then updates the database
     /// in place and returns the IDs of changed files.
     ///
-    /// # Returns
+    /// # Errors
     ///
-    /// - `Ok(file_ids)` - The IDs of files that were changed (empty if no changes)
-    /// - `Err(DatabaseError::WatcherNotActive)` - If the watcher is not currently watching
-    /// - `Err(e)` - If updating the database failed
+    /// Returns a [`DatabaseError`] if:
+    /// - The watcher is not currently active ([`DatabaseError::WatcherNotActive`])
+    /// - Updating the database with changed files fails
     pub fn wait(&mut self) -> Result<Vec<FileId>, DatabaseError> {
         let Some(receiver) = &self.receiver else {
             return Err(DatabaseError::WatcherNotActive);
