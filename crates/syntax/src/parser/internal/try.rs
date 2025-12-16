@@ -1,5 +1,7 @@
 use crate::T;
-use crate::ast::ast::*;
+use crate::ast::ast::Try;
+use crate::ast::ast::TryCatchClause;
+use crate::ast::ast::TryFinallyClause;
 use crate::ast::sequence::Sequence;
 use crate::error::ParseError;
 use crate::parser::internal::block::parse_block;

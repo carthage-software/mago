@@ -2,7 +2,9 @@ use mago_codex::ttype::TType;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
-use mago_syntax::ast::*;
+use mago_syntax::ast::EnumCase;
+use mago_syntax::ast::EnumCaseBackedItem;
+use mago_syntax::ast::EnumCaseItem;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -26,7 +28,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for EnumCase<'arena> {
             artifacts,
             self.attribute_lists.as_slice(),
             AttributeTarget::ClassLikeConstant,
-        )?;
+        );
 
         self.item.analyze(context, block_context, artifacts)
     }

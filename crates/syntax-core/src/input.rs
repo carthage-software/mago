@@ -31,6 +31,7 @@ impl<'a> Input<'a> {
     /// # Returns
     ///
     /// A new `Input` instance initialized at the beginning of the input.
+    #[must_use]
     pub fn new(file_id: FileId, bytes: &'a [u8]) -> Self {
         let length = bytes.len();
 
@@ -46,6 +47,7 @@ impl<'a> Input<'a> {
     /// # Returns
     ///
     /// A new `Input` instance initialized with the file's ID and contents.
+    #[must_use]
     pub fn from_file(file: &'a File) -> Self {
         Self::new(file.id, file.contents.as_bytes())
     }
@@ -83,6 +85,7 @@ impl<'a> Input<'a> {
     ///
     /// A new `Input` instance ready to lex the `bytes`, maintaining positions
     /// relative to `anchor_position`.
+    #[must_use]
     pub fn anchored_at(file_id: FileId, bytes: &'a [u8], anchor_position: Position) -> Self {
         let length = bytes.len();
 
@@ -91,6 +94,7 @@ impl<'a> Input<'a> {
 
     /// Returns the source file identifier of the input code.
     #[inline]
+    #[must_use]
     pub const fn file_id(&self) -> FileId {
         self.file_id
     }
@@ -100,6 +104,7 @@ impl<'a> Input<'a> {
     /// It calculates this by adding the internal offset (progress within the current byte slice)
     /// to the `starting_position` the `Input` was initialized with.
     #[inline]
+    #[must_use]
     pub const fn current_position(&self) -> Position {
         // Calculate absolute position by adding internal offset to the starting base
         self.starting_position.forward(self.offset as u32)
@@ -110,18 +115,21 @@ impl<'a> Input<'a> {
     /// This indicates how many bytes have been consumed from the current `bytes` slice.
     /// To get the absolute position in the original source file, use `current_position()`.
     #[inline]
+    #[must_use]
     pub const fn current_offset(&self) -> usize {
         self.offset
     }
 
     /// Returns `true` if the input slice is empty (length is zero).
     #[inline]
+    #[must_use]
     pub const fn is_empty(&self) -> bool {
         self.length == 0
     }
 
     /// Returns the total length in bytes of the input slice being processed.
     #[inline]
+    #[must_use]
     pub const fn len(&self) -> usize {
         self.length
     }
@@ -132,6 +140,7 @@ impl<'a> Input<'a> {
     ///
     /// `true` if the current offset is greater than or equal to the input length; `false` otherwise.
     #[inline]
+    #[must_use]
     pub const fn has_reached_eof(&self) -> bool {
         self.offset >= self.length
     }
@@ -158,6 +167,7 @@ impl<'a> Input<'a> {
     ///
     /// A byte slice `&[u8]` corresponding to the requested range.
     #[inline]
+    #[must_use]
     pub fn slice_in_range(&self, from: u32, to: u32) -> &'a [u8] {
         let base_offset = self.starting_position.offset;
 
@@ -329,6 +339,7 @@ impl<'a> Input<'a> {
     ///
     /// A byte slice containing the next `n` characters.
     #[inline]
+    #[must_use]
     pub fn read(&self, n: usize) -> &'a [u8] {
         let (from, until) = self.calculate_bound(n);
 
@@ -353,6 +364,7 @@ impl<'a> Input<'a> {
     ///
     /// This method **panics** if the provided `at` offset is out of bounds
     /// for the input byte slice (i.e., if `at >= self.bytes.len()`).
+    #[must_use]
     pub fn read_at(&self, at: usize) -> &'a u8 {
         &self.bytes[at]
     }
@@ -368,6 +380,7 @@ impl<'a> Input<'a> {
     ///
     /// `true` if the next bytes match `search`; `false` otherwise.
     #[inline]
+    #[must_use]
     pub fn is_at(&self, search: &[u8], ignore_ascii_case: bool) -> bool {
         let (from, until) = self.calculate_bound(search.len());
         let slice = &self.bytes[from..until];
@@ -399,6 +412,7 @@ impl<'a> Input<'a> {
     ///   of the input consumed to match `search`, including any skipped whitespace **within** the matched sequence.
     /// * `None` - If the input does not match `search`.
     #[inline]
+    #[must_use]
     pub const fn match_sequence_ignore_whitespace(&self, search: &[u8], ignore_ascii_case: bool) -> Option<usize> {
         let mut offset = self.offset;
         let mut search_offset = 0;
@@ -447,6 +461,7 @@ impl<'a> Input<'a> {
     ///
     /// A byte slice containing the peeked characters.
     #[inline]
+    #[must_use]
     pub fn peek(&self, offset: usize, n: usize) -> &'a [u8] {
         let from = self.offset + offset;
         if from >= self.length {

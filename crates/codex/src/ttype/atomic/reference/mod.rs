@@ -24,6 +24,7 @@ pub enum TReferenceMemberSelector {
 impl TReferenceMemberSelector {
     /// Returns true if this selector matches the given member name.
     #[inline]
+    #[must_use]
     pub fn matches(&self, name: &Atom) -> bool {
         match self {
             Self::Wildcard => true,
@@ -64,30 +65,35 @@ pub enum TReference {
 impl TReference {
     /// Creates a simple symbol reference with no generic parameters.
     #[inline]
+    #[must_use]
     pub fn new_symbol(name: Atom) -> Self {
         TReference::Symbol { name, parameters: None, intersection_types: None }
     }
 
     /// Creates a symbol reference with generic parameters.
     #[inline]
+    #[must_use]
     pub fn new_symbol_with_parameters(name: Atom, parameters: Vec<TUnion>) -> Self {
         TReference::Symbol { name, parameters: Some(parameters), intersection_types: None }
     }
 
     /// Creates a class-like member reference.
     #[inline]
+    #[must_use]
     pub fn new_member(class_like_name: Atom, member_selector: TReferenceMemberSelector) -> Self {
         TReference::Member { class_like_name, member_selector }
     }
 
     /// Checks if this is a reference to a symbol name.
     #[inline]
+    #[must_use]
     pub const fn is_symbol(&self) -> bool {
         matches!(self, TReference::Symbol { .. })
     }
 
     /// Checks if this is a reference to a class-like member.
     #[inline]
+    #[must_use]
     pub const fn is_member(&self) -> bool {
         matches!(self, TReference::Member { .. })
     }
@@ -95,6 +101,7 @@ impl TReference {
     /// Returns the name and parameters if this is a Symbol reference.
     #[inline]
     #[allow(clippy::type_complexity)]
+    #[must_use]
     pub const fn get_symbol_data(&self) -> Option<(&Atom, &Option<Vec<TUnion>>, &Option<Vec<TAtomic>>)> {
         match self {
             TReference::Symbol { name, parameters, intersection_types } => Some((name, parameters, intersection_types)),
@@ -104,6 +111,7 @@ impl TReference {
 
     /// Returns the class-like name and member name if this is a Member reference.
     #[inline]
+    #[must_use]
     pub const fn get_member_data(&self) -> Option<(&Atom, &TReferenceMemberSelector)> {
         match self {
             TReference::Member { class_like_name: classlike_name, member_selector } => {

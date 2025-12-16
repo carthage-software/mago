@@ -10,7 +10,12 @@ use mago_fixer::SafetyClassification;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Binary;
+use mago_syntax::ast::BinaryOperator;
+use mago_syntax::ast::Expression;
+use mago_syntax::ast::Literal;
+use mago_syntax::ast::Parenthesized;
+use mago_syntax::ast::Variable;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -53,8 +58,8 @@ pub fn analyze_comparison_operation<'ctx, 'arena>(
     let lhs_type = artifacts.get_rc_expression_type(&binary.lhs).unwrap_or(&fallback_type);
     let rhs_type = artifacts.get_rc_expression_type(&binary.rhs).unwrap_or(&fallback_type);
 
-    check_comparison_operand(context, binary.lhs, lhs_type, "Left", &binary.operator)?;
-    check_comparison_operand(context, binary.rhs, rhs_type, "Right", &binary.operator)?;
+    check_comparison_operand(context, binary.lhs, lhs_type, "Left", &binary.operator);
+    check_comparison_operand(context, binary.rhs, rhs_type, "Right", &binary.operator);
 
     if context.settings.no_boolean_literal_comparison
         // Only consider equality/inequality operators.
@@ -368,9 +373,9 @@ fn check_comparison_operand<'ast, 'arena>(
     operand_type: &TUnion,
     side: &'static str,
     operator: &'ast BinaryOperator<'arena>,
-) -> Result<(), AnalysisError> {
+) {
     if operator.is_identity() {
-        return Ok(());
+        return;
     }
 
     let op_str = operator.as_str();
@@ -428,8 +433,6 @@ fn check_comparison_operand<'ast, 'arena>(
             .with_help("Ensure this operand is non-false or that comparison with `false` is intended and handled safely."),
         );
     }
-
-    Ok(())
 }
 
 /// Helper to report redundant comparison issues.

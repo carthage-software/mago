@@ -1,4 +1,6 @@
-use crate::ast::*;
+use crate::ast::GenericParameterEntry;
+use crate::ast::GenericParameters;
+use crate::ast::SingleGenericParameter;
 use crate::error::ParseError;
 use crate::parser::internal::parse_type;
 use crate::parser::internal::stream::TypeTokenStream;

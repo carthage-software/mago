@@ -27,7 +27,7 @@ impl Formatter for ShortFormatter {
             issues,
             database,
             config,
-            Config { display_style: DisplayStyle::Short, ..Default::default() },
+            &Config { display_style: DisplayStyle::Short, ..Default::default() },
         )
     }
 }

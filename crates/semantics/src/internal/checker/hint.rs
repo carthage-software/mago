@@ -1,7 +1,8 @@
 use mago_php_version::feature::Feature;
-use mago_reporting::*;
-use mago_span::*;
-use mago_syntax::ast::*;
+use mago_reporting::Annotation;
+use mago_reporting::Issue;
+use mago_span::HasSpan;
+use mago_syntax::ast::Hint;
 
 use crate::internal::context::Context;
 

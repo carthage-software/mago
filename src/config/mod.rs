@@ -286,7 +286,7 @@ impl Configuration {
                 let config_path = config_root.join(CONFIGURATION_FILE_NAME);
 
                 for format in formats {
-                    for ext in format.file_extensions().iter() {
+                    for ext in format.file_extensions() {
                         let config_file = config_path.with_extension(ext);
 
                         if !config_file.exists() {

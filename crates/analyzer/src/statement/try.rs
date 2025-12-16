@@ -20,7 +20,8 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_span::Span;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Hint;
+use mago_syntax::ast::Try;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -43,7 +44,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
         let mut catch_actions = vec![];
         let mut all_catches_leave = !self.catch_clauses.is_empty();
 
-        for catch_clause in self.catch_clauses.iter() {
+        for catch_clause in &self.catch_clauses {
             let actions = ControlAction::from_statements(
                 catch_clause.block.statements.iter().collect::<Vec<_>>(),
                 vec![],
@@ -133,11 +134,11 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
 
         if all_catches_leave {
             for assigned_variable_id in newly_assigned_variable_ids.keys() {
-                try_block_context.remove_variable_from_conflicting_clauses(context, assigned_variable_id, None);
+                try_block_context.remove_variable_from_conflicting_clauses(context, *assigned_variable_id, None);
             }
         } else {
             for assigned_variable_id in newly_assigned_variable_ids.keys() {
-                block_context.remove_variable_from_conflicting_clauses(context, assigned_variable_id, None);
+                block_context.remove_variable_from_conflicting_clauses(context, *assigned_variable_id, None);
             }
         }
 
@@ -203,7 +204,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
 
                 let catch_var_name = Atom::from(catch_variable.name);
                 catch_block_context.locals.insert(catch_var_name, Rc::new(exception_type));
-                catch_block_context.remove_variable_from_conflicting_clauses(context, &catch_var_name, None);
+                catch_block_context.remove_variable_from_conflicting_clauses(context, catch_var_name, None);
                 catch_block_context.variables_possibly_in_scope.insert(catch_var_name);
             }
 

@@ -1,5 +1,5 @@
 use crate::T;
-use crate::ast::ast::*;
+use crate::ast::ast::Modifier;
 use crate::ast::sequence::Sequence;
 use crate::error::ParseError;
 use crate::parser::internal::token_stream::TokenStream;

@@ -10,7 +10,16 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_reporting::Level;
 use mago_span::HasSpan;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Expression;
+use mago_syntax::ast::FullOpeningTag;
+use mago_syntax::ast::Inline;
+use mago_syntax::ast::InlineKind;
+use mago_syntax::ast::Literal;
+use mago_syntax::ast::Node;
+use mago_syntax::ast::NodeKind;
+use mago_syntax::ast::OpeningTag;
+use mago_syntax::ast::ShortOpeningTag;
+use mago_syntax::ast::Statement;
 
 use crate::category::Category;
 use crate::context::LintContext;
@@ -94,10 +103,8 @@ impl LintRule for StrictTypesRule {
 
         let mut found = false;
         let mut has_useful_statements = false;
-        for statement in program.statements.iter() {
-            let declare = if let Statement::Declare(declare) = statement {
-                declare
-            } else {
+        for statement in &program.statements {
+            let Statement::Declare(declare) = statement else {
                 has_useful_statements |= !matches!(
                     statement,
                     Statement::OpeningTag(_) | Statement::ClosingTag(_) | Statement::Inline(_) | Statement::Noop(_)
@@ -106,7 +113,7 @@ impl LintRule for StrictTypesRule {
                 continue;
             };
 
-            for item in declare.items.iter() {
+            for item in &declare.items {
                 if item.name.value != STRICT_TYPES_DIRECTIVE {
                     continue;
                 }

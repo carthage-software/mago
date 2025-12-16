@@ -1,6 +1,9 @@
+use crate::ast::Keyword;
+use crate::ast::ShapeField;
+use crate::ast::ShapeFieldKey;
+use crate::ast::Type;
 use crate::ast::object::ObjectProperties;
 use crate::ast::object::ObjectType;
-use crate::ast::*;
 use crate::error::ParseError;
 use crate::parser::internal::array_like::parse_shape_field_key;
 use crate::parser::internal::parse_type;
@@ -45,7 +48,6 @@ pub fn parse_object_type<'input>(stream: &mut TypeTokenStream<'input>) -> Result
                                     }
                                     // If the question mark is not followed by a colon,
                                     // it could be part of the key.
-                                    continue;
                                 }
                                 // If we find any of these tokens, what came before must have
                                 // been a full value type, not a key.
@@ -60,7 +62,7 @@ pub fn parse_object_type<'input>(stream: &mut TypeTokenStream<'input>) -> Result
                                     break;
                                 }
                                 // Any other token is part of a potential key, so keep scanning.
-                                _ => continue,
+                                _ => {}
                             }
                         }
 

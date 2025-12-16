@@ -1,7 +1,9 @@
-use crate::ast::*;
+use crate::ast::Sequence;
+use crate::ast::Statement;
 
 /// Determine if a statement contains only definitions.
 #[inline]
+#[must_use]
 pub fn statement_contains_only_definitions(statement: &Statement) -> bool {
     let (definitions, statements) = get_statement_stats(statement);
 
@@ -9,10 +11,11 @@ pub fn statement_contains_only_definitions(statement: &Statement) -> bool {
 }
 
 #[inline]
+#[must_use]
 pub fn statement_sequence_contains_only_definitions(statement: &Sequence<Statement>) -> bool {
     let mut definitions = 0;
     let mut statements = 0;
-    for statement in statement.iter() {
+    for statement in statement {
         let (def, stmt) = get_statement_stats(statement);
 
         definitions += def;
@@ -29,14 +32,14 @@ fn get_statement_stats(statement: &Statement) -> (usize, usize) {
 
     match &statement {
         Statement::Namespace(namespace) => {
-            for statement in namespace.statements().iter() {
+            for statement in namespace.statements() {
                 let (definitions, statements) = get_statement_stats(statement);
                 total_definitions += definitions;
                 total_statements += statements;
             }
         }
         Statement::Block(block) => {
-            for statement in block.statements.iter() {
+            for statement in &block.statements {
                 let (definitions, statements) = get_statement_stats(statement);
                 total_definitions += definitions;
                 total_statements += statements;

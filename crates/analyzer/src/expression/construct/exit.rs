@@ -1,6 +1,7 @@
 use mago_codex::ttype::get_int_or_string;
 use mago_codex::ttype::get_never;
-use mago_syntax::ast::*;
+use mago_syntax::ast::DieConstruct;
+use mago_syntax::ast::ExitConstruct;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -25,7 +26,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ExitConstruct<'arena> {
             "exit",
             self.exit.span,
             ConstructInput::ArgumentList(self.arguments.as_ref()),
-            get_int_or_string(),
+            &get_int_or_string(),
             true,
             true,
             true,
@@ -54,7 +55,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for DieConstruct<'arena> {
             "die",
             self.die.span,
             ConstructInput::ArgumentList(self.arguments.as_ref()),
-            get_int_or_string(),
+            &get_int_or_string(),
             true,
             true,
             true,

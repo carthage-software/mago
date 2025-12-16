@@ -70,6 +70,7 @@ impl Prelude {
     /// time within a `build.rs` script. It is only available when the `build`
     /// feature is enabled.
     #[cfg(feature = "build")]
+    #[must_use]
     pub fn build() -> Self {
         build::build_prelude_internal()
     }

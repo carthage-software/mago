@@ -18,11 +18,13 @@ use crate::ttype::union::TUnion;
 pub struct TValueOf(Box<TUnion>);
 
 impl TValueOf {
+    #[must_use]
     pub fn new(object: Box<TUnion>) -> Self {
         Self(object)
     }
 
     #[inline]
+    #[must_use]
     pub const fn get_target_type(&self) -> &TUnion {
         &self.0
     }
@@ -33,6 +35,7 @@ impl TValueOf {
     }
 
     #[inline]
+    #[must_use]
     pub fn get_value_of_targets(
         target_types: &[TAtomic],
         codebase: &CodebaseMetadata,
@@ -115,9 +118,7 @@ impl TValueOf {
                         value_types.extend(generic_value_types.types.into_owned());
                     }
                 }
-                _ => {
-                    continue;
-                }
+                _ => {}
             }
         }
 

@@ -38,6 +38,7 @@ mod tests;
 
 pub trait Config: Default + DeserializeOwned {
     /// Whether the rule is enabled by default.
+    #[must_use]
     fn default_enabled() -> bool {
         true
     }
@@ -53,11 +54,13 @@ pub trait LintRule {
 
     fn targets() -> &'static [NodeKind];
 
+    #[must_use]
     fn deprecated() -> bool {
         false
     }
 
     #[inline]
+    #[must_use]
     fn is_enabled_for(php_version: PHPVersion, integrations: IntegrationSet) -> bool {
         Self::meta().requirements.are_met_by(php_version, integrations)
     }

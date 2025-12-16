@@ -1,8 +1,23 @@
-use mago_reporting::*;
-use mago_span::*;
-use mago_syntax::ast::*;
+use mago_reporting::Annotation;
+use mago_reporting::Issue;
+use mago_span::HasSpan;
+use mago_syntax::ast::Declare;
+use mago_syntax::ast::Expression;
+use mago_syntax::ast::Goto;
+use mago_syntax::ast::Inline;
+use mago_syntax::ast::InlineKind;
+use mago_syntax::ast::Literal;
+use mago_syntax::ast::LiteralInteger;
+use mago_syntax::ast::Namespace;
+use mago_syntax::ast::NamespaceBody;
+use mago_syntax::ast::Node;
+use mago_syntax::ast::Program;
+use mago_syntax::ast::Statement;
 
-use crate::internal::consts::*;
+use crate::internal::consts::DECLARE_DIRECTIVES;
+use crate::internal::consts::ENCODING_DECLARE_DIRECTIVE;
+use crate::internal::consts::STRICT_TYPES_DECLARE_DIRECTIVE;
+use crate::internal::consts::TICKS_DECLARE_DIRECTIVE;
 use crate::internal::context::Context;
 
 #[inline]
@@ -13,7 +28,7 @@ pub fn check_top_level_statements<'ast, 'arena>(
     let mut index = 0;
     let mut before = vec![];
 
-    for statement in program.statements.iter() {
+    for statement in &program.statements {
         if !matches!(
             statement,
             Statement::Declare(_)
@@ -32,7 +47,7 @@ pub fn check_top_level_statements<'ast, 'arena>(
         }
 
         if let Statement::Declare(declare) = statement {
-            for item in declare.items.iter() {
+            for item in &declare.items {
                 if item.name.value.eq_ignore_ascii_case(STRICT_TYPES_DECLARE_DIRECTIVE) {
                     context.report(
                         Issue::error("Strict type declaration must be the first statement in the file.")
@@ -53,7 +68,7 @@ pub fn check_top_level_statements<'ast, 'arena>(
     let mut index = 0;
     let mut before = vec![];
 
-    for statement in program.statements.iter() {
+    for statement in &program.statements {
         if !matches!(
             statement,
             Statement::Declare(_)
@@ -163,7 +178,7 @@ pub fn check_top_level_statements<'ast, 'arena>(
 
 #[inline]
 pub fn check_declare(declare: &Declare, context: &mut Context<'_, '_, '_>) {
-    for item in declare.items.iter() {
+    for item in &declare.items {
         let name = item.name.value;
 
         match name.to_ascii_lowercase().as_str() {

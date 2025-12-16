@@ -1,5 +1,7 @@
 use crate::T;
-use crate::ast::ast::*;
+use crate::ast::ast::FunctionLikeParameter;
+use crate::ast::ast::FunctionLikeParameterDefaultValue;
+use crate::ast::ast::FunctionLikeParameterList;
 use crate::ast::sequence::TokenSeparatedSequence;
 use crate::error::ParseError;
 use crate::parser::internal::attribute;

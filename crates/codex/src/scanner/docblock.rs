@@ -1,10 +1,36 @@
 use mago_docblock::error::ParseError;
-use mago_docblock::tag::*;
+use mago_docblock::tag::AssertionTag;
+use mago_docblock::tag::ImportTypeTag;
+use mago_docblock::tag::MethodTag;
+use mago_docblock::tag::ParameterOutTag;
+use mago_docblock::tag::ParameterTag;
+use mago_docblock::tag::PropertyTag;
+use mago_docblock::tag::ReturnTypeTag;
+use mago_docblock::tag::TemplateTag;
+use mago_docblock::tag::ThrowsTag;
+use mago_docblock::tag::TypeString;
+use mago_docblock::tag::TypeTag;
+use mago_docblock::tag::WhereTag;
+use mago_docblock::tag::parse_assertion_tag;
+use mago_docblock::tag::parse_import_type_tag;
+use mago_docblock::tag::parse_method_tag;
+use mago_docblock::tag::parse_param_out_tag;
+use mago_docblock::tag::parse_param_tag;
+use mago_docblock::tag::parse_property_tag;
+use mago_docblock::tag::parse_return_tag;
+use mago_docblock::tag::parse_template_tag;
+use mago_docblock::tag::parse_throws_tag;
+use mago_docblock::tag::parse_type_tag;
+use mago_docblock::tag::parse_where_tag;
+use mago_docblock::tag::split_tag_content;
 use mago_names::kind::NameKind;
 use mago_names::scope::NamespaceScope;
 use serde::Serialize;
 
-use mago_docblock::document::*;
+use mago_docblock::document::Element;
+use mago_docblock::document::Tag;
+use mago_docblock::document::TagKind;
+use mago_docblock::document::TextSegment;
 use mago_docblock::parse_trivia;
 use mago_span::HasSpan;
 use mago_span::Span;
@@ -178,7 +204,7 @@ impl ClassLikeDocblockComment {
                     let description_span = tag.description_span;
 
                     let template = parse_template_tag(description_str, description_span, false, false)?;
-                    scope.add(NameKind::Default, &template.name, None as Option<&str>);
+                    scope.add(NameKind::Default, &template.name, &(None as Option<&str>));
                     templates.push(template);
                 }
                 TagKind::PhpstanTemplateContravariant
@@ -188,7 +214,7 @@ impl ClassLikeDocblockComment {
                     let description_span = tag.description_span;
 
                     let template = parse_template_tag(description_str, description_span, false, true)?;
-                    scope.add(NameKind::Default, &template.name, None as Option<&str>);
+                    scope.add(NameKind::Default, &template.name, &(None as Option<&str>));
 
                     templates.push(template);
                 }
@@ -197,7 +223,7 @@ impl ClassLikeDocblockComment {
                     let description_span = tag.description_span;
 
                     let template = parse_template_tag(description_str, description_span, true, false)?;
-                    scope.add(NameKind::Default, &template.name, None as Option<&str>);
+                    scope.add(NameKind::Default, &template.name, &(None as Option<&str>));
 
                     templates.push(template);
                 }
@@ -360,13 +386,13 @@ impl FunctionLikeDocblockComment {
                 | TagKind::PhpstanTemplateInvariant
                 | TagKind::PsalmTemplateInvariant => {
                     let t = parse_template_tag(tag.description, tag.description_span, false, false)?;
-                    scope.add(NameKind::Default, &t.name, None as Option<&str>);
+                    scope.add(NameKind::Default, &t.name, &(None as Option<&str>));
 
                     templates.push(t);
                 }
                 TagKind::TemplateCovariant | TagKind::PhpstanTemplateCovariant | TagKind::PsalmTemplateCovariant => {
                     let t = parse_template_tag(tag.description, tag.description_span, true, false)?;
-                    scope.add(NameKind::Default, &t.name, None as Option<&str>);
+                    scope.add(NameKind::Default, &t.name, &(None as Option<&str>));
 
                     templates.push(t);
                 }
@@ -374,7 +400,7 @@ impl FunctionLikeDocblockComment {
                 | TagKind::PhpstanTemplateContravariant
                 | TagKind::PsalmTemplateContravariant => {
                     let t = parse_template_tag(tag.description, tag.description_span, false, true)?;
-                    scope.add(NameKind::Default, &t.name, None as Option<&str>);
+                    scope.add(NameKind::Default, &t.name, &(None as Option<&str>));
 
                     templates.push(t);
                 }

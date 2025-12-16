@@ -3,9 +3,14 @@ use mago_codex::metadata::function_like::FunctionLikeKind;
 use mago_codex::metadata::function_like::FunctionLikeMetadata;
 use mago_php_version::PHPVersion;
 use mago_php_version::feature::Feature;
-use mago_reporting::*;
+use mago_reporting::Annotation;
+use mago_reporting::Issue;
 use mago_span::HasSpan;
-use mago_syntax::ast::*;
+use mago_syntax::ast::ClassLikeConstant;
+use mago_syntax::ast::FunctionLikeParameter;
+use mago_syntax::ast::FunctionLikeReturnTypeHint;
+use mago_syntax::ast::Property;
+use mago_syntax::ast::PropertyItem;
 
 use crate::code::IssueCode;
 use crate::context::Context;

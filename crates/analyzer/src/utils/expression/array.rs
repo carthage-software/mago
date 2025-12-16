@@ -32,7 +32,9 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_span::Span;
-use mago_syntax::ast::*;
+use mago_syntax::ast::ArrayAccess;
+use mago_syntax::ast::ArrayAppend;
+use mago_syntax::ast::Expression;
 
 use crate::code::IssueCode;
 use crate::context::Context;
@@ -84,8 +86,8 @@ impl<'ast, 'arena> From<&'ast ArrayAppend<'arena>> for ArrayTarget<'ast, 'arena>
     }
 }
 
-pub(crate) fn get_array_target_type_given_index<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+pub(crate) fn get_array_target_type_given_index<'ctx>(
+    context: &mut Context<'ctx, '_>,
     block_context: &mut BlockContext<'ctx>,
     access_span: Span,
     access_array_span: Span,
@@ -93,7 +95,7 @@ pub(crate) fn get_array_target_type_given_index<'ctx, 'arena>(
     array_like_type: &TUnion,
     index_type: &TUnion,
     in_assignment: bool,
-    extended_var_id: &Option<Atom>,
+    extended_var_id: Option<Atom>,
     assign_value_type: Option<&TUnion>,
     is_array_like_nullsafe: bool,
 ) -> TUnion {
@@ -115,7 +117,7 @@ pub(crate) fn get_array_target_type_given_index<'ctx, 'arena>(
                 "Cannot use `null` as an array index to access element{}.",
                 match extended_var_id {
                     Some(var) => "of variable ".to_string() + var.as_str(),
-                    None => "".to_string(),
+                    None => String::new(),
                 }
             ))
             .with_annotation(
@@ -134,7 +136,7 @@ pub(crate) fn get_array_target_type_given_index<'ctx, 'arena>(
                     "Possibly using `null` as an array index to access element{}.",
                     match extended_var_id {
                         Some(var) => "of variable ".to_string() + var.as_str(),
-                        None => "".to_string(),
+                        None => String::new(),
                     }
                 ))
                 .with_annotation(Annotation::primary(access_index_span).with_message("Index might be `null` here."))
@@ -232,7 +234,7 @@ pub(crate) fn get_array_target_type_given_index<'ctx, 'arena>(
                 let new_type = handle_array_access_on_string(
                     context,
                     atomic_var_type.clone(),
-                    index_type.clone(),
+                    index_type,
                     &mut has_valid_expected_index,
                     &mut expected_index_types,
                 );
@@ -452,8 +454,8 @@ pub(crate) fn get_array_target_type_given_index<'ctx, 'arena>(
     }
 }
 
-pub(crate) fn handle_array_access_on_list<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+pub(crate) fn handle_array_access_on_list<'ctx>(
+    context: &mut Context<'ctx, '_>,
     block_context: &mut BlockContext<'ctx>,
     span: Option<Span>,
     list: &TAtomic,
@@ -605,8 +607,8 @@ pub(crate) fn handle_array_access_on_list<'ctx, 'arena>(
     get_mixed()
 }
 
-pub(crate) fn handle_array_access_on_keyed_array<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+pub(crate) fn handle_array_access_on_keyed_array<'ctx>(
+    context: &mut Context<'ctx, '_>,
     block_context: &mut BlockContext<'ctx>,
     span: Span,
     keyed_array: &TAtomic,
@@ -729,7 +731,12 @@ pub(crate) fn handle_array_access_on_keyed_array<'ctx, 'arena>(
                     false
                 };
 
-                if !key_exists_in_other_variant {
+                if key_exists_in_other_variant {
+                    // Key exists in some but not all variants - mark as possibly undefined
+                    // Don't report warning here - it will be reported at the union level to avoid duplicates
+                    *has_possibly_undefined = true;
+                    *key_in_other_variant = true;
+                } else {
                     // Key doesn't exist in any variant - report error
                     context.collector.report_with_code(
                         IssueCode::UndefinedStringArrayIndex,
@@ -751,11 +758,6 @@ pub(crate) fn handle_array_access_on_keyed_array<'ctx, 'arena>(
                             )
                         ),
                     );
-                } else {
-                    // Key exists in some but not all variants - mark as possibly undefined
-                    // Don't report warning here - it will be reported at the union level to avoid duplicates
-                    *has_possibly_undefined = true;
-                    *key_in_other_variant = true;
                 }
 
                 if has_value_parameter { get_mixed() } else { get_null() }
@@ -821,7 +823,7 @@ pub(crate) fn handle_array_access_on_keyed_array<'ctx, 'arena>(
             return result;
         }
 
-        let possible_keys: Vec<ArrayKey> = index_type.types.iter().filter_map(|atomic| atomic.to_array_key()).collect();
+        let possible_keys: Vec<ArrayKey> = index_type.types.iter().filter_map(TAtomic::to_array_key).collect();
 
         if !possible_keys.is_empty() && possible_keys.len() == index_type.types.len() {
             for key in &possible_keys {
@@ -902,8 +904,8 @@ pub(crate) fn handle_array_access_on_keyed_array<'ctx, 'arena>(
     }
 }
 
-pub(crate) fn handle_array_access_on_named_object<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+pub(crate) fn handle_array_access_on_named_object(
+    context: &mut Context<'_, '_>,
     span: Span,
     named_object: &TAtomic,
     index_type: &TUnion,
@@ -911,8 +913,8 @@ pub(crate) fn handle_array_access_on_named_object<'ctx, 'arena>(
     expected_index_types: &mut Vec<TUnion>,
     assign_value_type: Option<&TUnion>,
 ) -> TUnion {
-    fn get_array_access_classes<'ctx, 'arena>(
-        context: &mut Context<'ctx, 'arena>,
+    fn get_array_access_classes<'ctx>(
+        context: &mut Context<'ctx, '_>,
         atomic: &TAtomic,
     ) -> Option<(Vec<&'ctx ClassLikeMetadata>, TUnion, TUnion)> {
         let mut parameters = vec![];
@@ -1071,10 +1073,10 @@ pub(crate) fn handle_array_access_on_named_object<'ctx, 'arena>(
     resulting_value_type
 }
 
-pub(crate) fn handle_array_access_on_string<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+pub(crate) fn handle_array_access_on_string(
+    context: &mut Context<'_, '_>,
     string: TAtomic,
-    index_type: TUnion,
+    index_type: &TUnion,
     has_valid_expected_index: &mut bool,
     expected_index_types: &mut Vec<TUnion>,
 ) -> TUnion {
@@ -1096,25 +1098,25 @@ pub(crate) fn handle_array_access_on_string<'ctx, 'arena>(
         get_int()
     };
 
-    if !is_contained_by(
+    if is_contained_by(
         context.codebase,
-        &index_type,
+        index_type,
         &valid_index_type,
         false,
         false,
         false,
         &mut ComparisonResult::new(),
     ) {
-        expected_index_types.push(valid_index_type);
-    } else {
         *has_valid_expected_index = true;
+    } else {
+        expected_index_types.push(valid_index_type);
     }
 
     if non_empty { get_non_empty_string() } else { get_string() }
 }
 
-pub(crate) fn handle_array_access_on_mixed<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+pub(crate) fn handle_array_access_on_mixed<'ctx>(
+    context: &mut Context<'ctx, '_>,
     block_context: &mut BlockContext<'ctx>,
     span: Span,
     mixed: &TAtomic,

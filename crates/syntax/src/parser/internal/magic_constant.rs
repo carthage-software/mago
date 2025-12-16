@@ -1,5 +1,5 @@
 use crate::T;
-use crate::ast::ast::*;
+use crate::ast::ast::MagicConstant;
 use crate::error::ParseError;
 use crate::parser::internal::identifier::parse_local_identifier;
 use crate::parser::internal::token_stream::TokenStream;

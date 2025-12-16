@@ -9,7 +9,8 @@ use serde::Serialize;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_reporting::Level;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Node;
+use mago_syntax::ast::NodeKind;
 use mago_syntax::comments::comment_lines;
 
 use crate::category::Category;
@@ -93,7 +94,7 @@ impl LintRule for TaggedTodoRule {
             return;
         };
 
-        for trivia in program.trivia.iter() {
+        for trivia in &program.trivia {
             if !trivia.kind.is_comment() {
                 continue;
             }

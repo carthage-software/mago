@@ -4,7 +4,9 @@ use ahash::HashMap;
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_syntax::ast::*;
+use mago_syntax::ast::Use;
+use mago_syntax::ast::UseItems;
+use mago_syntax::ast::UseType;
 
 use crate::kind::NameKind;
 
@@ -39,6 +41,7 @@ pub struct NamespaceScope {
 
 impl NamespaceScope {
     /// Creates a new, empty scope, optionally associated with a namespace.
+    #[must_use]
     pub fn new(namespace_name: Option<String>) -> Self {
         NamespaceScope {
             namespace_name,
@@ -49,6 +52,7 @@ impl NamespaceScope {
     }
 
     /// Creates a new, empty scope representing the global namespace.
+    #[must_use]
     pub fn global() -> Self {
         NamespaceScope {
             namespace_name: None,
@@ -70,27 +74,32 @@ impl NamespaceScope {
     }
 
     /// Checks if any aliases have been defined in this scope.
+    #[must_use]
     pub fn has_aliases(&self) -> bool {
         // Corrected implementation for checking if *any* alias map is non-empty
         !self.default_aliases.is_empty() || !self.function_aliases.is_empty() || !self.constant_aliases.is_empty()
     }
 
     /// Returns the name of the current namespace, if this scope represents one.
+    #[must_use]
     pub fn namespace_name(&self) -> Option<&str> {
         self.namespace_name.as_deref()
     }
 
     /// Returns a reference to the map of default (class/namespace) aliases.
+    #[must_use]
     pub fn default_aliases(&self) -> &HashMap<String, String> {
         &self.default_aliases
     }
 
     /// Returns a reference to the map of function aliases.
+    #[must_use]
     pub fn function_aliases(&self) -> &HashMap<String, String> {
         &self.function_aliases
     }
 
     /// Returns a reference to the map of constant aliases.
+    #[must_use]
     pub fn constant_aliases(&self) -> &HashMap<String, String> {
         &self.constant_aliases
     }
@@ -111,12 +120,12 @@ impl NamespaceScope {
     pub fn populate_from_use(&mut self, r#use: &Use<'_>) {
         match &r#use.items {
             UseItems::Sequence(use_item_sequence) => {
-                for use_item in use_item_sequence.items.iter() {
+                for use_item in &use_item_sequence.items {
                     let name = use_item.name.value().trim_start_matches('\\');
                     let alias = use_item.alias.as_ref().map(|alias_node| alias_node.identifier.value);
 
                     // Add as a default (class/namespace) alias
-                    self.add(NameKind::Default, name, alias);
+                    self.add(NameKind::Default, name, &alias);
                 }
             }
             UseItems::TypedSequence(typed_use_item_sequence) => {
@@ -126,12 +135,12 @@ impl NamespaceScope {
                     UseType::Const(_) => NameKind::Constant,
                 };
 
-                for use_item in typed_use_item_sequence.items.iter() {
+                for use_item in &typed_use_item_sequence.items {
                     let name = use_item.name.value().trim_start_matches('\\');
                     let alias = use_item.alias.as_ref().map(|alias_node| alias_node.identifier.value);
 
                     // Add with the determined kind (Function or Constant)
-                    self.add(name_kind, name, alias);
+                    self.add(name_kind, name, &alias);
                 }
             }
             UseItems::TypedList(typed_use_item_list) => {
@@ -144,7 +153,7 @@ impl NamespaceScope {
                 // Get the common namespace prefix for the group
                 let prefix = (typed_use_item_list.namespace.value()).trim_start_matches('\\');
 
-                for use_item in typed_use_item_list.items.iter() {
+                for use_item in &typed_use_item_list.items {
                     let name_part = use_item.name.value();
                     let alias = use_item.alias.as_ref().map(|alias_node| &alias_node.identifier.value);
 
@@ -152,14 +161,14 @@ impl NamespaceScope {
                     let fully_qualified_name = format!("{prefix}\\{name_part}");
 
                     // Add the alias for the fully constructed name
-                    self.add(name_kind, fully_qualified_name, alias);
+                    self.add(name_kind, fully_qualified_name, &alias);
                 }
             }
             UseItems::MixedList(mixed_use_item_list) => {
                 // Get the common namespace prefix for the group
                 let prefix = (mixed_use_item_list.namespace.value()).trim_start_matches('\\');
 
-                for mixed_use_item in mixed_use_item_list.items.iter() {
+                for mixed_use_item in &mixed_use_item_list.items {
                     // Determine the kind for *this specific item* within the mixed list
                     let name_kind = match &mixed_use_item.r#type {
                         None => NameKind::Default, // No type specified, defaults to class/namespace
@@ -175,7 +184,7 @@ impl NamespaceScope {
                     let fully_qualified_name = format!("{prefix}\\{name_part}");
 
                     // Add the alias with its specific kind
-                    self.add(name_kind, fully_qualified_name, alias);
+                    self.add(name_kind, fully_qualified_name, &alias);
                 }
             }
         }
@@ -192,7 +201,7 @@ impl NamespaceScope {
     ///
     /// The alias name (explicit or derived) is stored lowercase as the key.
     #[inline]
-    pub fn add(&mut self, kind: NameKind, name: impl AsRef<str>, alias: Option<impl AsRef<str>>) {
+    pub fn add(&mut self, kind: NameKind, name: impl AsRef<str>, alias: &Option<impl AsRef<str>>) {
         self.add_str(kind, name.as_ref(), alias.as_ref().map(std::convert::AsRef::as_ref));
     }
 
@@ -266,6 +275,7 @@ impl NamespaceScope {
 
     /// non-generic version of `resolve` that takes a string slice.
     #[inline]
+    #[must_use]
     pub fn resolve_str<'a>(&self, kind: NameKind, name_ref: &'a str) -> (Cow<'a, str>, bool) {
         // Try resolving using explicit aliases and constructs
         if let Some(resolved_name) = self.resolve_alias_str(kind, name_ref) {

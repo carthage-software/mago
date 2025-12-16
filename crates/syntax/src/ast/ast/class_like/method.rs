@@ -65,11 +65,15 @@ pub struct MethodAbstractBody {
 impl Method<'_> {
     /// Returns `true` if the method contains any promoted properties.
     pub fn has_promoted_properties(&self) -> bool {
-        self.parameter_list.parameters.iter().any(|parameter| parameter.is_promoted_property())
+        self.parameter_list
+            .parameters
+            .iter()
+            .any(super::super::function_like::parameter::FunctionLikeParameter::is_promoted_property)
     }
 
     /// Returns `true` if the method is abstract.
     #[inline]
+    #[must_use]
     pub const fn is_abstract(&self) -> bool {
         matches!(self.body, MethodBody::Abstract(_))
     }
@@ -77,7 +81,7 @@ impl Method<'_> {
     /// Returns `true` if the method is static.
     #[inline]
     pub fn is_static(&self) -> bool {
-        self.modifiers.iter().any(|modifier| modifier.is_static())
+        self.modifiers.iter().any(super::super::modifier::Modifier::is_static)
     }
 }
 

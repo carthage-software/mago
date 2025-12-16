@@ -1,6 +1,6 @@
 use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::get_string;
-use mago_syntax::ast::*;
+use mago_syntax::ast::EvalConstruct;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -24,7 +24,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for EvalConstruct<'arena> {
             "eval",
             self.eval.span,
             ConstructInput::Expression(self.value),
-            get_string(),
+            &get_string(),
             false, // is_variadic
             false, // is_optional
             true,  // has_side_effects

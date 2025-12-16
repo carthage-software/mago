@@ -9,7 +9,8 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_span::Span;
-use mago_syntax::ast::*;
+use mago_syntax::ast::ArgumentList;
+use mago_syntax::ast::Expression;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -38,7 +39,7 @@ pub fn analyze_construct_inputs<'ctx, 'arena>(
     construct_kind: &'static str,
     construct_keyword: Span,
     inputs: ConstructInput<'_, 'arena>,
-    expected_type: TUnion,
+    expected_type: &TUnion,
     is_variadic: bool,
     has_default: bool,
     has_side_effects: bool,
@@ -83,7 +84,7 @@ pub fn analyze_construct_inputs<'ctx, 'arena>(
                 verify_construct_input_type(
                     context,
                     &input_type,
-                    &expected_type,
+                    expected_type,
                     index,
                     argument.value(),
                     construct_kind,
@@ -101,7 +102,7 @@ pub fn analyze_construct_inputs<'ctx, 'arena>(
             verify_construct_input_type(
                 context,
                 &input_type,
-                &expected_type,
+                expected_type,
                 0,
                 expression,
                 construct_kind,
@@ -139,7 +140,7 @@ pub fn analyze_construct_inputs<'ctx, 'arena>(
                 verify_construct_input_type(
                     context,
                     &input_type,
-                    &expected_type,
+                    expected_type,
                     index,
                     expression,
                     construct_kind,

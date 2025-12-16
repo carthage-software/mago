@@ -1,7 +1,9 @@
 use std::rc::Rc;
 
 use mago_codex::ttype::get_bool;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Binary;
+use mago_syntax::ast::BinaryOperator;
+use mago_syntax::ast::Expression;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;

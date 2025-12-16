@@ -1,10 +1,23 @@
 use bumpalo::collections::Vec;
 use bumpalo::vec;
 
-use mago_span::*;
-use mago_syntax::ast::*;
+use mago_span::HasSpan;
+use mago_syntax::ast::Access;
+use mago_syntax::ast::Argument;
+use mago_syntax::ast::ArgumentList;
+use mago_syntax::ast::ArrayElement;
+use mago_syntax::ast::Call;
+use mago_syntax::ast::Expression;
+use mago_syntax::ast::PartialArgumentList;
+use mago_syntax::ast::UnaryPrefixOperator;
 
-use crate::document::*;
+use crate::document::Document;
+use crate::document::Group;
+use crate::document::IfBreak;
+use crate::document::IndentIfBreak;
+use crate::document::Line;
+use crate::document::Separator;
+use crate::document::clone_in_arena;
 use crate::internal::FormatterState;
 use crate::internal::comment::CommentFlags;
 use crate::internal::format::Format;
@@ -381,7 +394,7 @@ pub(super) fn print_partial_argument_list<'arena>(
 
     let arguments_count = argument_list.arguments.len();
     let mut formatted_arguments: Vec<'arena, Document<'arena>> = Vec::with_capacity_in(arguments_count, f.arena);
-    for arg in argument_list.arguments.iter() {
+    for arg in &argument_list.arguments {
         formatted_arguments.push(arg.format(f));
     }
 
@@ -614,9 +627,8 @@ pub fn should_expand_last_arg<'arena>(
         None
     };
 
-    let penultimate_argument_comments = penultimate_argument
-        .map(|a| f.has_comment(a.span(), CommentFlags::Leading | CommentFlags::Trailing))
-        .unwrap_or(false);
+    let penultimate_argument_comments =
+        penultimate_argument.is_some_and(|a| f.has_comment(a.span(), CommentFlags::Leading | CommentFlags::Trailing));
 
     could_expand_value(f, last_argument_value, nested_args)
         // If the last two arguments are of the same type,
@@ -627,10 +639,10 @@ pub fn should_expand_last_arg<'arena>(
         && (argument_list.arguments.len() != 2
             || penultimate_argument_comments
             || !matches!(last_argument_value, Expression::Array(_) | Expression::LegacyArray(_))
-            || !matches!(penultimate_argument.map(|a| a.value()), Some(Expression::Closure(c)) if c.use_clause.is_none()))
+            || !matches!(penultimate_argument.map(Argument::value), Some(Expression::Closure(c)) if c.use_clause.is_none()))
         && (argument_list.arguments.len() != 2
             || penultimate_argument_comments
-            || !matches!(penultimate_argument.map(|a| a.value()), Some(Expression::Array(_) | Expression::LegacyArray(_)))
+            || !matches!(penultimate_argument.map(Argument::value), Some(Expression::Array(_) | Expression::LegacyArray(_)))
             || !matches!(last_argument_value, Expression::Closure(c) if c.use_clause.is_none())
         )
 }
@@ -740,7 +752,7 @@ fn is_simple_call_argument<'arena>(node: &'arena Expression<'arena>, depth: usiz
             };
 
             argument_list.arguments.len() <= depth
-                && argument_list.arguments.iter().map(|a| a.value()).all(is_child_simple)
+                && argument_list.arguments.iter().map(Argument::value).all(is_child_simple)
         }
         Expression::Access(access) => {
             let object_or_class = match access {
@@ -760,7 +772,7 @@ fn is_simple_call_argument<'arena>(node: &'arena Expression<'arena>, depth: usiz
                 match &instantiation.argument_list {
                     Some(argument_list) => {
                         argument_list.arguments.len() <= depth
-                            && argument_list.arguments.iter().map(|a| a.value()).all(is_child_simple)
+                            && argument_list.arguments.iter().map(Argument::value).all(is_child_simple)
                     }
                     None => true,
                 }

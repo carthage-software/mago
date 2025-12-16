@@ -35,6 +35,7 @@ impl EnumCaseMetadata {
     /// * `name_span`: The source code location of the name identifier.
     /// * `span`: The source code location of the entire case declaration.
     #[inline]
+    #[must_use]
     pub fn new(name: Atom, name_span: Span, span: Span, flags: MetadataFlags) -> Self {
         Self { attributes: Vec::new(), name, name_span, span, flags, value_type: None }
     }

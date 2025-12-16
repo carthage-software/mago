@@ -24,6 +24,7 @@ pub enum ParseError {
 
 impl ParseError {
     /// Provides a detailed, user-friendly note explaining the context of the parse error.
+    #[must_use]
     pub fn note(&self) -> String {
         match self {
             ParseError::SyntaxError(SyntaxError::UnrecognizedToken(_, _, _)) => {
@@ -55,6 +56,7 @@ impl ParseError {
     }
 
     /// Provides a concise, actionable help message suggesting a fix for the error.
+    #[must_use]
     pub fn help(&self) -> String {
         match self {
             ParseError::SyntaxError(SyntaxError::UnrecognizedToken(_, _, _)) => {

@@ -10,7 +10,8 @@ use mago_codex::ttype::union::TUnion;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Binary;
+use mago_syntax::ast::Expression;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -43,8 +44,8 @@ pub fn analyze_spaceship_operation<'ctx, 'arena>(
     let lhs_type = artifacts.get_rc_expression_type(&binary.lhs).unwrap_or(&fallback_type);
     let rhs_type = artifacts.get_rc_expression_type(&binary.rhs).unwrap_or(&fallback_type);
 
-    check_spaceship_operand(context, binary.lhs, lhs_type, "Left")?;
-    check_spaceship_operand(context, binary.rhs, rhs_type, "Right")?;
+    check_spaceship_operand(context, binary.lhs, lhs_type, "Left");
+    check_spaceship_operand(context, binary.rhs, rhs_type, "Right");
 
     let lhs_is_array = lhs_type.is_array();
     let rhs_is_array = rhs_type.is_array();
@@ -122,7 +123,7 @@ fn check_spaceship_operand<'arena>(
     operand: &Expression<'arena>,
     operand_type: &TUnion,
     side: &'static str,
-) -> Result<(), AnalysisError> {
+) {
     if operand_type.is_null() {
         context.collector.report_with_code(
              IssueCode::NullOperand,
@@ -174,6 +175,4 @@ fn check_spaceship_operand<'arena>(
             .with_help("Ensure this operand is non-false or that comparison with `false` is intended."),
         );
     }
-
-    Ok(())
 }

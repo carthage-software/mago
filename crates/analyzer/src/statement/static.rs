@@ -5,7 +5,7 @@ use mago_codex::ttype::get_mixed;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Static;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -43,7 +43,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Static<'arena> {
             );
         }
 
-        for item in self.items.iter() {
+        for item in &self.items {
             let variable = item.variable();
             let initial_value = item.value();
 

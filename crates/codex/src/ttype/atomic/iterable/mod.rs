@@ -32,12 +32,14 @@ impl TIterable {
     /// * `key_type`: The key type of the iterable (e.g., `K`).
     /// * `value_type`: The value type of the iterable (e.g., `V`).
     #[inline]
+    #[must_use]
     pub fn new(key_type: Box<TUnion>, value_type: Box<TUnion>) -> Self {
         Self { key_type, value_type, intersection_types: None }
     }
 
     /// Creates a new iterable type with the given value type,
     /// and a default key type of `Mixed`.
+    #[must_use]
     pub fn of_value(value_type: Box<TUnion>) -> Self {
         Self::new(Box::new(get_mixed()), value_type)
     }
@@ -45,12 +47,14 @@ impl TIterable {
     /// Creates a new iterable with both key and value types set to `Mixed`.
     ///
     /// This is useful for cases where the specific types are not known or are generic.
+    #[must_use]
     pub fn mixed() -> Self {
         Self::new(Box::new(get_mixed()), Box::new(get_mixed()))
     }
 
     /// Returns the key type of the iterable.
     #[inline]
+    #[must_use]
     pub fn get_key_type(&self) -> &TUnion {
         &self.key_type
     }
@@ -63,6 +67,7 @@ impl TIterable {
 
     /// Returns the value type of the iterable.
     #[inline]
+    #[must_use]
     pub fn get_value_type(&self) -> &TUnion {
         &self.value_type
     }

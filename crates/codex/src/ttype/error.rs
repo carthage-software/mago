@@ -26,6 +26,7 @@ impl std::fmt::Display for TypeError {
 }
 
 impl TypeError {
+    #[must_use]
     pub fn note(&self) -> String {
         match self {
             TypeError::ParseError(err) => err.note(),
@@ -38,6 +39,7 @@ impl TypeError {
         }
     }
 
+    #[must_use]
     pub fn help(&self) -> String {
         match self {
             TypeError::ParseError(err) => err.help(),

@@ -34,44 +34,53 @@ impl TGenericParameter {
     /// * `constraint`: The primary bound (`TUnion`), boxed (e.g., `of SomeInterface`).
     /// * `defining_entity`: The scope (`GenericParent`) where it was defined.
     #[inline]
+    #[must_use]
     pub fn new(parameter_name: Atom, constraint: Box<TUnion>, defining_entity: GenericParent) -> Self {
         Self { parameter_name, constraint, defining_entity, intersection_types: None }
     }
 
     /// Returns the name identifier of the template parameter.
     #[inline]
+    #[must_use]
     pub const fn get_parameter_name(&self) -> Atom {
         self.parameter_name
     }
 
     /// Returns a reference to the main bound (`as`) type (`TUnion`).
     #[inline]
+    #[must_use]
     pub fn get_constraint(&self) -> &TUnion {
         &self.constraint
     }
 
     /// Returns the defining entity (scope) of the template parameter.
     #[inline]
+    #[must_use]
     pub const fn get_defining_entity(&self) -> GenericParent {
         self.defining_entity
     }
 
+    #[must_use]
     pub fn is_constrained_as_numeric(&self) -> bool {
         self.constraint.is_numeric()
     }
 
+    #[must_use]
     pub fn is_constrained_as_mixed(&self) -> bool {
         self.constraint.is_mixed()
     }
 
+    #[must_use]
     pub fn is_constrained_as_vanilla_mixed(&self) -> bool {
         self.constraint.is_mixed()
     }
 
+    #[must_use]
     pub fn is_constrained_as_objecty(&self) -> bool {
         self.constraint.is_objecty()
     }
 
+    #[must_use]
     pub fn with_constraint(&self, constraint: TUnion) -> Self {
         Self {
             parameter_name: self.parameter_name,
@@ -81,6 +90,7 @@ impl TGenericParameter {
         }
     }
 
+    #[must_use]
     pub fn without_intersection_types(&self) -> Self {
         Self {
             parameter_name: self.parameter_name,

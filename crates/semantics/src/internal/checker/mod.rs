@@ -1,7 +1,24 @@
-use mago_span::*;
-use mago_syntax::ast::*;
+use mago_span::HasSpan;
+use mago_syntax::ast::Block;
+use mago_syntax::ast::Hint;
 
-use crate::internal::consts::*;
+use crate::internal::consts::CALL_MAGIC_METHOD;
+use crate::internal::consts::CALL_STATIC_MAGIC_METHOD;
+use crate::internal::consts::CLONE_MAGIC_METHOD;
+use crate::internal::consts::CONSTRUCTOR_MAGIC_METHOD;
+use crate::internal::consts::DEBUG_INFO_MAGIC_METHOD;
+use crate::internal::consts::DESTRUCTOR_MAGIC_METHOD;
+use crate::internal::consts::GET_MAGIC_METHOD;
+use crate::internal::consts::INVOKE_MAGIC_METHOD;
+use crate::internal::consts::ISSET_MAGIC_METHOD;
+use crate::internal::consts::SERIALIZE_MAGIC_METHOD;
+use crate::internal::consts::SET_MAGIC_METHOD;
+use crate::internal::consts::SET_STATE_MAGIC_METHOD;
+use crate::internal::consts::SLEEP_MAGIC_METHOD;
+use crate::internal::consts::TO_STRING_MAGIC_METHOD;
+use crate::internal::consts::UNSERIALIZE_MAGIC_METHOD;
+use crate::internal::consts::UNSET_MAGIC_METHOD;
+use crate::internal::consts::WAKEUP_MAGIC_METHOD;
 use crate::internal::context::Context;
 
 pub mod access;
@@ -64,7 +81,7 @@ fn returns_generator<'ast>(context: &mut Context<'_, '_, '_>, block: &'ast Block
 fn hint_contains_generator(context: &mut Context<'_, '_, '_>, hint: &Hint) -> bool {
     match hint {
         Hint::Identifier(identifier) => {
-            let symbol = context.get_name(&identifier.span().start);
+            let symbol = context.get_name(identifier.span().start);
 
             "generator".eq_ignore_ascii_case(symbol)
         }

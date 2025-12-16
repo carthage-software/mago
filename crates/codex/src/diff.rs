@@ -52,6 +52,7 @@ pub struct CodebaseDiff {
 
 impl CodebaseDiff {
     #[inline]
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
@@ -71,24 +72,28 @@ impl CodebaseDiff {
 
     /// Returns a reference to the set of symbols/members to keep unchanged.
     #[inline]
+    #[must_use]
     pub fn get_keep(&self) -> &HashSet<SymbolIdentifier> {
         &self.keep
     }
 
     /// Returns a reference to the set of changed symbols/members.
     #[inline]
+    #[must_use]
     pub fn get_changed(&self) -> &HashSet<SymbolIdentifier> {
         &self.changed
     }
 
     /// Returns a reference to the map of source files to text diff hunks.
     #[inline]
+    #[must_use]
     pub fn get_diff_map(&self) -> &HashMap<FileId, Vec<DiffHunk>> {
         &self.diff_map
     }
 
     /// Returns a reference to the map of source files to deletion ranges.
     #[inline]
+    #[must_use]
     pub fn get_deletion_ranges_map(&self) -> &HashMap<FileId, Vec<DeletionRange>> {
         &self.deletion_ranges_map
     }
@@ -114,6 +119,7 @@ impl CodebaseDiff {
 
     /// Returns a new instance with the entry added to the 'keep' set.
     #[inline]
+    #[must_use]
     pub fn with_added_keep_entry(mut self, entry: SymbolIdentifier) -> Self {
         self.add_keep_entry(entry);
         self
@@ -140,6 +146,7 @@ impl CodebaseDiff {
 
     /// Returns a new instance with an empty 'keep' set.
     #[inline]
+    #[must_use]
     pub fn without_keep(mut self) -> Self {
         self.unset_keep();
         self
@@ -166,12 +173,14 @@ impl CodebaseDiff {
 
     /// Checks if the 'changed' set contains a specific entry.
     #[inline]
+    #[must_use]
     pub fn contains_changed_entry(&self, entry: &SymbolIdentifier) -> bool {
         self.changed.contains(entry)
     }
 
     /// Returns a new instance with the entry added to the 'changed' set.
     #[inline]
+    #[must_use]
     pub fn with_added_changed_entry(mut self, entry: SymbolIdentifier) -> Self {
         self.add_changed_entry(entry);
         self
@@ -198,6 +207,7 @@ impl CodebaseDiff {
 
     /// Returns a new instance with an empty 'changed' set.
     #[inline]
+    #[must_use]
     pub fn without_changed(mut self) -> Self {
         self.unset_changed();
         self
@@ -211,6 +221,7 @@ impl CodebaseDiff {
 
     /// Returns a new instance with the diff map replaced.
     #[inline]
+    #[must_use]
     pub fn with_diff_map(mut self, map: HashMap<FileId, Vec<DiffHunk>>) -> Self {
         self.set_diff_map(map);
         self
@@ -224,6 +235,7 @@ impl CodebaseDiff {
 
     /// Returns a new instance with the diff hunks for the source file added or updated.
     #[inline]
+    #[must_use]
     pub fn with_added_diff_map_entry(mut self, source: FileId, diffs: Vec<DiffHunk>) -> Self {
         self.add_diff_map_entry(source, diffs);
         self
@@ -250,6 +262,7 @@ impl CodebaseDiff {
 
     /// Returns a new instance with an empty diff map.
     #[inline]
+    #[must_use]
     pub fn without_diff_map(mut self) -> Self {
         self.unset_diff_map();
         self
@@ -263,6 +276,7 @@ impl CodebaseDiff {
 
     /// Returns a new instance with the deletion ranges map replaced.
     #[inline]
+    #[must_use]
     pub fn with_deletion_ranges_map(mut self, map: HashMap<FileId, Vec<DeletionRange>>) -> Self {
         self.set_deletion_ranges_map(map);
         self
@@ -280,6 +294,7 @@ impl CodebaseDiff {
 
     /// Returns a new instance with the deletion ranges for the source file added or updated.
     #[inline]
+    #[must_use]
     pub fn with_added_deletion_ranges_entry(mut self, file: FileId, ranges: Vec<DeletionRange>) -> Self {
         self.add_deletion_ranges_entry(file, ranges);
         self
@@ -310,6 +325,7 @@ impl CodebaseDiff {
 
     /// Returns a new instance with an empty deletion ranges map.
     #[inline]
+    #[must_use]
     pub fn without_deletion_ranges_map(mut self) -> Self {
         self.unset_deletion_ranges_map();
         self

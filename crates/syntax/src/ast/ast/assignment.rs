@@ -37,11 +37,13 @@ pub struct Assignment<'arena> {
 
 impl AssignmentOperator {
     #[inline]
+    #[must_use]
     pub const fn is_assign(&self) -> bool {
         matches!(self, Self::Assign(_))
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_arithmetic(&self) -> bool {
         matches!(
             self,
@@ -50,6 +52,7 @@ impl AssignmentOperator {
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_bitwise(&self) -> bool {
         matches!(
             self,
@@ -59,6 +62,7 @@ impl AssignmentOperator {
 
     /// Returns the string representation of the assignment operator.
     #[inline]
+    #[must_use]
     pub const fn as_str(&self) -> &'static str {
         match self {
             Self::Assign(_) => "=",

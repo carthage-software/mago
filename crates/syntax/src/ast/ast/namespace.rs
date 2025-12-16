@@ -57,6 +57,7 @@ pub struct NamespaceImplicitBody<'arena> {
 }
 
 impl<'arena> Namespace<'arena> {
+    #[must_use]
     pub fn statements(&self) -> &Sequence<'arena, Statement<'arena>> {
         match &self.body {
             NamespaceBody::Implicit(body) => &body.statements,

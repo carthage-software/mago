@@ -82,9 +82,7 @@ impl FunctionReturnTypeProvider for TypeStructureProvider {
             false
         };
 
-        let keyed_array = if let TArray::Keyed(keyed_array) = elements_array {
-            keyed_array
-        } else {
+        let TArray::Keyed(keyed_array) = elements_array else {
             return None;
         };
 

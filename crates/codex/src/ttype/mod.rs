@@ -24,7 +24,60 @@ use crate::ttype::comparator::ComparisonResult;
 use crate::ttype::comparator::union_comparator;
 use crate::ttype::expander::TypeExpansionOptions;
 use crate::ttype::resolution::TypeResolutionContext;
-use crate::ttype::shared::*;
+use crate::ttype::shared::ARRAYKEY_ATOMIC;
+use crate::ttype::shared::BOOL_ATOMIC;
+use crate::ttype::shared::CLASS_STRING_ATOMIC;
+use crate::ttype::shared::CLOSED_RESOURCE_ATOMIC;
+use crate::ttype::shared::EMPTY_KEYED_ARRAY_ATOMIC;
+use crate::ttype::shared::EMPTY_STRING_ATOMIC;
+use crate::ttype::shared::ENUM_STRING_ATOMIC;
+use crate::ttype::shared::FALSE_ATOMIC;
+use crate::ttype::shared::FLOAT_ATOMIC;
+use crate::ttype::shared::INT_ATOMIC;
+use crate::ttype::shared::INT_FLOAT_ATOMIC_SLICE;
+use crate::ttype::shared::INT_STRING_ATOMIC_SLICE;
+use crate::ttype::shared::INTERFACE_STRING_ATOMIC;
+use crate::ttype::shared::ISSET_FROM_LOOP_MIXED_ATOMIC;
+use crate::ttype::shared::LOWERCASE_STRING_ATOMIC;
+use crate::ttype::shared::MINUS_ONE_INT_ATOMIC;
+use crate::ttype::shared::MIXED_ATOMIC;
+use crate::ttype::shared::MIXED_CALLABLE_ATOMIC;
+use crate::ttype::shared::MIXED_CLOSURE_ATOMIC;
+use crate::ttype::shared::MIXED_ITERABLE_ATOMIC;
+use crate::ttype::shared::NEGATIVE_INT_ATOMIC;
+use crate::ttype::shared::NEVER_ATOMIC;
+use crate::ttype::shared::NON_EMPTY_LOWERCASE_STRING_ATOMIC;
+use crate::ttype::shared::NON_EMPTY_STRING_ATOMIC;
+use crate::ttype::shared::NON_EMPTY_UNSPECIFIED_LITERAL_STRING_ATOMIC;
+use crate::ttype::shared::NON_NEGATIVE_INT_ATOMIC;
+use crate::ttype::shared::NON_POSITIVE_INT_ATOMIC;
+use crate::ttype::shared::NULL_ATOMIC;
+use crate::ttype::shared::NULL_FLOAT_ATOMIC_SLICE;
+use crate::ttype::shared::NULL_INT_ATOMIC_SLICE;
+use crate::ttype::shared::NULL_OBJECT_ATOMIC_SLICE;
+use crate::ttype::shared::NULL_SCALAR_ATOMIC_SLICE;
+use crate::ttype::shared::NULL_STRING_ATOMIC_SLICE;
+use crate::ttype::shared::NUMERIC_ATOMIC;
+use crate::ttype::shared::NUMERIC_STRING_ATOMIC;
+use crate::ttype::shared::NUMERIC_TRUTHY_STRING_ATOMIC;
+use crate::ttype::shared::OBJECT_ATOMIC;
+use crate::ttype::shared::ONE_INT_ATOMIC;
+use crate::ttype::shared::OPEN_RESOURCE_ATOMIC;
+use crate::ttype::shared::PLACEHOLDER_ATOMIC;
+use crate::ttype::shared::POSITIVE_INT_ATOMIC;
+use crate::ttype::shared::RESOURCE_ATOMIC;
+use crate::ttype::shared::SCALAR_ATOMIC;
+use crate::ttype::shared::SIGNUM_RESULT_SLICE;
+use crate::ttype::shared::STRING_ATOMIC;
+use crate::ttype::shared::TRAIT_STRING_ATOMIC;
+use crate::ttype::shared::TRUE_ATOMIC;
+use crate::ttype::shared::TRUTHY_LOWERCASE_STRING_ATOMIC;
+use crate::ttype::shared::TRUTHY_STRING_ATOMIC;
+use crate::ttype::shared::UNSPECIFIED_LITERAL_FLOAT_ATOMIC;
+use crate::ttype::shared::UNSPECIFIED_LITERAL_INT_ATOMIC;
+use crate::ttype::shared::UNSPECIFIED_LITERAL_STRING_ATOMIC;
+use crate::ttype::shared::VOID_ATOMIC;
+use crate::ttype::shared::ZERO_INT_ATOMIC;
 use crate::ttype::template::TemplateResult;
 use crate::ttype::template::inferred_type_replacer;
 use crate::ttype::union::TUnion;
@@ -213,6 +266,7 @@ impl<'a> From<&'a TAtomic> for TypeRef<'a> {
 /// For specific literal values or ranges that do not have a canonical static
 /// representation, it falls back to creating a new, owned `TUnion`, which
 /// involves a heap allocation.
+#[must_use]
 pub fn get_union_from_integer(integer: &TInteger) -> TUnion {
     if integer.is_unspecified() {
         return get_int();
@@ -238,46 +292,55 @@ pub fn get_union_from_integer(integer: &TInteger) -> TUnion {
 }
 
 #[inline]
+#[must_use]
 pub fn wrap_atomic(tinner: TAtomic) -> TUnion {
     TUnion::from_single(Cow::Owned(tinner))
 }
 
 #[inline]
+#[must_use]
 pub fn get_int() -> TUnion {
     TUnion::from_single(Cow::Borrowed(INT_ATOMIC))
 }
 
 #[inline]
+#[must_use]
 pub fn get_positive_int() -> TUnion {
     TUnion::from_single(Cow::Borrowed(POSITIVE_INT_ATOMIC))
 }
 
 #[inline]
+#[must_use]
 pub fn get_negative_int() -> TUnion {
     TUnion::from_single(Cow::Borrowed(NEGATIVE_INT_ATOMIC))
 }
 
 #[inline]
+#[must_use]
 pub fn get_non_positive_int() -> TUnion {
     TUnion::from_single(Cow::Borrowed(NON_POSITIVE_INT_ATOMIC))
 }
 
 #[inline]
+#[must_use]
 pub fn get_non_negative_int() -> TUnion {
     TUnion::from_single(Cow::Borrowed(NON_NEGATIVE_INT_ATOMIC))
 }
 
 #[inline]
+#[must_use]
 pub fn get_unspecified_literal_int() -> TUnion {
     TUnion::from_single(Cow::Borrowed(UNSPECIFIED_LITERAL_INT_ATOMIC))
 }
 
 #[inline]
+#[must_use]
 pub fn get_unspecified_literal_float() -> TUnion {
     TUnion::from_single(Cow::Borrowed(UNSPECIFIED_LITERAL_FLOAT_ATOMIC))
 }
 
 #[inline]
+#[must_use]
 pub fn get_int_range(from: Option<i64>, to: Option<i64>) -> TUnion {
     let atomic = match (from, to) {
         (Some(from), Some(to)) => TAtomic::Scalar(TScalar::Integer(TInteger::Range(from, to))),
@@ -311,29 +374,34 @@ pub fn get_int_range(from: Option<i64>, to: Option<i64>) -> TUnion {
 
 /// Returns a zero-allocation `TUnion` for the type `-1|0|1`.
 #[inline]
+#[must_use]
 pub fn get_signum_result() -> TUnion {
     TUnion::new(Cow::Borrowed(SIGNUM_RESULT_SLICE))
 }
 
 /// Returns a zero-allocation `TUnion` for the integer literal `1`.
 #[inline]
+#[must_use]
 pub fn get_one_int() -> TUnion {
     TUnion::from_single(Cow::Borrowed(ONE_INT_ATOMIC))
 }
 
 /// Returns a zero-allocation `TUnion` for the integer literal `0`.
 #[inline]
+#[must_use]
 pub fn get_zero_int() -> TUnion {
     TUnion::from_single(Cow::Borrowed(ZERO_INT_ATOMIC))
 }
 
 /// Returns a zero-allocation `TUnion` for the integer literal `-1`.
 #[inline]
+#[must_use]
 pub fn get_minus_one_int() -> TUnion {
     TUnion::from_single(Cow::Borrowed(MINUS_ONE_INT_ATOMIC))
 }
 
 #[inline]
+#[must_use]
 pub fn get_literal_int(value: i64) -> TUnion {
     if value == 0 {
         return get_zero_int();
@@ -351,36 +419,43 @@ pub fn get_literal_int(value: i64) -> TUnion {
 }
 
 #[inline]
+#[must_use]
 pub fn get_int_or_float() -> TUnion {
     TUnion::new(Cow::Borrowed(INT_FLOAT_ATOMIC_SLICE))
 }
 
 #[inline]
+#[must_use]
 pub fn get_int_or_string() -> TUnion {
     TUnion::new(Cow::Borrowed(INT_STRING_ATOMIC_SLICE))
 }
 
 #[inline]
+#[must_use]
 pub fn get_nullable_int() -> TUnion {
     TUnion::new(Cow::Borrowed(NULL_INT_ATOMIC_SLICE))
 }
 
 #[inline]
+#[must_use]
 pub fn get_nullable_float() -> TUnion {
     TUnion::new(Cow::Borrowed(NULL_FLOAT_ATOMIC_SLICE))
 }
 
 #[inline]
+#[must_use]
 pub fn get_nullable_object() -> TUnion {
     TUnion::new(Cow::Borrowed(NULL_OBJECT_ATOMIC_SLICE))
 }
 
 #[inline]
+#[must_use]
 pub fn get_nullable_string() -> TUnion {
     TUnion::new(Cow::Borrowed(NULL_STRING_ATOMIC_SLICE))
 }
 
 #[inline]
+#[must_use]
 pub fn get_string() -> TUnion {
     TUnion::from_single(Cow::Borrowed(STRING_ATOMIC))
 }
@@ -389,6 +464,7 @@ pub fn get_string() -> TUnion {
 ///
 /// This function maps all possible boolean property combinations to a canonical,
 /// static `TAtomic` instance, avoiding heap allocations for common string types.
+#[must_use]
 pub fn get_string_with_props(is_numeric: bool, is_truthy: bool, is_non_empty: bool, is_lowercase: bool) -> TUnion {
     let atomic_ref = match (is_numeric, is_truthy, is_non_empty, is_lowercase) {
         // is_numeric = true
@@ -408,16 +484,19 @@ pub fn get_string_with_props(is_numeric: bool, is_truthy: bool, is_non_empty: bo
 }
 
 #[inline]
+#[must_use]
 pub fn get_literal_class_string(value: Atom) -> TUnion {
     TUnion::from_single(Cow::Owned(TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::literal(value)))))
 }
 
 #[inline]
+#[must_use]
 pub fn get_class_string() -> TUnion {
     TUnion::from_single(Cow::Borrowed(CLASS_STRING_ATOMIC))
 }
 
 #[inline]
+#[must_use]
 pub fn get_class_string_of_type(constraint: TAtomic) -> TUnion {
     TUnion::from_single(Cow::Owned(TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::class_string_of_type(
         constraint,
@@ -425,11 +504,13 @@ pub fn get_class_string_of_type(constraint: TAtomic) -> TUnion {
 }
 
 #[inline]
+#[must_use]
 pub fn get_interface_string() -> TUnion {
     TUnion::from_single(Cow::Borrowed(INTERFACE_STRING_ATOMIC))
 }
 
 #[inline]
+#[must_use]
 pub fn get_interface_string_of_type(constraint: TAtomic) -> TUnion {
     TUnion::from_single(Cow::Owned(TAtomic::Scalar(TScalar::ClassLikeString(
         TClassLikeString::interface_string_of_type(constraint),
@@ -437,11 +518,13 @@ pub fn get_interface_string_of_type(constraint: TAtomic) -> TUnion {
 }
 
 #[inline]
+#[must_use]
 pub fn get_enum_string() -> TUnion {
     TUnion::from_single(Cow::Borrowed(ENUM_STRING_ATOMIC))
 }
 
 #[inline]
+#[must_use]
 pub fn get_enum_string_of_type(constraint: TAtomic) -> TUnion {
     TUnion::from_single(Cow::Owned(TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::enum_string_of_type(
         constraint,
@@ -449,11 +532,13 @@ pub fn get_enum_string_of_type(constraint: TAtomic) -> TUnion {
 }
 
 #[inline]
+#[must_use]
 pub fn get_trait_string() -> TUnion {
     TUnion::from_single(Cow::Borrowed(TRAIT_STRING_ATOMIC))
 }
 
 #[inline]
+#[must_use]
 pub fn get_trait_string_of_type(constraint: TAtomic) -> TUnion {
     TUnion::from_single(Cow::Owned(TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::trait_string_of_type(
         constraint,
@@ -461,70 +546,84 @@ pub fn get_trait_string_of_type(constraint: TAtomic) -> TUnion {
 }
 
 #[inline]
+#[must_use]
 pub fn get_literal_string(value: Atom) -> TUnion {
     TUnion::from_single(Cow::Owned(TAtomic::Scalar(TScalar::literal_string(value))))
 }
 
 #[inline]
+#[must_use]
 pub fn get_float() -> TUnion {
     TUnion::from_single(Cow::Borrowed(FLOAT_ATOMIC))
 }
 
 #[inline]
+#[must_use]
 pub fn get_literal_float(v: f64) -> TUnion {
     TUnion::from_single(Cow::Owned(TAtomic::Scalar(TScalar::literal_float(v))))
 }
 
 #[inline]
+#[must_use]
 pub fn get_mixed() -> TUnion {
     TUnion::from_single(Cow::Borrowed(MIXED_ATOMIC))
 }
 
 #[inline]
+#[must_use]
 pub fn get_isset_from_mixed_mixed() -> TUnion {
     TUnion::from_single(Cow::Borrowed(ISSET_FROM_LOOP_MIXED_ATOMIC))
 }
 
+#[must_use]
 pub fn get_mixed_maybe_from_loop(from_loop_isset: bool) -> TUnion {
     if from_loop_isset { get_isset_from_mixed_mixed() } else { get_mixed() }
 }
 
 #[inline]
+#[must_use]
 pub fn get_never() -> TUnion {
     TUnion::from_single(Cow::Borrowed(NEVER_ATOMIC))
 }
 
 #[inline]
+#[must_use]
 pub fn get_resource() -> TUnion {
     TUnion::from_single(Cow::Borrowed(RESOURCE_ATOMIC))
 }
 
 #[inline]
+#[must_use]
 pub fn get_closed_resource() -> TUnion {
     TUnion::from_single(Cow::Borrowed(CLOSED_RESOURCE_ATOMIC))
 }
 
 #[inline]
+#[must_use]
 pub fn get_open_resource() -> TUnion {
     TUnion::from_single(Cow::Borrowed(OPEN_RESOURCE_ATOMIC))
 }
 
 #[inline]
+#[must_use]
 pub fn get_placeholder() -> TUnion {
     TUnion::from_single(Cow::Borrowed(PLACEHOLDER_ATOMIC))
 }
 
 #[inline]
+#[must_use]
 pub fn get_void() -> TUnion {
     TUnion::from_single(Cow::Borrowed(VOID_ATOMIC))
 }
 
 #[inline]
+#[must_use]
 pub fn get_null() -> TUnion {
     TUnion::from_single(Cow::Borrowed(NULL_ATOMIC))
 }
 
 #[inline]
+#[must_use]
 pub fn get_undefined_null() -> TUnion {
     let mut null = TUnion::from_single(Cow::Borrowed(NULL_ATOMIC));
     null.set_possibly_undefined(true, None);
@@ -532,116 +631,139 @@ pub fn get_undefined_null() -> TUnion {
 }
 
 #[inline]
+#[must_use]
 pub fn get_arraykey() -> TUnion {
     TUnion::from_single(Cow::Borrowed(ARRAYKEY_ATOMIC))
 }
 
 #[inline]
+#[must_use]
 pub fn get_bool() -> TUnion {
     TUnion::from_single(Cow::Borrowed(BOOL_ATOMIC))
 }
 
 #[inline]
+#[must_use]
 pub fn get_false() -> TUnion {
     TUnion::from_single(Cow::Borrowed(FALSE_ATOMIC))
 }
 
 #[inline]
+#[must_use]
 pub fn get_true() -> TUnion {
     TUnion::from_single(Cow::Borrowed(TRUE_ATOMIC))
 }
 
 #[inline]
+#[must_use]
 pub fn get_object() -> TUnion {
     TUnion::from_single(Cow::Borrowed(OBJECT_ATOMIC))
 }
 
 #[inline]
+#[must_use]
 pub fn get_numeric() -> TUnion {
     TUnion::from_single(Cow::Borrowed(NUMERIC_ATOMIC))
 }
 
 #[inline]
+#[must_use]
 pub fn get_numeric_string() -> TUnion {
     TUnion::from_single(Cow::Borrowed(NUMERIC_STRING_ATOMIC))
 }
 
 #[inline]
+#[must_use]
 pub fn get_lowercase_string() -> TUnion {
     TUnion::from_single(Cow::Borrowed(LOWERCASE_STRING_ATOMIC))
 }
 
 #[inline]
+#[must_use]
 pub fn get_non_empty_lowercase_string() -> TUnion {
     TUnion::from_single(Cow::Borrowed(NON_EMPTY_LOWERCASE_STRING_ATOMIC))
 }
 
 #[inline]
+#[must_use]
 pub fn get_non_empty_string() -> TUnion {
     TUnion::from_single(Cow::Borrowed(NON_EMPTY_STRING_ATOMIC))
 }
 
 #[inline]
+#[must_use]
 pub fn get_empty_string() -> TUnion {
     TUnion::from_single(Cow::Borrowed(&EMPTY_STRING_ATOMIC))
 }
 
 #[inline]
+#[must_use]
 pub fn get_truthy_string() -> TUnion {
     TUnion::from_single(Cow::Borrowed(TRUTHY_STRING_ATOMIC))
 }
 
 #[inline]
+#[must_use]
 pub fn get_unspecified_literal_string() -> TUnion {
     TUnion::from_single(Cow::Borrowed(UNSPECIFIED_LITERAL_STRING_ATOMIC))
 }
 
 #[inline]
+#[must_use]
 pub fn get_non_empty_unspecified_literal_string() -> TUnion {
     TUnion::from_single(Cow::Borrowed(NON_EMPTY_UNSPECIFIED_LITERAL_STRING_ATOMIC))
 }
 
 #[inline]
+#[must_use]
 pub fn get_scalar() -> TUnion {
     TUnion::from_single(Cow::Borrowed(SCALAR_ATOMIC))
 }
 
 #[inline]
+#[must_use]
 pub fn get_nullable_scalar() -> TUnion {
     TUnion::new(Cow::Borrowed(NULL_SCALAR_ATOMIC_SLICE))
 }
 
 #[inline]
+#[must_use]
 pub fn get_mixed_iterable() -> TUnion {
     TUnion::from_single(Cow::Borrowed(&MIXED_ITERABLE_ATOMIC))
 }
 
 #[inline]
+#[must_use]
 pub fn get_empty_keyed_array() -> TUnion {
     TUnion::from_single(Cow::Borrowed(&EMPTY_KEYED_ARRAY_ATOMIC))
 }
 
 #[inline]
+#[must_use]
 pub fn get_mixed_list() -> TUnion {
     get_list(get_mixed())
 }
 
 #[inline]
+#[must_use]
 pub fn get_mixed_keyed_array() -> TUnion {
     get_keyed_array(get_arraykey(), get_mixed())
 }
 
 #[inline]
+#[must_use]
 pub fn get_mixed_callable() -> TUnion {
     TUnion::from_single(Cow::Borrowed(&MIXED_CALLABLE_ATOMIC))
 }
 
 #[inline]
+#[must_use]
 pub fn get_mixed_closure() -> TUnion {
     TUnion::from_single(Cow::Borrowed(&MIXED_CLOSURE_ATOMIC))
 }
 
 #[inline]
+#[must_use]
 pub fn get_named_object(name: Atom, type_resolution_context: Option<&TypeResolutionContext>) -> TUnion {
     if let Some(type_resolution_context) = type_resolution_context
         && let Some(defining_entities) = type_resolution_context.get_template_definition(&name)
@@ -658,21 +780,25 @@ pub fn get_named_object(name: Atom, type_resolution_context: Option<&TypeResolut
 }
 
 #[inline]
+#[must_use]
 pub fn get_iterable(key_parameter: TUnion, value_parameter: TUnion) -> TUnion {
     wrap_atomic(TAtomic::Iterable(TIterable::new(Box::new(key_parameter), Box::new(value_parameter))))
 }
 
 #[inline]
+#[must_use]
 pub fn get_list(element_type: TUnion) -> TUnion {
     wrap_atomic(TAtomic::Array(TArray::List(TList::new(Box::new(element_type)))))
 }
 
 #[inline]
+#[must_use]
 pub fn get_non_empty_list(element_type: TUnion) -> TUnion {
     wrap_atomic(TAtomic::Array(TArray::List(TList::new_non_empty(Box::new(element_type)))))
 }
 
 #[inline]
+#[must_use]
 pub fn get_keyed_array(key_parameter: TUnion, value_parameter: TUnion) -> TUnion {
     wrap_atomic(TAtomic::Array(TArray::Keyed(TKeyedArray::new_with_parameters(
         Box::new(key_parameter),
@@ -681,11 +807,13 @@ pub fn get_keyed_array(key_parameter: TUnion, value_parameter: TUnion) -> TUnion
 }
 
 #[inline]
+#[must_use]
 pub fn add_optional_union_type(base_type: TUnion, maybe_type: Option<&TUnion>, codebase: &CodebaseMetadata) -> TUnion {
     if let Some(type_2) = maybe_type { add_union_type(base_type, type_2, codebase, false) } else { base_type }
 }
 
 #[inline]
+#[must_use]
 pub fn combine_optional_union_types(
     type_1: Option<&TUnion>,
     type_2: Option<&TUnion>,
@@ -700,6 +828,7 @@ pub fn combine_optional_union_types(
 }
 
 #[inline]
+#[must_use]
 pub fn combine_union_types(
     type_1: &TUnion,
     type_2: &TUnion,
@@ -749,6 +878,7 @@ pub fn combine_union_types(
 }
 
 #[inline]
+#[must_use]
 pub fn add_union_type(
     mut base_type: TUnion,
     other_type: &TUnion,
@@ -787,6 +917,7 @@ pub fn add_union_type(
     base_type
 }
 
+#[must_use]
 pub fn intersect_union_types(type_1: &TUnion, type_2: &TUnion, codebase: &CodebaseMetadata) -> Option<TUnion> {
     if type_1 == type_2 {
         return Some(type_1.clone());
@@ -1056,8 +1187,8 @@ pub fn get_iterable_parameters(atomic: &TAtomic, codebase: &CodebaseMetadata) ->
                 if !is_iterator_interface
                     && codebase.is_instance_of(&class_metadata.name, &iterator)
                     && let (Some(key_type), Some(value_type)) = (
-                        get_iterator_method_return_type(codebase, name, "key"),
-                        get_iterator_method_return_type(codebase, name, "current"),
+                        get_iterator_method_return_type(codebase, *name, "key"),
+                        get_iterator_method_return_type(codebase, *name, "current"),
                     )
                 {
                     let contains_generic_param = |t: &TUnion| t.types.iter().any(atomic::TAtomic::is_generic_parameter);
@@ -1114,6 +1245,7 @@ pub fn get_iterable_parameters(atomic: &TAtomic, codebase: &CodebaseMetadata) ->
     None
 }
 
+#[must_use]
 pub fn get_array_parameters(array_type: &TArray, codebase: &CodebaseMetadata) -> (TUnion, TUnion) {
     match array_type {
         TArray::Keyed(keyed_data) => {
@@ -1167,6 +1299,7 @@ pub fn get_array_parameters(array_type: &TArray, codebase: &CodebaseMetadata) ->
     }
 }
 
+#[must_use]
 pub fn get_iterable_value_parameter(atomic: &TAtomic, codebase: &CodebaseMetadata) -> Option<TUnion> {
     if let Some(generator_parameters) = atomic.get_generator_parameters() {
         return Some(generator_parameters.1);
@@ -1213,6 +1346,7 @@ pub fn get_iterable_value_parameter(atomic: &TAtomic, codebase: &CodebaseMetadat
     None
 }
 
+#[must_use]
 pub fn get_array_value_parameter(array_type: &TArray, codebase: &CodebaseMetadata) -> TUnion {
     match array_type {
         TArray::Keyed(keyed_data) => {
@@ -1250,6 +1384,7 @@ pub fn get_array_value_parameter(array_type: &TArray, codebase: &CodebaseMetadat
 ///
 /// This function correctly traverses the pre-calculated inheritance map to determine the
 /// concrete type of a template parameter.
+#[must_use]
 pub fn get_specialized_template_type(
     codebase: &CodebaseMetadata,
     template_name: &Atom,
@@ -1327,12 +1462,8 @@ pub fn get_specialized_template_type(
     Some(template_type)
 }
 
-fn get_iterator_method_return_type(
-    codebase: &CodebaseMetadata,
-    class_name: &Atom,
-    method_name: &str,
-) -> Option<TUnion> {
-    let method = codebase.get_declaring_method(class_name, method_name)?;
+fn get_iterator_method_return_type(codebase: &CodebaseMetadata, class_name: Atom, method_name: &str) -> Option<TUnion> {
+    let method = codebase.get_declaring_method(&class_name, method_name)?;
     let return_type_meta = method.return_type_metadata.as_ref()?;
     let mut return_type = return_type_meta.type_union.clone();
     expander::expand_union(codebase, &mut return_type, &TypeExpansionOptions::default());

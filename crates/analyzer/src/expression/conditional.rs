@@ -16,7 +16,8 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_span::Span;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Conditional;
+use mago_syntax::ast::Expression;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -109,7 +110,7 @@ pub(super) fn analyze_conditional<'ctx, 'ast, 'arena>(
 
         'outer: for key in keys {
             for mixed_var_id in &mixed_variables {
-                if is_derived_access_path(&key, mixed_var_id) {
+                if is_derived_access_path(key, *mixed_var_id) {
                     let has_explicit_type_assertion = clause
                         .possibilities
                         .get(&key)

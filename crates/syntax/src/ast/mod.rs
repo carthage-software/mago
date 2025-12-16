@@ -29,8 +29,9 @@ pub struct Program<'arena> {
 }
 
 impl Program<'_> {
+    #[must_use]
     pub fn has_script(&self) -> bool {
-        for statement in self.statements.iter() {
+        for statement in &self.statements {
             if !matches!(statement, Statement::Inline(_)) {
                 return true;
             }
@@ -42,8 +43,8 @@ impl Program<'_> {
 
 impl HasSpan for Program<'_> {
     fn span(&self) -> Span {
-        let start = self.statements.first().map(|stmt| stmt.span().start).unwrap_or_else(Position::zero);
-        let end = self.statements.last().map(|stmt| stmt.span().end).unwrap_or_else(Position::zero);
+        let start = self.statements.first().map_or_else(Position::zero, |stmt| stmt.span().start);
+        let end = self.statements.last().map_or_else(Position::zero, |stmt| stmt.span().end);
 
         Span::new(self.file_id, start, end)
     }

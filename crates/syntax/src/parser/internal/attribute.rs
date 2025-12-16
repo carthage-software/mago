@@ -1,5 +1,6 @@
 use crate::T;
-use crate::ast::ast::*;
+use crate::ast::ast::Attribute;
+use crate::ast::ast::AttributeList;
 use crate::ast::sequence::Sequence;
 use crate::ast::sequence::TokenSeparatedSequence;
 use crate::error::ParseError;

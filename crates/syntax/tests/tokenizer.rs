@@ -12,7 +12,7 @@ use mago_syntax::token::TokenKind;
 #[test]
 fn test_shebang() -> Result<(), SyntaxError> {
     let code = b"#!/usr/bin/env php\n<?php";
-    let expected = vec![TokenKind::InlineShebang, TokenKind::OpenTag];
+    let expected = &[TokenKind::InlineShebang, TokenKind::OpenTag];
 
     test_lexer(code, expected).map_err(|err| {
         panic!("unexpected error: {err}");
@@ -22,7 +22,7 @@ fn test_shebang() -> Result<(), SyntaxError> {
 #[test]
 fn test_base_integers() -> Result<(), SyntaxError> {
     let code = b"<?php 0x 0o 0b 0X 0O 0B 0o9 0b2 0xg 0o2 0b1 0xF";
-    let expected = vec![
+    let expected = &[
         TokenKind::OpenTag,
         TokenKind::Whitespace,
         TokenKind::LiteralInteger,
@@ -67,7 +67,7 @@ fn test_base_integers() -> Result<(), SyntaxError> {
 #[test]
 fn test_emoji_attribute() -> Result<(), SyntaxError> {
     let code = "<?php #️⃣[Foo] class Bar {}".as_bytes();
-    let expected = vec![TokenKind::OpenTag, TokenKind::Whitespace, TokenKind::HashComment];
+    let expected = &[TokenKind::OpenTag, TokenKind::Whitespace, TokenKind::HashComment];
 
     test_lexer(code, expected).map_err(|err| {
         panic!("unexpected error: {err}");
@@ -77,7 +77,7 @@ fn test_emoji_attribute() -> Result<(), SyntaxError> {
 #[test]
 fn test_casts() -> Result<(), SyntaxError> {
     let code = b"hello <?= ( string ) + - / ??= ?-> ... ( int   ) (integer    ) (    double) &&  ?> world";
-    let expected = vec![
+    let expected = &[
         TokenKind::InlineText,
         TokenKind::EchoTag,
         TokenKind::Whitespace,
@@ -115,7 +115,7 @@ fn test_casts() -> Result<(), SyntaxError> {
 #[test]
 fn test_empty_multiline_comments() -> Result<(), SyntaxError> {
     let code = b"<?php /**/ /***/ ?>";
-    let expected = vec![
+    let expected = &[
         TokenKind::OpenTag,
         TokenKind::Whitespace,
         TokenKind::MultiLineComment,
@@ -133,7 +133,7 @@ fn test_empty_multiline_comments() -> Result<(), SyntaxError> {
 #[test]
 fn test_callable_token() -> Result<(), SyntaxError> {
     let code = b"<?php function foo(callable $bar) {}";
-    let expected = vec![
+    let expected = &[
         TokenKind::OpenTag,
         TokenKind::Whitespace,
         TokenKind::Function,
@@ -173,7 +173,7 @@ fn test_assignment_operators() -> Result<(), SyntaxError> {
         ??=
     ";
 
-    let expected = vec![
+    let expected = &[
         TokenKind::OpenTag,
         TokenKind::Whitespace,
         TokenKind::Equal,
@@ -225,7 +225,7 @@ PHP;
 
 echo $a;
 ";
-    let expected = vec![
+    let expected = &[
         TokenKind::OpenTag,
         TokenKind::Whitespace,
         TokenKind::Variable,
@@ -267,7 +267,7 @@ PHP;
 
 echo $a;
 ";
-    let expected = vec![
+    let expected = &[
         TokenKind::OpenTag,
         TokenKind::Whitespace,
         TokenKind::Variable,
@@ -298,7 +298,7 @@ echo $a;
 #[test]
 fn test_unterminated_multiple_comment() {
     let code = b"<?php /* hello";
-    let expected = vec![TokenKind::OpenTag, TokenKind::Whitespace];
+    let expected = &[TokenKind::OpenTag, TokenKind::Whitespace];
 
     match test_lexer(code, expected) {
         Ok(()) => panic!("expected error"),
@@ -312,7 +312,7 @@ fn test_unterminated_multiple_comment() {
 #[test]
 fn test_unterminated_docblock_comment() {
     let code = b"<?php /** hello";
-    let expected = vec![TokenKind::OpenTag, TokenKind::Whitespace];
+    let expected = &[TokenKind::OpenTag, TokenKind::Whitespace];
 
     match test_lexer(code, expected) {
         Ok(()) => panic!("expected error"),
@@ -326,7 +326,7 @@ fn test_unterminated_docblock_comment() {
 #[test]
 fn test_namespace() -> Result<(), SyntaxError> {
     let code = b"<?php use Foo\\{Bar, Baz}";
-    let expected = vec![
+    let expected = &[
         TokenKind::OpenTag,
         TokenKind::Whitespace,
         TokenKind::Use,
@@ -359,7 +359,7 @@ fn test_comments() -> Result<(), SyntaxError> {
             ?> hello
         ";
 
-    let expected = vec![
+    let expected = &[
         TokenKind::InlineText,
         TokenKind::OpenTag,
         TokenKind::Whitespace,
@@ -390,7 +390,7 @@ fn test_comments() -> Result<(), SyntaxError> {
 fn test_single_line_comments() -> Result<(), SyntaxError> {
     let code = b"<?php // this is a single-line comment ?> hello <?php // another single-line comment ?> world";
 
-    let expected = vec![
+    let expected = &[
         TokenKind::OpenTag,
         TokenKind::Whitespace,
         TokenKind::SingleLineComment,
@@ -428,7 +428,7 @@ fn test_keywords() -> Result<(), SyntaxError> {
     expected.push(TokenKind::RightParenthesis);
     expected.push(TokenKind::Semicolon);
 
-    test_lexer(code.as_slice(), expected).map_err(|err| {
+    test_lexer(code.as_slice(), &expected).map_err(|err| {
         panic!("unexpected error: {err}");
     })
 }
@@ -436,7 +436,7 @@ fn test_keywords() -> Result<(), SyntaxError> {
 #[test]
 fn test_halt() -> Result<(), SyntaxError> {
     let code = b"hello <?= echo + __halt_compiler ( ) ;  echo 'unreachable';";
-    let expected = vec![
+    let expected = &[
         TokenKind::InlineText,
         TokenKind::EchoTag,
         TokenKind::Whitespace,
@@ -462,7 +462,7 @@ fn test_halt() -> Result<(), SyntaxError> {
 #[test]
 fn test_identifiers() -> Result<(), SyntaxError> {
     let code = b"hello <?php FooBar Foo\\Bar Foo\\\\Bar::class;";
-    let expected = vec![
+    let expected = &[
         TokenKind::InlineText,
         TokenKind::OpenTag,
         TokenKind::Whitespace,
@@ -486,7 +486,7 @@ fn test_identifiers() -> Result<(), SyntaxError> {
 #[test]
 fn test_nss() -> Result<(), SyntaxError> {
     let code = b"<?php use Foo\\{};";
-    let expected = vec![
+    let expected = &[
         TokenKind::OpenTag,
         TokenKind::Whitespace,
         TokenKind::Use,
@@ -506,7 +506,7 @@ fn test_nss() -> Result<(), SyntaxError> {
 #[test]
 fn test_numbers() -> Result<(), SyntaxError> {
     let code = b"hello <?php 123 123.456 0x123 0b101 0o123 4e-2;";
-    let expected = vec![
+    let expected = &[
         TokenKind::InlineText,
         TokenKind::OpenTag,
         TokenKind::Whitespace,
@@ -532,7 +532,7 @@ fn test_numbers() -> Result<(), SyntaxError> {
 #[test]
 fn test_emojis() -> Result<(), SyntaxError> {
     let code = "hello <?php final readonly class 🐘 { const 🦀 = 🐱 + 🦊; }".as_bytes();
-    let expected = vec![
+    let expected = &[
         TokenKind::InlineText,
         TokenKind::OpenTag,
         TokenKind::Whitespace,
@@ -570,7 +570,7 @@ fn test_emojis() -> Result<(), SyntaxError> {
 #[test]
 fn test_single_quote_literal_string() -> Result<(), SyntaxError> {
     let code = b"hello <?php 'hello world';";
-    let expected = vec![
+    let expected = &[
         TokenKind::InlineText,
         TokenKind::OpenTag,
         TokenKind::Whitespace,
@@ -586,8 +586,7 @@ fn test_single_quote_literal_string() -> Result<(), SyntaxError> {
 #[test]
 fn test_partial_single_quote_literal_string() -> Result<(), SyntaxError> {
     let code = b"hello <?php 'hello world";
-    let expected =
-        vec![TokenKind::InlineText, TokenKind::OpenTag, TokenKind::Whitespace, TokenKind::PartialLiteralString];
+    let expected = &[TokenKind::InlineText, TokenKind::OpenTag, TokenKind::Whitespace, TokenKind::PartialLiteralString];
 
     test_lexer(code, expected).map_err(|err| {
         panic!("unexpected error: {err}");
@@ -597,7 +596,7 @@ fn test_partial_single_quote_literal_string() -> Result<(), SyntaxError> {
 #[test]
 fn test_double_quote_literal_string() -> Result<(), SyntaxError> {
     let code = b"hello <?php \"hello world\";";
-    let expected = vec![
+    let expected = &[
         TokenKind::InlineText,
         TokenKind::OpenTag,
         TokenKind::Whitespace,
@@ -613,8 +612,7 @@ fn test_double_quote_literal_string() -> Result<(), SyntaxError> {
 #[test]
 fn test_partial_double_quote_literal_string() -> Result<(), SyntaxError> {
     let code = b"hello <?php \"hello world";
-    let expected =
-        vec![TokenKind::InlineText, TokenKind::OpenTag, TokenKind::Whitespace, TokenKind::PartialLiteralString];
+    let expected = &[TokenKind::InlineText, TokenKind::OpenTag, TokenKind::Whitespace, TokenKind::PartialLiteralString];
 
     test_lexer(code, expected).map_err(|err| {
         panic!("unexpected error: {err}");
@@ -624,7 +622,7 @@ fn test_partial_double_quote_literal_string() -> Result<(), SyntaxError> {
 #[test]
 fn test_variables() -> Result<(), SyntaxError> {
     let code = b"hello <?php $foo $foo_bar $fooBar $foo123 $foo_123 $foo_123_bar $$bar ${bar};";
-    let expected = vec![
+    let expected = &[
         TokenKind::InlineText,
         TokenKind::OpenTag,
         TokenKind::Whitespace,
@@ -669,7 +667,7 @@ fn test_literal_nowdoc_heredoc() -> Result<(), SyntaxError> {
             FOF;
         ";
 
-    let expected = vec![
+    let expected = &[
         TokenKind::InlineText,
         TokenKind::OpenTag,
         TokenKind::Whitespace,
@@ -721,7 +719,7 @@ fn test_heredoc() -> Result<(), SyntaxError> {
                 e;
             ";
 
-    let expected = vec![
+    let expected = &[
         TokenKind::InlineText,
         TokenKind::OpenTag,
         TokenKind::Whitespace,
@@ -819,7 +817,7 @@ fn test_double_quote_string() -> Result<(), SyntaxError> {
             $bar = \"$foo\\\"\";
         ";
 
-    let expected = vec![
+    let expected = &[
         TokenKind::InlineText,
         TokenKind::OpenTag,
         TokenKind::Whitespace,
@@ -897,7 +895,7 @@ fn test_double_quote_string() -> Result<(), SyntaxError> {
 fn test_escape() -> Result<(), SyntaxError> {
     let code = r#"<?= "\033]8;;{$attr['href']}\033\\{$value}\033]8;;\033\\" . FOO;"#;
 
-    let expected = vec![
+    let expected = &[
         TokenKind::EchoTag,
         TokenKind::Whitespace,
         TokenKind::DoubleQuote,
@@ -930,7 +928,7 @@ fn test_escape() -> Result<(), SyntaxError> {
 fn test_sep_literal_num() -> Result<(), SyntaxError> {
     let code = r"<?= 1_200;";
 
-    let expected = vec![TokenKind::EchoTag, TokenKind::Whitespace, TokenKind::LiteralInteger, TokenKind::Semicolon];
+    let expected = &[TokenKind::EchoTag, TokenKind::Whitespace, TokenKind::LiteralInteger, TokenKind::Semicolon];
 
     test_lexer(code.as_bytes(), expected).map_err(|err| {
         panic!("unexpected error: {err}");
@@ -941,7 +939,7 @@ fn test_sep_literal_num() -> Result<(), SyntaxError> {
 fn test_escape_in_string() -> Result<(), SyntaxError> {
     let code = r#"<?= "$foo->bar\nvar";"#;
 
-    let expected = vec![
+    let expected = &[
         TokenKind::EchoTag,
         TokenKind::Whitespace,
         TokenKind::DoubleQuote,
@@ -962,7 +960,7 @@ fn test_escape_in_string() -> Result<(), SyntaxError> {
 #[test]
 fn test_dynamic_array_key_in_string_interpolation() -> Result<(), SyntaxError> {
     let code = r#"<?= "{$a["foo_$n"]}";"#;
-    let expected = vec![
+    let expected = &[
         TokenKind::EchoTag,
         TokenKind::Whitespace,
         TokenKind::DoubleQuote,
@@ -988,7 +986,7 @@ fn test_dynamic_array_key_in_string_interpolation() -> Result<(), SyntaxError> {
 #[test]
 fn test_braced_dynamic_array_key_in_string_interpolation() -> Result<(), SyntaxError> {
     let code = r#"<?= "{$a["foo_{$n}"]}";"#;
-    let expected = vec![
+    let expected = &[
         TokenKind::EchoTag,
         TokenKind::Whitespace,
         TokenKind::DoubleQuote,
@@ -1016,7 +1014,7 @@ fn test_braced_dynamic_array_key_in_string_interpolation() -> Result<(), SyntaxE
 #[test]
 fn test_braced_string_interpolation() -> Result<(), SyntaxError> {
     let code = r#"<?= "a {$a} b";"#;
-    let expected = vec![
+    let expected = &[
         TokenKind::EchoTag,
         TokenKind::Whitespace,
         TokenKind::DoubleQuote,
@@ -1037,7 +1035,7 @@ fn test_braced_string_interpolation() -> Result<(), SyntaxError> {
 #[test]
 fn test_use_fully_qualified() -> Result<(), SyntaxError> {
     let code = r"<?php use \Foo\{Bar,Baz};";
-    let expected = vec![
+    let expected = &[
         TokenKind::OpenTag,
         TokenKind::Whitespace,
         TokenKind::Use,
@@ -1057,7 +1055,7 @@ fn test_use_fully_qualified() -> Result<(), SyntaxError> {
     })
 }
 
-fn test_lexer(code: &[u8], expected_kinds: Vec<TokenKind>) -> Result<(), SyntaxError> {
+fn test_lexer(code: &[u8], expected_kinds: &[TokenKind]) -> Result<(), SyntaxError> {
     let arena = Bump::new();
     let input = Input::new(FileId::zero(), code);
     let mut lexer = Lexer::new(&arena, input);

@@ -54,6 +54,7 @@ impl TypeMetadata {
     /// # Returns
     ///
     /// A new `TypeMetadata` instance with `is_nullable`, `from_docblock`, and `inferred` set to `false`.
+    #[must_use]
     pub fn new(type_union: TUnion, span: Span) -> Self {
         Self { span, type_union, from_docblock: false, inferred: false }
     }
@@ -71,6 +72,7 @@ impl TypeMetadata {
     /// # Returns
     ///
     /// A new `TypeMetadata` instance with `from_docblock` set to `true` and `inferred` set to `false`.
+    #[must_use]
     pub fn from_docblock(type_union: TUnion, span: Span) -> Self {
         Self { span, type_union, from_docblock: true, inferred: false }
     }

@@ -29,42 +29,49 @@ pub enum TArray {
 impl TArray {
     /// Creates a new `ArrayType::List` with the given element type.
     #[inline]
+    #[must_use]
     pub fn new_list(element_type: Box<TUnion>) -> Self {
         Self::List(TList::new(element_type))
     }
 
     /// Creates a new `ArrayType::Keyed` with default parameters (no known items or generics).
     #[inline]
+    #[must_use]
     pub fn new_keyed() -> Self {
         Self::Keyed(TKeyedArray::new())
     }
 
     /// Creates a new `ArrayType::Keyed` with the specified generic key and value types.
     #[inline]
+    #[must_use]
     pub fn new_keyed_with_generics(key_type: Box<TUnion>, value_type: Box<TUnion>) -> Self {
         Self::Keyed(TKeyedArray::new_with_parameters(key_type, value_type))
     }
 
     /// Checks if this represents a list (`list<T>`).
     #[inline]
+    #[must_use]
     pub const fn is_list(&self) -> bool {
         matches!(self, TArray::List(_))
     }
 
     /// Checks if this represents a keyed array (`array<Tk, Tv>`).
     #[inline]
+    #[must_use]
     pub const fn is_keyed(&self) -> bool {
         matches!(self, TArray::Keyed(_))
     }
 
     /// Returns a reference to the `ListArrayType` data if this is a `List` variant.
     #[inline]
+    #[must_use]
     pub const fn get_list(&self) -> Option<&TList> {
         if let TArray::List(data) = self { Some(data) } else { None }
     }
 
     /// Returns a reference to the `KeyedArrayType` data if this is a `Keyed` variant.
     #[inline]
+    #[must_use]
     pub const fn get_keyed(&self) -> Option<&TKeyedArray> {
         if let TArray::Keyed(data) = self { Some(data) } else { None }
     }
@@ -88,6 +95,7 @@ impl TArray {
     }
 
     #[inline]
+    #[must_use]
     pub fn has_known_items(&self) -> bool {
         match &self {
             Self::Keyed(keyed_array) => keyed_array.known_items.as_ref().is_some_and(|items| !items.is_empty()),
@@ -95,6 +103,7 @@ impl TArray {
         }
     }
 
+    #[must_use]
     pub fn is_sealed(&self) -> bool {
         match &self {
             Self::Keyed(keyed_array) => keyed_array.parameters.is_none(),
@@ -104,6 +113,7 @@ impl TArray {
 
     /// Checks if the array is known to be non-empty.
     #[inline]
+    #[must_use]
     pub const fn is_non_empty(&self) -> bool {
         match &self {
             Self::Keyed(keyed_array) => keyed_array.non_empty,
@@ -112,6 +122,7 @@ impl TArray {
     }
 
     /// Returns the minimum size of the array based on known items or elements.
+    #[must_use]
     pub fn get_minimum_size(&self) -> usize {
         let mut size = 0;
 
@@ -146,6 +157,7 @@ impl TArray {
     }
 
     /// Returns the key type of the array, if applicable.
+    #[must_use]
     pub fn get_key_type(&self) -> Option<TUnion> {
         match self {
             Self::Keyed(keyed_array) => {
@@ -160,6 +172,7 @@ impl TArray {
     }
 
     /// Returns the value type of the array, if available.
+    #[must_use]
     pub fn get_value_type(&self) -> Option<TUnion> {
         match self {
             Self::Keyed(keyed_array) => {
@@ -175,6 +188,7 @@ impl TArray {
 
     /// Checks if the array is truthy (non-empty or contains known definite elements).
     #[inline]
+    #[must_use]
     pub fn is_truthy(&self) -> bool {
         match &self {
             Self::Keyed(keyed_array) => {
@@ -212,6 +226,7 @@ impl TArray {
 
     /// Checks if the array is falsy (empty or contains no known elements).
     #[inline]
+    #[must_use]
     pub fn is_falsy(&self) -> bool {
         match &self {
             Self::Keyed(keyed_array) => {

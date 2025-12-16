@@ -15,7 +15,7 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_span::Span;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Expression;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -513,7 +513,7 @@ fn get_intersections_from_metadata(context: &Context<'_, '_>, metadata: &ClassLi
     intersections
 }
 
-pub fn report_non_existent_class_like(context: &mut Context, span: Span, classname: &Atom) {
+pub fn report_non_existent_class_like(context: &mut Context, span: Span, classname: Atom) {
     context.collector.report_with_code(
         IssueCode::NonExistentClassLike,
         Issue::error(format!("Class, Interface, or Trait `{classname}` does not exist."))

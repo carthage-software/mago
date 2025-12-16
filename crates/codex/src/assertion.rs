@@ -60,6 +60,7 @@ pub enum Assertion {
 }
 
 impl Assertion {
+    #[must_use]
     pub fn to_atom(&self) -> Atom {
         match self {
             Assertion::Any => atom("any"),
@@ -109,12 +110,14 @@ impl Assertion {
         }
     }
 
+    #[must_use]
     pub fn to_hash(&self) -> u64 {
         let mut state = AHasher::default();
         self.to_atom().hash(&mut state);
         state.finish()
     }
 
+    #[must_use]
     pub fn is_negation(&self) -> bool {
         matches!(
             self,
@@ -135,6 +138,7 @@ impl Assertion {
         )
     }
 
+    #[must_use]
     pub fn has_isset(&self) -> bool {
         matches!(
             self,
@@ -142,6 +146,7 @@ impl Assertion {
         )
     }
 
+    #[must_use]
     pub fn has_non_isset_equality(&self) -> bool {
         matches!(
             self,
@@ -153,6 +158,7 @@ impl Assertion {
         )
     }
 
+    #[must_use]
     pub fn has_equality(&self) -> bool {
         matches!(
             self,
@@ -168,6 +174,7 @@ impl Assertion {
         )
     }
 
+    #[must_use]
     pub fn has_literal_value(&self) -> bool {
         match self {
             Assertion::IsIdentical(atomic)
@@ -186,6 +193,7 @@ impl Assertion {
         }
     }
 
+    #[must_use]
     pub fn has_integer(&self) -> bool {
         match self {
             Assertion::IsIdentical(atomic)
@@ -198,6 +206,7 @@ impl Assertion {
         }
     }
 
+    #[must_use]
     pub fn has_literal_string(&self) -> bool {
         match self {
             Assertion::IsIdentical(atomic)
@@ -211,6 +220,7 @@ impl Assertion {
         }
     }
 
+    #[must_use]
     pub fn has_literal_int(&self) -> bool {
         match self {
             Assertion::IsIdentical(atomic)
@@ -224,6 +234,7 @@ impl Assertion {
         }
     }
 
+    #[must_use]
     pub fn has_literal_float(&self) -> bool {
         match self {
             Assertion::IsIdentical(atomic)
@@ -237,6 +248,7 @@ impl Assertion {
         }
     }
 
+    #[must_use]
     pub fn with_type(&self, atomic: TAtomic) -> Self {
         match self {
             Assertion::IsType(_) => Assertion::IsType(atomic),
@@ -249,6 +261,7 @@ impl Assertion {
         }
     }
 
+    #[must_use]
     pub fn get_type(&self) -> Option<&TAtomic> {
         match self {
             Assertion::IsIdentical(atomic)
@@ -273,6 +286,7 @@ impl Assertion {
         }
     }
 
+    #[must_use]
     pub fn resolve_templates(&self, codebase: &CodebaseMetadata, template_result: &TemplateResult) -> Vec<Self> {
         match self {
             Assertion::IsType(atomic) => {
@@ -321,6 +335,7 @@ impl Assertion {
         }
     }
 
+    #[must_use]
     pub fn is_negation_of(&self, other: &Assertion) -> bool {
         match self {
             Assertion::Any => false,
@@ -428,6 +443,7 @@ impl Assertion {
         }
     }
 
+    #[must_use]
     pub fn get_negation(&self) -> Self {
         match self {
             Assertion::Any => Assertion::Any,

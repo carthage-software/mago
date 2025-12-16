@@ -273,6 +273,7 @@ pub struct Token<'arena> {
 
 impl Precedence {
     #[inline]
+    #[must_use]
     pub const fn infix(kind: &TokenKind) -> Precedence {
         match kind {
             T!["**"] => Precedence::Pow,
@@ -316,6 +317,7 @@ impl Precedence {
     }
 
     #[inline]
+    #[must_use]
     pub const fn postfix(kind: &TokenKind) -> Self {
         match kind {
             T!["++" | "--"] => Self::IncDec,
@@ -327,6 +329,7 @@ impl Precedence {
     }
 
     #[inline]
+    #[must_use]
     pub const fn associativity(&self) -> Option<Associativity> {
         Some(match self {
             Self::MulDivMod
@@ -351,21 +354,25 @@ impl Precedence {
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_associative(&self) -> bool {
         self.associativity().is_some()
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_right_associative(&self) -> bool {
         matches!(self.associativity(), Some(Associativity::Right))
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_left_associative(&self) -> bool {
         matches!(self.associativity(), Some(Associativity::Left))
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_non_associative(&self) -> bool {
         matches!(self.associativity(), Some(Associativity::NonAssociative))
     }
@@ -373,6 +380,7 @@ impl Precedence {
 
 impl TokenKind {
     #[inline]
+    #[must_use]
     pub const fn is_keyword(&self) -> bool {
         matches!(
             self,
@@ -465,6 +473,7 @@ impl TokenKind {
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_infix(&self) -> bool {
         matches!(
             self,
@@ -517,16 +526,19 @@ impl TokenKind {
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_postfix(&self) -> bool {
         matches!(self, T!["++" | "--" | "(" | "[" | "->" | "?->" | "::"])
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_visibility_modifier(&self) -> bool {
         matches!(self, T!["public" | "protected" | "private" | "private(set)" | "protected(set)" | "public(set)"])
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_modifier(&self) -> bool {
         matches!(
             self,
@@ -544,16 +556,19 @@ impl TokenKind {
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_identifier_maybe_soft_reserved(&self) -> bool {
         if let TokenKind::Identifier = self { true } else { self.is_soft_reserved_identifier() }
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_identifier_maybe_reserved(&self) -> bool {
         if let TokenKind::Identifier = self { true } else { self.is_reserved_identifier() }
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_soft_reserved_identifier(&self) -> bool {
         matches!(
             self,
@@ -562,6 +577,7 @@ impl TokenKind {
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_reserved_identifier(&self) -> bool {
         if self.is_soft_reserved_identifier() {
             return true;
@@ -653,6 +669,7 @@ impl TokenKind {
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_literal(&self) -> bool {
         matches!(
             self,
@@ -661,6 +678,7 @@ impl TokenKind {
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_magic_constant(&self) -> bool {
         matches!(
             self,
@@ -676,6 +694,7 @@ impl TokenKind {
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_cast(&self) -> bool {
         matches!(
             self,
@@ -696,6 +715,7 @@ impl TokenKind {
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_unary_prefix(&self) -> bool {
         if self.is_cast() {
             return true;
@@ -705,21 +725,25 @@ impl TokenKind {
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_trivia(&self) -> bool {
         matches!(self, T![SingleLineComment | MultiLineComment | DocBlockComment | HashComment | Whitespace])
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_comment(&self) -> bool {
         matches!(self, T![SingleLineComment | MultiLineComment | DocBlockComment | HashComment])
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_comma(&self) -> bool {
         matches!(self, T![","])
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_construct(&self) -> bool {
         matches!(
             self,
@@ -739,12 +763,13 @@ impl TokenKind {
 }
 
 impl<'arena> Token<'arena> {
+    #[must_use]
     pub const fn new(kind: TokenKind, value: &'arena str, span: Span) -> Self {
         Self { kind, value, span }
     }
 }
 
-impl<'arena> std::fmt::Display for Token<'arena> {
+impl std::fmt::Display for Token<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "{}({})", self.kind, self.value)
     }

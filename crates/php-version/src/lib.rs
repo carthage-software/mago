@@ -127,6 +127,7 @@ impl PHPVersion {
     /// assert_eq!(version.patch(), 3);
     /// ```
     #[inline]
+    #[must_use]
     pub const fn new(major: u32, minor: u32, patch: u32) -> Self {
         Self((major << 16) | (minor << 8) | patch)
     }
@@ -146,6 +147,7 @@ impl PHPVersion {
     /// assert_eq!(version.to_string(), "8.4.0");
     /// ```
     #[inline]
+    #[must_use]
     pub const fn from_version_id(version_id: u32) -> Self {
         Self(version_id)
     }
@@ -161,6 +163,7 @@ impl PHPVersion {
     /// assert_eq!(version.major(), 8);
     /// ```
     #[inline]
+    #[must_use]
     pub const fn major(&self) -> u32 {
         self.0 >> 16
     }
@@ -176,6 +179,7 @@ impl PHPVersion {
     /// assert_eq!(version.minor(), 2);
     /// ```
     #[inline]
+    #[must_use]
     pub const fn minor(&self) -> u32 {
         (self.0 >> 8) & 0xff
     }
@@ -191,6 +195,7 @@ impl PHPVersion {
     /// assert_eq!(version.patch(), 13);
     /// ```
     #[inline]
+    #[must_use]
     pub const fn patch(&self) -> u32 {
         self.0 & 0xff
     }
@@ -209,6 +214,7 @@ impl PHPVersion {
     /// assert!(version.is_at_least(7, 4, 30)); // 8.0.0 is newer than 7.4.30
     /// assert!(!version.is_at_least(8, 1, 0));
     /// ```
+    #[must_use]
     pub const fn is_at_least(&self, major: u32, minor: u32, patch: u32) -> bool {
         self.0 >= ((major << 16) | (minor << 8) | patch)
     }
@@ -229,6 +235,7 @@ impl PHPVersion {
     /// assert!(version.is_supported(Feature::NullCoalesceAssign));
     /// assert!(!version.is_supported(Feature::NamedArguments));
     /// ```
+    #[must_use]
     pub const fn is_supported(&self, feature: Feature) -> bool {
         match feature {
             Feature::NullableTypeHint
@@ -246,7 +253,7 @@ impl PHPVersion {
             | Feature::PregUnmatchedAsNull
             | Feature::ArrowFunctions
             | Feature::NumericLiteralSeparator
-            | Feature::TypedProperties => self.0 >= 0x070400,
+            | Feature::TypedProperties => self.0 >= 0x07_04_00,
             Feature::NonCapturingCatches
             | Feature::NativeUnionTypes
             | Feature::LessOverriddenParametersWithVariadic
@@ -342,6 +349,7 @@ impl PHPVersion {
     /// assert!(version.is_deprecated(Feature::RequiredParameterAfterOptional));
     /// assert!(!version.is_deprecated(Feature::DynamicProperties)); // that is 8.2+
     /// ```
+    #[must_use]
     pub const fn is_deprecated(&self, feature: Feature) -> bool {
         match feature {
             Feature::DynamicProperties | Feature::CallStaticMethodOnTrait => self.0 >= 0x08_02_00,
@@ -366,6 +374,7 @@ impl PHPVersion {
     /// let version = PHPVersion::new(8, 4, 0);
     /// assert_eq!(version.to_version_id(), 0x080400);
     /// ```
+    #[must_use]
     pub const fn to_version_id(&self) -> u32 {
         self.0
     }
@@ -379,27 +388,32 @@ impl PHPVersionRange {
     pub const PHP8: PHPVersionRange = Self::between(PHPVersion::new(8, 0, 0), PHPVersion::new(8, 99, 99));
 
     /// Creates a new `PHPVersionRange` that includes all versions.
+    #[must_use]
     pub const fn any() -> Self {
         Self { min: None, max: None }
     }
 
     /// Creates a new `PHPVersionRange` that includes all versions up to (and including) the specified version.
+    #[must_use]
     pub const fn until(version: PHPVersion) -> Self {
         Self { min: None, max: Some(version) }
     }
 
     /// Creates a new `PHPVersionRange` that includes all versions from (and including) the specified version.
+    #[must_use]
     pub const fn from(version: PHPVersion) -> Self {
         Self { min: Some(version), max: None }
     }
 
     /// Creates a new `PHPVersionRange` that includes all versions between (and including) the specified minimum and maximum versions.
+    #[must_use]
     pub const fn between(min: PHPVersion, max: PHPVersion) -> Self {
         Self { min: Some(min), max: Some(max) }
     }
 
     /// Checks if this version range supports the given `PHPVersion`.
     #[inline]
+    #[must_use]
     pub const fn includes(&self, version: PHPVersion) -> bool {
         if let Some(min) = self.min
             && version.0 < min.0

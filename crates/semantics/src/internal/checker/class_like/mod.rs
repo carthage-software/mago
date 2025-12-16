@@ -1,9 +1,29 @@
 use mago_php_version::feature::Feature;
-use mago_reporting::*;
-use mago_span::*;
-use mago_syntax::ast::*;
+use mago_reporting::Annotation;
+use mago_reporting::Issue;
+use mago_span::HasSpan;
+use mago_span::Span;
+use mago_syntax::ast::AnonymousClass;
+use mago_syntax::ast::Class;
+use mago_syntax::ast::ClassLikeMember;
+use mago_syntax::ast::Enum;
+use mago_syntax::ast::EnumBackingTypeHint;
+use mago_syntax::ast::EnumCaseItem;
+use mago_syntax::ast::Hint;
+use mago_syntax::ast::Interface;
+use mago_syntax::ast::MethodBody;
+use mago_syntax::ast::Modifier;
+use mago_syntax::ast::Property;
+use mago_syntax::ast::PropertyHookBody;
+use mago_syntax::ast::PropertyItem;
+use mago_syntax::ast::Sequence;
+use mago_syntax::ast::Trait;
 
-use crate::internal::consts::*;
+use crate::internal::consts::ANONYMOUS_CLASS_NAME;
+use crate::internal::consts::CONSTRUCTOR_MAGIC_METHOD;
+use crate::internal::consts::MAGIC_METHODS;
+use crate::internal::consts::RESERVED_KEYWORDS;
+use crate::internal::consts::SOFT_RESERVED_KEYWORDS_MINUS_SYMBOL_ALLOWED;
 use crate::internal::context::Context;
 
 pub use constant::*;
@@ -19,7 +39,7 @@ mod property;
 #[inline]
 pub fn check_class<'ast, 'arena>(class: &'ast Class<'arena>, context: &mut Context<'_, 'ast, 'arena>) {
     let class_name = class.name.value;
-    let class_fqcn = context.get_name(&class.name.span.start);
+    let class_fqcn = context.get_name(class.name.span.start);
 
     if RESERVED_KEYWORDS.iter().any(|keyword| keyword.eq_ignore_ascii_case(class_name))
         || SOFT_RESERVED_KEYWORDS_MINUS_SYMBOL_ALLOWED.iter().any(|keyword| keyword.eq_ignore_ascii_case(class_name))
@@ -41,7 +61,7 @@ pub fn check_class<'ast, 'arena>(class: &'ast Class<'arena>, context: &mut Conte
     let mut last_abstract = None;
     let mut last_readonly = None;
 
-    for modifier in class.modifiers.iter() {
+    for modifier in &class.modifiers {
         match &modifier {
             Modifier::Static(_) => {
                 context.report(
@@ -188,7 +208,7 @@ pub fn check_class<'ast, 'arena>(class: &'ast Class<'arena>, context: &mut Conte
 
     check_members(&class.members, class.span(), "class", class_name, class_fqcn, context);
 
-    for member in class.members.iter() {
+    for member in &class.members {
         match &member {
             ClassLikeMember::EnumCase(case) => {
                 context.report(
@@ -224,7 +244,7 @@ pub fn check_class<'ast, 'arena>(class: &'ast Class<'arena>, context: &mut Conte
 
                 // Check for hooked promoted properties in readonly classes (inline check)
                 if last_readonly.is_some() && method_name.eq_ignore_ascii_case("__construct") {
-                    for parameter in method.parameter_list.parameters.iter() {
+                    for parameter in &method.parameter_list.parameters {
                         if let Some(hooks) = &parameter.hooks {
                             let param_name = parameter.variable.name;
                             context.report(
@@ -277,7 +297,7 @@ pub fn check_class<'ast, 'arena>(class: &'ast Class<'arena>, context: &mut Conte
 #[inline]
 pub fn check_interface<'ast, 'arena>(interface: &'ast Interface<'arena>, context: &mut Context<'_, 'ast, 'arena>) {
     let interface_name = interface.name.value;
-    let interface_fqcn = context.get_name(&interface.name.span.start);
+    let interface_fqcn = context.get_name(interface.name.span.start);
 
     if RESERVED_KEYWORDS.iter().any(|keyword| keyword.eq_ignore_ascii_case(interface_name))
         || SOFT_RESERVED_KEYWORDS_MINUS_SYMBOL_ALLOWED
@@ -304,7 +324,7 @@ pub fn check_interface<'ast, 'arena>(interface: &'ast Interface<'arena>, context
 
     check_members(&interface.members, interface.span(), "interface", interface_name, interface_fqcn, context);
 
-    for member in interface.members.iter() {
+    for member in &interface.members {
         match &member {
             ClassLikeMember::TraitUse(trait_use) => {
                 context.report(
@@ -335,7 +355,7 @@ pub fn check_interface<'ast, 'arena>(interface: &'ast Interface<'arena>, context
                 let method_name = &method_name_id;
 
                 let mut visibilities = vec![];
-                for modifier in method.modifiers.iter() {
+                for modifier in &method.modifiers {
                     if matches!(modifier, Modifier::Private(_) | Modifier::Protected(_)) {
                         visibilities.push(modifier);
                     }
@@ -435,7 +455,7 @@ pub fn check_interface<'ast, 'arena>(interface: &'ast Interface<'arena>, context
                         let mut found_public = false;
                         let mut non_public_read_visibilities = vec![];
                         let mut write_visibilities = vec![];
-                        for modifier in hooked_property.modifiers.iter() {
+                        for modifier in &hooked_property.modifiers {
                             if matches!(modifier, Modifier::Public(_)) {
                                 found_public = true;
                             }
@@ -552,7 +572,7 @@ pub fn check_interface<'ast, 'arena>(interface: &'ast Interface<'arena>, context
                             );
                         }
 
-                        for hook in hooked_property.hook_list.hooks.iter() {
+                        for hook in &hooked_property.hook_list.hooks {
                             if let PropertyHookBody::Concrete(property_hook_concrete_body) = &hook.body {
                                 context.report(
                                     Issue::error(format!(
@@ -591,7 +611,7 @@ pub fn check_interface<'ast, 'arena>(interface: &'ast Interface<'arena>, context
             }
             ClassLikeMember::Constant(class_like_constant) => {
                 let mut non_public_read_visibility = vec![];
-                for modifier in class_like_constant.modifiers.iter() {
+                for modifier in &class_like_constant.modifiers {
                     if matches!(modifier, Modifier::Private(_) | Modifier::Protected(_)) {
                         non_public_read_visibility.push(modifier);
                     }
@@ -633,7 +653,7 @@ pub fn check_interface<'ast, 'arena>(interface: &'ast Interface<'arena>, context
 #[inline]
 pub fn check_trait<'ast, 'arena>(r#trait: &'ast Trait<'arena>, context: &mut Context<'_, 'ast, 'arena>) {
     let class_like_name = r#trait.name.value;
-    let class_like_fqcn = context.get_name(&r#trait.name.span.start);
+    let class_like_fqcn = context.get_name(r#trait.name.span.start);
 
     if RESERVED_KEYWORDS.iter().any(|keyword| keyword.eq_ignore_ascii_case(class_like_name))
         || SOFT_RESERVED_KEYWORDS_MINUS_SYMBOL_ALLOWED
@@ -656,7 +676,7 @@ pub fn check_trait<'ast, 'arena>(r#trait: &'ast Trait<'arena>, context: &mut Con
 
     check_members(&r#trait.members, r#trait.span(), class_like_name, class_like_fqcn, "trait", context);
 
-    for member in r#trait.members.iter() {
+    for member in &r#trait.members {
         match &member {
             ClassLikeMember::EnumCase(case) => {
                 context.report(
@@ -735,7 +755,7 @@ pub fn check_enum<'ast, 'arena>(r#enum: &'ast Enum<'arena>, context: &mut Contex
     }
 
     let enum_name = r#enum.name.value;
-    let enum_fqcn = context.get_name(&r#enum.name.span.start);
+    let enum_fqcn = context.get_name(r#enum.name.span.start);
     let enum_is_backed = r#enum.backing_type_hint.is_some();
 
     if RESERVED_KEYWORDS.iter().any(|keyword| keyword.eq_ignore_ascii_case(enum_name))
@@ -779,7 +799,7 @@ pub fn check_enum<'ast, 'arena>(r#enum: &'ast Enum<'arena>, context: &mut Contex
 
     check_members(&r#enum.members, r#enum.span(), enum_name, enum_fqcn, "enum", context);
 
-    for member in r#enum.members.iter() {
+    for member in &r#enum.members {
         match &member {
             ClassLikeMember::EnumCase(case) => {
                 let item_name = case.item.name().value;
@@ -899,7 +919,7 @@ pub fn check_anonymous_class<'ast, 'arena>(
     let mut last_final = None;
     let mut last_readonly = None;
 
-    for modifier in anonymous_class.modifiers.iter() {
+    for modifier in &anonymous_class.modifiers {
         match &modifier {
             Modifier::Static(_)
             | Modifier::Abstract(_)
@@ -1017,7 +1037,7 @@ pub fn check_anonymous_class<'ast, 'arena>(
         context,
     );
 
-    for member in anonymous_class.members.iter() {
+    for member in &anonymous_class.members {
         match &member {
             ClassLikeMember::EnumCase(case) => {
                 context.report(
@@ -1102,11 +1122,11 @@ pub fn check_members<'ast, 'arena>(
     let mut constant_names: Vec<(bool, std::string::String, Span)> = vec![];
     let mut property_names: Vec<(bool, &str, Span)> = vec![];
 
-    for member in members.iter() {
+    for member in members {
         match &member {
             ClassLikeMember::Property(property) => match &property {
                 Property::Plain(plain_property) => {
-                    for item in plain_property.items.iter() {
+                    for item in &plain_property.items {
                         let item_name = item.variable().name;
 
                         if let Some((is_promoted, _, span)) =
@@ -1192,7 +1212,7 @@ pub fn check_members<'ast, 'arena>(
                 }
 
                 if method_name.eq_ignore_ascii_case(CONSTRUCTOR_MAGIC_METHOD) {
-                    for parameter in method.parameter_list.parameters.iter() {
+                    for parameter in &method.parameter_list.parameters {
                         if parameter.is_promoted_property() {
                             let item_name = parameter.variable.name;
 
@@ -1230,7 +1250,7 @@ pub fn check_members<'ast, 'arena>(
                 }
             }
             ClassLikeMember::Constant(class_like_constant) => {
-                for item in class_like_constant.items.iter() {
+                for item in &class_like_constant.items {
                     let item_name = item.name.value;
 
                     if let Some((is_constant, name, span)) = constant_names.iter().find(|t| t.1.eq(&item_name)) {

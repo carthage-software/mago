@@ -291,6 +291,7 @@ pub enum IssueCode {
 }
 
 impl IssueCode {
+    #[must_use]
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::AbstractClassUsedAsAttribute => "abstract-class-used-as-attribute",
@@ -583,6 +584,7 @@ impl IssueCode {
         }
     }
 
+    #[must_use]
     pub fn as_u16(&self) -> u16 {
         *self as u16
     }

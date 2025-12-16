@@ -9,7 +9,7 @@ use mago_codex::ttype::get_never;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Clone;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -65,19 +65,14 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Clone<'arena> {
                 TAtomic::Mixed(_) => {
                     has_mixed_type = true;
                 }
-                TAtomic::Scalar(scalar) if scalar.is_false() && object_type.ignore_falsable_issues() => {
-                    continue;
-                }
-                TAtomic::Null | TAtomic::Void if object_type.ignore_nullable_issues() => {
-                    continue;
-                }
+                TAtomic::Scalar(scalar) if scalar.is_false() && object_type.ignore_falsable_issues() => {}
+                TAtomic::Null | TAtomic::Void if object_type.ignore_nullable_issues() => {}
                 TAtomic::Callable(callable)
                     if callable
                         .get_signature()
                         .is_none_or(mago_codex::ttype::atomic::callable::TCallableSignature::is_closure) =>
                 {
                     has_cloneable_object = true;
-                    continue;
                 }
                 _ => {
                     invalid_clone_atomics.push(atomic_type);

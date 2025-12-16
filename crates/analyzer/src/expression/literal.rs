@@ -8,7 +8,7 @@ use mago_codex::ttype::get_literal_string;
 use mago_codex::ttype::get_non_empty_string;
 use mago_codex::ttype::get_null;
 use mago_codex::ttype::get_true;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Literal;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;

@@ -30,7 +30,8 @@ use mago_codex::ttype::union::TUnion;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Argument;
+use mago_syntax::ast::Expression;
 
 use crate::artifacts::AnalysisArtifacts;
 use crate::code::IssueCode;
@@ -114,7 +115,7 @@ pub fn post_invocation_process<'ctx, 'arena>(
     if metadata.flags.forbids_named_arguments()
         && let InvocationArgumentsSource::ArgumentList(argument_list) = invoication.arguments_source
     {
-        for argument in argument_list.arguments.iter() {
+        for argument in &argument_list.arguments {
             let Argument::Named(_) = argument else {
                 continue; // Skip if it's not a named argument
             };
@@ -299,7 +300,7 @@ fn update_by_reference_argument_types<'ctx, 'arena>(
 
             if constraint_type && let Some(argument_id) = argument_id {
                 if let Some(existing_type) = block_context.locals.get(&argument_id).cloned() {
-                    block_context.remove_descendants(context, &argument_id, &existing_type, Some(&new_type));
+                    block_context.remove_descendants(context, argument_id, &existing_type, Some(&new_type));
                 }
 
                 assign_to_expression(
@@ -321,7 +322,7 @@ fn update_by_reference_argument_types<'ctx, 'arena>(
                 if let Some(argument_id) = &argument_id
                     && let Some(existing_type) = block_context.locals.get(argument_id).cloned()
                 {
-                    block_context.remove_descendants(context, argument_id, &existing_type, Some(&new_type));
+                    block_context.remove_descendants(context, *argument_id, &existing_type, Some(&new_type));
                 }
 
                 assign_to_expression(
@@ -414,7 +415,7 @@ fn resolve_invocation_assertion<'ctx, 'arena>(
 
     for (parameter_id, variable_assertions) in assertions {
         let (assertion_expression, assertion_variable) =
-            resolve_argument_or_special_target(context, block_context, invocation, parameter_id, this_variable);
+            resolve_argument_or_special_target(context, block_context, invocation, *parameter_id, this_variable);
 
         match assertion_variable {
             Some(assertion_variable) => {
@@ -706,7 +707,7 @@ fn resolve_argument_or_special_target<'ctx, 'ast, 'arena>(
     context: &mut Context<'ctx, 'arena>,
     block_context: &mut BlockContext<'ctx>,
     invocation: &Invocation<'ctx, 'ast, 'arena>,
-    parameter_name: &Atom,
+    parameter_name: Atom,
     this_variable: Option<&str>,
 ) -> (Option<&'ast Expression<'arena>>, Option<Atom>) {
     // First, check if the name refers to a special assertion target like `$this->...`
@@ -715,7 +716,7 @@ fn resolve_argument_or_special_target<'ctx, 'ast, 'arena>(
     }
 
     // If not a special target, treat it as a regular parameter and find its argument.
-    get_argument_for_parameter(context, block_context, invocation, None, Some(*parameter_name))
+    get_argument_for_parameter(context, block_context, invocation, None, Some(parameter_name))
 }
 
 /// Resolves special assertion targets like `$this->...` or `self::...`.
@@ -736,7 +737,7 @@ fn resolve_argument_or_special_target<'ctx, 'ast, 'arena>(
 /// * `None`: If the target is not a special reference and should be treated as a regular parameter.
 fn resolve_special_assertion_target(
     block_context: &BlockContext<'_>,
-    target_name: &Atom,
+    target_name: Atom,
     this_variable: Option<&str>,
 ) -> Option<Atom> {
     if let Some(this_variable) = this_variable

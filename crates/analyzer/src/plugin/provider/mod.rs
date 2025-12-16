@@ -20,6 +20,7 @@ pub struct ProviderMeta {
 }
 
 impl ProviderMeta {
+    #[must_use]
     pub const fn new(id: &'static str, name: &'static str, description: &'static str) -> Self {
         Self { id, name, description }
     }

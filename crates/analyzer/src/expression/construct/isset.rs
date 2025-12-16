@@ -2,7 +2,8 @@ use mago_codex::ttype::get_bool;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Expression;
+use mago_syntax::ast::IssetConstruct;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -18,7 +19,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for IssetConstruct<'arena> {
         block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
-        for value in self.values.iter() {
+        for value in &self.values {
             if !is_valid_isset_expression(value) {
                 context.collector.report_with_code(
                     IssueCode::InvalidIssetExpression,

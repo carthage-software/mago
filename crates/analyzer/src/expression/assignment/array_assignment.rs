@@ -20,7 +20,8 @@ use mago_codex::ttype::get_non_negative_int;
 use mago_codex::ttype::union::TUnion;
 use mago_codex::ttype::wrap_atomic;
 use mago_span::HasSpan;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Access;
+use mago_syntax::ast::Expression;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -38,7 +39,7 @@ pub(crate) fn analyze<'ctx, 'arena>(
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     array_target: ArrayTarget<'_, 'arena>,
-    assign_value_type: TUnion,
+    assign_value_type: &TUnion,
 ) -> Result<(), AnalysisError> {
     let mut array_target_expressions = vec![array_target];
     while let Some(next_target) = array_target_expressions.last().and_then(|expr| match expr.get_array() {
@@ -108,9 +109,9 @@ pub(crate) fn analyze<'ctx, 'arena>(
     }
 
     root_array_type = if !key_values.is_empty() {
-        update_type_with_key_values(context, root_array_type, current_type, &key_values, index_type)
+        update_type_with_key_values(context, root_array_type, &current_type, &key_values, &index_type)
     } else if !root_is_string {
-        update_array_assignment_child_type(context, block_context, index_type, current_type, root_array_type)
+        update_array_assignment_child_type(context, block_context, &index_type, &current_type, root_array_type)
     } else {
         root_array_type
     };
@@ -139,9 +140,9 @@ pub(crate) fn analyze<'ctx, 'arena>(
 pub(crate) fn update_type_with_key_values(
     context: &Context<'_, '_>,
     mut new_type: TUnion,
-    current_type: TUnion,
+    current_type: &TUnion,
     key_values: &Vec<TAtomic>,
-    key_type: Option<Rc<TUnion>>,
+    key_type: &Option<Rc<TUnion>>,
 ) -> TUnion {
     let mut has_matching_item = false;
 
@@ -150,14 +151,7 @@ pub(crate) fn update_type_with_key_values(
         .into_owned()
         .into_iter()
         .map(|atomic_type| {
-            update_atomic_given_key(
-                context,
-                atomic_type,
-                key_values,
-                key_type.clone(),
-                &mut has_matching_item,
-                &current_type,
-            )
+            update_atomic_given_key(context, atomic_type, key_values, key_type, &mut has_matching_item, current_type)
         })
         .collect();
 
@@ -168,7 +162,7 @@ fn update_atomic_given_key(
     context: &Context<'_, '_>,
     mut atomic_type: TAtomic,
     key_values: &Vec<TAtomic>,
-    key_type: Option<Rc<TUnion>>,
+    key_type: &Option<Rc<TUnion>>,
     has_matching_item: &mut bool,
     current_type: &TUnion,
 ) -> TAtomic {
@@ -225,7 +219,7 @@ fn update_atomic_given_key(
                     keyed_array.parameters = Some((
                         Box::new(add_union_type(
                             array_key_type,
-                            &key_type.unwrap_or_else(|| Rc::new(get_int())),
+                            &key_type.as_ref().map_or_else(get_int, |rc| (**rc).clone()),
                             context.codebase,
                             false,
                         )),
@@ -320,8 +314,8 @@ fn update_atomic_given_key(
 fn update_array_assignment_child_type<'ctx>(
     context: &mut Context<'ctx, '_>,
     block_context: &mut BlockContext<'ctx>,
-    key_type: Option<Rc<TUnion>>,
-    value_type: TUnion,
+    key_type: &Option<Rc<TUnion>>,
+    value_type: &TUnion,
     mut root_type: TUnion,
 ) -> TUnion {
     let mut collection_types = Vec::new();
@@ -459,7 +453,7 @@ pub(crate) fn analyze_nested_array_assignment<'ctx, 'ast, 'arena>(
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     mut array_target_expressions: Vec<ArrayTarget<'ast, 'arena>>,
-    assign_value_type: TUnion,
+    assign_value_type: &TUnion,
     root_var_id: Option<Atom>,
     root_type: &mut TUnion,
     last_array_expr_type: &mut TUnion,
@@ -540,8 +534,8 @@ pub(crate) fn analyze_nested_array_assignment<'ctx, 'ast, 'arena>(
             &array_expression_type,
             &new_index_type,
             true,
-            &extended_var_id,
-            if is_last { Some(&assign_value_type) } else { None },
+            extended_var_id,
+            if is_last { Some(assign_value_type) } else { None },
             false,
         );
 
@@ -625,13 +619,8 @@ pub(crate) fn analyze_nested_array_assignment<'ctx, 'ast, 'arena>(
             Atom::from(&combined)
         });
 
-        array_expr_type = update_type_with_key_values(
-            context,
-            array_expr_type,
-            last_array_expr_type.clone(),
-            &key_values,
-            index_type,
-        );
+        array_expr_type =
+            update_type_with_key_values(context, array_expr_type, last_array_expr_type, &key_values, &index_type);
 
         *last_array_expr_type = array_expr_type.clone();
         last_array_expression_index = array_target.get_index();

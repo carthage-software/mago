@@ -9,7 +9,8 @@ use mago_codex::ttype::template::TemplateResult;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Expression;
+use mago_syntax::ast::FunctionCall;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -103,7 +104,7 @@ pub(super) fn resolve_targets<'ctx, 'arena>(
         let skip_error = block_context.known_functions.contains(&lowercased_name);
 
         let target =
-            get_function_like_target_with_skip(context, identifier, alternative, expression.span(), None, skip_error)?;
+            get_function_like_target_with_skip(context, identifier, alternative, expression.span(), None, skip_error);
 
         return Ok(if let Some(t) = target { (vec![t], false) } else { (vec![], false) });
     }
@@ -130,7 +131,7 @@ pub(super) fn resolve_targets<'ctx, 'arena>(
                             None,
                             expression.span(),
                             callable_signature.return_type.clone(),
-                        )?
+                        )
                     {
                         targets.push(target);
                         continue;
@@ -143,7 +144,7 @@ pub(super) fn resolve_targets<'ctx, 'arena>(
                     });
                 }
                 TCallable::Alias(id) => {
-                    if let Some(t) = get_function_like_target(context, *id, None, expression.span(), None)? {
+                    if let Some(t) = get_function_like_target(context, *id, None, expression.span(), None) {
                         targets.push(t);
                     } else {
                         encountered_invalid_targets = true;

@@ -1,6 +1,30 @@
-use mago_span::*;
+use mago_span::HasSpan;
+use mago_span::Span;
 
-use crate::ast::*;
+use crate::ast::Argument;
+use crate::ast::ArgumentList;
+use crate::ast::Array;
+use crate::ast::ArrayElement;
+use crate::ast::Block;
+use crate::ast::Call;
+use crate::ast::ClassLikeMemberSelector;
+use crate::ast::Expression;
+use crate::ast::ForBody;
+use crate::ast::ForeachBody;
+use crate::ast::ForeachTarget;
+use crate::ast::IfBody;
+use crate::ast::LegacyArray;
+use crate::ast::List;
+use crate::ast::MatchArm;
+use crate::ast::MethodCall;
+use crate::ast::MethodPartialApplication;
+use crate::ast::PartialApplication;
+use crate::ast::Statement;
+use crate::ast::StaticMethodCall;
+use crate::ast::StaticMethodPartialApplication;
+use crate::ast::SwitchCase;
+use crate::ast::WhileBody;
+use crate::ast::Yield;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
 pub enum MethodReference<'ast, 'arena> {
@@ -11,6 +35,7 @@ pub enum MethodReference<'ast, 'arena> {
 }
 
 impl<'ast, 'arena> MethodReference<'ast, 'arena> {
+    #[must_use]
     pub fn get_class_or_object(&self) -> &'ast Expression<'arena> {
         match self {
             MethodReference::MethodCall(call) => call.object,
@@ -20,6 +45,7 @@ impl<'ast, 'arena> MethodReference<'ast, 'arena> {
         }
     }
 
+    #[must_use]
     pub fn get_selector(&self) -> &'ast ClassLikeMemberSelector<'arena> {
         match self {
             MethodReference::MethodCall(call) => &call.method,
@@ -29,6 +55,7 @@ impl<'ast, 'arena> MethodReference<'ast, 'arena> {
         }
     }
 
+    #[must_use]
     pub fn get_argument_list(&self) -> Option<&'ast ArgumentList<'arena>> {
         match self {
             MethodReference::MethodCall(call) => Some(&call.argument_list),
@@ -58,7 +85,7 @@ where
     F: Fn(&MethodReference<'ast, 'arena>) -> bool,
 {
     let mut method_references = vec![];
-    for statement in block.statements.iter() {
+    for statement in &block.statements {
         method_references.extend(find_method_references_in_statement(statement, predicate));
     }
 
@@ -75,7 +102,7 @@ where
     match statement {
         Statement::Block(block) => {
             let mut references = vec![];
-            for statement in block.statements.iter() {
+            for statement in &block.statements {
                 references.extend(find_method_references_in_statement(statement, predicate));
             }
 
@@ -83,18 +110,18 @@ where
         }
         Statement::Try(try_catch) => {
             let mut references = vec![];
-            for statement in try_catch.block.statements.iter() {
+            for statement in &try_catch.block.statements {
                 references.extend(find_method_references_in_statement(statement, predicate));
             }
 
-            for catch in try_catch.catch_clauses.iter() {
-                for statement in catch.block.statements.iter() {
+            for catch in &try_catch.catch_clauses {
+                for statement in &catch.block.statements {
                     references.extend(find_method_references_in_statement(statement, predicate));
                 }
             }
 
             if let Some(finally) = &try_catch.finally_clause {
-                for statement in finally.block.statements.iter() {
+                for statement in &finally.block.statements {
                     references.extend(find_method_references_in_statement(statement, predicate));
                 }
             }
@@ -121,7 +148,7 @@ where
                     references.extend(find_method_references_in_statement(statement, predicate));
                 }
                 ForeachBody::ColonDelimited(foreach_colon_delimited_body) => {
-                    for statement in foreach_colon_delimited_body.statements.iter() {
+                    for statement in &foreach_colon_delimited_body.statements {
                         references.extend(find_method_references_in_statement(statement, predicate));
                     }
                 }
@@ -132,15 +159,15 @@ where
         Statement::For(for_loop) => {
             let mut references = vec![];
 
-            for init in for_loop.initializations.iter() {
+            for init in &for_loop.initializations {
                 references.extend(find_method_references_in_expression(init, predicate));
             }
 
-            for condition in for_loop.conditions.iter() {
+            for condition in &for_loop.conditions {
                 references.extend(find_method_references_in_expression(condition, predicate));
             }
 
-            for increment in for_loop.increments.iter() {
+            for increment in &for_loop.increments {
                 references.extend(find_method_references_in_expression(increment, predicate));
             }
 
@@ -149,7 +176,7 @@ where
                     references.extend(find_method_references_in_statement(statement, predicate));
                 }
                 ForBody::ColonDelimited(for_colon_delimited_body) => {
-                    for statement in for_colon_delimited_body.statements.iter() {
+                    for statement in &for_colon_delimited_body.statements {
                         references.extend(find_method_references_in_statement(statement, predicate));
                     }
                 }
@@ -167,7 +194,7 @@ where
                     references.extend(find_method_references_in_statement(statement, predicate));
                 }
                 WhileBody::ColonDelimited(while_colon_delimited_body) => {
-                    for statement in while_colon_delimited_body.statements.iter() {
+                    for statement in &while_colon_delimited_body.statements {
                         references.extend(find_method_references_in_statement(statement, predicate));
                     }
                 }
@@ -191,12 +218,12 @@ where
                     SwitchCase::Expression(expression_case) => {
                         references.extend(find_method_references_in_expression(expression_case.expression, predicate));
 
-                        for statement in expression_case.statements.iter() {
+                        for statement in &expression_case.statements {
                             references.extend(find_method_references_in_statement(statement, predicate));
                         }
                     }
                     SwitchCase::Default(default_case) => {
-                        for statement in default_case.statements.iter() {
+                        for statement in &default_case.statements {
                             references.extend(find_method_references_in_statement(statement, predicate));
                         }
                     }
@@ -212,7 +239,7 @@ where
             match &if_stmt.body {
                 IfBody::Statement(if_stmt_body) => {
                     references.extend(find_method_references_in_statement(if_stmt_body.statement, predicate));
-                    for else_if_clause in if_stmt_body.else_if_clauses.iter() {
+                    for else_if_clause in &if_stmt_body.else_if_clauses {
                         references.extend(find_method_references_in_expression(else_if_clause.condition, predicate));
                         references.extend(find_method_references_in_statement(else_if_clause.statement, predicate));
                     }
@@ -222,19 +249,19 @@ where
                     }
                 }
                 IfBody::ColonDelimited(if_colon_delimited_body) => {
-                    for statement in if_colon_delimited_body.statements.iter() {
+                    for statement in &if_colon_delimited_body.statements {
                         references.extend(find_method_references_in_statement(statement, predicate));
                     }
 
-                    for else_if_clause in if_colon_delimited_body.else_if_clauses.iter() {
+                    for else_if_clause in &if_colon_delimited_body.else_if_clauses {
                         references.extend(find_method_references_in_expression(else_if_clause.condition, predicate));
-                        for statement in else_if_clause.statements.iter() {
+                        for statement in &else_if_clause.statements {
                             references.extend(find_method_references_in_statement(statement, predicate));
                         }
                     }
 
                     if let Some(else_clause) = &if_colon_delimited_body.else_clause {
-                        for statement in else_clause.statements.iter() {
+                        for statement in &else_clause.statements {
                             references.extend(find_method_references_in_statement(statement, predicate));
                         }
                     }
@@ -255,7 +282,7 @@ where
         }
         Statement::Echo(echo) => {
             let mut references = vec![];
-            for expression in echo.values.iter() {
+            for expression in &echo.values {
                 references.extend(find_method_references_in_expression(expression, predicate));
             }
 
@@ -310,7 +337,7 @@ where
         | Expression::LegacyArray(LegacyArray { elements, .. })
         | Expression::List(List { elements, .. }) => {
             let mut references = vec![];
-            for element in elements.iter() {
+            for element in elements {
                 match element {
                     ArrayElement::KeyValue(kv) => {
                         references.extend(find_method_references_in_expression(kv.key, predicate));
@@ -347,10 +374,10 @@ where
             let mut references = vec![];
             references.extend(find_method_references_in_expression(r#match.expression, predicate));
 
-            for arm in r#match.arms.iter() {
+            for arm in &r#match.arms {
                 match arm {
                     MatchArm::Expression(match_expression_arm) => {
-                        for condition in match_expression_arm.conditions.iter() {
+                        for condition in &match_expression_arm.conditions {
                             references.extend(find_method_references_in_expression(condition, predicate));
                         }
 
@@ -453,7 +480,7 @@ where
     F: Fn(&MethodReference<'ast, 'arena>) -> bool,
 {
     let mut references = vec![];
-    for argument in argument_list.arguments.iter() {
+    for argument in &argument_list.arguments {
         match argument {
             Argument::Positional(positional_argument) => {
                 references.extend(find_method_references_in_expression(&positional_argument.value, predicate));

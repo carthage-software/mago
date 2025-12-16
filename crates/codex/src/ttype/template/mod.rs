@@ -22,6 +22,7 @@ pub struct TemplateResult {
 }
 
 impl TemplateResult {
+    #[must_use]
     pub fn new(
         template_types: IndexMap<Atom, Vec<(GenericParent, TUnion)>, RandomState>,
         lower_bounds: IndexMap<Atom, HashMap<GenericParent, TUnion>, RandomState>,
@@ -47,6 +48,7 @@ impl TemplateResult {
         }
     }
 
+    #[must_use]
     pub fn has_template_types(&self) -> bool {
         !self.template_types.is_empty()
     }
@@ -83,6 +85,7 @@ impl TemplateResult {
         self.upper_bounds_unintersectable_types.push(bound);
     }
 
+    #[must_use]
     pub fn has_lower_bound(&self, parameter_name: &Atom, generic_parent: &GenericParent) -> bool {
         self.lower_bounds
             .get(parameter_name)
@@ -90,10 +93,12 @@ impl TemplateResult {
             .is_some_and(|bounds| !bounds.is_empty())
     }
 
+    #[must_use]
     pub fn has_lower_bound_for_class_like(&self, parameter_name: &Atom, classlike_name: &Atom) -> bool {
         self.has_lower_bound(parameter_name, &GenericParent::ClassLike(*classlike_name))
     }
 
+    #[must_use]
     pub fn get_lower_bounds_for_class_like(
         &self,
         parameter_name: &Atom,
@@ -113,6 +118,7 @@ pub struct TemplateBound {
 }
 
 impl TemplateBound {
+    #[must_use]
     pub fn new(
         bound_type: TUnion,
         appearance_depth: usize,
@@ -122,6 +128,7 @@ impl TemplateBound {
         Self { bound_type, appearance_depth, argument_offset, equality_bound_classlike, span: None }
     }
 
+    #[must_use]
     pub fn of_type(bound_type: TUnion) -> Self {
         Self { bound_type, appearance_depth: 0, argument_offset: None, equality_bound_classlike: None, span: None }
     }

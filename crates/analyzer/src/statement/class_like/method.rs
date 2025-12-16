@@ -6,7 +6,8 @@ use mago_codex::context::ScopeContext;
 use mago_codex::identifier::method::MethodIdentifier;
 
 use mago_span::HasSpan;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Method;
+use mago_syntax::ast::MethodBody;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -27,13 +28,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Method<'arena> {
         block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
-        analyze_attributes(
-            context,
-            block_context,
-            artifacts,
-            self.attribute_lists.as_slice(),
-            AttributeTarget::Method,
-        )?;
+        analyze_attributes(context, block_context, artifacts, self.attribute_lists.as_slice(), AttributeTarget::Method);
 
         let MethodBody::Concrete(concrete_body) = &self.body else { return Ok(()) };
 
@@ -118,7 +113,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Method<'arena> {
         }
 
         // Check for missing type hints
-        for parameter in self.parameter_list.parameters.iter() {
+        for parameter in &self.parameter_list.parameters {
             crate::utils::missing_type_hints::check_parameter_type_hint(
                 context,
                 Some(class_like_metadata),

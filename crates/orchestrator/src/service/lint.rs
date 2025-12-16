@@ -52,6 +52,7 @@ impl LintService {
     /// # Returns
     ///
     /// A new `LintService` instance.
+    #[must_use]
     pub fn new(database: ReadDatabase, settings: Settings, use_progress_bars: bool) -> Self {
         Self { database, settings, use_progress_bars }
     }
@@ -66,6 +67,7 @@ impl LintService {
     /// # Returns
     ///
     /// A configured `RuleRegistry` instance.
+    #[must_use]
     pub fn create_registry(&self, only: Option<&[String]>, include_disabled: bool) -> RuleRegistry {
         RuleRegistry::build(&self.settings, only, include_disabled)
     }
@@ -85,6 +87,7 @@ impl LintService {
     /// # Returns
     ///
     /// An `IssueCollection` containing all issues found in the file.
+    #[must_use]
     pub fn lint_file(&self, file: &File, mode: LintMode, only: Option<&[String]>) -> IssueCollection {
         let arena = Bump::new();
         let (program, parsing_error) = parse_file(&arena, file);

@@ -1,5 +1,6 @@
 use crate::T;
-use crate::ast::ast::*;
+use crate::ast::ast::ClosingTag;
+use crate::ast::ast::Terminator;
 use crate::error::ParseError;
 use crate::parser::internal::tag::parse_opening_tag;
 use crate::parser::internal::token_stream::TokenStream;

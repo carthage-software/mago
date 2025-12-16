@@ -40,6 +40,7 @@ pub struct EnumCaseBackedItem<'arena> {
 }
 
 impl<'arena> EnumCaseItem<'arena> {
+    #[must_use]
     pub fn name(&self) -> &LocalIdentifier<'arena> {
         match &self {
             EnumCaseItem::Unit(enum_case_unit_item) => &enum_case_unit_item.name,

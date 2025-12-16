@@ -23,6 +23,7 @@ impl TMixed {
     ///
     /// Equivalent to `Mixed::default()`.
     #[inline]
+    #[must_use]
     pub const fn new() -> Self {
         Self {
             is_isset_from_loop: false,
@@ -34,6 +35,7 @@ impl TMixed {
 
     /// Creates a `Mixed` type constrained to be non-null.
     #[inline]
+    #[must_use]
     pub const fn non_null() -> Self {
         Self {
             is_isset_from_loop: false,
@@ -45,6 +47,7 @@ impl TMixed {
 
     /// Creates a `Mixed` type marked as originating from `isset()` in a loop.
     #[inline]
+    #[must_use]
     pub const fn isset_from_loop() -> Self {
         Self {
             is_isset_from_loop: true, // Mark origin
@@ -56,6 +59,7 @@ impl TMixed {
 
     /// Creates a `Mixed` type that may be marked as originating from `isset()` in a loop.
     #[inline]
+    #[must_use]
     pub const fn maybe_isset_from_loop(from_loop: bool) -> Self {
         Self {
             is_isset_from_loop: from_loop,
@@ -67,66 +71,77 @@ impl TMixed {
 
     /// Creates a `Mixed` type constrained to be truthy. Automatically sets `is_non_null` to `true`.
     #[inline]
+    #[must_use]
     pub const fn truthy() -> Self {
         Self { is_isset_from_loop: false, is_non_null: true, is_empty: false, truthiness: TMixedTruthiness::Truthy }
     }
 
     /// Creates a `Mixed` type constrained to be falsy. May include null.
     #[inline]
+    #[must_use]
     pub const fn falsy() -> Self {
         Self { is_isset_from_loop: false, is_non_null: false, is_empty: false, truthiness: TMixedTruthiness::Falsy }
     }
 
     /// Checks if this `mixed` type could be truthy or non-null.
     #[inline]
+    #[must_use]
     pub const fn could_be_truthy_or_non_null(&self) -> bool {
         self.is_vanilla() || self.is_non_null()
     }
 
     /// Checks if this `mixed` originated from `isset()` in a loop.
     #[inline]
+    #[must_use]
     pub const fn is_isset_from_loop(&self) -> bool {
         self.is_isset_from_loop
     }
 
     /// Checks if this `mixed` type is a vanilla `mixed` type.
     #[inline]
+    #[must_use]
     pub const fn is_vanilla(&self) -> bool {
         !self.is_non_null && !self.is_empty && matches!(self.truthiness, TMixedTruthiness::Undetermined)
     }
 
     /// Checks if `null` is explicitly excluded from this `mixed` type.
     #[inline]
+    #[must_use]
     pub const fn is_non_null(&self) -> bool {
         self.is_non_null
     }
 
     /// Returns the known truthiness constraint for this `mixed` type.
     #[inline]
+    #[must_use]
     pub const fn get_truthiness(&self) -> TMixedTruthiness {
         self.truthiness
     }
 
     /// Checks if the type is constrained to only truthy values.
     #[inline]
+    #[must_use]
     pub const fn is_truthy(&self) -> bool {
         matches!(self.truthiness, TMixedTruthiness::Truthy)
     }
 
     /// Checks if the type is constrained to only falsy values.
     #[inline]
+    #[must_use]
     pub const fn is_falsy(&self) -> bool {
         matches!(self.truthiness, TMixedTruthiness::Falsy)
     }
 
     /// Checks if the truthiness constraint is undetermined.
     #[inline]
+    #[must_use]
     pub const fn is_truthiness_undetermined(&self) -> bool {
         matches!(self.truthiness, TMixedTruthiness::Undetermined)
     }
 
     /// Returns a new instance with the `is_isset_from_loop` flag set.
     #[inline]
+    #[must_use]
     pub const fn with_is_isset_from_loop(mut self, is_isset_from_loop: bool) -> Self {
         self.is_isset_from_loop = is_isset_from_loop;
         self
@@ -134,6 +149,7 @@ impl TMixed {
 
     /// Returns a new instance with the `is_non_null` flag set and consistency ensured.
     #[inline]
+    #[must_use]
     pub const fn with_is_non_null(mut self, is_non_null: bool) -> Self {
         self.is_non_null = is_non_null;
         self
@@ -141,12 +157,14 @@ impl TMixed {
 
     /// Returns a new instance with the `truthiness` value set. Ensures consistency with `is_non_null`.
     #[inline]
+    #[must_use]
     pub const fn with_truthiness(mut self, truthiness: TMixedTruthiness) -> Self {
         self.truthiness = truthiness;
         self.ensure_consistency();
         self
     }
 
+    #[must_use]
     pub const fn as_empty(mut self) -> Self {
         self.is_empty = true;
         self.ensure_consistency();

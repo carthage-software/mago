@@ -5,7 +5,12 @@ use mago_codex::ttype::get_mixed;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Expression;
+use mago_syntax::ast::Foreach;
+use mago_syntax::ast::ForeachTarget;
+use mago_syntax::ast::UnaryPrefix;
+use mago_syntax::ast::UnaryPrefixOperator;
+use mago_syntax::ast::Variable;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -151,7 +156,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Foreach<'arena> {
         let (inner_loop_block_context, loop_scope) = r#loop::analyze(
             context,
             self.body.statements(),
-            vec![],
+            &[],
             vec![],
             loop_scope,
             &mut loop_block_context,

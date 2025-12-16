@@ -18,11 +18,13 @@ pub struct TIntMask {
 }
 
 impl TIntMask {
+    #[must_use]
     pub fn new(values: Vec<TUnion>) -> Self {
         Self { values }
     }
 
     #[inline]
+    #[must_use]
     pub fn get_values(&self) -> &[TUnion] {
         &self.values
     }
@@ -38,6 +40,7 @@ impl TIntMask {
     ///
     /// The algorithm works by iterating through all possible subsets (using a bitmask
     /// from 0 to 2^n - 1) and OR-ing together the values in each subset.
+    #[must_use]
     pub fn calculate_mask_combinations(values: &[i64]) -> Vec<i64> {
         let n = values.len();
         if n == 0 {

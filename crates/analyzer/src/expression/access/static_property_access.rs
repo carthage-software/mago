@@ -4,7 +4,7 @@ use mago_codex::ttype::add_optional_union_type;
 use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::get_never;
 use mago_codex::ttype::get_null;
-use mago_syntax::ast::*;
+use mago_syntax::ast::StaticPropertyAccess;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;

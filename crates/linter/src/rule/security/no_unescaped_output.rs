@@ -7,7 +7,12 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_reporting::Level;
 use mago_span::HasSpan;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Call;
+use mago_syntax::ast::Expression;
+use mago_syntax::ast::FunctionCall;
+use mago_syntax::ast::Literal;
+use mago_syntax::ast::Node;
+use mago_syntax::ast::NodeKind;
 
 use crate::category::Category;
 use crate::context::LintContext;
@@ -89,7 +94,7 @@ impl LintRule for NoUnescapedOutputRule {
         match node {
             Node::Echo(echo) => {
                 // Check each expression in the echo statement
-                for expression in echo.values.iter() {
+                for expression in &echo.values {
                     if needs_escaping_with_context(expression, Some(ctx)) {
                         self.report_unescaped_output(ctx, expression.span(), "echo statement");
                     }
@@ -97,7 +102,7 @@ impl LintRule for NoUnescapedOutputRule {
             }
             Node::EchoTag(echo_tag) => {
                 // Check each expression in the echo statement
-                for expression in echo_tag.values.iter() {
+                for expression in &echo_tag.values {
                     if needs_escaping_with_context(expression, Some(ctx)) {
                         self.report_unescaped_output(ctx, expression.span(), "echo tag");
                     }

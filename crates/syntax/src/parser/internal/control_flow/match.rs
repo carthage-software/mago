@@ -1,5 +1,8 @@
 use crate::T;
-use crate::ast::ast::*;
+use crate::ast::ast::Match;
+use crate::ast::ast::MatchArm;
+use crate::ast::ast::MatchDefaultArm;
+use crate::ast::ast::MatchExpressionArm;
 use crate::ast::sequence::TokenSeparatedSequence;
 use crate::error::ParseError;
 use crate::parser::internal::expression::parse_expression;

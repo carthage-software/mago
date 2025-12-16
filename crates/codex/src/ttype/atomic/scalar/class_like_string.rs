@@ -57,6 +57,7 @@ pub enum TClassLikeString {
 }
 
 impl TClassLikeStringKind {
+    #[must_use]
     pub fn as_str(&self) -> &'static str {
         match self {
             TClassLikeStringKind::Class => "class-string",
@@ -70,18 +71,21 @@ impl TClassLikeStringKind {
 impl TClassLikeString {
     /// Creates a new `class-string` instance with a specific kind.
     #[inline]
+    #[must_use]
     pub fn any(kind: TClassLikeStringKind) -> Self {
         Self::Any { kind }
     }
 
     /// Creates a new `class-string<T>` instance with a specific kind.
     #[inline]
+    #[must_use]
     pub fn of_type(kind: TClassLikeStringKind, constraint: TAtomic) -> Self {
         Self::OfType { kind, constraint: Box::new(constraint) }
     }
 
     /// Creates a new `class-string<T>` instance with a generic parameter.
     #[inline]
+    #[must_use]
     pub fn generic(
         kind: TClassLikeStringKind,
         parameter_name: Atom,
@@ -93,84 +97,98 @@ impl TClassLikeString {
 
     /// Creates a new `class-string` instance with a literal value.
     #[inline]
+    #[must_use]
     pub const fn literal(value: Atom) -> Self {
         Self::Literal { value }
     }
 
     /// Creates a new `class-string` instance.
     #[inline]
+    #[must_use]
     pub const fn class_string() -> Self {
         Self::Any { kind: TClassLikeStringKind::Class }
     }
 
     /// Creates a new `class-string<T>` instance.
     #[inline]
+    #[must_use]
     pub fn class_string_of_type(constraint: TAtomic) -> Self {
         Self::OfType { kind: TClassLikeStringKind::Class, constraint: Box::new(constraint) }
     }
 
     /// Creates a new `interface-string` instance.
     #[inline]
+    #[must_use]
     pub const fn interface_string() -> Self {
         Self::Any { kind: TClassLikeStringKind::Interface }
     }
 
     /// Creates a new `interface-string<T>` instance.
     #[inline]
+    #[must_use]
     pub fn interface_string_of_type(constraint: TAtomic) -> Self {
         Self::OfType { kind: TClassLikeStringKind::Interface, constraint: Box::new(constraint) }
     }
 
     /// Creates a new `enum-string` instance.
     #[inline]
+    #[must_use]
     pub const fn enum_string() -> Self {
         Self::Any { kind: TClassLikeStringKind::Enum }
     }
 
     /// Creates a new `enum-string<T>` instance.
     #[inline]
+    #[must_use]
     pub fn enum_string_of_type(constraint: TAtomic) -> Self {
         Self::OfType { kind: TClassLikeStringKind::Enum, constraint: Box::new(constraint) }
     }
 
     /// Creates a new `trait-string` instance.
     #[inline]
+    #[must_use]
     pub const fn trait_string() -> Self {
         Self::Any { kind: TClassLikeStringKind::Trait }
     }
 
     /// Creates a new `trait-string<T>` instance.
     #[inline]
+    #[must_use]
     pub fn trait_string_of_type(constraint: TAtomic) -> Self {
         Self::OfType { kind: TClassLikeStringKind::Trait, constraint: Box::new(constraint) }
     }
 
     /// Checks if this represents a general class-like string (`Any` variant).
     #[inline]
+    #[must_use]
     pub const fn is_any(&self) -> bool {
         matches!(self, Self::Any { .. })
     }
 
     /// Checks if this represents a class-like string derived from a generic parameter (`Generic` variant).
     #[inline]
+    #[must_use]
     pub const fn is_generic(&self) -> bool {
         matches!(self, Self::Generic { .. })
     }
 
     /// Checks if this represents a literal class-like string with a known name (`Literal` variant).
     #[inline]
+    #[must_use]
     pub const fn is_literal(&self) -> bool {
         matches!(self, Self::Literal { .. })
     }
 
     /// Checks if this represents a class-like string with a specific constraint type `<T>` (`OfType` variant).
     #[inline]
+    #[must_use]
     pub const fn is_of_type(&self) -> bool {
         matches!(self, Self::OfType { .. })
     }
 
     /// Checks if the *kind* is explicitly Class (for `Any`, `Generic`, `OfType`). Returns `false` for `Literal`.
     #[inline]
+    #[must_use]
     pub const fn is_class_kind(&self) -> bool {
         matches!(
             self,
@@ -182,6 +200,7 @@ impl TClassLikeString {
 
     /// Checks if the *kind* is explicitly Interface (for `Any`, `Generic`, `OfType`). Returns `false` for `Literal`.
     #[inline]
+    #[must_use]
     pub const fn is_interface_kind(&self) -> bool {
         matches!(
             self,
@@ -193,6 +212,7 @@ impl TClassLikeString {
 
     /// Checks if the *kind* is explicitly Enum (for `Any`, `Generic`, `OfType`). Returns `false` for `Literal`.
     #[inline]
+    #[must_use]
     pub const fn is_enum_kind(&self) -> bool {
         matches!(
             self,
@@ -204,6 +224,7 @@ impl TClassLikeString {
 
     /// Checks if this type has an explicit constraint `<T>` (`Generic` or `OfType` variants).
     #[inline]
+    #[must_use]
     pub const fn has_constraint(&self) -> bool {
         matches!(self, Self::Generic { .. } | Self::OfType { .. })
     }
@@ -211,6 +232,7 @@ impl TClassLikeString {
     /// Returns the base kind (class, interface, enum) if explicitly stored (`Any`, `Generic`, `OfType`).
     /// Returns `None` for the `Literal` variant, as the kind must be looked up externally.
     #[inline]
+    #[must_use]
     pub const fn kind(&self) -> Option<TClassLikeStringKind> {
         match self {
             Self::Any { kind } => Some(*kind),
@@ -222,6 +244,7 @@ impl TClassLikeString {
 
     /// Returns the literal string value (class/interface/enum name) if this is a `Literal` variant.
     #[inline]
+    #[must_use]
     pub fn literal_value(&self) -> Option<Atom> {
         match self {
             Self::Literal { value } => Some(*value),
@@ -231,6 +254,7 @@ impl TClassLikeString {
 
     /// Returns the constraint type `<T>` if this is a `Generic` or `OfType` variant.
     #[inline]
+    #[must_use]
     pub fn constraint(&self) -> Option<&TAtomic> {
         match self {
             Self::Generic { constraint, .. } => Some(constraint),
@@ -241,6 +265,7 @@ impl TClassLikeString {
 
     /// Returns the generic parameter name if this is a `Generic` variant.
     #[inline]
+    #[must_use]
     pub fn generic_parameter_name(&self) -> Option<Atom> {
         match self {
             Self::Generic { parameter_name, .. } => Some(*parameter_name),
@@ -250,6 +275,7 @@ impl TClassLikeString {
 
     /// Returns the defining entity (scope) if this is a `Generic` variant.
     #[inline]
+    #[must_use]
     pub fn generic_defining_entity(&self) -> Option<&GenericParent> {
         match self {
             Self::Generic { defining_entity, .. } => Some(defining_entity),
@@ -259,6 +285,7 @@ impl TClassLikeString {
 
     /// Returns the atomic type representation of the object type this string refers to.
     #[inline]
+    #[must_use]
     pub fn get_object_type(&self, codebase: &CodebaseMetadata) -> TAtomic {
         match self {
             TClassLikeString::Any { .. } => TAtomic::Object(TObject::Any),

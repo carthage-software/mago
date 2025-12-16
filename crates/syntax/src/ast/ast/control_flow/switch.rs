@@ -92,6 +92,7 @@ impl<'arena> SwitchBody<'arena> {
         self.cases().iter().any(SwitchCase::is_default)
     }
 
+    #[must_use]
     pub fn cases(&self) -> &[SwitchCase<'arena>] {
         match self {
             SwitchBody::BraceDelimited(body) => body.cases.as_slice(),
@@ -102,6 +103,7 @@ impl<'arena> SwitchBody<'arena> {
 
 impl<'arena> SwitchCase<'arena> {
     /// Returns the case expression if it exists.
+    #[must_use]
     pub fn expression(&self) -> Option<&Expression<'arena>> {
         match self {
             SwitchCase::Expression(case) => Some(case.expression),
@@ -110,6 +112,7 @@ impl<'arena> SwitchCase<'arena> {
     }
 
     /// Returns the statements within the case.
+    #[must_use]
     pub fn statements(&self) -> &[Statement<'arena>] {
         match self {
             SwitchCase::Expression(case) => case.statements.as_slice(),
@@ -118,6 +121,7 @@ impl<'arena> SwitchCase<'arena> {
     }
 
     /// Returns `true` if the case is a default case.
+    #[must_use]
     pub fn is_default(&self) -> bool {
         match self {
             SwitchCase::Expression(_) => false,
@@ -126,6 +130,7 @@ impl<'arena> SwitchCase<'arena> {
     }
 
     /// Returns `true` if the case is empty.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         match self {
             SwitchCase::Expression(case) => case.statements.is_empty(),
@@ -134,6 +139,7 @@ impl<'arena> SwitchCase<'arena> {
     }
 
     /// Returns the separator of the case.
+    #[must_use]
     pub fn separator(&self) -> &SwitchCaseSeparator {
         match self {
             SwitchCase::Expression(case) => &case.separator,
@@ -145,6 +151,7 @@ impl<'arena> SwitchCase<'arena> {
     ///
     /// A case is considered fall-through if it is not empty and
     /// does not end with a `break` statement.
+    #[must_use]
     pub fn is_fall_through(&self) -> bool {
         let Some(last_statement) = self.statements().last() else {
             return false;
@@ -192,19 +199,13 @@ impl HasSpan for SwitchCase<'_> {
 
 impl HasSpan for SwitchExpressionCase<'_> {
     fn span(&self) -> Span {
-        Span::between(
-            self.case.span(),
-            self.statements.last().map(|statement| statement.span()).unwrap_or(self.separator.span()),
-        )
+        Span::between(self.case.span(), self.statements.last().map_or(self.separator.span(), HasSpan::span))
     }
 }
 
 impl HasSpan for SwitchDefaultCase<'_> {
     fn span(&self) -> Span {
-        Span::between(
-            self.default.span(),
-            self.statements.last().map(|statement| statement.span()).unwrap_or(self.separator.span()),
-        )
+        Span::between(self.default.span(), self.statements.last().map_or(self.separator.span(), HasSpan::span))
     }
 }
 

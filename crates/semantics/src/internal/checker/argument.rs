@@ -1,7 +1,10 @@
 use mago_php_version::feature::Feature;
-use mago_reporting::*;
-use mago_span::*;
-use mago_syntax::ast::*;
+use mago_reporting::Annotation;
+use mago_reporting::Issue;
+use mago_span::HasSpan;
+use mago_span::Span;
+use mago_syntax::ast::Argument;
+use mago_syntax::ast::ArgumentList;
 
 use crate::internal::context::Context;
 
@@ -13,7 +16,7 @@ pub fn check_argument_list<'ast, 'arena>(
     let mut last_named_argument: Option<Span> = None;
     let mut last_unpacking: Option<Span> = None;
 
-    for argument in argument_list.arguments.iter() {
+    for argument in &argument_list.arguments {
         match &argument {
             Argument::Positional(positional_argument) => {
                 if let Some(ellipsis) = positional_argument.ellipsis {

@@ -11,7 +11,7 @@ use mago_codex::ttype::union::TUnion;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
-use mago_syntax::ast::*;
+use mago_syntax::ast::StaticPropertyAccess;
 
 use crate::artifacts::AnalysisArtifacts;
 use crate::code::IssueCode;
@@ -27,7 +27,7 @@ pub(crate) fn analyze<'ctx, 'arena>(
     artifacts: &mut AnalysisArtifacts,
     property_access: &StaticPropertyAccess<'arena>,
     assigned_value_type: &TUnion,
-    property_access_id: &Option<Atom>,
+    property_access_id: Option<Atom>,
 ) -> Result<(), AnalysisError> {
     let property_resolution =
         resolve_static_properties(context, block_context, artifacts, property_access.class, &property_access.property)?;
@@ -80,7 +80,7 @@ pub(crate) fn analyze<'ctx, 'arena>(
                     Issue::error("Mixed property type coercion").with_annotation(
                         Annotation::primary(property_access.class.span()).with_message(format!(
                             "{} expects {}, parent type {} provided",
-                            property_access_id.map(|a| a.as_str()).unwrap_or("This property"),
+                            property_access_id.map_or("This property", |a| a.as_str()),
                             resolved_property.property_type.get_id(),
                             assigned_value_type.get_id(),
                         )),
@@ -92,7 +92,7 @@ pub(crate) fn analyze<'ctx, 'arena>(
                     Issue::error("Property type coercion").with_annotation(
                         Annotation::primary(property_access.class.span()).with_message(format!(
                             "{} expects {}, parent type {} provided",
-                            property_access_id.map(|a| a.as_str()).unwrap_or("This property"),
+                            property_access_id.map_or("This property", |a| a.as_str()),
                             resolved_property.property_type.get_id(),
                             assigned_value_type.get_id(),
                         )),
@@ -101,7 +101,7 @@ pub(crate) fn analyze<'ctx, 'arena>(
             }
         }
 
-        if let Some(var_id) = *property_access_id {
+        if let Some(var_id) = property_access_id {
             block_context.locals.insert(var_id, Rc::new(assigned_value_type.clone()));
         }
 
@@ -137,7 +137,7 @@ pub(crate) fn analyze<'ctx, 'arena>(
     let resulting_type = Rc::new(resulting_type.unwrap_or_else(get_never));
 
     if context.settings.memoize_properties
-        && let Some(property_access_id) = *property_access_id
+        && let Some(property_access_id) = property_access_id
     {
         block_context.locals.insert(property_access_id, resulting_type.clone());
     }

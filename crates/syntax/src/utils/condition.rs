@@ -1,4 +1,7 @@
-use crate::ast::*;
+use crate::ast::BinaryOperator;
+use crate::ast::Expression;
+use crate::ast::Literal;
+use crate::ast::UnaryPrefixOperator;
 
 /// Determine if an expression is truthy.
 ///
@@ -7,6 +10,7 @@ use crate::ast::*;
 /// When this function returns true, it does not necessarily mean that the expression will always evaluate to true.
 /// It simply means that the expression is truthy in the context of PHP.
 #[inline]
+#[must_use]
 pub fn is_truthy(expression: &Expression<'_>) -> bool {
     match &expression {
         Expression::Parenthesized(parenthesized) => is_truthy(parenthesized.expression),
@@ -42,6 +46,7 @@ pub fn is_truthy(expression: &Expression<'_>) -> bool {
 /// When this function returns false, it does not mean that the expression is truthy,
 /// it just means that we could not determine if the expression is falsy.
 #[inline]
+#[must_use]
 pub fn is_falsy(expression: &Expression<'_>) -> bool {
     match &expression {
         Expression::Parenthesized(parenthesized) => is_falsy(parenthesized.expression),

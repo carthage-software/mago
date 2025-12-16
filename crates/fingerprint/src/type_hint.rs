@@ -1,7 +1,11 @@
 use std::hash::Hash;
 
 use mago_names::ResolvedNames;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Hint;
+use mago_syntax::ast::IntersectionHint;
+use mago_syntax::ast::NullableHint;
+use mago_syntax::ast::ParenthesizedHint;
+use mago_syntax::ast::UnionHint;
 
 use crate::FingerprintOptions;
 use crate::Fingerprintable;

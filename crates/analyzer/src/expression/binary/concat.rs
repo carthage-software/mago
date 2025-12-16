@@ -16,7 +16,9 @@ use mago_codex::ttype::union::TUnion;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Binary;
+use mago_syntax::ast::BinaryOperator;
+use mago_syntax::ast::Expression;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -79,7 +81,7 @@ pub fn analyze_string_concat_operation<'ctx, 'arena>(
             "middle"
         };
 
-        analyze_string_concat_operand(context, artifacts, operand, side)?;
+        analyze_string_concat_operand(context, artifacts, operand, side);
     }
 
     let result_type = fold_concat_operands(&operands, artifacts);
@@ -94,9 +96,9 @@ fn analyze_string_concat_operand<'arena>(
     artifacts: &mut AnalysisArtifacts,
     operand: &Expression<'arena>,
     side: &'static str,
-) -> Result<(), AnalysisError> {
+) {
     let Some(operand_type) = artifacts.get_expression_type(operand) else {
-        return Ok(());
+        return;
     };
 
     if operand_type.is_null() {
@@ -112,7 +114,7 @@ fn analyze_string_concat_operand<'arena>(
             ),
         );
 
-        return Ok(());
+        return;
     }
 
     if operand_type.is_false() {
@@ -126,7 +128,7 @@ fn analyze_string_concat_operand<'arena>(
             .with_help("Explicitly cast to string `(string) $var` or handle the `false` case if concatenation is not intended."),
         );
 
-        return Ok(());
+        return;
     }
 
     if operand_type.is_nullable() && !operand_type.ignore_nullable_issues() {
@@ -365,8 +367,6 @@ fn analyze_string_concat_operand<'arena>(
             ),
         );
     }
-
-    Ok(())
 }
 
 /// Folds multiple operands into a single result type by concatenating left-to-right.

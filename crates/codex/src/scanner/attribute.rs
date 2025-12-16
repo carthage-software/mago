@@ -2,7 +2,8 @@ use mago_atom::Atom;
 use mago_atom::atom;
 use mago_names::scope::NamespaceScope;
 use mago_span::HasSpan;
-use mago_syntax::ast::*;
+use mago_syntax::ast::AttributeList;
+use mago_syntax::ast::Sequence;
 
 use crate::flags::attribute::AttributeFlags;
 use crate::metadata::attribute::AttributeMetadata;
@@ -16,8 +17,8 @@ pub fn scan_attribute_lists<'arena>(
 ) -> Vec<AttributeMetadata> {
     let mut metadata = vec![];
 
-    for attribute_list in attribute_lists.iter() {
-        for attribute in attribute_list.attributes.iter() {
+    for attribute_list in attribute_lists {
+        for attribute in &attribute_list.attributes {
             metadata.push(AttributeMetadata {
                 name: atom(context.resolved_names.get(&attribute.name)),
                 span: attribute.span(),

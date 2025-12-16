@@ -2,14 +2,24 @@ use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 
 use mago_atom::Atom;
-use mago_syntax::ast::*;
+use mago_syntax::ast::ArgumentList;
+use mago_syntax::ast::ArrowFunction;
+use mago_syntax::ast::Assignment;
+use mago_syntax::ast::Closure;
+use mago_syntax::ast::Expression;
+use mago_syntax::ast::MethodCall;
+use mago_syntax::ast::MethodPartialApplication;
+use mago_syntax::ast::Statement;
+use mago_syntax::ast::UnaryPostfix;
+use mago_syntax::ast::UnaryPrefix;
+use mago_syntax::ast::Unset;
 use mago_syntax::walker::MutWalker;
 
 use crate::utils::expression::get_root_expression_id;
 
 pub fn get_assignment_map<'ast, 'arena>(
-    pre_conditions: &Vec<&'ast Expression<'arena>>,
-    post_expressions: &Vec<&'ast Expression<'arena>>,
+    pre_conditions: &[&'ast Expression<'arena>],
+    post_expressions: &[&'ast Expression<'arena>],
     statements: &'ast [Statement<'arena>],
 ) -> (BTreeMap<Atom, BTreeSet<Atom>>, Option<Atom>) {
     let mut walker = AssignmentMapWalker::default();
@@ -80,7 +90,7 @@ impl<'ast, 'arena> MutWalker<'ast, 'arena, ()> for AssignmentMapWalker {
     }
 
     fn walk_in_argument_list(&mut self, argument_list: &'ast ArgumentList<'arena>, _context: &mut ()) {
-        for argument in argument_list.arguments.iter() {
+        for argument in &argument_list.arguments {
             let root_expression_id = get_root_expression_id(argument.value());
 
             if let Some(root_expression_id) = root_expression_id {
@@ -110,7 +120,7 @@ impl<'ast, 'arena> MutWalker<'ast, 'arena, ()> for AssignmentMapWalker {
     }
 
     fn walk_in_unset(&mut self, unset: &'ast Unset<'arena>, _context: &mut ()) {
-        for unset_value in unset.values.iter() {
+        for unset_value in &unset.values {
             let root_expression_id = get_root_expression_id(unset_value);
 
             if let Some(root_expression_id) = root_expression_id {

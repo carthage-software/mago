@@ -20,7 +20,13 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_span::Span;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Binary;
+use mago_syntax::ast::BinaryOperator;
+use mago_syntax::ast::Expression;
+use mago_syntax::ast::If;
+use mago_syntax::ast::Statement;
+use mago_syntax::ast::UnaryPrefix;
+use mago_syntax::ast::UnaryPrefixOperator;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -118,7 +124,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for If<'arena> {
 
             'outer: for key in keys {
                 for mixed_var_id in &mixed_variables {
-                    if is_derived_access_path(&key, mixed_var_id) {
+                    if is_derived_access_path(key, *mixed_var_id) {
                         let has_explicit_type_assertion = clause
                             .possibilities
                             .get(&key)
@@ -169,7 +175,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for If<'arena> {
             }
         }
 
-        if_scope.reasonable_clauses = if_block_context.clauses.clone();
+        if_scope.reasonable_clauses.clone_from(&if_block_context.clauses);
         if_scope.negated_clauses = negate_or_synthesize(
             if_clauses,
             self.condition,
@@ -278,7 +284,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for If<'arena> {
                 if !if_scope.reasonable_clauses.is_empty() {
                     if_scope.reasonable_clauses = BlockContext::filter_clauses(
                         context,
-                        &variable_id,
+                        variable_id,
                         if_scope.reasonable_clauses,
                         block_context.locals.get(&variable_id).map(std::convert::AsRef::as_ref),
                     );
@@ -313,7 +319,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for If<'arena> {
             let new_type = combine_union_types(&existing_type, &variable_type, context.codebase, false);
 
             if !new_type.eq(&existing_type) {
-                block_context.remove_descendants(context, &variable_id, &existing_type, Some(&new_type));
+                block_context.remove_descendants(context, variable_id, &existing_type, Some(&new_type));
             }
 
             block_context.locals.insert(variable_id, Rc::new(new_type));
@@ -414,7 +420,7 @@ fn analyze_if_statement_block<'ctx, 'arena>(
             let mut variables_to_remove = vec![];
             for changed_variable_id in &changed_variable_ids {
                 for variable_id in if_block_context.locals.keys() {
-                    if is_derived_access_path(variable_id, changed_variable_id)
+                    if is_derived_access_path(*variable_id, *changed_variable_id)
                         && !changed_variable_ids.contains(variable_id)
                         && !conditionally_referenced_variable_ids.contains(variable_id)
                     {
@@ -443,7 +449,7 @@ fn analyze_if_statement_block<'ctx, 'arena>(
     analyze_statements(if_statement.body.statements(), context, &mut if_block_context, artifacts)?;
 
     for variable_id in &if_block_context.parent_conflicting_clause_variables {
-        outer_block_context.remove_variable_from_conflicting_clauses(context, variable_id, None);
+        outer_block_context.remove_variable_from_conflicting_clauses(context, *variable_id, None);
     }
 
     let final_actions = ControlAction::from_statements(
@@ -480,7 +486,7 @@ fn analyze_if_statement_block<'ctx, 'arena>(
             outer_block_context,
             new_assigned_variable_ids,
             new_possibly_assigned_variable_ids,
-            if_scope.conditionally_changed_variable_ids.clone(),
+            &if_scope.conditionally_changed_variable_ids.clone(),
             true,
         );
 
@@ -489,7 +495,7 @@ fn analyze_if_statement_block<'ctx, 'arena>(
                 let previous_clauses = std::mem::take(&mut if_scope.reasonable_clauses);
                 if_scope.reasonable_clauses = BlockContext::filter_clauses(
                     context,
-                    &variable_id,
+                    variable_id,
                     previous_clauses,
                     if_block_context.locals.get(&variable_id).map(std::convert::AsRef::as_ref),
                 );
@@ -525,7 +531,7 @@ fn analyze_if_statement_block<'ctx, 'arena>(
             &old_if_block_context,
             &mut if_block_context,
             has_leaving_statements,
-            variables_to_update,
+            &variables_to_update,
             &mut if_scope.updated_variables,
         );
     }
@@ -622,7 +628,7 @@ fn analyze_else_if_clause<'ctx, 'ast, 'arena>(
 
         'outer: for key in keys {
             for mixed_var_id in &mixed_variables {
-                if !is_derived_access_path(&key, mixed_var_id) {
+                if !is_derived_access_path(key, *mixed_var_id) {
                     continue;
                 }
 
@@ -644,7 +650,7 @@ fn analyze_else_if_clause<'ctx, 'ast, 'arena>(
     for mut clause in if_conditional_scope.entry_clauses {
         'set_clause: for key in clause.possibilities.keys() {
             for conditional_assigned_variable_id in assigned_in_conditional_variable_ids.keys() {
-                if !is_derived_access_path(key, conditional_assigned_variable_id) {
+                if !is_derived_access_path(*key, *conditional_assigned_variable_id) {
                     continue;
                 }
 
@@ -718,7 +724,7 @@ fn analyze_else_if_clause<'ctx, 'ast, 'arena>(
         find_satisfying_assignments(negated_if_clauses.as_slice(), None, &mut AtomSet::default());
 
     let all_negated_variables =
-        HashSet::from_iter(negated_else_if_types.keys().copied().chain(if_scope.negated_types.keys().copied()));
+        negated_else_if_types.keys().copied().chain(if_scope.negated_types.keys().copied()).collect::<HashSet<_>>();
 
     for negated_variable_id in all_negated_variables {
         if let Some(negated_variable_type_assertions) = negated_else_if_types.get(&negated_variable_id) {
@@ -764,7 +770,7 @@ fn analyze_else_if_clause<'ctx, 'ast, 'arena>(
             let mut variables_to_remove = vec![];
             for (changed_variable_id, _) in &reconcilable_else_if_types {
                 for variable_id in else_if_block_context.locals.keys() {
-                    if is_derived_access_path(variable_id, changed_variable_id)
+                    if is_derived_access_path(*variable_id, *changed_variable_id)
                         && !newly_reconciled_variable_ids.contains(variable_id)
                         && !conditionally_referenced_variable_ids.contains(variable_id)
                     {
@@ -785,7 +791,7 @@ fn analyze_else_if_clause<'ctx, 'ast, 'arena>(
     analyze_statements(else_if_clause.1, context, &mut else_if_block_context, artifacts)?;
 
     for variable_id in &else_if_block_context.parent_conflicting_clause_variables {
-        outer_block_context.remove_variable_from_conflicting_clauses(context, variable_id, None);
+        outer_block_context.remove_variable_from_conflicting_clauses(context, *variable_id, None);
     }
 
     let new_assigned_variable_ids = else_if_block_context.assigned_variable_ids.clone();
@@ -844,7 +850,7 @@ fn analyze_else_if_clause<'ctx, 'ast, 'arena>(
             outer_block_context,
             new_assigned_variable_ids.into_iter().chain(assigned_in_conditional_variable_ids).collect(),
             new_possibly_assigned_variable_ids.clone(),
-            newly_reconciled_variable_ids,
+            &newly_reconciled_variable_ids,
             false,
         );
 
@@ -977,7 +983,7 @@ fn analyze_else_statements<'ctx, 'arena>(
                     continue;
                 }
 
-                if is_derived_access_path(variable_id, changed_variable_id)
+                if is_derived_access_path(*variable_id, *changed_variable_id)
                     && !changed_variable_ids.contains(variable_id)
                 {
                     variables_to_remove.push(*variable_id);
@@ -999,7 +1005,7 @@ fn analyze_else_statements<'ctx, 'arena>(
     }
 
     for variable_id in &else_block_context.parent_conflicting_clause_variables {
-        outer_block_context.remove_variable_from_conflicting_clauses(context, variable_id, None);
+        outer_block_context.remove_variable_from_conflicting_clauses(context, *variable_id, None);
     }
 
     let new_assigned_variable_ids = else_block_context.assigned_variable_ids.clone();
@@ -1046,7 +1052,7 @@ fn analyze_else_statements<'ctx, 'arena>(
             &mut original_context,
             new_assigned_variable_ids,
             new_possibly_assigned_variable_ids.clone(),
-            if_scope.conditionally_changed_variable_ids.clone(),
+            &if_scope.conditionally_changed_variable_ids.clone(),
             true,
         );
 
@@ -1061,7 +1067,7 @@ fn analyze_else_statements<'ctx, 'arena>(
             &old_else_context,
             else_block_context,
             has_leaving_statements,
-            variables_to_update,
+            &variables_to_update,
             &mut if_scope.updated_variables,
         );
     }
@@ -1144,7 +1150,7 @@ fn update_if_scope<'ctx>(
     outer_block_context: &mut BlockContext<'ctx>,
     new_assigned_variable_ids: AtomMap<u32>,
     new_possibly_assigned_variable_ids: AtomSet,
-    newly_reconciled_variable_ids: AtomSet,
+    newly_reconciled_variable_ids: &AtomSet,
     update_new_variables: bool,
 ) {
     // Handle definitely_initialized_properties with INTERSECTION semantics

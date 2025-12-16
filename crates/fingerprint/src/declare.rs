@@ -1,7 +1,10 @@
 use std::hash::Hash;
 
 use mago_names::ResolvedNames;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Declare;
+use mago_syntax::ast::DeclareBody;
+use mago_syntax::ast::DeclareColonDelimitedBody;
+use mago_syntax::ast::DeclareItem;
 
 use crate::FingerprintOptions;
 use crate::Fingerprintable;
@@ -15,7 +18,7 @@ impl Fingerprintable for Declare<'_> {
     ) {
         "declare".hash(hasher);
 
-        for item in self.items.iter() {
+        for item in &self.items {
             item.fingerprint_with_hasher(hasher, resolved_names, options);
         }
 
@@ -64,7 +67,7 @@ impl Fingerprintable for DeclareColonDelimitedBody<'_> {
     ) {
         "declare_colon_delimited".hash(hasher);
 
-        for statement in self.statements.iter() {
+        for statement in &self.statements {
             statement.fingerprint_with_hasher(hasher, resolved_names, options);
         }
     }

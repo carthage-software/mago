@@ -12,7 +12,9 @@ use mago_reporting::Issue;
 use mago_reporting::Level;
 use mago_span::HasSpan;
 use mago_span::Span;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Expression;
+use mago_syntax::ast::Node;
+use mago_syntax::ast::NodeKind;
 
 use crate::category::Category;
 use crate::context::LintContext;
@@ -98,12 +100,12 @@ impl LintRule for TaintedDataToSinkRule {
     fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         match node {
             Node::Echo(echo) => {
-                for value in echo.values.iter() {
+                for value in &echo.values {
                     self.check_tainted_data_to_sink(ctx, echo.echo.span, value);
                 }
             }
             Node::EchoTag(echo) => {
-                for value in echo.values.iter() {
+                for value in &echo.values {
                     self.check_tainted_data_to_sink(ctx, echo.tag, value);
                 }
             }
@@ -116,7 +118,7 @@ impl LintRule for TaintedDataToSinkRule {
                     return;
                 }
 
-                for argument in function_call.argument_list.arguments.iter() {
+                for argument in &function_call.argument_list.arguments {
                     self.check_tainted_data_to_sink(ctx, function_call.function.span(), argument.value());
                 }
             }

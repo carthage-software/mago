@@ -17,25 +17,30 @@ pub enum FunctionTarget {
 
 impl FunctionTarget {
     #[inline]
+    #[must_use]
     pub const fn exact(name: &'static str) -> Self {
         Self::Exact(name)
     }
 
     #[inline]
+    #[must_use]
     pub const fn exact_multiple(names: &'static [&'static str]) -> Self {
         Self::ExactMultiple(names)
     }
 
     #[inline]
+    #[must_use]
     pub const fn prefix(prefix: &'static str) -> Self {
         Self::Prefix(prefix)
     }
 
     #[inline]
+    #[must_use]
     pub const fn namespace(ns: &'static str) -> Self {
         Self::Namespace(ns)
     }
 
+    #[must_use]
     pub fn matches(&self, name: &str) -> bool {
         match self {
             FunctionTarget::Exact(target) => name.eq_ignore_ascii_case(target),
@@ -45,6 +50,7 @@ impl FunctionTarget {
         }
     }
 
+    #[must_use]
     pub fn get_exact_names(&self) -> Option<Vec<&'static str>> {
         match self {
             FunctionTarget::Exact(name) => Some(vec![*name]),
@@ -53,14 +59,17 @@ impl FunctionTarget {
         }
     }
 
+    #[must_use]
     pub fn is_prefix(&self) -> bool {
         matches!(self, FunctionTarget::Prefix(_))
     }
 
+    #[must_use]
     pub fn is_namespace(&self) -> bool {
         matches!(self, FunctionTarget::Namespace(_))
     }
 
+    #[must_use]
     pub fn get_prefix(&self) -> Option<&'static str> {
         match self {
             FunctionTarget::Prefix(prefix) => Some(prefix),
@@ -68,6 +77,7 @@ impl FunctionTarget {
         }
     }
 
+    #[must_use]
     pub fn get_namespace(&self) -> Option<&'static str> {
         match self {
             FunctionTarget::Namespace(ns) => Some(ns),

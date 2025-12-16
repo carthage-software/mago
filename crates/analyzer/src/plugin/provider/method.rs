@@ -18,20 +18,24 @@ pub struct MethodTarget {
 
 impl MethodTarget {
     #[inline]
+    #[must_use]
     pub const fn exact(class: &'static str, method: &'static str) -> Self {
         Self { class, method }
     }
 
     #[inline]
+    #[must_use]
     pub const fn all_methods(class: &'static str) -> Self {
         Self { class, method: "*" }
     }
 
     #[inline]
+    #[must_use]
     pub const fn any_class(method: &'static str) -> Self {
         Self { class: "*", method }
     }
 
+    #[must_use]
     pub fn matches(&self, class_name: &str, method_name: &str) -> bool {
         self.matches_class(class_name) && self.matches_method(method_name)
     }
@@ -60,10 +64,12 @@ impl MethodTarget {
         }
     }
 
+    #[must_use]
     pub fn is_exact(&self) -> bool {
         !self.class.contains('*') && !self.method.contains('*')
     }
 
+    #[must_use]
     pub fn index_key(&self) -> Option<Atom> {
         if self.is_exact() {
             Some(concat_atom!(

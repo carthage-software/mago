@@ -2,9 +2,10 @@ use mago_atom::ascii_lowercase_atom;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_fixer::SafetyClassification;
 use mago_php_version::PHPVersion;
-use mago_reporting::*;
+use mago_reporting::Annotation;
+use mago_reporting::Issue;
 use mago_span::HasSpan;
-use mago_syntax::ast::*;
+use mago_syntax::ast::ClassLikeMember;
 
 use crate::code::IssueCode;
 use crate::context::Context;
@@ -27,7 +28,7 @@ pub fn check_override_attribute<'ctx, 'arena>(
 
         let (override_attribute, attribute_list_index) = 'outer: {
             for (index, attribute_list) in method.attribute_lists.iter().enumerate() {
-                for attribute in attribute_list.attributes.iter() {
+                for attribute in &attribute_list.attributes {
                     let fqcn = context.resolved_names.get(&attribute.name);
 
                     if fqcn.eq_ignore_ascii_case("Override") {

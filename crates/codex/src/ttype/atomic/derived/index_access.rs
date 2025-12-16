@@ -20,11 +20,13 @@ pub struct TIndexAccess {
 }
 
 impl TIndexAccess {
+    #[must_use]
     pub fn new(target: TUnion, index: TUnion) -> Self {
         Self { target_type: Box::new(target), index_type: Box::new(index) }
     }
 
     #[inline]
+    #[must_use]
     pub const fn get_target_type(&self) -> &TUnion {
         &self.target_type
     }
@@ -35,6 +37,7 @@ impl TIndexAccess {
     }
 
     #[inline]
+    #[must_use]
     pub const fn get_index_type(&self) -> &TUnion {
         &self.index_type
     }
@@ -44,6 +47,7 @@ impl TIndexAccess {
         &mut self.index_type
     }
 
+    #[must_use]
     pub fn get_indexed_access_result(
         target_types: &[TAtomic],
         index_types: &[TAtomic],

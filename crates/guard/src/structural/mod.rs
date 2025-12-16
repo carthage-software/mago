@@ -1,4 +1,11 @@
-use mago_syntax::ast::*;
+use mago_syntax::ast::Class;
+use mago_syntax::ast::ClassLikeMember;
+use mago_syntax::ast::Constant;
+use mago_syntax::ast::Enum;
+use mago_syntax::ast::Function;
+use mago_syntax::ast::Interface;
+use mago_syntax::ast::Namespace;
+use mago_syntax::ast::Trait;
 use mago_syntax::walker::MutWalker;
 
 use crate::context::GuardContext;
@@ -584,7 +591,7 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
 
     fn walk_in_constant(&mut self, constant: &'ast Constant<'arena>, context: &mut GuardContext<'ctx, 'arena>) {
         let mut structural_flaws = vec![];
-        for constant_item in constant.items.iter() {
+        for constant_item in &constant.items {
             let fqn = context.lookup_name(&constant_item.name);
             let structural_rules = Self::get_structural_rules(context, fqn, StructuralSymbolKind::Constant);
 

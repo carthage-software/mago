@@ -21,30 +21,35 @@ impl MethodIdentifier {
     /// * `class_name`: The `Atom` for the fully qualified class name.
     /// * `method_name`: The `Atom` for the method name.
     #[inline]
+    #[must_use]
     pub const fn new(class_name: Atom, method_name: Atom) -> Self {
         Self { class_name, method_name }
     }
 
     /// Returns the `Atom` for the class name.
     #[inline]
+    #[must_use]
     pub const fn get_class_name(&self) -> &Atom {
         &self.class_name
     }
 
     /// Returns the `Atom` for the method name.
     #[inline]
+    #[must_use]
     pub const fn get_method_name(&self) -> &Atom {
         &self.method_name
     }
 
     /// Converts the identifier to a human-readable string "`ClassName::methodName`".
     #[inline]
+    #[must_use]
     pub fn as_string(&self) -> String {
         format!("{}::{}", self.class_name, self.method_name)
     }
 
     /// Converts the identifier to a tuple of `Atom`s representing the class name and method name.
     #[inline]
+    #[must_use]
     pub fn get_key(&self) -> (Atom, Atom) {
         (self.class_name, self.method_name)
     }

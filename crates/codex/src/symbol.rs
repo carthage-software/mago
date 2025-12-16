@@ -25,30 +25,35 @@ pub enum SymbolKind {
 impl SymbolKind {
     /// Checks if this symbol kind is `Class`.
     #[inline]
+    #[must_use]
     pub const fn is_class(&self) -> bool {
         matches!(self, SymbolKind::Class)
     }
 
     /// Checks if this symbol kind is `Enum`.
     #[inline]
+    #[must_use]
     pub const fn is_enum(&self) -> bool {
         matches!(self, SymbolKind::Enum)
     }
 
     /// Checks if this symbol kind is `Trait`.
     #[inline]
+    #[must_use]
     pub const fn is_trait(&self) -> bool {
         matches!(self, SymbolKind::Trait)
     }
 
     /// Checks if this symbol kind is `Interface`.
     #[inline]
+    #[must_use]
     pub const fn is_interface(&self) -> bool {
         matches!(self, SymbolKind::Interface)
     }
 
     /// Returns the string representation of the symbol kind.
     #[inline]
+    #[must_use]
     pub const fn as_str(&self) -> &'static str {
         match self {
             SymbolKind::Class => "class",
@@ -69,6 +74,7 @@ pub struct Symbols {
 impl Symbols {
     /// Creates a new, empty `Symbols` map.
     #[inline]
+    #[must_use]
     pub fn new() -> Symbols {
         Symbols { all: AtomMap::default() }
     }
@@ -107,6 +113,7 @@ impl Symbols {
     ///
     /// `Some(SymbolKind)` if the symbol exists in the map, `None` otherwise.
     #[inline]
+    #[must_use]
     pub fn get_kind(&self, name: &Atom) -> Option<SymbolKind> {
         self.all.get(name).copied() // Use copied() since SymbolKind is Copy
     }
@@ -121,6 +128,7 @@ impl Symbols {
     ///
     /// `true` if the symbol exists in the map, `false` otherwise.
     #[inline]
+    #[must_use]
     pub fn contains(&self, name: &Atom) -> bool {
         self.all.contains_key(name)
     }
@@ -135,6 +143,7 @@ impl Symbols {
     ///
     /// `true` if the symbol is a `Class`, `false` otherwise.
     #[inline]
+    #[must_use]
     pub fn contains_class(&self, name: &Atom) -> bool {
         matches!(self.get_kind(name), Some(SymbolKind::Class))
     }
@@ -149,6 +158,7 @@ impl Symbols {
     ///
     /// `true` if the symbol is an `Interface`, `false` otherwise.
     #[inline]
+    #[must_use]
     pub fn contains_interface(&self, name: &Atom) -> bool {
         matches!(self.get_kind(name), Some(SymbolKind::Interface))
     }
@@ -163,6 +173,7 @@ impl Symbols {
     ///
     /// `true` if the symbol is a `Trait`, `false` otherwise.
     #[inline]
+    #[must_use]
     pub fn contains_trait(&self, name: &Atom) -> bool {
         matches!(self.get_kind(name), Some(SymbolKind::Trait))
     }
@@ -177,12 +188,14 @@ impl Symbols {
     ///
     /// `true` if the symbol is an `Enum`, `false` otherwise.
     #[inline]
+    #[must_use]
     pub fn contains_enum(&self, name: &Atom) -> bool {
         matches!(self.get_kind(name), Some(SymbolKind::Enum))
     }
 
     /// Returns a reference to the underlying map of all symbols.
     #[inline]
+    #[must_use]
     pub fn get_all(&self) -> &AtomMap<SymbolKind> {
         &self.all
     }

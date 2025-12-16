@@ -1,8 +1,13 @@
 #![allow(clippy::too_many_arguments)]
 
-use mago_reporting::*;
-use mago_span::*;
-use mago_syntax::ast::*;
+use mago_reporting::Annotation;
+use mago_reporting::Issue;
+use mago_span::HasSpan;
+use mago_span::Span;
+use mago_syntax::ast::Hint;
+use mago_syntax::ast::Method;
+use mago_syntax::ast::MethodBody;
+use mago_syntax::ast::Modifier;
 
 use crate::internal::checker::MAGIC_METHOD_SEMANTICS;
 use crate::internal::checker::function_like::check_for_promoted_properties_outside_constructor;
@@ -25,7 +30,7 @@ pub fn check_method<'ast, 'arena>(
     let mut last_abstract: Option<Span> = None;
     let mut last_visibility: Option<Span> = None;
     let mut is_public = true;
-    for modifier in method.modifiers.iter() {
+    for modifier in &method.modifiers {
         match modifier {
             Modifier::Static(_) => {
                 if let Some(last_static) = last_static {
@@ -204,7 +209,7 @@ pub fn check_method<'ast, 'arena>(
             if let Some(count) = parameter_count {
                 let mut found_count = 0;
                 let mut found_variadic = false;
-                for param in method.parameter_list.parameters.iter() {
+                for param in &method.parameter_list.parameters {
                     found_count += 1;
 
                     if param.ellipsis.is_some() {
@@ -438,7 +443,7 @@ pub fn check_method<'ast, 'arena>(
     if !method_name.eq_ignore_ascii_case("__construct") {
         check_for_promoted_properties_outside_constructor(&method.parameter_list, context);
     } else if is_abstract {
-        for parameter in method.parameter_list.parameters.iter() {
+        for parameter in &method.parameter_list.parameters {
             if parameter.is_promoted_property() {
                 context.report(
                     Issue::error("Promoted properties are not allowed in abstract constructors.")

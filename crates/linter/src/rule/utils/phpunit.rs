@@ -1,5 +1,10 @@
-use mago_syntax::ast::*;
-use mago_syntax::utils::reference::*;
+use mago_syntax::ast::ClassLikeMemberSelector;
+use mago_syntax::ast::Expression;
+use mago_syntax::ast::Method;
+use mago_syntax::ast::MethodBody;
+use mago_syntax::ast::Variable;
+use mago_syntax::utils::reference::MethodReference;
+use mago_syntax::utils::reference::find_method_references_in_block;
 
 pub const TESTING_METHODS: [&str; 57] = [
     "anything",

@@ -315,7 +315,7 @@ impl<'ctx> BlockContext<'ctx> {
 
             for key in c.possibilities.keys() {
                 for changed_var_id in changed_var_ids {
-                    if changed_var_id == key || var_has_root(key, changed_var_id) {
+                    if changed_var_id == key || var_has_root(*key, *changed_var_id) {
                         rejected_clauses.push(c.clone());
                         continue 'outer;
                     }
@@ -353,7 +353,7 @@ impl<'ctx> BlockContext<'ctx> {
 
     pub(crate) fn filter_clauses<'arena>(
         context: &mut Context<'ctx, 'arena>,
-        remove_var_id: &Atom,
+        remove_var_id: Atom,
         clauses: Vec<Rc<Clause>>,
         new_type: Option<&TUnion>,
     ) -> Vec<Rc<Clause>> {
@@ -362,7 +362,7 @@ impl<'ctx> BlockContext<'ctx> {
 
         'outer: for clause in clauses {
             for var_id in clause.possibilities.keys() {
-                if var_has_root(var_id, remove_var_id) {
+                if var_has_root(*var_id, remove_var_id) {
                     continue 'outer;
                 }
             }
@@ -381,7 +381,7 @@ impl<'ctx> BlockContext<'ctx> {
         {
             for clause in other_clauses {
                 let mut type_changed = false;
-                let Some(possibilities) = clause.possibilities.get(remove_var_id) else {
+                let Some(possibilities) = clause.possibilities.get(&remove_var_id) else {
                     clauses_to_keep.push(clause.clone());
 
                     continue;
@@ -422,18 +422,18 @@ impl<'ctx> BlockContext<'ctx> {
     pub(crate) fn remove_variable_from_conflicting_clauses<'arena>(
         &mut self,
         context: &mut Context<'ctx, 'arena>,
-        remove_var_id: &Atom,
+        remove_var_id: Atom,
         new_type: Option<&TUnion>,
     ) {
         self.clauses = BlockContext::filter_clauses(context, remove_var_id, self.clauses.clone(), new_type);
 
-        self.parent_conflicting_clause_variables.insert(*remove_var_id);
+        self.parent_conflicting_clause_variables.insert(remove_var_id);
     }
 
     pub(crate) fn remove_descendants<'arena>(
         &mut self,
         context: &mut Context<'ctx, 'arena>,
-        remove_var_id: &Atom,
+        remove_var_id: Atom,
         existing_type: &TUnion,
         new_type: Option<&TUnion>,
     ) {
@@ -452,7 +452,7 @@ impl<'ctx> BlockContext<'ctx> {
         let keys = self.locals.keys().copied().collect::<Vec<_>>();
 
         for var_id in keys {
-            if var_has_root(&var_id, remove_var_id) {
+            if var_has_root(var_id, remove_var_id) {
                 self.locals.remove(&var_id);
             }
         }
@@ -505,7 +505,7 @@ impl<'ctx> BlockContext<'ctx> {
         if let Some(existing_type) = self.locals.remove(&var_atom)
             && remove_descendants
         {
-            self.remove_descendants(context, &var_atom, &existing_type, None);
+            self.remove_descendants(context, var_atom, &existing_type, None);
         }
 
         self.assigned_variable_ids.remove(&var_atom);
@@ -565,7 +565,7 @@ impl<'ctx> BlockContext<'ctx> {
         start_block_context: &Self,
         end_block_context: &mut Self,
         has_leaving_statements: bool,
-        vars_to_update: AtomSet,
+        vars_to_update: &AtomSet,
         updated_vars: &mut AtomSet,
     ) {
         for (variable_id, old_type) in &start_block_context.locals {
@@ -709,8 +709,8 @@ pub fn subtract_union_types(context: &mut Context<'_, '_>, existing_type: TUnion
     result
 }
 
-fn should_keep_clause(clause: &Rc<Clause>, remove_var_id: &Atom, new_type: Option<&TUnion>) -> bool {
-    if let Some(possibilities) = clause.possibilities.get(remove_var_id) {
+fn should_keep_clause(clause: &Rc<Clause>, remove_var_id: Atom, new_type: Option<&TUnion>) -> bool {
+    if let Some(possibilities) = clause.possibilities.get(&remove_var_id) {
         if possibilities.len() == 1
             && let Some((_, Assertion::IsType(assertion_type))) = possibilities.first()
             && let Some(new_type) = new_type

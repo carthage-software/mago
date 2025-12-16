@@ -315,6 +315,7 @@ pub(crate) fn can_be_contained_by(
     !matching_input_keys.is_empty()
 }
 
+#[must_use]
 pub fn can_expression_types_be_identical(
     codebase: &CodebaseMetadata,
     type1: &TUnion,

@@ -1,5 +1,5 @@
 use crate::T;
-use crate::ast::ast::*;
+use crate::ast::ast::Instantiation;
 use crate::error::ParseError;
 use crate::parser::internal::argument::parse_optional_argument_list;
 use crate::parser::internal::expression::parse_expression_with_precedence;

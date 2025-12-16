@@ -76,6 +76,7 @@ impl PropertyMetadata {
     /// Creates new `PropertyMetadata` with basic defaults (public, non-static, non-readonly, etc.).
     /// Name is mandatory. Spans, types, and flags can be set using modifier methods.
     #[inline]
+    #[must_use]
     pub fn new(name: VariableIdentifier, flags: MetadataFlags) -> Self {
         Self {
             name,
@@ -99,7 +100,7 @@ impl PropertyMetadata {
     #[inline]
     pub fn set_type_declaration_metadata(&mut self, type_declaration_metadata: Option<TypeMetadata>) {
         if self.type_metadata.is_none() {
-            self.type_metadata = type_declaration_metadata.clone();
+            self.type_metadata.clone_from(&type_declaration_metadata);
         }
 
         self.type_declaration_metadata = type_declaration_metadata;
@@ -112,12 +113,14 @@ impl PropertyMetadata {
 
     /// Returns a reference to the property's name identifier.
     #[inline]
+    #[must_use]
     pub fn get_name(&self) -> &VariableIdentifier {
         &self.name
     }
 
     /// Checks if the property is effectively final (private read or write access).
     #[inline]
+    #[must_use]
     pub fn is_final(&self) -> bool {
         self.read_visibility.is_private() || self.write_visibility.is_private()
     }

@@ -204,6 +204,7 @@ pub struct PropertyHookConcreteExpressionBody<'arena> {
 }
 
 impl<'arena> Property<'arena> {
+    #[must_use]
     pub fn modifiers(&self) -> &Sequence<'arena, Modifier<'arena>> {
         match &self {
             Property::Hooked(h) => &h.modifiers,
@@ -211,6 +212,7 @@ impl<'arena> Property<'arena> {
         }
     }
 
+    #[must_use]
     pub fn var(&self) -> Option<&Keyword<'arena>> {
         match &self {
             Property::Hooked(h) => h.var.as_ref(),
@@ -224,6 +226,7 @@ impl<'arena> Property<'arena> {
     ///
     /// Panics if the property declaration has no variables. This indicates a bug in the parser,
     /// as valid PHP properties must have at least one variable.
+    #[must_use]
     pub fn first_variable(&self) -> &DirectVariable<'arena> {
         self.variables()
             .first()
@@ -232,11 +235,12 @@ impl<'arena> Property<'arena> {
 
     pub fn variables(&self) -> Vec<&DirectVariable<'arena>> {
         match &self {
-            Property::Plain(inner) => inner.items.iter().map(|item| item.variable()).collect(),
+            Property::Plain(inner) => inner.items.iter().map(PropertyItem::variable).collect(),
             Property::Hooked(inner) => vec![inner.item.variable()],
         }
     }
 
+    #[must_use]
     pub fn hint(&self) -> Option<&Hint<'arena>> {
         match &self {
             Property::Hooked(h) => h.hint.as_ref(),
@@ -246,6 +250,7 @@ impl<'arena> Property<'arena> {
 }
 
 impl<'arena> PropertyItem<'arena> {
+    #[must_use]
     pub fn variable(&self) -> &DirectVariable<'arena> {
         match &self {
             PropertyItem::Abstract(item) => &item.variable,

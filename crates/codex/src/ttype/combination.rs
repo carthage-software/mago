@@ -47,6 +47,7 @@ bitflags::bitflags! {
 impl CombinationFlags {
     /// Get a tristate value (Option<bool>) from two bits.
     #[inline]
+    #[must_use]
     pub fn get_tristate(self, set_bit: Self, value_bit: Self) -> Option<bool> {
         if self.contains(set_bit) { Some(self.contains(value_bit)) } else { None }
     }
@@ -71,6 +72,7 @@ impl CombinationFlags {
     }
 
     #[inline]
+    #[must_use]
     pub fn falsy_mixed(self) -> Option<bool> {
         self.get_tristate(Self::FALSY_MIXED_SET, Self::FALSY_MIXED_VALUE)
     }
@@ -81,6 +83,7 @@ impl CombinationFlags {
     }
 
     #[inline]
+    #[must_use]
     pub fn truthy_mixed(self) -> Option<bool> {
         self.get_tristate(Self::TRUTHY_MIXED_SET, Self::TRUTHY_MIXED_VALUE)
     }
@@ -91,6 +94,7 @@ impl CombinationFlags {
     }
 
     #[inline]
+    #[must_use]
     pub fn nonnull_mixed(self) -> Option<bool> {
         self.get_tristate(Self::NONNULL_MIXED_SET, Self::NONNULL_MIXED_VALUE)
     }
@@ -101,6 +105,7 @@ impl CombinationFlags {
     }
 
     #[inline]
+    #[must_use]
     pub fn mixed_from_loop_isset(self) -> Option<bool> {
         self.get_tristate(Self::MIXED_FROM_LOOP_ISSET_SET, Self::MIXED_FROM_LOOP_ISSET_VALUE)
     }
@@ -138,6 +143,7 @@ impl Default for TypeCombination {
 }
 
 impl TypeCombination {
+    #[must_use]
     pub fn new() -> Self {
         let flags = CombinationFlags::LIST_ARRAY_ALWAYS_FILLED | CombinationFlags::KEYED_ARRAY_ALWAYS_FILLED;
 
@@ -162,6 +168,7 @@ impl TypeCombination {
     }
 
     #[inline]
+    #[must_use]
     pub fn is_simple(&self) -> bool {
         if self.value_types.len() == 1
             && self.sealed_arrays.is_empty()

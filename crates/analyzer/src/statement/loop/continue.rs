@@ -8,7 +8,10 @@ use mago_codex::ttype::combine_union_types;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Continue;
+use mago_syntax::ast::Expression;
+use mago_syntax::ast::Literal;
+use mago_syntax::ast::LiteralInteger;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;

@@ -22,13 +22,14 @@ use mago_syntax::parser::parse_file;
 static PRELUDE: LazyLock<Prelude> = LazyLock::new(Prelude::build);
 static PLUGIN_REGISTRY: LazyLock<PluginRegistry> = LazyLock::new(PluginRegistry::with_library_providers);
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct TestCase<'a> {
     name: &'a str,
     content: &'a str,
 }
 
 impl<'a> TestCase<'a> {
+    #[must_use]
     pub fn new(name: &'a str, content: &'a str) -> Self {
         Self { name, content }
     }
@@ -89,7 +90,7 @@ fn verify_reported_issues(test_name: &str, mut analysis_result: AnalysisResult, 
     actual_issues_collected.extend(codebase.take_issues(true));
 
     let mut actual_issue_counts: BTreeMap<String, usize> = BTreeMap::new();
-    for actual_issue in actual_issues_collected.iter() {
+    for actual_issue in &actual_issues_collected {
         let Some(issue_code) = actual_issue.code.clone() else {
             panic!("Analyzer returned an issue with no code: {actual_issue:?}");
         };

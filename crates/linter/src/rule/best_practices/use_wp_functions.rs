@@ -7,7 +7,12 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_reporting::Level;
 use mago_span::HasSpan;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Expression;
+use mago_syntax::ast::FunctionCall;
+use mago_syntax::ast::Literal;
+use mago_syntax::ast::LiteralString;
+use mago_syntax::ast::Node;
+use mago_syntax::ast::NodeKind;
 
 use crate::category::Category;
 use crate::context::LintContext;
@@ -173,7 +178,7 @@ impl LintRule for UseWpFunctionsRule {
 fn is_http_url_in_args(function_call: &FunctionCall) -> bool {
     let argument_list = &function_call.argument_list;
 
-    for argument in argument_list.arguments.iter() {
+    for argument in &argument_list.arguments {
         if let Expression::Literal(Literal::String(string_literal)) = &argument.value()
             && let Some(value) = extract_string_value(string_literal)
             && (value.starts_with("http://") || value.starts_with("https://"))

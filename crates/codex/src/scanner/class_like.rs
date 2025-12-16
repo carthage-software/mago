@@ -10,7 +10,22 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_span::Span;
-use mago_syntax::ast::*;
+use mago_syntax::ast::AnonymousClass;
+use mago_syntax::ast::AttributeList;
+use mago_syntax::ast::Class;
+use mago_syntax::ast::ClassLikeMember;
+use mago_syntax::ast::Enum;
+use mago_syntax::ast::EnumBackingTypeHint;
+use mago_syntax::ast::Extends;
+use mago_syntax::ast::Hint;
+use mago_syntax::ast::Implements;
+use mago_syntax::ast::Interface;
+use mago_syntax::ast::Modifier;
+use mago_syntax::ast::Sequence;
+use mago_syntax::ast::Trait;
+use mago_syntax::ast::TraitUseAdaptation;
+use mago_syntax::ast::TraitUseMethodReference;
+use mago_syntax::ast::TraitUseSpecification;
 
 use crate::consts::MAX_ENUM_CASES_FOR_ANALYSIS;
 use crate::get_anonymous_class_name;
@@ -60,10 +75,10 @@ use crate::visibility::Visibility;
 type ClassLikeRegistration = Option<(Atom, TemplateConstraintList, AtomSet, AtomMap<(Atom, Atom)>)>;
 
 #[inline]
-pub fn register_anonymous_class<'ctx, 'arena>(
+pub fn register_anonymous_class<'arena>(
     codebase: &mut CodebaseMetadata,
     class: &'arena AnonymousClass<'arena>,
-    context: &mut Context<'ctx, 'arena>,
+    context: &mut Context<'_, 'arena>,
     scope: &mut NamespaceScope,
 ) -> ClassLikeRegistration {
     let span = class.span();
@@ -104,10 +119,10 @@ pub fn register_anonymous_class<'ctx, 'arena>(
 }
 
 #[inline]
-pub fn register_class<'ctx, 'arena>(
+pub fn register_class<'arena>(
     codebase: &mut CodebaseMetadata,
     class: &'arena Class<'arena>,
-    context: &mut Context<'ctx, 'arena>,
+    context: &mut Context<'_, 'arena>,
     scope: &mut NamespaceScope,
 ) -> ClassLikeRegistration {
     let class_like_metadata = scan_class_like(
@@ -146,10 +161,10 @@ pub fn register_class<'ctx, 'arena>(
 }
 
 #[inline]
-pub fn register_interface<'ctx, 'arena>(
+pub fn register_interface<'arena>(
     codebase: &mut CodebaseMetadata,
     interface: &'arena Interface<'arena>,
-    context: &mut Context<'ctx, 'arena>,
+    context: &mut Context<'_, 'arena>,
     scope: &mut NamespaceScope,
 ) -> ClassLikeRegistration {
     let class_like_metadata = scan_class_like(
@@ -188,10 +203,10 @@ pub fn register_interface<'ctx, 'arena>(
 }
 
 #[inline]
-pub fn register_trait<'ctx, 'arena>(
+pub fn register_trait<'arena>(
     codebase: &mut CodebaseMetadata,
     r#trait: &'arena Trait<'arena>,
-    context: &mut Context<'ctx, 'arena>,
+    context: &mut Context<'_, 'arena>,
     scope: &mut NamespaceScope,
 ) -> ClassLikeRegistration {
     let class_like_metadata = scan_class_like(
@@ -230,10 +245,10 @@ pub fn register_trait<'ctx, 'arena>(
 }
 
 #[inline]
-pub fn register_enum<'ctx, 'arena>(
+pub fn register_enum<'arena>(
     codebase: &mut CodebaseMetadata,
     r#enum: &'arena Enum<'arena>,
-    context: &mut Context<'ctx, 'arena>,
+    context: &mut Context<'_, 'arena>,
     scope: &mut NamespaceScope,
 ) -> ClassLikeRegistration {
     let class_like_metadata = scan_class_like(
@@ -273,7 +288,7 @@ pub fn register_enum<'ctx, 'arena>(
 
 #[inline]
 #[allow(clippy::too_many_arguments)]
-fn scan_class_like<'ctx, 'arena>(
+fn scan_class_like<'arena>(
     codebase: &mut CodebaseMetadata,
     name: Atom,
     kind: SymbolKind,
@@ -285,7 +300,7 @@ fn scan_class_like<'ctx, 'arena>(
     extends: Option<&'arena Extends<'arena>>,
     implements: Option<&'arena Implements<'arena>>,
     enum_type: Option<&'arena EnumBackingTypeHint<'arena>>,
-    context: &mut Context<'ctx, 'arena>,
+    context: &mut Context<'_, 'arena>,
     scope: &mut NamespaceScope,
 ) -> Option<ClassLikeMetadata> {
     let original_name = name;
@@ -319,15 +334,15 @@ fn scan_class_like<'ctx, 'arena>(
 
     match kind {
         SymbolKind::Class => {
-            if modifiers.is_some_and(|m| m.contains_final()) {
+            if modifiers.is_some_and(Sequence::contains_final) {
                 class_like_metadata.flags |= MetadataFlags::FINAL;
             }
 
-            if modifiers.is_some_and(|m| m.contains_abstract()) {
+            if modifiers.is_some_and(Sequence::contains_abstract) {
                 class_like_metadata.flags |= MetadataFlags::ABSTRACT;
             }
 
-            if modifiers.is_some_and(|m| m.contains_readonly()) {
+            if modifiers.is_some_and(Sequence::contains_readonly) {
                 class_like_metadata.flags |= MetadataFlags::READONLY;
             }
 
@@ -376,7 +391,7 @@ fn scan_class_like<'ctx, 'arena>(
             codebase.symbols.add_interface_name(name);
 
             if let Some(extends) = extends {
-                for extended_interface in extends.types.iter() {
+                for extended_interface in &extends.types {
                     let parent_name = context.resolved_names.get(extended_interface);
                     let parent_name = ascii_lowercase_atom(parent_name);
 
@@ -389,7 +404,7 @@ fn scan_class_like<'ctx, 'arena>(
     if (class_like_metadata.kind.is_class() || class_like_metadata.kind.is_enum())
         && let Some(implemented_interfaces) = implements
     {
-        for interface_name in implemented_interfaces.types.iter() {
+        for interface_name in &implemented_interfaces.types {
             let interface_name = context.resolved_names.get(interface_name);
             let interface_name = ascii_lowercase_atom(interface_name);
 
@@ -528,26 +543,26 @@ fn scan_class_like<'ctx, 'arena>(
                 continue;
             }
 
-            let (parent_name, parent_parameters) = match extended_union.get_single_owned() {
-                TAtomic::Reference(TReference::Symbol { name, parameters, intersection_types: None }) => {
-                    (name, parameters)
-                }
-                _ => {
-                    class_like_metadata.issues.push(
-                        Issue::error("The `@extends` tag expects a generic class type.")
-                            .with_code(ScanningIssueKind::InvalidExtendsTag)
-                            .with_annotation(
-                                Annotation::primary(extended_type.span)
-                                    .with_message("This must be a class name, not a primitive or other complex type."),
-                            )
-                            .with_note(
-                                "The `@extends` tag provides concrete types for type parameters from a direct parent class.",
-                            )
-                            .with_help("For example: `@extends Box<string>`."),
-                    );
+            let TAtomic::Reference(TReference::Symbol {
+                name: parent_name,
+                parameters: parent_parameters,
+                intersection_types: None,
+            }) = extended_union.get_single_owned()
+            else {
+                class_like_metadata.issues.push(
+                    Issue::error("The `@extends` tag expects a generic class type.")
+                        .with_code(ScanningIssueKind::InvalidExtendsTag)
+                        .with_annotation(
+                            Annotation::primary(extended_type.span)
+                                .with_message("This must be a class name, not a primitive or other complex type."),
+                        )
+                        .with_note(
+                            "The `@extends` tag provides concrete types for type parameters from a direct parent class.",
+                        )
+                        .with_help("For example: `@extends Box<string>`."),
+                );
 
-                    continue;
-                }
+                continue;
             };
 
             let lowercase_parent_name = ascii_lowercase_atom(&parent_name);
@@ -703,39 +718,41 @@ fn scan_class_like<'ctx, 'arena>(
                 continue;
             }
 
-            let (required_name, required_params) = match required_union.get_single_owned() {
-                TAtomic::Reference(TReference::Symbol { name, parameters, intersection_types }) => {
-                    if intersection_types.is_some() {
-                        class_like_metadata.issues.push(
-                            Issue::error("The `@require-extends` tag expects a single class name.")
-                                .with_code(ScanningIssueKind::InvalidRequireExtendsTag)
-                                .with_annotation(
-                                    Annotation::primary(require_extend.span)
-                                        .with_message("Intersection types are not supported here."),
-                                )
-                                .with_note("The `@require-extends` tag forces any type that inherits from this one to also extend a specific base class.")
-                                .with_help("A class can only extend one other class. Provide a single parent class name."),
-                        );
-
-                        continue;
-                    }
-
-                    (name, parameters)
-                }
-                _ => {
+            let (required_name, required_params) = if let TAtomic::Reference(TReference::Symbol {
+                name,
+                parameters,
+                intersection_types,
+            }) = required_union.get_single_owned()
+            {
+                if intersection_types.is_some() {
                     class_like_metadata.issues.push(
                         Issue::error("The `@require-extends` tag expects a single class name.")
                             .with_code(ScanningIssueKind::InvalidRequireExtendsTag)
                             .with_annotation(
                                 Annotation::primary(require_extend.span)
-                                    .with_message("This must be a class name, not a primitive or other complex type.")
+                                    .with_message("Intersection types are not supported here."),
                             )
                             .with_note("The `@require-extends` tag forces any type that inherits from this one to also extend a specific base class.")
-                            .with_help("Provide the single, class name that all inheriting classes must extend."),
+                            .with_help("A class can only extend one other class. Provide a single parent class name."),
                     );
 
                     continue;
                 }
+
+                (name, parameters)
+            } else {
+                class_like_metadata.issues.push(
+                    Issue::error("The `@require-extends` tag expects a single class name.")
+                        .with_code(ScanningIssueKind::InvalidRequireExtendsTag)
+                        .with_annotation(
+                            Annotation::primary(require_extend.span)
+                                .with_message("This must be a class name, not a primitive or other complex type.")
+                        )
+                        .with_note("The `@require-extends` tag forces any type that inherits from this one to also extend a specific base class.")
+                        .with_help("Provide the single, class name that all inheriting classes must extend."),
+                );
+
+                continue;
             };
 
             class_like_metadata.require_extends.insert(ascii_lowercase_atom(&required_name));
@@ -783,39 +800,41 @@ fn scan_class_like<'ctx, 'arena>(
                 continue;
             }
 
-            let (required_name, required_parameters) = match required_union.get_single_owned() {
-                TAtomic::Reference(TReference::Symbol { name, parameters, intersection_types }) => {
-                    if intersection_types.is_some() {
-                        class_like_metadata.issues.push(
-                            Issue::error("The `@require-implements` tag expects a single interface name.")
-                                .with_code(ScanningIssueKind::InvalidRequireImplementsTag)
-                                .with_annotation(
-                                    Annotation::primary(require_implements.span)
-                                        .with_message("Intersection types are not supported here."),
-                                )
-                                .with_note("The `@require-implements` tag forces any type that inherits from this one to also implement a specific interface.")
-                                .with_help("To require that inheriting types implement multiple interfaces, use a separate `@require-implements` tag for each one."),
-                        );
-
-                        continue;
-                    }
-
-                    (name, parameters)
-                }
-                _ => {
+            let (required_name, required_parameters) = if let TAtomic::Reference(TReference::Symbol {
+                name,
+                parameters,
+                intersection_types,
+            }) = required_union.get_single_owned()
+            {
+                if intersection_types.is_some() {
                     class_like_metadata.issues.push(
                         Issue::error("The `@require-implements` tag expects a single interface name.")
                             .with_code(ScanningIssueKind::InvalidRequireImplementsTag)
                             .with_annotation(
                                 Annotation::primary(require_implements.span)
-                                    .with_message("This must be an interface, not a primitive or other complex type."),
+                                    .with_message("Intersection types are not supported here."),
                             )
                             .with_note("The `@require-implements` tag forces any type that inherits from this one to also implement a specific interface.")
-                            .with_help("Provide the single, interface name that all inheriting classes must implement."),
+                            .with_help("To require that inheriting types implement multiple interfaces, use a separate `@require-implements` tag for each one."),
                     );
 
                     continue;
                 }
+
+                (name, parameters)
+            } else {
+                class_like_metadata.issues.push(
+                    Issue::error("The `@require-implements` tag expects a single interface name.")
+                        .with_code(ScanningIssueKind::InvalidRequireImplementsTag)
+                        .with_annotation(
+                            Annotation::primary(require_implements.span)
+                                .with_message("This must be an interface, not a primitive or other complex type."),
+                        )
+                        .with_note("The `@require-implements` tag forces any type that inherits from this one to also implement a specific interface.")
+                        .with_help("Provide the single, interface name that all inheriting classes must implement."),
+                );
+
+                continue;
             };
 
             class_like_metadata.require_implements.insert(ascii_lowercase_atom(&required_name));
@@ -978,7 +997,7 @@ fn scan_class_like<'ctx, 'arena>(
         for imported_type_alias in docblock.imported_type_aliases {
             let fqcn = ascii_lowercase_atom(&scope.resolve_str(NameKind::Default, &imported_type_alias.from).0);
             let type_name = atom(&imported_type_alias.name);
-            let alias = imported_type_alias.alias.as_deref().map(atom).unwrap_or(type_name);
+            let alias = imported_type_alias.alias.as_deref().map_or(type_name, atom);
 
             // Skip self-imports to prevent infinite recursion during type expansion
             // Self-imports are useless since the type is already available locally
@@ -988,7 +1007,7 @@ fn scan_class_like<'ctx, 'arena>(
                         .with_code(ScanningIssueKind::CircularTypeImport)
                         .with_annotation(
                             Annotation::primary(imported_type_alias.span)
-                                .with_message(format!("Type alias `{}` is already defined in this class", type_name)),
+                                .with_message(format!("Type alias `{type_name}` is already defined in this class")),
                         )
                         .with_help("Remove this import statement as the type is already available locally."),
                 );
@@ -1024,7 +1043,7 @@ fn scan_class_like<'ctx, 'arena>(
         }
     }
 
-    for member in members.iter() {
+    for member in members {
         match member {
             ClassLikeMember::Constant(constant) => {
                 for constant_metadata in scan_class_like_constants(
@@ -1050,9 +1069,7 @@ fn scan_class_like<'ctx, 'arena>(
 
                 class_like_metadata.enum_cases.insert(case_metadata.name, case_metadata);
             }
-            _ => {
-                continue;
-            }
+            _ => {}
         }
     }
 
@@ -1060,7 +1077,7 @@ fn scan_class_like<'ctx, 'arena>(
         let enum_name_span = class_like_metadata.name_span.expect("Enum name span should be present");
         let mut name_types = vec![];
         let mut value_types = vec![];
-        let backing_type = class_like_metadata.enum_type.as_ref().cloned();
+        let backing_type = class_like_metadata.enum_type.clone();
 
         if class_like_metadata.enum_cases.len() <= MAX_ENUM_CASES_FOR_ANALYSIS {
             for (case_name, case_info) in &class_like_metadata.enum_cases {
@@ -1112,21 +1129,19 @@ fn scan_class_like<'ctx, 'arena>(
         }
     }
 
-    for member in members.iter() {
+    for member in members {
         match member {
             ClassLikeMember::TraitUse(trait_use) => {
-                for trait_use in trait_use.trait_names.iter() {
+                for trait_use in &trait_use.trait_names {
                     let trait_name = context.resolved_names.get(trait_use);
 
                     class_like_metadata.add_used_trait(ascii_lowercase_atom(trait_name));
                 }
 
                 if let TraitUseSpecification::Concrete(specification) = &trait_use.specification {
-                    for adaptation in specification.adaptations.iter() {
+                    for adaptation in &specification.adaptations {
                         match adaptation {
-                            TraitUseAdaptation::Precedence(_) => {
-                                continue;
-                            }
+                            TraitUseAdaptation::Precedence(_) => {}
                             TraitUseAdaptation::Alias(adaptation) => {
                                 let method_name = ascii_lowercase_atom(match &adaptation.method_reference {
                                     TraitUseMethodReference::Identifier(local_identifier) => local_identifier.value,
@@ -1230,23 +1245,25 @@ fn scan_class_like<'ctx, 'arena>(
                         continue;
                     }
 
-                    let (trait_name, trait_parameters) = match template_use_type.get_single_owned() {
-                        TAtomic::Reference(TReference::Symbol { name, parameters, intersection_types: None }) => {
-                            (name, parameters)
-                        }
-                        _ => {
-                            class_like_metadata.issues.push(
-                                Issue::error("The `@use` tag expects a single trait type.")
-                                    .with_code(ScanningIssueKind::InvalidUseTag)
-                                    .with_annotation(Annotation::primary(template_use.span).with_message(
+                    let TAtomic::Reference(TReference::Symbol {
+                        name: trait_name,
+                        parameters: trait_parameters,
+                        intersection_types: None,
+                    }) = template_use_type.get_single_owned()
+                    else {
+                        class_like_metadata.issues.push(
+                            Issue::error("The `@use` tag expects a single trait type.")
+                                .with_code(ScanningIssueKind::InvalidUseTag)
+                                .with_annotation(
+                                    Annotation::primary(template_use.span).with_message(
                                         "This must be a trait name, not a primitive or other complex type.",
-                                    ))
-                                    .with_note("The `@use` tag provides concrete types for generics from a trait.")
-                                    .with_help("Provide the single trait type, e.g., `@use MyTrait<string>`."),
-                            );
+                                    ),
+                                )
+                                .with_note("The `@use` tag provides concrete types for generics from a trait.")
+                                .with_help("Provide the single trait type, e.g., `@use MyTrait<string>`."),
+                        );
 
-                            continue;
-                        }
+                        continue;
                     };
 
                     let lowercase_trait_name = ascii_lowercase_atom(&trait_name);
@@ -1290,8 +1307,6 @@ fn scan_class_like<'ctx, 'arena>(
                                     .with_note("The `@use` tag is used to provide type information for the trait that is used in this class.")
                                     .with_help("Provide type parameters, e.g., `@use MyTrait<string>`."),
                             );
-
-                            continue;
                         }
                     }
                 }
@@ -1338,9 +1353,7 @@ fn scan_class_like<'ctx, 'arena>(
                     class_like_metadata.add_property_metadata(property_metadata);
                 }
             }
-            _ => {
-                continue;
-            }
+            _ => {}
         }
     }
 
@@ -1369,7 +1382,7 @@ fn create_enum_methods(codebase: &mut CodebaseMetadata, class_like: &mut ClassLi
         };
 
     let enum_name = class_like.name.as_str();
-    let backing_type = class_like.enum_type.as_ref().cloned();
+    let backing_type = class_like.enum_type.clone();
 
     if let Some(backing_type) = backing_type {
         let from_method = create_enum_from_method(enum_name, span, backing_type.clone());

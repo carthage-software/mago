@@ -1,6 +1,6 @@
 use mago_codex::ttype::get_literal_int;
 use mago_codex::ttype::get_string;
-use mago_syntax::ast::*;
+use mago_syntax::ast::PrintConstruct;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -24,7 +24,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for PrintConstruct<'arena> {
             "print",
             self.print.span,
             ConstructInput::Expression(self.value),
-            get_string(),
+            &get_string(),
             false,
             false,
             true,

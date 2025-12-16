@@ -10,7 +10,14 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_reporting::Level;
 use mago_span::HasSpan;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Argument;
+use mago_syntax::ast::Call;
+use mago_syntax::ast::Expression;
+use mago_syntax::ast::FunctionLikeParameterList;
+use mago_syntax::ast::Node;
+use mago_syntax::ast::NodeKind;
+use mago_syntax::ast::PositionalArgument;
+use mago_syntax::ast::Variable;
 
 use crate::category::Category;
 use crate::context::LintContext;

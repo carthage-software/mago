@@ -20,7 +20,18 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_span::Span;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Access;
+use mago_syntax::ast::Array;
+use mago_syntax::ast::ArrayElement;
+use mago_syntax::ast::Assignment;
+use mago_syntax::ast::AssignmentOperator;
+use mago_syntax::ast::Binary;
+use mago_syntax::ast::BinaryOperator;
+use mago_syntax::ast::Expression;
+use mago_syntax::ast::List;
+use mago_syntax::ast::UnaryPrefix;
+use mago_syntax::ast::UnaryPrefixOperator;
+use mago_syntax::ast::Variable;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -203,14 +214,14 @@ pub fn analyze_assignment<'ctx, 'ast, 'arena>(
     }
 
     if let (Some(target_variable_id), Some(existing_target_type)) = (&target_variable_id, &existing_target_type) {
-        block_context.remove_descendants(context, target_variable_id, existing_target_type, Some(&source_type));
+        block_context.remove_descendants(context, *target_variable_id, existing_target_type, Some(&source_type));
     } else {
         let root_var_id = get_root_expression_id(target_expression);
 
         if let Some(root_var_id) = root_var_id
             && let Some(existing_root_type) = block_context.locals.get(&root_var_id).cloned()
         {
-            block_context.remove_variable_from_conflicting_clauses(context, &root_var_id, Some(&existing_root_type));
+            block_context.remove_variable_from_conflicting_clauses(context, root_var_id, Some(&existing_root_type));
         }
     }
 
@@ -278,7 +289,7 @@ pub(crate) fn assign_to_expression<'ctx, 'ast, 'arena>(
     if let Some(source_expression) = source_expression {
         source_type.set_by_reference(source_expression.is_reference());
 
-        analyze_reference_assignment(context, block_context, target_expression, source_expression)?;
+        analyze_reference_assignment(context, block_context, target_expression, source_expression);
     }
 
     match target_expression {
@@ -290,7 +301,7 @@ pub(crate) fn assign_to_expression<'ctx, 'ast, 'arena>(
             source_expression,
             source_type,
             // SAFETY: `target_expression_id` is guaranteed to be `Some` here.
-            unsafe { target_expression_id.as_ref().unwrap_unchecked() },
+            unsafe { *target_expression_id.as_ref().unwrap_unchecked() },
             destructuring,
         ),
         Expression::Access(Access::Property(property_access)) => property_assignment::analyze(
@@ -307,13 +318,13 @@ pub(crate) fn assign_to_expression<'ctx, 'ast, 'arena>(
             artifacts,
             property_access,
             &source_type,
-            &target_expression_id,
+            target_expression_id,
         )?,
         Expression::ArrayAccess(array_access) => {
-            array_assignment::analyze(context, block_context, artifacts, array_access.into(), source_type)?;
+            array_assignment::analyze(context, block_context, artifacts, array_access.into(), &source_type)?;
         }
         Expression::ArrayAppend(array_append) => {
-            array_assignment::analyze(context, block_context, artifacts, array_append.into(), source_type)?;
+            array_assignment::analyze(context, block_context, artifacts, array_append.into(), &source_type)?;
         }
         Expression::Array(array) => {
             analyze_destructuring(
@@ -322,7 +333,7 @@ pub(crate) fn assign_to_expression<'ctx, 'ast, 'arena>(
                 artifacts,
                 array.span(),
                 source_expression,
-                source_type,
+                &source_type,
                 array.elements.as_slice(),
             )?;
         }
@@ -333,7 +344,7 @@ pub(crate) fn assign_to_expression<'ctx, 'ast, 'arena>(
                 artifacts,
                 list.span(),
                 source_expression,
-                source_type,
+                &source_type,
                 list.elements.as_slice(),
             )?;
         }
@@ -350,13 +361,13 @@ fn analyze_reference_assignment<'ctx, 'ast, 'arena>(
     block_context: &mut BlockContext<'ctx>,
     target_expression: &'ast Expression<'arena>,
     source_expression: &'ast Expression<'arena>,
-) -> Result<(), AnalysisError> {
+) {
     let Expression::UnaryPrefix(UnaryPrefix {
         operator: UnaryPrefixOperator::Reference(_),
         operand: referenced_expression,
     }) = source_expression
     else {
-        return Ok(());
+        return;
     };
 
     let target_variable_id = get_expression_id(
@@ -374,7 +385,7 @@ fn analyze_reference_assignment<'ctx, 'ast, 'arena>(
     );
 
     let (Some(target_variable_id), Some(referenced_variable_id)) = (target_variable_id, referenced_variable_id) else {
-        return Ok(());
+        return;
     };
 
     block_context.locals.entry(referenced_variable_id).or_insert_with(|| Rc::new(get_mixed()));
@@ -393,8 +404,6 @@ fn analyze_reference_assignment<'ctx, 'ast, 'arena>(
     if referenced_variable_id.contains('[') || referenced_variable_id.contains("->") {
         block_context.references_to_external_scope.insert(target_variable_id);
     }
-
-    Ok(())
 }
 
 pub fn analyze_assignment_to_variable<'ctx, 'arena>(
@@ -404,10 +413,10 @@ pub fn analyze_assignment_to_variable<'ctx, 'arena>(
     variable_span: Span,
     source_expression: Option<&Expression<'arena>>,
     mut assigned_type: TUnion,
-    variable_id: &Atom,
+    variable_id: Atom,
     destructuring: bool,
 ) {
-    if let Some(constraint) = block_context.by_reference_constraints.get(variable_id) {
+    if let Some(constraint) = block_context.by_reference_constraints.get(&variable_id) {
         if let Some(constraint_type) = constraint.constraint_type.as_ref()
             && !union_comparator::is_contained_by(
                 context.codebase,
@@ -500,7 +509,7 @@ pub fn analyze_assignment_to_variable<'ctx, 'arena>(
         assigned_type.set_by_reference(true);
     }
 
-    if block_context.references_possibly_from_confusing_scope.contains(variable_id) {
+    if block_context.references_possibly_from_confusing_scope.contains(&variable_id) {
         context.collector.report_with_code(
             IssueCode::ReferenceReusedFromConfusingScope,
             Issue::warning("Potential unintended modification: This variable may still hold a reference to another variable from a preceding scope.")
@@ -555,11 +564,11 @@ pub fn analyze_assignment_to_variable<'ctx, 'arena>(
 
     let mut from_docblock = false;
     if let Some((variable_type, variable_type_span)) =
-        get_type_from_var_docblock(context, block_context, artifacts, Some(variable_id), !destructuring)
+        get_type_from_var_docblock(context, block_context, artifacts, Some(variable_id.as_str()), !destructuring)
     {
         check_docblock_type_incompatibility(
             context,
-            Some(variable_id),
+            Some(variable_id.as_str()),
             variable_span,
             &assigned_type,
             &variable_type,
@@ -610,7 +619,7 @@ pub fn analyze_assignment_to_variable<'ctx, 'arena>(
         );
     }
 
-    block_context.locals.insert(*variable_id, Rc::new(assigned_type));
+    block_context.locals.insert(variable_id, Rc::new(assigned_type));
 }
 
 fn analyze_destructuring<'ctx, 'ast, 'arena>(
@@ -619,7 +628,7 @@ fn analyze_destructuring<'ctx, 'ast, 'arena>(
     artifacts: &mut AnalysisArtifacts,
     target_span: Span, // the span of the destructuring target ( list or array )
     source_expression: Option<&'ast Expression<'arena>>, // the expression being destructured
-    array_type: TUnion, // the type of the array being destructured
+    array_type: &TUnion, // the type of the array being destructured
     target_elements: &'ast [ArrayElement<'arena>], // the elements being destructured
 ) -> Result<(), AnalysisError> {
     let mut non_array = false;
@@ -768,10 +777,10 @@ fn analyze_destructuring<'ctx, 'ast, 'arena>(
                             target_span
                         },
                         None,
-                        &array_type,
+                        array_type,
                         &index_type,
                         false,
-                        &None,
+                        None,
                         None,
                         false,
                     )
@@ -804,10 +813,10 @@ fn analyze_destructuring<'ctx, 'ast, 'arena>(
                             target_span
                         },
                         Some(value_element.value.span()),
-                        &array_type,
+                        array_type,
                         &index_type,
                         false,
-                        &None,
+                        None,
                         None,
                         false,
                     )
@@ -869,7 +878,7 @@ fn analyze_assignment_target<'ctx, 'arena>(
             indirect.expression.analyze(context, block_context, artifacts)?;
         }
         Expression::List(List { elements, .. }) | Expression::Array(Array { elements, .. }) => {
-            for element in elements.iter() {
+            for element in elements {
                 match element {
                     ArrayElement::KeyValue(key_value_array_element) => {
                         analyze_assignment_target(key_value_array_element.value, context, block_context, artifacts)?;
@@ -909,7 +918,7 @@ fn handle_assignment_with_boolean_logic<'ctx, 'arena>(
     artifacts: &mut AnalysisArtifacts,
     variable_expression_id: Span,
     source_expression: &Expression<'arena>,
-    variable_id: &Atom,
+    variable_id: Atom,
 ) {
     let Some(right_clauses) = get_formula(
         source_expression.span(),
@@ -926,7 +935,7 @@ fn handle_assignment_with_boolean_logic<'ctx, 'arena>(
         BlockContext::filter_clauses(context, variable_id, right_clauses.into_iter().map(Rc::new).collect(), None);
 
     let mut possibilities = IndexMap::default();
-    possibilities.insert(*variable_id, IndexMap::from([(Assertion::Falsy.to_hash(), Assertion::Falsy)]));
+    possibilities.insert(variable_id, IndexMap::from([(Assertion::Falsy.to_hash(), Assertion::Falsy)]));
 
     block_context.clauses.extend(
         disjoin_clauses(

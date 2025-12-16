@@ -75,7 +75,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ArrowFunction<'arena> {
         }
 
         // Check for missing type hints
-        for parameter in self.parameter_list.parameters.iter() {
+        for parameter in &self.parameter_list.parameters {
             crate::utils::missing_type_hints::check_parameter_type_hint(
                 context,
                 block_context.scope.get_class_like(),

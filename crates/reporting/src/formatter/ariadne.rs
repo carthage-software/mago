@@ -1,7 +1,10 @@
 use std::io::Write;
 
+use ariadne::Color;
+use ariadne::Label;
+use ariadne::Report;
+use ariadne::ReportKind;
 use ariadne::sources as ariadne_sources;
-use ariadne::*;
 
 use mago_database::DatabaseReader;
 use mago_database::ReadDatabase;

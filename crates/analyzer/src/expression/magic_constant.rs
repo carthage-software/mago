@@ -12,7 +12,7 @@ use mago_codex::ttype::get_string;
 use mago_codex::ttype::union::TUnion;
 use mago_span::HasPosition;
 use mago_span::HasSpan;
-use mago_syntax::ast::*;
+use mago_syntax::ast::MagicConstant;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;

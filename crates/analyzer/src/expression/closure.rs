@@ -19,7 +19,7 @@ use mago_codex::ttype::union::TUnion;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Closure;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -59,7 +59,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Closure<'arena> {
 
         let mut variable_spans = HashMap::default();
         if let Some(use_clause) = self.use_clause.as_ref() {
-            for use_variable in use_clause.variables.iter() {
+            for use_variable in &use_clause.variables {
                 let was_inside_general_use = block_context.inside_general_use;
                 block_context.inside_general_use = true;
                 use_variable.variable.analyze(context, block_context, artifacts)?;
@@ -138,7 +138,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Closure<'arena> {
         }
 
         // Check for missing type hints
-        for parameter in self.parameter_list.parameters.iter() {
+        for parameter in &self.parameter_list.parameters {
             crate::utils::missing_type_hints::check_parameter_type_hint(
                 context,
                 block_context.scope.get_class_like(),

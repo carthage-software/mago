@@ -2,7 +2,15 @@ use bumpalo::vec;
 
 use mago_php_version::feature::Feature;
 use mago_span::HasSpan;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Access;
+use mago_syntax::ast::BinaryOperator;
+use mago_syntax::ast::Call;
+use mago_syntax::ast::Construct;
+use mago_syntax::ast::Expression;
+use mago_syntax::ast::Instantiation;
+use mago_syntax::ast::Literal;
+use mago_syntax::ast::Node;
+use mago_syntax::ast::PartialApplication;
 use mago_syntax::token::Associativity;
 use mago_syntax::token::GetPrecedence;
 use mago_syntax::token::Precedence;
@@ -14,7 +22,7 @@ use crate::document::Line;
 use crate::internal::FormatterState;
 use crate::internal::utils::unwrap_parenthesized;
 
-impl<'ctx, 'arena> FormatterState<'ctx, 'arena> {
+impl<'arena> FormatterState<'_, 'arena> {
     pub(crate) fn add_parens(
         &mut self,
         document: Document<'arena>,
@@ -341,9 +349,8 @@ impl<'ctx, 'arena> FormatterState<'ctx, 'arena> {
         let (parent_precedence, parent_associativity, parent_op_start) = match parent {
             Node::Binary(bin) => {
                 let precedence = bin.operator.precedence();
-                let associativity = match precedence.associativity() {
-                    Some(assoc) => assoc,
-                    None => return false,
+                let Some(associativity) = precedence.associativity() else {
+                    return false;
                 };
 
                 (precedence, associativity, bin.operator.start_position())

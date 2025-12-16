@@ -2,7 +2,7 @@ use mago_codex::ttype::TType;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Constant;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -26,9 +26,9 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Constant<'arena> {
             artifacts,
             self.attribute_lists.as_slice(),
             AttributeTarget::Constant,
-        )?;
+        );
 
-        for item in self.items.iter() {
+        for item in &self.items {
             let name = context.resolved_names.get(&item.name);
 
             let Some(constant_metadata) = context.codebase.get_constant(name) else {

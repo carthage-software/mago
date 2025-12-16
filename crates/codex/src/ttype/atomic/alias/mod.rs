@@ -25,16 +25,19 @@ pub struct TAlias {
 }
 
 impl TAlias {
+    #[must_use]
     pub fn new(class_name: Atom, alias_name: Atom) -> Self {
         Self { class_name, alias_name }
     }
 
     #[inline]
+    #[must_use]
     pub const fn get_class_name(&self) -> Atom {
         self.class_name
     }
 
     #[inline]
+    #[must_use]
     pub const fn get_alias_name(&self) -> Atom {
         self.alias_name
     }
@@ -42,6 +45,7 @@ impl TAlias {
     /// Expands this type alias to its actual type.
     ///
     /// Returns None if the alias cannot be resolved.
+    #[must_use]
     pub fn resolve<'a>(&self, codebase: &'a CodebaseMetadata) -> Option<&'a TUnion> {
         let class_like = codebase.get_class_like(&self.class_name)?;
         if let Some(type_alias) = class_like.type_aliases.get(&self.alias_name) {

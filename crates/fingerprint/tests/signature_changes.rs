@@ -15,7 +15,7 @@ fn get_fingerprint(code: &'static str) -> u64 {
     use ahash::AHasher;
     use std::hash::Hasher;
     let mut hasher = AHasher::default();
-    for statement in program.statements.iter() {
+    for statement in &program.statements {
         statement.fingerprint_with_hasher(&mut hasher, &resolved_names, &options);
     }
     hasher.finish()

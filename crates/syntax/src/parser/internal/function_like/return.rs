@@ -1,5 +1,5 @@
 use crate::T;
-use crate::ast::ast::*;
+use crate::ast::ast::FunctionLikeReturnTypeHint;
 use crate::error::ParseError;
 use crate::parser::internal::token_stream::TokenStream;
 use crate::parser::internal::type_hint;

@@ -205,9 +205,8 @@ pub fn inherit_method_docblocks(codebase: &mut CodebaseMetadata) {
         let child_method_id = (class_name, method_name);
         let parent_method_id = (parent_class, parent_method);
 
-        let parent_method = match codebase.function_likes.get(&parent_method_id) {
-            Some(m) => m,
-            None => continue,
+        let Some(parent_method) = codebase.function_likes.get(&parent_method_id) else {
+            continue;
         };
 
         let parent_return_type = parent_method.return_type_metadata.as_ref();
@@ -218,9 +217,8 @@ pub fn inherit_method_docblocks(codebase: &mut CodebaseMetadata) {
         let parent_if_true_assertions = &parent_method.if_true_assertions;
         let parent_if_false_assertions = &parent_method.if_false_assertions;
 
-        let child_class = match codebase.class_likes.get(&class_name) {
-            Some(c) => c,
-            None => continue,
+        let Some(child_class) = codebase.class_likes.get(&class_name) else {
+            continue;
         };
 
         let template_map = child_class.template_extended_parameters.get(&parent_class);
@@ -283,9 +281,8 @@ pub fn inherit_method_docblocks(codebase: &mut CodebaseMetadata) {
             should_inherit_if_true_assertions,
             should_inherit_if_false_assertions,
         ) = {
-            let child_method = match codebase.function_likes.get(&child_method_id) {
-                Some(m) => m,
-                None => continue,
+            let Some(child_method) = codebase.function_likes.get(&child_method_id) else {
+                continue;
             };
 
             let has_explicit_inherit_doc = child_method.flags.contains(MetadataFlags::INHERITS_DOCS);
@@ -367,9 +364,8 @@ pub fn inherit_method_docblocks(codebase: &mut CodebaseMetadata) {
             None
         };
 
-        let child_method = match codebase.function_likes.get_mut(&child_method_id) {
-            Some(m) => m,
-            None => continue,
+        let Some(child_method) = codebase.function_likes.get_mut(&child_method_id) else {
+            continue;
         };
 
         if should_inherit_return && let Some((type_union, span)) = substituted_return_type {

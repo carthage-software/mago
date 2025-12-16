@@ -53,53 +53,62 @@ bitflags::bitflags! {
 impl AttributeFlags {
     /// Checks if the `IS_REPEATABLE` flag is set, meaning the attribute
     /// can be declared multiple times on the same target.
+    #[must_use]
     pub const fn is_repeatable(&self) -> bool {
         self.contains(Self::IS_REPEATABLE)
     }
 
     /// Checks if the `TARGET_CLASS` flag is set, indicating the attribute
     /// can be applied to classes, interfaces, traits, or enums.
+    #[must_use]
     pub const fn targets_class(&self) -> bool {
         self.contains(Self::TARGET_CLASS)
     }
 
     /// Checks if the `TARGET_FUNCTION` flag is set, indicating the attribute
     /// can be applied to functions or closures.
+    #[must_use]
     pub const fn targets_function(&self) -> bool {
         self.contains(Self::TARGET_FUNCTION)
     }
 
     /// Checks if the `TARGET_METHOD` flag is set, indicating the attribute
     /// can be applied to class or interface methods.
+    #[must_use]
     pub const fn targets_method(&self) -> bool {
         self.contains(Self::TARGET_METHOD)
     }
 
     /// Checks if the `TARGET_PROPERTY` flag is set, indicating the attribute
     /// can be applied to class properties.
+    #[must_use]
     pub const fn targets_property(&self) -> bool {
         self.contains(Self::TARGET_PROPERTY)
     }
 
     /// Checks if the `TARGET_CLASS_CONSTANT` flag is set, indicating the attribute
     /// can be applied to class constants.
+    #[must_use]
     pub const fn targets_class_constant(&self) -> bool {
         self.contains(Self::TARGET_CLASS_CONSTANT)
     }
 
     /// Checks if the `TARGET_PARAMETER` flag is set, indicating the attribute
     /// can be applied to function or method parameters.
+    #[must_use]
     pub const fn targets_parameter(&self) -> bool {
         self.contains(Self::TARGET_PARAMETER)
     }
 
     /// Checks if the `TARGET_CONSTANT` flag is set, indicating the attribute
     /// can be applied to global constants.
+    #[must_use]
     pub const fn targets_constant(&self) -> bool {
         self.contains(Self::TARGET_CONSTANT)
     }
 
     /// Returns a list of human-readable strings for each target flag set.
+    #[must_use]
     pub fn get_target_names(&self) -> Vec<&'static str> {
         let mut targets = Vec::with_capacity(7);
 

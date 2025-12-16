@@ -18,6 +18,7 @@ pub struct TConditional {
 }
 
 impl TConditional {
+    #[must_use]
     pub fn new(
         subject: Box<TUnion>,
         target: Box<TUnion>,
@@ -28,6 +29,7 @@ impl TConditional {
         Self { subject, target, then, otherwise, negated }
     }
 
+    #[must_use]
     pub fn get_subject(&self) -> &TUnion {
         &self.subject
     }
@@ -36,6 +38,7 @@ impl TConditional {
         &mut self.subject
     }
 
+    #[must_use]
     pub fn get_target(&self) -> &TUnion {
         &self.target
     }
@@ -44,6 +47,7 @@ impl TConditional {
         &mut self.target
     }
 
+    #[must_use]
     pub fn get_then(&self) -> &TUnion {
         &self.then
     }
@@ -52,6 +56,7 @@ impl TConditional {
         &mut self.then
     }
 
+    #[must_use]
     pub fn get_otherwise(&self) -> &TUnion {
         &self.otherwise
     }
@@ -60,6 +65,7 @@ impl TConditional {
         &mut self.otherwise
     }
 
+    #[must_use]
     pub fn is_negated(&self) -> bool {
         self.negated
     }

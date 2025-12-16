@@ -115,6 +115,7 @@ impl ChangeSet {
     ///
     /// assert_eq!(change_set.get_original(), "Hello World");
     /// ```
+    #[must_use]
     pub fn new(changes: Vec<Change>) -> Self {
         Self { changes }
     }
@@ -172,6 +173,7 @@ impl ChangeSet {
     /// assert_eq!(change_set.get_original(), "Hello World");
     /// ```
     #[inline]
+    #[must_use]
     pub fn get_original(&self) -> String {
         let mut result = String::new();
         for change in &self.changes {
@@ -211,6 +213,7 @@ impl ChangeSet {
     /// assert_eq!(change_set.get_fixed(), "Hello Rustaceans");
     /// ```
     #[inline]
+    #[must_use]
     pub fn get_fixed(&self) -> String {
         let mut result = String::new();
         for change in &self.changes {
@@ -224,11 +227,13 @@ impl ChangeSet {
     }
 
     /// Returns the number of changes in the sequence.
+    #[must_use]
     pub fn len(&self) -> usize {
         self.changes.len()
     }
 
     /// Returns `true` if the sequence contains no changes.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.changes.is_empty()
     }
@@ -245,6 +250,7 @@ impl ChangeSet {
 }
 
 impl FixOperation {
+    #[must_use]
     pub fn get_safety_classification(&self) -> SafetyClassification {
         match self {
             FixOperation::Insert { safety_classification, .. } => *safety_classification,
@@ -262,11 +268,13 @@ impl FixPlan {
     ///
     /// # Returns
     /// A new `FixPlan` instance with no operations.
+    #[must_use]
     pub fn new() -> Self {
         Self { operations: Vec::default() }
     }
 
     /// Creates a new `FixPlan` instance from a vector of `FixOperation` instances.
+    #[must_use]
     pub fn from_operations(operations: Vec<FixOperation>) -> Self {
         Self { operations }
     }
@@ -354,6 +362,7 @@ impl FixPlan {
     }
 
     /// Returns a reference to the operations in the plan.
+    #[must_use]
     pub fn get_operations(&self) -> &Vec<FixOperation> {
         &self.operations
     }
@@ -361,6 +370,7 @@ impl FixPlan {
     /// Takes ownership of the operations in the plan.
     ///
     /// This method consumes the `FixPlan` and returns the list of operations it contains.
+    #[must_use]
     pub fn take_operations(self) -> Vec<FixOperation> {
         self.operations
     }
@@ -375,6 +385,7 @@ impl FixPlan {
     ///
     /// The minimum `SafetyClassification` of all operations.
     #[inline]
+    #[must_use]
     pub fn get_minimum_safety_classification(&self) -> SafetyClassification {
         self.operations
             .iter()
@@ -388,6 +399,7 @@ impl FixPlan {
     }
 
     #[inline]
+    #[must_use]
     pub fn to_minimum_safety_classification(&self, safety: SafetyClassification) -> Self {
         let min_safety = self.get_minimum_safety_classification();
         if min_safety > safety {
@@ -400,11 +412,13 @@ impl FixPlan {
     }
 
     /// Determines whether the plan is empty.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.operations.is_empty()
     }
 
     /// Returns the number of operations in the plan.
+    #[must_use]
     pub fn len(&self) -> usize {
         self.operations.len()
     }
@@ -425,6 +439,7 @@ impl FixPlan {
     ///
     /// A `ChangeSet` object representing the changes made to the content.
     #[inline]
+    #[must_use]
     pub fn execute(&self, content: &str) -> ChangeSet {
         let mut operations = self.operations.clone();
 

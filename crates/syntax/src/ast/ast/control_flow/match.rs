@@ -47,16 +47,19 @@ pub struct MatchDefaultArm<'arena> {
 
 impl<'arena> MatchArm<'arena> {
     #[inline]
+    #[must_use]
     pub const fn is_default(&self) -> bool {
         matches!(self, MatchArm::Default(_))
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_conditional(&self) -> bool {
         matches!(self, MatchArm::Expression(_))
     }
 
     #[inline]
+    #[must_use]
     pub fn expression(&self) -> &Expression<'arena> {
         match self {
             MatchArm::Expression(arm) => arm.expression,

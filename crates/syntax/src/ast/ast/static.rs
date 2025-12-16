@@ -38,6 +38,7 @@ pub struct StaticConcreteItem<'arena> {
 }
 
 impl<'arena> StaticItem<'arena> {
+    #[must_use]
     pub fn variable(&self) -> &DirectVariable<'arena> {
         match self {
             StaticItem::Abstract(item) => &item.variable,
@@ -45,6 +46,7 @@ impl<'arena> StaticItem<'arena> {
         }
     }
 
+    #[must_use]
     pub fn value(&self) -> Option<&Expression<'arena>> {
         match self {
             StaticItem::Abstract(_) => None,

@@ -109,13 +109,12 @@ impl LintRule for TooManyEnumCasesRule {
     }
 
     fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
-        let r#enum = match node {
-            Node::Enum(e) => e,
-            _ => return,
+        let Node::Enum(r#enum) = node else {
+            return;
         };
 
         let mut cases = 0;
-        for member in r#enum.members.iter() {
+        for member in &r#enum.members {
             if let ClassLikeMember::EnumCase(_) = member {
                 cases += 1;
             }

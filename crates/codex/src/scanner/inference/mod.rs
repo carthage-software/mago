@@ -8,7 +8,22 @@ use mago_names::ResolvedNames;
 use mago_names::scope::NamespaceScope;
 use mago_span::HasPosition;
 use mago_span::HasSpan;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Access;
+use mago_syntax::ast::Array;
+use mago_syntax::ast::ArrayElement;
+use mago_syntax::ast::Binary;
+use mago_syntax::ast::BinaryOperator;
+use mago_syntax::ast::ClassConstantAccess;
+use mago_syntax::ast::ClassLikeConstantSelector;
+use mago_syntax::ast::Construct;
+use mago_syntax::ast::Expression;
+use mago_syntax::ast::Identifier;
+use mago_syntax::ast::LegacyArray;
+use mago_syntax::ast::Literal;
+use mago_syntax::ast::MagicConstant;
+use mago_syntax::ast::StringPart;
+use mago_syntax::ast::UnaryPrefix;
+use mago_syntax::ast::UnaryPrefixOperator;
 
 use crate::flags::attribute::AttributeFlags;
 use crate::identifier::function_like::FunctionLikeIdentifier;
@@ -117,17 +132,12 @@ pub fn infer<'arena>(
         },
         Expression::CompositeString(composite_string) => {
             let mut contains_content = false;
-            for part in composite_string.parts().iter() {
-                match part {
-                    StringPart::Literal(literal_string_part) => {
-                        if !literal_string_part.value.is_empty() {
-                            contains_content = true;
-                            break;
-                        }
-                    }
-                    _ => {
-                        continue;
-                    }
+            for part in composite_string.parts() {
+                if let StringPart::Literal(literal_string_part) = part
+                    && !literal_string_part.value.is_empty()
+                {
+                    contains_content = true;
+                    break;
                 }
             }
 
@@ -338,7 +348,7 @@ pub fn infer<'arena>(
             if is_keyed_array_expression(expression) =>
         {
             let mut known_items = BTreeMap::new();
-            for element in elements.iter() {
+            for element in elements {
                 let ArrayElement::KeyValue(element) = element else {
                     return None;
                 };
@@ -402,13 +412,13 @@ fn infer_constant<'ctx, 'arena>(
     });
 
     const PHP_INT_MAX_SLICE: &[TAtomic] = &[
-        TAtomic::Scalar(TScalar::Integer(TInteger::Literal(9223372036854775807))),
-        TAtomic::Scalar(TScalar::Integer(TInteger::Literal(2147483647))),
+        TAtomic::Scalar(TScalar::Integer(TInteger::Literal(9_223_372_036_854_775_807))),
+        TAtomic::Scalar(TScalar::Integer(TInteger::Literal(2_147_483_647))),
     ];
 
     const PHP_INT_MIN_SLICE: &[TAtomic] = &[
-        TAtomic::Scalar(TScalar::Integer(TInteger::Literal(-9223372036854775808))),
-        TAtomic::Scalar(TScalar::Integer(TInteger::Literal(-2147483648))),
+        TAtomic::Scalar(TScalar::Integer(TInteger::Literal(-9_223_372_036_854_775_808))),
+        TAtomic::Scalar(TScalar::Integer(TInteger::Literal(-2_147_483_648))),
     ];
 
     const PHP_MAJOR_VERSION_ATOMIC: &TAtomic = &TAtomic::Scalar(TScalar::Integer(TInteger::Range(8, 9)));

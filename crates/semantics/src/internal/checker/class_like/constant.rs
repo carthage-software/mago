@@ -1,7 +1,10 @@
 use mago_php_version::feature::Feature;
-use mago_reporting::*;
-use mago_span::*;
-use mago_syntax::ast::*;
+use mago_reporting::Annotation;
+use mago_reporting::Issue;
+use mago_span::HasSpan;
+use mago_span::Span;
+use mago_syntax::ast::ClassLikeConstant;
+use mago_syntax::ast::Modifier;
 
 use crate::internal::context::Context;
 
@@ -19,7 +22,7 @@ pub fn check_class_like_constant<'ast, 'arena>(
 
     let mut last_final: Option<Span> = None;
     let mut last_visibility: Option<Span> = None;
-    for modifier in class_like_constant.modifiers.iter() {
+    for modifier in &class_like_constant.modifiers {
         match modifier {
             Modifier::Readonly(k)
             | Modifier::Static(k)
@@ -108,7 +111,7 @@ pub fn check_class_like_constant<'ast, 'arena>(
         );
     }
 
-    for item in class_like_constant.items.iter() {
+    for item in &class_like_constant.items {
         let item_name = item.name.value;
 
         if !item.value.is_constant(&context.version, false) {

@@ -1,5 +1,8 @@
 use crate::T;
-use crate::ast::ast::*;
+use crate::ast::ast::FullyQualifiedIdentifier;
+use crate::ast::ast::Identifier;
+use crate::ast::ast::LocalIdentifier;
+use crate::ast::ast::QualifiedIdentifier;
 use crate::error::ParseError;
 use crate::parser::internal::token_stream::TokenStream;
 use crate::parser::internal::utils;

@@ -34,7 +34,7 @@ pub fn is_contained_by(
     ) {
         all_types_contain = false;
 
-        update_failed_result_from_nested(atomic_comparison_result, nested_comparison_result);
+        update_failed_result_from_nested(atomic_comparison_result, &nested_comparison_result);
     }
 
     let mut nested_comparison_result = ComparisonResult::new();
@@ -50,7 +50,7 @@ pub fn is_contained_by(
     ) {
         all_types_contain = false;
 
-        update_failed_result_from_nested(atomic_comparison_result, nested_comparison_result);
+        update_failed_result_from_nested(atomic_comparison_result, &nested_comparison_result);
     }
 
     all_types_contain

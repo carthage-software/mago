@@ -1,5 +1,6 @@
 use mago_names::ResolvedNames;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Echo;
+use mago_syntax::ast::EchoTag;
 
 use crate::FingerprintOptions;
 use crate::Fingerprintable;
@@ -14,7 +15,7 @@ impl Fingerprintable for Echo<'_> {
     ) {
         "echo".hash(hasher);
 
-        for value in self.values.iter() {
+        for value in &self.values {
             value.fingerprint_with_hasher(hasher, resolved_names, options);
         }
     }
@@ -29,7 +30,7 @@ impl Fingerprintable for EchoTag<'_> {
     ) {
         "echo_tag".hash(hasher);
 
-        for value in self.values.iter() {
+        for value in &self.values {
             value.fingerprint_with_hasher(hasher, resolved_names, options);
         }
     }

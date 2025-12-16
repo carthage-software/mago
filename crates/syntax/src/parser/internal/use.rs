@@ -1,7 +1,16 @@
 use mago_database::file::HasFileId;
 
 use crate::T;
-use crate::ast::ast::*;
+use crate::ast::ast::MaybeTypedUseItem;
+use crate::ast::ast::MixedUseItemList;
+use crate::ast::ast::TypedUseItemList;
+use crate::ast::ast::TypedUseItemSequence;
+use crate::ast::ast::Use;
+use crate::ast::ast::UseItem;
+use crate::ast::ast::UseItemAlias;
+use crate::ast::ast::UseItemSequence;
+use crate::ast::ast::UseItems;
+use crate::ast::ast::UseType;
 use crate::ast::sequence::TokenSeparatedSequence;
 use crate::error::ParseError;
 use crate::parser::internal::identifier::parse_identifier;

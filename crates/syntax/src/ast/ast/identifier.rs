@@ -45,21 +45,25 @@ pub struct FullyQualifiedIdentifier<'arena> {
 
 impl<'arena> Identifier<'arena> {
     #[inline]
+    #[must_use]
     pub const fn is_local(&self) -> bool {
         matches!(self, Identifier::Local(_))
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_qualified(&self) -> bool {
         matches!(self, Identifier::Qualified(_))
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_fully_qualified(&self) -> bool {
         matches!(self, Identifier::FullyQualified(_))
     }
 
     #[inline]
+    #[must_use]
     pub const fn value(&self) -> &'arena str {
         match &self {
             Identifier::Local(local_identifier) => local_identifier.value,
@@ -69,6 +73,7 @@ impl<'arena> Identifier<'arena> {
     }
 
     #[inline]
+    #[must_use]
     pub fn last_segment(&self) -> &'arena str {
         let value = self.value();
 

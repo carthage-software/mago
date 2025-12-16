@@ -14,19 +14,36 @@ use mago_atom::AtomSet;
 use mago_atom::atom;
 
 use mago_codex::ttype;
+use mago_codex::ttype::TType;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::bool::TBool;
 use mago_codex::ttype::combine_union_types;
 use mago_codex::ttype::combiner::combine;
+use mago_codex::ttype::get_array_parameters;
+use mago_codex::ttype::get_arraykey;
+use mago_codex::ttype::get_iterable_parameters;
+use mago_codex::ttype::get_literal_string;
+use mago_codex::ttype::get_mixed;
+use mago_codex::ttype::get_never;
+use mago_codex::ttype::get_non_empty_string;
+use mago_codex::ttype::get_string;
 use mago_codex::ttype::union::TUnion;
-use mago_codex::ttype::*;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_span::Span;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Access;
+use mago_syntax::ast::Array;
+use mago_syntax::ast::BinaryOperator;
+use mago_syntax::ast::Expression;
+use mago_syntax::ast::Foreach;
+use mago_syntax::ast::LegacyArray;
+use mago_syntax::ast::List;
+use mago_syntax::ast::Statement;
+use mago_syntax::ast::UnaryPrefix;
+use mago_syntax::ast::Variable;
 
 use crate::analyzable::Analyzable;
 use crate::analyze_statements;
@@ -86,7 +103,7 @@ fn analyze_for_or_while_loop<'ctx, 'ast, 'arena>(
     let (inner_loop_block_context, loop_scope) = analyze(
         context,
         statements,
-        conditions.iter().collect(),
+        &conditions.iter().collect::<Vec<_>>(),
         increments.iter().collect(),
         loop_scope,
         &mut loop_block_context,
@@ -164,7 +181,7 @@ fn inherit_loop_block_context<'ctx>(
 fn analyze<'ctx, 'ast, 'arena>(
     context: &mut Context<'ctx, 'arena>,
     statements: &'ast [Statement<'arena>],
-    pre_conditions: Vec<&'ast Expression<'arena>>,
+    pre_conditions: &[&'ast Expression<'arena>],
     post_expressions: Vec<&'ast Expression<'arena>>,
     mut loop_scope: LoopScope,
     loop_context: &mut BlockContext<'ctx>,
@@ -173,9 +190,9 @@ fn analyze<'ctx, 'ast, 'arena>(
     is_do: bool,
     always_enters_loop: bool,
 ) -> Result<(BlockContext<'ctx>, LoopScope), AnalysisError> {
-    let (assignment_map, first_variable_id) = get_assignment_map(&pre_conditions, &post_expressions, statements);
+    let (assignment_map, first_variable_id) = get_assignment_map(pre_conditions, &post_expressions, statements);
     let assignment_depth = if let Some(first_variable_id) = first_variable_id {
-        get_assignment_map_depth(&first_variable_id, &mut assignment_map.clone())
+        get_assignment_map_depth(first_variable_id, &mut assignment_map.clone())
     } else {
         0
     };
@@ -193,7 +210,7 @@ fn analyze<'ctx, 'ast, 'arena>(
         let assertion_context = context.get_assertion_context_from_block(loop_context);
 
         let mut complex_conditions = vec![];
-        for pre_condition in &pre_conditions {
+        for pre_condition in pre_conditions {
             let condition_span = pre_condition.span();
             let clauses = get_formula(condition_span, condition_span, pre_condition, assertion_context, artifacts)
                 .unwrap_or_else(|| {
@@ -407,7 +424,7 @@ fn analyze<'ctx, 'ast, 'arena>(
                             )),
                         );
 
-                        pre_loop_context.remove_variable_from_conflicting_clauses(context, &variable_id, None);
+                        pre_loop_context.remove_variable_from_conflicting_clauses(context, variable_id, None);
 
                         loop_parent_context.possibly_assigned_variable_ids.insert(variable_id);
                     }
@@ -424,7 +441,7 @@ fn analyze<'ctx, 'ast, 'arena>(
                         );
 
                         // if there's a change, invalidate related clauses
-                        pre_loop_context.remove_variable_from_conflicting_clauses(context, &variable_id, None);
+                        pre_loop_context.remove_variable_from_conflicting_clauses(context, variable_id, None);
                     }
                 } else {
                     if !recorded_issues.is_empty() {
@@ -614,7 +631,7 @@ fn analyze<'ctx, 'ast, 'arena>(
                     Rc::new(combine_union_types(variable_type, loop_context_type, codebase, always_enters_loop)),
                 );
 
-                loop_parent_context.remove_variable_from_conflicting_clauses(context, variable_id, None);
+                loop_parent_context.remove_variable_from_conflicting_clauses(context, *variable_id, None);
             } else if let Some(loop_parent_context_type) = loop_parent_context.locals.get_mut(variable_id)
                 && loop_parent_context_type != loop_context_type
             {
@@ -630,7 +647,7 @@ fn analyze<'ctx, 'ast, 'arena>(
                     *continue_context_type = Rc::new((**continue_context_type).clone());
 
                     loop_parent_context.locals.insert(variable_id, continue_context_type.clone());
-                    loop_parent_context.remove_variable_from_conflicting_clauses(context, &variable_id, None);
+                    loop_parent_context.remove_variable_from_conflicting_clauses(context, variable_id, None);
                 } else if continue_context_type != &variable_type {
                     loop_parent_context.locals.insert(
                         variable_id,
@@ -641,7 +658,7 @@ fn analyze<'ctx, 'ast, 'arena>(
                             always_enters_loop,
                         )),
                     );
-                    loop_parent_context.remove_variable_from_conflicting_clauses(context, &variable_id, None);
+                    loop_parent_context.remove_variable_from_conflicting_clauses(context, variable_id, None);
                 } else if let Some(loop_parent_context_type) = loop_parent_context.locals.get_mut(&variable_id) {
                     *loop_parent_context_type = Rc::new((**continue_context_type).clone());
                 }
@@ -686,7 +703,7 @@ fn analyze<'ctx, 'ast, 'arena>(
                         loop_parent_context.locals.insert(variable_id, reconciled_type.clone());
                     }
 
-                    loop_parent_context.remove_variable_from_conflicting_clauses(context, &variable_id, None);
+                    loop_parent_context.remove_variable_from_conflicting_clauses(context, variable_id, None);
                 }
             }
         }
@@ -723,8 +740,8 @@ fn analyze<'ctx, 'ast, 'arena>(
     Ok((continue_context, loop_scope))
 }
 
-fn get_assignment_map_depth(first_variable_id: &Atom, assignment_map: &mut BTreeMap<Atom, BTreeSet<Atom>>) -> usize {
-    let Some(assignment_variable_ids) = assignment_map.remove(first_variable_id) else {
+fn get_assignment_map_depth(first_variable_id: Atom, assignment_map: &mut BTreeMap<Atom, BTreeSet<Atom>>) -> usize {
+    let Some(assignment_variable_ids) = assignment_map.remove(&first_variable_id) else {
         return 0;
     };
 
@@ -733,7 +750,7 @@ fn get_assignment_map_depth(first_variable_id: &Atom, assignment_map: &mut BTree
         let mut depth = 1;
 
         if assignment_map.contains_key(&assignment_variable_id) {
-            depth += get_assignment_map_depth(&assignment_variable_id, assignment_map);
+            depth += get_assignment_map_depth(assignment_variable_id, assignment_map);
         }
 
         if depth > max_depth {
@@ -820,7 +837,7 @@ fn apply_pre_condition_to_loop_context<'ctx, 'arena>(
         let mut loop_context_clauses = loop_context.clauses.clone();
 
         for variable_id in &always_assigned_before_loop_body_variables {
-            loop_context_clauses = BlockContext::filter_clauses(context, variable_id, loop_context_clauses, None);
+            loop_context_clauses = BlockContext::filter_clauses(context, *variable_id, loop_context_clauses, None);
         }
 
         loop_context.clauses = loop_context_clauses;
@@ -989,9 +1006,7 @@ fn analyze_iterator<'ctx, 'ast, 'arena>(
         };
 
         match iterator_atomic {
-            TAtomic::Null | TAtomic::Scalar(TScalar::Bool(TBool { value: Some(false), .. })) => {
-                continue;
-            }
+            TAtomic::Null | TAtomic::Scalar(TScalar::Bool(TBool { value: Some(false), .. })) => {}
             TAtomic::Array(array) => {
                 has_valid_iterable_type = true;
                 if array.is_non_empty() {
@@ -1211,7 +1226,7 @@ fn scrape_variables_from_expression<'arena>(expression: &Expression<'arena>) -> 
             Expression::List(List { elements, .. })
             | Expression::Array(Array { elements, .. })
             | Expression::LegacyArray(LegacyArray { elements, .. }) => {
-                for element in elements.iter() {
+                for element in elements {
                     if let Some(key_expression) = element.get_key() {
                         walk(key_expression, current_set);
                     }

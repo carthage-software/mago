@@ -1,5 +1,7 @@
 use crate::T;
-use crate::ast::ast::*;
+use crate::ast::ast::While;
+use crate::ast::ast::WhileBody;
+use crate::ast::ast::WhileColonDelimitedBody;
 use crate::ast::sequence::Sequence;
 use crate::error::ParseError;
 use crate::parser::internal::expression::parse_expression;

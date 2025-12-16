@@ -185,7 +185,7 @@ pub(crate) fn reconcile(
                     key,
                     negated,
                     span,
-                    resource_to_subtract,
+                    *resource_to_subtract,
                 ));
             }
             TAtomic::Mixed(mixed) if mixed.is_non_null() => {
@@ -236,15 +236,13 @@ pub(crate) fn reconcile(
             Some(reconcile_empty_countable(context, assertion, existing_var_type, key, negated, span))
         }
         Assertion::DoesNotHaveExactCount(count) => {
-            Some(reconcile_not_exactly_countable(context, assertion, existing_var_type, key, negated, span, count))
+            Some(reconcile_not_exactly_countable(context, assertion, existing_var_type, key, negated, span, *count))
         }
         Assertion::NotCountable(_) => {
             let mut atomics = vec![];
             for existing_atomic in existing_var_type.types.as_ref() {
                 match existing_atomic {
-                    TAtomic::Array(_) => {
-                        continue;
-                    }
+                    TAtomic::Array(_) => {}
                     TAtomic::Iterable(iterable) => {
                         let mut traversable = TNamedObject::new(atom("Traversable"))
                             .with_type_parameters(Some(vec![*iterable.key_type.clone(), *iterable.value_type.clone()]));
@@ -256,7 +254,6 @@ pub(crate) fn reconcile(
                         }
 
                         atomics.push(TAtomic::Object(TObject::Named(traversable)));
-                        continue;
                     }
                     _ => {
                         atomics.push(existing_atomic.clone());
@@ -926,7 +923,7 @@ pub(crate) fn subtract_resource(
     key: Option<&str>,
     negated: bool,
     span: Option<&Span>,
-    resource_to_subtract: &TResource,
+    resource_to_subtract: TResource,
 ) -> TUnion {
     let mut did_remove_type = false;
     let mut new_var_type = existing_var_type.clone();
@@ -1288,7 +1285,7 @@ fn reconcile_not_exactly_countable(
     key: Option<&str>,
     negated: bool,
     span: Option<&Span>,
-    count: &usize,
+    count: usize,
 ) -> TUnion {
     let mut did_remove_type = existing_var_type.possibly_undefined_from_try();
     let mut new_var_type = existing_var_type.clone();
@@ -1297,7 +1294,7 @@ fn reconcile_not_exactly_countable(
     for atomic in new_var_type.types.to_mut().drain(..) {
         if let TAtomic::Array(TArray::List(TList { known_count, .. })) = atomic {
             if let Some(known_count) = &known_count {
-                if known_count == count {
+                if *known_count == count {
                     did_remove_type = true;
                     continue;
                 }

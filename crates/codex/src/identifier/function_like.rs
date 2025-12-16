@@ -30,18 +30,21 @@ pub enum FunctionLikeIdentifier {
 impl FunctionLikeIdentifier {
     /// Checks if this identifier represents a `Function`.
     #[inline]
+    #[must_use]
     pub const fn is_function(&self) -> bool {
         matches!(self, FunctionLikeIdentifier::Function(_))
     }
 
     /// Checks if this identifier represents a `Method`.
     #[inline]
+    #[must_use]
     pub const fn is_method(&self) -> bool {
         matches!(self, FunctionLikeIdentifier::Method(_, _))
     }
 
     /// Checks if this identifier represents a `Closure`.
     #[inline]
+    #[must_use]
     pub const fn is_closure(&self) -> bool {
         matches!(self, FunctionLikeIdentifier::Closure(_, _))
     }
@@ -49,6 +52,7 @@ impl FunctionLikeIdentifier {
     /// If this identifier represents a method, returns it as a `MethodIdentifier`.
     /// Otherwise, returns `None`.
     #[inline]
+    #[must_use]
     pub const fn as_method_identifier(&self) -> Option<MethodIdentifier> {
         match self {
             FunctionLikeIdentifier::Method(fq_classlike_name, method_name) => {
@@ -60,6 +64,7 @@ impl FunctionLikeIdentifier {
 
     /// Returns a string representation of the kind of function-like construct.
     #[inline]
+    #[must_use]
     pub const fn title_kind_str(&self) -> &'static str {
         match self {
             FunctionLikeIdentifier::Function(_) => "Function",
@@ -70,6 +75,7 @@ impl FunctionLikeIdentifier {
 
     /// Returns a string representation of the kind of function-like construct.
     #[inline]
+    #[must_use]
     pub const fn kind_str(&self) -> &'static str {
         match self {
             FunctionLikeIdentifier::Function(_) => "function",
@@ -82,6 +88,7 @@ impl FunctionLikeIdentifier {
     ///
     /// For closures, this typically includes the filename and starting offset.
     #[inline]
+    #[must_use]
     pub fn as_string(&self) -> String {
         match self {
             FunctionLikeIdentifier::Function(fn_name) => fn_name.to_string(),
@@ -96,6 +103,7 @@ impl FunctionLikeIdentifier {
 
     /// Creates a stable string representation suitable for use as a key or unique ID.
     #[inline]
+    #[must_use]
     pub fn to_hash(&self) -> String {
         match self {
             FunctionLikeIdentifier::Function(fn_name) => fn_name.to_string(),

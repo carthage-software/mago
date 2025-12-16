@@ -7,7 +7,23 @@ use bumpalo::vec;
 use bumpalo::Bump;
 use mago_span::HasPosition;
 use mago_span::HasSpan;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Constant;
+use mago_syntax::ast::Declare;
+use mago_syntax::ast::DeclareBody;
+use mago_syntax::ast::Echo;
+use mago_syntax::ast::ExpressionStatement;
+use mago_syntax::ast::Global;
+use mago_syntax::ast::Goto;
+use mago_syntax::ast::MaybeTypedUseItem;
+use mago_syntax::ast::Sequence;
+use mago_syntax::ast::Statement;
+use mago_syntax::ast::Static;
+use mago_syntax::ast::Terminator;
+use mago_syntax::ast::Unset;
+use mago_syntax::ast::Use;
+use mago_syntax::ast::UseItem;
+use mago_syntax::ast::UseItems;
+use mago_syntax::ast::UseType;
 
 use crate::document::Align;
 use crate::document::Document;
@@ -112,8 +128,8 @@ fn print_statement_slice<'ctx, 'arena>(
 }
 
 // New function to format statements with spacing and newlines
-fn format_statement_with_spacing<'ctx, 'arena>(
-    f: &mut FormatterState<'ctx, 'arena>,
+fn format_statement_with_spacing<'arena>(
+    f: &mut FormatterState<'_, 'arena>,
     i: usize,
     stmt: &'arena Statement<'arena>,
     stmts: &[&'arena Statement<'arena>],
@@ -336,13 +352,13 @@ fn print_use_statements<'arena>(
             let a_full_name = join_item_name(f.arena, &a.namespace, a.name);
             let b_full_name = join_item_name(f.arena, &b.namespace, b.name);
 
-            let mut a_chars = a_full_name.chars().flat_map(|c| c.to_lowercase());
-            let mut b_chars = b_full_name.chars().flat_map(|c| c.to_lowercase());
+            let mut a_chars = a_full_name.chars().flat_map(char::to_lowercase);
+            let mut b_chars = b_full_name.chars().flat_map(char::to_lowercase);
 
             loop {
                 match (a_chars.next(), b_chars.next()) {
                     (Some(ac), Some(bc)) => match ac.cmp(&bc) {
-                        Ordering::Equal => continue,
+                        Ordering::Equal => {}
                         other => return other,
                     },
                     (None, Some(_)) => return Ordering::Less,
@@ -447,20 +463,20 @@ fn expand_use<'arena>(
 ) -> std::vec::Vec<ExpandedUseItem<'arena>> {
     let mut expanded_items = std::vec::Vec::new();
 
-    /// Extract namespace and name from a UseItem by splitting its full name path.
+    /// Extract namespace and name from a `UseItem` by splitting its full name path.
     fn extract_namespace_and_name_from_item<'arena>(
         f: &mut FormatterState<'_, 'arena>,
         item: &'arena UseItem<'arena>,
         mut namespace: Vec<'arena, &'arena str>,
     ) -> (Vec<'arena, &'arena str>, &'arena str) {
-        let mut parts = item.name.value().split("\\").collect_in::<Vec<_>>(f.arena);
+        let mut parts = item.name.value().split('\\').collect_in::<Vec<_>>(f.arena);
         // SAFETY: split always returns at least one element
         let name = unsafe { parts.pop().unwrap_unchecked() };
         namespace.extend(parts);
         (namespace, name)
     }
 
-    /// Extract namespace and name from a grouped list (TypedList or MixedList).
+    /// Extract namespace and name from a grouped list (`TypedList` or `MixedList`).
     /// The namespace is the list's namespace appended to the current namespace,
     /// and the name is extracted from the first item.
     fn extract_namespace_and_name_from_grouped_list<'arena>(
@@ -485,7 +501,7 @@ fn expand_use<'arena>(
         match items {
             UseItems::Sequence(seq) => {
                 if should_expand {
-                    for item in seq.items.iter() {
+                    for item in &seq.items {
                         expand_single_item(f, item, current_namespace.clone(), use_type, expanded_items, original_node);
                     }
                 } else {
@@ -500,7 +516,7 @@ fn expand_use<'arena>(
             }
             UseItems::TypedSequence(seq) => {
                 if should_expand {
-                    for item in seq.items.iter() {
+                    for item in &seq.items {
                         expand_single_item(
                             f,
                             item,
@@ -530,7 +546,7 @@ fn expand_use<'arena>(
                 if should_expand {
                     let mut new_namespace = current_namespace.clone();
                     new_namespace.push(list.namespace.value());
-                    for item in list.items.iter() {
+                    for item in &list.items {
                         expand_single_item(
                             f,
                             item,
@@ -561,7 +577,7 @@ fn expand_use<'arena>(
                 if should_expand {
                     let mut new_namespace = current_namespace.clone();
                     new_namespace.push(list.namespace.value());
-                    for maybe_typed_item in list.items.iter() {
+                    for maybe_typed_item in &list.items {
                         expand_single_item(
                             f,
                             &maybe_typed_item.item,
@@ -599,7 +615,7 @@ fn expand_use<'arena>(
         expanded_items: &mut std::vec::Vec<ExpandedUseItem<'arena>>,
         original_node: &'arena Use<'arena>,
     ) {
-        let mut parts = item.name.value().split("\\").collect_in::<Vec<_>>(f.arena);
+        let mut parts = item.name.value().split('\\').collect_in::<Vec<_>>(f.arena);
         // SAFETY: split always returns at least one element
         let name = unsafe { parts.pop().unwrap_unchecked() };
         current_namespace.extend(parts);

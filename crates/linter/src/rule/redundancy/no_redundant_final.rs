@@ -8,7 +8,9 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_reporting::Level;
 use mago_span::HasSpan;
-use mago_syntax::ast::*;
+use mago_syntax::ast::ClassLikeMember;
+use mago_syntax::ast::Node;
+use mago_syntax::ast::NodeKind;
 
 use crate::category::Category;
 use crate::context::LintContext;
@@ -105,7 +107,7 @@ impl LintRule for NoRedundantFinalRule {
             return;
         }
 
-        for member in members.iter() {
+        for member in members {
             if let ClassLikeMember::Method(method) = member {
                 let Some(final_modifier) = method.modifiers.get_final() else {
                     continue;

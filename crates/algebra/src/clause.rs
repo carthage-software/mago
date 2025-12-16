@@ -38,6 +38,7 @@ impl Hash for Clause {
 }
 
 impl Clause {
+    #[must_use]
     pub fn new(
         possibilities: IndexMap<Atom, IndexMap<u64, Assertion>>,
         condition_span: Span,
@@ -57,6 +58,7 @@ impl Clause {
         }
     }
 
+    #[must_use]
     pub fn remove_possibilities(&self, var_id: &Atom) -> Option<Clause> {
         let mut possibilities = self.possibilities.clone();
 
@@ -76,6 +78,7 @@ impl Clause {
         ))
     }
 
+    #[must_use]
     pub fn add_possibility(&self, var_id: Atom, new_possibility: IndexMap<u64, Assertion>) -> Clause {
         let mut possibilities = self.possibilities.clone();
 
@@ -91,6 +94,7 @@ impl Clause {
         )
     }
 
+    #[must_use]
     pub fn contains(&self, other_clause: &Self) -> bool {
         if other_clause.possibilities.len() > self.possibilities.len() {
             return false;
@@ -103,6 +107,7 @@ impl Clause {
         })
     }
 
+    #[must_use]
     pub fn get_impossibilities(&self) -> BTreeMap<Atom, Vec<Assertion>> {
         self.possibilities
             .iter()
@@ -114,6 +119,7 @@ impl Clause {
             .collect()
     }
 
+    #[must_use]
     pub fn to_atom(&self) -> Atom {
         if self.possibilities.is_empty() {
             return atom("<empty>");
@@ -176,7 +182,7 @@ fn get_hash(
     if wedge || !reconcilable {
         (Wrapping(clause_span.start.offset)
             + Wrapping(clause_span.end.offset)
-            + Wrapping(if wedge { 100000 } else { 0 }))
+            + Wrapping(if wedge { 100_000 } else { 0 }))
         .0
     } else {
         let mut hasher = AHasher::default();

@@ -8,7 +8,7 @@ pub mod if_scope;
 pub mod loop_scope;
 
 #[inline]
-pub fn var_has_root(var_id: &Atom, root_var_id: &Atom) -> bool {
+pub fn var_has_root(var_id: Atom, root_var_id: Atom) -> bool {
     if var_id == root_var_id {
         return true;
     }
@@ -28,15 +28,15 @@ mod tests {
 
     #[test]
     fn test_var_has_root() {
-        assert!(var_has_root(&atom("$foo"), &atom("$foo")));
-        assert!(var_has_root(&atom("$foo[bar]"), &atom("$foo")));
-        assert!(var_has_root(&atom("$foo->bar"), &atom("$foo")));
-        assert!(var_has_root(&atom("$foo::bar"), &atom("$foo")));
-        assert!(var_has_root(&atom("$foo->bar[0]"), &atom("$foo")));
-        assert!(var_has_root(&atom("$foo->bar[0]->baz"), &atom("$foo")));
-        assert!(!var_has_root(&atom("$foo[bar]"), &atom("$bar")));
-        assert!(var_has_root(&atom("$foo[bar]"), &atom("$foo[bar]")));
-        assert!(!var_has_root(&atom("$foo[bar]"), &atom("$foo[bar][baz]")));
-        assert!(!var_has_root(&atom("$foo[bar]"), &atom("$foo[bar][baz]")));
+        assert!(var_has_root(atom("$foo"), atom("$foo")));
+        assert!(var_has_root(atom("$foo[bar]"), atom("$foo")));
+        assert!(var_has_root(atom("$foo->bar"), atom("$foo")));
+        assert!(var_has_root(atom("$foo::bar"), atom("$foo")));
+        assert!(var_has_root(atom("$foo->bar[0]"), atom("$foo")));
+        assert!(var_has_root(atom("$foo->bar[0]->baz"), atom("$foo")));
+        assert!(!var_has_root(atom("$foo[bar]"), atom("$bar")));
+        assert!(var_has_root(atom("$foo[bar]"), atom("$foo[bar]")));
+        assert!(!var_has_root(atom("$foo[bar]"), atom("$foo[bar][baz]")));
+        assert!(!var_has_root(atom("$foo[bar]"), atom("$foo[bar][baz]")));
     }
 }

@@ -134,9 +134,8 @@ pub fn validate_method_signature_compatibility(
     }
 
     for (index, parent_param) in parent_method.parameters.iter().enumerate() {
-        let child_param = match child_method.parameters.get(index) {
-            Some(p) => p,
-            None => continue,
+        let Some(child_param) = child_method.parameters.get(index) else {
+            continue;
         };
 
         let parent_param_type = match &parent_param.type_metadata {
@@ -188,9 +187,8 @@ pub fn validate_method_signature_compatibility(
     }
 
     for (index, parent_param) in parent_method.parameters.iter().enumerate() {
-        let child_param = match child_method.parameters.get(index) {
-            Some(p) => p,
-            None => continue,
+        let Some(child_param) = child_method.parameters.get(index) else {
+            continue;
         };
 
         if parent_param.name != child_param.name {

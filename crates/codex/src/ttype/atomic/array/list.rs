@@ -34,6 +34,7 @@ impl TList {
     ///
     /// * `element_type`: The general type (`TUnion`) of elements in the list, boxed.
     #[inline]
+    #[must_use]
     pub fn new(element_type: Box<TUnion>) -> Self {
         Self { element_type, known_elements: None, known_count: None, non_empty: false }
     }
@@ -46,6 +47,7 @@ impl TList {
     /// # Arguments
     ///
     /// * `known_elements`: A `BTreeMap` mapping indices to (`is_optional`, `TUnion`) tuples.
+    #[must_use]
     pub fn from_known_elements(known_elements: BTreeMap<usize, (bool, TUnion)>) -> Self {
         Self {
             element_type: Box::new(get_never()),
@@ -60,30 +62,35 @@ impl TList {
     }
 
     #[inline]
+    #[must_use]
     pub fn new_non_empty(element_type: Box<TUnion>) -> Self {
         Self { element_type, known_elements: None, known_count: None, non_empty: true }
     }
 
     /// Returns a reference to the general element type (`TUnion`).
     #[inline]
+    #[must_use]
     pub fn get_element_type(&self) -> &TUnion {
         &self.element_type
     }
 
     /// Returns a reference to the map of known element types by index, if any.
     #[inline]
+    #[must_use]
     pub fn get_known_elements(&self) -> Option<&BTreeMap<usize, (bool, TUnion)>> {
         self.known_elements.as_ref()
     }
 
     /// Returns the known count of elements, if determined.
     #[inline]
+    #[must_use]
     pub fn get_known_count(&self) -> Option<usize> {
         self.known_count
     }
 
     /// Create a non-empty clone of the list type.
     #[inline]
+    #[must_use]
     pub fn clone_non_empty(&self) -> Self {
         Self {
             element_type: self.element_type.clone(),
@@ -95,6 +102,7 @@ impl TList {
 
     /// Create a non-empty clone of the list type.
     #[inline]
+    #[must_use]
     pub fn clone_non_empty_with_count(&self, count: Option<usize>) -> Self {
         Self {
             element_type: self.element_type.clone(),
@@ -106,24 +114,28 @@ impl TList {
 
     /// Checks if the list is known to be non-empty.
     #[inline]
+    #[must_use]
     pub const fn is_non_empty(&self) -> bool {
         self.non_empty
     }
 
     /// Checks if there are any known specific element types defined.
     #[inline]
+    #[must_use]
     pub fn has_known_elements(&self) -> bool {
         self.known_elements.is_some()
     }
 
     /// Checks if the list contains any known optional elements.
     #[inline]
+    #[must_use]
     pub fn has_known_optional_elements(&self) -> bool {
         self.known_elements.as_ref().is_some_and(|elements| elements.values().any(|(optional, _)| *optional))
     }
 
     /// Checks if the exact count of elements is known.
     #[inline]
+    #[must_use]
     pub fn has_known_count(&self) -> bool {
         self.known_count.is_some()
     }

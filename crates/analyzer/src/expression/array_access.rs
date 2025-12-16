@@ -71,7 +71,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ArrayAccess<'arena> {
                 &container_type,
                 &index_type,
                 false,
-                &extended_var_id,
+                extended_var_id,
                 None,
                 container_type.is_nullable() && expression_is_nullsafe(self.array),
             );

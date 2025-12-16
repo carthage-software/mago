@@ -7,7 +7,8 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_reporting::Level;
 use mago_span::HasSpan;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Node;
+use mago_syntax::ast::NodeKind;
 
 use crate::category::Category;
 use crate::context::LintContext;
@@ -100,7 +101,7 @@ impl LintRule for NoGlobalRule {
                     .with_note("Consider using dependency injection or other techniques to manage state and avoid relying on global variables.")
                     .with_help("Refactor your code to avoid using the `global` keyword.");
 
-                for variable in global.variables.iter() {
+                for variable in &global.variables {
                     issue = issue.with_annotation(
                         Annotation::secondary(variable.span()).with_message("This variable is declared as global"),
                     );

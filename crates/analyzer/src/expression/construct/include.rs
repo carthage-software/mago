@@ -2,7 +2,11 @@ use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::get_string;
 use mago_span::HasSpan;
 use mago_span::Span;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Expression;
+use mago_syntax::ast::IncludeConstruct;
+use mago_syntax::ast::IncludeOnceConstruct;
+use mago_syntax::ast::RequireConstruct;
+use mago_syntax::ast::RequireOnceConstruct;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -122,7 +126,7 @@ fn analyze_include<'ctx, 'arena>(
         construct_kind,
         keyword_span,
         ConstructInput::Expression(included_file),
-        get_string(),
+        &get_string(),
         false,
         false,
         true,

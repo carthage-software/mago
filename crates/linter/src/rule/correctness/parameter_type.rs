@@ -5,9 +5,14 @@ use serde::Serialize;
 
 use mago_php_version::PHPVersion;
 use mago_php_version::PHPVersionRange;
-use mago_reporting::*;
+use mago_reporting::Annotation;
+use mago_reporting::Issue;
+use mago_reporting::Level;
 use mago_span::HasSpan;
-use mago_syntax::ast::*;
+use mago_syntax::ast::ClassLikeMember;
+use mago_syntax::ast::FunctionLikeParameter;
+use mago_syntax::ast::Node;
+use mago_syntax::ast::NodeKind;
 
 use crate::category::Category;
 use crate::context::LintContext;
@@ -107,7 +112,7 @@ impl LintRule for ParameterTypeRule {
     fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         match node {
             Node::Function(function) => {
-                for parameter in function.parameter_list.parameters.iter() {
+                for parameter in &function.parameter_list.parameters {
                     self.check_function_like_parameter(parameter, ctx);
                 }
             }
@@ -116,7 +121,7 @@ impl LintRule for ParameterTypeRule {
                     return;
                 }
 
-                for parameter in closure.parameter_list.parameters.iter() {
+                for parameter in &closure.parameter_list.parameters {
                     self.check_function_like_parameter(parameter, ctx);
                 }
             }
@@ -125,7 +130,7 @@ impl LintRule for ParameterTypeRule {
                     return;
                 }
 
-                for parameter in arrow_function.parameter_list.parameters.iter() {
+                for parameter in &arrow_function.parameter_list.parameters {
                     self.check_function_like_parameter(parameter, ctx);
                 }
             }
@@ -176,7 +181,7 @@ impl ParameterTypeRule {
                 continue;
             };
 
-            for parameter in method.parameter_list.parameters.iter() {
+            for parameter in &method.parameter_list.parameters {
                 self.check_function_like_parameter(parameter, ctx);
             }
         }

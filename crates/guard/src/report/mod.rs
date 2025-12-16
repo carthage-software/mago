@@ -20,6 +20,7 @@ pub struct FortressReport {
 }
 
 impl FortressReport {
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.boundary_breaches.is_empty() && self.structural_flaws.is_empty()
     }

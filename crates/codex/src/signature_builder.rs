@@ -5,7 +5,19 @@ use mago_fingerprint::FingerprintOptions;
 use mago_fingerprint::Fingerprintable;
 use mago_names::ResolvedNames;
 use mago_span::HasSpan;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Class;
+use mago_syntax::ast::ClassLikeConstant;
+use mago_syntax::ast::Constant;
+use mago_syntax::ast::Enum;
+use mago_syntax::ast::EnumCase;
+use mago_syntax::ast::EnumCaseItem;
+use mago_syntax::ast::Function;
+use mago_syntax::ast::Interface;
+use mago_syntax::ast::Method;
+use mago_syntax::ast::Program;
+use mago_syntax::ast::Property;
+use mago_syntax::ast::PropertyItem;
+use mago_syntax::ast::Trait;
 use mago_syntax::walker::MutWalker;
 
 use crate::signature::DefSignatureNode;
@@ -22,6 +34,7 @@ use crate::signature::FileSignature;
 /// # Returns
 ///
 /// A `FileSignature` containing all top-level definitions with their hashes and positions.
+#[must_use]
 pub fn build_file_signature<'arena>(
     file: &File,
     program: &'arena Program<'arena>,
@@ -163,7 +176,7 @@ impl<'ast, 'arena> MutWalker<'ast, 'arena, ()> for SignatureBuilder<'_, 'arena> 
         let span = constant.span();
         let hash = constant.fingerprint(self.resolved_names, &self.fingerprint_options);
 
-        for item in constant.items.iter() {
+        for item in &constant.items {
             let name = item.name.value;
             let node = self.create_node(name, false, true, false, span, hash);
             self.ast_nodes.push(node);

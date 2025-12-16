@@ -1,6 +1,16 @@
 use crate::T;
+use crate::ast::ast::ArrayAccess;
+use crate::ast::ast::BracedExpressionStringPart;
+use crate::ast::ast::CompositeString;
+use crate::ast::ast::ConstantAccess;
+use crate::ast::ast::DocumentIndentation;
 use crate::ast::ast::DocumentKind as AstDocumentKind;
-use crate::ast::ast::*;
+use crate::ast::ast::DocumentString;
+use crate::ast::ast::Expression;
+use crate::ast::ast::InterpolatedString;
+use crate::ast::ast::LiteralStringPart;
+use crate::ast::ast::ShellExecuteString;
+use crate::ast::ast::StringPart;
 use crate::ast::sequence::Sequence;
 use crate::error::ParseError;
 use crate::parser::internal::expression::parse_expression;

@@ -109,24 +109,29 @@ impl Default for FingerprintOptions<'_> {
 }
 
 impl<'a> FingerprintOptions<'a> {
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
+    #[must_use]
     pub fn strict() -> Self {
         Self { include_use_statements: true, important_comment_patterns: &[] }
     }
 
+    #[must_use]
     pub fn with_use_statements(mut self, include: bool) -> Self {
         self.include_use_statements = include;
         self
     }
 
+    #[must_use]
     pub fn with_comment_patterns(mut self, patterns: &'a [&'a str]) -> Self {
         self.important_comment_patterns = patterns;
         self
     }
 
+    #[must_use]
     pub fn is_important_comment(&self, comment: &str) -> bool {
         for pattern in self.important_comment_patterns {
             if comment.contains(pattern) {

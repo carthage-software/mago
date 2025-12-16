@@ -52,9 +52,7 @@ pub fn reconcile(
     let codebase = context.codebase;
     let is_negation = assertion.is_negation();
 
-    let existing_var_type = if let Some(existing_var_type) = existing_var_type {
-        existing_var_type
-    } else {
+    let Some(existing_var_type) = existing_var_type else {
         return get_missing_type(assertion, inside_loop);
     };
 

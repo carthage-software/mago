@@ -28,7 +28,15 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_span::Span;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Class;
+use mago_syntax::ast::ClassLikeMember;
+use mago_syntax::ast::Enum;
+use mago_syntax::ast::Extends;
+use mago_syntax::ast::Implements;
+use mago_syntax::ast::Interface;
+use mago_syntax::ast::Property;
+use mago_syntax::ast::Trait;
+use mago_syntax::ast::TraitUse;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -267,7 +275,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Class<'arena> {
             artifacts,
             self.attribute_lists.as_slice(),
             AttributeTarget::ClassLike,
-        )?;
+        );
 
         let name = context.resolved_names.get(&self.name);
         let Some(class_like_metadata) = context.codebase.get_class_like(name) else {
@@ -326,7 +334,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Interface<'arena> {
             artifacts,
             self.attribute_lists.as_slice(),
             AttributeTarget::ClassLike,
-        )?;
+        );
 
         let name = context.resolved_names.get(&self.name);
         let Some(class_like_metadata) = context.codebase.get_class_like(name) else {
@@ -385,7 +393,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Trait<'arena> {
             artifacts,
             self.attribute_lists.as_slice(),
             AttributeTarget::ClassLike,
-        )?;
+        );
 
         let name = context.resolved_names.get(&self.name);
         let Some(class_like_metadata) = context.codebase.get_class_like(name) else {
@@ -444,7 +452,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Enum<'arena> {
             artifacts,
             self.attribute_lists.as_slice(),
             AttributeTarget::ClassLike,
-        )?;
+        );
 
         let name = context.resolved_names.get(&self.name);
         let Some(class_like_metadata) = context.codebase.get_class_like(name) else {
@@ -722,9 +730,7 @@ pub(crate) fn analyze_class_like<'ctx, 'ast, 'arena>(
             ClassLikeMember::Method(method) => {
                 method.analyze(context, &mut block_context, artifacts)?;
             }
-            _ => {
-                continue;
-            }
+            _ => {}
         }
     }
 
@@ -757,7 +763,7 @@ fn check_class_like_extends<'ctx, 'arena>(
     let using_name = class_like_metadata.original_name;
     let using_class_span = class_like_metadata.name_span.unwrap_or(class_like_metadata.span);
 
-    for extended_type in extends.types.iter() {
+    for extended_type in &extends.types {
         let extended_type_str = context.resolved_names.get(&extended_type);
         let extended_class_metadata = context.codebase.get_class_like(extended_type_str);
 
@@ -923,7 +929,7 @@ fn check_class_like_implements<'ctx, 'arena>(
     let using_name = class_like_metadata.original_name;
     let using_class_span = class_like_metadata.name_span.unwrap_or(class_like_metadata.span);
 
-    for implemented_type in implements.types.iter() {
+    for implemented_type in &implements.types {
         let implemented_type_str = context.resolved_names.get(&implemented_type);
         let implemented_interface_metadata = context.codebase.get_class_like(implemented_type_str);
 
@@ -1013,7 +1019,7 @@ fn check_class_like_use<'ctx, 'arena>(
     let using_name = class_like_metadata.original_name;
     let using_class_span = class_like_metadata.name_span.unwrap_or(class_like_metadata.span);
 
-    for used_type in trait_use.trait_names.iter() {
+    for used_type in &trait_use.trait_names {
         let used_type_str = context.resolved_names.get(&used_type);
         let used_trait_metadata = context.codebase.get_class_like(used_type_str);
 
@@ -1494,7 +1500,7 @@ fn check_abstract_method_signatures<'ctx>(
             }
 
             let substituted_overridden_method =
-                get_substituted_method(overridden_method, class_like_metadata, declaring_class_name, context.codebase);
+                get_substituted_method(overridden_method, class_like_metadata, *declaring_class_name, context.codebase);
 
             let issues = method_signature::validate_method_signature_compatibility(
                 context.codebase,
@@ -1518,7 +1524,7 @@ fn check_abstract_method_signatures<'ctx>(
                     context,
                     class_like_metadata,
                     overridden_class,
-                    method_name_atom,
+                    *method_name_atom,
                     appearing_method,
                     incompatibility,
                     error_span,
@@ -1538,7 +1544,7 @@ fn check_trait_method_conflicts<'ctx, 'ast, 'arena>(
     for member in members {
         if let ClassLikeMember::TraitUse(trait_use) = member {
             let mut trait_names = Vec::new();
-            for trait_name_id in trait_use.trait_names.iter() {
+            for trait_name_id in &trait_use.trait_names {
                 let (trait_fqcn, _) = context.scope.resolve(NameKind::Default, trait_name_id.value());
                 trait_names.push(Atom::from(trait_fqcn.as_str()));
             }
@@ -1595,7 +1601,7 @@ fn check_trait_method_conflicts<'ctx, 'ast, 'arena>(
                                     context,
                                     class_like_metadata,
                                     first_trait_metadata,
-                                    method_name,
+                                    *method_name,
                                     second_method,
                                     incompatibility,
                                     trait_use_span,
@@ -1655,7 +1661,7 @@ fn check_trait_method_conflicts<'ctx, 'ast, 'arena>(
                                         context,
                                         class_like_metadata,
                                         first_trait_metadata,
-                                        method_name,
+                                        *method_name,
                                         second_method,
                                         incompatibility,
                                         second_trait_use_span,
@@ -1680,7 +1686,7 @@ fn check_trait_property_conflicts<'ctx, 'ast, 'arena>(
     for member in members {
         if let ClassLikeMember::TraitUse(trait_use) = member {
             let mut trait_names = Vec::new();
-            for trait_name_id in trait_use.trait_names.iter() {
+            for trait_name_id in &trait_use.trait_names {
                 let (trait_fqcn, _) = context.scope.resolve(NameKind::Default, trait_name_id.value());
                 trait_names.push(Atom::from(trait_fqcn.as_str()));
             }
@@ -1724,10 +1730,10 @@ fn check_trait_property_conflicts<'ctx, 'ast, 'arena>(
 
                     report_trait_property_conflict(
                         context,
-                        &class_like_metadata.name,
-                        property_name,
-                        first_trait_fqcn,
-                        second_trait_fqcn,
+                        class_like_metadata.name,
+                        *property_name,
+                        *first_trait_fqcn,
+                        *second_trait_fqcn,
                         first_trait_use.span(),
                         first_property,
                         second_property,
@@ -1761,10 +1767,10 @@ fn check_trait_property_conflicts<'ctx, 'ast, 'arena>(
 
                         report_trait_property_conflict(
                             context,
-                            &class_like_metadata.name,
-                            property_name,
-                            first_trait_fqcn,
-                            second_trait_fqcn,
+                            class_like_metadata.name,
+                            *property_name,
+                            *first_trait_fqcn,
+                            *second_trait_fqcn,
                             second_trait_use.span(),
                             first_property,
                             second_property,
@@ -1794,7 +1800,7 @@ fn check_trait_property_conflicts<'ctx, 'ast, 'arena>(
                         if let ClassLikeMember::Property(prop) = member {
                             match prop {
                                 Property::Plain(plain_prop) => {
-                                    for item in plain_prop.items.iter() {
+                                    for item in &plain_prop.items {
                                         let var_name = Atom::from(item.variable().name);
                                         if var_name == *property_name {
                                             return Some(prop.span());
@@ -1815,10 +1821,10 @@ fn check_trait_property_conflicts<'ctx, 'ast, 'arena>(
 
                 report_trait_property_conflict(
                     context,
-                    &class_like_metadata.name,
-                    property_name,
-                    first_trait_fqcn,
-                    &class_like_metadata.name,
+                    class_like_metadata.name,
+                    *property_name,
+                    *first_trait_fqcn,
+                    class_like_metadata.name,
                     conflict_span,
                     trait_property,
                     class_property,
@@ -1937,10 +1943,10 @@ fn check_property_compatibility(prop1: &PropertyMetadata, prop2: &PropertyMetada
 
 fn report_trait_property_conflict(
     context: &mut Context,
-    class_name: &Atom,
-    property_name: &Atom,
-    trait1_name: &Atom,
-    trait2_name: &Atom,
+    class_name: Atom,
+    property_name: Atom,
+    trait1_name: Atom,
+    trait2_name: Atom,
     conflict_span: Span,
     prop1: &PropertyMetadata,
     prop2: &PropertyMetadata,
@@ -1978,18 +1984,18 @@ fn report_trait_property_conflict(
 fn get_substituted_method(
     method: &FunctionLikeMetadata,
     class_like_metadata: &ClassLikeMetadata,
-    parent_class_name: &Atom,
+    parent_class_name: Atom,
     codebase: &mago_codex::metadata::CodebaseMetadata,
 ) -> FunctionLikeMetadata {
     let template_mapping =
-        class_like_metadata.template_extended_parameters.get(parent_class_name).cloned().unwrap_or_default();
+        class_like_metadata.template_extended_parameters.get(&parent_class_name).cloned().unwrap_or_default();
 
     if template_mapping.is_empty() {
         method.clone()
     } else {
         let mut template_result = TemplateResult::default();
         for (template_name, concrete_type) in template_mapping {
-            template_result.add_lower_bound(template_name, GenericParent::ClassLike(*parent_class_name), concrete_type);
+            template_result.add_lower_bound(template_name, GenericParent::ClassLike(parent_class_name), concrete_type);
         }
 
         apply_template_substitution_to_method(method, &template_result, codebase)
@@ -2051,7 +2057,7 @@ fn check_interface_method_signatures<'ctx>(
         let substituted_interface_method = get_substituted_method(
             interface_method,
             class_like_metadata,
-            interface_method_id.get_class_name(),
+            *interface_method_id.get_class_name(),
             context.codebase,
         );
 
@@ -2073,7 +2079,7 @@ fn check_interface_method_signatures<'ctx>(
                 context,
                 class_like_metadata,
                 declaring_class,
-                method_name_atom,
+                *method_name_atom,
                 class_method,
                 incompatibility,
                 method_span,
@@ -2086,7 +2092,7 @@ fn report_signature_compatibility_issue<'ctx>(
     context: &mut Context<'ctx, '_>,
     child_class: &'ctx ClassLikeMetadata,
     parent_class: &'ctx ClassLikeMetadata,
-    method_name: &Atom,
+    method_name: Atom,
     parent_method: &FunctionLikeMetadata,
     incompatibility: SignatureCompatibilityIssue,
     primary_span: Span,
@@ -2726,7 +2732,7 @@ fn check_class_like_constants<'ctx, 'arena>(
             continue;
         };
 
-        for item in constant.items.iter() {
+        for item in &constant.items {
             let constant_name = atom(item.name.value);
 
             let Some(trait_fqcn) = class_like_metadata.trait_constant_ids.get(&constant_name) else {
@@ -2804,7 +2810,7 @@ fn check_class_like_constants<'ctx, 'arena>(
             continue;
         };
 
-        for item in constant.items.iter() {
+        for item in &constant.items {
             let constant_name = atom(item.name.value);
 
             let Some(child_constant) = class_like_metadata.constants.get(&constant_name) else {
@@ -2910,7 +2916,7 @@ fn check_class_like_constants<'ctx, 'arena>(
             continue;
         };
 
-        for item in constant.items.iter() {
+        for item in &constant.items {
             let constant_name = atom(item.name.value);
 
             let Some(child_constant) = class_like_metadata.constants.get(&constant_name) else {

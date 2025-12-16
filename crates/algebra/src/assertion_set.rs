@@ -78,6 +78,7 @@ pub fn add_and_clause(assertion_set: &mut AssertionSet, or_assertions: &[Asserti
 /// This function applies De Morgan's laws to the formula. The process involves:
 /// 1. Converting the CNF formula `(A OR B) AND C` to its negated DNF form: `(NOT A AND NOT B) OR (NOT C)`.
 /// 2. Converting the resulting DNF back to CNF using the distributive property.
+#[must_use]
 pub fn negate_assertion_set(assertion_set: AssertionSet) -> AssertionSet {
     // 1. Apply De Morgan's laws to get the DNF representation.
     //    `(A OR B) AND C` becomes `(¬A AND ¬B) OR (¬C)`.

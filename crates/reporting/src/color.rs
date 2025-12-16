@@ -20,6 +20,7 @@ impl ColorChoice {
     /// # Returns
     ///
     /// `true` if colors should be used, `false` otherwise
+    #[must_use]
     pub fn should_use_colors(self, is_tty: bool) -> bool {
         match self {
             ColorChoice::Auto => is_tty,

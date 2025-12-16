@@ -97,7 +97,7 @@ impl LintRule for NoRedundantReadonlyRule {
             return;
         }
 
-        for member in class.members.iter() {
+        for member in &class.members {
             if let ClassLikeMember::Property(property) = member
                 && let Some(readonly_modifier) = property.modifiers().get_readonly()
             {

@@ -1,5 +1,8 @@
 use crate::T;
-use crate::ast::ast::*;
+use crate::ast::ast::AttributeList;
+use crate::ast::ast::ClassLikeConstant;
+use crate::ast::ast::ClassLikeConstantItem;
+use crate::ast::ast::Modifier;
 use crate::ast::sequence::Sequence;
 use crate::ast::sequence::TokenSeparatedSequence;
 use crate::error::ParseError;
@@ -20,7 +23,9 @@ pub fn parse_class_like_constant_with_attributes_and_modifiers<'arena>(
         modifiers,
         r#const: utils::expect_keyword(stream, T!["const"])?,
         hint: match utils::maybe_peek_nth(stream, 1)?.map(|t| t.kind) {
-            Some(T!["=" | ";" | "?>"]) => None,
+            Some(
+                crate::token::TokenKind::Equal | crate::token::TokenKind::Semicolon | crate::token::TokenKind::CloseTag,
+            ) => None,
             _ => Some(parse_type_hint(stream)?),
         },
         items: {

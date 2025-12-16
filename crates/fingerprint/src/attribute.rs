@@ -1,7 +1,8 @@
 use crate::FingerprintOptions;
 use crate::Fingerprintable;
 use mago_names::ResolvedNames;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Attribute;
+use mago_syntax::ast::AttributeList;
 use std::hash::Hash;
 
 impl Fingerprintable for AttributeList<'_> {
@@ -11,7 +12,7 @@ impl Fingerprintable for AttributeList<'_> {
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
     ) {
-        for attribute in self.attributes.iter() {
+        for attribute in &self.attributes {
             attribute.fingerprint_with_hasher(hasher, resolved_names, options);
         }
     }

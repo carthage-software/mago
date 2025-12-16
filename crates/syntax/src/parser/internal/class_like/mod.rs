@@ -1,5 +1,12 @@
 use crate::T;
-use crate::ast::ast::*;
+use crate::ast::ast::AnonymousClass;
+use crate::ast::ast::AttributeList;
+use crate::ast::ast::Class;
+use crate::ast::ast::Enum;
+use crate::ast::ast::EnumBackingTypeHint;
+use crate::ast::ast::Interface;
+use crate::ast::ast::Modifier;
+use crate::ast::ast::Trait;
 use crate::ast::sequence::Sequence;
 use crate::error::ParseError;
 use crate::parser::internal::argument::parse_optional_argument_list;

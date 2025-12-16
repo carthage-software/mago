@@ -1,5 +1,8 @@
 use mago_names::ResolvedNames;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Yield;
+use mago_syntax::ast::YieldFrom;
+use mago_syntax::ast::YieldPair;
+use mago_syntax::ast::YieldValue;
 
 use crate::FingerprintOptions;
 use crate::Fingerprintable;

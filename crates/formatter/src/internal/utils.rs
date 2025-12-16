@@ -2,7 +2,14 @@ use bumpalo::collections::CollectIn;
 use bumpalo::collections::Vec;
 use unicode_width::UnicodeWidthStr;
 
-use mago_syntax::ast::*;
+use mago_syntax::ast::Access;
+use mago_syntax::ast::ArrayElement;
+use mago_syntax::ast::Call;
+use mago_syntax::ast::Expression;
+use mago_syntax::ast::Literal;
+use mago_syntax::ast::Node;
+use mago_syntax::ast::PartialApplication;
+use mago_syntax::ast::StringPart;
 
 use crate::document::Align;
 use crate::document::Document;
@@ -156,7 +163,7 @@ pub fn replace_end_of_line<'arena>(
 
     Document::Array(Document::join(
         f.arena,
-        text.split("\n").map(Document::String).collect_in::<Vec<_>>(f.arena),
+        text.split('\n').map(Document::String).collect_in::<Vec<_>>(f.arena),
         replacement,
     ))
 }
@@ -181,7 +188,7 @@ pub fn could_expand_value<'arena>(
             }
 
             // If it has at least one key-value pair, we should expand it.
-            if expr.elements.iter().any(|element| element.is_key_value()) {
+            if expr.elements.iter().any(ArrayElement::is_key_value) {
                 return true;
             }
 

@@ -114,6 +114,7 @@ impl<'arena> Scope<'arena> {
 
 impl<'arena> ScopeStack<'arena> {
     /// Creates a new, empty scope stack.
+    #[must_use]
     pub fn new() -> Self {
         Self { stack: Vec::new() }
     }
@@ -135,6 +136,7 @@ impl<'arena> ScopeStack<'arena> {
     /// Searches the stack and returns the name of the current namespace.
     ///
     /// Returns an empty string if in the global scope.
+    #[must_use]
     pub fn get_namespace(&self) -> &'arena str {
         self.stack
             .iter()
@@ -147,6 +149,7 @@ impl<'arena> ScopeStack<'arena> {
     }
 
     /// Searches the stack and returns the innermost `ClassLikeScope`.
+    #[must_use]
     pub fn get_class_like_scope(&self) -> Option<ClassLikeScope<'arena>> {
         self.stack.iter().rev().find_map(|scope| match scope {
             Scope::ClassLike(class_like) => Some(*class_like),
@@ -155,6 +158,7 @@ impl<'arena> ScopeStack<'arena> {
     }
 
     /// Searches the stack and returns the innermost `FunctionLikeScope`.
+    #[must_use]
     pub fn get_function_like_scope(&self) -> Option<FunctionLikeScope<'arena>> {
         self.stack.iter().rev().find_map(|scope| match scope {
             Scope::FunctionLike(function_like) => Some(*function_like),

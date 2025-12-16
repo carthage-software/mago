@@ -6,7 +6,90 @@ use bumpalo::vec;
 
 use mago_span::HasPosition;
 use mago_span::HasSpan;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Access;
+use mago_syntax::ast::AnonymousClass;
+use mago_syntax::ast::Argument;
+use mago_syntax::ast::Array;
+use mago_syntax::ast::ArrayAccess;
+use mago_syntax::ast::ArrayAppend;
+use mago_syntax::ast::ArrayElement;
+use mago_syntax::ast::ArrowFunction;
+use mago_syntax::ast::Assignment;
+use mago_syntax::ast::AssignmentOperator;
+use mago_syntax::ast::Binary;
+use mago_syntax::ast::BracedExpressionStringPart;
+use mago_syntax::ast::Call;
+use mago_syntax::ast::ClassConstantAccess;
+use mago_syntax::ast::ClassLikeConstantSelector;
+use mago_syntax::ast::ClassLikeMemberExpressionSelector;
+use mago_syntax::ast::ClassLikeMemberSelector;
+use mago_syntax::ast::Clone;
+use mago_syntax::ast::CompositeString;
+use mago_syntax::ast::Conditional;
+use mago_syntax::ast::ConstantAccess;
+use mago_syntax::ast::Construct;
+use mago_syntax::ast::DieConstruct;
+use mago_syntax::ast::DirectVariable;
+use mago_syntax::ast::DocumentIndentation;
+use mago_syntax::ast::DocumentKind;
+use mago_syntax::ast::DocumentString;
+use mago_syntax::ast::EmptyConstruct;
+use mago_syntax::ast::EvalConstruct;
+use mago_syntax::ast::ExitConstruct;
+use mago_syntax::ast::Expression;
+use mago_syntax::ast::FunctionPartialApplication;
+use mago_syntax::ast::IncludeConstruct;
+use mago_syntax::ast::IncludeOnceConstruct;
+use mago_syntax::ast::IndirectVariable;
+use mago_syntax::ast::Instantiation;
+use mago_syntax::ast::InterpolatedString;
+use mago_syntax::ast::IssetConstruct;
+use mago_syntax::ast::KeyValueArrayElement;
+use mago_syntax::ast::LegacyArray;
+use mago_syntax::ast::List;
+use mago_syntax::ast::Literal;
+use mago_syntax::ast::LiteralFloat;
+use mago_syntax::ast::LiteralInteger;
+use mago_syntax::ast::LiteralString;
+use mago_syntax::ast::LiteralStringPart;
+use mago_syntax::ast::MagicConstant;
+use mago_syntax::ast::Match;
+use mago_syntax::ast::MatchArm;
+use mago_syntax::ast::MatchDefaultArm;
+use mago_syntax::ast::MatchExpressionArm;
+use mago_syntax::ast::MethodPartialApplication;
+use mago_syntax::ast::MissingArrayElement;
+use mago_syntax::ast::NamedArgument;
+use mago_syntax::ast::NamedPlaceholderArgument;
+use mago_syntax::ast::NestedVariable;
+use mago_syntax::ast::NullSafePropertyAccess;
+use mago_syntax::ast::PartialApplication;
+use mago_syntax::ast::PartialArgument;
+use mago_syntax::ast::PartialArgumentList;
+use mago_syntax::ast::Pipe;
+use mago_syntax::ast::PlaceholderArgument;
+use mago_syntax::ast::PositionalArgument;
+use mago_syntax::ast::PrintConstruct;
+use mago_syntax::ast::PropertyAccess;
+use mago_syntax::ast::RequireConstruct;
+use mago_syntax::ast::RequireOnceConstruct;
+use mago_syntax::ast::ShellExecuteString;
+use mago_syntax::ast::StaticMethodPartialApplication;
+use mago_syntax::ast::StaticPropertyAccess;
+use mago_syntax::ast::StringPart;
+use mago_syntax::ast::Throw;
+use mago_syntax::ast::UnaryPostfix;
+use mago_syntax::ast::UnaryPostfixOperator;
+use mago_syntax::ast::UnaryPrefix;
+use mago_syntax::ast::UnaryPrefixOperator;
+use mago_syntax::ast::ValueArrayElement;
+use mago_syntax::ast::Variable;
+use mago_syntax::ast::VariadicArrayElement;
+use mago_syntax::ast::VariadicPlaceholderArgument;
+use mago_syntax::ast::Yield;
+use mago_syntax::ast::YieldFrom;
+use mago_syntax::ast::YieldPair;
+use mago_syntax::ast::YieldValue;
 
 use crate::document::Align;
 use crate::document::Document;
@@ -41,7 +124,7 @@ use crate::internal::format::string::print_string;
 use crate::internal::utils;
 use crate::internal::utils::could_expand_value;
 use crate::internal::utils::unwrap_parenthesized;
-use crate::settings::*;
+use crate::settings::BraceStyle;
 use crate::wrap;
 
 impl<'arena> Format<'arena> for Expression<'arena> {
@@ -1029,89 +1112,86 @@ impl<'arena> Format<'arena> for DocumentString<'arena> {
             // Track the indentation from the last line of the previous literal part
             let mut last_part_indentation = Cow::Borrowed("");
 
-            for part in self.parts.iter() {
-                let formatted = match part {
-                    StringPart::Literal(l) => {
-                        let content = l.value;
-                        let mut part_contents = vec![in f.arena;];
-                        let own_line = f.has_newline(l.span.start.offset, true);
-                        let lines = f.split_lines(content);
+            for part in &self.parts {
+                let formatted = if let StringPart::Literal(l) = part {
+                    let content = l.value;
+                    let mut part_contents = vec![in f.arena;];
+                    let own_line = f.has_newline(l.span.start.offset, true);
+                    let lines = f.split_lines(content);
 
-                        for line in lines.iter() {
-                            let mut line = *line;
-                            if own_line {
-                                line = FormatterState::skip_leading_whitespace_up_to(line, indent);
-                            }
-
-                            let mut line_content = vec![in f.arena; Document::String(line)];
-                            if !line.is_empty() {
-                                line_content.push(Document::DoNotTrim);
-                            }
-
-                            part_contents.push(Document::Array(line_content));
+                    for line in &lines {
+                        let mut line = *line;
+                        if own_line {
+                            line = FormatterState::skip_leading_whitespace_up_to(line, indent);
                         }
 
-                        part_contents = Document::join(f.arena, part_contents, Separator::HardLine);
-
-                        // if ends with a newline, add a newline
-                        if content.ends_with('\n') {
-                            part_contents.push(Document::Line(Line::hard()));
+                        let mut line_content = vec![in f.arena; Document::String(line)];
+                        if !line.is_empty() {
+                            line_content.push(Document::DoNotTrim);
                         }
 
-                        // Calculate indentation from the last line of this literal part
-                        // We need to use the stripped line (after removing heredoc indent)
-                        if let Some(last_line) = lines.last() {
-                            let stripped_line = if own_line {
-                                FormatterState::skip_leading_whitespace_up_to(last_line, indent)
-                            } else {
-                                *last_line
-                            };
-
-                            let mut tabs = 0;
-                            let mut spaces = 0;
-                            for ch in stripped_line.chars() {
-                                match ch {
-                                    '\t' => tabs += 1,
-                                    ' ' => spaces += 1,
-                                    _ => break,
-                                }
-                            }
-
-                            if tabs > 0 || spaces > 0 {
-                                last_part_indentation = if tabs > 0 {
-                                    Cow::Owned("\t".repeat(tabs) + &" ".repeat(spaces))
-                                } else {
-                                    Cow::Owned(" ".repeat(spaces))
-                                };
-                            } else {
-                                last_part_indentation = Cow::Borrowed("");
-                            }
-                        }
-
-                        Document::Array(part_contents)
+                        part_contents.push(Document::Array(line_content));
                     }
-                    _ => {
-                        let base_alignment = match self.indentation {
-                            DocumentIndentation::None => Cow::Borrowed(""),
-                            DocumentIndentation::Whitespace(n) => Cow::Owned(" ".repeat(n)),
-                            DocumentIndentation::Tab(n) => Cow::Owned("\t".repeat(n)),
-                            DocumentIndentation::Mixed(t, w) => Cow::Owned("\t".repeat(t) + &" ".repeat(w)),
-                        };
 
-                        let combined_alignment = if !base_alignment.is_empty() || !last_part_indentation.is_empty() {
-                            Cow::Owned(format!("{}{}", base_alignment, last_part_indentation))
+                    part_contents = Document::join(f.arena, part_contents, Separator::HardLine);
+
+                    // if ends with a newline, add a newline
+                    if content.ends_with('\n') {
+                        part_contents.push(Document::Line(Line::hard()));
+                    }
+
+                    // Calculate indentation from the last line of this literal part
+                    // We need to use the stripped line (after removing heredoc indent)
+                    if let Some(last_line) = lines.last() {
+                        let stripped_line = if own_line {
+                            FormatterState::skip_leading_whitespace_up_to(last_line, indent)
                         } else {
-                            Cow::Borrowed("")
+                            *last_line
                         };
 
-                        Document::Align(Align {
-                            alignment: f.as_str(&combined_alignment),
-                            contents: vec![
-                                in f.arena;
-                                part.format(f)
-                            ],
-                        })
+                        let mut tabs = 0;
+                        let mut spaces = 0;
+                        for ch in stripped_line.chars() {
+                            match ch {
+                                '\t' => tabs += 1,
+                                ' ' => spaces += 1,
+                                _ => break,
+                            }
+                        }
+
+                        if tabs > 0 || spaces > 0 {
+                            last_part_indentation = if tabs > 0 {
+                                Cow::Owned("\t".repeat(tabs) + &" ".repeat(spaces))
+                            } else {
+                                Cow::Owned(" ".repeat(spaces))
+                            };
+                        } else {
+                            last_part_indentation = Cow::Borrowed("");
+                        }
                     }
+
+                    Document::Array(part_contents)
+                } else {
+                    let base_alignment = match self.indentation {
+                        DocumentIndentation::None => Cow::Borrowed(""),
+                        DocumentIndentation::Whitespace(n) => Cow::Owned(" ".repeat(n)),
+                        DocumentIndentation::Tab(n) => Cow::Owned("\t".repeat(n)),
+                        DocumentIndentation::Mixed(t, w) => Cow::Owned("\t".repeat(t) + &" ".repeat(w)),
+                    };
+
+                    let combined_alignment = if !base_alignment.is_empty() || !last_part_indentation.is_empty() {
+                        Cow::Owned(format!("{base_alignment}{last_part_indentation}"))
+                    } else {
+                        Cow::Borrowed("")
+                    };
+
+                    Document::Align(Align {
+                        alignment: f.as_str(&combined_alignment),
+                        contents: vec![
+                            in f.arena;
+                            part.format(f)
+                        ],
+                    })
                 };
 
                 contents.push(formatted);
@@ -1130,7 +1210,7 @@ impl<'arena> Format<'arena> for InterpolatedString<'arena> {
             let mut parts = vec![in f.arena; Document::String("\"")];
             let mut last_part_indentation = Cow::Borrowed("");
 
-            for part in self.parts.iter() {
+            for part in &self.parts {
                 let formatted = match part {
                     StringPart::Literal(l) => {
                         let lines = f.split_lines(l.value);
@@ -1157,13 +1237,13 @@ impl<'arena> Format<'arena> for InterpolatedString<'arena> {
                         part.format(f)
                     }
                     _ => {
-                        if !last_part_indentation.is_empty() {
+                        if last_part_indentation.is_empty() {
+                            part.format(f)
+                        } else {
                             Document::Align(Align {
                                 alignment: f.as_str(&last_part_indentation),
                                 contents: vec![in f.arena; part.format(f)],
                             })
-                        } else {
-                            part.format(f)
                         }
                     }
                 };
@@ -1183,7 +1263,7 @@ impl<'arena> Format<'arena> for ShellExecuteString<'arena> {
             let mut parts = vec![in f.arena; Document::String("`")];
             let mut last_part_indentation = Cow::Borrowed("");
 
-            for part in self.parts.iter() {
+            for part in &self.parts {
                 let formatted = match part {
                     StringPart::Literal(l) => {
                         let lines = f.split_lines(l.value);
@@ -1210,13 +1290,13 @@ impl<'arena> Format<'arena> for ShellExecuteString<'arena> {
                         part.format(f)
                     }
                     StringPart::BracedExpression(_) => {
-                        if !last_part_indentation.is_empty() {
+                        if last_part_indentation.is_empty() {
+                            part.format(f)
+                        } else {
                             Document::Align(Align {
                                 alignment: f.as_str(&last_part_indentation),
                                 contents: vec![in f.arena; part.format(f)],
                             })
-                        } else {
-                            part.format(f)
                         }
                     }
                     _ => part.format(f),

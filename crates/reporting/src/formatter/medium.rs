@@ -27,7 +27,7 @@ impl Formatter for MediumFormatter {
             issues,
             database,
             config,
-            Config { display_style: DisplayStyle::Medium, ..Default::default() },
+            &Config { display_style: DisplayStyle::Medium, ..Default::default() },
         )
     }
 }

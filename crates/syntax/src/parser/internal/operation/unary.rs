@@ -1,5 +1,6 @@
 use crate::T;
-use crate::ast::ast::*;
+use crate::ast::ast::UnaryPrefix;
+use crate::ast::ast::UnaryPrefixOperator;
 use crate::error::ParseError;
 use crate::parser::internal::expression::parse_expression_with_precedence;
 use crate::parser::internal::token_stream::TokenStream;

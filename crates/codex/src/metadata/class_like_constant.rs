@@ -24,6 +24,7 @@ pub struct ClassLikeConstantMetadata {
 }
 
 impl ClassLikeConstantMetadata {
+    #[must_use]
     pub fn new(name: Atom, span: Span, visibility: Visibility, flags: MetadataFlags) -> Self {
         Self {
             attributes: Vec::new(),

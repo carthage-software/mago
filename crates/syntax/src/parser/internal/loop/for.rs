@@ -1,5 +1,7 @@
 use crate::T;
-use crate::ast::ast::*;
+use crate::ast::ast::For;
+use crate::ast::ast::ForBody;
+use crate::ast::ast::ForColonDelimitedBody;
 use crate::ast::sequence::Sequence;
 use crate::ast::sequence::TokenSeparatedSequence;
 use crate::error::ParseError;

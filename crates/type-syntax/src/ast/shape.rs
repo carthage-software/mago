@@ -57,16 +57,19 @@ pub struct ShapeAdditionalFields<'input> {
 
 impl ShapeTypeKind {
     #[inline]
+    #[must_use]
     pub const fn is_array(&self) -> bool {
         matches!(self, ShapeTypeKind::Array | ShapeTypeKind::NonEmptyArray | ShapeTypeKind::AssociativeArray)
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_list(&self) -> bool {
         matches!(self, ShapeTypeKind::List | ShapeTypeKind::NonEmptyList)
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_non_empty(&self) -> bool {
         matches!(self, ShapeTypeKind::NonEmptyArray | ShapeTypeKind::NonEmptyList)
     }
@@ -74,6 +77,7 @@ impl ShapeTypeKind {
 
 impl ShapeField<'_> {
     #[inline]
+    #[must_use]
     pub fn is_optional(&self) -> bool {
         if let Some(key) = self.key.as_ref() { key.question_mark.is_some() } else { false }
     }
@@ -81,11 +85,13 @@ impl ShapeField<'_> {
 
 impl ShapeType<'_> {
     #[inline]
+    #[must_use]
     pub fn has_fields(&self) -> bool {
         !self.fields.is_empty()
     }
 
     #[inline]
+    #[must_use]
     pub fn has_non_optional_fields(&self) -> bool {
         self.fields.iter().any(|field| !field.is_optional())
     }

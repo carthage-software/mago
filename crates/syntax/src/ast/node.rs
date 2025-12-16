@@ -7,7 +7,228 @@ use mago_span::HasSpan;
 use mago_span::Span;
 
 use crate::ast::Program;
-use crate::ast::ast::*;
+use crate::ast::ast::Access;
+use crate::ast::ast::AnonymousClass;
+use crate::ast::ast::Argument;
+use crate::ast::ast::ArgumentList;
+use crate::ast::ast::Array;
+use crate::ast::ast::ArrayAccess;
+use crate::ast::ast::ArrayAppend;
+use crate::ast::ast::ArrayElement;
+use crate::ast::ast::ArrowFunction;
+use crate::ast::ast::Assignment;
+use crate::ast::ast::AssignmentOperator;
+use crate::ast::ast::Attribute;
+use crate::ast::ast::AttributeList;
+use crate::ast::ast::Binary;
+use crate::ast::ast::BinaryOperator;
+use crate::ast::ast::Block;
+use crate::ast::ast::BracedExpressionStringPart;
+use crate::ast::ast::Break;
+use crate::ast::ast::Call;
+use crate::ast::ast::Class;
+use crate::ast::ast::ClassConstantAccess;
+use crate::ast::ast::ClassLikeConstant;
+use crate::ast::ast::ClassLikeConstantItem;
+use crate::ast::ast::ClassLikeConstantSelector;
+use crate::ast::ast::ClassLikeMember;
+use crate::ast::ast::ClassLikeMemberExpressionSelector;
+use crate::ast::ast::ClassLikeMemberSelector;
+use crate::ast::ast::Clone;
+use crate::ast::ast::ClosingTag;
+use crate::ast::ast::Closure;
+use crate::ast::ast::ClosureUseClause;
+use crate::ast::ast::ClosureUseClauseVariable;
+use crate::ast::ast::CompositeString;
+use crate::ast::ast::Conditional;
+use crate::ast::ast::Constant;
+use crate::ast::ast::ConstantAccess;
+use crate::ast::ast::ConstantItem;
+use crate::ast::ast::Construct;
+use crate::ast::ast::Continue;
+use crate::ast::ast::Declare;
+use crate::ast::ast::DeclareBody;
+use crate::ast::ast::DeclareColonDelimitedBody;
+use crate::ast::ast::DeclareItem;
+use crate::ast::ast::DieConstruct;
+use crate::ast::ast::DirectVariable;
+use crate::ast::ast::DoWhile;
+use crate::ast::ast::DocumentString;
+use crate::ast::ast::Echo;
+use crate::ast::ast::EchoTag;
+use crate::ast::ast::EmptyConstruct;
+use crate::ast::ast::Enum;
+use crate::ast::ast::EnumBackingTypeHint;
+use crate::ast::ast::EnumCase;
+use crate::ast::ast::EnumCaseBackedItem;
+use crate::ast::ast::EnumCaseItem;
+use crate::ast::ast::EnumCaseUnitItem;
+use crate::ast::ast::EvalConstruct;
+use crate::ast::ast::ExitConstruct;
+use crate::ast::ast::Expression;
+use crate::ast::ast::ExpressionStatement;
+use crate::ast::ast::Extends;
+use crate::ast::ast::For;
+use crate::ast::ast::ForBody;
+use crate::ast::ast::ForColonDelimitedBody;
+use crate::ast::ast::Foreach;
+use crate::ast::ast::ForeachBody;
+use crate::ast::ast::ForeachColonDelimitedBody;
+use crate::ast::ast::ForeachKeyValueTarget;
+use crate::ast::ast::ForeachTarget;
+use crate::ast::ast::ForeachValueTarget;
+use crate::ast::ast::FullOpeningTag;
+use crate::ast::ast::FullyQualifiedIdentifier;
+use crate::ast::ast::Function;
+use crate::ast::ast::FunctionCall;
+use crate::ast::ast::FunctionLikeParameter;
+use crate::ast::ast::FunctionLikeParameterDefaultValue;
+use crate::ast::ast::FunctionLikeParameterList;
+use crate::ast::ast::FunctionLikeReturnTypeHint;
+use crate::ast::ast::FunctionPartialApplication;
+use crate::ast::ast::Global;
+use crate::ast::ast::Goto;
+use crate::ast::ast::HaltCompiler;
+use crate::ast::ast::Hint;
+use crate::ast::ast::HookedProperty;
+use crate::ast::ast::Identifier;
+use crate::ast::ast::If;
+use crate::ast::ast::IfBody;
+use crate::ast::ast::IfColonDelimitedBody;
+use crate::ast::ast::IfColonDelimitedBodyElseClause;
+use crate::ast::ast::IfColonDelimitedBodyElseIfClause;
+use crate::ast::ast::IfStatementBody;
+use crate::ast::ast::IfStatementBodyElseClause;
+use crate::ast::ast::IfStatementBodyElseIfClause;
+use crate::ast::ast::Implements;
+use crate::ast::ast::IncludeConstruct;
+use crate::ast::ast::IncludeOnceConstruct;
+use crate::ast::ast::IndirectVariable;
+use crate::ast::ast::Inline;
+use crate::ast::ast::Instantiation;
+use crate::ast::ast::Interface;
+use crate::ast::ast::InterpolatedString;
+use crate::ast::ast::IntersectionHint;
+use crate::ast::ast::IssetConstruct;
+use crate::ast::ast::KeyValueArrayElement;
+use crate::ast::ast::Keyword;
+use crate::ast::ast::Label;
+use crate::ast::ast::LegacyArray;
+use crate::ast::ast::List;
+use crate::ast::ast::Literal;
+use crate::ast::ast::LiteralFloat;
+use crate::ast::ast::LiteralInteger;
+use crate::ast::ast::LiteralString;
+use crate::ast::ast::LiteralStringPart;
+use crate::ast::ast::LocalIdentifier;
+use crate::ast::ast::MagicConstant;
+use crate::ast::ast::Match;
+use crate::ast::ast::MatchArm;
+use crate::ast::ast::MatchDefaultArm;
+use crate::ast::ast::MatchExpressionArm;
+use crate::ast::ast::MaybeTypedUseItem;
+use crate::ast::ast::Method;
+use crate::ast::ast::MethodAbstractBody;
+use crate::ast::ast::MethodBody;
+use crate::ast::ast::MethodCall;
+use crate::ast::ast::MethodPartialApplication;
+use crate::ast::ast::MissingArrayElement;
+use crate::ast::ast::MixedUseItemList;
+use crate::ast::ast::Modifier;
+use crate::ast::ast::NamedArgument;
+use crate::ast::ast::NamedPlaceholderArgument;
+use crate::ast::ast::Namespace;
+use crate::ast::ast::NamespaceBody;
+use crate::ast::ast::NamespaceImplicitBody;
+use crate::ast::ast::NestedVariable;
+use crate::ast::ast::NullSafeMethodCall;
+use crate::ast::ast::NullSafePropertyAccess;
+use crate::ast::ast::NullableHint;
+use crate::ast::ast::OpeningTag;
+use crate::ast::ast::Parenthesized;
+use crate::ast::ast::ParenthesizedHint;
+use crate::ast::ast::PartialApplication;
+use crate::ast::ast::PartialArgument;
+use crate::ast::ast::PartialArgumentList;
+use crate::ast::ast::Pipe;
+use crate::ast::ast::PlaceholderArgument;
+use crate::ast::ast::PlainProperty;
+use crate::ast::ast::PositionalArgument;
+use crate::ast::ast::PrintConstruct;
+use crate::ast::ast::Property;
+use crate::ast::ast::PropertyAbstractItem;
+use crate::ast::ast::PropertyAccess;
+use crate::ast::ast::PropertyConcreteItem;
+use crate::ast::ast::PropertyHook;
+use crate::ast::ast::PropertyHookAbstractBody;
+use crate::ast::ast::PropertyHookBody;
+use crate::ast::ast::PropertyHookConcreteBody;
+use crate::ast::ast::PropertyHookConcreteExpressionBody;
+use crate::ast::ast::PropertyHookList;
+use crate::ast::ast::PropertyItem;
+use crate::ast::ast::QualifiedIdentifier;
+use crate::ast::ast::RequireConstruct;
+use crate::ast::ast::RequireOnceConstruct;
+use crate::ast::ast::Return;
+use crate::ast::ast::ShellExecuteString;
+use crate::ast::ast::ShortOpeningTag;
+use crate::ast::ast::Statement;
+use crate::ast::ast::Static;
+use crate::ast::ast::StaticAbstractItem;
+use crate::ast::ast::StaticConcreteItem;
+use crate::ast::ast::StaticItem;
+use crate::ast::ast::StaticMethodCall;
+use crate::ast::ast::StaticMethodPartialApplication;
+use crate::ast::ast::StaticPropertyAccess;
+use crate::ast::ast::StringPart;
+use crate::ast::ast::Switch;
+use crate::ast::ast::SwitchBody;
+use crate::ast::ast::SwitchBraceDelimitedBody;
+use crate::ast::ast::SwitchCase;
+use crate::ast::ast::SwitchCaseSeparator;
+use crate::ast::ast::SwitchColonDelimitedBody;
+use crate::ast::ast::SwitchDefaultCase;
+use crate::ast::ast::SwitchExpressionCase;
+use crate::ast::ast::Terminator;
+use crate::ast::ast::Throw;
+use crate::ast::ast::Trait;
+use crate::ast::ast::TraitUse;
+use crate::ast::ast::TraitUseAbsoluteMethodReference;
+use crate::ast::ast::TraitUseAbstractSpecification;
+use crate::ast::ast::TraitUseAdaptation;
+use crate::ast::ast::TraitUseAliasAdaptation;
+use crate::ast::ast::TraitUseConcreteSpecification;
+use crate::ast::ast::TraitUseMethodReference;
+use crate::ast::ast::TraitUsePrecedenceAdaptation;
+use crate::ast::ast::TraitUseSpecification;
+use crate::ast::ast::Try;
+use crate::ast::ast::TryCatchClause;
+use crate::ast::ast::TryFinallyClause;
+use crate::ast::ast::TypedUseItemList;
+use crate::ast::ast::TypedUseItemSequence;
+use crate::ast::ast::UnaryPostfix;
+use crate::ast::ast::UnaryPostfixOperator;
+use crate::ast::ast::UnaryPrefix;
+use crate::ast::ast::UnaryPrefixOperator;
+use crate::ast::ast::UnionHint;
+use crate::ast::ast::Unset;
+use crate::ast::ast::Use;
+use crate::ast::ast::UseItem;
+use crate::ast::ast::UseItemAlias;
+use crate::ast::ast::UseItemSequence;
+use crate::ast::ast::UseItems;
+use crate::ast::ast::UseType;
+use crate::ast::ast::ValueArrayElement;
+use crate::ast::ast::Variable;
+use crate::ast::ast::VariadicArrayElement;
+use crate::ast::ast::VariadicPlaceholderArgument;
+use crate::ast::ast::While;
+use crate::ast::ast::WhileBody;
+use crate::ast::ast::WhileColonDelimitedBody;
+use crate::ast::ast::Yield;
+use crate::ast::ast::YieldFrom;
+use crate::ast::ast::YieldPair;
+use crate::ast::ast::YieldValue;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
@@ -496,6 +717,7 @@ impl<'ast, 'arena> Node<'ast, 'arena> {
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_declaration(&self) -> bool {
         matches!(
             self,
@@ -504,6 +726,7 @@ impl<'ast, 'arena> Node<'ast, 'arena> {
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_statement(&self) -> bool {
         matches!(
             self,
@@ -546,6 +769,7 @@ impl<'ast, 'arena> Node<'ast, 'arena> {
     }
 
     #[inline]
+    #[must_use]
     pub const fn kind(&self) -> NodeKind {
         match &self {
             Self::Program(_) => NodeKind::Program,
@@ -865,8 +1089,8 @@ impl<'ast, 'arena> Node<'ast, 'arena> {
             Node::KeyValueArrayElement(node) => {
                 vec![Node::Expression(node.key), Node::Expression(node.value)]
             }
-            Node::LegacyArray(node) => Vec::from_iter(node.elements.iter().map(Node::ArrayElement)),
-            Node::List(node) => Vec::from_iter(node.elements.iter().map(Node::ArrayElement)),
+            Node::LegacyArray(node) => node.elements.iter().map(Node::ArrayElement).collect(),
+            Node::List(node) => node.elements.iter().map(Node::ArrayElement).collect(),
             Node::MissingArrayElement(_) => vec![],
             Node::ValueArrayElement(node) => vec![Node::Expression(node.value)],
             Node::VariadicArrayElement(node) => vec![Node::Expression(node.value)],
@@ -878,8 +1102,8 @@ impl<'ast, 'arena> Node<'ast, 'arena> {
 
                 children
             }
-            Node::AttributeList(node) => Vec::from_iter(node.attributes.iter().map(Node::Attribute)),
-            Node::Block(node) => Vec::from_iter(node.statements.iter().map(Node::Statement)),
+            Node::AttributeList(node) => node.attributes.iter().map(Node::Attribute).collect(),
+            Node::Block(node) => node.statements.iter().map(Node::Statement).collect(),
             Node::Call(node) => match node {
                 Call::Function(node) => vec![Node::FunctionCall(node)],
                 Call::Method(node) => vec![Node::MethodCall(node)],
@@ -934,7 +1158,7 @@ impl<'ast, 'arena> Node<'ast, 'arena> {
             }
             Node::ClassLikeConstant(node) => {
                 let mut children = vec![];
-                for attr in node.attribute_lists.iter() {
+                for attr in &node.attribute_lists {
                     children.push(Node::AttributeList(attr));
                 }
 
@@ -954,7 +1178,7 @@ impl<'ast, 'arena> Node<'ast, 'arena> {
             }
             Node::EnumCase(node) => {
                 let mut children = vec![];
-                for attr in node.attribute_lists.iter() {
+                for attr in &node.attribute_lists {
                     children.push(Node::AttributeList(attr));
                 }
 
@@ -1083,7 +1307,7 @@ impl<'ast, 'arena> Node<'ast, 'arena> {
                 PropertyHookConcreteBody::Block(node) => Node::Block(node),
             }],
             Node::PropertyHookConcreteExpressionBody(node) => vec![Node::Expression(&node.expression)],
-            Node::PropertyHookList(node) => Vec::from_iter(node.hooks.iter().map(Node::PropertyHook)),
+            Node::PropertyHookList(node) => node.hooks.iter().map(Node::PropertyHook).collect(),
             Node::PropertyItem(node) => match node {
                 PropertyItem::Abstract(node) => vec![Node::PropertyAbstractItem(node)],
                 PropertyItem::Concrete(node) => vec![Node::PropertyConcreteItem(node)],
@@ -1448,7 +1672,7 @@ impl<'ast, 'arena> Node<'ast, 'arena> {
                 DeclareBody::ColonDelimited(body) => vec![Node::DeclareColonDelimitedBody(body)],
             },
             Node::DeclareColonDelimitedBody(node) => {
-                let mut children = Vec::from_iter(node.statements.iter().map(Node::Statement));
+                let mut children = node.statements.iter().map(Node::Statement).collect::<Vec<_>>();
 
                 children.push(Node::Keyword(&node.end_declare));
                 children.push(Node::Terminator(&node.terminator));
@@ -1603,9 +1827,7 @@ impl<'ast, 'arena> Node<'ast, 'arena> {
 
                 children
             }
-            Node::FunctionLikeParameterList(node) => {
-                Vec::from_iter(node.parameters.iter().map(Node::FunctionLikeParameter))
-            }
+            Node::FunctionLikeParameterList(node) => node.parameters.iter().map(Node::FunctionLikeParameter).collect(),
             Node::FunctionLikeParameter(node) => {
                 let mut children = vec![];
 
@@ -1755,7 +1977,7 @@ impl<'ast, 'arena> Node<'ast, 'arena> {
                 ForeachBody::ColonDelimited(node) => Node::ForeachColonDelimitedBody(node),
             }],
             Node::ForeachColonDelimitedBody(node) => {
-                let mut children = Vec::from_iter(node.statements.iter().map(Node::Statement));
+                let mut children = node.statements.iter().map(Node::Statement).collect::<Vec<_>>();
 
                 children.push(Node::Keyword(&node.end_foreach));
                 children.push(Node::Terminator(&node.terminator));
@@ -1931,7 +2153,7 @@ impl<'ast, 'arena> Node<'ast, 'arena> {
             }
             Node::UseItemSequence(node) => {
                 let mut children = vec![];
-                for item in node.items.iter() {
+                for item in &node.items {
                     children.push(Node::UseItem(item));
                 }
 

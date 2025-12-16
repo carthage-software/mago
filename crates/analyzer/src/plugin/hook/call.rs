@@ -1,6 +1,9 @@
 //! Call hooks for function and method call events.
 
-use mago_syntax::ast::*;
+use mago_syntax::ast::FunctionCall;
+use mago_syntax::ast::MethodCall;
+use mago_syntax::ast::NullSafeMethodCall;
+use mago_syntax::ast::StaticMethodCall;
 
 use crate::plugin::context::HookContext;
 use crate::plugin::hook::ExpressionHookResult;

@@ -16,7 +16,9 @@ use mago_fixer::SafetyClassification;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Binary;
+use mago_syntax::ast::BinaryOperator;
+use mago_syntax::ast::Expression;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -52,7 +54,7 @@ pub fn analyze_logical_and_operation<'ctx, 'arena>(
 
     let lhs_type = match artifacts.get_rc_expression_type(&binary.lhs).cloned() {
         Some(lhs_type) => {
-            check_logical_operand(context, binary.lhs, &lhs_type, "Left", "&&")?;
+            check_logical_operand(context, binary.lhs, &lhs_type, "Left", "&&");
 
             lhs_type
         }
@@ -145,7 +147,8 @@ pub fn analyze_logical_and_operation<'ctx, 'arena>(
         binary.rhs.analyze(context, &mut right_block_context, artifacts)?;
         let rhs_type = match artifacts.get_rc_expression_type(&binary.rhs).cloned() {
             Some(rhs_type) => {
-                check_logical_operand(context, binary.rhs, &rhs_type, "Right", "&&")?;
+                check_logical_operand(context, binary.rhs, &rhs_type, "Right", "&&");
+
                 rhs_type
             }
             None => Rc::new(get_mixed()),
@@ -254,7 +257,7 @@ pub fn analyze_logical_or_operation<'ctx, 'arena>(
         left_block_context.if_body_context = tmp_if_body_block_context;
 
         for var_id in &left_block_context.parent_conflicting_clause_variables {
-            block_context.remove_variable_from_conflicting_clauses(context, var_id, None);
+            block_context.remove_variable_from_conflicting_clauses(context, *var_id, None);
         }
 
         let cloned_vars = block_context.locals.clone();
@@ -288,7 +291,7 @@ pub fn analyze_logical_or_operation<'ctx, 'arena>(
 
     let lhs_type = match artifacts.get_rc_expression_type(&binary.lhs).cloned() {
         Some(lhs_type) => {
-            check_logical_operand(context, binary.lhs, &lhs_type, "Left", "||")?;
+            check_logical_operand(context, binary.lhs, &lhs_type, "Left", "||");
 
             lhs_type
         }
@@ -389,7 +392,7 @@ pub fn analyze_logical_or_operation<'ctx, 'arena>(
 
         let rhs_type = match artifacts.get_rc_expression_type(&binary.rhs).cloned() {
             Some(rhs_type) => {
-                check_logical_operand(context, binary.rhs, &rhs_type, "Right", "||")?;
+                check_logical_operand(context, binary.rhs, &rhs_type, "Right", "||");
 
                 rhs_type
             }
@@ -540,8 +543,8 @@ pub fn analyze_logical_xor_operation<'ctx, 'arena>(
     let lhs_type = artifacts.get_rc_expression_type(&binary.lhs).unwrap_or(&fallback_type);
     let rhs_type = artifacts.get_rc_expression_type(&binary.rhs).unwrap_or(&fallback_type);
 
-    check_logical_operand(context, binary.lhs, lhs_type, "Left", "xor")?;
-    check_logical_operand(context, binary.rhs, rhs_type, "Right", "xor")?;
+    check_logical_operand(context, binary.lhs, lhs_type, "Left", "xor");
+    check_logical_operand(context, binary.rhs, rhs_type, "Right", "xor");
 
     let result_type = if lhs_type.is_always_truthy() && rhs_type.is_always_truthy() {
         if !block_context.inside_loop_expressions {
@@ -589,9 +592,7 @@ fn check_logical_operand<'arena>(
     operand_type: &TUnion,
     side: &'static str,
     operator_name: &'static str,
-) -> Result<bool, AnalysisError> {
-    let mut critical_error_found = false;
-
+) {
     if operand_type.is_mixed() {
         context.collector.report_with_code(
             IssueCode::MixedOperand,
@@ -602,8 +603,6 @@ fn check_logical_operand<'arena>(
                 ))
                 .with_help("Ensure this operand has a known type or explicitly cast to `bool`."),
         );
-
-        critical_error_found = true;
     } else if operand_type.is_null() {
         context.collector.report_with_code(
             IssueCode::NullOperand,
@@ -642,8 +641,6 @@ fn check_logical_operand<'arena>(
                 .with_help("Explicitly check the state of the resource or cast to `bool` if necessary."),
         );
     }
-
-    Ok(critical_error_found)
 }
 
 /// Helper to report redundant logical operation issues.

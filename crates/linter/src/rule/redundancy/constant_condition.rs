@@ -8,7 +8,9 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_reporting::Level;
 use mago_span::HasSpan;
-use mago_syntax::ast::*;
+use mago_syntax::ast::IfBody;
+use mago_syntax::ast::Node;
+use mago_syntax::ast::NodeKind;
 use mago_syntax::utils::condition::is_falsy;
 use mago_syntax::utils::condition::is_truthy;
 use mago_syntax::utils::definition::statement_contains_only_definitions;
@@ -114,7 +116,7 @@ impl LintRule for ConstantConditionRule {
 
                 match &r#if.body {
                     IfBody::Statement(body) => {
-                        for clause in body.else_if_clauses.iter() {
+                        for clause in &body.else_if_clauses {
                             plan.delete(clause.span().to_range(), SafetyClassification::Safe);
                         }
 
@@ -125,7 +127,7 @@ impl LintRule for ConstantConditionRule {
                     IfBody::ColonDelimited(body) => {
                         plan.delete(body.colon.to_range(), SafetyClassification::Safe);
 
-                        for clause in body.else_if_clauses.iter() {
+                        for clause in &body.else_if_clauses {
                             plan.delete(clause.span().to_range(), SafetyClassification::Safe);
                         }
 

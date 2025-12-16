@@ -19,6 +19,7 @@ pub struct ConditionalType<'input> {
 }
 
 impl ConditionalType<'_> {
+    #[must_use]
     pub fn is_negated(&self) -> bool {
         self.not.is_some()
     }

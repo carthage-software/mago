@@ -22,7 +22,8 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_span::Span;
-use mago_syntax::ast::*;
+use mago_syntax::ast::ArgumentList;
+use mago_syntax::ast::Instantiation;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -95,7 +96,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Instantiation<'arena> {
                 context,
                 block_context,
                 artifacts,
-                classname,
+                &classname,
                 instantiation_span,
                 class_expression_span,
                 argument_list,
@@ -118,7 +119,7 @@ fn analyze_class_instantiation<'ctx, 'arena>(
     context: &mut Context<'ctx, 'arena>,
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
-    classname: ResolvedClassname,
+    classname: &ResolvedClassname,
     instantiation_span: Span,
     class_expression_span: Span,
     argument_list: Option<&ArgumentList<'arena>>,
@@ -375,8 +376,8 @@ fn analyze_class_instantiation<'ctx, 'arena>(
                     .collect::<AtomMap<_>>();
 
                 get_generic_parameter_for_offset(
-                    &metadata.name,
-                    template_name,
+                    metadata.name,
+                    *template_name,
                     &metadata.template_extended_parameters,
                     &found_generic_parameters,
                 )

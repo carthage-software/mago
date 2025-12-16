@@ -20,6 +20,7 @@ impl Default for GroupIdentifierBuilder {
 }
 
 impl GroupIdentifierBuilder {
+    #[must_use]
     pub fn new() -> Self {
         Self { id: GroupIdentifier(0) }
     }

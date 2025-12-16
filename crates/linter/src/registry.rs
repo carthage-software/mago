@@ -46,42 +46,50 @@ impl RuleRegistry {
 
     /// Checks if a specific rule is enabled in the registry.
     #[inline]
+    #[must_use]
     pub fn is_rule_enabled(&self, code: &str) -> bool {
         self.rules.iter().any(|r| r.code() == code)
     }
 
     /// Checks if a specific integration is enabled in the registry.
     #[inline]
+    #[must_use]
     pub fn is_integration_enabled(&self, name: Integration) -> bool {
         self.integrations.contains(name)
     }
 
     #[inline]
+    #[must_use]
     pub fn integrations(&self) -> IntegrationSet {
         self.integrations
     }
 
     #[inline]
+    #[must_use]
     pub fn rules(&self) -> &[AnyRule] {
         &self.rules
     }
 
     #[inline]
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.rules.is_empty()
     }
 
     #[inline]
+    #[must_use]
     pub fn len(&self) -> usize {
         self.rules.len()
     }
 
     #[inline]
+    #[must_use]
     pub fn for_kind(&self, kind: NodeKind) -> &'static [usize] {
         self.by_kind[kind as usize]
     }
 
     #[inline]
+    #[must_use]
     pub fn rule(&self, idx: usize) -> &AnyRule {
         &self.rules[idx]
     }

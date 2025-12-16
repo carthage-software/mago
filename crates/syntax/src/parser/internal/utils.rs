@@ -1,7 +1,7 @@
 use mago_database::file::HasFileId;
 use mago_span::Span;
 
-use crate::ast::ast::*;
+use crate::ast::ast::Keyword;
 use crate::error::ParseError;
 use crate::parser::internal::token_stream::TokenStream;
 use crate::token::Token;
@@ -96,7 +96,7 @@ pub fn maybe_expect<'arena>(
 }
 
 #[inline]
-pub fn expect_span<'arena>(stream: &mut TokenStream<'_, 'arena>, kind: TokenKind) -> Result<Span, ParseError> {
+pub fn expect_span(stream: &mut TokenStream<'_, '_>, kind: TokenKind) -> Result<Span, ParseError> {
     expect(stream, kind).map(|token| token.span)
 }
 
@@ -135,11 +135,7 @@ pub fn to_keyword(token: Token) -> Keyword {
 }
 
 #[inline]
-pub fn unexpected<'arena>(
-    stream: &mut TokenStream<'_, 'arena>,
-    token: Option<Token>,
-    one_of: &[TokenKind],
-) -> ParseError {
+pub fn unexpected(stream: &mut TokenStream<'_, '_>, token: Option<Token>, one_of: &[TokenKind]) -> ParseError {
     if let Some(token) = token {
         ParseError::UnexpectedToken(one_of.to_vec(), token.kind, token.span)
     } else {

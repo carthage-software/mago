@@ -249,36 +249,43 @@ impl<'ctx, 'ast, 'arena> InvocationInfo<'ctx, 'ast, 'arena> {
     }
 
     #[inline]
+    #[must_use]
     pub fn get_argument(&self, index: usize, names: &[&str]) -> Option<&'ast Expression<'arena>> {
         get_argument(self.invocation.arguments_source, index, names)
     }
 
     #[inline]
+    #[must_use]
     pub fn arguments(&self) -> Vec<InvocationArgument<'ast, 'arena>> {
         self.invocation.arguments_source.get_arguments()
     }
 
     #[inline]
+    #[must_use]
     pub fn argument_count(&self) -> usize {
         self.invocation.arguments_source.get_arguments().len()
     }
 
     #[inline]
+    #[must_use]
     pub fn has_no_arguments(&self) -> bool {
         self.invocation.arguments_source.get_arguments().is_empty()
     }
 
     #[inline]
+    #[must_use]
     pub fn span(&self) -> Span {
         self.invocation.span
     }
 
     #[inline]
+    #[must_use]
     pub fn inner(&self) -> &'ctx Invocation<'ctx, 'ast, 'arena> {
         self.invocation
     }
 
     #[inline]
+    #[must_use]
     pub fn function_name(&self) -> String {
         self.invocation.target.guess_name()
     }
@@ -301,7 +308,7 @@ fn get_argument<'ast, 'arena>(
                 return Some(&argument.value);
             }
 
-            for argument in argument_list.arguments.iter() {
+            for argument in &argument_list.arguments {
                 if let Argument::Named(named_argument) = argument
                     && names.contains(&named_argument.name.value)
                 {
@@ -316,7 +323,7 @@ fn get_argument<'ast, 'arena>(
                 return Some(&argument.value);
             }
 
-            for argument in partial_argument_list.arguments.iter() {
+            for argument in &partial_argument_list.arguments {
                 if let PartialArgument::Named(named_argument) = argument
                     && names.contains(&named_argument.name.value)
                 {

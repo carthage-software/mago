@@ -381,6 +381,7 @@ pub fn find_satisfying_assignments(
 ///
 /// A `Vec<Clause>` representing the resulting CNF formula.
 #[inline]
+#[must_use]
 pub fn disjoin_clauses(
     left_clauses: Vec<Clause>,
     right_clauses: Vec<Clause>,
@@ -504,6 +505,7 @@ pub fn disjoin_clauses(
 /// A `Some(Vec<Clause>)` representing the negated and simplified CNF formula,
 /// or `None` if the negation is not possible due to complexity or other constraints.
 #[inline]
+#[must_use]
 pub fn negate_formula(mut clauses: Vec<Clause>) -> Option<Vec<Clause>> {
     clauses.retain(|clause| clause.reconcilable);
 

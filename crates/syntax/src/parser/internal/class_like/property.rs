@@ -1,5 +1,18 @@
 use crate::T;
-use crate::ast::ast::*;
+use crate::ast::ast::AttributeList;
+use crate::ast::ast::HookedProperty;
+use crate::ast::ast::Modifier;
+use crate::ast::ast::PlainProperty;
+use crate::ast::ast::Property;
+use crate::ast::ast::PropertyAbstractItem;
+use crate::ast::ast::PropertyConcreteItem;
+use crate::ast::ast::PropertyHook;
+use crate::ast::ast::PropertyHookAbstractBody;
+use crate::ast::ast::PropertyHookBody;
+use crate::ast::ast::PropertyHookConcreteBody;
+use crate::ast::ast::PropertyHookConcreteExpressionBody;
+use crate::ast::ast::PropertyHookList;
+use crate::ast::ast::PropertyItem;
 use crate::ast::sequence::Sequence;
 use crate::ast::sequence::TokenSeparatedSequence;
 use crate::error::ParseError;
@@ -149,8 +162,8 @@ pub fn parse_property_hook_body<'arena>(
     })
 }
 
-pub fn parse_property_hook_abstract_body<'arena>(
-    stream: &mut TokenStream<'_, 'arena>,
+pub fn parse_property_hook_abstract_body(
+    stream: &mut TokenStream<'_, '_>,
 ) -> Result<PropertyHookAbstractBody, ParseError> {
     Ok(PropertyHookAbstractBody { semicolon: utils::expect_span(stream, T![";"])? })
 }

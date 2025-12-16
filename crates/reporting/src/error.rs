@@ -28,6 +28,7 @@ pub enum ReportingError {
 }
 
 impl ReportingError {
+    #[must_use]
     pub fn is_broken_pipe(&self) -> bool {
         let err = match self {
             Self::IoError(err) => err,

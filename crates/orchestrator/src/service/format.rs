@@ -35,6 +35,7 @@ pub struct FormatService {
 }
 
 impl FormatService {
+    #[must_use]
     pub fn new(
         database: ReadDatabase,
         php_version: PHPVersion,
@@ -151,22 +152,27 @@ impl Default for FormatResult {
 }
 
 impl FormatResult {
+    #[must_use]
     pub fn new() -> Self {
         Self { changed_files: HashMap::new() }
     }
 
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.changed_files.is_empty()
     }
 
+    #[must_use]
     pub fn is_successful(&self) -> bool {
         self.changed_files.values().all(|status| !matches!(status, FileFormatStatus::FailedToParse(_)))
     }
 
+    #[must_use]
     pub fn is_failed(&self) -> bool {
         self.changed_files.values().any(|status| matches!(status, FileFormatStatus::FailedToParse(_)))
     }
 
+    #[must_use]
     pub fn is_changed(&self) -> bool {
         self.changed_files.values().any(|status| matches!(status, FileFormatStatus::Changed(_)))
     }
@@ -183,6 +189,7 @@ impl FormatResult {
         })
     }
 
+    #[must_use]
     pub fn changed_files_count(&self) -> usize {
         self.changed_files.values().filter(|status| matches!(status, FileFormatStatus::Changed(_))).count()
     }

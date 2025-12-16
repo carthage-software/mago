@@ -21,24 +21,28 @@ pub enum Visibility {
 impl Visibility {
     /// Checks if the visibility level is `Public`.
     #[inline]
+    #[must_use]
     pub const fn is_public(&self) -> bool {
         matches!(self, Visibility::Public)
     }
 
     /// Checks if the visibility level is `Protected`.
     #[inline]
+    #[must_use]
     pub const fn is_protected(&self) -> bool {
         matches!(self, Visibility::Protected)
     }
 
     /// Checks if the visibility level is `Private`.
     #[inline]
+    #[must_use]
     pub const fn is_private(&self) -> bool {
         matches!(self, Visibility::Private)
     }
 
     /// Returns the visibility level as a static string.
     #[inline]
+    #[must_use]
     pub const fn as_str(&self) -> &'static str {
         match self {
             Visibility::Public => "public",

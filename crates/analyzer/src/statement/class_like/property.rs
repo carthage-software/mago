@@ -7,7 +7,14 @@ use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::wrap_atomic;
 use mago_span::HasSpan;
-use mago_syntax::ast::*;
+use mago_syntax::ast::HookedProperty;
+use mago_syntax::ast::PlainProperty;
+use mago_syntax::ast::Property;
+use mago_syntax::ast::PropertyConcreteItem;
+use mago_syntax::ast::PropertyHook;
+use mago_syntax::ast::PropertyHookBody;
+use mago_syntax::ast::PropertyHookConcreteBody;
+use mago_syntax::ast::PropertyItem;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -47,9 +54,9 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for PlainProperty<'arena> {
             artifacts,
             self.attribute_lists.as_slice(),
             AttributeTarget::Property,
-        )?;
+        );
 
-        for item in self.items.iter() {
+        for item in &self.items {
             item.analyze(context, block_context, artifacts)?;
         }
 
@@ -96,11 +103,11 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for HookedProperty<'arena> {
             artifacts,
             self.attribute_lists.as_slice(),
             AttributeTarget::Property,
-        )?;
+        );
         self.item.analyze(context, block_context, artifacts)?;
 
         let property_name = atom(self.item.variable().name);
-        for hook in self.hook_list.hooks.iter() {
+        for hook in &self.hook_list.hooks {
             analyze_property_hook(hook, property_name, context, block_context, artifacts)?;
         }
 
@@ -132,7 +139,7 @@ fn analyze_property_hook<'ctx, 'arena>(
         artifacts,
         hook.attribute_lists.as_slice(),
         AttributeTarget::Method,
-    )?;
+    );
 
     let PropertyHookBody::Concrete(body) = &hook.body else {
         return Ok(());
@@ -154,7 +161,7 @@ fn analyze_property_hook<'ctx, 'arena>(
     if let Some(class_like_metadata) = parent_block_context.scope.get_class_like() {
         let this_type = wrap_atomic(TAtomic::Object(get_this_type(context, class_like_metadata, None)));
         hook_block_context.locals.insert(Atom::from("$this"), Rc::new(this_type));
-        add_properties_to_hook_context(context, &mut hook_block_context, class_like_metadata)?;
+        add_properties_to_hook_context(context, &mut hook_block_context, class_like_metadata);
     }
 
     if hook.name.value == "set" {
@@ -188,7 +195,7 @@ fn analyze_property_hook<'ctx, 'arena>(
                     Some(&expr_body.expression),
                     value_type,
                     expr_body.expression.span(),
-                )?;
+                );
             }
         }
     }
@@ -221,7 +228,7 @@ fn add_properties_to_hook_context<'ctx>(
     context: &Context<'ctx, '_>,
     hook_block_context: &mut BlockContext<'ctx>,
     class_like_metadata: &mago_codex::metadata::class_like::ClassLikeMetadata,
-) -> Result<(), AnalysisError> {
+) {
     for (property_name, declaring_class) in &class_like_metadata.declaring_property_ids {
         let Some(property_class) = context.codebase.get_class_like(declaring_class) else { continue };
         let Some(property) = property_class.properties.get(property_name) else { continue };
@@ -234,6 +241,4 @@ fn add_properties_to_hook_context<'ctx>(
         let raw_name = property_name.strip_prefix("$").unwrap_or(property_name);
         hook_block_context.locals.insert(Atom::from(&format!("$this->{raw_name}")), Rc::new(property_type));
     }
-
-    Ok(())
 }

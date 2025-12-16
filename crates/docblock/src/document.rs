@@ -241,6 +241,7 @@ impl TagKind {
     /// Returns the vendor of the tag, if it has one.
     ///
     /// If the tag does not have a vendor, `None` is returned.
+    #[must_use]
     pub fn get_vendor(&self) -> Option<TagVendor> {
         match self {
             Self::PsalmConsistentConstructor
@@ -322,6 +323,7 @@ impl TagKind {
     ///
     /// If the tag is not vendored, or if it does not have a non-vendored variant,
     ///  `None` is returned.
+    #[must_use]
     pub fn get_non_vendored_variant(&self) -> Option<TagKind> {
         match self {
             Self::PsalmConsistentConstructor => Some(Self::ConsistentConstructor),
@@ -369,6 +371,7 @@ impl TagKind {
         }
     }
 
+    #[must_use]
     pub fn is_repeatable(&self) -> bool {
         matches!(
             self,
@@ -623,6 +626,7 @@ where
 }
 
 impl TagVendor {
+    #[must_use]
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Mago => "mago",

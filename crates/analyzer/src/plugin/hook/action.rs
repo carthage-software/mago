@@ -29,12 +29,14 @@ pub enum ExpressionHookResult {
 impl ExpressionHookResult {
     /// Returns true if this result indicates the hook wants to skip analysis.
     #[inline]
+    #[must_use]
     pub fn should_skip(&self) -> bool {
         !matches!(self, ExpressionHookResult::Continue)
     }
 
     /// Returns the type to use if `SkipWithType`, otherwise `None`.
     #[inline]
+    #[must_use]
     pub fn take_type(self) -> Option<TUnion> {
         match self {
             ExpressionHookResult::SkipWithType(ty) => Some(ty),

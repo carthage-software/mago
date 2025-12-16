@@ -1,4 +1,5 @@
-use crate::ast::*;
+use crate::ast::Trivia;
+use crate::ast::TriviaKind;
 
 pub mod docblock;
 
@@ -12,6 +13,7 @@ pub mod docblock;
 /// line from the start of the entire trivia text (including `/**`, `//`, etc.),
 /// and the `&str` is the cleaned line content.
 #[inline]
+#[must_use]
 pub fn comment_lines<'arena>(trivia: &Trivia<'arena>) -> Vec<(u32, &'arena str)> {
     let full_text = trivia.value;
     let (content_start_offset, content_end_offset) = match trivia.kind {

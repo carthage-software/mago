@@ -10,21 +10,25 @@ pub enum Variance {
 
 impl Variance {
     #[inline]
+    #[must_use]
     pub const fn is_invariant(&self) -> bool {
         matches!(self, Variance::Invariant)
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_covariant(&self) -> bool {
         matches!(self, Variance::Covariant)
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_contravariant(&self) -> bool {
         matches!(self, Variance::Contravariant)
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_readonly(&self) -> bool {
         matches!(self, Variance::Covariant | Variance::Invariant)
     }
@@ -43,6 +47,7 @@ impl Variance {
     /// - Covariant + Contravariant = Contravariant
     /// - Contravariant + Covariant = Contravariant
     #[inline]
+    #[must_use]
     pub const fn combine(outer_variance: Self, inner_variance: Self) -> Self {
         match (outer_variance, inner_variance) {
             // If either is invariant, the result is invariant

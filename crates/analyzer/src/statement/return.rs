@@ -21,7 +21,8 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_span::Span;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Expression;
+use mago_syntax::ast::Return;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -93,7 +94,9 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Return<'arena> {
             Rc::new(get_void())
         };
 
-        handle_return_value(context, block_context, artifacts, self.value.as_ref(), inferred_return_type, self.span())
+        handle_return_value(context, block_context, artifacts, self.value.as_ref(), inferred_return_type, self.span());
+
+        Ok(())
     }
 }
 
@@ -104,7 +107,7 @@ pub fn handle_return_value<'ctx>(
     return_value: Option<&Expression>,
     mut inferred_return_type: Rc<TUnion>,
     return_span: Span,
-) -> Result<(), AnalysisError> {
+) {
     if inferred_return_type.is_void() {
         inferred_return_type = Rc::new(get_null());
     }
@@ -129,12 +132,12 @@ pub fn handle_return_value<'ctx>(
             block_context.scope.get_function_like_identifier()
         && method_name.eq_ignore_ascii_case("__construct")
     {
-        check_constructor_early_return(context, block_context, return_span, &class_name);
+        check_constructor_early_return(context, block_context, return_span, class_name);
     }
 
     // Check if we're in a property hook context
     if let Some((property_name, hook_metadata)) = block_context.scope.get_property_hook() {
-        return handle_property_hook_return(
+        handle_property_hook_return(
             context,
             block_context,
             return_value,
@@ -143,15 +146,15 @@ pub fn handle_return_value<'ctx>(
             property_name,
             hook_metadata,
         );
+
+        return;
     }
 
-    let (function_like_metadata, function_like_identifier) = if let (Some(s), Some(i)) =
+    let (Some(function_like_metadata), Some(function_like_identifier)) =
         (block_context.scope.get_function_like(), block_context.scope.get_function_like_identifier())
-    {
-        (s, i)
-    } else {
+    else {
         // Global return, no function context, exiting.
-        return Ok(());
+        return;
     };
 
     if inferred_return_type.is_expandable() {
@@ -279,7 +282,7 @@ pub fn handle_return_value<'ctx>(
 
     if let Some(return_value) = return_value {
         if expected_return_type.is_mixed() {
-            return Ok(());
+            return;
         }
 
         if expected_return_type.is_void() {
@@ -303,7 +306,7 @@ pub fn handle_return_value<'ctx>(
                 ),
             );
 
-            return Ok(());
+            return;
         }
 
         if inferred_return_type.is_mixed() {
@@ -326,7 +329,7 @@ pub fn handle_return_value<'ctx>(
                 ),
             );
 
-            return Ok(());
+            return;
         }
 
         let mut union_comparison_result = ComparisonResult::new();
@@ -342,7 +345,7 @@ pub fn handle_return_value<'ctx>(
         );
 
         if is_contained_by {
-            return Ok(());
+            return;
         }
 
         let expected_return_type_str = expected_return_type.get_id();
@@ -406,7 +409,7 @@ pub fn handle_return_value<'ctx>(
 
         if union_comparison_result.type_coerced.unwrap_or(false) {
             if union_comparison_result.type_coerced_from_as_mixed.unwrap_or(false) {
-                return Ok(());
+                return;
             }
 
             if union_comparison_result.type_coerced_from_nested_mixed.unwrap_or(false) {
@@ -511,8 +514,6 @@ pub fn handle_return_value<'ctx>(
             ),
         );
     }
-
-    Ok(())
 }
 
 fn handle_property_hook_return<'ctx>(
@@ -523,14 +524,16 @@ fn handle_property_hook_return<'ctx>(
     _return_span: Span,
     property_name: Atom,
     hook_metadata: &PropertyHookMetadata,
-) -> Result<(), AnalysisError> {
+) {
     if !hook_metadata.is_get() {
-        return Ok(());
+        return;
     }
 
-    let Some(class_like) = block_context.scope.get_class_like() else { return Ok(()) };
-    let Some(property) = class_like.properties.get(&property_name) else { return Ok(()) };
-    let Some(type_metadata) = &property.type_metadata else { return Ok(()) };
+    let Some(class_like) = block_context.scope.get_class_like() else {
+        return;
+    };
+    let Some(property) = class_like.properties.get(&property_name) else { return };
+    let Some(type_metadata) = &property.type_metadata else { return };
 
     let mut expected_return_type = type_metadata.type_union.clone();
     expand_union(
@@ -557,13 +560,13 @@ fn handle_property_hook_return<'ctx>(
     }
 
     if expected_return_type.is_mixed() {
-        return Ok(());
+        return;
     }
 
-    let Some(return_value) = return_value else { return Ok(()) };
+    let Some(return_value) = return_value else { return };
 
     if expected_return_type.is_void() {
-        return Ok(());
+        return;
     }
 
     let hook_name = concat_atom!(class_like.name, "::", property_name, "::get");
@@ -579,7 +582,7 @@ fn handle_property_hook_return<'ctx>(
             .with_note("The analysis could not determine a specific type for the value returned here.")
             .with_help("Add specific type hints to variables or properties involved in calculating the return value."),
         );
-        return Ok(());
+        return;
     }
 
     let mut comparison_result = ComparisonResult::new();
@@ -592,7 +595,7 @@ fn handle_property_hook_return<'ctx>(
         false,
         &mut comparison_result,
     ) {
-        return Ok(());
+        return;
     }
 
     let expected_str = expected_return_type.get_id();
@@ -614,7 +617,7 @@ fn handle_property_hook_return<'ctx>(
                 "Ensure the hook always returns a non-null value, or change the property type to `?{expected_str}`."
             )),
         );
-        return Ok(());
+        return;
     }
 
     if inferred_return_type.is_falsable()
@@ -631,7 +634,7 @@ fn handle_property_hook_return<'ctx>(
             .with_note("The property type does not permit false, but this expression could return false.")
             .with_help(format!("Ensure the hook never returns false, or change the property type to `{expected_str}|false`.")),
         );
-        return Ok(());
+        return;
     }
 
     context.collector.report_with_code(
@@ -645,8 +648,6 @@ fn handle_property_hook_return<'ctx>(
         .with_note(format!("The get hook must return a value compatible with the property type `{expected_str}`."))
         .with_help("Change the returned expression to match the property type."),
     );
-
-    Ok(())
 }
 
 /// Check for uninitialized properties when returning early from a constructor.
@@ -654,9 +655,9 @@ fn check_constructor_early_return<'ctx>(
     context: &mut Context<'ctx, '_>,
     block_context: &BlockContext<'ctx>,
     return_span: Span,
-    class_name: &Atom,
+    class_name: Atom,
 ) {
-    let Some(class_like_metadata) = context.codebase.get_class_like(class_name) else {
+    let Some(class_like_metadata) = context.codebase.get_class_like(&class_name) else {
         return;
     };
 

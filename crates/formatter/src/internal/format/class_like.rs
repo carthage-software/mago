@@ -6,7 +6,10 @@ use bumpalo::vec;
 
 use mago_span::HasSpan;
 use mago_span::Span;
-use mago_syntax::ast::*;
+use mago_syntax::ast::ClassLikeMember;
+use mago_syntax::ast::Method;
+use mago_syntax::ast::Modifier;
+use mago_syntax::ast::Sequence;
 
 use crate::document::Document;
 use crate::document::Group;

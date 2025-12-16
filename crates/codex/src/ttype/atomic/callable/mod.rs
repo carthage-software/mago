@@ -56,10 +56,12 @@ pub enum TCallable {
 impl TCallableSignature {
     /// Creates a new `CallableSignature` with the specified purity and closure status.
     #[inline]
+    #[must_use]
     pub fn new(is_pure: bool, is_closure: bool) -> Self {
         Self { is_pure, is_closure, parameters: Vec::new(), return_type: None, closure_location: None, source: None }
     }
 
+    #[must_use]
     pub fn mixed(is_closure: bool) -> Self {
         TCallableSignature::new(false, is_closure)
             .with_parameters(vec![TCallableParameter::new(Some(Box::new(get_mixed())), false, true, true)])
@@ -68,6 +70,7 @@ impl TCallableSignature {
 
     /// Returns a slice of the callable parameters.
     #[inline]
+    #[must_use]
     pub fn get_parameters(&self) -> &[TCallableParameter] {
         &self.parameters
     }
@@ -80,6 +83,7 @@ impl TCallableSignature {
 
     /// Returns a reference to the return type (`TUnion`), if specified.
     #[inline]
+    #[must_use]
     pub fn get_return_type(&self) -> Option<&TUnion> {
         self.return_type.as_deref()
     }
@@ -92,36 +96,42 @@ impl TCallableSignature {
 
     /// Returns the closure's starting position, if this signature represents a specific closure literal.
     #[inline]
+    #[must_use]
     pub fn get_closure_position(&self) -> Option<(FileId, Position)> {
         self.closure_location
     }
 
     /// Checks if the callable is marked as pure.
     #[inline]
+    #[must_use]
     pub const fn is_pure(&self) -> bool {
         self.is_pure
     }
 
     /// Checks if this signature specifically represents a closure.
     #[inline]
+    #[must_use]
     pub const fn is_closure(&self) -> bool {
         self.is_closure
     }
 
     /// Checks if the callable has a source, indicating it is an alias or reference to another function-like construct.
     #[inline]
+    #[must_use]
     pub const fn has_source(&self) -> bool {
         self.source.is_some()
     }
 
     /// Returns the source of the callable, if it is an alias or reference to another function-like construct.
     #[inline]
+    #[must_use]
     pub fn get_source(&self) -> Option<FunctionLikeIdentifier> {
         self.source
     }
 
     /// Clones the signature as a closure, setting `is_closure` to `true`.
     #[inline]
+    #[must_use]
     pub fn clone_as_closure(&self) -> Self {
         Self {
             is_pure: self.is_pure,
@@ -135,6 +145,7 @@ impl TCallableSignature {
 
     /// Returns a new instance with `is_pure` set to the given value.
     #[inline]
+    #[must_use]
     pub fn with_pure(mut self, is_pure: bool) -> Self {
         self.is_pure = is_pure;
         self
@@ -142,6 +153,7 @@ impl TCallableSignature {
 
     /// Returns a new instance with the given parameters.
     #[inline]
+    #[must_use]
     pub fn with_parameters(mut self, parameters: Vec<TCallableParameter>) -> Self {
         self.parameters = parameters;
         self
@@ -149,6 +161,7 @@ impl TCallableSignature {
 
     /// Returns a new instance with the return type set.
     #[inline]
+    #[must_use]
     pub fn with_return_type(mut self, return_type: Option<Box<TUnion>>) -> Self {
         self.return_type = return_type;
         self
@@ -156,6 +169,7 @@ impl TCallableSignature {
 
     /// Returns a new instance with the closure position set.
     #[inline]
+    #[must_use]
     pub fn with_closure_location(mut self, closure_position: Option<(FileId, Position)>) -> Self {
         self.closure_location = closure_position;
         self
@@ -163,6 +177,7 @@ impl TCallableSignature {
 
     /// Returns a new instance with the source set.
     #[inline]
+    #[must_use]
     pub fn with_source(mut self, source: Option<FunctionLikeIdentifier>) -> Self {
         self.source = source;
         self
@@ -172,18 +187,21 @@ impl TCallableSignature {
 impl TCallable {
     /// Checks if this representation is a concrete `Signature`.
     #[inline]
+    #[must_use]
     pub const fn is_signature(&self) -> bool {
         matches!(self, TCallable::Signature(_))
     }
 
     /// Checks if this representation is an `Alias` to another function-like.
     #[inline]
+    #[must_use]
     pub const fn is_alias(&self) -> bool {
         matches!(self, TCallable::Alias(_))
     }
 
     /// Returns a reference to the `CallableSignature` if this is the `Signature` variant.
     #[inline]
+    #[must_use]
     pub fn get_signature(&self) -> Option<&TCallableSignature> {
         match self {
             TCallable::Signature(s) => Some(s),
@@ -193,6 +211,7 @@ impl TCallable {
 
     /// Returns a reference to the `FunctionLikeIdentifier` if this is the `Alias` variant.
     #[inline]
+    #[must_use]
     pub fn get_alias(&self) -> Option<&FunctionLikeIdentifier> {
         match self {
             TCallable::Signature(_) => None,

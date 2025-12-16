@@ -3,7 +3,13 @@ use bumpalo::collections::Vec;
 
 use mago_span::Span;
 
-use crate::document::*;
+use crate::document::Annotation;
+use crate::document::Code;
+use crate::document::Document;
+use crate::document::Element;
+use crate::document::Tag;
+use crate::document::Text;
+use crate::document::TextSegment;
 use crate::error::ParseError;
 
 use super::token::Token;
@@ -382,7 +388,7 @@ fn parse_text_segments<'arena>(
                 if let Some(tag_end_pos) = tag_end_pos {
                     let tag_content = &text_content[tag_content_start..tag_end_pos];
                     let tag_span = base_span.subspan(tag_start_pos as u32, tag_end_pos as u32 + 1);
-                    let tag = parse_inline_tag(tag_content, tag_span)?;
+                    let tag = parse_inline_tag(tag_content, tag_span);
                     segments.push(TextSegment::InlineTag(tag));
                 } else {
                     // Unclosed inline tag
@@ -433,18 +439,18 @@ fn parse_text_segments<'arena>(
     Ok(segments)
 }
 
-fn parse_inline_tag(tag_content: &str, span: Span) -> Result<Tag<'_>, ParseError> {
+fn parse_inline_tag(tag_content: &str, span: Span) -> Tag<'_> {
     let mut parts = tag_content.trim().splitn(2, char::is_whitespace);
     let name = parts.next().unwrap_or("");
     let description = parts.next().unwrap_or("");
 
-    Ok(Tag {
+    Tag {
         span,
         name,
         kind: name.into(),
         description,
         description_span: Span::new(span.file_id, span.start.forward(name.len() as u32 + 1), span.end),
-    })
+    }
 }
 
 fn parse_annotation<'arena>(

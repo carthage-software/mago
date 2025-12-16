@@ -10,7 +10,8 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_reporting::Level;
 use mago_span::HasSpan;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Node;
+use mago_syntax::ast::NodeKind;
 
 use crate::category::Category;
 use crate::context::LintContext;
@@ -98,8 +99,8 @@ impl LintRule for SensitiveParameterRule {
             return; // Not a password-related parameter, no issue
         }
 
-        for attribute_list in parameter.attribute_lists.iter() {
-            for attribute in attribute_list.attributes.iter() {
+        for attribute_list in &parameter.attribute_lists {
+            for attribute in &attribute_list.attributes {
                 let name = ctx.resolved_names.get(&attribute.name);
 
                 if name.eq_ignore_ascii_case("SensitiveParameter") {

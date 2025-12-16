@@ -22,6 +22,7 @@ pub enum MagicConstant<'arena> {
 }
 
 impl<'arena> MagicConstant<'arena> {
+    #[must_use]
     pub fn value(&self) -> &LocalIdentifier<'arena> {
         match self {
             MagicConstant::Line(value) => value,

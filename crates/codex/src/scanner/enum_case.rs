@@ -1,7 +1,8 @@
 use mago_atom::atom;
 use mago_names::scope::NamespaceScope;
 use mago_span::HasSpan;
-use mago_syntax::ast::*;
+use mago_syntax::ast::EnumCase;
+use mago_syntax::ast::EnumCaseItem;
 
 use crate::metadata::enum_case::EnumCaseMetadata;
 use crate::metadata::flags::MetadataFlags;

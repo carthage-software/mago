@@ -1,5 +1,13 @@
 use mago_names::ResolvedNames;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Argument;
+use mago_syntax::ast::ArgumentList;
+use mago_syntax::ast::NamedArgument;
+use mago_syntax::ast::NamedPlaceholderArgument;
+use mago_syntax::ast::PartialArgument;
+use mago_syntax::ast::PartialArgumentList;
+use mago_syntax::ast::PlaceholderArgument;
+use mago_syntax::ast::PositionalArgument;
+use mago_syntax::ast::VariadicPlaceholderArgument;
 
 use crate::FingerprintOptions;
 use crate::Fingerprintable;
@@ -18,7 +26,7 @@ impl Fingerprintable for ArgumentList<'_> {
         }
 
         "args".hash(hasher);
-        for argument in self.arguments.iter() {
+        for argument in &self.arguments {
             argument.fingerprint_with_hasher(hasher, resolved_names, options);
         }
     }
@@ -76,7 +84,7 @@ impl Fingerprintable for PartialArgumentList<'_> {
         }
 
         "partial_args".hash(hasher);
-        for argument in self.arguments.iter() {
+        for argument in &self.arguments {
             argument.fingerprint_with_hasher(hasher, resolved_names, options);
         }
     }

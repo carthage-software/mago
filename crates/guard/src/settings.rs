@@ -122,6 +122,7 @@ pub enum StructuralInheritanceConstraint {
 
 impl PermittedDependencyKind {
     /// Returns the string representation of the symbol type.
+    #[must_use]
     pub const fn as_str(&self) -> &'static str {
         match self {
             PermittedDependencyKind::ClassLike => "class-like",
@@ -133,11 +134,13 @@ impl PermittedDependencyKind {
 }
 
 impl StructuralSymbolKind {
+    #[must_use]
     pub const fn is_constant(&self) -> bool {
         matches!(self, StructuralSymbolKind::Constant)
     }
 
     /// Returns the string representation of the symbol kind.
+    #[must_use]
     pub const fn as_str(&self) -> &'static str {
         match self {
             StructuralSymbolKind::ClassLike => "class-like",

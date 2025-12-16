@@ -1,11 +1,15 @@
 use crate::T;
-use crate::ast::ast::*;
+use crate::ast::ast::Hint;
+use crate::ast::ast::IntersectionHint;
+use crate::ast::ast::NullableHint;
+use crate::ast::ast::ParenthesizedHint;
+use crate::ast::ast::UnionHint;
 use crate::error::ParseError;
 use crate::parser::internal::identifier;
 use crate::parser::internal::token_stream::TokenStream;
 use crate::parser::internal::utils;
 
-pub fn is_at_type_hint<'arena>(stream: &mut TokenStream<'_, 'arena>) -> Result<bool, ParseError> {
+pub fn is_at_type_hint(stream: &mut TokenStream<'_, '_>) -> Result<bool, ParseError> {
     Ok(matches!(
         utils::peek(stream)?.kind,
         T!["?"

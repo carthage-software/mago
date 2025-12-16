@@ -85,7 +85,7 @@ pub fn run(code: String, settings_js: JsValue) -> Result<JsValue, JsValue> {
     let mut issue_map: HashMap<(String, u32, u32), WasmIssue> = HashMap::new();
     let mut issues_without_key: Vec<WasmIssue> = Vec::new();
 
-    for issue in linter_issues.iter() {
+    for issue in &linter_issues {
         if let Some(code) = &issue.code
             && disabled_rules.contains(code)
         {
@@ -145,7 +145,7 @@ pub fn run(code: String, settings_js: JsValue) -> Result<JsValue, JsValue> {
         .get_ref(&file_id)
         .expect("File should exist in prelude database after being added prior to analysis");
 
-    for issue in analyzer_issues.iter() {
+    for issue in &analyzer_issues {
         let wasm_issue = WasmIssue::from_issue(issue, file, IssueSource::Analyzer);
         if let Some(key) = issue_key(&wasm_issue) {
             if let Some(existing) = issue_map.get_mut(&key) {
@@ -177,8 +177,8 @@ pub fn run(code: String, settings_js: JsValue) -> Result<JsValue, JsValue> {
 ///
 /// A JavaScript array of linter issue objects.
 #[wasm_bindgen]
-pub fn lint(code: String, php_version: String) -> Result<JsValue, JsValue> {
-    let version = parse_php_version(&php_version);
+pub fn lint(code: String, php_version: &str) -> Result<JsValue, JsValue> {
+    let version = parse_php_version(php_version);
     let file = File::ephemeral(Cow::Borrowed("code.php"), Cow::Owned(code));
     let settings = LinterSettings { php_version: version, ..Default::default() };
 
@@ -206,8 +206,8 @@ pub fn lint(code: String, php_version: String) -> Result<JsValue, JsValue> {
 ///
 /// A JavaScript array of analyzer issue objects.
 #[wasm_bindgen]
-pub fn analyze(code: String, php_version: String) -> Result<JsValue, JsValue> {
-    let version = parse_php_version(&php_version);
+pub fn analyze(code: String, php_version: &str) -> Result<JsValue, JsValue> {
+    let version = parse_php_version(php_version);
     let file = File::ephemeral(Cow::Borrowed("code.php"), Cow::Owned(code));
     let file_id = file.id;
 
@@ -265,9 +265,9 @@ pub fn analyze(code: String, php_version: String) -> Result<JsValue, JsValue> {
 ///
 /// The formatted PHP code as a string, or an error if parsing fails.
 #[wasm_bindgen]
-pub fn format(code: String, php_version: String) -> Result<String, JsValue> {
-    let version = parse_php_version(&php_version);
-    let file = File::ephemeral(Cow::Borrowed("code.php"), Cow::Owned(code.clone()));
+pub fn format(code: String, php_version: &str) -> Result<String, JsValue> {
+    let version = parse_php_version(php_version);
+    let file = File::ephemeral(Cow::Borrowed("code.php"), Cow::Owned(code));
 
     let arena = bumpalo::Bump::new();
     let (program, parse_error) = parse_file(&arena, &file);

@@ -6,8 +6,10 @@ use serde::Serialize;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_reporting::Level;
-use mago_span::*;
-use mago_syntax::ast::*;
+use mago_span::HasSpan;
+use mago_syntax::ast::Hint;
+use mago_syntax::ast::Node;
+use mago_syntax::ast::NodeKind;
 
 use crate::category::Category;
 use crate::context::LintContext;
@@ -90,19 +92,17 @@ impl LintRule for LowercaseTypeHintRule {
             return;
         };
 
-        let identifier = match hint {
-            Hint::Void(identifier)
-            | Hint::Never(identifier)
-            | Hint::Float(identifier)
-            | Hint::Bool(identifier)
-            | Hint::Integer(identifier)
-            | Hint::String(identifier)
-            | Hint::Object(identifier)
-            | Hint::Mixed(identifier)
-            | Hint::Iterable(identifier) => identifier,
-            _ => {
-                return;
-            }
+        let (Hint::Void(identifier)
+        | Hint::Never(identifier)
+        | Hint::Float(identifier)
+        | Hint::Bool(identifier)
+        | Hint::Integer(identifier)
+        | Hint::String(identifier)
+        | Hint::Object(identifier)
+        | Hint::Mixed(identifier)
+        | Hint::Iterable(identifier)) = hint
+        else {
+            return;
         };
 
         if identifier.value.chars().all(|c| !c.is_ascii_alphabetic() || c.is_ascii_lowercase()) {

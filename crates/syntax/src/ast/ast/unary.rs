@@ -57,11 +57,13 @@ pub struct UnaryPostfix<'arena> {
 
 impl<'arena> UnaryPrefixOperator<'arena> {
     #[inline]
+    #[must_use]
     pub const fn is_error_control(&self) -> bool {
         matches!(self, Self::ErrorControl(_))
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_constant(&self) -> bool {
         matches!(
             self,
@@ -75,6 +77,7 @@ impl<'arena> UnaryPrefixOperator<'arena> {
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_cast(&self) -> bool {
         matches!(
             self,
@@ -95,26 +98,31 @@ impl<'arena> UnaryPrefixOperator<'arena> {
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_reference(&self) -> bool {
         matches!(self, Self::Reference(_))
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_arithmetic(&self) -> bool {
         matches!(self, Self::Plus(_) | Self::Negation(_) | Self::PreIncrement(_) | Self::PreDecrement(_))
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_increment_or_decrement(&self) -> bool {
         matches!(self, Self::PreIncrement(_) | Self::PreDecrement(_))
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_not(&self) -> bool {
         matches!(self, Self::Not(_))
     }
 
     #[inline]
+    #[must_use]
     pub fn as_str(&self) -> &'arena str {
         match self {
             UnaryPrefixOperator::ErrorControl(_) => "@",
@@ -142,6 +150,7 @@ impl<'arena> UnaryPrefixOperator<'arena> {
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_same_as(&self, other: &Self) -> bool {
         matches!(
             (self, other),
@@ -183,6 +192,7 @@ impl GetPrecedence for UnaryPrefixOperator<'_> {
 
 impl UnaryPostfixOperator {
     #[inline]
+    #[must_use]
     pub const fn is_constant(&self) -> bool {
         match self {
             Self::PostIncrement(_) | Self::PostDecrement(_) => false,
@@ -190,6 +200,7 @@ impl UnaryPostfixOperator {
     }
 
     #[inline]
+    #[must_use]
     pub const fn as_str<'a>(&self) -> &'a str {
         match self {
             UnaryPostfixOperator::PostIncrement(_) => "++",
@@ -198,6 +209,7 @@ impl UnaryPostfixOperator {
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_same_as(&self, other: &Self) -> bool {
         matches!(
             (self, other),

@@ -1,7 +1,36 @@
 use mago_span::HasSpan;
 use mago_span::Span;
 
-use crate::ast::*;
+use crate::ast::Access;
+use crate::ast::Array;
+use crate::ast::ArrayElement;
+use crate::ast::Block;
+use crate::ast::Break;
+use crate::ast::Call;
+use crate::ast::ClassLikeConstantSelector;
+use crate::ast::ClassLikeMemberSelector;
+use crate::ast::Construct;
+use crate::ast::Continue;
+use crate::ast::Expression;
+use crate::ast::ForBody;
+use crate::ast::ForeachBody;
+use crate::ast::ForeachTarget;
+use crate::ast::IfBody;
+use crate::ast::LegacyArray;
+use crate::ast::List;
+use crate::ast::Literal;
+use crate::ast::LiteralInteger;
+use crate::ast::MatchArm;
+use crate::ast::PartialApplication;
+use crate::ast::Return;
+use crate::ast::Statement;
+use crate::ast::StringPart;
+use crate::ast::SwitchBody;
+use crate::ast::SwitchCase;
+use crate::ast::Throw;
+use crate::ast::Variable;
+use crate::ast::WhileBody;
+use crate::ast::Yield;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ControlFlow<'ast, 'arena> {
@@ -23,10 +52,11 @@ impl HasSpan for ControlFlow<'_, '_> {
 }
 
 #[inline]
+#[must_use]
 pub fn find_control_flows_in_block<'ast, 'arena>(block: &'ast Block<'arena>) -> Vec<ControlFlow<'ast, 'arena>> {
     let mut controls = vec![];
 
-    for statement in block.statements.iter() {
+    for statement in &block.statements {
         controls.extend(find_control_flows_in_statement(statement));
     }
 
@@ -34,6 +64,7 @@ pub fn find_control_flows_in_block<'ast, 'arena>(block: &'ast Block<'arena>) -> 
 }
 
 #[inline]
+#[must_use]
 pub fn find_control_flows_in_statement<'ast, 'arena>(
     statement: &'ast Statement<'arena>,
 ) -> Vec<ControlFlow<'ast, 'arena>> {
@@ -41,7 +72,7 @@ pub fn find_control_flows_in_statement<'ast, 'arena>(
 
     match statement {
         Statement::Namespace(namespace) => {
-            for statement in namespace.statements().iter() {
+            for statement in namespace.statements() {
                 controls.extend(find_control_flows_in_statement(statement));
             }
         }
@@ -51,7 +82,7 @@ pub fn find_control_flows_in_statement<'ast, 'arena>(
         Statement::Try(r#try) => {
             controls.extend(find_control_flows_in_block(&r#try.block));
 
-            for catch in r#try.catch_clauses.iter() {
+            for catch in &r#try.catch_clauses {
                 controls.extend(find_control_flows_in_block(&catch.block));
             }
 
@@ -76,22 +107,22 @@ pub fn find_control_flows_in_statement<'ast, 'arena>(
                     controls.extend(find_control_flows_in_statement(statement));
                 }
                 ForeachBody::ColonDelimited(foreach_colon_delimited_body) => {
-                    for statement in foreach_colon_delimited_body.statements.iter() {
+                    for statement in &foreach_colon_delimited_body.statements {
                         controls.extend(find_control_flows_in_statement(statement));
                     }
                 }
             }
         }
         Statement::For(r#for) => {
-            for initialization in r#for.initializations.iter() {
+            for initialization in &r#for.initializations {
                 controls.extend(find_control_flows_in_expression(initialization));
             }
 
-            for condition in r#for.conditions.iter() {
+            for condition in &r#for.conditions {
                 controls.extend(find_control_flows_in_expression(condition));
             }
 
-            for increment in r#for.increments.iter() {
+            for increment in &r#for.increments {
                 controls.extend(find_control_flows_in_expression(increment));
             }
 
@@ -100,7 +131,7 @@ pub fn find_control_flows_in_statement<'ast, 'arena>(
                     controls.extend(find_control_flows_in_statement(statement));
                 }
                 ForBody::ColonDelimited(foreach_colon_delimited_body) => {
-                    for statement in foreach_colon_delimited_body.statements.iter() {
+                    for statement in &foreach_colon_delimited_body.statements {
                         controls.extend(find_control_flows_in_statement(statement));
                     }
                 }
@@ -114,7 +145,7 @@ pub fn find_control_flows_in_statement<'ast, 'arena>(
                     controls.extend(find_control_flows_in_statement(statement));
                 }
                 WhileBody::ColonDelimited(foreach_colon_delimited_body) => {
-                    for statement in foreach_colon_delimited_body.statements.iter() {
+                    for statement in &foreach_colon_delimited_body.statements {
                         controls.extend(find_control_flows_in_statement(statement));
                     }
                 }
@@ -133,17 +164,17 @@ pub fn find_control_flows_in_statement<'ast, 'arena>(
             };
 
             let mut switch_controls = vec![];
-            for case in cases.iter() {
+            for case in cases {
                 match &case {
                     SwitchCase::Expression(switch_expression_case) => {
                         switch_controls.extend(find_control_flows_in_expression(switch_expression_case.expression));
 
-                        for statement in switch_expression_case.statements.iter() {
+                        for statement in &switch_expression_case.statements {
                             switch_controls.extend(find_control_flows_in_statement(statement));
                         }
                     }
                     SwitchCase::Default(switch_default_case) => {
-                        for statement in switch_default_case.statements.iter() {
+                        for statement in &switch_default_case.statements {
                             switch_controls.extend(find_control_flows_in_statement(statement));
                         }
                     }
@@ -171,7 +202,7 @@ pub fn find_control_flows_in_statement<'ast, 'arena>(
                 IfBody::Statement(if_statement_body) => {
                     controls.extend(find_control_flows_in_statement(if_statement_body.statement));
 
-                    for else_if in if_statement_body.else_if_clauses.iter() {
+                    for else_if in &if_statement_body.else_if_clauses {
                         controls.extend(find_control_flows_in_expression(else_if.condition));
                         controls.extend(find_control_flows_in_statement(else_if.statement));
                     }
@@ -181,19 +212,19 @@ pub fn find_control_flows_in_statement<'ast, 'arena>(
                     }
                 }
                 IfBody::ColonDelimited(if_colon_delimited_body) => {
-                    for statement in if_colon_delimited_body.statements.iter() {
+                    for statement in &if_colon_delimited_body.statements {
                         controls.extend(find_control_flows_in_statement(statement));
                     }
 
-                    for else_if in if_colon_delimited_body.else_if_clauses.iter() {
+                    for else_if in &if_colon_delimited_body.else_if_clauses {
                         controls.extend(find_control_flows_in_expression(else_if.condition));
-                        for statement in else_if.statements.iter() {
+                        for statement in &else_if.statements {
                             controls.extend(find_control_flows_in_statement(statement));
                         }
                     }
 
                     if let Some(else_clause) = &if_colon_delimited_body.else_clause {
-                        for statement in else_clause.statements.iter() {
+                        for statement in &else_clause.statements {
                             controls.extend(find_control_flows_in_statement(statement));
                         }
                     }
@@ -222,12 +253,12 @@ pub fn find_control_flows_in_statement<'ast, 'arena>(
             controls.extend(find_control_flows_in_expression(expression_statement.expression));
         }
         Statement::Echo(echo) => {
-            for expression in echo.values.iter() {
+            for expression in &echo.values {
                 controls.extend(find_control_flows_in_expression(expression));
             }
         }
         Statement::Unset(unset) => {
-            for value in unset.values.iter() {
+            for value in &unset.values {
                 controls.extend(find_control_flows_in_expression(value));
             }
         }
@@ -238,6 +269,7 @@ pub fn find_control_flows_in_statement<'ast, 'arena>(
 }
 
 #[inline]
+#[must_use]
 pub fn find_control_flows_in_expression<'ast, 'arena>(
     expression: &'ast Expression<'arena>,
 ) -> Vec<ControlFlow<'ast, 'arena>> {
@@ -258,7 +290,7 @@ pub fn find_control_flows_in_expression<'ast, 'arena>(
             controls.extend(find_control_flows_in_expression(parenthesized.expression));
         }
         Expression::CompositeString(composite_string) => {
-            for part in composite_string.parts().iter() {
+            for part in composite_string.parts() {
                 match part {
                     StringPart::Expression(expression) => {
                         controls.extend(find_control_flows_in_expression(expression));
@@ -285,7 +317,7 @@ pub fn find_control_flows_in_expression<'ast, 'arena>(
         Expression::Array(Array { elements, .. })
         | Expression::LegacyArray(LegacyArray { elements, .. })
         | Expression::List(List { elements, .. }) => {
-            for element in elements.iter() {
+            for element in elements {
                 match element {
                     ArrayElement::KeyValue(key_value_array_element) => {
                         controls.extend(find_control_flows_in_expression(key_value_array_element.key));
@@ -310,17 +342,17 @@ pub fn find_control_flows_in_expression<'ast, 'arena>(
         }
         Expression::AnonymousClass(anonymous_class) => {
             if let Some(arguments) = &anonymous_class.argument_list {
-                for argument in arguments.arguments.iter() {
+                for argument in &arguments.arguments {
                     controls.extend(find_control_flows_in_expression(argument.value()));
                 }
             }
         }
         Expression::Match(r#match) => {
             controls.extend(find_control_flows_in_expression(r#match.expression));
-            for arm in r#match.arms.iter() {
+            for arm in &r#match.arms {
                 match arm {
                     MatchArm::Expression(match_expression_arm) => {
-                        for condition in match_expression_arm.conditions.iter() {
+                        for condition in &match_expression_arm.conditions {
                             controls.extend(find_control_flows_in_expression(condition));
                         }
 
@@ -348,7 +380,7 @@ pub fn find_control_flows_in_expression<'ast, 'arena>(
         },
         Expression::Construct(construct) => match construct {
             Construct::Isset(isset_construct) => {
-                for expression in isset_construct.values.iter() {
+                for expression in &isset_construct.values {
                     controls.extend(find_control_flows_in_expression(expression));
                 }
             }
@@ -375,14 +407,14 @@ pub fn find_control_flows_in_expression<'ast, 'arena>(
             }
             Construct::Exit(exit_construct) => {
                 if let Some(arguments) = &exit_construct.arguments {
-                    for argument in arguments.arguments.iter() {
+                    for argument in &arguments.arguments {
                         controls.extend(find_control_flows_in_expression(argument.value()));
                     }
                 }
             }
             Construct::Die(die_construct) => {
                 if let Some(arguments) = &die_construct.arguments {
-                    for argument in arguments.arguments.iter() {
+                    for argument in &arguments.arguments {
                         controls.extend(find_control_flows_in_expression(argument.value()));
                     }
                 }
@@ -397,7 +429,7 @@ pub fn find_control_flows_in_expression<'ast, 'arena>(
         Expression::Call(call) => match call {
             Call::Function(function_call) => {
                 controls.extend(find_control_flows_in_expression(function_call.function));
-                for argument in function_call.argument_list.arguments.iter() {
+                for argument in &function_call.argument_list.arguments {
                     controls.extend(find_control_flows_in_expression(argument.value()));
                 }
             }
@@ -414,7 +446,7 @@ pub fn find_control_flows_in_expression<'ast, 'arena>(
                     _ => {}
                 }
 
-                for argument in method_call.argument_list.arguments.iter() {
+                for argument in &method_call.argument_list.arguments {
                     controls.extend(find_control_flows_in_expression(argument.value()));
                 }
             }
@@ -431,7 +463,7 @@ pub fn find_control_flows_in_expression<'ast, 'arena>(
                     _ => {}
                 }
 
-                for argument in null_safe_method_call.argument_list.arguments.iter() {
+                for argument in &null_safe_method_call.argument_list.arguments {
                     controls.extend(find_control_flows_in_expression(argument.value()));
                 }
             }
@@ -448,7 +480,7 @@ pub fn find_control_flows_in_expression<'ast, 'arena>(
                     _ => {}
                 }
 
-                for argument in static_method_call.argument_list.arguments.iter() {
+                for argument in &static_method_call.argument_list.arguments {
                     controls.extend(find_control_flows_in_expression(argument.value()));
                 }
             }
@@ -530,7 +562,7 @@ pub fn find_control_flows_in_expression<'ast, 'arena>(
         Expression::Instantiation(instantiation) => {
             controls.extend(find_control_flows_in_expression(instantiation.class));
             if let Some(argument_list) = &instantiation.argument_list {
-                for argument in argument_list.arguments.iter() {
+                for argument in &argument_list.arguments {
                     controls.extend(find_control_flows_in_expression(argument.value()));
                 }
             }

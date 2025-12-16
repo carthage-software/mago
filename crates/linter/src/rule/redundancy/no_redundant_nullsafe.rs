@@ -8,7 +8,12 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_reporting::Level;
 use mago_span::HasSpan;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Access;
+use mago_syntax::ast::Binary;
+use mago_syntax::ast::BinaryOperator;
+use mago_syntax::ast::Expression;
+use mago_syntax::ast::Node;
+use mago_syntax::ast::NodeKind;
 
 use crate::category::Category;
 use crate::context::LintContext;
@@ -120,7 +125,7 @@ impl LintRule for NoRedundantNullsafeRule {
                 });
             }
             Node::IssetConstruct(construct) => {
-                for value in construct.values.iter() {
+                for value in &construct.values {
                     let Expression::Access(Access::NullSafeProperty(null_safe)) = value else {
                         continue;
                     };

@@ -1,5 +1,5 @@
 use mago_names::ResolvedNames;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Unset;
 
 use crate::FingerprintOptions;
 use crate::Fingerprintable;
@@ -14,7 +14,7 @@ impl Fingerprintable for Unset<'_> {
     ) {
         "unset".hash(hasher);
 
-        for value in self.values.iter() {
+        for value in &self.values {
             value.fingerprint_with_hasher(hasher, resolved_names, options);
         }
     }

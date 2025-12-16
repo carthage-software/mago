@@ -16,42 +16,49 @@ pub struct TBool {
 
 impl TBool {
     /// Creates a new Bool instance from an optional boolean value.
+    #[must_use]
     pub const fn new(value: Option<bool>) -> Self {
         Self { value }
     }
 
     /// Creates an instance representing the literal `true` type.
     #[inline]
+    #[must_use]
     pub const fn r#true() -> Self {
         Self { value: Some(true) }
     }
 
     /// Creates an instance representing the literal `false` type.
     #[inline]
+    #[must_use]
     pub const fn r#false() -> Self {
         Self { value: Some(false) }
     }
 
     /// Creates an instance representing the general `bool` type.
     #[inline]
+    #[must_use]
     pub const fn general() -> Self {
         Self { value: None }
     }
 
     /// Checks if this instance represents the literal `true` type.
     #[inline]
+    #[must_use]
     pub const fn is_true(&self) -> bool {
         matches!(self.value, Some(true))
     }
 
     /// Checks if this instance represents the literal `false` type.
     #[inline]
+    #[must_use]
     pub const fn is_false(&self) -> bool {
         matches!(self.value, Some(false))
     }
 
     /// Checks if this instance represents the general `bool` type (neither specifically true nor false).
     #[inline]
+    #[must_use]
     pub const fn is_general(&self) -> bool {
         self.value.is_none()
     }

@@ -7,7 +7,19 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_reporting::Level;
 use mago_span::HasSpan;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Break;
+use mago_syntax::ast::DeclareBody;
+use mago_syntax::ast::Expression;
+use mago_syntax::ast::ForBody;
+use mago_syntax::ast::ForeachBody;
+use mago_syntax::ast::IfBody;
+use mago_syntax::ast::Literal;
+use mago_syntax::ast::LiteralInteger;
+use mago_syntax::ast::Node;
+use mago_syntax::ast::NodeKind;
+use mago_syntax::ast::Return;
+use mago_syntax::ast::Statement;
+use mago_syntax::ast::WhileBody;
 
 use crate::category::Category;
 use crate::context::LintContext;
@@ -105,7 +117,7 @@ impl LintRule for LoopDoesNotIterateRule {
         };
 
         if let Some(terminator) = terminator {
-            check_loop(node, terminator, ctx, &self.cfg, self.meta);
+            check_loop(node, terminator, ctx, self.cfg, self.meta);
         }
     }
 }
@@ -114,7 +126,7 @@ fn check_loop<'ast, 'arena>(
     r#loop: Node<'ast, 'arena>,
     terminator: LoopTerminator<'ast, 'arena>,
     ctx: &mut LintContext,
-    cfg: &LoopDoesNotIterateConfig,
+    cfg: LoopDoesNotIterateConfig,
     meta: &'static RuleMeta,
 ) {
     let (terminator_span, terminator_name) = match terminator {
@@ -135,7 +147,7 @@ fn check_loop<'ast, 'arena>(
     ctx.collector.report(issue);
 }
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 enum LoopTerminator<'ast, 'arena> {
     Break(&'ast Break<'arena>),
     Return(&'ast Return<'arena>),

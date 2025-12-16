@@ -26,14 +26,17 @@ pub struct TypeLexer<'input> {
 }
 
 impl<'input> TypeLexer<'input> {
+    #[must_use]
     pub fn new(input: Input<'input>) -> TypeLexer<'input> {
         TypeLexer { input }
     }
 
+    #[must_use]
     pub fn has_reached_eof(&self) -> bool {
         self.input.has_reached_eof()
     }
 
+    #[must_use]
     pub fn current_position(&self) -> Position {
         self.input.current_position()
     }
@@ -48,6 +51,7 @@ impl<'input> TypeLexer<'input> {
     /// * `from` - The absolute starting byte offset.
     /// * `to` - The absolute ending byte offset (exclusive).
     #[inline]
+    #[must_use]
     pub fn slice_in_range(&self, from: u32, to: u32) -> &'input str {
         let bytes_slice = self.input.slice_in_range(from, to);
 
@@ -66,7 +70,7 @@ impl<'input> TypeLexer<'input> {
         if !whitespaces.is_empty() {
             let end = self.input.current_position();
 
-            return self.token(TypeTokenKind::Whitespace, whitespaces, start, end);
+            return Some(Ok(self.token(TypeTokenKind::Whitespace, whitespaces, start, end)));
         }
 
         let (kind, length) = match self.input.read(3) {
@@ -272,7 +276,7 @@ impl<'input> TypeLexer<'input> {
             [b'/', b'/', ..] => self.read_single_line_comment(),
             [b'.', start_of_number!(), ..] => self.read_decimal(),
             [start_of_number!(), ..] => self.read_number(),
-            [quote @ (b'\'' | b'"'), ..] => self.read_literal_string(quote),
+            [quote @ (b'\'' | b'"'), ..] => self.read_literal_string(*quote),
             [b'\\', start_of_identifier!(), ..] => self.read_fully_qualified_identifier(),
             [start_of_identifier!(), ..] => self.read_identifier(),
             [b'$', start_of_identifier!(), ..] => {
@@ -315,7 +319,7 @@ impl<'input> TypeLexer<'input> {
         let buffer = self.input.consume(length);
         let end = self.input.current_position();
 
-        self.token(kind, buffer, start, end)
+        Some(Ok(self.token(kind, buffer, start, end)))
     }
 
     fn read_single_line_comment(&self) -> (TypeTokenKind, usize) {
@@ -411,7 +415,7 @@ impl<'input> TypeLexer<'input> {
         (TypeTokenKind::LiteralFloat, length)
     }
 
-    fn read_literal_string(&self, quote: &u8) -> (TypeTokenKind, usize) {
+    fn read_literal_string(&self, quote: u8) -> (TypeTokenKind, usize) {
         let total = self.input.len();
         let start = self.input.current_offset();
         let mut length = 1; // We assume the opening quote is already consumed.
@@ -433,7 +437,7 @@ impl<'input> TypeLexer<'input> {
                 length += 1;
             } else {
                 // If we see the closing quote and the previous byte was not an escape.
-                if byte == quote && !last_was_backslash {
+                if byte == &quote && !last_was_backslash {
                     length += 1; // Include the closing quote.
                     break;
                 }
@@ -577,13 +581,7 @@ impl<'input> TypeLexer<'input> {
     }
 
     #[inline]
-    fn token(
-        &self,
-        kind: TypeTokenKind,
-        value: &'input [u8],
-        from: Position,
-        to: Position,
-    ) -> Option<Result<TypeToken<'input>, SyntaxError>> {
+    fn token(&self, kind: TypeTokenKind, value: &'input [u8], from: Position, to: Position) -> TypeToken<'input> {
         let mut value_chunks = value.utf8_chunks();
         let value_str = if let Some(chunk) = value_chunks.next() {
             let valid = chunk.valid();
@@ -595,7 +593,7 @@ impl<'input> TypeLexer<'input> {
             ""
         };
 
-        Some(Ok(TypeToken { kind, value: value_str, span: Span::new(self.file_id(), from, to) }))
+        TypeToken { kind, value: value_str, span: Span::new(self.file_id(), from, to) }
     }
 }
 

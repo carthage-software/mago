@@ -42,16 +42,19 @@ pub enum Integration {
 }
 
 impl IntegrationSet {
+    #[must_use]
     pub const fn all() -> Self {
         Self(u32::MAX)
     }
 
     #[inline]
+    #[must_use]
     pub const fn empty() -> Self {
         Self(0)
     }
 
     #[inline]
+    #[must_use]
     pub const fn only(integration: Integration) -> Self {
         let mut s = Self::empty();
         s.0 |= 1 << (integration as u32);
@@ -64,28 +67,33 @@ impl IntegrationSet {
     }
 
     #[inline]
+    #[must_use]
     pub const fn contains(&self, lib: Integration) -> bool {
         (self.0 & (1 << (lib as u32))) != 0
     }
 
     /// Checks if this set has any integrations in common with another set.
     #[inline]
+    #[must_use]
     pub const fn intersects(&self, other: IntegrationSet) -> bool {
         (self.0 & other.0) != 0
     }
 
     /// Creates a new set containing all integrations from both sets.
     #[inline]
+    #[must_use]
     pub const fn union(&self, other: IntegrationSet) -> Self {
         Self(self.0 | other.0)
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_superset_of(&self, other: IntegrationSet) -> bool {
         (self.0 & other.0) == other.0
     }
 
     #[inline]
+    #[must_use]
     pub const fn from_slice(xs: &[Integration]) -> Self {
         let mut s = IntegrationSet::empty();
         let mut i = 0;

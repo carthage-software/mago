@@ -1,7 +1,10 @@
 use mago_php_version::feature::Feature;
-use mago_reporting::*;
-use mago_span::*;
-use mago_syntax::ast::*;
+use mago_reporting::Annotation;
+use mago_reporting::Issue;
+use mago_span::HasSpan;
+use mago_span::Span;
+use mago_syntax::ast::FunctionLikeParameterList;
+use mago_syntax::ast::Modifier;
 
 use crate::internal::context::Context;
 
@@ -12,7 +15,7 @@ pub fn check_parameter_list(
 ) {
     let mut last_variadic = None;
     let mut parameters_seen: Vec<(&str, Span)> = vec![];
-    for parameter in function_like_parameter_list.parameters.iter() {
+    for parameter in &function_like_parameter_list.parameters {
         if parameter.is_promoted_property() && !context.version.is_supported(Feature::PromotedProperties) {
             context.report(
                 Issue::error("Promoted properties are only available in PHP 8.0 and above.").with_annotation(
@@ -43,7 +46,7 @@ pub fn check_parameter_list(
         let mut last_readonly = None;
         let mut last_read_visibility = None;
         let mut last_write_visibility = None;
-        for modifier in parameter.modifiers.iter() {
+        for modifier in &parameter.modifiers {
             match &modifier {
                 Modifier::Static(keyword) | Modifier::Final(keyword) | Modifier::Abstract(keyword) => {
                     context.report(

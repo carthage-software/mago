@@ -166,7 +166,7 @@ fn subtract_complex_type(
                             context,
                             child_classlikes,
                             &existing_atomic,
-                            assertion_classlike_name,
+                            *assertion_classlike_name,
                             &mut acceptable_types,
                         );
 
@@ -241,11 +241,11 @@ fn handle_negated_class(
     context: &mut Context<'_, '_>,
     child_classlikes: &AtomSet,
     existing_atomic: &TAtomic,
-    assertion_classlike_name: &Atom,
+    assertion_classlike_name: Atom,
     acceptable_types: &mut Vec<TAtomic>,
 ) {
     for child_classlike in child_classlikes {
-        if child_classlike != assertion_classlike_name {
+        if *child_classlike != assertion_classlike_name {
             let alternate_class =
                 TAtomic::Object(TObject::Named(TNamedObject::new(*child_classlike).with_type_parameters(
                     if let Some(child_metadata) = context.codebase.get_class_like(child_classlike) {

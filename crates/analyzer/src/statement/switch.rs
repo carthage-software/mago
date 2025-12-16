@@ -166,7 +166,7 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
                 switch,
                 &subject_for_conditions,
                 is_synthetic,
-                &subject_id,
+                subject_id,
                 case,
                 &previous_empty_cases,
                 &original_context,
@@ -243,7 +243,7 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
         switch: &Switch,
         switch_condition: &'ast Expression<'arena>,
         condition_is_synthetic: bool,
-        switch_var_id: &Atom,
+        switch_var_id: Atom,
         switch_case: &'ast SwitchCase<'arena>,
         previous_empty_cases: &Vec<&'ast SwitchExpressionCase<'arena>>,
         original_block_context: &BlockContext<'ctx>,
@@ -319,7 +319,7 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
         if condition_is_synthetic {
             self.artifacts.set_expression_type(
                 switch_condition,
-                if let Some(t) = self.block_context.locals.get(switch_var_id) { (**t).clone() } else { get_mixed() },
+                if let Some(t) = self.block_context.locals.get(&switch_var_id) { (**t).clone() } else { get_mixed() },
             );
         }
 
@@ -525,7 +525,7 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
                 IndexMap::new(),
                 &mut case_block_context,
                 &mut changed_var_ids,
-                &if switch_case.is_default() { AtomSet::default() } else { AtomSet::from_iter([*switch_var_id]) },
+                &if switch_case.is_default() { AtomSet::default() } else { AtomSet::from_iter([switch_var_id]) },
                 &switch_case.span(),
                 true,
                 false,
@@ -571,7 +571,7 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
         self.artifacts.expression_types = old_expression_types;
 
         if !matches!(case_exit_type, ControlAction::Return) {
-            self.handle_non_returning_case(&case_block_context, original_block_context, case_exit_type)?;
+            self.handle_non_returning_case(&case_block_context, original_block_context, case_exit_type);
         }
 
         inherit_branch_context_properties(self.context, self.block_context, &case_block_context);
@@ -639,9 +639,9 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
         case_block_context: &BlockContext<'ctx>,
         original_block_context: &BlockContext<'ctx>,
         case_exit_type: ControlAction,
-    ) -> Result<(), AnalysisError> {
+    ) {
         if matches!(case_exit_type, ControlAction::Continue) {
-            return Ok(());
+            return;
         }
 
         let mut removed_var_ids = AtomSet::default();
@@ -706,8 +706,6 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
                     .collect(),
             );
         }
-
-        Ok(())
     }
 
     fn get_subject_info(

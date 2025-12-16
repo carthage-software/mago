@@ -1,5 +1,15 @@
-use mago_atom::*;
-use mago_syntax::ast::*;
+use mago_atom::Atom;
+use mago_atom::ascii_lowercase_atom;
+use mago_atom::ascii_lowercase_constant_name_atom;
+use mago_syntax::ast::ArgumentList;
+use mago_syntax::ast::Binary;
+use mago_syntax::ast::BinaryOperator;
+use mago_syntax::ast::Call;
+use mago_syntax::ast::Expression;
+use mago_syntax::ast::FunctionCall;
+use mago_syntax::ast::Parenthesized;
+use mago_syntax::ast::UnaryPrefix;
+use mago_syntax::ast::UnaryPrefixOperator;
 
 use crate::artifacts::AnalysisArtifacts;
 use crate::context::block::BlockContext;

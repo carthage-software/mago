@@ -224,7 +224,7 @@ where
         }
 
         if let Some(compiling_bar) = compiling_bar {
-            remove_progress_bar(compiling_bar);
+            remove_progress_bar(&compiling_bar);
         }
 
         let host_files = self
@@ -267,7 +267,7 @@ where
             .collect::<Result<Vec<I>, OrchestratorError>>()?;
 
         if let Some(main_task_bar) = main_task_bar {
-            remove_progress_bar(main_task_bar);
+            remove_progress_bar(&main_task_bar);
         }
 
         let final_codebase = Arc::unwrap_or_clone(final_codebase);
@@ -325,7 +325,7 @@ where
                 })
                 .collect::<Result<Vec<I>, OrchestratorError>>()?;
 
-            remove_progress_bar(progress_bar);
+            remove_progress_bar(&progress_bar);
 
             results
         } else {
@@ -381,7 +381,7 @@ where
                 })
                 .collect::<Result<Vec<I>, OrchestratorError>>()?;
 
-            remove_progress_bar(progress_bar);
+            remove_progress_bar(&progress_bar);
 
             results
         } else {

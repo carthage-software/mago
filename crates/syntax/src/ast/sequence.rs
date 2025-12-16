@@ -37,6 +37,7 @@ pub struct TokenSeparatedSequence<'arena, T> {
 
 impl<'arena, T: HasSpan> Sequence<'arena, T> {
     #[inline]
+    #[must_use]
     pub const fn new(inner: Vec<'arena, T>) -> Self {
         Self { nodes: inner }
     }
@@ -47,11 +48,13 @@ impl<'arena, T: HasSpan> Sequence<'arena, T> {
     }
 
     #[inline]
+    #[must_use]
     pub fn len(&self) -> usize {
         self.nodes.len()
     }
 
     #[inline]
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.nodes.is_empty()
     }
@@ -71,7 +74,7 @@ impl<'arena, T: HasSpan> Sequence<'arena, T> {
     #[inline]
     #[must_use]
     pub fn first_span(&self) -> Option<Span> {
-        self.nodes.first().map(|node| node.span())
+        self.nodes.first().map(HasSpan::span)
     }
 
     #[inline]
@@ -83,7 +86,7 @@ impl<'arena, T: HasSpan> Sequence<'arena, T> {
     #[inline]
     #[must_use]
     pub fn last_span(&self) -> Option<Span> {
-        self.nodes.last().map(|node| node.span())
+        self.nodes.last().map(HasSpan::span)
     }
 
     #[inline]
@@ -118,16 +121,19 @@ impl<'arena, T: HasSpan> TokenSeparatedSequence<'arena, T> {
     }
 
     #[inline]
+    #[must_use]
     pub fn len(&self) -> usize {
         self.nodes.len()
     }
 
     #[inline]
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.nodes.is_empty()
     }
 
     #[inline]
+    #[must_use]
     pub fn get(&self, index: usize) -> Option<&T> {
         self.nodes.get(index)
     }
@@ -139,6 +145,7 @@ impl<'arena, T: HasSpan> TokenSeparatedSequence<'arena, T> {
     }
 
     #[inline]
+    #[must_use]
     pub fn first_span(&self) -> Option<Span> {
         match (self.tokens.first(), self.nodes.first()) {
             (Some(token), Some(node)) => {
@@ -152,11 +159,13 @@ impl<'arena, T: HasSpan> TokenSeparatedSequence<'arena, T> {
     }
 
     #[inline]
+    #[must_use]
     pub fn last(&self) -> Option<&T> {
         self.nodes.last()
     }
 
     #[inline]
+    #[must_use]
     pub fn last_span(&self) -> Option<Span> {
         match (self.tokens.last(), self.nodes.last()) {
             (Some(token), Some(node)) => {
@@ -170,6 +179,7 @@ impl<'arena, T: HasSpan> TokenSeparatedSequence<'arena, T> {
     }
 
     #[inline]
+    #[must_use]
     pub fn span(&self, file_id: FileId, from: Position) -> Span {
         match (self.first_span(), self.last_span()) {
             (Some(first), Some(last)) => Span::new(file_id, first.start, last.end),
@@ -178,6 +188,7 @@ impl<'arena, T: HasSpan> TokenSeparatedSequence<'arena, T> {
     }
 
     #[inline]
+    #[must_use]
     pub fn has_trailing_token(&self) -> bool {
         self.tokens
             .last()
@@ -185,6 +196,7 @@ impl<'arena, T: HasSpan> TokenSeparatedSequence<'arena, T> {
     }
 
     #[inline]
+    #[must_use]
     pub fn get_trailing_token(&self) -> Option<&Token<'arena>> {
         self.tokens
             .last()
@@ -192,7 +204,7 @@ impl<'arena, T: HasSpan> TokenSeparatedSequence<'arena, T> {
     }
 
     #[inline]
-    pub fn iter<'ast>(&'ast self) -> Iter<'ast, T> {
+    pub fn iter(&self) -> Iter<'_, T> {
         self.nodes.iter()
     }
 
@@ -209,6 +221,7 @@ impl<'arena, T: HasSpan> TokenSeparatedSequence<'arena, T> {
     }
 
     #[inline]
+    #[must_use]
     pub fn as_slice(&self) -> &[T] {
         self.nodes.as_slice()
     }
@@ -223,11 +236,29 @@ impl<'arena, T: HasSpan> IntoIterator for Sequence<'arena, T> {
     }
 }
 
+impl<'a, T: HasSpan> IntoIterator for &'a Sequence<'_, T> {
+    type Item = &'a T;
+    type IntoIter = Iter<'a, T>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
 impl<'arena, T: HasSpan> IntoIterator for TokenSeparatedSequence<'arena, T> {
     type Item = T;
     type IntoIter = IntoIter<'arena, Self::Item>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.nodes.into_iter()
+    }
+}
+
+impl<'a, T: HasSpan> IntoIterator for &'a TokenSeparatedSequence<'_, T> {
+    type Item = &'a T;
+    type IntoIter = Iter<'a, T>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
     }
 }

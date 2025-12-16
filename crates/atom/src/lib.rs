@@ -30,7 +30,21 @@
 //! ```
 
 #[cfg(target_arch = "aarch64")]
-use std::arch::aarch64::*;
+use std::arch::aarch64::vandq_u8;
+#[cfg(target_arch = "aarch64")]
+use std::arch::aarch64::vceqq_u8;
+#[cfg(target_arch = "aarch64")]
+use std::arch::aarch64::vcgeq_u8;
+#[cfg(target_arch = "aarch64")]
+use std::arch::aarch64::vcleq_u8;
+#[cfg(target_arch = "aarch64")]
+use std::arch::aarch64::vdupq_n_u8;
+#[cfg(target_arch = "aarch64")]
+use std::arch::aarch64::vld1q_u8;
+#[cfg(target_arch = "aarch64")]
+use std::arch::aarch64::vminvq_u8;
+#[cfg(target_arch = "aarch64")]
+use std::arch::aarch64::vorrq_u8;
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
 use std::collections::HashMap;
@@ -245,6 +259,7 @@ pub fn ascii_lowercase_atom(s: &str) -> Atom {
 /// assert!(!starts_with_ignore_case("hi", "hello"));
 /// ```
 #[inline]
+#[must_use]
 pub fn starts_with_ignore_case(haystack: &str, prefix: &str) -> bool {
     #[cfg(target_arch = "x86_64")]
     #[target_feature(enable = "avx2")]

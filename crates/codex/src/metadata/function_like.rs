@@ -144,24 +144,28 @@ pub struct FunctionLikeMetadata {
 impl FunctionLikeKind {
     /// Checks if this kind represents a class/trait/enum/interface method.
     #[inline]
+    #[must_use]
     pub const fn is_method(&self) -> bool {
         matches!(self, Self::Method)
     }
 
     /// Checks if this kind represents a globally/namespace-scoped function.
     #[inline]
+    #[must_use]
     pub const fn is_function(&self) -> bool {
         matches!(self, Self::Function)
     }
 
     /// Checks if this kind represents an anonymous function (`function() {}`).
     #[inline]
+    #[must_use]
     pub const fn is_closure(&self) -> bool {
         matches!(self, Self::Closure)
     }
 
     /// Checks if this kind represents an arrow function (`fn() => ...`).
     #[inline]
+    #[must_use]
     pub const fn is_arrow_function(&self) -> bool {
         matches!(self, Self::ArrowFunction)
     }
@@ -170,6 +174,7 @@ impl FunctionLikeKind {
 /// Contains comprehensive metadata for any function-like structure in PHP.
 impl FunctionLikeMetadata {
     /// Creates new `FunctionLikeMetadata` with basic information and default flags.
+    #[must_use]
     pub fn new(kind: FunctionLikeKind, span: Span, flags: MetadataFlags) -> Self {
         let method_metadata = if kind.is_method() { Some(MethodMetadata::default()) } else { None };
 
@@ -198,6 +203,7 @@ impl FunctionLikeMetadata {
 
     /// Returns the kind of function-like (Function, Method, Closure, `ArrowFunction`).
     #[inline]
+    #[must_use]
     pub fn get_kind(&self) -> FunctionLikeKind {
         self.kind
     }
@@ -210,6 +216,7 @@ impl FunctionLikeMetadata {
 
     /// Returns a reference to specific parameter metadata by name, if it exists.
     #[inline]
+    #[must_use]
     pub fn get_parameter(&self, name: Atom) -> Option<&FunctionLikeParameterMetadata> {
         self.parameters.iter().find(|parameter| parameter.get_name().0 == name)
     }
@@ -228,6 +235,7 @@ impl FunctionLikeMetadata {
 
     /// Returns a slice of the attributes.
     #[inline]
+    #[must_use]
     pub fn get_attributes(&self) -> &[AttributeMetadata] {
         &self.attributes
     }
@@ -265,7 +273,7 @@ impl FunctionLikeMetadata {
     #[inline]
     pub fn set_return_type_declaration_metadata(&mut self, return_type: Option<TypeMetadata>) {
         if self.return_type_metadata.is_none() {
-            self.return_type_metadata = return_type.clone();
+            self.return_type_metadata.clone_from(&return_type);
         }
 
         self.return_type_declaration_metadata = return_type;
@@ -285,6 +293,7 @@ impl FunctionLikeMetadata {
     ///
     /// Returns `false` otherwise (method has a docblock but no @inheritDoc).
     #[inline]
+    #[must_use]
     pub fn needs_docblock_inheritance(&self) -> bool {
         self.flags.contains(MetadataFlags::INHERITS_DOCS) || !self.has_docblock
     }

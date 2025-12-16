@@ -47,210 +47,245 @@ pub enum TScalar {
 impl TScalar {
     /// Creates the `scalar` (Generic) type.
     #[inline]
+    #[must_use]
     pub const fn generic() -> Self {
         TScalar::Generic
     }
 
     /// Creates the `numeric` (`int` | `float` | `string` that is numeric) type.
     #[inline]
+    #[must_use]
     pub const fn numeric() -> Self {
         TScalar::Numeric
     }
 
     /// Creates the `array-key` (`int` | `string`) type.
     #[inline]
+    #[must_use]
     pub const fn array_key() -> Self {
         TScalar::ArrayKey
     }
 
     /// Creates the general `bool` type.
     #[inline]
+    #[must_use]
     pub const fn bool() -> Self {
         TScalar::Bool(TBool::general())
     }
 
     /// Creates the literal `true` type.
     #[inline]
+    #[must_use]
     pub const fn r#true() -> Self {
         TScalar::Bool(TBool::r#true())
     }
 
     /// Creates the literal `false` type.
     #[inline]
+    #[must_use]
     pub const fn r#false() -> Self {
         TScalar::Bool(TBool::r#false())
     }
 
     /// Creates the general `int` type.
     #[inline]
+    #[must_use]
     pub const fn int() -> Self {
         TScalar::Integer(TInteger::unspecified())
     }
 
     /// Creates a literal `int` type (e.g., `123`).
     #[inline]
+    #[must_use]
     pub const fn literal_int(value: i64) -> Self {
         TScalar::Integer(TInteger::literal(value))
     }
 
     /// Creates the general `float` type.
     #[inline]
+    #[must_use]
     pub const fn float() -> Self {
         TScalar::Float(TFloat::general())
     }
 
     /// Creates a literal `float` type (e.g., `12.3`).
     #[inline]
+    #[must_use]
     pub fn literal_float(value: f64) -> Self {
         TScalar::Float(TFloat::literal(value))
     }
 
     /// Creates the `numeric-string` type.
     #[inline]
+    #[must_use]
     pub const fn numeric_string() -> Self {
         TScalar::String(TString::general_with_props(true, false, false, false))
     }
 
     /// Creates the general `string` type.
     #[inline]
+    #[must_use]
     pub const fn string() -> Self {
         TScalar::String(TString::general())
     }
 
     /// Creates the non-empty `string` type.
     #[inline]
+    #[must_use]
     pub const fn non_empty_string() -> Self {
         TScalar::String(TString::non_empty())
     }
 
     /// Creates a literal `string` type with a known value (e.g., `"hello"`).
     #[inline]
+    #[must_use]
     pub fn literal_string(value: Atom) -> Self {
         TScalar::String(TString::known_literal(value))
     }
 
     /// Creates a literal `class-string` type with a known value (e.g., `"MyClass"`).
     #[inline]
+    #[must_use]
     pub fn literal_class_string(value: Atom) -> Self {
         TScalar::ClassLikeString(TClassLikeString::literal(value))
     }
 
     /// Creates a literal `string` type with an unspecified value
     #[inline]
+    #[must_use]
     pub const fn unspecified_literal_string(non_empty: bool) -> Self {
         TScalar::String(TString::unspecified_literal(non_empty))
     }
 
     /// Creates a literal `int` type with an unspecified value (literal-int)
     #[inline]
+    #[must_use]
     pub const fn unspecified_literal_int() -> Self {
         TScalar::Integer(TInteger::unspecified_literal())
     }
 
     /// Creates a literal `float` type with an unspecified value (literal-float)
     #[inline]
+    #[must_use]
     pub const fn unspecified_literal_float() -> Self {
         TScalar::Float(TFloat::unspecified_literal())
     }
 
     /// Creates the general `class-string` type (no constraint `<T>`).
     #[inline]
+    #[must_use]
     pub const fn class_string() -> Self {
         TScalar::ClassLikeString(TClassLikeString::class_string())
     }
 
     /// Creates the general `interface-string` type (no constraint `<T>`).
     #[inline]
+    #[must_use]
     pub const fn interface_string() -> Self {
         TScalar::ClassLikeString(TClassLikeString::interface_string())
     }
 
     /// Creates the general `enum-string` type (no constraint `<T>`).
     #[inline]
+    #[must_use]
     pub const fn enum_string() -> Self {
         TScalar::ClassLikeString(TClassLikeString::enum_string())
     }
 
     /// Creates the general `trait-string` type (no constraint `<T>`).
     #[inline]
+    #[must_use]
     pub const fn trait_string() -> Self {
         TScalar::ClassLikeString(TClassLikeString::trait_string())
     }
 
     /// Creates the `class-string<T>` type.
     #[inline]
+    #[must_use]
     pub fn class_string_of_type(atomic_type: TAtomic) -> Self {
         TScalar::ClassLikeString(TClassLikeString::class_string_of_type(atomic_type))
     }
 
     /// Creates the `interface-string<T>` type.
     #[inline]
+    #[must_use]
     pub fn interface_string_of_type(atomic_type: TAtomic) -> Self {
         TScalar::ClassLikeString(TClassLikeString::interface_string_of_type(atomic_type))
     }
 
     /// Creates the `enum-string<T>` type.
     #[inline]
+    #[must_use]
     pub fn enum_string_of_type(atomic_type: TAtomic) -> Self {
         TScalar::ClassLikeString(TClassLikeString::enum_string_of_type(atomic_type))
     }
 
     /// Checks if this is the top type `scalar`.
     #[inline]
+    #[must_use]
     pub const fn is_generic(&self) -> bool {
         matches!(self, TScalar::Generic)
     }
 
     /// Checks if this is the `array-key` type (`int` | `string`).
     #[inline]
+    #[must_use]
     pub const fn is_array_key(&self) -> bool {
         matches!(self, TScalar::ArrayKey)
     }
 
     /// Checks if this is any kind of boolean (`bool`, `true`, `false`).
     #[inline]
+    #[must_use]
     pub const fn is_bool(&self) -> bool {
         matches!(self, TScalar::Bool(_))
     }
 
     /// Checks if this is the general `bool` type.
     #[inline]
+    #[must_use]
     pub const fn is_general_bool(&self) -> bool {
         matches!(self, TScalar::Bool(b) if b.is_general())
     }
 
     /// Checks if this is the literal `true` type.
     #[inline]
+    #[must_use]
     pub const fn is_true(&self) -> bool {
         matches!(self, TScalar::Bool(b) if b.is_true())
     }
 
     /// Checks if this is the literal `false` type.
     #[inline]
+    #[must_use]
     pub const fn is_false(&self) -> bool {
         matches!(self, TScalar::Bool(b) if b.is_false())
     }
 
     /// Checks if this is any kind of integer (`int`, literal `int`).
     #[inline]
+    #[must_use]
     pub const fn is_int(&self) -> bool {
         matches!(self, TScalar::Integer(_))
     }
 
     /// Checks if this is the general `int` type.
     #[inline]
+    #[must_use]
     pub const fn is_general_int(&self) -> bool {
         matches!(self, TScalar::Integer(i) if i.is_unspecified())
     }
 
     /// Checks if this is a literal `int` type.
     #[inline]
+    #[must_use]
     pub const fn is_literal_int(&self) -> bool {
         matches!(self, TScalar::Integer(i) if i.is_literal())
     }
 
     /// Checks if this is any kind of numeric type (`int`, `float`, `num`, or a string that is numeric).
     #[inline]
+    #[must_use]
     pub const fn is_literal_value(&self) -> bool {
         match self {
             TScalar::String(str) => str.is_known_literal(),
@@ -263,6 +298,7 @@ impl TScalar {
 
     /// Checks if this is any kind of numeric type (`int`, `float`, `num`, or a string that is numeric).
     #[inline]
+    #[must_use]
     pub const fn is_numeric(&self) -> bool {
         match self {
             TScalar::Numeric => true,
@@ -274,12 +310,14 @@ impl TScalar {
 
     /// Checks if this is any kind of number type (`int`, `float`, or `num`).
     #[inline]
+    #[must_use]
     pub const fn is_int_or_float(&self) -> bool {
         matches!(self, TScalar::Integer(_) | TScalar::Float(_))
     }
 
     /// Gets the value if this is a literal `int`.
     #[inline]
+    #[must_use]
     pub const fn get_literal_int_value(&self) -> Option<i64> {
         match self {
             TScalar::Integer(i) => i.get_literal_value(),
@@ -289,6 +327,7 @@ impl TScalar {
 
     /// Gets the maximum value if this is an integer of a specific size.
     #[inline]
+    #[must_use]
     pub const fn get_maximum_int_value(&self) -> Option<i64> {
         match self {
             TScalar::Integer(i) => i.get_maximum_value(),
@@ -298,6 +337,7 @@ impl TScalar {
 
     /// Gets the minimum value if this is an integer of a specific size.
     #[inline]
+    #[must_use]
     pub const fn get_minimum_int_value(&self) -> Option<i64> {
         match self {
             TScalar::Integer(i) => i.get_minimum_value(),
@@ -307,24 +347,28 @@ impl TScalar {
 
     /// Checks if this is any kind of float (`float`, literal `float`).
     #[inline]
+    #[must_use]
     pub const fn is_float(&self) -> bool {
         matches!(self, TScalar::Float(_))
     }
 
     /// Checks if this is the general `float` type.
     #[inline]
+    #[must_use]
     pub const fn is_general_float(&self) -> bool {
         matches!(self, TScalar::Float(f) if f.is_general())
     }
 
     /// Checks if this is a literal `float` type.
     #[inline]
+    #[must_use]
     pub const fn is_literal_float(&self) -> bool {
         matches!(self, TScalar::Float(f) if f.is_literal())
     }
 
     /// Gets the value if this is a literal `float`.
     #[inline]
+    #[must_use]
     pub fn get_literal_float_value(&self) -> Option<f64> {
         match self {
             TScalar::Float(f) => f.get_literal_value(),
@@ -334,18 +378,21 @@ impl TScalar {
 
     /// Checks if this is any kind of string represented by `StringScalar`.
     #[inline]
+    #[must_use]
     pub const fn is_string(&self) -> bool {
         matches!(self, TScalar::String(_))
     }
 
     /// Checks if this is any kind of string represented by `StringScalar` or `ClassLikeStringScalar`.
     #[inline]
+    #[must_use]
     pub const fn is_any_string(&self) -> bool {
         matches!(self, TScalar::String(_) | TScalar::ClassLikeString(_))
     }
 
     /// Checks if this is a non-boring string (not general).
     #[inline]
+    #[must_use]
     pub const fn is_non_boring_string(&self) -> bool {
         match self {
             TScalar::String(s) => !s.is_boring(),
@@ -356,36 +403,42 @@ impl TScalar {
 
     /// Checks if this is the general `string` type (not known literal origin).
     #[inline]
+    #[must_use]
     pub const fn is_general_string(&self) -> bool {
         matches!(self, TScalar::String(s) if s.is_general())
     }
 
     /// Checks if this is a literal `string` with a *known* value.
     #[inline]
+    #[must_use]
     pub const fn is_known_literal_string(&self) -> bool {
         matches!(self, TScalar::String(s) if s.is_known_literal())
     }
 
     /// Checks if this is a `string` that is known to be non-empty.
     #[inline]
+    #[must_use]
     pub const fn is_non_empty_string(&self) -> bool {
         matches!(self, TScalar::String(s) if s.is_non_empty())
     }
 
     /// Checks if this is a string known to be literal, but with an *unspecified* value.
     #[inline]
+    #[must_use]
     pub const fn is_unspecified_literal_string(&self) -> bool {
         matches!(self, TScalar::String(s) if s.is_unspecified_literal())
     }
 
     /// Checks if this is any string known to originate from a literal (known or unspecified value).
     #[inline]
+    #[must_use]
     pub const fn is_literal_origin_string(&self) -> bool {
         matches!(self, TScalar::String(s) if s.is_literal_origin())
     }
 
     /// Gets the value if this is a literal `string` with a known value.
     #[inline]
+    #[must_use]
     pub fn get_known_literal_string_value(&self) -> Option<&str> {
         match self {
             TScalar::String(s) => s.get_known_literal_value(),
@@ -394,6 +447,7 @@ impl TScalar {
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_literal_class_string(&self) -> bool {
         match self {
             TScalar::ClassLikeString(s) => s.is_literal(),
@@ -402,6 +456,7 @@ impl TScalar {
     }
 
     #[inline]
+    #[must_use]
     pub fn get_literal_class_string_value(&self) -> Option<Atom> {
         match self {
             TScalar::ClassLikeString(s) => s.literal_value(),
@@ -411,30 +466,35 @@ impl TScalar {
 
     /// Checks if this is any kind of class-like string type.
     #[inline]
+    #[must_use]
     pub const fn is_class_string_type(&self) -> bool {
         matches!(self, TScalar::ClassLikeString(_))
     }
 
     /// Checks if this is a `class-string` (any constraint).
     #[inline]
+    #[must_use]
     pub const fn is_class_string_kind(&self) -> bool {
         matches!(self, TScalar::ClassLikeString(cls) if cls.is_class_kind())
     }
 
     /// Checks if this is an `interface-string` (any constraint).
     #[inline]
+    #[must_use]
     pub const fn is_interface_string_kind(&self) -> bool {
         matches!(self, TScalar::ClassLikeString(cls) if cls.is_interface_kind())
     }
 
     /// Checks if this is an `enum-string` (any constraint).
     #[inline]
+    #[must_use]
     pub const fn is_enum_string_kind(&self) -> bool {
         matches!(self, TScalar::ClassLikeString(cls) if cls.is_enum_kind())
     }
 
     /// Check if the scalar is truthy (i.e., will resolve to `true` in a boolean context).
     #[inline]
+    #[must_use]
     pub fn is_truthy(&self) -> bool {
         match &self {
             TScalar::Bool(b) => b.is_true(),
@@ -472,6 +532,7 @@ impl TScalar {
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_boring(&self) -> bool {
         match self {
             TScalar::Numeric => true,
@@ -487,6 +548,7 @@ impl TScalar {
 
     /// Returns the inner `TBool` struct if this is a `Scalar::Bool`.
     #[inline]
+    #[must_use]
     pub const fn as_bool(&self) -> Option<&TBool> {
         match self {
             TScalar::Bool(b) => Some(b),
@@ -496,6 +558,7 @@ impl TScalar {
 
     /// Returns the inner `IntScalar` struct if this is a `Scalar::Int`.
     #[inline]
+    #[must_use]
     pub const fn as_int(&self) -> Option<&TInteger> {
         match self {
             TScalar::Integer(i) => Some(i),
@@ -505,6 +568,7 @@ impl TScalar {
 
     /// Returns the inner `FloatScalar` struct if this is a `Scalar::Float`.
     #[inline]
+    #[must_use]
     pub const fn as_float(&self) -> Option<&TFloat> {
         match self {
             TScalar::Float(f) => Some(f),
@@ -514,6 +578,7 @@ impl TScalar {
 
     /// Returns the inner `StringScalar` struct if this is a `Scalar::String`.
     #[inline]
+    #[must_use]
     pub const fn as_string(&self) -> Option<&TString> {
         match self {
             TScalar::String(s) => Some(s),
@@ -523,6 +588,7 @@ impl TScalar {
 
     /// Returns the inner `ClassLikeStringScalar` struct if this is a `Scalar::ClassLikeString`.
     #[inline]
+    #[must_use]
     pub const fn as_class_string(&self) -> Option<&TClassLikeString> {
         match self {
             TScalar::ClassLikeString(cs) => Some(cs),

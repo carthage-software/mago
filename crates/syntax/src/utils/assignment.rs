@@ -1,4 +1,15 @@
-use crate::ast::*;
+use crate::ast::Access;
+use crate::ast::Argument;
+use crate::ast::ArrayElement;
+use crate::ast::Assignment;
+use crate::ast::Call;
+use crate::ast::ClassLikeConstantSelector;
+use crate::ast::ClassLikeMemberSelector;
+use crate::ast::Construct;
+use crate::ast::Expression;
+use crate::ast::MatchArm;
+use crate::ast::PartialApplication;
+use crate::ast::Yield;
 
 /// Get the assignment operation from an expression.
 ///
@@ -7,6 +18,7 @@ use crate::ast::*;
 ///
 /// If no assignment operation is found, it will return `None`.
 #[inline]
+#[must_use]
 pub fn get_assignment_from_expression<'a, 'arena>(
     expression: &'a Expression<'arena>,
 ) -> Option<&'a Assignment<'arena>> {

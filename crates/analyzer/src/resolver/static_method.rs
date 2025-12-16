@@ -125,7 +125,7 @@ fn resolve_method_from_classname<'ctx, 'arena>(
             if !from_instance && !is_relative && defining_class_metadata.kind.is_interface() && !has_magic_static_call {
                 report_static_call_on_interface(
                     context,
-                    &defining_class_metadata.original_name,
+                    defining_class_metadata.original_name,
                     class_span,
                     from_class_string,
                 );
@@ -143,7 +143,7 @@ fn resolve_method_from_classname<'ctx, 'arena>(
                 block_context,
                 current_class_metadata,
                 method_name,
-                &fq_class_id,
+                fq_class_id,
                 defining_class_metadata,
                 classname,
                 result,
@@ -172,7 +172,7 @@ fn resolve_method_from_classname<'ctx, 'arena>(
                 && defining_class_metadata.kind.is_trait()
                 && context.settings.version.is_deprecated(Feature::CallStaticMethodOnTrait)
             {
-                report_deprecated_static_access_on_trait(context, &defining_class_metadata.original_name, class_span);
+                report_deprecated_static_access_on_trait(context, defining_class_metadata.original_name, class_span);
             }
 
             (true, Some(method))
@@ -257,9 +257,9 @@ fn resolve_method_from_classname<'ctx, 'arena>(
 
             if !could_method_ever_exist {
                 if call_static_could_exist {
-                    report_non_documented_method(context, class_span, method_span, &fq_class_id, &method_name);
+                    report_non_documented_method(context, class_span, method_span, fq_class_id, method_name);
                 } else {
-                    report_non_existent_method(context, class_span, method_span, &fq_class_id, &method_name);
+                    report_non_existent_method(context, class_span, method_span, fq_class_id, method_name);
                 }
             }
         } else {
@@ -275,7 +275,7 @@ fn resolve_method_from_metadata<'ctx, 'arena>(
     block_context: &mut BlockContext<'ctx>,
     current_class_metadata: Option<&'ctx ClassLikeMetadata>,
     method_name: Atom,
-    fq_class_id: &Atom,
+    fq_class_id: Atom,
     defining_class_metadata: &'ctx ClassLikeMetadata,
     classname: &ResolvedClassname,
     result: Option<&mut MethodResolutionResult>,
@@ -306,8 +306,8 @@ fn resolve_method_from_metadata<'ctx, 'arena>(
             context,
             class_span,
             selector.span(),
-            method_id.get_class_name(),
-            &method_name,
+            *method_id.get_class_name(),
+            method_name,
             true,
         );
     }
@@ -325,11 +325,11 @@ fn resolve_method_from_metadata<'ctx, 'arena>(
     } else if defining_class_metadata.kind.is_enum() {
         StaticClassType::Object(TObject::Enum(TEnum { name: defining_class_metadata.original_name, case: None }))
     } else {
-        StaticClassType::Name(*fq_class_id)
+        StaticClassType::Name(fq_class_id)
     };
 
     // Get the class it was called on - need original name for callable creation
-    let called_on_class_metadata = context.codebase.get_class_like(fq_class_id)?;
+    let called_on_class_metadata = context.codebase.get_class_like(&fq_class_id)?;
 
     Some(ResolvedMethod {
         // Use the original name of the class it was called on
@@ -444,7 +444,7 @@ fn report_non_static_access(context: &mut Context, method_id: &MethodIdentifier,
     );
 }
 
-fn report_static_call_on_interface(context: &mut Context, name: &Atom, span: Span, from_class_string: bool) {
+fn report_static_call_on_interface(context: &mut Context, name: Atom, span: Span, from_class_string: bool) {
     if from_class_string {
         context.collector.report_with_code(
             IssueCode::PossiblyStaticAccessOnInterface,
@@ -471,7 +471,7 @@ fn report_static_call_on_interface(context: &mut Context, name: &Atom, span: Spa
     }
 }
 
-fn report_deprecated_static_access_on_trait(context: &mut Context, name: &Atom, span: Span) {
+fn report_deprecated_static_access_on_trait(context: &mut Context, name: Atom, span: Span) {
     context.collector.report_with_code(
         IssueCode::DeprecatedFeature,
         Issue::warning(format!("Calling static methods directly on traits (`{name}`) is deprecated."))

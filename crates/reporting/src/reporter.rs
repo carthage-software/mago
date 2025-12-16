@@ -90,6 +90,7 @@ pub struct Reporter {
 
 impl Reporter {
     /// Create a new reporter with the given database and configuration.
+    #[must_use]
     pub fn new(database: ReadDatabase, config: ReporterConfig) -> Self {
         Self { database, config }
     }

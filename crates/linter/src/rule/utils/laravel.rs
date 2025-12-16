@@ -1,4 +1,6 @@
-use mago_syntax::ast::*;
+use mago_syntax::ast::ClassLikeMemberSelector;
+use mago_syntax::ast::Expression;
+use mago_syntax::ast::Variable;
 
 use crate::context::LintContext;
 use crate::scope::ClassLikeScope;

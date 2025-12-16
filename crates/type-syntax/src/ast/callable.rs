@@ -54,11 +54,13 @@ pub struct CallableTypeReturnType<'input> {
 
 impl CallableTypeKind {
     #[inline]
+    #[must_use]
     pub fn is_pure(&self) -> bool {
         matches!(self, CallableTypeKind::PureCallable | CallableTypeKind::PureClosure)
     }
 
     #[inline]
+    #[must_use]
     pub fn is_closure(&self) -> bool {
         matches!(self, CallableTypeKind::Closure | CallableTypeKind::PureClosure)
     }
@@ -66,11 +68,13 @@ impl CallableTypeKind {
 
 impl CallableTypeParameter<'_> {
     #[inline]
+    #[must_use]
     pub const fn is_variadic(&self) -> bool {
         self.ellipsis.is_some()
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_optional(&self) -> bool {
         self.equals.is_some()
     }

@@ -1,5 +1,8 @@
 use crate::T;
-use crate::ast::ast::*;
+use crate::ast::ast::Static;
+use crate::ast::ast::StaticAbstractItem;
+use crate::ast::ast::StaticConcreteItem;
+use crate::ast::ast::StaticItem;
 use crate::ast::sequence::TokenSeparatedSequence;
 use crate::error::ParseError;
 use crate::parser::internal::expression::parse_expression;

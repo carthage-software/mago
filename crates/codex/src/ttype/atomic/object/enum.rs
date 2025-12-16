@@ -22,6 +22,7 @@ impl TEnum {
     ///
     /// * `name`: The `Atom` for the enum's FQCN.
     #[inline]
+    #[must_use]
     pub const fn new(name: Atom) -> Self {
         Self { name, case: None }
     }
@@ -33,24 +34,28 @@ impl TEnum {
     /// * `name`: The `Atom` for the enum's FQCN.
     /// * `case`: The `Atom` for the enum case name.
     #[inline]
+    #[must_use]
     pub const fn new_case(name: Atom, case: Atom) -> Self {
         Self { name, case: Some(case) }
     }
 
     /// Returns the `Atom` for the enum's FQCN.
     #[inline]
+    #[must_use]
     pub const fn get_name(&self) -> Atom {
         self.name
     }
 
     /// Returns a reference to the `Atom` for the enum's FQCN.
     #[inline]
+    #[must_use]
     pub const fn get_name_ref(&self) -> &Atom {
         &self.name
     }
 
     /// Returns the `Atom` for the enum case, if it exists.
     #[inline]
+    #[must_use]
     pub const fn get_case(&self) -> Option<Atom> {
         self.case
     }

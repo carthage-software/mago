@@ -91,7 +91,7 @@ pub struct DieConstruct<'arena> {
     pub arguments: Option<ArgumentList<'arena>>,
 }
 
-impl<'arena> Construct<'arena> {
+impl Construct<'_> {
     #[must_use]
     #[inline]
     pub const fn is_import(&self) -> bool {

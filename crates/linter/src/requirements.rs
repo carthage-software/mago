@@ -41,11 +41,13 @@ impl RuleRequirements {
     /// The outer `Vec` represents an `OR`, and each inner `IntegrationSet` represents an `AND`.
     ///
     /// Example: `(A & B) | C` becomes `vec![{A, B}, {C}]`.
+    #[must_use]
     pub fn required_integrations(&self) -> Vec<IntegrationSet> {
         self.dnf()
     }
 
     /// Checks if a given set of enabled integrations satisfies the rule's requirements.
+    #[must_use]
     pub fn are_met_by(&self, configured_php_version: PHPVersion, configured_integrations: IntegrationSet) -> bool {
         match self {
             Self::None => true,

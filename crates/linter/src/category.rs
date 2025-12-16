@@ -16,6 +16,7 @@ pub enum Category {
 }
 
 impl Category {
+    #[must_use]
     pub fn as_str(&self) -> &'static str {
         match self {
             Category::Clarity => "Clarity",

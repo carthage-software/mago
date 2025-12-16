@@ -5,7 +5,10 @@ use mago_names::scope::NamespaceScope;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Constant;
+use mago_syntax::ast::Expression;
+use mago_syntax::ast::FunctionCall;
+use mago_syntax::ast::Literal;
 
 use crate::issue::ScanningIssueKind;
 use crate::metadata::constant::ConstantMetadata;
@@ -21,7 +24,7 @@ use crate::ttype::resolution::TypeResolutionContext;
 pub fn scan_constant<'arena>(
     constant: &'arena Constant<'arena>,
     context: &mut Context<'_, 'arena>,
-    type_context: TypeResolutionContext,
+    type_context: &TypeResolutionContext,
     scope: &NamespaceScope,
 ) -> Vec<ConstantMetadata> {
     let attributes = scan_attribute_lists(&constant.attribute_lists, context);
@@ -41,10 +44,10 @@ pub fn scan_constant<'arena>(
             let name = ascii_lowercase_constant_name_atom(context.resolved_names.get(&item.name));
 
             let mut metadata = ConstantMetadata::new(name, item.span(), flags);
-            metadata.attributes = attributes.clone();
+            metadata.attributes.clone_from(&attributes);
             metadata.inferred_type = infer(context, scope, &item.value);
 
-            process_constant_docblock(&mut metadata, &docblock, None, &type_context, scope);
+            process_constant_docblock(&mut metadata, &docblock, None, type_context, scope);
 
             metadata
         })
@@ -55,7 +58,7 @@ pub fn scan_constant<'arena>(
 pub fn scan_defined_constant<'arena>(
     define: &'arena FunctionCall<'arena>,
     context: &mut Context<'_, 'arena>,
-    type_context: TypeResolutionContext,
+    type_context: &TypeResolutionContext,
     scope: &NamespaceScope,
 ) -> Option<ConstantMetadata> {
     let Expression::Identifier(identifier) = define.function else {
@@ -89,7 +92,7 @@ pub fn scan_defined_constant<'arena>(
     let mut metadata = ConstantMetadata::new(name, define.span(), flags);
     metadata.inferred_type = infer(context, scope, arguments[1].value());
 
-    process_constant_docblock(&mut metadata, &docblock, None, &type_context, scope);
+    process_constant_docblock(&mut metadata, &docblock, None, type_context, scope);
 
     Some(metadata)
 }

@@ -27,6 +27,7 @@ impl SemanticsChecker {
     ///
     /// - `php_version`: The target PHP version to check against.
     ///
+    #[must_use]
     pub fn new(php_version: PHPVersion) -> Self {
         Self { version: php_version }
     }
@@ -45,6 +46,7 @@ impl SemanticsChecker {
     /// # Returns
     ///
     /// An `IssueCollection` containing all semantic issues discovered during the check.
+    #[must_use]
     pub fn check<'ast, 'arena>(
         &self,
         file: &File,

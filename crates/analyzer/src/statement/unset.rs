@@ -8,9 +8,11 @@ use mago_codex::ttype::atomic::array::keyed::TKeyedArray;
 use mago_codex::ttype::atomic::array::list::TList;
 use mago_codex::ttype::get_int;
 use mago_codex::ttype::union::TUnion;
-use mago_reporting::*;
+use mago_reporting::Annotation;
+use mago_reporting::Issue;
 use mago_span::HasSpan;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Expression;
+use mago_syntax::ast::Unset;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -30,7 +32,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Unset<'arena> {
         let was_inside_unset = block_context.inside_unset;
         block_context.inside_unset = true;
 
-        for value in self.values.iter() {
+        for value in &self.values {
             let was_inside_general_use = block_context.inside_general_use;
             block_context.inside_general_use = true;
             value.analyze(context, block_context, artifacts)?;
@@ -305,7 +307,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Unset<'arena> {
                 let rc = Rc::new(TUnion::from_vec(atomics));
 
                 block_context.locals.insert(array_id, rc.clone());
-                block_context.remove_variable_from_conflicting_clauses(context, &array_id, Some(rc.as_ref()));
+                block_context.remove_variable_from_conflicting_clauses(context, array_id, Some(rc.as_ref()));
             };
         }
 

@@ -104,7 +104,8 @@ fn report_parameter<'arena>(
 
 pub mod utils {
     use ahash::HashSet;
-    use mago_syntax::ast::*;
+    use mago_syntax::ast::Expression;
+    use mago_syntax::ast::Statement;
     use mago_syntax::walker::Walker;
 
     use crate::context::Context;
@@ -203,7 +204,8 @@ pub mod utils {
         stmts: &[Statement<'arena>],
         context: &Context<'_, 'arena>,
     ) -> Vec<ForeignVariable<'arena>> {
-        use internal::*;
+        use internal::VariableReference;
+        use internal::VariableWalker;
 
         let mut walker_context = (Vec::default(), context, 0);
         let walker = VariableWalker;
@@ -247,7 +249,38 @@ pub mod utils {
     pub(super) mod internal {
         use super::is_predefined_variable;
 
-        use mago_syntax::ast::*;
+        use mago_syntax::ast::AnonymousClass;
+        use mago_syntax::ast::ArrayElement;
+        use mago_syntax::ast::ArrowFunction;
+        use mago_syntax::ast::Assignment;
+        use mago_syntax::ast::AssignmentOperator;
+        use mago_syntax::ast::Binary;
+        use mago_syntax::ast::Class;
+        use mago_syntax::ast::Closure;
+        use mago_syntax::ast::Conditional;
+        use mago_syntax::ast::DirectVariable;
+        use mago_syntax::ast::DoWhile;
+        use mago_syntax::ast::Enum;
+        use mago_syntax::ast::Expression;
+        use mago_syntax::ast::For;
+        use mago_syntax::ast::ForeachKeyValueTarget;
+        use mago_syntax::ast::ForeachValueTarget;
+        use mago_syntax::ast::Function;
+        use mago_syntax::ast::FunctionCall;
+        use mago_syntax::ast::Global;
+        use mago_syntax::ast::If;
+        use mago_syntax::ast::Interface;
+        use mago_syntax::ast::MatchDefaultArm;
+        use mago_syntax::ast::MatchExpressionArm;
+        use mago_syntax::ast::Namespace;
+        use mago_syntax::ast::StaticAbstractItem;
+        use mago_syntax::ast::StaticConcreteItem;
+        use mago_syntax::ast::SwitchDefaultCase;
+        use mago_syntax::ast::SwitchExpressionCase;
+        use mago_syntax::ast::Trait;
+        use mago_syntax::ast::TryCatchClause;
+        use mago_syntax::ast::Variable;
+        use mago_syntax::ast::While;
         use mago_syntax::walker::Walker;
 
         use crate::context::Context;
@@ -285,15 +318,15 @@ pub mod utils {
                 r#for: &'ast For<'arena>,
                 context: &mut (Vec<VariableReference<'arena>>, &Context<'_, 'arena>, usize),
             ) {
-                for i in r#for.initializations.iter() {
+                for i in &r#for.initializations {
                     self.walk_expression(i, context);
                 }
 
-                for c in r#for.conditions.iter() {
+                for c in &r#for.conditions {
                     self.walk_expression(c, context);
                 }
 
-                for i in r#for.increments.iter() {
+                for i in &r#for.increments {
                     self.walk_expression(i, context);
                 }
 
@@ -329,7 +362,7 @@ pub mod utils {
                 match_expression_arm: &'ast MatchExpressionArm<'arena>,
                 context: &mut (Vec<VariableReference<'arena>>, &Context<'_, 'arena>, usize),
             ) {
-                for c in match_expression_arm.conditions.iter() {
+                for c in &match_expression_arm.conditions {
                     self.walk_expression(c, context);
                 }
 
@@ -355,7 +388,7 @@ pub mod utils {
             ) {
                 self.walk_expression(switch_expression_case.expression, context);
                 context.2 += 1;
-                for statement in switch_expression_case.statements.iter() {
+                for statement in &switch_expression_case.statements {
                     self.walk_statement(statement, context);
                 }
                 context.2 -= 1;
@@ -367,7 +400,7 @@ pub mod utils {
                 context: &mut (Vec<VariableReference<'arena>>, &Context<'_, 'arena>, usize),
             ) {
                 context.2 += 1;
-                for statement in switch_default_case.statements.iter() {
+                for statement in &switch_default_case.statements {
                     self.walk_statement(statement, context);
                 }
                 context.2 -= 1;
@@ -431,7 +464,7 @@ pub mod utils {
                 global: &'ast Global<'arena>,
                 context: &mut (Vec<VariableReference<'arena>>, &Context<'_, 'arena>, usize),
             ) {
-                for variable in global.variables.iter() {
+                for variable in &global.variables {
                     let Variable::Direct(variable) = variable else {
                         continue;
                     };
@@ -517,7 +550,7 @@ pub mod utils {
                 context: &mut (Vec<VariableReference<'arena>>, &Context<'_, 'arena>, usize),
             ) {
                 if let Some(use_clause) = &closure.use_clause {
-                    for use_clause_variable in use_clause.variables.iter() {
+                    for use_clause_variable in &use_clause.variables {
                         context.0.push(VariableReference::Use(use_clause_variable.variable.name));
                     }
                 }
@@ -528,7 +561,7 @@ pub mod utils {
                 arrow_function: &'ast ArrowFunction<'arena>,
                 context: &mut (Vec<VariableReference<'arena>>, &Context<'_, 'arena>, usize),
             ) {
-                for parameter in arrow_function.parameter_list.parameters.iter() {
+                for parameter in &arrow_function.parameter_list.parameters {
                     context.0.push(VariableReference::Assign(parameter.variable.name, false));
                 }
             }
@@ -538,7 +571,7 @@ pub mod utils {
                 arrow_function: &'ast ArrowFunction<'arena>,
                 context: &mut (Vec<VariableReference<'arena>>, &Context<'_, 'arena>, usize),
             ) {
-                for parameter in arrow_function.parameter_list.parameters.iter() {
+                for parameter in &arrow_function.parameter_list.parameters {
                     context.0.push(VariableReference::Unset(parameter.variable.name));
                 }
             }
@@ -664,7 +697,7 @@ pub mod utils {
                     }
                 }
                 Expression::Array(array) => {
-                    for element in array.elements.iter() {
+                    for element in &array.elements {
                         match &element {
                             ArrayElement::KeyValue(key_value_array_element) => {
                                 scan_expression_for_assignment(key_value_array_element.key, variables, is_conditional);
@@ -682,7 +715,7 @@ pub mod utils {
                     }
                 }
                 Expression::LegacyArray(array) => {
-                    for element in array.elements.iter() {
+                    for element in &array.elements {
                         match &element {
                             ArrayElement::KeyValue(key_value_array_element) => {
                                 scan_expression_for_assignment(key_value_array_element.key, variables, is_conditional);
@@ -700,7 +733,7 @@ pub mod utils {
                     }
                 }
                 Expression::List(list) => {
-                    for element in list.elements.iter() {
+                    for element in &list.elements {
                         match &element {
                             ArrayElement::KeyValue(key_value_array_element) => {
                                 scan_expression_for_assignment(key_value_array_element.key, variables, is_conditional);

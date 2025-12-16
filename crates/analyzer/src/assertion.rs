@@ -17,7 +17,18 @@ use mago_codex::ttype::get_array_value_parameter;
 use mago_codex::ttype::get_iterable_value_parameter;
 use mago_span::HasSpan;
 use mago_span::Span;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Access;
+use mago_syntax::ast::BinaryOperator;
+use mago_syntax::ast::Call;
+use mago_syntax::ast::ClassConstantAccess;
+use mago_syntax::ast::ClassLikeConstantSelector;
+use mago_syntax::ast::Construct;
+use mago_syntax::ast::Expression;
+use mago_syntax::ast::FunctionCall;
+use mago_syntax::ast::Literal;
+use mago_syntax::ast::LocalIdentifier;
+use mago_syntax::ast::UnaryPrefix;
+use mago_syntax::ast::UnaryPrefixOperator;
 
 use crate::artifacts::AnalysisArtifacts;
 use crate::context::assertion::AssertionContext;
@@ -115,7 +126,7 @@ pub fn scrape_assertions(
                 }
             }
             Construct::Isset(isset_construct) => {
-                for value in isset_construct.values.iter() {
+                for value in &isset_construct.values {
                     if let Some(value_id) = get_expression_id(
                         value,
                         assertion_context.this_class_name,

@@ -72,6 +72,7 @@ pub enum TAtomic {
 }
 
 impl TAtomic {
+    #[must_use]
     pub fn is_numeric(&self) -> bool {
         match self {
             TAtomic::Scalar(scalar) => scalar.is_numeric(),
@@ -80,6 +81,7 @@ impl TAtomic {
         }
     }
 
+    #[must_use]
     pub fn is_int_or_float(&self) -> bool {
         match self {
             TAtomic::Scalar(scalar) => scalar.is_int_or_float(),
@@ -90,6 +92,7 @@ impl TAtomic {
 
     /// Returns `Some(true)` if this type is effectively an int, `Some(false)` if effectively a float,
     /// or `None` if neither. Considers generic parameter constraints (e.g., `T of int` is treated as int).
+    #[must_use]
     pub fn effective_int_or_float(&self) -> Option<bool> {
         match self {
             TAtomic::Scalar(TScalar::Integer(_)) => Some(true),
@@ -99,30 +102,37 @@ impl TAtomic {
         }
     }
 
+    #[must_use]
     pub const fn is_mixed(&self) -> bool {
         matches!(self, TAtomic::Mixed(_))
     }
 
+    #[must_use]
     pub const fn is_vanilla_mixed(&self) -> bool {
         matches!(self, TAtomic::Mixed(_))
     }
 
+    #[must_use]
     pub const fn is_mixed_isset_from_loop(&self) -> bool {
         matches!(self, TAtomic::Mixed(mixed) if mixed.is_isset_from_loop())
     }
 
+    #[must_use]
     pub const fn is_never(&self) -> bool {
         matches!(self, TAtomic::Never)
     }
 
+    #[must_use]
     pub fn is_templated_as_never(&self) -> bool {
         matches!(self, TAtomic::GenericParameter(parameter) if parameter.constraint.is_never())
     }
 
+    #[must_use]
     pub fn is_templated_as_mixed(&self) -> bool {
         matches!(self, TAtomic::GenericParameter(parameter) if parameter.is_constrained_as_mixed())
     }
 
+    #[must_use]
     pub fn is_templated_as_vanilla_mixed(&self) -> bool {
         matches!(self, TAtomic::GenericParameter(parameter) if parameter.is_constrained_as_vanilla_mixed())
     }
@@ -134,10 +144,12 @@ impl TAtomic {
         if let TAtomic::GenericParameter(parameter) = self { Some(f(parameter.constraint.as_ref())) } else { None }
     }
 
+    #[must_use]
     pub fn is_enum(&self) -> bool {
         matches!(self, TAtomic::Object(TObject::Enum(TEnum { .. })))
     }
 
+    #[must_use]
     pub fn is_enum_case(&self) -> bool {
         matches!(self, TAtomic::Object(TObject::Enum(TEnum { case: Some(_), .. })))
     }
@@ -153,10 +165,12 @@ impl TAtomic {
         }
     }
 
+    #[must_use]
     pub fn is_this(&self) -> bool {
         matches!(self, TAtomic::Object(TObject::Named(named_object)) if named_object.is_this())
     }
 
+    #[must_use]
     pub fn get_object_or_enum_name(&self) -> Option<Atom> {
         match self {
             TAtomic::Object(object) => match object {
@@ -168,6 +182,7 @@ impl TAtomic {
         }
     }
 
+    #[must_use]
     pub fn get_all_object_names(&self) -> Vec<Atom> {
         let mut object_names = vec![];
 
@@ -186,18 +201,21 @@ impl TAtomic {
         object_names
     }
 
+    #[must_use]
     pub fn is_stdclass(&self) -> bool {
         matches!(&self, TAtomic::Object(object) if {
             object.get_name().is_some_and(|name| name.eq_ignore_ascii_case("stdClass"))
         })
     }
 
+    #[must_use]
     pub fn is_generator(&self) -> bool {
         matches!(&self, TAtomic::Object(object) if {
             object.get_name().is_some_and(|name| name.eq_ignore_ascii_case("Generator"))
         })
     }
 
+    #[must_use]
     pub fn get_generator_parameters(&self) -> Option<(TUnion, TUnion, TUnion, TUnion)> {
         let generator_parameters = 'parameters: {
             let TAtomic::Object(TObject::Named(named_object)) = self else {
@@ -235,6 +253,7 @@ impl TAtomic {
         None
     }
 
+    #[must_use]
     pub fn is_templated_as_object(&self) -> bool {
         matches!(self, TAtomic::GenericParameter(parameter) if {
             parameter.constraint.is_objecty() && parameter.intersection_types.is_none()
@@ -242,6 +261,7 @@ impl TAtomic {
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_list(&self) -> bool {
         matches!(self, TAtomic::Array(array) if array.is_list())
     }
@@ -259,11 +279,13 @@ impl TAtomic {
     }
 
     #[inline]
+    #[must_use]
     pub fn is_empty_array(&self) -> bool {
         matches!(self, TAtomic::Array(array) if array.is_empty())
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_keyed_array(&self) -> bool {
         matches!(self, TAtomic::Array(array) if array.is_keyed())
     }
@@ -273,16 +295,19 @@ impl TAtomic {
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_array(&self) -> bool {
         matches!(self, TAtomic::Array(_))
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_iterable(&self) -> bool {
         matches!(self, TAtomic::Iterable(_))
     }
 
     #[inline]
+    #[must_use]
     pub fn extends_or_implements(&self, codebase: &CodebaseMetadata, interface: &str) -> bool {
         let object = match self {
             TAtomic::Object(object) => object,
@@ -339,6 +364,7 @@ impl TAtomic {
     }
 
     #[inline]
+    #[must_use]
     pub fn is_countable(&self, codebase: &CodebaseMetadata) -> bool {
         match self {
             TAtomic::Array(_) => true,
@@ -347,11 +373,13 @@ impl TAtomic {
     }
 
     #[inline]
+    #[must_use]
     pub fn could_be_countable(&self, codebase: &CodebaseMetadata) -> bool {
         self.is_mixed() || self.is_countable(codebase)
     }
 
     #[inline]
+    #[must_use]
     pub fn is_traversable(&self, codebase: &CodebaseMetadata) -> bool {
         self.extends_or_implements(codebase, "Traversable")
             || self.extends_or_implements(codebase, "Iterator")
@@ -360,6 +388,7 @@ impl TAtomic {
     }
 
     #[inline]
+    #[must_use]
     pub fn is_array_or_traversable(&self, codebase: &CodebaseMetadata) -> bool {
         match self {
             TAtomic::Iterable(_) => true,
@@ -369,10 +398,12 @@ impl TAtomic {
     }
 
     #[inline]
+    #[must_use]
     pub fn could_be_array_or_traversable(&self, codebase: &CodebaseMetadata) -> bool {
         self.is_mixed() || self.is_array_or_traversable(codebase)
     }
 
+    #[must_use]
     pub fn is_non_empty_array(&self) -> bool {
         matches!(self, TAtomic::Array(array) if array.is_non_empty())
     }
@@ -387,6 +418,7 @@ impl TAtomic {
         }
     }
 
+    #[must_use]
     pub fn get_array_key_type(&self) -> Option<TUnion> {
         match self {
             TAtomic::Array(array) => array.get_key_type(),
@@ -394,6 +426,7 @@ impl TAtomic {
         }
     }
 
+    #[must_use]
     pub fn get_array_value_type(&self) -> Option<TUnion> {
         match self {
             TAtomic::Array(array) => array.get_value_type(),
@@ -402,16 +435,19 @@ impl TAtomic {
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_generic_scalar(&self) -> bool {
         matches!(self, TAtomic::Scalar(TScalar::Generic))
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_some_scalar(&self) -> bool {
         matches!(self, TAtomic::Scalar(_))
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_boring_scalar(&self) -> bool {
         matches!(
             self,
@@ -420,6 +456,7 @@ impl TAtomic {
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_any_string(&self) -> bool {
         matches!(
             self,
@@ -428,6 +465,7 @@ impl TAtomic {
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_string(&self) -> bool {
         matches!(
             self,
@@ -436,6 +474,7 @@ impl TAtomic {
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_string_of_literal_origin(&self) -> bool {
         matches!(
             self,
@@ -444,6 +483,7 @@ impl TAtomic {
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_non_empty_string(&self) -> bool {
         matches!(
             self,
@@ -452,6 +492,7 @@ impl TAtomic {
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_known_literal_string(&self) -> bool {
         matches!(
             self,
@@ -460,6 +501,7 @@ impl TAtomic {
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_literal_class_string(&self) -> bool {
         matches!(
             self,
@@ -467,6 +509,7 @@ impl TAtomic {
         )
     }
 
+    #[must_use]
     pub const fn is_string_subtype(&self) -> bool {
         matches!(
             self,
@@ -475,6 +518,7 @@ impl TAtomic {
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_array_key(&self) -> bool {
         matches!(
             self,
@@ -483,6 +527,7 @@ impl TAtomic {
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_int(&self) -> bool {
         matches!(
             self,
@@ -491,6 +536,7 @@ impl TAtomic {
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_literal_int(&self) -> bool {
         matches!(
             self,
@@ -499,6 +545,7 @@ impl TAtomic {
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_float(&self) -> bool {
         matches!(
             self,
@@ -507,6 +554,7 @@ impl TAtomic {
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_literal_float(&self) -> bool {
         matches!(
             self,
@@ -515,16 +563,19 @@ impl TAtomic {
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_null(&self) -> bool {
         matches!(self, TAtomic::Null)
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_void(&self) -> bool {
         matches!(self, TAtomic::Void)
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_bool(&self) -> bool {
         matches!(
             self,
@@ -533,6 +584,7 @@ impl TAtomic {
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_general_bool(&self) -> bool {
         matches!(
             self,
@@ -541,6 +593,7 @@ impl TAtomic {
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_general_string(&self) -> bool {
         matches!(
             self,
@@ -549,6 +602,7 @@ impl TAtomic {
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_true(&self) -> bool {
         matches!(
             self,
@@ -557,6 +611,7 @@ impl TAtomic {
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_false(&self) -> bool {
         matches!(
             self,
@@ -565,6 +620,7 @@ impl TAtomic {
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_falsable(&self) -> bool {
         matches!(
             self,
@@ -573,21 +629,25 @@ impl TAtomic {
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_resource(&self) -> bool {
         matches!(self, TAtomic::Resource(_))
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_closed_resource(&self) -> bool {
         matches!(self, TAtomic::Resource(resource) if resource.is_closed())
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_open_resource(&self) -> bool {
         matches!(self, TAtomic::Resource(resource) if resource.is_open())
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_literal(&self) -> bool {
         match self {
             TAtomic::Scalar(scalar) => scalar.is_literal_value(),
@@ -597,21 +657,25 @@ impl TAtomic {
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_callable(&self) -> bool {
         matches!(self, TAtomic::Callable(_))
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_conditional(&self) -> bool {
         matches!(self, TAtomic::Conditional(_))
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_generic_parameter(&self) -> bool {
         matches!(self, TAtomic::GenericParameter(_))
     }
 
     #[inline]
+    #[must_use]
     pub const fn get_generic_parameter_name(&self) -> Option<Atom> {
         match self {
             TAtomic::GenericParameter(parameter) => Some(parameter.parameter_name),
@@ -621,6 +685,7 @@ impl TAtomic {
 
     /// Is this a type that could potentially be callable at runtime?
     #[inline]
+    #[must_use]
     pub const fn can_be_callable(&self) -> bool {
         matches!(
             self,
@@ -631,6 +696,7 @@ impl TAtomic {
         )
     }
 
+    #[must_use]
     pub fn is_truthy(&self) -> bool {
         match &self {
             TAtomic::Scalar(scalar) => scalar.is_truthy(),
@@ -641,6 +707,7 @@ impl TAtomic {
         }
     }
 
+    #[must_use]
     pub fn is_falsy(&self) -> bool {
         match &self {
             TAtomic::Scalar(scalar) if scalar.is_falsy() => true,
@@ -651,18 +718,22 @@ impl TAtomic {
         }
     }
 
+    #[must_use]
     pub fn is_array_accessible_with_string_key(&self) -> bool {
         matches!(self, TAtomic::Array(array) if array.is_keyed())
     }
 
+    #[must_use]
     pub fn is_array_accessible_with_int_or_string_key(&self) -> bool {
         matches!(self, TAtomic::Array(_))
     }
 
+    #[must_use]
     pub fn is_derived(&self) -> bool {
         matches!(self, TAtomic::Derived(_))
     }
 
+    #[must_use]
     pub fn clone_without_intersection_types(&self) -> TAtomic {
         let mut clone = self.clone();
         match &mut clone {
@@ -720,6 +791,7 @@ impl TAtomic {
         }
     }
 
+    #[must_use]
     pub fn get_literal_string_value(&self) -> Option<&str> {
         match self {
             TAtomic::Scalar(scalar) => scalar.get_known_literal_string_value(),
@@ -727,6 +799,7 @@ impl TAtomic {
         }
     }
 
+    #[must_use]
     pub fn get_class_string_value(&self) -> Option<Atom> {
         match self {
             TAtomic::Scalar(scalar) => scalar.get_literal_class_string_value(),
@@ -734,6 +807,7 @@ impl TAtomic {
         }
     }
 
+    #[must_use]
     pub fn get_integer(&self) -> Option<TInteger> {
         match self {
             TAtomic::Scalar(TScalar::Integer(integer)) => Some(*integer),
@@ -741,6 +815,7 @@ impl TAtomic {
         }
     }
 
+    #[must_use]
     pub fn get_literal_int_value(&self) -> Option<i64> {
         match self {
             TAtomic::Scalar(scalar) => scalar.get_literal_int_value(),
@@ -748,6 +823,7 @@ impl TAtomic {
         }
     }
 
+    #[must_use]
     pub fn get_maximum_int_value(&self) -> Option<i64> {
         match self {
             TAtomic::Scalar(scalar) => scalar.get_maximum_int_value(),
@@ -755,6 +831,7 @@ impl TAtomic {
         }
     }
 
+    #[must_use]
     pub fn get_minimum_int_value(&self) -> Option<i64> {
         match self {
             TAtomic::Scalar(scalar) => scalar.get_minimum_int_value(),
@@ -762,6 +839,7 @@ impl TAtomic {
         }
     }
 
+    #[must_use]
     pub fn get_literal_float_value(&self) -> Option<f64> {
         match self {
             TAtomic::Scalar(scalar) => scalar.get_literal_float_value(),

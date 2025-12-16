@@ -53,7 +53,7 @@ pub fn populate_codebase(
 
     let sorted_classes = sorter::sort_class_likes(codebase, &class_likes_to_repopulate);
     for class_name in sorted_classes {
-        hierarchy::populate_class_like_metadata_iterative(&class_name, codebase, symbol_references);
+        hierarchy::populate_class_like_metadata_iterative(class_name, codebase, symbol_references);
     }
 
     for (name, function_like_metadata) in &mut codebase.function_likes {
@@ -80,7 +80,7 @@ pub fn populate_codebase(
         let userland_force_repopulation = metadata.flags.is_user_defined() && !safe_symbols.contains(name);
 
         hierarchy::populate_class_like_types(
-            name,
+            *name,
             metadata,
             &codebase.symbols,
             symbol_references,

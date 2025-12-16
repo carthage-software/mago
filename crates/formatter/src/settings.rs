@@ -78,7 +78,7 @@ pub struct FormatSettings {
     /// }
     /// ```
     ///
-    /// Default: same_line
+    /// Default: `same_line`
     #[serde(default = "BraceStyle::same_line")]
     pub control_brace_style: BraceStyle,
 
@@ -99,7 +99,7 @@ pub struct FormatSettings {
     /// };
     /// ```
     ///
-    /// Default: same_line
+    /// Default: `same_line`
     #[serde(default = "BraceStyle::same_line")]
     pub closure_brace_style: BraceStyle,
 
@@ -120,7 +120,7 @@ pub struct FormatSettings {
     /// }
     /// ```
     ///
-    /// Default: next_line
+    /// Default: `next_line`
     #[serde(default = "BraceStyle::next_line")]
     pub function_brace_style: BraceStyle,
 
@@ -147,7 +147,7 @@ pub struct FormatSettings {
     /// }
     /// ```
     ///
-    /// Default: next_line
+    /// Default: `next_line`
     #[serde(default = "BraceStyle::next_line")]
     pub method_brace_style: BraceStyle,
 
@@ -166,7 +166,7 @@ pub struct FormatSettings {
     /// }
     /// ```
     ///
-    /// Default: next_line
+    /// Default: `next_line`
     #[serde(default = "BraceStyle::next_line")]
     pub classlike_brace_style: BraceStyle,
 
@@ -321,7 +321,7 @@ pub struct FormatSettings {
     ///     ->baz();
     /// ```
     ///
-    /// Default: next_line
+    /// Default: `next_line`
     #[serde(default)]
     pub method_chain_breaking_style: MethodChainBreakingStyle,
 
@@ -538,7 +538,7 @@ pub struct FormatSettings {
     /// }
     /// ```
     ///
-    /// Default: NullPipe
+    /// Default: `NullPipe`
     #[serde(default)]
     pub null_type_hint: NullTypeHint,
 
@@ -988,15 +988,18 @@ pub enum MethodChainBreakingStyle {
 }
 
 impl BraceStyle {
+    #[must_use]
     pub fn same_line() -> Self {
         Self::SameLine
     }
 
+    #[must_use]
     pub fn next_line() -> Self {
         Self::NextLine
     }
 
     #[inline]
+    #[must_use]
     pub fn is_next_line(&self) -> bool {
         *self == Self::NextLine
     }
@@ -1004,6 +1007,7 @@ impl BraceStyle {
 
 impl MethodChainBreakingStyle {
     #[inline]
+    #[must_use]
     pub fn is_next_line(&self) -> bool {
         *self == Self::NextLine
     }
@@ -1011,6 +1015,7 @@ impl MethodChainBreakingStyle {
 
 impl EndOfLine {
     #[inline]
+    #[must_use]
     pub const fn as_str(&self) -> &'static str {
         match self {
             Self::Crlf => "\r\n",
@@ -1045,6 +1050,7 @@ pub enum NullTypeHint {
 }
 
 impl NullTypeHint {
+    #[must_use]
     pub fn is_question(&self) -> bool {
         *self == Self::Question
     }

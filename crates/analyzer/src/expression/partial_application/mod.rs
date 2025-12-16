@@ -7,7 +7,9 @@ use mago_codex::ttype::atomic::callable::TCallableSignature;
 use mago_codex::ttype::atomic::callable::parameter::TCallableParameter;
 use mago_codex::ttype::template::TemplateResult;
 use mago_codex::ttype::template::inferred_type_replacer;
-use mago_syntax::ast::*;
+use mago_syntax::ast::PartialApplication;
+use mago_syntax::ast::PartialArgument;
+use mago_syntax::ast::PartialArgumentList;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -79,7 +81,7 @@ fn find_parameter_index_by_name(
 /// A `TAtomic::Callable` containing the new closure signature with only placeholder parameters
 /// and all template types replaced with their inferred concrete types
 fn create_closure_from_partial_application(
-    callable_signature: TCallableSignature,
+    callable_signature: &TCallableSignature,
     argument_list: &PartialArgumentList<'_>,
     original_parameters: &[InvocationTargetParameter<'_>],
     template_result: &TemplateResult,
@@ -91,7 +93,7 @@ fn create_closure_from_partial_application(
     let mut parameter_offset = 0;
     let mut new_parameters = Vec::new();
 
-    for argument in arguments.iter() {
+    for argument in arguments {
         match argument {
             PartialArgument::Placeholder(_) => {
                 if let Some(param) = parameters.get(parameter_offset) {

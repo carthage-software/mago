@@ -79,6 +79,7 @@ impl File {
     /// Creates a new `File` instance from its name, type, path, and contents.
     ///
     /// It automatically calculates the size, and line start offsets.
+    #[must_use]
     pub fn new(
         name: Cow<'static, str>,
         file_type: FileType,
@@ -117,6 +118,7 @@ impl File {
     /// This is a convenience method for situations like testing or formatting where
     /// a full file context (e.g., a real path) is not required. It defaults to
     /// `FileType::Host` and a `path` of `None`.
+    #[must_use]
     pub fn ephemeral(name: Cow<'static, str>, contents: Cow<'static, str>) -> Self {
         Self::new(name, FileType::Host, None, contents)
     }
@@ -131,6 +133,7 @@ impl File {
     ///
     /// The line number for the given byte offset (0-based index).
     #[inline]
+    #[must_use]
     pub fn line_number(&self, offset: u32) -> u32 {
         self.lines.binary_search(&offset).unwrap_or_else(|next_line| next_line - 1) as u32
     }
@@ -144,6 +147,7 @@ impl File {
     /// # Returns
     ///
     /// The byte offset for the start of the given line (0-based index).
+    #[must_use]
     pub fn get_line_start_offset(&self, line: u32) -> Option<u32> {
         self.lines.get(line as usize).copied()
     }
@@ -157,6 +161,7 @@ impl File {
     /// # Returns
     ///
     /// The byte offset for the end of the given line (0-based index).
+    #[must_use]
     pub fn get_line_end_offset(&self, line: u32) -> Option<u32> {
         match self.lines.get(line as usize + 1) {
             Some(&end) => Some(end - 1),
@@ -175,6 +180,7 @@ impl File {
     ///
     /// The column number for the given byte offset (0-based index).
     #[inline]
+    #[must_use]
     pub fn column_number(&self, offset: u32) -> u32 {
         let line_start =
             self.lines.binary_search(&offset).unwrap_or_else(|next_line| self.lines[next_line - 1] as usize);
@@ -185,32 +191,38 @@ impl File {
 
 impl FileType {
     /// Returns `true` if the file is a host file, meaning it is part of the project's source code.
+    #[must_use]
     pub const fn is_host(self) -> bool {
         matches!(self, FileType::Host)
     }
 
     /// Returns `true` if the file is a vendored file, meaning it comes from an external library or dependency.
+    #[must_use]
     pub const fn is_vendored(self) -> bool {
         matches!(self, FileType::Vendored)
     }
 
     /// Returns `true` if the file is a built-in file, meaning it represents a core language construct.
+    #[must_use]
     pub const fn is_builtin(self) -> bool {
         matches!(self, FileType::Builtin)
     }
 }
 
 impl FileId {
+    #[must_use]
     pub fn new(logical_name: &str) -> Self {
         let mut hasher = DefaultHasher::new();
         logical_name.hash(&mut hasher);
         Self(hasher.finish())
     }
 
+    #[must_use]
     pub const fn zero() -> Self {
         Self(0)
     }
 
+    #[must_use]
     pub const fn is_zero(self) -> bool {
         self.0 == 0
     }

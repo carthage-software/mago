@@ -57,6 +57,7 @@ impl std::fmt::Debug for AnalysisService {
 }
 
 impl AnalysisService {
+    #[must_use]
     pub fn new(
         database: ReadDatabase,
         codebase: CodebaseMetadata,
@@ -81,6 +82,7 @@ impl AnalysisService {
     ///
     /// When set, the service will use the `run_incremental()` method which detects
     /// file changes and only re-scans modified files for improved performance.
+    #[must_use]
     pub fn with_incremental(mut self, incremental: IncrementalAnalysis) -> Self {
         self.incremental = Some(incremental);
         self
@@ -153,11 +155,13 @@ impl AnalysisService {
     }
 
     /// Gets a reference to the codebase (for incremental analysis state saving).
+    #[must_use]
     pub fn codebase(&self) -> &CodebaseMetadata {
         &self.codebase
     }
 
     /// Gets a reference to the symbol references (for incremental analysis state saving).
+    #[must_use]
     pub fn symbol_references(&self) -> &SymbolReferences {
         &self.symbol_references
     }
@@ -193,7 +197,7 @@ impl AnalysisService {
                     let diff = inc_for_callback.compute_diffs(&old_metadata, codebase);
 
                     // Mark safe symbols (includes invalidation cascade)
-                    inc_for_callback.mark_safe_symbols(diff, &old_refs, codebase);
+                    inc_for_callback.mark_safe_symbols(&diff, &old_refs, codebase);
 
                     tracing::debug!(
                         "Incremental analysis complete: {} safe symbols, {} safe members",
@@ -287,7 +291,7 @@ impl AnalysisService {
                     let diff = inc_for_callback.compute_diffs(&old_metadata, codebase);
 
                     // Mark safe symbols (includes invalidation cascade)
-                    inc_for_callback.mark_safe_symbols(diff, &old_refs, codebase);
+                    inc_for_callback.mark_safe_symbols(&diff, &old_refs, codebase);
 
                     tracing::debug!(
                         "Incremental analysis complete: {} safe symbols, {} safe members",

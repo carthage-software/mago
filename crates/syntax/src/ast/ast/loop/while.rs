@@ -64,6 +64,7 @@ pub struct WhileColonDelimitedBody<'arena> {
 
 impl<'arena> WhileBody<'arena> {
     #[inline]
+    #[must_use]
     pub fn statements(&self) -> &[Statement<'arena>] {
         match self {
             WhileBody::Statement(statement) => std::slice::from_ref(statement),

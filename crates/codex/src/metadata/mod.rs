@@ -83,6 +83,7 @@ impl CodebaseMetadata {
 
     /// Creates a new, empty `CodebaseMetadata` with default values.
     #[inline]
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
@@ -97,6 +98,7 @@ impl CodebaseMetadata {
     /// }
     /// ```
     #[inline]
+    #[must_use]
     pub fn class_exists(&self, name: &str) -> bool {
         let lowercase_name = ascii_lowercase_atom(name);
         matches!(self.symbols.get_kind(&lowercase_name), Some(SymbolKind::Class))
@@ -104,6 +106,7 @@ impl CodebaseMetadata {
 
     /// Checks if an interface exists in the codebase (case-insensitive).
     #[inline]
+    #[must_use]
     pub fn interface_exists(&self, name: &str) -> bool {
         let lowercase_name = ascii_lowercase_atom(name);
         matches!(self.symbols.get_kind(&lowercase_name), Some(SymbolKind::Interface))
@@ -111,6 +114,7 @@ impl CodebaseMetadata {
 
     /// Checks if a trait exists in the codebase (case-insensitive).
     #[inline]
+    #[must_use]
     pub fn trait_exists(&self, name: &str) -> bool {
         let lowercase_name = ascii_lowercase_atom(name);
         matches!(self.symbols.get_kind(&lowercase_name), Some(SymbolKind::Trait))
@@ -118,6 +122,7 @@ impl CodebaseMetadata {
 
     /// Checks if an enum exists in the codebase (case-insensitive).
     #[inline]
+    #[must_use]
     pub fn enum_exists(&self, name: &str) -> bool {
         let lowercase_name = ascii_lowercase_atom(name);
         matches!(self.symbols.get_kind(&lowercase_name), Some(SymbolKind::Enum))
@@ -125,6 +130,7 @@ impl CodebaseMetadata {
 
     /// Checks if a class-like (class, interface, trait, or enum) exists (case-insensitive).
     #[inline]
+    #[must_use]
     pub fn class_like_exists(&self, name: &str) -> bool {
         let lowercase_name = ascii_lowercase_atom(name);
         self.symbols.contains(&lowercase_name)
@@ -132,6 +138,7 @@ impl CodebaseMetadata {
 
     /// Checks if a class or trait exists in the codebase (case-insensitive).
     #[inline]
+    #[must_use]
     pub fn class_or_trait_exists(&self, name: &str) -> bool {
         let lowercase_name = ascii_lowercase_atom(name);
         matches!(self.symbols.get_kind(&lowercase_name), Some(SymbolKind::Class | SymbolKind::Trait))
@@ -139,6 +146,7 @@ impl CodebaseMetadata {
 
     /// Checks if a class or interface exists in the codebase (case-insensitive).
     #[inline]
+    #[must_use]
     pub fn class_or_interface_exists(&self, name: &str) -> bool {
         let lowercase_name = ascii_lowercase_atom(name);
         matches!(self.symbols.get_kind(&lowercase_name), Some(SymbolKind::Class | SymbolKind::Interface))
@@ -146,6 +154,7 @@ impl CodebaseMetadata {
 
     /// Checks if a method identifier exists in the codebase.
     #[inline]
+    #[must_use]
     pub fn method_identifier_exists(&self, method_id: &MethodIdentifier) -> bool {
         let lowercase_class = ascii_lowercase_atom(method_id.get_class_name());
         let lowercase_method = ascii_lowercase_atom(method_id.get_method_name());
@@ -155,6 +164,7 @@ impl CodebaseMetadata {
 
     /// Checks if a global function exists in the codebase (case-insensitive).
     #[inline]
+    #[must_use]
     pub fn function_exists(&self, name: &str) -> bool {
         let lowercase_name = ascii_lowercase_atom(name);
         let identifier = (empty_atom(), lowercase_name);
@@ -164,6 +174,7 @@ impl CodebaseMetadata {
     /// Checks if a global constant exists in the codebase.
     /// The namespace part is case-insensitive, but the constant name is case-sensitive.
     #[inline]
+    #[must_use]
     pub fn constant_exists(&self, name: &str) -> bool {
         let lowercase_name = ascii_lowercase_constant_name_atom(name);
         self.constants.contains_key(&lowercase_name)
@@ -171,6 +182,7 @@ impl CodebaseMetadata {
 
     /// Checks if a method exists on a class-like, including inherited methods (case-insensitive).
     #[inline]
+    #[must_use]
     pub fn method_exists(&self, class: &str, method: &str) -> bool {
         let lowercase_class = ascii_lowercase_atom(class);
         let lowercase_method = ascii_lowercase_atom(method);
@@ -182,6 +194,7 @@ impl CodebaseMetadata {
     /// Checks if a property exists on a class-like, including inherited properties.
     /// Class name is case-insensitive, property name is case-sensitive.
     #[inline]
+    #[must_use]
     pub fn property_exists(&self, class: &str, property: &str) -> bool {
         let lowercase_class = ascii_lowercase_atom(class);
         let property_name = atom(property);
@@ -193,6 +206,7 @@ impl CodebaseMetadata {
     /// Checks if a class constant or enum case exists on a class-like.
     /// Class name is case-insensitive, constant/case name is case-sensitive.
     #[inline]
+    #[must_use]
     pub fn class_constant_exists(&self, class: &str, constant: &str) -> bool {
         let lowercase_class = ascii_lowercase_atom(class);
         let constant_name = atom(constant);
@@ -203,6 +217,7 @@ impl CodebaseMetadata {
 
     /// Checks if a method is declared directly in a class (not inherited).
     #[inline]
+    #[must_use]
     pub fn method_is_declared_in_class(&self, class: &str, method: &str) -> bool {
         let lowercase_class = ascii_lowercase_atom(class);
         let lowercase_method = ascii_lowercase_atom(method);
@@ -214,6 +229,7 @@ impl CodebaseMetadata {
 
     /// Checks if a property is declared directly in a class (not inherited).
     #[inline]
+    #[must_use]
     pub fn property_is_declared_in_class(&self, class: &str, property: &str) -> bool {
         let lowercase_class = ascii_lowercase_atom(class);
         let property_name = atom(property);
@@ -224,6 +240,7 @@ impl CodebaseMetadata {
     /// Retrieves metadata for a class (case-insensitive).
     /// Returns `None` if the name doesn't correspond to a class.
     #[inline]
+    #[must_use]
     pub fn get_class(&self, name: &str) -> Option<&ClassLikeMetadata> {
         let lowercase_name = ascii_lowercase_atom(name);
         if self.symbols.contains_class(&lowercase_name) { self.class_likes.get(&lowercase_name) } else { None }
@@ -231,6 +248,7 @@ impl CodebaseMetadata {
 
     /// Retrieves metadata for an interface (case-insensitive).
     #[inline]
+    #[must_use]
     pub fn get_interface(&self, name: &str) -> Option<&ClassLikeMetadata> {
         let lowercase_name = ascii_lowercase_atom(name);
         if self.symbols.contains_interface(&lowercase_name) { self.class_likes.get(&lowercase_name) } else { None }
@@ -238,6 +256,7 @@ impl CodebaseMetadata {
 
     /// Retrieves metadata for a trait (case-insensitive).
     #[inline]
+    #[must_use]
     pub fn get_trait(&self, name: &str) -> Option<&ClassLikeMetadata> {
         let lowercase_name = ascii_lowercase_atom(name);
         if self.symbols.contains_trait(&lowercase_name) { self.class_likes.get(&lowercase_name) } else { None }
@@ -245,6 +264,7 @@ impl CodebaseMetadata {
 
     /// Retrieves metadata for an enum (case-insensitive).
     #[inline]
+    #[must_use]
     pub fn get_enum(&self, name: &str) -> Option<&ClassLikeMetadata> {
         let lowercase_name = ascii_lowercase_atom(name);
         if self.symbols.contains_enum(&lowercase_name) { self.class_likes.get(&lowercase_name) } else { None }
@@ -252,6 +272,7 @@ impl CodebaseMetadata {
 
     /// Retrieves metadata for any class-like structure (case-insensitive).
     #[inline]
+    #[must_use]
     pub fn get_class_like(&self, name: &str) -> Option<&ClassLikeMetadata> {
         let lowercase_name = ascii_lowercase_atom(name);
         self.class_likes.get(&lowercase_name)
@@ -260,6 +281,7 @@ impl CodebaseMetadata {
 
     /// Retrieves metadata for a global function (case-insensitive).
     #[inline]
+    #[must_use]
     pub fn get_function(&self, name: &str) -> Option<&FunctionLikeMetadata> {
         let lowercase_name = ascii_lowercase_atom(name);
         let identifier = (empty_atom(), lowercase_name);
@@ -268,6 +290,7 @@ impl CodebaseMetadata {
 
     /// Retrieves metadata for a method (case-insensitive for both class and method names).
     #[inline]
+    #[must_use]
     pub fn get_method(&self, class: &str, method: &str) -> Option<&FunctionLikeMetadata> {
         let lowercase_class = ascii_lowercase_atom(class);
         let lowercase_method = ascii_lowercase_atom(method);
@@ -277,6 +300,7 @@ impl CodebaseMetadata {
 
     /// Retrieves metadata for a closure based on its file and position.
     #[inline]
+    #[must_use]
     pub fn get_closure(&self, file_id: &FileId, position: &Position) -> Option<&FunctionLikeMetadata> {
         let file_ref = u64_atom(file_id.as_u64());
         let closure_ref = u32_atom(position.offset);
@@ -286,6 +310,7 @@ impl CodebaseMetadata {
 
     /// Retrieves method metadata by `MethodIdentifier`.
     #[inline]
+    #[must_use]
     pub fn get_method_by_id(&self, method_id: &MethodIdentifier) -> Option<&FunctionLikeMetadata> {
         let lowercase_class = ascii_lowercase_atom(method_id.get_class_name());
         let lowercase_method = ascii_lowercase_atom(method_id.get_method_name());
@@ -296,6 +321,7 @@ impl CodebaseMetadata {
     /// Retrieves the declaring method metadata, following the inheritance chain.
     /// This finds where the method is actually implemented.
     #[inline]
+    #[must_use]
     pub fn get_declaring_method(&self, class: &str, method: &str) -> Option<&FunctionLikeMetadata> {
         let method_id = MethodIdentifier::new(atom(class), atom(method));
         let declaring_method_id = self.get_declaring_method_identifier(&method_id);
@@ -305,6 +331,7 @@ impl CodebaseMetadata {
     /// Retrieves metadata for any function-like construct (function, method, or closure).
     /// This is a convenience method that delegates to the appropriate getter based on the identifier type.
     #[inline]
+    #[must_use]
     pub fn get_function_like(
         &self,
         identifier: &crate::identifier::function_like::FunctionLikeIdentifier,
@@ -321,6 +348,7 @@ impl CodebaseMetadata {
     /// Retrieves metadata for a global constant.
     /// Namespace lookup is case-insensitive, constant name is case-sensitive.
     #[inline]
+    #[must_use]
     pub fn get_constant(&self, name: &str) -> Option<&ConstantMetadata> {
         let lowercase_name = ascii_lowercase_constant_name_atom(name);
         self.constants.get(&lowercase_name)
@@ -329,6 +357,7 @@ impl CodebaseMetadata {
     /// Retrieves metadata for a class constant.
     /// Class name is case-insensitive, constant name is case-sensitive.
     #[inline]
+    #[must_use]
     pub fn get_class_constant(&self, class: &str, constant: &str) -> Option<&ClassLikeConstantMetadata> {
         let lowercase_class = ascii_lowercase_atom(class);
         let constant_name = atom(constant);
@@ -337,6 +366,7 @@ impl CodebaseMetadata {
 
     /// Retrieves metadata for an enum case.
     #[inline]
+    #[must_use]
     pub fn get_enum_case(&self, class: &str, case: &str) -> Option<&EnumCaseMetadata> {
         let lowercase_class = ascii_lowercase_atom(class);
         let case_name = atom(case);
@@ -347,6 +377,7 @@ impl CodebaseMetadata {
     /// Retrieves metadata for a property directly from the class where it's declared.
     /// Class name is case-insensitive, property name is case-sensitive.
     #[inline]
+    #[must_use]
     pub fn get_property(&self, class: &str, property: &str) -> Option<&PropertyMetadata> {
         let lowercase_class = ascii_lowercase_atom(class);
         let property_name = atom(property);
@@ -355,6 +386,7 @@ impl CodebaseMetadata {
 
     /// Retrieves the property metadata, potentially from a parent class if inherited.
     #[inline]
+    #[must_use]
     pub fn get_declaring_property(&self, class: &str, property: &str) -> Option<&PropertyMetadata> {
         let lowercase_class = ascii_lowercase_atom(class);
         let property_name = atom(property);
@@ -365,6 +397,7 @@ impl CodebaseMetadata {
 
     /// Gets the type of a property, resolving it from the declaring class if needed.
     #[inline]
+    #[must_use]
     pub fn get_property_type(&self, class: &str, property: &str) -> Option<&TUnion> {
         let lowercase_class = ascii_lowercase_atom(class);
         let property_name = atom(property);
@@ -374,6 +407,7 @@ impl CodebaseMetadata {
     }
 
     /// Gets the type of a class constant, considering both type hints and inferred types.
+    #[must_use]
     pub fn get_class_constant_type<'a>(&'a self, class: &str, constant: &str) -> Option<Cow<'a, TUnion>> {
         let lowercase_class = ascii_lowercase_atom(class);
         let constant_name = atom(constant);
@@ -399,6 +433,7 @@ impl CodebaseMetadata {
 
     /// Gets the literal value of a class constant if it was inferred.
     #[inline]
+    #[must_use]
     pub fn get_class_constant_literal_value(&self, class: &str, constant: &str) -> Option<&TAtomic> {
         let lowercase_class = ascii_lowercase_atom(class);
         let constant_name = atom(constant);
@@ -411,6 +446,7 @@ impl CodebaseMetadata {
 
     /// Checks if a child class extends a parent class (case-insensitive).
     #[inline]
+    #[must_use]
     pub fn class_extends(&self, child: &str, parent: &str) -> bool {
         let lowercase_child = ascii_lowercase_atom(child);
         let lowercase_parent = ascii_lowercase_atom(parent);
@@ -419,6 +455,7 @@ impl CodebaseMetadata {
 
     /// Checks if a class directly extends a parent class (case-insensitive).
     #[inline]
+    #[must_use]
     pub fn class_directly_extends(&self, child: &str, parent: &str) -> bool {
         let lowercase_child = ascii_lowercase_atom(child);
         let lowercase_parent = ascii_lowercase_atom(parent);
@@ -429,6 +466,7 @@ impl CodebaseMetadata {
 
     /// Checks if a class implements an interface (case-insensitive).
     #[inline]
+    #[must_use]
     pub fn class_implements(&self, class: &str, interface: &str) -> bool {
         let lowercase_class = ascii_lowercase_atom(class);
         let lowercase_interface = ascii_lowercase_atom(interface);
@@ -439,6 +477,7 @@ impl CodebaseMetadata {
 
     /// Checks if a class directly implements an interface (case-insensitive).
     #[inline]
+    #[must_use]
     pub fn class_directly_implements(&self, class: &str, interface: &str) -> bool {
         let lowercase_class = ascii_lowercase_atom(class);
         let lowercase_interface = ascii_lowercase_atom(interface);
@@ -449,6 +488,7 @@ impl CodebaseMetadata {
 
     /// Checks if a class uses a trait (case-insensitive).
     #[inline]
+    #[must_use]
     pub fn class_uses_trait(&self, class: &str, trait_name: &str) -> bool {
         let lowercase_class = ascii_lowercase_atom(class);
         let lowercase_trait = ascii_lowercase_atom(trait_name);
@@ -457,6 +497,7 @@ impl CodebaseMetadata {
 
     /// Checks if child is an instance of parent (via extends or implements).
     #[inline]
+    #[must_use]
     pub fn is_instance_of(&self, child: &str, parent: &str) -> bool {
         if child == parent {
             return true;
@@ -477,6 +518,7 @@ impl CodebaseMetadata {
 
     /// Checks if the given name is an enum or final class.
     #[inline]
+    #[must_use]
     pub fn is_enum_or_final_class(&self, name: &str) -> bool {
         let lowercase_name = ascii_lowercase_atom(name);
         self.class_likes.get(&lowercase_name).is_some_and(|meta| meta.kind.is_enum() || meta.flags.is_final())
@@ -485,6 +527,7 @@ impl CodebaseMetadata {
     /// Checks if a class-like can be part of an intersection.
     /// Generally, only final classes and enums cannot be intersected.
     #[inline]
+    #[must_use]
     pub fn is_inheritable(&self, name: &str) -> bool {
         let lowercase_name = ascii_lowercase_atom(name);
         match self.symbols.get_kind(&lowercase_name) {
@@ -496,6 +539,7 @@ impl CodebaseMetadata {
 
     /// Gets all descendants of a class (recursive).
     #[inline]
+    #[must_use]
     pub fn get_class_descendants(&self, class: &str) -> AtomSet {
         let lowercase_class = ascii_lowercase_atom(class);
         let mut all_descendants = AtomSet::default();
@@ -519,6 +563,7 @@ impl CodebaseMetadata {
 
     /// Gets all ancestors of a class (parents + interfaces).
     #[inline]
+    #[must_use]
     pub fn get_class_ancestors(&self, class: &str) -> AtomSet {
         let lowercase_class = ascii_lowercase_atom(class);
         let mut ancestors = AtomSet::default();
@@ -532,6 +577,7 @@ impl CodebaseMetadata {
 
     /// Gets the class where a method is declared (following inheritance).
     #[inline]
+    #[must_use]
     pub fn get_declaring_method_class(&self, class: &str, method: &str) -> Option<Atom> {
         let lowercase_class = ascii_lowercase_atom(class);
         let lowercase_method = ascii_lowercase_atom(method);
@@ -545,6 +591,7 @@ impl CodebaseMetadata {
 
     /// Gets the class where a method appears (could be the declaring class or child class).
     #[inline]
+    #[must_use]
     pub fn get_appearing_method_class(&self, class: &str, method: &str) -> Option<Atom> {
         let lowercase_class = ascii_lowercase_atom(class);
         let lowercase_method = ascii_lowercase_atom(method);
@@ -556,6 +603,7 @@ impl CodebaseMetadata {
     }
 
     /// Gets the declaring method identifier for a method.
+    #[must_use]
     pub fn get_declaring_method_identifier(&self, method_id: &MethodIdentifier) -> MethodIdentifier {
         let lowercase_class = ascii_lowercase_atom(method_id.get_class_name());
         let lowercase_method = ascii_lowercase_atom(method_id.get_method_name());
@@ -580,6 +628,7 @@ impl CodebaseMetadata {
 
     /// Checks if a method is overriding a parent method.
     #[inline]
+    #[must_use]
     pub fn method_is_overriding(&self, class: &str, method: &str) -> bool {
         let lowercase_class = ascii_lowercase_atom(class);
         let lowercase_method = ascii_lowercase_atom(method);
@@ -590,6 +639,7 @@ impl CodebaseMetadata {
 
     /// Checks if a method is abstract.
     #[inline]
+    #[must_use]
     pub fn method_is_abstract(&self, class: &str, method: &str) -> bool {
         let lowercase_class = ascii_lowercase_atom(class);
         let lowercase_method = ascii_lowercase_atom(method);
@@ -602,6 +652,7 @@ impl CodebaseMetadata {
 
     /// Checks if a method is static.
     #[inline]
+    #[must_use]
     pub fn method_is_static(&self, class: &str, method: &str) -> bool {
         let lowercase_class = ascii_lowercase_atom(class);
         let lowercase_method = ascii_lowercase_atom(method);
@@ -614,6 +665,7 @@ impl CodebaseMetadata {
 
     /// Checks if a method is final.
     #[inline]
+    #[must_use]
     pub fn method_is_final(&self, class: &str, method: &str) -> bool {
         let lowercase_class = ascii_lowercase_atom(class);
         let lowercase_method = ascii_lowercase_atom(method);
@@ -630,6 +682,7 @@ impl CodebaseMetadata {
     /// the visibility is stored in the class's `trait_visibility_map`. This method checks that map first,
     /// then falls back to the method's declared visibility.
     #[inline]
+    #[must_use]
     pub fn get_method_visibility(&self, class: &str, method: &str) -> Option<Visibility> {
         let lowercase_class = ascii_lowercase_atom(class);
         let lowercase_method = ascii_lowercase_atom(method);
@@ -652,6 +705,7 @@ impl CodebaseMetadata {
     }
 
     /// Gets thrown types for a function-like, including inherited throws.
+    #[must_use]
     pub fn get_function_like_thrown_types<'a>(
         &'a self,
         class_like: Option<&'a ClassLikeMetadata>,
@@ -695,6 +749,7 @@ impl CodebaseMetadata {
 
     /// Gets the class where a property is declared.
     #[inline]
+    #[must_use]
     pub fn get_declaring_property_class(&self, class: &str, property: &str) -> Option<Atom> {
         let lowercase_class = ascii_lowercase_atom(class);
         let property_name = atom(property);
@@ -703,6 +758,7 @@ impl CodebaseMetadata {
 
     /// Gets the class where a property appears.
     #[inline]
+    #[must_use]
     pub fn get_appearing_property_class(&self, class: &str, property: &str) -> Option<Atom> {
         let lowercase_class = ascii_lowercase_atom(class);
         let property_name = atom(property);
@@ -710,6 +766,7 @@ impl CodebaseMetadata {
     }
 
     /// Gets all descendants of a class (recursive).
+    #[must_use]
     pub fn get_all_descendants(&self, class: &str) -> AtomSet {
         let lowercase_class = ascii_lowercase_atom(class);
         let mut all_descendants = AtomSet::default();
@@ -732,6 +789,7 @@ impl CodebaseMetadata {
     }
 
     /// Generates a unique name for an anonymous class based on its span.
+    #[must_use]
     pub fn get_anonymous_class_name(span: mago_span::Span) -> Atom {
         use std::io::Write;
 
@@ -749,6 +807,7 @@ impl CodebaseMetadata {
     }
 
     /// Retrieves the metadata for an anonymous class based on its span.
+    #[must_use]
     pub fn get_anonymous_class(&self, span: mago_span::Span) -> Option<&ClassLikeMetadata> {
         let name = Self::get_anonymous_class_name(span);
         if self.class_exists(&name) { self.class_likes.get(&name) } else { None }
@@ -764,6 +823,7 @@ impl CodebaseMetadata {
     ///
     /// A reference to the `FileSignature` if it exists, or `None` if the file has no signature.
     #[inline]
+    #[must_use]
     pub fn get_file_signature(&self, file_id: &FileId) -> Option<&FileSignature> {
         self.file_signatures.get(file_id)
     }
@@ -910,6 +970,7 @@ impl CodebaseMetadata {
     /// Gets all file IDs that have signatures in this metadata.
     ///
     /// This is a helper method for incremental analysis to iterate over all files.
+    #[must_use]
     pub fn get_all_file_ids(&self) -> Vec<FileId> {
         self.file_signatures.keys().copied().collect()
     }

@@ -30,31 +30,37 @@ pub struct TPropertiesOf {
 
 impl TPropertiesOf {
     #[inline]
+    #[must_use]
     pub const fn new(target_type: Box<TUnion>) -> Self {
         TPropertiesOf { visibility: None, target_type }
     }
 
     #[inline]
+    #[must_use]
     pub const fn public(target_type: Box<TUnion>) -> Self {
         TPropertiesOf { visibility: Some(Visibility::Public), target_type }
     }
 
     #[inline]
+    #[must_use]
     pub const fn protected(target_type: Box<TUnion>) -> Self {
         TPropertiesOf { visibility: Some(Visibility::Protected), target_type }
     }
 
     #[inline]
+    #[must_use]
     pub const fn private(target_type: Box<TUnion>) -> Self {
         TPropertiesOf { visibility: Some(Visibility::Private), target_type }
     }
 
     #[inline]
+    #[must_use]
     pub const fn visibility(&self) -> Option<Visibility> {
         self.visibility
     }
 
     #[inline]
+    #[must_use]
     pub const fn get_target_type(&self) -> &TUnion {
         &self.target_type
     }
@@ -78,6 +84,7 @@ impl TPropertiesOf {
     /// For non-final classes, the result is an unsealed array (with `parameters = (string, mixed)`)
     /// to indicate that subclasses may have additional properties.
     #[inline]
+    #[must_use]
     pub fn get_properties_of_targets(
         target_types: &[TAtomic],
         codebase: &CodebaseMetadata,
@@ -190,11 +197,8 @@ impl TPropertiesOf {
                 TAtomic::GenericParameter(_parameter) => {
                     // For generic parameters, we can't expand at this point
                     // The caller should handle unexpanded types
-                    continue;
                 }
-                _ => {
-                    continue;
-                }
+                _ => {}
             }
         }
 

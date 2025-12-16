@@ -42,6 +42,7 @@ impl GuardService {
     /// # Returns
     ///
     /// A new `GuardService` instance.
+    #[must_use]
     pub fn new(
         database: ReadDatabase,
         codebase: CodebaseMetadata,

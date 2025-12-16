@@ -92,6 +92,7 @@ impl std::fmt::Display for ParseError {
 }
 
 impl ParseError {
+    #[must_use]
     pub fn note(&self) -> String {
         match self {
             ParseError::InvalidTrivia(_) | ParseError::InvalidComment(_) => {
@@ -142,6 +143,7 @@ impl ParseError {
         }
     }
 
+    #[must_use]
     pub fn help(&self) -> String {
         match self {
             ParseError::UnclosedInlineTag(_) => "Add a closing `}` to complete the inline tag.".to_string(),

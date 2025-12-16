@@ -56,11 +56,10 @@ impl FunctionReturnTypeProvider for CompactProvider {
             let Some(argument_expr) = invocation_argument.value() else {
                 continue;
             };
-            let argument_type = context.get_expression_type(argument_expr)?;
 
-            let variable_name = match argument_type.get_single_literal_string_value() {
-                Some(name) => name,
-                None => continue,
+            let argument_type = context.get_expression_type(argument_expr)?;
+            let Some(variable_name) = argument_type.get_single_literal_string_value() else {
+                continue;
             };
 
             let variable_id = format!("${variable_name}");

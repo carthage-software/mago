@@ -1,6 +1,8 @@
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_span::HasSpan;
-use mago_syntax::ast::*;
+use mago_syntax::ast::ClassLikeMemberSelector;
+use mago_syntax::ast::Expression;
+use mago_syntax::ast::StaticMethodCall;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;

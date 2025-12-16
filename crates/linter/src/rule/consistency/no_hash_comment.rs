@@ -6,7 +6,9 @@ use serde::Serialize;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_reporting::Level;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Node;
+use mago_syntax::ast::NodeKind;
+use mago_syntax::ast::TriviaKind;
 
 use crate::category::Category;
 use crate::context::LintContext;
@@ -84,7 +86,7 @@ impl LintRule for NoHashCommentRule {
             return;
         };
 
-        for trivia in program.trivia.iter() {
+        for trivia in &program.trivia {
             if let TriviaKind::HashComment = trivia.kind {
                 let issue = Issue::new(self.cfg.level(), "Shell-style comments ('#') are not allowed.")
                     .with_code(self.meta.code)

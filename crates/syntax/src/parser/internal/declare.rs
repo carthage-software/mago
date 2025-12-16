@@ -1,5 +1,8 @@
 use crate::T;
-use crate::ast::ast::*;
+use crate::ast::ast::Declare;
+use crate::ast::ast::DeclareBody;
+use crate::ast::ast::DeclareColonDelimitedBody;
+use crate::ast::ast::DeclareItem;
 use crate::ast::sequence::Sequence;
 use crate::ast::sequence::TokenSeparatedSequence;
 use crate::error::ParseError;

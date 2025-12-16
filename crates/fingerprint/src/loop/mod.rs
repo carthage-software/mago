@@ -1,7 +1,21 @@
 use std::hash::Hash;
 
 use mago_names::ResolvedNames;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Break;
+use mago_syntax::ast::Continue;
+use mago_syntax::ast::DoWhile;
+use mago_syntax::ast::For;
+use mago_syntax::ast::ForBody;
+use mago_syntax::ast::ForColonDelimitedBody;
+use mago_syntax::ast::Foreach;
+use mago_syntax::ast::ForeachBody;
+use mago_syntax::ast::ForeachColonDelimitedBody;
+use mago_syntax::ast::ForeachKeyValueTarget;
+use mago_syntax::ast::ForeachTarget;
+use mago_syntax::ast::ForeachValueTarget;
+use mago_syntax::ast::While;
+use mago_syntax::ast::WhileBody;
+use mago_syntax::ast::WhileColonDelimitedBody;
 
 use crate::FingerprintOptions;
 use crate::Fingerprintable;
@@ -14,13 +28,13 @@ impl Fingerprintable for For<'_> {
         options: &FingerprintOptions<'_>,
     ) {
         "for".hash(hasher);
-        for init in self.initializations.iter() {
+        for init in &self.initializations {
             init.fingerprint_with_hasher(hasher, resolved_names, options);
         }
-        for condition in self.conditions.iter() {
+        for condition in &self.conditions {
             condition.fingerprint_with_hasher(hasher, resolved_names, options);
         }
-        for increment in self.increments.iter() {
+        for increment in &self.increments {
             increment.fingerprint_with_hasher(hasher, resolved_names, options);
         }
         self.body.fingerprint_with_hasher(hasher, resolved_names, options);
@@ -49,7 +63,7 @@ impl Fingerprintable for ForColonDelimitedBody<'_> {
         options: &FingerprintOptions<'_>,
     ) {
         "for_colon_body".hash(hasher);
-        for statement in self.statements.iter() {
+        for statement in &self.statements {
             statement.fingerprint_with_hasher(hasher, resolved_names, options);
         }
     }
@@ -130,7 +144,7 @@ impl Fingerprintable for ForeachColonDelimitedBody<'_> {
         options: &FingerprintOptions<'_>,
     ) {
         "foreach_colon_body".hash(hasher);
-        for statement in self.statements.iter() {
+        for statement in &self.statements {
             statement.fingerprint_with_hasher(hasher, resolved_names, options);
         }
     }
@@ -171,7 +185,7 @@ impl Fingerprintable for WhileColonDelimitedBody<'_> {
         options: &FingerprintOptions<'_>,
     ) {
         "while_colon_body".hash(hasher);
-        for statement in self.statements.iter() {
+        for statement in &self.statements {
             statement.fingerprint_with_hasher(hasher, resolved_names, options);
         }
     }

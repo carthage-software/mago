@@ -3,7 +3,24 @@ use bumpalo::vec;
 
 use mago_span::HasSpan;
 use mago_span::Span;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Access;
+use mago_syntax::ast::Argument;
+use mago_syntax::ast::ArrayAccess;
+use mago_syntax::ast::AttributeList;
+use mago_syntax::ast::Call;
+use mago_syntax::ast::ConstantAccess;
+use mago_syntax::ast::Expression;
+use mago_syntax::ast::Identifier;
+use mago_syntax::ast::Instantiation;
+use mago_syntax::ast::Keyword;
+use mago_syntax::ast::Literal;
+use mago_syntax::ast::Modifier;
+use mago_syntax::ast::Node;
+use mago_syntax::ast::Sequence;
+use mago_syntax::ast::Statement;
+use mago_syntax::ast::Terminator;
+use mago_syntax::ast::Variable;
+use mago_syntax::ast::Yield;
 
 use crate::document::Document;
 use crate::document::Group;
@@ -438,9 +455,9 @@ pub(super) fn print_attribute_list_sequence<'arena>(
     let mut lists = vec![in f.arena;];
     let mut has_new_line = false;
     let mut has_potentially_long_attribute = false;
-    for attribute_list in attribute_lists.iter() {
+    for attribute_list in attribute_lists {
         if !has_potentially_long_attribute {
-            for attribute in attribute_list.attributes.iter() {
+            for attribute in &attribute_list.attributes {
                 has_potentially_long_attribute =
                     !attribute.argument_list.as_ref().is_none_or(|args| args.arguments.is_empty());
 

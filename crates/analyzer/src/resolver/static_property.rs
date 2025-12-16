@@ -10,7 +10,8 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_span::Span;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Expression;
+use mago_syntax::ast::Variable;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -102,12 +103,12 @@ pub fn resolve_static_properties<'ctx, 'ast, 'arena>(
             if let Some(resolved_property) = find_static_property_in_class(
                 context,
                 block_context,
-                &fqcn,
-                property_name,
+                fqcn,
+                *property_name,
                 property_variable,
                 class_expression,
                 &mut result,
-            )? {
+            ) {
                 result.properties.push(resolved_property);
             }
         }
@@ -120,38 +121,40 @@ pub fn resolve_static_properties<'ctx, 'ast, 'arena>(
 fn find_static_property_in_class<'ctx, 'ast, 'arena>(
     context: &mut Context<'ctx, 'arena>,
     block_context: &BlockContext<'ctx>,
-    class_id: &Atom,
-    property_name: &Atom,
+    class_id: Atom,
+    property_name: Atom,
     variable: &'ast Variable<'arena>,
     class_expr: &'ast Expression<'arena>,
     result: &mut PropertyResolutionResult,
-) -> Result<Option<ResolvedProperty>, AnalysisError> {
-    let Some(class_metadata) = context.codebase.get_class_like(class_id) else {
+) -> Option<ResolvedProperty> {
+    let Some(class_metadata) = context.codebase.get_class_like(&class_id) else {
         // Error reporting for non-existent class is handled by `resolve_classnames_from_expression`.
         result.has_invalid_path = true;
-        return Ok(None);
+        return None;
     };
 
-    let declaring_class_id =
-        context.codebase.get_declaring_property_class(class_id, property_name).unwrap_or(class_metadata.original_name);
+    let declaring_class_id = context
+        .codebase
+        .get_declaring_property_class(&class_id, &property_name)
+        .unwrap_or(class_metadata.original_name);
 
     let Some(declaring_class_metadata) = context.codebase.get_class_like(&declaring_class_id) else {
         // Should not happen if declaring_class_id is valid.
         result.has_error_path = true;
-        return Ok(None);
+        return None;
     };
 
-    let Some(property_metadata) = declaring_class_metadata.properties.get(property_name) else {
+    let Some(property_metadata) = declaring_class_metadata.properties.get(&property_name) else {
         result.has_invalid_path = true;
         report_non_existent_property(
             context,
-            &declaring_class_metadata.original_name,
+            declaring_class_metadata.original_name,
             property_name,
             variable.span(),
             class_expr.span(),
         );
 
-        return Ok(None);
+        return None;
     };
 
     if !property_metadata.flags.is_static() {
@@ -166,19 +169,19 @@ fn find_static_property_in_class<'ctx, 'ast, 'arena>(
         );
 
         result.has_error_path = true;
-        return Ok(None);
+        return None;
     }
 
     if !check_property_read_visibility(
         context,
         block_context,
         &declaring_class_id,
-        property_name,
+        &property_name,
         class_expr.span(),
         Some(variable.span()),
     ) {
         result.has_error_path = true;
-        return Ok(None);
+        return None;
     }
 
     let mut property_type =
@@ -189,29 +192,29 @@ fn find_static_property_in_class<'ctx, 'ast, 'arena>(
         &mut property_type,
         &TypeExpansionOptions {
             self_class: Some(declaring_class_id),
-            static_class_type: StaticClassType::Name(*class_id),
+            static_class_type: StaticClassType::Name(class_id),
             parent_class: declaring_class_metadata.direct_parent_class,
             ..Default::default()
         },
     );
 
-    Ok(Some(ResolvedProperty {
+    Some(ResolvedProperty {
         property_span: property_metadata.name_span.or(property_metadata.span),
-        property_name: *property_name,
+        property_name,
         declaring_class_id: Some(declaring_class_id),
         property_type,
         is_magic: false,
-    }))
+    })
 }
 
 fn report_non_existent_property(
     context: &mut Context<'_, '_>,
-    classname: &Atom,
-    property_name: &Atom,
+    classname: Atom,
+    property_name: Atom,
     selector_span: Span,
     class_like_name_span: Span,
 ) {
-    let class_kind_str = context.codebase.get_class_like(classname).map_or("class", |m| m.kind.as_str());
+    let class_kind_str = context.codebase.get_class_like(&classname).map_or("class", |m| m.kind.as_str());
 
     context.collector.report_with_code(
         IssueCode::NonExistentProperty,

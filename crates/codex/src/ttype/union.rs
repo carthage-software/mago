@@ -84,6 +84,7 @@ impl TUnion {
     ///
     /// This is the most basic way to create a `TUnion` and is used by both the
     /// zero-allocation static helpers and the `from_vec` constructor.
+    #[must_use]
     pub fn new(types: Cow<'static, [TAtomic]>) -> TUnion {
         TUnion { types, flags: UnionFlags::empty() }
     }
@@ -98,6 +99,7 @@ impl TUnion {
     /// In debug builds, panics if:
     /// - The input Vec is empty (unions must contain at least one type)
     /// - The input contains a mix of `never` types with other types (invalid union construction)
+    #[must_use]
     pub fn from_vec(mut types: Vec<TAtomic>) -> TUnion {
         if cfg!(debug_assertions) {
             assert!(
@@ -142,6 +144,7 @@ impl TUnion {
     ///
     /// This function is a key optimization point. When passed a `Cow::Borrowed`,
     /// it creates the `TUnion` without any heap allocation.
+    #[must_use]
     pub fn from_single(atomic: Cow<'static, TAtomic>) -> TUnion {
         let types_cow = match atomic {
             Cow::Borrowed(borrowed_atomic) => Cow::Borrowed(std::slice::from_ref(borrowed_atomic)),
@@ -152,6 +155,7 @@ impl TUnion {
     }
 
     /// Creates a `TUnion` from a single owned atomic type.
+    #[must_use]
     pub fn from_atomic(atomic: TAtomic) -> TUnion {
         TUnion::new(Cow::Owned(vec![atomic]))
     }
@@ -165,46 +169,55 @@ impl TUnion {
     }
 
     #[inline]
+    #[must_use]
     pub const fn had_template(&self) -> bool {
         self.flags.contains(UnionFlags::HAD_TEMPLATE)
     }
 
     #[inline]
+    #[must_use]
     pub const fn by_reference(&self) -> bool {
         self.flags.contains(UnionFlags::BY_REFERENCE)
     }
 
     #[inline]
+    #[must_use]
     pub const fn reference_free(&self) -> bool {
         self.flags.contains(UnionFlags::REFERENCE_FREE)
     }
 
     #[inline]
+    #[must_use]
     pub const fn possibly_undefined_from_try(&self) -> bool {
         self.flags.contains(UnionFlags::POSSIBLY_UNDEFINED_FROM_TRY)
     }
 
     #[inline]
+    #[must_use]
     pub const fn possibly_undefined(&self) -> bool {
         self.flags.contains(UnionFlags::POSSIBLY_UNDEFINED)
     }
 
     #[inline]
+    #[must_use]
     pub const fn ignore_nullable_issues(&self) -> bool {
         self.flags.contains(UnionFlags::IGNORE_NULLABLE_ISSUES)
     }
 
     #[inline]
+    #[must_use]
     pub const fn ignore_falsable_issues(&self) -> bool {
         self.flags.contains(UnionFlags::IGNORE_FALSABLE_ISSUES)
     }
 
     #[inline]
+    #[must_use]
     pub const fn from_template_default(&self) -> bool {
         self.flags.contains(UnionFlags::FROM_TEMPLATE_DEFAULT)
     }
 
     #[inline]
+    #[must_use]
     pub const fn populated(&self) -> bool {
         self.flags.contains(UnionFlags::POPULATED)
     }
@@ -250,18 +263,22 @@ impl TUnion {
     }
 
     /// Creates a new `TUnion` with the same properties as the original, but with a new set of types.
+    #[must_use]
     pub fn clone_with_types(&self, types: Vec<TAtomic>) -> TUnion {
         TUnion { types: Cow::Owned(types), flags: self.flags }
     }
 
+    #[must_use]
     pub fn to_non_nullable(&self) -> TUnion {
         TUnion { types: Cow::Owned(self.get_non_nullable_types()), flags: self.flags }
     }
 
+    #[must_use]
     pub fn to_truthy(&self) -> TUnion {
         TUnion { types: Cow::Owned(self.get_truthy_types()), flags: self.flags }
     }
 
+    #[must_use]
     pub fn get_non_nullable_types(&self) -> Vec<TAtomic> {
         self.types
             .iter()
@@ -279,6 +296,7 @@ impl TUnion {
             .collect()
     }
 
+    #[must_use]
     pub fn get_truthy_types(&self) -> Vec<TAtomic> {
         self.types
             .iter()
@@ -302,14 +320,15 @@ impl TUnion {
     }
 
     /// Adds `null` to the union type, making it nullable.
+    #[must_use]
     pub fn as_nullable(mut self) -> TUnion {
         let types = self.types.to_mut();
 
-        types.iter_mut().for_each(|atomic| {
+        for atomic in types.iter_mut() {
             if let TAtomic::Mixed(mixed) = atomic {
                 *mixed = mixed.with_is_non_null(false);
             }
-        });
+        }
 
         if !types.iter().any(|atomic| atomic.is_null() || atomic.is_mixed()) {
             types.push(TAtomic::Null);
@@ -334,6 +353,7 @@ impl TUnion {
         }
     }
 
+    #[must_use]
     pub fn is_int(&self) -> bool {
         for atomic in self.types.as_ref() {
             if !atomic.is_int() {
@@ -344,6 +364,7 @@ impl TUnion {
         true
     }
 
+    #[must_use]
     pub fn has_int_or_float(&self) -> bool {
         for atomic in self.types.as_ref() {
             if atomic.is_int_or_float() {
@@ -354,6 +375,7 @@ impl TUnion {
         false
     }
 
+    #[must_use]
     pub fn has_int_and_float(&self) -> bool {
         let mut has_int = false;
         let mut has_float = false;
@@ -376,6 +398,7 @@ impl TUnion {
         false
     }
 
+    #[must_use]
     pub fn has_int_and_string(&self) -> bool {
         let mut has_int = false;
         let mut has_string = false;
@@ -398,6 +421,7 @@ impl TUnion {
         false
     }
 
+    #[must_use]
     pub fn has_int(&self) -> bool {
         for atomic in self.types.as_ref() {
             if atomic.is_int() || atomic.is_array_key() || atomic.is_numeric() {
@@ -408,6 +432,7 @@ impl TUnion {
         false
     }
 
+    #[must_use]
     pub fn has_float(&self) -> bool {
         for atomic in self.types.as_ref() {
             if atomic.is_float() {
@@ -418,6 +443,7 @@ impl TUnion {
         false
     }
 
+    #[must_use]
     pub fn is_array_key(&self) -> bool {
         for atomic in self.types.as_ref() {
             if atomic.is_array_key() {
@@ -430,6 +456,7 @@ impl TUnion {
         true
     }
 
+    #[must_use]
     pub fn is_any_string(&self) -> bool {
         for atomic in self.types.as_ref() {
             if !atomic.is_any_string() {
@@ -444,6 +471,7 @@ impl TUnion {
         self.types.iter().all(super::atomic::TAtomic::is_string) && !self.types.is_empty()
     }
 
+    #[must_use]
     pub fn is_always_array_key(&self, ignore_never: bool) -> bool {
         self.types.iter().all(|atomic| match atomic {
             TAtomic::Never => ignore_never,
@@ -486,6 +514,7 @@ impl TUnion {
         self.types.iter().all(super::atomic::TAtomic::is_templated_as_never) && !self.types.is_empty()
     }
 
+    #[must_use]
     pub fn is_placeholder(&self) -> bool {
         self.types.iter().all(|t| matches!(t, TAtomic::Placeholder)) && !self.types.is_empty()
     }
@@ -498,6 +527,7 @@ impl TUnion {
         self.types.iter().all(super::atomic::TAtomic::is_false) && !self.types.is_empty()
     }
 
+    #[must_use]
     pub fn is_nonnull(&self) -> bool {
         self.types.len() == 1 && matches!(self.types[0], TAtomic::Mixed(mixed) if mixed.is_non_null())
     }
@@ -512,6 +542,7 @@ impl TUnion {
 
     /// Returns `Some(true)` if all types are effectively int, `Some(false)` if all are effectively float,
     /// or `None` if mixed or neither. Handles unions like `1|2` (all int) or `3.4|4.5` (all float).
+    #[must_use]
     pub fn effective_int_or_float(&self) -> Option<bool> {
         let mut result: Option<bool> = None;
         for atomic in self.types.as_ref() {
@@ -532,6 +563,7 @@ impl TUnion {
         result
     }
 
+    #[must_use]
     pub fn is_mixed(&self) -> bool {
         self.types.iter().all(|t| matches!(t, TAtomic::Mixed(_))) && !self.types.is_empty()
     }
@@ -540,6 +572,7 @@ impl TUnion {
         self.types.iter().all(super::atomic::TAtomic::is_templated_as_mixed) && !self.types.is_empty()
     }
 
+    #[must_use]
     pub fn has_mixed(&self) -> bool {
         self.types.iter().any(|t| matches!(t, TAtomic::Mixed(_))) && !self.types.is_empty()
     }
@@ -548,18 +581,22 @@ impl TUnion {
         self.types.iter().any(super::atomic::TAtomic::is_templated_as_mixed) && !self.types.is_empty()
     }
 
+    #[must_use]
     pub fn has_nullable_mixed(&self) -> bool {
         self.types.iter().any(|t| matches!(t, TAtomic::Mixed(mixed) if !mixed.is_non_null())) && !self.types.is_empty()
     }
 
+    #[must_use]
     pub fn has_void(&self) -> bool {
         self.types.iter().any(|t| matches!(t, TAtomic::Void)) && !self.types.is_empty()
     }
 
+    #[must_use]
     pub fn has_null(&self) -> bool {
         self.types.iter().any(|t| matches!(t, TAtomic::Null)) && !self.types.is_empty()
     }
 
+    #[must_use]
     pub fn has_nullish(&self) -> bool {
         self.types.iter().any(|t| match t {
             TAtomic::Null | TAtomic::Void => true,
@@ -569,6 +606,7 @@ impl TUnion {
         }) && !self.types.is_empty()
     }
 
+    #[must_use]
     pub fn is_nullable_mixed(&self) -> bool {
         if self.types.len() != 1 {
             return false;
@@ -580,6 +618,7 @@ impl TUnion {
         }
     }
 
+    #[must_use]
     pub fn is_falsy_mixed(&self) -> bool {
         if self.types.len() != 1 {
             return false;
@@ -588,6 +627,7 @@ impl TUnion {
         matches!(&self.types[0], &TAtomic::Mixed(mixed) if mixed.is_falsy())
     }
 
+    #[must_use]
     pub fn is_vanilla_mixed(&self) -> bool {
         if self.types.len() != 1 {
             return false;
@@ -596,6 +636,7 @@ impl TUnion {
         self.types[0].is_vanilla_mixed()
     }
 
+    #[must_use]
     pub fn is_templated_as_vanilla_mixed(&self) -> bool {
         if self.types.len() != 1 {
             return false;
@@ -604,6 +645,7 @@ impl TUnion {
         self.types[0].is_templated_as_vanilla_mixed()
     }
 
+    #[must_use]
     pub fn has_template_or_static(&self) -> bool {
         for atomic in self.types.as_ref() {
             if let TAtomic::GenericParameter(_) = atomic {
@@ -628,6 +670,7 @@ impl TUnion {
         false
     }
 
+    #[must_use]
     pub fn has_template(&self) -> bool {
         for atomic in self.types.as_ref() {
             if let TAtomic::GenericParameter(_) = atomic {
@@ -646,6 +689,7 @@ impl TUnion {
         false
     }
 
+    #[must_use]
     pub fn has_template_types(&self) -> bool {
         let all_child_nodes = self.get_all_child_nodes();
 
@@ -662,6 +706,7 @@ impl TUnion {
         false
     }
 
+    #[must_use]
     pub fn get_template_types(&self) -> Vec<&TAtomic> {
         let all_child_nodes = self.get_all_child_nodes();
 
@@ -702,6 +747,7 @@ impl TUnion {
         true
     }
 
+    #[must_use]
     pub fn is_generator(&self) -> bool {
         for atomic in self.types.as_ref() {
             if atomic.is_generator() {
@@ -714,6 +760,7 @@ impl TUnion {
         true
     }
 
+    #[must_use]
     pub fn extends_or_implements(&self, codebase: &CodebaseMetadata, interface: &str) -> bool {
         for atomic in self.types.as_ref() {
             if !atomic.extends_or_implements(codebase, interface) {
@@ -724,10 +771,12 @@ impl TUnion {
         true
     }
 
+    #[must_use]
     pub fn is_generic_parameter(&self) -> bool {
         self.types.len() == 1 && matches!(self.types[0], TAtomic::GenericParameter(_))
     }
 
+    #[must_use]
     pub fn get_generic_parameter_constraint(&self) -> Option<&TUnion> {
         if self.is_generic_parameter()
             && let TAtomic::GenericParameter(parameter) = &self.types[0]
@@ -738,10 +787,12 @@ impl TUnion {
         None
     }
 
+    #[must_use]
     pub fn is_null(&self) -> bool {
         self.types.iter().all(|t| matches!(t, TAtomic::Null)) && !self.types.is_empty()
     }
 
+    #[must_use]
     pub fn is_nullable(&self) -> bool {
         self.types.iter().any(|t| match t {
             TAtomic::Null => self.types.len() >= 2,
@@ -749,10 +800,12 @@ impl TUnion {
         })
     }
 
+    #[must_use]
     pub fn is_void(&self) -> bool {
         self.types.iter().all(|t| matches!(t, TAtomic::Void)) && !self.types.is_empty()
     }
 
+    #[must_use]
     pub fn is_voidable(&self) -> bool {
         self.types.iter().any(|t| matches!(t, TAtomic::Void)) && !self.types.is_empty()
     }
@@ -781,6 +834,7 @@ impl TUnion {
         self.types.len() >= 2 && self.types.iter().any(super::atomic::TAtomic::is_false)
     }
 
+    #[must_use]
     pub fn has_bool(&self) -> bool {
         self.types.iter().any(|t| t.is_bool() || t.is_generic_scalar()) && !self.types.is_empty()
     }
@@ -796,6 +850,7 @@ impl TUnion {
 
     /// Checks if the union contains a combination of types that is equivalent
     /// to the generic `scalar` type (i.e., contains `int`, `float`, `bool`, and `string`).
+    #[must_use]
     pub fn has_scalar_combination(&self) -> bool {
         const HAS_INT: u8 = 1 << 0;
         const HAS_FLOAT: u8 = 1 << 1;
@@ -843,10 +898,12 @@ impl TUnion {
         self.types.iter().any(super::atomic::TAtomic::is_array) && !self.types.is_empty()
     }
 
+    #[must_use]
     pub fn has_traversable(&self, codebase: &CodebaseMetadata) -> bool {
         self.types.iter().any(|atomic| atomic.is_traversable(codebase)) && !self.types.is_empty()
     }
 
+    #[must_use]
     pub fn has_array_key_like(&self) -> bool {
         self.types.iter().any(|atomic| atomic.is_array_key() || atomic.is_int() || atomic.is_string())
     }
@@ -863,6 +920,7 @@ impl TUnion {
         self.types.iter().all(super::atomic::TAtomic::is_falsy) && !self.types.is_empty()
     }
 
+    #[must_use]
     pub fn is_literal_of(&self, other: &TUnion) -> bool {
         let Some(other_atomic_type) = other.types.first() else {
             return false;
@@ -906,18 +964,21 @@ impl TUnion {
         }
     }
 
+    #[must_use]
     pub fn all_literals(&self) -> bool {
         self.types
             .iter()
             .all(|atomic| atomic.is_string_of_literal_origin() || atomic.is_literal_int() || atomic.is_literal_float())
     }
 
+    #[must_use]
     pub fn has_static_object(&self) -> bool {
         self.types
             .iter()
             .any(|atomic| matches!(atomic, TAtomic::Object(TObject::Named(named_object)) if named_object.is_this()))
     }
 
+    #[must_use]
     pub fn is_static_object(&self) -> bool {
         self.types
             .iter()
@@ -925,11 +986,13 @@ impl TUnion {
     }
 
     #[inline]
+    #[must_use]
     pub fn is_single(&self) -> bool {
         self.types.len() == 1
     }
 
     #[inline]
+    #[must_use]
     pub fn get_single_string(&self) -> Option<&TString> {
         if self.is_single()
             && let TAtomic::Scalar(TScalar::String(string)) = &self.types[0]
@@ -941,6 +1004,7 @@ impl TUnion {
     }
 
     #[inline]
+    #[must_use]
     pub fn get_single_array(&self) -> Option<&TArray> {
         if self.is_single()
             && let TAtomic::Array(array) = &self.types[0]
@@ -952,6 +1016,7 @@ impl TUnion {
     }
 
     #[inline]
+    #[must_use]
     pub fn get_single_bool(&self) -> Option<&TBool> {
         if self.is_single()
             && let TAtomic::Scalar(TScalar::Bool(bool)) = &self.types[0]
@@ -963,6 +1028,7 @@ impl TUnion {
     }
 
     #[inline]
+    #[must_use]
     pub fn get_single_named_object(&self) -> Option<&TNamedObject> {
         if self.is_single()
             && let TAtomic::Object(TObject::Named(named_object)) = &self.types[0]
@@ -974,6 +1040,7 @@ impl TUnion {
     }
 
     #[inline]
+    #[must_use]
     pub fn get_single_shaped_object(&self) -> Option<&TObjectWithProperties> {
         if self.is_single()
             && let TAtomic::Object(TObject::WithProperties(shaped_object)) = &self.types[0]
@@ -985,60 +1052,72 @@ impl TUnion {
     }
 
     #[inline]
+    #[must_use]
     pub fn get_single(&self) -> &TAtomic {
         &self.types[0]
     }
 
     #[inline]
+    #[must_use]
     pub fn get_single_owned(self) -> TAtomic {
         self.types[0].clone()
     }
 
     #[inline]
+    #[must_use]
     pub fn is_named_object(&self) -> bool {
         self.types.iter().all(|t| matches!(t, TAtomic::Object(TObject::Named(_))))
     }
 
+    #[must_use]
     pub fn is_enum(&self) -> bool {
         self.types.iter().all(|t| matches!(t, TAtomic::Object(TObject::Enum(_))))
     }
 
+    #[must_use]
     pub fn is_enum_case(&self) -> bool {
         self.types.iter().all(|t| matches!(t, TAtomic::Object(TObject::Enum(r#enum)) if r#enum.case.is_some()))
     }
 
+    #[must_use]
     pub fn is_single_enum_case(&self) -> bool {
         self.is_single()
             && self.types.iter().all(|t| matches!(t, TAtomic::Object(TObject::Enum(r#enum)) if r#enum.case.is_some()))
     }
 
     #[inline]
+    #[must_use]
     pub fn has_named_object(&self) -> bool {
         self.types.iter().any(|t| matches!(t, TAtomic::Object(TObject::Named(_))))
     }
 
     #[inline]
+    #[must_use]
     pub fn has_object(&self) -> bool {
         self.types.iter().any(|t| matches!(t, TAtomic::Object(TObject::Any | TObject::WithProperties(_))))
     }
 
     #[inline]
+    #[must_use]
     pub fn has_callable(&self) -> bool {
         self.types.iter().any(|t| matches!(t, TAtomic::Callable(_)))
     }
 
     #[inline]
+    #[must_use]
     pub fn is_callable(&self) -> bool {
         self.types.iter().all(|t| matches!(t, TAtomic::Callable(_)))
     }
 
     #[inline]
+    #[must_use]
     pub fn has_object_type(&self) -> bool {
         self.types.iter().any(|t| matches!(t, TAtomic::Object(_)))
     }
 
     /// Return a vector of pairs containing the enum name, and their case name
     /// if specified.
+    #[must_use]
     pub fn get_enum_cases(&self) -> Vec<(Atom, Option<Atom>)> {
         self.types
             .iter()
@@ -1049,38 +1128,47 @@ impl TUnion {
             .collect()
     }
 
+    #[must_use]
     pub fn get_single_int(&self) -> Option<TInteger> {
         if self.is_single() { self.get_single().get_integer() } else { None }
     }
 
+    #[must_use]
     pub fn get_single_literal_int_value(&self) -> Option<i64> {
         if self.is_single() { self.get_single().get_literal_int_value() } else { None }
     }
 
+    #[must_use]
     pub fn get_single_maximum_int_value(&self) -> Option<i64> {
         if self.is_single() { self.get_single().get_maximum_int_value() } else { None }
     }
 
+    #[must_use]
     pub fn get_single_minimum_int_value(&self) -> Option<i64> {
         if self.is_single() { self.get_single().get_minimum_int_value() } else { None }
     }
 
+    #[must_use]
     pub fn get_single_literal_float_value(&self) -> Option<f64> {
         if self.is_single() { self.get_single().get_literal_float_value() } else { None }
     }
 
+    #[must_use]
     pub fn get_single_literal_string_value(&self) -> Option<&str> {
         if self.is_single() { self.get_single().get_literal_string_value() } else { None }
     }
 
+    #[must_use]
     pub fn get_single_class_string_value(&self) -> Option<Atom> {
         if self.is_single() { self.get_single().get_class_string_value() } else { None }
     }
 
+    #[must_use]
     pub fn get_single_array_key(&self) -> Option<ArrayKey> {
         if self.is_single() { self.get_single().to_array_key() } else { None }
     }
 
+    #[must_use]
     pub fn get_single_key_of_array_like(&self) -> Option<TUnion> {
         if !self.is_single() {
             return None;
@@ -1098,6 +1186,7 @@ impl TUnion {
         }
     }
 
+    #[must_use]
     pub fn get_single_value_of_array_like(&self) -> Option<Cow<'_, TUnion>> {
         if !self.is_single() {
             return None;
@@ -1115,14 +1204,17 @@ impl TUnion {
         }
     }
 
+    #[must_use]
     pub fn get_literal_ints(&self) -> Vec<&TAtomic> {
         self.types.iter().filter(|a| a.is_literal_int()).collect()
     }
 
+    #[must_use]
     pub fn get_literal_strings(&self) -> Vec<&TAtomic> {
         self.types.iter().filter(|a| a.is_known_literal_string()).collect()
     }
 
+    #[must_use]
     pub fn get_literal_string_values(&self) -> Vec<Option<Atom>> {
         self.get_literal_strings()
             .into_iter()
@@ -1135,6 +1227,7 @@ impl TUnion {
             .collect()
     }
 
+    #[must_use]
     pub fn has_literal_float(&self) -> bool {
         self.types.iter().any(|atomic| match atomic {
             TAtomic::Scalar(scalar) => scalar.is_literal_float(),
@@ -1142,6 +1235,7 @@ impl TUnion {
         })
     }
 
+    #[must_use]
     pub fn has_literal_int(&self) -> bool {
         self.types.iter().any(|atomic| match atomic {
             TAtomic::Scalar(scalar) => scalar.is_literal_int(),
@@ -1149,6 +1243,7 @@ impl TUnion {
         })
     }
 
+    #[must_use]
     pub fn has_literal_string(&self) -> bool {
         self.types.iter().any(|atomic| match atomic {
             TAtomic::Scalar(scalar) => scalar.is_known_literal_string(),
@@ -1156,6 +1251,7 @@ impl TUnion {
         })
     }
 
+    #[must_use]
     pub fn has_literal_value(&self) -> bool {
         self.types.iter().any(|atomic| match atomic {
             TAtomic::Scalar(scalar) => scalar.is_literal_value(),
@@ -1163,6 +1259,7 @@ impl TUnion {
         })
     }
 
+    #[must_use]
     pub fn accepts_false(&self) -> bool {
         self.types.iter().any(|t| match t {
             TAtomic::GenericParameter(parameter) => parameter.constraint.accepts_false(),
@@ -1172,6 +1269,7 @@ impl TUnion {
         })
     }
 
+    #[must_use]
     pub fn accepts_null(&self) -> bool {
         self.types.iter().any(|t| match t {
             TAtomic::GenericParameter(generic_parameter) => generic_parameter.constraint.accepts_null(),

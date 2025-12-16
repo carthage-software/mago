@@ -113,21 +113,25 @@ pub struct TypeToken<'input> {
 
 impl TypeTokenKind {
     #[inline]
+    #[must_use]
     pub const fn is_trivia(&self) -> bool {
         matches!(self, Self::SingleLineComment | Self::Whitespace)
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_simple_identifier(&self) -> bool {
         matches!(self, Self::Identifier)
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_identifier(&self) -> bool {
         matches!(self, Self::Identifier | Self::QualifiedIdentifier | Self::FullyQualifiedIdentifier)
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_keyword(&self) -> bool {
         matches!(
             self,
@@ -201,6 +205,7 @@ impl TypeTokenKind {
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_array_like(&self) -> bool {
         matches!(self, Self::Array | Self::NonEmptyArray | Self::AssociativeArray | Self::List | Self::NonEmptyList)
     }

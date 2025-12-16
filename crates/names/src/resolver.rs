@@ -33,6 +33,7 @@ impl<'arena> NameResolver<'arena> {
     ///
     /// A `ResolvedNames` struct containing the mapping of original names/nodes
     /// to their resolved fully qualified names.
+    #[must_use]
     pub fn resolve<'ast>(&self, program: &'ast Program<'arena>) -> ResolvedNames<'arena> {
         let mut context = NameResolutionContext::new(self.arena);
         let mut walker = NameWalker::default();

@@ -13,6 +13,7 @@ pub use hook::*;
 pub use provider::*;
 pub use registry::PluginRegistry;
 
+#[must_use]
 pub fn create_registry() -> PluginRegistry {
     let mut registry = PluginRegistry::new();
     libraries::register_library_providers(&mut registry);

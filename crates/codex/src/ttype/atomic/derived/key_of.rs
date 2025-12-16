@@ -15,11 +15,13 @@ use crate::ttype::union::TUnion;
 pub struct TKeyOf(Box<TUnion>);
 
 impl TKeyOf {
+    #[must_use]
     pub fn new(object: Box<TUnion>) -> Self {
         Self(object)
     }
 
     #[inline]
+    #[must_use]
     pub const fn get_target_type(&self) -> &TUnion {
         &self.0
     }
@@ -29,6 +31,7 @@ impl TKeyOf {
         &mut self.0
     }
 
+    #[must_use]
     pub fn get_key_of_targets(
         target_types: &[TAtomic],
         codebase: &CodebaseMetadata,
@@ -55,9 +58,7 @@ impl TKeyOf {
                         key_types.extend(generic_key_types.types.into_owned());
                     }
                 }
-                _ => {
-                    continue;
-                }
+                _ => {}
             }
         }
 

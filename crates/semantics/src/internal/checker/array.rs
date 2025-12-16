@@ -1,7 +1,12 @@
 use mago_php_version::feature::Feature;
-use mago_reporting::*;
-use mago_span::*;
-use mago_syntax::ast::*;
+use mago_reporting::Annotation;
+use mago_reporting::Issue;
+use mago_span::HasSpan;
+use mago_syntax::ast::ArrayElement;
+use mago_syntax::ast::Expression;
+use mago_syntax::ast::List;
+use mago_syntax::ast::UnaryPrefix;
+use mago_syntax::ast::UnaryPrefixOperator;
 
 use crate::internal::context::Context;
 
@@ -18,7 +23,7 @@ pub fn check_list(list: &List, context: &mut Context<'_, '_, '_>) {
     }
 
     if !context.version.is_supported(Feature::ListReferenceAssignment) {
-        for element in list.elements.iter() {
+        for element in &list.elements {
             let value = match element {
                 ArrayElement::KeyValue(kv) => kv.value,
                 ArrayElement::Value(v) => v.value,

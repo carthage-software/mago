@@ -2,7 +2,7 @@ use mago_atom::atom;
 use mago_codex::context::ScopeContext;
 
 use mago_span::HasSpan;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Function;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -30,7 +30,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Function<'arena> {
             artifacts,
             self.attribute_lists.as_slice(),
             AttributeTarget::Function,
-        )?;
+        );
 
         let function_name = atom(context.resolved_names.get(&self.name));
 
@@ -95,7 +95,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Function<'arena> {
         }
 
         // Check for missing type hints
-        for parameter in self.parameter_list.parameters.iter() {
+        for parameter in &self.parameter_list.parameters {
             crate::utils::missing_type_hints::check_parameter_type_hint(
                 context,
                 None, // Functions don't have a class context

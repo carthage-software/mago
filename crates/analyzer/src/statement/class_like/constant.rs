@@ -1,4 +1,5 @@
-use mago_syntax::ast::*;
+use mago_syntax::ast::ClassLikeConstant;
+use mago_syntax::ast::ClassLikeConstantItem;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -21,9 +22,9 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ClassLikeConstant<'arena> {
             artifacts,
             self.attribute_lists.as_slice(),
             AttributeTarget::ClassLikeConstant,
-        )?;
+        );
 
-        for item in self.items.iter() {
+        for item in &self.items {
             item.analyze(context, block_context, artifacts)?;
         }
 

@@ -11,7 +11,8 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasPosition;
 use mago_span::HasSpan;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Expression;
+use mago_syntax::ast::Parenthesized;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -112,7 +113,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Expression<'arena> {
                     artifacts,
                     anonymous_class.attribute_lists.as_slice(),
                     AttributeTarget::ClassLike,
-                )?;
+                );
 
                 let Some(class_like_metadata) = context.codebase.get_anonymous_class(self.span()) else {
                     return Ok(());
@@ -298,7 +299,7 @@ pub fn find_expression_logic_issues<'ctx, 'arena>(
     let mut mixed_var_ids = Vec::new();
     for (var_id, var_type) in &block_context.locals {
         if var_type.is_mixed() && block_context.locals.contains_key(var_id) {
-            mixed_var_ids.push(var_id);
+            mixed_var_ids.push(*var_id);
         }
     }
 
@@ -311,7 +312,7 @@ pub fn find_expression_logic_issues<'ctx, 'arena>(
 
             for key in &keys {
                 for mixed_var_id in &mixed_var_ids {
-                    if var_has_root(key, mixed_var_id) {
+                    if var_has_root(*key, *mixed_var_id) {
                         return Clause::new(
                             IndexMap::default(),
                             expression.span(),

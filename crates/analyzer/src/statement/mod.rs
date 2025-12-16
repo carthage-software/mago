@@ -7,7 +7,11 @@ use mago_names::scope::NamespaceScope;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Call;
+use mago_syntax::ast::Expression;
+use mago_syntax::ast::ExpressionStatement;
+use mago_syntax::ast::FunctionCall;
+use mago_syntax::ast::Statement;
 
 use crate::Context;
 use crate::analyzable::Analyzable;
@@ -120,36 +124,36 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Statement<'arena> {
             Statement::Class(class) => {
                 let class_name = context.resolved_names.get(&class.name);
 
-                context.scope.add(NameKind::Default, class_name, None as Option<&str>);
+                context.scope.add(NameKind::Default, class_name, &None::<&str>);
 
                 class.analyze(context, block_context, artifacts)
             }
             Statement::Interface(interface) => {
                 let interface_name = context.resolved_names.get(&interface.name);
 
-                context.scope.add(NameKind::Default, interface_name, None as Option<&str>);
+                context.scope.add(NameKind::Default, interface_name, &None::<&str>);
 
                 interface.analyze(context, block_context, artifacts)
             }
             Statement::Trait(r#trait) => {
                 let trait_name = context.resolved_names.get(&r#trait.name);
 
-                context.scope.add(NameKind::Default, trait_name, None as Option<&str>);
+                context.scope.add(NameKind::Default, trait_name, &None::<&str>);
 
                 r#trait.analyze(context, block_context, artifacts)
             }
             Statement::Enum(r#enum) => {
                 let enum_name = context.resolved_names.get(&r#enum.name);
 
-                context.scope.add(NameKind::Default, enum_name, None as Option<&str>);
+                context.scope.add(NameKind::Default, enum_name, &None::<&str>);
 
                 r#enum.analyze(context, block_context, artifacts)
             }
             Statement::Constant(constant) => {
-                for item in constant.items.iter() {
+                for item in &constant.items {
                     let constant_item_name = context.resolved_names.get(&item.name);
 
-                    context.scope.add(NameKind::Constant, constant_item_name, None as Option<&str>);
+                    context.scope.add(NameKind::Constant, constant_item_name, &None::<&str>);
                 }
 
                 constant.analyze(context, block_context, artifacts)
@@ -157,7 +161,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Statement<'arena> {
             Statement::Function(function) => {
                 let function_name = context.resolved_names.get(&function.name);
 
-                context.scope.add(NameKind::Function, function_name, None as Option<&str>);
+                context.scope.add(NameKind::Function, function_name, &None::<&str>);
 
                 function.analyze(context, block_context, artifacts)
             }
@@ -350,9 +354,8 @@ fn has_unused_must_use<'arena>(
     context: &Context<'_, 'arena>,
     artifacts: &AnalysisArtifacts,
 ) -> Option<(IssueCode, Atom)> {
-    let call_expression = match expression {
-        Expression::Call(call_expr) => call_expr,
-        _ => return None,
+    let Expression::Call(call_expression) = expression else {
+        return None;
     };
 
     let functionlike_id_from_call =

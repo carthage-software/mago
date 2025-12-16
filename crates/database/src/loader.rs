@@ -40,10 +40,12 @@ pub struct DatabaseLoader<'a> {
 }
 
 impl<'a> DatabaseLoader<'a> {
+    #[must_use]
     pub fn new(configuration: DatabaseConfiguration<'a>) -> Self {
         Self { configuration, memory_sources: vec![], database: None }
     }
 
+    #[must_use]
     pub fn with_database(mut self, database: Database<'a>) -> Self {
         self.database = Some(database);
         self

@@ -89,11 +89,13 @@ pub struct UseItemAlias<'arena> {
 
 impl UseType<'_> {
     #[inline]
+    #[must_use]
     pub const fn is_function(&self) -> bool {
         matches!(self, UseType::Function(_))
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_const(&self) -> bool {
         matches!(self, UseType::Const(_))
     }

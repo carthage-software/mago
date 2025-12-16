@@ -15,7 +15,11 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_span::Span;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Expression;
+use mago_syntax::ast::Match;
+use mago_syntax::ast::MatchArm;
+use mago_syntax::ast::MatchDefaultArm;
+use mago_syntax::ast::MatchExpressionArm;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -78,7 +82,7 @@ impl<'anlyz, 'ctx, 'ast, 'arena> MatchAnalyzer<'anlyz, 'ctx, 'ast, 'arena> {
         let mut expression_arms = vec![];
         let mut first_default_arm = None;
 
-        for arm in self.stmt.arms.iter() {
+        for arm in &self.stmt.arms {
             match arm {
                 MatchArm::Expression(expr_arm) => expression_arms.push(expr_arm),
                 MatchArm::Default(default_arm) => {
@@ -338,7 +342,7 @@ impl<'anlyz, 'ctx, 'ast, 'arena> MatchAnalyzer<'anlyz, 'ctx, 'ast, 'arena> {
             );
         }
 
-        for condition in expression_arm.conditions.iter() {
+        for condition in &expression_arm.conditions {
             extract_function_constant_existence(condition, self.artifacts, &mut arm_body_context, false);
         }
 

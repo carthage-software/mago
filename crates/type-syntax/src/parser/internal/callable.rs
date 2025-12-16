@@ -1,4 +1,8 @@
-use crate::ast::*;
+use crate::ast::CallableTypeParameter;
+use crate::ast::CallableTypeParameters;
+use crate::ast::CallableTypeReturnType;
+use crate::ast::CallableTypeSpecification;
+use crate::ast::VariableType;
 use crate::error::ParseError;
 use crate::parser::internal::parse_type;
 use crate::parser::internal::stream::TypeTokenStream;

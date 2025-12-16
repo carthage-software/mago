@@ -1,7 +1,16 @@
 use std::hash::Hash;
 
 use mago_names::ResolvedNames;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Array;
+use mago_syntax::ast::ArrayAccess;
+use mago_syntax::ast::ArrayAppend;
+use mago_syntax::ast::ArrayElement;
+use mago_syntax::ast::KeyValueArrayElement;
+use mago_syntax::ast::LegacyArray;
+use mago_syntax::ast::List;
+use mago_syntax::ast::MissingArrayElement;
+use mago_syntax::ast::ValueArrayElement;
+use mago_syntax::ast::VariadicArrayElement;
 
 use crate::FingerprintOptions;
 use crate::Fingerprintable;
@@ -14,7 +23,7 @@ impl Fingerprintable for Array<'_> {
         options: &FingerprintOptions<'_>,
     ) {
         "array".hash(hasher);
-        for element in self.elements.iter() {
+        for element in &self.elements {
             element.fingerprint_with_hasher(hasher, resolved_names, options);
         }
     }
@@ -28,7 +37,7 @@ impl Fingerprintable for LegacyArray<'_> {
         options: &FingerprintOptions<'_>,
     ) {
         "array".hash(hasher);
-        for element in self.elements.iter() {
+        for element in &self.elements {
             element.fingerprint_with_hasher(hasher, resolved_names, options);
         }
     }
@@ -42,7 +51,7 @@ impl Fingerprintable for List<'_> {
         options: &FingerprintOptions<'_>,
     ) {
         "list".hash(hasher);
-        for element in self.elements.iter() {
+        for element in &self.elements {
             element.fingerprint_with_hasher(hasher, resolved_names, options);
         }
     }

@@ -3,9 +3,107 @@ use bumpalo::vec;
 
 use mago_span::HasSpan;
 use mago_span::Span;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Attribute;
+use mago_syntax::ast::AttributeList;
+use mago_syntax::ast::Block;
+use mago_syntax::ast::Class;
+use mago_syntax::ast::ClassLikeConstant;
+use mago_syntax::ast::ClassLikeConstantItem;
+use mago_syntax::ast::ClassLikeMember;
+use mago_syntax::ast::ClosingTag;
+use mago_syntax::ast::Constant;
+use mago_syntax::ast::ConstantItem;
+use mago_syntax::ast::Declare;
+use mago_syntax::ast::DeclareBody;
+use mago_syntax::ast::DeclareColonDelimitedBody;
+use mago_syntax::ast::DeclareItem;
+use mago_syntax::ast::Echo;
+use mago_syntax::ast::EchoTag;
+use mago_syntax::ast::Enum;
+use mago_syntax::ast::EnumBackingTypeHint;
+use mago_syntax::ast::EnumCase;
+use mago_syntax::ast::EnumCaseBackedItem;
+use mago_syntax::ast::EnumCaseItem;
+use mago_syntax::ast::EnumCaseUnitItem;
+use mago_syntax::ast::ExpressionStatement;
+use mago_syntax::ast::Extends;
+use mago_syntax::ast::FullOpeningTag;
+use mago_syntax::ast::FullyQualifiedIdentifier;
+use mago_syntax::ast::FunctionLikeParameter;
+use mago_syntax::ast::FunctionLikeParameterDefaultValue;
+use mago_syntax::ast::FunctionLikeParameterList;
+use mago_syntax::ast::FunctionLikeReturnTypeHint;
+use mago_syntax::ast::Global;
+use mago_syntax::ast::Goto;
+use mago_syntax::ast::HaltCompiler;
+use mago_syntax::ast::Hint;
+use mago_syntax::ast::HookedProperty;
+use mago_syntax::ast::Identifier;
+use mago_syntax::ast::Implements;
+use mago_syntax::ast::Inline;
+use mago_syntax::ast::Interface;
+use mago_syntax::ast::Keyword;
+use mago_syntax::ast::Label;
+use mago_syntax::ast::LocalIdentifier;
+use mago_syntax::ast::MaybeTypedUseItem;
+use mago_syntax::ast::MixedUseItemList;
+use mago_syntax::ast::Modifier;
+use mago_syntax::ast::Namespace;
+use mago_syntax::ast::NamespaceBody;
+use mago_syntax::ast::Node;
+use mago_syntax::ast::OpeningTag;
+use mago_syntax::ast::PlainProperty;
+use mago_syntax::ast::Program;
+use mago_syntax::ast::Property;
+use mago_syntax::ast::PropertyAbstractItem;
+use mago_syntax::ast::PropertyConcreteItem;
+use mago_syntax::ast::PropertyHook;
+use mago_syntax::ast::PropertyHookAbstractBody;
+use mago_syntax::ast::PropertyHookBody;
+use mago_syntax::ast::PropertyHookConcreteBody;
+use mago_syntax::ast::PropertyHookConcreteExpressionBody;
+use mago_syntax::ast::PropertyHookList;
+use mago_syntax::ast::PropertyItem;
+use mago_syntax::ast::QualifiedIdentifier;
+use mago_syntax::ast::Return;
+use mago_syntax::ast::ShortOpeningTag;
+use mago_syntax::ast::Statement;
+use mago_syntax::ast::Static;
+use mago_syntax::ast::StaticAbstractItem;
+use mago_syntax::ast::StaticConcreteItem;
+use mago_syntax::ast::StaticItem;
+use mago_syntax::ast::Terminator;
+use mago_syntax::ast::Trait;
+use mago_syntax::ast::TraitUse;
+use mago_syntax::ast::TraitUseAbsoluteMethodReference;
+use mago_syntax::ast::TraitUseAbstractSpecification;
+use mago_syntax::ast::TraitUseAdaptation;
+use mago_syntax::ast::TraitUseAliasAdaptation;
+use mago_syntax::ast::TraitUseConcreteSpecification;
+use mago_syntax::ast::TraitUseMethodReference;
+use mago_syntax::ast::TraitUsePrecedenceAdaptation;
+use mago_syntax::ast::TraitUseSpecification;
+use mago_syntax::ast::Try;
+use mago_syntax::ast::TryCatchClause;
+use mago_syntax::ast::TryFinallyClause;
+use mago_syntax::ast::TypedUseItemList;
+use mago_syntax::ast::TypedUseItemSequence;
+use mago_syntax::ast::Unset;
+use mago_syntax::ast::Use;
+use mago_syntax::ast::UseItem;
+use mago_syntax::ast::UseItemAlias;
+use mago_syntax::ast::UseItemSequence;
+use mago_syntax::ast::UseItems;
+use mago_syntax::ast::UseType;
 
-use crate::document::*;
+use crate::document::Document;
+use crate::document::Group;
+use crate::document::IfBreak;
+use crate::document::IndentIfBreak;
+use crate::document::Line;
+use crate::document::Separator;
+use crate::document::Space;
+use crate::document::Trim;
 use crate::internal::FormatterState;
 use crate::internal::format::assignment::AssignmentLikeNode;
 use crate::internal::format::assignment::print_assignment;
@@ -21,7 +119,7 @@ use crate::internal::format::return_value::format_return_value;
 use crate::internal::format::statement::print_statement_sequence;
 use crate::internal::format::string::print_lowercase_keyword;
 use crate::internal::utils;
-use crate::settings::*;
+use crate::settings::NullTypeHint;
 use crate::wrap;
 
 pub mod array;
@@ -707,7 +805,7 @@ impl<'arena> Format<'arena> for EnumCase<'arena> {
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
         wrap!(f, self, EnumCase, {
             let mut parts = vec![in f.arena];
-            for attribute_list in self.attribute_lists.iter() {
+            for attribute_list in &self.attribute_lists {
                 parts.push(attribute_list.format(f));
                 parts.push(Document::Line(Line::hard()));
             }
@@ -965,7 +1063,7 @@ impl<'arena> Format<'arena> for Interface<'arena> {
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
         wrap!(f, self, Interface, {
             let mut attributes = vec![in f.arena];
-            for attribute_list in self.attribute_lists.iter() {
+            for attribute_list in &self.attribute_lists {
                 attributes.push(attribute_list.format(f));
                 attributes.push(Document::Line(Line::hard()));
             }
@@ -1047,7 +1145,7 @@ impl<'arena> Format<'arena> for Trait<'arena> {
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
         wrap!(f, self, Trait, {
             let mut attributes = vec![in f.arena];
-            for attribute_list in self.attribute_lists.iter() {
+            for attribute_list in &self.attribute_lists {
                 attributes.push(attribute_list.format(f));
                 attributes.push(Document::Line(Line::hard()));
             }
@@ -1066,7 +1164,7 @@ impl<'arena> Format<'arena> for Enum<'arena> {
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
         wrap!(f, self, Enum, {
             let mut attributes = vec![in f.arena];
-            for attribute_list in self.attribute_lists.iter() {
+            for attribute_list in &self.attribute_lists {
                 attributes.push(attribute_list.format(f));
                 attributes.push(Document::Line(Line::hard()));
             }
@@ -1588,7 +1686,7 @@ impl<'arena> Format<'arena> for Try<'arena> {
         wrap!(f, self, Try, {
             let mut parts = vec![in f.arena; self.r#try.format(f), Document::space(), self.block.format(f)];
 
-            for clause in self.catch_clauses.iter() {
+            for clause in &self.catch_clauses {
                 parts.push(Document::space());
                 parts.push(clause.format(f));
             }

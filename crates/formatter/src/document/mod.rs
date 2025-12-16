@@ -93,7 +93,7 @@ pub struct Fill<'arena> {
     pub parts: Vec<'arena, Document<'arena>>,
 }
 
-#[derive(Debug, Eq, PartialEq, PartialOrd, Ord)]
+#[derive(Debug, Eq, PartialEq, PartialOrd, Ord, Copy, Clone)]
 pub struct IfBreak<'arena> {
     pub break_contents: &'arena Document<'arena>,
     pub flat_content: &'arena Document<'arena>,
@@ -115,16 +115,19 @@ pub enum Separator {
 impl Line {
     /// Specify a line break.
     /// The difference from line is that if the expression fits on one line, it will be replaced with nothing.
+    #[must_use]
     pub fn soft() -> Self {
         Self { soft: true, ..Self::default() }
     }
 
     /// Specify a line break that is **always** included in the output,
     /// no matter if the expression fits on one line or not.
+    #[must_use]
     pub fn hard() -> Self {
         Self { hard: true, ..Self::default() }
     }
 
+    #[must_use]
     pub fn literal() -> Self {
         Self { hard: true, literal: true, ..Default::default() }
     }
@@ -133,21 +136,25 @@ impl Line {
 impl Space {
     /// Specify a space that is "soft" and will only be printed if the preceding
     /// character is not whitespace or a line break.
+    #[must_use]
     pub fn soft() -> Self {
         Self { soft: true }
     }
 
     /// Specify a space that is "hard" and will always be printed.
+    #[must_use]
     pub fn hard() -> Self {
         Self { soft: false }
     }
 }
 
 impl<'arena> Group<'arena> {
+    #[must_use]
     pub fn new(contents: Vec<'arena, Document<'arena>>) -> Self {
         Self { contents, should_break: RefCell::new(false), id: None, expanded_states: None }
     }
 
+    #[must_use]
     pub fn conditional(
         contents: Vec<'arena, Document<'arena>>,
         expanded_states: Vec<'arena, Document<'arena>>,
@@ -167,27 +174,29 @@ impl<'arena> Group<'arena> {
 }
 
 impl<'arena> IndentIfBreak<'arena> {
+    #[must_use]
     pub fn new(group_id: GroupIdentifier, contents: Vec<'arena, Document<'arena>>) -> Self {
-        Self { contents, group_id }
+        Self { group_id, contents }
     }
 }
 
 impl<'arena> Fill<'arena> {
     pub fn drain_out_pair(&mut self) -> (Option<Document<'arena>>, Option<Document<'arena>>) {
-        let content = if !self.parts.is_empty() { Some(self.parts.remove(0)) } else { None };
-        let whitespace = if !self.parts.is_empty() { Some(self.parts.remove(0)) } else { None };
+        let content = if self.parts.is_empty() { None } else { Some(self.parts.remove(0)) };
+        let whitespace = if self.parts.is_empty() { None } else { Some(self.parts.remove(0)) };
 
         (content, whitespace)
     }
 
     pub fn dequeue(&mut self) -> Option<Document<'arena>> {
-        if !self.parts.is_empty() { Some(self.parts.remove(0)) } else { None }
+        if self.parts.is_empty() { None } else { Some(self.parts.remove(0)) }
     }
 
     pub fn enqueue(&mut self, doc: Document<'arena>) {
         self.parts.insert(0, doc);
     }
 
+    #[must_use]
     pub fn parts(&self) -> &[Document<'arena>] {
         &self.parts
     }
@@ -206,6 +215,7 @@ impl<'arena> IfBreak<'arena> {
         }
     }
 
+    #[must_use]
     pub fn with_id(mut self, id: GroupIdentifier) -> Self {
         self.group_id = Some(id);
         self
@@ -214,16 +224,19 @@ impl<'arena> IfBreak<'arena> {
 
 impl<'arena> Document<'arena> {
     #[inline]
+    #[must_use]
     pub fn empty() -> Document<'arena> {
         Document::String("")
     }
 
     #[inline]
+    #[must_use]
     pub fn space() -> Document<'arena> {
         Document::Space(Space { soft: false })
     }
 
     #[inline]
+    #[must_use]
     pub fn soft_space() -> Document<'arena> {
         Document::Space(Space { soft: true })
     }
@@ -471,7 +484,7 @@ pub(crate) fn print_document_to_string<'arena>(arena: &'arena Bump, document: &D
         Document::BreakParent => buffer.push_str("breakParent"),
         Document::Align(Align { alignment, contents }) => {
             buffer.push_str("dedentToRoot(align(");
-            buffer.push_str(&format!("{:?}, ", alignment));
+            buffer.push_str(&format!("{alignment:?}, "));
             write_documents_vec_to_buffer(&mut buffer, arena, contents);
             buffer.push(')');
             buffer.push(')');

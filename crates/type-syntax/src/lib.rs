@@ -88,7 +88,7 @@ mod tests {
 
         assert_parsed_literal_int("0", 0);
         assert_parsed_literal_int("1", 1);
-        assert_parsed_literal_int("123_345", 123345);
+        assert_parsed_literal_int("123_345", 123_345);
         assert_parsed_literal_int("0b1", 1);
         assert_parsed_literal_int("0o10", 8);
         assert_parsed_literal_int("0x1", 1);
@@ -542,7 +542,7 @@ mod tests {
             "-
             // This is a comment
             123_345",
-            123345,
+            123_345,
         );
         assert_negated_int("-0b1", 1);
     }

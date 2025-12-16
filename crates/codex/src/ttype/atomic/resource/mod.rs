@@ -14,26 +14,31 @@ pub struct TResource {
 
 impl TResource {
     #[inline]
+    #[must_use]
     pub const fn new(closed: Option<bool>) -> Self {
         Self { closed }
     }
 
     #[inline]
+    #[must_use]
     pub const fn closed() -> Self {
         Self::new(Some(true))
     }
 
     #[inline]
+    #[must_use]
     pub const fn open() -> Self {
         Self::new(Some(false))
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_closed(&self) -> bool {
         matches!(self.closed, Some(true))
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_open(&self) -> bool {
         matches!(self.closed, Some(false))
     }

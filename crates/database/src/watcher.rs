@@ -61,6 +61,7 @@ pub struct DatabaseWatcher<'a> {
 }
 
 impl<'a> DatabaseWatcher<'a> {
+    #[must_use]
     pub fn new(database: Database<'a>) -> Self {
         Self { database, watcher: None, watched_paths: Vec::new(), receiver: None }
     }
@@ -167,6 +168,7 @@ impl<'a> DatabaseWatcher<'a> {
     }
 
     /// Checks if the watcher is currently active.
+    #[must_use]
     pub fn is_watching(&self) -> bool {
         self.watcher.is_some()
     }
@@ -344,11 +346,13 @@ impl<'a> DatabaseWatcher<'a> {
     }
 
     /// Returns a reference to the database.
+    #[must_use]
     pub fn database(&self) -> &Database<'a> {
         &self.database
     }
 
     /// Returns a reference to the database.
+    #[must_use]
     pub fn read_only_database(&self) -> ReadDatabase {
         self.database.read_only()
     }
@@ -374,6 +378,7 @@ impl<'a> DatabaseWatcher<'a> {
     }
 
     /// Consumes the watcher and returns the database.
+    #[must_use]
     pub fn into_database(self) -> Database<'a> {
         let mut md = ManuallyDrop::new(self);
         md.stop();

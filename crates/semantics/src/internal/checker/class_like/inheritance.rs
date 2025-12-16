@@ -1,6 +1,9 @@
-use mago_reporting::*;
-use mago_span::*;
-use mago_syntax::ast::*;
+use mago_reporting::Annotation;
+use mago_reporting::Issue;
+use mago_span::HasSpan;
+use mago_span::Span;
+use mago_syntax::ast::Extends;
+use mago_syntax::ast::Implements;
 
 use crate::internal::consts::RESERVED_KEYWORDS;
 use crate::internal::consts::SOFT_RESERVED_KEYWORDS_MINUS_SYMBOL_ALLOWED;
@@ -33,8 +36,8 @@ pub fn check_extends(
         );
     }
 
-    for extended_type in extends.types.iter() {
-        let extended_fqcn = context.get_name(&extended_type.span().start);
+    for extended_type in &extends.types {
+        let extended_fqcn = context.get_name(extended_type.span().start);
 
         if extended_fqcn.eq_ignore_ascii_case(class_like_fqcn) {
             context.report(
@@ -52,7 +55,7 @@ pub fn check_extends(
         }
     }
 
-    for extended_type in extends.types.iter() {
+    for extended_type in &extends.types {
         let extended_name = extended_type.value();
 
         if RESERVED_KEYWORDS.iter().any(|keyword| keyword.eq_ignore_ascii_case(extended_name))
@@ -90,8 +93,8 @@ pub fn check_implements(
     context: &mut Context<'_, '_, '_>,
 ) {
     if check_for_self_implement {
-        for implemented_type in implements.types.iter() {
-            let implemented_fqcn = context.get_name(&implemented_type.span().start);
+        for implemented_type in &implements.types {
+            let implemented_fqcn = context.get_name(implemented_type.span().start);
 
             if implemented_fqcn.eq_ignore_ascii_case(class_like_fqcn) {
                 context.report(
@@ -110,7 +113,7 @@ pub fn check_implements(
         }
     }
 
-    for implemented_type in implements.types.iter() {
+    for implemented_type in &implements.types {
         let implemented_name = implemented_type.value();
 
         if RESERVED_KEYWORDS.iter().any(|keyword| keyword.eq_ignore_ascii_case(implemented_name))

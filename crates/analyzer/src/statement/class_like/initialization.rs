@@ -42,7 +42,7 @@ pub fn check_property_initialization<'ctx>(
         .filter_map(|(name, declaring_class)| {
             let declaring_meta = context.codebase.get_class_like(declaring_class)?;
             let prop = declaring_meta.properties.get(name)?;
-            if property_requires_initialization(name, prop, class_like_metadata, declaring_meta, context) {
+            if property_requires_initialization(*name, prop, class_like_metadata, declaring_meta, context) {
                 Some((name, prop))
             } else {
                 None
@@ -178,7 +178,7 @@ pub fn check_property_initialization<'ctx>(
                 report_uninitialized_property(
                     context,
                     class_like_metadata,
-                    prop_name,
+                    **prop_name,
                     prop_metadata.name_span,
                     name_span.unwrap_or(declaration_span),
                     declaring_class,
@@ -214,7 +214,7 @@ pub fn check_property_initialization<'ctx>(
             report_uninitialized_property(
                 context,
                 class_like_metadata,
-                prop_name,
+                **prop_name,
                 prop_metadata.name_span,
                 name_span.unwrap_or(declaration_span),
                 declaring_class,
@@ -225,7 +225,7 @@ pub fn check_property_initialization<'ctx>(
 
 /// Determines if a property requires initialization in the constructor.
 fn property_requires_initialization(
-    _name: &Atom,
+    _name: Atom,
     property: &PropertyMetadata,
     class_like_metadata: &ClassLikeMetadata,
     declaring_class_metadata: &ClassLikeMetadata,
@@ -638,7 +638,7 @@ fn report_missing_constructor(
 fn report_uninitialized_property(
     context: &mut Context<'_, '_>,
     class_like_metadata: &ClassLikeMetadata,
-    prop_name: &Atom,
+    prop_name: Atom,
     prop_span: Option<Span>,
     class_span: Span,
     declaring_class: Option<Atom>,

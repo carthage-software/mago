@@ -49,6 +49,7 @@ impl TDerived {
     /// Note: For `IntMask`, this returns `None` as it has multiple value types, not a single target.
     /// For `IntMaskOf`, this returns the target type reference.
     #[inline]
+    #[must_use]
     pub const fn get_target_type(&self) -> Option<&TUnion> {
         match self {
             TDerived::KeyOf(key_of) => Some(key_of.get_target_type()),

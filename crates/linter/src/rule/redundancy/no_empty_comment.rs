@@ -9,7 +9,9 @@ use mago_fixer::SafetyClassification;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_reporting::Level;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Node;
+use mago_syntax::ast::NodeKind;
+use mago_syntax::ast::TriviaKind;
 use mago_syntax::comments::comment_lines;
 
 use crate::category::Category;
@@ -115,7 +117,7 @@ impl LintRule for NoEmptyCommentRule {
             }
         };
 
-        for trivia in program.trivia.iter() {
+        for trivia in &program.trivia {
             // Check if we're still in the same block of single line comments
             if let Some((kind, end)) = &mut current_block {
                 if (trivia.kind == *kind || trivia.kind == TriviaKind::WhiteSpace) && trivia.start_position() == *end {

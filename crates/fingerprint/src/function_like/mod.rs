@@ -1,7 +1,15 @@
 use std::hash::Hash;
 
 use mago_names::ResolvedNames;
-use mago_syntax::ast::*;
+use mago_syntax::ast::ArrowFunction;
+use mago_syntax::ast::Closure;
+use mago_syntax::ast::ClosureUseClause;
+use mago_syntax::ast::ClosureUseClauseVariable;
+use mago_syntax::ast::Function;
+use mago_syntax::ast::FunctionLikeParameter;
+use mago_syntax::ast::FunctionLikeParameterDefaultValue;
+use mago_syntax::ast::FunctionLikeParameterList;
+use mago_syntax::ast::FunctionLikeReturnTypeHint;
 
 use crate::FingerprintOptions;
 use crate::Fingerprintable;
@@ -14,7 +22,7 @@ impl Fingerprintable for Closure<'_> {
         options: &FingerprintOptions<'_>,
     ) {
         "closure".hash(hasher);
-        for attribute_list in self.attribute_lists.iter() {
+        for attribute_list in &self.attribute_lists {
             attribute_list.fingerprint_with_hasher(hasher, resolved_names, options);
         }
         self.r#static.is_some().hash(hasher);
@@ -35,7 +43,7 @@ impl Fingerprintable for ClosureUseClause<'_> {
     ) {
         "use_clause".hash(hasher);
 
-        for variable in self.variables.iter() {
+        for variable in &self.variables {
             variable.fingerprint_with_hasher(hasher, resolved_names, options);
         }
     }
@@ -62,7 +70,7 @@ impl Fingerprintable for Function<'_> {
         options: &FingerprintOptions<'_>,
     ) {
         "function".hash(hasher);
-        for attribute_list in self.attribute_lists.iter() {
+        for attribute_list in &self.attribute_lists {
             attribute_list.fingerprint_with_hasher(hasher, resolved_names, options);
         }
         self.ampersand.is_some().hash(hasher);
@@ -81,7 +89,7 @@ impl Fingerprintable for ArrowFunction<'_> {
         options: &FingerprintOptions<'_>,
     ) {
         "arrow_fn".hash(hasher);
-        for attribute_list in self.attribute_lists.iter() {
+        for attribute_list in &self.attribute_lists {
             attribute_list.fingerprint_with_hasher(hasher, resolved_names, options);
         }
         self.r#static.is_some().hash(hasher);
@@ -101,7 +109,7 @@ impl Fingerprintable for FunctionLikeParameterList<'_> {
     ) {
         "params".hash(hasher);
 
-        for parameter in self.parameters.iter() {
+        for parameter in &self.parameters {
             parameter.fingerprint_with_hasher(hasher, resolved_names, options);
         }
     }
@@ -115,10 +123,10 @@ impl Fingerprintable for FunctionLikeParameter<'_> {
         options: &FingerprintOptions<'_>,
     ) {
         "param".hash(hasher);
-        for attribute_list in self.attribute_lists.iter() {
+        for attribute_list in &self.attribute_lists {
             attribute_list.fingerprint_with_hasher(hasher, resolved_names, options);
         }
-        for modifier in self.modifiers.iter() {
+        for modifier in &self.modifiers {
             modifier.fingerprint_with_hasher(hasher, resolved_names, options);
         }
         self.hint.fingerprint_with_hasher(hasher, resolved_names, options);

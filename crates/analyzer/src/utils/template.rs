@@ -55,7 +55,7 @@ pub fn get_template_types_for_class_member(
     let codebase = context.codebase;
 
     let mut template_types: IndexMap<Atom, Vec<(GenericParent, TUnion)>, RandomState> =
-        IndexMap::from_iter(existing_template_types.iter().cloned());
+        existing_template_types.iter().cloned().collect();
 
     if let Some(declaring_class_meta) = declaring_class_meta {
         let declaring_class_name = declaring_class_meta.name;
@@ -82,8 +82,8 @@ pub fn get_template_types_for_class_member(
                                     combined_parameters.extend(template_types.clone());
 
                                     get_generic_parameter_for_offset(
-                                        defining_entity,
-                                        parameter_name,
+                                        *defining_entity,
+                                        *parameter_name,
                                         calling_template_extended,
                                         &combined_parameters.into_iter().collect::<AtomMap<_>>(),
                                     )
@@ -168,15 +168,15 @@ pub fn get_template_types_for_class_member(
 /// An `TUnion` representing the resolved concrete type for the template parameter,
 /// or `any` if it cannot be resolved.
 pub fn get_generic_parameter_for_offset(
-    class_like_name: &Atom,
-    template_name: &Atom,
+    class_like_name: Atom,
+    template_name: Atom,
     template_extended_parameters: &AtomMap<IndexMap<Atom, TUnion, RandomState>>,
     found_generic_parameters: &AtomMap<Vec<(GenericParent, TUnion)>>,
 ) -> TUnion {
-    if let Some(result_map) = found_generic_parameters.get(template_name)
+    if let Some(result_map) = found_generic_parameters.get(&template_name)
         && let Some(found_parameter_type) = result_map
             .iter()
-            .find(|(parent, _)| parent == &GenericParent::ClassLike(*class_like_name))
+            .find(|(parent, _)| parent == &GenericParent::ClassLike(class_like_name))
             .map(|(_, type_arc)| type_arc)
     {
         return found_parameter_type.clone();
@@ -190,12 +190,12 @@ pub fn get_generic_parameter_for_offset(
                     defining_entity: GenericParent::ClassLike(current_defining_class),
                     ..
                 }) = extended_atomic_type
-                    && current_parameter_name == template_name
-                    && current_defining_class == class_like_name
+                    && *current_parameter_name == template_name
+                    && *current_defining_class == class_like_name
                 {
                     return get_generic_parameter_for_offset(
-                        extending_class_name,
-                        extended_template_name,
+                        *extending_class_name,
+                        *extended_template_name,
                         template_extended_parameters,
                         found_generic_parameters,
                     );

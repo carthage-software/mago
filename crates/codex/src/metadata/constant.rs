@@ -34,6 +34,7 @@ impl ConstantMetadata {
     /// * `name`: The identifier (name) of the constant.
     /// * `span`: The source code location of this specific constant's definition item (`NAME = value`).
     #[inline]
+    #[must_use]
     pub fn new(name: Atom, span: Span, flags: MetadataFlags) -> Self {
         Self { attributes: Vec::new(), name, span, flags, type_metadata: None, inferred_type: None, issues: Vec::new() }
     }

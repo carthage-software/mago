@@ -1,7 +1,24 @@
 use mago_php_version::feature::Feature;
-use mago_reporting::*;
-use mago_span::*;
-use mago_syntax::ast::*;
+use mago_reporting::Annotation;
+use mago_reporting::Issue;
+use mago_span::HasSpan;
+use mago_span::Span;
+use mago_syntax::ast::Access;
+use mago_syntax::ast::ArrowFunction;
+use mago_syntax::ast::Block;
+use mago_syntax::ast::Call;
+use mago_syntax::ast::Closure;
+use mago_syntax::ast::Expression;
+use mago_syntax::ast::ForBody;
+use mago_syntax::ast::ForeachBody;
+use mago_syntax::ast::Function;
+use mago_syntax::ast::FunctionLikeParameterList;
+use mago_syntax::ast::FunctionLikeReturnTypeHint;
+use mago_syntax::ast::Hint;
+use mago_syntax::ast::IfBody;
+use mago_syntax::ast::Statement;
+use mago_syntax::ast::Variable;
+use mago_syntax::ast::WhileBody;
 
 use crate::internal::context::Context;
 
@@ -67,7 +84,7 @@ fn contains_this_in_expression(expression: &Expression<'_>) -> Option<Span> {
 
 /// Helper function to check if a block contains $this
 fn contains_this_in_block(block: &Block<'_>) -> Option<Span> {
-    for statement in block.statements.iter() {
+    for statement in &block.statements {
         if let Some(span) = contains_this_in_statement(statement) {
             return Some(span);
         }
@@ -88,7 +105,7 @@ fn contains_this_in_statement(statement: &Statement<'_>) -> Option<Span> {
             }
         }
         Statement::Echo(echo) => {
-            for expr in echo.values.iter() {
+            for expr in &echo.values {
                 if let Some(span) = contains_this_in_expression(expr) {
                     return Some(span);
                 }
@@ -103,7 +120,7 @@ fn contains_this_in_statement(statement: &Statement<'_>) -> Option<Span> {
             match &r#if.body {
                 IfBody::Statement(stmt_body) => contains_this_in_statement(stmt_body.statement),
                 IfBody::ColonDelimited(colon_body) => {
-                    for stmt in colon_body.statements.iter() {
+                    for stmt in &colon_body.statements {
                         if let Some(span) = contains_this_in_statement(stmt) {
                             return Some(span);
                         }
@@ -119,7 +136,7 @@ fn contains_this_in_statement(statement: &Statement<'_>) -> Option<Span> {
             match &r#while.body {
                 WhileBody::Statement(stmt) => contains_this_in_statement(stmt),
                 WhileBody::ColonDelimited(colon_body) => {
-                    for stmt in colon_body.statements.iter() {
+                    for stmt in &colon_body.statements {
                         if let Some(span) = contains_this_in_statement(stmt) {
                             return Some(span);
                         }
@@ -129,17 +146,17 @@ fn contains_this_in_statement(statement: &Statement<'_>) -> Option<Span> {
             }
         }
         Statement::For(r#for) => {
-            for init in r#for.initializations.iter() {
+            for init in &r#for.initializations {
                 if let Some(span) = contains_this_in_expression(init) {
                     return Some(span);
                 }
             }
-            for condition in r#for.conditions.iter() {
+            for condition in &r#for.conditions {
                 if let Some(span) = contains_this_in_expression(condition) {
                     return Some(span);
                 }
             }
-            for increment in r#for.increments.iter() {
+            for increment in &r#for.increments {
                 if let Some(span) = contains_this_in_expression(increment) {
                     return Some(span);
                 }
@@ -147,7 +164,7 @@ fn contains_this_in_statement(statement: &Statement<'_>) -> Option<Span> {
             match &r#for.body {
                 ForBody::Statement(stmt) => contains_this_in_statement(stmt),
                 ForBody::ColonDelimited(colon_body) => {
-                    for stmt in colon_body.statements.iter() {
+                    for stmt in &colon_body.statements {
                         if let Some(span) = contains_this_in_statement(stmt) {
                             return Some(span);
                         }
@@ -163,7 +180,7 @@ fn contains_this_in_statement(statement: &Statement<'_>) -> Option<Span> {
             match &foreach.body {
                 ForeachBody::Statement(stmt) => contains_this_in_statement(stmt),
                 ForeachBody::ColonDelimited(colon_body) => {
-                    for stmt in colon_body.statements.iter() {
+                    for stmt in &colon_body.statements {
                         if let Some(span) = contains_this_in_statement(stmt) {
                             return Some(span);
                         }
@@ -185,7 +202,7 @@ pub fn check_function<'arena>(function: &Function<'arena>, context: &mut Context
     };
 
     let name = function.name.value;
-    let fqfn = context.get_name(&function.name.span.start);
+    let fqfn = context.get_name(function.name.span.start);
 
     match &return_hint.hint {
         Hint::Void(_) => {
@@ -439,7 +456,7 @@ pub fn check_for_promoted_properties_outside_constructor(
     parameter_list: &FunctionLikeParameterList,
     context: &mut Context<'_, '_, '_>,
 ) {
-    for parameter in parameter_list.parameters.iter() {
+    for parameter in &parameter_list.parameters {
         if parameter.is_promoted_property() {
             context.report(
                 Issue::error("Promoted properties are not allowed outside of constructors.")

@@ -106,6 +106,7 @@ pub struct ForeachColonDelimitedBody<'arena> {
 }
 
 impl<'arena> ForeachTarget<'arena> {
+    #[must_use]
     pub fn key(&self) -> Option<&Expression<'arena>> {
         match self {
             ForeachTarget::Value(_) => None,
@@ -113,6 +114,7 @@ impl<'arena> ForeachTarget<'arena> {
         }
     }
 
+    #[must_use]
     pub fn value(&self) -> &Expression<'arena> {
         match self {
             ForeachTarget::Value(value) => value.value,
@@ -122,6 +124,7 @@ impl<'arena> ForeachTarget<'arena> {
 }
 
 impl<'arena> ForeachBody<'arena> {
+    #[must_use]
     pub fn statements(&self) -> &[Statement<'arena>] {
         match self {
             ForeachBody::Statement(statement) => std::slice::from_ref(statement),

@@ -35,13 +35,13 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Global<'arena> {
             );
         }
 
-        for variable in self.variables.iter() {
+        for variable in &self.variables {
             if let Some(var_id) = get_variable_id(variable) {
                 block_context.locals.insert(Atom::from(var_id), Rc::new(get_mixed()));
             }
         }
 
-        for variable in self.variables.iter() {
+        for variable in &self.variables {
             let Some(var_id) = get_variable_id(variable) else {
                 continue;
             };

@@ -746,7 +746,7 @@ fn scrape_type_properties(
     if let TAtomic::Object(TObject::Named(named_object)) = &atomic {
         let fq_class_name = named_object.get_name();
         if let Some(type_parameters) = named_object.get_type_parameters() {
-            let object_type_key = get_combiner_key(&fq_class_name, type_parameters, codebase);
+            let object_type_key = get_combiner_key(fq_class_name, type_parameters, codebase);
 
             if let Some((_, existing_type_params)) = combination.object_type_params.get(&object_type_key) {
                 let mut new_type_parameters = Vec::with_capacity(type_parameters.len());
@@ -780,15 +780,13 @@ fn scrape_type_properties(
         let fq_class_name = named_object.get_name();
         let intersection_types = named_object.get_intersection_types();
 
-        if combination.flags.contains(CombinationFlags::HAS_OBJECT_TOP_TYPE) {
-            return;
-        } else if combination.value_types.contains_key(&atomic.get_id()) {
+        if combination.flags.contains(CombinationFlags::HAS_OBJECT_TOP_TYPE)
+            || combination.value_types.contains_key(&atomic.get_id())
+        {
             return;
         }
 
-        let symbol_type = if let Some(symbol_type) = codebase.symbols.get_kind(&fq_class_name) {
-            symbol_type
-        } else {
+        let Some(symbol_type) = codebase.symbols.get_kind(&fq_class_name) else {
             combination.value_types.insert(atomic.get_id(), atomic);
             return;
         };
@@ -1023,11 +1021,11 @@ fn adjust_keyed_array_parameters(
 
 const COMBINER_KEY_STACK_BUF: usize = 256;
 
-fn get_combiner_key(name: &Atom, type_params: &[TUnion], codebase: &CodebaseMetadata) -> Atom {
-    let covariants = if let Some(class_like_metadata) = codebase.get_class_like(name) {
+fn get_combiner_key(name: Atom, type_params: &[TUnion], codebase: &CodebaseMetadata) -> Atom {
+    let covariants = if let Some(class_like_metadata) = codebase.get_class_like(&name) {
         &class_like_metadata.template_variance
     } else {
-        return *name;
+        return name;
     };
 
     let name_str = name.as_str();

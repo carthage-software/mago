@@ -1,5 +1,8 @@
 use mago_names::ResolvedNames;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Static;
+use mago_syntax::ast::StaticAbstractItem;
+use mago_syntax::ast::StaticConcreteItem;
+use mago_syntax::ast::StaticItem;
 
 use crate::FingerprintOptions;
 use crate::Fingerprintable;
@@ -14,7 +17,7 @@ impl Fingerprintable for Static<'_> {
     ) {
         "static".hash(hasher);
 
-        for item in self.items.iter() {
+        for item in &self.items {
             item.fingerprint_with_hasher(hasher, resolved_names, options);
         }
     }

@@ -170,6 +170,7 @@ impl Default for Settings {
 }
 
 impl Settings {
+    #[must_use]
     pub fn new(version: PHPVersion) -> Self {
         Self {
             version,

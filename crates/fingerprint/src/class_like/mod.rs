@@ -1,7 +1,34 @@
 use std::hash::Hash;
 
 use mago_names::ResolvedNames;
-use mago_syntax::ast::*;
+use mago_syntax::ast::AnonymousClass;
+use mago_syntax::ast::Class;
+use mago_syntax::ast::ClassLikeConstant;
+use mago_syntax::ast::ClassLikeConstantItem;
+use mago_syntax::ast::ClassLikeMember;
+use mago_syntax::ast::Enum;
+use mago_syntax::ast::EnumBackingTypeHint;
+use mago_syntax::ast::EnumCase;
+use mago_syntax::ast::EnumCaseItem;
+use mago_syntax::ast::Extends;
+use mago_syntax::ast::HookedProperty;
+use mago_syntax::ast::Implements;
+use mago_syntax::ast::Interface;
+use mago_syntax::ast::Method;
+use mago_syntax::ast::MethodBody;
+use mago_syntax::ast::PlainProperty;
+use mago_syntax::ast::Property;
+use mago_syntax::ast::PropertyHook;
+use mago_syntax::ast::PropertyHookBody;
+use mago_syntax::ast::PropertyHookConcreteBody;
+use mago_syntax::ast::PropertyHookList;
+use mago_syntax::ast::PropertyItem;
+use mago_syntax::ast::Trait;
+use mago_syntax::ast::TraitUse;
+use mago_syntax::ast::TraitUseAbsoluteMethodReference;
+use mago_syntax::ast::TraitUseAdaptation;
+use mago_syntax::ast::TraitUseMethodReference;
+use mago_syntax::ast::TraitUseSpecification;
 
 use crate::FingerprintOptions;
 use crate::Fingerprintable;
@@ -14,14 +41,14 @@ impl Fingerprintable for AnonymousClass<'_> {
         options: &FingerprintOptions<'_>,
     ) {
         "anon_class".hash(hasher);
-        for attribute_list in self.attribute_lists.iter() {
+        for attribute_list in &self.attribute_lists {
             attribute_list.fingerprint_with_hasher(hasher, resolved_names, options);
         }
         crate::modifier::fingerprint_modifiers(self.modifiers.iter(), hasher, resolved_names, options);
         self.argument_list.fingerprint_with_hasher(hasher, resolved_names, options);
         self.extends.fingerprint_with_hasher(hasher, resolved_names, options);
         self.implements.fingerprint_with_hasher(hasher, resolved_names, options);
-        for member in self.members.iter() {
+        for member in &self.members {
             member.fingerprint_with_hasher(hasher, resolved_names, options);
         }
     }
@@ -35,7 +62,7 @@ impl Fingerprintable for Extends<'_> {
         options: &FingerprintOptions<'_>,
     ) {
         "extends".hash(hasher);
-        for type_name in self.types.iter() {
+        for type_name in &self.types {
             type_name.fingerprint_with_hasher(hasher, resolved_names, options);
         }
     }
@@ -49,7 +76,7 @@ impl Fingerprintable for Implements<'_> {
         options: &FingerprintOptions<'_>,
     ) {
         "implements".hash(hasher);
-        for type_name in self.types.iter() {
+        for type_name in &self.types {
             type_name.fingerprint_with_hasher(hasher, resolved_names, options);
         }
     }
@@ -90,7 +117,7 @@ impl Fingerprintable for TraitUse<'_> {
         options: &FingerprintOptions<'_>,
     ) {
         "trait_use".hash(hasher);
-        for trait_name in self.trait_names.iter() {
+        for trait_name in &self.trait_names {
             trait_name.fingerprint_with_hasher(hasher, resolved_names, options);
         }
         self.specification.fingerprint_with_hasher(hasher, resolved_names, options);
@@ -111,7 +138,7 @@ impl Fingerprintable for TraitUseSpecification<'_> {
             }
             TraitUseSpecification::Concrete(spec) => {
                 "trait_use_concrete".hash(hasher);
-                for adaptation in spec.adaptations.iter() {
+                for adaptation in &spec.adaptations {
                     adaptation.fingerprint_with_hasher(hasher, resolved_names, options);
                 }
             }
@@ -130,7 +157,7 @@ impl Fingerprintable for TraitUseAdaptation<'_> {
             TraitUseAdaptation::Precedence(adaptation) => {
                 "precedence".hash(hasher);
                 adaptation.method_reference.fingerprint_with_hasher(hasher, resolved_names, options);
-                for trait_name in adaptation.trait_names.iter() {
+                for trait_name in &adaptation.trait_names {
                     trait_name.fingerprint_with_hasher(hasher, resolved_names, options);
                 }
                 adaptation.terminator.fingerprint_with_hasher(hasher, resolved_names, options);
@@ -186,12 +213,12 @@ impl Fingerprintable for ClassLikeConstant<'_> {
         options: &FingerprintOptions<'_>,
     ) {
         "class_const".hash(hasher);
-        for attribute_list in self.attribute_lists.iter() {
+        for attribute_list in &self.attribute_lists {
             attribute_list.fingerprint_with_hasher(hasher, resolved_names, options);
         }
         crate::modifier::fingerprint_modifiers(self.modifiers.iter(), hasher, resolved_names, options);
         self.hint.fingerprint_with_hasher(hasher, resolved_names, options);
-        for item in self.items.iter() {
+        for item in &self.items {
             item.fingerprint_with_hasher(hasher, resolved_names, options);
         }
         self.terminator.fingerprint_with_hasher(hasher, resolved_names, options);
@@ -238,13 +265,13 @@ impl Fingerprintable for PlainProperty<'_> {
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
     ) {
-        for attribute_list in self.attribute_lists.iter() {
+        for attribute_list in &self.attribute_lists {
             attribute_list.fingerprint_with_hasher(hasher, resolved_names, options);
         }
         crate::modifier::fingerprint_modifiers(self.modifiers.iter(), hasher, resolved_names, options);
         self.var.is_some().hash(hasher);
         self.hint.fingerprint_with_hasher(hasher, resolved_names, options);
-        for item in self.items.iter() {
+        for item in &self.items {
             item.fingerprint_with_hasher(hasher, resolved_names, options);
         }
         self.terminator.fingerprint_with_hasher(hasher, resolved_names, options);
@@ -258,7 +285,7 @@ impl Fingerprintable for HookedProperty<'_> {
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
     ) {
-        for attribute_list in self.attribute_lists.iter() {
+        for attribute_list in &self.attribute_lists {
             attribute_list.fingerprint_with_hasher(hasher, resolved_names, options);
         }
         crate::modifier::fingerprint_modifiers(self.modifiers.iter(), hasher, resolved_names, options);
@@ -298,7 +325,7 @@ impl Fingerprintable for PropertyHookList<'_> {
         options: &FingerprintOptions<'_>,
     ) {
         "hook_list".hash(hasher);
-        for hook in self.hooks.iter() {
+        for hook in &self.hooks {
             hook.fingerprint_with_hasher(hasher, resolved_names, options);
         }
     }
@@ -312,7 +339,7 @@ impl Fingerprintable for PropertyHook<'_> {
         options: &FingerprintOptions<'_>,
     ) {
         "hook".hash(hasher);
-        for attribute_list in self.attribute_lists.iter() {
+        for attribute_list in &self.attribute_lists {
             attribute_list.fingerprint_with_hasher(hasher, resolved_names, options);
         }
         crate::modifier::fingerprint_modifiers(self.modifiers.iter(), hasher, resolved_names, options);
@@ -372,7 +399,7 @@ impl Fingerprintable for EnumCase<'_> {
         options: &FingerprintOptions<'_>,
     ) {
         "enum_case".hash(hasher);
-        for attribute_list in self.attribute_lists.iter() {
+        for attribute_list in &self.attribute_lists {
             attribute_list.fingerprint_with_hasher(hasher, resolved_names, options);
         }
         self.item.fingerprint_with_hasher(hasher, resolved_names, options);
@@ -409,7 +436,7 @@ impl Fingerprintable for Method<'_> {
         options: &FingerprintOptions<'_>,
     ) {
         "method".hash(hasher);
-        for attribute_list in self.attribute_lists.iter() {
+        for attribute_list in &self.attribute_lists {
             attribute_list.fingerprint_with_hasher(hasher, resolved_names, options);
         }
         crate::modifier::fingerprint_modifiers(self.modifiers.iter(), hasher, resolved_names, options);
@@ -450,14 +477,14 @@ impl Fingerprintable for Class<'_> {
         options: &FingerprintOptions<'_>,
     ) {
         "class".hash(hasher);
-        for attribute_list in self.attribute_lists.iter() {
+        for attribute_list in &self.attribute_lists {
             attribute_list.fingerprint_with_hasher(hasher, resolved_names, options);
         }
         crate::modifier::fingerprint_modifiers(self.modifiers.iter(), hasher, resolved_names, options);
         self.name.fingerprint_with_hasher(hasher, resolved_names, options);
         self.extends.fingerprint_with_hasher(hasher, resolved_names, options);
         self.implements.fingerprint_with_hasher(hasher, resolved_names, options);
-        for member in self.members.iter() {
+        for member in &self.members {
             member.fingerprint_with_hasher(hasher, resolved_names, options);
         }
     }
@@ -471,12 +498,12 @@ impl Fingerprintable for Interface<'_> {
         options: &FingerprintOptions<'_>,
     ) {
         "interface".hash(hasher);
-        for attribute_list in self.attribute_lists.iter() {
+        for attribute_list in &self.attribute_lists {
             attribute_list.fingerprint_with_hasher(hasher, resolved_names, options);
         }
         self.name.fingerprint_with_hasher(hasher, resolved_names, options);
         self.extends.fingerprint_with_hasher(hasher, resolved_names, options);
-        for member in self.members.iter() {
+        for member in &self.members {
             member.fingerprint_with_hasher(hasher, resolved_names, options);
         }
     }
@@ -490,11 +517,11 @@ impl Fingerprintable for Trait<'_> {
         options: &FingerprintOptions<'_>,
     ) {
         "trait".hash(hasher);
-        for attribute_list in self.attribute_lists.iter() {
+        for attribute_list in &self.attribute_lists {
             attribute_list.fingerprint_with_hasher(hasher, resolved_names, options);
         }
         self.name.fingerprint_with_hasher(hasher, resolved_names, options);
-        for member in self.members.iter() {
+        for member in &self.members {
             member.fingerprint_with_hasher(hasher, resolved_names, options);
         }
     }
@@ -508,13 +535,13 @@ impl Fingerprintable for Enum<'_> {
         options: &FingerprintOptions<'_>,
     ) {
         "enum".hash(hasher);
-        for attribute_list in self.attribute_lists.iter() {
+        for attribute_list in &self.attribute_lists {
             attribute_list.fingerprint_with_hasher(hasher, resolved_names, options);
         }
         self.name.fingerprint_with_hasher(hasher, resolved_names, options);
         self.backing_type_hint.fingerprint_with_hasher(hasher, resolved_names, options);
         self.implements.fingerprint_with_hasher(hasher, resolved_names, options);
-        for member in self.members.iter() {
+        for member in &self.members {
             member.fingerprint_with_hasher(hasher, resolved_names, options);
         }
     }

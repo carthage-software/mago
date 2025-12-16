@@ -1,7 +1,9 @@
 use std::hash::Hash;
 
 use mago_names::ResolvedNames;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Program;
+use mago_syntax::ast::Trivia;
+use mago_syntax::ast::TriviaKind;
 
 use crate::FingerprintOptions;
 use crate::Fingerprintable;
@@ -13,11 +15,11 @@ impl Fingerprintable for Program<'_> {
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
     ) {
-        for trivia in self.trivia.iter() {
+        for trivia in &self.trivia {
             trivia.fingerprint_with_hasher(hasher, resolved_names, options);
         }
 
-        for statement in self.statements.iter() {
+        for statement in &self.statements {
             statement.fingerprint_with_hasher(hasher, resolved_names, options);
         }
     }

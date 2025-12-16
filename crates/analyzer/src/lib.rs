@@ -267,7 +267,7 @@ mod tests {
         }
 
         let mut actual_issue_counts: BTreeMap<String, usize> = BTreeMap::new();
-        for actual_issue in actual_issues_collected.iter() {
+        for actual_issue in &actual_issues_collected {
             let Some(issue_code) = actual_issue.code.clone() else {
                 panic!("Analyzer returned an issue with no code: {actual_issue:?}");
             };

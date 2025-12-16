@@ -153,26 +153,31 @@ pub struct MissingArrayElement {
 
 impl<'arena> ArrayElement<'arena> {
     #[inline]
+    #[must_use]
     pub const fn is_variadic(&self) -> bool {
         matches!(self, ArrayElement::Variadic(_))
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_missing(&self) -> bool {
         matches!(self, ArrayElement::Missing(_))
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_key_value(&self) -> bool {
         matches!(self, ArrayElement::KeyValue(_))
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_value(&self) -> bool {
         matches!(self, ArrayElement::Value(_))
     }
 
     #[inline]
+    #[must_use]
     pub fn get_key(&self) -> Option<&Expression<'arena>> {
         match self {
             ArrayElement::KeyValue(element) => Some(element.key),
@@ -183,6 +188,7 @@ impl<'arena> ArrayElement<'arena> {
     }
 
     #[inline]
+    #[must_use]
     pub fn get_value(&self) -> Option<&Expression<'arena>> {
         match self {
             ArrayElement::KeyValue(element) => Some(element.value),

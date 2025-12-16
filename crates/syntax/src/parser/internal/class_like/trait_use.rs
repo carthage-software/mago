@@ -1,5 +1,13 @@
 use crate::T;
-use crate::ast::ast::*;
+use crate::ast::ast::TraitUse;
+use crate::ast::ast::TraitUseAbsoluteMethodReference;
+use crate::ast::ast::TraitUseAbstractSpecification;
+use crate::ast::ast::TraitUseAdaptation;
+use crate::ast::ast::TraitUseAliasAdaptation;
+use crate::ast::ast::TraitUseConcreteSpecification;
+use crate::ast::ast::TraitUseMethodReference;
+use crate::ast::ast::TraitUsePrecedenceAdaptation;
+use crate::ast::ast::TraitUseSpecification;
 use crate::ast::sequence::Sequence;
 use crate::ast::sequence::TokenSeparatedSequence;
 use crate::error::ParseError;

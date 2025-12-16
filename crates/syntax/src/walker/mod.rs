@@ -1,7 +1,228 @@
 #![allow(unused_variables)]
 
 use crate::ast::Program;
-use crate::ast::ast::*;
+use crate::ast::ast::Access;
+use crate::ast::ast::AnonymousClass;
+use crate::ast::ast::Argument;
+use crate::ast::ast::ArgumentList;
+use crate::ast::ast::Array;
+use crate::ast::ast::ArrayAccess;
+use crate::ast::ast::ArrayAppend;
+use crate::ast::ast::ArrayElement;
+use crate::ast::ast::ArrowFunction;
+use crate::ast::ast::Assignment;
+use crate::ast::ast::AssignmentOperator;
+use crate::ast::ast::Attribute;
+use crate::ast::ast::AttributeList;
+use crate::ast::ast::Binary;
+use crate::ast::ast::BinaryOperator;
+use crate::ast::ast::Block;
+use crate::ast::ast::BracedExpressionStringPart;
+use crate::ast::ast::Break;
+use crate::ast::ast::Call;
+use crate::ast::ast::Class;
+use crate::ast::ast::ClassConstantAccess;
+use crate::ast::ast::ClassLikeConstant;
+use crate::ast::ast::ClassLikeConstantItem;
+use crate::ast::ast::ClassLikeConstantSelector;
+use crate::ast::ast::ClassLikeMember;
+use crate::ast::ast::ClassLikeMemberExpressionSelector;
+use crate::ast::ast::ClassLikeMemberSelector;
+use crate::ast::ast::Clone;
+use crate::ast::ast::ClosingTag;
+use crate::ast::ast::Closure;
+use crate::ast::ast::ClosureUseClause;
+use crate::ast::ast::ClosureUseClauseVariable;
+use crate::ast::ast::CompositeString;
+use crate::ast::ast::Conditional;
+use crate::ast::ast::Constant;
+use crate::ast::ast::ConstantAccess;
+use crate::ast::ast::ConstantItem;
+use crate::ast::ast::Construct;
+use crate::ast::ast::Continue;
+use crate::ast::ast::Declare;
+use crate::ast::ast::DeclareBody;
+use crate::ast::ast::DeclareColonDelimitedBody;
+use crate::ast::ast::DeclareItem;
+use crate::ast::ast::DieConstruct;
+use crate::ast::ast::DirectVariable;
+use crate::ast::ast::DoWhile;
+use crate::ast::ast::DocumentString;
+use crate::ast::ast::Echo;
+use crate::ast::ast::EchoTag;
+use crate::ast::ast::EmptyConstruct;
+use crate::ast::ast::Enum;
+use crate::ast::ast::EnumBackingTypeHint;
+use crate::ast::ast::EnumCase;
+use crate::ast::ast::EnumCaseBackedItem;
+use crate::ast::ast::EnumCaseItem;
+use crate::ast::ast::EnumCaseUnitItem;
+use crate::ast::ast::EvalConstruct;
+use crate::ast::ast::ExitConstruct;
+use crate::ast::ast::Expression;
+use crate::ast::ast::ExpressionStatement;
+use crate::ast::ast::Extends;
+use crate::ast::ast::For;
+use crate::ast::ast::ForBody;
+use crate::ast::ast::ForColonDelimitedBody;
+use crate::ast::ast::Foreach;
+use crate::ast::ast::ForeachBody;
+use crate::ast::ast::ForeachColonDelimitedBody;
+use crate::ast::ast::ForeachKeyValueTarget;
+use crate::ast::ast::ForeachTarget;
+use crate::ast::ast::ForeachValueTarget;
+use crate::ast::ast::FullOpeningTag;
+use crate::ast::ast::FullyQualifiedIdentifier;
+use crate::ast::ast::Function;
+use crate::ast::ast::FunctionCall;
+use crate::ast::ast::FunctionLikeParameter;
+use crate::ast::ast::FunctionLikeParameterDefaultValue;
+use crate::ast::ast::FunctionLikeParameterList;
+use crate::ast::ast::FunctionLikeReturnTypeHint;
+use crate::ast::ast::FunctionPartialApplication;
+use crate::ast::ast::Global;
+use crate::ast::ast::Goto;
+use crate::ast::ast::HaltCompiler;
+use crate::ast::ast::Hint;
+use crate::ast::ast::HookedProperty;
+use crate::ast::ast::Identifier;
+use crate::ast::ast::If;
+use crate::ast::ast::IfBody;
+use crate::ast::ast::IfColonDelimitedBody;
+use crate::ast::ast::IfColonDelimitedBodyElseClause;
+use crate::ast::ast::IfColonDelimitedBodyElseIfClause;
+use crate::ast::ast::IfStatementBody;
+use crate::ast::ast::IfStatementBodyElseClause;
+use crate::ast::ast::IfStatementBodyElseIfClause;
+use crate::ast::ast::Implements;
+use crate::ast::ast::IncludeConstruct;
+use crate::ast::ast::IncludeOnceConstruct;
+use crate::ast::ast::IndirectVariable;
+use crate::ast::ast::Inline;
+use crate::ast::ast::Instantiation;
+use crate::ast::ast::Interface;
+use crate::ast::ast::InterpolatedString;
+use crate::ast::ast::IntersectionHint;
+use crate::ast::ast::IssetConstruct;
+use crate::ast::ast::KeyValueArrayElement;
+use crate::ast::ast::Keyword;
+use crate::ast::ast::Label;
+use crate::ast::ast::LegacyArray;
+use crate::ast::ast::List;
+use crate::ast::ast::Literal;
+use crate::ast::ast::LiteralFloat;
+use crate::ast::ast::LiteralInteger;
+use crate::ast::ast::LiteralString;
+use crate::ast::ast::LiteralStringPart;
+use crate::ast::ast::LocalIdentifier;
+use crate::ast::ast::MagicConstant;
+use crate::ast::ast::Match;
+use crate::ast::ast::MatchArm;
+use crate::ast::ast::MatchDefaultArm;
+use crate::ast::ast::MatchExpressionArm;
+use crate::ast::ast::MaybeTypedUseItem;
+use crate::ast::ast::Method;
+use crate::ast::ast::MethodAbstractBody;
+use crate::ast::ast::MethodBody;
+use crate::ast::ast::MethodCall;
+use crate::ast::ast::MethodPartialApplication;
+use crate::ast::ast::MissingArrayElement;
+use crate::ast::ast::MixedUseItemList;
+use crate::ast::ast::Modifier;
+use crate::ast::ast::NamedArgument;
+use crate::ast::ast::NamedPlaceholderArgument;
+use crate::ast::ast::Namespace;
+use crate::ast::ast::NamespaceBody;
+use crate::ast::ast::NamespaceImplicitBody;
+use crate::ast::ast::NestedVariable;
+use crate::ast::ast::NullSafeMethodCall;
+use crate::ast::ast::NullSafePropertyAccess;
+use crate::ast::ast::NullableHint;
+use crate::ast::ast::OpeningTag;
+use crate::ast::ast::Parenthesized;
+use crate::ast::ast::ParenthesizedHint;
+use crate::ast::ast::PartialApplication;
+use crate::ast::ast::PartialArgument;
+use crate::ast::ast::PartialArgumentList;
+use crate::ast::ast::Pipe;
+use crate::ast::ast::PlaceholderArgument;
+use crate::ast::ast::PlainProperty;
+use crate::ast::ast::PositionalArgument;
+use crate::ast::ast::PrintConstruct;
+use crate::ast::ast::Property;
+use crate::ast::ast::PropertyAbstractItem;
+use crate::ast::ast::PropertyAccess;
+use crate::ast::ast::PropertyConcreteItem;
+use crate::ast::ast::PropertyHook;
+use crate::ast::ast::PropertyHookAbstractBody;
+use crate::ast::ast::PropertyHookBody;
+use crate::ast::ast::PropertyHookConcreteBody;
+use crate::ast::ast::PropertyHookConcreteExpressionBody;
+use crate::ast::ast::PropertyHookList;
+use crate::ast::ast::PropertyItem;
+use crate::ast::ast::QualifiedIdentifier;
+use crate::ast::ast::RequireConstruct;
+use crate::ast::ast::RequireOnceConstruct;
+use crate::ast::ast::Return;
+use crate::ast::ast::ShellExecuteString;
+use crate::ast::ast::ShortOpeningTag;
+use crate::ast::ast::Statement;
+use crate::ast::ast::Static;
+use crate::ast::ast::StaticAbstractItem;
+use crate::ast::ast::StaticConcreteItem;
+use crate::ast::ast::StaticItem;
+use crate::ast::ast::StaticMethodCall;
+use crate::ast::ast::StaticMethodPartialApplication;
+use crate::ast::ast::StaticPropertyAccess;
+use crate::ast::ast::StringPart;
+use crate::ast::ast::Switch;
+use crate::ast::ast::SwitchBody;
+use crate::ast::ast::SwitchBraceDelimitedBody;
+use crate::ast::ast::SwitchCase;
+use crate::ast::ast::SwitchCaseSeparator;
+use crate::ast::ast::SwitchColonDelimitedBody;
+use crate::ast::ast::SwitchDefaultCase;
+use crate::ast::ast::SwitchExpressionCase;
+use crate::ast::ast::Terminator;
+use crate::ast::ast::Throw;
+use crate::ast::ast::Trait;
+use crate::ast::ast::TraitUse;
+use crate::ast::ast::TraitUseAbsoluteMethodReference;
+use crate::ast::ast::TraitUseAbstractSpecification;
+use crate::ast::ast::TraitUseAdaptation;
+use crate::ast::ast::TraitUseAliasAdaptation;
+use crate::ast::ast::TraitUseConcreteSpecification;
+use crate::ast::ast::TraitUseMethodReference;
+use crate::ast::ast::TraitUsePrecedenceAdaptation;
+use crate::ast::ast::TraitUseSpecification;
+use crate::ast::ast::Try;
+use crate::ast::ast::TryCatchClause;
+use crate::ast::ast::TryFinallyClause;
+use crate::ast::ast::TypedUseItemList;
+use crate::ast::ast::TypedUseItemSequence;
+use crate::ast::ast::UnaryPostfix;
+use crate::ast::ast::UnaryPostfixOperator;
+use crate::ast::ast::UnaryPrefix;
+use crate::ast::ast::UnaryPrefixOperator;
+use crate::ast::ast::UnionHint;
+use crate::ast::ast::Unset;
+use crate::ast::ast::Use;
+use crate::ast::ast::UseItem;
+use crate::ast::ast::UseItemAlias;
+use crate::ast::ast::UseItemSequence;
+use crate::ast::ast::UseItems;
+use crate::ast::ast::UseType;
+use crate::ast::ast::ValueArrayElement;
+use crate::ast::ast::Variable;
+use crate::ast::ast::VariadicArrayElement;
+use crate::ast::ast::VariadicPlaceholderArgument;
+use crate::ast::ast::While;
+use crate::ast::ast::WhileBody;
+use crate::ast::ast::WhileColonDelimitedBody;
+use crate::ast::ast::Yield;
+use crate::ast::ast::YieldFrom;
+use crate::ast::ast::YieldPair;
+use crate::ast::ast::YieldValue;
 
 /// Helper macro to generate the core walk logic.
 macro_rules! define_walk_body {
@@ -150,7 +371,7 @@ generate_ast_walker! {
     using(walker, context, 'ast, 'arena):
 
     'arena Program as program => {
-        for statement in program.statements.iter() {
+        for statement in &program.statements {
             walker.walk_statement(statement, context);
         }
     }
@@ -237,7 +458,7 @@ generate_ast_walker! {
     'arena NamespaceImplicitBody as namespace_implicit_body => {
         walker.walk_terminator(&namespace_implicit_body.terminator, context);
 
-        for statement in namespace_implicit_body.statements.iter() {
+        for statement in &namespace_implicit_body.statements {
             walker.walk_statement(statement, context);
         }
     }
@@ -283,7 +504,7 @@ generate_ast_walker! {
     }
 
     'arena UseItemSequence as use_item_sequence => {
-        for use_item in use_item_sequence.items.iter() {
+        for use_item in &use_item_sequence.items {
             walker.walk_use_item(use_item, context);
         }
     }
@@ -304,7 +525,7 @@ generate_ast_walker! {
     'arena TypedUseItemSequence as typed_use_item_sequence => {
         walker.walk_use_type(&typed_use_item_sequence.r#type, context);
 
-        for use_item in typed_use_item_sequence.items.iter() {
+        for use_item in &typed_use_item_sequence.items {
             walker.walk_use_item(use_item, context);
         }
     }
@@ -320,7 +541,7 @@ generate_ast_walker! {
         walker.walk_use_type(&typed_use_item_list.r#type, context);
         walker.walk_identifier(&typed_use_item_list.namespace, context);
 
-        for use_item in typed_use_item_list.items.iter() {
+        for use_item in &typed_use_item_list.items {
             walker.walk_use_item(use_item, context);
         }
     }
@@ -328,7 +549,7 @@ generate_ast_walker! {
     'arena MixedUseItemList as mixed_use_item_list => {
         walker.walk_identifier(&mixed_use_item_list.namespace, context);
 
-        for maybe_typed_use_item in mixed_use_item_list.items.iter() {
+        for maybe_typed_use_item in &mixed_use_item_list.items {
             walker.walk_maybe_typed_use_item(maybe_typed_use_item, context);
         }
     }
@@ -342,7 +563,7 @@ generate_ast_walker! {
     }
 
     'arena AttributeList as attribute_list => {
-        for attribute in attribute_list.attributes.iter() {
+        for attribute in &attribute_list.attributes {
             walker.walk_attribute(attribute, context);
         }
     }
@@ -356,13 +577,13 @@ generate_ast_walker! {
     }
 
     'arena ArgumentList as argument_list => {
-        for argument in argument_list.arguments.iter() {
+        for argument in &argument_list.arguments {
             walker.walk_argument(argument, context);
         }
     }
 
     'arena PartialArgumentList as partial_argument_list => {
-        for partial_argument in partial_argument_list.arguments.iter() {
+        for partial_argument in &partial_argument_list.arguments {
             walker.walk_partial_argument(partial_argument, context);
         }
     }
@@ -426,7 +647,7 @@ generate_ast_walker! {
     'arena Extends as extends => {
         walker.walk_keyword(&extends.extends, context);
 
-        for ty in extends.types.iter() {
+        for ty in &extends.types {
             walker.walk_identifier(ty, context);
         }
     }
@@ -434,17 +655,17 @@ generate_ast_walker! {
     'arena Implements as implements => {
         walker.walk_keyword(&implements.implements, context);
 
-        for ty in implements.types.iter() {
+        for ty in &implements.types {
             walker.walk_identifier(ty, context);
         }
     }
 
     'arena Class as class => {
-        for attribute_list in class.attribute_lists.iter() {
+        for attribute_list in &class.attribute_lists {
             walker.walk_attribute_list(attribute_list, context);
         }
 
-        for modifier in class.modifiers.iter() {
+        for modifier in &class.modifiers {
             walker.walk_modifier(modifier, context);
         }
 
@@ -458,13 +679,13 @@ generate_ast_walker! {
             walker.walk_implements(implements, context);
         }
 
-        for class_member in class.members.iter() {
+        for class_member in &class.members {
             walker.walk_class_like_member(class_member, context);
         }
     }
 
     'arena Interface as interface => {
-        for attribute_list in interface.attribute_lists.iter() {
+        for attribute_list in &interface.attribute_lists {
             walker.walk_attribute_list(attribute_list, context);
         }
 
@@ -475,26 +696,26 @@ generate_ast_walker! {
             walker.walk_extends(extends, context);
         }
 
-        for class_member in interface.members.iter() {
+        for class_member in &interface.members {
             walker.walk_class_like_member(class_member, context);
         }
     }
 
     'arena Trait as r#trait => {
-        for attribute_list in r#trait.attribute_lists.iter() {
+        for attribute_list in &r#trait.attribute_lists {
             walker.walk_attribute_list(attribute_list, context);
         }
 
         walker.walk_keyword(&r#trait.r#trait, context);
         walker.walk_local_identifier(&r#trait.name, context);
 
-        for class_member in r#trait.members.iter() {
+        for class_member in &r#trait.members {
             walker.walk_class_like_member(class_member, context);
         }
     }
 
     'arena Enum as r#enum => {
-        for attribute_list in r#enum.attribute_lists.iter() {
+        for attribute_list in &r#enum.attribute_lists {
             walker.walk_attribute_list(attribute_list, context);
         }
 
@@ -509,7 +730,7 @@ generate_ast_walker! {
             walker.walk_implements(implements, context);
         }
 
-        for class_member in r#enum.members.iter() {
+        for class_member in &r#enum.members {
             walker.walk_class_like_member(class_member, context);
         }
     }
@@ -541,7 +762,7 @@ generate_ast_walker! {
     'arena TraitUse as trait_use => {
         walker.walk_keyword(&trait_use.r#use, context);
 
-        for trait_name in trait_use.trait_names.iter() {
+        for trait_name in &trait_use.trait_names {
             walker.walk_identifier(trait_name, context);
         }
 
@@ -564,7 +785,7 @@ generate_ast_walker! {
     }
 
     'arena TraitUseConcreteSpecification as trait_use_concrete_specification => {
-        for adaptation in trait_use_concrete_specification.adaptations.iter() {
+        for adaptation in &trait_use_concrete_specification.adaptations {
             walker.walk_trait_use_adaptation(
                 adaptation,
 
@@ -593,7 +814,7 @@ generate_ast_walker! {
 
         walker.walk_keyword(&trait_use_precedence_adaptation.insteadof, context);
 
-        for trait_name in trait_use_precedence_adaptation.trait_names.iter() {
+        for trait_name in &trait_use_precedence_adaptation.trait_names {
             walker.walk_identifier(trait_name, context);
         }
 
@@ -637,11 +858,11 @@ generate_ast_walker! {
     }
 
     'arena ClassLikeConstant as class_like_constant => {
-        for attribute_list in class_like_constant.attribute_lists.iter() {
+        for attribute_list in &class_like_constant.attribute_lists {
             walker.walk_attribute_list(attribute_list, context);
         }
 
-        for modifier in class_like_constant.modifiers.iter() {
+        for modifier in &class_like_constant.modifiers {
             walker.walk_modifier(modifier, context);
         }
 
@@ -651,7 +872,7 @@ generate_ast_walker! {
             walker.walk_hint(hint, context);
         }
 
-        for item in class_like_constant.items.iter() {
+        for item in &class_like_constant.items {
             walker.walk_class_like_constant_item(item, context);
         }
 
@@ -675,11 +896,11 @@ generate_ast_walker! {
     }
 
     'arena PlainProperty as plain_property => {
-        for attribute_list in plain_property.attribute_lists.iter() {
+        for attribute_list in &plain_property.attribute_lists {
             walker.walk_attribute_list(attribute_list, context);
         }
 
-        for modifier in plain_property.modifiers.iter() {
+        for modifier in &plain_property.modifiers {
             walker.walk_modifier(modifier, context);
         }
 
@@ -691,7 +912,7 @@ generate_ast_walker! {
             walker.walk_hint(hint, context);
         }
 
-        for item in plain_property.items.iter() {
+        for item in &plain_property.items {
             walker.walk_property_item(item, context);
         }
 
@@ -719,11 +940,11 @@ generate_ast_walker! {
     }
 
     'arena HookedProperty as hooked_property => {
-        for attribute_list in hooked_property.attribute_lists.iter() {
+        for attribute_list in &hooked_property.attribute_lists {
             walker.walk_attribute_list(attribute_list, context);
         }
 
-        for modifier in hooked_property.modifiers.iter() {
+        for modifier in &hooked_property.modifiers {
             walker.walk_modifier(modifier, context);
         }
 
@@ -740,17 +961,17 @@ generate_ast_walker! {
     }
 
     'arena PropertyHookList as property_hook_list => {
-        for hook in property_hook_list.hooks.iter() {
+        for hook in &property_hook_list.hooks {
             walker.walk_property_hook(hook, context);
         }
     }
 
     'arena PropertyHook as property_hook => {
-        for attribute_list in property_hook.attribute_lists.iter() {
+        for attribute_list in &property_hook.attribute_lists {
             walker.walk_attribute_list(attribute_list, context);
         }
 
-        for modifier in property_hook.modifiers.iter() {
+        for modifier in &property_hook.modifiers {
             walker.walk_modifier(modifier, context);
         }
 
@@ -793,17 +1014,17 @@ generate_ast_walker! {
     }
 
     'arena FunctionLikeParameterList as function_like_parameter_list => {
-        for parameter in function_like_parameter_list.parameters.iter() {
+        for parameter in &function_like_parameter_list.parameters {
             walker.walk_function_like_parameter(parameter, context);
         }
     }
 
     'arena FunctionLikeParameter as function_like_parameter => {
-        for attribute_list in function_like_parameter.attribute_lists.iter() {
+        for attribute_list in &function_like_parameter.attribute_lists {
             walker.walk_attribute_list(attribute_list, context);
         }
 
-        for modifier in function_like_parameter.modifiers.iter() {
+        for modifier in &function_like_parameter.modifiers {
             walker.walk_modifier(modifier, context);
         }
 
@@ -826,7 +1047,7 @@ generate_ast_walker! {
     }
 
     'arena EnumCase as enum_case => {
-        for attribute_list in enum_case.attribute_lists.iter() {
+        for attribute_list in &enum_case.attribute_lists {
             walker.walk_attribute_list(attribute_list, context);
         }
 
@@ -856,11 +1077,11 @@ generate_ast_walker! {
     }
 
     'arena Method as method => {
-        for attribute_list in method.attribute_lists.iter() {
+        for attribute_list in &method.attribute_lists {
             walker.walk_attribute_list(attribute_list, context);
         }
 
-        for modifier in method.modifiers.iter() {
+        for modifier in &method.modifiers {
             walker.walk_modifier(modifier, context);
         }
 
@@ -894,18 +1115,18 @@ generate_ast_walker! {
     }
 
     'arena Block as block => {
-        for statement in block.statements.iter() {
+        for statement in &block.statements {
             walker.walk_statement(statement, context);
         }
     }
 
     'arena Constant as constant => {
-        for attribute_list in constant.attribute_lists.iter() {
+        for attribute_list in &constant.attribute_lists {
             walker.walk_attribute_list(attribute_list, context);
         }
 
         walker.walk_keyword(&constant.r#const, context);
-        for item in constant.items.iter() {
+        for item in &constant.items {
             walker.walk_constant_item(item, context);
         }
 
@@ -918,7 +1139,7 @@ generate_ast_walker! {
     }
 
     'arena Function as function => {
-        for attribute_list in function.attribute_lists.iter() {
+        for attribute_list in &function.attribute_lists {
             walker.walk_attribute_list(attribute_list, context);
         }
 
@@ -934,7 +1155,7 @@ generate_ast_walker! {
 
     'arena Declare as declare => {
         walker.walk_keyword(&declare.declare, context);
-        for item in declare.items.iter() {
+        for item in &declare.items {
             walker.walk_declare_item(item, context);
         }
 
@@ -958,7 +1179,7 @@ generate_ast_walker! {
     }
 
     'arena DeclareColonDelimitedBody as declare_colon_delimited_body => {
-        for statement in declare_colon_delimited_body.statements.iter() {
+        for statement in &declare_colon_delimited_body.statements {
             walker.walk_statement(statement, context);
         }
 
@@ -978,7 +1199,7 @@ generate_ast_walker! {
     'arena Try as r#try => {
         walker.walk_keyword(&r#try.r#try, context);
         walker.walk_block(&r#try.block, context);
-        for catch in r#try.catch_clauses.iter() {
+        for catch in &r#try.catch_clauses {
             walker.walk_try_catch_clause(catch, context);
         }
 
@@ -1042,7 +1263,7 @@ generate_ast_walker! {
     }
 
     'arena ForeachColonDelimitedBody as foreach_colon_delimited_body => {
-        for statement in foreach_colon_delimited_body.statements.iter() {
+        for statement in &foreach_colon_delimited_body.statements {
             walker.walk_statement(statement, context);
         }
 
@@ -1053,15 +1274,15 @@ generate_ast_walker! {
     'arena For as r#for => {
         walker.walk_keyword(&r#for.r#for, context);
 
-        for initialization in r#for.initializations.iter() {
+        for initialization in &r#for.initializations {
             walker.walk_expression(initialization, context);
         }
 
-        for condition in r#for.conditions.iter() {
+        for condition in &r#for.conditions {
             walker.walk_expression(condition, context);
         }
 
-        for increment in r#for.increments.iter() {
+        for increment in &r#for.increments {
             walker.walk_expression(increment, context);
         }
 
@@ -1080,7 +1301,7 @@ generate_ast_walker! {
     }
 
     'arena ForColonDelimitedBody as for_colon_delimited_body => {
-        for statement in for_colon_delimited_body.statements.iter() {
+        for statement in &for_colon_delimited_body.statements {
             walker.walk_statement(statement, context);
         }
 
@@ -1106,7 +1327,7 @@ generate_ast_walker! {
     }
 
     'arena WhileColonDelimitedBody as while_colon_delimited_body => {
-        for statement in while_colon_delimited_body.statements.iter() {
+        for statement in &while_colon_delimited_body.statements {
             walker.walk_statement(statement, context);
         }
 
@@ -1162,7 +1383,7 @@ generate_ast_walker! {
             walker.walk_terminator(terminator, context);
         }
 
-        for case in switch_brace_delimited_body.cases.iter() {
+        for case in &switch_brace_delimited_body.cases {
             walker.walk_switch_case(case, context);
         }
     }
@@ -1172,7 +1393,7 @@ generate_ast_walker! {
             walker.walk_terminator(terminator, context);
         }
 
-        for case in switch_colon_delimited_body.cases.iter() {
+        for case in &switch_colon_delimited_body.cases {
             walker.walk_switch_case(case, context);
         }
 
@@ -1195,7 +1416,7 @@ generate_ast_walker! {
         walker.walk_keyword(&switch_expression_case.r#case, context);
         walker.walk_expression(switch_expression_case.expression, context);
         walker.walk_switch_case_separator(&switch_expression_case.separator, context);
-        for statement in switch_expression_case.statements.iter() {
+        for statement in &switch_expression_case.statements {
             walker.walk_statement(statement, context);
         }
     }
@@ -1203,7 +1424,7 @@ generate_ast_walker! {
     'arena SwitchDefaultCase as switch_default_case => {
         walker.walk_keyword(&switch_default_case.r#default, context);
         walker.walk_switch_case_separator(&switch_default_case.separator, context);
-        for statement in switch_default_case.statements.iter() {
+        for statement in &switch_default_case.statements {
             walker.walk_statement(statement, context);
         }
     }
@@ -1232,7 +1453,7 @@ generate_ast_walker! {
     'arena IfStatementBody as if_statement_body => {
         walker.walk_statement(if_statement_body.statement, context);
 
-        for else_if_clause in if_statement_body.else_if_clauses.iter() {
+        for else_if_clause in &if_statement_body.else_if_clauses {
             walker.walk_if_statement_body_else_if_clause(else_if_clause, context);
         }
 
@@ -1253,11 +1474,11 @@ generate_ast_walker! {
     }
 
     'arena IfColonDelimitedBody as if_colon_delimited_body => {
-        for statement in if_colon_delimited_body.statements.iter() {
+        for statement in &if_colon_delimited_body.statements {
             walker.walk_statement(statement, context);
         }
 
-        for else_if_clause in if_colon_delimited_body.else_if_clauses.iter() {
+        for else_if_clause in &if_colon_delimited_body.else_if_clauses {
             walker.walk_if_colon_delimited_body_else_if_clause(else_if_clause, context);
         }
 
@@ -1272,14 +1493,14 @@ generate_ast_walker! {
     'arena IfColonDelimitedBodyElseIfClause as if_colon_delimited_body_else_if_clause => {
         walker.walk_keyword(&if_colon_delimited_body_else_if_clause.r#elseif, context);
         walker.walk_expression(if_colon_delimited_body_else_if_clause.condition, context);
-        for statement in if_colon_delimited_body_else_if_clause.statements.iter() {
+        for statement in &if_colon_delimited_body_else_if_clause.statements {
             walker.walk_statement(statement, context);
         }
     }
 
     'arena IfColonDelimitedBodyElseClause as if_colon_delimited_body_else_clause => {
         walker.walk_keyword(&if_colon_delimited_body_else_clause.r#else, context);
-        for statement in if_colon_delimited_body_else_clause.statements.iter() {
+        for statement in &if_colon_delimited_body_else_clause.statements {
             walker.walk_statement(statement, context);
         }
     }
@@ -1299,7 +1520,7 @@ generate_ast_walker! {
     }
 
     'arena EchoTag as echo_tag => {
-        for expression in echo_tag.values.iter() {
+        for expression in &echo_tag.values {
             walker.walk_expression(expression, context);
         }
 
@@ -1308,7 +1529,7 @@ generate_ast_walker! {
 
     'arena Echo as echo => {
         walker.walk_keyword(&echo.echo, context);
-        for expression in echo.values.iter() {
+        for expression in &echo.values {
             walker.walk_expression(expression, context);
         }
 
@@ -1317,7 +1538,7 @@ generate_ast_walker! {
 
     'arena Global as global => {
         walker.walk_keyword(&global.global, context);
-        for variable in global.variables.iter() {
+        for variable in &global.variables {
             walker.walk_variable(variable, context);
         }
 
@@ -1326,7 +1547,7 @@ generate_ast_walker! {
 
     'arena Static as r#static => {
         walker.walk_keyword(&r#static.r#static, context);
-        for item in r#static.items.iter() {
+        for item in &r#static.items {
             walker.walk_static_item(item, context);
         }
 
@@ -1359,7 +1580,7 @@ generate_ast_walker! {
 
     'arena Unset as unset => {
         walker.walk_keyword(&unset.unset, context);
-        for value in unset.values.iter() {
+        for value in &unset.values {
             walker.walk_expression(value, context);
         }
 
@@ -1494,19 +1715,19 @@ generate_ast_walker! {
     }
 
     'arena ShellExecuteString as shell_execute_string => {
-        for part in shell_execute_string.parts.iter() {
+        for part in &shell_execute_string.parts {
             walker.walk_string_part(part, context);
         }
     }
 
     'arena InterpolatedString as interpolated_string => {
-        for part in interpolated_string.parts.iter() {
+        for part in &interpolated_string.parts {
             walker.walk_string_part(part, context);
         }
     }
 
     'arena DocumentString as document_string => {
-        for part in document_string.parts.iter() {
+        for part in &document_string.parts {
             walker.walk_string_part(part, context);
         }
     }
@@ -1549,7 +1770,7 @@ generate_ast_walker! {
     }
 
     'arena Array as array => {
-        for element in array.elements.iter() {
+        for element in &array.elements {
             walker.walk_array_element(element, context);
         }
     }
@@ -1590,7 +1811,7 @@ generate_ast_walker! {
 
     'arena LegacyArray as legacy_array => {
         walker.walk_keyword(&legacy_array.array, context);
-        for element in legacy_array.elements.iter() {
+        for element in &legacy_array.elements {
             walker.walk_array_element(element, context);
         }
     }
@@ -1598,7 +1819,7 @@ generate_ast_walker! {
     'arena List as list => {
         walker.walk_keyword(&list.list, context);
 
-        for element in list.elements.iter() {
+        for element in &list.elements {
             walker.walk_array_element(element, context);
         }
     }
@@ -1613,11 +1834,11 @@ generate_ast_walker! {
     }
 
     'arena AnonymousClass as anonymous_class => {
-        for attribute_list in anonymous_class.attribute_lists.iter() {
+        for attribute_list in &anonymous_class.attribute_lists {
             walker.walk_attribute_list(attribute_list, context);
         }
 
-        for modifier in anonymous_class.modifiers.iter() {
+        for modifier in &anonymous_class.modifiers {
             walker.walk_modifier(modifier, context);
         }
 
@@ -1635,13 +1856,13 @@ generate_ast_walker! {
             walker.walk_implements(implements, context);
         }
 
-        for class_member in anonymous_class.members.iter() {
+        for class_member in &anonymous_class.members {
             walker.walk_class_like_member(class_member, context);
         }
     }
 
     'arena Closure as closure => {
-        for attribute_list in closure.attribute_lists.iter() {
+        for attribute_list in &closure.attribute_lists {
                 walker.walk_attribute_list(attribute_list, context);
             }
 
@@ -1663,7 +1884,7 @@ generate_ast_walker! {
     }
 
     'arena ClosureUseClause as closure_use_clause => {
-        for variable in closure_use_clause.variables.iter() {
+        for variable in &closure_use_clause.variables {
             walker.walk_closure_use_clause_variable(variable, context);
         }
     }
@@ -1673,7 +1894,7 @@ generate_ast_walker! {
     }
 
     'arena ArrowFunction as arrow_function => {
-        for attribute_list in arrow_function.attribute_lists.iter() {
+        for attribute_list in &arrow_function.attribute_lists {
             walker.walk_attribute_list(attribute_list, context);
         }
 
@@ -1740,7 +1961,7 @@ generate_ast_walker! {
     'arena Match as r#match => {
         walker.walk_keyword(&r#match.r#match, context);
         walker.walk_expression(r#match.expression, context);
-        for arm in r#match.arms.iter() {
+        for arm in &r#match.arms {
             walker.walk_match_arm(arm, context);
         }
     }
@@ -1757,7 +1978,7 @@ generate_ast_walker! {
     }
 
     'arena MatchExpressionArm as match_expression_arm => {
-        for condition in match_expression_arm.conditions.iter() {
+        for condition in &match_expression_arm.conditions {
             walker.walk_expression(condition, context);
         }
 
@@ -1840,7 +2061,7 @@ generate_ast_walker! {
 
     'arena IssetConstruct as isset_construct => {
         walker.walk_keyword(&isset_construct.isset, context);
-        for value in isset_construct.values.iter() {
+        for value in &isset_construct.values {
             walker.walk_expression(value, context);
         }
     }

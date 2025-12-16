@@ -8,7 +8,9 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_reporting::Level;
 use mago_span::HasSpan;
-use mago_syntax::ast::*;
+use mago_syntax::ast::ClassLikeMember;
+use mago_syntax::ast::Node;
+use mago_syntax::ast::NodeKind;
 
 use crate::category::Category;
 use crate::context::LintContext;
@@ -112,7 +114,7 @@ impl LintRule for NoProtectedInFinalRule {
             _ => return,
         };
 
-        for member in members.iter() {
+        for member in members {
             let modifiers = match member {
                 ClassLikeMember::Method(method) => &method.modifiers,
                 ClassLikeMember::Property(property) => property.modifiers(),

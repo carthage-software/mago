@@ -21,7 +21,10 @@ use crate::ttype::atomic::reference::TReference;
 use crate::ttype::union::TUnion;
 use crate::ttype::union::populate_union_type;
 
-use super::merge::*;
+use super::merge::merge_interface_metadata_from_parent_interface;
+use super::merge::merge_metadata_from_parent_class_like;
+use super::merge::merge_metadata_from_required_class_like;
+use super::merge::merge_metadata_from_trait;
 
 /// Detects circular references in a type definition by walking its dependencies.
 ///
@@ -89,19 +92,17 @@ fn check_union_for_circular_refs(
 /// (parent classes, interfaces, traits) have already been populated.
 /// Populates the metadata for a single class-like iteratively (non-recursive).
 pub fn populate_class_like_metadata_iterative(
-    classlike_name: &Atom,
+    classlike_name: Atom,
     codebase: &mut CodebaseMetadata,
     symbol_references: &mut SymbolReferences,
 ) {
-    if let Some(metadata) = codebase.class_likes.get(classlike_name)
+    if let Some(metadata) = codebase.class_likes.get(&classlike_name)
         && metadata.flags.is_populated()
     {
         return; // Already done, exit early
     }
 
-    let mut metadata = if let Some(metadata) = codebase.class_likes.remove(classlike_name) {
-        metadata
-    } else {
+    let Some(mut metadata) = codebase.class_likes.remove(&classlike_name) else {
         return;
     };
 
@@ -110,11 +111,11 @@ pub fn populate_class_like_metadata_iterative(
     }
 
     for property_name in metadata.get_property_names() {
-        metadata.add_declaring_property_id(property_name, *classlike_name);
+        metadata.add_declaring_property_id(property_name, classlike_name);
     }
 
     for method_name in &metadata.methods {
-        let method_id = MethodIdentifier::new(*classlike_name, *method_name);
+        let method_id = MethodIdentifier::new(classlike_name, *method_name);
         metadata.appearing_method_ids.insert(*method_name, method_id);
         metadata.declaring_method_ids.insert(*method_name, method_id);
     }
@@ -207,7 +208,7 @@ pub fn populate_class_like_metadata_iterative(
 
     if !metadata.type_aliases.is_empty() {
         for method_name in &metadata.methods {
-            let method_id = (*classlike_name, *method_name);
+            let method_id = (classlike_name, *method_name);
             if let Some(method_metadata) = codebase.function_likes.get_mut(&method_id) {
                 let mut updated_context = method_metadata.type_resolution_context.clone().unwrap_or_default();
                 for alias_name in metadata.type_aliases.keys() {
@@ -220,21 +221,21 @@ pub fn populate_class_like_metadata_iterative(
     }
 
     metadata.mark_as_populated();
-    codebase.class_likes.insert(*classlike_name, metadata);
+    codebase.class_likes.insert(classlike_name, metadata);
 }
 
 /// Populates types for properties, constants, enum cases, and type aliases within a class-like.
 pub fn populate_class_like_types(
-    name: &Atom,
+    name: Atom,
     metadata: &mut ClassLikeMetadata,
     codebase_symbols: &crate::symbol::Symbols,
     symbol_references: &mut SymbolReferences,
     force_repopulation: bool,
 ) {
-    let class_like_reference_source = ReferenceSource::Symbol(true, *name);
+    let class_like_reference_source = ReferenceSource::Symbol(true, name);
 
     for (property_name, property_metadata) in &mut metadata.properties {
-        let property_reference_source = ReferenceSource::ClassLikeMember(true, *name, *property_name);
+        let property_reference_source = ReferenceSource::ClassLikeMember(true, name, *property_name);
 
         if let Some(signature) = property_metadata.type_declaration_metadata.as_mut() {
             populate_union_type(
@@ -370,11 +371,11 @@ pub fn populate_class_like_types(
     }
 
     for (constant_name, constant) in &mut metadata.constants {
-        let constant_reference_source = ReferenceSource::ClassLikeMember(true, *name, *constant_name);
+        let constant_reference_source = ReferenceSource::ClassLikeMember(true, name, *constant_name);
 
         for attribute_metadata in &constant.attributes {
             symbol_references.add_class_member_reference_to_symbol(
-                (*name, *constant_name),
+                (name, *constant_name),
                 attribute_metadata.name,
                 true,
             );
@@ -402,11 +403,11 @@ pub fn populate_class_like_types(
     }
 
     for (enum_case_name, enum_case) in &mut metadata.enum_cases {
-        let enum_case_reference_source = ReferenceSource::ClassLikeMember(true, *name, *enum_case_name);
+        let enum_case_reference_source = ReferenceSource::ClassLikeMember(true, name, *enum_case_name);
 
         for attribute_metadata in &enum_case.attributes {
             symbol_references.add_class_member_reference_to_symbol(
-                (*name, *enum_case_name),
+                (name, *enum_case_name),
                 attribute_metadata.name,
                 true,
             );
@@ -427,7 +428,7 @@ pub fn populate_class_like_types(
         populate_atomic_type(
             enum_type,
             codebase_symbols,
-            Some(&ReferenceSource::Symbol(true, *name)),
+            Some(&ReferenceSource::Symbol(true, name)),
             symbol_references,
             force_repopulation,
         );

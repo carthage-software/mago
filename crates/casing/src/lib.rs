@@ -42,6 +42,7 @@ pub use cruet::case::train::to_train_case;
 /// assert!(!is_class_case("Foo bar string that is really really long"));
 /// assert!(!is_class_case("Foo Bar Is A Really Really Long String"));
 /// ```
+#[must_use]
 pub fn is_class_case(test_string: &str) -> bool {
     to_class_case(test_string) == test_string
 }
@@ -69,6 +70,7 @@ pub fn is_class_case(test_string: &str) -> bool {
 /// assert_eq!(to_class_case("Foo_Bar"), "FooBar");
 /// assert_eq!(to_class_case("Foo bar"), "FooBar");
 /// ```
+#[must_use]
 pub fn to_class_case(non_class_case_string: &str) -> String {
     // grab the prefix, which is the first N - 1 uppercase characters, leaving only one uppercase
     // character at the beginning of the string
@@ -157,6 +159,7 @@ pub fn to_class_case(non_class_case_string: &str) -> String {
 /// assert!(!is_snake_case("FooBarIsAReallyReallyLongStrings"));
 /// assert!(!is_snake_case("foo-bar-string-that-is-really-really-long"));
 /// ```
+#[must_use]
 pub fn is_snake_case(test_string: &str) -> bool {
     test_string == to_snake_case(test_string)
 }
@@ -181,6 +184,7 @@ pub fn is_snake_case(test_string: &str) -> bool {
 /// assert_eq!(to_snake_case("fooBar3"),  "foo_bar3");
 /// assert_eq!(to_snake_case("lower2upper"),  "lower2upper");
 /// ```
+#[must_use]
 pub fn to_snake_case(non_snake_case_string: &str) -> String {
     let mut first_character: bool = true;
     let mut last_separator: bool = true;

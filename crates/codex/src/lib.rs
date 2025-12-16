@@ -23,6 +23,7 @@ pub mod visibility;
 
 mod utils;
 
+#[must_use]
 pub fn get_anonymous_class_name(span: Span) -> Atom {
     use std::io::Write;
 

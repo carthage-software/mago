@@ -1,5 +1,6 @@
 use mago_span::HasSpan;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Expression;
+use mago_syntax::ast::Statement;
 use mago_syntax::walker::Walker;
 
 use crate::artifacts::AnalysisArtifacts;

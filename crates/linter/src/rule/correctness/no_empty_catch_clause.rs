@@ -7,7 +7,9 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_reporting::Level;
 use mago_span::HasSpan;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Node;
+use mago_syntax::ast::NodeKind;
+use mago_syntax::ast::Statement;
 
 use crate::category::Category;
 use crate::context::LintContext;
@@ -97,7 +99,7 @@ impl LintRule for NoEmptyCatchClauseRule {
             return;
         };
 
-        for catch_clause in try_stmt.catch_clauses.iter() {
+        for catch_clause in &try_stmt.catch_clauses {
             if !are_statements_empty(catch_clause.block.statements.as_slice()) {
                 continue;
             }

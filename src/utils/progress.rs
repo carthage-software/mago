@@ -39,10 +39,10 @@ pub fn create_progress_bar(length: usize, prefix: &'static str, theme: ProgressB
 /// # Arguments
 ///
 /// * `progress_bar` - The progress bar to remove.
-pub fn remove_progress_bar(progress_bar: ProgressBar) {
+pub fn remove_progress_bar(progress_bar: &ProgressBar) {
     progress_bar.finish_and_clear();
 
-    GLOBAL_PROGRESS_MANAGER.remove(&progress_bar);
+    GLOBAL_PROGRESS_MANAGER.remove(progress_bar);
 }
 
 /// Represents different visual themes for the progress bar.

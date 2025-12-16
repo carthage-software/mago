@@ -27,7 +27,7 @@ pub fn parse_trivia<'arena>(arena: &'arena Bump, trivia: &Trivia<'arena>) -> Res
     parse_phpdoc_with_span(arena, trivia.value, trivia.span)
 }
 
-/// Parses a PHPDoc comment string with an associated span.
+/// Parses a `PHPDoc` comment string with an associated span.
 ///
 /// # Errors
 ///

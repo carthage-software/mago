@@ -1,5 +1,9 @@
+use crate::document::Document;
+use crate::document::Group;
+use crate::document::IfBreak;
+use crate::document::Line;
+use crate::document::Separator;
 use crate::document::group::GroupIdentifier;
-use crate::document::*;
 use crate::internal::FormatterState;
 use crate::internal::format::Format;
 use crate::internal::format::block::block_is_empty;
@@ -7,12 +11,26 @@ use crate::internal::format::format_token;
 use crate::internal::format::misc::print_modifiers;
 use crate::internal::format::parameters::should_break_parameters;
 use crate::internal::format::parameters::should_hug_the_only_parameter;
-use crate::settings::*;
+use crate::settings::BraceStyle;
 use crate::wrap;
 use bumpalo::vec;
 use mago_span::HasSpan;
 use mago_span::Span;
-use mago_syntax::ast::*;
+use mago_syntax::ast::AttributeList;
+use mago_syntax::ast::Block;
+use mago_syntax::ast::Closure;
+use mago_syntax::ast::ClosureUseClause;
+use mago_syntax::ast::ClosureUseClauseVariable;
+use mago_syntax::ast::Function;
+use mago_syntax::ast::FunctionLikeParameterList;
+use mago_syntax::ast::FunctionLikeReturnTypeHint;
+use mago_syntax::ast::Keyword;
+use mago_syntax::ast::LocalIdentifier;
+use mago_syntax::ast::Method;
+use mago_syntax::ast::MethodAbstractBody;
+use mago_syntax::ast::MethodBody;
+use mago_syntax::ast::Modifier;
+use mago_syntax::ast::Sequence;
 
 #[derive(Debug, Clone, Copy)]
 enum FunctionLikeBody<'arena> {
@@ -102,7 +120,7 @@ impl<'arena> FunctionLikeParts<'arena> {
 
     fn format_attributes(&self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
         let mut attributes = vec![in f.arena];
-        for attribute_list in self.attribute_lists.iter() {
+        for attribute_list in self.attribute_lists {
             attributes.push(attribute_list.format(f));
             attributes.push(Document::Line(Line::hard()));
 
@@ -115,7 +133,7 @@ impl<'arena> FunctionLikeParts<'arena> {
         Document::Group(Group::new(attributes))
     }
 
-    fn should_use_inlined_braces(&self, f: &FormatterState<'_, 'arena>, settings: &FunctionLikeSettings) -> bool {
+    fn should_use_inlined_braces(&self, f: &FormatterState<'_, 'arena>, settings: FunctionLikeSettings) -> bool {
         match &self.body {
             FunctionLikeBody::Abstract(_) => false,
             FunctionLikeBody::Block(block) => {
@@ -194,7 +212,7 @@ impl<'arena> FunctionLikeParts<'arena> {
     fn format_brace_spacing(
         &self,
         f: &mut FormatterState<'_, 'arena>,
-        settings: &FunctionLikeSettings,
+        settings: FunctionLikeSettings,
         signature_id: GroupIdentifier,
         parameter_list_will_break: Option<bool>,
         inlined_braces: bool,
@@ -220,7 +238,7 @@ impl<'arena> FunctionLikeParts<'arena> {
     fn format_body(
         &self,
         f: &mut FormatterState<'_, 'arena>,
-        settings: &FunctionLikeSettings,
+        settings: FunctionLikeSettings,
         signature_id: GroupIdentifier,
         parameter_list_will_break: Option<bool>,
     ) -> Document<'arena> {
@@ -256,7 +274,7 @@ impl<'arena> FunctionLikeParts<'arena> {
         };
 
         let (signature, signature_id) = self.format_signature(f, settings.space_before_params);
-        let body = self.format_body(f, &settings, signature_id, parameter_list_will_break);
+        let body = self.format_body(f, settings, signature_id, parameter_list_will_break);
 
         Document::Group(Group::new(vec![
             in f.arena;
@@ -323,7 +341,7 @@ impl<'arena> Format<'arena> for ClosureUseClause<'arena> {
             contents.push(Document::String("("));
 
             let mut variables = vec![in f.arena];
-            for variable in self.variables.iter() {
+            for variable in &self.variables {
                 variables.push(variable.format(f));
             }
 

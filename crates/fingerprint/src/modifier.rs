@@ -1,7 +1,7 @@
 use crate::FingerprintOptions;
 use crate::Fingerprintable;
 use mago_names::ResolvedNames;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Modifier;
 use std::hash::Hash;
 
 impl Fingerprintable for Modifier<'_> {

@@ -27,6 +27,7 @@ impl TCallableParameter {
     /// * `is_variadic`: Whether the parameter is variadic (`...`).
     /// * `has_default`: Whether the parameter is optional (`=`).
     #[inline]
+    #[must_use]
     pub const fn new(
         type_signature: Option<Box<TUnion>>,
         is_by_reference: bool,
@@ -38,6 +39,7 @@ impl TCallableParameter {
 
     /// Returns a reference to the parameter's type signature (`TUnion`), if specified.
     #[inline]
+    #[must_use]
     pub fn get_type_signature(&self) -> Option<&TUnion> {
         self.type_signature.as_deref()
     }
@@ -49,18 +51,21 @@ impl TCallableParameter {
 
     /// Checks if the parameter expects an argument passed by reference (`&`).
     #[inline]
+    #[must_use]
     pub const fn is_by_reference(&self) -> bool {
         self.is_by_reference
     }
 
     /// Checks if the parameter is variadic (`...`).
     #[inline]
+    #[must_use]
     pub const fn is_variadic(&self) -> bool {
         self.is_variadic
     }
 
     /// Checks if the parameter is has a default value (`=`).
     #[inline]
+    #[must_use]
     pub const fn has_default(&self) -> bool {
         self.has_default
     }

@@ -123,12 +123,14 @@ pub struct IssueCollection {
 impl AnnotationKind {
     /// Returns `true` if this annotation kind is primary.
     #[inline]
+    #[must_use]
     pub const fn is_primary(&self) -> bool {
         matches!(self, AnnotationKind::Primary)
     }
 
     /// Returns `true` if this annotation kind is secondary.
     #[inline]
+    #[must_use]
     pub const fn is_secondary(&self) -> bool {
         matches!(self, AnnotationKind::Secondary)
     }
@@ -151,6 +153,7 @@ impl Annotation {
     /// let span = Span::new(file, start, end);
     /// let annotation = Annotation::new(AnnotationKind::Primary, span);
     /// ```
+    #[must_use]
     pub fn new(kind: AnnotationKind, span: Span) -> Self {
         Self { message: None, kind, span }
     }
@@ -171,6 +174,7 @@ impl Annotation {
     /// let span = Span::new(file, start, end);
     /// let annotation = Annotation::primary(span);
     /// ```
+    #[must_use]
     pub fn primary(span: Span) -> Self {
         Self::new(AnnotationKind::Primary, span)
     }
@@ -191,6 +195,7 @@ impl Annotation {
     /// let span = Span::new(file, start, end);
     /// let annotation = Annotation::secondary(span);
     /// ```
+    #[must_use]
     pub fn secondary(span: Span) -> Self {
         Self::new(AnnotationKind::Secondary, span)
     }
@@ -219,6 +224,7 @@ impl Annotation {
     }
 
     /// Returns `true` if this annotation is a primary annotation.
+    #[must_use]
     pub fn is_primary(&self) -> bool {
         self.kind == AnnotationKind::Primary
     }
@@ -251,6 +257,7 @@ impl Level {
     /// let level = Level::Note;
     /// assert_eq!(level.downgrade(), Level::Note);
     /// ```
+    #[must_use]
     pub fn downgrade(&self) -> Self {
         match self {
             Level::Error => Level::Warning,
@@ -448,6 +455,7 @@ impl Issue {
 }
 
 impl IssueCollection {
+    #[must_use]
     pub fn new() -> Self {
         Self { issues: Vec::new() }
     }
@@ -468,43 +476,51 @@ impl IssueCollection {
         self.issues.shrink_to_fit();
     }
 
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.issues.is_empty()
     }
 
+    #[must_use]
     pub fn len(&self) -> usize {
         self.issues.len()
     }
 
     /// Filters the issues in the collection to only include those with a severity level
     /// lower than or equal to the given level.
+    #[must_use]
     pub fn with_maximum_level(self, level: Level) -> Self {
         Self { issues: self.issues.into_iter().filter(|issue| issue.level <= level).collect() }
     }
 
     /// Filters the issues in the collection to only include those with a severity level
     ///  higher than or equal to the given level.
+    #[must_use]
     pub fn with_minimum_level(self, level: Level) -> Self {
         Self { issues: self.issues.into_iter().filter(|issue| issue.level >= level).collect() }
     }
 
     /// Returns `true` if the collection contains any issues with a severity level
     ///  higher than or equal to the given level.
+    #[must_use]
     pub fn has_minimum_level(&self, level: Level) -> bool {
         self.issues.iter().any(|issue| issue.level >= level)
     }
 
     /// Returns the number of issues in the collection with the given severity level.
+    #[must_use]
     pub fn get_level_count(&self, level: Level) -> usize {
         self.issues.iter().filter(|issue| issue.level == level).count()
     }
 
     /// Returns the highest severity level of the issues in the collection.
+    #[must_use]
     pub fn get_highest_level(&self) -> Option<Level> {
         self.issues.iter().map(|issue| issue.level).max()
     }
 
     /// Returns the lowest severity level of the issues in the collection.
+    #[must_use]
     pub fn get_lowest_level(&self) -> Option<Level> {
         self.issues.iter().map(|issue| issue.level).min()
     }
@@ -521,6 +537,7 @@ impl IssueCollection {
         self.issues.iter_mut().flat_map(Issue::take_suggestions)
     }
 
+    #[must_use]
     pub fn filter_fixable(self) -> Self {
         Self { issues: self.issues.into_iter().filter(|issue| !issue.suggestions.is_empty()).collect() }
     }
@@ -529,6 +546,7 @@ impl IssueCollection {
     ///
     /// The issues are sorted by severity level in descending order,
     /// then by code in ascending order, and finally by the primary annotation span.
+    #[must_use]
     pub fn sorted(self) -> Self {
         let mut issues = self.issues;
 
@@ -568,6 +586,7 @@ impl IssueCollection {
         self.issues.iter()
     }
 
+    #[must_use]
     pub fn to_fix_plans(self) -> HashMap<FileId, FixPlan> {
         let mut plans: HashMap<FileId, FixPlan> = HashMap::default();
         for issue in self.issues.into_iter().filter(|issue| !issue.suggestions.is_empty()) {
@@ -594,6 +613,16 @@ impl IntoIterator for IssueCollection {
 
     fn into_iter(self) -> Self::IntoIter {
         self.issues.into_iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a IssueCollection {
+    type Item = &'a Issue;
+
+    type IntoIter = std::slice::Iter<'a, Issue>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.issues.iter()
     }
 }
 

@@ -131,6 +131,7 @@ fn normalize_path(path: &str) -> String {
 
 impl StrictBaseline {
     /// Creates a new empty strict baseline.
+    #[must_use]
     pub fn new() -> Self {
         Self { variant: Some(BaselineVariant::Strict), entries: BTreeMap::new() }
     }
@@ -139,6 +140,7 @@ impl StrictBaseline {
     ///
     /// The baseline will contain all issues organized by their file paths with exact line numbers.
     /// File paths are normalized to ensure cross-platform compatibility.
+    #[must_use]
     pub fn generate_from_issues(issues: &IssueCollection, read_database: &ReadDatabase) -> Self {
         let mut entries: BTreeMap<Cow<'static, str>, StrictBaselineEntry> = BTreeMap::new();
 
@@ -180,6 +182,7 @@ impl StrictBaseline {
     ///
     /// Returns a new issue collection containing only issues that are not in the baseline.
     /// Issues are matched by exact file path, code, and line numbers.
+    #[must_use]
     pub fn filter_issues(&self, issues: IssueCollection, read_database: &ReadDatabase) -> IssueCollection {
         let mut filtered_issues = Vec::new();
 
@@ -221,6 +224,7 @@ impl StrictBaseline {
     ///
     /// Returns a comparison result with statistics about differences between the baseline
     /// and current issues.
+    #[must_use]
     pub fn compare_with_issues(
         &self,
         issues: &IssueCollection,
@@ -283,6 +287,7 @@ impl StrictBaseline {
 
 impl LooseBaseline {
     /// Creates a new empty loose baseline.
+    #[must_use]
     pub fn new() -> Self {
         Self { variant: BaselineVariant::Loose, issues: Vec::new() }
     }
@@ -291,6 +296,7 @@ impl LooseBaseline {
     ///
     /// Issues are grouped by (file, code, message) tuple and stored with a count.
     /// File paths are normalized to ensure cross-platform compatibility.
+    #[must_use]
     pub fn generate_from_issues(issues: &IssueCollection, read_database: &ReadDatabase) -> Self {
         let mut issue_counts: HashMap<(String, String, String), u32> = HashMap::default();
 
@@ -325,6 +331,7 @@ impl LooseBaseline {
     ///
     /// Returns a new issue collection containing only issues that exceed the baseline counts.
     /// For each (file, code, message) tuple, issues are filtered out up to the count in the baseline.
+    #[must_use]
     pub fn filter_issues(&self, issues: IssueCollection, read_database: &ReadDatabase) -> IssueCollection {
         let mut remaining_counts: HashMap<(String, String, String), u32> =
             self.issues.iter().map(|i| ((i.file.clone(), i.code.clone(), i.message.clone()), i.count)).collect();
@@ -363,6 +370,7 @@ impl LooseBaseline {
     ///
     /// Returns a comparison result with statistics about differences between the baseline
     /// and current issues.
+    #[must_use]
     pub fn compare_with_issues(
         &self,
         issues: &IssueCollection,
@@ -407,6 +415,7 @@ impl LooseBaseline {
 
 impl Baseline {
     /// Generates a baseline from a collection of issues using the specified variant.
+    #[must_use]
     pub fn generate_from_issues(
         issues: &IssueCollection,
         read_database: &ReadDatabase,
@@ -421,6 +430,7 @@ impl Baseline {
     /// Filters an issue collection against this baseline.
     ///
     /// Returns a new issue collection containing only issues that are not in the baseline.
+    #[must_use]
     pub fn filter_issues(&self, issues: IssueCollection, read_database: &ReadDatabase) -> IssueCollection {
         match self {
             Baseline::Strict(strict) => strict.filter_issues(issues, read_database),
@@ -432,6 +442,7 @@ impl Baseline {
     ///
     /// Returns a comparison result with statistics about differences between the baseline
     /// and current issues.
+    #[must_use]
     pub fn compare_with_issues(
         &self,
         issues: &IssueCollection,
@@ -444,6 +455,7 @@ impl Baseline {
     }
 
     /// Returns the variant of this baseline.
+    #[must_use]
     pub fn variant(&self) -> BaselineVariant {
         match self {
             Baseline::Strict(_) => BaselineVariant::Strict,

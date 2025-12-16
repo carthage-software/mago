@@ -99,7 +99,7 @@ pub(crate) fn reconcile(
                     key,
                     negated,
                     span,
-                    resource_to_intersect,
+                    *resource_to_intersect,
                 ));
             }
             TAtomic::Mixed(mixed) if mixed.is_non_null() => {
@@ -122,7 +122,7 @@ pub(crate) fn reconcile(
                     assertion,
                     existing_var_type,
                     key,
-                    &has_method.method,
+                    has_method.method,
                     negated,
                     span,
                 ));
@@ -133,7 +133,7 @@ pub(crate) fn reconcile(
                     assertion,
                     existing_var_type,
                     key,
-                    &has_property.property,
+                    has_property.property,
                     negated,
                     span,
                 ));
@@ -226,7 +226,7 @@ pub(crate) fn reconcile(
                     negated,
                     span,
                     assertion.has_equality(),
-                    bool,
+                    *bool,
                 ));
             }
             TAtomic::Scalar(TScalar::Float(float)) if float.is_general() => {
@@ -302,16 +302,16 @@ pub(crate) fn reconcile(
             Some(reconcile_non_empty_countable(context, assertion, existing_var_type, key, negated, span, false))
         }
         Assertion::HasExactCount(count) => {
-            Some(reconcile_exactly_countable(context, assertion, existing_var_type, key, negated, span, false, count))
+            Some(reconcile_exactly_countable(context, assertion, existing_var_type, key, negated, span, false, *count))
         }
         Assertion::HasAtLeastCount(count) => {
-            Some(reconcile_at_least_countable(context, assertion, existing_var_type, key, negated, span, false, count))
+            Some(reconcile_at_least_countable(context, assertion, existing_var_type, key, negated, span, false, *count))
         }
         Assertion::IsLessThan(less_than) => {
-            Some(reconcile_less_than(context, assertion, existing_var_type, key, negated, span, less_than))
+            Some(reconcile_less_than(context, assertion, existing_var_type, key, negated, span, *less_than))
         }
         Assertion::IsGreaterThan(greater_than) => {
-            Some(reconcile_greater_than(context, assertion, existing_var_type, key, negated, span, greater_than))
+            Some(reconcile_greater_than(context, assertion, existing_var_type, key, negated, span, *greater_than))
         }
         Assertion::IsLessThanOrEqual(less_than_or_equal) => Some(reconcile_less_than_or_equal(
             context,
@@ -320,7 +320,7 @@ pub(crate) fn reconcile(
             key,
             negated,
             span,
-            less_than_or_equal,
+            *less_than_or_equal,
         )),
         Assertion::IsGreaterThanOrEqual(greater_than_or_equal) => Some(reconcile_greater_than_or_equal(
             context,
@@ -329,7 +329,7 @@ pub(crate) fn reconcile(
             key,
             negated,
             span,
-            greater_than_or_equal,
+            *greater_than_or_equal,
         )),
         Assertion::Countable => Some(reconcile_countable(context, assertion, existing_var_type, key, negated, span)),
         _ => None,
@@ -407,7 +407,7 @@ pub(crate) fn intersect_resource(
     key: Option<&str>,
     negated: bool,
     span: Option<&Span>,
-    resource_to_intersection: &TResource,
+    resource_to_intersection: TResource,
 ) -> TUnion {
     if existing_var_type.is_mixed() {
         return match resource_to_intersection.closed {
@@ -429,7 +429,7 @@ pub(crate) fn intersect_resource(
                 (None, Some(true | false)) => {
                     did_remove_type = true;
 
-                    acceptable_types.push(TAtomic::Resource(*resource_to_intersection));
+                    acceptable_types.push(TAtomic::Resource(resource_to_intersection));
                 }
                 (Some(true), Some(false)) | (Some(false), Some(true)) => {
                     did_remove_type = true;
@@ -1089,7 +1089,7 @@ fn intersect_bool(
     negated: bool,
     span: Option<&Span>,
     is_equality: bool,
-    boolean: &TBool,
+    boolean: TBool,
 ) -> TUnion {
     // Treat specific boolean values (true/false literals) as equality checks
     // even if the assertion is IsType rather than IsIdentical
@@ -1101,21 +1101,21 @@ fn intersect_bool(
     for atomic in existing_var_type.types.as_ref() {
         match atomic {
             TAtomic::Scalar(TScalar::Bool(existing_bool)) => {
-                if existing_bool.is_general() || existing_bool == boolean {
-                    acceptable_types.push(TAtomic::Scalar(TScalar::Bool(*boolean)));
+                if existing_bool.is_general() || *existing_bool == boolean {
+                    acceptable_types.push(TAtomic::Scalar(TScalar::Bool(boolean)));
                 } else {
                     did_remove_type = true;
                 }
             }
             TAtomic::Mixed(_) | TAtomic::Scalar(TScalar::Generic | TScalar::ArrayKey) => {
-                return TUnion::from_atomic(TAtomic::Scalar(TScalar::Bool(*boolean)));
+                return TUnion::from_atomic(TAtomic::Scalar(TScalar::Bool(boolean)));
             }
             TAtomic::GenericParameter(generic_parameter) => {
                 did_remove_type = true;
 
                 if let Some(atomic) = map_generic_constraint_or_else(
                     generic_parameter,
-                    || TUnion::from_atomic(TAtomic::Scalar(TScalar::Bool(*boolean))),
+                    || TUnion::from_atomic(TAtomic::Scalar(TScalar::Bool(boolean))),
                     |constraint| {
                         intersect_bool(context, assertion, constraint, None, false, None, is_equality, boolean)
                     },
@@ -1131,7 +1131,7 @@ fn intersect_bool(
                 if atomic_comparator::is_contained_by(
                     context.codebase,
                     atomic,
-                    &TAtomic::Scalar(TScalar::Bool(*boolean)),
+                    &TAtomic::Scalar(TScalar::Bool(boolean)),
                     false,
                     &mut ComparisonResult::new(),
                 ) {
@@ -1521,7 +1521,7 @@ fn reconcile_exactly_countable(
     negated: bool,
     span: Option<&Span>,
     recursive_check: bool,
-    count: &usize,
+    count: usize,
 ) -> TUnion {
     let old_var_type_atom = existing_var_type.get_id();
 
@@ -1532,14 +1532,14 @@ fn reconcile_exactly_countable(
 
     for atomic in existing_var_types {
         if let TAtomic::Array(TArray::List(TList { non_empty, known_count, element_type, known_elements })) = atomic {
-            let min_under_count = if let Some(known_count) = known_count { known_count < count } else { false };
+            let min_under_count = if let Some(known_count) = known_count { *known_count < count } else { false };
             if !non_empty || min_under_count {
                 existing_var_type.remove_type(atomic);
                 if !element_type.is_never() {
                     existing_var_type.types.to_mut().push(TAtomic::Array(TArray::List(TList {
                         element_type: element_type.clone(),
                         known_elements: known_elements.clone(),
-                        known_count: Some(*count),
+                        known_count: Some(count),
                         non_empty: true,
                     })));
                 }
@@ -1586,7 +1586,7 @@ fn reconcile_at_least_countable(
     negated: bool,
     span: Option<&Span>,
     recursive_check: bool,
-    count: &usize,
+    count: usize,
 ) -> TUnion {
     let old_var_type_atom = existing_var_type.get_id();
 
@@ -1598,8 +1598,8 @@ fn reconcile_at_least_countable(
     for atomic in existing_var_types {
         if let TAtomic::Array(TArray::List(TList { non_empty, known_count, element_type, known_elements })) = atomic {
             let min_under_count = match known_count {
-                Some(kc) => kc < count,
-                None => *non_empty && *count > 1,
+                Some(kc) => *kc < count,
+                None => *non_empty && count > 1,
             };
 
             if !non_empty || min_under_count {
@@ -1608,7 +1608,7 @@ fn reconcile_at_least_countable(
                     existing_var_type.types.to_mut().push(TAtomic::Array(TArray::List(TList {
                         element_type: element_type.clone(),
                         known_elements: known_elements.clone(),
-                        known_count: Some(*count),
+                        known_count: Some(count),
                         non_empty: true,
                     })));
                 }
@@ -1723,7 +1723,7 @@ fn reconcile_less_than(
     key: Option<&str>,
     negated: bool,
     span: Option<&Span>,
-    value: &i64,
+    value: i64,
 ) -> TUnion {
     reconcile_integer_comparison(
         context,
@@ -1746,7 +1746,7 @@ fn reconcile_less_than_or_equal(
     key: Option<&str>,
     negated: bool,
     span: Option<&Span>,
-    value: &i64,
+    value: i64,
 ) -> TUnion {
     reconcile_integer_comparison(
         context,
@@ -1769,7 +1769,7 @@ fn reconcile_greater_than(
     key: Option<&str>,
     negated: bool,
     span: Option<&Span>,
-    value: &i64,
+    value: i64,
 ) -> TUnion {
     reconcile_integer_comparison(
         context,
@@ -1792,7 +1792,7 @@ fn reconcile_greater_than_or_equal(
     key: Option<&str>,
     negated: bool,
     span: Option<&Span>,
-    value: &i64,
+    value: i64,
 ) -> TUnion {
     reconcile_integer_comparison(
         context,
@@ -1814,7 +1814,7 @@ fn reconcile_integer_comparison(
     key: Option<&str>,
     negated: bool,
     span: Option<&Span>,
-    value: &i64,
+    value: i64,
     is_less_than: bool,
     or_equal: bool,
 ) -> TUnion {
@@ -1827,7 +1827,7 @@ fn reconcile_integer_comparison(
 
     for atomic in existing_var_types {
         if is_less_than
-            && *value == 0
+            && value == 0
             && let TAtomic::Null | TAtomic::Scalar(TScalar::Bool(TBool { value: Some(false) })) = &atomic
         {
             existing_var_type.remove_type(atomic);
@@ -1845,23 +1845,23 @@ fn reconcile_integer_comparison(
 
             if is_less_than {
                 existing_var_type.types.to_mut().push(TAtomic::Scalar(TScalar::Integer(TInteger::To(if or_equal {
-                    *value
+                    value
                 } else {
                     value.saturating_sub(1)
                 }))));
             } else {
                 existing_var_type.types.to_mut().push(TAtomic::Scalar(TScalar::Integer(TInteger::From(if or_equal {
-                    *value
+                    value
                 } else {
                     value.saturating_add(1)
                 }))));
             }
         } else {
             let new_integer = match (is_less_than, or_equal) {
-                (true, false) => integer.to_less_than(*value),
-                (true, true) => integer.to_less_than_or_equal(*value),
-                (false, false) => integer.to_greater_than(*value),
-                (false, true) => integer.to_greater_than_or_equal(*value),
+                (true, false) => integer.to_less_than(value),
+                (true, true) => integer.to_less_than_or_equal(value),
+                (false, false) => integer.to_greater_than(value),
+                (false, true) => integer.to_greater_than_or_equal(value),
             };
 
             if let Some(new_integer) = new_integer {
@@ -2235,12 +2235,12 @@ fn reconcile_has_method(
     assertion: &Assertion,
     existing_var_type: &TUnion,
     key: Option<&str>,
-    method_name: &Atom,
+    method_name: Atom,
     negated: bool,
     span: Option<&Span>,
 ) -> TUnion {
     if existing_var_type.is_mixed() {
-        return wrap_atomic(TAtomic::Object(TObject::new_has_method(*method_name)));
+        return wrap_atomic(TAtomic::Object(TObject::new_has_method(method_name)));
     }
 
     let mut acceptable_types = Vec::new();
@@ -2249,19 +2249,19 @@ fn reconcile_has_method(
     for atomic in existing_var_type.types.as_ref() {
         match atomic {
             TAtomic::Object(TObject::Any | TObject::WithProperties(_)) => {
-                acceptable_types.push(TAtomic::Object(TObject::new_has_method(*method_name)));
+                acceptable_types.push(TAtomic::Object(TObject::new_has_method(method_name)));
                 did_remove_type = true;
             }
             TAtomic::Object(TObject::Named(named_object)) => {
                 let class_name = named_object.get_name();
-                let method_id = MethodIdentifier::new(class_name, *method_name);
+                let method_id = MethodIdentifier::new(class_name, method_name);
                 if context.codebase.method_identifier_exists(&method_id)
                     || context.codebase.get_declaring_method_identifier(&method_id) != method_id
                 {
                     acceptable_types.push(atomic.clone());
                 } else {
                     let mut new_named = named_object.clone();
-                    new_named.add_intersection_type(TAtomic::Object(TObject::new_has_method(*method_name)));
+                    new_named.add_intersection_type(TAtomic::Object(TObject::new_has_method(method_name)));
                     acceptable_types.push(TAtomic::Object(TObject::Named(new_named)));
                     did_remove_type = true;
                 }
@@ -2271,12 +2271,12 @@ fn reconcile_has_method(
             }
             TAtomic::Object(TObject::HasMethod(has_method)) => {
                 let mut new_has_method = has_method.clone();
-                new_has_method.add_intersection_type(TAtomic::Object(TObject::new_has_method(*method_name)));
+                new_has_method.add_intersection_type(TAtomic::Object(TObject::new_has_method(method_name)));
                 acceptable_types.push(TAtomic::Object(TObject::HasMethod(new_has_method)));
             }
             TAtomic::Object(TObject::HasProperty(has_property)) => {
                 let mut new_has_property = has_property.clone();
-                new_has_property.add_intersection_type(TAtomic::Object(TObject::new_has_method(*method_name)));
+                new_has_property.add_intersection_type(TAtomic::Object(TObject::new_has_method(method_name)));
                 acceptable_types.push(TAtomic::Object(TObject::HasProperty(new_has_property)));
             }
             TAtomic::GenericParameter(generic_parameter) => {
@@ -2292,7 +2292,7 @@ fn reconcile_has_method(
                 did_remove_type = true;
             }
             TAtomic::Mixed(_) => {
-                acceptable_types.push(TAtomic::Object(TObject::new_has_method(*method_name)));
+                acceptable_types.push(TAtomic::Object(TObject::new_has_method(method_name)));
                 did_remove_type = true;
             }
             _ => {
@@ -2324,12 +2324,12 @@ fn reconcile_has_property(
     assertion: &Assertion,
     existing_var_type: &TUnion,
     key: Option<&str>,
-    property_name: &Atom,
+    property_name: Atom,
     negated: bool,
     span: Option<&Span>,
 ) -> TUnion {
     if existing_var_type.is_mixed() {
-        return wrap_atomic(TAtomic::Object(TObject::new_has_property(*property_name)));
+        return wrap_atomic(TAtomic::Object(TObject::new_has_property(property_name)));
     }
 
     let mut acceptable_types = Vec::new();
@@ -2341,22 +2341,22 @@ fn reconcile_has_property(
                 did_remove_type = true;
             }
             TAtomic::Object(TObject::Any | TObject::WithProperties(_)) => {
-                acceptable_types.push(TAtomic::Object(TObject::new_has_property(*property_name)));
+                acceptable_types.push(TAtomic::Object(TObject::new_has_property(property_name)));
                 did_remove_type = true;
             }
             TAtomic::Object(TObject::Named(named_object)) => {
                 let mut new_named = named_object.clone();
-                new_named.add_intersection_type(TAtomic::Object(TObject::new_has_property(*property_name)));
+                new_named.add_intersection_type(TAtomic::Object(TObject::new_has_property(property_name)));
                 acceptable_types.push(TAtomic::Object(TObject::Named(new_named)));
             }
             TAtomic::Object(TObject::HasMethod(has_method)) => {
                 let mut new_has_method = has_method.clone();
-                new_has_method.add_intersection_type(TAtomic::Object(TObject::new_has_property(*property_name)));
+                new_has_method.add_intersection_type(TAtomic::Object(TObject::new_has_property(property_name)));
                 acceptable_types.push(TAtomic::Object(TObject::HasMethod(new_has_method)));
             }
             TAtomic::Object(TObject::HasProperty(has_property)) => {
                 let mut new_has_property = has_property.clone();
-                new_has_property.add_intersection_type(TAtomic::Object(TObject::new_has_property(*property_name)));
+                new_has_property.add_intersection_type(TAtomic::Object(TObject::new_has_property(property_name)));
                 acceptable_types.push(TAtomic::Object(TObject::HasProperty(new_has_property)));
             }
             TAtomic::GenericParameter(generic_parameter) => {
@@ -2372,7 +2372,7 @@ fn reconcile_has_property(
                 did_remove_type = true;
             }
             TAtomic::Mixed(_) => {
-                acceptable_types.push(TAtomic::Object(TObject::new_has_property(*property_name)));
+                acceptable_types.push(TAtomic::Object(TObject::new_has_property(property_name)));
                 did_remove_type = true;
             }
             _ => {

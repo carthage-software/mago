@@ -6,13 +6,13 @@ use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Attribute;
+use mago_syntax::ast::AttributeList;
 
 use crate::artifacts::AnalysisArtifacts;
 use crate::code::IssueCode;
 use crate::context::Context;
 use crate::context::block::BlockContext;
-use crate::error::AnalysisError;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u8)]
@@ -49,7 +49,7 @@ pub fn analyze_attributes<'ctx, 'arena>(
     _artifacts: &mut AnalysisArtifacts,
     attribute_lists: &[AttributeList<'arena>],
     target: AttributeTarget,
-) -> Result<(), AnalysisError> {
+) {
     let attributes = attribute_lists.iter().flat_map(|list| list.attributes.iter()).collect::<Vec<_>>();
 
     let mut used_attributes = HashMap::default();
@@ -182,8 +182,6 @@ pub fn analyze_attributes<'ctx, 'arena>(
             }
         }
     }
-
-    Ok(())
 }
 
 fn report_invalid_target<'ctx, 'arena>(

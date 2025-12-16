@@ -10,7 +10,9 @@ use mago_codex::ttype::union::TUnion;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
-use mago_syntax::ast::*;
+use mago_syntax::ast::BinaryOperator;
+use mago_syntax::ast::Expression;
+use mago_syntax::ast::UnaryPrefixOperator;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;

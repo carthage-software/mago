@@ -1,7 +1,12 @@
 use mago_php_version::feature::Feature;
-use mago_reporting::*;
-use mago_span::*;
-use mago_syntax::ast::*;
+use mago_reporting::Annotation;
+use mago_reporting::Issue;
+use mago_span::HasSpan;
+use mago_span::Span;
+use mago_syntax::ast::Match;
+use mago_syntax::ast::MatchArm;
+use mago_syntax::ast::Switch;
+use mago_syntax::ast::SwitchCase;
 
 use crate::internal::context::Context;
 
@@ -50,7 +55,7 @@ pub fn check_match(r#match: &Match, context: &mut Context<'_, '_, '_>) {
     }
 
     let mut last_default: Option<Span> = None;
-    for arm in r#match.arms.iter() {
+    for arm in &r#match.arms {
         let MatchArm::Default(default_arm) = &arm else {
             continue;
         };

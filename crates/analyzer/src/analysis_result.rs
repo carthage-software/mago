@@ -12,6 +12,7 @@ pub struct AnalysisResult {
 }
 
 impl AnalysisResult {
+    #[must_use]
     pub fn new(symbol_references: SymbolReferences) -> Self {
         Self {
             issues: IssueCollection::default(),

@@ -23,18 +23,21 @@ pub struct TObjectHasMethod {
 impl TObjectHasMethod {
     /// Creates a new `TObjectHasMethod` with the given method name.
     #[inline]
+    #[must_use]
     pub const fn new(method: Atom) -> Self {
         Self { method, intersection_types: None }
     }
 
     /// Returns the method name.
     #[inline]
+    #[must_use]
     pub const fn get_method(&self) -> &Atom {
         &self.method
     }
 
     /// Checks if this method name matches the given name (case-insensitive).
     #[inline]
+    #[must_use]
     pub fn has_method(&self, method_name: &str) -> bool {
         self.method.eq_ignore_ascii_case(method_name)
     }

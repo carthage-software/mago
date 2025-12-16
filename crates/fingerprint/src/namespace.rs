@@ -1,7 +1,9 @@
 use std::hash::Hash;
 
 use mago_names::ResolvedNames;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Namespace;
+use mago_syntax::ast::NamespaceBody;
+use mago_syntax::ast::NamespaceImplicitBody;
 
 use crate::FingerprintOptions;
 use crate::Fingerprintable;
@@ -42,7 +44,7 @@ impl Fingerprintable for NamespaceImplicitBody<'_> {
     ) {
         "namespace_implicit".hash(hasher);
 
-        for statement in self.statements.iter() {
+        for statement in &self.statements {
             statement.fingerprint_with_hasher(hasher, resolved_names, options);
         }
     }

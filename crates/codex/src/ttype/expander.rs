@@ -236,7 +236,7 @@ pub(crate) fn expand_atomic(
         }
         TAtomic::Reference(TReference::Member { class_like_name, member_selector }) => {
             *skip_key = true;
-            expand_member_reference(class_like_name, member_selector, codebase, options, new_return_type_parts);
+            expand_member_reference(*class_like_name, member_selector, codebase, options, new_return_type_parts);
         }
         TAtomic::Callable(TCallable::Alias(id)) => {
             if let Some(value) = get_atomic_of_function_like_identifier(id, codebase) {
@@ -296,13 +296,13 @@ pub(crate) fn expand_atomic(
 
 #[cold]
 fn expand_member_reference(
-    class_like_name: &Atom,
+    class_like_name: Atom,
     member_selector: &TReferenceMemberSelector,
     codebase: &CodebaseMetadata,
     options: &TypeExpansionOptions,
     new_return_type_parts: &mut Vec<TAtomic>,
 ) {
-    let Some(class_like) = codebase.get_class_like(class_like_name) else {
+    let Some(class_like) = codebase.get_class_like(&class_like_name) else {
         new_return_type_parts.push(TAtomic::Mixed(TMixed::new()));
         return;
     };
@@ -362,7 +362,7 @@ fn expand_object(named_object: &mut TObject, codebase: &CodebaseMetadata, option
                     }
 
                     if named_object.type_parameters.is_none() {
-                        named_object.type_parameters = static_object.type_parameters.clone();
+                        named_object.type_parameters.clone_from(&static_object.type_parameters);
                     }
 
                     named_object.name = static_object.name;
@@ -400,9 +400,8 @@ fn expand_object(named_object: &mut TObject, codebase: &CodebaseMetadata, option
         return;
     };
 
-    let _guard = match ObjectParamsExpansionGuard::try_new(named_object.name) {
-        Some(guard) => guard,
-        None => return,
+    let Some(_guard) = ObjectParamsExpansionGuard::try_new(named_object.name) else {
+        return;
     };
 
     if let Some(class_like_metadata) = codebase.get_class_like(&named_object.name) {
@@ -441,6 +440,7 @@ fn expand_object(named_object: &mut TObject, codebase: &CodebaseMetadata, option
     }
 }
 
+#[must_use]
 pub fn get_signature_of_function_like_identifier(
     function_like_identifier: &FunctionLikeIdentifier,
     codebase: &CodebaseMetadata,
@@ -483,6 +483,7 @@ pub fn get_signature_of_function_like_identifier(
     })
 }
 
+#[must_use]
 pub fn get_atomic_of_function_like_identifier(
     function_like_identifier: &FunctionLikeIdentifier,
     codebase: &CodebaseMetadata,
@@ -492,6 +493,7 @@ pub fn get_atomic_of_function_like_identifier(
     Some(TAtomic::Callable(TCallable::Signature(signature)))
 }
 
+#[must_use]
 pub fn get_signature_of_function_like_metadata(
     function_like_identifier: &FunctionLikeIdentifier,
     function_like_metadata: &FunctionLikeMetadata,

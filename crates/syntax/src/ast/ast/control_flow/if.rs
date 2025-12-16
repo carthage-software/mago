@@ -99,6 +99,7 @@ pub struct IfColonDelimitedBodyElseClause<'arena> {
 }
 
 impl<'arena> IfBody<'arena> {
+    #[must_use]
     pub const fn has_else_clause(&self) -> bool {
         match &self {
             IfBody::Statement(if_statement_body) => if_statement_body.else_clause.is_some(),
@@ -106,6 +107,7 @@ impl<'arena> IfBody<'arena> {
         }
     }
 
+    #[must_use]
     pub fn has_else_if_clauses(&self) -> bool {
         match &self {
             IfBody::Statement(if_statement_body) => !if_statement_body.else_if_clauses.is_empty(),
@@ -113,6 +115,7 @@ impl<'arena> IfBody<'arena> {
         }
     }
 
+    #[must_use]
     pub fn statements(&self) -> &[Statement<'arena>] {
         match &self {
             IfBody::Statement(if_statement_body) => std::slice::from_ref(if_statement_body.statement),
@@ -120,6 +123,7 @@ impl<'arena> IfBody<'arena> {
         }
     }
 
+    #[must_use]
     pub fn else_statements(&self) -> Option<&[Statement<'arena>]> {
         match &self {
             IfBody::Statement(if_statement_body) => {
@@ -131,6 +135,7 @@ impl<'arena> IfBody<'arena> {
         }
     }
 
+    #[must_use]
     pub fn else_if_statements(&self) -> Vec<&[Statement<'arena>]> {
         match &self {
             IfBody::Statement(if_statement_body) => {
@@ -142,6 +147,7 @@ impl<'arena> IfBody<'arena> {
         }
     }
 
+    #[must_use]
     pub fn else_if_clauses(&self) -> Vec<(&Expression<'arena>, &[Statement<'arena>])> {
         match &self {
             IfBody::Statement(if_statement_body) => if_statement_body
@@ -177,9 +183,7 @@ impl HasSpan for IfStatementBody<'_> {
 
         Span::between(
             span,
-            self.else_clause
-                .as_ref()
-                .map_or_else(|| self.else_if_clauses.span(span.file_id, span.end), |r#else| r#else.span()),
+            self.else_clause.as_ref().map_or_else(|| self.else_if_clauses.span(span.file_id, span.end), HasSpan::span),
         )
     }
 }

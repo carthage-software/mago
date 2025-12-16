@@ -9,7 +9,8 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_reporting::Level;
 use mago_span::HasSpan;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Node;
+use mago_syntax::ast::NodeKind;
 
 use crate::category::Category;
 use crate::context::LintContext;
@@ -98,7 +99,7 @@ impl LintRule for ConstantNameRule {
     fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         match node {
             Node::Constant(constant) => {
-                for item in constant.items.iter() {
+                for item in &constant.items {
                     let name = item.name.value;
                     if !is_constant_case(name) {
                         ctx.collector.report(
@@ -120,7 +121,7 @@ impl LintRule for ConstantNameRule {
                 }
             }
             Node::ClassLikeConstant(class_like_constant) => {
-                for item in class_like_constant.items.iter() {
+                for item in &class_like_constant.items {
                     let name = item.name.value;
 
                     if !is_constant_case(name) {

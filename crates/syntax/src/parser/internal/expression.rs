@@ -1,7 +1,39 @@
 use either::Either;
 
 use crate::T;
-use crate::ast::ast::*;
+use crate::ast::ast::Access;
+use crate::ast::ast::ArrayAccess;
+use crate::ast::ast::ArrayAppend;
+use crate::ast::ast::ArrowFunction;
+use crate::ast::ast::Assignment;
+use crate::ast::ast::AssignmentOperator;
+use crate::ast::ast::Binary;
+use crate::ast::ast::BinaryOperator;
+use crate::ast::ast::Call;
+use crate::ast::ast::ClassConstantAccess;
+use crate::ast::ast::ClassLikeConstantSelector;
+use crate::ast::ast::ClassLikeMemberSelector;
+use crate::ast::ast::Closure;
+use crate::ast::ast::Conditional;
+use crate::ast::ast::ConstantAccess;
+use crate::ast::ast::Expression;
+use crate::ast::ast::FunctionCall;
+use crate::ast::ast::FunctionPartialApplication;
+use crate::ast::ast::MethodCall;
+use crate::ast::ast::MethodPartialApplication;
+use crate::ast::ast::NullSafeMethodCall;
+use crate::ast::ast::NullSafePropertyAccess;
+use crate::ast::ast::Parenthesized;
+use crate::ast::ast::PartialApplication;
+use crate::ast::ast::Pipe;
+use crate::ast::ast::PropertyAccess;
+use crate::ast::ast::StaticMethodCall;
+use crate::ast::ast::StaticMethodPartialApplication;
+use crate::ast::ast::StaticPropertyAccess;
+use crate::ast::ast::UnaryPostfix;
+use crate::ast::ast::UnaryPostfixOperator;
+use crate::ast::ast::UnaryPrefix;
+use crate::ast::ast::UnaryPrefixOperator;
 use crate::error::ParseError;
 use crate::parser::internal::argument;
 use crate::parser::internal::array::parse_array;
@@ -92,7 +124,16 @@ fn parse_lhs_expression<'arena>(
     let next = utils::maybe_peek_nth(stream, 1)?.map(|t| t.kind);
 
     let is_call = precedence != Precedence::New && matches!(next, Some(T!["("]));
-    let is_call_or_access = is_call || matches!(next, Some(T!["[" | "::" | "->" | "?->"]));
+    let is_call_or_access = is_call
+        || matches!(
+            next,
+            Some(
+                crate::token::TokenKind::LeftBracket
+                    | crate::token::TokenKind::ColonColon
+                    | crate::token::TokenKind::MinusGreaterThan
+                    | crate::token::TokenKind::QuestionMinusGreaterThan
+            )
+        );
 
     if token.kind.is_literal() && (!token.kind.is_keyword() || !is_call_or_access) {
         return literal::parse_literal(stream).map(Expression::Literal);
@@ -148,7 +189,12 @@ fn parse_lhs_expression<'arena>(
         (T!["match"], Some(T!["("])) => Expression::Match(parse_match(stream)?),
         (T!["array"], Some(T!["("])) => Expression::LegacyArray(parse_legacy_array(stream)?),
         (T!["["], _) => Expression::Array(parse_array(stream)?),
-        (T!["$" | "${" | "$variable"], _) => variable::parse_variable(stream).map(Expression::Variable)?,
+        (
+            crate::token::TokenKind::Dollar
+            | crate::token::TokenKind::DollarLeftBrace
+            | crate::token::TokenKind::Variable,
+            _,
+        ) => variable::parse_variable(stream).map(Expression::Variable)?,
         (kind, _) if kind.is_magic_constant() => Expression::MagicConstant(parse_magic_constant(stream)?),
         (kind, ..)
             if matches!(kind, T![Identifier | QualifiedIdentifier | FullyQualifiedIdentifier | "clone"])

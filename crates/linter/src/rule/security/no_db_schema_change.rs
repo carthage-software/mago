@@ -7,7 +7,15 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_reporting::Level;
 use mago_span::HasSpan;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Argument;
+use mago_syntax::ast::BinaryOperator;
+use mago_syntax::ast::ClassLikeMemberSelector;
+use mago_syntax::ast::Expression;
+use mago_syntax::ast::Literal;
+use mago_syntax::ast::Node;
+use mago_syntax::ast::NodeKind;
+use mago_syntax::ast::StringPart;
+use mago_syntax::ast::Variable;
 
 use crate::category::Category;
 use crate::context::LintContext;
@@ -166,7 +174,7 @@ fn contains_schema_change_keywords(expr: &Expression) -> bool {
             contains_schema_change_keywords(binary.lhs) || contains_schema_change_keywords(binary.rhs)
         }
         Expression::CompositeString(composite_string) => {
-            for part in composite_string.parts().iter() {
+            for part in composite_string.parts() {
                 let StringPart::Literal(literal_string_part) = part else {
                     continue;
                 };

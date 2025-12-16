@@ -31,6 +31,7 @@ pub struct Trivia<'arena> {
 impl TriviaKind {
     /// Returns `true` if the trivia kind is a comment.
     #[inline]
+    #[must_use]
     pub const fn is_comment(&self) -> bool {
         matches!(
             self,
@@ -42,16 +43,19 @@ impl TriviaKind {
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_docblock(&self) -> bool {
         matches!(self, TriviaKind::DocBlockComment)
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_block_comment(&self) -> bool {
         matches!(self, TriviaKind::MultiLineComment | TriviaKind::DocBlockComment)
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_single_line_comment(&self) -> bool {
         matches!(self, TriviaKind::HashComment | TriviaKind::SingleLineComment)
     }

@@ -42,161 +42,193 @@ bitflags::bitflags! {
 // example: helper methods for extra readability
 impl MetadataFlags {
     #[inline]
+    #[must_use]
     pub const fn is_deprecated(self) -> bool {
         self.contains(Self::DEPRECATED)
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_abstract(self) -> bool {
         self.contains(Self::ABSTRACT)
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_final(self) -> bool {
         self.contains(Self::FINAL)
     }
 
     #[inline]
+    #[must_use]
     pub const fn has_yield(self) -> bool {
         self.contains(Self::HAS_YIELD)
     }
 
     #[inline]
+    #[must_use]
     pub const fn must_use(self) -> bool {
         self.contains(Self::MUST_USE)
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_pure(self) -> bool {
         self.contains(Self::PURE)
     }
 
     #[inline]
+    #[must_use]
     pub const fn has_consistent_constructor(self) -> bool {
         self.contains(Self::CONSISTENT_CONSTRUCTOR)
     }
 
     #[inline]
+    #[must_use]
     pub const fn has_consistent_templates(self) -> bool {
         self.contains(Self::CONSISTENT_TEMPLATES)
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_user_defined(self) -> bool {
         self.contains(Self::USER_DEFINED)
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_built_in(self) -> bool {
         self.contains(Self::BUILTIN)
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_internal(self) -> bool {
         self.contains(Self::INTERNAL)
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_populated(self) -> bool {
         self.contains(Self::POPULATED)
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_readonly(self) -> bool {
         self.contains(Self::READONLY)
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_writeonly(self) -> bool {
         self.contains(Self::WRITEONLY)
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_enum_interface(self) -> bool {
         self.contains(Self::ENUM_INTERFACE)
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_unchecked(self) -> bool {
         self.contains(Self::UNCHECKED)
     }
 
     #[inline]
+    #[must_use]
     pub const fn ignore_nullable_return(self) -> bool {
         self.contains(Self::IGNORE_NULLABLE_RETURN)
     }
 
     #[inline]
+    #[must_use]
     pub const fn ignore_falsable_return(self) -> bool {
         self.contains(Self::IGNORE_FALSABLE_RETURN)
     }
 
     #[inline]
+    #[must_use]
     pub const fn inherits_docs(self) -> bool {
         self.contains(Self::INHERITS_DOCS)
     }
 
     #[inline]
+    #[must_use]
     pub const fn forbids_named_arguments(self) -> bool {
         self.contains(Self::NO_NAMED_ARGUMENTS)
     }
 
     #[inline]
+    #[must_use]
     pub const fn has_throw(self) -> bool {
         self.contains(Self::HAS_THROW)
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_backed_enum_case(self) -> bool {
         self.contains(Self::BACKED_ENUM_CASE)
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_unit_enum_case(self) -> bool {
         self.contains(Self::UNIT_ENUM_CASE)
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_by_reference(self) -> bool {
         self.contains(Self::BY_REFERENCE)
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_variadic(self) -> bool {
         self.contains(Self::VARIADIC)
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_promoted_property(self) -> bool {
         self.contains(Self::PROMOTED_PROPERTY)
     }
 
     #[inline]
+    #[must_use]
     pub const fn has_default(self) -> bool {
         self.contains(Self::HAS_DEFAULT)
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_virtual_property(self) -> bool {
         self.contains(Self::VIRTUAL_PROPERTY)
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_magic_property(self) -> bool {
         self.contains(Self::MAGIC_PROPERTY)
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_magic_method(self) -> bool {
         self.contains(Self::MAGIC_METHOD)
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_asymmetric_property(self) -> bool {
         self.contains(Self::ASYMMETRIC_PROPERTY)
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_static(self) -> bool {
         self.contains(Self::STATIC)
     }

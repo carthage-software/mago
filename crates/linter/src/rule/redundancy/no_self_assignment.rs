@@ -1,7 +1,12 @@
 use indoc::indoc;
 use mago_fixer::SafetyClassification;
 use mago_span::HasSpan;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Access;
+use mago_syntax::ast::ClassLikeMemberSelector;
+use mago_syntax::ast::Expression;
+use mago_syntax::ast::Node;
+use mago_syntax::ast::NodeKind;
+use mago_syntax::ast::Variable;
 use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;

@@ -1,5 +1,8 @@
 use crate::T;
-use crate::ast::ast::*;
+use crate::ast::ast::Yield;
+use crate::ast::ast::YieldFrom;
+use crate::ast::ast::YieldPair;
+use crate::ast::ast::YieldValue;
 use crate::error::ParseError;
 use crate::parser::internal::expression::parse_expression_with_precedence;
 use crate::parser::internal::token_stream::TokenStream;

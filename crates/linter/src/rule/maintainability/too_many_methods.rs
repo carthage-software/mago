@@ -5,7 +5,10 @@ use serde::Serialize;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_reporting::Level;
-use mago_syntax::ast::*;
+use mago_syntax::ast::ClassLikeMember;
+use mago_syntax::ast::Node;
+use mago_syntax::ast::NodeKind;
+use mago_syntax::ast::Property;
 
 use crate::category::Category;
 use crate::context::LintContext;

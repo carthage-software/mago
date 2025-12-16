@@ -1,7 +1,26 @@
 use std::hash::Hash;
 
 use mago_names::ResolvedNames;
-use mago_syntax::ast::*;
+use mago_syntax::ast::If;
+use mago_syntax::ast::IfBody;
+use mago_syntax::ast::IfColonDelimitedBody;
+use mago_syntax::ast::IfColonDelimitedBodyElseClause;
+use mago_syntax::ast::IfColonDelimitedBodyElseIfClause;
+use mago_syntax::ast::IfStatementBody;
+use mago_syntax::ast::IfStatementBodyElseClause;
+use mago_syntax::ast::IfStatementBodyElseIfClause;
+use mago_syntax::ast::Match;
+use mago_syntax::ast::MatchArm;
+use mago_syntax::ast::MatchDefaultArm;
+use mago_syntax::ast::MatchExpressionArm;
+use mago_syntax::ast::Switch;
+use mago_syntax::ast::SwitchBody;
+use mago_syntax::ast::SwitchBraceDelimitedBody;
+use mago_syntax::ast::SwitchCase;
+use mago_syntax::ast::SwitchCaseSeparator;
+use mago_syntax::ast::SwitchColonDelimitedBody;
+use mago_syntax::ast::SwitchDefaultCase;
+use mago_syntax::ast::SwitchExpressionCase;
 
 use crate::FingerprintOptions;
 use crate::Fingerprintable;
@@ -15,7 +34,7 @@ impl Fingerprintable for Match<'_> {
     ) {
         "match".hash(hasher);
         self.expression.fingerprint_with_hasher(hasher, resolved_names, options);
-        for arm in self.arms.iter() {
+        for arm in &self.arms {
             arm.fingerprint_with_hasher(hasher, resolved_names, options);
         }
     }
@@ -43,7 +62,7 @@ impl Fingerprintable for MatchExpressionArm<'_> {
         options: &FingerprintOptions<'_>,
     ) {
         "match_expr_arm".hash(hasher);
-        for condition in self.conditions.iter() {
+        for condition in &self.conditions {
             condition.fingerprint_with_hasher(hasher, resolved_names, options);
         }
         self.expression.fingerprint_with_hasher(hasher, resolved_names, options);
@@ -98,7 +117,7 @@ impl Fingerprintable for IfStatementBody<'_> {
     ) {
         "if_stmt_body".hash(hasher);
         self.statement.fingerprint_with_hasher(hasher, resolved_names, options);
-        for elseif in self.else_if_clauses.iter() {
+        for elseif in &self.else_if_clauses {
             elseif.fingerprint_with_hasher(hasher, resolved_names, options);
         }
         self.else_clause.fingerprint_with_hasher(hasher, resolved_names, options);
@@ -138,10 +157,10 @@ impl Fingerprintable for IfColonDelimitedBody<'_> {
         options: &FingerprintOptions<'_>,
     ) {
         "if_colon_body".hash(hasher);
-        for statement in self.statements.iter() {
+        for statement in &self.statements {
             statement.fingerprint_with_hasher(hasher, resolved_names, options);
         }
-        for elseif in self.else_if_clauses.iter() {
+        for elseif in &self.else_if_clauses {
             elseif.fingerprint_with_hasher(hasher, resolved_names, options);
         }
         self.else_clause.fingerprint_with_hasher(hasher, resolved_names, options);
@@ -158,7 +177,7 @@ impl Fingerprintable for IfColonDelimitedBodyElseIfClause<'_> {
     ) {
         "elseif_colon".hash(hasher);
         self.condition.fingerprint_with_hasher(hasher, resolved_names, options);
-        for statement in self.statements.iter() {
+        for statement in &self.statements {
             statement.fingerprint_with_hasher(hasher, resolved_names, options);
         }
     }
@@ -172,7 +191,7 @@ impl Fingerprintable for IfColonDelimitedBodyElseClause<'_> {
         options: &FingerprintOptions<'_>,
     ) {
         "else_colon".hash(hasher);
-        for statement in self.statements.iter() {
+        for statement in &self.statements {
             statement.fingerprint_with_hasher(hasher, resolved_names, options);
         }
     }
@@ -214,7 +233,7 @@ impl Fingerprintable for SwitchBraceDelimitedBody<'_> {
     ) {
         "switch_brace_body".hash(hasher);
         self.optional_terminator.fingerprint_with_hasher(hasher, resolved_names, options);
-        for case in self.cases.iter() {
+        for case in &self.cases {
             case.fingerprint_with_hasher(hasher, resolved_names, options);
         }
     }
@@ -229,7 +248,7 @@ impl Fingerprintable for SwitchColonDelimitedBody<'_> {
     ) {
         "switch_colon_body".hash(hasher);
         self.optional_terminator.fingerprint_with_hasher(hasher, resolved_names, options);
-        for case in self.cases.iter() {
+        for case in &self.cases {
             case.fingerprint_with_hasher(hasher, resolved_names, options);
         }
         self.terminator.fingerprint_with_hasher(hasher, resolved_names, options);
@@ -260,7 +279,7 @@ impl Fingerprintable for SwitchExpressionCase<'_> {
         "case".hash(hasher);
         self.expression.fingerprint_with_hasher(hasher, resolved_names, options);
         self.separator.fingerprint_with_hasher(hasher, resolved_names, options);
-        for statement in self.statements.iter() {
+        for statement in &self.statements {
             statement.fingerprint_with_hasher(hasher, resolved_names, options);
         }
     }
@@ -275,7 +294,7 @@ impl Fingerprintable for SwitchDefaultCase<'_> {
     ) {
         "default".hash(hasher);
         self.separator.fingerprint_with_hasher(hasher, resolved_names, options);
-        for statement in self.statements.iter() {
+        for statement in &self.statements {
             statement.fingerprint_with_hasher(hasher, resolved_names, options);
         }
     }

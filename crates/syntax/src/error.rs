@@ -94,7 +94,7 @@ impl std::fmt::Display for ParseError {
                 return write!(f, "{e}");
             }
             ParseError::UnexpectedEndOfFile(expected, _, _) => {
-                let expected = expected.iter().map(|kind| kind.to_string()).collect::<Vec<_>>().join("`, `");
+                let expected = expected.iter().map(ToString::to_string).collect::<Vec<_>>().join("`, `");
 
                 if expected.is_empty() {
                     "Unexpected end of file".to_string()
@@ -105,7 +105,7 @@ impl std::fmt::Display for ParseError {
                 }
             }
             ParseError::UnexpectedToken(expected, found, _) => {
-                let expected = expected.iter().map(|kind| kind.to_string()).collect::<Vec<_>>().join("`, `");
+                let expected = expected.iter().map(ToString::to_string).collect::<Vec<_>>().join("`, `");
 
                 let found = found.to_string();
 

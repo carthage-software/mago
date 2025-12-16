@@ -1,5 +1,6 @@
 use crate::T;
-use crate::ast::ast::*;
+use crate::ast::ast::ArrowFunction;
+use crate::ast::ast::AttributeList;
 use crate::ast::sequence::Sequence;
 use crate::error::ParseError;
 use crate::parser::internal::expression::parse_expression;

@@ -1,5 +1,5 @@
 use crate::T;
-use crate::ast::ast::*;
+use crate::ast::ast::Throw;
 use crate::error::ParseError;
 use crate::parser::internal::expression::parse_expression;
 use crate::parser::internal::token_stream::TokenStream;

@@ -159,7 +159,7 @@ pub fn resolve_instance_properties<'ctx, 'ast, 'arena>(
             TObject::HasMethod(has_method) => {
                 let all_properties_match = property_names.iter().all(|prop_name| {
                     let prop_name_without_dollar = atom(prop_name.trim_start_matches('$'));
-                    type_has_property_assertion(has_method.intersection_types.as_deref(), &prop_name_without_dollar)
+                    type_has_property_assertion(has_method.intersection_types.as_deref(), prop_name_without_dollar)
                 });
 
                 if all_properties_match {
@@ -192,7 +192,7 @@ pub fn resolve_instance_properties<'ctx, 'ast, 'arena>(
                     has_property.has_property(&prop_name_without_dollar)
                         || type_has_property_assertion(
                             has_property.intersection_types.as_deref(),
-                            &prop_name_without_dollar,
+                            prop_name_without_dollar,
                         )
                 });
 
@@ -229,8 +229,8 @@ pub fn resolve_instance_properties<'ctx, 'ast, 'arena>(
 
                             report_non_existent_property(
                                 context,
-                                &object_type.get_id(),
-                                prop_name,
+                                object_type.get_id(),
+                                *prop_name,
                                 property_selector.span(),
                                 object_expression.span(),
                                 true,
@@ -261,7 +261,7 @@ pub fn resolve_instance_properties<'ctx, 'ast, 'arena>(
                             report_possibly_non_existent_property(
                                 context,
                                 &object_type,
-                                prop_name,
+                                *prop_name,
                                 property_selector.span(),
                                 object_expression.span(),
                             );
@@ -296,8 +296,8 @@ pub fn resolve_instance_properties<'ctx, 'ast, 'arena>(
             let resolved_property = find_property_in_class(
                 context,
                 block_context,
-                &classname,
-                prop_name,
+                classname,
+                *prop_name,
                 property_selector,
                 object_expression,
                 object,
@@ -305,7 +305,7 @@ pub fn resolve_instance_properties<'ctx, 'ast, 'arena>(
                 for_assignment,
                 &mut result,
                 magic_method.is_some(),
-            )?;
+            );
 
             let Some(resolved_property) = resolved_property else {
                 result.has_invalid_path = true;
@@ -319,8 +319,8 @@ pub fn resolve_instance_properties<'ctx, 'ast, 'arena>(
                         context,
                         object_expression.span(),
                         property_selector.span(),
-                        &classname,
-                        prop_name,
+                        classname,
+                        *prop_name,
                         for_assignment,
                     );
                 }
@@ -346,7 +346,7 @@ pub fn resolve_instance_properties<'ctx, 'ast, 'arena>(
 }
 
 /// Checks if this is a direct backing store access: `$this->prop` inside the set hook for that property.
-fn is_backing_store_access(object_expr: &Expression, prop_name: &Atom, block_context: &BlockContext) -> bool {
+fn is_backing_store_access(object_expr: &Expression, prop_name: Atom, block_context: &BlockContext) -> bool {
     let is_this = matches!(object_expr, Expression::Variable(Variable::Direct(var)) if var.name == "$this");
     if !is_this {
         return false;
@@ -355,15 +355,15 @@ fn is_backing_store_access(object_expr: &Expression, prop_name: &Atom, block_con
     block_context
         .scope
         .get_property_hook()
-        .is_some_and(|(hook_prop_name, hook_meta)| hook_prop_name == *prop_name && hook_meta.is_set())
+        .is_some_and(|(hook_prop_name, hook_meta)| hook_prop_name == prop_name && hook_meta.is_set())
 }
 
 /// Finds a property in a class, gets its type, and handles template localization.
 fn find_property_in_class<'ctx, 'ast, 'arena>(
     context: &mut Context<'ctx, 'arena>,
     block_context: &BlockContext<'ctx>,
-    class_id: &Atom,
-    prop_name: &Atom,
+    class_id: Atom,
+    prop_name: Atom,
     selector: &'ast ClassLikeMemberSelector<'arena>,
     object_expr: &'ast Expression<'arena>,
     object: &TObject,
@@ -371,51 +371,51 @@ fn find_property_in_class<'ctx, 'ast, 'arena>(
     for_assignment: bool,
     result: &mut PropertyResolutionResult,
     has_magic_method: bool,
-) -> Result<Option<ResolvedProperty>, AnalysisError> {
-    let declaring_class_id = context.codebase.get_declaring_property_class(class_id, prop_name).unwrap_or(*class_id);
+) -> Option<ResolvedProperty> {
+    let declaring_class_id = context.codebase.get_declaring_property_class(&class_id, &prop_name).unwrap_or(class_id);
 
     let Some(declaring_class_metadata) = context.codebase.get_class_like(&declaring_class_id) else {
-        report_non_existent_class_like(context, object_expr.span(), &declaring_class_id);
+        report_non_existent_class_like(context, object_expr.span(), declaring_class_id);
 
-        return Ok(None);
+        return None;
     };
 
-    let Some(property_metadata) = declaring_class_metadata.properties.get(prop_name) else {
+    let Some(property_metadata) = declaring_class_metadata.properties.get(&prop_name) else {
         if has_magic_method {
             report_non_documented_property(
                 context,
                 object_expr.span(),
                 selector.span(),
-                &declaring_class_id,
+                declaring_class_id,
                 prop_name,
                 for_assignment,
             );
 
-            return Ok(Some(ResolvedProperty {
+            return Some(ResolvedProperty {
                 property_span: None,
-                property_name: *prop_name,
+                property_name: prop_name,
                 declaring_class_id: Some(declaring_class_id),
                 property_type: get_mixed(),
                 is_magic: true,
-            }));
+            });
         }
 
         let prop_str: &str = prop_name.as_ref();
         let prop_name_without_dollar = atom(prop_str.trim_start_matches('$'));
         let has_property_assertion = if let TObject::Named(named_object) = object {
-            type_has_property_assertion(named_object.get_intersection_types(), &prop_name_without_dollar)
+            type_has_property_assertion(named_object.get_intersection_types(), prop_name_without_dollar)
         } else {
             false
         };
 
         if has_property_assertion {
-            return Ok(Some(ResolvedProperty {
+            return Some(ResolvedProperty {
                 property_span: None,
-                property_name: *prop_name,
+                property_name: prop_name,
                 declaring_class_id: None,
                 property_type: get_mixed(),
                 is_magic: false,
-            }));
+            });
         }
 
         result.has_invalid_path = true;
@@ -428,7 +428,7 @@ fn find_property_in_class<'ctx, 'ast, 'arena>(
         }
 
         report_non_existent_property(context, class_id, prop_name, selector.span(), object_expr.span(), false);
-        return Ok(None);
+        return None;
     };
 
     // For assignment, use set hook parameter type when not accessing backing store directly
@@ -477,7 +477,7 @@ fn find_property_in_class<'ctx, 'ast, 'arena>(
             if class_id.eq_ignore_ascii_case(&declaring_class_id) {
                 declaring_class_metadata
             } else {
-                context.codebase.get_class_like(class_id).unwrap_or(declaring_class_metadata)
+                context.codebase.get_class_like(&class_id).unwrap_or(declaring_class_metadata)
             },
             declaring_class_metadata,
         );
@@ -488,7 +488,7 @@ fn find_property_in_class<'ctx, 'ast, 'arena>(
             context,
             block_context,
             &declaring_class_id,
-            prop_name,
+            &prop_name,
             access_span,
             Some(selector.span()),
         )
@@ -497,7 +497,7 @@ fn find_property_in_class<'ctx, 'ast, 'arena>(
             context,
             block_context,
             &declaring_class_id,
-            prop_name,
+            &prop_name,
             access_span,
             Some(selector.span()),
         )
@@ -506,16 +506,16 @@ fn find_property_in_class<'ctx, 'ast, 'arena>(
     if !is_visible {
         result.has_error_path = true;
 
-        return Ok(None);
+        return None;
     }
 
-    Ok(Some(ResolvedProperty {
+    Some(ResolvedProperty {
         property_span: property_metadata.name_span.or(property_metadata.span),
-        property_name: *prop_name,
+        property_name: prop_name,
         declaring_class_id: Some(declaring_class_id),
         property_type,
         is_magic: property_metadata.flags.is_magic_property(),
-    }))
+    })
 }
 
 pub fn localize_property_type(
@@ -763,7 +763,7 @@ fn report_ambiguous_access(
 fn report_possibly_non_existent_property(
     context: &mut Context,
     object_type: &TUnion,
-    prop_name: &Atom,
+    prop_name: Atom,
     selector_span: Span,
     object_span: Span,
 ) {
@@ -785,13 +785,13 @@ fn report_possibly_non_existent_property(
 
 fn report_non_existent_property(
     context: &mut Context,
-    classname: &Atom,
-    prop_name: &Atom,
+    classname: Atom,
+    prop_name: Atom,
     selector_span: Span,
     object_span: Span,
     is_sealed_object: bool, // `true` if we are accessing undefined prop on `object{foo: string}` type, not an actual class
 ) {
-    let class_kind_str = context.codebase.get_class_like(classname).map_or("class", |m| m.kind.as_str());
+    let class_kind_str = context.codebase.get_class_like(&classname).map_or("class", |m| m.kind.as_str());
 
     context.collector.report_with_code(
         IssueCode::NonExistentProperty,
@@ -815,8 +815,8 @@ pub(super) fn report_non_documented_property(
     context: &mut Context,
     obj_span: Span,
     selector_span: Span,
-    classname: &Atom,
-    property_name: &Atom,
+    classname: Atom,
+    property_name: Atom,
     for_assignment: bool,
 ) {
     if classname.eq_ignore_ascii_case("stdClass") {
@@ -849,8 +849,8 @@ pub(super) fn report_magic_property_without_get_set_method(
     context: &mut Context,
     obj_span: Span,
     selector_span: Span,
-    classname: &Atom,
-    property_name: &Atom,
+    classname: Atom,
+    property_name: Atom,
     for_assignment: bool,
 ) {
     let magic_method_name = if for_assignment { "__set" } else { "__get" };
@@ -877,11 +877,11 @@ pub(super) fn report_magic_property_without_get_set_method(
     );
 }
 
-fn type_has_property_assertion(intersection_types: Option<&[TAtomic]>, property_name: &Atom) -> bool {
+fn type_has_property_assertion(intersection_types: Option<&[TAtomic]>, property_name: Atom) -> bool {
     intersection_types.is_some_and(|types| {
         types.iter().any(|atomic| match atomic {
             TAtomic::Object(TObject::HasProperty(has_property)) => {
-                has_property.has_property(property_name)
+                has_property.has_property(&property_name)
                     || type_has_property_assertion(has_property.intersection_types.as_deref(), property_name)
             }
             TAtomic::Object(TObject::HasMethod(has_method)) => {

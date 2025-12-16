@@ -1,5 +1,9 @@
 use crate::T;
-use crate::ast::ast::*;
+use crate::ast::ast::AttributeList;
+use crate::ast::ast::EnumCase;
+use crate::ast::ast::EnumCaseBackedItem;
+use crate::ast::ast::EnumCaseItem;
+use crate::ast::ast::EnumCaseUnitItem;
 use crate::ast::sequence::Sequence;
 use crate::error::ParseError;
 use crate::parser::internal::expression;

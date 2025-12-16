@@ -42,12 +42,14 @@ pub struct InvocationAssertions {
 impl InvocationAssertions {
     /// Create new empty assertions.
     #[inline]
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
     /// Check if there are any assertions.
     #[inline]
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.type_assertions.is_empty() && self.if_true.is_empty() && self.if_false.is_empty()
     }

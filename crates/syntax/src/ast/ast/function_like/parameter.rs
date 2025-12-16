@@ -51,16 +51,19 @@ impl FunctionLikeParameter<'_> {
     ///
     /// [RFC: Constructor Property Promotion](https://wiki.php.net/rfc/constructor_promotion)
     /// [RFC: Property Hooks](https://wiki.php.net/rfc/property-hooks)
+    #[must_use]
     pub fn is_promoted_property(&self) -> bool {
         !self.modifiers.is_empty() || self.hooks.is_some()
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_variadic(&self) -> bool {
         self.ellipsis.is_some()
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_reference(&self) -> bool {
         self.ampersand.is_some()
     }
@@ -74,9 +77,10 @@ impl HasSpan for FunctionLikeParameterList<'_> {
 
 impl HasSpan for FunctionLikeParameter<'_> {
     fn span(&self) -> Span {
-        let right = self.hooks.as_ref().map(|hooks| hooks.span()).unwrap_or_else(|| {
-            self.default_value.as_ref().map_or_else(|| self.variable.span(), |default_value| default_value.span())
-        });
+        let right = self.hooks.as_ref().map_or_else(
+            || self.default_value.as_ref().map_or_else(|| self.variable.span(), HasSpan::span),
+            HasSpan::span,
+        );
 
         if let Some(attribute) = self.attribute_lists.first() {
             return Span::between(attribute.span(), right);

@@ -19,6 +19,7 @@ use crate::ttype::atomic::object::TObject;
 use crate::ttype::template::TemplateResult;
 use crate::ttype::union::TUnion;
 
+#[must_use]
 pub fn cast_atomic_to_callable<'a>(
     atomic: &'a TAtomic,
     codebase: &CodebaseMetadata,

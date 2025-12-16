@@ -81,6 +81,7 @@ impl<'arena> Formatter<'arena> {
     /// This is the lowest-level formatting method that operates directly on the AST.
     /// It first builds an intermediate [`Document`] representation and then prints it.
     /// This is useful if you have already parsed the code and want to avoid re-parsing.
+    #[must_use]
     pub fn format<'ctx>(&self, file: &'ctx File, program: &'arena Program<'arena>) -> &'arena str {
         let document = self.build(file, program);
 
@@ -93,6 +94,7 @@ impl<'arena> Formatter<'arena> {
     /// layout of the code with elements like groups, indentation, and line breaks.
     /// This is a separate step from printing, allowing for potential inspection or
     /// manipulation of the layout before rendering.
+    #[must_use]
     pub fn build(&self, file: &File, program: &'arena Program<'arena>) -> Document<'arena> {
         program.format(&mut FormatterState::new(self.arena, program, file, self.php_version, self.settings))
     }

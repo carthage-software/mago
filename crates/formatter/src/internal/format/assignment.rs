@@ -1,7 +1,25 @@
 use bumpalo::vec;
 
-use mago_span::*;
-use mago_syntax::ast::*;
+use mago_span::HasSpan;
+use mago_syntax::ast::Access;
+use mago_syntax::ast::ArgumentList;
+use mago_syntax::ast::ArrayElement;
+use mago_syntax::ast::Assignment;
+use mago_syntax::ast::Binary;
+use mago_syntax::ast::BinaryOperator;
+use mago_syntax::ast::Call;
+use mago_syntax::ast::ClassLikeConstantItem;
+use mago_syntax::ast::ConstantItem;
+use mago_syntax::ast::Construct;
+use mago_syntax::ast::EnumCaseBackedItem;
+use mago_syntax::ast::Expression;
+use mago_syntax::ast::Identifier;
+use mago_syntax::ast::KeyValueArrayElement;
+use mago_syntax::ast::Literal;
+use mago_syntax::ast::Node;
+use mago_syntax::ast::PropertyConcreteItem;
+use mago_syntax::ast::Variable;
+use mago_syntax::ast::YieldPair;
 
 use crate::document::Document;
 use crate::document::Group;

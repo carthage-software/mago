@@ -1,9 +1,13 @@
 use bumpalo::vec;
 
-use mago_span::*;
-use mago_syntax::ast::*;
+use mago_span::HasSpan;
+use mago_syntax::ast::FunctionLikeParameter;
+use mago_syntax::ast::FunctionLikeParameterList;
 
-use crate::document::*;
+use crate::document::Document;
+use crate::document::Group;
+use crate::document::IfBreak;
+use crate::document::Line;
 use crate::internal::FormatterState;
 use crate::internal::comment::CommentFlags;
 use crate::internal::format::Format;
@@ -88,7 +92,9 @@ pub(super) fn should_break_parameters<'arena>(
     f: &FormatterState<'_, 'arena>,
     parameter_list: &'arena FunctionLikeParameterList<'arena>,
 ) -> bool {
-    if f.settings.break_promoted_properties_list && parameter_list.parameters.iter().any(|p| p.is_promoted_property()) {
+    if f.settings.break_promoted_properties_list
+        && parameter_list.parameters.iter().any(FunctionLikeParameter::is_promoted_property)
+    {
         return true;
     }
 

@@ -2,7 +2,27 @@ mod checker;
 
 use mago_atom::concat_atom;
 use mago_span::HasSpan;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Attribute;
+use mago_syntax::ast::ClassConstantAccess;
+use mago_syntax::ast::ConstantAccess;
+use mago_syntax::ast::Expression;
+use mago_syntax::ast::Extends;
+use mago_syntax::ast::FunctionCall;
+use mago_syntax::ast::FunctionLikeParameter;
+use mago_syntax::ast::FunctionLikeReturnTypeHint;
+use mago_syntax::ast::FunctionPartialApplication;
+use mago_syntax::ast::Hint;
+use mago_syntax::ast::Implements;
+use mago_syntax::ast::Instantiation;
+use mago_syntax::ast::Namespace;
+use mago_syntax::ast::Property;
+use mago_syntax::ast::StaticMethodCall;
+use mago_syntax::ast::StaticMethodPartialApplication;
+use mago_syntax::ast::StaticPropertyAccess;
+use mago_syntax::ast::TraitUse;
+use mago_syntax::ast::Use;
+use mago_syntax::ast::UseItems;
+use mago_syntax::ast::UseType;
 use mago_syntax::walker::MutWalker;
 
 use crate::context::GuardContext;
@@ -121,7 +141,7 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
 
     // Check class-like extends
     fn walk_in_extends(&mut self, extends: &'ast Extends<'arena>, context: &mut GuardContext<'ctx, 'arena>) {
-        for extended_type in extends.types.iter() {
+        for extended_type in &extends.types {
             let fqn = context.lookup_name(extended_type);
 
             check_usage(context, fqn, PermittedDependencyKind::ClassLike, BreachVector::Extends, extended_type.span());
@@ -130,7 +150,7 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
 
     // Check class-like implements
     fn walk_in_implements(&mut self, implements: &'ast Implements<'arena>, context: &mut GuardContext<'ctx, 'arena>) {
-        for interface in implements.types.iter() {
+        for interface in &implements.types {
             let fqn = context.lookup_name(interface);
 
             check_usage(context, fqn, PermittedDependencyKind::ClassLike, BreachVector::Implements, interface.span());
@@ -139,7 +159,7 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
 
     // Check trait uses
     fn walk_in_trait_use(&mut self, trait_use: &'ast TraitUse<'arena>, context: &mut GuardContext<'ctx, 'arena>) {
-        for trait_name in trait_use.trait_names.iter() {
+        for trait_name in &trait_use.trait_names {
             let fqn = context.lookup_name(trait_name);
 
             check_usage(context, fqn, PermittedDependencyKind::ClassLike, BreachVector::TraitUse, trait_name.span());

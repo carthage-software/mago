@@ -1,5 +1,15 @@
 use mago_names::ResolvedNames;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Construct;
+use mago_syntax::ast::DieConstruct;
+use mago_syntax::ast::EmptyConstruct;
+use mago_syntax::ast::EvalConstruct;
+use mago_syntax::ast::ExitConstruct;
+use mago_syntax::ast::IncludeConstruct;
+use mago_syntax::ast::IncludeOnceConstruct;
+use mago_syntax::ast::IssetConstruct;
+use mago_syntax::ast::PrintConstruct;
+use mago_syntax::ast::RequireConstruct;
+use mago_syntax::ast::RequireOnceConstruct;
 
 use crate::FingerprintOptions;
 use crate::Fingerprintable;
@@ -46,7 +56,7 @@ impl Fingerprintable for IssetConstruct<'_> {
         options: &FingerprintOptions<'_>,
     ) {
         "isset".hash(hasher);
-        for value in self.values.iter() {
+        for value in &self.values {
             value.fingerprint_with_hasher(hasher, resolved_names, options);
         }
     }

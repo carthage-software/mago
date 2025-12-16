@@ -44,11 +44,11 @@ impl<'arena> Linter<'arena> {
     /// * `only` - If `Some`, only the rules with the specified codes will be loaded.
     ///   If `None`, all rules enabled by the settings will be loaded.
     /// * `include_disabled` - If `true`, includes rules that are disabled in the settings.
-    pub fn new(arena: &'arena Bump, settings: Settings, only: Option<&[String]>, include_disabled: bool) -> Self {
+    pub fn new(arena: &'arena Bump, settings: &Settings, only: Option<&[String]>, include_disabled: bool) -> Self {
         Self {
             arena,
             php_version: settings.php_version,
-            registry: Arc::new(RuleRegistry::build(&settings, only, include_disabled)),
+            registry: Arc::new(RuleRegistry::build(settings, only, include_disabled)),
         }
     }
 
@@ -63,10 +63,12 @@ impl<'arena> Linter<'arena> {
         Self { arena, registry, php_version }
     }
 
+    #[must_use]
     pub fn rules(&self) -> &[AnyRule] {
         self.registry.rules()
     }
 
+    #[must_use]
     pub fn lint<'ctx, 'ast>(
         &self,
         source_file: &'ctx File,

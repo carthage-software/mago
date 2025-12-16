@@ -1,5 +1,8 @@
 use crate::T;
-use crate::ast::ast::*;
+use crate::ast::ast::AttributeList;
+use crate::ast::ast::Expression;
+use crate::ast::ast::ExpressionStatement;
+use crate::ast::ast::Statement;
 use crate::ast::sequence::Sequence;
 use crate::error::ParseError;
 use crate::parser::internal::attribute::parse_attribute_list_sequence;

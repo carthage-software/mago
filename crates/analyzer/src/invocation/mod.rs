@@ -12,7 +12,17 @@ use mago_codex::ttype::expander::StaticClassType;
 use mago_codex::ttype::union::TUnion;
 use mago_span::HasSpan;
 use mago_span::Span;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Argument;
+use mago_syntax::ast::ArgumentList;
+use mago_syntax::ast::Expression;
+use mago_syntax::ast::NamedArgument;
+use mago_syntax::ast::NamedPlaceholderArgument;
+use mago_syntax::ast::PartialArgument;
+use mago_syntax::ast::PartialArgumentList;
+use mago_syntax::ast::Pipe;
+use mago_syntax::ast::PlaceholderArgument;
+use mago_syntax::ast::PositionalArgument;
+use mago_syntax::ast::VariadicPlaceholderArgument;
 
 mod resolver;
 mod template_inference;

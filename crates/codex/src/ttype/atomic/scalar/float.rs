@@ -24,6 +24,7 @@ pub enum TFloat {
 impl TFloat {
     /// Creates a new `FloatScalar` from an optional float value.
     #[inline]
+    #[must_use]
     pub fn new(value: Option<f64>) -> Self {
         match value {
             Some(v) => Self::Literal(OrderedFloat::from(v)),
@@ -33,48 +34,56 @@ impl TFloat {
 
     /// Creates an instance representing the general `float` type.
     #[inline]
+    #[must_use]
     pub const fn general() -> Self {
         Self::Float
     }
 
     /// Creates an instance representing the `literal-float` type (unspecified literal).
     #[inline]
+    #[must_use]
     pub const fn unspecified_literal() -> Self {
         Self::UnspecifiedLiteral
     }
 
     /// Creates an instance representing a literal float type (e.g., `12.3`).
     #[inline]
+    #[must_use]
     pub fn literal(value: f64) -> Self {
         Self::Literal(OrderedFloat::from(value))
     }
 
     /// Checks if this represents the general `float` type.
     #[inline]
+    #[must_use]
     pub const fn is_general(&self) -> bool {
         matches!(self, Self::Float)
     }
 
     /// Checks if this represents an unspecified literal (`literal-float`).
     #[inline]
+    #[must_use]
     pub const fn is_unspecified_literal(&self) -> bool {
         matches!(self, Self::UnspecifiedLiteral)
     }
 
     /// Checks if this represents a specific literal float type.
     #[inline]
+    #[must_use]
     pub const fn is_literal(&self) -> bool {
         matches!(self, Self::Literal(_))
     }
 
     /// Checks if this originates from any kind of literal (specific or unspecified).
     #[inline]
+    #[must_use]
     pub const fn is_literal_origin(&self) -> bool {
         matches!(self, Self::Literal(_) | Self::UnspecifiedLiteral)
     }
 
     /// Returns the literal float value if this represents a specific literal.
     #[inline]
+    #[must_use]
     pub fn get_literal_value(&self) -> Option<f64> {
         match self {
             Self::Literal(v) => Some(v.into_inner()),
@@ -86,6 +95,7 @@ impl TFloat {
     ///
     /// Type hierarchy: Literal(v) ⊂ `UnspecifiedLiteral` ⊂ Float
     #[inline]
+    #[must_use]
     pub fn contains(&self, other: TFloat) -> bool {
         match (self, other) {
             // Float contains everything

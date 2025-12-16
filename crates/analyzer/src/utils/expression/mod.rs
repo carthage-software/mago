@@ -13,7 +13,20 @@ use mago_codex::ttype::union::TUnion;
 
 use mago_names::ResolvedNames;
 use mago_span::HasSpan;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Access;
+use mago_syntax::ast::ArrayAccess;
+use mago_syntax::ast::Call;
+use mago_syntax::ast::ClassLikeConstantSelector;
+use mago_syntax::ast::ClassLikeMemberSelector;
+use mago_syntax::ast::Expression;
+use mago_syntax::ast::FunctionCall;
+use mago_syntax::ast::Literal;
+use mago_syntax::ast::MethodCall;
+use mago_syntax::ast::NullSafeMethodCall;
+use mago_syntax::ast::StaticMethodCall;
+use mago_syntax::ast::UnaryPrefix;
+use mago_syntax::ast::UnaryPrefixOperator;
+use mago_syntax::ast::Variable;
 
 use crate::utils::misc::unwrap_expression;
 
@@ -354,7 +367,7 @@ pub fn get_method_id_from_call(
 ///   or if it does but is not followed by a recognized access operator character,
 ///   or if `derived_path` is identical to `base_path`).
 #[inline]
-pub fn is_derived_access_path(derived_path: &Atom, base_path: &Atom) -> bool {
+pub fn is_derived_access_path(derived_path: Atom, base_path: Atom) -> bool {
     derived_path.as_str().starts_with(base_path.as_str())
         && derived_path.as_str().chars().nth(base_path.len()).is_some_and(|c| c == ':' || c == '-' || c == '[')
 }

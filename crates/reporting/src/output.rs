@@ -48,6 +48,7 @@ impl ReportingTarget {
     /// # Returns
     ///
     /// A tuple of (target, buffer) where the buffer can be read after reporting.
+    #[must_use]
     pub fn buffer() -> (Self, Arc<Mutex<Vec<u8>>>) {
         let buffer = Arc::new(Mutex::new(Vec::new()));
         let writer_buffer = buffer.clone();

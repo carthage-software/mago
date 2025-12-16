@@ -11,8 +11,11 @@ use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_span::HasSpan;
 use mago_span::Span;
+use mago_syntax::ast::BinaryOperator;
+use mago_syntax::ast::Construct;
+use mago_syntax::ast::Expression;
 use mago_syntax::ast::UnaryPrefix;
-use mago_syntax::ast::*;
+use mago_syntax::ast::UnaryPrefixOperator;
 
 use crate::artifacts::AnalysisArtifacts;
 use crate::assertion::scrape_assertions;
@@ -499,7 +502,7 @@ pub fn remove_clauses_with_mixed_variables(
             mixed_var_ids = new_mixed_var_ids;
             for key in &keys {
                 for mixed_var_id in &mixed_var_ids {
-                    if var_has_root(key, mixed_var_id) {
+                    if var_has_root(*key, **mixed_var_id) {
                         return Clause::new(IndexMap::new(), cond_object_id, cond_object_id, Some(true), None, None);
                     }
                 }

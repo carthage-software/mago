@@ -1,5 +1,15 @@
 use crate::T;
-use crate::ast::ast::*;
+use crate::ast::ast::Construct;
+use crate::ast::ast::DieConstruct;
+use crate::ast::ast::EmptyConstruct;
+use crate::ast::ast::EvalConstruct;
+use crate::ast::ast::ExitConstruct;
+use crate::ast::ast::IncludeConstruct;
+use crate::ast::ast::IncludeOnceConstruct;
+use crate::ast::ast::IssetConstruct;
+use crate::ast::ast::PrintConstruct;
+use crate::ast::ast::RequireConstruct;
+use crate::ast::ast::RequireOnceConstruct;
 use crate::ast::sequence::TokenSeparatedSequence;
 use crate::error::ParseError;
 use crate::parser::internal::argument::parse_optional_argument_list;

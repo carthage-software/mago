@@ -860,6 +860,7 @@ pub fn parse_property_tag(content: &str, span: Span, is_read: bool, is_write: bo
 ///
 /// Output: `Some((TypeString, rest_slice))` or `None`
 #[inline]
+#[must_use]
 pub fn split_tag_content(content: &str, input_span: Span) -> Option<(TypeString, &str)> {
     // Find start byte offset of trimmed content relative to original `content` slice
     let trim_start_offset = content.find(|c: char| !c.is_whitespace()).unwrap_or(0);
@@ -900,7 +901,7 @@ pub fn split_tag_content(content: &str, input_span: Span) -> Option<(TypeString,
             '<' | '(' | '[' | '{' => bracket_stack.push(char),
             '>' | ')' | ']' | '}' => {
                 match bracket_stack.pop() {
-                    Some(opening) if brackets_match(&opening, &char) => {}
+                    Some(opening) if brackets_match(opening, char) => {}
                     _ => return None, // Mismatch or unbalanced
                 }
             }
@@ -1293,7 +1294,7 @@ fn parse_argument(arg_str: &str, span: &Span) -> Option<Argument> {
 
 /// Checks if an opening bracket matches a closing one.
 #[inline]
-const fn brackets_match(open: &char, close: &char) -> bool {
+const fn brackets_match(open: char, close: char) -> bool {
     matches!((open, close), ('<', '>') | ('(', ')') | ('[', ']') | ('{', '}'))
 }
 

@@ -3,9 +3,12 @@ use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_reporting::*;
+use mago_reporting::Annotation;
+use mago_reporting::Issue;
+use mago_reporting::Level;
 use mago_span::HasSpan;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Node;
+use mago_syntax::ast::NodeKind;
 use mago_syntax::utils::control_flow::ControlFlow;
 use mago_syntax::utils::control_flow::find_control_flows_in_block;
 

@@ -6,7 +6,8 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_span::Span;
-use mago_syntax::ast::*;
+use mago_syntax::ast::ClassLikeConstantSelector;
+use mago_syntax::ast::ClassLikeMemberSelector;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -57,7 +58,7 @@ enum SelectorKind {
 }
 
 impl SelectorKind {
-    fn as_str(&self) -> &'static str {
+    fn as_str(self) -> &'static str {
         match self {
             SelectorKind::Member => "member",
             SelectorKind::Constant => "constant",

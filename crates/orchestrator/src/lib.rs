@@ -90,6 +90,7 @@ impl<'a> Orchestrator<'a> {
     /// # Arguments
     ///
     /// * `config` - The configuration specifying PHP version, paths, tool settings, etc.
+    #[must_use]
     pub fn new(config: OrchestratorConfiguration<'a>) -> Self {
         Self { config, plugin_registry: OnceLock::new() }
     }

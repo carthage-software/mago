@@ -22,18 +22,21 @@ pub enum NameKind {
 impl NameKind {
     /// Checks if the kind is `NameKind::Default`.
     #[inline]
+    #[must_use]
     pub const fn is_default(&self) -> bool {
         matches!(self, NameKind::Default)
     }
 
     /// Checks if the kind is `NameKind::Function`.
     #[inline]
+    #[must_use]
     pub const fn is_function(&self) -> bool {
         matches!(self, NameKind::Function)
     }
 
     /// Checks if the kind is `NameKind::Constant`.
     #[inline]
+    #[must_use]
     pub const fn is_constant(&self) -> bool {
         matches!(self, NameKind::Constant)
     }
@@ -44,6 +47,7 @@ impl NameKind {
     /// Class, interface, trait, namespace, and function names are generally
     /// resolved case-insensitively.
     #[inline]
+    #[must_use]
     pub const fn is_case_sensitive(&self) -> bool {
         // Renamed from is_case_sensitive
         // Only constants are case-sensitive in PHP name resolution

@@ -19,7 +19,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ArgumentList<'arena> {
         block_context.inside_call = true;
         block_context.inside_general_use = true;
 
-        for argument in self.arguments.iter() {
+        for argument in &self.arguments {
             argument.value().analyze(context, block_context, artifacts)?;
         }
 

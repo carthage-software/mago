@@ -15,7 +15,7 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_span::Span;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Call;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -200,7 +200,7 @@ fn get_function_like_target<'ctx>(
     alternative: Option<FunctionLikeIdentifier>,
     span: Span,
     inferred_return_type: Option<Box<TUnion>>,
-) -> Result<Option<InvocationTarget<'ctx>>, AnalysisError> {
+) -> Option<InvocationTarget<'ctx>> {
     get_function_like_target_inner(context, function_like, alternative, span, inferred_return_type, false)
 }
 
@@ -211,7 +211,7 @@ pub(super) fn get_function_like_target_with_skip<'ctx>(
     span: Span,
     inferred_return_type: Option<Box<TUnion>>,
     skip_error_on_not_found: bool,
-) -> Result<Option<InvocationTarget<'ctx>>, AnalysisError> {
+) -> Option<InvocationTarget<'ctx>> {
     get_function_like_target_inner(
         context,
         function_like,
@@ -229,7 +229,7 @@ fn get_function_like_target_inner<'ctx>(
     span: Span,
     inferred_return_type: Option<Box<TUnion>>,
     skip_error_on_not_found: bool,
-) -> Result<Option<InvocationTarget<'ctx>>, AnalysisError> {
+) -> Option<InvocationTarget<'ctx>> {
     let mut identifier = function_like;
     let original_class_for_method_context =
         if let FunctionLikeIdentifier::Method(class_name, _) = function_like { Some(class_name) } else { None };
@@ -303,7 +303,7 @@ fn get_function_like_target_inner<'ctx>(
             );
         }
 
-        return Ok(None);
+        return None;
     };
 
     // If this is a method, we need to create a method context so that static types can be resolved properly
@@ -329,7 +329,7 @@ fn get_function_like_target_inner<'ctx>(
         None
     };
 
-    Ok(Some(InvocationTarget::FunctionLike { identifier, metadata, inferred_return_type, method_context, span }))
+    Some(InvocationTarget::FunctionLike { identifier, metadata, inferred_return_type, method_context, span })
 }
 
 fn inspect_arguments<'ctx, 'arena>(

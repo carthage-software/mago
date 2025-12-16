@@ -1,7 +1,15 @@
 use std::hash::Hash;
 
 use mago_names::ResolvedNames;
-use mago_syntax::ast::*;
+use mago_syntax::ast::BracedExpressionStringPart;
+use mago_syntax::ast::CompositeString;
+use mago_syntax::ast::DocumentIndentation;
+use mago_syntax::ast::DocumentKind;
+use mago_syntax::ast::DocumentString;
+use mago_syntax::ast::InterpolatedString;
+use mago_syntax::ast::LiteralStringPart;
+use mago_syntax::ast::ShellExecuteString;
+use mago_syntax::ast::StringPart;
 
 use crate::FingerprintOptions;
 use crate::Fingerprintable;
@@ -33,7 +41,7 @@ impl Fingerprintable for ShellExecuteString<'_> {
         options: &FingerprintOptions<'_>,
     ) {
         "shell_execute".hash(hasher);
-        for part in self.parts.iter() {
+        for part in &self.parts {
             part.fingerprint_with_hasher(hasher, resolved_names, options);
         }
     }
@@ -47,7 +55,7 @@ impl Fingerprintable for InterpolatedString<'_> {
         options: &FingerprintOptions<'_>,
     ) {
         "interpolated_string".hash(hasher);
-        for part in self.parts.iter() {
+        for part in &self.parts {
             part.fingerprint_with_hasher(hasher, resolved_names, options);
         }
     }
@@ -66,7 +74,7 @@ impl Fingerprintable for DocumentString<'_> {
         }
         self.label.hash(hasher);
         self.indentation.fingerprint_with_hasher(hasher, resolved_names, options);
-        for part in self.parts.iter() {
+        for part in &self.parts {
             part.fingerprint_with_hasher(hasher, resolved_names, options);
         }
     }

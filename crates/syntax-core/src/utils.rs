@@ -153,6 +153,7 @@ pub fn parse_literal_string_in<'arena>(
 /// Panics if internal assumptions about character parsing are violated (e.g., invalid hex or octal digits
 /// after validation). This should not occur with valid PHP strings.
 #[inline]
+#[must_use]
 pub fn parse_literal_string(s: &str, quote_char: Option<char>, has_quote: bool) -> Option<String> {
     if s.is_empty() {
         return Some(String::new());
@@ -287,6 +288,7 @@ pub fn parse_literal_string(s: &str, quote_char: Option<char>, has_quote: bool) 
 }
 
 #[inline]
+#[must_use]
 pub fn parse_literal_float(value: &str) -> Option<f64> {
     let source = value.replace('_', "");
 
@@ -294,6 +296,7 @@ pub fn parse_literal_float(value: &str) -> Option<f64> {
 }
 
 #[inline]
+#[must_use]
 pub fn parse_literal_integer(value: &str) -> Option<u64> {
     if value.is_empty() {
         return None;
@@ -350,11 +353,13 @@ pub fn parse_literal_integer(value: &str) -> Option<u64> {
 }
 
 #[inline]
+#[must_use]
 pub fn is_start_of_identifier(byte: &u8) -> bool {
     byte.is_ascii_lowercase() || byte.is_ascii_uppercase() || (*byte == b'_')
 }
 
 #[inline]
+#[must_use]
 pub fn is_part_of_identifier(byte: &u8) -> bool {
     byte.is_ascii_digit()
         || byte.is_ascii_lowercase()

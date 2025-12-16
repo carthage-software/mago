@@ -11,7 +11,18 @@ use mago_codex::metadata::function_like::FunctionLikeMetadata;
 use mago_codex::metadata::property::PropertyMetadata;
 use mago_codex::ttype::union::TUnion;
 use mago_database::file::File;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Class;
+use mago_syntax::ast::Enum;
+use mago_syntax::ast::Expression;
+use mago_syntax::ast::Function;
+use mago_syntax::ast::FunctionCall;
+use mago_syntax::ast::Interface;
+use mago_syntax::ast::MethodCall;
+use mago_syntax::ast::NullSafeMethodCall;
+use mago_syntax::ast::Program;
+use mago_syntax::ast::Statement;
+use mago_syntax::ast::StaticMethodCall;
+use mago_syntax::ast::Trait;
 
 use crate::artifacts::AnalysisArtifacts;
 use crate::context::block::BlockContext;
@@ -21,7 +32,22 @@ use crate::plugin::context::InvocationInfo;
 use crate::plugin::context::ProviderContext;
 use crate::plugin::context::ReportedIssue;
 use crate::plugin::error::PluginResult;
-use crate::plugin::hook::*;
+use crate::plugin::hook::ClassDeclarationHook;
+use crate::plugin::hook::EnumDeclarationHook;
+use crate::plugin::hook::ExpressionHook;
+use crate::plugin::hook::ExpressionHookResult;
+use crate::plugin::hook::FunctionCallHook;
+use crate::plugin::hook::FunctionDeclarationHook;
+use crate::plugin::hook::HookAction;
+use crate::plugin::hook::InterfaceDeclarationHook;
+use crate::plugin::hook::IssueFilterDecision;
+use crate::plugin::hook::IssueFilterHook;
+use crate::plugin::hook::MethodCallHook;
+use crate::plugin::hook::NullSafeMethodCallHook;
+use crate::plugin::hook::ProgramHook;
+use crate::plugin::hook::StatementHook;
+use crate::plugin::hook::StaticMethodCallHook;
+use crate::plugin::hook::TraitDeclarationHook;
 use crate::plugin::provider::assertion::FunctionAssertionProvider;
 use crate::plugin::provider::assertion::InvocationAssertions;
 use crate::plugin::provider::assertion::MethodAssertionProvider;
@@ -111,10 +137,12 @@ impl std::fmt::Debug for PluginRegistry {
 
 impl PluginRegistry {
     #[inline]
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
+    #[must_use]
     pub fn with_library_providers() -> Self {
         crate::plugin::create_registry()
     }
@@ -327,96 +355,115 @@ impl PluginRegistry {
     }
 
     #[inline]
+    #[must_use]
     pub fn has_program_hooks(&self) -> bool {
         !self.program_hooks.is_empty()
     }
 
     #[inline]
+    #[must_use]
     pub fn has_statement_hooks(&self) -> bool {
         !self.statement_hooks.is_empty()
     }
 
     #[inline]
+    #[must_use]
     pub fn has_expression_hooks(&self) -> bool {
         !self.expression_hooks.is_empty()
     }
 
     #[inline]
+    #[must_use]
     pub fn has_function_call_hooks(&self) -> bool {
         !self.function_call_hooks.is_empty()
     }
 
     #[inline]
+    #[must_use]
     pub fn has_method_call_hooks(&self) -> bool {
         !self.method_call_hooks.is_empty()
     }
 
     #[inline]
+    #[must_use]
     pub fn has_static_method_call_hooks(&self) -> bool {
         !self.static_method_call_hooks.is_empty()
     }
 
     #[inline]
+    #[must_use]
     pub fn has_nullsafe_method_call_hooks(&self) -> bool {
         !self.nullsafe_method_call_hooks.is_empty()
     }
 
     #[inline]
+    #[must_use]
     pub fn has_class_hooks(&self) -> bool {
         !self.class_hooks.is_empty()
     }
 
     #[inline]
+    #[must_use]
     pub fn has_interface_hooks(&self) -> bool {
         !self.interface_hooks.is_empty()
     }
 
     #[inline]
+    #[must_use]
     pub fn has_trait_hooks(&self) -> bool {
         !self.trait_hooks.is_empty()
     }
 
     #[inline]
+    #[must_use]
     pub fn has_enum_hooks(&self) -> bool {
         !self.enum_hooks.is_empty()
     }
 
     #[inline]
+    #[must_use]
     pub fn has_function_decl_hooks(&self) -> bool {
         !self.function_decl_hooks.is_empty()
     }
 
     #[inline]
+    #[must_use]
     pub fn has_property_initialization_providers(&self) -> bool {
         !self.property_initialization_providers.is_empty()
     }
 
     #[inline]
+    #[must_use]
     pub fn has_issue_filter_hooks(&self) -> bool {
         !self.issue_filter_hooks.is_empty()
     }
 
     #[inline]
+    #[must_use]
     pub fn has_function_assertion_providers(&self) -> bool {
         !self.function_assertion_providers.is_empty()
     }
 
     #[inline]
+    #[must_use]
     pub fn has_method_assertion_providers(&self) -> bool {
         !self.method_assertion_providers.is_empty()
     }
 
     #[inline]
+    #[must_use]
     pub fn has_expression_throw_providers(&self) -> bool {
         !self.expression_throw_providers.is_empty()
     }
 
     #[inline]
+    #[must_use]
     pub fn has_function_throw_providers(&self) -> bool {
         !self.function_throw_providers.is_empty()
     }
 
     #[inline]
+    #[must_use]
     pub fn has_method_throw_providers(&self) -> bool {
         !self.method_throw_providers.is_empty()
     }
@@ -747,6 +794,7 @@ impl PluginRegistry {
         indices
     }
 
+    #[must_use]
     pub fn get_function_like_return_type<'ctx>(
         &self,
         codebase: &'ctx CodebaseMetadata,
@@ -771,6 +819,7 @@ impl PluginRegistry {
         }
     }
 
+    #[must_use]
     pub fn get_function_return_type<'ctx>(
         &self,
         codebase: &'ctx CodebaseMetadata,
@@ -797,6 +846,7 @@ impl PluginRegistry {
         ProviderResult { return_type: None, issues: all_issues }
     }
 
+    #[must_use]
     pub fn get_method_return_type<'ctx>(
         &self,
         codebase: &'ctx CodebaseMetadata,
@@ -827,11 +877,13 @@ impl PluginRegistry {
     }
 
     #[inline]
+    #[must_use]
     pub fn function_provider_count(&self) -> usize {
         self.function_providers.len()
     }
 
     #[inline]
+    #[must_use]
     pub fn method_provider_count(&self) -> usize {
         self.method_providers.len()
     }
@@ -839,6 +891,7 @@ impl PluginRegistry {
     /// Check if a property should be considered initialized by any registered provider.
     ///
     /// Returns `true` if any provider considers the property initialized.
+    #[must_use]
     pub fn is_property_initialized(
         &self,
         class_metadata: &ClassLikeMetadata,
@@ -911,6 +964,7 @@ impl PluginRegistry {
         indices
     }
 
+    #[must_use]
     pub fn get_function_like_assertions<'ctx>(
         &self,
         codebase: &'ctx CodebaseMetadata,
@@ -931,6 +985,7 @@ impl PluginRegistry {
     }
 
     /// Get assertions for a function invocation from registered providers.
+    #[must_use]
     pub fn get_function_assertions<'ctx>(
         &self,
         codebase: &'ctx CodebaseMetadata,
@@ -961,6 +1016,7 @@ impl PluginRegistry {
     }
 
     /// Get assertions for a method invocation from registered providers.
+    #[must_use]
     pub fn get_method_assertions<'ctx>(
         &self,
         codebase: &'ctx CodebaseMetadata,
@@ -1056,6 +1112,7 @@ impl PluginRegistry {
     }
 
     /// Get thrown exception class names for an expression from registered providers.
+    #[must_use]
     pub fn get_expression_thrown_exceptions<'ctx>(
         &self,
         codebase: &'ctx CodebaseMetadata,
@@ -1074,6 +1131,7 @@ impl PluginRegistry {
     }
 
     /// Get thrown exception class names for a function invocation from registered providers.
+    #[must_use]
     pub fn get_function_thrown_exceptions<'ctx>(
         &self,
         codebase: &'ctx CodebaseMetadata,
@@ -1096,6 +1154,7 @@ impl PluginRegistry {
     }
 
     /// Get thrown exception class names for a method invocation from registered providers.
+    #[must_use]
     pub fn get_method_thrown_exceptions<'ctx>(
         &self,
         codebase: &'ctx CodebaseMetadata,
@@ -1125,6 +1184,7 @@ impl PluginRegistry {
     /// Filter issues through all registered issue filter hooks.
     ///
     /// Returns a new `IssueCollection` with filtered issues.
+    #[must_use]
     pub fn filter_issues(&self, file: &File, issues: IssueCollection) -> IssueCollection {
         if self.issue_filter_hooks.is_empty() {
             return issues;

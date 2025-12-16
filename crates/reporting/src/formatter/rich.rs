@@ -42,7 +42,7 @@ impl Formatter for RichFormatter {
             issues,
             database,
             config,
-            Config { display_style: DisplayStyle::Rich, ..Default::default() },
+            &Config { display_style: DisplayStyle::Rich, ..Default::default() },
         )
     }
 }
@@ -52,7 +52,7 @@ pub(super) fn codespan_format_with_config(
     issues: &IssueCollection,
     database: &ReadDatabase,
     config: &FormatterConfig,
-    codespan_config: Config,
+    codespan_config: &Config,
 ) -> Result<(), ReportingError> {
     // Apply filters
     let issues = apply_filters(issues, config);
@@ -94,7 +94,7 @@ pub(super) fn codespan_format_with_config(
 
         let diagnostic: Diagnostic<FileId> = issue.into();
 
-        term::emit_to_write_style(&mut buffer, &codespan_config, &files, &diagnostic)?;
+        term::emit_to_write_style(&mut buffer, codespan_config, &files, &diagnostic)?;
     }
 
     if let Some(highest_level) = highest_level {
@@ -126,7 +126,7 @@ pub(super) fn codespan_format_with_config(
             diagnostic = diagnostic.with_notes(vec![format!("{} issues contain auto-fix suggestions", suggestions)]);
         }
 
-        term::emit_to_write_style(&mut buffer, &codespan_config, &files, &diagnostic)?;
+        term::emit_to_write_style(&mut buffer, codespan_config, &files, &diagnostic)?;
     }
 
     // Write buffer to writer

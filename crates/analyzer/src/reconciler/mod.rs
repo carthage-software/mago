@@ -204,7 +204,7 @@ pub fn reconcile_keyed_types<'ctx>(
                         continue;
                     }
 
-                    if is_real && !new_types.contains_key(new_key) && var_has_root(new_key, key) {
+                    if is_real && !new_types.contains_key(new_key) && var_has_root(*new_key, *key) {
                         if let Some(references_map) = reference_graph.get(new_key) {
                             let references_to_fix = references_map.iter().copied().collect::<Vec<_>>();
 
@@ -264,7 +264,7 @@ pub fn reconcile_keyed_types<'ctx>(
             // If key is new, create references for other variables that reference the root variable.
             let mut reference_key_parts = key_parts.clone();
             for reference in &reference_graph[&key_parts_0_atom] {
-                reference_key_parts[0] = reference.as_str().to_owned();
+                reference.as_str().clone_into(&mut reference_key_parts[0]);
                 let reference_key = atom(&reference_key_parts.join(""));
                 block_context.locals.insert(reference_key, existing_type.clone());
             }
@@ -869,7 +869,7 @@ fn get_value_for_key(
                         {
                             class_property_type = get_mixed();
                         } else {
-                            class_property_type = get_property_type(context, fq_class_name, &property_name)?;
+                            class_property_type = get_property_type(context, *fq_class_name, &property_name)?;
                         }
                     } else {
                         class_property_type = get_mixed();
@@ -896,12 +896,12 @@ fn get_value_for_key(
     block_context.locals.get(&base_key_atom).map(|t| (**t).clone())
 }
 
-fn get_property_type(context: &Context<'_, '_>, classlike_name: &Atom, property_name_str: &str) -> Option<TUnion> {
+fn get_property_type(context: &Context<'_, '_>, classlike_name: Atom, property_name_str: &str) -> Option<TUnion> {
     // Add `$` prefix
     let property_name = concat_atom!("$", property_name_str);
 
-    let declaring_property_class = context.codebase.get_declaring_property_class(classlike_name, &property_name)?;
-    let property_metadata = context.codebase.get_property(classlike_name, &property_name)?;
+    let declaring_property_class = context.codebase.get_declaring_property_class(&classlike_name, &property_name)?;
+    let property_metadata = context.codebase.get_property(&classlike_name, &property_name)?;
     let property_type = property_metadata.type_metadata.as_ref().map(|metadata| metadata.type_union.clone());
 
     let property_type = if let Some(mut property_type) = property_type {

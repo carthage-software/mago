@@ -26,24 +26,28 @@ pub struct TObjectWithProperties {
 
 impl TObjectWithProperties {
     #[inline]
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
     /// Returns a reference to the map of known item types by key, if any.
     #[inline]
+    #[must_use]
     pub fn get_known_properties(&self) -> &BTreeMap<Atom, (bool, TUnion)> {
         &self.known_properties
     }
 
     /// Checks if there are any known specific item types defined.
     #[inline]
+    #[must_use]
     pub fn has_known_properties(&self) -> bool {
         !self.known_properties.is_empty()
     }
 
     /// Checks if the list contains any known indefinite elements.
     #[inline]
+    #[must_use]
     pub fn has_known_indefinite_properties(&self) -> bool {
         self.known_properties.values().any(|(indefinite, _)| *indefinite)
     }

@@ -1,7 +1,11 @@
 use mago_span::HasSpan;
 use mago_span::Span;
-use mago_syntax::ast::*;
-use mago_syntax::walker::*;
+use mago_syntax::ast::ClassLikeMember;
+use mago_syntax::ast::Program;
+use mago_syntax::ast::Statement;
+use mago_syntax::walker::Walker;
+use mago_syntax::walker::walk_class_like_member;
+use mago_syntax::walker::walk_statement;
 
 use crate::Collector;
 

@@ -1,5 +1,10 @@
 use crate::T;
-use crate::ast::ast::*;
+use crate::ast::ast::Foreach;
+use crate::ast::ast::ForeachBody;
+use crate::ast::ast::ForeachColonDelimitedBody;
+use crate::ast::ast::ForeachKeyValueTarget;
+use crate::ast::ast::ForeachTarget;
+use crate::ast::ast::ForeachValueTarget;
 use crate::ast::sequence::Sequence;
 use crate::error::ParseError;
 use crate::parser::internal::expression::parse_expression;

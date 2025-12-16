@@ -119,7 +119,7 @@ pub fn resolve_class_constants<'ctx, 'ast, 'arena>(
             // Handle regular constants and enum cases
             let Some(metadata) = context.codebase.get_class_like(&fq_class_id) else {
                 result.has_invalid_path = true;
-                report_non_existent_class(context, &fq_class_id, class_expr.span());
+                report_non_existent_class(context, fq_class_id, class_expr.span());
                 continue;
             };
 
@@ -270,7 +270,7 @@ fn find_constant_in_class<'ctx>(
 }
 
 /// Reports an error for a class-like that cannot be found in the codebase.
-fn report_non_existent_class(context: &mut Context<'_, '_>, classname: &Atom, class_span: Span) {
+fn report_non_existent_class(context: &mut Context<'_, '_>, classname: Atom, class_span: Span) {
     context.collector.report_with_code(
         IssueCode::NonExistentClassLike,
         Issue::error(format!("Class, interface, enum, or trait `{classname}` not found."))

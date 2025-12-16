@@ -1,6 +1,15 @@
 use mago_span::HasSpan;
 use mago_span::Span;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Access;
+use mago_syntax::ast::Call;
+use mago_syntax::ast::ClassLikeConstantSelector;
+use mago_syntax::ast::ClassLikeMemberSelector;
+use mago_syntax::ast::Expression;
+use mago_syntax::ast::Identifier;
+use mago_syntax::ast::Literal;
+use mago_syntax::ast::LiteralString;
+use mago_syntax::ast::MatchArm;
+use mago_syntax::ast::Variable;
 
 #[inline]
 #[must_use]

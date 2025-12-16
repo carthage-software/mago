@@ -85,10 +85,10 @@ pub fn create_progress_bar(length: usize, prefix: &'static str, theme: ProgressB
 /// # Arguments
 ///
 /// * `progress_bar` - The progress bar to remove (obtained from [`create_progress_bar`])
-pub fn remove_progress_bar(progress_bar: ProgressBar) {
+pub fn remove_progress_bar(progress_bar: &ProgressBar) {
     progress_bar.finish_and_clear();
 
-    GLOBAL_PROGRESS_MANAGER.remove(&progress_bar);
+    GLOBAL_PROGRESS_MANAGER.remove(progress_bar);
 }
 
 /// Visual themes for progress bars.
@@ -131,6 +131,7 @@ pub enum ProgressBarTheme {
 
 impl ProgressBarTheme {
     /// Returns the template string for the selected theme, defining the layout and appearance of the progress bar.
+    #[must_use]
     pub fn template(&self) -> &'static str {
         match self {
             Self::Red => {
@@ -155,6 +156,7 @@ impl ProgressBarTheme {
     }
 
     /// Returns the characters used to represent the progress of the bar.
+    #[must_use]
     pub fn progress_chars(&self) -> &'static str {
         match self {
             ProgressBarTheme::Red => "█░ ",
@@ -167,6 +169,7 @@ impl ProgressBarTheme {
     }
 
     /// Returns the characters used to animate the spinner/ticker in the progress bar.
+    #[must_use]
     pub fn tick_chars(&self) -> &'static str {
         match self {
             ProgressBarTheme::Red => "⠁⠂⠄⡀⢀⠠⠐⠈ ",

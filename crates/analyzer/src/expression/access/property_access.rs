@@ -6,7 +6,10 @@ use mago_codex::ttype::get_never;
 use mago_codex::ttype::get_null;
 use mago_span::HasSpan;
 use mago_span::Span;
-use mago_syntax::ast::*;
+use mago_syntax::ast::ClassLikeMemberSelector;
+use mago_syntax::ast::Expression;
+use mago_syntax::ast::NullSafePropertyAccess;
+use mago_syntax::ast::PropertyAccess;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;

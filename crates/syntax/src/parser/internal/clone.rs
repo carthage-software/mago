@@ -1,5 +1,15 @@
 use crate::T;
-use crate::ast::ast::*;
+use crate::ast::ast::Call;
+use crate::ast::ast::Clone;
+use crate::ast::ast::Expression;
+use crate::ast::ast::FunctionCall;
+use crate::ast::ast::FunctionPartialApplication;
+use crate::ast::ast::Identifier;
+use crate::ast::ast::LocalIdentifier;
+use crate::ast::ast::Parenthesized;
+use crate::ast::ast::PartialApplication;
+use crate::ast::ast::PartialArgument;
+use crate::ast::ast::PartialArgumentList;
 use crate::ast::sequence::TokenSeparatedSequence;
 use crate::error::ParseError;
 use crate::parser::internal::argument::parse_partial_argument;

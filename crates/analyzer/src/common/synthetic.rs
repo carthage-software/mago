@@ -3,8 +3,22 @@ use bumpalo::vec;
 
 use mago_span::HasSpan;
 use mago_span::Span;
+use mago_syntax::ast::Argument;
+use mago_syntax::ast::ArgumentList;
+use mago_syntax::ast::Binary;
+use mago_syntax::ast::BinaryOperator;
+use mago_syntax::ast::Call;
+use mago_syntax::ast::DirectVariable;
+use mago_syntax::ast::Expression;
+use mago_syntax::ast::FunctionCall;
+use mago_syntax::ast::Literal;
+use mago_syntax::ast::LiteralString;
+use mago_syntax::ast::LiteralStringKind;
+use mago_syntax::ast::PositionalArgument;
+use mago_syntax::ast::UnaryPrefix;
+use mago_syntax::ast::UnaryPrefixOperator;
+use mago_syntax::ast::Variable;
 use mago_syntax::ast::sequence::TokenSeparatedSequence;
-use mago_syntax::ast::*;
 
 pub fn new_synthetic_call<'arena>(arena: &'arena Bump, f: &str, expression: Expression<'arena>) -> Expression<'arena> {
     Expression::Call(Call::Function(FunctionCall {

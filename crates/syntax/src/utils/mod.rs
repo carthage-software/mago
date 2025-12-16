@@ -1,4 +1,22 @@
-use crate::ast::*;
+use crate::ast::Access;
+use crate::ast::Argument;
+use crate::ast::ArrayElement;
+use crate::ast::Block;
+use crate::ast::Call;
+use crate::ast::ClassLikeConstantSelector;
+use crate::ast::ClassLikeMemberSelector;
+use crate::ast::Construct;
+use crate::ast::Expression;
+use crate::ast::ForBody;
+use crate::ast::ForeachBody;
+use crate::ast::IfBody;
+use crate::ast::MatchArm;
+use crate::ast::PartialApplication;
+use crate::ast::Return;
+use crate::ast::Statement;
+use crate::ast::SwitchBody;
+use crate::ast::SwitchCase;
+use crate::ast::WhileBody;
 use crate::utils::control_flow::ControlFlow;
 
 pub mod assignment;
@@ -8,6 +26,7 @@ pub mod definition;
 pub mod reference;
 
 #[inline]
+#[must_use]
 pub fn find_returns_in_block<'ast, 'arena>(block: &'ast Block<'arena>) -> Vec<&'ast Return<'arena>> {
     let mut returns = vec![];
     for control_flow in control_flow::find_control_flows_in_block(block) {
@@ -20,6 +39,7 @@ pub fn find_returns_in_block<'ast, 'arena>(block: &'ast Block<'arena>) -> Vec<&'
 }
 
 #[inline]
+#[must_use]
 pub fn find_returns_in_statement<'ast, 'arena>(statement: &'ast Statement<'arena>) -> Vec<&'ast Return<'arena>> {
     let mut returns = vec![];
     for control_flow in control_flow::find_control_flows_in_statement(statement) {
@@ -32,7 +52,8 @@ pub fn find_returns_in_statement<'ast, 'arena>(statement: &'ast Statement<'arena
 }
 
 #[inline]
-pub fn block_has_throws<'ast, 'arena>(block: &'ast Block<'arena>) -> bool {
+#[must_use]
+pub fn block_has_throws(block: &Block<'_>) -> bool {
     for control_flow in control_flow::find_control_flows_in_block(block) {
         if let ControlFlow::Throw(_) = control_flow {
             return true;
@@ -43,7 +64,8 @@ pub fn block_has_throws<'ast, 'arena>(block: &'ast Block<'arena>) -> bool {
 }
 
 #[inline]
-pub fn statement_has_throws<'ast, 'arena>(statement: &'ast Statement<'arena>) -> bool {
+#[must_use]
+pub fn statement_has_throws(statement: &Statement<'_>) -> bool {
     for control_flow in control_flow::find_control_flows_in_statement(statement) {
         if let ControlFlow::Throw(_) = control_flow {
             return true;
@@ -54,7 +76,8 @@ pub fn statement_has_throws<'ast, 'arena>(statement: &'ast Statement<'arena>) ->
 }
 
 #[inline]
-pub fn expression_has_throws<'ast, 'arena>(expression: &'ast Expression<'arena>) -> bool {
+#[must_use]
+pub fn expression_has_throws(expression: &Expression<'_>) -> bool {
     for control_flow in control_flow::find_control_flows_in_expression(expression) {
         if let ControlFlow::Throw(_) = control_flow {
             return true;
@@ -65,8 +88,9 @@ pub fn expression_has_throws<'ast, 'arena>(expression: &'ast Expression<'arena>)
 }
 
 #[inline]
+#[must_use]
 pub fn block_has_yield(block: &Block) -> bool {
-    for statement in block.statements.iter() {
+    for statement in &block.statements {
         if statement_has_yield(statement) {
             return true;
         }
@@ -79,7 +103,7 @@ pub fn block_has_yield(block: &Block) -> bool {
 pub fn statement_has_yield(statement: &Statement) -> bool {
     match statement {
         Statement::Namespace(namespace) => {
-            for statement in namespace.statements().iter() {
+            for statement in namespace.statements() {
                 if statement_has_yield(statement) {
                     return true;
                 }
@@ -95,7 +119,7 @@ pub fn statement_has_yield(statement: &Statement) -> bool {
                 return true;
             }
 
-            for catch in r#try.catch_clauses.iter() {
+            for catch in &r#try.catch_clauses {
                 if block_has_yield(&catch.block) {
                     return true;
                 }
@@ -134,17 +158,17 @@ pub fn statement_has_yield(statement: &Statement) -> bool {
                 SwitchBody::ColonDelimited(switch_colon_delimited_body) => &switch_colon_delimited_body.cases,
             };
 
-            for case in cases.iter() {
+            for case in cases {
                 match &case {
                     SwitchCase::Expression(switch_expression_case) => {
-                        for statement in switch_expression_case.statements.iter() {
+                        for statement in &switch_expression_case.statements {
                             if statement_has_yield(statement) {
                                 return true;
                             }
                         }
                     }
                     SwitchCase::Default(switch_default_case) => {
-                        for statement in switch_default_case.statements.iter() {
+                        for statement in &switch_default_case.statements {
                             if statement_has_yield(statement) {
                                 return true;
                             }
@@ -161,7 +185,7 @@ pub fn statement_has_yield(statement: &Statement) -> bool {
                     return true;
                 }
 
-                for else_if in if_statement_body.else_if_clauses.iter() {
+                for else_if in &if_statement_body.else_if_clauses {
                     if statement_has_yield(else_if.statement) {
                         return true;
                     }
@@ -180,7 +204,7 @@ pub fn statement_has_yield(statement: &Statement) -> bool {
                     return true;
                 }
 
-                for else_if in if_colon_delimited_body.else_if_clauses.iter() {
+                for else_if in &if_colon_delimited_body.else_if_clauses {
                     if else_if.statements.iter().any(statement_has_yield) {
                         return true;
                     }
@@ -214,7 +238,7 @@ pub fn expression_has_yield(expression: &Expression) -> bool {
         }
         Expression::Conditional(conditional) => {
             expression_has_yield(conditional.condition)
-                || conditional.then.as_ref().map(|e| expression_has_yield(e)).unwrap_or(false)
+                || conditional.then.as_ref().is_some_and(|e| expression_has_yield(e))
                 || expression_has_yield(conditional.r#else)
         }
         Expression::Array(array) => array.elements.iter().any(|element| match element {
@@ -264,26 +288,18 @@ pub fn expression_has_yield(expression: &Expression) -> bool {
             Construct::Require(require_construct) => expression_has_yield(require_construct.value),
             Construct::RequireOnce(require_once_construct) => expression_has_yield(require_once_construct.value),
             Construct::Print(print_construct) => expression_has_yield(print_construct.value),
-            Construct::Exit(exit_construct) => exit_construct
-                .arguments
-                .as_ref()
-                .map(|arguments| {
-                    arguments.arguments.iter().any(|argument| match argument {
-                        Argument::Positional(positional_argument) => expression_has_yield(&positional_argument.value),
-                        Argument::Named(named_argument) => expression_has_yield(&named_argument.value),
-                    })
+            Construct::Exit(exit_construct) => exit_construct.arguments.as_ref().is_some_and(|arguments| {
+                arguments.arguments.iter().any(|argument| match argument {
+                    Argument::Positional(positional_argument) => expression_has_yield(&positional_argument.value),
+                    Argument::Named(named_argument) => expression_has_yield(&named_argument.value),
                 })
-                .unwrap_or(false),
-            Construct::Die(die_construct) => die_construct
-                .arguments
-                .as_ref()
-                .map(|arguments| {
-                    arguments.arguments.iter().any(|argument| match argument {
-                        Argument::Positional(positional_argument) => expression_has_yield(&positional_argument.value),
-                        Argument::Named(named_argument) => expression_has_yield(&named_argument.value),
-                    })
+            }),
+            Construct::Die(die_construct) => die_construct.arguments.as_ref().is_some_and(|arguments| {
+                arguments.arguments.iter().any(|argument| match argument {
+                    Argument::Positional(positional_argument) => expression_has_yield(&positional_argument.value),
+                    Argument::Named(named_argument) => expression_has_yield(&named_argument.value),
                 })
-                .unwrap_or(false),
+            }),
         },
         Expression::Throw(throw) => expression_has_yield(throw.exception),
         Expression::Clone(clone) => expression_has_yield(clone.object),
@@ -350,18 +366,12 @@ pub fn expression_has_yield(expression: &Expression) -> bool {
         },
         Expression::Instantiation(instantiation) => {
             expression_has_yield(instantiation.class)
-                || instantiation
-                    .argument_list
-                    .as_ref()
-                    .map(|arguments| {
-                        arguments.arguments.iter().any(|argument| match argument {
-                            Argument::Positional(positional_argument) => {
-                                expression_has_yield(&positional_argument.value)
-                            }
-                            Argument::Named(named_argument) => expression_has_yield(&named_argument.value),
-                        })
+                || instantiation.argument_list.as_ref().is_some_and(|arguments| {
+                    arguments.arguments.iter().any(|argument| match argument {
+                        Argument::Positional(positional_argument) => expression_has_yield(&positional_argument.value),
+                        Argument::Named(named_argument) => expression_has_yield(&named_argument.value),
                     })
-                    .unwrap_or(false)
+                })
         }
         Expression::Yield(_) => true,
         _ => false,

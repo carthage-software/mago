@@ -23,18 +23,21 @@ impl Default for ScopeContext<'_> {
 impl<'ctx> ScopeContext<'ctx> {
     /// Creates a new `ScopeContext` representing a default global, static scope.
     #[inline]
+    #[must_use]
     pub fn new() -> Self {
         Self { function_like: None, class_like: None, property_hook: None, is_static: true }
     }
 
     /// Returns whether the current scope is a global scope.
     #[inline]
+    #[must_use]
     pub const fn is_global(&self) -> bool {
         self.function_like.is_none() && self.class_like.is_none()
     }
 
     /// Returns whether the current scope is pure.
     #[inline]
+    #[must_use]
     pub const fn is_pure(&self) -> bool {
         if let Some(function_like) = self.function_like
             && function_like.flags.is_pure()
@@ -47,24 +50,28 @@ impl<'ctx> ScopeContext<'ctx> {
 
     /// Returns the calling class-like context, if available.
     #[inline]
+    #[must_use]
     pub fn get_class_like(&self) -> Option<&'ctx ClassLikeMetadata> {
         self.class_like
     }
 
     /// Returns the calling class FQCN, if inside a class scope.
     #[inline]
+    #[must_use]
     pub fn get_class_like_name(&self) -> Option<Atom> {
         self.class_like.map(|class| class.name)
     }
 
     /// Returns the calling function-like context, if available.
     #[inline]
+    #[must_use]
     pub fn get_function_like(&self) -> Option<&'ctx FunctionLikeMetadata> {
         self.function_like
     }
 
     /// Returns the identifier of the calling function/method, if available.
     #[inline]
+    #[must_use]
     pub fn get_function_like_identifier(&self) -> Option<FunctionLikeIdentifier> {
         let function_like = self.function_like?;
 
@@ -85,6 +92,7 @@ impl<'ctx> ScopeContext<'ctx> {
 
     /// Checks if the calling class scope is marked as `final`.
     #[inline]
+    #[must_use]
     pub const fn is_class_like_final(&self) -> bool {
         match self.class_like {
             Some(class) => class.flags.is_final(),
@@ -94,6 +102,7 @@ impl<'ctx> ScopeContext<'ctx> {
 
     /// Checks if the calling scope is static.
     #[inline]
+    #[must_use]
     pub const fn is_static(&self) -> bool {
         self.is_static
     }
@@ -120,6 +129,7 @@ impl<'ctx> ScopeContext<'ctx> {
     ///
     /// Returns a tuple of (`property_name`, `hook_metadata`) when analyzing a property hook body.
     #[inline]
+    #[must_use]
     pub fn get_property_hook(&self) -> Option<(Atom, &'ctx PropertyHookMetadata)> {
         self.property_hook
     }
@@ -135,6 +145,7 @@ impl<'ctx> ScopeContext<'ctx> {
     /// Determines the `ReferenceSource` (symbol or member) based on the current function context.
     /// Used to identify the origin of a code reference for dependency tracking.
     #[inline]
+    #[must_use]
     pub fn get_reference_source(&self) -> Option<ReferenceSource> {
         if let Some(calling_functionlike_id) = self.get_function_like_identifier() {
             match calling_functionlike_id {

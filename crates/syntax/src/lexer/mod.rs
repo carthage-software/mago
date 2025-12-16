@@ -7,11 +7,21 @@ use mago_database::file::HasFileId;
 use mago_span::Position;
 use mago_span::Span;
 
+use mago_syntax_core::float_exponent;
+use mago_syntax_core::float_separator;
 use mago_syntax_core::input::Input;
+use mago_syntax_core::number_sign;
+use mago_syntax_core::part_of_identifier;
+use mago_syntax_core::start_of_binary_number;
+use mago_syntax_core::start_of_float_number;
+use mago_syntax_core::start_of_hexadecimal_number;
+use mago_syntax_core::start_of_identifier;
+use mago_syntax_core::start_of_number;
+use mago_syntax_core::start_of_octal_number;
+use mago_syntax_core::start_of_octal_or_float_number;
 use mago_syntax_core::utils::is_part_of_identifier;
 use mago_syntax_core::utils::is_start_of_identifier;
 use mago_syntax_core::utils::read_digits_of_base;
-use mago_syntax_core::*;
 
 use crate::error::SyntaxError;
 use crate::lexer::internal::mode::HaltStage;
@@ -76,11 +86,13 @@ impl<'input, 'arena> Lexer<'input, 'arena> {
     /// Check if the lexer has reached the end of the input.
     ///
     /// If this method returns `true`, the lexer will not produce any more tokens.
+    #[must_use]
     pub fn has_reached_eof(&self) -> bool {
         self.input.has_reached_eof()
     }
 
     /// Get the current position of the lexer in the input source code.
+    #[must_use]
     pub fn get_position(&self) -> Position {
         self.input.current_position()
     }
@@ -146,26 +158,31 @@ impl<'input, 'arena> Lexer<'input, 'arena> {
 
                     self.mode = LexerMode::Script;
 
-                    return tag;
+                    return Some(Ok(tag));
                 }
 
                 if self.input.is_at(b"#!", true) {
                     let buffer = self.input.consume_through(b'\n');
                     let end = self.input.current_position();
 
-                    self.token(TokenKind::InlineShebang, buffer, start, end)
+                    Some(Ok(self.token(TokenKind::InlineShebang, buffer, start, end)))
                 } else {
                     let buffer = self.input.consume_until(b"<?", false);
                     let end = self.input.current_position();
 
-                    self.token(TokenKind::InlineText, buffer, start, end)
+                    Some(Ok(self.token(TokenKind::InlineText, buffer, start, end)))
                 }
             }
             LexerMode::Script => {
                 let start = self.input.current_position();
                 let whitespaces = self.input.consume_whitespaces();
                 if !whitespaces.is_empty() {
-                    return self.token(TokenKind::Whitespace, whitespaces, start, self.input.current_position());
+                    return Some(Ok(self.token(
+                        TokenKind::Whitespace,
+                        whitespaces,
+                        start,
+                        self.input.current_position(),
+                    )));
                 }
 
                 let mut document_label: &[u8] = &[];
@@ -358,9 +375,9 @@ impl<'input, 'arena> Lexer<'input, 'arena> {
                     [b'^', ..] => (TokenKind::Caret, 1),
                     [b'*', ..] => (TokenKind::Asterisk, 1),
                     [b'/', ..] => (TokenKind::Slash, 1),
-                    [quote @ b'\'', ..] => read_literal_string(&self.input, quote),
+                    [quote @ b'\'', ..] => read_literal_string(&self.input, *quote),
                     [quote @ b'"', ..] if matches_literal_double_quote_string(&self.input) => {
-                        read_literal_string(&self.input, quote)
+                        read_literal_string(&self.input, *quote)
                     }
                     [b'"', ..] => (TokenKind::DoubleQuote, 1),
                     [b'(', ..] => 'parenthesis: {
@@ -460,17 +477,17 @@ impl<'input, 'arena> Lexer<'input, 'arena> {
                                     length += 1;
                                 }
                                 [b'\\', ..] if !self.interpolating => {
-                                    if !last_was_slash {
-                                        length += 1;
-                                        slashes += 1;
-                                        last_was_slash = true;
-                                    } else {
+                                    if last_was_slash {
                                         length -= 1;
                                         slashes -= 1;
                                         last_was_slash = false;
 
                                         break;
                                     }
+
+                                    length += 1;
+                                    slashes += 1;
+                                    last_was_slash = true;
                                 }
                                 _ => {
                                     break;
@@ -587,7 +604,7 @@ impl<'input, 'arena> Lexer<'input, 'arena> {
                 let buffer = self.input.consume(len);
                 let end = self.input.current_position();
 
-                self.token(token_kind, buffer, start, end)
+                Some(Ok(self.token(token_kind, buffer, start, end)))
             }
             LexerMode::DoubleQuoteString(interpolation) => match &interpolation {
                 Interpolation::None => {
@@ -646,7 +663,7 @@ impl<'input, 'arena> Lexer<'input, 'arena> {
                         self.mode = LexerMode::Script;
                     }
 
-                    self.token(token_kind, buffer, start, end)
+                    Some(Ok(self.token(token_kind, buffer, start, end)))
                 }
                 Interpolation::Until(offset) => {
                     self.interpolation(*offset, LexerMode::DoubleQuoteString(Interpolation::None))
@@ -708,7 +725,7 @@ impl<'input, 'arena> Lexer<'input, 'arena> {
                         self.mode = LexerMode::Script;
                     }
 
-                    self.token(token_kind, buffer, start, end)
+                    Some(Ok(self.token(token_kind, buffer, start, end)))
                 }
                 Interpolation::Until(offset) => {
                     self.interpolation(*offset, LexerMode::ShellExecuteString(Interpolation::None))
@@ -730,7 +747,7 @@ impl<'input, 'arena> Lexer<'input, 'arena> {
 
                                     break;
                                 }
-                                [b'\n', ..] | [b'\r', ..] => {
+                                [b'\n' | b'\r', ..] => {
                                     length += 1;
 
                                     break;
@@ -798,7 +815,7 @@ impl<'input, 'arena> Lexer<'input, 'arena> {
                             self.mode = LexerMode::Script;
                         }
 
-                        self.token(token_kind, buffer, start, end)
+                        Some(Ok(self.token(token_kind, buffer, start, end)))
                     }
                     Interpolation::Until(offset) => {
                         self.interpolation(*offset, LexerMode::DocumentString(kind, label, Interpolation::None))
@@ -818,7 +835,7 @@ impl<'input, 'arena> Lexer<'input, 'arena> {
 
                                 break;
                             }
-                            [b'\n', ..] | [b'\r', ..] => {
+                            [b'\n' | b'\r', ..] => {
                                 length += 1;
 
                                 break;
@@ -856,10 +873,10 @@ impl<'input, 'arena> Lexer<'input, 'arena> {
                     if terminated {
                         self.mode = LexerMode::Script;
 
-                        return self.token(TokenKind::DocumentEnd, buffer, start, end);
+                        return Some(Ok(self.token(TokenKind::DocumentEnd, buffer, start, end)));
                     }
 
-                    self.token(TokenKind::StringPart, buffer, start, end)
+                    Some(Ok(self.token(TokenKind::StringPart, buffer, start, end)))
                 }
             },
             LexerMode::Halt(stage) => 'halt: {
@@ -868,14 +885,14 @@ impl<'input, 'arena> Lexer<'input, 'arena> {
                     let buffer = self.input.consume_remaining();
                     let end = self.input.current_position();
 
-                    break 'halt self.token(TokenKind::InlineText, buffer, start, end);
+                    break 'halt Some(Ok(self.token(TokenKind::InlineText, buffer, start, end)));
                 }
 
                 let whitespaces = self.input.consume_whitespaces();
                 if !whitespaces.is_empty() {
                     let end = self.input.current_position();
 
-                    break 'halt self.token(TokenKind::Whitespace, whitespaces, start, end);
+                    break 'halt Some(Ok(self.token(TokenKind::Whitespace, whitespaces, start, end)));
                 }
 
                 match &stage {
@@ -886,7 +903,7 @@ impl<'input, 'arena> Lexer<'input, 'arena> {
 
                             self.mode = LexerMode::Halt(HaltStage::LookingForRightParenthesis);
 
-                            self.token(TokenKind::LeftParenthesis, buffer, start, end)
+                            Some(Ok(self.token(TokenKind::LeftParenthesis, buffer, start, end)))
                         } else {
                             Some(Err(SyntaxError::UnexpectedToken(
                                 self.file_id(),
@@ -902,7 +919,7 @@ impl<'input, 'arena> Lexer<'input, 'arena> {
 
                             self.mode = LexerMode::Halt(HaltStage::LookingForTerminator);
 
-                            self.token(TokenKind::RightParenthesis, buffer, start, end)
+                            Some(Ok(self.token(TokenKind::RightParenthesis, buffer, start, end)))
                         } else {
                             Some(Err(SyntaxError::UnexpectedToken(
                                 self.file_id(),
@@ -918,14 +935,14 @@ impl<'input, 'arena> Lexer<'input, 'arena> {
 
                             self.mode = LexerMode::Halt(HaltStage::End);
 
-                            self.token(TokenKind::Semicolon, buffer, start, end)
+                            Some(Ok(self.token(TokenKind::Semicolon, buffer, start, end)))
                         } else if self.input.is_at(b"?>", false) {
                             let buffer = self.input.consume(2);
                             let end = self.input.current_position();
 
                             self.mode = LexerMode::Halt(HaltStage::End);
 
-                            self.token(TokenKind::CloseTag, buffer, start, end)
+                            Some(Ok(self.token(TokenKind::CloseTag, buffer, start, end)))
                         } else {
                             Some(Err(SyntaxError::UnexpectedToken(
                                 self.file_id(),
@@ -941,20 +958,14 @@ impl<'input, 'arena> Lexer<'input, 'arena> {
     }
 
     #[inline]
-    fn token(
-        &mut self,
-        kind: TokenKind,
-        v: &[u8],
-        from: Position,
-        to: Position,
-    ) -> Option<Result<Token<'arena>, SyntaxError>> {
+    fn token(&mut self, kind: TokenKind, v: &[u8], from: Position, to: Position) -> Token<'arena> {
         // SAFETY: The input bytes are guaranteed to be valid UTF-8 because:
         // 1. File contents are validated via simdutf8 during database loading
         // 2. Invalid UTF-8 is converted lossily before reaching the lexer
         // 3. All byte slices here are subslices of the validated input
         let string = unsafe { std::str::from_utf8_unchecked(v) };
 
-        Some(Ok(Token { kind, value: self.arena.alloc_str(string), span: Span::new(self.file_id(), from, to) }))
+        Token { kind, value: self.arena.alloc_str(string), span: Span::new(self.file_id(), from, to) }
     }
 
     #[inline]
@@ -1273,7 +1284,7 @@ fn read_start_of_nowdoc_document(input: &Input) -> (usize, usize, usize) {
 }
 
 #[inline]
-fn read_literal_string(input: &Input, quote: &u8) -> (TokenKind, usize) {
+fn read_literal_string(input: &Input, quote: u8) -> (TokenKind, usize) {
     let total = input.len();
     let start = input.current_offset();
     let mut length = 1; // We assume the opening quote is already consumed.
@@ -1295,7 +1306,7 @@ fn read_literal_string(input: &Input, quote: &u8) -> (TokenKind, usize) {
             length += 1;
         } else {
             // If we see the closing quote and the previous byte was not an escape.
-            if *byte == *quote && !last_was_backslash {
+            if *byte == quote && !last_was_backslash {
                 length += 1; // Include the closing quote.
                 break;
             }

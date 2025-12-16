@@ -51,65 +51,78 @@ pub struct ClassLikeMemberExpressionSelector<'arena> {
 
 impl ClassLikeMember<'_> {
     #[inline]
+    #[must_use]
     pub const fn is_trait_use(&self) -> bool {
         matches!(self, ClassLikeMember::TraitUse(_))
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_constant(&self) -> bool {
         matches!(self, ClassLikeMember::Constant(_))
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_property(&self) -> bool {
         matches!(self, ClassLikeMember::Property(_))
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_enum_case(&self) -> bool {
         matches!(self, ClassLikeMember::EnumCase(_))
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_method(&self) -> bool {
         matches!(self, ClassLikeMember::Method(_))
     }
 }
 
-impl<'arena> ClassLikeMemberSelector<'arena> {
+impl ClassLikeMemberSelector<'_> {
     #[inline]
+    #[must_use]
     pub const fn is_identifier(&self) -> bool {
         matches!(self, ClassLikeMemberSelector::Identifier(_))
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_variable(&self) -> bool {
         matches!(self, ClassLikeMemberSelector::Variable(_))
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_expression(&self) -> bool {
         matches!(self, ClassLikeMemberSelector::Expression(_))
     }
 }
 
 impl<'arena> Sequence<'arena, ClassLikeMember<'arena>> {
+    #[must_use]
     pub fn contains_trait_uses(&self) -> bool {
         self.iter().any(|member| matches!(member, ClassLikeMember::TraitUse(_)))
     }
 
+    #[must_use]
     pub fn contains_constants(&self) -> bool {
         self.iter().any(|member| matches!(member, ClassLikeMember::Constant(_)))
     }
 
+    #[must_use]
     pub fn contains_properties(&self) -> bool {
         self.iter().any(|member| matches!(member, ClassLikeMember::Property(_)))
     }
 
+    #[must_use]
     pub fn contains_enum_cases(&self) -> bool {
         self.iter().any(|member| matches!(member, ClassLikeMember::EnumCase(_)))
     }
 
+    #[must_use]
     pub fn contains_methods(&self) -> bool {
         self.iter().any(|member| matches!(member, ClassLikeMember::Method(_)))
     }

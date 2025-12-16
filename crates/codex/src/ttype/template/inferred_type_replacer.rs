@@ -25,6 +25,7 @@ use crate::ttype::template::standin_type_replacer::get_most_specific_type_from_b
 use crate::ttype::union::TUnion;
 use crate::ttype::wrap_atomic;
 
+#[must_use]
 pub fn replace(union: &TUnion, template_result: &TemplateResult, codebase: &CodebaseMetadata) -> TUnion {
     let mut keys_to_unset = HashSet::default();
     let mut new_types = Vec::new();
@@ -44,13 +45,13 @@ pub fn replace(union: &TUnion, template_result: &TemplateResult, codebase: &Code
 
                 let template_type = replace_template_parameter(
                     &template_result.lower_bounds,
-                    parameter_name,
+                    *parameter_name,
                     defining_entity,
                     codebase,
                     constraint,
                     intersection_types,
                     template_result,
-                    key,
+                    *key,
                 );
 
                 if let Some(template_type) = template_type {
@@ -129,13 +130,13 @@ pub fn replace(union: &TUnion, template_result: &TemplateResult, codebase: &Code
 #[allow(clippy::too_many_arguments)]
 fn replace_template_parameter(
     inferred_lower_bounds: &IndexMap<Atom, HashMap<GenericParent, Vec<TemplateBound>>, RandomState>,
-    parameter_name: &Atom,
+    parameter_name: Atom,
     defining_entity: &GenericParent,
     codebase: &CodebaseMetadata,
     constraint: &TUnion,
     intersection_types: &Option<Vec<TAtomic>>,
     template_result: &TemplateResult,
-    key: &Atom,
+    key: Atom,
 ) -> Option<TUnion> {
     let mut template_type = None;
     let traversed_type = standin_type_replacer::get_root_template_type(
@@ -201,7 +202,7 @@ fn replace_template_parameter(
                 if let GenericParent::ClassLike(classlike_name) = map_defining_entity
                     && let Some(metadata) = codebase.get_class_like(classlike_name)
                     && let Some(extended_parameter_map) = metadata.template_extended_parameters.get(&metadata.name)
-                    && let Some(param) = extended_parameter_map.get(key)
+                    && let Some(param) = extended_parameter_map.get(&key)
                     && let TAtomic::GenericParameter(TGenericParameter { parameter_name, .. }) = param.get_single()
                     && let Some(bounds_map) = inferred_lower_bounds.get(parameter_name)
                     && let Some(bounds) = bounds_map.get(map_defining_entity)

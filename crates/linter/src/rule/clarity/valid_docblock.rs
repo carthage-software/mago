@@ -7,7 +7,9 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_reporting::Level;
 use mago_span::HasSpan;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Node;
+use mago_syntax::ast::NodeKind;
+use mago_syntax::ast::TriviaKind;
 
 use crate::category::Category;
 use crate::context::LintContext;
@@ -103,7 +105,7 @@ impl LintRule for ValidDocblockRule {
             return;
         };
 
-        for trivia in program.trivia.iter() {
+        for trivia in &program.trivia {
             if let TriviaKind::DocBlockComment = trivia.kind {
                 let Err(parse_error) = mago_docblock::parse_trivia(ctx.arena, trivia) else {
                     continue;

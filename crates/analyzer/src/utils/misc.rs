@@ -20,7 +20,7 @@ pub fn check_for_paradox(
     formula_2: &[Clause],
     span: Span,
 ) {
-    let formula_1_hashes: HashMap<u32, Span> = HashMap::from_iter(formula_1.iter().map(|c| (c.hash, c.condition_span)));
+    let formula_1_hashes: HashMap<u32, Span> = formula_1.iter().map(|c| (c.hash, c.condition_span)).collect();
     let mut formula_2_hashes: HashMap<u32, Span> = HashMap::default();
 
     for formula_2_clause in formula_2 {

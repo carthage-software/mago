@@ -1,5 +1,6 @@
 use mago_codex::ttype::get_nullable_scalar;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Echo;
+use mago_syntax::ast::EchoTag;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -23,7 +24,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Echo<'arena> {
             "echo",
             self.echo.span,
             ConstructInput::ExpressionList(self.values.as_slice()),
-            get_nullable_scalar(),
+            &get_nullable_scalar(),
             true,
             false,
             true,
@@ -47,7 +48,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for EchoTag<'arena> {
             "echo",
             self.tag,
             ConstructInput::ExpressionList(self.values.as_slice()),
-            get_nullable_scalar(),
+            &get_nullable_scalar(),
             true,
             false,
             true,

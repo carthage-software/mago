@@ -8,8 +8,9 @@ use mago_php_version::PHPVersionRange;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_reporting::Level;
-use mago_span::*;
-use mago_syntax::ast::*;
+use mago_span::HasSpan;
+use mago_syntax::ast::Node;
+use mago_syntax::ast::NodeKind;
 
 use crate::category::Category;
 use crate::context::LintContext;
@@ -85,7 +86,7 @@ impl LintRule for OptionalParamOrderRule {
 
         let mut optional_parameters = Vec::new();
 
-        for parameter in function_like_parameter_list.parameters.iter() {
+        for parameter in &function_like_parameter_list.parameters {
             if parameter.default_value.is_some() || parameter.ellipsis.is_some() {
                 optional_parameters.push((parameter.variable.name, parameter.variable.span()));
             } else if !optional_parameters.is_empty() {

@@ -1,5 +1,7 @@
 use mago_names::ResolvedNames;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Try;
+use mago_syntax::ast::TryCatchClause;
+use mago_syntax::ast::TryFinallyClause;
 
 use crate::FingerprintOptions;
 use crate::Fingerprintable;
@@ -14,7 +16,7 @@ impl Fingerprintable for Try<'_> {
     ) {
         "try".hash(hasher);
         self.block.fingerprint_with_hasher(hasher, resolved_names, options);
-        for catch_clause in self.catch_clauses.iter() {
+        for catch_clause in &self.catch_clauses {
             catch_clause.fingerprint_with_hasher(hasher, resolved_names, options);
         }
         self.finally_clause.fingerprint_with_hasher(hasher, resolved_names, options);

@@ -1,7 +1,39 @@
 use bumpalo::vec;
 
 use mago_span::HasSpan;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Break;
+use mago_syntax::ast::Continue;
+use mago_syntax::ast::DoWhile;
+use mago_syntax::ast::Expression;
+use mago_syntax::ast::For;
+use mago_syntax::ast::ForBody;
+use mago_syntax::ast::ForColonDelimitedBody;
+use mago_syntax::ast::Foreach;
+use mago_syntax::ast::ForeachBody;
+use mago_syntax::ast::ForeachColonDelimitedBody;
+use mago_syntax::ast::ForeachKeyValueTarget;
+use mago_syntax::ast::ForeachTarget;
+use mago_syntax::ast::ForeachValueTarget;
+use mago_syntax::ast::If;
+use mago_syntax::ast::IfBody;
+use mago_syntax::ast::IfColonDelimitedBody;
+use mago_syntax::ast::IfColonDelimitedBodyElseClause;
+use mago_syntax::ast::IfColonDelimitedBodyElseIfClause;
+use mago_syntax::ast::IfStatementBody;
+use mago_syntax::ast::IfStatementBodyElseClause;
+use mago_syntax::ast::IfStatementBodyElseIfClause;
+use mago_syntax::ast::Statement;
+use mago_syntax::ast::Switch;
+use mago_syntax::ast::SwitchBody;
+use mago_syntax::ast::SwitchBraceDelimitedBody;
+use mago_syntax::ast::SwitchCase;
+use mago_syntax::ast::SwitchCaseSeparator;
+use mago_syntax::ast::SwitchColonDelimitedBody;
+use mago_syntax::ast::SwitchDefaultCase;
+use mago_syntax::ast::SwitchExpressionCase;
+use mago_syntax::ast::While;
+use mago_syntax::ast::WhileBody;
+use mago_syntax::ast::WhileColonDelimitedBody;
 
 use crate::document::Document;
 use crate::document::Group;
@@ -13,7 +45,7 @@ use crate::internal::format::format_token;
 use crate::internal::format::misc;
 use crate::internal::format::misc::print_colon_delimited_body;
 use crate::internal::format::statement::print_statement_sequence;
-use crate::settings::*;
+use crate::settings::BraceStyle;
 use crate::wrap;
 
 impl<'arena> Format<'arena> for If<'arena> {
@@ -50,7 +82,7 @@ impl<'arena> Format<'arena> for IfStatementBody<'arena> {
         wrap!(f, self, IfStatementBody, {
             let mut parts = vec![in f.arena; misc::print_clause(f, self.statement, false)];
 
-            for else_if_clause in self.else_if_clauses.iter() {
+            for else_if_clause in &self.else_if_clauses {
                 parts.push(else_if_clause.format(f));
             }
 
@@ -93,49 +125,58 @@ impl<'arena> Format<'arena> for IfStatementBodyElseIfClause<'arena> {
 
 impl<'arena> Format<'arena> for IfColonDelimitedBody<'arena> {
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
-        wrap!(f, self, IfColonDelimitedBody, {
-            let mut parts = vec![in f.arena; Document::String(":")];
-
-            let mut statements = print_statement_sequence(f, &self.statements);
-            if !statements.is_empty() {
-                if let Some(Statement::ClosingTag(_)) = self.statements.first() {
-                    statements.insert(0, Document::String(" "));
-                    parts.push(Document::Array(statements));
-                } else {
-                    statements.insert(0, Document::Line(Line::hard()));
-                    parts.push(Document::Indent(statements));
+        {
+            let node = mago_syntax::ast::Node::IfColonDelimitedBody(self);
+            f.enter_node(node);
+            let was_wrapped_in_parens = f.is_wrapped_in_parens;
+            let needed_to_wrap_in_parens = f.need_parens(node);
+            f.is_wrapped_in_parens |= needed_to_wrap_in_parens;
+            let leading = f.print_leading_comments(node.span());
+            let doc = {
+                let mut parts = vec![in f.arena; Document::String(":")];
+                let mut statements = print_statement_sequence(f, &self.statements);
+                if !statements.is_empty() {
+                    if let Some(Statement::ClosingTag(_)) = self.statements.first() {
+                        statements.insert(0, Document::String(" "));
+                        parts.push(Document::Array(statements));
+                    } else {
+                        statements.insert(0, Document::Line(Line::hard()));
+                        parts.push(Document::Indent(statements));
+                    }
                 }
-            }
 
-            if !matches!(self.statements.last(), Some(Statement::OpeningTag(_))) {
-                parts.push(Document::Line(Line::hard()));
-            } else {
-                parts.push(Document::String(" "));
-            }
+                parts.push(match self.statements.last() {
+                    Some(Statement::OpeningTag(_)) => Document::space(),
+                    _ => Document::Line(Line::hard()),
+                });
 
-            for else_if_clause in self.else_if_clauses.iter() {
-                parts.push(else_if_clause.format(f));
-                if !matches!(else_if_clause.statements.last(), Some(Statement::OpeningTag(_))) {
-                    parts.push(Document::Line(Line::hard()));
-                } else {
-                    parts.push(Document::String(" "));
+                for else_if_clause in &self.else_if_clauses {
+                    parts.push(else_if_clause.format(f));
+
+                    parts.push(match else_if_clause.statements.last() {
+                        Some(Statement::OpeningTag(_)) => Document::space(),
+                        _ => Document::Line(Line::hard()),
+                    });
                 }
-            }
-
-            if let Some(else_clause) = &self.else_clause {
-                parts.push(else_clause.format(f));
-                if !matches!(else_clause.statements.last(), Some(Statement::OpeningTag(_))) {
-                    parts.push(Document::Line(Line::hard()));
-                } else {
-                    parts.push(Document::String(" "));
+                if let Some(else_clause) = &self.else_clause {
+                    parts.push(else_clause.format(f));
+                    parts.push(match else_clause.statements.last() {
+                        Some(Statement::OpeningTag(_)) => Document::space(),
+                        _ => Document::Line(Line::hard()),
+                    });
                 }
-            }
-
-            parts.push(self.endif.format(f));
-            parts.push(self.terminator.format(f));
-
-            Document::Group(Group::new(parts))
-        })
+                parts.push(self.endif.format(f));
+                parts.push(self.terminator.format(f));
+                Document::Group(Group::new(parts))
+            };
+            let trailing = f.print_trailing_comments_for_node(node);
+            let has_leading_comments = leading.is_some();
+            let doc = f.print_comments(leading, doc, trailing);
+            let doc = if needed_to_wrap_in_parens { f.add_parens(doc, node, has_leading_comments) } else { doc };
+            f.leave_node();
+            f.is_wrapped_in_parens = was_wrapped_in_parens;
+            doc
+        }
     }
 }
 
@@ -337,7 +378,7 @@ impl<'arena> Format<'arena> for SwitchColonDelimitedBody<'arena> {
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
         wrap!(f, self, SwitchColonDelimitedBody, {
             let mut contents = vec![in f.arena; Document::String(":")];
-            for case in self.cases.iter() {
+            for case in &self.cases {
                 contents.push(Document::Indent(vec![in f.arena; Document::Line(Line::hard()), case.format(f)]));
             }
 

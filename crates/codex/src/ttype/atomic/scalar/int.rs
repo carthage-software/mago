@@ -48,6 +48,7 @@ impl TInteger {
     ///
     /// If `Some(v)` is provided, it creates a `Literal(v)`. Otherwise, `Unspecified`.
     #[inline]
+    #[must_use]
     pub const fn new(value: Option<i64>) -> Self {
         match value {
             Some(v) => TInteger::Literal(v),
@@ -57,6 +58,7 @@ impl TInteger {
 
     /// Creates the most specific integer type possible from optional lower and upper bounds.
     #[inline]
+    #[must_use]
     pub const fn from_bounds(from: Option<i64>, to: Option<i64>) -> Self {
         match (from, to) {
             (Some(f), Some(t)) => {
@@ -76,96 +78,112 @@ impl TInteger {
 
     /// Creates an instance representing the general `int` type.
     #[inline]
+    #[must_use]
     pub const fn unspecified() -> Self {
         Self::Unspecified
     }
 
     /// Creates an instance representing a literal integer type (e.g., `5`).
     #[inline]
+    #[must_use]
     pub const fn literal(value: i64) -> Self {
         Self::Literal(value)
     }
 
     /// Creates an instance representing a `positive-int` (`int<1, max>`).
     #[inline]
+    #[must_use]
     pub const fn positive() -> Self {
         Self::From(1)
     }
 
     /// Creates an instance representing a `non-negative-int` (`int<0, max>`).
     #[inline]
+    #[must_use]
     pub const fn non_negative() -> Self {
         Self::From(0)
     }
 
     /// Creates an instance representing a `negative-int` (`int<min, -1>`).
     #[inline]
+    #[must_use]
     pub const fn negative() -> Self {
         Self::To(-1)
     }
 
     /// Creates an instance representing a `non-positive-int` (`int<min, 0>`).
     #[inline]
+    #[must_use]
     pub const fn non_positive() -> Self {
         Self::To(0)
     }
 
     /// Creates an instance representing a `literal-int` (any literal integer).
     #[inline]
+    #[must_use]
     pub const fn unspecified_literal() -> Self {
         Self::UnspecifiedLiteral
     }
 
     /// Returns `true` if the type is `Unspecified`.
     #[inline]
+    #[must_use]
     pub const fn is_unspecified(&self) -> bool {
         matches!(self, TInteger::Unspecified)
     }
 
     /// Returns `true` if the type is `UnspecifiedLiteral`.
     #[inline]
+    #[must_use]
     pub const fn is_unspecified_literal(&self) -> bool {
         matches!(self, TInteger::UnspecifiedLiteral)
     }
 
     /// Returns `true` if the type is a `Literal`.
     #[inline]
+    #[must_use]
     pub const fn is_literal(&self) -> bool {
         matches!(self, TInteger::Literal(_))
     }
 
     /// Returns `true` if the type is of literal origin (`Literal` or `UnspecifiedLiteral`).
     #[inline]
+    #[must_use]
     pub const fn is_of_literal_origin(&self) -> bool {
         matches!(self, TInteger::Literal(_) | TInteger::UnspecifiedLiteral)
     }
 
     /// Returns `true` if the type is a `Range`.
     #[inline]
+    #[must_use]
     pub const fn is_range(&self) -> bool {
         matches!(self, TInteger::Range(_, _))
     }
 
     /// Returns `true` if the type is a `From` range.
     #[inline]
+    #[must_use]
     pub const fn is_from(&self) -> bool {
         matches!(self, TInteger::From(_))
     }
 
     /// Returns `true` if the type is a `To` range.
     #[inline]
+    #[must_use]
     pub const fn is_to(&self) -> bool {
         matches!(self, TInteger::To(_))
     }
 
     /// Returns `true` if the type is exactly `Literal(0)`.
     #[inline]
+    #[must_use]
     pub const fn is_zero(&self) -> bool {
         matches!(self, TInteger::Literal(0))
     }
 
     /// Returns `true` if all possible values in this type are known to be positive (`> 0`).
     #[inline]
+    #[must_use]
     pub const fn is_positive(&self) -> bool {
         match *self {
             TInteger::From(f) => f > 0,
@@ -177,6 +195,7 @@ impl TInteger {
 
     /// Returns `true` if all possible values in this type are known to be negative (`< 0`).
     #[inline]
+    #[must_use]
     pub const fn is_negative(&self) -> bool {
         match *self {
             TInteger::To(t) => t < 0,
@@ -188,6 +207,7 @@ impl TInteger {
 
     /// Returns `true` if all possible values in this type are known to be non-negative (`>= 0`).
     #[inline]
+    #[must_use]
     pub const fn is_non_negative(&self) -> bool {
         match *self {
             TInteger::From(f) => f >= 0,
@@ -199,6 +219,7 @@ impl TInteger {
 
     /// Returns `true` if all possible values in this type are known to be non-positive (`<= 0`).
     #[inline]
+    #[must_use]
     pub const fn is_non_positive(&self) -> bool {
         match *self {
             TInteger::To(t) => t <= 0,
@@ -210,6 +231,7 @@ impl TInteger {
 
     /// Returns `true` if the type's possible set of values includes zero.
     #[inline]
+    #[must_use]
     pub const fn can_be_zero(&self) -> bool {
         match *self {
             TInteger::Unspecified | TInteger::Literal(0) => true,
@@ -222,6 +244,7 @@ impl TInteger {
 
     /// If the type is a `Literal`, returns its value. Otherwise, returns `None`.
     #[inline]
+    #[must_use]
     pub const fn get_literal_value(&self) -> Option<i64> {
         match *self {
             TInteger::Literal(value) => Some(value),
@@ -231,6 +254,7 @@ impl TInteger {
 
     /// Returns the minimum possible value for the type, if a lower bound exists.
     #[inline]
+    #[must_use]
     pub const fn get_minimum_value(&self) -> Option<i64> {
         match *self {
             TInteger::Literal(value) | TInteger::From(value) | TInteger::Range(value, _) => Some(value),
@@ -240,6 +264,7 @@ impl TInteger {
 
     /// Returns the maximum possible value for the type, if an upper bound exists.
     #[inline]
+    #[must_use]
     pub const fn get_maximum_value(&self) -> Option<i64> {
         match *self {
             TInteger::Literal(value) | TInteger::To(value) | TInteger::Range(_, value) => Some(value),
@@ -249,6 +274,7 @@ impl TInteger {
 
     /// Returns the bounds of the integer type as a tuple `(min, max)`, where each bound is optional.
     #[inline]
+    #[must_use]
     pub const fn get_bounds(&self) -> (Option<i64>, Option<i64>) {
         match *self {
             TInteger::Literal(value) => (Some(value), Some(value)),
@@ -270,6 +296,7 @@ impl TInteger {
     /// - An `Unspecified` container can hold any other integer type.
     /// - A specific container (e.g., `Literal`, `Range`) cannot hold an `Unspecified` type.
     #[inline]
+    #[must_use]
     pub const fn contains(&self, input: TInteger) -> bool {
         use TInteger::From;
         use TInteger::Literal;
@@ -316,6 +343,7 @@ impl TInteger {
     /// This method returns `true` if there exists at least one integer value that is included
     /// in both `self` and `other`. If either type is `Unspecified`, it is considered to overlap with any other type.
     #[inline]
+    #[must_use]
     pub const fn overlaps(&self, other: TInteger) -> bool {
         if self.is_unspecified() || other.is_unspecified() {
             return true;
@@ -473,6 +501,7 @@ impl TInteger {
     /// - `other`: The type to subtract from `self`.
     /// - `conservative_subtraction`: If `true`, the subtraction is bypassed
     ///   for non-literal types, returning `vec![self]` instead.
+    #[must_use]
     pub fn difference(&self, other: Self, conservative_subtraction: bool) -> Vec<Self> {
         let mut res = Vec::with_capacity(2);
         match other {
@@ -688,6 +717,7 @@ impl TInteger {
     }
 
     /// Returns a new `TInteger` that represents the negation of the current type.
+    #[must_use]
     pub fn negated(&self) -> Self {
         match *self {
             TInteger::Literal(v) => TInteger::Literal(v.saturating_neg()),
@@ -703,6 +733,7 @@ impl TInteger {
     ///
     /// Returns `Some(new_type)` if the new bound is compatible, or `None` if the
     /// resulting type would represent an impossible range (e.g., `int<10, max>` cannot be `< 5`).
+    #[must_use]
     pub fn to_less_than(&self, n: i64) -> Option<Self> {
         let new_upper_bound = n.saturating_sub(1);
         let narrowed_upper = match self.get_maximum_value() {
@@ -724,6 +755,7 @@ impl TInteger {
     ///
     /// Returns `Some(new_type)` if the new bound is compatible, or `None` if the
     /// resulting type would represent an impossible range.
+    #[must_use]
     pub fn to_less_than_or_equal(&self, n: i64) -> Option<Self> {
         let narrowed_upper = match self.get_maximum_value() {
             Some(existing_upper) => min(existing_upper, n),
@@ -744,6 +776,7 @@ impl TInteger {
     ///
     /// Returns `Some(new_type)` if the new bound is compatible, or `None` if the
     /// resulting type would represent an impossible range.
+    #[must_use]
     pub fn to_greater_than(&self, n: i64) -> Option<Self> {
         let new_lower_bound = n.saturating_add(1);
         let narrowed_lower = match self.get_minimum_value() {
@@ -765,6 +798,7 @@ impl TInteger {
     ///
     /// Returns `Some(new_type)` if the new bound is compatible, or `None` if the
     /// resulting type would represent an impossible range.
+    #[must_use]
     pub fn to_greater_than_or_equal(&self, n: i64) -> Option<Self> {
         let narrowed_lower = match self.get_minimum_value() {
             Some(existing_lower) => max(existing_lower, n),
@@ -782,6 +816,7 @@ impl TInteger {
     }
     /// Combines a list of `TInteger` types into the smallest possible set of disjoint types.
     /// Returns `Vec<TAtomic>` directly to avoid intermediate allocations.
+    #[must_use]
     pub fn combine(types: Vec<TInteger>) -> Vec<TAtomic> {
         if types.is_empty() {
             return Vec::new();

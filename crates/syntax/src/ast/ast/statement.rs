@@ -104,10 +104,9 @@ impl Statement<'_> {
     pub fn terminates_scripting(&self) -> bool {
         match self {
             Statement::ClosingTag(_) => true,
-            Statement::Namespace(Namespace { body: NamespaceBody::Implicit(implicit), .. }) => implicit
-                .statements
-                .last()
-                .map_or(implicit.terminator.is_closing_tag(), |statement| statement.terminates_scripting()),
+            Statement::Namespace(Namespace { body: NamespaceBody::Implicit(implicit), .. }) => {
+                implicit.statements.last().map_or(implicit.terminator.is_closing_tag(), Statement::terminates_scripting)
+            }
             Statement::Use(r#use) => r#use.terminator.is_closing_tag(),
             Statement::Goto(goto) => goto.terminator.is_closing_tag(),
             Statement::Declare(Declare { body: DeclareBody::Statement(b), .. }) => b.terminates_scripting(),
@@ -143,11 +142,13 @@ impl Statement<'_> {
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_loop(&self) -> bool {
         matches!(self, Statement::For(_) | Statement::Foreach(_) | Statement::While(_) | Statement::DoWhile(_))
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_control_flow(&self) -> bool {
         matches!(
             self,
@@ -161,6 +162,7 @@ impl Statement<'_> {
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_declaration(&self) -> bool {
         matches!(
             self,
@@ -176,6 +178,7 @@ impl Statement<'_> {
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_noop(&self) -> bool {
         matches!(self, Statement::Noop(_))
     }

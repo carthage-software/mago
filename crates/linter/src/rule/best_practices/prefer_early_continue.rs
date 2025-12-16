@@ -8,7 +8,17 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_reporting::Level;
 use mago_span::HasSpan;
-use mago_syntax::ast::*;
+use mago_syntax::ast::BinaryOperator;
+use mago_syntax::ast::Expression;
+use mago_syntax::ast::ForBody;
+use mago_syntax::ast::ForeachBody;
+use mago_syntax::ast::If;
+use mago_syntax::ast::IfBody;
+use mago_syntax::ast::Node;
+use mago_syntax::ast::NodeKind;
+use mago_syntax::ast::Statement;
+use mago_syntax::ast::UnaryPrefixOperator;
+use mago_syntax::ast::WhileBody;
 
 use crate::category::Category;
 use crate::context::LintContext;

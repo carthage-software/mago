@@ -41,11 +41,13 @@ pub struct StaticMethodPartialApplication<'arena> {
 
 impl<'arena> PartialApplication<'arena> {
     #[inline]
+    #[must_use]
     pub fn is_first_class_callable(&self) -> bool {
         self.get_argument_list().is_first_class_callable()
     }
 
     #[inline]
+    #[must_use]
     pub fn get_argument_list(&self) -> &PartialArgumentList<'arena> {
         match self {
             PartialApplication::Function(f) => &f.argument_list,

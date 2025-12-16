@@ -38,6 +38,7 @@ impl Default for ComparisonResult {
 }
 
 impl ComparisonResult {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             type_coerced: None,

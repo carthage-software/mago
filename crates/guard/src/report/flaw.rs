@@ -114,6 +114,7 @@ impl fmt::Display for FlawKind {
 
 impl FlawKind {
     /// Returns the error code for this type of flaw.
+    #[must_use]
     pub fn error_code(&self) -> &'static str {
         match self {
             Self::MustBeNamed { .. } => "must-be-named",

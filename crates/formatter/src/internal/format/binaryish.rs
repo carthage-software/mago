@@ -3,7 +3,14 @@ use bumpalo::vec;
 
 use mago_span::HasSpan;
 use mago_span::Span;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Array;
+use mago_syntax::ast::BinaryOperator;
+use mago_syntax::ast::Conditional;
+use mago_syntax::ast::Expression;
+use mago_syntax::ast::LegacyArray;
+use mago_syntax::ast::List;
+use mago_syntax::ast::Node;
+use mago_syntax::ast::node;
 use mago_syntax::token::GetPrecedence;
 use mago_syntax::token::Precedence;
 use node::NodeKind;
@@ -144,8 +151,8 @@ pub(super) fn print_binaryish_expression<'arena>(
             || (parent_binary.operator.is_logical() && operator.is_logical())
     } else {
         matches!(grandparent, Some(Node::Return(_) | Node::Throw(_)))
-            || matches!(grandparent, Some(Node::ArrowFunction(func)) if func.arrow.is_before(operator.span()))
-            || matches!(grandparent, Some(Node::For(r#for)) if r#for.body.span().is_after(operator.span()))
+            || matches!(grandparent, Some(Node::ArrowFunction(func)) if func.arrow.is_before(&operator.span()))
+            || matches!(grandparent, Some(Node::For(r#for)) if r#for.body.span().is_after(&operator.span()))
             || (matches!(grandparent, Some(Node::Conditional(_)))
                 && !matches!(f.great_grandparent_node(), Some(Node::Return(_) | Node::Throw(_)))
                 && !is_at_call_like_expression(f))

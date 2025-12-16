@@ -31,6 +31,7 @@ pub enum ArrayKey {
 impl ArrayKey {
     /// If this key is an `Integer`, returns `Some(i64)`, otherwise `None`.
     #[inline]
+    #[must_use]
     pub const fn get_integer(&self) -> Option<i64> {
         match self {
             ArrayKey::Integer(i) => Some(*i),
@@ -42,6 +43,7 @@ impl ArrayKey {
     #[inline]
     // Not const because it returns a reference derived from a match on a reference.
     // While theoretically possible in future Rust, currently references from matches prevent const.
+    #[must_use]
     pub fn get_string(&self) -> Option<&str> {
         match self {
             ArrayKey::Integer(_) => None,
@@ -51,12 +53,14 @@ impl ArrayKey {
 
     /// Checks if this array key is an integer (`ArrayKey::Integer`).
     #[inline]
+    #[must_use]
     pub const fn is_integer(&self) -> bool {
         matches!(self, ArrayKey::Integer(_))
     }
 
     /// Checks if this array key is a string (`ArrayKey::String`).
     #[inline]
+    #[must_use]
     pub const fn is_string(&self) -> bool {
         matches!(self, ArrayKey::String(_))
     }
@@ -64,6 +68,7 @@ impl ArrayKey {
     /// Converts the array key into an `Atom` representing the key *value*.
     /// Preserves the literal value (e.g., `10`, `"abc"`).
     #[inline]
+    #[must_use]
     pub fn to_atom(&self) -> Atom {
         match self {
             ArrayKey::Integer(i) => i64_atom(*i),
@@ -76,6 +81,7 @@ impl ArrayKey {
     ///
     /// Note: Clones the string for `ArrayKey::String`.
     #[inline]
+    #[must_use]
     pub fn to_atomic(&self) -> TAtomic {
         match &self {
             ArrayKey::Integer(i) => TAtomic::Scalar(TScalar::Integer(TInteger::literal(*i))),
@@ -85,6 +91,7 @@ impl ArrayKey {
 
     /// Converts the array key into a `TUnion` containing its specific literal atomic type.
     #[inline]
+    #[must_use]
     pub fn to_union(&self) -> TUnion {
         TUnion::from_single(Cow::Owned(self.to_atomic()))
     }
@@ -92,6 +99,7 @@ impl ArrayKey {
     /// Converts the array key into a general atomic type representing the key *type* (`int` or `string`).
     /// Does not preserve the specific literal value.
     #[inline]
+    #[must_use]
     pub const fn to_general_atomic(&self) -> &'static TAtomic {
         match self {
             ArrayKey::Integer(_) => INT_ATOMIC,
@@ -101,6 +109,7 @@ impl ArrayKey {
 
     /// Converts the array key into a `TUnion` containing its general atomic type (`int` or `string`).
     #[inline]
+    #[must_use]
     pub fn to_general_union(&self) -> TUnion {
         match self {
             ArrayKey::Integer(_) => get_int(),

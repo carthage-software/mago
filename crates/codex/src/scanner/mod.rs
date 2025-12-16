@@ -12,7 +12,21 @@ use mago_database::file::File;
 use mago_names::ResolvedNames;
 use mago_names::scope::NamespaceScope;
 use mago_span::HasSpan;
-use mago_syntax::ast::*;
+use mago_syntax::ast::AnonymousClass;
+use mago_syntax::ast::ArrowFunction;
+use mago_syntax::ast::Class;
+use mago_syntax::ast::Closure;
+use mago_syntax::ast::Constant;
+use mago_syntax::ast::Enum;
+use mago_syntax::ast::Function;
+use mago_syntax::ast::FunctionCall;
+use mago_syntax::ast::Interface;
+use mago_syntax::ast::Method;
+use mago_syntax::ast::Namespace;
+use mago_syntax::ast::Program;
+use mago_syntax::ast::Trait;
+use mago_syntax::ast::Trivia;
+use mago_syntax::ast::Use;
 use mago_syntax::comments::docblock::get_docblock_for_node;
 use mago_syntax::walker::MutWalker;
 use mago_syntax::walker::walk_anonymous_class_mut;
@@ -27,9 +41,17 @@ use crate::metadata::flags::MetadataFlags;
 use crate::metadata::function_like::FunctionLikeKind;
 use crate::metadata::function_like::FunctionLikeMetadata;
 use crate::misc::GenericParent;
-use crate::scanner::class_like::*;
-use crate::scanner::constant::*;
-use crate::scanner::function_like::*;
+use crate::scanner::class_like::register_anonymous_class;
+use crate::scanner::class_like::register_class;
+use crate::scanner::class_like::register_enum;
+use crate::scanner::class_like::register_interface;
+use crate::scanner::class_like::register_trait;
+use crate::scanner::constant::scan_constant;
+use crate::scanner::constant::scan_defined_constant;
+use crate::scanner::function_like::scan_arrow_function;
+use crate::scanner::function_like::scan_closure;
+use crate::scanner::function_like::scan_function;
+use crate::scanner::function_like::scan_method;
 use crate::scanner::property::scan_promoted_property;
 use crate::ttype::resolution::TypeResolutionContext;
 use crate::ttype::union::TUnion;
@@ -249,7 +271,7 @@ impl<'ctx, 'arena> MutWalker<'arena, 'arena, Context<'ctx, 'arena>> for Scanner 
 
     #[inline]
     fn walk_in_constant(&mut self, constant: &'arena Constant<'arena>, context: &mut Context<'ctx, 'arena>) {
-        let constants = scan_constant(constant, context, self.get_current_type_resolution_context(), &self.scope);
+        let constants = scan_constant(constant, context, &self.get_current_type_resolution_context(), &self.scope);
 
         for constant_metadata in constants {
             let constant_name = constant_metadata.name;
@@ -264,7 +286,7 @@ impl<'ctx, 'arena> MutWalker<'arena, 'arena, Context<'ctx, 'arena>> for Scanner 
         context: &mut Context<'ctx, 'arena>,
     ) {
         let Some(constant_metadata) =
-            scan_defined_constant(function_call, context, self.get_current_type_resolution_context(), &self.scope)
+            scan_defined_constant(function_call, context, &self.get_current_type_resolution_context(), &self.scope)
         else {
             return;
         };

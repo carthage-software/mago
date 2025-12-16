@@ -3,8 +3,26 @@ use bumpalo::collections::Vec;
 use bumpalo::vec;
 use unicode_width::UnicodeWidthStr;
 
-use mago_span::*;
-use mago_syntax::ast::*;
+use mago_span::HasSpan;
+use mago_span::Span;
+use mago_syntax::ast::Access;
+use mago_syntax::ast::Argument;
+use mago_syntax::ast::ArgumentList;
+use mago_syntax::ast::Array;
+use mago_syntax::ast::ArrayElement;
+use mago_syntax::ast::Call;
+use mago_syntax::ast::ClassConstantAccess;
+use mago_syntax::ast::ClassLikeConstantSelector;
+use mago_syntax::ast::ClassLikeMemberSelector;
+use mago_syntax::ast::ConstantAccess;
+use mago_syntax::ast::Expression;
+use mago_syntax::ast::FunctionCall;
+use mago_syntax::ast::Identifier;
+use mago_syntax::ast::LegacyArray;
+use mago_syntax::ast::List;
+use mago_syntax::ast::Literal;
+use mago_syntax::ast::StaticMethodCall;
+use mago_syntax::ast::Variable;
 
 use crate::document::Document;
 use crate::document::Group;
@@ -430,7 +448,7 @@ fn is_table_style<'arena>(f: &mut FormatterState<'_, 'arena>, array_like: &Array
 
                     // Check if all inner elements are simple (strings, numbers, etc.)
                     let mut elements_width = 0;
-                    for inner_element in elements.iter() {
+                    for inner_element in elements {
                         match inner_element {
                             ArrayElement::Value(inner_value) => {
                                 match get_element_width(inner_value.value) {

@@ -7,7 +7,11 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_span::Span;
-use mago_syntax::ast::*;
+use mago_syntax::ast::ArrowFunction;
+use mago_syntax::ast::Closure;
+use mago_syntax::ast::Function;
+use mago_syntax::ast::Method;
+use mago_syntax::ast::MethodBody;
 use mago_syntax::utils;
 
 use crate::assertion::Assertion;
@@ -31,11 +35,11 @@ use crate::ttype::resolution::TypeResolutionContext;
 use crate::visibility::Visibility;
 
 #[inline]
-pub fn scan_method<'ctx, 'arena>(
+pub fn scan_method<'arena>(
     functionlike_id: (Atom, Atom),
     method: &'arena Method<'arena>,
     class_like_metadata: &ClassLikeMetadata,
-    context: &mut Context<'ctx, 'arena>,
+    context: &mut Context<'_, 'arena>,
     scope: &mut NamespaceScope,
     type_resolution_context: Option<TypeResolutionContext>,
 ) -> FunctionLikeMetadata {
@@ -109,11 +113,11 @@ pub fn scan_method<'ctx, 'arena>(
 }
 
 #[inline]
-pub fn scan_function<'ctx, 'arena>(
+pub fn scan_function<'arena>(
     functionlike_id: (Atom, Atom),
     function: &'arena Function<'arena>,
     classname: Option<Atom>,
-    context: &mut Context<'ctx, 'arena>,
+    context: &mut Context<'_, 'arena>,
     scope: &mut NamespaceScope,
     type_resolution_context: TypeResolutionContext,
 ) -> FunctionLikeMetadata {
@@ -168,11 +172,11 @@ pub fn scan_function<'ctx, 'arena>(
 }
 
 #[inline]
-pub fn scan_closure<'ctx, 'arena>(
+pub fn scan_closure<'arena>(
     functionlike_id: (Atom, Atom),
     closure: &'arena Closure<'arena>,
     classname: Option<Atom>,
-    context: &mut Context<'ctx, 'arena>,
+    context: &mut Context<'_, 'arena>,
     scope: &mut NamespaceScope,
     type_resolution_context: TypeResolutionContext,
 ) -> FunctionLikeMetadata {
@@ -219,11 +223,11 @@ pub fn scan_closure<'ctx, 'arena>(
 }
 
 #[inline]
-pub fn scan_arrow_function<'ctx, 'arena>(
+pub fn scan_arrow_function<'arena>(
     functionlike_id: (Atom, Atom),
     arrow_function: &'arena ArrowFunction<'arena>,
     classname: Option<Atom>,
-    context: &mut Context<'ctx, 'arena>,
+    context: &mut Context<'_, 'arena>,
     scope: &mut NamespaceScope,
     type_resolution_context: TypeResolutionContext,
 ) -> FunctionLikeMetadata {
@@ -273,12 +277,12 @@ pub fn scan_arrow_function<'ctx, 'arena>(
     metadata
 }
 
-fn scan_function_like_docblock<'ctx, 'arena>(
+fn scan_function_like_docblock(
     span: Span,
     functionlike_id: (Atom, Atom),
     metadata: &mut FunctionLikeMetadata,
     classname: Option<Atom>,
-    context: &mut Context<'ctx, 'arena>,
+    context: &mut Context<'_, '_>,
     scope: &mut NamespaceScope,
 ) {
     let docblock = match FunctionLikeDocblockComment::create(context, span, scope) {
@@ -340,7 +344,7 @@ fn scan_function_like_docblock<'ctx, 'arena>(
     }
 
     let mut type_context = metadata.type_resolution_context.clone().unwrap_or_default();
-    for template in docblock.templates.iter() {
+    for template in &docblock.templates {
         let template_name = atom(&template.name);
         let template_as_type = if let Some(type_string) = &template.type_string {
             match builder::get_type_from_string(&type_string.value, type_string.span, scope, &type_context, classname) {
@@ -668,13 +672,13 @@ fn parse_assertion_string(
 
     let mut is_equal = false;
     let mut is_negation = false;
-    if type_string.value.starts_with("!") {
+    if type_string.value.starts_with('!') {
         is_negation = true;
         type_string.value = type_string.value[1..].to_string();
         type_string.span = type_string.span.from_start(type_string.span.start + 1);
     }
 
-    if type_string.value.starts_with("=") {
+    if type_string.value.starts_with('=') {
         is_equal = true;
         type_string.value = type_string.value[1..].to_string();
         type_string.span = type_string.span.from_start(type_string.span.start + 1);

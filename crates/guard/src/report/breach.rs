@@ -111,6 +111,7 @@ impl fmt::Display for BreachVector {
 }
 
 impl BreachVector {
+    #[must_use]
     pub fn error_code(&self) -> &'static str {
         match self {
             Self::Extends => "disallowed-extends",

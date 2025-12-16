@@ -1,7 +1,18 @@
 use bumpalo::vec;
 
-use mago_span::*;
-use mago_syntax::ast::*;
+use mago_span::HasSpan;
+use mago_span::Span;
+use mago_syntax::ast::ArgumentList;
+use mago_syntax::ast::Attribute;
+use mago_syntax::ast::Call;
+use mago_syntax::ast::ClassLikeMemberSelector;
+use mago_syntax::ast::DieConstruct;
+use mago_syntax::ast::ExitConstruct;
+use mago_syntax::ast::Expression;
+use mago_syntax::ast::Instantiation;
+use mago_syntax::ast::MethodCall;
+use mago_syntax::ast::StaticMethodCall;
+use mago_syntax::ast::Variable;
 
 use crate::document::Document;
 use crate::document::Group;
@@ -13,6 +24,7 @@ use crate::internal::format::call_arguments::print_call_arguments;
 use super::member_access::format_access_operator;
 use super::misc;
 
+#[derive(Copy, Clone)]
 pub(super) enum CallLikeNode<'arena> {
     Call(&'arena Call<'arena>),
     Instantiation(&'arena Instantiation<'arena>),

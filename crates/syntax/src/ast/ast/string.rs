@@ -80,6 +80,7 @@ pub struct BracedExpressionStringPart<'arena> {
 }
 
 impl<'arena> CompositeString<'arena> {
+    #[must_use]
     pub fn parts(&self) -> &Sequence<'arena, StringPart<'arena>> {
         match self {
             CompositeString::ShellExecute(s) => &s.parts,

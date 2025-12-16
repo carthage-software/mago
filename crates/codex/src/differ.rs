@@ -29,6 +29,7 @@ use crate::signature::FileSignature;
 /// - `changed`: Symbols that are new, deleted, or modified
 /// - `diff_map`: Position mappings for symbols that moved
 /// - `deletion_ranges_map`: Ranges of deleted code
+#[must_use]
 pub fn compute_file_diff(
     file_id: FileId,
     old_signature: Option<&FileSignature>,
@@ -108,7 +109,7 @@ fn myers_diff(file_id: FileId, old_signature: &FileSignature, new_signature: &Fi
         return mark_all_as_changed(new_signature);
     };
 
-    let diff = extract_diff(trace, x, y, &old_signature.ast_nodes, &new_signature.ast_nodes);
+    let diff = extract_diff(&trace, x, y, &old_signature.ast_nodes, &new_signature.ast_nodes);
 
     for diff_elem in diff {
         match diff_elem {
@@ -128,7 +129,7 @@ fn myers_diff(file_id: FileId, old_signature: &FileSignature, new_signature: &Fi
                     continue;
                 };
 
-                let class_diff = extract_diff(class_trace, class_x, class_y, &a.children, &b.children);
+                let class_diff = extract_diff(&class_trace, class_x, class_y, &a.children, &b.children);
 
                 for class_diff_elem in class_diff {
                     match class_diff_elem {
@@ -289,7 +290,7 @@ fn is_equal(a_node: &DefSignatureNode, b_node: &DefSignatureNode) -> bool {
 ///
 /// Walks backward through the trace to build a sequence of Keep, Remove, and Add operations.
 fn extract_diff<'a>(
-    trace: Vec<HashMap<isize, usize>>,
+    trace: &[HashMap<isize, usize>],
     mut x: usize,
     mut y: usize,
     a_nodes: &'a [DefSignatureNode],

@@ -38,6 +38,7 @@ impl Default for ChangeLog {
 
 impl ChangeLog {
     /// Creates a new, empty `ChangeLog`.
+    #[must_use]
     pub fn new() -> Self {
         Self { changes: Arc::new(Mutex::new(Vec::new())) }
     }
@@ -85,7 +86,7 @@ impl ChangeLog {
     pub fn changed_file_ids(&self) -> Result<Vec<FileId>, DatabaseError> {
         let changes = self.changes.lock().map_err(|_| DatabaseError::PoisonedLogMutex)?;
         let mut ids = Vec::new();
-        for change in changes.iter() {
+        for change in &*changes {
             match change {
                 Change::Add(file) => ids.push(file.id),
                 Change::Update(id, _) => ids.push(*id),

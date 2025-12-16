@@ -85,7 +85,7 @@ pub(crate) fn collect(
                     .or_insert(TUnion::from_vec(expand_type(
                         extended_type,
                         &static_class_metadata.template_extended_parameters,
-                        &static_class_metadata.name,
+                        static_class_metadata.name,
                         &static_class_metadata.template_types,
                     )));
             }
@@ -163,7 +163,7 @@ pub(crate) fn resolve_template_parameter(
 fn expand_type(
     input_type_extends: &TUnion,
     template_extended_parameters: &AtomMap<IndexMap<Atom, TUnion, RandomState>>,
-    static_class_name: &Atom,
+    static_class_name: Atom,
     static_class_template_types: &[(Atom, Vec<(GenericParent, TUnion)>)],
 ) -> Vec<TAtomic> {
     let mut output_type_extends = Vec::new();
@@ -179,7 +179,7 @@ fn expand_type(
             continue;
         };
 
-        if static_class_name == defining_entity && static_class_template_types.iter().any(|(k, _)| k == parameter_name)
+        if static_class_name == *defining_entity && static_class_template_types.iter().any(|(k, _)| k == parameter_name)
         {
             output_type_extends.push(extends_atomic.clone());
             continue;

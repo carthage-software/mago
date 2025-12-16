@@ -35,7 +35,13 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_span::Span;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Array;
+use mago_syntax::ast::ArrayElement;
+use mago_syntax::ast::Expression;
+use mago_syntax::ast::LegacyArray;
+use mago_syntax::ast::UnaryPrefix;
+use mago_syntax::ast::UnaryPrefixOperator;
+use mago_syntax::ast::VariadicArrayElement;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -312,7 +318,7 @@ fn analyze_array_elements<'ctx, 'arena>(
 
             if let Some(variable_id) = variable_id {
                 if let Some(existing_type) = block_context.locals.remove(&variable_id) {
-                    block_context.remove_descendants(context, &variable_id, &existing_type, None);
+                    block_context.remove_descendants(context, variable_id, &existing_type, None);
                 }
 
                 block_context.locals.insert(variable_id, Rc::new(get_mixed()));
@@ -357,13 +363,14 @@ fn analyze_array_elements<'ctx, 'arena>(
         if array_creation_info.is_list {
             TUnion::from_vec(vec![TAtomic::Array(TArray::List(TList {
                 known_count: Some(array_creation_info.property_types.len()),
-                known_elements: Some(BTreeMap::from_iter(
+                known_elements: Some(
                     array_creation_info
                         .property_types
                         .into_iter()
                         .enumerate()
-                        .map(|(index, (_, value_tuple))| (index, (value_tuple.0, value_tuple.1))),
-                )),
+                        .map(|(index, (_, value_tuple))| (index, (value_tuple.0, value_tuple.1)))
+                        .collect(),
+                ),
                 element_type: Box::new(match item_value_type {
                     Some(value) => value,
                     None => get_never(),
@@ -372,9 +379,9 @@ fn analyze_array_elements<'ctx, 'arena>(
             }))])
         } else {
             TUnion::from_vec(vec![TAtomic::Array(TArray::Keyed(TKeyedArray {
-                known_items: Some(BTreeMap::from_iter(
-                    array_creation_info.property_types.into_iter().map(|(k, v)| (k, (v.0, v.1))),
-                )),
+                known_items: Some(
+                    array_creation_info.property_types.into_iter().map(|(k, v)| (k, (v.0, v.1))).collect(),
+                ),
                 parameters: if array_creation_info.can_create_objectlike {
                     None
                 } else {

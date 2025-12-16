@@ -5,7 +5,11 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_span::Span;
-use mago_syntax::ast::*;
+use mago_syntax::ast::FunctionLikeParameter;
+use mago_syntax::ast::Property;
+use mago_syntax::ast::PropertyHook;
+use mago_syntax::ast::PropertyHookBody;
+use mago_syntax::ast::PropertyItem;
 
 use crate::issue::ScanningIssueKind;
 use crate::metadata::class_like::ClassLikeMetadata;
@@ -94,7 +98,7 @@ pub fn scan_promoted_property<'arena>(
     );
 
     if let Some(hook_list) = &parameter.hooks {
-        for hook in hook_list.hooks.iter() {
+        for hook in &hook_list.hooks {
             let mut hook_metadata = scan_property_hook(hook, &property_metadata, context, scope);
             class_like_metadata.issues.extend(hook_metadata.take_issues());
             property_metadata.hooks.insert(hook_metadata.name, hook_metadata);
@@ -294,7 +298,7 @@ pub fn scan_properties<'arena>(
                 );
             }
 
-            for hook in hooked_property.hook_list.hooks.iter() {
+            for hook in &hooked_property.hook_list.hooks {
                 let mut hook_metadata = scan_property_hook(hook, &metadata, context, scope);
                 // Collect hook docblock issues into class-like metadata
                 class_like_metadata.issues.extend(hook_metadata.take_issues());

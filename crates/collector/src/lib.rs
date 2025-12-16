@@ -316,6 +316,7 @@ impl<'ctx, 'arena> Collector<'ctx, 'arena> {
     /// Returns `true` if there is at least one recording in progress.
     /// This is useful to determine if you can safely call `stop_recording`.
     #[inline]
+    #[must_use]
     pub fn is_recording(&self) -> bool {
         !self.recordings.is_empty()
     }
@@ -335,6 +336,7 @@ impl<'ctx, 'arena> Collector<'ctx, 'arena> {
     /// - Unfulfilled `@mago-expect` pragmas.
     /// - Unused pragmas of any kind.
     #[inline]
+    #[must_use]
     pub fn finish(mut self) -> IssueCollection {
         let mut issues = self.issues;
 

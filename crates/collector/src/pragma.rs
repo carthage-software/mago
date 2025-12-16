@@ -49,17 +49,20 @@ pub struct Pragma<'a> {
 impl PragmaKind {
     /// Returns `true` if the pragma kind is `Ignore`.
     #[inline]
+    #[must_use]
     pub const fn is_ignore(self) -> bool {
         matches!(self, PragmaKind::Ignore)
     }
 
     /// Returns `true` if the pragma kind is `Expect`.
     #[inline]
+    #[must_use]
     pub const fn is_expect(self) -> bool {
         matches!(self, PragmaKind::Expect)
     }
 
     /// Returns the string representation of the pragma kind.
+    #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
             PragmaKind::Ignore => "ignore",

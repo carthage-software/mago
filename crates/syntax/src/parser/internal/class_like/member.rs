@@ -1,7 +1,13 @@
 use either::Either;
 
 use crate::T;
-use crate::ast::ast::*;
+use crate::ast::ast::AttributeList;
+use crate::ast::ast::ClassLikeConstantSelector;
+use crate::ast::ast::ClassLikeMember;
+use crate::ast::ast::ClassLikeMemberExpressionSelector;
+use crate::ast::ast::ClassLikeMemberSelector;
+use crate::ast::ast::Modifier;
+use crate::ast::ast::Variable;
 use crate::ast::sequence::Sequence;
 use crate::error::ParseError;
 use crate::parser::internal::attribute::parse_attribute_list_sequence;

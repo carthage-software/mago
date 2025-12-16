@@ -1,5 +1,13 @@
 use crate::T;
-use crate::ast::ast::*;
+use crate::ast::ast::Argument;
+use crate::ast::ast::ArgumentList;
+use crate::ast::ast::NamedArgument;
+use crate::ast::ast::NamedPlaceholderArgument;
+use crate::ast::ast::PartialArgument;
+use crate::ast::ast::PartialArgumentList;
+use crate::ast::ast::PlaceholderArgument;
+use crate::ast::ast::PositionalArgument;
+use crate::ast::ast::VariadicPlaceholderArgument;
 use crate::ast::sequence::TokenSeparatedSequence;
 use crate::error::ParseError;
 use crate::parser::internal::expression;
@@ -100,7 +108,7 @@ pub fn parse_partial_argument<'arena>(
     if current.kind == T!["..."] {
         let next = utils::maybe_peek_nth(stream, 1)?;
         match next.map(|t| t.kind) {
-            Some(T![","]) | Some(T![")"]) | None => {
+            Some(crate::token::TokenKind::Comma | crate::token::TokenKind::RightParenthesis) | None => {
                 return Ok(PartialArgument::VariadicPlaceholder(VariadicPlaceholderArgument {
                     span: utils::expect_any(stream)?.span,
                 }));

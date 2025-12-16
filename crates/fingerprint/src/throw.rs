@@ -1,5 +1,5 @@
 use mago_names::ResolvedNames;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Throw;
 
 use crate::FingerprintOptions;
 use crate::Fingerprintable;

@@ -135,6 +135,7 @@ impl<'a> DatabaseConfiguration<'a> {
         Self { workspace: Cow::Borrowed(workspace), paths, includes, excludes, extensions }
     }
 
+    #[must_use]
     pub fn into_static(self) -> DatabaseConfiguration<'static> {
         DatabaseConfiguration {
             workspace: Cow::Owned(self.workspace.into_owned()),
@@ -171,10 +172,12 @@ pub struct ReadDatabase {
 }
 
 impl<'a> Database<'a> {
+    #[must_use]
     pub fn new(configuration: DatabaseConfiguration<'a>) -> Self {
         Self { files: HashMap::default(), id_to_name: HashMap::default(), configuration }
     }
 
+    #[must_use]
     pub fn single(file: File, configuration: DatabaseConfiguration<'a>) -> Self {
         let mut db = Self::new(configuration);
         db.add(file);
@@ -280,6 +283,7 @@ impl<'a> Database<'a> {
     /// data. The resulting [`ReadDatabase`] is highly optimized for fast reads and
     /// guarantees a deterministic iteration order. The original `Database` is not
     /// consumed and can continue to be used.
+    #[must_use]
     pub fn read_only(&self) -> ReadDatabase {
         let mut files_vec: Vec<Arc<File>> = self.files.values().cloned().collect();
         files_vec.sort_unstable_by_key(|f| f.id);
@@ -301,6 +305,7 @@ impl<'a> Database<'a> {
 }
 
 impl ReadDatabase {
+    #[must_use]
     pub fn empty() -> Self {
         Self {
             files: Vec::with_capacity(0),
@@ -319,6 +324,7 @@ impl ReadDatabase {
     /// # Arguments
     ///
     /// * `file`: The single `File` to include in the database.
+    #[must_use]
     pub fn single(file: File) -> Self {
         let mut id_to_index = HashMap::with_capacity(1);
         let mut name_to_index = HashMap::with_capacity(1);

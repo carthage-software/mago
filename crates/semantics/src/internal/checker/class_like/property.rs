@@ -1,7 +1,12 @@
 use mago_php_version::feature::Feature;
-use mago_reporting::*;
-use mago_span::*;
-use mago_syntax::ast::*;
+use mago_reporting::Annotation;
+use mago_reporting::Issue;
+use mago_span::HasSpan;
+use mago_span::Span;
+use mago_syntax::ast::Modifier;
+use mago_syntax::ast::Property;
+use mago_syntax::ast::PropertyHookBody;
+use mago_syntax::ast::PropertyItem;
 
 use crate::internal::checker::function_like::check_for_promoted_properties_outside_constructor;
 use crate::internal::context::Context;
@@ -31,7 +36,7 @@ pub fn check_property(
     let mut last_read_visibility: Option<Span> = None;
     let mut last_write_visibility: Option<Span> = None;
 
-    for modifier in modifiers.iter() {
+    for modifier in modifiers {
         match modifier {
             Modifier::Abstract(_) => {
                 let is_hooked_property = matches!(property, Property::Hooked(_));
@@ -468,7 +473,7 @@ pub fn check_property(
                 );
             }
 
-            for item in plain_property.items.iter() {
+            for item in &plain_property.items {
                 if let PropertyItem::Concrete(property_concrete_item) = &item {
                     let item_name = property_concrete_item.variable.name;
 
@@ -678,7 +683,7 @@ pub fn check_property(
             }
 
             let mut hook_names: Vec<(std::string::String, Span)> = vec![];
-            for hook in hooked_property.hook_list.hooks.iter() {
+            for hook in &hooked_property.hook_list.hooks {
                 let name = hook.name.value;
                 let lowered_name = name.to_ascii_lowercase();
 

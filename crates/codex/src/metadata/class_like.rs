@@ -88,6 +88,7 @@ pub struct ClassLikeMetadata {
 }
 
 impl ClassLikeMetadata {
+    #[must_use]
     pub fn new(
         name: Atom,
         original_name: Atom,
@@ -152,24 +153,28 @@ impl ClassLikeMetadata {
 
     /// Returns a reference to the map of trait method aliases.
     #[inline]
+    #[must_use]
     pub fn get_trait_alias_map(&self) -> &AtomMap<Atom> {
         &self.trait_alias_map
     }
 
     /// Returns a vector of the generic type parameter names.
     #[inline]
+    #[must_use]
     pub fn get_template_type_names(&self) -> Vec<Atom> {
         self.template_types.iter().map(|(name, _)| *name).collect()
     }
 
     /// Returns type parameters for a specific generic parameter name.
     #[inline]
+    #[must_use]
     pub fn get_template_type(&self, name: &Atom) -> Option<&Vec<(GenericParent, TUnion)>> {
         self.template_types.iter().find_map(|(param_name, types)| if param_name == name { Some(types) } else { None })
     }
 
     /// Returns type parameters for a specific generic parameter name with its index.
     #[inline]
+    #[must_use]
     pub fn get_template_type_with_index(&self, name: &Atom) -> Option<(usize, &Vec<(GenericParent, TUnion)>)> {
         self.template_types
             .iter()
@@ -177,50 +182,59 @@ impl ClassLikeMetadata {
             .find_map(|(index, (param_name, types))| if param_name == name { Some((index, types)) } else { None })
     }
 
+    #[must_use]
     pub fn get_template_for_index(&self, index: usize) -> Option<(Atom, &Vec<(GenericParent, TUnion)>)> {
         self.template_types.get(index).map(|(name, types)| (*name, types))
     }
 
+    #[must_use]
     pub fn get_template_name_for_index(&self, index: usize) -> Option<Atom> {
         self.template_types.get(index).map(|(name, _)| *name)
     }
 
+    #[must_use]
     pub fn get_template_index_for_name(&self, name: &Atom) -> Option<usize> {
         self.template_types.iter().position(|(param_name, _)| param_name == name)
     }
 
     /// Checks if a specific parent is either a parent class or interface.
     #[inline]
+    #[must_use]
     pub fn has_parent(&self, parent: &Atom) -> bool {
         self.all_parent_classes.contains(parent) || self.all_parent_interfaces.contains(parent)
     }
 
     /// Checks if a specific parent has template extended parameters.
     #[inline]
+    #[must_use]
     pub fn has_template_extended_parameter(&self, parent: &Atom) -> bool {
         self.template_extended_parameters.contains_key(parent)
     }
 
     /// Checks if a specific method appears in this class-like.
     #[inline]
+    #[must_use]
     pub fn has_appearing_method(&self, method: &Atom) -> bool {
         self.appearing_method_ids.contains_key(method)
     }
 
     /// Returns a vector of property names.
     #[inline]
+    #[must_use]
     pub fn get_property_names(&self) -> AtomSet {
         self.properties.keys().copied().collect()
     }
 
     /// Checks if a specific property appears in this class-like.
     #[inline]
+    #[must_use]
     pub fn has_appearing_property(&self, name: &Atom) -> bool {
         self.appearing_property_ids.contains_key(name)
     }
 
     /// Checks if a specific property is declared in this class-like.
     #[inline]
+    #[must_use]
     pub fn has_declaring_property(&self, name: &Atom) -> bool {
         self.declaring_property_ids.contains_key(name)
     }
@@ -384,6 +398,7 @@ impl ClassLikeMetadata {
         self.declaring_property_ids.insert(prop, declaring_fqcn)
     }
 
+    #[must_use]
     pub fn get_missing_required_interface<'a>(&self, other: &'a ClassLikeMetadata) -> Option<&'a Atom> {
         for required_interface in &other.require_implements {
             if self.all_parent_interfaces.contains(required_interface) {
@@ -402,6 +417,7 @@ impl ClassLikeMetadata {
         None
     }
 
+    #[must_use]
     pub fn get_missing_required_extends<'a>(&self, other: &'a ClassLikeMetadata) -> Option<&'a Atom> {
         for required_extend in &other.require_extends {
             if self.all_parent_classes.contains(required_extend) {
@@ -422,6 +438,7 @@ impl ClassLikeMetadata {
         None
     }
 
+    #[must_use]
     pub fn is_permitted_to_inherit(&self, other: &ClassLikeMetadata) -> bool {
         if self.kind.is_trait() || self.flags.is_abstract() {
             return true; // Traits and abstract classes can always inherit

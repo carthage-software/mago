@@ -1,7 +1,13 @@
 use ahash::HashSet;
 
 use mago_span::HasSpan;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Construct;
+use mago_syntax::ast::Expression;
+use mago_syntax::ast::ForBody;
+use mago_syntax::ast::ForeachBody;
+use mago_syntax::ast::Literal;
+use mago_syntax::ast::Statement;
+use mago_syntax::ast::WhileBody;
 
 use crate::artifacts::AnalysisArtifacts;
 
@@ -126,7 +132,7 @@ impl ControlAction {
                             && let Statement::For(for_loop) = statement
                         {
                             let mut is_infinite_loop = true;
-                            for condition in for_loop.conditions.iter() {
+                            for condition in &for_loop.conditions {
                                 let Some(condition_type) = artifacts.get_expression_type(condition) else {
                                     is_infinite_loop = false;
 
@@ -255,7 +261,7 @@ impl ControlAction {
                             has_non_breaking_default = true;
                         }
 
-                        let case_does_end = case_actions.iter().any(ControlAction::is_exit_path);
+                        let case_does_end = case_actions.iter().any(|c| c.is_exit_path());
                         if case_does_end {
                             has_ended = true;
                         }
@@ -351,7 +357,7 @@ impl ControlAction {
                     let mut all_catch_actions = vec![];
                     if !try_catch.catch_clauses.is_empty() {
                         let mut all_catches_leave = try_leaves;
-                        for catch in try_catch.catch_clauses.iter() {
+                        for catch in &try_catch.catch_clauses {
                             let catch_actions = ControlAction::from_statements(
                                 catch.block.statements.iter().collect::<Vec<_>>(),
                                 break_type.clone(),
@@ -368,7 +374,7 @@ impl ControlAction {
                             }
                         }
 
-                        if all_catches_leave && !try_statement_actions.iter().all(ControlAction::is_none) {
+                        if all_catches_leave && !try_statement_actions.iter().all(|c| c.is_none()) {
                             control_actions.extend(try_statement_actions);
                             control_actions.extend(all_catch_actions);
 
@@ -390,7 +396,7 @@ impl ControlAction {
                             return_is_exit,
                         );
 
-                        if !finally_statement_actions.iter().any(ControlAction::is_none) {
+                        if !finally_statement_actions.iter().any(|c| c.is_none()) {
                             control_actions.retain(|c| !c.is_none());
                             control_actions.extend(finally_statement_actions);
 
@@ -411,34 +417,34 @@ impl ControlAction {
     }
 
     #[inline]
-    pub const fn is_none(&self) -> bool {
+    pub const fn is_none(self) -> bool {
         matches!(self, ControlAction::None)
     }
 
     #[inline]
-    pub const fn is_exit_path(&self) -> bool {
+    pub const fn is_exit_path(self) -> bool {
         matches!(self, ControlAction::End | ControlAction::Return)
     }
 
     #[inline]
-    pub const fn is_break_immediate_loop(&self) -> bool {
+    pub const fn is_break_immediate_loop(self) -> bool {
         matches!(self, ControlAction::BreakImmediateLoop)
     }
 
     #[inline]
-    pub const fn is_leave_switch(&self) -> bool {
+    pub const fn is_leave_switch(self) -> bool {
         matches!(self, ControlAction::BreakImmediateLoop)
     }
 
     #[inline]
-    pub const fn is_break_or_continue(&self) -> bool {
+    pub const fn is_break_or_continue(self) -> bool {
         matches!(self, ControlAction::Break | ControlAction::Continue)
     }
 }
 
 impl BreakType {
     #[inline]
-    pub const fn is_switch(&self) -> bool {
+    pub const fn is_switch(self) -> bool {
         matches!(self, BreakType::Switch)
     }
 }

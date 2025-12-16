@@ -1,5 +1,8 @@
 use crate::T;
-use crate::ast::ast::*;
+use crate::ast::ast::DirectVariable;
+use crate::ast::ast::IndirectVariable;
+use crate::ast::ast::NestedVariable;
+use crate::ast::ast::Variable;
 use crate::error::ParseError;
 use crate::parser::internal::expression;
 use crate::parser::internal::token_stream::TokenStream;

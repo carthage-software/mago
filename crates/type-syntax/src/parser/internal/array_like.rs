@@ -3,7 +3,19 @@ use mago_span::Position;
 use mago_span::Span;
 use mago_syntax_core::utils::parse_literal_integer;
 
-use crate::ast::*;
+use crate::ast::ArrayType;
+use crate::ast::AssociativeArrayType;
+use crate::ast::Keyword;
+use crate::ast::ListType;
+use crate::ast::NonEmptyArrayType;
+use crate::ast::NonEmptyListType;
+use crate::ast::ShapeAdditionalFields;
+use crate::ast::ShapeField;
+use crate::ast::ShapeFieldKey;
+use crate::ast::ShapeKey;
+use crate::ast::ShapeType;
+use crate::ast::ShapeTypeKind;
+use crate::ast::Type;
 use crate::error::ParseError;
 use crate::parser::internal::generic::parse_generic_parameters_or_none;
 use crate::parser::internal::parse_type;
@@ -109,7 +121,6 @@ pub fn parse_array_like_type<'input>(stream: &mut TypeTokenStream<'input>) -> Re
                                 }
                                 // If the question mark is not followed by a colon,
                                 // it could be part of the key.
-                                continue;
                             }
                             // If we find any of these tokens, what came before must have
                             // been a full value type, not a key.
@@ -124,7 +135,7 @@ pub fn parse_array_like_type<'input>(stream: &mut TypeTokenStream<'input>) -> Re
                                 break;
                             }
                             // Any other token is part of a potential key, so keep scanning.
-                            _ => continue,
+                            _ => {}
                         }
                     }
 

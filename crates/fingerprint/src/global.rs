@@ -1,5 +1,5 @@
 use mago_names::ResolvedNames;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Global;
 
 use crate::FingerprintOptions;
 use crate::Fingerprintable;
@@ -14,7 +14,7 @@ impl Fingerprintable for Global<'_> {
     ) {
         "global".hash(hasher);
 
-        for variable in self.variables.iter() {
+        for variable in &self.variables {
             variable.fingerprint_with_hasher(hasher, resolved_names, options);
         }
     }

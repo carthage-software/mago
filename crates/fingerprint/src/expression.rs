@@ -1,7 +1,8 @@
 use crate::FingerprintOptions;
 use crate::Fingerprintable;
 use mago_names::ResolvedNames;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Expression;
+use mago_syntax::ast::Parenthesized;
 
 impl Fingerprintable for Expression<'_> {
     fn fingerprint_with_hasher<H: std::hash::Hasher>(

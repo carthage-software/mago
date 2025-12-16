@@ -10,7 +10,8 @@ use mago_codex::ttype::get_non_empty_unspecified_literal_string;
 use mago_codex::ttype::get_string;
 use mago_codex::ttype::get_unspecified_literal_string;
 use mago_span::HasSpan;
-use mago_syntax::ast::*;
+use mago_syntax::ast::CompositeString;
+use mago_syntax::ast::StringPart;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;

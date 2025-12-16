@@ -67,7 +67,7 @@ pub fn scan_class_like_constants<'arena>(
                 meta.set_type_declaration(type_declaration);
             }
 
-            meta.attributes = attributes.clone();
+            meta.attributes.clone_from(&attributes);
             meta.inferred_type =
                 infer(context, scope, &item.value).map(super::super::ttype::union::TUnion::get_single_owned);
 

@@ -18,9 +18,7 @@ pub fn merge_interface_metadata_from_parent_interface(
 ) {
     symbol_references.add_symbol_reference_to_symbol(metadata.name, parent_interface, true);
 
-    let parent_interface_metadata = if let Some(parent_meta) = codebase.class_likes.get(&parent_interface) {
-        parent_meta
-    } else {
+    let Some(parent_interface_metadata) = codebase.class_likes.get(&parent_interface) else {
         metadata.invalid_dependencies.insert(parent_interface);
         return;
     };
@@ -53,9 +51,7 @@ pub fn merge_metadata_from_parent_class_like(
 ) {
     symbol_references.add_symbol_reference_to_symbol(metadata.name, parent_class, true);
 
-    let parent_metadata = if let Some(parent_meta) = codebase.class_likes.get(&parent_class) {
-        parent_meta
-    } else {
+    let Some(parent_metadata) = codebase.class_likes.get(&parent_class) else {
         metadata.invalid_dependencies.insert(parent_class);
         return;
     };
@@ -95,9 +91,7 @@ pub fn merge_metadata_from_required_class_like(
 ) {
     symbol_references.add_symbol_reference_to_symbol(metadata.name, parent_class, true);
 
-    let parent_metadata = if let Some(parent_meta) = codebase.class_likes.get(&parent_class) {
-        parent_meta
-    } else {
+    let Some(parent_metadata) = codebase.class_likes.get(&parent_class) else {
         metadata.invalid_dependencies.insert(parent_class);
         return;
     };

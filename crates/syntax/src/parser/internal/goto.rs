@@ -1,5 +1,6 @@
 use crate::T;
-use crate::ast::ast::*;
+use crate::ast::ast::Goto;
+use crate::ast::ast::Label;
 use crate::error::ParseError;
 use crate::parser::internal::identifier::parse_local_identifier;
 use crate::parser::internal::terminator::parse_terminator;

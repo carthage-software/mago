@@ -35,7 +35,9 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_span::Span;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Expression;
+use mago_syntax::ast::FunctionLikeParameterList;
+use mago_syntax::ast::Statement;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -117,7 +119,7 @@ pub fn analyze_function_like<'ctx, 'ast, 'arena>(
                 break;
             };
 
-            for variable in global.variables.iter() {
+            for variable in &global.variables {
                 if let Some(var_id) = get_variable_id(variable) {
                     block_context.conditionally_referenced_variable_ids.insert(Atom::from(var_id));
                 }
@@ -145,7 +147,7 @@ pub fn analyze_function_like<'ctx, 'ast, 'arena>(
                 let value_type =
                     artifacts.get_rc_expression_type(value).cloned().unwrap_or_else(|| Rc::new(get_mixed()));
 
-                handle_return_value(context, block_context, &mut artifacts, Some(value), value_type, value.span())?;
+                handle_return_value(context, block_context, &mut artifacts, Some(value), value_type, value.span());
             }
         }
     }
@@ -186,7 +188,7 @@ pub fn analyze_function_like<'ctx, 'ast, 'arena>(
         );
     }
 
-    check_thrown_types(context, block_context, &mut artifacts, function_like_metadata)?;
+    check_thrown_types(context, block_context, &mut artifacts, function_like_metadata);
 
     std::mem::swap(&mut context.type_resolution_context, &mut previous_type_resolution_context);
     parent_artifacts.expression_types.extend(std::mem::take(&mut artifacts.expression_types));
@@ -246,9 +248,7 @@ fn add_parameter_types_to_context<'ctx, 'arena>(
             );
         }
 
-        let parameter_node = if let Some(parameter_node) = parameter_list.parameters.get(i) {
-            parameter_node
-        } else {
+        let Some(parameter_node) = parameter_list.parameters.get(i) else {
             continue;
         };
 
@@ -262,7 +262,7 @@ fn add_parameter_types_to_context<'ctx, 'arena>(
             } else {
                 AttributeTarget::Parameter
             },
-        )?;
+        );
 
         if let Some(default_value) = parameter_node.default_value.as_ref() {
             default_value.value.analyze(context, block_context, artifacts)?;
@@ -545,24 +545,24 @@ fn check_thrown_types<'ctx>(
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     function_like_metadata: &'ctx FunctionLikeMetadata,
-) -> Result<(), AnalysisError> {
+) {
     if !context.settings.check_throws {
         // If the setting is disabled, we skip the check.
-        return Ok(());
+        return;
     }
 
     if block_context.possibly_thrown_exceptions.is_empty() {
         // No exceptions are thrown in this block, so we can skip the check.
-        return Ok(());
+        return;
     }
 
     let Some(function_name) = function_like_metadata.original_name.as_ref() else {
-        return Ok(());
+        return;
     };
 
     let (function_kind, function_name) = if function_like_metadata.kind.is_method() {
         let Some(class_like_metadata) = block_context.scope.get_class_like() else {
-            return Ok(());
+            return;
         };
 
         let name = concat_atom!(&class_like_metadata.original_name, "::", function_name);
@@ -627,8 +627,6 @@ fn check_thrown_types<'ctx>(
 
         context.collector.report_with_code(IssueCode::UnhandledThrownType, issue);
     }
-
-    Ok(())
 }
 
 /// Checks if an exception should be ignored based on the unchecked exception settings.

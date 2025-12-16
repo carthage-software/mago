@@ -8,7 +8,13 @@ use mago_reporting::Issue;
 use mago_reporting::Level;
 use mago_span::HasSpan;
 use mago_span::Span;
-use mago_syntax::ast::*;
+use mago_syntax::ast::ForBody;
+use mago_syntax::ast::ForeachBody;
+use mago_syntax::ast::IfBody;
+use mago_syntax::ast::Node;
+use mago_syntax::ast::NodeKind;
+use mago_syntax::ast::Statement;
+use mago_syntax::ast::WhileBody;
 
 use crate::category::Category;
 use crate::context::LintContext;
@@ -126,7 +132,7 @@ impl LintRule for BlockStatementRule {
                     report("if", if_stmt.r#if.span(), body.statement.span());
                 }
 
-                for else_if_clause in body.else_if_clauses.iter() {
+                for else_if_clause in &body.else_if_clauses {
                     if !matches!(else_if_clause.statement, Statement::Block(_)) {
                         report("else if", else_if_clause.elseif.span(), else_if_clause.statement.span());
                     }

@@ -53,7 +53,7 @@ impl Formatter for CodeCountFormatter {
         // Write results
         for (code, (count, level)) in counts_vec {
             if use_colors {
-                let ansi_code = level_ansi_code(&level);
+                let ansi_code = level_ansi_code(level);
                 writeln!(writer, "\x1b[{ansi_code}m\x1b[1m{code}:\x1b[0m {count}")?;
             } else {
                 writeln!(writer, "{code}: {count}")?;
@@ -82,7 +82,7 @@ fn apply_filters(issues: &IssueCollection, config: &FormatterConfig) -> IssueCol
     filtered
 }
 
-fn level_ansi_code(level: &Level) -> &'static str {
+fn level_ansi_code(level: Level) -> &'static str {
     match level {
         Level::Error => "31",   // Red
         Level::Warning => "33", // Yellow

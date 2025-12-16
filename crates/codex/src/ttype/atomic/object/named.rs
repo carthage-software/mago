@@ -32,42 +32,49 @@ pub struct TNamedObject {
 impl TNamedObject {
     /// Creates metadata for a named object type with default flags and no generics/intersections.
     #[inline]
+    #[must_use]
     pub fn new(name: Atom) -> Self {
         Self { name, type_parameters: None, is_this: false, remapped_parameters: false, intersection_types: None }
     }
 
     /// Creates metadata for a named object type with specified type parameters.
     #[inline]
+    #[must_use]
     pub fn new_with_type_parameters(name: Atom, type_parameters: Option<Vec<TUnion>>) -> Self {
         Self { name, type_parameters, is_this: false, remapped_parameters: false, intersection_types: None }
     }
 
     /// Creates metadata representing the `$this` variable for a specific class.
     #[inline]
+    #[must_use]
     pub fn new_this(name: Atom) -> Self {
         Self { name, type_parameters: None, is_this: true, remapped_parameters: false, intersection_types: None }
     }
 
     /// Returns the `Atom` for the primary class/interface name.
     #[inline]
+    #[must_use]
     pub const fn get_name(&self) -> Atom {
         self.name
     }
 
     /// Returns the `Atom` for the primary class/interface name.
     #[inline]
+    #[must_use]
     pub const fn get_name_ref(&self) -> &Atom {
         &self.name
     }
 
     /// Checks if this object has concrete generic type parameters.
     #[inline]
+    #[must_use]
     pub fn has_type_parameters(&self) -> bool {
         self.type_parameters.as_ref().is_some_and(|v| !v.is_empty())
     }
 
     /// Returns a slice of the concrete generic type parameters, if specified.
     #[inline]
+    #[must_use]
     pub fn get_type_parameters(&self) -> Option<&[TUnion]> {
         self.type_parameters.as_deref()
     }
@@ -80,18 +87,21 @@ impl TNamedObject {
 
     /// Checks if this represents the `$this` variable.
     #[inline]
+    #[must_use]
     pub const fn is_this(&self) -> bool {
         self.is_this
     }
 
     /// Checks if this is part of an intersection type (has extra types).
     #[inline]
+    #[must_use]
     pub fn is_intersection(&self) -> bool {
         self.intersection_types.as_ref().is_some_and(|v| !v.is_empty())
     }
 
     /// Returns a new instance with the type parameters set.
     #[inline]
+    #[must_use]
     pub fn with_type_parameters(mut self, type_parameters: Option<Vec<TUnion>>) -> Self {
         self.type_parameters = type_parameters;
         self
@@ -99,6 +109,7 @@ impl TNamedObject {
 
     /// Returns a new instance with the `$this` flag set.
     #[inline]
+    #[must_use]
     pub fn with_is_this(mut self, is_this: bool) -> Self {
         self.is_this = is_this;
         self

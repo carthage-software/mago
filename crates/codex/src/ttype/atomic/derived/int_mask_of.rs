@@ -19,11 +19,13 @@ use crate::ttype::union::TUnion;
 pub struct TIntMaskOf(Box<TUnion>);
 
 impl TIntMaskOf {
+    #[must_use]
     pub fn new(target: Box<TUnion>) -> Self {
         Self(target)
     }
 
     #[inline]
+    #[must_use]
     pub const fn get_target_type(&self) -> &TUnion {
         &self.0
     }

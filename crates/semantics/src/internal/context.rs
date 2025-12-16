@@ -41,8 +41,8 @@ impl<'ctx, 'ast, 'arena> Context<'ctx, 'ast, 'arena> {
     }
 
     #[inline]
-    pub fn get_name(&self, position: &Position) -> &'arena str {
-        self.names.get(position)
+    pub fn get_name(&self, position: Position) -> &'arena str {
+        self.names.get(&position)
     }
 
     #[inline]

@@ -1,7 +1,9 @@
 use mago_php_version::feature::Feature;
-use mago_reporting::*;
-use mago_span::*;
-use mago_syntax::ast::*;
+use mago_reporting::Annotation;
+use mago_reporting::Issue;
+use mago_span::HasSpan;
+use mago_syntax::ast::Argument;
+use mago_syntax::ast::AttributeList;
 
 use crate::internal::context::Context;
 
@@ -15,11 +17,11 @@ pub fn check_attribute_list(attribute_list: &AttributeList, context: &mut Contex
         );
     }
 
-    for attr in attribute_list.attributes.iter() {
+    for attr in &attribute_list.attributes {
         let name = attr.name.value();
 
         if let Some(list) = &attr.argument_list {
-            for argument in list.arguments.iter() {
+            for argument in &list.arguments {
                 let (ellipsis, value) = match &argument {
                     Argument::Positional(positional_argument) => {
                         (positional_argument.ellipsis.as_ref(), &positional_argument.value)

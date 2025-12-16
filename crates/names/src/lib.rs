@@ -25,16 +25,19 @@ pub struct ResolvedNames<'arena> {
 
 impl<'arena> ResolvedNames<'arena> {
     /// Returns the total number of resolved names stored.
+    #[must_use]
     pub fn len(&self) -> usize {
         self.names.len()
     }
 
     /// Returns `true` if no resolved names are stored.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.names.is_empty()
     }
 
     /// Checks if a resolved name exists for the given source `Position`.
+    #[must_use]
     pub fn contains(&self, position: &Position) -> bool {
         self.names.contains_key(&position.offset)
     }
@@ -79,7 +82,8 @@ impl<'arena> ResolvedNames<'arena> {
     ///
     /// Each element in the set is a reference to a tuple: `(&usize, &(StringIdentifier, bool))`,
     /// representing `(&position, &(resolved_name_id, was_imported_flag))`.
+    #[must_use]
     pub fn all(&self) -> HashSet<(&u32, &(&'arena str, bool))> {
-        HashSet::from_iter(self.names.iter())
+        self.names.iter().collect()
     }
 }

@@ -64,14 +64,17 @@ impl Default for StandinOptions<'_> {
 }
 
 impl StandinOptions<'_> {
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
+    #[must_use]
     pub fn next_iteration(&self) -> Self {
         Self { iteration_depth: self.iteration_depth + 1, ..*self }
     }
 
+    #[must_use]
     pub fn with_appearance_depth(&self, appearance_depth: usize) -> Self {
         Self { appearance_depth, ..*self }
     }
@@ -125,7 +128,7 @@ pub fn replace(
             atomic_type,
             template_result,
             codebase,
-            &argument_type.as_ref(),
+            argument_type.as_ref(),
             argument_offset,
             argument_span,
             options,
@@ -158,7 +161,7 @@ fn handle_atomic_standin(
     parameter_atomic: &TAtomic,
     template_result: &mut TemplateResult,
     codebase: &CodebaseMetadata,
-    argument_type: &Option<&TUnion>,
+    argument_type: Option<&TUnion>,
     argument_offset: Option<usize>,
     argument_span: Option<Span>,
     options: StandinOptions<'_>,
@@ -173,7 +176,7 @@ fn handle_atomic_standin(
 
     if let TAtomic::GenericParameter(TGenericParameter { parameter_name, defining_entity, .. }) = parameter_atomic
         && let Some(template_type) =
-            template_types_contains(&template_result.template_types.clone(), parameter_name, defining_entity)
+            template_types_contains(&template_result.template_types.clone(), *parameter_name, defining_entity)
     {
         return handle_template_param_standin(
             parameter_atomic,
@@ -192,7 +195,7 @@ fn handle_atomic_standin(
     if let TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::Generic {
         parameter_name, defining_entity, ..
     })) = parameter_atomic
-        && template_types_contains(&template_result.template_types.clone(), parameter_name, defining_entity).is_some()
+        && template_types_contains(&template_result.template_types.clone(), *parameter_name, defining_entity).is_some()
     {
         return handle_template_param_class_standin(
             parameter_atomic,
@@ -497,25 +500,22 @@ fn handle_template_param_standin(
     template_type: &TUnion,
     template_result: &mut TemplateResult,
     codebase: &CodebaseMetadata,
-    input_type: &Option<&TUnion>,
+    input_type: Option<&TUnion>,
     input_arg_offset: Option<usize>,
     input_arg_pos: Option<Span>,
     options: StandinOptions<'_>,
     had_template: &mut bool,
 ) -> Vec<TAtomic> {
-    let (parameter_name, defining_entity, intersection_types, constraint) =
-        if let TAtomic::GenericParameter(TGenericParameter {
-            parameter_name,
-            defining_entity,
-            intersection_types,
-            constraint,
-            ..
-        }) = atomic_type
-        {
-            (parameter_name, defining_entity, intersection_types, constraint)
-        } else {
-            unreachable!("handle_template_param_standin called with non-GenericParameter atomic type: {atomic_type:?}",)
-        };
+    let TAtomic::GenericParameter(TGenericParameter {
+        parameter_name,
+        defining_entity,
+        intersection_types,
+        constraint,
+        ..
+    }) = atomic_type
+    else {
+        unreachable!("handle_template_param_standin called with non-GenericParameter atomic type: {atomic_type:?}",)
+    };
 
     if let Some(calling_class) = options.calling_class
         && defining_entity == &GenericParent::ClassLike(calling_class)
@@ -539,7 +539,7 @@ fn handle_template_param_standin(
                 &TUnion::from_vec(vec![intersection_type.clone()]),
                 template_result,
                 codebase,
-                input_type,
+                &input_type,
                 input_arg_offset,
                 input_arg_pos,
                 StandinOptions { iteration_depth: options.iteration_depth + 1, ..options },
@@ -582,7 +582,7 @@ fn handle_template_param_standin(
                 &replacement_type,
                 template_result,
                 codebase,
-                input_type,
+                &input_type,
                 input_arg_offset,
                 input_arg_pos,
                 StandinOptions { iteration_depth: options.iteration_depth + 1, ..options },
@@ -651,7 +651,7 @@ fn handle_template_param_standin(
         &as_type,
         template_result,
         codebase,
-        input_type,
+        &input_type,
         input_arg_offset,
         input_arg_pos,
         options.next_iteration(),
@@ -804,7 +804,7 @@ fn handle_template_param_class_standin(
     atomic_type: &TAtomic,
     template_result: &mut TemplateResult,
     codebase: &CodebaseMetadata,
-    input_type: &Option<&TUnion>,
+    input_type: Option<&TUnion>,
     input_argument_offset: Option<usize>,
     input_argument_span: Option<Span>,
     options: StandinOptions<'_>,
@@ -956,6 +956,7 @@ fn handle_template_param_class_standin(
     atomic_types
 }
 
+#[must_use]
 pub fn get_actual_type_from_literal(name: &Atom, codebase: &CodebaseMetadata) -> Vec<TAtomic> {
     if codebase.class_like_exists(name) {
         vec![TAtomic::Object(TObject::Named(TNamedObject::new(*name)))]
@@ -966,10 +967,10 @@ pub fn get_actual_type_from_literal(name: &Atom, codebase: &CodebaseMetadata) ->
 
 fn template_types_contains<'a>(
     template_types: &'a IndexMap<Atom, Vec<(GenericParent, TUnion)>, RandomState>,
-    parameter_name: &Atom,
+    parameter_name: Atom,
     defining_entity: &GenericParent,
 ) -> Option<&'a TUnion> {
-    if let Some(mapped_classes) = template_types.get(parameter_name) {
+    if let Some(mapped_classes) = template_types.get(&parameter_name) {
         return mapped_classes.iter().filter(|(e, _)| e == defining_entity).map(|(_, v)| v).next();
     }
 
@@ -989,13 +990,11 @@ fn find_matching_atomic_types_for_template(
         match (atomic_input_type, base_type) {
             (TAtomic::Callable(TCallable::Signature(_)), TAtomic::Callable(TCallable::Signature(_))) => {
                 matching_atomic_types.push(atomic_input_type.clone());
-                continue;
             }
             (TAtomic::Array(_), traversable_object)
                 if !traversable_object.is_array() && traversable_object.is_array_or_traversable(codebase) =>
             {
                 matching_atomic_types.push(atomic_input_type.clone());
-                continue;
             }
             (
                 TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::Literal { value: atomic_class_name })),
@@ -1021,7 +1020,6 @@ fn find_matching_atomic_types_for_template(
                                 constraint: Box::new(constraint_object),
                             },
                         )));
-                        continue;
                     }
                 }
             }
@@ -1035,9 +1033,7 @@ fn find_matching_atomic_types_for_template(
                     continue;
                 }
 
-                let class_metadata = if let Some(metadata) = codebase.get_class_like(&input_name) {
-                    metadata
-                } else {
+                let Some(class_metadata) = codebase.get_class_like(&input_name) else {
                     matching_atomic_types.push(TAtomic::Object(TObject::Any));
                     continue;
                 };
@@ -1052,7 +1048,6 @@ fn find_matching_atomic_types_for_template(
                         .push(TAtomic::Object(TObject::Named(TNamedObject::new(input_name).with_type_parameters(
                             Some(extended_parameters.values().cloned().collect::<Vec<TUnion>>()),
                         ))));
-                    continue;
                 }
             }
             (
@@ -1112,7 +1107,6 @@ fn find_matching_atomic_types_for_template(
 
                 if *input_key == normalized_key {
                     matching_atomic_types.push(atomic_input_type.clone());
-                    continue;
                 }
             }
         }
@@ -1241,6 +1235,7 @@ pub fn get_mapped_generic_type_parameters(
     input_type_parameters
 }
 
+#[must_use]
 pub fn get_extended_templated_types<'a>(
     atomic_type: &'a TAtomic,
     extends: &'a AtomMap<IndexMap<Atom, TUnion, RandomState>>,
@@ -1275,7 +1270,7 @@ pub fn get_extended_templated_types<'a>(
 
 pub(crate) fn get_root_template_type(
     lower_bounds: &IndexMap<Atom, HashMap<GenericParent, Vec<TemplateBound>>, RandomState>,
-    parameter_name: &Atom,
+    parameter_name: Atom,
     defining_entity: &GenericParent,
     mut visited_entities: HashSet<GenericParent>,
     codebase: &CodebaseMetadata,
@@ -1284,7 +1279,7 @@ pub(crate) fn get_root_template_type(
         return None;
     }
 
-    if let Some(mapped) = lower_bounds.get(parameter_name)
+    if let Some(mapped) = lower_bounds.get(&parameter_name)
         && let Some(bounds) = mapped.get(defining_entity)
     {
         let mapped_type = get_most_specific_type_from_bounds(bounds, codebase);
@@ -1299,7 +1294,7 @@ pub(crate) fn get_root_template_type(
             visited_entities.insert(*defining_entity);
 
             return Some(
-                get_root_template_type(lower_bounds, parameter_name, defining_entity, visited_entities, codebase)
+                get_root_template_type(lower_bounds, *parameter_name, defining_entity, visited_entities, codebase)
                     .unwrap_or(mapped_type),
             );
         }
@@ -1310,6 +1305,7 @@ pub(crate) fn get_root_template_type(
     None
 }
 
+#[must_use]
 pub fn get_most_specific_type_from_bounds(lower_bounds: &[TemplateBound], codebase: &CodebaseMetadata) -> TUnion {
     let relevant_bounds = get_relevant_bounds(lower_bounds);
 
@@ -1330,6 +1326,7 @@ pub fn get_most_specific_type_from_bounds(lower_bounds: &[TemplateBound], codeba
     specific_type
 }
 
+#[must_use]
 pub fn get_relevant_bounds(lower_bounds: &[TemplateBound]) -> Vec<&TemplateBound> {
     let mut lower_bounds = lower_bounds.iter().collect::<Vec<_>>();
 

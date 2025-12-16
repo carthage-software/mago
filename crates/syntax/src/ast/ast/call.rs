@@ -50,11 +50,13 @@ pub struct StaticMethodCall<'arena> {
 
 impl<'arena> Call<'arena> {
     #[inline]
+    #[must_use]
     pub const fn is_null_safe(&self) -> bool {
         matches!(self, Call::NullSafeMethod(_))
     }
 
     #[inline]
+    #[must_use]
     pub fn get_argument_list(&self) -> &ArgumentList<'arena> {
         match self {
             Call::Function(f) => &f.argument_list,

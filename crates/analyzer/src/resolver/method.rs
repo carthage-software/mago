@@ -188,16 +188,16 @@ pub fn resolve_method_targets<'ctx, 'ast, 'arena>(
                                     context,
                                     object.span(),
                                     selector.span(),
-                                    classname,
-                                    method_name,
+                                    *classname,
+                                    *method_name,
                                 );
                             } else {
                                 report_non_documented_method(
                                     context,
                                     object.span(),
                                     selector.span(),
-                                    classname,
-                                    method_name,
+                                    *classname,
+                                    *method_name,
                                 );
                             }
 
@@ -315,7 +315,7 @@ pub fn get_method_ids_from_object<'ctx, 'ast, 'arena, 'object>(
 
     let Some(class_metadata) = context.codebase.get_class_like(name) else {
         result.has_invalid_target = true;
-        report_non_existent_class_like(context, object.span(), name);
+        report_non_existent_class_like(context, object.span(), *name);
         return ids;
     };
 
@@ -343,7 +343,7 @@ pub fn get_method_ids_from_object<'ctx, 'ast, 'arena, 'object>(
             selector,
             class_metadata,
             function_like_metadata,
-            &class_metadata.original_name,
+            class_metadata.original_name,
         ) {
             result.has_invalid_target = true;
         }
@@ -379,8 +379,8 @@ pub fn get_method_ids_from_object<'ctx, 'ast, 'arena, 'object>(
                     context,
                     object.span(),
                     selector.span(),
-                    &class_metadata.original_name,
-                    &method_name,
+                    class_metadata.original_name,
+                    method_name,
                     has_magic_call,
                 );
             } else if !has_magic_call && !is_inherited {
@@ -388,8 +388,8 @@ pub fn get_method_ids_from_object<'ctx, 'ast, 'arena, 'object>(
                     context,
                     object.span(),
                     selector.span(),
-                    &class_metadata.original_name,
-                    &method_name,
+                    class_metadata.original_name,
+                    method_name,
                     false,
                 );
             }
@@ -453,7 +453,7 @@ fn check_where_method_constraints(
     selector: &ClassLikeMemberSelector,
     class_like_metadata: &ClassLikeMetadata,
     function_like_metadata: &FunctionLikeMetadata,
-    defining_class_id: &Atom,
+    defining_class_id: Atom,
 ) -> bool {
     let Some(method_metadata) = function_like_metadata.method_metadata.as_ref() else {
         return true;
@@ -467,7 +467,7 @@ fn check_where_method_constraints(
         let actual_template_type = get_specialized_template_type(
             context.codebase,
             template_name,
-            defining_class_id,
+            &defining_class_id,
             class_like_metadata,
             object_type.get_type_parameters(),
         )
@@ -552,8 +552,8 @@ pub(super) fn report_non_existent_method(
     context: &mut Context,
     obj_span: Span,
     selector_span: Span,
-    classname: &Atom,
-    method_name: &Atom,
+    classname: Atom,
+    method_name: Atom,
 ) {
     context.collector.report_with_code(
         IssueCode::NonExistentMethod,
@@ -570,8 +570,8 @@ pub(super) fn report_non_documented_method(
     context: &mut Context,
     obj_span: Span,
     selector_span: Span,
-    classname: &Atom,
-    method_name: &Atom,
+    classname: Atom,
+    method_name: Atom,
 ) {
     context.collector.report_with_code(
         IssueCode::NonDocumentedMethod,
@@ -597,8 +597,8 @@ pub(super) fn report_magic_call_without_call_method(
     context: &mut Context,
     obj_span: Span,
     selector_span: Span,
-    classname: &Atom,
-    method_name: &Atom,
+    classname: Atom,
+    method_name: Atom,
     is_static: bool,
 ) {
     let magic_method_name = if is_static { "__callStatic" } else { "__call" };
@@ -628,8 +628,8 @@ pub(super) fn report_dynamic_static_method_call(
     context: &mut Context,
     obj_span: Span,
     selector_span: Span,
-    classname: &Atom,
-    method_name: &Atom,
+    classname: Atom,
+    method_name: Atom,
     has_magic_call: bool,
 ) {
     let mut issue =

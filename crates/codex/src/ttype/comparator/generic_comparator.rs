@@ -77,7 +77,7 @@ pub(crate) fn is_contained_by(
                 continue;
             }
 
-            update_failed_result_from_nested(atomic_comparison_result, parameter_comparison_result);
+            update_failed_result_from_nested(atomic_comparison_result, &parameter_comparison_result);
 
             all_parameters_match = false;
         }
@@ -88,7 +88,7 @@ pub(crate) fn is_contained_by(
 
 pub(crate) fn update_failed_result_from_nested(
     atomic_comparison_result: &mut ComparisonResult,
-    param_comparison_result: ComparisonResult,
+    param_comparison_result: &ComparisonResult,
 ) {
     atomic_comparison_result.type_coerced = Some(if let Some(val) = atomic_comparison_result.type_coerced {
         val

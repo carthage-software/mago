@@ -2,7 +2,7 @@ use mago_atom::Atom;
 use mago_atom::atom;
 use mago_names::scope::NamespaceScope;
 use mago_span::HasSpan;
-use mago_syntax::ast::*;
+use mago_syntax::ast::FunctionLikeParameter;
 
 use crate::metadata::flags::MetadataFlags;
 use crate::metadata::parameter::FunctionLikeParameterMetadata;

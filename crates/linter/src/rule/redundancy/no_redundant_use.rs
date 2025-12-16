@@ -15,7 +15,14 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_reporting::Level;
 use mago_span::HasSpan;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Inline;
+use mago_syntax::ast::MixedUseItemList;
+use mago_syntax::ast::Node;
+use mago_syntax::ast::NodeKind;
+use mago_syntax::ast::Program;
+use mago_syntax::ast::Statement;
+use mago_syntax::ast::UseItem;
+use mago_syntax::ast::UseItems;
 
 use crate::category::Category;
 use crate::context::LintContext;
@@ -200,7 +207,19 @@ mod utils {
     use mago_atom::concat_atom;
     use mago_syntax::walker::MutWalker;
 
-    use super::*;
+    use super::Atom;
+    use super::AtomSet;
+    use super::HasSpan;
+    use super::Inline;
+    use super::LintContext;
+    use super::MixedUseItemList;
+    use super::Program;
+    use super::Range;
+    use super::Statement;
+    use super::UseItem;
+    use super::UseItems;
+    use super::atom;
+    use super::starts_with_ignore_case;
 
     #[derive(Debug, PartialEq, Eq, Clone, Copy)]
     pub(super) enum ImportType {
@@ -219,9 +238,9 @@ mod utils {
 
     pub(super) fn collect_use_declarations<'ast>(program: &'ast Program<'ast>) -> Vec<UseDeclaration<'ast>> {
         let mut declarations = Vec::new();
-        for stmt in program.statements.iter() {
+        for stmt in &program.statements {
             if let Statement::Namespace(ns) = stmt {
-                for ns_stmt in ns.statements().iter() {
+                for ns_stmt in ns.statements() {
                     collect_from_statement(ns_stmt, &mut declarations);
                 }
             } else {
@@ -349,7 +368,7 @@ mod utils {
             UseItems::Sequence(s) => &s.items,
             UseItems::TypedSequence(s) => &s.items,
             UseItems::TypedList(l) => &l.items,
-            UseItems::MixedList(l) => return find_range_in_mixed_list(l, item_to_delete),
+            UseItems::MixedList(l) => return Some(find_range_in_mixed_list(l, item_to_delete)),
         };
 
         let Some(index) = items.nodes.iter().position(|i| std::ptr::eq(i, item_to_delete)) else {
@@ -371,13 +390,13 @@ mod utils {
         Some(delete_span.to_range())
     }
 
-    fn find_range_in_mixed_list(list: &MixedUseItemList, item_to_delete: &UseItem) -> Option<Range<u32>> {
+    fn find_range_in_mixed_list(list: &MixedUseItemList, item_to_delete: &UseItem) -> Range<u32> {
         let Some(index) = list.items.nodes.iter().position(|i| std::ptr::eq(&raw const i.item, item_to_delete)) else {
-            return Some(item_to_delete.span().to_range());
+            return item_to_delete.span().to_range();
         };
 
         if list.items.nodes.len() == 1 {
-            return Some(list.span().to_range());
+            return list.span().to_range();
         }
 
         let typed_item_span = list.items.nodes[index].span();
@@ -390,6 +409,6 @@ mod utils {
             typed_item_span.join(comma_span)
         };
 
-        Some(delete_span.to_range())
+        delete_span.to_range()
     }
 }

@@ -2,7 +2,9 @@ use bumpalo::vec;
 
 use mago_span::HasSpan;
 use mago_span::Span;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Node;
+use mago_syntax::ast::Sequence;
+use mago_syntax::ast::Statement;
 
 use crate::document::Document;
 use crate::document::Group;

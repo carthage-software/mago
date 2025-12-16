@@ -1,5 +1,14 @@
 use mago_names::ResolvedNames;
-use mago_syntax::ast::*;
+use mago_syntax::ast::MaybeTypedUseItem;
+use mago_syntax::ast::MixedUseItemList;
+use mago_syntax::ast::TypedUseItemList;
+use mago_syntax::ast::TypedUseItemSequence;
+use mago_syntax::ast::Use;
+use mago_syntax::ast::UseItem;
+use mago_syntax::ast::UseItemAlias;
+use mago_syntax::ast::UseItemSequence;
+use mago_syntax::ast::UseItems;
+use mago_syntax::ast::UseType;
 
 use crate::FingerprintOptions;
 use crate::Fingerprintable;
@@ -59,7 +68,7 @@ impl Fingerprintable for UseItemSequence<'_> {
         options: &FingerprintOptions<'_>,
     ) {
         "use_sequence".hash(hasher);
-        for item in self.items.iter() {
+        for item in &self.items {
             item.fingerprint_with_hasher(hasher, resolved_names, options);
         }
     }
@@ -74,7 +83,7 @@ impl Fingerprintable for TypedUseItemSequence<'_> {
     ) {
         "use_typed_sequence".hash(hasher);
         self.r#type.fingerprint_with_hasher(hasher, resolved_names, options);
-        for item in self.items.iter() {
+        for item in &self.items {
             item.fingerprint_with_hasher(hasher, resolved_names, options);
         }
     }
@@ -90,7 +99,7 @@ impl Fingerprintable for TypedUseItemList<'_> {
         "use_typed_list".hash(hasher);
         self.r#type.fingerprint_with_hasher(hasher, resolved_names, options);
         self.namespace.fingerprint_with_hasher(hasher, resolved_names, options);
-        for item in self.items.iter() {
+        for item in &self.items {
             item.fingerprint_with_hasher(hasher, resolved_names, options);
         }
     }
@@ -105,7 +114,7 @@ impl Fingerprintable for MixedUseItemList<'_> {
     ) {
         "use_mixed_list".hash(hasher);
         self.namespace.fingerprint_with_hasher(hasher, resolved_names, options);
-        for item in self.items.iter() {
+        for item in &self.items {
             item.fingerprint_with_hasher(hasher, resolved_names, options);
         }
     }

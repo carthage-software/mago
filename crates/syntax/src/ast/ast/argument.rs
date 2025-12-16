@@ -24,7 +24,7 @@ pub struct ArgumentList<'arena> {
 ///
 /// Example: `(1, ?, 3, ...)` in `foo(1, ?, 3, ...)`
 ///
-/// Reference: https://wiki.php.net/rfc/partial_function_application_v2
+/// Reference: <https://wiki.php.net/rfc/partial_function_application_v2>
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub struct PartialArgumentList<'arena> {
     pub left_parenthesis: Span,
@@ -76,7 +76,7 @@ pub struct NamedArgument<'arena> {
 ///
 /// Example: `foo: ?` in `foo(foo: ?, bar: 2)`
 ///
-/// Reference: https://wiki.php.net/rfc/partial_function_application_v2
+/// Reference: <https://wiki.php.net/rfc/partial_function_application_v2>
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub struct NamedPlaceholderArgument<'arena> {
     pub name: LocalIdentifier<'arena>,
@@ -88,7 +88,7 @@ pub struct NamedPlaceholderArgument<'arena> {
 ///
 /// Example: `?` in `foo(1, ?, 3)`
 ///
-/// Reference: https://wiki.php.net/rfc/partial_function_application_v2
+/// Reference: <https://wiki.php.net/rfc/partial_function_application_v2>
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub struct PlaceholderArgument {
     pub span: Span,
@@ -98,7 +98,7 @@ pub struct PlaceholderArgument {
 ///
 /// Example: `...` in `foo(1, 2, ...)`
 ///
-/// Reference: https://wiki.php.net/rfc/partial_function_application_v2
+/// Reference: <https://wiki.php.net/rfc/partial_function_application_v2>
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub struct VariadicPlaceholderArgument {
     pub span: Span,
@@ -106,6 +106,7 @@ pub struct VariadicPlaceholderArgument {
 
 impl<'arena> PartialArgumentList<'arena> {
     #[inline]
+    #[must_use]
     pub fn is_first_class_callable(&self) -> bool {
         self.arguments.len() == 1 && matches!(self.arguments.first(), Some(PartialArgument::VariadicPlaceholder(_)))
     }
@@ -145,11 +146,13 @@ impl<'arena> PartialArgumentList<'arena> {
 
 impl<'arena> Argument<'arena> {
     #[inline]
+    #[must_use]
     pub const fn is_positional(&self) -> bool {
         matches!(self, Argument::Positional(_))
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_unpacked(&self) -> bool {
         match self {
             Argument::Positional(arg) => arg.ellipsis.is_some(),
@@ -158,6 +161,7 @@ impl<'arena> Argument<'arena> {
     }
 
     #[inline]
+    #[must_use]
     pub const fn value(&self) -> &Expression<'arena> {
         match self {
             Argument::Positional(arg) => &arg.value,
@@ -166,28 +170,33 @@ impl<'arena> Argument<'arena> {
     }
 }
 
-impl<'arena> PartialArgument<'arena> {
+impl PartialArgument<'_> {
     #[inline]
+    #[must_use]
     pub const fn is_positional(&self) -> bool {
         matches!(self, PartialArgument::Positional(_))
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_named(&self) -> bool {
         matches!(self, PartialArgument::Named(_))
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_named_placeholder(&self) -> bool {
         matches!(self, PartialArgument::NamedPlaceholder(_))
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_placeholder(&self) -> bool {
         matches!(self, PartialArgument::Placeholder(_))
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_variadic_placeholder(&self) -> bool {
         matches!(self, PartialArgument::VariadicPlaceholder(_))
     }

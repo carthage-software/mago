@@ -30,91 +30,107 @@ impl TKeyedArray {
     /// Creates new metadata for a keyed array, initially with no known items or generic parameters.
     /// Non-empty is false by default.
     #[inline]
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
     /// Creates new metadata for a keyed array with specified generic key and value types.
     #[inline]
+    #[must_use]
     pub fn new_with_parameters(key_type: Box<TUnion>, value_type: Box<TUnion>) -> Self {
         Self { known_items: None, parameters: Some((key_type, value_type)), non_empty: false }
     }
 
     #[inline]
+    #[must_use]
     pub fn with_known_items(self, known_items: BTreeMap<ArrayKey, (bool, TUnion)>) -> Self {
         Self { known_items: Some(known_items), ..self }
     }
 
     #[inline]
+    #[must_use]
     pub fn with_no_known_items(self) -> Self {
         Self { known_items: None, ..self }
     }
 
     #[inline]
+    #[must_use]
     pub fn with_parameters(self, key_type: Box<TUnion>, value_type: Box<TUnion>) -> Self {
         Self { parameters: Some((key_type, value_type)), ..self }
     }
 
     #[inline]
+    #[must_use]
     pub fn with_no_parameters(self) -> Self {
         Self { parameters: None, ..self }
     }
 
     #[inline]
+    #[must_use]
     pub fn with_non_empty(self, non_empty: bool) -> Self {
         Self { non_empty, ..self }
     }
 
     /// Returns a reference to the map of known item types by key, if any.
     #[inline]
+    #[must_use]
     pub fn get_known_items(&self) -> Option<&BTreeMap<ArrayKey, (bool, TUnion)>> {
         self.known_items.as_ref()
     }
 
     /// Returns the generic key and value types (`(&TKey, &TValue)`), if specified.
     #[inline]
+    #[must_use]
     pub fn get_generic_parameters(&self) -> Option<(&TUnion, &TUnion)> {
         self.parameters.as_ref().map(|(k, v)| (&**k, &**v))
     }
 
     /// Return a reference to the generic key type, if specified.
     #[inline]
+    #[must_use]
     pub fn get_key_type(&self) -> Option<&TUnion> {
         self.parameters.as_ref().map(|(k, _)| &**k)
     }
 
     /// Return a reference to the generic value type, if specified.
     #[inline]
+    #[must_use]
     pub fn get_value_type(&self) -> Option<&TUnion> {
         self.parameters.as_ref().map(|(_, v)| &**v)
     }
 
     /// Checks if the array is known to be non-empty.
     #[inline]
+    #[must_use]
     pub const fn is_non_empty(&self) -> bool {
         self.non_empty
     }
 
     /// Checks if there are any known specific item types defined.
     #[inline]
+    #[must_use]
     pub fn has_known_items(&self) -> bool {
         self.known_items.as_ref().is_some_and(|elements| !elements.is_empty())
     }
 
     /// Checks if the list contains any known indefinite elements.
     #[inline]
+    #[must_use]
     pub fn has_known_indefinite_items(&self) -> bool {
         self.known_items.as_ref().is_some_and(|elements| elements.values().any(|(indefinite, _)| *indefinite))
     }
 
     /// Checks if generic key/value parameters are defined.
     #[inline]
+    #[must_use]
     pub fn has_generic_parameters(&self) -> bool {
         self.parameters.is_some()
     }
 
     /// Returns a new `TKeyedArray` with the specified non-empty flag.
     #[inline]
+    #[must_use]
     pub fn as_non_empty_array(&self, non_empty: bool) -> Self {
         Self { non_empty, ..self.clone() }
     }

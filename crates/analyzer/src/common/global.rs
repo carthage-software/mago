@@ -12,8 +12,17 @@ use mago_codex::ttype::atomic::array::list::TList;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::int::TInteger;
 use mago_codex::ttype::atomic::scalar::string::TString;
+use mago_codex::ttype::get_bool;
+use mago_codex::ttype::get_float;
+use mago_codex::ttype::get_int_range;
+use mago_codex::ttype::get_mixed;
+use mago_codex::ttype::get_non_empty_string;
+use mago_codex::ttype::get_non_negative_int;
+use mago_codex::ttype::get_one_int;
+use mago_codex::ttype::get_positive_int;
+use mago_codex::ttype::get_string;
+use mago_codex::ttype::get_truthy_string;
 use mago_codex::ttype::union::TUnion;
-use mago_codex::ttype::*;
 
 std::thread_local! {
     static SUPERGLOBALS_MAP: LazyLock<HashMap<&'static str, Rc<TUnion>>> = LazyLock::new(|| {
@@ -98,7 +107,7 @@ std::thread_local! {
             // This value (1764191486) was chosen at the time of implementation and has no special meaning.
             // Using a dynamic timestamp would cause baseline matching to fail since error messages
             // include the type, and the type would change on every run.
-            const REQUEST_TIME_MIN: i64 = 1764191486;
+            const REQUEST_TIME_MIN: i64 = 1_764_191_486;
 
             let mut known_items = BTreeMap::new();
             // Standard CGI/1.1 and PHP variables

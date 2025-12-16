@@ -52,6 +52,7 @@ impl DefSignatureNode {
     /// Creates a new `DefSignatureNode` with the given parameters.
     #[inline]
     #[allow(clippy::too_many_arguments)]
+    #[must_use]
     pub fn new(
         name: Atom,
         is_function: bool,
@@ -87,6 +88,7 @@ impl DefSignatureNode {
 
     /// Returns a reference to the children of this node.
     #[inline]
+    #[must_use]
     pub fn children(&self) -> &[DefSignatureNode] {
         &self.children
     }
@@ -112,6 +114,7 @@ pub struct FileSignature {
 impl FileSignature {
     /// Creates a new empty `FileSignature`.
     #[inline]
+    #[must_use]
     pub fn new(hash: u64) -> Self {
         Self { hash, ast_nodes: Vec::new() }
     }
@@ -124,6 +127,7 @@ impl FileSignature {
 
     /// Returns a reference to the top-level nodes.
     #[inline]
+    #[must_use]
     pub fn nodes(&self) -> &[DefSignatureNode] {
         &self.ast_nodes
     }
@@ -136,12 +140,14 @@ impl FileSignature {
 
     /// Returns true if this file signature has no nodes.
     #[inline]
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.ast_nodes.is_empty()
     }
 
     /// Returns the number of top-level nodes.
     #[inline]
+    #[must_use]
     pub fn len(&self) -> usize {
         self.ast_nodes.len()
     }

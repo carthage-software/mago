@@ -65,6 +65,7 @@ impl Default for IncrementalAnalysis {
 
 impl IncrementalAnalysis {
     /// Creates a new incremental analysis manager.
+    #[must_use]
     pub fn new() -> Self {
         Self { previous_metadata: None, previous_references: None }
     }
@@ -118,6 +119,7 @@ impl IncrementalAnalysis {
     /// let diff = incremental.compute_diffs(&old_metadata, &new_metadata);
     /// println!("Kept: {}, Changed: {}", diff.get_keep().len(), diff.get_changed().len());
     /// ```
+    #[must_use]
     pub fn compute_diffs(&self, old_metadata: &CodebaseMetadata, new_metadata: &CodebaseMetadata) -> CodebaseDiff {
         let mut aggregate_diff = CodebaseDiff::new();
 
@@ -163,14 +165,12 @@ impl IncrementalAnalysis {
     /// ```
     pub fn mark_safe_symbols(
         &self,
-        diff: CodebaseDiff,
+        diff: &CodebaseDiff,
         references: &SymbolReferences,
         metadata: &mut CodebaseMetadata,
     ) {
         // Get invalid symbols with propagation through reference graph
-        let (invalid_symbols, partially_invalid) = if let Some(result) = references.get_invalid_symbols(&diff) {
-            result
-        } else {
+        let Some((invalid_symbols, partially_invalid)) = references.get_invalid_symbols(diff) else {
             // Propagation too expensive (>5000 steps), skip incremental
             tracing::warn!("Invalidation cascade too expensive (>5000 steps), falling back to full analysis");
             return;

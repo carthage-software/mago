@@ -1,5 +1,13 @@
 use crate::T;
-use crate::ast::ast::*;
+use crate::ast::ast::Statement;
+use crate::ast::ast::Switch;
+use crate::ast::ast::SwitchBody;
+use crate::ast::ast::SwitchBraceDelimitedBody;
+use crate::ast::ast::SwitchCase;
+use crate::ast::ast::SwitchCaseSeparator;
+use crate::ast::ast::SwitchColonDelimitedBody;
+use crate::ast::ast::SwitchDefaultCase;
+use crate::ast::ast::SwitchExpressionCase;
 use crate::ast::sequence::Sequence;
 use crate::error::ParseError;
 use crate::parser::internal::expression::parse_expression;
@@ -120,9 +128,7 @@ pub fn parse_switch_statements<'arena>(
     Ok(Sequence::new(statements))
 }
 
-pub fn parse_switch_case_separator<'arena>(
-    stream: &mut TokenStream<'_, 'arena>,
-) -> Result<SwitchCaseSeparator, ParseError> {
+pub fn parse_switch_case_separator(stream: &mut TokenStream<'_, '_>) -> Result<SwitchCaseSeparator, ParseError> {
     let token = utils::expect_one_of(stream, T![":", ";"])?;
 
     Ok(match token.kind {

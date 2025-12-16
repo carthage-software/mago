@@ -1,7 +1,7 @@
 use bumpalo::vec;
 
 use mago_span::HasSpan;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Expression;
 
 use crate::document::Document;
 use crate::document::Group;

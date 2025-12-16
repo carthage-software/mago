@@ -8,7 +8,7 @@ use mago_algebra::saturate_clauses;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
-use mago_syntax::ast::*;
+use mago_syntax::ast::DoWhile;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -95,7 +95,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for DoWhile<'arena> {
         let (mut inner_loop_block_context, loop_scope) = r#loop::analyze(
             context,
             std::slice::from_ref(self.statement),
-            vec![],
+            &[],
             r#loop::get_and_expressions(self.condition),
             loop_scope,
             &mut loop_block_context,

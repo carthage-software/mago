@@ -8,7 +8,7 @@ use mago_codex::ttype::get_never;
 use mago_codex::ttype::template::TemplateResult;
 use mago_codex::ttype::union::TUnion;
 use mago_span::HasSpan;
-use mago_syntax::ast::*;
+use mago_syntax::ast::MethodPartialApplication;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -109,7 +109,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for MethodPartialApplication<'arena>
                 )?;
 
                 closure_types.push(create_closure_from_partial_application(
-                    signature,
+                    &signature,
                     &self.argument_list,
                     &original_parameters,
                     &template_result,

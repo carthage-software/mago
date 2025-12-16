@@ -5,7 +5,21 @@ use bumpalo::Bump;
 use mago_database::file::HasFileId;
 use mago_span::HasSpan;
 use mago_span::Span;
-use mago_syntax::ast::*;
+use mago_syntax::ast::Access;
+use mago_syntax::ast::Argument;
+use mago_syntax::ast::ArgumentList;
+use mago_syntax::ast::Call;
+use mago_syntax::ast::ClassLikeMemberSelector;
+use mago_syntax::ast::Expression;
+use mago_syntax::ast::FunctionCall;
+use mago_syntax::ast::Identifier;
+use mago_syntax::ast::MethodCall;
+use mago_syntax::ast::Node;
+use mago_syntax::ast::NullSafeMethodCall;
+use mago_syntax::ast::NullSafePropertyAccess;
+use mago_syntax::ast::PropertyAccess;
+use mago_syntax::ast::StaticMethodCall;
+use mago_syntax::ast::Variable;
 
 use crate::document::Document;
 use crate::document::Group;
@@ -152,11 +166,7 @@ impl<'arena> MemberAccessChain<'arena> {
             }
 
             let breaking_arguments = if argument_list.arguments.len() == 1 {
-                argument_list
-                    .arguments
-                    .first()
-                    .map(|argument| argument.value())
-                    .is_some_and(|e| is_breaking_expression(f, e, true))
+                argument_list.arguments.first().map(Argument::value).is_some_and(|e| is_breaking_expression(f, e, true))
             } else {
                 argument_list.arguments.iter().all(|arg| !arg.is_positional())
                     && argument_list.arguments.iter().any(|arg| is_breaking_expression(f, arg.value(), false))
@@ -363,15 +373,13 @@ impl<'arena> MemberAccessChain<'arena> {
             && variable.name.eq_ignore_ascii_case("$builder")
             && self.accesses.len() >= 3
             && self.accesses.iter().all(|access| {
-                let id = match access {
-                    MemberAccess::MethodCall(MethodCall {
-                        method: ClassLikeMemberSelector::Identifier(id), ..
-                    })
-                    | MemberAccess::NullSafeMethodCall(NullSafeMethodCall {
-                        method: ClassLikeMemberSelector::Identifier(id),
-                        ..
-                    }) => id,
-                    _ => return false,
+                let (MemberAccess::MethodCall(MethodCall { method: ClassLikeMemberSelector::Identifier(id), .. })
+                | MemberAccess::NullSafeMethodCall(NullSafeMethodCall {
+                    method: ClassLikeMemberSelector::Identifier(id),
+                    ..
+                })) = access
+                else {
+                    return false;
                 };
 
                 id.value.starts_with("add") || id.value.starts_with("with")

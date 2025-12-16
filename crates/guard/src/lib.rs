@@ -30,6 +30,7 @@ impl ArchitecturalGuard {
     ///
     /// * `arena` - The bump allocator to use for memory management
     /// * `settings` - The guard settings containing architectural rules
+    #[must_use]
     pub fn new(settings: Settings) -> Self {
         Self { settings }
     }
@@ -45,6 +46,7 @@ impl ArchitecturalGuard {
     /// # Returns
     ///
     /// A `GuardResult` containing all violations found.
+    #[must_use]
     pub fn check<'ast, 'arena>(
         &self,
         codebase: &CodebaseMetadata,

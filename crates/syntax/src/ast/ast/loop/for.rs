@@ -65,6 +65,7 @@ pub struct ForColonDelimitedBody<'arena> {
 
 impl<'arena> ForBody<'arena> {
     #[inline]
+    #[must_use]
     pub fn statements(&self) -> &[Statement<'arena>] {
         match self {
             ForBody::Statement(statement) => std::slice::from_ref(statement),

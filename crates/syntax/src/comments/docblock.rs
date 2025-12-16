@@ -69,7 +69,7 @@ pub fn get_docblock_before_position<'arena>(
                     .get(docblock_end_offset as usize..node_start_offset as usize)
                     .unwrap_or(&[]);
 
-                if code_between_slice.iter().all(|b| b.is_ascii_whitespace()) {
+                if code_between_slice.iter().all(u8::is_ascii_whitespace) {
                     // It's the correct docblock!
                     return Some(trivia);
                 }
@@ -78,9 +78,7 @@ pub fn get_docblock_before_position<'arena>(
                 // This docblock doesn't apply. Stop searching.
                 return None;
             }
-            TriviaKind::WhiteSpace => {
-                continue;
-            }
+            TriviaKind::WhiteSpace => {}
             _ => {
                 return None;
             }

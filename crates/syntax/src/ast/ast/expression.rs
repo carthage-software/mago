@@ -95,6 +95,7 @@ pub enum Expression<'arena> {
 }
 
 impl<'arena> Expression<'arena> {
+    #[must_use]
     pub fn is_constant(&self, version: &PHPVersion, initialization: bool) -> bool {
         match &self {
             Self::Binary(operation) => {
@@ -138,25 +139,21 @@ impl<'arena> Expression<'arena> {
                 if initialization && version.is_supported(Feature::NewInInitializers) =>
             {
                 instantiation.class.is_constant(version, initialization)
-                    && instantiation
-                        .argument_list
-                        .as_ref()
-                        .map(|arguments| {
-                            arguments.arguments.iter().all(|argument| match &argument {
-                                Argument::Positional(positional_argument) => {
-                                    positional_argument.ellipsis.is_none()
-                                        && positional_argument.value.is_constant(version, initialization)
-                                }
-                                Argument::Named(named_argument) => {
-                                    named_argument.value.is_constant(version, initialization)
-                                }
-                            })
+                    && instantiation.argument_list.as_ref().is_none_or(|arguments| {
+                        arguments.arguments.iter().all(|argument| match &argument {
+                            Argument::Positional(positional_argument) => {
+                                positional_argument.ellipsis.is_none()
+                                    && positional_argument.value.is_constant(version, initialization)
+                            }
+                            Argument::Named(named_argument) => {
+                                named_argument.value.is_constant(version, initialization)
+                            }
                         })
-                        .unwrap_or(true)
+                    })
             }
             Self::Conditional(conditional) => {
                 conditional.condition.is_constant(version, initialization)
-                    && conditional.then.as_ref().map(|e| e.is_constant(version, initialization)).unwrap_or(true)
+                    && conditional.then.as_ref().is_none_or(|e| e.is_constant(version, initialization))
                     && conditional.r#else.is_constant(version, initialization)
             }
             Self::Array(array) => array.elements.nodes.iter().all(|element| match &element {
@@ -233,11 +230,13 @@ impl<'arena> Expression<'arena> {
     }
 
     #[inline]
+    #[must_use]
     pub const fn unparenthesized(&self) -> &Expression<'arena> {
         if let Expression::Parenthesized(expression) = self { expression.expression } else { self }
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_assignment(&self) -> bool {
         if let Expression::Parenthesized(expression) = self {
             expression.expression.is_assignment()
@@ -247,6 +246,7 @@ impl<'arena> Expression<'arena> {
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_call(&self) -> bool {
         if let Expression::Parenthesized(expression) = self {
             expression.expression.is_call()
@@ -256,6 +256,7 @@ impl<'arena> Expression<'arena> {
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_variable(&self) -> bool {
         if let Expression::Parenthesized(expression) = self {
             expression.expression.is_variable()
@@ -265,6 +266,7 @@ impl<'arena> Expression<'arena> {
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_binary(&self) -> bool {
         if let Expression::Parenthesized(expression) = self {
             expression.expression.is_binary()
@@ -274,6 +276,7 @@ impl<'arena> Expression<'arena> {
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_unary(&self) -> bool {
         if let Expression::Parenthesized(expression) = self {
             expression.expression.is_unary()
@@ -283,6 +286,7 @@ impl<'arena> Expression<'arena> {
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_conditional(&self) -> bool {
         if let Expression::Parenthesized(expression) = self {
             expression.expression.is_conditional()
@@ -292,6 +296,7 @@ impl<'arena> Expression<'arena> {
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_unary_or_binary_or_conditional(&self) -> bool {
         if let Expression::Parenthesized(expression) = self {
             expression.expression.is_unary_or_binary_or_conditional()
@@ -307,6 +312,7 @@ impl<'arena> Expression<'arena> {
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_reference(&self) -> bool {
         if let Expression::Parenthesized(expression) = self {
             expression.expression.is_reference()
@@ -316,6 +322,7 @@ impl<'arena> Expression<'arena> {
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_true(&self) -> bool {
         if let Expression::Parenthesized(expression) = self {
             expression.expression.is_true()
@@ -325,6 +332,7 @@ impl<'arena> Expression<'arena> {
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_false(&self) -> bool {
         if let Expression::Parenthesized(expression) = self {
             expression.expression.is_false()
@@ -334,10 +342,11 @@ impl<'arena> Expression<'arena> {
     }
 
     #[inline]
+    #[must_use]
     pub const fn evaluates_to_boolean(&self) -> bool {
         match self {
             Expression::Parenthesized(expression) => expression.expression.evaluates_to_boolean(),
-            Expression::Literal(Literal::True(_)) | Expression::Literal(Literal::False(_)) => true,
+            Expression::Literal(Literal::True(_) | Literal::False(_)) => true,
             Expression::Binary(Binary { operator, .. })
                 if operator.is_comparison() || operator.is_logical() || operator.is_instanceof() =>
             {
@@ -348,6 +357,7 @@ impl<'arena> Expression<'arena> {
     }
 
     #[inline]
+    #[must_use]
     pub fn is_literal(&self) -> bool {
         if let Expression::Parenthesized(expression) = self {
             expression.expression.is_literal()
@@ -357,6 +367,7 @@ impl<'arena> Expression<'arena> {
     }
 
     #[inline]
+    #[must_use]
     pub fn is_string_literal(&self) -> bool {
         if let Expression::Parenthesized(expression) = self {
             expression.expression.is_string_literal()
@@ -366,6 +377,7 @@ impl<'arena> Expression<'arena> {
     }
 
     #[inline]
+    #[must_use]
     pub fn is_referenceable(&self, include_calls: bool) -> bool {
         match self {
             Expression::Variable(_) => true,
@@ -378,6 +390,7 @@ impl<'arena> Expression<'arena> {
     }
 
     #[inline]
+    #[must_use]
     pub fn get_array_like_elements(&self) -> Option<&[ArrayElement<'arena>]> {
         match self {
             Expression::Parenthesized(expression) => expression.expression.get_array_like_elements(),
@@ -389,6 +402,7 @@ impl<'arena> Expression<'arena> {
     }
 
     #[inline]
+    #[must_use]
     pub const fn node_kind(&self) -> NodeKind {
         match &self {
             Expression::Binary(_) => NodeKind::Binary,
