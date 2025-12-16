@@ -46,13 +46,13 @@ These flags control specific, powerful analysis capabilities.
 
 | Option                                | Default | Description                                                                                          |
 | :------------------------------------ | :------ | :--------------------------------------------------------------------------------------------------- |
-| `find-unused-expressions`             | `true`  | Find and report expressions whose results are not used (e.g., `$a + $b;`).                           |
-| `find-unused-definitions`             | `true`  | Find and report unused definitions (e.g., private methods that are never called).                    |
-| `analyze-dead-code`                   | `true`  | Analyze code that appears to be unreachable.                                                         |
-| `memoize-properties`                  | `false` | Track the literal values of class properties. Improves type inference but may increase memory usage. |
+| `find-unused-expressions`             | `false` | Find and report expressions whose results are not used (e.g., `$a + $b;`).                           |
+| `find-unused-definitions`             | `false` | Find and report unused definitions (e.g., private methods that are never called).                    |
+| `analyze-dead-code`                   | `false` | Analyze code that appears to be unreachable.                                                         |
+| `memoize-properties`                  | `true`  | Track the literal values of class properties. Improves type inference but may increase memory usage. |
 | `allow-possibly-undefined-array-keys` | `true`  | Allow accessing array keys that may not be defined without reporting an issue.                       |
-| `check-throws`                        | `true`  | Check for unhandled thrown exceptions that are not caught or documented with `@throws`.              |
-| `perform-heuristic-checks`            | `true`  | Perform extra heuristic checks for potential issues that are not strict typing errors.               |
+| `check-throws`                        | `false` | Check for unhandled thrown exceptions that are not caught or documented with `@throws`.              |
+| `perform-heuristic-checks`            | `false` | Perform extra heuristic checks for potential issues that are not strict typing errors.               |
 | `strict-list-index-checks`            | `false` | When `true`, requires any integer used as a `list` index to be provably non-negative.                |
 | `no-boolean-literal-comparison`       | `false` | When `true`, disallows direct comparison to boolean literals (e.g., `$a === true`).                  |
 | `check-missing-type-hints`            | `false` | When `true`, reports missing type hints on parameters, properties, and return types.                 |
