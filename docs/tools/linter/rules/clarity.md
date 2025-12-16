@@ -10,6 +10,7 @@ This document details the rules available in the `Clarity` category.
 | Rule | Code |
 | :--- | :---------- |
 | Explicit Octal | [`explicit-octal`](#explicit-octal) |
+| Instanceof Stringable | [`instanceof-stringable`](#instanceof-stringable) |
 | Literal Named Argument | [`literal-named-argument`](#literal-named-argument) |
 | No Empty | [`no-empty`](#no-empty) |
 | No Hash Emoji | [`no-hash-emoji`](#no-hash-emoji) |
@@ -56,6 +57,56 @@ $a = 0o123;
 <?php
 
 $a = 0123;
+```
+
+
+## <a id="instanceof-stringable"></a>`instanceof-stringable`
+
+Detects the legacy pattern `is_object($x) && method_exists($x, '__toString')` and suggests
+replacing it with `$x instanceof Stringable` for improved readability and performance.
+
+Since PHP 8.0, all classes with `__toString()` automatically implement the `Stringable` interface.
+
+
+### Requirements
+
+- **PHP version:** >= `8.0.0`
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `true` |
+| `level` | `string` | `"warning"` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+
+function stringify(mixed $value): string {
+    if ($value instanceof Stringable) {
+        return (string) $value;
+    }
+
+    return '';
+}
+```
+
+#### Incorrect code
+
+```php
+<?php
+
+function stringify(mixed $value): string {
+    if (is_object($value) && method_exists($value, '__toString')) {
+        return (string) $value;
+    }
+
+    return '';
+}
 ```
 
 
