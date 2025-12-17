@@ -188,9 +188,9 @@ pub enum IssueCode {
     NonExistentClassLike,
     NonExistentConstant,
     NonExistentFunction,
-    NonExistentUseImport,
     NonExistentMethod,
     NonExistentProperty,
+    NonExistentUseImport,
     NonIterableObjectIteration,
     NonStaticAbstractImplementation,
     NullArgument,
@@ -292,7 +292,6 @@ pub enum IssueCode {
 }
 
 impl IssueCode {
-    #[must_use]
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::AbstractClassUsedAsAttribute => "abstract-class-used-as-attribute",
@@ -482,9 +481,9 @@ impl IssueCode {
             Self::NonExistentClassLike => "non-existent-class-like",
             Self::NonExistentConstant => "non-existent-constant",
             Self::NonExistentFunction => "non-existent-function",
-            Self::NonExistentUseImport => "non-existent-use-import",
             Self::NonExistentMethod => "non-existent-method",
             Self::NonExistentProperty => "non-existent-property",
+            Self::NonExistentUseImport => "non-existent-use-import",
             Self::NonIterableObjectIteration => "non-iterable-object-iteration",
             Self::NonStaticAbstractImplementation => "non-static-abstract-implementation",
             Self::NullArgument => "null-argument",
@@ -586,7 +585,6 @@ impl IssueCode {
         }
     }
 
-    #[must_use]
     pub fn as_u16(&self) -> u16 {
         *self as u16
     }
@@ -784,9 +782,9 @@ impl std::str::FromStr for IssueCode {
             "non-existent-class-like" => Ok(Self::NonExistentClassLike),
             "non-existent-constant" => Ok(Self::NonExistentConstant),
             "non-existent-function" => Ok(Self::NonExistentFunction),
-            "non-existent-use-import" => Ok(Self::NonExistentUseImport),
             "non-existent-method" => Ok(Self::NonExistentMethod),
             "non-existent-property" => Ok(Self::NonExistentProperty),
+            "non-existent-use-import" => Ok(Self::NonExistentUseImport),
             "non-iterable-object-iteration" => Ok(Self::NonIterableObjectIteration),
             "non-static-abstract-implementation" => Ok(Self::NonStaticAbstractImplementation),
             "null-argument" => Ok(Self::NullArgument),
