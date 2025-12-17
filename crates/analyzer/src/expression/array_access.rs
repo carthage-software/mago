@@ -97,6 +97,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ArrayAccess<'arena> {
 mod tests {
     use indoc::indoc;
 
+    use crate::code::IssueCode;
     use crate::test_analysis;
 
     test_analysis! {
@@ -121,5 +122,28 @@ mod tests {
                 return $old;
             }
         "},
+    }
+
+    test_analysis! {
+        name = negated_isset_narrows_parent_array_type,
+        code = indoc! {r#"
+            <?php
+
+            /**
+             * @return array{foo?: array{bar?: string}}
+             */
+            function y(): array { return []; }
+
+            $y = y();
+
+            if (isset($y['foo']) && !isset($y['foo']['bar'])) {
+                echo $y['foo']['bar'];
+                echo $y['foo']['baz'];
+            }
+        "#},
+        issues = [
+            IssueCode::UndefinedStringArrayIndex,  // $y['foo']['bar']
+            IssueCode::UndefinedStringArrayIndex,  // $y['foo']['baz']
+        ],
     }
 }

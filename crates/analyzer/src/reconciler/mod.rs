@@ -184,20 +184,31 @@ pub fn reconcile_keyed_types<'ctx>(
 
         let result_type = result_type.unwrap_or_else(get_never);
 
+        let key_parts = break_up_path_into_parts(key_str);
+
         if !did_type_exist && result_type.is_never() {
+            // Even when the type doesn't exist and result is never, we still need to
+            // update parent array types for negated isset/key_exists to remove the key
+            if key_str.ends_with(']') && (has_inverted_isset || has_inverted_key_exists) {
+                adjust_array_type_remove_key(key_parts.clone(), block_context, changed_var_ids);
+            }
+
             continue;
         }
 
         let type_changed =
             if let Some(before_adjustment) = &before_adjustment { &result_type != before_adjustment } else { true };
 
-        let key_parts = break_up_path_into_parts(key_str);
         if type_changed {
             changed_var_ids.insert(*key);
 
             if key_str.ends_with(']') && !has_inverted_isset && !has_inverted_key_exists && !has_empty && !is_equality {
                 adjust_array_type(key_parts.clone(), block_context, changed_var_ids, &result_type);
-            } else if key_str != "$this" {
+            } else if key_str.ends_with(']') && (has_inverted_isset || has_inverted_key_exists) {
+                adjust_array_type_remove_key(key_parts.clone(), block_context, changed_var_ids);
+            }
+
+            if key_str != "$this" {
                 let mut removable_keys: Vec<Atom> = Vec::new();
                 for new_key in block_context.locals.keys() {
                     if new_key == key {
@@ -330,6 +341,79 @@ fn adjust_array_type(
                     } else {
                         *known_elements = Some(BTreeMap::from([(arraykey_offset, (false, result_type.clone()))]));
                     }
+                }
+            }
+            _ => {
+                continue;
+            }
+        }
+
+        changed_var_ids.insert(concat_atom!(&base_key, "[", &array_key, "]"));
+
+        if let Some(last_part) = key_parts.last()
+            && last_part == "]"
+        {
+            adjust_array_type(key_parts.clone(), context, changed_var_ids, &wrap_atomic(base_atomic_type.clone()));
+        }
+    }
+
+    context.locals.insert(base_key_atom, Rc::new(existing_type));
+}
+
+fn adjust_array_type_remove_key(
+    mut key_parts: Vec<String>,
+    context: &mut BlockContext<'_>,
+    changed_var_ids: &mut AtomSet,
+) {
+    key_parts.pop();
+    let Some(array_key) = key_parts.pop() else {
+        return;
+    };
+
+    key_parts.pop();
+
+    if array_key.starts_with('$') {
+        return;
+    }
+
+    let mut has_string_offset = false;
+
+    let arraykey_offset = if array_key.starts_with('\'') || array_key.starts_with('\"') {
+        has_string_offset = true;
+        array_key[1..(array_key.len() - 1)].to_string()
+    } else {
+        array_key.clone()
+    };
+
+    let base_key = key_parts.join("");
+    let base_key_atom = atom(&base_key);
+
+    let mut existing_type = if let Some(existing_type) = context.locals.get(&base_key_atom) {
+        (**existing_type).clone()
+    } else {
+        return;
+    };
+
+    for base_atomic_type in existing_type.types.to_mut() {
+        match base_atomic_type {
+            TAtomic::Array(TArray::Keyed(TKeyedArray { known_items, .. })) => {
+                let dictkey = if has_string_offset {
+                    ArrayKey::String(atom(&arraykey_offset))
+                } else if let Ok(arraykey_value) = arraykey_offset.parse::<i64>() {
+                    ArrayKey::Integer(arraykey_value)
+                } else {
+                    continue;
+                };
+
+                if let Some(known_items) = known_items {
+                    known_items.remove(&dictkey);
+                }
+            }
+            TAtomic::Array(TArray::List(TList { known_elements, .. })) => {
+                if let Ok(arraykey_offset) = arraykey_offset.parse::<usize>()
+                    && let Some(known_elements) = known_elements
+                {
+                    known_elements.remove(&arraykey_offset);
                 }
             }
             _ => {

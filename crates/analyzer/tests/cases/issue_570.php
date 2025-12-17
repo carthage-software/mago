@@ -8,7 +8,7 @@ declare(strict_types=1);
 function x1(array $y): void
 {
     if (isset($y['foo']) && !isset($y['foo']['bar'])) {
-        echo $y['foo']['bar']; // @mago-expect analysis:possibly-undefined-string-array-index
+        echo $y['foo']['bar']; // @mago-expect analysis:undefined-string-array-index
     }
 }
 
@@ -18,6 +18,6 @@ function x1(array $y): void
 function x2(array $y): void
 {
     if (!isset($y['foo']['bar']) && isset($y['foo'])) {
-        echo $y['foo']['bar']; // @mago-expect analysis:possibly-undefined-string-array-index
+        echo $y['foo']['bar']; // @mago-expect analysis:undefined-string-array-index
     }
 }
