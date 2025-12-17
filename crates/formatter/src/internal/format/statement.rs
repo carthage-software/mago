@@ -233,7 +233,19 @@ fn format_statement_with_spacing<'arena>(
         && i != index
     {
         statement_parts.push(Document::Line(Line::hard()));
-        if should_add_empty_line_after(f, stmt) || f.is_next_line_empty(stmt.span()) {
+
+        let should_add_empty_line = if should_add_empty_line_after(f, stmt) {
+            if !f.settings.empty_line_between_same_symbols && is_symbol(stmt) {
+                let next_stmt = stmts.get(i + 1);
+                next_stmt.is_none_or(|next| !is_same_symbol_type(stmt, next))
+            } else {
+                true
+            }
+        } else {
+            false
+        };
+
+        if should_add_empty_line || f.is_next_line_empty(stmt.span()) {
             statement_parts.push(Document::Line(Line::hard()));
         }
     }
@@ -283,6 +295,34 @@ fn should_add_empty_line_before<'arena>(f: &FormatterState<'_, 'arena>, stmt: &'
         Statement::Return(_) => f.settings.empty_line_before_return,
         _ => false,
     }
+}
+
+/// Check if a statement is a symbol (class, enum, interface, trait, function, const).
+#[inline]
+const fn is_symbol(stmt: &Statement<'_>) -> bool {
+    matches!(
+        stmt,
+        Statement::Constant(_)
+            | Statement::Function(_)
+            | Statement::Class(_)
+            | Statement::Interface(_)
+            | Statement::Trait(_)
+            | Statement::Enum(_)
+    )
+}
+
+/// Check if two statements are the same symbol type.
+#[inline]
+const fn is_same_symbol_type(a: &Statement<'_>, b: &Statement<'_>) -> bool {
+    matches!(
+        (a, b),
+        (Statement::Constant(_), Statement::Constant(_))
+            | (Statement::Function(_), Statement::Function(_))
+            | (Statement::Class(_), Statement::Class(_))
+            | (Statement::Interface(_), Statement::Interface(_))
+            | (Statement::Trait(_), Statement::Trait(_))
+            | (Statement::Enum(_), Statement::Enum(_))
+    )
 }
 
 fn should_add_new_line_or_space_after_stmt<'arena>(

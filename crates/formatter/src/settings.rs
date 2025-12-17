@@ -833,6 +833,14 @@ pub struct FormatSettings {
     #[serde(default = "default_true")]
     pub empty_line_after_symbols: bool,
 
+    /// Whether to add an empty line between consecutive symbols of the same type.
+    ///
+    /// Only applies when `empty_line_after_symbols` is true.
+    ///
+    /// Default: true
+    #[serde(default = "default_true")]
+    pub empty_line_between_same_symbols: bool,
+
     /// Whether to add an empty line after class-like constant.
     ///
     /// Note: if an empty line already exists, it will be preserved regardless of this
@@ -963,6 +971,7 @@ impl Default for FormatSettings {
             empty_line_after_namespace: true,
             empty_line_after_use: true,
             empty_line_after_symbols: true,
+            empty_line_between_same_symbols: true,
             empty_line_after_class_like_constant: false,
             empty_line_after_enum_case: false,
             empty_line_after_trait_use: false,

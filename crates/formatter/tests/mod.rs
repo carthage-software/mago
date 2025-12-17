@@ -146,6 +146,7 @@ test_case!(line_options);
 test_case!(line_options_flipped);
 test_case!(line_options_all_on);
 test_case!(line_options_all_off);
+test_case!(blank_line_between_same_symbols_disabled);
 test_case!(whitespace_in_heredoc);
 test_case!(shell_style_comments);
 test_case!(double_slash_comments);
