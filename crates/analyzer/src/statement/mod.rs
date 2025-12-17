@@ -37,6 +37,7 @@ pub mod r#static;
 pub mod switch;
 pub mod r#try;
 pub mod unset;
+pub mod use_statement;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for Statement<'arena> {
     fn analyze<'ctx>(
@@ -106,6 +107,9 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Statement<'arena> {
             }
             Statement::Use(r#use) => {
                 context.scope.populate_from_use(r#use);
+                if context.settings.check_use_statements {
+                    r#use.analyze(context, block_context, artifacts)?;
+                }
 
                 Ok(())
             }

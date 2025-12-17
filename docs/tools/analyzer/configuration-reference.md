@@ -62,6 +62,7 @@ These flags control specific, powerful analysis capabilities.
 | `register-super-globals`              | `true`  | Automatically register PHP superglobals (e.g., `$_GET`, `$_POST`) for analysis.                      |
 | `trust-existence-checks`              | `true`  | When `true`, narrows types based on `method_exists()`, `property_exists()`, `function_exists()`, and `defined()` checks. |
 | `check-property-initialization`       | `false` | When `true`, checks that typed properties are initialized in constructors or class initializers.      |
+| `check-use-statements`                | `false` | When `true`, reports use statements that import non-existent classes, functions, or constants.        |
 
 ## Property initialization
 

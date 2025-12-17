@@ -139,6 +139,7 @@ pub struct WasmAnalyzerSettings {
     pub trust_existence_checks: bool,
     pub class_initializers: Vec<String>,
     pub check_property_initialization: bool,
+    pub check_use_statements: bool,
 }
 
 impl Default for WasmAnalyzerSettings {
@@ -163,6 +164,7 @@ impl Default for WasmAnalyzerSettings {
             trust_existence_checks: true,
             class_initializers: Vec::new(),
             check_property_initialization: false,
+            check_use_statements: false,
         }
     }
 }

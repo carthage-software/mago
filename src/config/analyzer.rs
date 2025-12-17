@@ -166,6 +166,15 @@ pub struct AnalyzerConfiguration {
     /// Defaults to `false`.
     pub check_property_initialization: bool,
 
+    /// Check for non-existent symbols in use statements.
+    ///
+    /// When enabled, the analyzer will report use statements that import symbols
+    /// (classes, interfaces, traits, enums, functions, or constants) that do not exist
+    /// in the codebase.
+    ///
+    /// Defaults to `false`.
+    pub check_use_statements: bool,
+
     /// **Deprecated**: Use `check-missing-override` and `find-unused-parameters` instead.
     ///
     /// When set to `true`, enables both `check-missing-override` and `find-unused-parameters`.
@@ -209,6 +218,7 @@ impl AnalyzerConfiguration {
             trust_existence_checks: self.trust_existence_checks,
             class_initializers: self.class_initializers.iter().map(|s| ascii_lowercase_atom(s.as_str())).collect(),
             check_property_initialization: self.check_property_initialization,
+            check_use_statements: self.check_use_statements,
         }
     }
 }
@@ -241,6 +251,7 @@ impl Default for AnalyzerConfiguration {
             trust_existence_checks: defaults.trust_existence_checks,
             class_initializers: vec![],
             check_property_initialization: defaults.check_property_initialization,
+            check_use_statements: defaults.check_use_statements,
             perform_heuristic_checks: None,
         }
     }

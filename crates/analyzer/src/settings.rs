@@ -161,6 +161,15 @@ pub struct Settings {
     ///
     /// Defaults to `false`.
     pub check_property_initialization: bool,
+
+    /// Check for non-existent symbols in use statements.
+    ///
+    /// When enabled, the analyzer will report use statements that import symbols
+    /// (classes, interfaces, traits, enums, functions, or constants) that do not exist
+    /// in the codebase.
+    ///
+    /// Defaults to `false`.
+    pub check_use_statements: bool,
 }
 
 impl Default for Settings {
@@ -195,6 +204,7 @@ impl Settings {
             trust_existence_checks: true,
             class_initializers: AtomSet::default(),
             check_property_initialization: false,
+            check_use_statements: false,
         }
     }
 }

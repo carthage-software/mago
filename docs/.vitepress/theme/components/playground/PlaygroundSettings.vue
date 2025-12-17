@@ -120,6 +120,11 @@ const analyzerOptions = [
     key: 'checkPropertyInitialization',
     label: 'Check property initialization',
     description: 'Report uninitialized typed properties that may be accessed before assignment',
+  },
+  {
+    key: 'checkUseStatements',
+    label: 'Check use statements',
+    description: 'Report use statements that import non-existent classes, functions, or constants',
   }
 ];
 
