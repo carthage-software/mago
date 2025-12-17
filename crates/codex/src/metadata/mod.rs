@@ -495,6 +495,18 @@ impl CodebaseMetadata {
         self.class_likes.get(&lowercase_class).is_some_and(|meta| meta.used_traits.contains(&lowercase_trait))
     }
 
+    /// Checks if a trait has `@require-extends` for a class (case-insensitive).
+    /// Returns true if the trait requires extending the specified class or any of its parents.
+    #[inline]
+    #[must_use]
+    pub fn trait_requires_extends(&self, trait_name: &str, class_name: &str) -> bool {
+        let lowercase_trait = ascii_lowercase_atom(trait_name);
+
+        self.class_likes
+            .get(&lowercase_trait)
+            .is_some_and(|meta| meta.require_extends.iter().any(|required| self.is_instance_of(class_name, required)))
+    }
+
     /// Checks if child is an instance of parent (via extends or implements).
     #[inline]
     #[must_use]
@@ -513,6 +525,9 @@ impl CodebaseMetadata {
         self.class_likes.get(&lowercase_child).is_some_and(|meta| {
             meta.all_parent_classes.contains(&lowercase_parent)
                 || meta.all_parent_interfaces.contains(&lowercase_parent)
+                || meta.used_traits.contains(&lowercase_parent)
+                || meta.require_extends.contains(&lowercase_parent)
+                || meta.require_implements.contains(&lowercase_parent)
         })
     }
 
