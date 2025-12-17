@@ -18,6 +18,7 @@ This document details the rules available in the `Clarity` category.
 | No Nested Ternary | [`no-nested-ternary`](#no-nested-ternary) |
 | No Shorthand Ternary | [`no-shorthand-ternary`](#no-shorthand-ternary) |
 | No Variable Variable | [`no-variable-variable`](#no-variable-variable) |
+| Readable Literal | [`readable-literal`](#readable-literal) |
 | Str Contains | [`str-contains`](#str-contains) |
 | Str Starts With | [`str-starts-with`](#str-starts-with) |
 | Tagged FIXME | [`tagged-fixme`](#tagged-fixme) |
@@ -380,6 +381,46 @@ $foo = 'bar';
 $varName = 'foo';
 
 echo $$varName; // Outputs 'bar'
+```
+
+
+## <a id="readable-literal"></a>`readable-literal`
+
+Enforces using underscore separators in numeric literals for improved readability.
+
+
+### Requirements
+
+- **PHP version:** >= `7.4.0`
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `false` |
+| `level` | `string` | `"warning"` |
+| `min-digits` | `integer` | `5` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+
+$a = 1_000_000;
+$b = 0xCAFE_F00D;
+$c = 0b0101_1111;
+```
+
+#### Incorrect code
+
+```php
+<?php
+
+$a = 1000000;
+$b = 0xCAFEF00D;
+$c = 0b01011111;
 ```
 
 
