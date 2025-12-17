@@ -106,7 +106,7 @@ use crate::document::Space;
 use crate::document::Trim;
 use crate::internal::FormatterState;
 use crate::internal::format::assignment::AssignmentLikeNode;
-use crate::internal::format::assignment::print_assignment;
+use crate::internal::format::assignment::print_assignment_with_alignment;
 use crate::internal::format::block::print_block_of_nodes;
 use crate::internal::format::call_node::CallLikeNode;
 use crate::internal::format::call_node::print_call_like_node;
@@ -122,6 +122,7 @@ use crate::internal::utils;
 use crate::settings::NullTypeHint;
 use crate::wrap;
 
+pub mod alignment;
 pub mod array;
 pub mod assignment;
 pub mod binaryish;
@@ -790,12 +791,13 @@ impl<'arena> Format<'arena> for ClassLikeConstantItem<'arena> {
         wrap!(f, self, ClassLikeConstantItem, {
             let lhs = self.name.format(f);
 
-            print_assignment(
+            print_assignment_with_alignment(
                 f,
                 AssignmentLikeNode::ClassLikeConstantItem(self),
                 lhs,
                 Document::String("="),
                 &self.value,
+                f.alignment_context(),
             )
         })
     }
@@ -843,7 +845,14 @@ impl<'arena> Format<'arena> for EnumCaseBackedItem<'arena> {
             let lhs = self.name.format(f);
             let operator = Document::String("=");
 
-            print_assignment(f, AssignmentLikeNode::EnumCaseBackedItem(self), lhs, operator, &self.value)
+            print_assignment_with_alignment(
+                f,
+                AssignmentLikeNode::EnumCaseBackedItem(self),
+                lhs,
+                operator,
+                &self.value,
+                f.alignment_context(),
+            )
         })
     }
 }
@@ -885,6 +894,14 @@ impl<'arena> Format<'arena> for PlainProperty<'arena> {
                 }
 
                 contents.push(h.format(f));
+
+                // Add type padding for alignment if in an alignment context
+                if let Some(alignment) = f.alignment_context()
+                    && alignment.type_padding > 0
+                {
+                    contents.push(Document::String(f.as_str(" ".repeat(alignment.type_padding))));
+                }
+
                 should_add_space = true;
             }
 
@@ -979,7 +996,14 @@ impl<'arena> Format<'arena> for PropertyConcreteItem<'arena> {
             let lhs = self.variable.format(f);
             let operator = Document::String("=");
 
-            print_assignment(f, AssignmentLikeNode::PropertyConcreteItem(self), lhs, operator, &self.value)
+            print_assignment_with_alignment(
+                f,
+                AssignmentLikeNode::PropertyConcreteItem(self),
+                lhs,
+                operator,
+                &self.value,
+                f.alignment_context(),
+            )
         })
     }
 }
@@ -1273,9 +1297,15 @@ impl<'arena> Format<'arena> for ConstantItem<'arena> {
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
         wrap!(f, self, ConstantItem, {
             let lhs = self.name.format(f);
-            let operator = Document::String("=");
 
-            print_assignment(f, AssignmentLikeNode::ConstantItem(self), lhs, operator, &self.value)
+            print_assignment_with_alignment(
+                f,
+                AssignmentLikeNode::ConstantItem(self),
+                lhs,
+                Document::String("="),
+                &self.value,
+                f.alignment_context(),
+            )
         })
     }
 }

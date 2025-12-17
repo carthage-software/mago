@@ -7,8 +7,12 @@ use bumpalo::vec;
 use mago_span::HasSpan;
 use mago_span::Span;
 use mago_syntax::ast::ClassLikeMember;
+use mago_syntax::ast::EnumCaseItem;
 use mago_syntax::ast::Method;
 use mago_syntax::ast::Modifier;
+use mago_syntax::ast::PlainProperty;
+use mago_syntax::ast::Property;
+use mago_syntax::ast::PropertyItem;
 use mago_syntax::ast::Sequence;
 
 use crate::document::Document;
@@ -18,6 +22,10 @@ use crate::document::Line;
 use crate::document::group::GroupIdentifier;
 use crate::internal::FormatterState;
 use crate::internal::format::Format;
+use crate::internal::format::alignment::AlignmentWidths;
+use crate::internal::format::alignment::detect_class_member_alignment_runs;
+use crate::internal::format::alignment::get_member_alignment;
+use crate::internal::format::assignment::AssignmentAlignment;
 use crate::internal::format::block::block_is_empty;
 use crate::settings::BraceStyle;
 
@@ -65,6 +73,8 @@ pub fn print_class_like_body<'arena>(
             } else {
                 class_like_members.iter().collect_in::<Vec<_>>(f.arena)
             };
+
+            let alignment_runs = detect_class_member_alignment_runs(f, class_like_members.as_slice());
 
             let mut i = 0;
             let mut formatted_count = 0;
@@ -141,7 +151,14 @@ pub fn print_class_like_body<'arena>(
                     members.push(Document::Line(Line::hard()));
                 }
 
+                if let Some(widths) = get_member_alignment(&alignment_runs, i) {
+                    let alignment = calculate_member_alignment(item, &widths);
+                    f.set_alignment_context(Some(alignment));
+                }
+
                 members.push(item.format(f));
+
+                f.set_alignment_context(None);
 
                 if i < (length - 1) {
                     members.push(Document::Line(Line::hard()));
@@ -357,4 +374,42 @@ fn get_visibility_order(modifiers: &Sequence<'_, Modifier<'_>>) -> u8 {
         // Default to public if no visibility specified
         0
     }
+}
+
+/// Calculate alignment padding for a class member based on the run's max widths.
+fn calculate_member_alignment(member: &ClassLikeMember<'_>, widths: &AlignmentWidths) -> AssignmentAlignment {
+    let (current_type_width, current_name_width) = match member {
+        ClassLikeMember::Property(Property::Plain(p)) => {
+            let type_width = get_plain_property_type_width(p);
+            let name_width = p
+                .items
+                .iter()
+                .filter_map(|item| {
+                    if matches!(item, PropertyItem::Concrete(_)) { Some(item.variable().name.len()) } else { None }
+                })
+                .max()
+                .unwrap_or(0);
+            (type_width, name_width)
+        }
+        ClassLikeMember::Constant(constant) => {
+            (0, constant.items.iter().map(|item| item.name.value.len()).max().unwrap_or(0))
+        }
+        ClassLikeMember::EnumCase(case) => {
+            if let EnumCaseItem::Backed(backed) = &case.item {
+                (0, backed.name.value.len())
+            } else {
+                (0, 0)
+            }
+        }
+        _ => (0, 0),
+    };
+
+    let type_padding = widths.type_width.saturating_sub(current_type_width);
+    let name_padding = widths.name_width.saturating_sub(current_name_width);
+
+    AssignmentAlignment { type_padding, name_padding }
+}
+
+fn get_plain_property_type_width(prop: &PlainProperty<'_>) -> usize {
+    prop.hint.as_ref().map_or(0, |h| h.span().length() as usize)
 }

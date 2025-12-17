@@ -208,6 +208,16 @@ test_case!(class_member_format_ignore_next_hooked_property);
 test_case!(class_member_format_ignore_next_interface_constant);
 test_case!(class_member_format_ignore_next_backed_enum);
 test_case!(class_member_format_ignore_in_nested_anonymous_class);
+test_case!(align_assignment_like);
+test_case!(align_statement_like);
+test_case!(align_array_like);
+test_case!(align_variable_assignments);
+test_case!(align_class_properties);
+test_case!(align_class_constants);
+test_case!(align_global_constants);
+test_case!(align_enum_cases);
+test_case!(align_run_breaking);
+test_case!(align_modifier_breaking);
 
 // A special test case for regressions in the Psl codebase
 test_case!(psl_regressions);

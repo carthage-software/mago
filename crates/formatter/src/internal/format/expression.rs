@@ -105,6 +105,7 @@ use crate::internal::format::array::ArrayLike;
 use crate::internal::format::array::print_array_like;
 use crate::internal::format::assignment::AssignmentLikeNode;
 use crate::internal::format::assignment::print_assignment;
+use crate::internal::format::assignment::print_assignment_with_alignment;
 use crate::internal::format::binaryish;
 use crate::internal::format::binaryish::BinaryishOperator;
 use crate::internal::format::call_arguments::print_argument_list;
@@ -405,12 +406,13 @@ impl<'arena> Format<'arena> for KeyValueArrayElement<'arena> {
             let lhs = self.key.format(f);
             let operator = Document::String("=>");
 
-            Document::Group(Group::new(vec![in f.arena; print_assignment(
+            Document::Group(Group::new(vec![in f.arena; print_assignment_with_alignment(
                 f,
                 AssignmentLikeNode::KeyValueArrayElement(self),
                 lhs,
                 operator,
                 self.value,
+                f.alignment_context(),
             )]))
         })
     }
@@ -687,7 +689,14 @@ impl<'arena> Format<'arena> for Assignment<'arena> {
                 AssignmentOperator::Coalesce(_) => Document::String("??="),
             };
 
-            print_assignment(f, AssignmentLikeNode::AssignmentOperation(self), lhs, operator, self.rhs)
+            print_assignment_with_alignment(
+                f,
+                AssignmentLikeNode::AssignmentOperation(self),
+                lhs,
+                operator,
+                self.rhs,
+                f.alignment_context(),
+            )
         })
     }
 }

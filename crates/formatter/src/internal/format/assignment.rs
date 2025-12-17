@@ -1,3 +1,4 @@
+use bumpalo::collections::Vec;
 use bumpalo::vec;
 
 use mago_span::HasSpan;
@@ -34,6 +35,15 @@ use crate::internal::format::misc::is_breaking_expression;
 use crate::internal::format::misc::is_simple_expression;
 use crate::internal::utils::string_width;
 use crate::internal::utils::unwrap_parenthesized;
+
+/// Alignment information for assignment-like constructs.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct AssignmentAlignment {
+    /// Padding to add after the type hint (for properties with different type widths).
+    pub type_padding: usize,
+    /// Padding to add after the name (before the `=` or `=>` operator).
+    pub name_padding: usize,
+}
 
 /// Represents nodes in the Abstract Syntax Tree (AST) that involve assignment-like operations.
 #[derive(Debug, Clone, Copy)]
@@ -92,6 +102,39 @@ pub(super) fn print_assignment<'arena>(
     operator: Document<'arena>,
     rhs_expression: &'arena Expression<'arena>,
 ) -> Document<'arena> {
+    print_assignment_with_alignment(f, assignment_node, lhs, operator, rhs_expression, None)
+}
+
+pub(super) fn print_assignment_with_alignment<'arena>(
+    f: &mut FormatterState<'_, 'arena>,
+    assignment_node: AssignmentLikeNode<'arena>,
+    lhs: Document<'arena>,
+    operator: Document<'arena>,
+    rhs_expression: &'arena Expression<'arena>,
+    alignment: Option<AssignmentAlignment>,
+) -> Document<'arena> {
+    if let Some(align) = alignment {
+        let rhs = rhs_expression.format(f);
+
+        let padding = if align.name_padding > 0 {
+            let mut spaces = Vec::with_capacity_in(align.name_padding, f.arena);
+            spaces.resize(align.name_padding, b' ');
+            Document::String(unsafe { std::str::from_utf8_unchecked(spaces.into_bump_slice()) })
+        } else {
+            Document::empty()
+        };
+
+        return Document::Array(vec![
+            in f.arena;
+            lhs,
+            padding,
+            Document::space(),
+            operator,
+            Document::space(),
+            rhs,
+        ]);
+    }
+
     let layout = choose_layout(f, &lhs, &assignment_node, rhs_expression);
     let rhs = rhs_expression.format(f);
 

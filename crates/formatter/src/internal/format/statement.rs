@@ -25,6 +25,8 @@ use mago_syntax::ast::UseItem;
 use mago_syntax::ast::UseItems;
 use mago_syntax::ast::UseType;
 
+use mago_syntax::ast::Expression;
+
 use crate::document::Align;
 use crate::document::Document;
 use crate::document::Group;
@@ -33,6 +35,10 @@ use crate::document::Trim;
 use crate::internal::FormatterState;
 use crate::internal::comment::CommentFlags;
 use crate::internal::format::Format;
+use crate::internal::format::alignment::AlignmentWidths;
+use crate::internal::format::alignment::detect_statement_ref_alignment_runs;
+use crate::internal::format::alignment::get_statement_alignment;
+use crate::internal::format::assignment::AssignmentAlignment;
 
 pub fn print_statement_sequence<'arena>(
     f: &mut FormatterState<'_, 'arena>,
@@ -49,6 +55,9 @@ fn print_statement_slice<'ctx, 'arena>(
 ) -> Vec<'arena, Document<'arena>> {
     let mut use_statements: std::vec::Vec<&'arena Use<'arena>> = std::vec::Vec::new();
     let mut parts = vec![in f.arena;];
+
+    // Detect alignment runs for consecutive assignment statements and global constants
+    let alignment_runs = detect_statement_ref_alignment_runs(f, stmts);
 
     let last_statement_index = if stmts.is_empty() { None } else { stmts.len().checked_sub(1) };
     let mut i = 0;
@@ -140,7 +149,14 @@ fn print_statement_slice<'ctx, 'arena>(
             }
         }
 
+        if let Some(widths) = get_statement_alignment(&alignment_runs, i) {
+            let alignment = calculate_statement_alignment(stmt, &widths);
+            f.set_alignment_context(Some(alignment));
+        }
+
         let mut formatted_statement = format_statement_with_spacing(f, i, stmt, stmts, last_statement_index, i == 0);
+
+        f.set_alignment_context(None);
 
         if let Statement::OpeningTag(tag) = stmt {
             let offset = tag.span().start.offset;
@@ -724,4 +740,26 @@ pub fn sort_maybe_typed_use_items<'arena>(
     });
 
     items
+}
+
+fn calculate_statement_alignment(stmt: &Statement<'_>, widths: &AlignmentWidths) -> AssignmentAlignment {
+    let current_name_width = match stmt {
+        Statement::Expression(expr_stmt) => {
+            if let Expression::Assignment(assign) = &expr_stmt.expression {
+                if let Expression::Variable(var) = assign.lhs {
+                    (var.span().end.offset - var.span().start.offset) as usize
+                } else {
+                    0
+                }
+            } else {
+                0
+            }
+        }
+        Statement::Constant(constant) => constant.items.iter().map(|item| item.name.value.len()).max().unwrap_or(0),
+        _ => 0,
+    };
+
+    let name_padding = widths.name_width.saturating_sub(current_name_width);
+
+    AssignmentAlignment { type_padding: 0, name_padding }
 }

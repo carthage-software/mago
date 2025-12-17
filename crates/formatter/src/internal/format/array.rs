@@ -31,6 +31,11 @@ use crate::document::Line;
 use crate::document::clone_in_arena;
 use crate::internal::FormatterState;
 use crate::internal::format::Format;
+use crate::internal::format::alignment::AlignmentRun;
+use crate::internal::format::alignment::AlignmentWidths;
+use crate::internal::format::alignment::has_blank_line_between;
+use crate::internal::format::alignment::has_comment_between;
+use crate::internal::format::assignment::AssignmentAlignment;
 use crate::internal::format::misc;
 use crate::internal::format::misc::is_expandable_expression;
 use crate::internal::format::misc::is_string_word_type;
@@ -189,10 +194,24 @@ pub(super) fn print_array_like<'arena>(
                 }
             }
         } else {
-            // Standard formatting without alignment
+            // Check if we should use key-value alignment with align_assignment_like
+            let kv_alignment_runs = detect_array_element_alignment_runs(f, &elements);
+
+            // Standard formatting with optional key-value alignment
             for (i, element) in elements.into_iter().enumerate() {
                 let element_span = element.span();
+
+                // Set alignment context if this element is in an alignment run
+                if let Some(widths) = get_array_element_alignment(&kv_alignment_runs, i) {
+                    let alignment = calculate_array_element_alignment(element, &widths);
+                    f.set_alignment_context(Some(alignment));
+                }
+
                 indent_parts.push(element.format(f));
+
+                // Clear alignment context after formatting
+                f.set_alignment_context(None);
+
                 if i == len - 1 {
                     break;
                 }
@@ -628,4 +647,103 @@ fn get_document_width(doc: &Document<'_>) -> usize {
         Document::IndentIfBreak(indent_if_break) => indent_if_break.contents.iter().map(get_document_width).sum(),
         _ => 0,
     }
+}
+
+/// Detect alignment runs in array elements for key-value pairs.
+fn detect_array_element_alignment_runs<'arena>(
+    f: &FormatterState<'_, 'arena>,
+    elements: &[&'arena ArrayElement<'arena>],
+) -> std::vec::Vec<AlignmentRun> {
+    if !f.settings.align_assignment_like || elements.is_empty() {
+        return std::vec::Vec::new();
+    }
+
+    let mut runs = std::vec::Vec::new();
+    let mut run_start: Option<usize> = None;
+
+    for (i, element) in elements.iter().enumerate() {
+        let is_key_value = matches!(element, ArrayElement::KeyValue(_));
+
+        let should_break_run = run_start.is_some_and(|_start_idx| {
+            if !is_key_value {
+                return true;
+            }
+
+            if i > 0 {
+                let prev_span = elements[i - 1].span();
+                let curr_span = element.span();
+                if has_blank_line_between(f, prev_span, curr_span) || has_comment_between(f, prev_span, curr_span) {
+                    return true;
+                }
+            }
+
+            false
+        });
+
+        if should_break_run {
+            if let Some(start_idx) = run_start
+                && i - start_idx >= 2
+            {
+                let widths = calculate_array_element_widths(&elements[start_idx..i]);
+                runs.push(AlignmentRun::new(start_idx, i, widths));
+            }
+            run_start = None;
+        }
+
+        if is_key_value {
+            if run_start.is_none() {
+                run_start = Some(i);
+            }
+        } else {
+            if let Some(start_idx) = run_start
+                && i - start_idx >= 2
+            {
+                let widths = calculate_array_element_widths(&elements[start_idx..i]);
+                runs.push(AlignmentRun::new(start_idx, i, widths));
+            }
+            run_start = None;
+        }
+    }
+
+    if let Some(start_idx) = run_start {
+        let len = elements.len();
+        if len - start_idx >= 2 {
+            let widths = calculate_array_element_widths(&elements[start_idx..]);
+            runs.push(AlignmentRun::new(start_idx, len, widths));
+        }
+    }
+
+    runs
+}
+
+fn calculate_array_element_widths(elements: &[&ArrayElement<'_>]) -> AlignmentWidths {
+    let mut max_key_width = 0usize;
+
+    for element in elements {
+        if let ArrayElement::KeyValue(kv) = element {
+            let key_width = get_expression_width(kv.key);
+            max_key_width = max_key_width.max(key_width);
+        }
+    }
+
+    AlignmentWidths::new(max_key_width)
+}
+
+fn get_expression_width(expr: &Expression<'_>) -> usize {
+    (expr.span().end.offset - expr.span().start.offset) as usize
+}
+
+fn get_array_element_alignment(runs: &[AlignmentRun], index: usize) -> Option<AlignmentWidths> {
+    runs.iter().find(|run| run.contains(index)).map(|run| run.widths)
+}
+
+fn calculate_array_element_alignment(element: &ArrayElement<'_>, widths: &AlignmentWidths) -> AssignmentAlignment {
+    let current_key_width = match element {
+        ArrayElement::KeyValue(kv) => get_expression_width(kv.key),
+        _ => 0,
+    };
+
+    let name_padding = widths.name_width.saturating_sub(current_key_width);
+
+    AssignmentAlignment { type_padding: 0, name_padding }
 }

@@ -13,6 +13,7 @@ use mago_syntax::ast::Trivia;
 
 use crate::document::group::GroupIdentifier;
 use crate::document::group::GroupIdentifierBuilder;
+use crate::internal::format::assignment::AssignmentAlignment;
 use crate::settings::FormatSettings;
 
 pub mod comment;
@@ -120,6 +121,7 @@ pub struct FormatterState<'ctx, 'arena> {
     is_wrapped_in_parens: bool,
     is_in_inlined_binary_chain: bool,
     halted_compilation: bool,
+    alignment_context: Option<AssignmentAlignment>,
 }
 
 impl<'ctx, 'arena> FormatterState<'ctx, 'arena> {
@@ -162,7 +164,20 @@ impl<'ctx, 'arena> FormatterState<'ctx, 'arena> {
             is_in_inlined_binary_chain: false,
             halted_compilation: false,
             in_script_terminating_statement: false,
+            alignment_context: None,
         }
+    }
+
+    /// Get the current alignment context.
+    #[inline]
+    pub fn alignment_context(&self) -> Option<AssignmentAlignment> {
+        self.alignment_context
+    }
+
+    /// Set the alignment context for the current formatting operation.
+    #[inline]
+    pub fn set_alignment_context(&mut self, context: Option<AssignmentAlignment>) {
+        self.alignment_context = context;
     }
 
     fn next_id(&mut self) -> GroupIdentifier {

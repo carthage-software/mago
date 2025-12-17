@@ -450,6 +450,37 @@ pub struct FormatSettings {
     #[serde(default = "default_true")]
     pub array_table_style_alignment: bool,
 
+    /// Whether to align consecutive assignment-like constructs in columns.
+    ///
+    /// When enabled, consecutive variable assignments, class properties, class constants,
+    /// global constants, array key-value pairs, and backed enum cases are column-aligned.
+    ///
+    /// Example with `true`:
+    /// ```php
+    /// $foo     = 1;
+    /// $b       = 2;
+    /// $ccccccc = 3;
+    ///
+    /// class X {
+    ///     public string       $foo    = 1;
+    ///     public readonly int $barrrr = 2;
+    /// }
+    /// ```
+    ///
+    /// Example with `false`:
+    /// ```php
+    /// $foo = 1;
+    /// $b = 2;
+    /// $ccccccc = 3;
+    /// ```
+    ///
+    /// Note: Blank lines and comments break alignment runs. In class bodies,
+    /// different member types (properties vs constants) are aligned separately.
+    ///
+    /// Default: false
+    #[serde(default = "default_false")]
+    pub align_assignment_like: bool,
+
     /// Whether to sort use statements alphabetically.
     ///
     /// Default: true
@@ -902,6 +933,7 @@ impl Default for FormatSettings {
             parentheses_in_exit_and_die: true,
             parentheses_in_attribute: false,
             array_table_style_alignment: true,
+            align_assignment_like: false,
             always_break_named_arguments_list: false,
             always_break_attribute_named_argument_lists: false,
             preserve_breaking_member_access_chain: false,
