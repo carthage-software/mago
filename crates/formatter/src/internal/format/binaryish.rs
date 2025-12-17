@@ -132,6 +132,35 @@ pub(super) fn print_binaryish_expression<'arena>(
             )
         );
 
+    let is_breaking_concat_in_arg = operator.is_concatenation()
+        && matches!(grandparent, Some(Node::PositionalArgument(_) | Node::NamedArgument(_)))
+        && (matches!(left, Expression::Call(_)) || matches!(right, Expression::Call(_)));
+
+    if is_breaking_concat_in_arg {
+        let has_space_around = match operator {
+            BinaryishOperator::Binary(BinaryOperator::StringConcat(_)) => {
+                f.settings.space_around_concatenation_binary_operator
+            }
+            _ => true,
+        };
+        let group_id = f.next_id();
+
+        return Document::Group(
+            Group::new(vec![
+                in f.arena;
+                left.format(f),
+                Document::IndentIfBreak(IndentIfBreak::new(group_id, vec![
+                    in f.arena;
+                    Document::Line(if has_space_around { Line::default() } else { Line::soft() }),
+                    format_token(f, operator.span(), operator.as_str()),
+                    Document::String(if has_space_around { " " } else { "" }),
+                    right.format(f),
+                ])),
+            ])
+            .with_id(group_id),
+        );
+    }
+
     let parts = print_binaryish_expression_parts(f, left, operator, right, is_inside_parenthesis, false);
 
     if is_inside_parenthesis {
