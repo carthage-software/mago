@@ -414,8 +414,8 @@ pub struct FormatSettings {
     /// );
     /// ```
     ///
-    /// Default: true
-    #[serde(default = "default_true")]
+    /// Default: false
+    #[serde(default = "default_false")]
     pub always_break_named_arguments_list: bool,
 
     /// Whether to always break named argument lists in attributes into multiple lines.
@@ -902,7 +902,7 @@ impl Default for FormatSettings {
             parentheses_in_exit_and_die: true,
             parentheses_in_attribute: false,
             array_table_style_alignment: true,
-            always_break_named_arguments_list: true,
+            always_break_named_arguments_list: false,
             always_break_attribute_named_argument_lists: false,
             preserve_breaking_member_access_chain: false,
             preserve_breaking_argument_list: false,

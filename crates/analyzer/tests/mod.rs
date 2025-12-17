@@ -227,6 +227,7 @@ test_case!(trait_property_static_modifiers);
 test_case!(trait_property_type_conflicts);
 test_case!(trait_property_hierarchy_conflicts);
 test_case!(trait_property_readonly_conflicts);
+test_case!(readonly_class_trait_non_readonly_property);
 test_case!(test_visibility);
 test_case!(test_minimal_static);
 test_case!(interface_template_signatures);
@@ -461,6 +462,9 @@ test_case!(issue_746_part_4);
 test_case!(issue_746_part_5);
 test_case!(issue_746_part_6);
 test_case!(issue_752);
+test_case!(issue_754);
+test_case!(issue_755);
+test_case!(issue_756);
 
 #[test]
 fn test_all_test_cases_are_ran() {

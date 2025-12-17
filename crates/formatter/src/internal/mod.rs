@@ -33,6 +33,71 @@ pub struct ParameterState {
     force_break: bool,
 }
 
+/// A region of source code that should not be formatted.
+#[derive(Debug, Clone, Copy)]
+pub struct IgnoreRegion {
+    /// Start offset (beginning of the @mago-format-ignore-start comment)
+    pub start: u32,
+    /// End offset (end of the @mago-format-ignore-end comment, or EOF)
+    pub end: u32,
+}
+
+/// Markers that indicate the start of an unformatted region.
+const IGNORE_START_MARKERS: [&str; 2] = ["@mago-format-ignore-start", "@mago-formatter-ignore-start"];
+
+/// Markers that indicate the end of an unformatted region.
+const IGNORE_END_MARKERS: [&str; 2] = ["@mago-format-ignore-end", "@mago-formatter-ignore-end"];
+
+/// Markers that indicate the next statement should be ignored.
+const IGNORE_NEXT_MARKERS: [&str; 2] = ["@mago-format-ignore-next", "@mago-formatter-ignore-next"];
+
+/// A marker indicating the next statement should not be formatted.
+#[derive(Debug, Clone, Copy)]
+pub struct IgnoreNextMarker {
+    /// Start offset of the comment containing the marker.
+    pub comment_start: u32,
+    /// End offset of the comment containing the marker.
+    pub comment_end: u32,
+}
+
+/// Scans comments to build a list of ignore regions and ignore-next markers.
+fn build_ignore_markers<'arena>(
+    arena: &'arena Bump,
+    comments: &[Trivia<'arena>],
+    source_len: u32,
+) -> (&'arena [IgnoreRegion], &'arena [IgnoreNextMarker]) {
+    let mut regions = BumpVec::new_in(arena);
+    let mut next_markers = BumpVec::new_in(arena);
+    let mut current_start: Option<u32> = None;
+
+    for comment in comments {
+        let has_start = IGNORE_START_MARKERS.iter().any(|m| comment.value.contains(m));
+        let has_end = IGNORE_END_MARKERS.iter().any(|m| comment.value.contains(m));
+        let has_next = IGNORE_NEXT_MARKERS.iter().any(|m| comment.value.contains(m));
+
+        if has_start && current_start.is_none() {
+            current_start = Some(comment.span.start.offset);
+        } else if has_end && current_start.is_some() {
+            regions.push(IgnoreRegion { start: current_start.unwrap(), end: comment.span.end.offset });
+            current_start = None;
+        }
+
+        if has_next {
+            next_markers.push(IgnoreNextMarker {
+                comment_start: comment.span.start.offset,
+                comment_end: comment.span.end.offset,
+            });
+        }
+    }
+
+    // If start without end, extend to EOF
+    if let Some(start) = current_start {
+        regions.push(IgnoreRegion { start, end: source_len });
+    }
+
+    (regions.into_bump_slice(), next_markers.into_bump_slice())
+}
+
 #[derive(Debug)]
 pub struct FormatterState<'ctx, 'arena> {
     arena: &'arena Bump,
@@ -43,6 +108,9 @@ pub struct FormatterState<'ctx, 'arena> {
     stack: BumpVec<'arena, Node<'arena, 'arena>>,
     all_comments: &'arena [Trivia<'arena>],
     next_comment_index: usize,
+    ignore_regions: &'arena [IgnoreRegion],
+    ignore_next_markers: &'arena [IgnoreNextMarker],
+    next_ignore_next_index: usize,
     scripting_mode: bool,
     id_builder: GroupIdentifierBuilder,
     argument_state: ArgumentState,
@@ -70,6 +138,9 @@ impl<'ctx, 'arena> FormatterState<'ctx, 'arena> {
             .collect_in::<BumpVec<_>>(arena)
             .into_bump_slice();
 
+        let (ignore_regions, ignore_next_markers) =
+            build_ignore_markers(arena, all_comments, program.source_text.len() as u32);
+
         Self {
             arena,
             file,
@@ -79,6 +150,9 @@ impl<'ctx, 'arena> FormatterState<'ctx, 'arena> {
             stack: BumpVec::new_in(arena),
             all_comments,
             next_comment_index: 0,
+            ignore_regions,
+            ignore_next_markers,
+            next_ignore_next_index: 0,
             scripting_mode: false,
             id_builder: GroupIdentifierBuilder::new(),
             argument_state: ArgumentState::default(),
@@ -174,7 +248,7 @@ impl<'ctx, 'arena> FormatterState<'ctx, 'arena> {
     }
 
     #[inline]
-    fn is_next_line_empty_after_index(&self, start_index: u32) -> bool {
+    pub(crate) fn is_next_line_empty_after_index(&self, start_index: u32) -> bool {
         let mut old_idx = None;
         let mut idx = Some(start_index);
         while idx != old_idx {
@@ -384,6 +458,40 @@ impl<'ctx, 'arena> FormatterState<'ctx, 'arena> {
         }
 
         &s[position..]
+    }
+
+    /// Returns the ignore region that contains this offset, if any.
+    pub(crate) fn get_ignore_region_for(&self, offset: u32) -> Option<&IgnoreRegion> {
+        self.ignore_regions.iter().find(|r| offset >= r.start && offset < r.end)
+    }
+
+    /// Get source text slice for a given range.
+    pub(crate) fn get_source_slice(&self, start: u32, end: u32) -> &'arena str {
+        &self.source_text[start as usize..end as usize]
+    }
+
+    /// Advance the comment index past a given offset.
+    pub(crate) fn skip_comments_until(&mut self, end_offset: u32) {
+        while let Some(comment) = self.all_comments.get(self.next_comment_index) {
+            if comment.span.end.offset <= end_offset {
+                self.next_comment_index += 1;
+            } else {
+                break;
+            }
+        }
+    }
+
+    /// Checks if there's an ignore-next marker before this statement and consumes it.
+    /// Returns the marker's start offset if the next statement should be ignored.
+    pub(crate) fn consume_ignore_next_before(&mut self, stmt_start: u32) -> Option<u32> {
+        if let Some(marker) = self.ignore_next_markers.get(self.next_ignore_next_index) {
+            // The marker should be before this statement
+            if marker.comment_end < stmt_start {
+                self.next_ignore_next_index += 1;
+                return Some(marker.comment_start);
+            }
+        }
+        None
     }
 }
 

@@ -1,6 +1,8 @@
 pub mod assert_description;
 pub mod constant_type;
 pub mod identity_comparison;
+pub mod ineffective_format_ignore_next;
+pub mod ineffective_format_ignore_region;
 pub mod invalid_open_tag;
 pub mod no_assign_in_condition;
 pub mod no_boolean_literal_comparison;
@@ -16,6 +18,8 @@ pub mod use_specific_assertions;
 pub use assert_description::*;
 pub use constant_type::*;
 pub use identity_comparison::*;
+pub use ineffective_format_ignore_next::*;
+pub use ineffective_format_ignore_region::*;
 pub use invalid_open_tag::*;
 pub use no_assign_in_condition::*;
 pub use no_boolean_literal_comparison::*;

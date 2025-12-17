@@ -139,6 +139,7 @@ test_case!(preserve_breaking_parameter_list_promoted_properties);
 test_case!(hooks_always_break);
 test_case!(comments_are_preserved);
 test_case!(array_comment);
+test_case!(array_preserve_empty_lines);
 test_case!(spacing_options);
 test_case!(spacing_options_flipped);
 test_case!(line_options);
@@ -246,6 +247,56 @@ test_case!(issue_640);
 test_case!(issue_683);
 test_case!(issue_727);
 test_case!(issue_738);
+
+// Format ignore tests
+test_case!(format_ignore_single_line_comment);
+test_case!(format_ignore_block_comment);
+test_case!(format_ignore_docblock);
+test_case!(format_ignore_hash_comment);
+
+// Range-based format ignore tests
+test_case!(format_ignore_range_basic);
+test_case!(format_ignore_range_no_end);
+test_case!(format_ignore_range_multiple);
+test_case!(format_ignore_range_block_comment);
+test_case!(format_ignore_range_multi_statements);
+
+// Format ignore-next tests
+test_case!(format_ignore_next_basic);
+test_case!(format_ignore_next_multiple);
+
+// Class member format ignore tests
+test_case!(class_member_format_ignore_next);
+test_case!(class_member_format_ignore_region);
+test_case!(class_member_format_ignore_next_trait_use);
+test_case!(class_member_format_ignore_next_enum_case);
+test_case!(class_member_format_ignore_next_with_attributes);
+test_case!(class_member_format_ignore_region_mixed_types);
+test_case!(class_member_format_ignore_in_trait);
+test_case!(class_member_format_ignore_in_interface);
+test_case!(class_member_format_ignore_in_enum);
+test_case!(class_member_format_ignore_in_anonymous_class);
+test_case!(class_member_format_ignore_next_last_member);
+test_case!(class_member_format_ignore_next_multiple_consecutive);
+test_case!(class_member_format_ignore_region_entire_body);
+test_case!(class_member_format_ignore_region_single_member);
+test_case!(class_member_format_ignore_region_standalone_comment);
+test_case!(class_member_format_ignore_next_abstract_method);
+test_case!(class_member_format_ignore_next_static_members);
+test_case!(class_member_format_ignore_next_readonly_property);
+test_case!(class_member_format_ignore_next_promoted_property);
+test_case!(class_member_format_ignore_block_comment);
+test_case!(class_member_format_ignore_hash_comment);
+test_case!(class_member_format_ignore_docblock);
+test_case!(class_member_format_ignore_multiple_regions);
+test_case!(class_member_format_ignore_nested_class);
+test_case!(class_member_format_ignore_next_final_method);
+test_case!(class_member_format_ignore_next_visibility_variations);
+test_case!(class_member_format_ignore_region_with_comments);
+test_case!(class_member_format_ignore_next_hooked_property);
+test_case!(class_member_format_ignore_next_interface_constant);
+test_case!(class_member_format_ignore_next_backed_enum);
+test_case!(class_member_format_ignore_in_nested_anonymous_class);
 
 #[test]
 fn test_all_test_cases_are_ran() {

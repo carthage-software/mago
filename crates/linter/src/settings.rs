@@ -29,6 +29,8 @@ use crate::rule::FinalControllerConfig;
 use crate::rule::FunctionNameConfig;
 use crate::rule::HalsteadConfig;
 use crate::rule::IdentityComparisonConfig;
+use crate::rule::IneffectiveFormatIgnoreNextConfig;
+use crate::rule::IneffectiveFormatIgnoreRegionConfig;
 use crate::rule::InstanceofStringableConfig;
 use crate::rule::InterfaceNameConfig;
 use crate::rule::InvalidOpenTagConfig;
@@ -115,6 +117,8 @@ use crate::rule::PslRandomnessFunctionsConfig;
 use crate::rule::PslRegexFunctionsConfig;
 use crate::rule::PslSleepFunctionsConfig;
 use crate::rule::PslStringFunctionsConfig;
+use crate::rule::ReadableLiteralConfig;
+use crate::rule::RequireNamespaceConfig;
 use crate::rule::RequirePregQuoteDelimiterConfig;
 use crate::rule::ReturnTypeConfig;
 use crate::rule::SensitiveParameterConfig;
@@ -231,6 +235,8 @@ pub struct RulesSettings {
     pub no_alias_function: RuleSettings<NoAliasFunctionConfig>,
     pub lowercase_type_hint: RuleSettings<LowercaseTypeHintConfig>,
     pub identity_comparison: RuleSettings<IdentityComparisonConfig>,
+    pub ineffective_format_ignore_next: RuleSettings<IneffectiveFormatIgnoreNextConfig>,
+    pub ineffective_format_ignore_region: RuleSettings<IneffectiveFormatIgnoreRegionConfig>,
     pub instanceof_stringable: RuleSettings<InstanceofStringableConfig>,
     pub interface_name: RuleSettings<InterfaceNameConfig>,
     pub invalid_open_tag: RuleSettings<InvalidOpenTagConfig>,
@@ -281,6 +287,8 @@ pub struct RulesSettings {
     pub middleware_in_routes: RuleSettings<MiddlewareInRoutesConfig>,
     pub use_compound_assignment: RuleSettings<UseCompoundAssignmentConfig>,
     pub require_preg_quote_delimiter: RuleSettings<RequirePregQuoteDelimiterConfig>,
+    pub require_namespace: RuleSettings<RequireNamespaceConfig>,
+    pub readable_literal: RuleSettings<ReadableLiteralConfig>,
     pub yoda_conditions: RuleSettings<YodaConditionsConfig>,
     pub use_wp_functions: RuleSettings<UseWpFunctionsConfig>,
     pub no_direct_db_query: RuleSettings<NoDirectDbQueryConfig>,

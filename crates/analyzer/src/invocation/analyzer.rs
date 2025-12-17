@@ -167,6 +167,10 @@ pub fn analyze_invocation<'ctx, 'arena>(
 
         let parameter = get_parameter_of_argument(&parameter_refs, argument, *argument_offset);
         let mut parameter_type_had_template_types = false;
+        // Store the original unreplaced type for template inference, so closure return types
+        // can contribute bounds even after other arguments have already inferred some bounds.
+        // See: https://github.com/carthage-software/mago/issues/755
+        let mut base_parameter_type_for_inference: Option<TUnion> = None;
         let parameter_type = if let Some((_, parameter_ref)) = parameter {
             let base_parameter_type = get_parameter_type(
                 context,
@@ -178,6 +182,8 @@ pub fn analyze_invocation<'ctx, 'arena>(
 
             if base_parameter_type.has_template_types() {
                 parameter_type_had_template_types = true;
+                // Store the original type before replacement for inference
+                base_parameter_type_for_inference = Some(base_parameter_type.clone());
                 let mut replaced_type =
                     inferred_type_replacer::replace(&base_parameter_type, template_result, context.codebase);
                 if replaced_type.is_expandable() {
@@ -211,13 +217,15 @@ pub fn analyze_invocation<'ctx, 'arena>(
             parameter_type.as_ref(),
         )?;
 
+        // Use the original unreplaced type for inference to allow closure return types
+        // to contribute bounds that can widen literal types from other arguments.
         if parameter_type_had_template_types
             && let Some(argument_type) = analyzed_argument_types.get(argument_offset)
-            && let Some(parameter_type) = parameter_type
+            && let Some(base_type) = &base_parameter_type_for_inference
         {
             infer_parameter_templates_from_argument(
                 context,
-                &parameter_type,
+                base_type,
                 &argument_type.0,
                 template_result,
                 *argument_offset,

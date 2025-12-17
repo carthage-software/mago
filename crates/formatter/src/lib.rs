@@ -24,6 +24,9 @@ pub mod settings;
 
 mod internal;
 
+/// Markers that indicate a file should not be formatted.
+const FORMAT_IGNORE_MARKERS: [&str; 2] = ["@mago-format-ignore", "@mago-formatter-ignore"];
+
 /// The main entry point for formatting PHP code.
 ///
 /// The `Formatter` orchestrates the entire formatting process, from parsing
@@ -96,6 +99,11 @@ impl<'arena> Formatter<'arena> {
     /// manipulation of the layout before rendering.
     #[must_use]
     pub fn build(&self, file: &File, program: &'arena Program<'arena>) -> Document<'arena> {
+        // Check for format-ignore directive in comments
+        if has_format_ignore_comment(program) {
+            return Document::String(program.source_text);
+        }
+
         program.format(&mut FormatterState::new(self.arena, program, file, self.php_version, self.settings))
     }
 
@@ -116,4 +124,19 @@ impl<'arena> Formatter<'arena> {
     pub fn print(&self, document: Document<'arena>, capacity_hint: Option<usize>) -> &'arena str {
         Printer::new(self.arena, document, capacity_hint.unwrap_or(0), self.settings).build()
     }
+}
+
+/// Checks if any comment in the program contains a file-level format-ignore directive.
+///
+/// This only matches `@mago-format-ignore` and `@mago-formatter-ignore` (without `-start`, `-end`, or `-next` suffix).
+fn has_format_ignore_comment(program: &Program<'_>) -> bool {
+    program.trivia.comments().any(|comment| {
+        FORMAT_IGNORE_MARKERS.iter().any(|marker| {
+            if let Some(pos) = comment.value.find(marker) {
+                !comment.value[pos + marker.len()..].starts_with('-')
+            } else {
+                false
+            }
+        })
+    })
 }
