@@ -134,11 +134,6 @@ impl LintRule for UseWpFunctionsRule {
             ),
             // JSON functions
             (&["json_encode"], "wp_json_encode()", "Use wp_json_encode() for better security and compatibility"),
-            (
-                &["json_decode"],
-                "wp_json_decode() (if available) or validate the result",
-                "Consider using WordPress alternatives or validate JSON decode results",
-            ),
             // Mail functions
             (&["mail"], "wp_mail()", "Use wp_mail() for better compatibility and filtering support"),
             // Cache functions
