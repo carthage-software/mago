@@ -26,13 +26,13 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Use<'arena> {
             UseItems::Sequence(sequence) => {
                 for item in sequence.items.iter() {
                     let fqn = item.name.value().trim_start_matches('\\');
-                    check_class_like_import(context, &item.name, &fqn);
+                    check_class_like_import(context, &item.name, fqn);
                 }
             }
             UseItems::TypedSequence(typed_sequence) => {
                 for item in typed_sequence.items.iter() {
                     let fqn = item.name.value().trim_start_matches('\\');
-                    check_typed_import(context, &item.name, &fqn, &typed_sequence.r#type);
+                    check_typed_import(context, &item.name, fqn, &typed_sequence.r#type);
                 }
             }
             UseItems::TypedList(typed_list) => {
@@ -64,12 +64,12 @@ fn check_class_like_import(context: &mut Context<'_, '_>, name: &Identifier<'_>,
 fn check_typed_import(context: &mut Context<'_, '_>, name: &Identifier<'_>, fqn: &str, use_type: &UseType<'_>) {
     match use_type {
         UseType::Function(_) => {
-            if !context.codebase.function_exists(&fqn) {
+            if !context.codebase.function_exists(fqn) {
                 report_non_existent_import(context, name.span(), fqn, "function");
             }
         }
         UseType::Const(_) => {
-            if !context.codebase.constant_exists(&fqn) {
+            if !context.codebase.constant_exists(fqn) {
                 report_non_existent_import(context, name.span(), fqn, "constant");
             }
         }

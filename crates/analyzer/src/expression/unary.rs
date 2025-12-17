@@ -1416,6 +1416,11 @@ pub fn cast_type_to_string<'ctx>(
     artifacts: &mut AnalysisArtifacts,
     expression_span: Span,
 ) -> Result<TUnion, AnalysisError> {
+    // Detect if this is a mixed union (has both array and non-array types)
+    let has_array = operand_type.types.iter().any(|t| matches!(t, TAtomic::Array(_)));
+    let has_non_array = operand_type.types.iter().any(|t| !matches!(t, TAtomic::Array(_)));
+    let is_mixed_union = has_array && has_non_array;
+
     let mut possibilities = vec![];
     for t in operand_type.types.as_ref() {
         let possible = match t {
@@ -1609,21 +1614,39 @@ pub fn cast_type_to_string<'ctx>(
                 );
             }
             TAtomic::Array(_) => {
-                context.collector.report_with_code(
-                    IssueCode::ArrayToStringConversion,
-                    Issue::warning(
-                        "Casting `array` to `string` is deprecated and produces the literal string 'Array'."
-                    )
-                    .with_annotation(
-                        Annotation::primary(expression_span.span()).with_message("Casting `array` to `string`.")
-                    )
-                    .with_note(
-                        "PHP raises an `E_WARNING` (or `E_NOTICE` in older versions) when an array is cast to a string, resulting in the literal string 'Array'."
-                    )
-                    .with_help(
-                        "Do not cast arrays to strings directly. Use functions like `implode()`, `json_encode()`, or loop through the array to create a string representation."
-                    ),
-                );
+                if is_mixed_union {
+                    context.collector.report_with_code(
+                        IssueCode::ArrayToStringConversion,
+                        Issue::warning("Potentially casting `array` to `string`.")
+                            .with_annotation(
+                                Annotation::primary(expression_span.span())
+                                    .with_message("This expression may be an array."),
+                            )
+                            .with_note(
+                                "Casting an array to string produces the literal 'Array' and triggers a PHP warning.",
+                            )
+                            .with_help(
+                                "Add a type check (e.g., `is_numeric()`) before casting to ensure the value is not an array.",
+                            ),
+                    );
+                } else {
+                    context.collector.report_with_code(
+                        IssueCode::ArrayToStringConversion,
+                        Issue::warning(
+                            "Casting `array` to `string` is deprecated and produces the literal string 'Array'.",
+                        )
+                        .with_annotation(
+                            Annotation::primary(expression_span.span())
+                                .with_message("Casting `array` to `string`."),
+                        )
+                        .with_note(
+                            "PHP raises an `E_WARNING` (or `E_NOTICE` in older versions) when an array is cast to a string, resulting in the literal string 'Array'.",
+                        )
+                        .with_help(
+                            "Do not cast arrays to strings directly. Use functions like `implode()`, `json_encode()`, or loop through the array to create a string representation.",
+                        ),
+                    );
+                }
 
                 TAtomic::Scalar(TScalar::literal_string(atom("Array")))
             }

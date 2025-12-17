@@ -161,6 +161,10 @@ fn analyze_string_concat_operand<'arena>(
         );
     }
 
+    let has_array = operand_type.types.iter().any(|t| matches!(t, TAtomic::Array(_)));
+    let has_non_array = operand_type.types.iter().any(|t| !matches!(t, TAtomic::Array(_)));
+    let is_mixed_union = has_array && has_non_array;
+
     let mut overall_type_match = true;
     let mut has_at_least_one_valid_operand_type = false;
     let mut reported_invalid_issue = false;
@@ -269,15 +273,41 @@ fn analyze_string_concat_operand<'arena>(
             }
             TAtomic::Array(_) => {
                 if !reported_invalid_issue {
-                    context.collector.report_with_code(
-                        IssueCode::ArrayToStringConversion,
-                        Issue::error(format!(
-                            "Invalid {side} operand: cannot use type `array` in string concatenation."
-                        ))
-                        .with_annotation(Annotation::primary(operand.span()).with_message("Cannot concatenate with an `array`"))
-                        .with_note("PHP raises an `E_WARNING` or `E_NOTICE` and uses the literal string 'Array' when an array is used in string context.")
-                        .with_help("Do not use arrays directly in string concatenation. Use `implode()`, `json_encode()`, or loop to format its contents."),
-                    );
+                    if is_mixed_union {
+                        context.collector.report_with_code(
+                            IssueCode::ArrayToStringConversion,
+                            Issue::warning(format!(
+                                "Potential array in {side} operand of string concatenation."
+                            ))
+                            .with_annotation(
+                                Annotation::primary(operand.span())
+                                    .with_message("This expression may be an array."),
+                            )
+                            .with_note(
+                                "Using an array in string concatenation produces the literal 'Array' and triggers a PHP warning.",
+                            )
+                            .with_help(
+                                "Add a type check (e.g., `is_string()`) before concatenation to ensure the value is not an array.",
+                            ),
+                        );
+                    } else {
+                        context.collector.report_with_code(
+                            IssueCode::ArrayToStringConversion,
+                            Issue::error(format!(
+                                "Invalid {side} operand: cannot use type `array` in string concatenation."
+                            ))
+                            .with_annotation(
+                                Annotation::primary(operand.span())
+                                    .with_message("Cannot concatenate with an `array`"),
+                            )
+                            .with_note(
+                                "PHP raises an `E_WARNING` or `E_NOTICE` and uses the literal string 'Array' when an array is used in string context.",
+                            )
+                            .with_help(
+                                "Do not use arrays directly in string concatenation. Use `implode()`, `json_encode()`, or loop to format its contents.",
+                            ),
+                        );
+                    }
 
                     reported_invalid_issue = true;
                 }
