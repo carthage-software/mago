@@ -166,12 +166,6 @@ impl ResolvedClassname {
         )
     }
 
-    /// Checks if the resolution is from the `parent` keyword.
-    #[inline]
-    pub const fn is_parent(&self) -> bool {
-        matches!(self.origin, ResolutionOrigin::Named { is_parent: true, .. })
-    }
-
     #[inline]
     pub fn get_object_type(&self, codebase: &CodebaseMetadata) -> TAtomic {
         let mut object_atomic = if let ResolutionOrigin::SpecificClassLikeString(class_string) = &self.origin {
