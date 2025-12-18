@@ -1,6 +1,25 @@
 use serde::Deserialize;
 use serde::Serialize;
 
+/// Represents the safety of applying a specific edit.
+///
+/// Ordered from most safe to least safe.
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[serde(rename_all = "lowercase")]
+#[derive(Default)]
+pub enum Safety {
+    /// Safe to apply automatically. The semantic meaning of the code is preserved.
+    /// Example: Formatting, renaming a local variable.
+    #[default]
+    Safe,
+    /// Likely safe, but changes semantics slightly or relies on heuristics.
+    /// Example: Removing an unused variable (might have side effects in constructor).
+    PotentiallyUnsafe,
+    /// Requires manual user review. Valid code, but changes logic significantly.
+    /// Example: Changing type casts, altering control flow logic.
+    Unsafe,
+}
+
 /// Represents a range in the source text identified by byte offsets.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub struct TextRange {
@@ -75,19 +94,39 @@ pub struct TextEdit {
     pub range: TextRange,
     /// The new text to replace the range with.
     pub new_text: String,
+    /// How safe this specific edit is.
+    pub safety: Safety,
 }
 
 impl TextEdit {
+    /// Creates a delete edit (defaults to Safe).
     pub fn delete(range: impl Into<TextRange>) -> Self {
-        Self { range: range.into(), new_text: String::new() }
+        Self { range: range.into(), new_text: String::new(), safety: Safety::Safe }
     }
 
+    /// Creates an insert edit (defaults to Safe).
     pub fn insert(offset: u32, text: impl Into<String>) -> Self {
-        Self { range: TextRange::new(offset, offset), new_text: text.into() }
+        Self { range: TextRange::new(offset, offset), new_text: text.into(), safety: Safety::Safe }
     }
 
+    /// Creates a replace edit (defaults to Safe).
     pub fn replace(range: impl Into<TextRange>, text: impl Into<String>) -> Self {
-        Self { range: range.into(), new_text: text.into() }
+        Self { range: range.into(), new_text: text.into(), safety: Safety::Safe }
+    }
+
+    /// Builder method to change the safety level of this edit.
+    ///
+    /// # Example
+    /// ```
+    /// use mago_text_edit::{TextEdit, Safety};
+    ///
+    /// let edit = TextEdit::replace(1..2, "b").with_safety(Safety::Unsafe);
+    /// assert_eq!(edit.safety, Safety::Unsafe);
+    /// ```
+    #[must_use]
+    pub fn with_safety(mut self, safety: Safety) -> Self {
+        self.safety = safety;
+        self
     }
 }
 
@@ -101,6 +140,10 @@ pub enum ApplyResult {
     Overlap,
     /// The provided checker function returned `false`.
     Rejected,
+    /// Edit rejected because it's unsafe and we're in safe or potentially-unsafe mode.
+    Unsafe,
+    /// Edit rejected because it's potentially-unsafe and we're in safe mode.
+    PotentiallyUnsafe,
 }
 
 /// A high-performance, transactional text editor.
@@ -112,20 +155,64 @@ pub struct TextEditor<'a> {
     original_text: &'a str,
     original_len: u32,
     edits: Vec<TextEdit>,
+    /// Maximum safety level to accept. Edits above this level are rejected.
+    safety_threshold: Safety,
 }
 
 impl<'a> TextEditor<'a> {
+    /// Creates a new TextEditor with the default safety threshold (Unsafe - accepts all edits).
     pub fn new(text: &'a str) -> Self {
-        Self { original_text: text, original_len: text.len() as u32, edits: Vec::new() }
+        Self {
+            original_text: text,
+            original_len: text.len() as u32,
+            edits: Vec::new(),
+            safety_threshold: Safety::Unsafe,
+        }
+    }
+
+    /// Creates a new TextEditor with a specific safety threshold.
+    ///
+    /// Edits with a safety level above the threshold will be rejected.
+    ///
+    /// # Example
+    /// ```
+    /// use mago_text_edit::{TextEditor, Safety};
+    ///
+    /// // Only accept Safe edits
+    /// let editor = TextEditor::with_safety("hello", Safety::Safe);
+    /// ```
+    pub fn with_safety(text: &'a str, threshold: Safety) -> Self {
+        Self { original_text: text, original_len: text.len() as u32, edits: Vec::new(), safety_threshold: threshold }
+    }
+
+    /// Checks if an edit's safety level exceeds the threshold.
+    /// Returns the appropriate rejection result, or None if the edit is acceptable.
+    #[inline]
+    fn check_safety(&self, edit_safety: Safety) -> Option<ApplyResult> {
+        if edit_safety > self.safety_threshold {
+            Some(match edit_safety {
+                Safety::Unsafe => ApplyResult::Unsafe,
+                Safety::PotentiallyUnsafe => ApplyResult::PotentiallyUnsafe,
+                Safety::Safe => unreachable!(),
+            })
+        } else {
+            None
+        }
     }
 
     /// Applies a single edit.
     ///
     /// Uses binary search to check for overlaps in O(log N).
+    /// Rejects edits that exceed the safety threshold.
     pub fn apply<F>(&mut self, edit: TextEdit, checker: Option<F>) -> ApplyResult
     where
         F: FnOnce(&str) -> bool,
     {
+        // Check safety first
+        if let Some(rejection) = self.check_safety(edit.safety) {
+            return rejection;
+        }
+
         if edit.range.end > self.original_len || edit.range.start > edit.range.end {
             return ApplyResult::OutOfBounds;
         }
@@ -152,13 +239,21 @@ impl<'a> TextEditor<'a> {
 
     /// Applies a batch of edits atomically.
     ///
-    /// Either all edits are applied, or none are (if overlap/check fails).
+    /// Either all edits are applied, or none are (if overlap/check/safety fails).
+    /// If any edit in the batch exceeds the safety threshold, the entire batch is rejected.
     pub fn apply_batch<F>(&mut self, mut new_edits: Vec<TextEdit>, checker: Option<F>) -> ApplyResult
     where
         F: FnOnce(&str) -> bool,
     {
         if new_edits.is_empty() {
             return ApplyResult::Applied;
+        }
+
+        // Check safety of all edits first
+        for edit in &new_edits {
+            if let Some(rejection) = self.check_safety(edit.safety) {
+                return rejection;
+            }
         }
 
         new_edits
@@ -216,6 +311,11 @@ impl<'a> TextEditor<'a> {
     /// Returns a slice of the currently applied edits.
     pub fn get_edits(&self) -> &[TextEdit] {
         &self.edits
+    }
+
+    /// Returns the current safety threshold.
+    pub fn safety_threshold(&self) -> Safety {
+        self.safety_threshold
     }
 }
 
@@ -363,5 +463,99 @@ mod tests {
 
         editor.apply_batch(batch, None::<fn(&str) -> bool>);
         assert_eq!(editor.finish(), "AbcdEf");
+    }
+
+    #[test]
+    fn test_safety_default_is_safe() {
+        let edit = TextEdit::replace(0..1, "x");
+        assert_eq!(edit.safety, Safety::Safe);
+    }
+
+    #[test]
+    fn test_with_safety_builder() {
+        let edit = TextEdit::replace(0..1, "x").with_safety(Safety::Unsafe);
+        assert_eq!(edit.safety, Safety::Unsafe);
+
+        let edit = TextEdit::delete(0..1).with_safety(Safety::PotentiallyUnsafe);
+        assert_eq!(edit.safety, Safety::PotentiallyUnsafe);
+    }
+
+    #[test]
+    fn test_safety_threshold_safe_mode() {
+        let mut editor = TextEditor::with_safety("hello world", Safety::Safe);
+
+        // Safe edit should be accepted
+        let res = editor.apply(TextEdit::replace(0..5, "hi"), None::<fn(&str) -> bool>);
+        assert_eq!(res, ApplyResult::Applied);
+
+        // PotentiallyUnsafe edit should be rejected
+        let res = editor
+            .apply(TextEdit::replace(6..11, "there").with_safety(Safety::PotentiallyUnsafe), None::<fn(&str) -> bool>);
+        assert_eq!(res, ApplyResult::PotentiallyUnsafe);
+
+        // Unsafe edit should be rejected
+        let res = editor.apply(TextEdit::replace(6..11, "there").with_safety(Safety::Unsafe), None::<fn(&str) -> bool>);
+        assert_eq!(res, ApplyResult::Unsafe);
+
+        assert_eq!(editor.finish(), "hi world"); // Only safe edit applied
+    }
+
+    #[test]
+    fn test_safety_threshold_potentially_unsafe_mode() {
+        let mut editor = TextEditor::with_safety("hello world", Safety::PotentiallyUnsafe);
+
+        // Safe edit should be accepted
+        let res = editor.apply(TextEdit::replace(0..5, "hi"), None::<fn(&str) -> bool>);
+        assert_eq!(res, ApplyResult::Applied);
+
+        // PotentiallyUnsafe edit should be accepted
+        let res = editor
+            .apply(TextEdit::replace(6..11, "there").with_safety(Safety::PotentiallyUnsafe), None::<fn(&str) -> bool>);
+        assert_eq!(res, ApplyResult::Applied);
+
+        assert_eq!(editor.finish(), "hi there");
+    }
+
+    #[test]
+    fn test_safety_threshold_unsafe_mode() {
+        let mut editor = TextEditor::with_safety("hello world", Safety::Unsafe);
+
+        // All safety levels should be accepted
+        let res = editor.apply(TextEdit::replace(0..1, "H"), None::<fn(&str) -> bool>);
+        assert_eq!(res, ApplyResult::Applied);
+
+        let res =
+            editor.apply(TextEdit::replace(1..2, "E").with_safety(Safety::PotentiallyUnsafe), None::<fn(&str) -> bool>);
+        assert_eq!(res, ApplyResult::Applied);
+
+        let res = editor.apply(TextEdit::replace(2..3, "L").with_safety(Safety::Unsafe), None::<fn(&str) -> bool>);
+        assert_eq!(res, ApplyResult::Applied);
+
+        assert_eq!(editor.finish(), "HELlo world");
+    }
+
+    #[test]
+    fn test_batch_safety_rejection() {
+        let mut editor = TextEditor::with_safety("hello", Safety::Safe);
+
+        // Batch with one unsafe edit should reject entire batch
+        let batch = vec![
+            TextEdit::replace(0..1, "H"),                             // Safe
+            TextEdit::replace(1..2, "E").with_safety(Safety::Unsafe), // Unsafe - should cause rejection
+        ];
+
+        let res = editor.apply_batch(batch, None::<fn(&str) -> bool>);
+        assert_eq!(res, ApplyResult::Unsafe);
+
+        // Original text unchanged
+        assert_eq!(editor.finish(), "hello");
+    }
+
+    #[test]
+    fn test_safety_ordering() {
+        // Test that Safety enum orders correctly (Safe < PotentiallyUnsafe < Unsafe)
+        assert!(Safety::Safe < Safety::PotentiallyUnsafe);
+        assert!(Safety::PotentiallyUnsafe < Safety::Unsafe);
+        assert!(Safety::Safe < Safety::Unsafe);
     }
 }
