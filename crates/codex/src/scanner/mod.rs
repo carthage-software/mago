@@ -399,28 +399,29 @@ impl<'ctx, 'arena> MutWalker<'arena, 'arena, Context<'ctx, 'arena>> for Scanner 
         }
 
         let method_id = (class_like_metadata.name, name);
-        let type_resolution = if method.is_static() {
-            if !class_like_metadata.type_aliases.is_empty() || !class_like_metadata.imported_type_aliases.is_empty() {
-                let mut context = TypeResolutionContext::new();
+        let type_resolution_context = {
+            let mut context = self.get_current_type_resolution_context();
 
-                for alias_name in class_like_metadata.type_aliases.keys() {
-                    context = context.with_type_alias(*alias_name);
-                }
-
-                for (alias_name, (source_class, original_name, _span)) in &class_like_metadata.imported_type_aliases {
-                    context = context.with_imported_type_alias(*alias_name, *source_class, *original_name);
-                }
-
-                Some(context)
-            } else {
-                None
+            for alias_name in class_like_metadata.type_aliases.keys() {
+                context = context.with_type_alias(*alias_name);
             }
-        } else {
-            Some(self.get_current_type_resolution_context())
+
+            for (alias_name, (source_class, original_name, _span)) in &class_like_metadata.imported_type_aliases {
+                context = context.with_imported_type_alias(*alias_name, *source_class, *original_name);
+            }
+
+            context
         };
 
-        let mut function_like_metadata =
-            scan_method(method_id, method, &class_like_metadata, context, &mut self.scope, type_resolution);
+        let mut function_like_metadata = scan_method(
+            method_id,
+            method,
+            &class_like_metadata,
+            context,
+            &mut self.scope,
+            Some(type_resolution_context),
+        );
+
         let Some(method_metadata) = &function_like_metadata.method_metadata else {
             unreachable!("Method info should be present for method.",);
         };

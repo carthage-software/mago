@@ -13,6 +13,9 @@ use mago_codex::metadata::property::PropertyMetadata;
 use mago_codex::misc::GenericParent;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::atomic::TAtomic;
+use mago_codex::ttype::atomic::generic::TGenericParameter;
+use mago_codex::ttype::atomic::scalar::TScalar;
+use mago_codex::ttype::atomic::scalar::class_like_string::TClassLikeString;
 use mago_codex::ttype::comparator::ComparisonResult;
 use mago_codex::ttype::comparator::union_comparator;
 use mago_codex::ttype::expander::TypeExpansionOptions;
@@ -131,10 +134,24 @@ fn type_contains_template_param(type_union: &TUnion, param_name: Atom, defining_
     use mago_codex::ttype::TypeRef;
 
     type_union.types.iter().any(|atomic| {
-        if let TAtomic::GenericParameter(gp) = atomic
-            && gp.parameter_name == param_name
-            && let GenericParent::ClassLike(class_name) = gp.defining_entity
-            && class_name == defining_class
+        if let TAtomic::GenericParameter(TGenericParameter {
+            parameter_name,
+            defining_entity: GenericParent::ClassLike(class_name),
+            ..
+        }) = atomic
+            && *parameter_name == param_name
+            && *class_name == defining_class
+        {
+            return true;
+        }
+
+        if let TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::Generic {
+            parameter_name,
+            defining_entity: GenericParent::ClassLike(class_name),
+            ..
+        })) = atomic
+            && *parameter_name == param_name
+            && *class_name == defining_class
         {
             return true;
         }
@@ -143,6 +160,14 @@ fn type_contains_template_param(type_union: &TUnion, param_name: Atom, defining_
             TypeRef::Atomic(TAtomic::GenericParameter(gp)) => {
                 gp.parameter_name == param_name
                     && matches!(gp.defining_entity, GenericParent::ClassLike(c) if c == defining_class)
+            }
+            TypeRef::Atomic(TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::Generic {
+                parameter_name,
+                defining_entity,
+                ..
+            }))) => {
+                *parameter_name == param_name
+                    && matches!(defining_entity, GenericParent::ClassLike(c) if *c == defining_class)
             }
             TypeRef::Union(u) => type_contains_template_param(u, param_name, defining_class),
             _ => false,
