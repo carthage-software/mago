@@ -1,4 +1,5 @@
 use indoc::indoc;
+use mago_text_edit::Safety;
 use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
@@ -25,6 +26,7 @@ use crate::rule_meta::RuleMeta;
 use crate::settings::RuleSettings;
 
 const GENERIC_ASSERTIONS: [&str; 4] = ["assertEquals", "assertNotEquals", "assertSame", "assertNotSame"];
+const EQUALITY_ASSERTIONS: [&str; 2] = ["assertEquals", "assertNotEquals"];
 
 /// Position of the literal in the assertion call.
 #[derive(Debug, Clone, Copy)]
@@ -157,13 +159,15 @@ impl LintRule for UseSpecificAssertionsRule {
             let first_expr = first_arg.value();
             let second_expr = second_arg.value();
 
+            let is_equality_assertion = EQUALITY_ASSERTIONS.contains(&identifier.value);
+
             let Some((specific_assertion, literal_position)) =
                 get_specific_assertion(identifier.value, first_expr, second_expr)
             else {
                 continue;
             };
 
-            let issue = Issue::new(
+            let mut issue = Issue::new(
                 self.cfg.level(),
                 format!("Use `{}` instead of `{}` for clearer test assertions.", specific_assertion, identifier.value),
             )
@@ -177,21 +181,35 @@ impl LintRule for UseSpecificAssertionsRule {
                 identifier.value, specific_assertion
             ));
 
+            if is_equality_assertion {
+                issue = issue.with_help(format!(
+                    "`{}` performs a non-strict comparison, while `{specific_assertion}` performs a strict comparison.",
+                    identifier.value
+                ));
+
+                issue = issue.with_help("Ensure that this change does not affect the test behavior.");
+            }
+
             ctx.collector.propose(issue, |edits| {
-                edits.push(TextEdit::replace(reference.get_selector().span(), specific_assertion));
+                let safety = if is_equality_assertion { Safety::PotentiallyUnsafe } else { Safety::Safe };
+
+                edits.push(TextEdit::replace(reference.get_selector().span(), specific_assertion).with_safety(safety));
 
                 match literal_position {
                     LiteralPosition::First => {
-                        edits.push(TextEdit::replace(
-                            argument_list.span().start_offset()..second_expr.span().start_offset(),
-                            "(",
-                        ));
+                        edits.push(
+                            TextEdit::replace(
+                                argument_list.span().start_offset()..second_expr.span().start_offset(),
+                                "(",
+                            )
+                            .with_safety(safety),
+                        );
                     }
                     LiteralPosition::Second => {
-                        edits.push(TextEdit::replace(
-                            first_expr.span().end_offset()..argument_list.span().end_offset(),
-                            ")",
-                        ));
+                        edits.push(
+                            TextEdit::replace(first_expr.span().end_offset()..argument_list.span().end_offset(), ")")
+                                .with_safety(safety),
+                        );
                     }
                 }
             });
