@@ -26,6 +26,7 @@ mago-php-version = { workspace = true }
 mago-collector = { workspace = true }
 ahash = { workspace = true }
 serde = { workspace = true }
+serde_json = { workspace = true }
 regex = { workspace = true }
 indoc = { workspace = true }
 bumpalo = { workspace = true }

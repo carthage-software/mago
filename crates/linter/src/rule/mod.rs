@@ -9,6 +9,7 @@ use crate::context::LintContext;
 use crate::integration::IntegrationSet;
 use crate::rule_meta::RuleMeta;
 use crate::settings::RuleSettings;
+use crate::settings::RulesSettings;
 use crate::settings::Settings;
 
 pub mod best_practices;
@@ -147,6 +148,30 @@ macro_rules! define_rules {
                     $( AnyRule::$variant(r) => r.check(ctx, node), )*
                 }
             }
+        }
+
+        /// Filters rule settings based on PHP version and integration requirements.
+        ///
+        /// Returns a JSON map containing only rules whose requirements are met
+        /// by the given PHP version and integrations.
+        #[must_use]
+        pub fn filter_rules_settings(
+            rules: &RulesSettings,
+            php_version: PHPVersion,
+            integrations: IntegrationSet,
+        ) -> serde_json::Map<String, serde_json::Value> {
+            let mut map = serde_json::Map::new();
+            $(
+                if $rule::is_enabled_for(php_version, integrations) {
+                    if let Ok(value) = serde_json::to_value(&rules.$module) {
+                        map.insert(
+                            stringify!($module).replace('_', "-"),
+                            value,
+                        );
+                    }
+                }
+            )*
+            map
         }
     }
 }

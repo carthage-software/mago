@@ -1874,6 +1874,7 @@ dependencies = [
  "regex",
  "schemars",
  "serde",
+ "serde_json",
  "tracing",
 ]
 
