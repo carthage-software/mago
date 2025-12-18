@@ -2006,6 +2006,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "mago-text-edit"
+version = "1.0.0-rc.13"
+dependencies = [
+ "pretty_assertions",
+ "serde",
+ "strum",
+ "tracing",
+]
+
+[[package]]
 name = "mago-type-syntax"
 version = "1.0.0-rc.13"
 dependencies = [

@@ -54,6 +54,7 @@ publish:
     cargo publish -p mago-casing
     cargo publish -p mago-php-version
     cargo publish -p mago-fixer
+    cargo publish -p mago-text-edit
     cargo publish -p mago-atom
     cargo publish -p mago-database
     cargo publish -p mago-span
