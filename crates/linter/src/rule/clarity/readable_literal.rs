@@ -3,7 +3,6 @@ use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_fixer::SafetyClassification;
 use mago_php_version::PHPVersion;
 use mago_php_version::PHPVersionRange;
 use mago_reporting::Annotation;
@@ -12,6 +11,7 @@ use mago_reporting::Level;
 use mago_span::HasSpan;
 use mago_syntax::ast::Node;
 use mago_syntax::ast::NodeKind;
+use mago_text_edit::TextEdit;
 
 use crate::category::Category;
 use crate::context::LintContext;
@@ -121,8 +121,8 @@ impl LintRule for ReadableLiteralRule {
             .with_note("Underscore separators improve readability of large numeric literals.")
             .with_help(format!("For example, `{raw}` could be written as `{suggested}`."));
 
-        ctx.collector.propose(issue, |plan| {
-            plan.replace(span.to_range(), &suggested, SafetyClassification::Safe);
+        ctx.collector.propose(issue, |edits| {
+            edits.push(TextEdit::replace(span, suggested));
         });
     }
 }

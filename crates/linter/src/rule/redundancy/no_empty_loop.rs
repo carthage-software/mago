@@ -3,7 +3,6 @@ use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_fixer::SafetyClassification;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_reporting::Level;
@@ -14,6 +13,7 @@ use mago_syntax::ast::Node;
 use mago_syntax::ast::NodeKind;
 use mago_syntax::ast::Statement;
 use mago_syntax::ast::WhileBody;
+use mago_text_edit::TextEdit;
 
 use crate::category::Category;
 use crate::context::LintContext;
@@ -120,8 +120,8 @@ impl LintRule for NoEmptyLoopRule {
             .with_note("Empty loops are often a sign of a logic error or dead code.")
             .with_help("Consider removing this loop or adding meaningful logic to its body.");
 
-        ctx.collector.propose(issue, |plan| {
-            plan.delete(node.span().to_range(), SafetyClassification::PotentiallyUnsafe);
+        ctx.collector.propose(issue, |edits| {
+            edits.push(TextEdit::delete(node.span()));
         });
     }
 }

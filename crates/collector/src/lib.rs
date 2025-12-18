@@ -4,12 +4,12 @@ use bumpalo::collections::CollectIn;
 use bumpalo::collections::Vec;
 
 use mago_database::file::File;
-use mago_fixer::FixPlan;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_reporting::IssueCollection;
 use mago_span::Span;
 use mago_syntax::ast::Program;
+use mago_text_edit::TextEdit;
 
 use crate::pragma::Pragma;
 use crate::pragma::PragmaKind;
@@ -242,31 +242,31 @@ impl<'ctx, 'arena> Collector<'ctx, 'arena> {
         }
     }
 
-    /// Reports an issue with a suggested fix, returning `true` if it was added.
+    /// Reports an issue with suggested edits, returning `true` if it was added.
     ///
-    /// This is a convenience method that builds a `FixPlan` from the provided closure
+    /// This is a convenience method that builds a vector of `TextEdit` from the provided closure
     /// and attaches it to the issue before calling `report`.
     #[inline]
     pub fn propose<F>(&mut self, mut issue: Issue, f: F) -> bool
     where
-        F: FnOnce(&mut FixPlan),
+        F: FnOnce(&mut std::vec::Vec<TextEdit>),
     {
-        let mut plan = FixPlan::new();
-        f(&mut plan);
-        if !plan.is_empty() {
-            issue = issue.with_suggestion(self.file.id, plan);
+        let mut edits = std::vec::Vec::new();
+        f(&mut edits);
+        if !edits.is_empty() {
+            issue = issue.with_file_edits(self.file.id, edits);
         }
 
         self.report(issue)
     }
 
-    /// Reports an issue with a specific code and a suggested fix, returning `true` if it was added.
+    /// Reports an issue with a specific code and suggested edits, returning `true` if it was added.
     ///
     /// This is a convenience method that is equivalent to `propose(issue.with_code(code), f)`.
     #[inline]
     pub fn propose_with_code<F>(&mut self, code: impl Into<String>, issue: Issue, f: F) -> bool
     where
-        F: FnOnce(&mut FixPlan),
+        F: FnOnce(&mut std::vec::Vec<TextEdit>),
     {
         self.propose(issue.with_code(code), f)
     }

@@ -3,13 +3,13 @@ use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_fixer::SafetyClassification;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_reporting::Level;
 use mago_span::HasSpan;
 use mago_syntax::ast::Node;
 use mago_syntax::ast::NodeKind;
+use mago_text_edit::TextEdit;
 
 use crate::category::Category;
 use crate::context::LintContext;
@@ -104,10 +104,10 @@ impl LintRule for ArrayStyleRule {
                     )
                     .with_help("Use the short array style `[..]` instead.");
 
-                ctx.collector.propose(issue, |plan| {
-                    plan.delete(arr.array.span.to_range(), SafetyClassification::Safe);
-                    plan.replace(arr.left_parenthesis.to_range(), "[", SafetyClassification::Safe);
-                    plan.replace(arr.right_parenthesis.to_range(), "]", SafetyClassification::Safe);
+                ctx.collector.propose(issue, |edits| {
+                    edits.push(TextEdit::delete(arr.array.span));
+                    edits.push(TextEdit::replace(arr.left_parenthesis, "["));
+                    edits.push(TextEdit::replace(arr.right_parenthesis, "]"));
                 });
             }
             Node::Array(arr) if ArrayStyleOption::Long == self.cfg.style => {
@@ -118,9 +118,9 @@ impl LintRule for ArrayStyleRule {
                     )
                     .with_help("Use the long array style `array(..)` instead.");
 
-                ctx.collector.propose(issue, |plan| {
-                    plan.replace(arr.left_bracket.to_range(), "array(", SafetyClassification::Safe);
-                    plan.replace(arr.right_bracket.to_range(), ")", SafetyClassification::Safe);
+                ctx.collector.propose(issue, |edits| {
+                    edits.push(TextEdit::replace(arr.left_bracket, "array("));
+                    edits.push(TextEdit::replace(arr.right_bracket, ")"));
                 });
             }
             _ => {}

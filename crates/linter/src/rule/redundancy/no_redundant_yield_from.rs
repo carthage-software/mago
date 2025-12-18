@@ -3,7 +3,6 @@ use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_fixer::SafetyClassification;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_reporting::Level;
@@ -11,6 +10,7 @@ use mago_span::HasSpan;
 use mago_syntax::ast::Expression;
 use mago_syntax::ast::Node;
 use mago_syntax::ast::NodeKind;
+use mago_text_edit::TextEdit;
 
 use crate::category::Category;
 use crate::context::LintContext;
@@ -128,21 +128,21 @@ impl LintRule for NoRedundantYieldFromRule {
         .with_note("This is more efficient and easier to read.")
         .with_help("Replace with direct `yield` for better performance.");
 
-        ctx.collector.propose(issue, |plan| {
+        ctx.collector.propose(issue, |edits| {
             // `yield from [...]` -> `yield [...]`
-            plan.delete(yield_from.from.span.to_range(), SafetyClassification::Safe);
+            edits.push(TextEdit::delete(yield_from.from.span));
 
             match yield_from.iterator {
                 // `yield [expr]` -> `yield expr`
                 Expression::Array(array) => {
-                    plan.delete(array.left_bracket.to_range(), SafetyClassification::Safe);
-                    plan.delete(array.right_bracket.to_range(), SafetyClassification::Safe);
+                    edits.push(TextEdit::delete(array.left_bracket));
+                    edits.push(TextEdit::delete(array.right_bracket));
                 }
                 // `yield array(expr)` -> `yield expr`
                 Expression::LegacyArray(legacy_array) => {
-                    plan.delete(legacy_array.array.span.to_range(), SafetyClassification::Safe);
-                    plan.delete(legacy_array.left_parenthesis.to_range(), SafetyClassification::Safe);
-                    plan.delete(legacy_array.right_parenthesis.to_range(), SafetyClassification::Safe);
+                    edits.push(TextEdit::delete(legacy_array.array.span));
+                    edits.push(TextEdit::delete(legacy_array.left_parenthesis));
+                    edits.push(TextEdit::delete(legacy_array.right_parenthesis));
                 }
                 _ => unreachable!("Already filtered out non-array literals"),
             }

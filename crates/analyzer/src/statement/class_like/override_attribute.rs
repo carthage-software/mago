@@ -1,11 +1,11 @@
 use mago_atom::ascii_lowercase_atom;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
-use mago_fixer::SafetyClassification;
 use mago_php_version::PHPVersion;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_syntax::ast::ClassLikeMember;
+use mago_text_edit::TextEdit;
 
 use crate::code::IssueCode;
 use crate::context::Context;
@@ -52,12 +52,12 @@ pub fn check_override_attribute<'ctx, 'arena>(
                     .with_note("PHP constructors don't override parent constructors.")
                     .with_help("Remove the `#[Override]` attribute from the constructor.");
 
-                context.collector.propose(issue, |plan| {
+                context.collector.propose(issue, |edits| {
                     let attribute_list = &method.attribute_lists.as_slice()[attribute_list_index];
                     if attribute_list.attributes.len() == 1 {
-                        plan.delete(attribute_list.span().to_range(), SafetyClassification::Safe);
+                        edits.push(TextEdit::delete(attribute_list.span()));
                     } else {
-                        plan.delete(attribute.span().to_range(), SafetyClassification::Safe);
+                        edits.push(TextEdit::delete(attribute.span()));
                     }
                 });
             }
@@ -77,12 +77,12 @@ pub fn check_override_attribute<'ctx, 'arena>(
                     .with_note("The attribute should only be used when explicitly overriding a parent method.")
                     .with_help(format!("Remove the `#[Override]` attribute from `{name}` or verify inheritance."));
 
-                context.collector.propose(issue, |plan| {
+                context.collector.propose(issue, |edits| {
                     let attribute_list = &method.attribute_lists.as_slice()[attribute_list_index];
                     if attribute_list.attributes.len() == 1 {
-                        plan.delete(attribute_list.span().to_range(), SafetyClassification::Safe);
+                        edits.push(TextEdit::delete(attribute_list.span()));
                     } else {
-                        plan.delete(attribute.span().to_range(), SafetyClassification::Safe);
+                        edits.push(TextEdit::delete(attribute.span()));
                     }
                 });
             }
@@ -116,7 +116,7 @@ pub fn check_override_attribute<'ctx, 'arena>(
         .with_note("The `#[Override]` attribute clarifies intent and prevents accidental signature mismatches.")
         .with_help("Add `#[Override]` attribute to method declaration.");
 
-        context.collector.propose(issue, |plan| {
+        context.collector.propose(issue, |edits| {
             let offset = method.span().start.offset;
             let line_start_offset =
                 context.source_file.get_line_start_offset(context.source_file.line_number(offset)).unwrap_or(offset);
@@ -126,7 +126,7 @@ pub fn check_override_attribute<'ctx, 'arena>(
                 .take_while(|c| c.is_whitespace())
                 .collect::<String>();
 
-            plan.insert(method.span().start.offset, format!("#[\\Override]\n{indent}"), SafetyClassification::Safe);
+            edits.push(TextEdit::insert(method.start_offset(), format!("#[\\Override]\n{indent}")));
         });
     }
 }

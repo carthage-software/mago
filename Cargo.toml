@@ -126,7 +126,7 @@ mago-database = { workspace = true }
 mago-linter = { workspace = true }
 mago-names = { workspace = true }
 mago-formatter = { workspace = true }
-mago-fixer = { workspace = true }
+mago-text-edit = { workspace = true }
 mago-php-version = { workspace = true }
 mago-composer = { workspace = true }
 mago-prelude = { workspace = true }

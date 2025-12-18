@@ -36,7 +36,6 @@ use mago_codex::ttype::get_true;
 use mago_codex::ttype::get_void;
 use mago_codex::ttype::union::TUnion;
 use mago_codex::ttype::wrap_atomic;
-use mago_fixer::SafetyClassification;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
@@ -47,6 +46,7 @@ use mago_syntax::ast::UnaryPostfixOperator;
 use mago_syntax::ast::UnaryPrefix;
 use mago_syntax::ast::UnaryPrefixOperator;
 use mago_syntax::ast::Variable;
+use mago_text_edit::TextEdit;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -918,10 +918,10 @@ fn report_redundant_type_cast<'ast, 'arena>(
             )
             .with_note("Casting a value to a type it already possesses has no effect.")
             .with_help(format!("Remove the redundant `{}` cast.", cast_operator.as_str())),
-        |plan| {
+        |edits| {
             // Delete the cast operator, keep only the operand
             // For `(string)$var`, delete `(string)` and keep `$var`
-            plan.delete(expression.operator.span().to_range(), SafetyClassification::Safe);
+            edits.push(TextEdit::delete(expression.operator.span()));
         },
     );
 }

@@ -3,7 +3,6 @@ use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_fixer::SafetyClassification;
 use mago_php_version::PHPVersion;
 use mago_php_version::PHPVersionRange;
 use mago_reporting::Annotation;
@@ -12,6 +11,7 @@ use mago_reporting::Level;
 use mago_span::HasSpan;
 use mago_syntax::ast::Node;
 use mago_syntax::ast::NodeKind;
+use mago_text_edit::TextEdit;
 
 use crate::category::Category;
 use crate::context::LintContext;
@@ -115,10 +115,10 @@ impl LintRule for SensitiveParameterRule {
             .with_note("Marking sensitive parameters helps prevent accidental logging or exposure of sensitive data in exception backtraces.")
             .with_help("Add the `#[SensitiveParameter]` attribute to the parameter declaration.");
 
-        ctx.collector.propose(issue, |plan| {
+        ctx.collector.propose(issue, |edits| {
             let start_position = parameter.start_position();
 
-            plan.insert(start_position.offset, "#[\\SensitiveParameter] ", SafetyClassification::Safe);
+            edits.push(TextEdit::insert(start_position.offset, "#[\\SensitiveParameter] "));
         });
     }
 }

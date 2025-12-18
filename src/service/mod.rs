@@ -57,6 +57,8 @@ use std::sync::Arc;
 
 use bumpalo::Bump;
 use clap::ColorChoice;
+use mago_database::file::FileId;
+use mago_syntax::parser::parse_file_content;
 use rayon::iter::IntoParallelIterator;
 use rayon::iter::ParallelIterator;
 
@@ -65,9 +67,6 @@ use mago_database::DatabaseReader;
 use mago_database::ReadDatabase;
 use mago_database::change::ChangeLog;
 use mago_database::file::File;
-use mago_database::file::FileId;
-use mago_fixer::FixPlan;
-use mago_fixer::SafetyClassification;
 use mago_orchestrator::Orchestrator;
 use mago_orchestrator::service::format::FileFormatStatus;
 use mago_reporting::ColorChoice as ReportingColorChoice;
@@ -79,9 +78,13 @@ use mago_reporting::baseline::Baseline;
 use mago_reporting::baseline::BaselineVariant;
 use mago_reporting::reporter::Reporter;
 use mago_reporting::reporter::ReporterConfig;
+use mago_text_edit::ApplyResult;
+use mago_text_edit::Safety;
+use mago_text_edit::TextEditor;
 
 use crate::baseline;
 use crate::baseline::unserialize_baseline;
+use crate::consts::ISSUE_URL;
 use crate::error::Error;
 use crate::utils;
 
@@ -320,35 +323,42 @@ impl IssueProcessor {
         issues: IssueCollection,
     ) -> Result<ExitCode, Error> {
         let dry_run = self.dry_run;
-        let (applied_fixes, skipped_unsafe, skipped_potentially_unsafe) =
+        let (applied_fixes, skipped_unsafe, skipped_potentially_unsafe, bugs) =
             self.apply_fixes(orchestrator, database, issues)?;
 
         if skipped_unsafe > 0 {
-            tracing::warn!("Skipped {} unsafe fixes. Use `--unsafe` to apply them.", skipped_unsafe);
+            tracing::warn!("Skipped {skipped_unsafe} unsafe fixes. Use `--unsafe` to apply them.");
         }
 
         if skipped_potentially_unsafe > 0 {
             tracing::warn!(
-                "Skipped {} potentially unsafe fixes. Use `--potentially-unsafe` or `--unsafe` to apply them.",
-                skipped_potentially_unsafe
+                "Skipped {skipped_potentially_unsafe} potentially unsafe fixes. Use `--potentially-unsafe` or `--unsafe` to apply them.",
             );
         }
 
-        if applied_fixes == 0 {
-            tracing::info!("No fixes were applied.");
+        let success = {
+            if applied_fixes == 0 {
+                tracing::info!("No fixes were applied.");
 
-            return Ok(ExitCode::SUCCESS);
+                true
+            } else if dry_run {
+                tracing::info!("Found {applied_fixes} fixes that can be applied (dry-run).");
+
+                false
+            } else {
+                tracing::info!("Successfully applied {applied_fixes} fixes.");
+
+                true
+            }
+        };
+
+        if bugs > 0 {
+            tracing::error!("Encountered {bugs} bugs while applying fixes. Please report them at {}", ISSUE_URL);
+
+            return Ok(ExitCode::FAILURE);
         }
 
-        if dry_run {
-            tracing::info!("Found {} fixes that can be applied (dry-run).", applied_fixes);
-
-            Ok(ExitCode::FAILURE)
-        } else {
-            tracing::info!("Successfully applied {} fixes.", applied_fixes);
-
-            Ok(ExitCode::SUCCESS)
-        }
+        Ok(if success { ExitCode::SUCCESS } else { ExitCode::FAILURE })
     }
 
     /// Reports issues to the configured output target when `--fix` is not enabled.
@@ -442,48 +452,110 @@ impl IssueProcessor {
 
     /// Applies code fixes in parallel according to safety settings.
     ///
-    /// This method extracts fix plans from issues, filters them based on the
-    /// configured safety level (safe, potentially unsafe, or unsafe), and applies
-    /// them concurrently using a parallel thread pool. Each fix can optionally be
-    /// followed by code formatting if `--format-after-fix` is enabled.
+    /// This method extracts edits from issues, groups them by file, and applies
+    /// them concurrently using a parallel thread pool. The TextEditor handles
+    /// safety filtering based on the configured threshold. Each fix can optionally
+    /// be followed by code formatting if `--format-after-fix` is enabled.
     ///
-    /// Returns the count of applied fixes and the counts of skipped fixes by
-    /// safety classification.
+    /// Returns a tuple containing:
+    ///
+    /// - Number of files successfully modified
+    /// - Number of unsafe fixes skipped
+    /// - Number of potentially unsafe fixes skipped
+    /// - Number of bugs encountered during fix application, such as out-of-bounds edits or
+    ///   rejected edits
     fn apply_fixes(
         &self,
         orchestrator: &Orchestrator<'_>,
         database: &mut Database<'_>,
         issues: IssueCollection,
-    ) -> Result<(usize, usize, usize), Error> {
+    ) -> Result<(usize, usize, usize, usize), Error> {
         let read_database = Arc::new(database.read_only());
         let change_log = ChangeLog::new();
 
-        let (fix_plans, skipped_unsafe, skipped_potentially_unsafe) = self.filter_fix_plans(&read_database, issues);
+        // Determine safety threshold based on flags
+        let safety_threshold = if self.r#unsafe {
+            Safety::Unsafe
+        } else if self.potentially_unsafe {
+            Safety::PotentiallyUnsafe
+        } else {
+            Safety::Safe
+        };
 
-        if fix_plans.is_empty() {
-            return Ok((0, skipped_unsafe, skipped_potentially_unsafe));
+        // Collect edit batches by file (each batch = all edits from one issue)
+        let batches_by_file = issues.to_edit_batches();
+        if batches_by_file.is_empty() {
+            return Ok((0, 0, 0, 0));
         }
 
-        let changed_results: Vec<bool> = fix_plans
+        let format_after_fix = self.format_after_fix;
+        let dry_run = self.dry_run;
+        let color_choice = self.color_choice;
+
+        let results: Vec<(bool, usize, usize, usize)> = batches_by_file
             .into_par_iter()
-            .map_init(Bump::new, |arena, (file_id, plan)| {
+            .map_init(Bump::new, |arena, (file_id, batches)| {
                 let file = read_database.get_ref(&file_id)?;
-                let fixed_content = plan.execute(&file.contents).get_fixed();
-                let final_content = if self.format_after_fix {
-                    let file = File::ephemeral(file.name.clone(), Cow::Owned(fixed_content));
-                    let format_status = orchestrator.format_file_in(&file, arena)?;
+                let mut editor = TextEditor::with_safety(&file.contents, safety_threshold);
+                let checker = |code: &str| check_php_code(arena, file_id, code);
+
+                let mut skipped_unsafe = 0usize;
+                let mut skipped_potentially_unsafe = 0usize;
+                let mut bugs = 0usize;
+
+                // Each batch contains all edits from a single issue - they must be applied together
+                for (rule_code, edits) in batches {
+                    let rule_code = rule_code.as_deref().unwrap_or("unknown");
+                    let result = editor.apply_batch(edits, Some(checker));
+                    match result {
+                        ApplyResult::Applied => {
+                            // Successfully applied
+                        }
+                        ApplyResult::Unsafe => {
+                            skipped_unsafe += 1;
+                        }
+                        ApplyResult::PotentiallyUnsafe => {
+                            skipped_potentially_unsafe += 1;
+                        }
+                        ApplyResult::OutOfBounds => {
+                            tracing::warn!("Edit out of bounds for `{}` (issue: `{rule_code}`). This is a bug in Mago.", file.name.as_ref());
+                            tracing::error!("Please report this issue at {}", ISSUE_URL);
+
+                            bugs += 1;
+                        }
+                        ApplyResult::Overlap => {
+                            tracing::warn!("Overlapping edit for `{}` (issue: `{rule_code}`), skipping.", file.name.as_ref());
+                            tracing::warn!("This can happen when multiple fixers modify the same code. Try running the fixer again to apply remaining fixes.");
+                        }
+                        ApplyResult::Rejected => {
+                            tracing::error!("Edit for `{}` (issue: `{rule_code}`) was rejected because it would produce invalid PHP syntax.", file.name.as_ref());
+                            tracing::error!("This is a bug in Mago. Please report this issue at {}", ISSUE_URL);
+
+                            bugs += 1;
+                        }
+                    }
+                }
+
+                let fixed_content = editor.finish();
+                if fixed_content == file.contents {
+                    return Ok((false, skipped_unsafe, skipped_potentially_unsafe, bugs));
+                }
+
+                let final_content = if format_after_fix {
+                    let ephemeral_file = File::ephemeral(file.name.clone(), Cow::Owned(fixed_content));
+                    let format_status = orchestrator.format_file_in(&ephemeral_file, arena)?;
 
                     match format_status {
-                        FileFormatStatus::Unchanged => file.contents.into_owned(),
+                        FileFormatStatus::Unchanged => ephemeral_file.contents.into_owned(),
                         FileFormatStatus::Changed(new_content) => new_content,
                         FileFormatStatus::FailedToParse(parse_error) => {
                             tracing::warn!(
                                 "Failed to format file `{}` after applying fixes: {}",
-                                file.name.as_ref(),
+                                ephemeral_file.name.as_ref(),
                                 parse_error
                             );
 
-                            file.contents.into_owned()
+                            ephemeral_file.contents.into_owned()
                         }
                     }
                 } else {
@@ -492,80 +564,30 @@ impl IssueProcessor {
 
                 arena.reset();
 
-                utils::apply_update(&change_log, file, final_content.as_ref(), self.dry_run, self.color_choice)
+                let changed = utils::apply_update(&change_log, file, final_content.as_ref(), dry_run, color_choice)?;
+                Ok((changed, skipped_unsafe, skipped_potentially_unsafe, bugs))
             })
-            .collect::<Result<Vec<bool>, Error>>()?;
+            .collect::<Result<Vec<(bool, usize, usize, usize)>, Error>>()?;
 
-        if !self.dry_run {
+        if !dry_run {
             database.commit(change_log, true)?;
         }
 
-        let applied_fix_count = changed_results.into_iter().filter(|&c| c).count();
+        let mut applied_fix_count = 0;
+        let mut total_skipped_unsafe = 0;
+        let mut total_skipped_potentially_unsafe = 0;
+        let mut total_bugs = 0;
 
-        Ok((applied_fix_count, skipped_unsafe, skipped_potentially_unsafe))
-    }
-
-    /// Filters fix plans based on configured safety thresholds.
-    ///
-    /// This method examines each fix operation's safety classification and
-    /// includes or skips it based on the `--unsafe` and `--potentially-unsafe`
-    /// flags. Safe fixes are always included.
-    ///
-    /// Returns a tuple containing the list of applicable fix plans and the
-    /// counts of skipped fixes by safety classification.
-    #[inline]
-    fn filter_fix_plans(
-        &self,
-        database: &ReadDatabase,
-        issues: IssueCollection,
-    ) -> (Vec<(FileId, FixPlan)>, usize, usize) {
-        let mut skipped_unsafe_count = 0;
-        let mut skipped_potentially_unsafe_count = 0;
-        let mut applicable_plans = Vec::new();
-
-        for (file_id, plan) in issues.to_fix_plans() {
-            if plan.is_empty() {
-                continue;
+        for (changed, skipped_unsafe, skipped_potentially_unsafe, bugs) in results {
+            if changed {
+                applied_fix_count += 1;
             }
-
-            let mut filtered_operations = Vec::new();
-            for operation in plan.take_operations() {
-                // Consumes operations from the plan
-                match operation.get_safety_classification() {
-                    SafetyClassification::Unsafe => {
-                        if self.r#unsafe {
-                            filtered_operations.push(operation);
-                        } else {
-                            skipped_unsafe_count += 1;
-                            tracing::debug!(
-                                "Skipping unsafe fix for `{}`. Use --unsafe to apply.",
-                                database.get_ref(&file_id).map(|f| f.name.as_ref()).unwrap_or("<unknown>"),
-                            );
-                        }
-                    }
-                    SafetyClassification::PotentiallyUnsafe => {
-                        if self.r#unsafe || self.potentially_unsafe {
-                            filtered_operations.push(operation);
-                        } else {
-                            skipped_potentially_unsafe_count += 1;
-                            tracing::debug!(
-                                "Skipping potentially unsafe fix for `{}`. Use --potentially-unsafe or --unsafe to apply.",
-                                database.get_ref(&file_id).map(|f| f.name.as_ref()).unwrap_or("<unknown>"),
-                            );
-                        }
-                    }
-                    SafetyClassification::Safe => {
-                        filtered_operations.push(operation);
-                    }
-                }
-            }
-
-            if !filtered_operations.is_empty() {
-                applicable_plans.push((file_id, FixPlan::from_operations(filtered_operations)));
-            }
+            total_skipped_unsafe += skipped_unsafe;
+            total_skipped_potentially_unsafe += skipped_potentially_unsafe;
+            total_bugs += bugs;
         }
 
-        (applicable_plans, skipped_unsafe_count, skipped_potentially_unsafe_count)
+        Ok((applied_fix_count, total_skipped_unsafe, total_skipped_potentially_unsafe, total_bugs))
     }
 }
 
@@ -820,4 +842,21 @@ impl BaselineIssueProcessor {
             true
         }
     }
+}
+
+/// Checks if the given PHP code snippet is syntactically valid.
+///
+/// # Arguments
+///
+/// * `arena` - The memory arena to use for parsing.
+/// * `file_id` - The identifier for the temporary file.
+/// * `code` - The PHP code snippet to check.
+///
+/// # Returns
+///
+/// * `true` if the code is syntactically valid, `false` otherwise.
+fn check_php_code(arena: &Bump, file_id: FileId, code: &str) -> bool {
+    let parse_result = parse_file_content(arena, file_id, code);
+
+    parse_result.1.is_none()
 }

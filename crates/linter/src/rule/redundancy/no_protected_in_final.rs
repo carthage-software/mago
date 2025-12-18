@@ -3,7 +3,6 @@ use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_fixer::SafetyClassification;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_reporting::Level;
@@ -11,6 +10,7 @@ use mago_span::HasSpan;
 use mago_syntax::ast::ClassLikeMember;
 use mago_syntax::ast::Node;
 use mago_syntax::ast::NodeKind;
+use mago_text_edit::TextEdit;
 
 use crate::category::Category;
 use crate::context::LintContext;
@@ -132,21 +132,21 @@ impl LintRule for NoProtectedInFinalRule {
                     .with_help("Replace the `protected` visibility by `private`.");
 
                 if protected_modifier.is_protected_set() {
-                    ctx.collector.propose(issue, |plan| {
-                        plan.replace(span.to_range(), "private(set)", SafetyClassification::Safe);
+                    ctx.collector.propose(issue, |edits| {
+                        edits.push(TextEdit::replace(span, "private(set)"));
                     });
                 } else if let Some(set_modifier) = modifiers.get_first_write_visibility() {
                     let issue = issue.with_annotation(
                         Annotation::secondary(set_modifier.span())
                             .with_message("This write visibility will become redundant"),
                     );
-                    ctx.collector.propose(issue, |plan| {
-                        plan.replace(span.to_range(), "private", SafetyClassification::Safe);
-                        plan.delete(set_modifier.span().to_range(), SafetyClassification::Safe);
+                    ctx.collector.propose(issue, |edits| {
+                        edits.push(TextEdit::replace(span, "private"));
+                        edits.push(TextEdit::delete(set_modifier.span()));
                     });
                 } else {
-                    ctx.collector.propose(issue, |plan| {
-                        plan.replace(span.to_range(), "private", SafetyClassification::Safe);
+                    ctx.collector.propose(issue, |edits| {
+                        edits.push(TextEdit::replace(span, "private"));
                     });
                 }
             }

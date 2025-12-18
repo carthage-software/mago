@@ -1,12 +1,4 @@
 use indoc::indoc;
-use mago_fixer::SafetyClassification;
-use mago_span::HasSpan;
-use mago_syntax::ast::Access;
-use mago_syntax::ast::ClassLikeMemberSelector;
-use mago_syntax::ast::Expression;
-use mago_syntax::ast::Node;
-use mago_syntax::ast::NodeKind;
-use mago_syntax::ast::Variable;
 use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
@@ -14,6 +6,14 @@ use serde::Serialize;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_reporting::Level;
+use mago_span::HasSpan;
+use mago_syntax::ast::Access;
+use mago_syntax::ast::ClassLikeMemberSelector;
+use mago_syntax::ast::Expression;
+use mago_syntax::ast::Node;
+use mago_syntax::ast::NodeKind;
+use mago_syntax::ast::Variable;
+use mago_text_edit::TextEdit;
 
 use crate::category::Category;
 use crate::context::LintContext;
@@ -106,14 +106,8 @@ impl LintRule for NoSelfAssignmentRule {
             return;
         }
 
-        // Determine safety classification based on expression type
-        let safety = if is_object_property_access(assignment.lhs) {
-            // Object property access may have side effects through __get/__set or property hooks
-            SafetyClassification::PotentiallyUnsafe
-        } else {
-            // Variable assignments are safe to remove
-            SafetyClassification::Safe
-        };
+        // Determine safety based on expression type
+        let is_potentially_unsafe = is_object_property_access(assignment.lhs);
 
         let issue = Issue::new(self.cfg.level(), "Self-assignment has no effect.")
             .with_code(self.meta.code)
@@ -123,9 +117,15 @@ impl LintRule for NoSelfAssignmentRule {
             .with_note("Self-assignments are redundant and typically indicate a mistake or leftover from refactoring.")
             .with_help("Remove this self-assignment statement.");
 
-        ctx.collector.propose(issue, |plan| {
+        ctx.collector.propose(issue, |edits| {
             // Delete the entire statement including the semicolon
-            plan.delete(statement.span().to_range(), safety);
+            let edit = TextEdit::delete(statement.span());
+            edits.push(if is_potentially_unsafe {
+                // Object property access may have side effects through __get/__set or property hooks
+                edit.with_safety(mago_text_edit::Safety::PotentiallyUnsafe)
+            } else {
+                edit
+            });
         });
     }
 }

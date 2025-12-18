@@ -3,7 +3,6 @@ use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_fixer::SafetyClassification;
 use mago_php_version::PHPVersion;
 use mago_php_version::PHPVersionRange;
 use mago_reporting::Annotation;
@@ -18,6 +17,8 @@ use mago_syntax::ast::Node;
 use mago_syntax::ast::NodeKind;
 use mago_syntax::ast::PositionalArgument;
 use mago_syntax::ast::Variable;
+use mago_text_edit::Safety;
+use mago_text_edit::TextEdit;
 
 use crate::category::Category;
 use crate::context::LintContext;
@@ -117,9 +118,11 @@ impl LintRule for PreferFirstClassCallableRule {
             .with_note("This closure only forwards its arguments to another function or method, which can be expressed more concisely.")
             .with_help("Replace the arrow function with the first-class callable syntax (e.g., `strlen(...)`).");
 
-            ctx.collector.propose(issue, |p| {
-                p.delete(span.to_end(call.start_position()).to_range(), SafetyClassification::PotentiallyUnsafe);
-                p.replace(call.get_argument_list().span().to_range(), "(...)", SafetyClassification::PotentiallyUnsafe);
+            ctx.collector.propose(issue, |edits| {
+                edits.push(TextEdit::delete(span.to_end(call.start_position())).with_safety(Safety::PotentiallyUnsafe));
+                edits.push(
+                    TextEdit::replace(call.get_argument_list().span(), "(...)").with_safety(Safety::PotentiallyUnsafe),
+                );
             });
         }
 
@@ -151,18 +154,20 @@ impl LintRule for PreferFirstClassCallableRule {
             .with_note("This closure only forwards its arguments to another function or method, which can be expressed more concisely.")
             .with_help("Replace the closure with the first-class callable syntax (e.g., `strlen(...)`).");
 
-            ctx.collector.propose(issue, |p| {
+            ctx.collector.propose(issue, |edits| {
                 let closure_end = closure.end_position();
 
-                p.delete(
-                    closure.span().to_end(value.start_position()).to_range(),
-                    SafetyClassification::PotentiallyUnsafe,
+                edits.push(
+                    TextEdit::delete(closure.span().to_end(value.start_position()))
+                        .with_safety(Safety::PotentiallyUnsafe),
                 );
-                p.delete(
-                    return_stmt.terminator.span().to_end(closure_end).to_range(),
-                    SafetyClassification::PotentiallyUnsafe,
+                edits.push(
+                    TextEdit::delete(return_stmt.terminator.span().to_end(closure_end))
+                        .with_safety(Safety::PotentiallyUnsafe),
                 );
-                p.replace(call.get_argument_list().span().to_range(), "(...)", SafetyClassification::PotentiallyUnsafe);
+                edits.push(
+                    TextEdit::replace(call.get_argument_list().span(), "(...)").with_safety(Safety::PotentiallyUnsafe),
+                );
             });
         }
     }

@@ -3,7 +3,6 @@ use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_fixer::SafetyClassification;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_reporting::Level;
@@ -16,6 +15,7 @@ use mago_syntax::ast::Node;
 use mago_syntax::ast::NodeKind;
 use mago_syntax::ast::Statement;
 use mago_syntax::ast::Variable;
+use mago_text_edit::TextEdit;
 
 use crate::category::Category;
 use crate::context::LintContext;
@@ -240,18 +240,15 @@ impl LintRule for NoRedundantLiteralReturnRule {
                 ))
                 .with_help("Remove the if statement and just return the variable.");
 
-            ctx.collector.propose(issue, |plan| {
+            ctx.collector.propose(issue, |edits| {
                 if delete_includes_return {
                     let replacement = format!("return {};", var_name);
-                    plan.replace(
-                        return_span.start.offset..return_span.end.offset,
-                        replacement,
-                        SafetyClassification::Safe,
-                    );
+                    edits.push(TextEdit::replace(return_span, replacement));
                 } else {
                     let if_span = if_stmt.span();
-                    let delete_end = find_next_non_whitespace(ctx.source_file.contents.as_bytes(), if_span.end.offset);
-                    plan.delete(if_span.start.offset..delete_end, SafetyClassification::Safe);
+                    let delete_end =
+                        find_next_non_whitespace(ctx.source_file.contents.as_bytes(), if_span.end_offset());
+                    edits.push(TextEdit::delete(if_span.start_offset()..delete_end));
                 }
             });
         }

@@ -173,7 +173,7 @@ struct IgnoreNextChecker<'a> {
 
 impl<'ast, 'arena> MutWalker<'ast, 'arena, ()> for IgnoreNextChecker<'_> {
     fn walk_in_statement(&mut self, statement: &'ast Statement<'arena>, _context: &mut ()) {
-        let stmt_start = statement.span().start.offset;
+        let stmt_start = statement.span().start_offset();
 
         for marker in self.markers.iter_mut() {
             if !marker.used && stmt_start > marker.marker_span.end_offset() {
@@ -184,7 +184,7 @@ impl<'ast, 'arena> MutWalker<'ast, 'arena, ()> for IgnoreNextChecker<'_> {
     }
 
     fn walk_in_class_like_member(&mut self, member: &'ast ClassLikeMember<'arena>, _context: &mut ()) {
-        let member_start = member.span().start.offset;
+        let member_start = member.span().start_offset();
 
         for marker in self.markers.iter_mut() {
             if !marker.used && member_start > marker.marker_span.end_offset() {

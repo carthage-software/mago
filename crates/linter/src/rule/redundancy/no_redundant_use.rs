@@ -1,8 +1,7 @@
-use schemars::JsonSchema;
 use std::collections::HashMap;
-use std::ops::Range;
 
 use indoc::indoc;
+use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -10,7 +9,6 @@ use mago_atom::Atom;
 use mago_atom::AtomSet;
 use mago_atom::atom;
 use mago_atom::starts_with_ignore_case;
-use mago_fixer::SafetyClassification;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_reporting::Level;
@@ -23,6 +21,7 @@ use mago_syntax::ast::Program;
 use mago_syntax::ast::Statement;
 use mago_syntax::ast::UseItem;
 use mago_syntax::ast::UseItems;
+use mago_text_edit::TextEdit;
 
 use crate::category::Category;
 use crate::context::LintContext;
@@ -157,8 +156,8 @@ impl LintRule for NoRedundantUseRule {
                         )
                         .with_help("Remove the entire `use` statement.");
 
-                    ctx.collector.propose(issue, |plan| {
-                        plan.delete(parent_stmt.span().to_range(), SafetyClassification::Safe);
+                    ctx.collector.propose(issue, |edits| {
+                        edits.push(TextEdit::delete(parent_stmt.span()));
                     });
                 } else {
                     let issue = Issue::new(self.cfg.level(), "Redundant `use` statement.")
@@ -169,8 +168,8 @@ impl LintRule for NoRedundantUseRule {
                         )
                         .with_help("Remove the entire `use` statement.");
 
-                    ctx.collector.propose(issue, |plan| {
-                        plan.delete(parent_stmt.span().to_range(), SafetyClassification::Safe);
+                    ctx.collector.propose(issue, |edits| {
+                        edits.push(TextEdit::delete(parent_stmt.span()));
                     });
                 }
             } else {
@@ -189,12 +188,12 @@ impl LintRule for NoRedundantUseRule {
                     );
                 }
 
-                ctx.collector.propose(issue, |plan| {
+                ctx.collector.propose(issue, |edits| {
                     for unused_decl in unused_items.iter().rev() {
                         if let Some(delete_range) =
                             utils::calculate_delete_range_for_item(parent_stmt, unused_decl.item)
                         {
-                            plan.delete(delete_range, SafetyClassification::Safe);
+                            edits.push(TextEdit::delete(delete_range));
                         }
                     }
                 });
@@ -205,6 +204,7 @@ impl LintRule for NoRedundantUseRule {
 
 mod utils {
     use mago_atom::concat_atom;
+    use mago_span::Span;
     use mago_syntax::walker::MutWalker;
 
     use super::Atom;
@@ -214,7 +214,6 @@ mod utils {
     use super::LintContext;
     use super::MixedUseItemList;
     use super::Program;
-    use super::Range;
     use super::Statement;
     use super::UseItem;
     use super::UseItems;
@@ -358,10 +357,7 @@ mod utils {
         atom(item.alias.as_ref().map_or_else(|| item.name.last_segment(), |alias| alias.identifier.value))
     }
 
-    pub(super) fn calculate_delete_range_for_item(
-        parent_stmt: &Statement,
-        item_to_delete: &UseItem,
-    ) -> Option<Range<u32>> {
+    pub(super) fn calculate_delete_range_for_item(parent_stmt: &Statement, item_to_delete: &UseItem) -> Option<Span> {
         let Statement::Use(use_stmt) = parent_stmt else { return None };
 
         let items = match &use_stmt.items {
@@ -372,11 +368,11 @@ mod utils {
         };
 
         let Some(index) = items.nodes.iter().position(|i| std::ptr::eq(i, item_to_delete)) else {
-            return Some(item_to_delete.span().to_range());
+            return Some(item_to_delete.span());
         };
 
         if items.nodes.len() == 1 {
-            return Some(parent_stmt.span().to_range());
+            return Some(parent_stmt.span());
         }
 
         let delete_span = if index > 0 {
@@ -387,28 +383,26 @@ mod utils {
             item_to_delete.span().join(comma_span)
         };
 
-        Some(delete_span.to_range())
+        Some(delete_span)
     }
 
-    fn find_range_in_mixed_list(list: &MixedUseItemList, item_to_delete: &UseItem) -> Range<u32> {
+    fn find_range_in_mixed_list(list: &MixedUseItemList, item_to_delete: &UseItem) -> Span {
         let Some(index) = list.items.nodes.iter().position(|i| std::ptr::eq(&raw const i.item, item_to_delete)) else {
-            return item_to_delete.span().to_range();
+            return item_to_delete.span();
         };
 
         if list.items.nodes.len() == 1 {
-            return list.span().to_range();
+            return list.span();
         }
 
         let typed_item_span = list.items.nodes[index].span();
 
-        let delete_span = if index > 0 {
+        if index > 0 {
             let comma_span = list.items.tokens[index - 1].span;
             comma_span.join(typed_item_span)
         } else {
             let comma_span = list.items.tokens[index].span;
             typed_item_span.join(comma_span)
-        };
-
-        delete_span.to_range()
+        }
     }
 }

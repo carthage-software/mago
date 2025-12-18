@@ -12,13 +12,14 @@ use mago_codex::ttype::get_false;
 use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::get_true;
 use mago_codex::ttype::union::TUnion;
-use mago_fixer::SafetyClassification;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_syntax::ast::Binary;
 use mago_syntax::ast::BinaryOperator;
 use mago_syntax::ast::Expression;
+use mago_text_edit::Safety;
+use mago_text_edit::TextEdit;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -692,8 +693,8 @@ fn report_redundant_logical_operation<'arena>(
             binary.lhs.span().join(binary.operator.span())
         };
 
-        context.collector.propose_with_code(IssueCode::RedundantLogicalOperation, issue, |plan| {
-            plan.delete(to_remove.to_range(), SafetyClassification::PotentiallyUnsafe);
+        context.collector.propose_with_code(IssueCode::RedundantLogicalOperation, issue, |edits| {
+            edits.push(TextEdit::delete(to_remove).with_safety(Safety::PotentiallyUnsafe));
         });
     } else {
         context.collector.report_with_code(IssueCode::RedundantLogicalOperation, issue);

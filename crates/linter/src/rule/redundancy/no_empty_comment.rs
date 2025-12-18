@@ -5,7 +5,6 @@ use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_fixer::SafetyClassification;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_reporting::Level;
@@ -13,6 +12,7 @@ use mago_syntax::ast::Node;
 use mago_syntax::ast::NodeKind;
 use mago_syntax::ast::TriviaKind;
 use mago_syntax::comments::comment_lines;
+use mago_text_edit::TextEdit;
 
 use crate::category::Category;
 use crate::context::LintContext;
@@ -111,8 +111,8 @@ impl LintRule for NoEmptyCommentRule {
                     .with_annotation(Annotation::primary(span).with_message("This is an empty comment"))
                     .with_help("Consider removing this comment.");
 
-                ctx.collector.propose(issue, |plan| {
-                    plan.delete(span.to_range(), SafetyClassification::Safe);
+                ctx.collector.propose(issue, |edits| {
+                    edits.push(TextEdit::delete(span));
                 });
             }
         };

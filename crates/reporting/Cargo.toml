@@ -15,7 +15,7 @@ workspace = true
 [dependencies]
 mago-span = { workspace = true }
 mago-database = { workspace = true }
-mago-fixer = { workspace = true }
+mago-text-edit = { workspace = true }
 ahash = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

@@ -14,7 +14,7 @@ workspace = true
 
 [dependencies]
 mago-atom = { workspace = true }
-mago-fixer = { workspace = true }
+mago-text-edit = { workspace = true }
 mago-reporting = { workspace = true }
 mago-docblock = { workspace = true }
 mago-span = { workspace = true }

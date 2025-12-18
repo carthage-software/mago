@@ -1,5 +1,6 @@
 use indoc::indoc;
-use mago_fixer::SafetyClassification;
+use mago_text_edit::Safety;
+use mago_text_edit::TextEdit;
 use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
@@ -162,11 +163,11 @@ impl LintRule for StrictTypesRule {
             .with_note("The `strict_types` directive enforces strict type checking, which can prevent subtle bugs.")
             .with_help("Add `declare(strict_types=1);` at the top of your file.");
 
-            ctx.collector.propose(issue, |plan| {
+            ctx.collector.propose(issue, |edits| {
                 let Some(mut first_statement) = program.statements.first() else {
                     // The file is completely empty, insert an opening tag and declare statement
                     // This change is safe because the file is empty.
-                    plan.insert(0, "<?php\n\ndeclare(strict_types=1);\n", SafetyClassification::Safe);
+                    edits.push(TextEdit::insert(0, "<?php\n\ndeclare(strict_types=1);\n"));
 
                     return;
                 };
@@ -187,7 +188,7 @@ impl LintRule for StrictTypesRule {
                         };
 
                         // This is safe because the shebang is the only statement in the file.
-                        plan.insert(span.end.offset, content, SafetyClassification::Safe);
+                        edits.push(TextEdit::insert(span.end_offset(), content));
 
                         return;
                     };
@@ -203,25 +204,26 @@ impl LintRule for StrictTypesRule {
                             "<?php\n\ndeclare(strict_types=1);\n\n?>\n"
                         };
 
-                        plan.insert(inline.span.start.offset, content, SafetyClassification::PotentiallyUnsafe);
+                        edits.push(
+                            TextEdit::insert(inline.span.start_offset(), content)
+                                .with_safety(Safety::PotentiallyUnsafe),
+                        );
                     }
                     Statement::OpeningTag(
                         OpeningTag::Full(FullOpeningTag { span, .. }) | OpeningTag::Short(ShortOpeningTag { span }),
                     ) => {
                         // If the first statement is an opening tag, insert the declare statement after it.
-                        plan.insert(
-                            span.end.offset,
-                            "\n\ndeclare(strict_types=1);\n",
-                            SafetyClassification::PotentiallyUnsafe,
+                        edits.push(
+                            TextEdit::insert(span.end_offset(), "\n\ndeclare(strict_types=1);\n")
+                                .with_safety(Safety::PotentiallyUnsafe),
                         );
                     }
                     Statement::EchoTag(echo_tag) => {
                         // If the first statement is an echo opening tag, insert an opening tag and declare statement
                         // and a closing tag before it.
-                        plan.insert(
-                            echo_tag.tag.start.offset,
-                            "<?php\n\ndeclare(strict_types=1);\n\n?>\n",
-                            SafetyClassification::PotentiallyUnsafe,
+                        edits.push(
+                            TextEdit::insert(echo_tag.tag.start_offset(), "<?php\n\ndeclare(strict_types=1);\n\n?>\n")
+                                .with_safety(Safety::PotentiallyUnsafe),
                         );
                     }
                     _ => unreachable!(),

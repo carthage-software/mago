@@ -3,7 +3,6 @@ use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_fixer::SafetyClassification;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_reporting::Level;
@@ -13,6 +12,7 @@ use mago_syntax::ast::Node;
 use mago_syntax::ast::NodeKind;
 use mago_syntax::ast::Statement;
 use mago_syntax::ast::Variable;
+use mago_text_edit::TextEdit;
 
 use crate::category::Category;
 use crate::context::LintContext;
@@ -182,15 +182,16 @@ impl LintRule for InlineVariableReturnRule {
                 .with_note("Assigning to a variable just to return it immediately is redundant.")
                 .with_help(format!("Return the expression directly: `return {rhs_text};`"));
 
-            ctx.collector.propose(issue, |plan| {
+            ctx.collector.propose(issue, |edits| {
                 let assign_span = expr_stmt.span();
-                let delete_end = find_next_non_whitespace(ctx.source_file.contents.as_bytes(), assign_span.end.offset);
-                let delete_range = assign_span.start.offset..delete_end;
+                let delete_end =
+                    find_next_non_whitespace(ctx.source_file.contents.as_bytes(), assign_span.end_offset());
+                let delete_range = assign_span.start_offset()..delete_end;
 
-                plan.delete(delete_range, SafetyClassification::Safe);
+                edits.push(TextEdit::delete(delete_range));
 
                 let return_var_span = return_var.span;
-                plan.replace(return_var_span.to_range(), rhs_text.to_string(), SafetyClassification::Safe);
+                edits.push(TextEdit::replace(return_var_span, rhs_text));
             });
         }
     }

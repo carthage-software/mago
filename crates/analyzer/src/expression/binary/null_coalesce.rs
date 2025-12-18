@@ -10,13 +10,14 @@ use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::combine_union_types;
 use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::union::TUnion;
-use mago_fixer::SafetyClassification;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_syntax::ast::Binary;
 use mago_syntax::ast::Expression;
 use mago_syntax::ast::Variable;
+use mago_text_edit::Safety;
+use mago_text_edit::TextEdit;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -81,10 +82,10 @@ pub fn analyze_null_coalesce_operation<'ctx, 'arena>(
                 )
                 .with_note("The right-hand side of `??` will always be evaluated.")
                 .with_help("Consider directly using the right-hand side expression."),
-            |plan| {
-                plan.delete(
-                    binary.lhs.span().join(binary.operator.span()).to_range(),
-                    SafetyClassification::PotentiallyUnsafe,
+            |edits| {
+                edits.push(
+                    TextEdit::delete(binary.lhs.span().join(binary.operator.span()))
+                        .with_safety(Safety::PotentiallyUnsafe),
                 );
             },
         );
@@ -108,11 +109,10 @@ pub fn analyze_null_coalesce_operation<'ctx, 'arena>(
                 "The null coalesce operator `??` only evaluates the right-hand side if the left-hand side is `null` or not set.",
             )
             .with_help("Consider removing the `??` operator and the right-hand side expression."),
-            |plan| {
-                plan.delete(
-                    binary.operator.span().join(binary.rhs.span()).to_range(),
-                    SafetyClassification::PotentiallyUnsafe,
-                );
+            |edits| {
+                edits.push(TextEdit::delete(
+                    binary.operator.span().join(binary.rhs.span())
+                ).with_safety(Safety::PotentiallyUnsafe));
             },
         );
 

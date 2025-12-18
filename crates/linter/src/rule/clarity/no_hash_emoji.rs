@@ -3,7 +3,6 @@ use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_fixer::SafetyClassification;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_reporting::Level;
@@ -12,6 +11,7 @@ use mago_syntax::ast::Node;
 use mago_syntax::ast::NodeKind;
 use mago_syntax::ast::trivia::Trivia;
 use mago_syntax::ast::trivia::TriviaKind;
+use mago_text_edit::TextEdit;
 
 use crate::category::Category;
 use crate::context::LintContext;
@@ -119,15 +119,14 @@ impl LintRule for NoHashEmojiRule {
                 issue = issue.with_note("`#️⃣[` does not parse as an attribute in PHP; use `#[` instead.");
             }
 
-            ctx.collector.propose(issue, |plan| {
+            ctx.collector.propose(issue, |edits| {
                 let trivia_span = trivia.span();
                 let emoji_len = "#️⃣".len() as u32;
 
-                plan.replace(
-                    trivia_span.start.offset..(trivia_span.start.offset + emoji_len),
+                edits.push(TextEdit::replace(
+                    trivia_span.start_offset()..(trivia_span.start_offset() + emoji_len),
                     "#".to_string(),
-                    SafetyClassification::Safe,
-                );
+                ));
             });
         }
     }

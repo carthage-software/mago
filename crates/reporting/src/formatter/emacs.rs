@@ -65,7 +65,7 @@ fn apply_filters(issues: &IssueCollection, config: &FormatterConfig) -> IssueCol
     }
 
     if config.filter_fixable {
-        filtered = filtered.filter_fixable();
+        filtered = filtered.with_edits();
     }
 
     if config.sort {

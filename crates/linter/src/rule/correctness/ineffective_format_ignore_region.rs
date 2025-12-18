@@ -173,14 +173,14 @@ fn build_ignore_regions(program: &Program<'_>) -> Vec<IgnoreRegion> {
         let has_end = IGNORE_END_MARKERS.iter().any(|m| trivia.value.contains(m));
 
         if has_start && current_start.is_none() {
-            current_start = Some((trivia.span, trivia.span.start.offset));
+            current_start = Some((trivia.span, trivia.span.start_offset()));
         } else if let Some((start_span, start_offset)) = current_start
             && has_end
         {
             regions.push(IgnoreRegion {
                 start_marker_span: start_span,
                 start: start_offset,
-                end: trivia.span.end.offset,
+                end: trivia.span.end_offset(),
                 used: false,
             });
 
@@ -202,7 +202,7 @@ struct IgnoreRegionChecker<'a> {
 
 impl<'ast, 'arena> MutWalker<'ast, 'arena, ()> for IgnoreRegionChecker<'_> {
     fn walk_in_statement(&mut self, statement: &'ast Statement<'arena>, _context: &mut ()) {
-        let stmt_start = statement.span().start.offset;
+        let stmt_start = statement.span().start_offset();
 
         // Mark any region that contains this statement's start as used
         for region in self.regions.iter_mut() {
@@ -213,7 +213,7 @@ impl<'ast, 'arena> MutWalker<'ast, 'arena, ()> for IgnoreRegionChecker<'_> {
     }
 
     fn walk_in_class_like_member(&mut self, member: &'ast ClassLikeMember<'arena>, _context: &mut ()) {
-        let member_start = member.span().start.offset;
+        let member_start = member.span().start_offset();
 
         // Mark any region that contains this member's start as used
         for region in self.regions.iter_mut() {

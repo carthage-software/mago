@@ -15,7 +15,7 @@ use crate::ttype::union::TUnion;
 ///
 /// Represents a single constant declaration item, potentially within a grouped declaration,
 /// like `MAX_RETRIES = 3` in `const MAX_RETRIES = 3;` or `B = 2` in `const A = 1, B = 2;`.
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ConstantMetadata {
     pub attributes: Vec<AttributeMetadata>,
     pub name: Atom,
