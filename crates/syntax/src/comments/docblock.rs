@@ -55,32 +55,34 @@ pub fn get_docblock_before_position<'arena>(
         return None;
     }
 
+    // Track the earliest position we've "covered" by trivia.
+    // Start from node_start_offset and work backwards.
+    // As we iterate, we verify that each trivia connects to the next (no code gaps).
+    let mut covered_from = node_start_offset;
+
     for i in (0..candidate_partition_idx).rev() {
         let trivia = &trivias[i];
+        let trivia_end = trivia.span.end_offset();
+
+        // Check if there's a gap between this trivia and our covered region.
+        // If there's non-whitespace content in the gap, there's actual code between them.
+        let gap_slice = file.contents.as_bytes().get(trivia_end as usize..covered_from as usize).unwrap_or(&[]);
+
+        if !gap_slice.iter().all(u8::is_ascii_whitespace) {
+            // There's actual code in the gap. No docblock applies.
+            return None;
+        }
 
         match trivia.kind {
             TriviaKind::DocBlockComment => {
-                let docblock_end_offset = trivia.span().end.offset;
-
-                // Get the slice between docblock end and class start
-                let code_between_slice = file
-                    .contents
-                    .as_bytes()
-                    .get(docblock_end_offset as usize..node_start_offset as usize)
-                    .unwrap_or(&[]);
-
-                if code_between_slice.iter().all(u8::is_ascii_whitespace) {
-                    // It's the correct docblock!
-                    return Some(trivia);
-                }
-
-                // There was non-whitespace code between this docblock and the class.
-                // This docblock doesn't apply. Stop searching.
-                return None;
+                // Found a docblock with no code between it and the node.
+                return Some(trivia);
             }
-            TriviaKind::WhiteSpace => {}
-            _ => {
-                return None;
+            TriviaKind::WhiteSpace
+            | TriviaKind::SingleLineComment
+            | TriviaKind::MultiLineComment
+            | TriviaKind::HashComment => {
+                covered_from = trivia.span.start_offset();
             }
         }
     }
