@@ -330,6 +330,7 @@ test_case!(type_assert);
 test_case!(string_callable_template_inference);
 test_case!(clear_narrowed_prop_after_call);
 test_case!(binary_throw_used);
+test_case!(template_null_comparison);
 
 // Github Issues
 test_case!(issue_659);

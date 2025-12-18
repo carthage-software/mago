@@ -796,6 +796,7 @@ impl TUnion {
     pub fn is_nullable(&self) -> bool {
         self.types.iter().any(|t| match t {
             TAtomic::Null => self.types.len() >= 2,
+            TAtomic::GenericParameter(param) => param.constraint.is_nullable(),
             _ => false,
         })
     }
