@@ -1,5 +1,6 @@
 use indexmap::IndexMap;
 
+use mago_algebra::AlgebraThresholds;
 use mago_algebra::assertion_set::AssertionSet;
 use mago_algebra::clause::Clause;
 use mago_algebra::disjoin_clauses;
@@ -24,8 +25,6 @@ use crate::context::assertion::AssertionContext;
 use crate::context::scope::var_has_root;
 use crate::utils::expression::get_expression_id;
 use crate::utils::misc::unwrap_expression;
-
-const FORMULA_SIZE_THRESHOLD: usize = 512;
 
 /// Recursively traverses a conditional expression to generate a corresponding logical formula.
 ///
@@ -52,11 +51,13 @@ const FORMULA_SIZE_THRESHOLD: usize = 512;
 /// * `conditional`: The conditional expression to convert into a formula.
 /// * `assertion_context`: The context required for generating assertions.
 /// * `artifacts`: A mutable reference to the analysis artifacts.
+/// * `algebra_thresholds`: Thresholds for controlling algebra operations complexity.
+/// * `formula_size_threshold`: The maximum allowed formula size before returning `None`.
 ///
 /// # Returns
 ///
 /// Returns `Some(Vec<Clause>)` representing the logical formula. Returns `None` if the
-/// formula's complexity exceeds a predefined threshold (`FORMULA_SIZE_THRESHOLD`) at
+/// formula's complexity exceeds the provided `formula_size_threshold` at
 /// any point during the recursive process.
 pub fn get_formula(
     conditional_object_id: Span,
@@ -64,6 +65,8 @@ pub fn get_formula(
     conditional: &Expression,
     assertion_context: AssertionContext<'_, '_>,
     artifacts: &AnalysisArtifacts,
+    algebra_thresholds: &AlgebraThresholds,
+    formula_size_threshold: u16,
 ) -> Option<Vec<Clause>> {
     let expression = unwrap_expression(conditional);
 
@@ -75,6 +78,8 @@ pub fn get_formula(
                 binary.rhs,
                 assertion_context,
                 artifacts,
+                algebra_thresholds,
+                formula_size_threshold,
             );
         }
 
@@ -85,6 +90,8 @@ pub fn get_formula(
                 binary.rhs,
                 assertion_context,
                 artifacts,
+                algebra_thresholds,
+                formula_size_threshold,
             );
         }
 
@@ -157,10 +164,12 @@ pub fn get_formula(
                         binary.rhs,
                         assertion_context,
                         artifacts,
+                        algebra_thresholds,
+                        formula_size_threshold,
                     )?;
 
                     let should_negate = if is_identical { left_is_false } else { left_is_true };
-                    return if should_negate { negate_formula(formula) } else { Some(formula) };
+                    return if should_negate { negate_formula(formula, algebra_thresholds) } else { Some(formula) };
                 }
                 (_, true) => {
                     if let Some(var_name) = get_expression_id(
@@ -205,10 +214,12 @@ pub fn get_formula(
                         binary.lhs,
                         assertion_context,
                         artifacts,
+                        algebra_thresholds,
+                        formula_size_threshold,
                     )?;
 
                     let should_negate = if is_identical { right_is_false } else { right_is_true };
-                    return if should_negate { negate_formula(formula) } else { Some(formula) };
+                    return if should_negate { negate_formula(formula, algebra_thresholds) } else { Some(formula) };
                 }
                 _ => {}
             }
@@ -251,14 +262,14 @@ pub fn get_formula(
                             Some(has_equality),
                         ));
 
-                        if clauses.len() > FORMULA_SIZE_THRESHOLD {
+                        if clauses.len() > usize::from(formula_size_threshold) {
                             return None;
                         }
                     }
                 }
             }
 
-            return negate_formula(clauses);
+            return negate_formula(clauses, algebra_thresholds);
         }
 
         if let Expression::Binary(binary_expression) = unwrap_expression(unary_prefix.operand) {
@@ -275,6 +286,8 @@ pub fn get_formula(
                     }),
                     assertion_context,
                     artifacts,
+                    algebra_thresholds,
+                    formula_size_threshold,
                 );
             }
 
@@ -291,20 +304,27 @@ pub fn get_formula(
                     }),
                     assertion_context,
                     artifacts,
+                    algebra_thresholds,
+                    formula_size_threshold,
                 );
             }
         }
 
         let unary_operand_span = unary_prefix.operand.span();
-        let negated = negate_formula(get_formula(
-            conditional_object_id,
-            unary_operand_span,
-            unary_prefix.operand,
-            assertion_context,
-            artifacts,
-        )?)?;
+        let negated = negate_formula(
+            get_formula(
+                conditional_object_id,
+                unary_operand_span,
+                unary_prefix.operand,
+                assertion_context,
+                artifacts,
+                algebra_thresholds,
+                formula_size_threshold,
+            )?,
+            algebra_thresholds,
+        )?;
 
-        return if negated.len() > FORMULA_SIZE_THRESHOLD { None } else { Some(negated) };
+        return if negated.len() > usize::from(formula_size_threshold) { None } else { Some(negated) };
     }
 
     get_formula_from_assertions(
@@ -312,6 +332,7 @@ pub fn get_formula(
         creating_object_id,
         expression,
         scrape_assertions(expression, artifacts, assertion_context),
+        formula_size_threshold,
     )
 }
 
@@ -331,13 +352,15 @@ pub fn get_formula(
 /// * `assertion_context`: The context required for generating assertions.
 /// * `artifacts`: A mutable reference to the analysis artifacts.
 /// * `is_identity`: A boolean indicating whether the equality is an identity check (e.g., `===`).
+/// * `algebra_thresholds`: Thresholds for controlling algebra operations complexity.
+/// * `formula_size_threshold`: The maximum allowed formula size before returning `None`.
 ///
 /// # Returns
 ///
 /// Returns `Some(Vec<Clause>)` containing the resulting logical formula if successful.
 ///
-/// Returns `None` if the formula's complexity exceeds a predefined threshold
-/// (`FORMULA_SIZE_THRESHOLD`), to avoid performance degradation.
+/// Returns `None` if the formula's complexity exceeds the provided `formula_size_threshold`,
+/// to avoid performance degradation.
 #[allow(dead_code)]
 pub fn get_disjunctive_equality_formula(
     subject: &Expression,
@@ -345,6 +368,8 @@ pub fn get_disjunctive_equality_formula(
     assertion_context: AssertionContext<'_, '_>,
     artifacts: &mut AnalysisArtifacts,
     is_identity: bool,
+    algebra_thresholds: &AlgebraThresholds,
+    formula_size_threshold: u16,
 ) -> Option<Vec<Clause>> {
     let subject = unwrap_expression(subject);
     let subject_span = subject.span();
@@ -354,14 +379,22 @@ pub fn get_disjunctive_equality_formula(
         let condition = unwrap_expression(condition);
         let condition_span = condition.span();
         let formula = if subject.is_true() && (!is_identity || condition.evaluates_to_boolean()) {
-            get_formula(condition_span, condition_span, condition, assertion_context, artifacts)?
+            get_formula(
+                condition_span,
+                condition_span,
+                condition,
+                assertion_context,
+                artifacts,
+                algebra_thresholds,
+                formula_size_threshold,
+            )?
         } else {
             let assertions = scrape_equality_assertions(subject, is_identity, condition, artifacts, assertion_context);
-            get_formula_from_assertions(condition_span, subject_span, subject, assertions)?
+            get_formula_from_assertions(condition_span, subject_span, subject, assertions, formula_size_threshold)?
         };
 
-        clauses = disjoin_clauses(clauses, formula, condition_span);
-        if clauses.len() > FORMULA_SIZE_THRESHOLD {
+        clauses = disjoin_clauses(clauses, formula, condition_span, algebra_thresholds);
+        if clauses.len() > usize::from(formula_size_threshold) {
             return None;
         }
     }
@@ -374,6 +407,7 @@ fn get_formula_from_assertions(
     creating_object_id: Span,
     conditional: &Expression,
     anded_assertions: Vec<AtomMap<AssertionSet>>,
+    formula_size_threshold: u16,
 ) -> Option<Vec<Clause>> {
     let mut clauses = Vec::new();
     for assertions in anded_assertions {
@@ -404,7 +438,7 @@ fn get_formula_from_assertions(
     }
 
     if !clauses.is_empty() {
-        return if clauses.len() > FORMULA_SIZE_THRESHOLD { None } else { Some(clauses) };
+        return if clauses.len() > usize::from(formula_size_threshold) { None } else { Some(clauses) };
     }
 
     let conditional_span = conditional.span();
@@ -430,8 +464,10 @@ pub fn negate_or_synthesize(
     conditional: &Expression,
     assertion_context: AssertionContext<'_, '_>,
     artifacts: &mut AnalysisArtifacts,
+    algebra_thresholds: &AlgebraThresholds,
+    formula_size_threshold: u16,
 ) -> Vec<Clause> {
-    match negate_formula(clauses) {
+    match negate_formula(clauses, algebra_thresholds) {
         Some(negated_clauses) => negated_clauses,
         None => match get_formula(
             conditional.span(),
@@ -442,6 +478,8 @@ pub fn negate_or_synthesize(
             }),
             assertion_context,
             artifacts,
+            algebra_thresholds,
+            formula_size_threshold,
         ) {
             Some(synthesized_clauses) => synthesized_clauses,
             None => {
@@ -460,12 +498,30 @@ fn handle_binary_or_operation(
     right: &Expression,
     assertion_context: AssertionContext<'_, '_>,
     artifacts: &AnalysisArtifacts,
+    algebra_thresholds: &AlgebraThresholds,
+    formula_size_threshold: u16,
 ) -> Option<Vec<Clause>> {
-    let left_clauses = get_formula(conditional_object_id, left.span(), left, assertion_context, artifacts)?;
-    let right_clauses = get_formula(conditional_object_id, right.span(), right, assertion_context, artifacts)?;
-    let clauses = disjoin_clauses(left_clauses, right_clauses, conditional_object_id);
+    let left_clauses = get_formula(
+        conditional_object_id,
+        left.span(),
+        left,
+        assertion_context,
+        artifacts,
+        algebra_thresholds,
+        formula_size_threshold,
+    )?;
+    let right_clauses = get_formula(
+        conditional_object_id,
+        right.span(),
+        right,
+        assertion_context,
+        artifacts,
+        algebra_thresholds,
+        formula_size_threshold,
+    )?;
+    let clauses = disjoin_clauses(left_clauses, right_clauses, conditional_object_id, algebra_thresholds);
 
-    if clauses.len() > FORMULA_SIZE_THRESHOLD { None } else { Some(clauses) }
+    if clauses.len() > usize::from(formula_size_threshold) { None } else { Some(clauses) }
 }
 
 #[inline]
@@ -475,11 +531,29 @@ fn handle_binary_and_operation(
     right: &Expression,
     assertion_context: AssertionContext<'_, '_>,
     artifacts: &AnalysisArtifacts,
+    algebra_thresholds: &AlgebraThresholds,
+    formula_size_threshold: u16,
 ) -> Option<Vec<Clause>> {
-    let mut clauses = get_formula(conditional_object_id, left.span(), left, assertion_context, artifacts)?;
-    clauses.extend(get_formula(conditional_object_id, right.span(), right, assertion_context, artifacts)?);
+    let mut clauses = get_formula(
+        conditional_object_id,
+        left.span(),
+        left,
+        assertion_context,
+        artifacts,
+        algebra_thresholds,
+        formula_size_threshold,
+    )?;
+    clauses.extend(get_formula(
+        conditional_object_id,
+        right.span(),
+        right,
+        assertion_context,
+        artifacts,
+        algebra_thresholds,
+        formula_size_threshold,
+    )?);
 
-    if clauses.len() > FORMULA_SIZE_THRESHOLD { None } else { Some(clauses) }
+    if clauses.len() > usize::from(formula_size_threshold) { None } else { Some(clauses) }
 }
 
 pub fn remove_clauses_with_mixed_variables(

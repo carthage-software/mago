@@ -2,15 +2,19 @@ use std::io::IsTerminal;
 use std::path::PathBuf;
 
 use clap::ColorChoice;
+use mago_algebra::DEFAULT_CONSENSUS_LIMIT;
+use mago_algebra::DEFAULT_DISJUNCTION_COMPLEXITY;
+use mago_algebra::DEFAULT_NEGATION_COMPLEXITY;
+use mago_algebra::DEFAULT_SATURATION_COMPLEXITY;
+use mago_analyzer::settings::DEFAULT_FORMULA_SIZE_THRESHOLD;
+use mago_analyzer::settings::Settings;
 use mago_atom::ascii_lowercase_atom;
 use mago_atom::atom;
+use mago_php_version::PHPVersion;
 use mago_reporting::baseline::BaselineVariant;
 use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
-
-use mago_analyzer::settings::Settings;
-use mago_php_version::PHPVersion;
 
 /// Configuration options for the static analyzer.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
@@ -183,6 +187,74 @@ pub struct AnalyzerConfiguration {
     /// This option is kept for backwards compatibility with existing configurations.
     #[serde(skip_serializing)]
     pub perform_heuristic_checks: Option<bool>,
+
+    /// Performance tuning settings.
+    ///
+    /// These thresholds control how deeply the analyzer explores complex logical formulas.
+    /// Higher values allow more precise analysis but may significantly increase analysis time.
+    /// Lower values improve speed but may reduce precision on complex conditional code.
+    #[serde(default)]
+    pub performance: PerformanceConfiguration,
+}
+
+/// Performance tuning settings for the analyzer.
+///
+/// These thresholds control the complexity limits for logical formula operations.
+/// Adjusting these values allows trading off between analysis precision and speed.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(default, rename_all = "kebab-case", deny_unknown_fields)]
+pub struct PerformanceConfiguration {
+    /// Maximum number of clauses to process during CNF saturation.
+    ///
+    /// Controls how many clauses the simplification algorithm will work with.
+    /// If exceeded, saturation returns an empty result to avoid performance issues.
+    ///
+    /// Defaults to `8192`.
+    pub saturation_complexity_threshold: u16,
+
+    /// Maximum number of clauses per side in disjunction operations.
+    ///
+    /// Controls the complexity limit for OR operations between clause sets.
+    /// If either side exceeds this, the disjunction returns an empty result.
+    ///
+    /// Defaults to `4096`.
+    pub disjunction_complexity_threshold: u16,
+
+    /// Maximum cumulative complexity during formula negation.
+    ///
+    /// Controls how complex the negation of a formula can become.
+    /// If exceeded, negation gives up to avoid exponential blowup.
+    ///
+    /// Defaults to `4096`.
+    pub negation_complexity_threshold: u16,
+
+    /// Upper limit for consensus optimization during saturation.
+    ///
+    /// Controls when the consensus rule is applied during saturation.
+    /// Only applies when clause count is between 3 and this limit.
+    ///
+    /// Defaults to `256`.
+    pub consensus_limit_threshold: u16,
+
+    /// Maximum logical formula size during conditional analysis.
+    ///
+    /// Limits the size of generated formulas to prevent exponential blowup
+    /// in deeply nested conditionals.
+    ///
+    /// Defaults to `512`.
+    pub formula_size_threshold: u16,
+}
+
+impl Default for PerformanceConfiguration {
+    fn default() -> Self {
+        Self {
+            saturation_complexity_threshold: DEFAULT_SATURATION_COMPLEXITY,
+            disjunction_complexity_threshold: DEFAULT_DISJUNCTION_COMPLEXITY,
+            negation_complexity_threshold: DEFAULT_NEGATION_COMPLEXITY,
+            consensus_limit_threshold: DEFAULT_CONSENSUS_LIMIT,
+            formula_size_threshold: DEFAULT_FORMULA_SIZE_THRESHOLD,
+        }
+    }
 }
 
 impl AnalyzerConfiguration {
@@ -219,6 +291,11 @@ impl AnalyzerConfiguration {
             class_initializers: self.class_initializers.iter().map(|s| ascii_lowercase_atom(s.as_str())).collect(),
             check_property_initialization: self.check_property_initialization,
             check_use_statements: self.check_use_statements,
+            saturation_complexity_threshold: self.performance.saturation_complexity_threshold,
+            disjunction_complexity_threshold: self.performance.disjunction_complexity_threshold,
+            negation_complexity_threshold: self.performance.negation_complexity_threshold,
+            consensus_limit_threshold: self.performance.consensus_limit_threshold,
+            formula_size_threshold: self.performance.formula_size_threshold,
         }
     }
 }
@@ -253,6 +330,7 @@ impl Default for AnalyzerConfiguration {
             check_property_initialization: defaults.check_property_initialization,
             check_use_statements: defaults.check_use_statements,
             perform_heuristic_checks: None,
+            performance: PerformanceConfiguration::default(),
         }
     }
 }

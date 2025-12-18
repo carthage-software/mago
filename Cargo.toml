@@ -130,6 +130,7 @@ mago-php-version = { workspace = true }
 mago-composer = { workspace = true }
 mago-prelude = { workspace = true }
 mago-analyzer = { workspace = true }
+mago-algebra = { workspace = true }
 mago-codex = { workspace = true }
 mago-guard = { workspace = true }
 mago-orchestrator = { workspace = true }

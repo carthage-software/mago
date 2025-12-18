@@ -1619,6 +1619,7 @@ dependencies = [
  "diffy",
  "indicatif 0.18.3",
  "indoc",
+ "mago-algebra",
  "mago-analyzer",
  "mago-atom",
  "mago-codex",

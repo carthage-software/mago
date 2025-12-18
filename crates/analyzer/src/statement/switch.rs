@@ -476,7 +476,16 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
             };
 
             // todo: complexity!!
-            get_formula(span, span, case_equality_expr, assertion_context, self.artifacts).unwrap_or_default()
+            get_formula(
+                span,
+                span,
+                case_equality_expr,
+                assertion_context,
+                self.artifacts,
+                &self.context.settings.algebra_thresholds(),
+                self.context.settings.formula_size_threshold,
+            )
+            .unwrap_or_default()
         } else {
             vec![]
         };
@@ -485,7 +494,7 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
             let mut c = original_block_context.clauses.iter().map(|v| &**v).collect::<Vec<_>>();
             c.extend(self.negated_clauses.iter());
 
-            mago_algebra::saturate_clauses(c)
+            mago_algebra::saturate_clauses(c, &self.context.settings.algebra_thresholds())
         } else {
             original_block_context.clauses.iter().map(|v| (**v).clone()).collect::<Vec<_>>()
         };
@@ -498,11 +507,16 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
                 &entry_clauses.iter().map(|v| Rc::new(v.clone())).collect::<Vec<_>>(),
                 &case_clauses,
                 case_condition.span(),
+                &self.context.settings.algebra_thresholds(),
             );
 
             entry_clauses.extend(case_clauses.clone());
 
-            if entry_clauses.len() < 50 { mago_algebra::saturate_clauses(entry_clauses.iter()) } else { entry_clauses }
+            if entry_clauses.len() < 50 {
+                mago_algebra::saturate_clauses(entry_clauses.iter(), &self.context.settings.algebra_thresholds())
+            } else {
+                entry_clauses
+            }
         } else {
             entry_clauses
         }
@@ -555,6 +569,8 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
                 case_equality_expr,
                 assertion_context,
                 self.artifacts,
+                &self.context.settings.algebra_thresholds(),
+                self.context.settings.formula_size_threshold,
             ));
         }
 

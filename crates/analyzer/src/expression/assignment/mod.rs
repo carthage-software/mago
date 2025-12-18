@@ -926,6 +926,8 @@ fn handle_assignment_with_boolean_logic<'ctx, 'arena>(
         source_expression,
         context.get_assertion_context_from_block(block_context),
         artifacts,
+        &context.settings.algebra_thresholds(),
+        context.settings.formula_size_threshold,
     ) else {
         // Complex clauses
         return;
@@ -942,6 +944,7 @@ fn handle_assignment_with_boolean_logic<'ctx, 'arena>(
             vec![Clause::new(possibilities, variable_expression_id, variable_expression_id, None, None, None)],
             right_clauses.into_iter().map(|v| (*v).clone()).collect(),
             source_expression.span(),
+            &context.settings.algebra_thresholds(),
         )
         .into_iter()
         .map(Rc::new),

@@ -274,6 +274,8 @@ pub fn find_expression_logic_issues<'ctx, 'arena>(
         expression,
         context.get_assertion_context_from_block(block_context),
         artifacts,
+        &context.settings.algebra_thresholds(),
+        context.settings.formula_size_threshold,
     ) else {
         context.collector.report_with_code(
            IssueCode::ExpressionIsTooComplex,
@@ -332,7 +334,13 @@ pub fn find_expression_logic_issues<'ctx, 'arena>(
     let expression_span = expression.span();
 
     // this will see whether any of the clauses in set A conflict with the clauses in set B
-    check_for_paradox(&mut context.collector, &block_context.clauses, &expression_clauses, expression_span);
+    check_for_paradox(
+        &mut context.collector,
+        &block_context.clauses,
+        &expression_clauses,
+        expression_span,
+        &context.settings.algebra_thresholds(),
+    );
 
     expression_clauses.extend(block_context.clauses.iter().map(|v| (**v).clone()));
 

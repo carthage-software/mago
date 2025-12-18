@@ -68,6 +68,8 @@ pub fn analyze_logical_and_operation<'ctx, 'arena>(
         binary.lhs,
         context.get_assertion_context_from_block(block_context),
         artifacts,
+        &context.settings.algebra_thresholds(),
+        context.settings.formula_size_threshold,
     )
     .unwrap_or_default();
 
@@ -95,7 +97,7 @@ pub fn analyze_logical_and_operation<'ctx, 'arena>(
         }
     }
 
-    let simplified_clauses = saturate_clauses(context_clauses);
+    let simplified_clauses = saturate_clauses(context_clauses, &context.settings.algebra_thresholds());
     let (left_assertions, active_left_assertions) = find_satisfying_assignments(
         simplified_clauses.as_slice(),
         Some(binary.lhs.span()),
@@ -305,6 +307,8 @@ pub fn analyze_logical_or_operation<'ctx, 'arena>(
         binary.lhs,
         context.get_assertion_context_from_block(block_context),
         artifacts,
+        &context.settings.algebra_thresholds(),
+        context.settings.formula_size_threshold,
     )
     .unwrap_or_default();
 
@@ -313,6 +317,8 @@ pub fn analyze_logical_or_operation<'ctx, 'arena>(
         binary.lhs,
         context.get_assertion_context_from_block(block_context),
         artifacts,
+        &context.settings.algebra_thresholds(),
+        context.settings.formula_size_threshold,
     );
 
     if !left_block_context.reconciled_expression_clauses.is_empty() {
@@ -329,8 +335,10 @@ pub fn analyze_logical_or_operation<'ctx, 'arena>(
         }
     }
 
-    let clauses_for_right_analysis =
-        saturate_clauses(block_context.clauses.iter().map(|v| &**v).chain(negated_left_clauses.iter()));
+    let clauses_for_right_analysis = saturate_clauses(
+        block_context.clauses.iter().map(|v| &**v).chain(negated_left_clauses.iter()),
+        &context.settings.algebra_thresholds(),
+    );
 
     let (negated_type_assertions, active_negated_type_assertions) = find_satisfying_assignments(
         clauses_for_right_analysis.as_slice(),
@@ -455,6 +463,8 @@ pub fn analyze_logical_or_operation<'ctx, 'arena>(
             binary.rhs,
             context.get_assertion_context_from_block(block_context),
             artifacts,
+            &context.settings.algebra_thresholds(),
+            context.settings.formula_size_threshold,
         )
         .unwrap_or_default();
 
@@ -466,7 +476,8 @@ pub fn analyze_logical_or_operation<'ctx, 'arena>(
 
         clauses_for_right_analysis.extend(right_clauses);
 
-        let combined_right_clauses = saturate_clauses(clauses_for_right_analysis.iter());
+        let combined_right_clauses =
+            saturate_clauses(clauses_for_right_analysis.iter(), &context.settings.algebra_thresholds());
 
         let (right_type_assertions, active_right_type_assertions) = find_satisfying_assignments(
             combined_right_clauses.as_slice(),

@@ -49,6 +49,8 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for DoWhile<'arena> {
             self.condition,
             context.get_assertion_context_from_block(block_context),
             artifacts,
+            &context.settings.algebra_thresholds(),
+            context.settings.formula_size_threshold,
         )
         .unwrap_or_else(|| {
             context.collector.report_with_code(
@@ -109,12 +111,12 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for DoWhile<'arena> {
 
         let clauses_to_simplify = {
             let mut c = block_context.clauses.iter().map(|v| (**v).clone()).collect::<Vec<_>>();
-            c.extend(negate_formula(while_clauses).unwrap_or_default());
+            c.extend(negate_formula(while_clauses, &context.settings.algebra_thresholds()).unwrap_or_default());
             c
         };
 
         let (negated_while_types, _) = find_satisfying_assignments(
-            saturate_clauses(&clauses_to_simplify).as_slice(),
+            saturate_clauses(&clauses_to_simplify, &context.settings.algebra_thresholds()).as_slice(),
             None,
             &mut AtomSet::default(),
         );

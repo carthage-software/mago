@@ -92,6 +92,8 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for If<'arena> {
             self.condition,
             context.get_assertion_context_from_block(block_context),
             artifacts,
+            &context.settings.algebra_thresholds(),
+            context.settings.formula_size_threshold,
         ).unwrap_or_else(|| {
             context.collector.report_with_code(
                 IssueCode::ConditionIsTooComplex,
@@ -149,13 +151,22 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for If<'arena> {
             }
         }
 
-        check_for_paradox(&mut context.collector, &block_context.clauses, &if_clauses, self.condition.span());
+        check_for_paradox(
+            &mut context.collector,
+            &block_context.clauses,
+            &if_clauses,
+            self.condition.span(),
+            &context.settings.algebra_thresholds(),
+        );
 
-        if_clauses = saturate_clauses(if_clauses.iter());
+        if_clauses = saturate_clauses(if_clauses.iter(), &context.settings.algebra_thresholds());
         let combined_clauses = if block_context.clauses.is_empty() {
             if_clauses.clone()
         } else {
-            saturate_clauses(if_clauses.iter().chain(block_context.clauses.iter().map(Rc::deref)))
+            saturate_clauses(
+                if_clauses.iter().chain(block_context.clauses.iter().map(Rc::deref)),
+                &context.settings.algebra_thresholds(),
+            )
         };
 
         if_block_context.clauses = combined_clauses.into_iter().map(Rc::new).collect();
@@ -181,10 +192,14 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for If<'arena> {
             self.condition,
             context.get_assertion_context_from_block(block_context),
             artifacts,
+            &context.settings.algebra_thresholds(),
+            context.settings.formula_size_threshold,
         );
 
-        let all_negated_clauses =
-            saturate_clauses(block_context.clauses.iter().map(Rc::deref).chain(if_scope.negated_clauses.iter()));
+        let all_negated_clauses = saturate_clauses(
+            block_context.clauses.iter().map(Rc::deref).chain(if_scope.negated_clauses.iter()),
+            &context.settings.algebra_thresholds(),
+        );
 
         if_scope.negated_types =
             find_satisfying_assignments(all_negated_clauses.iter().as_slice(), None, &mut AtomSet::default()).0;
@@ -229,11 +244,13 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for If<'arena> {
             post_if_block_context
         };
 
-        else_block_context.clauses =
-            saturate_clauses(else_block_context.clauses.iter().map(Rc::deref).chain(if_scope.negated_clauses.iter()))
-                .into_iter()
-                .map(Rc::new)
-                .collect();
+        else_block_context.clauses = saturate_clauses(
+            else_block_context.clauses.iter().map(Rc::deref).chain(if_scope.negated_clauses.iter()),
+            &context.settings.algebra_thresholds(),
+        )
+        .into_iter()
+        .map(Rc::new)
+        .collect();
 
         for clause in self.body.else_if_clauses() {
             analyze_else_if_clause(context, &mut if_scope, &mut else_block_context, block_context, artifacts, clause)?;
@@ -299,6 +316,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for If<'arena> {
         {
             block_context.clauses = saturate_clauses(
                 if_scope.reasonable_clauses.iter().map(Rc::deref).chain(block_context.clauses.iter().map(Rc::deref)),
+                &context.settings.algebra_thresholds(),
             )
             .into_iter()
             .map(Rc::new)
@@ -589,6 +607,8 @@ fn analyze_else_if_clause<'ctx, 'ast, 'arena>(
         else_if_clause.0,
         context.get_assertion_context_from_block(&else_if_block_context),
         artifacts,
+        &context.settings.algebra_thresholds(),
+        context.settings.formula_size_threshold,
     ).unwrap_or_else(|| {
         let clauses_statements_span = match (else_if_clause.1.first(), else_if_clause.1.last()) {
             (Some(first_statement), Some(last_statement)) => Some(first_statement.span().join(last_statement.span())),
@@ -670,16 +690,25 @@ fn analyze_else_if_clause<'ctx, 'ast, 'arena>(
         entry_clauses.push(Rc::new(clause));
     }
 
-    check_for_paradox(&mut context.collector, &entry_clauses, &else_if_clauses, else_if_clause.0.span());
+    check_for_paradox(
+        &mut context.collector,
+        &entry_clauses,
+        &else_if_clauses,
+        else_if_clause.0.span(),
+        &context.settings.algebra_thresholds(),
+    );
 
-    let else_if_clauses = saturate_clauses(else_if_clauses.iter());
+    let else_if_clauses = saturate_clauses(else_if_clauses.iter(), &context.settings.algebra_thresholds());
     else_if_block_context.clauses = if entry_clauses.is_empty() {
         else_if_clauses.clone().into_iter().map(Rc::new).collect()
     } else {
-        saturate_clauses(else_if_clauses.iter().chain(entry_clauses.iter().map(Rc::deref)))
-            .into_iter()
-            .map(Rc::new)
-            .collect()
+        saturate_clauses(
+            else_if_clauses.iter().chain(entry_clauses.iter().map(Rc::deref)),
+            &context.settings.algebra_thresholds(),
+        )
+        .into_iter()
+        .map(Rc::new)
+        .collect()
     };
 
     if !else_if_block_context.reconciled_expression_clauses.is_empty() {
@@ -718,6 +747,8 @@ fn analyze_else_if_clause<'ctx, 'ast, 'arena>(
         else_if_clause.0,
         context.get_assertion_context_from_block(&else_if_block_context),
         artifacts,
+        &context.settings.algebra_thresholds(),
+        context.settings.formula_size_threshold,
     );
 
     let (negated_else_if_types, _) =
@@ -863,6 +894,7 @@ fn analyze_else_if_clause<'ctx, 'ast, 'arena>(
                 previous_clauses.into_iter().map(Rc::unwrap_or_clone).collect(),
                 else_if_clauses.clone(),
                 else_if_clause.0.span(),
+                &context.settings.algebra_thresholds(),
             )
             .into_iter()
             .map(Rc::new)
@@ -895,8 +927,11 @@ fn analyze_else_if_clause<'ctx, 'ast, 'arena>(
         }
     }
 
-    if_scope.negated_clauses = match negate_formula(else_if_clauses) {
-        Some(negated_formula) => saturate_clauses(if_scope.negated_clauses.iter().chain(negated_formula.iter())),
+    if_scope.negated_clauses = match negate_formula(else_if_clauses, &context.settings.algebra_thresholds()) {
+        Some(negated_formula) => saturate_clauses(
+            if_scope.negated_clauses.iter().chain(negated_formula.iter()),
+            &context.settings.algebra_thresholds(),
+        ),
         None => vec![],
     };
 
@@ -938,11 +973,13 @@ fn analyze_else_statements<'ctx, 'arena>(
         None => if_span,
     };
 
-    else_block_context.clauses =
-        saturate_clauses(else_block_context.clauses.iter().map(Rc::deref).chain(if_scope.negated_clauses.iter()))
-            .into_iter()
-            .map(Rc::new)
-            .collect();
+    else_block_context.clauses = saturate_clauses(
+        else_block_context.clauses.iter().map(Rc::deref).chain(if_scope.negated_clauses.iter()),
+        &context.settings.algebra_thresholds(),
+    )
+    .into_iter()
+    .map(Rc::new)
+    .collect();
 
     let (else_types, _) = find_satisfying_assignments(
         else_block_context.clauses.iter().map(Rc::deref).cloned().collect_vec().as_slice(),

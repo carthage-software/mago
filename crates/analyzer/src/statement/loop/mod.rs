@@ -212,12 +212,20 @@ fn analyze<'ctx, 'ast, 'arena>(
         let mut complex_conditions = vec![];
         for pre_condition in pre_conditions {
             let condition_span = pre_condition.span();
-            let clauses = get_formula(condition_span, condition_span, pre_condition, assertion_context, artifacts)
-                .unwrap_or_else(|| {
-                    complex_conditions.push(condition_span);
+            let clauses = get_formula(
+                condition_span,
+                condition_span,
+                pre_condition,
+                assertion_context,
+                artifacts,
+                &context.settings.algebra_thresholds(),
+                context.settings.formula_size_threshold,
+            )
+            .unwrap_or_else(|| {
+                complex_conditions.push(condition_span);
 
-                    vec![]
-                });
+                vec![]
+            });
 
             pre_condition_clauses.push(clauses);
         }
@@ -672,8 +680,11 @@ fn analyze<'ctx, 'ast, 'arena>(
         // if the loop contains an assertion and there are no break statements, we can negate that assertion
         // and apply it to the current context
 
-        let negated_pre_condition_clauses =
-            negate_formula(pre_condition_clauses.into_iter().flatten().collect()).unwrap_or_default();
+        let negated_pre_condition_clauses = negate_formula(
+            pre_condition_clauses.into_iter().flatten().collect(),
+            &context.settings.algebra_thresholds(),
+        )
+        .unwrap_or_default();
 
         let (negated_pre_condition_types, _) =
             find_satisfying_assignments(negated_pre_condition_clauses.iter().as_slice(), None, &mut AtomSet::default());
@@ -800,11 +811,14 @@ fn apply_pre_condition_to_loop_context<'ctx, 'arena>(
     let always_assigned_before_loop_body_variables =
         BlockContext::get_new_or_updated_locals(loop_context, loop_parent_context);
 
-    loop_context.clauses = saturate_clauses({
-        let mut clauses = loop_parent_context.clauses.iter().map(|v| &**v).collect::<Vec<_>>();
-        clauses.extend(pre_condition_clauses.iter());
-        clauses
-    })
+    loop_context.clauses = saturate_clauses(
+        {
+            let mut clauses = loop_parent_context.clauses.iter().map(|v| &**v).collect::<Vec<_>>();
+            clauses.extend(pre_condition_clauses.iter());
+            clauses
+        },
+        &context.settings.algebra_thresholds(),
+    )
     .into_iter()
     .map(|v| Rc::new(v.clone()))
     .collect();

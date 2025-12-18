@@ -312,14 +312,18 @@ impl<'anlyz, 'ctx, 'ast, 'arena> MatchAnalyzer<'anlyz, 'ctx, 'ast, 'arena> {
             &arm_condition,
             assertion_context,
             self.artifacts,
+            &self.context.settings.algebra_thresholds(),
+            self.context.settings.formula_size_threshold,
         )
         .unwrap_or_default();
 
-        let combined_clauses: Vec<_> =
-            saturate_clauses(arm_clauses.iter().chain(arm_body_context.clauses.iter().map(Deref::deref)))
-                .into_iter()
-                .map(Rc::new)
-                .collect();
+        let combined_clauses: Vec<_> = saturate_clauses(
+            arm_clauses.iter().chain(arm_body_context.clauses.iter().map(Deref::deref)),
+            &self.context.settings.algebra_thresholds(),
+        )
+        .into_iter()
+        .map(Rc::new)
+        .collect();
 
         let mut arm_referenced_ids = AtomSet::default();
         let (reconcilable_types, active_types) = mago_algebra::find_satisfying_assignments(
@@ -360,13 +364,17 @@ impl<'anlyz, 'ctx, 'ast, 'arena> MatchAnalyzer<'anlyz, 'ctx, 'ast, 'arena> {
             &arm_condition,
             self.context.get_assertion_context_from_block(running_else_context),
             self.artifacts,
+            &self.context.settings.algebra_thresholds(),
+            self.context.settings.formula_size_threshold,
         );
 
-        running_else_context.clauses =
-            saturate_clauses(running_else_context.clauses.iter().map(Deref::deref).chain(negated_arm_clauses.iter()))
-                .into_iter()
-                .map(Rc::new)
-                .collect();
+        running_else_context.clauses = saturate_clauses(
+            running_else_context.clauses.iter().map(Deref::deref).chain(negated_arm_clauses.iter()),
+            &self.context.settings.algebra_thresholds(),
+        )
+        .into_iter()
+        .map(Rc::new)
+        .collect();
 
         Ok(arm_status)
     }

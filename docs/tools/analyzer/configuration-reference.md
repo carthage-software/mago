@@ -274,3 +274,64 @@ check-throws = false
 :::tip Gradual adoption
 When introducing Mago to an existing codebase, start with lenient settings and a [baseline](/fundamentals/baseline). Gradually enable stricter options as you improve the codebase.
 :::
+
+## Performance tuning
+
+The analyzer uses internal thresholds to balance analysis depth against performance. These thresholds control how deeply the type inference engine explores complex logical formulas. All settings go under `[analyzer.performance]` in your `mago.toml` file.
+
+| Option                                | Type  | Default | Description                                                              |
+| :------------------------------------ | :---- | :------ | :----------------------------------------------------------------------- |
+| `saturation-complexity-threshold`     | `u16` | `8192`  | Maximum clauses during CNF saturation.                                   |
+| `disjunction-complexity-threshold`    | `u16` | `4096`  | Maximum clauses per side in OR operations.                               |
+| `negation-complexity-threshold`       | `u16` | `4096`  | Maximum cumulative complexity when negating formulas.                    |
+| `consensus-limit-threshold`           | `u16` | `256`   | Upper limit for consensus optimization passes.                           |
+| `formula-size-threshold`              | `u16` | `512`   | Maximum logical formula size before simplification is skipped.           |
+
+### When to adjust thresholds
+
+Most projects work well with the default values. Consider adjusting these thresholds if:
+
+- **Analysis is too slow**: Reduce thresholds to improve speed at the cost of some type inference precision
+- **Type inference is imprecise**: Increase thresholds for deeper analysis on complex conditional code
+
+### Understanding the thresholds
+
+The analyzer converts type constraints into CNF (Conjunctive Normal Form) logical formulas. These formulas can grow exponentially with complex conditional logic. The thresholds prevent runaway computation.
+
+- **Saturation complexity**: Controls how many clauses the formula simplifier will process during saturation. When exceeded, simplification stops early.
+- **Disjunction complexity**: Limits clause explosion when combining OR conditions. Complex union types or many conditional branches may hit this limit.
+- **Negation complexity**: Limits expansion when negating formulas (e.g., for `else` branches). Deeply nested conditions may hit this limit.
+- **Consensus limit**: Controls an optimization pass that detects logical tautologies. Higher values may find more simplifications.
+- **Formula size**: Overall limit on formula complexity before the analyzer falls back to simpler inference.
+
+### Example configurations
+
+#### Fast analysis (reduced precision)
+
+For large codebases where speed is more important than deep type inference:
+
+```toml
+[analyzer.performance]
+saturation-complexity-threshold = 2048
+disjunction-complexity-threshold = 1024
+negation-complexity-threshold = 1024
+consensus-limit-threshold = 64
+formula-size-threshold = 128
+```
+
+#### Deep analysis (slower, more precise)
+
+For smaller codebases or CI pipelines where thorough analysis is important:
+
+```toml
+[analyzer.performance]
+saturation-complexity-threshold = 16384
+disjunction-complexity-threshold = 8192
+negation-complexity-threshold = 8192
+consensus-limit-threshold = 512
+formula-size-threshold = 1024
+```
+
+:::warning Performance impact
+Increasing these thresholds can significantly impact analysis time on codebases with complex conditional logic. Test on your codebase before deploying to CI.
+:::

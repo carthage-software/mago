@@ -167,8 +167,16 @@ pub fn analyze_null_coalesce_operation<'ctx, 'arena>(
 
     if rhs_is_never {
         let assertion_context = context.get_assertion_context_from_block(block_context);
-        let if_clauses =
-            get_formula(binary.lhs.span(), binary.lhs.span(), binary.lhs, assertion_context, artifacts).unwrap();
+        let if_clauses = get_formula(
+            binary.lhs.span(),
+            binary.lhs.span(),
+            binary.lhs,
+            assertion_context,
+            artifacts,
+            &context.settings.algebra_thresholds(),
+            context.settings.formula_size_threshold,
+        )
+        .unwrap();
 
         let mut if_scope = IfScope::new();
         let (if_conditional_scope, _) =

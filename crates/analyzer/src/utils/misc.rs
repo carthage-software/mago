@@ -2,6 +2,7 @@ use std::rc::Rc;
 
 use ahash::HashMap;
 
+use mago_algebra::AlgebraThresholds;
 use mago_algebra::clause::Clause;
 use mago_algebra::negate_formula;
 use mago_collector::Collector;
@@ -19,6 +20,7 @@ pub fn check_for_paradox(
     formula_1: &[Rc<Clause>],
     formula_2: &[Clause],
     span: Span,
+    algebra_thresholds: &AlgebraThresholds,
 ) {
     let formula_1_hashes: HashMap<u32, Span> = formula_1.iter().map(|c| (c.hash, c.condition_span)).collect();
     let mut formula_2_hashes: HashMap<u32, Span> = HashMap::default();
@@ -37,7 +39,7 @@ pub fn check_for_paradox(
         formula_2_hashes.entry(formula_2_clause.hash).or_insert(formula_2_clause.condition_span);
     }
 
-    let Some(negated_formula_2) = negate_formula(formula_2.to_vec()) else {
+    let Some(negated_formula_2) = negate_formula(formula_2.to_vec(), algebra_thresholds) else {
         return;
     };
 
@@ -61,7 +63,7 @@ pub fn check_for_paradox(
             });
 
             if is_subset && !clause_1.possibilities.is_empty() {
-                report_paradoxical_condition(collector, clause_1, negated_clause_2, span);
+                report_paradoxical_condition(collector, clause_1, negated_clause_2, span, algebra_thresholds);
 
                 return;
             }
@@ -103,8 +105,9 @@ fn report_paradoxical_condition(
     original_clause: &Clause,
     negated_conflicting_clause: &Clause,
     paradox_span: Span,
+    algebra_thresholds: &AlgebraThresholds,
 ) {
-    let Some(conflicting_clause) = negate_formula(vec![negated_conflicting_clause.clone()]) else {
+    let Some(conflicting_clause) = negate_formula(vec![negated_conflicting_clause.clone()], algebra_thresholds) else {
         return;
     };
 

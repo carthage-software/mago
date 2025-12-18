@@ -66,7 +66,7 @@ pub(super) fn analyze_conditional<'ctx, 'ast, 'arena>(
     let mut conditionally_referenced_variable_ids = if_conditional_scope.conditionally_referenced_variable_ids;
 
     let assertion_context = context.get_assertion_context_from_block(block_context);
-    let mut if_clauses = get_formula(condition.span(), condition.span(), condition, assertion_context, artifacts).unwrap_or_else(|| {
+    let mut if_clauses = get_formula(condition.span(), condition.span(), condition, assertion_context, artifacts, &context.settings.algebra_thresholds(), context.settings.formula_size_threshold).unwrap_or_else(|| {
         context.collector.report_with_code(
             IssueCode::ConditionIsTooComplex,
             Issue::warning("Condition is too complex for precise type analysis.")
@@ -138,14 +138,17 @@ pub(super) fn analyze_conditional<'ctx, 'ast, 'arena>(
 
     let entry_clauses = block_context.clauses.clone();
 
-    if_clauses = saturate_clauses(&if_clauses);
+    if_clauses = saturate_clauses(&if_clauses, &context.settings.algebra_thresholds());
     let mut conditional_context_clauses = if entry_clauses.is_empty() {
         if_clauses.clone().into_iter().map(Rc::new).collect::<Vec<_>>()
     } else {
-        saturate_clauses(if_clauses.iter().chain(entry_clauses.iter().map(Rc::deref)))
-            .into_iter()
-            .map(Rc::new)
-            .collect::<Vec<_>>()
+        saturate_clauses(
+            if_clauses.iter().chain(entry_clauses.iter().map(Rc::deref)),
+            &context.settings.algebra_thresholds(),
+        )
+        .into_iter()
+        .map(Rc::new)
+        .collect::<Vec<_>>()
     };
 
     if !if_block_context.reconciled_expression_clauses.is_empty() {
@@ -162,11 +165,21 @@ pub(super) fn analyze_conditional<'ctx, 'ast, 'arena>(
 
     extract_function_constant_existence(condition, artifacts, &mut if_block_context, false);
 
-    if_scope.negated_clauses =
-        negate_or_synthesize(if_clauses, condition, context.get_assertion_context_from_block(block_context), artifacts);
+    if_scope.negated_clauses = negate_or_synthesize(
+        if_clauses,
+        condition,
+        context.get_assertion_context_from_block(block_context),
+        artifacts,
+        &context.settings.algebra_thresholds(),
+        context.settings.formula_size_threshold,
+    );
 
     if_scope.negated_types = find_satisfying_assignments(
-        saturate_clauses(block_context.clauses.iter().map(Rc::deref).chain(if_scope.negated_clauses.iter())).as_slice(),
+        saturate_clauses(
+            block_context.clauses.iter().map(Rc::deref).chain(if_scope.negated_clauses.iter()),
+            &context.settings.algebra_thresholds(),
+        )
+        .as_slice(),
         None,
         &mut AtomSet::default(),
     )
@@ -204,11 +217,13 @@ pub(super) fn analyze_conditional<'ctx, 'ast, 'arena>(
             .extend(if_block_context.conditionally_referenced_variable_ids.iter().copied());
     }
 
-    else_block_context.clauses =
-        saturate_clauses(else_block_context.clauses.iter().map(Rc::deref).chain(if_scope.negated_clauses.iter()))
-            .into_iter()
-            .map(Rc::new)
-            .collect::<Vec<_>>();
+    else_block_context.clauses = saturate_clauses(
+        else_block_context.clauses.iter().map(Rc::deref).chain(if_scope.negated_clauses.iter()),
+        &context.settings.algebra_thresholds(),
+    )
+    .into_iter()
+    .map(Rc::new)
+    .collect::<Vec<_>>();
 
     if !if_scope.negated_types.is_empty() {
         let mut changed_variable_ids = AtomSet::default();
