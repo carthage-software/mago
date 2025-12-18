@@ -10,6 +10,7 @@ This document details the rules available in the `Redundancy` category.
 | Rule | Code |
 | :--- | :---------- |
 | Constant Condition | [`constant-condition`](#constant-condition) |
+| Inline Variable Return | [`inline-variable-return`](#inline-variable-return) |
 | No Closing Tag | [`no-closing-tag`](#no-closing-tag) |
 | No Empty Comment | [`no-empty-comment`](#no-empty-comment) |
 | No Empty Loop | [`no-empty-loop`](#no-empty-loop) |
@@ -20,6 +21,7 @@ This document details the rules available in the `Redundancy` category.
 | No Redundant File | [`no-redundant-file`](#no-redundant-file) |
 | No Redundant Final | [`no-redundant-final`](#no-redundant-final) |
 | No Redundant Label | [`no-redundant-label`](#no-redundant-label) |
+| No Redundant Literal Return | [`no-redundant-literal-return`](#no-redundant-literal-return) |
 | No Redundant Math | [`no-redundant-math`](#no-redundant-math) |
 | No Redundant Method Override | [`no-redundant-method-override`](#no-redundant-method-override) |
 | No Redundant Nullsafe | [`no-redundant-nullsafe`](#no-redundant-nullsafe) |
@@ -71,6 +73,57 @@ if (true) {
 
 if (false) {
     echo "This is dead code";
+}
+```
+
+
+## <a id="inline-variable-return"></a>`inline-variable-return`
+
+Detects unnecessary variable assignments immediately before returning the variable.
+
+When a variable is only used once right after being assigned, the assignment
+can be inlined into the return statement.
+
+
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `true` |
+| `level` | `string` | `"warning"` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+
+function getValue() {
+    return computeResult();
+}
+
+function process() {
+    $result = computeResult();
+    log($result);
+    return $result;
+}
+```
+
+#### Incorrect code
+
+```php
+<?php
+
+function getValue() {
+    $result = computeResult();
+    return $result;
+}
+
+function getArray() {
+    $arr = [1, 2, 3];
+    return $arr;
 }
 ```
 
@@ -448,6 +501,76 @@ end:
 
 label:
 echo "Hello, world!";
+```
+
+
+## <a id="no-redundant-literal-return"></a>`no-redundant-literal-return`
+
+Detects redundant literal guard patterns where an if statement checks if a variable
+equals a literal and returns that same literal, followed by returning the variable.
+
+This pattern is redundant because if the variable equals the literal, returning the
+variable would return the same value anyway.
+
+This includes patterns with else clauses and elseif chains where all branches
+follow the same redundant pattern.
+
+
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `true` |
+| `level` | `string` | `"warning"` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+
+function getValue($x) {
+    return $x;
+}
+
+function getValueOrDefault($x, $default) {
+    if ($x === null) {
+        return $default;
+    }
+    return $x;
+}
+```
+
+#### Incorrect code
+
+```php
+<?php
+
+function getValue($x) {
+    if ($x === null) {
+        return null;
+    }
+    return $x;
+}
+
+function getWithElse($x) {
+    if ($x === null) {
+        return null;
+    } else {
+        return $x;
+    }
+}
+
+function getWithElseIf($x) {
+    if ($x === null) {
+        return null;
+    } elseif ($x === '') {
+        return '';
+    }
+    return $x;
+}
 ```
 
 

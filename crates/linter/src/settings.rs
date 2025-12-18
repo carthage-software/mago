@@ -31,6 +31,7 @@ use crate::rule::HalsteadConfig;
 use crate::rule::IdentityComparisonConfig;
 use crate::rule::IneffectiveFormatIgnoreNextConfig;
 use crate::rule::IneffectiveFormatIgnoreRegionConfig;
+use crate::rule::InlineVariableReturnConfig;
 use crate::rule::InstanceofStringableConfig;
 use crate::rule::InterfaceNameConfig;
 use crate::rule::InvalidOpenTagConfig;
@@ -73,6 +74,7 @@ use crate::rule::NoRedundantContinueConfig;
 use crate::rule::NoRedundantFileConfig;
 use crate::rule::NoRedundantFinalConfig;
 use crate::rule::NoRedundantLabelConfig;
+use crate::rule::NoRedundantLiteralReturnConfig;
 use crate::rule::NoRedundantMathConfig;
 use crate::rule::NoRedundantMethodOverrideConfig;
 use crate::rule::NoRedundantNullsafeConfig;
@@ -202,6 +204,7 @@ pub struct RulesSettings {
     pub no_redundant_nullsafe: RuleSettings<NoRedundantNullsafeConfig>,
     pub no_redundant_math: RuleSettings<NoRedundantMathConfig>,
     pub no_redundant_label: RuleSettings<NoRedundantLabelConfig>,
+    pub no_redundant_literal_return: RuleSettings<NoRedundantLiteralReturnConfig>,
     pub no_redundant_final: RuleSettings<NoRedundantFinalConfig>,
     pub no_redundant_readonly: RuleSettings<NoRedundantReadonlyConfig>,
     pub no_redundant_file: RuleSettings<NoRedundantFileConfig>,
@@ -237,6 +240,7 @@ pub struct RulesSettings {
     pub identity_comparison: RuleSettings<IdentityComparisonConfig>,
     pub ineffective_format_ignore_next: RuleSettings<IneffectiveFormatIgnoreNextConfig>,
     pub ineffective_format_ignore_region: RuleSettings<IneffectiveFormatIgnoreRegionConfig>,
+    pub inline_variable_return: RuleSettings<InlineVariableReturnConfig>,
     pub instanceof_stringable: RuleSettings<InstanceofStringableConfig>,
     pub interface_name: RuleSettings<InterfaceNameConfig>,
     pub invalid_open_tag: RuleSettings<InvalidOpenTagConfig>,
