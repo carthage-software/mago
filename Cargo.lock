@@ -1803,16 +1803,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "mago-fixer"
-version = "1.0.0-rc.13"
-dependencies = [
- "pretty_assertions",
- "serde",
- "strum",
- "tracing",
-]
-
-[[package]]
 name = "mago-formatter"
 version = "1.0.0-rc.13"
 dependencies = [

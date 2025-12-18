@@ -33,7 +33,6 @@ mago-type-syntax = { path = "crates/type-syntax", version = "1.0.0-rc.13" }
 mago-casing = { path = "crates/casing", version = "1.0.0-rc.13" }
 mago-composer = { path = "crates/composer", version = "1.0.0-rc.13" }
 mago-docblock = { path = "crates/docblock", version = "1.0.0-rc.13" }
-mago-fixer = { path = "crates/fixer", version = "1.0.0-rc.13" }
 mago-text-edit = { path = "crates/text-edit", version = "1.0.0-rc.13" }
 mago-formatter = { path = "crates/formatter", version = "1.0.0-rc.13" }
 mago-fingerprint = { path = "crates/fingerprint", version = "1.0.0-rc.13" }
