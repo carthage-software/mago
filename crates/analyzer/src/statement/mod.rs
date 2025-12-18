@@ -305,7 +305,13 @@ fn detect_unused_statement_expressions<'ast, 'arena>(
             "Using 'parent', 'static', or 'self' directly as a statement has no effect."
         }
         Expression::MagicConstant(_) => "Evaluating a magic constant as a statement has no effect.",
-        Expression::Binary(_) => "A binary operation used as a statement likely has no effect.",
+        Expression::Binary(binary) => {
+            if binary.operator.is_null_coalesce() && binary.rhs.is_throw() {
+                return; // `?? throw` has side effects
+            }
+
+            "A binary operation used as a statement likely has no effect."
+        }
         Expression::Call(Call::Function(FunctionCall { function, .. })) => {
             let Expression::Identifier(function_name) = function else {
                 return;
