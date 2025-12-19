@@ -4574,7 +4574,7 @@ function array_rand(array $array, int $num = 1): array|string|int
  * @param array<K, V> $array
  * @param int<0, 5> $flags
  *
- * @return array<K, V>
+ * @return ($array is non-empty-array|non-empty-list ? non-empty-array<K, V> : array<K, V>)
  *
  * @pure
  */
