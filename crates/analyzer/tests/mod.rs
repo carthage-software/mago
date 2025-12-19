@@ -59,6 +59,7 @@ test_case!(int_mask);
 test_case!(integer_range_reconciliation);
 test_case!(integer_reconciliation);
 test_case!(isset_and_nullable_access_assertions);
+test_case!(intersection_stringable);
 test_case!(iterable_count);
 test_case!(iterable_reconciliation);
 test_case!(non_empty_string_magic_constant);
