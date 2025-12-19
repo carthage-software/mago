@@ -336,6 +336,7 @@ test_case!(binary_throw_used);
 test_case!(template_null_comparison);
 test_case!(finally_after_return);
 test_case!(property_magic_constant);
+test_case!(variable_key_narrowing_not_null);
 
 // Github Issues
 test_case!(issue_659);
