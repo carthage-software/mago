@@ -41,8 +41,6 @@ mago-linter = { path = "crates/linter", version = "1.0.0-rc.13" }
 mago-names = { path = "crates/names", version = "1.0.0-rc.13" }
 mago-reporting = { path = "crates/reporting", version = "1.0.0-rc.13" }
 mago-span = { path = "crates/span", version = "1.0.0-rc.13" }
-mago-symbol-table = { path = "crates/symbol-table", version = "1.0.0-rc.13" }
-mago-traverser = { path = "crates/traverser", version = "1.0.0-rc.13" }
 mago-wasm = { path = "crates/wasm", version = "1.0.0-rc.13" }
 mago-php-version = { path = "crates/php-version", version = "1.0.0-rc.13" }
 mago-analyzer = { path = "crates/analyzer", version = "1.0.0-rc.13" }
