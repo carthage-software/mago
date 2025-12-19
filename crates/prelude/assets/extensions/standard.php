@@ -3008,7 +3008,7 @@ function rmdir(string $directory, $context = null): bool
 {
 }
 
-function umask(null|int $mask): int
+function umask(null|int $mask = null): int
 {
 }
 
