@@ -232,8 +232,8 @@ impl Settings {
 
         Self {
             version,
-            find_unused_expressions: false,
-            find_unused_definitions: false,
+            find_unused_expressions: true,
+            find_unused_definitions: true,
             analyze_dead_code: false,
             memoize_properties: true,
             allow_possibly_undefined_array_keys: true,

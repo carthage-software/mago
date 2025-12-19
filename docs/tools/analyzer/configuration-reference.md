@@ -46,8 +46,8 @@ These flags control specific, powerful analysis capabilities.
 
 | Option                                | Default | Description                                                                                          |
 | :------------------------------------ | :------ | :--------------------------------------------------------------------------------------------------- |
-| `find-unused-expressions`             | `false` | Find and report expressions whose results are not used (e.g., `$a + $b;`).                           |
-| `find-unused-definitions`             | `false` | Find and report unused definitions (e.g., private methods that are never called).                    |
+| `find-unused-expressions`             | `true`  | Find and report expressions whose results are not used (e.g., `$a + $b;`).                           |
+| `find-unused-definitions`             | `true`  | Find and report unused definitions (e.g., private methods that are never called).                    |
 | `analyze-dead-code`                   | `false` | Analyze code that appears to be unreachable.                                                         |
 | `memoize-properties`                  | `true`  | Track the literal values of class properties. Improves type inference but may increase memory usage. |
 | `allow-possibly-undefined-array-keys` | `true`  | Allow accessing array keys that may not be defined without reporting an issue.                       |

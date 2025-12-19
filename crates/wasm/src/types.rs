@@ -165,8 +165,8 @@ pub struct WasmAnalyzerSettings {
 impl Default for WasmAnalyzerSettings {
     fn default() -> Self {
         Self {
-            find_unused_expressions: false,
-            find_unused_definitions: false,
+            find_unused_expressions: true,
+            find_unused_definitions: true,
             analyze_dead_code: false,
             memoize_properties: false,
             allow_possibly_undefined_array_keys: false,
