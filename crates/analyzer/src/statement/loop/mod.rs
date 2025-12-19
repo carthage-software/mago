@@ -734,6 +734,13 @@ fn analyze<'ctx, 'ast, 'arena>(
                         *variable_id,
                         Rc::new(combine_union_types(variable_type, possibly_defined_type, codebase, true)),
                     );
+                } else if let Some(possibly_redefined_type) =
+                    loop_scope.possibly_redefined_loop_parent_variables.get(variable_id)
+                {
+                    loop_parent_context.locals.insert(
+                        *variable_id,
+                        Rc::new(combine_union_types(variable_type, possibly_redefined_type, codebase, true)),
+                    );
                 }
             } else {
                 loop_parent_context.locals.insert(*variable_id, variable_type.clone());
