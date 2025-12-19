@@ -40,6 +40,24 @@ pub struct AnalyzerConfiguration {
     /// don't affect the baseline.
     pub baseline_variant: BaselineVariant,
 
+    /// Disable all default plugins (including stdlib).
+    ///
+    /// When set to `true`, no plugins will be loaded by default, and only plugins
+    /// explicitly listed in `plugins` will be enabled.
+    ///
+    /// Defaults to `false`.
+    pub disable_default_plugins: bool,
+
+    /// List of plugins to enable (by name or alias).
+    ///
+    /// Plugins can be specified by their canonical name or any of their aliases:
+    /// - `stdlib` (aliases: `standard`, `std`, `php-stdlib`)
+    /// - `psl` (aliases: `php-standard-library`, `azjezz-psl`)
+    /// - `flow-php` (aliases: `flow`, `flow-etl`)
+    ///
+    /// Example: `plugins = ["stdlib", "psl"]`
+    pub plugins: Vec<String>,
+
     /// Whether to find unused expressions.
     pub find_unused_expressions: bool,
 
@@ -305,6 +323,8 @@ impl Default for AnalyzerConfiguration {
         let defaults = Settings::default();
 
         Self {
+            disable_default_plugins: false,
+            plugins: vec![],
             excludes: vec![],
             ignore: vec![],
             baseline: None,

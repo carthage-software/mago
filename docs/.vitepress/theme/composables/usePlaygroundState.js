@@ -42,6 +42,8 @@ export function createPlaygroundState(initialCode = DEFAULT_CODE) {
         checkArrowFunctionMissingTypeHints: false,
         registerSuperGlobals: true,
         trustExistenceChecks: true,
+        disableDefaultPlugins: false,
+        plugins: [],
       },
       linter: {
         disabledRules: [],

@@ -101,6 +101,20 @@ pub struct OrchestratorConfiguration<'a> {
     /// See [`mago_formatter::settings::FormatSettings`] for available options.
     pub formatter_settings: FormatSettings,
 
+    /// Disable all default analyzer plugins (including stdlib).
+    ///
+    /// When set to `true`, no plugins will be loaded by default, and only plugins
+    /// explicitly listed in `analyzer_plugins` will be enabled.
+    pub disable_default_analyzer_plugins: bool,
+
+    /// List of analyzer plugins to enable (by name or alias).
+    ///
+    /// Plugins can be specified by their canonical name or any of their aliases:
+    /// - `stdlib` (aliases: `standard`, `std`, `php-stdlib`)
+    /// - `psl` (aliases: `php-standard-library`, `azjezz-psl`)
+    /// - `flow-php` (aliases: `flow`, `flow-etl`)
+    pub analyzer_plugins: Vec<String>,
+
     /// Whether to display progress bars during long-running operations.
     ///
     /// Progress bars provide visual feedback in terminal environments but should be

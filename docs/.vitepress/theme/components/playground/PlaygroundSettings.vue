@@ -40,6 +40,28 @@ const phpVersions = [
   { value: '8.6', label: 'PHP 8.6 (dev)' },
 ];
 
+// Available analyzer plugins
+const availablePlugins = [
+  {
+    id: 'stdlib',
+    name: 'PHP Standard Library',
+    description: 'Type providers for PHP built-in functions (strlen, array_*, json_*, etc.)',
+    defaultEnabled: true,
+  },
+  {
+    id: 'psl',
+    name: 'PSL (PHP Standard Library)',
+    description: 'Type providers for azjezz/psl package',
+    defaultEnabled: false,
+  },
+  {
+    id: 'flow-php',
+    name: 'Flow-PHP',
+    description: 'Type providers for flow-php/etl package',
+    defaultEnabled: false,
+  },
+];
+
 const analyzerOptions = [
   {
     key: 'findUnusedExpressions',
@@ -239,6 +261,93 @@ function updateUncheckedExceptionClasses() {
     },
   });
 }
+
+function isPluginEnabled(pluginId) {
+  const disableDefaults = props.settings.analyzer?.disableDefaultPlugins ?? false;
+  const plugins = props.settings.analyzer?.plugins ?? [];
+  const plugin = availablePlugins.find(p => p.id === pluginId);
+
+  if (!plugin) return false;
+
+  // If explicitly in plugins list, it's enabled
+  if (plugins.includes(pluginId)) return true;
+
+  // If defaults are disabled, only explicitly listed plugins are enabled
+  if (disableDefaults) return false;
+
+  // Otherwise, use the plugin's default state
+  return plugin.defaultEnabled;
+}
+
+function togglePlugin(pluginId) {
+  const disableDefaults = props.settings.analyzer?.disableDefaultPlugins ?? false;
+  const plugins = [...(props.settings.analyzer?.plugins ?? [])];
+  const plugin = availablePlugins.find(p => p.id === pluginId);
+
+  if (!plugin) return;
+
+  const isCurrentlyEnabled = isPluginEnabled(pluginId);
+  const isInList = plugins.includes(pluginId);
+
+  if (isCurrentlyEnabled) {
+    // Disable the plugin
+    if (isInList) {
+      // Remove from explicit list
+      const idx = plugins.indexOf(pluginId);
+      plugins.splice(idx, 1);
+    } else if (plugin.defaultEnabled && !disableDefaults) {
+      // It was enabled by default, need to disable defaults and add all other default plugins
+      emit('update:settings', {
+        ...props.settings,
+        analyzer: {
+          ...props.settings.analyzer,
+          disableDefaultPlugins: true,
+          plugins: availablePlugins
+            .filter(p => p.defaultEnabled && p.id !== pluginId)
+            .map(p => p.id)
+            .concat(plugins),
+        },
+      });
+      return;
+    }
+  } else {
+    // Enable the plugin
+    if (!isInList) {
+      plugins.push(pluginId);
+    }
+  }
+
+  emit('update:settings', {
+    ...props.settings,
+    analyzer: {
+      ...props.settings.analyzer,
+      plugins,
+    },
+  });
+}
+
+function updateDisableDefaultPlugins(event) {
+  const disableDefaults = event.target.checked;
+  let plugins = [...(props.settings.analyzer?.plugins ?? [])];
+
+  if (disableDefaults) {
+    // When disabling defaults, add all currently-enabled default plugins to explicit list
+    for (const plugin of availablePlugins) {
+      if (plugin.defaultEnabled && !plugins.includes(plugin.id)) {
+        plugins.push(plugin.id);
+      }
+    }
+  }
+
+  emit('update:settings', {
+    ...props.settings,
+    analyzer: {
+      ...props.settings.analyzer,
+      disableDefaultPlugins: disableDefaults,
+      plugins,
+    },
+  });
+}
 </script>
 
 <template>
@@ -328,6 +437,37 @@ function updateUncheckedExceptionClasses() {
                 @keyup.enter="updateUncheckedExceptionClasses"
               />
             </div>
+          </div>
+        </section>
+
+        <!-- Analyzer Plugins -->
+        <section class="settings-section">
+          <h3>Analyzer Plugins</h3>
+          <p class="section-description">
+            Plugins provide type information for library functions.
+          </p>
+          <div class="plugins-list">
+            <label
+              v-for="plugin in availablePlugins"
+              :key="plugin.id"
+              :class="['plugin-item', { enabled: isPluginEnabled(plugin.id) }]"
+            >
+              <div class="plugin-checkbox">
+                <input
+                  type="checkbox"
+                  :checked="isPluginEnabled(plugin.id)"
+                  @change="togglePlugin(plugin.id)"
+                />
+                <span class="checkmark"></span>
+              </div>
+              <div class="plugin-content">
+                <div class="plugin-header">
+                  <span class="plugin-name">{{ plugin.name }}</span>
+                  <span v-if="plugin.defaultEnabled" class="plugin-badge">Default</span>
+                </div>
+                <span class="plugin-description">{{ plugin.description }}</span>
+              </div>
+            </label>
           </div>
         </section>
 
@@ -468,6 +608,118 @@ function updateUncheckedExceptionClasses() {
   color: var(--vp-c-text-1);
   text-transform: uppercase;
   letter-spacing: 0.5px;
+}
+
+/* Section Description */
+.section-description {
+  margin: -8px 0 16px;
+  font-size: 13px;
+  color: var(--vp-c-text-3);
+}
+
+/* Plugins List */
+.plugins-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.plugin-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 8px;
+  background: var(--vp-c-bg);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.plugin-item:hover {
+  border-color: var(--vp-c-brand-1);
+  background: var(--vp-c-bg-soft);
+}
+
+.plugin-item.enabled {
+  border-color: var(--vp-c-brand-1);
+  background: color-mix(in srgb, var(--vp-c-brand-1) 5%, var(--vp-c-bg));
+}
+
+.plugin-checkbox {
+  position: relative;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.plugin-checkbox input {
+  position: absolute;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.plugin-checkbox .checkmark {
+  display: block;
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--vp-c-divider);
+  border-radius: 4px;
+  background: var(--vp-c-bg);
+  transition: all 0.15s;
+}
+
+.plugin-checkbox input:checked + .checkmark {
+  background: var(--vp-c-brand-1);
+  border-color: var(--vp-c-brand-1);
+}
+
+.plugin-checkbox input:checked + .checkmark::after {
+  content: '';
+  position: absolute;
+  left: 6px;
+  top: 2px;
+  width: 5px;
+  height: 10px;
+  border: solid white;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+.plugin-content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+
+.plugin-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.plugin-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--vp-c-text-1);
+}
+
+.plugin-badge {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--vp-c-brand-soft);
+  color: var(--vp-c-brand-1);
+}
+
+.plugin-description {
+  font-size: 12px;
+  color: var(--vp-c-text-3);
+  line-height: 1.4;
 }
 
 /* PHP Version Selector */

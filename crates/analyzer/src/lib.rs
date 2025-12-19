@@ -59,10 +59,10 @@ impl<'ctx, 'ast, 'arena> Analyzer<'ctx, 'ast, 'arena> {
         source_file: &'ctx File,
         resolved_names: &'ast ResolvedNames<'arena>,
         codebase: &'ctx CodebaseMetadata,
-        settings: Settings,
         plugin_registry: &'ctx PluginRegistry,
+        settings: Settings,
     ) -> Self {
-        Self { arena, source_file, resolved_names, codebase, settings, plugin_registry }
+        Self { arena, source_file, resolved_names, codebase, plugin_registry, settings }
     }
 
     pub fn analyze(
@@ -239,7 +239,7 @@ mod tests {
 
         let mut analysis_result = AnalysisResult::new(symbol_references);
         let analyzer =
-            Analyzer::new(&arena, &source_file, &resolved_names, &codebase, config.settings, &plugin_registry);
+            Analyzer::new(&arena, &source_file, &resolved_names, &codebase, &plugin_registry, config.settings);
 
         let analysis_run_result = analyzer.analyze(program, &mut analysis_result);
 

@@ -40,6 +40,7 @@ use std::sync::OnceLock;
 
 use bumpalo::Bump;
 use mago_analyzer::plugin::PluginRegistry;
+use mago_analyzer::plugin::create_registry_with_plugins;
 use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::reference::SymbolReferences;
 use mago_database::Database;
@@ -98,13 +99,18 @@ impl<'a> Orchestrator<'a> {
     /// Gets the analyzer plugin registry, initializing it if necessary.
     ///
     /// This method returns a shared reference to the plugin registry used by the analysis service.
-    /// If the registry has not been initialized yet, it creates a new one with built-in library providers.
+    /// If the registry has not been initialized yet, it creates a new one based on the configuration.
     ///
     /// # Returns
     ///
     /// An `Arc` pointing to the `PluginRegistry`.
     pub fn get_analyzer_plugin_registry(&self) -> Arc<PluginRegistry> {
-        Arc::clone(self.plugin_registry.get_or_init(|| Arc::new(PluginRegistry::with_library_providers())))
+        Arc::clone(self.plugin_registry.get_or_init(|| {
+            Arc::new(create_registry_with_plugins(
+                &self.config.analyzer_plugins,
+                self.config.disable_default_analyzer_plugins,
+            ))
+        }))
     }
 
     /// Adds additional exclusion patterns to the orchestrator's configuration.
