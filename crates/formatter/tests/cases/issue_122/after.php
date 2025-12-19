@@ -5,7 +5,8 @@ return new CreateTableStatement('user_permissions')
     ->belongsTo('user_permissions.user_id', 'users.id')
     ->belongsTo('user_permissions.permission_id', 'permissions.id');
 
-$item = $this->getCachePool()
+$item = $this
+    ->getCachePool()
     ->getItem($key)
     ->set($value);
 

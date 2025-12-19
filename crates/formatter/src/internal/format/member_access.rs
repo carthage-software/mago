@@ -266,6 +266,11 @@ impl<'arena> MemberAccessChain<'arena> {
     }
 
     #[inline]
+    fn is_first_link_object_method_call(&self) -> bool {
+        matches!(self.accesses.first(), Some(MemberAccess::MethodCall(_) | MemberAccess::NullSafeMethodCall(_)))
+    }
+
+    #[inline]
     fn is_already_broken(&self, f: &FormatterState) -> bool {
         let mut accesses_len = self.accesses.len();
         if should_inline_first_access(f, self) {
@@ -624,6 +629,10 @@ fn should_inline_first_access<'arena>(
     f: &FormatterState<'_, 'arena>,
     member_access_chain: &MemberAccessChain<'arena>,
 ) -> bool {
+    if f.settings.first_method_chain_on_new_line && member_access_chain.is_first_link_object_method_call() {
+        return false;
+    }
+
     if member_access_chain.find_fluent_access_chain_start().is_some_and(|start| start == 0) {
         return false;
     }

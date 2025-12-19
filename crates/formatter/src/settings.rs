@@ -325,6 +325,27 @@ pub struct FormatSettings {
     #[serde(default)]
     pub method_chain_breaking_style: MethodChainBreakingStyle,
 
+    /// When method chaining breaks across lines, place the first method on a new line.
+    ///
+    /// This follows PER-CS 4.7: "When [method chaining is] put on separate lines, [...] the first method MUST be on the next line."
+    ///
+    /// When enabled:
+    /// ```php
+    /// $this
+    ///     ->getCache()
+    ///     ->forget();
+    /// ```
+    ///
+    /// When disabled:
+    /// ```php
+    /// $this->getCache()
+    ///     ->forget();
+    /// ```
+    ///
+    /// Default: `true`
+    #[serde(default = "default_true")]
+    pub first_method_chain_on_new_line: bool,
+
     /// Whether to preserve line breaks in method chains, even if they could fit on a single line.
     ///
     /// Default: false
@@ -930,6 +951,7 @@ impl Default for FormatSettings {
             null_type_hint: NullTypeHint::default(),
             break_promoted_properties_list: true,
             method_chain_breaking_style: MethodChainBreakingStyle::NextLine,
+            first_method_chain_on_new_line: true,
             line_before_binary_operator: true,
             sort_uses: true,
             sort_class_methods: false,
