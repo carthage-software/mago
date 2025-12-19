@@ -199,8 +199,6 @@ jobs:
           if [[ "${{ matrix.job.pgo }}" == "true" ]]; then
             cargo pgo build -- --target=${{ matrix.job.target }}
             cargo pgo run -- -- --workspace corpus/ analyze --reporting-format count || true
-            cargo pgo run --keep-profiles -- -- --workspace corpus/ lint --reporting-format count || true
-            cargo pgo run --keep-profiles -- -- --workspace corpus/ fmt --check || true
             cargo pgo optimize -- build --target=${{ matrix.job.target }}
           else
             $BUILD_CMD build --locked --release --target=${{ matrix.job.target }}
