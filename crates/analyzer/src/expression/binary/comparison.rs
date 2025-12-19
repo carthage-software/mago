@@ -122,7 +122,7 @@ pub fn analyze_comparison_operation<'ctx, 'arena>(
         let lhs_is_array = lhs_type.is_array();
         let rhs_is_array = rhs_type.is_array();
 
-        if lhs_is_array && !rhs_type.has_array() && !rhs_type.is_null() {
+        if lhs_is_array && !rhs_type.has_array() && !rhs_type.has_iterable() && !rhs_type.is_null() {
             context.collector.report_with_code(
                 IssueCode::InvalidOperand,
                 Issue::warning(format!(
@@ -137,7 +137,7 @@ pub fn analyze_comparison_operation<'ctx, 'arena>(
             );
 
             reported_general_invalid_operand = true;
-        } else if !lhs_type.has_array() && rhs_is_array && !lhs_type.is_null() {
+        } else if !lhs_type.has_array() && !lhs_type.has_iterable() && rhs_is_array && !lhs_type.is_null() {
             context.collector.report_with_code(
                 IssueCode::InvalidOperand,
                 Issue::warning(format!(

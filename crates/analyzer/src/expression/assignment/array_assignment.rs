@@ -3,6 +3,7 @@ use std::rc::Rc;
 
 use mago_atom::Atom;
 use mago_atom::atom;
+use mago_atom::empty_atom;
 use mago_codex::ttype::add_union_type;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::array::TArray;
@@ -10,6 +11,8 @@ use mago_codex::ttype::atomic::array::key::ArrayKey;
 use mago_codex::ttype::atomic::array::keyed::TKeyedArray;
 use mago_codex::ttype::atomic::array::list::TList;
 use mago_codex::ttype::atomic::generic::TGenericParameter;
+use mago_codex::ttype::atomic::scalar::TScalar;
+use mago_codex::ttype::atomic::scalar::string::TString;
 use mago_codex::ttype::combiner;
 use mago_codex::ttype::get_arraykey;
 use mago_codex::ttype::get_int;
@@ -321,7 +324,23 @@ fn update_array_assignment_child_type<'ctx>(
     let mut collection_types = Vec::new();
 
     if let Some(key_type) = &key_type {
-        let key_type = if key_type.is_mixed() { Rc::new(get_arraykey()) } else { key_type.clone() };
+        // PHP coerces null to empty string '' when used as array key.
+        // If the key type contains null, we need to:
+        // 1. Remove null from the type
+        // 2. Add empty string literal to represent the coerced value
+        let key_type = if key_type.is_mixed() {
+            Rc::new(get_arraykey())
+        } else if key_type.has_null() {
+            // Filter out null types
+            let mut types: Vec<TAtomic> = key_type.types.iter().filter(|t| !t.is_null()).cloned().collect();
+
+            // Add empty string literal since null coerces to ''
+            types.push(TAtomic::Scalar(TScalar::String(TString::known_literal(empty_atom()))));
+
+            Rc::new(TUnion::from_vec(types))
+        } else {
+            key_type.clone()
+        };
 
         for original_type in root_type.types.as_ref() {
             match original_type {

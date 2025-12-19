@@ -56,11 +56,14 @@ test_case!(empty_switch);
 test_case!(generic_shape_coercion);
 test_case!(int_or_float);
 test_case!(literal_float);
+test_case!(multiline_intersection_var);
+test_case!(multiline_union_param);
 test_case!(int_mask);
 test_case!(integer_range_reconciliation);
 test_case!(integer_reconciliation);
 test_case!(isset_and_nullable_access_assertions);
 test_case!(intersection_stringable);
+test_case!(iterable_array_comparison);
 test_case!(iterable_count);
 test_case!(iterable_reconciliation);
 test_case!(non_empty_string_magic_constant);
@@ -317,6 +320,7 @@ test_case!(nullable_method_coalesce);
 test_case!(property_coalesce_init);
 test_case!(ctype_digit_check);
 test_case!(mutually_exclusive_null);
+test_case!(null_array_key);
 test_case!(nullable_getter_check);
 test_case!(abstract_factory_pattern);
 test_case!(array_key_coalesce);
@@ -338,8 +342,6 @@ test_case!(template_null_comparison);
 test_case!(finally_after_return);
 test_case!(property_magic_constant);
 test_case!(variable_key_narrowing_not_null);
-
-// Bad path tests - verifying issues are triggered
 test_case!(bad_path_abstract_instantiation);
 test_case!(bad_path_interface_instantiation);
 test_case!(bad_path_enum_instantiation);
@@ -358,6 +360,7 @@ test_case!(bad_path_invalid_throw);
 test_case!(bad_path_redundant_null_coalesce);
 test_case!(bad_path_redundant_nullsafe);
 test_case!(bad_path_assignment_to_this);
+test_case!(typed_property_null_coalesce);
 
 // Github Issues
 test_case!(issue_659);
@@ -499,7 +502,7 @@ test_case!(issue_756);
 test_case!(issue_764);
 test_case!(issue_765);
 test_case!(issue_766);
-test_case!(typed_property_null_coalesce);
+test_case!(issue_776);
 
 #[test]
 fn test_all_test_cases_are_ran() {

@@ -4,13 +4,13 @@ use std::hash::Hasher;
 
 use bitflags::bitflags;
 use derivative::Derivative;
-use mago_atom::atom;
-use mago_atom::concat_atom;
-use mago_atom::empty_atom;
 use serde::Deserialize;
 use serde::Serialize;
 
 use mago_atom::Atom;
+use mago_atom::atom;
+use mago_atom::concat_atom;
+use mago_atom::empty_atom;
 
 use crate::metadata::CodebaseMetadata;
 use crate::reference::ReferenceSource;
@@ -468,7 +468,7 @@ impl TUnion {
     }
 
     pub fn is_string(&self) -> bool {
-        self.types.iter().all(super::atomic::TAtomic::is_string) && !self.types.is_empty()
+        self.types.iter().all(TAtomic::is_string) && !self.types.is_empty()
     }
 
     #[must_use]
@@ -487,31 +487,31 @@ impl TUnion {
     }
 
     pub fn is_non_empty_string(&self) -> bool {
-        self.types.iter().all(super::atomic::TAtomic::is_non_empty_string) && !self.types.is_empty()
+        self.types.iter().all(TAtomic::is_non_empty_string) && !self.types.is_empty()
     }
 
     pub fn is_empty_array(&self) -> bool {
-        self.types.iter().all(super::atomic::TAtomic::is_empty_array) && !self.types.is_empty()
+        self.types.iter().all(TAtomic::is_empty_array) && !self.types.is_empty()
     }
 
     pub fn has_string(&self) -> bool {
-        self.types.iter().any(super::atomic::TAtomic::is_string) && !self.types.is_empty()
+        self.types.iter().any(TAtomic::is_string) && !self.types.is_empty()
     }
 
     pub fn is_float(&self) -> bool {
-        self.types.iter().all(super::atomic::TAtomic::is_float) && !self.types.is_empty()
+        self.types.iter().all(TAtomic::is_float) && !self.types.is_empty()
     }
 
     pub fn is_bool(&self) -> bool {
-        self.types.iter().all(super::atomic::TAtomic::is_bool) && !self.types.is_empty()
+        self.types.iter().all(TAtomic::is_bool) && !self.types.is_empty()
     }
 
     pub fn is_never(&self) -> bool {
-        self.types.iter().all(super::atomic::TAtomic::is_never) || self.types.is_empty()
+        self.types.iter().all(TAtomic::is_never) || self.types.is_empty()
     }
 
     pub fn is_never_template(&self) -> bool {
-        self.types.iter().all(super::atomic::TAtomic::is_templated_as_never) && !self.types.is_empty()
+        self.types.iter().all(TAtomic::is_templated_as_never) && !self.types.is_empty()
     }
 
     #[must_use]
@@ -520,11 +520,11 @@ impl TUnion {
     }
 
     pub fn is_true(&self) -> bool {
-        self.types.iter().all(super::atomic::TAtomic::is_true) && !self.types.is_empty()
+        self.types.iter().all(TAtomic::is_true) && !self.types.is_empty()
     }
 
     pub fn is_false(&self) -> bool {
-        self.types.iter().all(super::atomic::TAtomic::is_false) && !self.types.is_empty()
+        self.types.iter().all(TAtomic::is_false) && !self.types.is_empty()
     }
 
     #[must_use]
@@ -533,11 +533,11 @@ impl TUnion {
     }
 
     pub fn is_numeric(&self) -> bool {
-        self.types.iter().all(super::atomic::TAtomic::is_numeric) && !self.types.is_empty()
+        self.types.iter().all(TAtomic::is_numeric) && !self.types.is_empty()
     }
 
     pub fn is_int_or_float(&self) -> bool {
-        self.types.iter().all(super::atomic::TAtomic::is_int_or_float) && !self.types.is_empty()
+        self.types.iter().all(TAtomic::is_int_or_float) && !self.types.is_empty()
     }
 
     /// Returns `Some(true)` if all types are effectively int, `Some(false)` if all are effectively float,
@@ -569,7 +569,7 @@ impl TUnion {
     }
 
     pub fn is_mixed_template(&self) -> bool {
-        self.types.iter().all(super::atomic::TAtomic::is_templated_as_mixed) && !self.types.is_empty()
+        self.types.iter().all(TAtomic::is_templated_as_mixed) && !self.types.is_empty()
     }
 
     #[must_use]
@@ -578,7 +578,7 @@ impl TUnion {
     }
 
     pub fn has_mixed_template(&self) -> bool {
-        self.types.iter().any(super::atomic::TAtomic::is_templated_as_mixed) && !self.types.is_empty()
+        self.types.iter().any(TAtomic::is_templated_as_mixed) && !self.types.is_empty()
     }
 
     #[must_use]
@@ -812,27 +812,27 @@ impl TUnion {
     }
 
     pub fn has_resource(&self) -> bool {
-        self.types.iter().any(super::atomic::TAtomic::is_resource)
+        self.types.iter().any(TAtomic::is_resource)
     }
 
     pub fn is_resource(&self) -> bool {
-        self.types.iter().all(super::atomic::TAtomic::is_resource) && !self.types.is_empty()
+        self.types.iter().all(TAtomic::is_resource) && !self.types.is_empty()
     }
 
     pub fn is_array(&self) -> bool {
-        self.types.iter().all(super::atomic::TAtomic::is_array) && !self.types.is_empty()
+        self.types.iter().all(TAtomic::is_array) && !self.types.is_empty()
     }
 
     pub fn is_list(&self) -> bool {
-        self.types.iter().all(super::atomic::TAtomic::is_list) && !self.types.is_empty()
+        self.types.iter().all(TAtomic::is_list) && !self.types.is_empty()
     }
 
     pub fn is_keyed_array(&self) -> bool {
-        self.types.iter().all(super::atomic::TAtomic::is_keyed_array) && !self.types.is_empty()
+        self.types.iter().all(TAtomic::is_keyed_array) && !self.types.is_empty()
     }
 
     pub fn is_falsable(&self) -> bool {
-        self.types.len() >= 2 && self.types.iter().any(super::atomic::TAtomic::is_false)
+        self.types.len() >= 2 && self.types.iter().any(TAtomic::is_false)
     }
 
     #[must_use]
@@ -846,7 +846,7 @@ impl TUnion {
     /// combination of types that would form a scalar (e.g., `int|string|bool|float`).
     /// For that, see `has_scalar_combination`.
     pub fn has_scalar(&self) -> bool {
-        self.types.iter().any(super::atomic::TAtomic::is_generic_scalar)
+        self.types.iter().any(TAtomic::is_generic_scalar)
     }
 
     /// Checks if the union contains a combination of types that is equivalent
@@ -888,15 +888,15 @@ impl TUnion {
         flags == ALL_SCALARS
     }
     pub fn has_array_key(&self) -> bool {
-        self.types.iter().any(super::atomic::TAtomic::is_array_key)
+        self.types.iter().any(TAtomic::is_array_key)
     }
 
     pub fn has_iterable(&self) -> bool {
-        self.types.iter().any(super::atomic::TAtomic::is_iterable) && !self.types.is_empty()
+        self.types.iter().any(TAtomic::is_iterable) && !self.types.is_empty()
     }
 
     pub fn has_array(&self) -> bool {
-        self.types.iter().any(super::atomic::TAtomic::is_array) && !self.types.is_empty()
+        self.types.iter().any(TAtomic::is_array) && !self.types.is_empty()
     }
 
     #[must_use]
@@ -910,15 +910,15 @@ impl TUnion {
     }
 
     pub fn has_numeric(&self) -> bool {
-        self.types.iter().any(super::atomic::TAtomic::is_numeric) && !self.types.is_empty()
+        self.types.iter().any(TAtomic::is_numeric) && !self.types.is_empty()
     }
 
     pub fn is_always_truthy(&self) -> bool {
-        self.types.iter().all(super::atomic::TAtomic::is_truthy) && !self.types.is_empty()
+        self.types.iter().all(TAtomic::is_truthy) && !self.types.is_empty()
     }
 
     pub fn is_always_falsy(&self) -> bool {
-        self.types.iter().all(super::atomic::TAtomic::is_falsy) && !self.types.is_empty()
+        self.types.iter().all(TAtomic::is_falsy) && !self.types.is_empty()
     }
 
     #[must_use]

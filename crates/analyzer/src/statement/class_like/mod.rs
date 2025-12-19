@@ -648,9 +648,14 @@ pub(crate) fn analyze_class_like<'ctx, 'ast, 'arena>(
                     let is_implemented = current_property
                         .map(|p| {
                             if p.hooks.is_empty() {
-                                true
+                                !p.flags.is_virtual_property()
                             } else {
-                                p.hooks.get(hook_name).is_some_and(|h| !h.is_abstract)
+                                // Property has hooks - check if the specific hook is implemented
+                                if p.hooks.get(hook_name).is_some_and(|h| !h.is_abstract) {
+                                    return true;
+                                }
+
+                                p.hooks.values().any(|h| !h.is_abstract)
                             }
                         })
                         .unwrap_or_else(|| {
@@ -659,7 +664,13 @@ pub(crate) fn analyze_class_like<'ctx, 'ast, 'arena>(
                                     .codebase
                                     .get_class_like(parent_class_fqcn)
                                     .and_then(|parent| parent.properties.get(property_name))
-                                    .is_some_and(|prop| prop.hooks.get(hook_name).is_some_and(|h| !h.is_abstract))
+                                    .is_some_and(|prop| {
+                                        if prop.hooks.get(hook_name).is_some_and(|h| !h.is_abstract) {
+                                            return true;
+                                        }
+
+                                        !prop.flags.is_virtual_property() || prop.hooks.values().any(|h| !h.is_abstract)
+                                    })
                             })
                         });
 

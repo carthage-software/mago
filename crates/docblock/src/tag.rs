@@ -908,9 +908,11 @@ pub fn split_tag_content(content: &str, input_span: Span) -> Option<(TypeString,
             _ => {}
         }
 
-        // if we are at `:` then consider it significant and consume following
+        // if we are at `:`, `|`, or `&` then consider it significant and consume following
         // whitespaces, and continue processing
-        if char == ':' {
+        // This allows union/intersection types like `int | string` or `Foo & Bar`
+        // as well as callable return types like `callable(): int`
+        if char == ':' || char == '|' || char == '&' {
             last_char_was_significant = true;
             while let Some(&(_, next_char)) = iter.peek() {
                 if next_char.is_whitespace() {
@@ -946,18 +948,18 @@ pub fn split_tag_content(content: &str, input_span: Span) -> Option<(TypeString,
         if char.is_whitespace() {
             if bracket_stack.is_empty() && last_char_was_significant {
                 let mut temp_iter = iter.clone();
-                let mut found_colon = false;
+                let mut found_continuation = false;
 
                 while let Some(&(_, next_char)) = temp_iter.peek() {
                     if next_char.is_whitespace() {
                         temp_iter.next();
                     } else {
-                        found_colon = next_char == ':';
+                        found_continuation = next_char == ':' || next_char == '|' || next_char == '&';
                         break;
                     }
                 }
 
-                if found_colon {
+                if found_continuation {
                     while let Some(&(_, next_char)) = iter.peek() {
                         if next_char.is_whitespace() {
                             iter.next();
