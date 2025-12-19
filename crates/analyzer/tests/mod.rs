@@ -338,6 +338,26 @@ test_case!(finally_after_return);
 test_case!(property_magic_constant);
 test_case!(variable_key_narrowing_not_null);
 
+// Bad path tests - verifying issues are triggered
+test_case!(bad_path_abstract_instantiation);
+test_case!(bad_path_interface_instantiation);
+test_case!(bad_path_enum_instantiation);
+test_case!(bad_path_invalid_break);
+test_case!(bad_path_invalid_continue);
+test_case!(bad_path_null_operand);
+test_case!(bad_path_null_iterator);
+test_case!(bad_path_null_property_access);
+test_case!(bad_path_method_access_on_null);
+test_case!(bad_path_possibly_null_operand);
+test_case!(bad_path_possibly_null_iterator);
+test_case!(bad_path_possibly_null_property_access);
+test_case!(bad_path_invalid_iterator);
+test_case!(bad_path_invalid_clone);
+test_case!(bad_path_invalid_throw);
+test_case!(bad_path_redundant_null_coalesce);
+test_case!(bad_path_redundant_nullsafe);
+test_case!(bad_path_assignment_to_this);
+
 // Github Issues
 test_case!(issue_659);
 test_case!(issue_660);
