@@ -8,9 +8,9 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 use std::sync::Arc;
 
-use mago_analyzer::plugin::PluginRegistry;
 use wasm_bindgen::prelude::*;
 
+use mago_analyzer::plugin::PluginRegistry;
 use mago_analyzer::settings::Settings as AnalyzerSettings;
 use mago_atom::ascii_lowercase_atom;
 use mago_atom::atom;
