@@ -342,8 +342,6 @@ test_case!(template_null_comparison);
 test_case!(finally_after_return);
 test_case!(property_magic_constant);
 test_case!(variable_key_narrowing_not_null);
-
-// Bad path tests - verifying issues are triggered
 test_case!(bad_path_abstract_instantiation);
 test_case!(bad_path_interface_instantiation);
 test_case!(bad_path_enum_instantiation);
@@ -362,6 +360,7 @@ test_case!(bad_path_invalid_throw);
 test_case!(bad_path_redundant_null_coalesce);
 test_case!(bad_path_redundant_nullsafe);
 test_case!(bad_path_assignment_to_this);
+test_case!(typed_property_null_coalesce);
 
 // Github Issues
 test_case!(issue_659);
@@ -503,7 +502,7 @@ test_case!(issue_756);
 test_case!(issue_764);
 test_case!(issue_765);
 test_case!(issue_766);
-test_case!(typed_property_null_coalesce);
+test_case!(issue_776);
 
 #[test]
 fn test_all_test_cases_are_ran() {
