@@ -312,6 +312,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
             finally_block_context.assigned_variable_ids = AtomMap::default();
             finally_block_context.possibly_assigned_variable_ids = AtomSet::default();
             finally_block_context.locals = finally_scope.locals;
+            finally_block_context.has_returned = false;
 
             analyze_statements(
                 finally_clause.block.statements.as_slice(),
