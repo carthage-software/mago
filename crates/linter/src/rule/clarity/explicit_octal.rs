@@ -1,4 +1,5 @@
 use indoc::indoc;
+use mago_text_edit::TextEdit;
 use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
@@ -106,6 +107,8 @@ impl LintRule for ExplicitOctalRule {
             .with_note("Using `0o` makes the octal intent explicit and avoids confusion with other formats.")
             .with_help("Replace the leading `0` with `0o` to make the octal intent explicit.");
 
-        ctx.collector.report(issue);
+        ctx.collector.propose(issue, |edits| {
+            edits.push(TextEdit::insert(literal_integer.start_offset() + 1, "o"));
+        });
     }
 }
