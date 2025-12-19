@@ -153,6 +153,7 @@ test_case!(readonly_proptected_set);
 test_case!(value_of_enum_resolution);
 test_case!(properties_of_enum);
 test_case!(properties_of_class);
+test_case!(properties_of_generic);
 test_case!(properties_of_visibility);
 test_case!(assert_or_type);
 test_case!(impossible_assertion);
