@@ -87,19 +87,21 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Break<'arena> {
             let redefined_vars =
                 block_context.get_redefined_locals(&loop_scope.parent_context_variables, false, &mut removed_var_ids);
 
-            for (var_id, parent_type) in &loop_scope.parent_context_variables {
+            for var_id in loop_scope.parent_context_variables.keys() {
                 if !redefined_vars.contains_key(var_id) {
-                    loop_scope.possibly_redefined_loop_parent_variables.insert(
-                        *var_id,
-                        Rc::new(add_optional_union_type(
-                            (**parent_type).clone(),
-                            loop_scope
-                                .possibly_redefined_loop_parent_variables
-                                .get(var_id)
-                                .map(std::convert::AsRef::as_ref),
-                            context.codebase,
-                        )),
-                    );
+                    if let Some(current_type) = block_context.locals.get(var_id) {
+                        loop_scope.possibly_redefined_loop_parent_variables.insert(
+                            *var_id,
+                            Rc::new(add_optional_union_type(
+                                (**current_type).clone(),
+                                loop_scope
+                                    .possibly_redefined_loop_parent_variables
+                                    .get(var_id)
+                                    .map(std::convert::AsRef::as_ref),
+                                context.codebase,
+                            )),
+                        );
+                    }
                 }
             }
 
