@@ -1,4 +1,5 @@
 FormatSettings {
+    null_type_hint: NullTypeHint::NullPipe,
     always_break_named_arguments_list: true,
     space_around_assignment_in_declare: true,
     space_within_grouping_parenthesis: true,

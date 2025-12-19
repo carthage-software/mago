@@ -555,13 +555,6 @@ pub struct FormatSettings {
 
     /// How to format null type hints.
     ///
-    /// With `NullPipe`:
-    /// ```php
-    /// function foo(null|string $bar) {
-    ///     return $bar;
-    /// }
-    /// ```
-    ///
     /// With `Question`:
     /// ```php
     /// function foo(?string $bar) {
@@ -569,7 +562,14 @@ pub struct FormatSettings {
     /// }
     /// ```
     ///
-    /// Default: `NullPipe`
+    /// With `NullPipe`:
+    /// ```php
+    /// function foo(null|string $bar) {
+    ///     return $bar;
+    /// }
+    /// ```
+    ///
+    /// Default: `Question`
     #[serde(default)]
     pub null_type_hint: NullTypeHint,
 
@@ -1083,9 +1083,9 @@ impl FromStr for EndOfLine {
 /// Specifies null type hint style.
 #[derive(Default, Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, JsonSchema)]
 pub enum NullTypeHint {
-    #[default]
     #[serde(alias = "null_pipe", alias = "pipe", alias = "long", alias = "|")]
     NullPipe,
+    #[default]
     #[serde(alias = "question", alias = "short", alias = "?")]
     Question,
 }

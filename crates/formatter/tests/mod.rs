@@ -4,6 +4,7 @@ use std::fs;
 
 use mago_formatter::Formatter;
 use mago_formatter::settings::FormatSettings;
+use mago_formatter::settings::NullTypeHint;
 use mago_php_version::PHPVersion;
 
 #[macro_export]
