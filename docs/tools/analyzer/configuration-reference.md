@@ -165,6 +165,70 @@ Use `unchecked-exceptions` when you want to ignore an entire category of excepti
 Use `unchecked-exception-classes` when you want to ignore a specific exception but still want to track its parent or sibling exceptions.
 :::
 
+## Plugins
+
+Plugins extend the analyzer with specialized type information for libraries and frameworks. They provide accurate type inference for functions that would otherwise return generic types.
+
+| Option                   | Type       | Default | Description                                                              |
+| :----------------------- | :--------- | :------ | :----------------------------------------------------------------------- |
+| `disable-default-plugins`| `bool`     | `false` | Disable all default plugins. Only explicitly listed plugins will be used.|
+| `plugins`                | `string[]` | `[]`    | List of plugins to enable (by name or alias).                            |
+
+### Available plugins
+
+| Plugin ID   | Aliases                                    | Default | Description                                                    |
+| :---------- | :----------------------------------------- | :------ | :------------------------------------------------------------- |
+| `stdlib`    | `standard`, `std`, `php-stdlib`            | Enabled | Type providers for PHP built-in functions (`strlen`, `array_*`, `json_*`, etc.) |
+| `psl`       | `php-standard-library`, `azjezz-psl`       | Disabled| Type providers for [azjezz/psl](https://github.com/azjezz/psl) package |
+| `flow-php`  | `flow`, `flow-etl`                         | Disabled| Type providers for [flow-php/etl](https://github.com/flow-php/etl) package |
+
+### How plugins work
+
+Plugins provide "type providers" that give the analyzer precise type information for library functions. For example, the `stdlib` plugin knows that:
+
+- `array_filter($array)` returns the same array type but potentially with fewer elements
+- `json_decode($json, true)` returns `array<string, mixed>` when the second argument is `true`
+- `strlen($string)` returns `int<0, max>`
+
+Without plugins, these functions would return less precise types like `mixed` or `array`.
+
+### Example configurations
+
+#### Using default plugins only
+
+By default, the `stdlib` plugin is enabled:
+
+```toml
+[analyzer]
+# No configuration needed - stdlib is enabled by default
+```
+
+#### Enabling additional plugins
+
+```toml
+[analyzer]
+plugins = ["psl", "flow-php"]
+```
+
+#### Disabling all plugins
+
+```toml
+[analyzer]
+disable-default-plugins = true
+```
+
+#### Using only specific plugins
+
+```toml
+[analyzer]
+disable-default-plugins = true
+plugins = ["psl"]  # Only enable PSL, not stdlib
+```
+
+:::tip Plugin aliases
+You can use any of the plugin aliases for convenience. For example, `plugins = ["std"]` is equivalent to `plugins = ["stdlib"]`.
+:::
+
 ## Strict mode
 
 The analyzer can be configured to be more or less strict depending on your project's needs. This section describes how to configure the analyzer for maximum strictness.
