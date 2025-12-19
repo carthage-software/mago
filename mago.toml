@@ -19,7 +19,15 @@ no-redundant-readonly = { enabled = true }
 sensitive-parameter = { enabled = true }
 
 [analyzer]
-allow-possibly-undefined-array-keys = false
 find-unused-expressions = true
+find-unused-definitions = true
+analyze-dead-code = true
+check-missing-override = true
+find-unused-parameters = true
+check-missing-type-hints = true
+check-closure-missing-type-hints = true
+check-arrow-function-missing-type-hints = true
+strict-list-index-checks = true
 no-boolean-literal-comparison = true
-check-property-initialization = true
+allow-possibly-undefined-array-keys = false
+trust-existence-checks = false
