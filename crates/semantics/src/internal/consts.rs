@@ -52,7 +52,7 @@ pub const SOFT_RESERVED_KEYWORDS_MINUS_SYMBOL_ALLOWED: [&str; 7] =
     ["parent", "self", "true", "false", "list", "null", "readonly"];
 
 // a list of reserved keywords in PHP
-pub const RESERVED_KEYWORDS: [&str; 77] = [
+pub const RESERVED_KEYWORDS: [&str; 78] = [
     "static",
     "abstract",
     "final",
@@ -127,6 +127,7 @@ pub const RESERVED_KEYWORDS: [&str; 77] = [
     "__FILE__",
     "__DIR__",
     "__NAMESPACE__",
+    "__PROPERTY__",
     "__halt_compiler",
     "fn",
     "match",

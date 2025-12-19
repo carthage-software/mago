@@ -211,6 +211,7 @@ pub enum TokenKind {
     Namespace,                   // `namespace`
     NamespaceSeparator,          // `\`
     NamespaceConstant,           // `__NAMESPACE__`
+    PropertyConstant,            // `__PROPERTY__`
     New,                         // `new`
     Null,                        // `null`
     ObjectCast,                  // `(object)`
@@ -468,6 +469,7 @@ impl TokenKind {
                 | TokenKind::MethodConstant
                 | TokenKind::TraitConstant
                 | TokenKind::NamespaceConstant
+                | TokenKind::PropertyConstant
                 | TokenKind::HaltCompiler
         )
     }
@@ -662,6 +664,7 @@ impl TokenKind {
                 | "__FILE__"
                 | "__DIR__"
                 | "__NAMESPACE__"
+                | "__PROPERTY__"
                 | "__halt_compiler"
                 | "fn"
                 | "match"]
@@ -689,6 +692,7 @@ impl TokenKind {
                 | "__LINE__"
                 | "__METHOD__"
                 | "__NAMESPACE__"
+                | "__PROPERTY__"
                 | "__TRAIT__"]
         )
     }

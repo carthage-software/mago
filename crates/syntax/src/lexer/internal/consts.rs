@@ -16,7 +16,7 @@ pub const CAST_TYPES: [(&[u8], TokenKind); 13] = [
     (b"(void)", TokenKind::VoidCast),
 ];
 
-pub const KEYWORD_TYPES: [(&[u8], TokenKind); 85] = [
+pub const KEYWORD_TYPES: [(&[u8], TokenKind); 86] = [
     (b"eval", TokenKind::Eval),
     (b"die", TokenKind::Die),
     (b"empty", TokenKind::Empty),
@@ -101,5 +101,6 @@ pub const KEYWORD_TYPES: [(&[u8], TokenKind); 85] = [
     (b"__method__", TokenKind::MethodConstant),
     (b"__trait__", TokenKind::TraitConstant),
     (b"__namespace__", TokenKind::NamespaceConstant),
+    (b"__property__", TokenKind::PropertyConstant),
     (b"__halt_compiler", TokenKind::HaltCompiler),
 ];

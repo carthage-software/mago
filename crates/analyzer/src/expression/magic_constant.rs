@@ -83,7 +83,15 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for MagicConstant<'arena> {
             MagicConstant::Function(_) | MagicConstant::Method(_) => {
                 if block_context.scope.get_function_like().is_none() { get_string() } else { get_non_empty_string() }
             }
-            MagicConstant::Property(_) => get_string(),
+            MagicConstant::Property(_) => {
+                if let Some((property_name, _)) = block_context.scope.get_property_hook() {
+                    let property_name = &property_name[1..];
+
+                    get_literal_string(atom(property_name))
+                } else {
+                    get_empty_string()
+                }
+            }
         };
 
         artifacts.set_expression_type(&self, constant_type);
