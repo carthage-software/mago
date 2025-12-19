@@ -57,7 +57,7 @@ jobs:
         run: cd docs && bun install --frozen-lockfile
 
       - name: Build docs
-        run: cd docs && bun build
+        run: cd docs && bun run build
 
       - name: Upload GitHub Pages artifact
         uses: actions/upload-pages-artifact@v3
