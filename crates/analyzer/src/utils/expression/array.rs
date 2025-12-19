@@ -129,7 +129,7 @@ pub(crate) fn get_array_target_type_given_index<'ctx>(
     }
 
     if !block_context.inside_isset {
-        if index_type.is_nullable() && !index_type.ignore_nullable_issues() && !array_like_type.is_keyed_array() {
+        if index_type.is_nullable() && !index_type.ignore_nullable_issues() {
             context.collector.report_with_code(
                 IssueCode::PossiblyNullArrayIndex,
                 Issue::warning(format!(

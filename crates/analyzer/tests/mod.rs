@@ -320,6 +320,7 @@ test_case!(nullable_method_coalesce);
 test_case!(property_coalesce_init);
 test_case!(ctype_digit_check);
 test_case!(mutually_exclusive_null);
+test_case!(null_array_key);
 test_case!(nullable_getter_check);
 test_case!(abstract_factory_pattern);
 test_case!(array_key_coalesce);

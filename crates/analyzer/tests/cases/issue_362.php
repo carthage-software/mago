@@ -51,6 +51,7 @@ class ArrayCollection implements ArrayAccess, Countable, IteratorAggregate
      * @param TValue $value
      *
      * @mago-expect analysis:invalid-property-assignment-value
+     * @mago-expect analysis:possibly-null-array-index
      */
     public function offsetSet(mixed $offset, mixed $value): void
     {
