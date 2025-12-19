@@ -222,7 +222,15 @@ fn add_parameter_types_to_context<'ctx, 'arena>(
         let mut final_parameter_type = if declared_type_is_specific {
             declared_parameter_type
         } else if let Some(inferred_map) = inferred_parameter_types.as_mut() {
-            inferred_map.remove(&i).unwrap_or(declared_parameter_type)
+            if let Some(inferred_type) = inferred_map.remove(&i) {
+                if is_unresolved_template_with_mixed_bound(&inferred_type) {
+                    declared_parameter_type
+                } else {
+                    inferred_type
+                }
+            } else {
+                declared_parameter_type
+            }
         } else {
             declared_parameter_type
         };
@@ -278,6 +286,20 @@ fn add_parameter_types_to_context<'ctx, 'arena>(
     }
 
     Ok(())
+}
+
+/// Checks if a type is a single unresolved template parameter with a mixed bound.
+/// Such types shouldn't override explicit type hints as they provide no additional information.
+fn is_unresolved_template_with_mixed_bound(union: &TUnion) -> bool {
+    if union.types.len() != 1 {
+        return false;
+    }
+
+    if let Some(TAtomic::GenericParameter(param)) = union.types.first() {
+        param.constraint.is_mixed() || param.constraint.is_vanilla_mixed()
+    } else {
+        false
+    }
 }
 
 fn expand_type_metadata<'ctx>(
