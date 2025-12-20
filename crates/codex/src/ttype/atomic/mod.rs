@@ -713,7 +713,7 @@ impl TAtomic {
             TAtomic::Scalar(scalar) if scalar.is_falsy() => true,
             TAtomic::Array(array) if array.is_falsy() => true,
             TAtomic::Mixed(mixed) if mixed.is_falsy() => true,
-            TAtomic::Null => true,
+            TAtomic::Null | TAtomic::Void => true,
             _ => false,
         }
     }
