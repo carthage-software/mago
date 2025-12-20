@@ -12,9 +12,10 @@ interface TestInterface
     public int $modified { get; }
 }
 
-// This class should NOT report any errors:
+// This class should NOT report any errors except missing-constructor for backed property:
 // 1. $backed only defines set hook, but PHP auto-generates get for backed properties
 // 2. $modified is a normal property with asymmetric visibility
+// @mago-expect analysis:missing-constructor
 final class Test implements TestInterface
 {
     public int $backed {
@@ -36,6 +37,7 @@ interface GetterInterface
 }
 
 // Backed property with only get hook should satisfy interface
+// @mago-expect analysis:missing-constructor
 class BackedGetter implements GetterInterface
 {
     public string $name {
@@ -55,6 +57,7 @@ interface SetterInterface
 }
 
 // Backed property with only set hook should satisfy interface
+// @mago-expect analysis:missing-constructor
 class BackedSetter implements SetterInterface
 {
     public int $value {

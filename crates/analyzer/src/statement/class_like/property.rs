@@ -24,6 +24,7 @@ use crate::error::AnalysisError;
 use crate::statement::analyze_statements;
 use crate::statement::attributes::AttributeTarget;
 use crate::statement::attributes::analyze_attributes;
+use crate::statement::function_like::add_properties_to_context;
 use crate::statement::function_like::get_this_type;
 use crate::statement::r#return::handle_return_value;
 
@@ -159,9 +160,12 @@ fn analyze_property_hook<'ctx, 'arena>(
     let mut hook_block_context = BlockContext::new(scope, context.settings.register_super_globals);
 
     if let Some(class_like_metadata) = parent_block_context.scope.get_class_like() {
-        let this_type = wrap_atomic(TAtomic::Object(get_this_type(context, class_like_metadata, None)));
-        hook_block_context.locals.insert(Atom::from("$this"), Rc::new(this_type));
-        add_properties_to_hook_context(context, &mut hook_block_context, class_like_metadata);
+        hook_block_context.locals.insert(
+            Atom::from("$this"),
+            Rc::new(wrap_atomic(TAtomic::Object(get_this_type(context, class_like_metadata, None)))),
+        );
+
+        add_properties_to_context(context, &mut hook_block_context, class_like_metadata, None)?;
     }
 
     if hook.name.value == "set" {
@@ -222,23 +226,4 @@ fn get_value_type_for_set_hook(
     }
 
     property.type_metadata.as_ref().map_or_else(get_mixed, |t| t.type_union.clone())
-}
-
-fn add_properties_to_hook_context<'ctx>(
-    context: &Context<'ctx, '_>,
-    hook_block_context: &mut BlockContext<'ctx>,
-    class_like_metadata: &mago_codex::metadata::class_like::ClassLikeMetadata,
-) {
-    for (property_name, declaring_class) in &class_like_metadata.declaring_property_ids {
-        let Some(property_class) = context.codebase.get_class_like(declaring_class) else { continue };
-        let Some(property) = property_class.properties.get(property_name) else { continue };
-
-        if property.flags.is_static() {
-            continue;
-        }
-
-        let property_type = property.type_metadata.as_ref().map_or_else(get_mixed, |t| t.type_union.clone());
-        let raw_name = property_name.strip_prefix("$").unwrap_or(property_name);
-        hook_block_context.locals.insert(Atom::from(&format!("$this->{raw_name}")), Rc::new(property_type));
-    }
 }

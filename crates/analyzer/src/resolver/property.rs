@@ -344,17 +344,11 @@ pub fn resolve_instance_properties<'ctx, 'ast, 'arena>(
     Ok(result)
 }
 
-/// Checks if this is a direct backing store access: `$this->prop` inside the set hook for that property.
+/// Checks if this is a backing store access: `$this->prop` inside a hook for that property.
 fn is_backing_store_access(object_expr: &Expression, prop_name: Atom, block_context: &BlockContext) -> bool {
     let is_this = matches!(object_expr, Expression::Variable(Variable::Direct(var)) if var.name == "$this");
-    if !is_this {
-        return false;
-    }
 
-    block_context
-        .scope
-        .get_property_hook()
-        .is_some_and(|(hook_prop_name, hook_meta)| hook_prop_name == prop_name && hook_meta.is_set())
+    is_this && block_context.scope.get_property_hook().is_some_and(|(hook_prop_name, _)| hook_prop_name == prop_name)
 }
 
 /// Finds a property in a class, gets its type, and handles template localization.
