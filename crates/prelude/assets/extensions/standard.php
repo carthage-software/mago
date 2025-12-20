@@ -5237,7 +5237,11 @@ function reset(object|array &$array): mixed
  *
  * @param object|array<T> $array
  *
- * @return $array is-non-empty-array|non-empty-list ? T : T|null
+ * @return (
+ *   $array is object ? mixed : (
+ *     $array is non-empty-array|non-empty-list ? T : T|null
+ *   )
+ * )
  *
  * @pure
  */
