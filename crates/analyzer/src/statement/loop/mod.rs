@@ -15,12 +15,12 @@ use mago_atom::atom;
 
 use mago_codex::ttype;
 use mago_codex::ttype::TType;
+use mago_codex::ttype::add_optional_union_type;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::bool::TBool;
 use mago_codex::ttype::combine_union_types;
-use mago_codex::ttype::combiner::combine;
 use mago_codex::ttype::get_array_parameters;
 use mago_codex::ttype::get_arraykey;
 use mago_codex::ttype::get_iterable_parameters;
@@ -1014,8 +1014,8 @@ fn analyze_iterator<'ctx, 'ast, 'arena>(
     }
 
     let mut has_at_least_one_entry = false;
-    let mut collected_key_atomics: Vec<TAtomic> = vec![];
-    let mut collected_value_atomics: Vec<TAtomic> = vec![];
+    let mut key_type = None;
+    let mut value_type = None;
     let mut has_valid_iterable_type = false;
     let mut invalid_atomic_ids = Vec::with_capacity(iterator_type.types.len());
 
@@ -1035,15 +1035,25 @@ fn analyze_iterator<'ctx, 'ast, 'arena>(
                 }
 
                 let (k, v) = get_array_parameters(array, context.codebase);
-                collected_key_atomics.extend(k.types.into_owned());
-                collected_value_atomics.extend(v.types.into_owned());
+
+                key_type = Some(add_optional_union_type(k, key_type.as_ref(), context.codebase));
+                value_type = Some(add_optional_union_type(v, value_type.as_ref(), context.codebase));
             }
             TAtomic::Iterable(iterable) => {
                 has_valid_iterable_type = true;
                 has_at_least_one_entry = false;
 
-                collected_key_atomics.extend(iterable.key_type.types.iter().cloned());
-                collected_value_atomics.extend(iterable.value_type.types.iter().cloned());
+                key_type = Some(add_optional_union_type(
+                    iterable.key_type.as_ref().clone(),
+                    key_type.as_ref(),
+                    context.codebase,
+                ));
+
+                value_type = Some(add_optional_union_type(
+                    iterable.value_type.as_ref().clone(),
+                    value_type.as_ref(),
+                    context.codebase,
+                ));
             }
             TAtomic::Object(object) => {
                 let (obj_key_type, obj_value_type) = match object {
@@ -1127,8 +1137,8 @@ fn analyze_iterator<'ctx, 'ast, 'arena>(
 
                 has_valid_iterable_type = true;
 
-                collected_key_atomics.extend(obj_key_type.types.into_owned());
-                collected_value_atomics.extend(obj_value_type.types.into_owned());
+                key_type = Some(add_optional_union_type(obj_key_type, key_type.as_ref(), context.codebase));
+                value_type = Some(add_optional_union_type(obj_value_type, value_type.as_ref(), context.codebase));
             }
             _ => {
                 let iterator_atomic_id = iterator_atomic.get_id();
@@ -1196,19 +1206,7 @@ fn analyze_iterator<'ctx, 'ast, 'arena>(
         return Ok((false, get_mixed(), get_mixed()));
     }
 
-    let final_key_type = if collected_key_atomics.is_empty() {
-        get_mixed()
-    } else {
-        TUnion::from_vec(combine(collected_key_atomics, context.codebase, false))
-    };
-
-    let final_value_type = if collected_value_atomics.is_empty() {
-        get_mixed()
-    } else {
-        TUnion::from_vec(combine(collected_value_atomics, context.codebase, false))
-    };
-
-    Ok((has_at_least_one_entry, final_key_type, final_value_type))
+    Ok((has_at_least_one_entry, key_type.unwrap_or_else(get_mixed), value_type.unwrap_or_else(get_mixed)))
 }
 
 /// Scrapes all direct variable names from an expression and indicates if a reference operator (`&`)

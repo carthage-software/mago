@@ -505,6 +505,7 @@ test_case!(issue_765);
 test_case!(issue_766);
 test_case!(issue_776);
 test_case!(issue_782);
+test_case!(issue_784);
 test_case!(issue_785);
 test_case!(issue_789);
 
