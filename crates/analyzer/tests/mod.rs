@@ -52,6 +52,7 @@ test_case!(conditional_return_with_assignment_in_condition);
 test_case!(const_array_key);
 test_case!(docblock_type_narrowing);
 test_case!(docblock_type_parsing_verification);
+test_case!(docblock_var_on_non_assignment);
 test_case!(empty_switch);
 test_case!(generic_shape_coercion);
 test_case!(int_or_float);
