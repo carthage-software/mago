@@ -5,11 +5,17 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_span::Span;
+use mago_syntax::ast::ClassLikeMemberSelector;
+use mago_syntax::ast::Expression;
 use mago_syntax::ast::FunctionLikeParameter;
+use mago_syntax::ast::NullSafePropertyAccess;
 use mago_syntax::ast::Property;
+use mago_syntax::ast::PropertyAccess;
 use mago_syntax::ast::PropertyHook;
 use mago_syntax::ast::PropertyHookBody;
 use mago_syntax::ast::PropertyItem;
+use mago_syntax::ast::Variable;
+use mago_syntax::walker::MutWalker;
 
 use crate::issue::ScanningIssueKind;
 use crate::metadata::class_like::ClassLikeMetadata;
@@ -92,7 +98,6 @@ pub fn scan_promoted_property<'arena>(
     property_metadata.set_name_span(Some(name_span));
     property_metadata.set_span(Some(parameter.span()));
     property_metadata.set_visibility(read_visibility, write_visibility);
-    property_metadata.set_is_virtual(parameter.hooks.is_some());
     property_metadata.set_type_declaration_metadata(
         parameter.hint.as_ref().map(|hint| get_type_metadata_from_hint(hint, Some(class_like_metadata.name), context)),
     );
@@ -103,6 +108,9 @@ pub fn scan_promoted_property<'arena>(
             class_like_metadata.issues.extend(hook_metadata.take_issues());
             property_metadata.hooks.insert(hook_metadata.name, hook_metadata);
         }
+
+        let prop_name = name.0.strip_prefix('$').unwrap_or(&name.0);
+        property_metadata.set_is_virtual(!hooks_reference_backing_store(&hook_list.hooks, prop_name));
     }
 
     let mut used_parameter_type_from_docblock = false;
@@ -300,12 +308,12 @@ pub fn scan_properties<'arena>(
 
             for hook in &hooked_property.hook_list.hooks {
                 let mut hook_metadata = scan_property_hook(hook, &metadata, context, scope);
-                // Collect hook docblock issues into class-like metadata
                 class_like_metadata.issues.extend(hook_metadata.take_issues());
                 metadata.hooks.insert(hook_metadata.name, hook_metadata);
             }
 
-            metadata.set_is_virtual(true);
+            let prop_name = name.0.strip_prefix('$').unwrap_or(&name.0);
+            metadata.set_is_virtual(!hooks_reference_backing_store(&hooked_property.hook_list.hooks, prop_name));
 
             vec![metadata]
         }
@@ -536,4 +544,67 @@ fn update_property_metadata_from_docblock(
             ),
         }
     }
+}
+
+/// Checks if any hook references `$this->propertyName` (indicating a backed property).
+fn hooks_reference_backing_store<'arena>(
+    hooks: impl IntoIterator<Item = &'arena PropertyHook<'arena>>,
+    property_name: &str,
+) -> bool {
+    struct Walker<'arena> {
+        property_name: &'arena str,
+        found: bool,
+    }
+
+    impl<'arena> Walker<'arena> {
+        fn new(property_name: &'arena str) -> Self {
+            Self { property_name, found: false }
+        }
+
+        fn check_access<'ast>(
+            &mut self,
+            object: &'ast Expression<'arena>,
+            property: &'ast ClassLikeMemberSelector<'arena>,
+        ) {
+            if self.found {
+                return;
+            }
+
+            let Expression::Variable(Variable::Direct(direct_variable)) = object else {
+                return;
+            };
+
+            if direct_variable.name != "$this" {
+                return;
+            }
+
+            let ClassLikeMemberSelector::Identifier(identifier) = property else {
+                return;
+            };
+
+            if identifier.value == self.property_name {
+                self.found = true;
+            }
+        }
+    }
+
+    impl<'ast, 'arena> MutWalker<'ast, 'arena, ()> for Walker<'arena> {
+        fn walk_in_property_access(&mut self, access: &'ast PropertyAccess<'arena>, _: &mut ()) {
+            self.check_access(access.object, &access.property);
+        }
+
+        fn walk_in_null_safe_property_access(&mut self, access: &'ast NullSafePropertyAccess<'arena>, _: &mut ()) {
+            self.check_access(access.object, &access.property);
+        }
+    }
+
+    let mut walker = Walker::new(property_name);
+    for hook in hooks {
+        walker.walk_property_hook_body(&hook.body, &mut ());
+        if walker.found {
+            return true;
+        }
+    }
+
+    false
 }

@@ -10,6 +10,7 @@ enum Suit
     case Spades;
 }
 
+// @mago-expect analysis:missing-constructor
 class MyClass
 {
     public Suit $suit {
@@ -18,6 +19,7 @@ class MyClass
     }
 }
 
+// @mago-expect analysis:missing-constructor
 class MyClass2
 {
     public Suit $suit {

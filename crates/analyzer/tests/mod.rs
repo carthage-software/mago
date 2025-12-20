@@ -52,6 +52,7 @@ test_case!(conditional_return_with_assignment_in_condition);
 test_case!(const_array_key);
 test_case!(docblock_type_narrowing);
 test_case!(docblock_type_parsing_verification);
+test_case!(docblock_var_on_non_assignment);
 test_case!(empty_switch);
 test_case!(generic_shape_coercion);
 test_case!(int_or_float);
@@ -504,6 +505,10 @@ test_case!(issue_764);
 test_case!(issue_765);
 test_case!(issue_766);
 test_case!(issue_776);
+test_case!(issue_782);
+test_case!(issue_784);
+test_case!(issue_785);
+test_case!(issue_789);
 
 #[test]
 fn test_all_test_cases_are_ran() {

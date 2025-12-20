@@ -130,7 +130,7 @@ pub fn analyze_function_like<'ctx, 'ast, 'arena>(
     if let Some(calling_class) = block_context.scope.get_class_like_name()
         && let Some(class_like_metadata) = context.codebase.get_class_like(&calling_class)
     {
-        add_properties_to_context(context, block_context, class_like_metadata, function_like_metadata)?;
+        add_properties_to_context(context, block_context, class_like_metadata, Some(function_like_metadata))?;
     }
 
     if !function_like_metadata.flags.is_unchecked() {
@@ -345,11 +345,11 @@ fn expand_type_metadata<'ctx>(
     signature_union
 }
 
-fn add_properties_to_context<'ctx>(
+pub(super) fn add_properties_to_context<'ctx>(
     context: &Context<'ctx, '_>,
     block_context: &mut BlockContext<'ctx>,
     class_like_metadata: &'ctx ClassLikeMetadata,
-    function_like_metadata: &'ctx FunctionLikeMetadata,
+    function_like_metadata: Option<&'ctx FunctionLikeMetadata>,
 ) -> Result<(), AnalysisError> {
     let Some(calling_class) = block_context.scope.get_class_like_name() else {
         return Ok(());
@@ -391,7 +391,7 @@ fn add_properties_to_context<'ctx>(
         let expression_id = if property_metadata.flags.is_static() {
             Atom::from(&format!("{}::${raw_property_name}", class_like_metadata.name))
         } else {
-            let this_type = get_this_type(context, class_like_metadata, Some(function_like_metadata));
+            let this_type = get_this_type(context, class_like_metadata, function_like_metadata);
 
             property_type = localize_property_type(
                 context,
@@ -414,11 +414,8 @@ fn add_properties_to_context<'ctx>(
             &TypeExpansionOptions {
                 self_class: Some(calling_class),
                 static_class_type: StaticClassType::Name(calling_class),
-                function_is_final: if let Some(method_metadata) = &function_like_metadata.method_metadata {
-                    method_metadata.is_final
-                } else {
-                    false
-                },
+                function_is_final: function_like_metadata
+                    .is_some_and(|m| m.method_metadata.as_ref().is_some_and(|metadata| metadata.is_final)),
                 expand_generic: true,
                 ..Default::default()
             },

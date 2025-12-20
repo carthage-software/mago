@@ -87,6 +87,7 @@ test_case!(no_space_before_enum_backing_type_colon);
 test_case!(closing_echo_tag_preserved);
 test_case!(closing_tag_removed);
 test_case!(closing_tag_preserved);
+test_case!(inline_comment_before_closing_tag);
 test_case!(single_quote_string);
 test_case!(double_quote_string);
 test_case!(inline_if_statement);
@@ -302,6 +303,9 @@ test_case!(issue_640);
 test_case!(issue_683);
 test_case!(issue_727);
 test_case!(issue_738);
+test_case!(issue_788);
+test_case!(inline_block_comments_in_arguments);
+test_case!(idempotent_chain_with_array);
 
 #[test]
 fn test_all_test_cases_are_ran() {

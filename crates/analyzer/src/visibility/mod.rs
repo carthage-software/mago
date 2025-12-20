@@ -214,6 +214,7 @@ pub fn check_property_write_visibility<'ctx>(
     if !property_metadata.hooks.is_empty()
         && property_metadata.hooks.contains_key(&atom("get"))
         && !property_metadata.hooks.contains_key(&atom("set"))
+        && property_metadata.flags.is_virtual_property()
     {
         let class_name = &declaring_class_metadata.original_name;
 

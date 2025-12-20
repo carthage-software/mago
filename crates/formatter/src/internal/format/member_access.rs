@@ -301,7 +301,7 @@ impl<'arena> MemberAccessChain<'arena> {
 
             let current_op_span = access.get_operator_span();
 
-            if misc::has_new_line_in_range(f.source_text, prev_selector_end.offset, current_op_span.start.offset) {
+            if misc::has_new_line_in_range(f.source_text, prev_selector_end.offset, current_op_span.start_offset()) {
                 broken_links += 1;
             }
         }
@@ -366,6 +366,42 @@ impl<'arena> MemberAccessChain<'arena> {
         }
 
         false
+    }
+
+    /// Checks if any method call in the chain has arguments that will force the chain to break.
+    /// This considers:
+    /// - Closures and anonymous classes (always break)
+    /// - Arrays/matches that are already formatted with line breaks
+    #[inline]
+    fn has_breaking_arguments(&self, f: &FormatterState<'_, 'arena>) -> bool {
+        self.accesses.iter().any(|access| {
+            let Some(argument_list) = access.get_arguments_list() else {
+                return false;
+            };
+
+            argument_list.arguments.iter().any(|arg| {
+                let value = arg.value();
+                match value {
+                    Expression::Closure(_) | Expression::AnonymousClass(_) => true,
+                    Expression::Array(arr) => misc::has_new_line_in_range(
+                        f.source_text,
+                        arr.left_bracket.start_offset(),
+                        arr.right_bracket.end_offset(),
+                    ),
+                    Expression::LegacyArray(arr) => misc::has_new_line_in_range(
+                        f.source_text,
+                        arr.array.span.start_offset(),
+                        arr.right_parenthesis.end_offset(),
+                    ),
+                    Expression::Match(m) => misc::has_new_line_in_range(
+                        f.source_text,
+                        m.r#match.span.start_offset(),
+                        m.right_brace.end_offset(),
+                    ),
+                    _ => false,
+                }
+            })
+        })
     }
 
     #[inline]
@@ -617,7 +653,8 @@ pub(super) fn print_member_access_chain<'arena>(
         }
     }
 
-    if must_break && !matches!(f.parent_node(), Node::Binary(_)) {
+    let should_break = must_break || member_access_chain.has_breaking_arguments(f);
+    if should_break && !matches!(f.parent_node(), Node::Binary(_)) {
         parts.push(Document::BreakParent);
     }
 

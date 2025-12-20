@@ -22,6 +22,8 @@ use crate::error::AnalysisError;
 use crate::plugin::HookAction;
 use crate::plugin::context::HookContext;
 use crate::utils::docblock::populate_docblock_variables;
+use crate::utils::docblock::populate_docblock_variables_excluding;
+use crate::utils::expression::get_expression_id;
 use crate::utils::expression::get_function_like_id_from_call;
 
 pub mod attributes;
@@ -86,9 +88,27 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Statement<'arena> {
         );
 
         if should_populate_docblock_variables {
-            let override_existing_variables = !matches!(self, Statement::Expression(ExpressionStatement { expression, .. }) if expression.is_assignment());
-
-            populate_docblock_variables(context, block_context, artifacts, override_existing_variables);
+            // For assignment statements, we populate all @var annotations except the one
+            // for the assignment target variable. The assignment analyzer handles that one
+            // to support the pattern: /** @var Type */ $var = something();
+            if let Statement::Expression(ExpressionStatement { expression, .. }) = self
+                && let Some(target_var) = get_expression_id(
+                    expression,
+                    block_context.scope.get_class_like_name(),
+                    context.resolved_names,
+                    Some(context.codebase),
+                )
+            {
+                populate_docblock_variables_excluding(
+                    context,
+                    block_context,
+                    artifacts,
+                    true, // override existing for non-target variables
+                    Some(target_var),
+                );
+            } else {
+                populate_docblock_variables(context, block_context, artifacts, true);
+            }
         }
 
         let result = match self {
