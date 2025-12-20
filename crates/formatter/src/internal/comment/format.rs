@@ -200,9 +200,16 @@ impl<'arena> FormatterState<'_, 'arena> {
                 Document::Array(vec![in self.arena; self.print_comment(comment), Document::Space(Space::soft())])
             }
         } else {
-            Document::Array(
-                vec![in self.arena; self.print_comment(comment), Document::BreakParent, Document::Line(Line::hard())],
-            )
+            // For inline comments (// or #), check if there's a newline after the comment.
+            // If there is, add a hard line break; if not, add a soft space.
+            // This handles cases like `<?//?><?` where the comment should stay on the same line.
+            if self.has_newline(comment.end, /* backwards */ false) {
+                Document::Array(
+                    vec![in self.arena; self.print_comment(comment), Document::BreakParent, Document::Line(Line::hard())],
+                )
+            } else {
+                Document::Array(vec![in self.arena; self.print_comment(comment), Document::Space(Space::soft())])
+            }
         };
 
         parts.push(comment_document);
