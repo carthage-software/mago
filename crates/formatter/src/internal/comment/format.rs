@@ -166,13 +166,18 @@ impl<'arena> FormatterState<'_, 'arena> {
             let comment = Comment::from_trivia(self.file, trivia);
 
             if range.end_offset() < comment.start && self.is_insignificant(range.end_offset(), comment.start) {
+                let gap = &self.source_text[(range.end_offset() as usize)..(comment.start as usize)];
+                if comment.is_block && gap.contains(',') {
+                    break;
+                }
+
                 // Check if comment is in an ignore region - if so, preserve as-is
                 if self.get_ignore_region_for(comment.start).is_some() {
                     self.print_preserved_trailing_comment(&mut parts, comment);
                     previous_comment = Some(comment);
                 } else {
-                    let previous = self.print_trailing_comment(&mut parts, comment, previous_comment);
-                    previous_comment = Some(previous);
+                    previous_comment =
+                        Some(self.print_trailing_comment(&mut parts, comment, previous_comment, range.end_offset()));
                 }
                 self.next_comment_index += 1;
             } else {
@@ -229,6 +234,7 @@ impl<'arena> FormatterState<'_, 'arena> {
         parts: &mut Vec<'arena, Document<'arena>>,
         comment: Comment,
         previous: Option<Comment>,
+        token_end_offset: u32,
     ) -> Comment {
         let printed = self.print_comment(comment);
 
@@ -251,7 +257,21 @@ impl<'arena> FormatterState<'_, 'arena> {
             return comment.with_line_suffix(true);
         }
 
-        if comment.is_inline_comment() || previous.is_some_and(|c| c.has_line_suffix) {
+        if !comment.is_block || previous.is_some_and(|c| c.has_line_suffix) {
+            parts.push(Document::LineSuffix(vec![in self.arena; Document::Space(Space::soft()), printed]));
+
+            return comment.with_line_suffix(true);
+        }
+
+        let followed_by_semicolon = self
+            .skip_spaces(Some(comment.end), false)
+            .map(|idx| self.source_text.as_bytes().get(idx as usize))
+            .is_some_and(|c| c == Some(&b';'));
+
+        let has_semicolon_in_gap =
+            self.source_text[(token_end_offset as usize)..(comment.start as usize)].bytes().any(|c| c == b';');
+
+        if followed_by_semicolon || has_semicolon_in_gap {
             parts.push(Document::LineSuffix(vec![in self.arena; Document::Space(Space::soft()), printed]));
 
             return comment.with_line_suffix(true);
@@ -489,8 +509,8 @@ impl<'arena> FormatterState<'_, 'arena> {
                 after.end_offset() == comment.start || self.is_insignificant(after.end_offset(), comment.start);
 
             if is_between && gap_is_ok {
-                let previous = self.print_trailing_comment(&mut parts, comment, previous_comment);
-                previous_comment = Some(previous);
+                previous_comment =
+                    Some(self.print_trailing_comment(&mut parts, comment, previous_comment, after.end_offset()));
                 self.next_comment_index += 1;
             } else {
                 break;

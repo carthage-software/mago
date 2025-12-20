@@ -304,6 +304,7 @@ test_case!(issue_683);
 test_case!(issue_727);
 test_case!(issue_738);
 test_case!(issue_788);
+test_case!(inline_block_comments_in_arguments);
 
 #[test]
 fn test_all_test_cases_are_ran() {
