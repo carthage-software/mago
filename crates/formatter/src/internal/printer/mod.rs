@@ -494,8 +494,8 @@ impl<'arena> Printer<'arena> {
                 }
                 Document::Group(group) => {
                     let group_mode = if *group.should_break.borrow() { Mode::Break } else { mode };
-                    if group.expanded_states.is_some() && group_mode.is_break() {
-                        if let Some(last_state) = group.expanded_states.as_ref().unwrap().last() {
+                    if let Some(expanded_states) = group.expanded_states.as_ref() {
+                        if let Some(last_state) = expanded_states.last() {
                             stack.push((group_mode, last_state));
                         }
                     } else {
