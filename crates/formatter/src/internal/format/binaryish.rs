@@ -164,6 +164,12 @@ pub(super) fn print_binaryish_expression<'arena>(
     let parts = print_binaryish_expression_parts(f, left, operator, right, is_inside_parenthesis, false);
 
     if is_inside_parenthesis {
+        let lhs_is_binary = left.is_binary();
+        let rhs_is_binary = right.is_binary();
+        if !lhs_is_binary && !rhs_is_binary {
+            return Document::Group(Group::new(parts));
+        }
+
         return Document::Array(parts);
     }
 

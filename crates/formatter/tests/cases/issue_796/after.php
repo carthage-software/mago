@@ -4,11 +4,9 @@ if (
     $x &&
     // Condition A
     (
-        $x
-        && $x ||
+        $x && $x ||
         // Condition B
-        $x
-        && $x
+        $x && $x
     )
 ) {
 }
