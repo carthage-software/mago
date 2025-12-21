@@ -221,6 +221,8 @@ test_case!(align_global_constants);
 test_case!(align_enum_cases);
 test_case!(align_run_breaking);
 test_case!(align_modifier_breaking);
+test_case!(inline_block_comments_in_arguments);
+test_case!(idempotent_chain_with_array);
 
 // A special test case for regressions in the Psl codebase
 test_case!(psl_regressions);
@@ -304,8 +306,7 @@ test_case!(issue_683);
 test_case!(issue_727);
 test_case!(issue_738);
 test_case!(issue_788);
-test_case!(inline_block_comments_in_arguments);
-test_case!(idempotent_chain_with_array);
+test_case!(issue_796);
 
 #[test]
 fn test_all_test_cases_are_ran() {

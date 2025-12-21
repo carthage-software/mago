@@ -230,7 +230,8 @@ fn print_binaryish_expression_parts<'arena>(
     let right = unwrap_parenthesized(right);
     let should_break = f
         .has_comment(operator.span(), CommentFlags::Trailing | CommentFlags::Leading | CommentFlags::Line)
-        || f.has_comment(left.span(), CommentFlags::Trailing | CommentFlags::Line);
+        || f.has_comment(left.span(), CommentFlags::Trailing | CommentFlags::Line)
+        || f.has_leading_own_line_comment(right.span());
 
     let mut should_inline_this_level = !should_break && should_inline_binary_rhs_expression(f, right, &operator);
     should_inline_this_level = should_inline_this_level || f.is_in_inlined_binary_chain;
