@@ -363,6 +363,7 @@ test_case!(bad_path_redundant_null_coalesce);
 test_case!(bad_path_redundant_nullsafe);
 test_case!(bad_path_assignment_to_this);
 test_case!(typed_property_null_coalesce);
+test_case!(docblock_var_override_foreach);
 
 // Github Issues
 test_case!(issue_659);
@@ -509,6 +510,7 @@ test_case!(issue_782);
 test_case!(issue_784);
 test_case!(issue_785);
 test_case!(issue_789);
+test_case!(issue_801);
 
 #[test]
 fn test_all_test_cases_are_ran() {
