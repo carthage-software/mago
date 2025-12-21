@@ -274,7 +274,7 @@ Class names should be in class case, also known as PascalCase.
 | :--- | :--- | :--- |
 | `enabled` | `boolean` | `true` |
 | `level` | `string` | `"help"` |
-| `psr` | `boolean` | `true` |
+| `psr` | `boolean` | `false` |
 
 ### Examples
 
@@ -433,7 +433,7 @@ Interface names should be in class case and suffixed with `Interface`, depending
 | :--- | :--- | :--- |
 | `enabled` | `boolean` | `true` |
 | `level` | `string` | `"help"` |
-| `psr` | `boolean` | `true` |
+| `psr` | `boolean` | `false` |
 
 ### Examples
 
@@ -731,7 +731,7 @@ Trait names should be in class case and suffixed with `Trait`, depending on the 
 | :--- | :--- | :--- |
 | `enabled` | `boolean` | `true` |
 | `level` | `string` | `"help"` |
-| `psr` | `boolean` | `true` |
+| `psr` | `boolean` | `false` |
 
 ### Examples
 
@@ -795,4 +795,3 @@ $My_Variable = 2;
 
 function foo($MyParam) {}
 ```
-
