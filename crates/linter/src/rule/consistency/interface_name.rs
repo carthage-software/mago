@@ -34,7 +34,7 @@ pub struct InterfaceNameConfig {
 
 impl Default for InterfaceNameConfig {
     fn default() -> Self {
-        Self { level: Level::Help, psr: true }
+        Self { level: Level::Help, psr: false }
     }
 }
 
