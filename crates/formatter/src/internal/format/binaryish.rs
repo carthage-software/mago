@@ -164,6 +164,12 @@ pub(super) fn print_binaryish_expression<'arena>(
     let parts = print_binaryish_expression_parts(f, left, operator, right, is_inside_parenthesis, false);
 
     if is_inside_parenthesis {
+        let lhs_is_binary = left.is_binary();
+        let rhs_is_binary = right.is_binary();
+        if !lhs_is_binary && !rhs_is_binary {
+            return Document::Group(Group::new(parts));
+        }
+
         return Document::Array(parts);
     }
 
@@ -230,7 +236,8 @@ fn print_binaryish_expression_parts<'arena>(
     let right = unwrap_parenthesized(right);
     let should_break = f
         .has_comment(operator.span(), CommentFlags::Trailing | CommentFlags::Leading | CommentFlags::Line)
-        || f.has_comment(left.span(), CommentFlags::Trailing | CommentFlags::Line);
+        || f.has_comment(left.span(), CommentFlags::Trailing | CommentFlags::Line)
+        || f.has_leading_own_line_comment(right.span());
 
     let mut should_inline_this_level = !should_break && should_inline_binary_rhs_expression(f, right, &operator);
     should_inline_this_level = should_inline_this_level || f.is_in_inlined_binary_chain;

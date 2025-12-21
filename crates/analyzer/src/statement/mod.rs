@@ -68,47 +68,28 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Statement<'arena> {
             }
         }
 
-        let should_populate_docblock_variables = matches!(
-            self,
-            Statement::Block(_)
-                | Statement::Expression(_)
-                | Statement::Try(_)
-                | Statement::Continue(_)
-                | Statement::Break(_)
-                | Statement::Return(_)
-                | Statement::Echo(_)
-                | Statement::EchoTag(_)
-                | Statement::Unset(_)
-                | Statement::Inline(_)
-                | Statement::OpeningTag(_)
-                | Statement::Declare(_)
-                | Statement::Noop(_)
-                | Statement::ClosingTag(_)
-                | Statement::HaltCompiler(_)
-        );
+        // For assignment statements, we populate all @var annotations except the one
+        // for the assignment target variable. The assignment analyzer handles that one
+        // to support the pattern: /** @var Type */ $var = something();
+        if let Statement::Expression(ExpressionStatement { expression, .. }) = self
+            && let Some(target_var) = get_expression_id(
+                expression,
+                block_context.scope.get_class_like_name(),
+                context.resolved_names,
+                Some(context.codebase),
+            )
+        {
+            populate_docblock_variables_excluding(
+                context,
+                block_context,
+                artifacts,
+                true, // override existing for non-target variables
+                Some(target_var),
+            );
+        } else {
+            let override_existing = !matches!(self, Statement::Foreach(_));
 
-        if should_populate_docblock_variables {
-            // For assignment statements, we populate all @var annotations except the one
-            // for the assignment target variable. The assignment analyzer handles that one
-            // to support the pattern: /** @var Type */ $var = something();
-            if let Statement::Expression(ExpressionStatement { expression, .. }) = self
-                && let Some(target_var) = get_expression_id(
-                    expression,
-                    block_context.scope.get_class_like_name(),
-                    context.resolved_names,
-                    Some(context.codebase),
-                )
-            {
-                populate_docblock_variables_excluding(
-                    context,
-                    block_context,
-                    artifacts,
-                    true, // override existing for non-target variables
-                    Some(target_var),
-                );
-            } else {
-                populate_docblock_variables(context, block_context, artifacts, true);
-            }
+            populate_docblock_variables(context, block_context, artifacts, override_existing);
         }
 
         let result = match self {
