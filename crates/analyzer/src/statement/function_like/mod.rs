@@ -214,23 +214,21 @@ fn add_parameter_types_to_context<'ctx, 'arena>(
             get_mixed()
         };
 
+        // TODO(azjezz): consider comparing declared and inferred types instead
+        // and choosing the more specific one, this current solution is a bit naive.
         let declared_type_is_specific = parameter_metadata.get_type_metadata().is_some_and(|tm| {
             let union = &tm.type_union;
-            union.is_list() || (!union.is_mixed() && !union.is_vanilla_mixed() && !union.is_array())
+
+            !union.is_vanilla_array() && !union.is_vanilla_mixed()
         });
 
         let mut final_parameter_type = if declared_type_is_specific {
             declared_parameter_type
-        } else if let Some(inferred_map) = inferred_parameter_types.as_mut() {
-            if let Some(inferred_type) = inferred_map.remove(&i) {
-                if is_unresolved_template_with_mixed_bound(&inferred_type) {
-                    declared_parameter_type
-                } else {
-                    inferred_type
-                }
-            } else {
-                declared_parameter_type
-            }
+        } else if let Some(inferred_map) = inferred_parameter_types.as_mut()
+            && let Some(inferred_type) = inferred_map.remove(&i)
+            && !is_unresolved_template_with_mixed_bound(&inferred_type)
+        {
+            inferred_type
         } else {
             declared_parameter_type
         };
