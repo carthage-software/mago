@@ -4711,7 +4711,9 @@ function array_filter(array $array, null|callable $callback = null, int $mode = 
  * @param array<K, V> $array
  * @param array<S> ...$arrays
  *
- * @return ($array is list<V> ? list<U> : array<K, U>)
+ * @return ($array is list<V>
+ *     ? ($array is non-empty-list<V> ? non-empty-list<U> : list<U>)
+ *     : ($array is non-empty-array<K, V> ? non-empty-array<K, U> : array<K, U>))
  */
 function array_map(null|callable $callback, array $array, array ...$arrays): array
 {
@@ -5239,7 +5241,7 @@ function reset(object|array &$array): mixed
  *
  * @return (
  *   $array is object ? mixed : (
- *     $array is non-empty-array|non-empty-list ? T : T|null
+ *     $array is non-empty-array|non-empty-list ? T : T|false
  *   )
  * )
  *

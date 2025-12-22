@@ -34,7 +34,7 @@ pub struct TraitNameConfig {
 
 impl Default for TraitNameConfig {
     fn default() -> Self {
-        Self { level: Level::Help, psr: true }
+        Self { level: Level::Help, psr: false }
     }
 }
 

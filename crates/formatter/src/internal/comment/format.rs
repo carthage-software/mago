@@ -74,6 +74,33 @@ impl<'arena> FormatterState<'_, 'arena> {
             || (remaining_content.starts_with('#') && !remaining_content.starts_with("#["))
     }
 
+    /// Checks if a node has a trailing line comment on the same line.
+    ///
+    /// This is different from `is_followed_by_comment_on_next_line` which checks
+    /// for comments on the subsequent line. This method detects trailing comments
+    /// that are on the same line as the node (e.g., `} // comment`).
+    ///
+    /// # Arguments
+    ///
+    /// * `span` - The span of the node to check for same-line trailing comments.
+    ///
+    /// # Returns
+    ///
+    /// `true` if there's a line comment on the same line after the node, `false` otherwise.
+    pub(crate) fn has_same_line_trailing_comment(&self, span: Span) -> bool {
+        let Some(first_char_offset) = self.skip_spaces(Some(span.end_offset()), false) else {
+            return false;
+        };
+
+        // If there's a newline before the next content, the comment is on the next line, not same line
+        if self.has_newline(first_char_offset, /* backwards */ true) {
+            return false;
+        }
+
+        let remaining = &self.source_text[first_char_offset as usize..];
+        remaining.starts_with("//") || (remaining.starts_with('#') && !remaining.starts_with("#["))
+    }
+
     pub(crate) fn has_leading_own_line_comment(&self, range: Span) -> bool {
         self.has_comment_with_filter(range, CommentFlags::Leading, |comment| {
             self.has_newline(comment.end, /* backwards */ false)

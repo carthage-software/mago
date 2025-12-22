@@ -121,6 +121,30 @@ impl TArray {
         }
     }
 
+    /// Checks if the array is a native PHP array (no known items and standard key/value types).
+    #[inline]
+    #[must_use]
+    pub fn is_vanilla(&self) -> bool {
+        match &self {
+            Self::Keyed(keyed_array) => {
+                if keyed_array.non_empty {
+                    return false;
+                }
+
+                if keyed_array.known_items.is_some() {
+                    return false;
+                }
+
+                let Some((key_parameter, value_parameter)) = keyed_array.parameters.as_ref() else {
+                    return false;
+                };
+
+                key_parameter.is_array_key() && value_parameter.is_vanilla_mixed()
+            }
+            Self::List(_) => false,
+        }
+    }
+
     /// Returns the minimum size of the array based on known items or elements.
     #[must_use]
     pub fn get_minimum_size(&self) -> usize {

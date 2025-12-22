@@ -56,6 +56,65 @@ jobs:
       - name: Run tests
         run: cargo test --workspace --locked --all-targets
 
+  source_archive:
+    name: Create source code archives
+    runs-on: ubuntu-latest
+    needs: crate_metadata
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+
+      - name: Set version
+        id: version
+        run: echo "VERSION=${{ needs.crate_metadata.outputs.version }}" >> $GITHUB_OUTPUT
+
+      - name: Create source archives
+        id: source_package
+        run: |
+          VERSION="${{ steps.version.outputs.VERSION }}"
+
+          STAGING="${{ env.CICD_INTERMEDIATES_DIR }}/source"
+          mkdir -p "${STAGING}"
+          rsync -a --exclude='.git' --exclude="${{ env.CICD_INTERMEDIATES_DIR }}" . "${STAGING}/mago-${VERSION}/"
+          TAR_NAME="source-code.tar.gz"
+          tar -czf "${STAGING}/${TAR_NAME}" -C "${STAGING}" "mago-${VERSION}"
+          echo "TAR_NAME=${TAR_NAME}" >> $GITHUB_OUTPUT
+          echo "TAR_PATH=${STAGING}/${TAR_NAME}" >> $GITHUB_OUTPUT
+          ZIP_NAME="source-code.zip"
+          cd "${STAGING}"
+          zip -r "${ZIP_NAME}" "mago-${VERSION}"
+          cd -
+          echo "ZIP_NAME=${ZIP_NAME}" >> $GITHUB_OUTPUT
+          echo "ZIP_PATH=${STAGING}/${ZIP_NAME}" >> $GITHUB_OUTPUT
+
+      - name: "Artifact upload: source tar.gz"
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.source_package.outputs.TAR_NAME }}
+          path: ${{ steps.source_package.outputs.TAR_PATH }}
+
+      - name: "Artifact upload: source zip"
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.source_package.outputs.ZIP_NAME }}
+          path: ${{ steps.source_package.outputs.ZIP_PATH }}
+
+      - name: Check for release
+        id: is-release
+        run: |
+          unset IS_RELEASE ; if [[ $GITHUB_REF =~ ^refs/tags/[0-9].* ]]; then IS_RELEASE='true' ; fi
+          echo "IS_RELEASE=${IS_RELEASE}" >> $GITHUB_OUTPUT
+
+      - name: Publish source archives
+        uses: softprops/action-gh-release@v2
+        if: steps.is-release.outputs.IS_RELEASE
+        with:
+          files: |
+            ${{ steps.source_package.outputs.TAR_PATH }}
+            ${{ steps.source_package.outputs.ZIP_PATH }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   build:
     name: ${{ matrix.job.target }} (${{ matrix.job.os }})
     runs-on: ${{ matrix.job.os }}
@@ -72,14 +131,44 @@ jobs:
           # Tier 1 targets:
 
           ## Windows MSVC: x86_64
-          - { target: x86_64-pc-windows-msvc, os: windows-latest, test: true, pgo: true }
+          - {
+              target: x86_64-pc-windows-msvc,
+              os: windows-latest,
+              test: true,
+              pgo: true,
+            }
           ## macOS: aarch64, x86_64
-          - { target: aarch64-apple-darwin, os: macos-latest, test: true, pgo: true }
-          - { target: x86_64-apple-darwin, os: macos-latest, test: true, pgo: true }
+          - {
+              target: aarch64-apple-darwin,
+              os: macos-latest,
+              test: true,
+              pgo: true,
+            }
+          - {
+              target: x86_64-apple-darwin,
+              os: macos-latest,
+              test: true,
+              pgo: true,
+            }
           ## Linux: aarch64, x86_64
-          - { target: aarch64-unknown-linux-gnu, os: ubuntu-latest, test: true, debian-package: true }
-          - { target: aarch64-unknown-linux-musl, os: ubuntu-latest, test: true }
-          - { target: x86_64-unknown-linux-gnu, os: ubuntu-latest, test: true, wasm: true, debian-package: true }
+          - {
+              target: aarch64-unknown-linux-gnu,
+              os: ubuntu-latest,
+              test: true,
+              debian-package: true,
+            }
+          - {
+              target: aarch64-unknown-linux-musl,
+              os: ubuntu-latest,
+              test: true,
+            }
+          - {
+              target: x86_64-unknown-linux-gnu,
+              os: ubuntu-latest,
+              test: true,
+              wasm: true,
+              debian-package: true,
+            }
           - { target: x86_64-unknown-linux-musl, os: ubuntu-latest, test: true }
 
           # Tier 2 targets:
@@ -182,7 +271,7 @@ jobs:
         if: matrix.job.pgo
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.3'
+          php-version: "8.3"
           tools: composer
 
       - name: setup PHP corpus for PGO profiling

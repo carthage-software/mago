@@ -10,10 +10,9 @@ use mago_syntax::ast::Expression;
 use mago_syntax::ast::LegacyArray;
 use mago_syntax::ast::List;
 use mago_syntax::ast::Node;
-use mago_syntax::ast::node;
+use mago_syntax::ast::NodeKind;
 use mago_syntax::token::GetPrecedence;
 use mago_syntax::token::Precedence;
-use node::NodeKind;
 
 use crate::document::Document;
 use crate::document::Group;
@@ -26,6 +25,38 @@ use crate::internal::format::format_token;
 use crate::internal::utils::is_at_call_like_expression;
 use crate::internal::utils::is_at_callee;
 use crate::internal::utils::unwrap_parenthesized;
+
+/// Recursively finds the leftmost expression in a binary tree and checks if it has
+/// a leading own-line comment. This is needed for idempotent formatting because
+/// comments inside nested parentheses will "float up" to become leading comments
+/// after the parens are removed during formatting.
+fn has_leading_comment_in_leftmost(f: &FormatterState, expr: &Expression) -> bool {
+    let expr = unwrap_parenthesized(expr);
+
+    if f.has_leading_own_line_comment(expr.span()) {
+        return true;
+    }
+
+    match expr {
+        Expression::Binary(binary) => has_leading_comment_in_leftmost(f, binary.lhs),
+        Expression::Conditional(Conditional { then: None, condition, .. }) => {
+            has_leading_comment_in_leftmost(f, condition)
+        }
+        _ => false,
+    }
+}
+
+/// Gets the leftmost expression in a binary tree, recursively unwrapping
+/// parentheses and following the LHS of binary/elvis expressions.
+fn get_leftmost_expression<'a>(expr: &'a Expression<'a>) -> &'a Expression<'a> {
+    let expr = unwrap_parenthesized(expr);
+
+    match expr {
+        Expression::Binary(binary) => get_leftmost_expression(binary.lhs),
+        Expression::Conditional(Conditional { then: None, condition, .. }) => get_leftmost_expression(condition),
+        _ => expr,
+    }
+}
 
 /// An internal-only enum to represent operators that should be formatted
 /// like binary operators. This allows us to reuse the same complex formatting
@@ -111,6 +142,7 @@ pub(super) fn print_binaryish_expression<'arena>(
     operator: BinaryishOperator<'arena>,
     right: &'arena Expression<'arena>,
 ) -> Document<'arena> {
+    let original_right = right;
     let left = unwrap_parenthesized(left);
     let right = unwrap_parenthesized(right);
 
@@ -161,9 +193,15 @@ pub(super) fn print_binaryish_expression<'arena>(
         );
     }
 
-    let parts = print_binaryish_expression_parts(f, left, operator, right, is_inside_parenthesis, false);
+    let parts = print_binaryish_expression_parts(f, left, operator, original_right, is_inside_parenthesis, false);
 
     if is_inside_parenthesis {
+        let lhs_is_binary = left.is_binary();
+        let rhs_is_binary = right.is_binary();
+        if !lhs_is_binary && !rhs_is_binary {
+            return Document::Group(Group::new(parts));
+        }
+
         return Document::Array(parts);
     }
 
@@ -227,10 +265,14 @@ fn print_binaryish_expression_parts<'arena>(
     is_nested: bool,
 ) -> Vec<'arena, Document<'arena>> {
     let left = unwrap_parenthesized(left);
+    let original_right = right;
     let right = unwrap_parenthesized(right);
+    let is_original_right_parenthesized = !std::ptr::eq(original_right, right);
     let should_break = f
         .has_comment(operator.span(), CommentFlags::Trailing | CommentFlags::Leading | CommentFlags::Line)
-        || f.has_comment(left.span(), CommentFlags::Trailing | CommentFlags::Line);
+        || f.has_comment(left.span(), CommentFlags::Trailing | CommentFlags::Line)
+        || f.has_leading_own_line_comment(right.span())
+        || (is_original_right_parenthesized && has_leading_comment_in_leftmost(f, original_right));
 
     let mut should_inline_this_level = !should_break && should_inline_binary_rhs_expression(f, right, &operator);
     should_inline_this_level = should_inline_this_level || f.is_in_inlined_binary_chain;
@@ -281,8 +323,18 @@ fn print_binaryish_expression_parts<'arena>(
         _ => true,
     };
 
-    let line_before_operator = f.settings.line_before_binary_operator && !f.has_leading_own_line_comment(right.span());
+    let has_leading_comment_on_right = f.has_leading_own_line_comment(right.span())
+        || (is_original_right_parenthesized && has_leading_comment_in_leftmost(f, original_right));
+    let line_before_operator = f.settings.line_before_binary_operator && !has_leading_comment_on_right;
     let operator_has_leading_comments = f.has_comment(operator.span(), CommentFlags::Leading);
+
+    let leftmost_leading_comments =
+        if is_original_right_parenthesized && has_leading_comment_in_leftmost(f, original_right) {
+            let leftmost = get_leftmost_expression(original_right);
+            f.print_leading_comments(leftmost.span())
+        } else {
+            None
+        };
 
     let right_document = vec![
         in f.arena;
@@ -297,8 +349,14 @@ fn print_binaryish_expression_parts<'arena>(
         } else {
             Document::Line(if has_space_around { Line::default() } else { Line::soft() })
         },
-        if should_inline_this_level {
-             Document::Group(Group::new(vec![in f.arena; right.format(f)]))
+        if let Some(comments) = leftmost_leading_comments {
+            if should_inline_this_level {
+                Document::Array(vec![in f.arena; comments, Document::Group(Group::new(vec![in f.arena; right.format(f)]))])
+            } else {
+                Document::Array(vec![in f.arena; comments, right.format(f)])
+            }
+        } else if should_inline_this_level {
+            Document::Group(Group::new(vec![in f.arena; right.format(f)]))
         } else {
             right.format(f)
         },

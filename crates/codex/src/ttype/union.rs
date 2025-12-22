@@ -827,6 +827,10 @@ impl TUnion {
         self.types.iter().all(TAtomic::is_list) && !self.types.is_empty()
     }
 
+    pub fn is_vanilla_array(&self) -> bool {
+        self.types.iter().all(TAtomic::is_vanilla_array) && !self.types.is_empty()
+    }
+
     pub fn is_keyed_array(&self) -> bool {
         self.types.iter().all(TAtomic::is_keyed_array) && !self.types.is_empty()
     }

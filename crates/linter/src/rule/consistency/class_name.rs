@@ -35,7 +35,7 @@ pub struct ClassNameConfig {
 
 impl Default for ClassNameConfig {
     fn default() -> Self {
-        Self { level: Level::Help, psr: true }
+        Self { level: Level::Help, psr: false }
     }
 }
 

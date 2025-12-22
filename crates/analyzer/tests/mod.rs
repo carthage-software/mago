@@ -34,6 +34,8 @@ macro_rules! test_case {
 test_case!(accessing_undefined_class_constant);
 test_case!(argument_count);
 test_case!(array_list_reconciliation);
+test_case!(array_map_non_empty_array);
+test_case!(array_map_non_empty_list);
 test_case!(array_shape_fields);
 test_case!(array_unique_non_empty);
 test_case!(assert_concrete_to_template_type);
@@ -363,6 +365,7 @@ test_case!(bad_path_redundant_null_coalesce);
 test_case!(bad_path_redundant_nullsafe);
 test_case!(bad_path_assignment_to_this);
 test_case!(typed_property_null_coalesce);
+test_case!(docblock_var_override_foreach);
 
 // Github Issues
 test_case!(issue_659);
@@ -509,6 +512,9 @@ test_case!(issue_782);
 test_case!(issue_784);
 test_case!(issue_785);
 test_case!(issue_789);
+test_case!(issue_801);
+test_case!(issue_806);
+test_case!(issue_809);
 
 #[test]
 fn test_all_test_cases_are_ran() {

@@ -1272,6 +1272,15 @@ fn check_template_parameters<'ctx>(
         let mut previous_extended_types: IndexMap<Atom, Vec<(GenericParent, TUnion)>, RandomState> =
             IndexMap::default();
 
+        for (template_name, _) in &parent_metadata.template_types {
+            if let Some(extended_type) = extended_parameters.get(template_name) {
+                previous_extended_types
+                    .entry(*template_name)
+                    .or_default()
+                    .push((GenericParent::ClassLike(parent_metadata.name), extended_type.clone()));
+            }
+        }
+
         for (template_name, template_type_map) in &parent_metadata.template_types {
             let Some(mut extended_type) = extended_parameters.get(template_name).cloned() else {
                 i += 1;
@@ -1370,7 +1379,7 @@ fn check_template_parameters<'ctx>(
                 previous_extended_types
                     .entry(*template_name)
                     .or_default()
-                    .push((GenericParent::ClassLike(class_like_metadata.name), extended_type));
+                    .push((GenericParent::ClassLike(parent_metadata.name), extended_type));
             } else {
                 let mut template_result = TemplateResult::new(previous_extended_types.clone(), Default::default());
                 let mut replaced_template_type = standin_type_replacer::replace(
@@ -1393,7 +1402,7 @@ fn check_template_parameters<'ctx>(
                     previous_extended_types
                         .entry(*template_name)
                         .or_default()
-                        .push((GenericParent::ClassLike(class_like_metadata.name), extended_type));
+                        .push((GenericParent::ClassLike(parent_metadata.name), extended_type));
                 } else {
                     let replaced_type_str = replaced_template_type.get_id();
 
