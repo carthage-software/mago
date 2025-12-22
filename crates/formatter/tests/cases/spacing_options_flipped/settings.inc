@@ -13,5 +13,6 @@ FormatSettings {
     space_after_increment_unary_prefix_operator: true,
     space_after_decrement_unary_prefix_operator: true,
     space_after_additive_unary_prefix_operator: true,
+    inline_empty_classlike_braces: false,
     ..Default::default()
 }

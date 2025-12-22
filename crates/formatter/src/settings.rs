@@ -284,8 +284,8 @@ pub struct FormatSettings {
     /// class Foo {}
     /// ```
     ///
-    /// Default: false
-    #[serde(default = "default_false")]
+    /// Default: true
+    #[serde(default = "default_true")]
     pub inline_empty_classlike_braces: bool,
 
     /// Place empty anonymous class bodies on the same line.
@@ -946,7 +946,7 @@ impl Default for FormatSettings {
             inline_empty_function_braces: false,
             inline_empty_method_braces: false,
             inline_empty_constructor_braces: true,
-            inline_empty_classlike_braces: false,
+            inline_empty_classlike_braces: true,
             inline_empty_anonymous_class_braces: true,
             null_type_hint: NullTypeHint::default(),
             break_promoted_properties_list: true,

@@ -12,5 +12,6 @@ FormatSettings {
     empty_line_after_method: true,
     empty_line_before_return: true,
     empty_line_before_dangling_comments: true,
+    inline_empty_classlike_braces: false,
     ..Default::default()
 }
