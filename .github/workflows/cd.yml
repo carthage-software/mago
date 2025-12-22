@@ -126,7 +126,6 @@ jobs:
           # Each job in this matrix defines a build target. The following custom keys control the pipeline steps:
           # - `test: true`: Enables the test suite to be run for this build.
           # - `wasm: true`: Triggers an additional WebAssembly build and packaging for this release.
-          # - `debian-package: true`: Generates a Debian package for the release.
 
           # Tier 1 targets:
 
@@ -151,12 +150,7 @@ jobs:
               pgo: true,
             }
           ## Linux: aarch64, x86_64
-          - {
-              target: aarch64-unknown-linux-gnu,
-              os: ubuntu-latest,
-              test: true,
-              debian-package: true,
-            }
+          - { target: aarch64-unknown-linux-gnu, os: ubuntu-latest, test: true }
           - {
               target: aarch64-unknown-linux-musl,
               os: ubuntu-latest,
@@ -167,7 +161,6 @@ jobs:
               os: ubuntu-latest,
               test: true,
               wasm: true,
-              debian-package: true,
             }
           - { target: x86_64-unknown-linux-musl, os: ubuntu-latest, test: true }
 
@@ -385,56 +378,6 @@ jobs:
 
           echo "WASM_PKG_PATH=${WASM_STAGING}/${WASM_PKG_NAME}" >> $GITHUB_OUTPUT
 
-      - name: create Debian package
-        id: debian-package
-        shell: bash
-        if: matrix.job.debian-package && !startsWith(github.ref, 'refs/pull/')
-        run: |
-          VERSION="${{ steps.version.outputs.VERSION }}"
-          TARGET="${{ matrix.job.target }}"
-
-          # Derive arch from target:
-          case "$TARGET" in
-            *x86_64*) DPKG_ARCH="amd64" ;;
-            *aarch64*|*arm64*) DPKG_ARCH="arm64" ;;
-            *arm*hf*) DPKG_ARCH="armhf" ;;
-            *arm*) DPKG_ARCH="armel" ;;
-            *powerpc64*) DPKG_ARCH="ppc64el" ;;
-            *powerpc*) DPKG_ARCH="powerpc" ;;
-            *s390x*) DPKG_ARCH="s390x" ;;
-          esac
-
-          DPKG_NAME="mago-${VERSION}-${TARGET}.deb"
-
-          echo "DPKG_NAME=${DPKG_NAME}" >> $GITHUB_OUTPUT
-
-          DPKG_STAGING="${{ env.CICD_INTERMEDIATES_DIR }}/debian-package"
-          DPKG_DIR="${DPKG_STAGING}/dpkg"
-          mkdir -p "${DPKG_DIR}"
-
-          install -Dm755 "${{ steps.bin.outputs.BIN_PATH }}" "${DPKG_DIR}/usr/bin/${{ steps.bin.outputs.BIN_NAME }}"
-
-          install -Dm644 "README.md" "${DPKG_DIR}/usr/share/doc/mago/README.md" || true
-          install -Dm644 "LICENSE-MIT" "${DPKG_DIR}/usr/share/doc/mago/LICENSE-MIT" || true
-          install -Dm644 "LICENSE-APACHE" "${DPKG_DIR}/usr/share/doc/mago/LICENSE-APACHE" || true
-
-          mkdir -p "${DPKG_DIR}/DEBIAN"
-          cat > "${DPKG_DIR}/DEBIAN/control" <<EOF
-          Package: mago
-          Version: ${VERSION}
-          Section: devel
-          Priority: optional
-          Maintainer: ${{ needs.crate_metadata.outputs.maintainer }}
-          Homepage: ${{ needs.crate_metadata.outputs.homepage }}
-          Architecture: ${DPKG_ARCH}
-          Description: Mago is a toolchain for PHP that aims to provide a set of tools to help developers write better code.
-          EOF
-
-          DPKG_PATH="${DPKG_STAGING}/${DPKG_NAME}"
-          echo "DPKG_PATH=${DPKG_PATH}" >> $GITHUB_OUTPUT
-
-          fakeroot dpkg-deb --build "${DPKG_DIR}" "${DPKG_PATH}"
-
       - name: "Artifact upload: tarball"
         uses: actions/upload-artifact@v4
         with:
@@ -447,13 +390,6 @@ jobs:
         with:
           name: ${{ steps.wasm_package.outputs.WASM_PKG_NAME }}
           path: ${{ steps.wasm_package.outputs.WASM_PKG_PATH }}
-
-      - name: "Artifact upload: Debian package"
-        uses: actions/upload-artifact@v4
-        if: steps.debian-package.outputs.DPKG_NAME
-        with:
-          name: ${{ steps.debian-package.outputs.DPKG_NAME }}
-          path: ${{ steps.debian-package.outputs.DPKG_PATH }}
 
       - name: check for release
         id: is-release
@@ -468,7 +404,6 @@ jobs:
         with:
           files: |
             ${{ steps.package.outputs.PKG_PATH }}
-            ${{ steps.debian-package.outputs.DPKG_PATH }}
             ${{ steps.wasm_package.outputs.WASM_PKG_PATH }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
