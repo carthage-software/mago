@@ -222,6 +222,7 @@ define_rules! {
     NoClosingTag(no_closing_tag @ NoClosingTagRule),
     NoBooleanLiteralComparison(no_boolean_literal_comparison @ NoBooleanLiteralComparisonRule),
     NoBooleanFlagParameter(no_boolean_flag_parameter @ NoBooleanFlagParameterRule),
+    NoAssignInArgument(no_assign_in_argument @ NoAssignInArgumentRule),
     NoAssignInCondition(no_assign_in_condition @ NoAssignInConditionRule),
     NoAliasFunction(no_alias_function @ NoAliasFunctionRule),
     LowercaseTypeHint(lowercase_type_hint @ LowercaseTypeHintRule),

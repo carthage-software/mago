@@ -39,6 +39,7 @@ use crate::rule::LowercaseKeywordConfig;
 use crate::rule::LowercaseTypeHintConfig;
 use crate::rule::MiddlewareInRoutesConfig;
 use crate::rule::NoAliasFunctionConfig;
+use crate::rule::NoAssignInArgumentConfig;
 use crate::rule::NoAssignInConditionConfig;
 use crate::rule::NoBooleanFlagParameterConfig;
 use crate::rule::NoBooleanLiteralComparisonConfig;
@@ -227,6 +228,7 @@ pub struct RulesSettings {
     pub no_closing_tag: RuleSettings<NoClosingTagConfig>,
     pub no_boolean_literal_comparison: RuleSettings<NoBooleanLiteralComparisonConfig>,
     pub no_boolean_flag_parameter: RuleSettings<NoBooleanFlagParameterConfig>,
+    pub no_assign_in_argument: RuleSettings<NoAssignInArgumentConfig>,
     pub no_assign_in_condition: RuleSettings<NoAssignInConditionConfig>,
     pub no_alias_function: RuleSettings<NoAliasFunctionConfig>,
     pub lowercase_type_hint: RuleSettings<LowercaseTypeHintConfig>,
