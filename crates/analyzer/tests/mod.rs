@@ -34,6 +34,8 @@ macro_rules! test_case {
 test_case!(accessing_undefined_class_constant);
 test_case!(argument_count);
 test_case!(array_list_reconciliation);
+test_case!(array_map_non_empty_array);
+test_case!(array_map_non_empty_list);
 test_case!(array_shape_fields);
 test_case!(array_unique_non_empty);
 test_case!(assert_concrete_to_template_type);
