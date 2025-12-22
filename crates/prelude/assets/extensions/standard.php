@@ -5239,7 +5239,7 @@ function reset(object|array &$array): mixed
  *
  * @return (
  *   $array is object ? mixed : (
- *     $array is non-empty-array|non-empty-list ? T : T|null
+ *     $array is non-empty-array|non-empty-list ? T : T|false
  *   )
  * )
  *
