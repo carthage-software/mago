@@ -98,7 +98,10 @@ fn parse_tag<'arena>(
     let description_start;
     if let (Some(char_pos), Some(byte_pos)) = (next_whitespace_char_pos, next_whitespace_byte_pos) {
         tag_name = &content[1..=char_pos];
-        let whitespace_char = content.chars().nth(byte_pos).unwrap();
+        let Some(whitespace_char) = content[byte_pos..].chars().next() else {
+            return Err(ParseError::InvalidTagName(*span));
+        };
+
         let after_whitespace_byte_pos = byte_pos + whitespace_char.len_utf8();
         description_part = &content[after_whitespace_byte_pos..];
         description_start = span.start.forward(after_whitespace_byte_pos as u32);
@@ -475,7 +478,10 @@ fn parse_annotation<'arena>(
         let mut args = String::new();
         let mut open_parens = 0;
 
-        let paren_start_pos = content_rest.find('(').unwrap();
+        let Some(paren_start_pos) = content_rest.find('(') else {
+            return Err(ParseError::UnclosedAnnotationArguments(*span));
+        };
+
         let line_content = content_rest[paren_start_pos..].trim_end();
 
         args.push_str(line_content);
