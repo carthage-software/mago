@@ -1,19 +1,5 @@
-use crate::document::Document;
-use crate::document::Group;
-use crate::document::IfBreak;
-use crate::document::Line;
-use crate::document::Separator;
-use crate::document::group::GroupIdentifier;
-use crate::internal::FormatterState;
-use crate::internal::format::Format;
-use crate::internal::format::block::block_is_empty;
-use crate::internal::format::format_token;
-use crate::internal::format::misc::print_modifiers;
-use crate::internal::format::parameters::should_break_parameters;
-use crate::internal::format::parameters::should_hug_the_only_parameter;
-use crate::settings::BraceStyle;
-use crate::wrap;
 use bumpalo::vec;
+
 use mago_span::HasSpan;
 use mago_span::Span;
 use mago_syntax::ast::AttributeList;
@@ -31,6 +17,22 @@ use mago_syntax::ast::MethodAbstractBody;
 use mago_syntax::ast::MethodBody;
 use mago_syntax::ast::Modifier;
 use mago_syntax::ast::Sequence;
+
+use crate::document::Document;
+use crate::document::Group;
+use crate::document::IfBreak;
+use crate::document::Line;
+use crate::document::Separator;
+use crate::document::group::GroupIdentifier;
+use crate::internal::FormatterState;
+use crate::internal::format::Format;
+use crate::internal::format::block::block_is_empty;
+use crate::internal::format::format_token;
+use crate::internal::format::misc::print_modifiers;
+use crate::internal::format::parameters::should_break_parameters;
+use crate::internal::format::parameters::should_hug_the_only_parameter;
+use crate::settings::BraceStyle;
+use crate::wrap;
 
 #[derive(Debug, Clone, Copy)]
 enum FunctionLikeBody<'arena> {
