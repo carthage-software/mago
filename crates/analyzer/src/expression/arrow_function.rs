@@ -46,8 +46,18 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ArrowFunction<'arena> {
 
         let mut scope = ScopeContext::new();
         scope.set_function_like(Some(function_metadata));
-        scope.set_class_like(block_context.scope.get_class_like());
-        scope.set_static(self.r#static.is_some());
+        if let Some(bind_scope) = &artifacts.closure_bind_scope {
+            if let Some(class_name) = bind_scope.class_name {
+                scope.set_class_like(context.codebase.get_class_like(&class_name));
+            } else {
+                scope.set_class_like(block_context.scope.get_class_like());
+            }
+
+            scope.set_static(!bind_scope.has_this);
+        } else {
+            scope.set_class_like(block_context.scope.get_class_like());
+            scope.set_static(self.r#static.is_some());
+        }
 
         let mut inner_block_context = BlockContext::new(scope, context.settings.register_super_globals);
 

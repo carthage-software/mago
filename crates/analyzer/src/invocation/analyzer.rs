@@ -6,9 +6,15 @@ use itertools::Itertools;
 use mago_atom::Atom;
 use mago_atom::AtomMap;
 use mago_atom::concat_atom;
+use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::atomic::TAtomic;
+use mago_codex::ttype::atomic::object::TObject;
+use mago_codex::ttype::atomic::scalar::TScalar;
+use mago_codex::ttype::atomic::scalar::class_like_string::TClassLikeString;
+use mago_codex::ttype::atomic::scalar::string::TString;
+use mago_codex::ttype::atomic::scalar::string::TStringLiteral;
 use mago_codex::ttype::expander;
 use mago_codex::ttype::expander::StaticClassType;
 use mago_codex::ttype::expander::TypeExpansionOptions;
@@ -22,6 +28,7 @@ use mago_span::HasSpan;
 use mago_syntax::ast::Expression;
 
 use crate::artifacts::AnalysisArtifacts;
+use crate::artifacts::ClosureBindScope;
 use crate::code::IssueCode;
 use crate::context::Context;
 use crate::context::block::BlockContext;
@@ -160,6 +167,10 @@ pub fn analyze_invocation<'ctx, 'arena>(
         }
     }
 
+    let closure_bind_scope = detect_closure_bind_scope(context, invocation, &analyzed_argument_types);
+    let previous_bind_scope = artifacts.closure_bind_scope.take();
+    artifacts.closure_bind_scope = closure_bind_scope;
+
     for (argument_offset, argument) in &closure_arguments {
         let Some(argument_expression) = argument.value() else {
             continue;
@@ -234,6 +245,9 @@ pub fn analyze_invocation<'ctx, 'arena>(
             );
         }
     }
+
+    // Restore the previous closure bind scope after analyzing closure arguments
+    artifacts.closure_bind_scope = previous_bind_scope;
 
     if let Some(function_like_metadata) = invocation.target.get_function_like_metadata() {
         let class_generic_parameters = get_class_template_parameters_from_result(template_result, context);
@@ -1047,5 +1061,97 @@ fn validate_keyed_array_elements<'ctx, 'arena>(
                 );
             }
         }
+    }
+}
+
+/// Detects if the current invocation is a `Closure::bind` or `Closure::bindTo` call
+/// and extracts the bound scope information from its arguments.
+///
+/// Returns `Some(ClosureBindScope)` if this is a Closure::bind/bindTo call with extractable scope,
+/// `None` otherwise.
+fn detect_closure_bind_scope<'ctx, 'arena>(
+    context: &Context<'ctx, 'arena>,
+    invocation: &Invocation<'ctx, '_, 'arena>,
+    analyzed_argument_types: &HashMap<usize, (TUnion, mago_span::Span)>,
+) -> Option<ClosureBindScope> {
+    let identifier = invocation.target.get_function_like_identifier()?;
+
+    let FunctionLikeIdentifier::Method(class_id, method_id) = identifier else {
+        return None;
+    };
+
+    if !class_id.eq_ignore_ascii_case("closure") {
+        return None;
+    }
+
+    let method_name = method_id.as_str().to_ascii_lowercase();
+
+    let (new_this_offset, new_scope_offset) = if method_name.eq_ignore_ascii_case("bind") {
+        (1, 2)
+    } else {
+        return None;
+    };
+
+    let new_this_type = analyzed_argument_types.get(&new_this_offset).map(|(t, _)| t);
+    let has_this = new_this_type.is_some_and(|t| !t.is_null());
+
+    let class_name = if let Some((scope_type, _)) = analyzed_argument_types.get(&new_scope_offset) {
+        extract_class_name_from_scope_arg(context, scope_type)
+    } else if has_this {
+        new_this_type.and_then(extract_class_name_from_type)
+    } else {
+        None
+    };
+
+    if class_name.is_some() || has_this { Some(ClosureBindScope { class_name, has_this }) } else { None }
+}
+
+/// Extracts a class name from a scope argument (typically the 3rd argument to Closure::bind).
+/// This handles cases like `Foo::class`, `'Foo'`, or a class instance type.
+fn extract_class_name_from_scope_arg(context: &Context<'_, '_>, scope_type: &TUnion) -> Option<Atom> {
+    for atomic in scope_type.types.as_ref() {
+        match atomic {
+            TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::Literal { value })) => {
+                return Some(*value);
+            }
+            TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::OfType { constraint, .. })) => {
+                if let Some(name) = extract_class_name_from_atomic(constraint) {
+                    return Some(name);
+                }
+            }
+            TAtomic::Scalar(TScalar::String(TString { literal: Some(TStringLiteral::Value(value)), .. })) => {
+                if context.codebase.get_class_like(value).is_some() {
+                    return Some(*value);
+                }
+            }
+            TAtomic::Object(TObject::Named(named)) => {
+                return Some(named.name);
+            }
+            TAtomic::Object(TObject::Enum(enum_obj)) => {
+                return Some(enum_obj.name);
+            }
+            _ => continue,
+        }
+    }
+
+    None
+}
+
+/// Extracts a class name from a type union (typically for $this type).
+fn extract_class_name_from_type(t: &TUnion) -> Option<Atom> {
+    for atomic in t.types.as_ref() {
+        if let Some(name) = extract_class_name_from_atomic(atomic) {
+            return Some(name);
+        }
+    }
+    None
+}
+
+/// Extracts a class name from an atomic type.
+fn extract_class_name_from_atomic(atomic: &TAtomic) -> Option<Atom> {
+    match atomic {
+        TAtomic::Object(TObject::Named(named)) => Some(named.name),
+        TAtomic::Object(TObject::Enum(enum_obj)) => Some(enum_obj.name),
+        _ => None,
     }
 }
