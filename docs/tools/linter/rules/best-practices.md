@@ -33,6 +33,7 @@ This document details the rules available in the `BestPractices` category.
 | Psl Regex Functions | [`psl-regex-functions`](#psl-regex-functions) |
 | Psl Sleep Functions | [`psl-sleep-functions`](#psl-sleep-functions) |
 | Psl String Functions | [`psl-string-functions`](#psl-string-functions) |
+| Require Namespace | [`require-namespace`](#require-namespace) |
 | Use Compound Assignment | [`use-compound-assignment`](#use-compound-assignment) |
 | Use WordPress API Functions | [`use-wp-functions`](#use-wp-functions) |
 | Yoda Conditions | [`yoda-conditions`](#yoda-conditions) |
@@ -1070,6 +1071,41 @@ $capitalized = Psl\Str\capitalize($string);
 <?php
 
 $capitalized = ucfirst($string);
+```
+
+
+## <a id="require-namespace"></a>`require-namespace`
+
+Detects files that contain definitions (classes, interfaces, enums, traits, functions, or constants)
+but do not declare a namespace. Using namespaces helps avoid naming conflicts and improves code organization.
+
+
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `false` |
+| `level` | `string` | `"warning"` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+
+namespace App;
+
+class Foo {}
+```
+
+#### Incorrect code
+
+```php
+<?php
+
+class Foo {}
 ```
 
 

@@ -130,7 +130,7 @@ pub fn analyze_function_like<'ctx, 'ast, 'arena>(
     if let Some(calling_class) = block_context.scope.get_class_like_name()
         && let Some(class_like_metadata) = context.codebase.get_class_like(&calling_class)
     {
-        add_properties_to_context(context, block_context, class_like_metadata, function_like_metadata)?;
+        add_properties_to_context(context, block_context, class_like_metadata, Some(function_like_metadata))?;
     }
 
     if !function_like_metadata.flags.is_unchecked() {
@@ -214,15 +214,21 @@ fn add_parameter_types_to_context<'ctx, 'arena>(
             get_mixed()
         };
 
+        // TODO(azjezz): consider comparing declared and inferred types instead
+        // and choosing the more specific one, this current solution is a bit naive.
         let declared_type_is_specific = parameter_metadata.get_type_metadata().is_some_and(|tm| {
             let union = &tm.type_union;
-            union.is_list() || (!union.is_mixed() && !union.is_vanilla_mixed() && !union.is_array())
+
+            !union.is_vanilla_array() && !union.is_vanilla_mixed()
         });
 
         let mut final_parameter_type = if declared_type_is_specific {
             declared_parameter_type
-        } else if let Some(inferred_map) = inferred_parameter_types.as_mut() {
-            inferred_map.remove(&i).unwrap_or(declared_parameter_type)
+        } else if let Some(inferred_map) = inferred_parameter_types.as_mut()
+            && let Some(inferred_type) = inferred_map.remove(&i)
+            && !is_unresolved_template_with_mixed_bound(&inferred_type)
+        {
+            inferred_type
         } else {
             declared_parameter_type
         };
@@ -280,6 +286,20 @@ fn add_parameter_types_to_context<'ctx, 'arena>(
     Ok(())
 }
 
+/// Checks if a type is a single unresolved template parameter with a mixed bound.
+/// Such types shouldn't override explicit type hints as they provide no additional information.
+fn is_unresolved_template_with_mixed_bound(union: &TUnion) -> bool {
+    if union.types.len() != 1 {
+        return false;
+    }
+
+    if let Some(TAtomic::GenericParameter(param)) = union.types.first() {
+        param.constraint.is_mixed() || param.constraint.is_vanilla_mixed()
+    } else {
+        false
+    }
+}
+
 fn expand_type_metadata<'ctx>(
     context: &mut Context<'ctx, '_>,
     block_context: &mut BlockContext<'ctx>,
@@ -323,11 +343,11 @@ fn expand_type_metadata<'ctx>(
     signature_union
 }
 
-fn add_properties_to_context<'ctx>(
+pub(super) fn add_properties_to_context<'ctx>(
     context: &Context<'ctx, '_>,
     block_context: &mut BlockContext<'ctx>,
     class_like_metadata: &'ctx ClassLikeMetadata,
-    function_like_metadata: &'ctx FunctionLikeMetadata,
+    function_like_metadata: Option<&'ctx FunctionLikeMetadata>,
 ) -> Result<(), AnalysisError> {
     let Some(calling_class) = block_context.scope.get_class_like_name() else {
         return Ok(());
@@ -369,7 +389,7 @@ fn add_properties_to_context<'ctx>(
         let expression_id = if property_metadata.flags.is_static() {
             Atom::from(&format!("{}::${raw_property_name}", class_like_metadata.name))
         } else {
-            let this_type = get_this_type(context, class_like_metadata, Some(function_like_metadata));
+            let this_type = get_this_type(context, class_like_metadata, function_like_metadata);
 
             property_type = localize_property_type(
                 context,
@@ -382,17 +402,18 @@ fn add_properties_to_context<'ctx>(
             Atom::from(&format!("$this->{raw_property_name}"))
         };
 
+        if property_metadata.type_declaration_metadata.is_some() && !property_metadata.flags.has_default() {
+            property_type.set_possibly_undefined(true, None);
+        }
+
         expander::expand_union(
             context.codebase,
             &mut property_type,
             &TypeExpansionOptions {
                 self_class: Some(calling_class),
                 static_class_type: StaticClassType::Name(calling_class),
-                function_is_final: if let Some(method_metadata) = &function_like_metadata.method_metadata {
-                    method_metadata.is_final
-                } else {
-                    false
-                },
+                function_is_final: function_like_metadata
+                    .is_some_and(|m| m.method_metadata.as_ref().is_some_and(|metadata| metadata.is_final)),
                 expand_generic: true,
                 ..Default::default()
             },

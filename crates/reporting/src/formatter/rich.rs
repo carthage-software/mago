@@ -88,7 +88,7 @@ pub(super) fn codespan_format_with_config(
             }
         }
 
-        if !issue.suggestions.is_empty() {
+        if !issue.edits.is_empty() {
             suggestions += 1;
         }
 
@@ -143,7 +143,7 @@ fn apply_filters(issues: &IssueCollection, config: &FormatterConfig) -> IssueCol
     }
 
     if config.filter_fixable {
-        filtered = filtered.filter_fixable();
+        filtered = filtered.with_edits();
     }
 
     if config.sort {

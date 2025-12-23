@@ -1,5 +1,5 @@
 use indoc::indoc;
-use mago_fixer::SafetyClassification;
+use mago_text_edit::TextEdit;
 use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
@@ -132,8 +132,8 @@ impl LintRule for NoRedundantFinalRule {
                     )
                     .with_help("Remove the redundant `final` modifier.");
 
-                ctx.collector.propose(issue, |plan| {
-                    plan.delete(final_modifier.span().to_range(), SafetyClassification::Safe);
+                ctx.collector.propose(issue, |edits| {
+                    edits.push(TextEdit::delete(final_modifier.span()));
                 });
             }
         }

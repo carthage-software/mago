@@ -68,7 +68,7 @@ std::thread_local! {
             })))
         }));
 
-        let user_input_type_union = Rc::new( TUnion::from_atomic(TAtomic::Array(TArray::Keyed(TKeyedArray::new_with_parameters(
+        let user_input_type_union = Rc::new(TUnion::from_atomic(TAtomic::Array(TArray::Keyed(TKeyedArray::new_with_parameters(
             Box::new(TUnion::from_vec(vec![
                 TAtomic::Scalar(TScalar::non_empty_string()),
                 TAtomic::Scalar(TScalar::int()),

@@ -1,5 +1,5 @@
 use indoc::indoc;
-use mago_fixer::SafetyClassification;
+use mago_text_edit::TextEdit;
 use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
@@ -111,8 +111,8 @@ impl LintRule for NoRedundantReadonlyRule {
                 )
                 .with_help("Remove the redundant `readonly` modifier.");
 
-                ctx.collector.propose(issue, |plan| {
-                    plan.delete(readonly_modifier.span().to_range(), SafetyClassification::Safe);
+                ctx.collector.propose(issue, |edits| {
+                    edits.push(TextEdit::delete(readonly_modifier.span()));
                 });
             }
         }

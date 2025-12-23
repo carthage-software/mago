@@ -312,6 +312,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
             finally_block_context.assigned_variable_ids = AtomMap::default();
             finally_block_context.possibly_assigned_variable_ids = AtomSet::default();
             finally_block_context.locals = finally_scope.locals;
+            finally_block_context.has_returned = false;
 
             analyze_statements(
                 finally_clause.block.statements.as_slice(),
@@ -370,8 +371,13 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
             block_context.possibly_thrown_exceptions.entry(possibly_thrown_exception).or_default().extend(throw_spans);
         }
 
-        block_context.has_returned =
-            finally_has_returned || (!try_block_control_actions.contains(&ControlAction::None) && all_catches_leave);
+        block_context.has_returned = if finally_has_returned {
+            true
+        } else if !try_block_control_actions.contains(&ControlAction::None) {
+            self.catch_clauses.is_empty() || all_catches_leave
+        } else {
+            false
+        };
 
         Ok(())
     }

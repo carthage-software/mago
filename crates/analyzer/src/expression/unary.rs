@@ -15,6 +15,7 @@ use mago_codex::ttype::atomic::array::TArray;
 use mago_codex::ttype::atomic::array::key::ArrayKey;
 use mago_codex::ttype::atomic::array::keyed::TKeyedArray;
 use mago_codex::ttype::atomic::array::list::TList;
+use mago_codex::ttype::atomic::callable::TCallableSignature;
 use mago_codex::ttype::atomic::mixed::TMixed;
 use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::atomic::scalar::TScalar;
@@ -36,7 +37,6 @@ use mago_codex::ttype::get_true;
 use mago_codex::ttype::get_void;
 use mago_codex::ttype::union::TUnion;
 use mago_codex::ttype::wrap_atomic;
-use mago_fixer::SafetyClassification;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
@@ -47,6 +47,7 @@ use mago_syntax::ast::UnaryPostfixOperator;
 use mago_syntax::ast::UnaryPrefix;
 use mago_syntax::ast::UnaryPrefixOperator;
 use mago_syntax::ast::Variable;
+use mago_text_edit::TextEdit;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -918,10 +919,10 @@ fn report_redundant_type_cast<'ast, 'arena>(
             )
             .with_note("Casting a value to a type it already possesses has no effect.")
             .with_help(format!("Remove the redundant `{}` cast.", cast_operator.as_str())),
-        |plan| {
+        |edits| {
             // Delete the cast operator, keep only the operand
             // For `(string)$var`, delete `(string)` and keep `$var`
-            plan.delete(expression.operator.span().to_range(), SafetyClassification::Safe);
+            edits.push(TextEdit::delete(expression.operator.span()));
         },
     );
 }
@@ -1416,51 +1417,55 @@ pub fn cast_type_to_string<'ctx>(
     artifacts: &mut AnalysisArtifacts,
     expression_span: Span,
 ) -> Result<TUnion, AnalysisError> {
-    let mut possibilities = vec![];
+    let (has_array, has_non_array) = operand_type
+        .types
+        .iter()
+        .fold((false, false), |(arr, non), t| if matches!(t, TAtomic::Array(_)) { (true, non) } else { (arr, true) });
+    let is_mixed_union = has_array && has_non_array;
+
+    let mut possibilities = Vec::with_capacity(operand_type.types.len());
+
     for t in operand_type.types.as_ref() {
-        let possible = match t {
+        match t {
             TAtomic::Scalar(scalar) => match scalar {
                 TScalar::Bool(boolean) => {
                     if boolean.is_true() {
-                        TAtomic::Scalar(TScalar::literal_string(atom("1")))
+                        possibilities.push(TAtomic::Scalar(TScalar::literal_string(atom("1"))));
                     } else if boolean.is_false() {
-                        TAtomic::Scalar(TScalar::literal_string(empty_atom()))
+                        possibilities.push(TAtomic::Scalar(TScalar::literal_string(empty_atom())));
                     } else {
                         possibilities.push(TAtomic::Scalar(TScalar::literal_string(empty_atom())));
-
-                        TAtomic::Scalar(TScalar::literal_string(atom("1")))
+                        possibilities.push(TAtomic::Scalar(TScalar::literal_string(atom("1"))));
                     }
                 }
                 TScalar::Integer(integer) => {
                     if let Some(value) = integer.get_literal_value() {
-                        TAtomic::Scalar(TScalar::literal_string(i64_atom(value)))
+                        possibilities.push(TAtomic::Scalar(TScalar::literal_string(i64_atom(value))));
                     } else {
-                        TAtomic::Scalar(TScalar::numeric_string())
+                        possibilities.push(TAtomic::Scalar(TScalar::numeric_string()));
                     }
                 }
                 TScalar::Float(float) => {
                     if let Some(value) = float.get_literal_value() {
-                        TAtomic::Scalar(TScalar::literal_string(f64_atom(value)))
+                        possibilities.push(TAtomic::Scalar(TScalar::literal_string(f64_atom(value))));
                     } else {
-                        TAtomic::Scalar(TScalar::numeric_string())
+                        possibilities.push(TAtomic::Scalar(TScalar::numeric_string()));
                     }
                 }
-                TScalar::Numeric => TAtomic::Scalar(TScalar::numeric_string()),
-                TScalar::String(string) => TAtomic::Scalar(TScalar::String(string.clone())),
+                TScalar::Numeric => possibilities.push(TAtomic::Scalar(TScalar::numeric_string())),
+                TScalar::String(string) => possibilities.push(TAtomic::Scalar(TScalar::String(string.clone()))),
                 TScalar::ClassLikeString(class_string) => {
                     if let Some(value) = class_string.literal_value() {
-                        TAtomic::Scalar(TScalar::literal_string(value))
+                        possibilities.push(TAtomic::Scalar(TScalar::literal_string(value)));
                     } else {
-                        TAtomic::Scalar(TScalar::non_empty_string())
+                        possibilities.push(TAtomic::Scalar(TScalar::non_empty_string()));
                     }
                 }
-                _ => TAtomic::Scalar(TScalar::string()),
+                _ => possibilities.push(TAtomic::Scalar(TScalar::string())),
             },
+
             TAtomic::Callable(callable) => {
-                return if callable
-                    .get_signature()
-                    .is_none_or(mago_codex::ttype::atomic::callable::TCallableSignature::is_closure)
-                {
+                if callable.get_signature().is_none_or(TCallableSignature::is_closure) {
                     context.collector.report_with_code(
                         IssueCode::InvalidTypeCast,
                         Issue::error("Cannot cast type `Closure` to `string`.")
@@ -1473,8 +1478,6 @@ pub fn cast_type_to_string<'ctx>(
                             )
                             .with_help("Remove the cast or ensure the expression being cast is not a `Closure`."),
                     );
-
-                    Ok(get_never())
                 } else {
                     context.collector.report_with_code(
                         IssueCode::InvalidTypeCast,
@@ -1482,23 +1485,41 @@ pub fn cast_type_to_string<'ctx>(
                             "Cannot reliably cast callable of type `{}` to `string`.",
                             callable.get_id()
                         ))
-                            .with_annotation(
-                                Annotation::primary(expression_span.span())
-                                    .with_message("Invalid cast from callable to string"),
-                            )
-                            .with_note("Casting a callable to `string` is ambiguous and may not yield a meaningful result.")
-                            .with_help("Ensure the callable can be represented as a string or use a specific callable type that guarantees string representation."),
+                        .with_annotation(
+                            Annotation::primary(expression_span.span())
+                                .with_message("Invalid cast from callable to string"),
+                        )
+                        .with_note("Casting a callable to `string` is ambiguous and may not yield a meaningful result.")
+                        .with_help("Ensure the callable can be represented as a string or use a specific callable type that guarantees string representation."),
                     );
-
-                    Ok(get_string())
-                };
+                    possibilities.push(TAtomic::Scalar(TScalar::string()));
+                }
             }
+
             TAtomic::Object(object) => {
+                if let TObject::HasMethod(has_method) = object
+                    && has_method.has_method("__toString")
+                {
+                    possibilities.push(TAtomic::Scalar(TScalar::string()));
+                    continue;
+                }
+
+                if let Some(result) = find_to_string_in_intersections(
+                    t,
+                    operand_expression_id,
+                    context,
+                    block_context,
+                    artifacts,
+                    expression_span,
+                ) {
+                    possibilities.extend(result?.types.into_owned());
+                    continue;
+                }
+
                 let class_like_name = match object {
-                    TObject::HasMethod(has_method) if has_method.has_method("__toString") => {
-                        return Ok(get_string());
-                    }
-                    TObject::Any | TObject::WithProperties(_) | TObject::HasMethod(_) | TObject::HasProperty(_) => {
+                    TObject::Named(named_object) => named_object.get_name(),
+                    TObject::Enum(enum_instance) => enum_instance.get_name(),
+                    _ => {
                         context.collector.report_with_code(
                             IssueCode::InvalidTypeCast,
                             Issue::error("Cannot reliably cast generic `object` to `string`.")
@@ -1515,11 +1536,9 @@ pub fn cast_type_to_string<'ctx>(
                                 "Ensure the object is stringable before casting, use a more specific object type, or avoid the cast."
                             ),
                         );
-
-                        return Ok(get_string());
+                        possibilities.push(TAtomic::Scalar(TScalar::string()));
+                        continue;
                     }
-                    TObject::Named(named_object) => named_object.get_name(),
-                    TObject::Enum(enum_instance) => enum_instance.get_name(),
                 };
 
                 let Some(class_metadata) = context.codebase.get_class_like(&class_like_name) else {
@@ -1535,8 +1554,8 @@ pub fn cast_type_to_string<'ctx>(
                         .with_note("Casting an object to `string` requires the class to exist and implement `Stringable` or have a `__toString()` method.")
                         .with_help("Ensure the class exists or avoid casting this object type to `string`."),
                     );
-
-                    return Ok(get_string());
+                    possibilities.push(TAtomic::Scalar(TScalar::string()));
+                    continue;
                 };
 
                 if class_metadata.kind.is_enum() {
@@ -1553,8 +1572,8 @@ pub fn cast_type_to_string<'ctx>(
                         .with_note("Casting an enum instance to `string` is not allowed and will throw a fatal error at runtime.")
                         .with_help("Use the enum's name or value instead, or avoid casting the enum instance to `string`."),
                     );
-
-                    return Ok(get_string());
+                    possibilities.push(TAtomic::Scalar(TScalar::string()));
+                    continue;
                 }
 
                 let to_string_method_id = atom("__toString");
@@ -1563,10 +1582,24 @@ pub fn cast_type_to_string<'ctx>(
                     to_string_method_id,
                 ));
 
-                let Some(to_string_metadata) = context
+                if let Some(to_string_metadata) = context
                     .codebase
                     .get_method(declaring_method_id.get_class_name(), declaring_method_id.get_method_name())
-                else {
+                {
+                    let result = analyze_implicit_method_call(
+                        context,
+                        block_context,
+                        artifacts,
+                        object,
+                        operand_expression_id,
+                        declaring_method_id,
+                        class_metadata,
+                        to_string_metadata,
+                        None,
+                        expression_span,
+                    )?;
+                    possibilities.extend(result.types.into_owned());
+                } else {
                     let class_name_str = class_metadata.original_name;
 
                     context.collector.report_with_code(
@@ -1591,52 +1624,123 @@ pub fn cast_type_to_string<'ctx>(
                             )
                         ),
                     );
+                    possibilities.push(TAtomic::Scalar(TScalar::string()));
+                }
+            }
 
-                    return Ok(get_string());
-                };
+            TAtomic::Array(_) => {
+                if is_mixed_union {
+                    context.collector.report_with_code(
+                        IssueCode::ArrayToStringConversion,
+                        Issue::warning("Potentially casting `array` to `string`.")
+                            .with_annotation(
+                                Annotation::primary(expression_span.span())
+                                    .with_message("This expression may be an array."),
+                            )
+                            .with_note(
+                                "Casting an array to string produces the literal 'Array' and triggers a PHP warning.",
+                            )
+                            .with_help(
+                                "Add a type check (e.g., `is_numeric()`) before casting to ensure the value is not an array.",
+                            ),
+                    );
+                } else {
+                    context.collector.report_with_code(
+                        IssueCode::ArrayToStringConversion,
+                        Issue::warning(
+                            "Casting `array` to `string` is deprecated and produces the literal string 'Array'.",
+                        )
+                        .with_annotation(
+                            Annotation::primary(expression_span.span())
+                                .with_message("Casting `array` to `string`."),
+                        )
+                        .with_note(
+                            "PHP raises an `E_WARNING` (or `E_NOTICE` in older versions) when an array is cast to a string, resulting in the literal string 'Array'.",
+                        )
+                        .with_help(
+                            "Do not cast arrays to strings directly. Use functions like `implode()`, `json_encode()`, or loop through the array to create a string representation.",
+                        ),
+                    );
+                }
+                possibilities.push(TAtomic::Scalar(TScalar::literal_string(atom("Array"))));
+            }
 
-                return analyze_implicit_method_call(
+            TAtomic::Null | TAtomic::Void => possibilities.push(TAtomic::Scalar(TScalar::literal_string(atom("")))),
+            TAtomic::Resource(_) => possibilities.push(TAtomic::Scalar(TScalar::non_empty_string())),
+            TAtomic::Never => continue,
+            _ => {
+                if let Some(result) = find_to_string_in_intersections(
+                    t,
+                    operand_expression_id,
                     context,
                     block_context,
                     artifacts,
-                    object,
-                    operand_expression_id,
-                    declaring_method_id,
-                    class_metadata,
-                    to_string_metadata,
-                    None,
                     expression_span,
-                );
+                ) {
+                    possibilities.extend(result?.types.to_vec());
+                } else {
+                    possibilities.push(TAtomic::Scalar(TScalar::string()));
+                }
             }
-            TAtomic::Array(_) => {
-                context.collector.report_with_code(
-                    IssueCode::ArrayToStringConversion,
-                    Issue::warning(
-                        "Casting `array` to `string` is deprecated and produces the literal string 'Array'."
-                    )
-                    .with_annotation(
-                        Annotation::primary(expression_span.span()).with_message("Casting `array` to `string`.")
-                    )
-                    .with_note(
-                        "PHP raises an `E_WARNING` (or `E_NOTICE` in older versions) when an array is cast to a string, resulting in the literal string 'Array'."
-                    )
-                    .with_help(
-                        "Do not cast arrays to strings directly. Use functions like `implode()`, `json_encode()`, or loop through the array to create a string representation."
-                    ),
-                );
-
-                TAtomic::Scalar(TScalar::literal_string(atom("Array")))
-            }
-            TAtomic::Null | TAtomic::Void => TAtomic::Scalar(TScalar::literal_string(atom(""))),
-            TAtomic::Resource(_) => TAtomic::Scalar(TScalar::non_empty_string()),
-            TAtomic::Never => return Ok(get_never()),
-            _ => return Ok(get_string()),
-        };
-
-        possibilities.push(possible);
+        }
     }
 
     Ok(TUnion::from_vec(combine(possibilities, context.codebase, false)))
+}
+
+fn find_to_string_in_intersections<'ctx>(
+    atomic: &TAtomic,
+    operand_expression_id: Option<&str>,
+    context: &mut Context<'ctx, '_>,
+    block_context: &mut BlockContext<'ctx>,
+    artifacts: &mut AnalysisArtifacts,
+    expression_span: Span,
+) -> Option<Result<TUnion, AnalysisError>> {
+    let intersection_types = atomic.get_intersection_types()?;
+    let to_string_id = atom("__toString");
+
+    for intersection in intersection_types {
+        match intersection {
+            TAtomic::Object(TObject::HasMethod(has_method)) if has_method.has_method(&to_string_id) => {
+                return Some(Ok(get_string()));
+            }
+
+            TAtomic::Object(TObject::Named(named)) => {
+                let intersection_name = named.get_name();
+                let Some(intersection_class) = context.codebase.get_class_like(&intersection_name) else {
+                    continue;
+                };
+
+                let intersection_method_id = context.codebase.get_declaring_method_identifier(&MethodIdentifier::new(
+                    intersection_class.original_name,
+                    to_string_id,
+                ));
+
+                let Some(method) = context
+                    .codebase
+                    .get_method(intersection_method_id.get_class_name(), intersection_method_id.get_method_name())
+                else {
+                    continue;
+                };
+
+                return Some(analyze_implicit_method_call(
+                    context,
+                    block_context,
+                    artifacts,
+                    &TObject::Named(named.clone()),
+                    operand_expression_id,
+                    intersection_method_id,
+                    intersection_class,
+                    method,
+                    None,
+                    expression_span,
+                ));
+            }
+            _ => continue,
+        }
+    }
+
+    None
 }
 
 #[cfg(test)]

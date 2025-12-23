@@ -117,6 +117,22 @@ pub struct WasmRuleInfo {
     pub category: String,
 }
 
+/// WASM-safe plugin info for exposing available plugins to the frontend.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WasmPluginInfo {
+    /// Canonical plugin identifier (e.g., "stdlib").
+    pub id: String,
+    /// Human-readable name (e.g., "PHP Standard Library").
+    pub name: String,
+    /// Description of what the plugin provides.
+    pub description: String,
+    /// Alternative names that resolve to this plugin.
+    pub aliases: Vec<String>,
+    /// Whether this plugin is enabled by default.
+    pub default_enabled: bool,
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct WasmAnalyzerSettings {
@@ -139,13 +155,18 @@ pub struct WasmAnalyzerSettings {
     pub trust_existence_checks: bool,
     pub class_initializers: Vec<String>,
     pub check_property_initialization: bool,
+    pub check_use_statements: bool,
+    /// Disable all default plugins (including stdlib).
+    pub disable_default_plugins: bool,
+    /// List of plugins to enable (by name or alias).
+    pub plugins: Vec<String>,
 }
 
 impl Default for WasmAnalyzerSettings {
     fn default() -> Self {
         Self {
-            find_unused_expressions: false,
-            find_unused_definitions: false,
+            find_unused_expressions: true,
+            find_unused_definitions: true,
             analyze_dead_code: false,
             memoize_properties: false,
             allow_possibly_undefined_array_keys: false,
@@ -163,6 +184,9 @@ impl Default for WasmAnalyzerSettings {
             trust_existence_checks: true,
             class_initializers: Vec::new(),
             check_property_initialization: false,
+            check_use_statements: false,
+            disable_default_plugins: false,
+            plugins: Vec::new(),
         }
     }
 }

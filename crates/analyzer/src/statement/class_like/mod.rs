@@ -13,6 +13,9 @@ use mago_codex::metadata::property::PropertyMetadata;
 use mago_codex::misc::GenericParent;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::atomic::TAtomic;
+use mago_codex::ttype::atomic::generic::TGenericParameter;
+use mago_codex::ttype::atomic::scalar::TScalar;
+use mago_codex::ttype::atomic::scalar::class_like_string::TClassLikeString;
 use mago_codex::ttype::comparator::ComparisonResult;
 use mago_codex::ttype::comparator::union_comparator;
 use mago_codex::ttype::expander::TypeExpansionOptions;
@@ -131,10 +134,24 @@ fn type_contains_template_param(type_union: &TUnion, param_name: Atom, defining_
     use mago_codex::ttype::TypeRef;
 
     type_union.types.iter().any(|atomic| {
-        if let TAtomic::GenericParameter(gp) = atomic
-            && gp.parameter_name == param_name
-            && let GenericParent::ClassLike(class_name) = gp.defining_entity
-            && class_name == defining_class
+        if let TAtomic::GenericParameter(TGenericParameter {
+            parameter_name,
+            defining_entity: GenericParent::ClassLike(class_name),
+            ..
+        }) = atomic
+            && *parameter_name == param_name
+            && *class_name == defining_class
+        {
+            return true;
+        }
+
+        if let TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::Generic {
+            parameter_name,
+            defining_entity: GenericParent::ClassLike(class_name),
+            ..
+        })) = atomic
+            && *parameter_name == param_name
+            && *class_name == defining_class
         {
             return true;
         }
@@ -143,6 +160,14 @@ fn type_contains_template_param(type_union: &TUnion, param_name: Atom, defining_
             TypeRef::Atomic(TAtomic::GenericParameter(gp)) => {
                 gp.parameter_name == param_name
                     && matches!(gp.defining_entity, GenericParent::ClassLike(c) if c == defining_class)
+            }
+            TypeRef::Atomic(TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::Generic {
+                parameter_name,
+                defining_entity,
+                ..
+            }))) => {
+                *parameter_name == param_name
+                    && matches!(defining_entity, GenericParent::ClassLike(c) if *c == defining_class)
             }
             TypeRef::Union(u) => type_contains_template_param(u, param_name, defining_class),
             _ => false,
@@ -623,9 +648,14 @@ pub(crate) fn analyze_class_like<'ctx, 'ast, 'arena>(
                     let is_implemented = current_property
                         .map(|p| {
                             if p.hooks.is_empty() {
-                                true
+                                !p.flags.is_virtual_property()
                             } else {
-                                p.hooks.get(hook_name).is_some_and(|h| !h.is_abstract)
+                                // Property has hooks - check if the specific hook is implemented
+                                if p.hooks.get(hook_name).is_some_and(|h| !h.is_abstract) {
+                                    return true;
+                                }
+
+                                p.hooks.values().any(|h| !h.is_abstract)
                             }
                         })
                         .unwrap_or_else(|| {
@@ -634,7 +664,13 @@ pub(crate) fn analyze_class_like<'ctx, 'ast, 'arena>(
                                     .codebase
                                     .get_class_like(parent_class_fqcn)
                                     .and_then(|parent| parent.properties.get(property_name))
-                                    .is_some_and(|prop| prop.hooks.get(hook_name).is_some_and(|h| !h.is_abstract))
+                                    .is_some_and(|prop| {
+                                        if prop.hooks.get(hook_name).is_some_and(|h| !h.is_abstract) {
+                                            return true;
+                                        }
+
+                                        !prop.flags.is_virtual_property() || prop.hooks.values().any(|h| !h.is_abstract)
+                                    })
                             })
                         });
 
@@ -673,6 +709,7 @@ pub(crate) fn analyze_class_like<'ctx, 'ast, 'arena>(
     }
 
     check_trait_property_conflicts(context, class_like_metadata, members);
+    check_readonly_class_trait_properties(context, class_like_metadata, members);
 
     if !class_like_metadata.template_types.is_empty() {
         for (template_name, _) in &class_like_metadata.template_types {
@@ -1235,6 +1272,15 @@ fn check_template_parameters<'ctx>(
         let mut previous_extended_types: IndexMap<Atom, Vec<(GenericParent, TUnion)>, RandomState> =
             IndexMap::default();
 
+        for (template_name, _) in &parent_metadata.template_types {
+            if let Some(extended_type) = extended_parameters.get(template_name) {
+                previous_extended_types
+                    .entry(*template_name)
+                    .or_default()
+                    .push((GenericParent::ClassLike(parent_metadata.name), extended_type.clone()));
+            }
+        }
+
         for (template_name, template_type_map) in &parent_metadata.template_types {
             let Some(mut extended_type) = extended_parameters.get(template_name).cloned() else {
                 i += 1;
@@ -1333,7 +1379,7 @@ fn check_template_parameters<'ctx>(
                 previous_extended_types
                     .entry(*template_name)
                     .or_default()
-                    .push((GenericParent::ClassLike(class_like_metadata.name), extended_type));
+                    .push((GenericParent::ClassLike(parent_metadata.name), extended_type));
             } else {
                 let mut template_result = TemplateResult::new(previous_extended_types.clone(), Default::default());
                 let mut replaced_template_type = standin_type_replacer::replace(
@@ -1356,7 +1402,7 @@ fn check_template_parameters<'ctx>(
                     previous_extended_types
                         .entry(*template_name)
                         .or_default()
-                        .push((GenericParent::ClassLike(class_like_metadata.name), extended_type));
+                        .push((GenericParent::ClassLike(parent_metadata.name), extended_type));
                 } else {
                     let replaced_type_str = replaced_template_type.get_id();
 
@@ -2983,6 +3029,51 @@ fn check_class_like_constants<'ctx, 'arena>(
                             .with_note("Constants implementing interface constants must have compatible types (covariance allowed).")
                             .with_help(format!("Change the type of `{constant_name}` to be compatible with `{interface_type_id}`.")),
                         );
+                }
+            }
+        }
+    }
+}
+
+/// Check that a readonly class does not use traits with non-readonly properties.
+///
+/// In PHP, a readonly class can only use traits where all properties are declared readonly.
+/// Using a trait with non-readonly properties in a readonly class causes a fatal error.
+fn check_readonly_class_trait_properties<'ctx, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    class_like_metadata: &'ctx ClassLikeMetadata,
+    members: &[ClassLikeMember<'arena>],
+) {
+    if !class_like_metadata.flags.is_readonly() {
+        return;
+    }
+
+    for member in members {
+        if let ClassLikeMember::TraitUse(trait_use) = member {
+            for trait_name_id in &trait_use.trait_names {
+                let (trait_fqcn, _) = context.scope.resolve(NameKind::Default, trait_name_id.value());
+                let trait_fqcn = Atom::from(trait_fqcn.as_str());
+
+                let Some(trait_metadata) = context.codebase.get_class_like(trait_fqcn.as_ref()) else {
+                    continue;
+                };
+
+                for (property_name, property) in &trait_metadata.properties {
+                    if !property.flags.is_readonly() {
+                        context.collector.report_with_code(
+                            IssueCode::InvalidTraitUse,
+                            Issue::error(format!(
+                                "Readonly class `{}` cannot use trait `{}` which has non-readonly property `{}`",
+                                class_like_metadata.name, trait_fqcn, property_name
+                            ))
+                            .with_annotation(Annotation::primary(trait_name_id.span()).with_message("Trait used here"))
+                            .with_note("All properties in a trait used by a readonly class must be declared readonly.")
+                            .with_help(format!(
+                                "Add the `readonly` modifier to property `{}` in trait `{}`.",
+                                property_name, trait_fqcn
+                            )),
+                        );
+                    }
                 }
             }
         }

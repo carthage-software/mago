@@ -165,7 +165,9 @@ impl ConfigCommand {
                     if self.default {
                         serde_json::to_string_pretty(&LinterConfiguration::default())?
                     } else {
-                        serde_json::to_string_pretty(&configuration.linter)?
+                        serde_json::to_string_pretty(
+                            &configuration.linter.to_filtered_value(configuration.php_version),
+                        )?
                     }
                 }
                 ConfigSection::Formatter => {
@@ -186,7 +188,9 @@ impl ConfigCommand {
         } else if self.default {
             serde_json::to_string_pretty(&Configuration::from_workspace(CURRENT_DIR.clone()))?
         } else {
-            serde_json::to_string_pretty(&configuration)?
+            // Filter rules based on configured integrations
+            let filtered = configuration.to_filtered_value();
+            serde_json::to_string_pretty(&filtered)?
         };
 
         println!("{}", json);

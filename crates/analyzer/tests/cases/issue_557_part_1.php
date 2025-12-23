@@ -23,24 +23,18 @@ function expectsArray(array $value): void
 $x = [];
 
 // Test 1: Direct negated isset check
-// When !isset($x['foo']) is true, $x['foo'] should be null
+// When !isset($x['foo']) is true, we know 'foo' definitely doesn't exist
 if (!isset($x['foo'])) {
-    /**
-     * @mago-expect analysis:possibly-undefined-string-array-index
-     * @mago-expect analysis:possibly-invalid-argument
-     */
+    // @mago-expect analysis:undefined-string-array-index
     expectsNull($x['foo']);
 }
 
 // Test 2: Negated isset check via else branch
-// The else branch uses negation internally as well
+// The else branch means isset returned false, so key doesn't exist
 if (isset($x['foo'])) {
     expectsString($x['foo']);
 } else {
-    /**
-     * @mago-expect analysis:possibly-undefined-string-array-index
-     * @mago-expect analysis:possibly-invalid-argument
-     */
+    // @mago-expect analysis:undefined-string-array-index
     expectsNull($x['foo']);
 }
 
@@ -49,12 +43,8 @@ if (isset($x['foo'])) {
 $y = [];
 
 if (!isset($y['foo']['bar'])) {
-    /**
-     * @mago-expect analysis:possibly-undefined-string-array-index
-     * @mago-expect analysis:possibly-undefined-string-array-index
-     * @mago-expect analysis:possibly-null-array-access
-     * @mago-expect analysis:possibly-invalid-argument
-     */
+    // After !isset($y['foo']['bar']), we know 'bar' doesn't exist in $y['foo']
+    // @mago-expect analysis:undefined-string-array-index
     expectsNull($y['foo']['bar']);
 } else {
     expectsArray($y['foo']);
@@ -63,12 +53,7 @@ if (!isset($y['foo']['bar'])) {
 if (isset($y['foo']['bar'])) {
     expectsString($y['foo']['bar']);
 } else {
-    /**
-     * @mago-expect analysis:possibly-undefined-string-array-index
-     * @mago-expect analysis:possibly-undefined-string-array-index
-     * @mago-expect analysis:possibly-null-array-access
-     * @mago-expect analysis:possibly-invalid-argument
-     */
+    // @mago-expect analysis:undefined-string-array-index
     expectsNull($y['foo']['bar']);
 }
 

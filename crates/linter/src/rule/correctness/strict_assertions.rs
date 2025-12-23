@@ -3,7 +3,6 @@ use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_fixer::SafetyClassification;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_reporting::Level;
@@ -13,6 +12,8 @@ use mago_syntax::ast::Expression;
 use mago_syntax::ast::Literal;
 use mago_syntax::ast::Node;
 use mago_syntax::ast::NodeKind;
+use mago_text_edit::Safety;
+use mago_text_edit::TextEdit;
 
 use crate::category::Category;
 use crate::context::LintContext;
@@ -161,11 +162,10 @@ impl LintRule for StrictAssertionsRule {
                     identifier.value, strict_name
                 ));
 
-            ctx.collector.propose(issue, |plan| {
-                plan.replace(
-                    reference.get_selector().span().to_range(),
-                    strict_name,
-                    SafetyClassification::PotentiallyUnsafe,
+            ctx.collector.propose(issue, |edits| {
+                edits.push(
+                    TextEdit::replace(reference.get_selector().span(), strict_name)
+                        .with_safety(Safety::PotentiallyUnsafe),
                 );
             });
         }

@@ -1,5 +1,15 @@
 use bumpalo::collections::CollectIn;
 use bumpalo::collections::Vec;
+use mago_syntax::ast::Argument;
+use mago_syntax::ast::ArgumentList;
+use mago_syntax::ast::ClassConstantAccess;
+use mago_syntax::ast::ClassLikeConstantSelector;
+use mago_syntax::ast::ClassLikeMemberSelector;
+use mago_syntax::ast::ConstantAccess;
+use mago_syntax::ast::FunctionCall;
+use mago_syntax::ast::Identifier;
+use mago_syntax::ast::StaticMethodCall;
+use mago_syntax::ast::Variable;
 use unicode_width::UnicodeWidthStr;
 
 use mago_syntax::ast::Access;
@@ -257,6 +267,93 @@ pub fn could_expand_value<'arena>(
         }
         _ => false,
     }
+}
+
+pub fn foreach_binary_operand<F>(expr: &Expression<'_>, f: &mut F)
+where
+    F: FnMut(&Expression<'_>),
+{
+    let Expression::Binary(binary) = expr else {
+        return;
+    };
+
+    f(binary.rhs);
+    foreach_binary_operand(binary.rhs, f);
+
+    f(binary.lhs);
+    foreach_binary_operand(binary.lhs, f);
+}
+
+pub fn get_expression_width(element: &Expression<'_>) -> Option<usize> {
+    fn get_argument_width(argument: &Argument<'_>) -> Option<usize> {
+        match argument {
+            Argument::Positional(arg) => match arg.ellipsis {
+                Some(_) => get_expression_width(&arg.value).map(|width| width + 3),
+                None => get_expression_width(&arg.value),
+            },
+            Argument::Named(arg) => get_expression_width(&arg.value).map(|mut width| {
+                width += 2;
+                width += arg.name.value.width();
+                width
+            }),
+        }
+    }
+
+    fn get_argument_list_width(argument_list: &ArgumentList<'_>) -> Option<usize> {
+        let mut width = 2;
+        for (i, argument) in argument_list.arguments.iter().enumerate() {
+            if i > 0 {
+                width += 2;
+            }
+
+            width += get_argument_width(argument)?;
+        }
+
+        Some(width)
+    }
+
+    Some(match element {
+        Expression::Literal(literal) => match literal {
+            Literal::String(literal_string) => string_width(literal_string.raw),
+            Literal::Integer(literal_integer) => literal_integer.raw.width(),
+            Literal::Float(literal_float) => literal_float.raw.width(),
+            Literal::True(_) => 4,
+            Literal::False(_) => 5,
+            Literal::Null(_) => 4,
+        },
+        Expression::MagicConstant(magic_constant) => string_width(magic_constant.value().value),
+        Expression::ConstantAccess(ConstantAccess { name: Identifier::Local(local) })
+        | Expression::Identifier(Identifier::Local(local)) => string_width(local.value),
+        Expression::Variable(Variable::Direct(variable)) => string_width(variable.name),
+        Expression::Call(Call::Function(FunctionCall { function, argument_list })) => {
+            let function_width = get_expression_width(function)?;
+            let args_width = get_argument_list_width(argument_list)?;
+
+            function_width + args_width
+        }
+        Expression::Call(Call::StaticMethod(StaticMethodCall {
+            class,
+            method: ClassLikeMemberSelector::Identifier(method),
+            argument_list,
+            ..
+        })) => {
+            let class_width = get_expression_width(class)?;
+            let method_width = string_width(method.value);
+            let args_width = get_argument_list_width(argument_list)?;
+
+            class_width + 2 + method_width + args_width
+        }
+        Expression::Access(Access::ClassConstant(ClassConstantAccess {
+            class,
+            constant: ClassLikeConstantSelector::Identifier(constant),
+            ..
+        })) => {
+            return get_expression_width(class).map(|class| class + 2 + string_width(constant.value));
+        }
+        _ => {
+            return None;
+        }
+    })
 }
 
 #[inline]

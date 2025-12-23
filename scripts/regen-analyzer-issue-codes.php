@@ -312,6 +312,7 @@ final class AnalyzerCodeModuleGenerator
         'missing-constant-type',
         'missing-return-type',
         'invalid-array-access-assignment-value',
+        'non-existent-use-import',
     ];
 
     /**

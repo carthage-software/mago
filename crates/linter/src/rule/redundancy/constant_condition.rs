@@ -3,7 +3,6 @@ use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_fixer::SafetyClassification;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_reporting::Level;
@@ -15,6 +14,7 @@ use mago_syntax::utils::condition::is_falsy;
 use mago_syntax::utils::condition::is_truthy;
 use mago_syntax::utils::definition::statement_contains_only_definitions;
 use mago_syntax::utils::definition::statement_sequence_contains_only_definitions;
+use mago_text_edit::TextEdit;
 
 use crate::category::Category;
 use crate::context::LintContext;
@@ -111,32 +111,32 @@ impl LintRule for ConstantConditionRule {
                 .with_note("The `if` wrapper is unnecessary as this code block will always be executed.")
                 .with_help("Remove the `if` statement and unwrap the code block.");
 
-            ctx.collector.propose(issue, |plan| {
-                plan.delete(r#if.r#if.span.join(r#if.right_parenthesis).to_range(), SafetyClassification::Safe);
+            ctx.collector.propose(issue, |edits| {
+                edits.push(TextEdit::delete(r#if.r#if.span.join(r#if.right_parenthesis)));
 
                 match &r#if.body {
                     IfBody::Statement(body) => {
                         for clause in &body.else_if_clauses {
-                            plan.delete(clause.span().to_range(), SafetyClassification::Safe);
+                            edits.push(TextEdit::delete(clause.span()));
                         }
 
                         if let Some(else_clause) = &body.else_clause {
-                            plan.delete(else_clause.span().to_range(), SafetyClassification::Safe);
+                            edits.push(TextEdit::delete(else_clause.span()));
                         }
                     }
                     IfBody::ColonDelimited(body) => {
-                        plan.delete(body.colon.to_range(), SafetyClassification::Safe);
+                        edits.push(TextEdit::delete(body.colon));
 
                         for clause in &body.else_if_clauses {
-                            plan.delete(clause.span().to_range(), SafetyClassification::Safe);
+                            edits.push(TextEdit::delete(clause.span()));
                         }
 
                         if let Some(else_clause) = &body.else_clause {
-                            plan.delete(else_clause.span().to_range(), SafetyClassification::Safe);
+                            edits.push(TextEdit::delete(else_clause.span()));
                         }
 
-                        plan.delete(body.endif.span().to_range(), SafetyClassification::Safe);
-                        plan.delete(body.terminator.span().to_range(), SafetyClassification::Safe);
+                        edits.push(TextEdit::delete(body.endif.span()));
+                        edits.push(TextEdit::delete(body.terminator.span()));
                     }
                 }
             });
@@ -172,34 +172,31 @@ impl LintRule for ConstantConditionRule {
                 .with_note("The body of this `if` is dead code as the condition is never met.")
                 .with_help("Remove the `if` statement. The `else` or `elseif` branches may need to be promoted.");
 
-            ctx.collector.propose(issue, |plan| match &r#if.body {
+            ctx.collector.propose(issue, |edits| match &r#if.body {
                 IfBody::Statement(body) => {
                     if let Some(else_if_clause) = body.else_if_clauses.first() {
                         let span = r#if.r#if.span.join(else_if_clause.elseif.span());
 
-                        plan.delete(span.start.offset..(span.end.offset - 2), SafetyClassification::Safe);
+                        edits.push(TextEdit::delete(span.start_offset()..(span.end_offset() - 2)));
                     } else if let Some(else_clause) = &body.else_clause {
                         let span = r#if.r#if.span.join(else_clause.r#else.span());
 
-                        plan.delete(span.to_range(), SafetyClassification::Safe);
+                        edits.push(TextEdit::delete(span));
                     } else {
-                        plan.delete(r#if.span().to_range(), SafetyClassification::Safe);
+                        edits.push(TextEdit::delete(r#if.span()));
                     }
                 }
                 IfBody::ColonDelimited(body) => {
                     if let Some(else_if_clause) = body.else_if_clauses.first() {
                         let span = r#if.r#if.span.join(else_if_clause.elseif.span());
 
-                        plan.delete(span.start.offset..(span.end.offset - 2), SafetyClassification::Safe);
+                        edits.push(TextEdit::delete(span.start_offset()..(span.end_offset() - 2)));
                     } else if let Some(else_clause) = &body.else_clause {
-                        plan.delete(
-                            r#if.r#if.span.join(else_clause.colon.span()).to_range(),
-                            SafetyClassification::Safe,
-                        );
-                        plan.delete(body.endif.span().to_range(), SafetyClassification::Safe);
-                        plan.delete(body.terminator.span().to_range(), SafetyClassification::Safe);
+                        edits.push(TextEdit::delete(r#if.r#if.span.join(else_clause.colon.span())));
+                        edits.push(TextEdit::delete(body.endif.span()));
+                        edits.push(TextEdit::delete(body.terminator.span()));
                     } else {
-                        plan.delete(r#if.span().to_range(), SafetyClassification::Safe);
+                        edits.push(TextEdit::delete(r#if.span()));
                     }
                 }
             });

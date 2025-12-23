@@ -399,6 +399,9 @@ macro_rules! T {
     ("__NAMESPACE__") => {
         $crate::token::TokenKind::NamespaceConstant
     };
+    ("__PROPERTY__") => {
+        $crate::token::TokenKind::PropertyConstant
+    };
     ("new") => {
         $crate::token::TokenKind::New
     };

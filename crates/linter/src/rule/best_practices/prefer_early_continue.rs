@@ -3,7 +3,6 @@ use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_fixer::SafetyClassification;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_reporting::Level;
@@ -19,6 +18,7 @@ use mago_syntax::ast::NodeKind;
 use mago_syntax::ast::Statement;
 use mago_syntax::ast::UnaryPrefixOperator;
 use mago_syntax::ast::WhileBody;
+use mago_text_edit::TextEdit;
 
 use crate::category::Category;
 use crate::context::LintContext;
@@ -160,17 +160,16 @@ impl LintRule for PreferEarlyContinueRule {
             .with_help("Invert the condition and use `continue` to exit early, then place the main logic outside the if block.")
             .with_note("This pattern improves readability by reducing nesting levels.");
 
-        ctx.collector.propose(issue, |plan| {
+        ctx.collector.propose(issue, |edits| {
             let condition = &if_stmt.condition;
             match condition {
                 Expression::UnaryPrefix(unary) if matches!(unary.operator, UnaryPrefixOperator::Not(_)) => {
                     // Already negated, remove the negation
-                    plan.replace(
-                        condition.span().to_range(),
+                    edits.push(TextEdit::replace(
+                        condition.span(),
                         &ctx.source_file.contents.as_ref()
-                            [unary.operand.span().start.offset as usize..unary.operand.span().end.offset as usize],
-                        SafetyClassification::Safe,
-                    );
+                            [unary.operand.start_offset() as usize..unary.operand.end_offset() as usize],
+                    ));
                 }
                 Expression::Binary(binary) => {
                     // Negate binary operators directly when possible
@@ -189,17 +188,17 @@ impl LintRule for PreferEarlyContinueRule {
 
                     if let Some(op) = negated_op {
                         // Replace the operator with its negation
-                        plan.replace(binary.operator.span().to_range(), op, SafetyClassification::Safe);
+                        edits.push(TextEdit::replace(binary.operator.span(), op));
                     } else {
                         // Can't negate the operator directly, wrap in !(...)
-                        plan.insert(condition.span().start.offset, "!(", SafetyClassification::Safe);
-                        plan.insert(condition.span().end.offset, ")", SafetyClassification::Safe);
+                        edits.push(TextEdit::insert(condition.start_offset(), "!("));
+                        edits.push(TextEdit::insert(condition.end_offset(), ")"));
                     }
                 }
                 _ => {
                     // For other expressions, wrap in !(...)
-                    plan.insert(condition.span().start.offset, "!(", SafetyClassification::Safe);
-                    plan.insert(condition.span().end.offset, ")", SafetyClassification::Safe);
+                    edits.push(TextEdit::insert(condition.start_offset(), "!("));
+                    edits.push(TextEdit::insert(condition.end_offset(), ")"));
                 }
             }
 
@@ -207,35 +206,31 @@ impl LintRule for PreferEarlyContinueRule {
                 IfBody::Statement(body) => {
                     if let Statement::Block(block) = body.statement {
                         if block.statements.is_empty() {
-                            plan.replace(
-                                block.left_brace.join(block.right_brace).to_range(),
-                                "{ continue; }",
-                                SafetyClassification::Safe,
-                            );
+                            edits.push(TextEdit::replace(block.left_brace.join(block.right_brace), "{ continue; }"));
                         } else {
-                            let first_stmt_start = block.statements.nodes[0].span().start.offset;
-                            let range_to_replace = block.left_brace.start.offset..first_stmt_start;
-                            plan.replace(range_to_replace, "{ continue; }\n\n", SafetyClassification::Safe);
+                            let first_stmt_start = block.statements.nodes[0].start_offset();
+                            let range_to_replace = block.left_brace.start_offset()..first_stmt_start;
+                            edits.push(TextEdit::replace(range_to_replace, "{ continue; }\n\n"));
 
-                            let last_stmt_end = block.statements.nodes.last().unwrap().span().end.offset;
-                            let range_to_delete = last_stmt_end..block.right_brace.end.offset;
-                            plan.delete(range_to_delete, SafetyClassification::Safe);
+                            let last_stmt_end = block.statements.nodes.last().unwrap().end_offset();
+                            let range_to_delete = last_stmt_end..block.right_brace.end_offset();
+                            edits.push(TextEdit::delete(range_to_delete));
                         }
                     }
                 }
                 IfBody::ColonDelimited(body) => {
                     if body.statements.is_empty() {
-                        let range = body.colon.start.offset..body.terminator.span().end.offset;
-                        plan.replace(range, "{ continue; }", SafetyClassification::Safe);
+                        let range = body.colon.start_offset()..body.terminator.end_offset();
+                        edits.push(TextEdit::replace(range, "{ continue; }"));
                     } else {
-                        let first_stmt_start = body.statements.nodes[0].span().start.offset;
-                        let range_to_replace = body.colon.start.offset..first_stmt_start;
-                        plan.replace(range_to_replace, "{ continue; }\n\n", SafetyClassification::Safe);
+                        let first_stmt_start = body.statements.nodes[0].start_offset();
+                        let range_to_replace = body.colon.start_offset()..first_stmt_start;
+                        edits.push(TextEdit::replace(range_to_replace, "{ continue; }\n\n"));
 
-                        let last_stmt_end = body.statements.nodes.last().unwrap().span().end.offset;
-                        let endif_end = body.terminator.span().end.offset;
+                        let last_stmt_end = body.statements.nodes.last().unwrap().end_offset();
+                        let endif_end = body.terminator.end_offset();
                         let range_to_delete = last_stmt_end..endif_end;
-                        plan.delete(range_to_delete, SafetyClassification::Safe);
+                        edits.push(TextEdit::delete(range_to_delete));
                     }
                 }
             }

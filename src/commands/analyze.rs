@@ -53,6 +53,7 @@ use mago_prelude::Prelude;
 
 use crate::commands::args::baseline_reporting::BaselineReportingArgs;
 use crate::config::Configuration;
+use crate::consts::ISSUE_URL;
 use crate::consts::PRELUDE_BYTES;
 use crate::error::Error;
 use crate::utils::create_orchestrator;
@@ -104,7 +105,7 @@ pub struct AnalyzeCommand {
     #[arg(long, default_value_t = false)]
     pub no_stubs: bool,
 
-    /// Enable watch mode for continuous analysis.
+    /// Enable watch mode for continuous analysis (experimental).
     ///
     /// When enabled, the analyzer watches the workspace for file changes and
     /// automatically re-runs analysis whenever PHP files are modified,
@@ -244,6 +245,9 @@ impl AnalyzeCommand {
         metadata: CodebaseMetadata,
         symbol_references: SymbolReferences,
     ) -> Result<ExitCode, Error> {
+        tracing::warn!("Watch mode is an experimental feature and may be unstable.");
+        tracing::warn!("If you encounter issues, please report them at {}", ISSUE_URL);
+
         tracing::info!("Starting watch mode. Press Ctrl+C to stop.");
 
         let database = orchestrator.load_database(&configuration.source.workspace, true, Some(prelude_database))?;

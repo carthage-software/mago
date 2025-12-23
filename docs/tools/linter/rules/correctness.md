@@ -12,6 +12,8 @@ This document details the rules available in the `Correctness` category.
 | Assert Description | [`assert-description`](#assert-description) |
 | Constant Type | [`constant-type`](#constant-type) |
 | Identity Comparison | [`identity-comparison`](#identity-comparison) |
+| Ineffective Format Ignore Next | [`ineffective-format-ignore-next`](#ineffective-format-ignore-next) |
+| Ineffective Format Ignore Region | [`ineffective-format-ignore-region`](#ineffective-format-ignore-region) |
 | Invalid Open Tag | [`invalid-open-tag`](#invalid-open-tag) |
 | No Assign In Argument | [`no-assign-in-argument`](#no-assign-in-argument) |
 | No Assign In Condition | [`no-assign-in-condition`](#no-assign-in-condition) |
@@ -156,6 +158,106 @@ if ($a === $b) {
 if ($a == $b) {
     echo '$a is same as $b';
 }
+```
+
+
+## <a id="ineffective-format-ignore-next"></a>`ineffective-format-ignore-next`
+
+Detects `@mago-format-ignore-next` markers that will have no effect.
+
+The formatter's ignore-next marker works at the statement level. When a
+marker is placed inside an expression (like function call arguments,
+array elements, or other non-statement contexts), it will not affect
+the formatter's output.
+
+To effectively ignore the next statement, place the marker immediately
+before a complete statement at the top level of a block or file.
+
+
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `true` |
+| `level` | `string` | `"warning"` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+
+// This works - marker is before a statement
+// @mago-format-ignore-next
+const GRID = [
+  [1, 2, 3], [1, 2, ], [0,    0],
+];
+
+foo();
+```
+
+#### Incorrect code
+
+```php
+<?php
+
+// This doesn't work - marker is inside an array literal
+$arr = [ // @mago-format-ignore-next
+    1,
+    2,
+];
+```
+
+
+## <a id="ineffective-format-ignore-region"></a>`ineffective-format-ignore-region`
+
+Detects `@mago-format-ignore-start` markers that will have no effect.
+
+The formatter's ignore regions work at the statement level. When an
+ignore marker is placed inside an expression (like function call arguments,
+array elements, or other non-statement contexts), it will not affect
+the formatter's output.
+
+To effectively ignore a region, place the ignore markers between complete
+statements at the top level of a block or file.
+
+
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `true` |
+| `level` | `string` | `"warning"` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+
+// This works - markers are between statements
+// @mago-format-ignore-start
+$x = 1;  $y = 2;  // preserved as-is
+// @mago-format-ignore-end
+
+foo();
+```
+
+#### Incorrect code
+
+```php
+<?php
+
+// This doesn't work - markers are inside a function call
+foo( // @mago-format-ignore-start
+    $x,
+    $y
+// @mago-format-ignore-end
+);
 ```
 
 

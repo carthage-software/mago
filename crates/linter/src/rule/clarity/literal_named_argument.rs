@@ -21,6 +21,7 @@ use crate::requirements::RuleRequirements;
 use crate::rule::Config;
 use crate::rule::LintRule;
 use crate::rule::utils::call::function_call_matches_any;
+use crate::rule::utils::consts::NO_NAMED_ARGUMENTS_FUNCTIONS;
 use crate::rule::utils::consts::VARIADIC_FUNCTIONS;
 use crate::rule_meta::RuleMeta;
 use crate::settings::RuleSettings;
@@ -100,7 +101,10 @@ impl LintRule for LiteralNamedArgumentRule {
             return;
         };
 
-        if function_call_matches_any(ctx, function_call, &VARIADIC_FUNCTIONS).is_some() {
+        // Skip variadic functions and functions marked with @no-named-arguments
+        if function_call_matches_any(ctx, function_call, &VARIADIC_FUNCTIONS).is_some()
+            || function_call_matches_any(ctx, function_call, &NO_NAMED_ARGUMENTS_FUNCTIONS).is_some()
+        {
             return;
         }
 

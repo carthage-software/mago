@@ -5,7 +5,9 @@
 //! the generic traits [`HasPosition`] and [`HasSpan`] to abstract over any syntax
 //! tree node or token that has a location.
 
+use std::ops::Bound;
 use std::ops::Range;
+use std::ops::RangeBounds;
 
 use serde::Deserialize;
 use serde::Serialize;
@@ -235,6 +237,16 @@ impl HasPosition for Position {
 impl HasSpan for Span {
     fn span(&self) -> Span {
         *self
+    }
+}
+
+impl RangeBounds<u32> for Span {
+    fn start_bound(&self) -> Bound<&u32> {
+        Bound::Included(&self.start.offset)
+    }
+
+    fn end_bound(&self) -> Bound<&u32> {
+        Bound::Excluded(&self.end.offset)
     }
 }
 

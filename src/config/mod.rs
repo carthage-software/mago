@@ -386,6 +386,25 @@ impl Configuration {
 }
 
 impl Configuration {
+    /// Returns a filtered version of the configuration suitable for display.
+    ///
+    /// This method excludes linter rules that don't match the configured integrations,
+    /// so that only applicable rules are shown in the output.
+    #[must_use]
+    pub fn to_filtered_value(&self) -> serde_json::Value {
+        serde_json::json!({
+            "threads": self.threads,
+            "stack-size": self.stack_size,
+            "php-version": self.php_version,
+            "allow-unsupported-php-version": self.allow_unsupported_php_version,
+            "source": self.source,
+            "linter": self.linter.to_filtered_value(self.php_version),
+            "formatter": self.formatter,
+            "analyzer": self.analyzer,
+            "guard": self.guard,
+        })
+    }
+
     /// Normalizes and validates configuration values.
     ///
     /// This method ensures that all configuration values are within acceptable ranges

@@ -19,6 +19,61 @@ pub mod clause;
 pub type SatisfyingAssignments = IndexMap<Atom, AssertionSet>;
 pub type ActiveTruths = IndexMap<Atom, HashSet<usize>>;
 
+/// Default maximum clauses during CNF saturation.
+pub const DEFAULT_SATURATION_COMPLEXITY: u16 = 8_192;
+
+/// Default maximum clauses per side in disjunction operations.
+pub const DEFAULT_DISJUNCTION_COMPLEXITY: u16 = 4_096;
+
+/// Default maximum cumulative complexity during negation.
+pub const DEFAULT_NEGATION_COMPLEXITY: u16 = 4_096;
+
+/// Default upper limit for consensus optimization.
+pub const DEFAULT_CONSENSUS_LIMIT: u16 = 256;
+
+/// Configuration thresholds for CNF formula operations.
+///
+/// These thresholds control how deeply the analyzer will explore complex logical formulas.
+/// Higher values allow more precise analysis but may significantly increase analysis time.
+/// Lower values improve speed but may reduce precision on complex conditional code.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AlgebraThresholds {
+    /// Maximum number of clauses to process during saturation (default: 8192).
+    ///
+    /// Controls how many clauses the simplification algorithm will work with.
+    /// If exceeded, saturation returns an empty result to avoid performance issues.
+    pub saturation_complexity: u16,
+
+    /// Maximum number of clauses per side in disjunction operations (default: 4096).
+    ///
+    /// Controls the complexity limit for OR operations between clause sets.
+    /// If either side exceeds this, the disjunction returns an empty result.
+    pub disjunction_complexity: u16,
+
+    /// Maximum cumulative complexity during negation (default: 4096).
+    ///
+    /// Controls how complex the negation of a formula can become.
+    /// If exceeded, negation returns None to avoid exponential blowup.
+    pub negation_complexity: u16,
+
+    /// Upper limit for consensus optimization (default: 256).
+    ///
+    /// Controls when the consensus rule is applied during saturation.
+    /// Only applies when clause count is between 3 and this limit.
+    pub consensus_limit: u16,
+}
+
+impl Default for AlgebraThresholds {
+    fn default() -> Self {
+        Self {
+            saturation_complexity: DEFAULT_SATURATION_COMPLEXITY,
+            disjunction_complexity: DEFAULT_DISJUNCTION_COMPLEXITY,
+            negation_complexity: DEFAULT_NEGATION_COMPLEXITY,
+            consensus_limit: DEFAULT_CONSENSUS_LIMIT,
+        }
+    }
+}
+
 /// Reduces a set of CNF clauses by exhaustively applying logical simplification rules.
 ///
 /// This function takes a set of clauses and "saturates" it by applying inference and
@@ -47,12 +102,17 @@ pub type ActiveTruths = IndexMap<Atom, HashSet<usize>>;
 ///
 /// A new `Vec<Clause>` containing the simplified, owned clauses.
 #[inline]
-pub fn saturate_clauses<'a>(clauses: impl IntoIterator<Item = &'a Clause>) -> Vec<Clause> {
-    const COMPLEXITY_THRESHOLD: usize = 8192;
-
-    fn saturate_clauses_inner(unique_clauses: Vec<&Clause>) -> Vec<Clause> {
+pub fn saturate_clauses<'a>(
+    clauses: impl IntoIterator<Item = &'a Clause>,
+    thresholds: &AlgebraThresholds,
+) -> Vec<Clause> {
+    fn saturate_clauses_inner(
+        unique_clauses: Vec<&Clause>,
+        saturation_complexity: usize,
+        consensus_limit: usize,
+    ) -> Vec<Clause> {
         let unique_clauses_len = unique_clauses.len();
-        if unique_clauses_len == 0 || unique_clauses_len > COMPLEXITY_THRESHOLD {
+        if unique_clauses_len == 0 || unique_clauses_len > saturation_complexity {
             // If the complexity is too high, or there are no clauses, return an empty set.
             return vec![];
         }
@@ -199,7 +259,7 @@ pub fn saturate_clauses<'a>(clauses: impl IntoIterator<Item = &'a Clause>) -> Ve
         // Consensus rule: remove redundant consensus clauses.
         // (A | X) & (!A | Y) implies (X | Y). If (X | Y) already exists, it is redundant.
         let simplified_clauses_len = simplified_clauses.len();
-        if simplified_clauses_len > 2 && simplified_clauses_len < 256 {
+        if simplified_clauses_len > 2 && simplified_clauses_len < consensus_limit {
             let mut compared_clauses = HashSet::default();
             let mut removed_clauses_by_consensus = HashSet::default();
 
@@ -269,7 +329,7 @@ pub fn saturate_clauses<'a>(clauses: impl IntoIterator<Item = &'a Clause>) -> Ve
 
     let unique_clauses = clauses.into_iter().unique().collect::<Vec<_>>();
 
-    saturate_clauses_inner(unique_clauses)
+    saturate_clauses_inner(unique_clauses, thresholds.saturation_complexity.into(), thresholds.consensus_limit.into())
 }
 
 /// Extracts simple assertions from a set of clauses and identifies which are "active".
@@ -386,9 +446,8 @@ pub fn disjoin_clauses(
     left_clauses: Vec<Clause>,
     right_clauses: Vec<Clause>,
     conditional_object_id: Span,
+    thresholds: &AlgebraThresholds,
 ) -> Vec<Clause> {
-    const COMPLEXITY_THRESHOLD: usize = 4096;
-
     let left_clauses_len = left_clauses.len();
     let right_clauses_len = right_clauses.len();
 
@@ -402,7 +461,9 @@ pub fn disjoin_clauses(
         return left_clauses;
     }
 
-    if left_clauses_len > COMPLEXITY_THRESHOLD || right_clauses_len > COMPLEXITY_THRESHOLD {
+    if left_clauses_len > usize::from(thresholds.disjunction_complexity)
+        || right_clauses_len > usize::from(thresholds.disjunction_complexity)
+    {
         // If either side is too complex, bail out early.
         return vec![];
     }
@@ -506,27 +567,25 @@ pub fn disjoin_clauses(
 /// or `None` if the negation is not possible due to complexity or other constraints.
 #[inline]
 #[must_use]
-pub fn negate_formula(mut clauses: Vec<Clause>) -> Option<Vec<Clause>> {
+pub fn negate_formula(mut clauses: Vec<Clause>, thresholds: &AlgebraThresholds) -> Option<Vec<Clause>> {
     clauses.retain(|clause| clause.reconcilable);
 
     if clauses.is_empty() {
         return Some(vec![]);
     }
 
-    let impossible_clauses = group_impossibilities(clauses)?;
+    let impossible_clauses = group_impossibilities(clauses, thresholds.negation_complexity.into())?;
     if impossible_clauses.is_empty() {
         return Some(vec![]);
     }
 
-    let negated = saturate_clauses(impossible_clauses.iter().as_slice());
+    let negated = saturate_clauses(impossible_clauses.iter().as_slice(), thresholds);
 
     Some(negated)
 }
 
 #[inline]
-fn group_impossibilities(mut clauses: Vec<Clause>) -> Option<Vec<Clause>> {
-    const MAX_COMPLEXITY: usize = 4096;
-
+fn group_impossibilities(mut clauses: Vec<Clause>, max_complexity: usize) -> Option<Vec<Clause>> {
     let mut seed_clauses = Vec::new();
     let mut complexity = 1usize;
 
@@ -565,7 +624,7 @@ fn group_impossibilities(mut clauses: Vec<Clause>) -> Option<Vec<Clause>> {
 
         complexity_upper_bound = complexity_upper_bound.saturating_mul(possibilities_count);
 
-        if complexity_upper_bound > MAX_COMPLEXITY {
+        if complexity_upper_bound > max_complexity {
             // If the complexity is too high, bail out early
             return None;
         }
@@ -579,7 +638,7 @@ fn group_impossibilities(mut clauses: Vec<Clause>) -> Option<Vec<Clause>> {
             for (var, impossible_types) in &clause_impossibilities {
                 'next: for impossible_type in impossible_types {
                     complexity += 1;
-                    if complexity > MAX_COMPLEXITY {
+                    if complexity > max_complexity {
                         // Early bailout
                         return None;
                     }

@@ -46,8 +46,8 @@ These flags control specific, powerful analysis capabilities.
 
 | Option                                | Default | Description                                                                                          |
 | :------------------------------------ | :------ | :--------------------------------------------------------------------------------------------------- |
-| `find-unused-expressions`             | `false` | Find and report expressions whose results are not used (e.g., `$a + $b;`).                           |
-| `find-unused-definitions`             | `false` | Find and report unused definitions (e.g., private methods that are never called).                    |
+| `find-unused-expressions`             | `true`  | Find and report expressions whose results are not used (e.g., `$a + $b;`).                           |
+| `find-unused-definitions`             | `true`  | Find and report unused definitions (e.g., private methods that are never called).                    |
 | `analyze-dead-code`                   | `false` | Analyze code that appears to be unreachable.                                                         |
 | `memoize-properties`                  | `true`  | Track the literal values of class properties. Improves type inference but may increase memory usage. |
 | `allow-possibly-undefined-array-keys` | `true`  | Allow accessing array keys that may not be defined without reporting an issue.                       |
@@ -62,6 +62,7 @@ These flags control specific, powerful analysis capabilities.
 | `register-super-globals`              | `true`  | Automatically register PHP superglobals (e.g., `$_GET`, `$_POST`) for analysis.                      |
 | `trust-existence-checks`              | `true`  | When `true`, narrows types based on `method_exists()`, `property_exists()`, `function_exists()`, and `defined()` checks. |
 | `check-property-initialization`       | `false` | When `true`, checks that typed properties are initialized in constructors or class initializers.      |
+| `check-use-statements`                | `false` | When `true`, reports use statements that import non-existent classes, functions, or constants.        |
 
 ## Property initialization
 
@@ -162,6 +163,70 @@ In this example:
 Use `unchecked-exceptions` when you want to ignore an entire category of exceptions, such as logic errors that indicate programming mistakes rather than runtime issues.
 
 Use `unchecked-exception-classes` when you want to ignore a specific exception but still want to track its parent or sibling exceptions.
+:::
+
+## Plugins
+
+Plugins extend the analyzer with specialized type information for libraries and frameworks. They provide accurate type inference for functions that would otherwise return generic types.
+
+| Option                   | Type       | Default | Description                                                              |
+| :----------------------- | :--------- | :------ | :----------------------------------------------------------------------- |
+| `disable-default-plugins`| `bool`     | `false` | Disable all default plugins. Only explicitly listed plugins will be used.|
+| `plugins`                | `string[]` | `[]`    | List of plugins to enable (by name or alias).                            |
+
+### Available plugins
+
+| Plugin ID   | Aliases                                    | Default | Description                                                    |
+| :---------- | :----------------------------------------- | :------ | :------------------------------------------------------------- |
+| `stdlib`    | `standard`, `std`, `php-stdlib`            | Enabled | Type providers for PHP built-in functions (`strlen`, `array_*`, `json_*`, etc.) |
+| `psl`       | `php-standard-library`, `azjezz-psl`       | Disabled| Type providers for [azjezz/psl](https://github.com/azjezz/psl) package |
+| `flow-php`  | `flow`, `flow-etl`                         | Disabled| Type providers for [flow-php/etl](https://github.com/flow-php/etl) package |
+
+### How plugins work
+
+Plugins provide "type providers" that give the analyzer precise type information for library functions. For example, the `stdlib` plugin knows that:
+
+- `array_filter($array)` returns the same array type but potentially with fewer elements
+- `json_decode($json, true)` returns `array<string, mixed>` when the second argument is `true`
+- `strlen($string)` returns `int<0, max>`
+
+Without plugins, these functions would return less precise types like `mixed` or `array`.
+
+### Example configurations
+
+#### Using default plugins only
+
+By default, the `stdlib` plugin is enabled:
+
+```toml
+[analyzer]
+# No configuration needed - stdlib is enabled by default
+```
+
+#### Enabling additional plugins
+
+```toml
+[analyzer]
+plugins = ["psl", "flow-php"]
+```
+
+#### Disabling all plugins
+
+```toml
+[analyzer]
+disable-default-plugins = true
+```
+
+#### Using only specific plugins
+
+```toml
+[analyzer]
+disable-default-plugins = true
+plugins = ["psl"]  # Only enable PSL, not stdlib
+```
+
+:::tip Plugin aliases
+You can use any of the plugin aliases for convenience. For example, `plugins = ["std"]` is equivalent to `plugins = ["stdlib"]`.
 :::
 
 ## Strict mode
@@ -272,4 +337,65 @@ check-throws = false
 
 :::tip Gradual adoption
 When introducing Mago to an existing codebase, start with lenient settings and a [baseline](/fundamentals/baseline). Gradually enable stricter options as you improve the codebase.
+:::
+
+## Performance tuning
+
+The analyzer uses internal thresholds to balance analysis depth against performance. These thresholds control how deeply the type inference engine explores complex logical formulas. All settings go under `[analyzer.performance]` in your `mago.toml` file.
+
+| Option                                | Type  | Default | Description                                                              |
+| :------------------------------------ | :---- | :------ | :----------------------------------------------------------------------- |
+| `saturation-complexity-threshold`     | `u16` | `8192`  | Maximum clauses during CNF saturation.                                   |
+| `disjunction-complexity-threshold`    | `u16` | `4096`  | Maximum clauses per side in OR operations.                               |
+| `negation-complexity-threshold`       | `u16` | `4096`  | Maximum cumulative complexity when negating formulas.                    |
+| `consensus-limit-threshold`           | `u16` | `256`   | Upper limit for consensus optimization passes.                           |
+| `formula-size-threshold`              | `u16` | `512`   | Maximum logical formula size before simplification is skipped.           |
+
+### When to adjust thresholds
+
+Most projects work well with the default values. Consider adjusting these thresholds if:
+
+- **Analysis is too slow**: Reduce thresholds to improve speed at the cost of some type inference precision
+- **Type inference is imprecise**: Increase thresholds for deeper analysis on complex conditional code
+
+### Understanding the thresholds
+
+The analyzer converts type constraints into CNF (Conjunctive Normal Form) logical formulas. These formulas can grow exponentially with complex conditional logic. The thresholds prevent runaway computation.
+
+- **Saturation complexity**: Controls how many clauses the formula simplifier will process during saturation. When exceeded, simplification stops early.
+- **Disjunction complexity**: Limits clause explosion when combining OR conditions. Complex union types or many conditional branches may hit this limit.
+- **Negation complexity**: Limits expansion when negating formulas (e.g., for `else` branches). Deeply nested conditions may hit this limit.
+- **Consensus limit**: Controls an optimization pass that detects logical tautologies. Higher values may find more simplifications.
+- **Formula size**: Overall limit on formula complexity before the analyzer falls back to simpler inference.
+
+### Example configurations
+
+#### Fast analysis (reduced precision)
+
+For large codebases where speed is more important than deep type inference:
+
+```toml
+[analyzer.performance]
+saturation-complexity-threshold = 2048
+disjunction-complexity-threshold = 1024
+negation-complexity-threshold = 1024
+consensus-limit-threshold = 64
+formula-size-threshold = 128
+```
+
+#### Deep analysis (slower, more precise)
+
+For smaller codebases or CI pipelines where thorough analysis is important:
+
+```toml
+[analyzer.performance]
+saturation-complexity-threshold = 16384
+disjunction-complexity-threshold = 8192
+negation-complexity-threshold = 8192
+consensus-limit-threshold = 512
+formula-size-threshold = 1024
+```
+
+:::warning Performance impact
+Increasing these thresholds can significantly impact analysis time on codebases with complex conditional logic. Test on your codebase before deploying to CI.
 :::

@@ -3008,7 +3008,7 @@ function rmdir(string $directory, $context = null): bool
 {
 }
 
-function umask(null|int $mask): int
+function umask(null|int $mask = null): int
 {
 }
 
@@ -4574,7 +4574,7 @@ function array_rand(array $array, int $num = 1): array|string|int
  * @param array<K, V> $array
  * @param int<0, 5> $flags
  *
- * @return array<K, V>
+ * @return ($array is non-empty-array|non-empty-list ? non-empty-array<K, V> : array<K, V>)
  *
  * @pure
  */
@@ -4711,7 +4711,9 @@ function array_filter(array $array, null|callable $callback = null, int $mode = 
  * @param array<K, V> $array
  * @param array<S> ...$arrays
  *
- * @return ($array is list<V> ? list<U> : array<K, U>)
+ * @return ($array is list<V>
+ *     ? ($array is non-empty-list<V> ? non-empty-list<U> : list<U>)
+ *     : ($array is non-empty-array<K, V> ? non-empty-array<K, U> : array<K, U>))
  */
 function array_map(null|callable $callback, array $array, array ...$arrays): array
 {
@@ -5237,7 +5239,11 @@ function reset(object|array &$array): mixed
  *
  * @param object|array<T> $array
  *
- * @return T|null
+ * @return (
+ *   $array is object ? mixed : (
+ *     $array is non-empty-array|non-empty-list ? T : T|false
+ *   )
+ * )
  *
  * @pure
  */
@@ -5515,7 +5521,7 @@ function header_register_callback(callable $callback): bool
  *  mime: string
  * }
  */
-function getimagesizefromstring(string $string, &$image_info): array|false
+function getimagesizefromstring(string $string, null|array &$image_info = null): array|false
 {
 }
 

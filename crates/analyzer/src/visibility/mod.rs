@@ -214,6 +214,7 @@ pub fn check_property_write_visibility<'ctx>(
     if !property_metadata.hooks.is_empty()
         && property_metadata.hooks.contains_key(&atom("get"))
         && !property_metadata.hooks.contains_key(&atom("set"))
+        && property_metadata.flags.is_virtual_property()
     {
         let class_name = &declaring_class_metadata.original_name;
 
@@ -292,10 +293,8 @@ fn is_visible_from_scope(
         Visibility::Protected => {
             if let Some(current_class_id) = current_class_opt {
                 current_class_id.eq_ignore_ascii_case(declaring_class_id)
-                    || context.codebase.class_extends(&current_class_id, declaring_class_id)
-                    || context.codebase.class_extends(declaring_class_id, &current_class_id)
-                    || context.codebase.class_uses_trait(&current_class_id, declaring_class_id)
-                    || context.codebase.class_uses_trait(declaring_class_id, &current_class_id)
+                    || context.codebase.is_instance_of(&current_class_id, declaring_class_id)
+                    || context.codebase.is_instance_of(declaring_class_id, &current_class_id)
             } else {
                 false
             }
@@ -321,10 +320,8 @@ fn can_initialize_readonly_property(
     current_function_opt.and_then(|func| func.method_metadata.as_ref()).is_some_and(|method| method.is_constructor)
         && current_class_opt.is_some_and(|current_class_id| {
             current_class_id.eq_ignore_ascii_case(declaring_class_id)
-                || context.codebase.class_extends(&current_class_id, declaring_class_id)
-                || context.codebase.class_extends(declaring_class_id, &current_class_id)
-                || context.codebase.class_uses_trait(&current_class_id, declaring_class_id)
-                || context.codebase.class_uses_trait(declaring_class_id, &current_class_id)
+                || context.codebase.is_instance_of(&current_class_id, declaring_class_id)
+                || context.codebase.is_instance_of(declaring_class_id, &current_class_id)
         })
 }
 

@@ -14,6 +14,16 @@ use mago_span::HasSpan;
 use crate::context::scope::case_scope::CaseScope;
 use crate::context::scope::loop_scope::LoopScope;
 
+/// Represents scope information extracted from a `Closure::bind()` or `Closure::bindTo()` call.
+/// This is used to pass the bound class scope to closure/arrow function analysis.
+#[derive(Debug, Clone)]
+pub struct ClosureBindScope {
+    /// The class name for the bound scope (from the newScope argument).
+    pub class_name: Option<Atom>,
+    /// Whether the closure has `$this` bound (newThis argument is non-null object).
+    pub has_this: bool,
+}
+
 #[derive(Debug, Clone)]
 pub struct AnalysisArtifacts {
     pub expression_types: HashMap<(u32, u32), Rc<TUnion>>,
@@ -29,6 +39,7 @@ pub struct AnalysisArtifacts {
     pub method_calls_this_methods: HashMap<(Atom, Atom), HashSet<Atom>>,
     pub method_calls_parent_constructor: HashMap<(Atom, Atom), bool>,
     pub method_calls_parent_initializer: HashMap<(Atom, Atom), Atom>,
+    pub closure_bind_scope: Option<ClosureBindScope>,
 }
 
 impl AnalysisArtifacts {
@@ -47,6 +58,7 @@ impl AnalysisArtifacts {
             method_calls_this_methods: HashMap::default(),
             method_calls_parent_constructor: HashMap::default(),
             method_calls_parent_initializer: HashMap::default(),
+            closure_bind_scope: None,
         }
     }
 

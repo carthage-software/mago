@@ -1,5 +1,6 @@
 <?php
 
+// @mago-expect analysis:missing-constructor
 class BasicHooks
 {
     public string $name {
@@ -44,6 +45,7 @@ class PropertyAccess
     }
 }
 
+// @mago-expect analysis:missing-constructor
 class ExplicitParameter
 {
     public int $count {
@@ -101,6 +103,7 @@ function test_computed_access(PropertyAccess $p): void
     $combined = $p->combined;
 }
 
+// @mago-expect analysis:missing-constructor
 class SetHookWrongType
 {
     public string $badSet {
@@ -160,6 +163,7 @@ class GetHookNullable
     }
 }
 
+// @mago-expect analysis:missing-constructor
 class SetHookParameterTypeValidation
 {
     public int $value {
@@ -193,6 +197,7 @@ function test_external_set_hook_assignment(SetHookParameterTypeValidation $obj):
     $obj->value = []; // ERROR: set hook doesn't accept array
 }
 
+// @mago-expect analysis:missing-constructor
 class SetHookNoExplicitParam
 {
     public int $count {
@@ -210,6 +215,7 @@ function test_no_explicit_param(SetHookNoExplicitParam $obj): void
     $obj->count = 'string';
 }
 
+// @mago-expect analysis:missing-constructor
 class User
 {
     private int $age {
@@ -225,6 +231,7 @@ class User
     }
 }
 
+// @mago-expect analysis:missing-constructor
 class TwoProperties
 {
     public int $a {
@@ -246,6 +253,7 @@ class TwoProperties
     }
 }
 
+// @mago-expect analysis:missing-constructor
 class ValidHookParamTypes
 {
     // OK: set hook param same as property type
@@ -284,6 +292,7 @@ class ValidHookParamTypes
     }
 }
 
+// @mago-expect analysis:missing-constructor
 class InvalidHookParamTypes
 {
     /**
@@ -323,6 +332,7 @@ class InvalidHookParamTypes
     }
 }
 
+// @mago-expect analysis:missing-constructor
 class HookDocblocks
 {
     // OK: @param on explicit parameter
@@ -344,6 +354,7 @@ class HookDocblocks
     }
 }
 
+// @mago-expect analysis:missing-constructor
 class DocblockValidation
 {
     // OK: docblock same as native

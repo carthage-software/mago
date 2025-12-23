@@ -25,6 +25,8 @@ use mago_syntax::ast::UseItem;
 use mago_syntax::ast::UseItems;
 use mago_syntax::ast::UseType;
 
+use mago_syntax::ast::Expression;
+
 use crate::document::Align;
 use crate::document::Document;
 use crate::document::Group;
@@ -33,6 +35,10 @@ use crate::document::Trim;
 use crate::internal::FormatterState;
 use crate::internal::comment::CommentFlags;
 use crate::internal::format::Format;
+use crate::internal::format::alignment::AlignmentWidths;
+use crate::internal::format::alignment::detect_statement_ref_alignment_runs;
+use crate::internal::format::alignment::get_statement_alignment;
+use crate::internal::format::assignment::AssignmentAlignment;
 
 pub fn print_statement_sequence<'arena>(
     f: &mut FormatterState<'_, 'arena>,
@@ -50,10 +56,75 @@ fn print_statement_slice<'ctx, 'arena>(
     let mut use_statements: std::vec::Vec<&'arena Use<'arena>> = std::vec::Vec::new();
     let mut parts = vec![in f.arena;];
 
+    // Detect alignment runs for consecutive assignment statements and global constants
+    let alignment_runs = detect_statement_ref_alignment_runs(f, stmts);
+
     let last_statement_index = if stmts.is_empty() { None } else { stmts.len().checked_sub(1) };
     let mut i = 0;
     while i < stmts.len() {
         let stmt = stmts[i];
+        let stmt_start = stmt.span().start.offset;
+
+        // Check if this statement falls within an ignore region
+        if let Some(region) = f.get_ignore_region_for(stmt_start).copied() {
+            // First, flush any pending use statements that came before the ignore region
+            if !use_statements.is_empty() {
+                parts.extend(print_use_statements(f, use_statements.as_slice()));
+                use_statements.clear();
+                parts.push(Document::Line(Line::hard()));
+            }
+
+            // Output the preserved source for this region
+            let preserved = f.get_source_slice(region.start, region.end);
+            parts.push(Document::String(preserved));
+
+            // Skip comments within the region
+            f.skip_comments_until(region.end);
+
+            // Skip all statements that fall within this region
+            while i < stmts.len() && stmts[i].span().end.offset <= region.end {
+                i += 1;
+            }
+
+            // Add newline if there are more statements
+            if i < stmts.len() {
+                parts.push(Document::Line(Line::hard()));
+                // Preserve blank line after ignore region if it existed in source
+                if f.is_next_line_empty_after_index(region.end) {
+                    parts.push(Document::Line(Line::hard()));
+                }
+            }
+            continue;
+        }
+
+        // Check if there's a format-ignore-next marker before this statement
+        if let Some(marker_start) = f.consume_ignore_next_before(stmt_start) {
+            // First, flush any pending use statements
+            if !use_statements.is_empty() {
+                parts.extend(print_use_statements(f, use_statements.as_slice()));
+                use_statements.clear();
+                parts.push(Document::Line(Line::hard()));
+            }
+
+            // Preserve the marker comment and statement as-is
+            let stmt_end = stmt.span().end.offset;
+            let preserved = f.get_source_slice(marker_start, stmt_end);
+            parts.push(Document::String(preserved));
+
+            // Skip comments within the preserved region
+            f.skip_comments_until(stmt_end);
+
+            i += 1;
+
+            // Add newline if there are more statements
+            if i < stmts.len() {
+                parts.push(Document::Line(Line::hard()));
+                if f.is_next_line_empty_after_index(stmt_end) {
+                    parts.push(Document::Line(Line::hard()));
+                }
+            }
+            continue;
+        }
 
         if let Statement::Use(use_stmt) = stmt {
             use_statements.push(use_stmt);
@@ -78,7 +149,14 @@ fn print_statement_slice<'ctx, 'arena>(
             }
         }
 
+        if let Some(widths) = get_statement_alignment(&alignment_runs, i) {
+            let alignment = calculate_statement_alignment(stmt, &widths);
+            f.set_alignment_context(Some(alignment));
+        }
+
         let mut formatted_statement = format_statement_with_spacing(f, i, stmt, stmts, last_statement_index, i == 0);
+
+        f.set_alignment_context(None);
 
         if let Statement::OpeningTag(tag) = stmt {
             let offset = tag.span().start.offset;
@@ -155,7 +233,19 @@ fn format_statement_with_spacing<'arena>(
         && i != index
     {
         statement_parts.push(Document::Line(Line::hard()));
-        if should_add_empty_line_after(f, stmt) || f.is_next_line_empty(stmt.span()) {
+
+        let should_add_empty_line = if should_add_empty_line_after(f, stmt) {
+            if !f.settings.empty_line_between_same_symbols && is_symbol(stmt) {
+                let next_stmt = stmts.get(i + 1);
+                next_stmt.is_none_or(|next| !is_same_symbol_type(stmt, next))
+            } else {
+                true
+            }
+        } else {
+            false
+        };
+
+        if should_add_empty_line || f.is_next_line_empty(stmt.span()) {
             statement_parts.push(Document::Line(Line::hard()));
         }
     }
@@ -205,6 +295,34 @@ fn should_add_empty_line_before<'arena>(f: &FormatterState<'_, 'arena>, stmt: &'
         Statement::Return(_) => f.settings.empty_line_before_return,
         _ => false,
     }
+}
+
+/// Check if a statement is a symbol (class, enum, interface, trait, function, const).
+#[inline]
+const fn is_symbol(stmt: &Statement<'_>) -> bool {
+    matches!(
+        stmt,
+        Statement::Constant(_)
+            | Statement::Function(_)
+            | Statement::Class(_)
+            | Statement::Interface(_)
+            | Statement::Trait(_)
+            | Statement::Enum(_)
+    )
+}
+
+/// Check if two statements are the same symbol type.
+#[inline]
+const fn is_same_symbol_type(a: &Statement<'_>, b: &Statement<'_>) -> bool {
+    matches!(
+        (a, b),
+        (Statement::Constant(_), Statement::Constant(_))
+            | (Statement::Function(_), Statement::Function(_))
+            | (Statement::Class(_), Statement::Class(_))
+            | (Statement::Interface(_), Statement::Interface(_))
+            | (Statement::Trait(_), Statement::Trait(_))
+            | (Statement::Enum(_), Statement::Enum(_))
+    )
 }
 
 fn should_add_new_line_or_space_after_stmt<'arena>(
@@ -662,4 +780,26 @@ pub fn sort_maybe_typed_use_items<'arena>(
     });
 
     items
+}
+
+fn calculate_statement_alignment(stmt: &Statement<'_>, widths: &AlignmentWidths) -> AssignmentAlignment {
+    let current_name_width = match stmt {
+        Statement::Expression(expr_stmt) => {
+            if let Expression::Assignment(assign) = &expr_stmt.expression {
+                if let Expression::Variable(var) = assign.lhs {
+                    (var.span().end.offset - var.span().start.offset) as usize
+                } else {
+                    0
+                }
+            } else {
+                0
+            }
+        }
+        Statement::Constant(constant) => constant.items.iter().map(|item| item.name.value.len()).max().unwrap_or(0),
+        _ => 0,
+    };
+
+    let name_padding = widths.name_width.saturating_sub(current_name_width);
+
+    AssignmentAlignment { type_padding: 0, name_padding }
 }

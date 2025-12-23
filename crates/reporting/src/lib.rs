@@ -11,11 +11,11 @@
 //! - [`baseline::Baseline`]: Manages baseline files to filter out known issues
 
 use std::cmp::Ordering;
-use std::collections::hash_map::Entry;
 use std::iter::Once;
 use std::str::FromStr;
 
 use ahash::HashMap;
+use ahash::HashMapExt;
 use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
@@ -23,8 +23,8 @@ use strum::Display;
 use strum::VariantNames;
 
 use mago_database::file::FileId;
-use mago_fixer::FixPlan;
 use mago_span::Span;
+use mago_text_edit::TextEdit;
 
 mod formatter;
 mod internal;
@@ -93,8 +93,11 @@ impl FromStr for Level {
     }
 }
 
+type IssueEdits = Vec<TextEdit>;
+type IssueEditBatches = Vec<(Option<String>, IssueEdits)>;
+
 /// Represents an issue identified in the code.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Issue {
     /// The severity level of the issue.
     pub level: Level,
@@ -110,12 +113,12 @@ pub struct Issue {
     pub link: Option<String>,
     /// Annotations associated with the issue, providing additional context or highlighting specific code spans.
     pub annotations: Vec<Annotation>,
-    /// Modification suggestions that can be applied to fix the issue.
-    pub suggestions: Vec<(FileId, FixPlan)>,
+    /// Text edits that can be applied to fix the issue, grouped by file.
+    pub edits: HashMap<FileId, IssueEdits>,
 }
 
 /// A collection of issues.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct IssueCollection {
     issues: Vec<Issue>,
 }
@@ -286,7 +289,7 @@ impl Issue {
             notes: Vec::new(),
             help: None,
             link: None,
-            suggestions: Vec::new(),
+            edits: HashMap::default(),
         }
     }
 
@@ -439,18 +442,28 @@ impl Issue {
         self
     }
 
-    /// Add a code modification suggestion to this issue.
+    /// Add a single edit to this issue.
     #[must_use]
-    pub fn with_suggestion(mut self, file_id: FileId, plan: FixPlan) -> Self {
-        self.suggestions.push((file_id, plan));
+    pub fn with_edit(mut self, file_id: FileId, edit: TextEdit) -> Self {
+        self.edits.entry(file_id).or_default().push(edit);
 
         self
     }
 
-    /// Take the code modification suggestion from this issue.
+    /// Add multiple edits to this issue.
     #[must_use]
-    pub fn take_suggestions(&mut self) -> Vec<(FileId, FixPlan)> {
-        self.suggestions.drain(..).collect()
+    pub fn with_file_edits(mut self, file_id: FileId, edits: IssueEdits) -> Self {
+        if !edits.is_empty() {
+            self.edits.entry(file_id).or_default().extend(edits);
+        }
+
+        self
+    }
+
+    /// Take the edits from this issue.
+    #[must_use]
+    pub fn take_edits(&mut self) -> HashMap<FileId, IssueEdits> {
+        std::mem::replace(&mut self.edits, HashMap::with_capacity(0))
     }
 }
 
@@ -533,13 +546,14 @@ impl IssueCollection {
         self.issues.retain(|issue| if let Some(code) = &issue.code { retain_codes.contains(code) } else { false });
     }
 
-    pub fn take_suggestions(&mut self) -> impl Iterator<Item = (FileId, FixPlan)> + '_ {
-        self.issues.iter_mut().flat_map(Issue::take_suggestions)
+    pub fn take_edits(&mut self) -> impl Iterator<Item = (FileId, IssueEdits)> + '_ {
+        self.issues.iter_mut().flat_map(|issue| issue.take_edits().into_iter())
     }
 
+    /// Filters the issues in the collection to only include those that have associated edits.
     #[must_use]
-    pub fn filter_fixable(self) -> Self {
-        Self { issues: self.issues.into_iter().filter(|issue| !issue.suggestions.is_empty()).collect() }
+    pub fn with_edits(self) -> Self {
+        Self { issues: self.issues.into_iter().filter(|issue| !issue.edits.is_empty()).collect() }
     }
 
     /// Sorts the issues in the collection.
@@ -586,23 +600,24 @@ impl IssueCollection {
         self.issues.iter()
     }
 
+    /// Converts the collection into a map of edit batches grouped by file.
+    ///
+    /// Each batch contains all edits from a single issue along with the rule code.
+    /// All edits from an issue must be applied together as a batch to maintain code validity.
+    ///
+    /// Returns `HashMap<FileId, Vec<(Option<String>, IssueEdits)>>` where each tuple
+    /// is (rule_code, edits_for_that_issue).
     #[must_use]
-    pub fn to_fix_plans(self) -> HashMap<FileId, FixPlan> {
-        let mut plans: HashMap<FileId, FixPlan> = HashMap::default();
-        for issue in self.issues.into_iter().filter(|issue| !issue.suggestions.is_empty()) {
-            for suggestion in issue.suggestions {
-                match plans.entry(suggestion.0) {
-                    Entry::Occupied(mut occupied_entry) => {
-                        occupied_entry.get_mut().merge(suggestion.1);
-                    }
-                    Entry::Vacant(vacant_entry) => {
-                        vacant_entry.insert(suggestion.1);
-                    }
-                }
+    pub fn to_edit_batches(self) -> HashMap<FileId, IssueEditBatches> {
+        let mut result: HashMap<FileId, Vec<(Option<String>, IssueEdits)>> = HashMap::default();
+        for issue in self.issues.into_iter().filter(|issue| !issue.edits.is_empty()) {
+            let code = issue.code;
+            for (file_id, edit_list) in issue.edits {
+                result.entry(file_id).or_default().push((code.clone(), edit_list));
             }
         }
 
-        plans
+        result
     }
 }
 

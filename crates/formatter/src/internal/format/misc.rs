@@ -121,6 +121,10 @@ pub(super) fn should_hug_expression<'arena>(
         }
 
         if binary.operator.is_concatenation() {
+            if matches!(binary.lhs, Expression::Call(_)) || matches!(binary.rhs, Expression::Call(_)) {
+                return false;
+            }
+
             return (is_left_hand_side_simple && should_hug_expression(f, binary.rhs, arrow_function_recursion))
                 || (is_right_hand_side_simple && should_hug_expression(f, binary.lhs, arrow_function_recursion));
         }
@@ -207,6 +211,16 @@ pub fn is_breaking_expression<'arena>(
             | Expression::AnonymousClass(_)
             | Expression::Match(_)
     )
+}
+
+fn contains_breaking_concatenation(node: &Expression<'_>) -> bool {
+    match node {
+        Expression::Binary(binary) if binary.operator.is_concatenation() => {
+            matches!(binary.lhs, Expression::Call(_)) || matches!(binary.rhs, Expression::Call(_))
+        }
+        Expression::Parenthesized(inner) => contains_breaking_concatenation(inner.expression),
+        _ => false,
+    }
 }
 
 pub fn is_expandable_expression<'arena>(node: &'arena Expression<'arena>, include_calls: bool) -> bool {
@@ -551,7 +565,10 @@ pub(super) fn adjust_clause<'arena>(
     };
 
     if has_trailing_segment {
-        if !is_block || f.is_followed_by_comment_on_next_line(node.span()) {
+        if !is_block
+            || f.is_followed_by_comment_on_next_line(node.span())
+            || f.has_same_line_trailing_comment(node.span())
+        {
             Document::Array(vec![in f.arena; clause, Document::Line(Line::hard())])
         } else {
             Document::Array(vec![in f.arena; clause, Document::space()])
@@ -570,7 +587,19 @@ pub(super) fn print_condition<'arena>(
     let was_in_condition = f.in_condition;
     f.in_condition = true;
 
+    let has_breaking_concat = match condition {
+        Expression::Call(call) => {
+            call.get_argument_list().arguments.iter().any(|arg| contains_breaking_concatenation(arg.value()))
+        }
+        Expression::Instantiation(inst) => inst
+            .argument_list
+            .as_ref()
+            .is_some_and(|args| args.arguments.iter().any(|arg| contains_breaking_concatenation(arg.value()))),
+        _ => false,
+    };
+
     let condition = if is_expandable_expression(condition, true)
+        && !has_breaking_concat
         && !f.has_comment(condition.span(), CommentFlags::Leading | CommentFlags::Trailing)
     {
         Document::Group(Group::new(vec![

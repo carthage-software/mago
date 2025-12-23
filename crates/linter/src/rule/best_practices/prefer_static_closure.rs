@@ -3,7 +3,6 @@ use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_fixer::SafetyClassification;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_reporting::Level;
@@ -13,6 +12,7 @@ use mago_syntax::ast::Expression;
 use mago_syntax::ast::Node;
 use mago_syntax::ast::NodeKind;
 use mago_syntax::ast::Variable;
+use mago_text_edit::TextEdit;
 
 use crate::category::Category;
 use crate::context::LintContext;
@@ -160,9 +160,9 @@ impl PreferStaticClosureRule {
                     kind
                 ));
 
-        ctx.collector.propose(issue, |plan| {
+        ctx.collector.propose(issue, |edits| {
             // Insert "static " before the function/fn keyword
-            plan.insert(keyword_span.start_position().offset, "static ", SafetyClassification::Safe);
+            edits.push(TextEdit::insert(keyword_span.start_offset(), "static "));
         });
     }
 }

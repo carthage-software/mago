@@ -3,7 +3,6 @@ use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_fixer::SafetyClassification;
 use mago_php_version::PHPVersion;
 use mago_php_version::PHPVersionRange;
 use mago_reporting::Annotation;
@@ -14,6 +13,8 @@ use mago_syntax::ast::Expression;
 use mago_syntax::ast::Node;
 use mago_syntax::ast::NodeKind;
 use mago_syntax::ast::Return;
+use mago_text_edit::Safety;
+use mago_text_edit::TextEdit;
 
 use crate::category::Category;
 use crate::context::LintContext;
@@ -134,17 +135,18 @@ impl LintRule for PreferArrowFunctionRule {
                 .with_note("Arrow functions automatically capture variables from the parent scope by-value, which differs from traditional closures that use an explicit `use` clause and can capture by-reference.")
                 .with_help("Consider rewriting this as an arrow function to improve readability.");
 
-        ctx.collector.propose(issue, |plan| {
-            let to_replace_with_fn = closure.function.span.to_range();
+        ctx.collector.propose(issue, |edits| {
+            let function_span = closure.function.span;
+            let to_replace_with_n = function_span.from_start(function_span.start.forward(1));
             let to_replace_with_arrow = match &closure.use_clause {
-                Some(use_clause) => use_clause.span().join(keyword.span).to_range(),
-                None => closure.body.left_brace.join(keyword.span).to_range(),
+                Some(use_clause) => use_clause.span().join(keyword.span),
+                None => closure.body.left_brace.join(keyword.span),
             };
-            let to_remove = terminator.span().join(closure.body.right_brace).to_range();
+            let to_remove = terminator.span().join(closure.body.right_brace);
 
-            plan.replace(to_replace_with_fn, "fn", SafetyClassification::PotentiallyUnsafe);
-            plan.replace(to_replace_with_arrow, "=>", SafetyClassification::PotentiallyUnsafe);
-            plan.delete(to_remove, SafetyClassification::PotentiallyUnsafe);
+            edits.push(TextEdit::replace(to_replace_with_n, "n").with_safety(Safety::PotentiallyUnsafe));
+            edits.push(TextEdit::replace(to_replace_with_arrow, "=>").with_safety(Safety::PotentiallyUnsafe));
+            edits.push(TextEdit::delete(to_remove).with_safety(Safety::PotentiallyUnsafe));
         });
     }
 }

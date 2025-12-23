@@ -38,7 +38,7 @@ final class Sponsor
         public readonly string $login,
         public readonly string $name,
         public readonly string $avatarUrl,
-        public readonly null|string $websiteUrl,
+        public readonly ?string $websiteUrl,
         public readonly int $monthlyPriceInDollars,
         public readonly bool $isCustomAmount,
         public readonly bool $isOneTime,

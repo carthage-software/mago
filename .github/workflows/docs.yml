@@ -49,21 +49,15 @@ jobs:
           cp crates/wasm/pkg-web/mago_wasm.js docs/public/wasm/
           cp crates/wasm/pkg-web/mago_wasm_bg.wasm docs/public/wasm/
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - uses: oven-sh/setup-bun@v2
         with:
-          node-version: 24
-
-      - name: Setup PNPM
-        uses: pnpm/action-setup@v4
-        with:
-          version: 9
+          bun-version: latest
 
       - name: Install dependencies
-        run: cd docs && pnpm install --frozen-lockfile
+        run: cd docs && bun install --frozen-lockfile
 
       - name: Build docs
-        run: cd docs && pnpm build
+        run: cd docs && bun run build
 
       - name: Upload GitHub Pages artifact
         uses: actions/upload-pages-artifact@v3

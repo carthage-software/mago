@@ -1,5 +1,6 @@
 use std::rc::Rc;
 
+use mago_atom::Atom;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::builder::get_type_from_string;
 use mago_codex::ttype::comparator::ComparisonResult;
@@ -39,10 +40,29 @@ pub fn populate_docblock_variables<'ctx>(
     artifacts: &mut AnalysisArtifacts,
     override_existing: bool,
 ) {
+    populate_docblock_variables_excluding(context, block_context, artifacts, override_existing, None);
+}
+
+/// Same as `populate_docblock_variables`, but allows excluding a specific variable.
+///
+/// This is useful for assignment statements where we want to populate all @var annotations
+/// except the one for the assignment target (which is handled by the assignment analyzer).
+pub fn populate_docblock_variables_excluding<'ctx>(
+    context: &mut Context<'ctx, '_>,
+    block_context: &mut BlockContext<'ctx>,
+    artifacts: &mut AnalysisArtifacts,
+    override_existing: bool,
+    exclude_variable: Option<Atom>,
+) {
     for (name, variable_type, variable_type_span) in get_docblock_variables(context, block_context, artifacts, true) {
         let Some(variable_name) = name else {
             continue;
         };
+
+        // Skip if this variable should be excluded (handled by assignment analyzer)
+        if exclude_variable.is_some_and(|excluded| variable_name.as_str() == excluded) {
+            continue;
+        }
 
         insert_variable_from_docblock(
             context,
@@ -55,10 +75,10 @@ pub fn populate_docblock_variables<'ctx>(
     }
 }
 
-/// Retrieves all `@var`, `@psalm-var`, and `@phpstan-var` tags from the docblock of the
+/// Retrieves all `@var`, `@psalm-var`, and `@phpstan-var` tags from the docblocks preceding the
 /// current statement in the context, parsing their variable types.
 ///
-/// This function scans the docblock associated with the current statement in the context,
+/// This function scans the docblocks associated with the current statement in the context,
 /// extracting all variable type declarations. It returns a vector of tuples, each containing:
 ///
 /// - An optional variable name (if specified in the tag)
@@ -84,11 +104,7 @@ pub fn get_docblock_variables<'ctx>(
     artifacts: &mut AnalysisArtifacts,
     allow_tracing: bool,
 ) -> Vec<(Option<mago_atom::Atom>, TUnion, Span)> {
-    let Some(elements) = context.get_parsed_docblock().map(|document| document.elements) else {
-        return vec![];
-    };
-
-    elements
+    context.get_parsed_docblocks()
         .into_iter()
         // Filter out non-tag elements
         .filter_map(|element| match element {

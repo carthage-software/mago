@@ -63,6 +63,7 @@ fn run_test_case_inner(config: TestCase) {
         source_file,
         &resolved_names,
         &metadata,
+        &PLUGIN_REGISTRY,
         Settings {
             find_unused_expressions: true,
             find_unused_definitions: true,
@@ -72,7 +73,6 @@ fn run_test_case_inner(config: TestCase) {
             check_property_initialization: true,
             ..Default::default()
         },
-        &PLUGIN_REGISTRY,
     );
 
     let analysis_run_result = analyzer.analyze(program, &mut analysis_result);

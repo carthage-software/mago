@@ -402,6 +402,15 @@ impl<'arena> Expression<'arena> {
     }
 
     #[inline]
+    pub const fn is_throw(&self) -> bool {
+        if let Expression::Parenthesized(expression) = self {
+            expression.expression.is_throw()
+        } else {
+            matches!(&self, Expression::Throw(_))
+        }
+    }
+
+    #[inline]
     #[must_use]
     pub const fn node_kind(&self) -> NodeKind {
         match &self {

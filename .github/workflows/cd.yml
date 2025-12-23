@@ -56,6 +56,65 @@ jobs:
       - name: Run tests
         run: cargo test --workspace --locked --all-targets
 
+  source_archive:
+    name: Create source code archives
+    runs-on: ubuntu-latest
+    needs: crate_metadata
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+
+      - name: Set version
+        id: version
+        run: echo "VERSION=${{ needs.crate_metadata.outputs.version }}" >> $GITHUB_OUTPUT
+
+      - name: Create source archives
+        id: source_package
+        run: |
+          VERSION="${{ steps.version.outputs.VERSION }}"
+
+          STAGING="${{ env.CICD_INTERMEDIATES_DIR }}/source"
+          mkdir -p "${STAGING}"
+          rsync -a --exclude='.git' --exclude="${{ env.CICD_INTERMEDIATES_DIR }}" . "${STAGING}/mago-${VERSION}/"
+          TAR_NAME="source-code.tar.gz"
+          tar -czf "${STAGING}/${TAR_NAME}" -C "${STAGING}" "mago-${VERSION}"
+          echo "TAR_NAME=${TAR_NAME}" >> $GITHUB_OUTPUT
+          echo "TAR_PATH=${STAGING}/${TAR_NAME}" >> $GITHUB_OUTPUT
+          ZIP_NAME="source-code.zip"
+          cd "${STAGING}"
+          zip -r "${ZIP_NAME}" "mago-${VERSION}"
+          cd -
+          echo "ZIP_NAME=${ZIP_NAME}" >> $GITHUB_OUTPUT
+          echo "ZIP_PATH=${STAGING}/${ZIP_NAME}" >> $GITHUB_OUTPUT
+
+      - name: "Artifact upload: source tar.gz"
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.source_package.outputs.TAR_NAME }}
+          path: ${{ steps.source_package.outputs.TAR_PATH }}
+
+      - name: "Artifact upload: source zip"
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.source_package.outputs.ZIP_NAME }}
+          path: ${{ steps.source_package.outputs.ZIP_PATH }}
+
+      - name: Check for release
+        id: is-release
+        run: |
+          unset IS_RELEASE ; if [[ $GITHUB_REF =~ ^refs/tags/[0-9].* ]]; then IS_RELEASE='true' ; fi
+          echo "IS_RELEASE=${IS_RELEASE}" >> $GITHUB_OUTPUT
+
+      - name: Publish source archives
+        uses: softprops/action-gh-release@v2
+        if: steps.is-release.outputs.IS_RELEASE
+        with:
+          files: |
+            ${{ steps.source_package.outputs.TAR_PATH }}
+            ${{ steps.source_package.outputs.ZIP_PATH }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   build:
     name: ${{ matrix.job.target }} (${{ matrix.job.os }})
     runs-on: ${{ matrix.job.os }}
@@ -67,19 +126,42 @@ jobs:
           # Each job in this matrix defines a build target. The following custom keys control the pipeline steps:
           # - `test: true`: Enables the test suite to be run for this build.
           # - `wasm: true`: Triggers an additional WebAssembly build and packaging for this release.
-          # - `debian-package: true`: Generates a Debian package for the release.
 
           # Tier 1 targets:
 
           ## Windows MSVC: x86_64
-          - { target: x86_64-pc-windows-msvc, os: windows-latest, test: true, pgo: true }
+          - {
+              target: x86_64-pc-windows-msvc,
+              os: windows-latest,
+              test: true,
+              pgo: true,
+            }
           ## macOS: aarch64, x86_64
-          - { target: aarch64-apple-darwin, os: macos-latest, test: true, pgo: true }
-          - { target: x86_64-apple-darwin, os: macos-latest, test: true, pgo: true }
+          - {
+              target: aarch64-apple-darwin,
+              os: macos-latest,
+              test: true,
+              pgo: true,
+            }
+          - {
+              target: x86_64-apple-darwin,
+              os: macos-latest,
+              test: true,
+              pgo: true,
+            }
           ## Linux: aarch64, x86_64
-          - { target: aarch64-unknown-linux-gnu, os: ubuntu-latest, test: true, debian-package: true }
-          - { target: aarch64-unknown-linux-musl, os: ubuntu-latest, test: true }
-          - { target: x86_64-unknown-linux-gnu, os: ubuntu-latest, test: true, wasm: true, debian-package: true }
+          - { target: aarch64-unknown-linux-gnu, os: ubuntu-latest, test: true }
+          - {
+              target: aarch64-unknown-linux-musl,
+              os: ubuntu-latest,
+              test: true,
+            }
+          - {
+              target: x86_64-unknown-linux-gnu,
+              os: ubuntu-latest,
+              test: true,
+              wasm: true,
+            }
           - { target: x86_64-unknown-linux-musl, os: ubuntu-latest, test: true }
 
           # Tier 2 targets:
@@ -182,7 +264,7 @@ jobs:
         if: matrix.job.pgo
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.3'
+          php-version: "8.3"
           tools: composer
 
       - name: setup PHP corpus for PGO profiling
@@ -199,8 +281,6 @@ jobs:
           if [[ "${{ matrix.job.pgo }}" == "true" ]]; then
             cargo pgo build -- --target=${{ matrix.job.target }}
             cargo pgo run -- -- --workspace corpus/ analyze --reporting-format count || true
-            cargo pgo run --keep-profiles -- -- --workspace corpus/ lint --reporting-format count || true
-            cargo pgo run --keep-profiles -- -- --workspace corpus/ fmt --check || true
             cargo pgo optimize -- build --target=${{ matrix.job.target }}
           else
             $BUILD_CMD build --locked --release --target=${{ matrix.job.target }}
@@ -298,56 +378,6 @@ jobs:
 
           echo "WASM_PKG_PATH=${WASM_STAGING}/${WASM_PKG_NAME}" >> $GITHUB_OUTPUT
 
-      - name: create Debian package
-        id: debian-package
-        shell: bash
-        if: matrix.job.debian-package && !startsWith(github.ref, 'refs/pull/')
-        run: |
-          VERSION="${{ steps.version.outputs.VERSION }}"
-          TARGET="${{ matrix.job.target }}"
-
-          # Derive arch from target:
-          case "$TARGET" in
-            *x86_64*) DPKG_ARCH="amd64" ;;
-            *aarch64*|*arm64*) DPKG_ARCH="arm64" ;;
-            *arm*hf*) DPKG_ARCH="armhf" ;;
-            *arm*) DPKG_ARCH="armel" ;;
-            *powerpc64*) DPKG_ARCH="ppc64el" ;;
-            *powerpc*) DPKG_ARCH="powerpc" ;;
-            *s390x*) DPKG_ARCH="s390x" ;;
-          esac
-
-          DPKG_NAME="mago-${VERSION}-${TARGET}.deb"
-
-          echo "DPKG_NAME=${DPKG_NAME}" >> $GITHUB_OUTPUT
-
-          DPKG_STAGING="${{ env.CICD_INTERMEDIATES_DIR }}/debian-package"
-          DPKG_DIR="${DPKG_STAGING}/dpkg"
-          mkdir -p "${DPKG_DIR}"
-
-          install -Dm755 "${{ steps.bin.outputs.BIN_PATH }}" "${DPKG_DIR}/usr/bin/${{ steps.bin.outputs.BIN_NAME }}"
-
-          install -Dm644 "README.md" "${DPKG_DIR}/usr/share/doc/mago/README.md" || true
-          install -Dm644 "LICENSE-MIT" "${DPKG_DIR}/usr/share/doc/mago/LICENSE-MIT" || true
-          install -Dm644 "LICENSE-APACHE" "${DPKG_DIR}/usr/share/doc/mago/LICENSE-APACHE" || true
-
-          mkdir -p "${DPKG_DIR}/DEBIAN"
-          cat > "${DPKG_DIR}/DEBIAN/control" <<EOF
-          Package: mago
-          Version: ${VERSION}
-          Section: devel
-          Priority: optional
-          Maintainer: ${{ needs.crate_metadata.outputs.maintainer }}
-          Homepage: ${{ needs.crate_metadata.outputs.homepage }}
-          Architecture: ${DPKG_ARCH}
-          Description: Mago is a toolchain for PHP that aims to provide a set of tools to help developers write better code.
-          EOF
-
-          DPKG_PATH="${DPKG_STAGING}/${DPKG_NAME}"
-          echo "DPKG_PATH=${DPKG_PATH}" >> $GITHUB_OUTPUT
-
-          fakeroot dpkg-deb --build "${DPKG_DIR}" "${DPKG_PATH}"
-
       - name: "Artifact upload: tarball"
         uses: actions/upload-artifact@v4
         with:
@@ -360,13 +390,6 @@ jobs:
         with:
           name: ${{ steps.wasm_package.outputs.WASM_PKG_NAME }}
           path: ${{ steps.wasm_package.outputs.WASM_PKG_PATH }}
-
-      - name: "Artifact upload: Debian package"
-        uses: actions/upload-artifact@v4
-        if: steps.debian-package.outputs.DPKG_NAME
-        with:
-          name: ${{ steps.debian-package.outputs.DPKG_NAME }}
-          path: ${{ steps.debian-package.outputs.DPKG_PATH }}
 
       - name: check for release
         id: is-release
@@ -381,7 +404,6 @@ jobs:
         with:
           files: |
             ${{ steps.package.outputs.PKG_PATH }}
-            ${{ steps.debian-package.outputs.DPKG_PATH }}
             ${{ steps.wasm_package.outputs.WASM_PKG_PATH }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

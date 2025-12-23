@@ -634,6 +634,8 @@ fn resolve_invocation_assertion<'ctx, 'arena>(
                             assertion_expression,
                             context.get_assertion_context_from_block(block_context),
                             artifacts,
+                            &context.settings.algebra_thresholds(),
+                            context.settings.formula_size_threshold,
                         ),
                         Assertion::IsNotType(TAtomic::Scalar(TScalar::Bool(TBool { value: Some(true) })))
                         | Assertion::IsType(TAtomic::Scalar(TScalar::Bool(TBool { value: Some(false) })))
@@ -643,6 +645,8 @@ fn resolve_invocation_assertion<'ctx, 'arena>(
                             assertion_expression,
                             context.get_assertion_context_from_block(block_context),
                             artifacts,
+                            &context.settings.algebra_thresholds(),
+                            context.settings.formula_size_threshold,
                         )
                         .map(|clauses| {
                             negate_or_synthesize(
@@ -650,6 +654,8 @@ fn resolve_invocation_assertion<'ctx, 'arena>(
                                 assertion_expression,
                                 context.get_assertion_context_from_block(block_context),
                                 artifacts,
+                                &context.settings.algebra_thresholds(),
+                                context.settings.formula_size_threshold,
                             )
                         }),
 
@@ -664,7 +670,10 @@ fn resolve_invocation_assertion<'ctx, 'arena>(
                         block_context.clauses.push(Rc::new(clause.clone()));
                     }
 
-                    let clauses = saturate_clauses(block_context.clauses.iter().map(Rc::as_ref));
+                    let clauses = saturate_clauses(
+                        block_context.clauses.iter().map(Rc::as_ref),
+                        &context.settings.algebra_thresholds(),
+                    );
 
                     let (truths, _) = find_satisfying_assignments(&clauses, None, &mut Default::default());
                     for (variable, assertions) in truths {

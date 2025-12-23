@@ -1,4 +1,6 @@
 FormatSettings {
+    null_type_hint: NullTypeHint::NullPipe,
+    always_break_named_arguments_list: true,
     space_around_assignment_in_declare: true,
     space_within_grouping_parenthesis: true,
     space_before_hook_parameter_list_parenthesis: true,
@@ -11,5 +13,6 @@ FormatSettings {
     space_after_increment_unary_prefix_operator: true,
     space_after_decrement_unary_prefix_operator: true,
     space_after_additive_unary_prefix_operator: true,
+    inline_empty_classlike_braces: false,
     ..Default::default()
 }

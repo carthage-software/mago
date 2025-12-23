@@ -1635,6 +1635,10 @@ class DirectoryIterator extends SplFileInfo implements SeekableIterator
     public function valid()
     {
     }
+
+    public function isDot(): bool
+    {
+    }
 }
 
 /**

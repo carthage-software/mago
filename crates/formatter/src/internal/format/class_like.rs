@@ -7,8 +7,12 @@ use bumpalo::vec;
 use mago_span::HasSpan;
 use mago_span::Span;
 use mago_syntax::ast::ClassLikeMember;
+use mago_syntax::ast::EnumCaseItem;
 use mago_syntax::ast::Method;
 use mago_syntax::ast::Modifier;
+use mago_syntax::ast::PlainProperty;
+use mago_syntax::ast::Property;
+use mago_syntax::ast::PropertyItem;
 use mago_syntax::ast::Sequence;
 
 use crate::document::Document;
@@ -18,6 +22,10 @@ use crate::document::Line;
 use crate::document::group::GroupIdentifier;
 use crate::internal::FormatterState;
 use crate::internal::format::Format;
+use crate::internal::format::alignment::AlignmentWidths;
+use crate::internal::format::alignment::detect_class_member_alignment_runs;
+use crate::internal::format::alignment::get_member_alignment;
+use crate::internal::format::assignment::AssignmentAlignment;
 use crate::internal::format::block::block_is_empty;
 use crate::settings::BraceStyle;
 
@@ -66,8 +74,68 @@ pub fn print_class_like_body<'arena>(
                 class_like_members.iter().collect_in::<Vec<_>>(f.arena)
             };
 
-            for (i, item) in members_to_format.iter().enumerate() {
-                let item = *item; // Dereference to get &ClassLikeMember
+            let alignment_runs = detect_class_member_alignment_runs(f, class_like_members.as_slice());
+
+            let mut i = 0;
+            let mut formatted_count = 0;
+            while i < length {
+                let item = members_to_format[i];
+                let member_start = item.span().start.offset;
+                let member_end = item.span().end.offset;
+
+                if let Some(region) = f.get_ignore_region_for(member_start).copied() {
+                    let preserved = f.get_source_slice(region.start, region.end);
+                    if formatted_count > 0 && !last_has_line_after {
+                        members.push(Document::Line(Line::hard()));
+                    }
+
+                    members.push(Document::String(preserved));
+
+                    f.skip_comments_until(region.end);
+
+                    while i < length && members_to_format[i].span().end.offset <= region.end {
+                        i += 1;
+                    }
+
+                    if i < length {
+                        members.push(Document::Line(Line::hard()));
+                        if f.is_next_line_empty_after_index(region.end) {
+                            members.push(Document::Line(Line::hard()));
+                        }
+                        last_has_line_after = true;
+                    }
+
+                    formatted_count += 1;
+                    last_member_kind = None;
+                    continue;
+                }
+
+                if let Some(marker_start) = f.consume_ignore_next_before(member_start) {
+                    let preserved = f.get_source_slice(marker_start, member_end);
+                    if formatted_count > 0 && !last_has_line_after {
+                        members.push(Document::Line(Line::hard()));
+                    }
+
+                    members.push(Document::String(preserved));
+
+                    f.skip_comments_until(member_end);
+                    i += 1;
+
+                    if i < length {
+                        members.push(Document::Line(Line::hard()));
+                        if f.is_next_line_empty_after_index(member_end) {
+                            members.push(Document::Line(Line::hard()));
+                            last_has_line_after = true;
+                        } else {
+                            last_has_line_after = false;
+                        }
+                    }
+
+                    formatted_count += 1;
+                    last_member_kind = None;
+                    continue;
+                }
+
                 let member_kind = match item {
                     ClassLikeMember::TraitUse(_) => ClassLikeMemberKind::TraitUse,
                     ClassLikeMember::Constant(_) => ClassLikeMemberKind::Constant,
@@ -76,11 +144,21 @@ pub fn print_class_like_body<'arena>(
                     ClassLikeMember::Method(_) => ClassLikeMemberKind::Method,
                 };
 
-                if i != 0 && !last_has_line_after && should_add_empty_line_before(f, member_kind, last_member_kind) {
+                if formatted_count != 0
+                    && !last_has_line_after
+                    && should_add_empty_line_before(f, member_kind, last_member_kind)
+                {
                     members.push(Document::Line(Line::hard()));
                 }
 
+                if let Some(widths) = get_member_alignment(&alignment_runs, i) {
+                    let alignment = calculate_member_alignment(item, &widths);
+                    f.set_alignment_context(Some(alignment));
+                }
+
                 members.push(item.format(f));
+
+                f.set_alignment_context(None);
 
                 if i < (length - 1) {
                     members.push(Document::Line(Line::hard()));
@@ -96,6 +174,8 @@ pub fn print_class_like_body<'arena>(
                 }
 
                 last_member_kind = Some(member_kind);
+                formatted_count += 1;
+                i += 1;
             }
 
             contents.push(Document::Indent(members));
@@ -294,4 +374,42 @@ fn get_visibility_order(modifiers: &Sequence<'_, Modifier<'_>>) -> u8 {
         // Default to public if no visibility specified
         0
     }
+}
+
+/// Calculate alignment padding for a class member based on the run's max widths.
+fn calculate_member_alignment(member: &ClassLikeMember<'_>, widths: &AlignmentWidths) -> AssignmentAlignment {
+    let (current_type_width, current_name_width) = match member {
+        ClassLikeMember::Property(Property::Plain(p)) => {
+            let type_width = get_plain_property_type_width(p);
+            let name_width = p
+                .items
+                .iter()
+                .filter_map(|item| {
+                    if matches!(item, PropertyItem::Concrete(_)) { Some(item.variable().name.len()) } else { None }
+                })
+                .max()
+                .unwrap_or(0);
+            (type_width, name_width)
+        }
+        ClassLikeMember::Constant(constant) => {
+            (0, constant.items.iter().map(|item| item.name.value.len()).max().unwrap_or(0))
+        }
+        ClassLikeMember::EnumCase(case) => {
+            if let EnumCaseItem::Backed(backed) = &case.item {
+                (0, backed.name.value.len())
+            } else {
+                (0, 0)
+            }
+        }
+        _ => (0, 0),
+    };
+
+    let type_padding = widths.type_width.saturating_sub(current_type_width);
+    let name_padding = widths.name_width.saturating_sub(current_name_width);
+
+    AssignmentAlignment { type_padding, name_padding }
+}
+
+fn get_plain_property_type_width(prop: &PlainProperty<'_>) -> usize {
+    prop.hint.as_ref().map_or(0, |h| h.span().length() as usize)
 }

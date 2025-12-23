@@ -5,7 +5,6 @@ use indoc::indoc;
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_fixer::SafetyClassification;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_reporting::Level;
@@ -15,6 +14,8 @@ use mago_syntax::ast::Node;
 use mago_syntax::ast::NodeKind;
 use mago_syntax::ast::StaticMethodCall;
 use mago_syntax::utils::reference::MethodReference;
+use mago_text_edit::Safety;
+use mago_text_edit::TextEdit;
 
 use crate::category::Category;
 use crate::context::LintContext;
@@ -177,12 +178,8 @@ impl LintRule for AssertionStyleRule {
                     "Use `{desired_syntax}` instead of `{current_syntax}` to conform to the `{desired_style}` style.",
                 ));
 
-            ctx.collector.propose(issue, |plan| {
-                plan.replace(
-                    to_replace.to_range(),
-                    desired_syntax.to_string(),
-                    SafetyClassification::PotentiallyUnsafe,
-                );
+            ctx.collector.propose(issue, |edits| {
+                edits.push(TextEdit::replace(to_replace, desired_syntax).with_safety(Safety::PotentiallyUnsafe));
             });
         }
     }

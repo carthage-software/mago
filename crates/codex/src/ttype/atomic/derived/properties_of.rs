@@ -18,7 +18,7 @@ use crate::ttype::atomic::object::TObject;
 use crate::ttype::atomic::object::r#enum::TEnum;
 use crate::ttype::atomic::scalar::TScalar;
 use crate::ttype::get_mixed;
-use crate::ttype::get_string;
+use crate::ttype::get_non_empty_string;
 use crate::ttype::union::TUnion;
 use crate::visibility::Visibility;
 
@@ -194,23 +194,27 @@ impl TPropertiesOf {
                         }
                     }
                 }
-                TAtomic::GenericParameter(_parameter) => {
-                    // For generic parameters, we can't expand at this point
-                    // The caller should handle unexpanded types
+                TAtomic::GenericParameter(parameter) => {
+                    if parameter.get_constraint().is_objecty() {
+                        needs_unsealed = true;
+                    }
                 }
                 _ => {}
             }
         }
 
-        if known_items.is_empty() {
+        if known_items.is_empty() && !needs_unsealed {
             None
         } else {
-            let mut keyed_array = TKeyedArray::new().with_known_items(known_items).with_non_empty(true);
+            let has_known_items = !known_items.is_empty();
+            let mut keyed_array = TKeyedArray::new().with_known_items(known_items);
 
-            // For non-final classes, make the array unsealed to indicate
-            // that subclasses may have additional properties
             if needs_unsealed {
-                keyed_array = keyed_array.with_parameters(Box::new(get_string()), Box::new(get_mixed()));
+                keyed_array = keyed_array.with_parameters(Box::new(get_non_empty_string()), Box::new(get_mixed()));
+            }
+
+            if has_known_items {
+                keyed_array = keyed_array.with_non_empty(true);
             }
 
             Some(TAtomic::Array(TArray::Keyed(keyed_array)))

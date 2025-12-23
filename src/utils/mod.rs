@@ -47,6 +47,8 @@ pub(crate) fn create_orchestrator<'a>(
         linter_settings,
         guard_settings: configuration.guard.settings.clone(),
         formatter_settings: configuration.formatter.settings,
+        disable_default_analyzer_plugins: configuration.analyzer.disable_default_plugins,
+        analyzer_plugins: configuration.analyzer.plugins.clone(),
         use_progress_bars,
         use_colors: color_choice != ColorChoice::Never,
         paths: configuration.source.paths.clone(),

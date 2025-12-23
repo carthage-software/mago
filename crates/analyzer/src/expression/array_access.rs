@@ -52,11 +52,13 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ArrayAccess<'arena> {
         if let Some(keyed_array_var_id) = &keyed_array_var_id
             && block_context.has_variable(keyed_array_var_id)
             && let Some(array_access_type) = block_context.locals.get(keyed_array_var_id).cloned()
-            && !array_access_type.possibly_undefined()
         {
-            artifacts.set_rc_expression_type(self, array_access_type.clone());
+            let is_variable_key = keyed_array_var_id.contains("[$");
+            if is_variable_key || !array_access_type.possibly_undefined() {
+                artifacts.set_rc_expression_type(self, array_access_type.clone());
 
-            return Ok(());
+                return Ok(());
+            }
         }
 
         let container_type = artifacts.get_rc_expression_type(&self.array).cloned();
@@ -79,7 +81,11 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ArrayAccess<'arena> {
             if let Some(keyed_array_var_id) = &keyed_array_var_id {
                 let can_store_result = block_context.inside_assignment || !container_type.is_mixed();
 
-                if !block_context.inside_isset && can_store_result && keyed_array_var_id.contains("[$") {
+                if !block_context.inside_isset
+                    && can_store_result
+                    && keyed_array_var_id.contains("[$")
+                    && !block_context.locals.contains_key(keyed_array_var_id)
+                {
                     block_context.locals.insert(*keyed_array_var_id, Rc::new(access_type.clone()));
                 }
             }
@@ -97,6 +103,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ArrayAccess<'arena> {
 mod tests {
     use indoc::indoc;
 
+    use crate::code::IssueCode;
     use crate::test_analysis;
 
     test_analysis! {
@@ -121,5 +128,47 @@ mod tests {
                 return $old;
             }
         "},
+    }
+
+    test_analysis! {
+        name = negated_isset_narrows_parent_array_type,
+        code = indoc! {r#"
+            <?php
+
+            /**
+             * @return array{foo?: array{bar?: string}}
+             */
+            function y(): array { return []; }
+
+            $y = y();
+
+            if (isset($y['foo']) && !isset($y['foo']['bar'])) {
+                echo $y['foo']['bar'];
+                echo $y['foo']['baz'];
+            }
+        "#},
+        issues = [
+            IssueCode::UndefinedStringArrayIndex,  // $y['foo']['bar']
+            IssueCode::UndefinedStringArrayIndex,  // $y['foo']['baz']
+        ],
+    }
+
+    test_analysis! {
+        name = variable_key_narrowing_not_null,
+        code = indoc! {r#"
+            <?php
+
+            /**
+             * @param array<string, int|null> $map
+             */
+            function testNotNullVariableKeyNarrowing(array $map, string $key): int
+            {
+                if ($map[$key] !== null) {
+                    return $map[$key];
+                }
+
+                return 0;
+            }
+        "#},
     }
 }

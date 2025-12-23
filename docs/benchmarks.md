@@ -2,7 +2,7 @@
 title: Benchmarks
 ---
 
-# Benchmarks ⚡️
+# Benchmarks
 
 Performance is a core feature of **Mago**. Every component, from the parser to the analyzer, is designed to be as fast as possible.
 
@@ -18,65 +18,78 @@ This is not just a goal; it's a guarantee. If any tool listed in our benchmarks 
 
 This benchmark measures the time it takes to check the formatting of an entire codebase.
 
-### Speed
+<BenchmarkChart
+  title="Speed"
+  :data="[
+    { label: 'Mago', value: 0.416, highlight: true },
+    { label: 'Pretty PHP', value: 35.83 }
+  ]"
+  unit="seconds"
+/>
 
-| Tool | Time (mean ± σ) | Relative Speed |
-| :--- | :--- | :--- |
-| **Mago** | **362.3ms ± 4.6ms** | **1x** |
-| Pretty PHP | 35.62s ± 0.06s | 98.32x slower |
-
-### Resource usage
-
-| Tool | Peak Memory (RSS) | CPU Cycles |
-| :--- | :--- | :--- |
-| **Mago** | 582 MB | **~9.4 Million** |
-| Pretty PHP | **159 MB** | ~10.4 Million |
+<BenchmarkChart
+  title="Peak Memory (RSS)"
+  :data="[
+    { label: 'Mago', value: 663, highlight: true },
+    { label: 'Pretty PHP', value: 150 }
+  ]"
+  unit="mb"
+/>
 
 ## Linter
 
 This benchmark measures the time it takes to lint an entire codebase.
 
-### Speed
+<BenchmarkChart
+  title="Speed"
+  :data="[
+    { label: 'Mago', value: 0.530, highlight: true },
+    { label: 'Pint', value: 38.85 },
+    { label: 'PHP-CS-Fixer', value: 53.28 }
+  ]"
+  unit="seconds"
+/>
 
-| Tool | Time (mean ± σ) | Relative Speed |
-| :--- | :--- | :--- |
-| **Mago** | **745.8ms ± 7.1ms** | **1x** |
-| Pint | 34.23s ± 0.05s | 45.89x slower |
-| PHP-CS-Fixer | 41.81s ± 0.13s | 56.07x slower |
-
-### Resource usage
-
-| Tool | Peak Memory (RSS) | CPU Cycles |
-| :--- | :--- | :--- |
-| **Mago** | 541 MB | **~9.2 Million** |
-| Pint | **74 MB** | ~9.8 Million |
-| PHP-CS-Fixer | 77 MB | ~9.8 Million |
+<BenchmarkChart
+  title="Peak Memory (RSS)"
+  :data="[
+    { label: 'Mago', value: 504, highlight: true },
+    { label: 'Pint', value: 78 },
+    { label: 'PHP-CS-Fixer', value: 167 }
+  ]"
+  unit="mb"
+/>
 
 ## Analyzer
 
 This benchmark measures the time it takes to perform a full static analysis.
 
-### Speed
+<BenchmarkChart
+  title="Speed"
+  :data="[
+    { label: 'Mago', value: 3.88, highlight: true },
+    { label: 'Psalm', value: 45.53 },
+    { label: 'PHPStan', value: 120.35 }
+  ]"
+  unit="seconds"
+/>
 
-| Tool | Time (mean ± σ) | Relative Speed |
-| :--- | :--- | :--- |
-| **Mago** | **3.86s ± 0.15s** | **1x** |
-| Psalm | 45.42s ± 1.16s | 11.77x slower |
-| PHPStan | 111.43s ± 0.45s | 28.88x slower |
-
-### Resource usage
-
-| Tool | Peak Memory (RSS) | CPU Cycles |
-| :--- | :--- | :--- |
-| **Mago** | 1.36 GB | **~9.8 Million** |
-| Psalm | 1.52 GB | ~9.9 Million |
-| PHPStan | **865 MB** | ~11.5 Million |
+<BenchmarkChart
+  title="Peak Memory (RSS)"
+  :data="[
+    { label: 'Mago', value: 930, highlight: true },
+    { label: 'Psalm', value: 1464 },
+    { label: 'PHPStan', value: 802 }
+  ]"
+  unit="mb"
+/>
 
 ## Environment
 
+- **Mago:** 1.0.0
 - **Codebase:** `wordpress-develop@5b01d24`
 - **Hardware:** MacBook Pro (Apple M1 Pro, 32GB RAM)
-- **PHP:** 8.4.11 (Zend v4.4.11, Zend OPcache v8.4.11)
+- **PHP:** 8.4.15 (Zend v4.4.15, Zend OPcache v8.4.15)
 
 ## A note on memory usage
 

@@ -12,13 +12,14 @@ use mago_codex::ttype::get_false;
 use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::get_true;
 use mago_codex::ttype::union::TUnion;
-use mago_fixer::SafetyClassification;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_syntax::ast::Binary;
 use mago_syntax::ast::BinaryOperator;
 use mago_syntax::ast::Expression;
+use mago_text_edit::Safety;
+use mago_text_edit::TextEdit;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -67,6 +68,8 @@ pub fn analyze_logical_and_operation<'ctx, 'arena>(
         binary.lhs,
         context.get_assertion_context_from_block(block_context),
         artifacts,
+        &context.settings.algebra_thresholds(),
+        context.settings.formula_size_threshold,
     )
     .unwrap_or_default();
 
@@ -94,7 +97,7 @@ pub fn analyze_logical_and_operation<'ctx, 'arena>(
         }
     }
 
-    let simplified_clauses = saturate_clauses(context_clauses);
+    let simplified_clauses = saturate_clauses(context_clauses, &context.settings.algebra_thresholds());
     let (left_assertions, active_left_assertions) = find_satisfying_assignments(
         simplified_clauses.as_slice(),
         Some(binary.lhs.span()),
@@ -304,6 +307,8 @@ pub fn analyze_logical_or_operation<'ctx, 'arena>(
         binary.lhs,
         context.get_assertion_context_from_block(block_context),
         artifacts,
+        &context.settings.algebra_thresholds(),
+        context.settings.formula_size_threshold,
     )
     .unwrap_or_default();
 
@@ -312,6 +317,8 @@ pub fn analyze_logical_or_operation<'ctx, 'arena>(
         binary.lhs,
         context.get_assertion_context_from_block(block_context),
         artifacts,
+        &context.settings.algebra_thresholds(),
+        context.settings.formula_size_threshold,
     );
 
     if !left_block_context.reconciled_expression_clauses.is_empty() {
@@ -328,8 +335,10 @@ pub fn analyze_logical_or_operation<'ctx, 'arena>(
         }
     }
 
-    let clauses_for_right_analysis =
-        saturate_clauses(block_context.clauses.iter().map(|v| &**v).chain(negated_left_clauses.iter()));
+    let clauses_for_right_analysis = saturate_clauses(
+        block_context.clauses.iter().map(|v| &**v).chain(negated_left_clauses.iter()),
+        &context.settings.algebra_thresholds(),
+    );
 
     let (negated_type_assertions, active_negated_type_assertions) = find_satisfying_assignments(
         clauses_for_right_analysis.as_slice(),
@@ -454,6 +463,8 @@ pub fn analyze_logical_or_operation<'ctx, 'arena>(
             binary.rhs,
             context.get_assertion_context_from_block(block_context),
             artifacts,
+            &context.settings.algebra_thresholds(),
+            context.settings.formula_size_threshold,
         )
         .unwrap_or_default();
 
@@ -465,7 +476,8 @@ pub fn analyze_logical_or_operation<'ctx, 'arena>(
 
         clauses_for_right_analysis.extend(right_clauses);
 
-        let combined_right_clauses = saturate_clauses(clauses_for_right_analysis.iter());
+        let combined_right_clauses =
+            saturate_clauses(clauses_for_right_analysis.iter(), &context.settings.algebra_thresholds());
 
         let (right_type_assertions, active_right_type_assertions) = find_satisfying_assignments(
             combined_right_clauses.as_slice(),
@@ -692,8 +704,8 @@ fn report_redundant_logical_operation<'arena>(
             binary.lhs.span().join(binary.operator.span())
         };
 
-        context.collector.propose_with_code(IssueCode::RedundantLogicalOperation, issue, |plan| {
-            plan.delete(to_remove.to_range(), SafetyClassification::PotentiallyUnsafe);
+        context.collector.propose_with_code(IssueCode::RedundantLogicalOperation, issue, |edits| {
+            edits.push(TextEdit::delete(to_remove).with_safety(Safety::PotentiallyUnsafe));
         });
     } else {
         context.collector.report_with_code(IssueCode::RedundantLogicalOperation, issue);

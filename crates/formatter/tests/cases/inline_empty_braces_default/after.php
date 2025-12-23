@@ -9,21 +9,13 @@ function empty_function()
 
 $closure = function () {};
 
-class EmptyClass
-{
-}
+class EmptyClass {}
 
-trait EmptyTrait
-{
-}
+trait EmptyTrait {}
 
-interface EmptyInterface
-{
-}
+interface EmptyInterface {}
 
-enum EmptyEnum
-{
-}
+enum EmptyEnum {}
 
 class Example
 {

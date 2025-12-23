@@ -6,7 +6,6 @@ use mago_codex::ttype::get_false;
 use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::get_true;
 use mago_codex::ttype::union::TUnion;
-use mago_fixer::SafetyClassification;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
@@ -16,6 +15,7 @@ use mago_syntax::ast::Expression;
 use mago_syntax::ast::Literal;
 use mago_syntax::ast::Parenthesized;
 use mago_syntax::ast::Variable;
+use mago_text_edit::TextEdit;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -98,20 +98,20 @@ pub fn analyze_comparison_operation<'ctx, 'arena>(
                 "This can be simplified to just `<expression>`."
             });
 
-        context.collector.propose_with_code(IssueCode::RedundantComparison, issue, |plan| {
+        context.collector.propose_with_code(IssueCode::RedundantComparison, issue, |edits| {
             // Determine which part of the expression to remove (the operator and the literal).
             let redundant_range = if variable_expr.start_position() < literal_expr.start_position() {
                 // Case: `$variable op $literal`
-                binary.operator.span().join(literal_expr.span()).to_range()
+                binary.operator.span().join(literal_expr.span())
             } else {
                 // Case: `$literal op $variable`
-                literal_expr.span().join(binary.operator.span()).to_range()
+                literal_expr.span().join(binary.operator.span())
             };
 
-            plan.delete(redundant_range, SafetyClassification::Safe);
+            edits.push(TextEdit::delete(redundant_range));
 
             if should_negate {
-                plan.insert(variable_expr.start_position().offset, "!", SafetyClassification::Safe);
+                edits.push(TextEdit::insert(variable_expr.start_offset(), "!"));
             }
         });
     }
@@ -122,7 +122,7 @@ pub fn analyze_comparison_operation<'ctx, 'arena>(
         let lhs_is_array = lhs_type.is_array();
         let rhs_is_array = rhs_type.is_array();
 
-        if lhs_is_array && !rhs_type.has_array() && !rhs_type.is_null() {
+        if lhs_is_array && !rhs_type.has_array() && !rhs_type.has_iterable() && !rhs_type.is_null() {
             context.collector.report_with_code(
                 IssueCode::InvalidOperand,
                 Issue::warning(format!(
@@ -137,7 +137,7 @@ pub fn analyze_comparison_operation<'ctx, 'arena>(
             );
 
             reported_general_invalid_operand = true;
-        } else if !lhs_type.has_array() && rhs_is_array && !lhs_type.is_null() {
+        } else if !lhs_type.has_array() && !lhs_type.has_iterable() && rhs_is_array && !lhs_type.is_null() {
             context.collector.report_with_code(
                 IssueCode::InvalidOperand,
                 Issue::warning(format!(

@@ -20,8 +20,6 @@ use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::template::TemplateResult;
 use mago_codex::ttype::template::inferred_type_replacer;
 use mago_codex::ttype::union::TUnion;
-use mago_fixer::FixPlan;
-use mago_fixer::SafetyClassification;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
@@ -29,6 +27,7 @@ use mago_span::Span;
 use mago_syntax::ast::ClassLikeMemberSelector;
 use mago_syntax::ast::Expression;
 use mago_syntax::ast::Variable;
+use mago_text_edit::TextEdit;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -345,17 +344,11 @@ pub fn resolve_instance_properties<'ctx, 'ast, 'arena>(
     Ok(result)
 }
 
-/// Checks if this is a direct backing store access: `$this->prop` inside the set hook for that property.
+/// Checks if this is a backing store access: `$this->prop` inside a hook for that property.
 fn is_backing_store_access(object_expr: &Expression, prop_name: Atom, block_context: &BlockContext) -> bool {
     let is_this = matches!(object_expr, Expression::Variable(Variable::Direct(var)) if var.name == "$this");
-    if !is_this {
-        return false;
-    }
 
-    block_context
-        .scope
-        .get_property_hook()
-        .is_some_and(|(hook_prop_name, hook_meta)| hook_prop_name == prop_name && hook_meta.is_set())
+    is_this && block_context.scope.get_property_hook().is_some_and(|(hook_prop_name, _)| hook_prop_name == prop_name)
 }
 
 /// Finds a property in a class, gets its type, and handles template localization.
@@ -646,8 +639,7 @@ fn report_access_on_null<'ctx>(
                     )
                     .with_note("If this expression resolves to `void` at runtime, accessing a property will result in `null` and raise a warning.")
                     .with_note("The `void` type often originates from a function or a method that does not return a value.")
-                    .with_help("You must guard this access. Check if the value is an object before accessing the property.")
-                ,
+                    .with_help("You must guard this access. Check if the value is an object before accessing the property."),
             );
         }
         (false, true) => {
@@ -685,12 +677,7 @@ fn report_access_on_null<'ctx>(
                             )
                             .with_note("If this expression is `null` at runtime, PHP will raise a warning and the property access will result in `null`.")
                             .with_help("Use the nullsafe operator (`?->`) to safely access the property, or add a check to ensure the value is not `null` (e.g., `if ($obj !== null)`).")
-                            .with_suggestion(operator_span.file_id, {
-                                let mut plan = FixPlan::new();
-                                plan.replace(operator_span.to_range(), "?->", SafetyClassification::Safe);
-
-                                plan
-                            }),
+                            .with_edit(operator_span.file_id, TextEdit::replace(operator_span, "?->")),
                     );
                 }
             }
@@ -718,10 +705,8 @@ fn report_redundant_nullsafe<'arena>(
             )
             .with_note("The nullsafe operator (`?->`) short-circuits the access if the object is `null`. Since this expression is guaranteed not to be `null`, this check is unnecessary.")
             .with_help("Consider using the direct property access operator (`->`) for clarity."),
-        |plan| {
-            // Replace `?->` with `->`
-            // Safe because we're just changing the operator, not removing any expressions
-            plan.replace(operator_span.to_range(), "->", SafetyClassification::Safe);
+        |edits| {
+            edits.push(TextEdit::replace(operator_span.to_range(), "->"));
         },
     );
 }

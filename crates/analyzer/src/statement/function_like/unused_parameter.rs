@@ -1,10 +1,11 @@
 use mago_codex::metadata::function_like::FunctionLikeMetadata;
-use mago_fixer::SafetyClassification;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_span::Span;
 use mago_syntax::ast::FunctionLikeParameter;
+use mago_text_edit::Safety;
+use mago_text_edit::TextEdit;
 
 use crate::code::IssueCode;
 use crate::context::Context;
@@ -93,11 +94,13 @@ fn report_parameter<'arena>(
         .with_note(format!("This parameter is declared but not used within the {kind}."))
         .with_help("Consider prefixing the parameter with an underscore (`_`) to indicate that it is intentionally unused, or remove it if it is not needed.");
 
-    context.collector.propose(issue, |plan| {
-        plan.insert(
-            parameter.variable.span().start.offset + 1, // skip the leading `$`
-            "_",
-            SafetyClassification::PotentiallyUnsafe,
+    context.collector.propose(issue, |edits| {
+        edits.push(
+            TextEdit::insert(
+                parameter.variable.start_offset() + 1, // skip the leading `$`
+                "_",
+            )
+            .with_safety(Safety::PotentiallyUnsafe),
         );
     });
 }

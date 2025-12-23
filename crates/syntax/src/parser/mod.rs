@@ -1,6 +1,7 @@
 use bumpalo::Bump;
 
 use mago_database::file::File;
+use mago_database::file::FileId;
 use mago_database::file::HasFileId;
 use mago_syntax_core::input::Input;
 
@@ -15,8 +16,16 @@ use crate::parser::internal::token_stream::TokenStream;
 mod internal;
 
 pub fn parse_file<'arena>(arena: &'arena Bump, file: &File) -> (&'arena Program<'arena>, Option<ParseError>) {
-    let source_text = arena.alloc_str(file.contents.as_ref());
-    let input = Input::new(file.id, source_text.as_bytes());
+    parse_file_content(arena, file.file_id(), file.contents.as_ref())
+}
+
+pub fn parse_file_content<'arena>(
+    arena: &'arena Bump,
+    file_id: FileId,
+    content: &str,
+) -> (&'arena Program<'arena>, Option<ParseError>) {
+    let source_text = arena.alloc_str(content);
+    let input = Input::new(file_id, source_text.as_bytes());
     let lexer = Lexer::new(arena, input);
 
     let mut stream = TokenStream::new(arena, lexer);

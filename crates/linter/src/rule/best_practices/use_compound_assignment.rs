@@ -3,7 +3,6 @@ use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_fixer::SafetyClassification;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_reporting::Level;
@@ -12,6 +11,7 @@ use mago_syntax::ast::BinaryOperator;
 use mago_syntax::ast::Expression;
 use mago_syntax::ast::Node;
 use mago_syntax::ast::NodeKind;
+use mago_text_edit::TextEdit;
 
 use crate::category::Category;
 use crate::context::LintContext;
@@ -123,10 +123,10 @@ impl LintRule for UseCompoundAssignmentRule {
             .with_note("Using operators like `+=` or `.=` is more idiomatic and can be faster, especially for string concatenation.")
             .with_help(format!("Use the `{compound_op_str}` operator instead."));
 
-        ctx.collector.propose(issue, |plan| {
+        ctx.collector.propose(issue, |edits| {
             let replacement_span = assignment.operator.span().join(binary.operator.span());
 
-            plan.replace(replacement_span.to_range(), compound_op_str, SafetyClassification::Safe);
+            edits.push(TextEdit::replace(replacement_span, compound_op_str));
         });
     }
 }

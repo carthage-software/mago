@@ -266,6 +266,11 @@ impl<'arena> MemberAccessChain<'arena> {
     }
 
     #[inline]
+    fn is_first_link_object_method_call(&self) -> bool {
+        matches!(self.accesses.first(), Some(MemberAccess::MethodCall(_) | MemberAccess::NullSafeMethodCall(_)))
+    }
+
+    #[inline]
     fn is_already_broken(&self, f: &FormatterState) -> bool {
         let mut accesses_len = self.accesses.len();
         if should_inline_first_access(f, self) {
@@ -296,7 +301,7 @@ impl<'arena> MemberAccessChain<'arena> {
 
             let current_op_span = access.get_operator_span();
 
-            if misc::has_new_line_in_range(f.source_text, prev_selector_end.offset, current_op_span.start.offset) {
+            if misc::has_new_line_in_range(f.source_text, prev_selector_end.offset, current_op_span.start_offset()) {
                 broken_links += 1;
             }
         }
@@ -361,6 +366,42 @@ impl<'arena> MemberAccessChain<'arena> {
         }
 
         false
+    }
+
+    /// Checks if any method call in the chain has arguments that will force the chain to break.
+    /// This considers:
+    /// - Closures and anonymous classes (always break)
+    /// - Arrays/matches that are already formatted with line breaks
+    #[inline]
+    fn has_breaking_arguments(&self, f: &FormatterState<'_, 'arena>) -> bool {
+        self.accesses.iter().any(|access| {
+            let Some(argument_list) = access.get_arguments_list() else {
+                return false;
+            };
+
+            argument_list.arguments.iter().any(|arg| {
+                let value = arg.value();
+                match value {
+                    Expression::Closure(_) | Expression::AnonymousClass(_) => true,
+                    Expression::Array(arr) => misc::has_new_line_in_range(
+                        f.source_text,
+                        arr.left_bracket.start_offset(),
+                        arr.right_bracket.end_offset(),
+                    ),
+                    Expression::LegacyArray(arr) => misc::has_new_line_in_range(
+                        f.source_text,
+                        arr.array.span.start_offset(),
+                        arr.right_parenthesis.end_offset(),
+                    ),
+                    Expression::Match(m) => misc::has_new_line_in_range(
+                        f.source_text,
+                        m.r#match.span.start_offset(),
+                        m.right_brace.end_offset(),
+                    ),
+                    _ => false,
+                }
+            })
+        })
     }
 
     #[inline]
@@ -612,7 +653,8 @@ pub(super) fn print_member_access_chain<'arena>(
         }
     }
 
-    if must_break && !matches!(f.parent_node(), Node::Binary(_)) {
+    let should_break = must_break || member_access_chain.has_breaking_arguments(f);
+    if should_break && !matches!(f.parent_node(), Node::Binary(_)) {
         parts.push(Document::BreakParent);
     }
 
@@ -624,6 +666,10 @@ fn should_inline_first_access<'arena>(
     f: &FormatterState<'_, 'arena>,
     member_access_chain: &MemberAccessChain<'arena>,
 ) -> bool {
+    if f.settings.first_method_chain_on_new_line && member_access_chain.is_first_link_object_method_call() {
+        return false;
+    }
+
     if member_access_chain.find_fluent_access_chain_start().is_some_and(|start| start == 0) {
         return false;
     }

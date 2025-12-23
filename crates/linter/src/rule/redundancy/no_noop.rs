@@ -1,5 +1,5 @@
 use indoc::indoc;
-use mago_fixer::SafetyClassification;
+use mago_text_edit::TextEdit;
 use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
@@ -117,8 +117,8 @@ impl LintRule for NoNoopRule {
                     .with_annotation(Annotation::primary(*noop).with_message("This is a redundant `noop` statement"))
                     .with_help("Remove the redundant `;`.");
 
-                ctx.collector.propose(issue, |plan| {
-                    plan.delete(noop.to_range(), SafetyClassification::Safe);
+                ctx.collector.propose(issue, |edits| {
+                    edits.push(TextEdit::delete(*noop));
                 });
             }
         }

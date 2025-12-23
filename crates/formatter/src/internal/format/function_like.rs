@@ -1,19 +1,5 @@
-use crate::document::Document;
-use crate::document::Group;
-use crate::document::IfBreak;
-use crate::document::Line;
-use crate::document::Separator;
-use crate::document::group::GroupIdentifier;
-use crate::internal::FormatterState;
-use crate::internal::format::Format;
-use crate::internal::format::block::block_is_empty;
-use crate::internal::format::format_token;
-use crate::internal::format::misc::print_modifiers;
-use crate::internal::format::parameters::should_break_parameters;
-use crate::internal::format::parameters::should_hug_the_only_parameter;
-use crate::settings::BraceStyle;
-use crate::wrap;
 use bumpalo::vec;
+
 use mago_span::HasSpan;
 use mago_span::Span;
 use mago_syntax::ast::AttributeList;
@@ -31,6 +17,22 @@ use mago_syntax::ast::MethodAbstractBody;
 use mago_syntax::ast::MethodBody;
 use mago_syntax::ast::Modifier;
 use mago_syntax::ast::Sequence;
+
+use crate::document::Document;
+use crate::document::Group;
+use crate::document::IfBreak;
+use crate::document::Line;
+use crate::document::Separator;
+use crate::document::group::GroupIdentifier;
+use crate::internal::FormatterState;
+use crate::internal::format::Format;
+use crate::internal::format::block::block_is_empty;
+use crate::internal::format::format_token;
+use crate::internal::format::misc::print_modifiers;
+use crate::internal::format::parameters::should_break_parameters;
+use crate::internal::format::parameters::should_hug_the_only_parameter;
+use crate::settings::BraceStyle;
+use crate::wrap;
 
 #[derive(Debug, Clone, Copy)]
 enum FunctionLikeBody<'arena> {
@@ -115,6 +117,16 @@ impl<'arena> FunctionLikeParts<'arena> {
             static_kw.span
         } else {
             self.fn_or_function.span
+        }
+    }
+
+    fn get_signature_end_span(&self) -> Span {
+        if let Some(return_type) = self.return_type_hint {
+            return_type.span()
+        } else if let Some(use_clause) = self.use_clause {
+            use_clause.span()
+        } else {
+            self.parameter_list.span()
         }
     }
 
@@ -241,6 +253,7 @@ impl<'arena> FunctionLikeParts<'arena> {
         settings: FunctionLikeSettings,
         signature_id: GroupIdentifier,
         parameter_list_will_break: Option<bool>,
+        dangling_comments: Option<Document<'arena>>,
     ) -> Document<'arena> {
         match self.body {
             FunctionLikeBody::Abstract(span) => format_token(f, span, ";"),
@@ -249,11 +262,22 @@ impl<'arena> FunctionLikeParts<'arena> {
                 let spacing =
                     self.format_brace_spacing(f, settings, signature_id, parameter_list_will_break, inlined_braces);
 
-                Document::Group(Group::new(vec![
-                    in f.arena;
-                    spacing,
-                    block.format(f),
-                ]))
+                if let Some(comments) = dangling_comments {
+                    let block_doc = block.format(f);
+
+                    Document::Group(Group::new(vec![
+                        in f.arena;
+                        spacing,
+                        comments,
+                        block_doc,
+                    ]))
+                } else {
+                    Document::Group(Group::new(vec![
+                        in f.arena;
+                        spacing,
+                        block.format(f),
+                    ]))
+                }
             }
         }
     }
@@ -273,8 +297,17 @@ impl<'arena> FunctionLikeParts<'arena> {
             None
         };
 
+        let dangling_comments = match (&self.body, parameter_list_will_break) {
+            (_, Some(false)) => None,
+            (FunctionLikeBody::Block(block), _) => {
+                let signature_end = self.get_signature_end_span();
+                f.print_trailing_comments_between_nodes(signature_end, block.left_brace)
+            }
+            (FunctionLikeBody::Abstract(_), _) => None,
+        };
+
         let (signature, signature_id) = self.format_signature(f, settings.space_before_params);
-        let body = self.format_body(f, settings, signature_id, parameter_list_will_break);
+        let body = self.format_body(f, settings, signature_id, parameter_list_will_break, dangling_comments);
 
         Document::Group(Group::new(vec![
             in f.arena;

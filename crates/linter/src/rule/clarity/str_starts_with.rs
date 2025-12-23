@@ -3,7 +3,6 @@ use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_fixer::SafetyClassification;
 use mago_php_version::PHPVersion;
 use mago_php_version::PHPVersionRange;
 use mago_reporting::Annotation;
@@ -18,6 +17,7 @@ use mago_syntax::ast::Literal;
 use mago_syntax::ast::LiteralInteger;
 use mago_syntax::ast::Node;
 use mago_syntax::ast::NodeKind;
+use mago_text_edit::TextEdit;
 
 use crate::category::Category;
 use crate::context::LintContext;
@@ -142,21 +142,21 @@ impl LintRule for StrStartsWithRule {
         .with_help("`strpos($a, $b) === 0` can be simplified to `str_starts_with($a, $b)`.")
         .with_note("Using `str_starts_with` makes the code easier to understand and more expressive.");
 
-        ctx.collector.propose(issue, |plan| {
+        ctx.collector.propose(issue, |edits| {
             if !equal {
-                plan.insert(binary.span().start_position().offset, "!", SafetyClassification::Safe);
+                edits.push(TextEdit::insert(binary.span().start_offset(), "!"));
             }
 
             let function_span = call.function.span();
 
-            plan.replace(function_span.to_range(), STR_STARTS_WITH.to_string(), SafetyClassification::Safe);
+            edits.push(TextEdit::replace(function_span, STR_STARTS_WITH));
 
             if left {
                 // delete the `=== 0` part
-                plan.delete(binary.operator.span().join(binary.rhs.span()).to_range(), SafetyClassification::Safe);
+                edits.push(TextEdit::delete(binary.operator.span().join(binary.rhs.span())));
             } else {
                 // delete the `0 ===` part
-                plan.delete(binary.lhs.span().join(binary.operator.span()).to_range(), SafetyClassification::Safe);
+                edits.push(TextEdit::delete(binary.lhs.span().join(binary.operator.span())));
             }
         });
     }

@@ -191,6 +191,12 @@ pub fn inherit_method_docblocks(codebase: &mut CodebaseMetadata) {
                 }
             }
 
+            if parent_method_id.is_none()
+                && let Some((declaring_class, method_id)) = method_ids.iter().next()
+            {
+                parent_method_id = Some((*declaring_class, *method_id.get_method_name()));
+            }
+
             if let Some((parent_class, parent_method)) = parent_method_id {
                 inheritance_work.push((*class_name, *method_name, parent_class, parent_method));
             }

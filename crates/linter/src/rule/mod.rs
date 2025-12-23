@@ -9,6 +9,7 @@ use crate::context::LintContext;
 use crate::integration::IntegrationSet;
 use crate::rule_meta::RuleMeta;
 use crate::settings::RuleSettings;
+use crate::settings::RulesSettings;
 use crate::settings::Settings;
 
 pub mod best_practices;
@@ -148,6 +149,30 @@ macro_rules! define_rules {
                 }
             }
         }
+
+        /// Filters rule settings based on PHP version and integration requirements.
+        ///
+        /// Returns a JSON map containing only rules whose requirements are met
+        /// by the given PHP version and integrations.
+        #[must_use]
+        pub fn filter_rules_settings(
+            rules: &RulesSettings,
+            php_version: PHPVersion,
+            integrations: IntegrationSet,
+        ) -> serde_json::Map<String, serde_json::Value> {
+            let mut map = serde_json::Map::new();
+            $(
+                if $rule::is_enabled_for(php_version, integrations) {
+                    if let Ok(value) = serde_json::to_value(&rules.$module) {
+                        map.insert(
+                            stringify!($module).replace('_', "-"),
+                            value,
+                        );
+                    }
+                }
+            )*
+            map
+        }
     }
 }
 
@@ -193,6 +218,7 @@ define_rules! {
     NoRedundantNullsafe(no_redundant_nullsafe @ NoRedundantNullsafeRule),
     NoRedundantMath(no_redundant_math @ NoRedundantMathRule),
     NoRedundantLabel(no_redundant_label @ NoRedundantLabelRule),
+    NoRedundantLiteralReturn(no_redundant_literal_return @ NoRedundantLiteralReturnRule),
     NoRedundantFinal(no_redundant_final @ NoRedundantFinalRule),
     NoRedundantReadonly(no_redundant_readonly @ NoRedundantReadonlyRule),
     NoRedundantFile(no_redundant_file @ NoRedundantFileRule),
@@ -227,11 +253,15 @@ define_rules! {
     NoAliasFunction(no_alias_function @ NoAliasFunctionRule),
     LowercaseTypeHint(lowercase_type_hint @ LowercaseTypeHintRule),
     IdentityComparison(identity_comparison @ IdentityComparisonRule),
+    IneffectiveFormatIgnoreNext(ineffective_format_ignore_next @ IneffectiveFormatIgnoreNextRule),
+    InlineVariableReturn(inline_variable_return @ InlineVariableReturnRule),
+    IneffectiveFormatIgnoreRegion(ineffective_format_ignore_region @ IneffectiveFormatIgnoreRegionRule),
     InstanceofStringable(instanceof_stringable @ InstanceofStringableRule),
     InterfaceName(interface_name @ InterfaceNameRule),
     InvalidOpenTag(invalid_open_tag @ InvalidOpenTagRule),
     FunctionName(function_name @ FunctionNameRule),
     ExplicitOctal(explicit_octal @ ExplicitOctalRule),
+    ReadableLiteral(readable_literal @ ReadableLiteralRule),
     ExplicitNullableParam(explicit_nullable_param @ ExplicitNullableParamRule),
     PreferArrowFunction(prefer_arrow_function @ PreferArrowFunctionRule),
     PreferEarlyContinue(prefer_early_continue @ PreferEarlyContinueRule),
@@ -276,6 +306,7 @@ define_rules! {
     MiddlewareInRoutes(middleware_in_routes @ MiddlewareInRoutesRule),
     UseCompoundAssignment(use_compound_assignment @ UseCompoundAssignmentRule),
     RequirePregQuoteDelimiter(require_preg_quote_delimiter @ RequirePregQuoteDelimiterRule),
+    RequireNamespace(require_namespace @ RequireNamespaceRule),
     YodaConditions(yoda_conditions @ YodaConditionsRule),
     UseWpFunctions(use_wp_functions @ UseWpFunctionsRule),
     NoDirectDbQuery(no_direct_db_query @ NoDirectDbQueryRule),

@@ -55,7 +55,7 @@ impl<'arena> FormatterState<'_, 'arena> {
     ///
     /// `true` if the next substantive line is a comment line, `false` otherwise.
     pub(crate) fn is_followed_by_comment_on_next_line(&self, span: Span) -> bool {
-        let Some(first_char_offset) = self.skip_spaces(Some(span.end.offset), false) else {
+        let Some(first_char_offset) = self.skip_spaces(Some(span.end_offset()), false) else {
             return false;
         };
 
@@ -72,6 +72,33 @@ impl<'arena> FormatterState<'_, 'arena> {
         remaining_content.starts_with("//")
             || remaining_content.starts_with("/*")
             || (remaining_content.starts_with('#') && !remaining_content.starts_with("#["))
+    }
+
+    /// Checks if a node has a trailing line comment on the same line.
+    ///
+    /// This is different from `is_followed_by_comment_on_next_line` which checks
+    /// for comments on the subsequent line. This method detects trailing comments
+    /// that are on the same line as the node (e.g., `} // comment`).
+    ///
+    /// # Arguments
+    ///
+    /// * `span` - The span of the node to check for same-line trailing comments.
+    ///
+    /// # Returns
+    ///
+    /// `true` if there's a line comment on the same line after the node, `false` otherwise.
+    pub(crate) fn has_same_line_trailing_comment(&self, span: Span) -> bool {
+        let Some(first_char_offset) = self.skip_spaces(Some(span.end_offset()), false) else {
+            return false;
+        };
+
+        // If there's a newline before the next content, the comment is on the next line, not same line
+        if self.has_newline(first_char_offset, /* backwards */ true) {
+            return false;
+        }
+
+        let remaining = &self.source_text[first_char_offset as usize..];
+        remaining.starts_with("//") || (remaining.starts_with('#') && !remaining.starts_with("#["))
     }
 
     pub(crate) fn has_leading_own_line_comment(&self, range: Span) -> bool {
@@ -93,15 +120,15 @@ impl<'arena> FormatterState<'_, 'arena> {
                 break;
             }
 
-            if comment.end <= range.start.offset {
+            if comment.end <= range.start_offset() {
                 if flags.contains(CommentFlags::Leading) && comment.matches_flags(flags) {
                     return true;
                 }
-            } else if range.end.offset < comment.start && self.is_insignificant(range.end.offset, comment.start) {
+            } else if range.end_offset() < comment.start && self.is_insignificant(range.end_offset(), comment.start) {
                 if flags.contains(CommentFlags::Trailing) && comment.matches_flags(flags) {
                     return true;
                 }
-            } else if comment.end <= range.end.offset {
+            } else if comment.end <= range.end_offset() {
                 if flags.contains(CommentFlags::Dangling) && comment.matches_flags(flags) {
                     return true;
                 }
@@ -117,11 +144,11 @@ impl<'arena> FormatterState<'_, 'arena> {
     #[inline]
     pub fn has_inner_comment(&self, range: Span) -> bool {
         for comment in self.remaining_comments() {
-            if comment.start > range.end.offset {
+            if comment.start > range.end_offset() {
                 break;
             }
 
-            if comment.start >= range.start.offset && comment.end <= range.end.offset {
+            if comment.start >= range.start_offset() && comment.end <= range.end_offset() {
                 return true;
             }
         }
@@ -141,8 +168,13 @@ impl<'arena> FormatterState<'_, 'arena> {
         while let Some(trivia) = self.all_comments.get(self.next_comment_index) {
             let comment = Comment::from_trivia(self.file, trivia);
 
-            if comment.end <= range.start.offset {
-                self.print_leading_comment(&mut parts, comment);
+            if comment.end <= range.start_offset() {
+                // Check if comment is in an ignore region - if so, preserve as-is
+                if self.get_ignore_region_for(comment.start).is_some() {
+                    self.print_preserved_leading_comment(&mut parts, comment);
+                } else {
+                    self.print_leading_comment(&mut parts, comment);
+                }
                 self.next_comment_index += 1;
             } else {
                 break;
@@ -160,9 +192,20 @@ impl<'arena> FormatterState<'_, 'arena> {
         while let Some(trivia) = self.all_comments.get(self.next_comment_index) {
             let comment = Comment::from_trivia(self.file, trivia);
 
-            if range.end.offset < comment.start && self.is_insignificant(range.end.offset, comment.start) {
-                let previous = self.print_trailing_comment(&mut parts, comment, previous_comment);
-                previous_comment = Some(previous);
+            if range.end_offset() < comment.start && self.is_insignificant(range.end_offset(), comment.start) {
+                let gap = &self.source_text[(range.end_offset() as usize)..(comment.start as usize)];
+                if comment.is_block && gap.contains(',') {
+                    break;
+                }
+
+                // Check if comment is in an ignore region - if so, preserve as-is
+                if self.get_ignore_region_for(comment.start).is_some() {
+                    self.print_preserved_trailing_comment(&mut parts, comment);
+                    previous_comment = Some(comment);
+                } else {
+                    previous_comment =
+                        Some(self.print_trailing_comment(&mut parts, comment, previous_comment, range.end_offset()));
+                }
                 self.next_comment_index += 1;
             } else {
                 break;
@@ -189,9 +232,16 @@ impl<'arena> FormatterState<'_, 'arena> {
                 Document::Array(vec![in self.arena; self.print_comment(comment), Document::Space(Space::soft())])
             }
         } else {
-            Document::Array(
-                vec![in self.arena; self.print_comment(comment), Document::BreakParent, Document::Line(Line::hard())],
-            )
+            // For inline comments (// or #), check if there's a newline after the comment.
+            // If there is, add a hard line break; if not, add a soft space.
+            // This handles cases like `<?//?><?` where the comment should stay on the same line.
+            if self.has_newline(comment.end, /* backwards */ false) {
+                Document::Array(
+                    vec![in self.arena; self.print_comment(comment), Document::BreakParent, Document::Line(Line::hard())],
+                )
+            } else {
+                Document::Array(vec![in self.arena; self.print_comment(comment), Document::Space(Space::soft())])
+            }
         };
 
         parts.push(comment_document);
@@ -211,6 +261,7 @@ impl<'arena> FormatterState<'_, 'arena> {
         parts: &mut Vec<'arena, Document<'arena>>,
         comment: Comment,
         previous: Option<Comment>,
+        token_end_offset: u32,
     ) -> Comment {
         let printed = self.print_comment(comment);
 
@@ -233,7 +284,21 @@ impl<'arena> FormatterState<'_, 'arena> {
             return comment.with_line_suffix(true);
         }
 
-        if comment.is_inline_comment() || previous.is_some_and(|c| c.has_line_suffix) {
+        if !comment.is_block || previous.is_some_and(|c| c.has_line_suffix) {
+            parts.push(Document::LineSuffix(vec![in self.arena; Document::Space(Space::soft()), printed]));
+
+            return comment.with_line_suffix(true);
+        }
+
+        let followed_by_semicolon = self
+            .skip_spaces(Some(comment.end), false)
+            .map(|idx| self.source_text.as_bytes().get(idx as usize))
+            .is_some_and(|c| c == Some(&b';'));
+
+        let has_semicolon_in_gap =
+            self.source_text[(token_end_offset as usize)..(comment.start as usize)].bytes().any(|c| c == b';');
+
+        if followed_by_semicolon || has_semicolon_in_gap {
             parts.push(Document::LineSuffix(vec![in self.arena; Document::Space(Space::soft()), printed]));
 
             return comment.with_line_suffix(true);
@@ -242,6 +307,73 @@ impl<'arena> FormatterState<'_, 'arena> {
         parts.push(Document::Array(vec![in self.arena; Document::Space(Space::soft()), printed]));
 
         comment.with_line_suffix(false)
+    }
+
+    /// Prints a leading comment that is within an ignore region, preserving its original formatting.
+    fn print_preserved_leading_comment(&mut self, parts: &mut Vec<'arena, Document<'arena>>, comment: Comment) {
+        // Preserve the comment exactly as-is from source
+        let preserved = self.get_source_slice(comment.start, comment.end);
+        let comment_document = if comment.is_block {
+            if self.has_newline(comment.end, /* backwards */ false) {
+                if self.has_newline(comment.start, /* backwards */ true) {
+                    Document::Array(vec![
+                        in self.arena;
+                        Document::String(preserved),
+                        Document::BreakParent,
+                        Document::Line(Line::hard()),
+                    ])
+                } else {
+                    Document::Array(vec![in self.arena; Document::String(preserved), Document::Line(Line::default())])
+                }
+            } else {
+                Document::Array(vec![in self.arena; Document::String(preserved), Document::Space(Space::soft())])
+            }
+        } else {
+            Document::Array(
+                vec![in self.arena; Document::String(preserved), Document::BreakParent, Document::Line(Line::hard())],
+            )
+        };
+
+        parts.push(comment_document);
+
+        // Check for blank lines after comment
+        if self
+            .skip_spaces(Some(comment.end), false)
+            .and_then(|idx| self.skip_newline(Some(idx), false))
+            .is_some_and(|i| self.has_newline(i, /* backwards */ false))
+        {
+            parts.push(Document::BreakParent);
+            parts.push(Document::Line(Line::hard()));
+        }
+    }
+
+    /// Prints a trailing comment that is within an ignore region, preserving its original formatting.
+    fn print_preserved_trailing_comment(&mut self, parts: &mut Vec<'arena, Document<'arena>>, comment: Comment) {
+        // Preserve the comment exactly as-is from source
+        let preserved = self.get_source_slice(comment.start, comment.end);
+
+        if self.has_newline(comment.start, /* backwards */ true) {
+            parts.push(Document::String(preserved));
+            let suffix = {
+                let mut parts = vec![in self.arena; Document::BreakParent, Document::Line(Line::hard())];
+
+                if self.is_previous_line_empty(comment.start) {
+                    parts.push(Document::Line(Line::hard()));
+                }
+
+                parts
+            };
+
+            parts.push(Document::LineSuffix(suffix));
+        } else if comment.is_inline_comment() {
+            parts.push(Document::LineSuffix(
+                vec![in self.arena; Document::Space(Space::soft()), Document::String(preserved)],
+            ));
+        } else {
+            parts.push(Document::Array(
+                vec![in self.arena; Document::Space(Space::soft()), Document::String(preserved)],
+            ));
+        }
     }
 
     #[must_use]
@@ -253,7 +385,7 @@ impl<'arena> FormatterState<'_, 'arena> {
         for trivia in &self.all_comments[self.next_comment_index..] {
             let comment = Comment::from_trivia(self.file, trivia);
 
-            if comment.start >= range.start.offset && comment.end <= range.end.offset {
+            if comment.start >= range.start_offset() && comment.end <= range.end_offset() {
                 must_break = must_break || !comment.is_block;
                 if !should_indent && self.is_next_line_empty(trivia.span) {
                     parts.push(Document::Array(
@@ -309,7 +441,7 @@ impl<'arena> FormatterState<'_, 'arena> {
         for trivia in &self.all_comments[self.next_comment_index..] {
             let comment = Comment::from_trivia(self.file, trivia);
 
-            if comment.end <= range.end.offset {
+            if comment.end <= range.end_offset() {
                 if !indented && self.is_next_line_empty(trivia.span) {
                     parts.push(Document::Array(
                         vec![in self.arena; self.print_comment(comment), Document::Line(Line::hard())],
@@ -357,9 +489,9 @@ impl<'arena> FormatterState<'_, 'arena> {
         for trivia in &self.all_comments[self.next_comment_index..] {
             let comment = Comment::from_trivia(self.file, trivia);
 
-            if comment.start >= after.end.offset
-                && comment.end <= before.start.offset
-                && self.is_insignificant(after.end.offset, comment.start)
+            if comment.start >= after.end_offset()
+                && comment.end <= before.start_offset()
+                && self.is_insignificant(after.end_offset(), comment.start)
             {
                 parts.push(self.print_comment(comment));
                 consumed_count += 1;
@@ -382,6 +514,37 @@ impl<'arena> FormatterState<'_, 'arena> {
             Document::Line(Line::hard()),
             Document::Array(Document::join(self.arena, parts, Separator::HardLine)),
         ]))
+    }
+
+    /// Prints trailing comments that appear between two nodes, suitable for use after `{`.
+    /// Unlike `print_dangling_comments_between_nodes`, this uses LineSuffix for inline comments
+    /// to keep them on the same line as the preceding content.
+    #[must_use]
+    pub(crate) fn print_trailing_comments_between_nodes(
+        &mut self,
+        after: Span,
+        before: Span,
+    ) -> Option<Document<'arena>> {
+        let mut parts = vec![in self.arena];
+        let mut previous_comment: Option<Comment> = None;
+
+        while let Some(trivia) = self.all_comments.get(self.next_comment_index) {
+            let comment = Comment::from_trivia(self.file, trivia);
+
+            let is_between = comment.start >= after.end_offset() && comment.end <= before.start_offset();
+            let gap_is_ok =
+                after.end_offset() == comment.start || self.is_insignificant(after.end_offset(), comment.start);
+
+            if is_between && gap_is_ok {
+                previous_comment =
+                    Some(self.print_trailing_comment(&mut parts, comment, previous_comment, after.end_offset()));
+                self.next_comment_index += 1;
+            } else {
+                break;
+            }
+        }
+
+        if parts.is_empty() { None } else { Some(Document::Array(parts)) }
     }
 
     #[must_use]

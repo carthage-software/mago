@@ -2046,6 +2046,61 @@ pub const EXTENSION_FUNCTIONS: [(&str, &[&str]); 48] = [
     ),
 ];
 
+/// List of PHP functions marked with @no-named-arguments.
+///
+/// These functions should not have their arguments passed by name,
+/// typically because the parameter names are considered internal or
+/// may change between PHP versions.
+pub const NO_NAMED_ARGUMENTS_FUNCTIONS: [&str; 47] = [
+    "func_get_args",
+    "strlen",
+    "strcmp",
+    "strncmp",
+    "strcasecmp",
+    "strncasecmp",
+    "str_starts_with",
+    "str_ends_with",
+    "str_contains",
+    "str_decrement",
+    "str_increment",
+    "error_reporting",
+    "defined",
+    "get_class",
+    "get_called_class",
+    "get_parent_class",
+    "method_exists",
+    "property_exists",
+    "trait_exists",
+    "class_exists",
+    "interface_exists",
+    "function_exists",
+    "enum_exists",
+    "class_alias",
+    "password_get_info",
+    "password_hash",
+    "password_needs_rehash",
+    "password_verify",
+    "password_algos",
+    "array_merge_recursive",
+    "array_replace",
+    "array_replace_recursive",
+    "array_keys",
+    "array_values",
+    "array_count_values",
+    "array_column",
+    "array_reverse",
+    "array_diff_ukey",
+    "array_udiff",
+    "array_udiff_assoc",
+    "array_diff_uassoc",
+    "array_udiff_uassoc",
+    "array_uintersect_assoc",
+    "array_intersect_uassoc",
+    "array_uintersect_uassoc",
+    "array_intersect_ukey",
+    "array_uintersect",
+];
+
 /// List of PHP variadic functions that accept variable number of arguments.
 pub const VARIADIC_FUNCTIONS: [&str; 40] = [
     "setlocale",

@@ -22,6 +22,8 @@ use crate::error::AnalysisError;
 use crate::plugin::HookAction;
 use crate::plugin::context::HookContext;
 use crate::utils::docblock::populate_docblock_variables;
+use crate::utils::docblock::populate_docblock_variables_excluding;
+use crate::utils::expression::get_expression_id;
 use crate::utils::expression::get_function_like_id_from_call;
 
 pub mod attributes;
@@ -37,6 +39,7 @@ pub mod r#static;
 pub mod switch;
 pub mod r#try;
 pub mod unset;
+pub mod use_statement;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for Statement<'arena> {
     fn analyze<'ctx>(
@@ -65,29 +68,28 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Statement<'arena> {
             }
         }
 
-        let should_populate_docblock_variables = matches!(
-            self,
-            Statement::Block(_)
-                | Statement::Expression(_)
-                | Statement::Try(_)
-                | Statement::Continue(_)
-                | Statement::Break(_)
-                | Statement::Return(_)
-                | Statement::Echo(_)
-                | Statement::EchoTag(_)
-                | Statement::Unset(_)
-                | Statement::Inline(_)
-                | Statement::OpeningTag(_)
-                | Statement::Declare(_)
-                | Statement::Noop(_)
-                | Statement::ClosingTag(_)
-                | Statement::HaltCompiler(_)
-        );
+        // For assignment statements, we populate all @var annotations except the one
+        // for the assignment target variable. The assignment analyzer handles that one
+        // to support the pattern: /** @var Type */ $var = something();
+        if let Statement::Expression(ExpressionStatement { expression, .. }) = self
+            && let Some(target_var) = get_expression_id(
+                expression,
+                block_context.scope.get_class_like_name(),
+                context.resolved_names,
+                Some(context.codebase),
+            )
+        {
+            populate_docblock_variables_excluding(
+                context,
+                block_context,
+                artifacts,
+                true, // override existing for non-target variables
+                Some(target_var),
+            );
+        } else {
+            let override_existing = !matches!(self, Statement::Foreach(_));
 
-        if should_populate_docblock_variables {
-            let override_existing_variables = !matches!(self, Statement::Expression(ExpressionStatement { expression, .. }) if expression.is_assignment());
-
-            populate_docblock_variables(context, block_context, artifacts, override_existing_variables);
+            populate_docblock_variables(context, block_context, artifacts, override_existing);
         }
 
         let result = match self {
@@ -106,6 +108,9 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Statement<'arena> {
             }
             Statement::Use(r#use) => {
                 context.scope.populate_from_use(r#use);
+                if context.settings.check_use_statements {
+                    r#use.analyze(context, block_context, artifacts)?;
+                }
 
                 Ok(())
             }
@@ -301,7 +306,13 @@ fn detect_unused_statement_expressions<'ast, 'arena>(
             "Using 'parent', 'static', or 'self' directly as a statement has no effect."
         }
         Expression::MagicConstant(_) => "Evaluating a magic constant as a statement has no effect.",
-        Expression::Binary(_) => "A binary operation used as a statement likely has no effect.",
+        Expression::Binary(binary) => {
+            if binary.operator.is_null_coalesce() && binary.rhs.is_throw() {
+                return; // `?? throw` has side effects
+            }
+
+            "A binary operation used as a statement likely has no effect."
+        }
         Expression::Call(Call::Function(FunctionCall { function, .. })) => {
             let Expression::Identifier(function_name) = function else {
                 return;

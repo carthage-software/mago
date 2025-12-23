@@ -284,8 +284,8 @@ pub struct FormatSettings {
     /// class Foo {}
     /// ```
     ///
-    /// Default: false
-    #[serde(default = "default_false")]
+    /// Default: true
+    #[serde(default = "default_true")]
     pub inline_empty_classlike_braces: bool,
 
     /// Place empty anonymous class bodies on the same line.
@@ -324,6 +324,27 @@ pub struct FormatSettings {
     /// Default: `next_line`
     #[serde(default)]
     pub method_chain_breaking_style: MethodChainBreakingStyle,
+
+    /// When method chaining breaks across lines, place the first method on a new line.
+    ///
+    /// This follows PER-CS 4.7: "When [method chaining is] put on separate lines, [...] the first method MUST be on the next line."
+    ///
+    /// When enabled:
+    /// ```php
+    /// $this
+    ///     ->getCache()
+    ///     ->forget();
+    /// ```
+    ///
+    /// When disabled:
+    /// ```php
+    /// $this->getCache()
+    ///     ->forget();
+    /// ```
+    ///
+    /// Default: `true`
+    #[serde(default = "default_true")]
+    pub first_method_chain_on_new_line: bool,
 
     /// Whether to preserve line breaks in method chains, even if they could fit on a single line.
     ///
@@ -414,8 +435,8 @@ pub struct FormatSettings {
     /// );
     /// ```
     ///
-    /// Default: true
-    #[serde(default = "default_true")]
+    /// Default: false
+    #[serde(default = "default_false")]
     pub always_break_named_arguments_list: bool,
 
     /// Whether to always break named argument lists in attributes into multiple lines.
@@ -449,6 +470,37 @@ pub struct FormatSettings {
     /// Default: true
     #[serde(default = "default_true")]
     pub array_table_style_alignment: bool,
+
+    /// Whether to align consecutive assignment-like constructs in columns.
+    ///
+    /// When enabled, consecutive variable assignments, class properties, class constants,
+    /// global constants, array key-value pairs, and backed enum cases are column-aligned.
+    ///
+    /// Example with `true`:
+    /// ```php
+    /// $foo     = 1;
+    /// $b       = 2;
+    /// $ccccccc = 3;
+    ///
+    /// class X {
+    ///     public string       $foo    = 1;
+    ///     public readonly int $barrrr = 2;
+    /// }
+    /// ```
+    ///
+    /// Example with `false`:
+    /// ```php
+    /// $foo = 1;
+    /// $b = 2;
+    /// $ccccccc = 3;
+    /// ```
+    ///
+    /// Note: Blank lines and comments break alignment runs. In class bodies,
+    /// different member types (properties vs constants) are aligned separately.
+    ///
+    /// Default: false
+    #[serde(default = "default_false")]
+    pub align_assignment_like: bool,
 
     /// Whether to sort use statements alphabetically.
     ///
@@ -524,13 +576,6 @@ pub struct FormatSettings {
 
     /// How to format null type hints.
     ///
-    /// With `NullPipe`:
-    /// ```php
-    /// function foo(null|string $bar) {
-    ///     return $bar;
-    /// }
-    /// ```
-    ///
     /// With `Question`:
     /// ```php
     /// function foo(?string $bar) {
@@ -538,7 +583,14 @@ pub struct FormatSettings {
     /// }
     /// ```
     ///
-    /// Default: `NullPipe`
+    /// With `NullPipe`:
+    /// ```php
+    /// function foo(null|string $bar) {
+    ///     return $bar;
+    /// }
+    /// ```
+    ///
+    /// Default: `Question`
     #[serde(default)]
     pub null_type_hint: NullTypeHint,
 
@@ -802,6 +854,14 @@ pub struct FormatSettings {
     #[serde(default = "default_true")]
     pub empty_line_after_symbols: bool,
 
+    /// Whether to add an empty line between consecutive symbols of the same type.
+    ///
+    /// Only applies when `empty_line_after_symbols` is true.
+    ///
+    /// Default: true
+    #[serde(default = "default_true")]
+    pub empty_line_between_same_symbols: bool,
+
     /// Whether to add an empty line after class-like constant.
     ///
     /// Note: if an empty line already exists, it will be preserved regardless of this
@@ -886,11 +946,12 @@ impl Default for FormatSettings {
             inline_empty_function_braces: false,
             inline_empty_method_braces: false,
             inline_empty_constructor_braces: true,
-            inline_empty_classlike_braces: false,
+            inline_empty_classlike_braces: true,
             inline_empty_anonymous_class_braces: true,
             null_type_hint: NullTypeHint::default(),
             break_promoted_properties_list: true,
             method_chain_breaking_style: MethodChainBreakingStyle::NextLine,
+            first_method_chain_on_new_line: true,
             line_before_binary_operator: true,
             sort_uses: true,
             sort_class_methods: false,
@@ -902,7 +963,8 @@ impl Default for FormatSettings {
             parentheses_in_exit_and_die: true,
             parentheses_in_attribute: false,
             array_table_style_alignment: true,
-            always_break_named_arguments_list: true,
+            align_assignment_like: false,
+            always_break_named_arguments_list: false,
             always_break_attribute_named_argument_lists: false,
             preserve_breaking_member_access_chain: false,
             preserve_breaking_argument_list: false,
@@ -931,6 +993,7 @@ impl Default for FormatSettings {
             empty_line_after_namespace: true,
             empty_line_after_use: true,
             empty_line_after_symbols: true,
+            empty_line_between_same_symbols: true,
             empty_line_after_class_like_constant: false,
             empty_line_after_enum_case: false,
             empty_line_after_trait_use: false,
@@ -1042,9 +1105,9 @@ impl FromStr for EndOfLine {
 /// Specifies null type hint style.
 #[derive(Default, Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, JsonSchema)]
 pub enum NullTypeHint {
-    #[default]
     #[serde(alias = "null_pipe", alias = "pipe", alias = "long", alias = "|")]
     NullPipe,
+    #[default]
     #[serde(alias = "question", alias = "short", alias = "?")]
     Question,
 }

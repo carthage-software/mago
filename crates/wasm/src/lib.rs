@@ -8,9 +8,10 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 use std::sync::Arc;
 
-use mago_analyzer::plugin::PluginRegistry;
 use wasm_bindgen::prelude::*;
 
+use mago_analyzer::plugin::available_plugins;
+use mago_analyzer::plugin::create_registry_with_plugins;
 use mago_analyzer::settings::Settings as AnalyzerSettings;
 use mago_atom::ascii_lowercase_atom;
 use mago_atom::atom;
@@ -31,6 +32,7 @@ use mago_syntax::parser::parse_file;
 
 use crate::types::IssueSource;
 use crate::types::WasmIssue;
+use crate::types::WasmPluginInfo;
 use crate::types::WasmRuleInfo;
 use crate::types::WasmSettings;
 
@@ -128,7 +130,7 @@ pub fn run(code: String, settings_js: JsValue) -> Result<JsValue, JsValue> {
         ..Default::default()
     };
 
-    let plugin_registry = Arc::new(PluginRegistry::with_library_providers());
+    let plugin_registry = Arc::new(create_registry_with_plugins(&s.plugins, s.disable_default_plugins));
     let analysis_service = AnalysisService::new(
         prelude.database.read_only(),
         prelude.metadata,
@@ -231,7 +233,8 @@ pub fn analyze(code: String, php_version: &str) -> Result<JsValue, JsValue> {
         ..Default::default()
     };
 
-    let plugin_registry = Arc::new(PluginRegistry::with_library_providers());
+    // Use default plugin configuration (stdlib enabled by default)
+    let plugin_registry = Arc::new(create_registry_with_plugins(&[], false));
     let service = AnalysisService::new(
         prelude.database.read_only(),
         prelude.metadata,
@@ -305,4 +308,25 @@ pub fn get_rules() -> Result<JsValue, JsValue> {
         .collect();
 
     serde_wasm_bindgen::to_value(&rules).map_err(|e| JsValue::from_str(&e.to_string()))
+}
+
+/// Returns metadata for all available analyzer plugins.
+///
+/// # Returns
+///
+/// A JavaScript array of plugin metadata objects.
+#[wasm_bindgen(js_name = getPlugins)]
+pub fn get_plugins() -> Result<JsValue, JsValue> {
+    let plugins: Vec<WasmPluginInfo> = available_plugins()
+        .into_iter()
+        .map(|meta| WasmPluginInfo {
+            id: meta.id.to_string(),
+            name: meta.name.to_string(),
+            description: meta.description.to_string(),
+            aliases: meta.aliases.iter().map(|s| (*s).to_string()).collect(),
+            default_enabled: meta.default_enabled,
+        })
+        .collect();
+
+    serde_wasm_bindgen::to_value(&plugins).map_err(|e| JsValue::from_str(&e.to_string()))
 }

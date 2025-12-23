@@ -15,12 +15,12 @@ use mago_atom::atom;
 
 use mago_codex::ttype;
 use mago_codex::ttype::TType;
+use mago_codex::ttype::add_optional_union_type;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::bool::TBool;
 use mago_codex::ttype::combine_union_types;
-use mago_codex::ttype::combiner::combine;
 use mago_codex::ttype::get_array_parameters;
 use mago_codex::ttype::get_arraykey;
 use mago_codex::ttype::get_iterable_parameters;
@@ -212,12 +212,20 @@ fn analyze<'ctx, 'ast, 'arena>(
         let mut complex_conditions = vec![];
         for pre_condition in pre_conditions {
             let condition_span = pre_condition.span();
-            let clauses = get_formula(condition_span, condition_span, pre_condition, assertion_context, artifacts)
-                .unwrap_or_else(|| {
-                    complex_conditions.push(condition_span);
+            let clauses = get_formula(
+                condition_span,
+                condition_span,
+                pre_condition,
+                assertion_context,
+                artifacts,
+                &context.settings.algebra_thresholds(),
+                context.settings.formula_size_threshold,
+            )
+            .unwrap_or_else(|| {
+                complex_conditions.push(condition_span);
 
-                    vec![]
-                });
+                vec![]
+            });
 
             pre_condition_clauses.push(clauses);
         }
@@ -672,8 +680,11 @@ fn analyze<'ctx, 'ast, 'arena>(
         // if the loop contains an assertion and there are no break statements, we can negate that assertion
         // and apply it to the current context
 
-        let negated_pre_condition_clauses =
-            negate_formula(pre_condition_clauses.into_iter().flatten().collect()).unwrap_or_default();
+        let negated_pre_condition_clauses = negate_formula(
+            pre_condition_clauses.into_iter().flatten().collect(),
+            &context.settings.algebra_thresholds(),
+        )
+        .unwrap_or_default();
 
         let (negated_pre_condition_types, _) =
             find_satisfying_assignments(negated_pre_condition_clauses.iter().as_slice(), None, &mut AtomSet::default());
@@ -722,6 +733,13 @@ fn analyze<'ctx, 'ast, 'arena>(
                     loop_parent_context.locals.insert(
                         *variable_id,
                         Rc::new(combine_union_types(variable_type, possibly_defined_type, codebase, true)),
+                    );
+                } else if let Some(possibly_redefined_type) =
+                    loop_scope.possibly_redefined_loop_parent_variables.get(variable_id)
+                {
+                    loop_parent_context.locals.insert(
+                        *variable_id,
+                        Rc::new(combine_union_types(variable_type, possibly_redefined_type, codebase, true)),
                     );
                 }
             } else {
@@ -800,11 +818,14 @@ fn apply_pre_condition_to_loop_context<'ctx, 'arena>(
     let always_assigned_before_loop_body_variables =
         BlockContext::get_new_or_updated_locals(loop_context, loop_parent_context);
 
-    loop_context.clauses = saturate_clauses({
-        let mut clauses = loop_parent_context.clauses.iter().map(|v| &**v).collect::<Vec<_>>();
-        clauses.extend(pre_condition_clauses.iter());
-        clauses
-    })
+    loop_context.clauses = saturate_clauses(
+        {
+            let mut clauses = loop_parent_context.clauses.iter().map(|v| &**v).collect::<Vec<_>>();
+            clauses.extend(pre_condition_clauses.iter());
+            clauses
+        },
+        &context.settings.algebra_thresholds(),
+    )
     .into_iter()
     .map(|v| Rc::new(v.clone()))
     .collect();
@@ -993,8 +1014,8 @@ fn analyze_iterator<'ctx, 'ast, 'arena>(
     }
 
     let mut has_at_least_one_entry = false;
-    let mut collected_key_atomics: Vec<TAtomic> = vec![];
-    let mut collected_value_atomics: Vec<TAtomic> = vec![];
+    let mut key_type = None;
+    let mut value_type = None;
     let mut has_valid_iterable_type = false;
     let mut invalid_atomic_ids = Vec::with_capacity(iterator_type.types.len());
 
@@ -1014,15 +1035,25 @@ fn analyze_iterator<'ctx, 'ast, 'arena>(
                 }
 
                 let (k, v) = get_array_parameters(array, context.codebase);
-                collected_key_atomics.extend(k.types.into_owned());
-                collected_value_atomics.extend(v.types.into_owned());
+
+                key_type = Some(add_optional_union_type(k, key_type.as_ref(), context.codebase));
+                value_type = Some(add_optional_union_type(v, value_type.as_ref(), context.codebase));
             }
             TAtomic::Iterable(iterable) => {
                 has_valid_iterable_type = true;
                 has_at_least_one_entry = false;
 
-                collected_key_atomics.extend(iterable.key_type.types.iter().cloned());
-                collected_value_atomics.extend(iterable.value_type.types.iter().cloned());
+                key_type = Some(add_optional_union_type(
+                    iterable.key_type.as_ref().clone(),
+                    key_type.as_ref(),
+                    context.codebase,
+                ));
+
+                value_type = Some(add_optional_union_type(
+                    iterable.value_type.as_ref().clone(),
+                    value_type.as_ref(),
+                    context.codebase,
+                ));
             }
             TAtomic::Object(object) => {
                 let (obj_key_type, obj_value_type) = match object {
@@ -1106,8 +1137,8 @@ fn analyze_iterator<'ctx, 'ast, 'arena>(
 
                 has_valid_iterable_type = true;
 
-                collected_key_atomics.extend(obj_key_type.types.into_owned());
-                collected_value_atomics.extend(obj_value_type.types.into_owned());
+                key_type = Some(add_optional_union_type(obj_key_type, key_type.as_ref(), context.codebase));
+                value_type = Some(add_optional_union_type(obj_value_type, value_type.as_ref(), context.codebase));
             }
             _ => {
                 let iterator_atomic_id = iterator_atomic.get_id();
@@ -1175,19 +1206,7 @@ fn analyze_iterator<'ctx, 'ast, 'arena>(
         return Ok((false, get_mixed(), get_mixed()));
     }
 
-    let final_key_type = if collected_key_atomics.is_empty() {
-        get_mixed()
-    } else {
-        TUnion::from_vec(combine(collected_key_atomics, context.codebase, false))
-    };
-
-    let final_value_type = if collected_value_atomics.is_empty() {
-        get_mixed()
-    } else {
-        TUnion::from_vec(combine(collected_value_atomics, context.codebase, false))
-    };
-
-    Ok((has_at_least_one_entry, final_key_type, final_value_type))
+    Ok((has_at_least_one_entry, key_type.unwrap_or_else(get_mixed), value_type.unwrap_or_else(get_mixed)))
 }
 
 /// Scrapes all direct variable names from an expression and indicates if a reference operator (`&`)

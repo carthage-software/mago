@@ -783,4 +783,42 @@ mod tests {
         assert_eq!(description, "Exception");
         assert_eq!(&phpdoc[tag.span.start.offset as usize..tag.span.end.offset as usize], "@throws\u{3000}Exception");
     }
+
+    #[test]
+    fn test_issue_808() {
+        let arena = Bump::new();
+
+        let phpdoc = "/** @param\u{3000}string $foo 中文描述 */";
+        let span = Span::new(FileId::zero(), Position::new(0), Position::new(phpdoc.len() as u32));
+        let document = parse_phpdoc_with_span(&arena, phpdoc, span).expect("Failed to parse PHPDoc");
+
+        assert_eq!(document.elements.len(), 1);
+        let Element::Tag(tag) = &document.elements[0] else {
+            panic!("Expected Element::Tag, got {:?}", document.elements[0]);
+        };
+        assert_eq!(tag.name, "param");
+        assert_eq!(tag.description, "string $foo 中文描述");
+
+        let phpdoc2 = "/** @return\u{3000}int 返回🎉值 */";
+        let span2 = Span::new(FileId::zero(), Position::new(0), Position::new(phpdoc2.len() as u32));
+        let document2 = parse_phpdoc_with_span(&arena, phpdoc2, span2).expect("Failed to parse PHPDoc");
+
+        assert_eq!(document2.elements.len(), 1);
+        let Element::Tag(tag2) = &document2.elements[0] else {
+            panic!("Expected Element::Tag, got {:?}", document2.elements[0]);
+        };
+        assert_eq!(tag2.name, "return");
+        assert_eq!(tag2.description, "int 返回🎉值");
+
+        let phpdoc3 = "/** @see\u{3000}中文类::方法() 说明 */";
+        let span3 = Span::new(FileId::zero(), Position::new(0), Position::new(phpdoc3.len() as u32));
+        let document3 = parse_phpdoc_with_span(&arena, phpdoc3, span3).expect("Failed to parse PHPDoc");
+
+        assert_eq!(document3.elements.len(), 1);
+        let Element::Tag(tag3) = &document3.elements[0] else {
+            panic!("Expected Element::Tag, got {:?}", document3.elements[0]);
+        };
+        assert_eq!(tag3.name, "see");
+        assert_eq!(tag3.description, "中文类::方法() 说明");
+    }
 }

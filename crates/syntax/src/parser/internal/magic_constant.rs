@@ -16,6 +16,7 @@ pub fn parse_magic_constant<'arena>(stream: &mut TokenStream<'_, 'arena>) -> Res
         T!["__LINE__"] => MagicConstant::Line(parse_local_identifier(stream)?),
         T!["__METHOD__"] => MagicConstant::Method(parse_local_identifier(stream)?),
         T!["__NAMESPACE__"] => MagicConstant::Namespace(parse_local_identifier(stream)?),
+        T!["__PROPERTY__"] => MagicConstant::Property(parse_local_identifier(stream)?),
         T!["__TRAIT__"] => MagicConstant::Trait(parse_local_identifier(stream)?),
         _ => {
             return Err(utils::unexpected(
@@ -29,6 +30,7 @@ pub fn parse_magic_constant<'arena>(stream: &mut TokenStream<'_, 'arena>) -> Res
                     "__LINE__",
                     "__METHOD__",
                     "__NAMESPACE__",
+                    "__PROPERTY__",
                     "__TRAIT__"
                 ],
             ));

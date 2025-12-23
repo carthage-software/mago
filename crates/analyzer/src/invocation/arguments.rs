@@ -81,10 +81,7 @@ pub fn analyze_and_store_argument_type<'ctx, 'arena>(
             })
             .flat_map(|callable| callable.parameters.iter().enumerate())
             .filter_map(|(parameter_index, parameter)| {
-                parameter
-                    .get_type_signature()
-                    .filter(|param_type| param_type.is_array() || param_type.has_object())
-                    .map(|param_type| (parameter_index, param_type.clone()))
+                parameter.get_type_signature().map(|param_type| (parameter_index, param_type.clone()))
             })
             .for_each(|(parameter_index, parameter_type)| {
                 inferred_parameters.insert(parameter_index, parameter_type);

@@ -315,11 +315,7 @@ fn resolve_method_from_metadata<'ctx, 'arena>(
     let static_class_type = if let Some(current_class_metadata) = current_class_metadata
         && classname.is_relative()
     {
-        let object = if classname.is_parent() {
-            get_metadata_object(context, defining_class_metadata, current_class_metadata)
-        } else {
-            get_metadata_object(context, current_class_metadata, current_class_metadata)
-        };
+        let object = get_metadata_object(context, current_class_metadata, current_class_metadata);
 
         StaticClassType::Object(object)
     } else if defining_class_metadata.kind.is_enum() {

@@ -9,8 +9,8 @@ use mago_database::ReadDatabase;
 use mago_database::error::DatabaseError;
 use mago_database::file::FileId;
 use mago_database::file::FileType;
-use mago_fixer::FixPlan;
 use mago_span::Span;
+use mago_text_edit::TextEdit;
 
 use crate::Annotation;
 use crate::AnnotationKind;
@@ -68,7 +68,7 @@ pub struct ExpandedIssue {
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub annotations: Vec<ExpandedAnnotation>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub suggestions: Vec<(ExpandedFileId, FixPlan)>,
+    pub edits: Vec<(ExpandedFileId, Vec<TextEdit>)>,
 }
 
 /// A collection of expanded issues.
@@ -119,9 +119,9 @@ impl Expandable<ExpandedIssue> for Issue {
             annotations.push(annotation.expand(database)?);
         }
 
-        let mut suggestions = Vec::new();
-        for (file_id, fix) in &self.suggestions {
-            suggestions.push((file_id.expand(database)?, fix.clone()));
+        let mut edits = Vec::new();
+        for (file_id, edit_list) in &self.edits {
+            edits.push((file_id.expand(database)?, edit_list.clone()));
         }
 
         Ok(ExpandedIssue {
@@ -132,7 +132,7 @@ impl Expandable<ExpandedIssue> for Issue {
             help: self.help.clone(),
             link: self.link.clone(),
             annotations,
-            suggestions,
+            edits,
         })
     }
 }

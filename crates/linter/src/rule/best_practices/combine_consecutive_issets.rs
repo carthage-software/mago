@@ -3,7 +3,6 @@ use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_fixer::SafetyClassification;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_reporting::Level;
@@ -14,6 +13,7 @@ use mago_syntax::ast::Expression;
 use mago_syntax::ast::IssetConstruct;
 use mago_syntax::ast::Node;
 use mago_syntax::ast::NodeKind;
+use mago_text_edit::TextEdit;
 
 use crate::category::Category;
 use crate::context::LintContext;
@@ -124,12 +124,12 @@ impl LintRule for CombineConsecutiveIssetsRule {
             return;
         }
 
-        ctx.collector.propose(issue, |plan| {
+        ctx.collector.propose(issue, |edits| {
             let to_replace = left_isset.right_parenthesis.join(binary.operator.span());
             let to_delete = right_isset.isset.span.join(right_isset.left_parenthesis);
 
-            plan.replace(to_replace.to_range(), ",".to_string(), SafetyClassification::Safe);
-            plan.delete(to_delete.to_range(), SafetyClassification::Safe);
+            edits.push(TextEdit::replace(to_replace, ","));
+            edits.push(TextEdit::delete(to_delete));
         });
     }
 }

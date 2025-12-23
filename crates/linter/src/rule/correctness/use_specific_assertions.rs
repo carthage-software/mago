@@ -1,9 +1,9 @@
 use indoc::indoc;
+use mago_text_edit::Safety;
 use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_fixer::SafetyClassification;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_reporting::Level;
@@ -13,6 +13,7 @@ use mago_syntax::ast::Expression;
 use mago_syntax::ast::Literal;
 use mago_syntax::ast::Node;
 use mago_syntax::ast::NodeKind;
+use mago_text_edit::TextEdit;
 
 use crate::category::Category;
 use crate::context::LintContext;
@@ -25,6 +26,7 @@ use crate::rule_meta::RuleMeta;
 use crate::settings::RuleSettings;
 
 const GENERIC_ASSERTIONS: [&str; 4] = ["assertEquals", "assertNotEquals", "assertSame", "assertNotSame"];
+const EQUALITY_ASSERTIONS: [&str; 2] = ["assertEquals", "assertNotEquals"];
 
 /// Position of the literal in the assertion call.
 #[derive(Debug, Clone, Copy)]
@@ -157,13 +159,15 @@ impl LintRule for UseSpecificAssertionsRule {
             let first_expr = first_arg.value();
             let second_expr = second_arg.value();
 
+            let is_equality_assertion = EQUALITY_ASSERTIONS.contains(&identifier.value);
+
             let Some((specific_assertion, literal_position)) =
                 get_specific_assertion(identifier.value, first_expr, second_expr)
             else {
                 continue;
             };
 
-            let issue = Issue::new(
+            let mut issue = Issue::new(
                 self.cfg.level(),
                 format!("Use `{}` instead of `{}` for clearer test assertions.", specific_assertion, identifier.value),
             )
@@ -177,26 +181,34 @@ impl LintRule for UseSpecificAssertionsRule {
                 identifier.value, specific_assertion
             ));
 
-            ctx.collector.propose(issue, |plan| {
-                plan.replace(
-                    reference.get_selector().span().to_range(),
-                    specific_assertion.to_string(),
-                    SafetyClassification::Safe,
-                );
+            if is_equality_assertion {
+                issue = issue.with_help(format!(
+                    "`{}` performs a non-strict comparison, while `{specific_assertion}` performs a strict comparison.",
+                    identifier.value
+                ));
+
+                issue = issue.with_help("Ensure that this change does not affect the test behavior.");
+            }
+
+            ctx.collector.propose(issue, |edits| {
+                let safety = if is_equality_assertion { Safety::PotentiallyUnsafe } else { Safety::Safe };
+
+                edits.push(TextEdit::replace(reference.get_selector().span(), specific_assertion).with_safety(safety));
 
                 match literal_position {
                     LiteralPosition::First => {
-                        plan.replace(
-                            argument_list.span().start_offset()..second_expr.span().start_offset(),
-                            "(".to_string(),
-                            SafetyClassification::Safe,
+                        edits.push(
+                            TextEdit::replace(
+                                argument_list.span().start_offset()..second_expr.span().start_offset(),
+                                "(",
+                            )
+                            .with_safety(safety),
                         );
                     }
                     LiteralPosition::Second => {
-                        plan.replace(
-                            first_expr.span().end_offset()..argument_list.span().end_offset(),
-                            ")".to_string(),
-                            SafetyClassification::Safe,
+                        edits.push(
+                            TextEdit::replace(first_expr.span().end_offset()..argument_list.span().end_offset(), ")")
+                                .with_safety(safety),
                         );
                     }
                 }

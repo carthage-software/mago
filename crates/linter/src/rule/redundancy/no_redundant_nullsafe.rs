@@ -3,7 +3,6 @@ use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_fixer::SafetyClassification;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_reporting::Level;
@@ -14,6 +13,7 @@ use mago_syntax::ast::BinaryOperator;
 use mago_syntax::ast::Expression;
 use mago_syntax::ast::Node;
 use mago_syntax::ast::NodeKind;
+use mago_text_edit::TextEdit;
 
 use crate::category::Category;
 use crate::context::LintContext;
@@ -120,8 +120,8 @@ impl LintRule for NoRedundantNullsafeRule {
                     .with_note("The `??` operator already handles cases where the left-hand side is `null`, making the `?->` operator unnecessary.")
                     .with_help("Replace `?->` with the standard `->` operator for clarity.");
 
-                ctx.collector.propose(issue, |plan| {
-                    plan.replace(null_safe.question_mark_arrow.to_range(), "->", SafetyClassification::Safe);
+                ctx.collector.propose(issue, |edits| {
+                    edits.push(TextEdit::replace(null_safe.question_mark_arrow, "->"));
                 });
             }
             Node::IssetConstruct(construct) => {
@@ -143,8 +143,8 @@ impl LintRule for NoRedundantNullsafeRule {
                         .with_note("Using the nullsafe operator in `isset` checks is unnecessary because `isset` inherently checks for the existence of the property, making the `?->` operator superfluous.")
                         .with_help("Replace `?->` with the standard `->` operator for clarity.");
 
-                    ctx.collector.propose(issue, |plan| {
-                        plan.replace(null_safe.question_mark_arrow.to_range(), "->", SafetyClassification::Safe);
+                    ctx.collector.propose(issue, |edits| {
+                        edits.push(TextEdit::replace(null_safe.question_mark_arrow, "->"));
                     });
                 }
             }

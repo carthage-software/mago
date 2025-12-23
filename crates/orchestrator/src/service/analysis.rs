@@ -137,7 +137,7 @@ impl AnalysisService {
         // Run the analyzer
         let mut analysis_result = AnalysisResult::new(self.symbol_references);
         let analyzer =
-            Analyzer::new(&arena, file, &resolved_names, &self.codebase, self.settings, &self.plugin_registry);
+            Analyzer::new(&arena, file, &resolved_names, &self.codebase, &self.plugin_registry, self.settings);
 
         if let Err(err) = analyzer.analyze(program, &mut analysis_result) {
             issues.push(Issue::error(format!("Analysis error: {err}")));
@@ -226,7 +226,7 @@ impl AnalysisService {
 
                 let semantics_checker = SemanticsChecker::new(settings.version);
                 let analyzer =
-                    Analyzer::new(arena, &source_file, &resolved_names, &codebase, settings, &plugin_registry);
+                    Analyzer::new(arena, &source_file, &resolved_names, &codebase, &plugin_registry, settings);
 
                 analysis_result.issues.extend(semantics_checker.check(&source_file, program, &resolved_names));
                 analyzer.analyze(program, &mut analysis_result)?;
@@ -320,7 +320,7 @@ impl AnalysisService {
 
                 let semantics_checker = SemanticsChecker::new(settings.version);
                 let analyzer =
-                    Analyzer::new(arena, &source_file, &resolved_names, &codebase, settings, &plugin_registry);
+                    Analyzer::new(arena, &source_file, &resolved_names, &codebase, &plugin_registry, settings);
 
                 analysis_result.issues.extend(semantics_checker.check(&source_file, program, &resolved_names));
                 analyzer.analyze(program, &mut analysis_result)?;

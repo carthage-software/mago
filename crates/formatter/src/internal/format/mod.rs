@@ -106,7 +106,7 @@ use crate::document::Space;
 use crate::document::Trim;
 use crate::internal::FormatterState;
 use crate::internal::format::assignment::AssignmentLikeNode;
-use crate::internal::format::assignment::print_assignment;
+use crate::internal::format::assignment::print_assignment_with_alignment;
 use crate::internal::format::block::print_block_of_nodes;
 use crate::internal::format::call_node::CallLikeNode;
 use crate::internal::format::call_node::print_call_like_node;
@@ -119,9 +119,9 @@ use crate::internal::format::return_value::format_return_value;
 use crate::internal::format::statement::print_statement_sequence;
 use crate::internal::format::string::print_lowercase_keyword;
 use crate::internal::utils;
-use crate::settings::NullTypeHint;
 use crate::wrap;
 
+pub mod alignment;
 pub mod array;
 pub mod assignment;
 pub mod binaryish;
@@ -790,12 +790,13 @@ impl<'arena> Format<'arena> for ClassLikeConstantItem<'arena> {
         wrap!(f, self, ClassLikeConstantItem, {
             let lhs = self.name.format(f);
 
-            print_assignment(
+            print_assignment_with_alignment(
                 f,
                 AssignmentLikeNode::ClassLikeConstantItem(self),
                 lhs,
                 Document::String("="),
                 &self.value,
+                f.alignment_context(),
             )
         })
     }
@@ -843,7 +844,14 @@ impl<'arena> Format<'arena> for EnumCaseBackedItem<'arena> {
             let lhs = self.name.format(f);
             let operator = Document::String("=");
 
-            print_assignment(f, AssignmentLikeNode::EnumCaseBackedItem(self), lhs, operator, &self.value)
+            print_assignment_with_alignment(
+                f,
+                AssignmentLikeNode::EnumCaseBackedItem(self),
+                lhs,
+                operator,
+                &self.value,
+                f.alignment_context(),
+            )
         })
     }
 }
@@ -885,6 +893,14 @@ impl<'arena> Format<'arena> for PlainProperty<'arena> {
                 }
 
                 contents.push(h.format(f));
+
+                // Add type padding for alignment if in an alignment context
+                if let Some(alignment) = f.alignment_context()
+                    && alignment.type_padding > 0
+                {
+                    contents.push(Document::String(f.as_str(" ".repeat(alignment.type_padding))));
+                }
+
                 should_add_space = true;
             }
 
@@ -979,7 +995,14 @@ impl<'arena> Format<'arena> for PropertyConcreteItem<'arena> {
             let lhs = self.variable.format(f);
             let operator = Document::String("=");
 
-            print_assignment(f, AssignmentLikeNode::PropertyConcreteItem(self), lhs, operator, &self.value)
+            print_assignment_with_alignment(
+                f,
+                AssignmentLikeNode::PropertyConcreteItem(self),
+                lhs,
+                operator,
+                &self.value,
+                f.alignment_context(),
+            )
         })
     }
 }
@@ -1273,9 +1296,15 @@ impl<'arena> Format<'arena> for ConstantItem<'arena> {
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
         wrap!(f, self, ConstantItem, {
             let lhs = self.name.format(f);
-            let operator = Document::String("=");
 
-            print_assignment(f, AssignmentLikeNode::ConstantItem(self), lhs, operator, &self.value)
+            print_assignment_with_alignment(
+                f,
+                AssignmentLikeNode::ConstantItem(self),
+                lhs,
+                Document::String("="),
+                &self.value,
+                f.alignment_context(),
+            )
         })
     }
 }
@@ -1323,12 +1352,12 @@ impl<'arena> Format<'arena> for Hint<'arena> {
         wrap!(f, self, Hint, {
             match self {
                 Hint::Identifier(identifier) => identifier.format(f),
-                Hint::Parenthesized(parenthesized_hint) => Document::Group(Group::new(vec![
+                Hint::Parenthesized(parenthesized_hint) => Document::Array(vec![
                     in f.arena;
                     format_token(f, parenthesized_hint.left_parenthesis, "("),
                     parenthesized_hint.hint.format(f),
                     format_token(f, parenthesized_hint.right_parenthesis, ")"),
-                ])),
+                ]),
                 Hint::Nullable(nullable_hint) => {
                     // If the nullable type is nested inside another type hint,
                     // we cannot use `?` syntax.
@@ -1338,25 +1367,15 @@ impl<'arena> Format<'arena> for Hint<'arena> {
                             Hint::Nullable(_) | Hint::Union(_) | Hint::Intersection(_) | Hint::Parenthesized(_)
                         ));
 
-                    if force_long_syntax {
-                        return Document::Group(Group::new(vec![
+                    if force_long_syntax || !f.settings.null_type_hint.is_question() {
+                        Document::Array(vec![
                             in f.arena;
                             Document::String("null"),
                             Document::String("|"),
                             nullable_hint.hint.format(f),
-                        ]));
-                    }
-
-                    match f.settings.null_type_hint {
-                        NullTypeHint::NullPipe => Document::Group(Group::new(vec![
-                            in f.arena;
-                            Document::String("null"),
-                            Document::String("|"),
-                            nullable_hint.hint.format(f),
-                        ])),
-                        NullTypeHint::Question => Document::Group(Group::new(
-                            vec![in f.arena; Document::String("?"), nullable_hint.hint.format(f)],
-                        )),
+                        ])
+                    } else {
+                        Document::Array(vec![in f.arena; Document::String("?"), nullable_hint.hint.format(f)])
                     }
                 }
                 Hint::Union(union_hint) => {
@@ -1370,39 +1389,33 @@ impl<'arena> Format<'arena> for Hint<'arena> {
                             Hint::Nullable(_) | Hint::Union(_) | Hint::Intersection(_) | Hint::Parenthesized(_)
                         );
 
-                    if !force_long_syntax {
-                        if let Hint::Null(_) = union_hint.left
-                            && f.settings.null_type_hint.is_question()
-                        {
-                            return Document::Group(Group::new(vec![
-                                in f.arena;
-                                Document::String("?"),
-                                union_hint.right.format(f),
-                            ]));
-                        }
+                    let use_short_syntax = if !force_long_syntax && f.settings.null_type_hint.is_question() {
+                        matches!(union_hint.left, Hint::Null(_)) || matches!(union_hint.right, Hint::Null(_))
+                    } else {
+                        false
+                    };
 
-                        if let Hint::Null(_) = union_hint.right
-                            && f.settings.null_type_hint.is_question()
-                        {
-                            return Document::Group(Group::new(
-                                vec![in f.arena; Document::String("?"), union_hint.left.format(f)],
-                            ));
-                        }
+                    if use_short_syntax {
+                        Document::Array(vec![
+                            in f.arena;
+                            Document::String("?"),
+                            union_hint.right.format(f),
+                        ])
+                    } else {
+                        Document::Array(vec![
+                            in f.arena;
+                            union_hint.left.format(f),
+                            format_token(f, union_hint.pipe, "|"),
+                            union_hint.right.format(f),
+                        ])
                     }
-
-                    Document::Group(Group::new(vec![
-                        in f.arena;
-                        union_hint.left.format(f),
-                        format_token(f, union_hint.pipe, "|"),
-                        union_hint.right.format(f),
-                    ]))
                 }
-                Hint::Intersection(intersection_hint) => Document::Group(Group::new(vec![
+                Hint::Intersection(intersection_hint) => Document::Array(vec![
                     in f.arena;
                     intersection_hint.left.format(f),
                     format_token(f, intersection_hint.ampersand, "&"),
                     intersection_hint.right.format(f),
-                ])),
+                ]),
                 Hint::Null(_) => Document::String("null"),
                 Hint::True(_) => Document::String("true"),
                 Hint::False(_) => Document::String("false"),

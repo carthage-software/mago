@@ -266,6 +266,12 @@ impl TAtomic {
         matches!(self, TAtomic::Array(array) if array.is_list())
     }
 
+    #[inline]
+    #[must_use]
+    pub fn is_vanilla_array(&self) -> bool {
+        matches!(self, TAtomic::Array(array) if array.is_vanilla())
+    }
+
     pub fn get_list_element_type(&self) -> Option<&TUnion> {
         match self {
             TAtomic::Array(array) => array.get_list().map(array::list::TList::get_element_type),
@@ -713,7 +719,7 @@ impl TAtomic {
             TAtomic::Scalar(scalar) if scalar.is_falsy() => true,
             TAtomic::Array(array) if array.is_falsy() => true,
             TAtomic::Mixed(mixed) if mixed.is_falsy() => true,
-            TAtomic::Null => true,
+            TAtomic::Null | TAtomic::Void => true,
             _ => false,
         }
     }

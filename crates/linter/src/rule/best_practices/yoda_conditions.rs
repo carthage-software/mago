@@ -1,5 +1,5 @@
 use indoc::indoc;
-use mago_fixer::SafetyClassification;
+use mago_text_edit::TextEdit;
 use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
@@ -124,21 +124,21 @@ impl LintRule for YodaConditionsRule {
                 .with_note("Yoda conditions help prevent accidental assignment bugs where `=` is used instead of `==`")
                 .with_help("Move constant/literal to left: `5 === $count`");
 
-            ctx.collector.propose(issue, |plan| {
+            ctx.collector.propose(issue, |edits| {
                 let source_code = ctx.source_file.contents.as_ref();
 
                 let right_side_span = binary.rhs.span();
-                let right_side_start = right_side_span.start.offset as usize;
-                let right_side_end = right_side_span.end.offset as usize;
+                let right_side_start = right_side_span.start_offset() as usize;
+                let right_side_end = right_side_span.end_offset() as usize;
                 let right_side = &source_code[right_side_start..right_side_end];
 
                 let left_side_span = binary.lhs.span();
-                let left_side_start = left_side_span.start.offset as usize;
-                let left_side_end = left_side_span.end.offset as usize;
+                let left_side_start = left_side_span.start_offset() as usize;
+                let left_side_end = left_side_span.end_offset() as usize;
                 let left_side = &source_code[left_side_start..left_side_end];
 
-                plan.replace(right_side_span.to_range(), left_side, SafetyClassification::Safe);
-                plan.replace(left_side_span.to_range(), right_side, SafetyClassification::Safe);
+                edits.push(TextEdit::replace(right_side_span, left_side));
+                edits.push(TextEdit::replace(left_side_span, right_side));
             });
         }
     }

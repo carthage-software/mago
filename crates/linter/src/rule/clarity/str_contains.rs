@@ -3,7 +3,6 @@ use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_fixer::SafetyClassification;
 use mago_php_version::PHPVersion;
 use mago_php_version::PHPVersionRange;
 use mago_reporting::Annotation;
@@ -17,6 +16,7 @@ use mago_syntax::ast::FunctionCall;
 use mago_syntax::ast::Literal;
 use mago_syntax::ast::Node;
 use mago_syntax::ast::NodeKind;
+use mago_text_edit::TextEdit;
 
 use crate::category::Category;
 use crate::context::LintContext;
@@ -185,7 +185,7 @@ impl LintRule for StrContainsRule {
             .with_help(help_text)
             .with_note("Using `str_contains` makes the code easier to understand and more expressive.");
 
-        ctx.collector.propose(issue, |plan| {
+        ctx.collector.propose(issue, |edits| {
             let function_span = call.function.span();
 
             if needs_negation {
@@ -193,22 +193,22 @@ impl LintRule for StrContainsRule {
                 // Replace entire binary expression with !str_contains(...)
                 if left {
                     // strpos(...) === false
-                    plan.replace(function_span.to_range(), format!("!{STR_CONTAINS}"), SafetyClassification::Safe);
-                    plan.delete(binary.operator.span().join(binary.rhs.span()).to_range(), SafetyClassification::Safe);
+                    edits.push(TextEdit::replace(function_span, format!("!{STR_CONTAINS}")));
+                    edits.push(TextEdit::delete(binary.operator.span().join(binary.rhs.span())));
                 } else {
                     // false === strpos(...)
-                    plan.delete(binary.lhs.span().join(binary.operator.span()).to_range(), SafetyClassification::Safe);
-                    plan.replace(function_span.to_range(), format!("!{STR_CONTAINS}"), SafetyClassification::Safe);
+                    edits.push(TextEdit::delete(binary.lhs.span().join(binary.operator.span())));
+                    edits.push(TextEdit::replace(function_span, format!("!{STR_CONTAINS}")));
                 }
             } else {
                 // For !== false, just replace with str_contains
-                plan.replace(function_span.to_range(), STR_CONTAINS.to_string(), SafetyClassification::Safe);
+                edits.push(TextEdit::replace(function_span, STR_CONTAINS));
 
                 // Remove comparison part
                 if left {
-                    plan.delete(binary.operator.span().join(binary.rhs.span()).to_range(), SafetyClassification::Safe);
+                    edits.push(TextEdit::delete(binary.operator.span().join(binary.rhs.span())));
                 } else {
-                    plan.delete(binary.lhs.span().join(binary.operator.span()).to_range(), SafetyClassification::Safe);
+                    edits.push(TextEdit::delete(binary.lhs.span().join(binary.operator.span())));
                 }
             }
         });

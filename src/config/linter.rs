@@ -6,7 +6,10 @@ use serde::Deserialize;
 use serde::Serialize;
 
 use mago_linter::integration::Integration;
+use mago_linter::integration::IntegrationSet;
+use mago_linter::rule::filter_rules_settings;
 use mago_linter::settings::RulesSettings;
+use mago_php_version::PHPVersion;
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(default, rename_all = "kebab-case", deny_unknown_fields)]
@@ -34,4 +37,24 @@ pub struct LinterConfiguration {
     /// The loose variant is more resilient to code changes as line number shifts
     /// don't affect the baseline.
     pub baseline_variant: BaselineVariant,
+}
+
+impl LinterConfiguration {
+    /// Returns a filtered version of the configuration suitable for display.
+    ///
+    /// This method excludes rules that don't match the configured integrations,
+    /// so that only applicable rules are shown in the output.
+    #[must_use]
+    pub fn to_filtered_value(&self, php_version: PHPVersion) -> serde_json::Value {
+        let integrations = IntegrationSet::from_slice(&self.integrations);
+        let filtered_rules = filter_rules_settings(&self.rules, php_version, integrations);
+
+        serde_json::json!({
+            "excludes": self.excludes,
+            "integrations": self.integrations,
+            "rules": filtered_rules,
+            "baseline": self.baseline,
+            "baseline-variant": self.baseline_variant,
+        })
+    }
 }

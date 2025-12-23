@@ -101,13 +101,13 @@ final class InstallMagoBinaryCommand extends BaseCommand
         $downloaded_file = $release_dir . '/' . $download['file'];
         $promise = $downloader
             ->addCopy($download['url'], $downloaded_file)
-            ->then(static function (null|Response $response = null) use (
+            ->then(static function (?Response $response = null) use (
                 $filesystem,
                 $release_dir,
                 $downloaded_file,
                 $executable_platform_file,
                 $executable_platform_content,
-            ): null|Response {
+            ): ?Response {
                 if (null === $response) {
                     return null;
                 }
@@ -176,7 +176,7 @@ final class InstallMagoBinaryCommand extends BaseCommand
                  *
                  * @return array<string, array{'file': string, 'url': string}>
                  */
-                static function (null|array $downloadMap, array $asset): array {
+                static function (?array $downloadMap, array $asset): array {
                     $downloadMap ??= [];
 
                     if (!str_ends_with($asset['name'], '.tar.gz') && !str_ends_with($asset['name'], '.zip')) {

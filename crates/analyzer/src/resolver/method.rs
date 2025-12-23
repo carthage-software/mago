@@ -121,7 +121,7 @@ pub fn resolve_method_targets<'ctx, 'ast, 'arena>(
 
             if object_atomic.is_null() {
                 result.encountered_null = true;
-                if !is_null_safe && !block_context.inside_nullsafe_chain {
+                if !object_type.ignore_nullable_issues() && !is_null_safe && !block_context.inside_nullsafe_chain {
                     result.has_invalid_target = true;
 
                     context.collector.report_with_code(

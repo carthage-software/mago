@@ -1,5 +1,9 @@
+use mago_algebra::AlgebraThresholds;
 use mago_atom::AtomSet;
 use mago_php_version::PHPVersion;
+
+/// Default maximum logical formula size during conditional analysis.
+pub const DEFAULT_FORMULA_SIZE_THRESHOLD: u16 = 512;
 
 /// Configuration settings that control the behavior of the Mago analyzer.
 ///
@@ -161,6 +165,58 @@ pub struct Settings {
     ///
     /// Defaults to `false`.
     pub check_property_initialization: bool,
+
+    /// Check for non-existent symbols in use statements.
+    ///
+    /// When enabled, the analyzer will report use statements that import symbols
+    /// (classes, interfaces, traits, enums, functions, or constants) that do not exist
+    /// in the codebase.
+    ///
+    /// Defaults to `false`.
+    pub check_use_statements: bool,
+
+    // Performance tuning thresholds
+    // Higher values allow deeper analysis at the cost of performance.
+    // Lower values improve speed but may reduce precision on complex code.
+    /// Maximum number of clauses to process during CNF saturation.
+    ///
+    /// Controls how many clauses the simplification algorithm will work with.
+    /// If exceeded, saturation returns an empty result to avoid performance issues.
+    ///
+    /// Defaults to `8192`.
+    pub saturation_complexity_threshold: u16,
+
+    /// Maximum number of clauses per side in disjunction operations.
+    ///
+    /// Controls the complexity limit for OR operations between clause sets.
+    /// If either side exceeds this, the disjunction returns an empty result.
+    ///
+    /// Defaults to `4096`.
+    pub disjunction_complexity_threshold: u16,
+
+    /// Maximum cumulative complexity during formula negation.
+    ///
+    /// Controls how complex the negation of a formula can become.
+    /// If exceeded, negation gives up to avoid exponential blowup.
+    ///
+    /// Defaults to `4096`.
+    pub negation_complexity_threshold: u16,
+
+    /// Upper limit for consensus optimization during saturation.
+    ///
+    /// Controls when the consensus rule is applied during saturation.
+    /// Only applies when clause count is between 3 and this limit.
+    ///
+    /// Defaults to `256`.
+    pub consensus_limit_threshold: u16,
+
+    /// Maximum logical formula size during conditional analysis.
+    ///
+    /// Limits the size of generated formulas to prevent exponential blowup
+    /// in deeply nested conditionals.
+    ///
+    /// Defaults to `512`.
+    pub formula_size_threshold: u16,
 }
 
 impl Default for Settings {
@@ -172,10 +228,12 @@ impl Default for Settings {
 impl Settings {
     #[must_use]
     pub fn new(version: PHPVersion) -> Self {
+        let default_thresholds = AlgebraThresholds::default();
+
         Self {
             version,
-            find_unused_expressions: false,
-            find_unused_definitions: false,
+            find_unused_expressions: true,
+            find_unused_definitions: true,
             analyze_dead_code: false,
             memoize_properties: true,
             allow_possibly_undefined_array_keys: true,
@@ -195,6 +253,23 @@ impl Settings {
             trust_existence_checks: true,
             class_initializers: AtomSet::default(),
             check_property_initialization: false,
+            check_use_statements: false,
+            saturation_complexity_threshold: default_thresholds.saturation_complexity,
+            disjunction_complexity_threshold: default_thresholds.disjunction_complexity,
+            negation_complexity_threshold: default_thresholds.negation_complexity,
+            consensus_limit_threshold: default_thresholds.consensus_limit,
+            formula_size_threshold: DEFAULT_FORMULA_SIZE_THRESHOLD,
+        }
+    }
+
+    /// Returns the algebra thresholds derived from the settings.
+    #[must_use]
+    pub fn algebra_thresholds(&self) -> AlgebraThresholds {
+        AlgebraThresholds {
+            saturation_complexity: self.saturation_complexity_threshold,
+            disjunction_complexity: self.disjunction_complexity_threshold,
+            negation_complexity: self.negation_complexity_threshold,
+            consensus_limit: self.consensus_limit_threshold,
         }
     }
 }

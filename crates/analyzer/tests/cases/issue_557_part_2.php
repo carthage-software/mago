@@ -4,7 +4,7 @@
 $x = [];
 
 if (!isset($x['foo'])) {
-    // @mago-expect analysis:possibly-undefined-string-array-index
+    // @mago-expect analysis:undefined-string-array-index
     echo $x['foo'];
 }
 
@@ -12,6 +12,6 @@ if (isset($x['foo'])) {
     // This is correctly diagnosed as always being a string
     echo $x['foo'];
 } else {
-    // @mago-expect analysis:possibly-undefined-string-array-index
+    // @mago-expect analysis:undefined-string-array-index
     echo $x['foo'];
 }
