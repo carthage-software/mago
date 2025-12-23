@@ -5521,7 +5521,7 @@ function header_register_callback(callable $callback): bool
  *  mime: string
  * }
  */
-function getimagesizefromstring(string $string, &$image_info): array|false
+function getimagesizefromstring(string $string, null|array &$image_info = null): array|false
 {
 }
 
