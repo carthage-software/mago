@@ -40,6 +40,10 @@ impl Default for NoAssignInArgumentConfig {
 }
 
 impl Config for NoAssignInArgumentConfig {
+    fn default_enabled() -> bool {
+        false
+    }
+
     fn level(&self) -> Level {
         self.level
     }
@@ -77,10 +81,7 @@ impl LintRule for NoAssignInArgumentRule {
 
     fn targets() -> &'static [NodeKind] {
         const TARGETS: &[NodeKind] = &[
-            NodeKind::FunctionCall,
-            NodeKind::MethodCall,
-            NodeKind::NullSafeMethodCall,
-            NodeKind::StaticMethodCall,
+            NodeKind::ArgumentList,
         ];
 
         TARGETS
@@ -91,12 +92,8 @@ impl LintRule for NoAssignInArgumentRule {
     }
 
     fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
-        let argument_list = match node {
-            Node::FunctionCall(call) => &call.argument_list,
-            Node::MethodCall(call) => &call.argument_list,
-            Node::NullSafeMethodCall(call) => &call.argument_list,
-            Node::StaticMethodCall(call) => &call.argument_list,
-            _ => return,
+        let Node::ArgumentList(argument_list) = node else {
+          return;
         };
 
         for argument in argument_list.arguments.iter() {
@@ -109,7 +106,7 @@ impl LintRule for NoAssignInArgumentRule {
                         Annotation::primary(assignment.span()).with_message("This is an assignment"),
                     )
                     .with_annotation(
-                        Annotation::secondary(argument.span()).with_message("This is the argument"),
+                        Annotation::secondary(argument_list.span()).with_message("In this argument list"),
                     )
                     .with_note("Assigning a value within a function call argument can lead to unexpected behavior and make the code harder to read and understand.")
                     .with_help("Consider assigning the variable before the function call.");
