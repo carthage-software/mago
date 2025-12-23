@@ -75,10 +75,10 @@ pub fn populate_docblock_variables_excluding<'ctx>(
     }
 }
 
-/// Retrieves all `@var`, `@psalm-var`, and `@phpstan-var` tags from the docblock of the
+/// Retrieves all `@var`, `@psalm-var`, and `@phpstan-var` tags from the docblocks preceding the
 /// current statement in the context, parsing their variable types.
 ///
-/// This function scans the docblock associated with the current statement in the context,
+/// This function scans the docblocks associated with the current statement in the context,
 /// extracting all variable type declarations. It returns a vector of tuples, each containing:
 ///
 /// - An optional variable name (if specified in the tag)
@@ -104,11 +104,7 @@ pub fn get_docblock_variables<'ctx>(
     artifacts: &mut AnalysisArtifacts,
     allow_tracing: bool,
 ) -> Vec<(Option<mago_atom::Atom>, TUnion, Span)> {
-    let Some(elements) = context.get_parsed_docblock().map(|document| document.elements) else {
-        return vec![];
-    };
-
-    elements
+    context.get_parsed_docblocks()
         .into_iter()
         // Filter out non-tag elements
         .filter_map(|element| match element {
