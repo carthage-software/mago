@@ -80,9 +80,7 @@ impl LintRule for NoAssignInArgumentRule {
     }
 
     fn targets() -> &'static [NodeKind] {
-        const TARGETS: &[NodeKind] = &[
-            NodeKind::ArgumentList,
-        ];
+        const TARGETS: &[NodeKind] = &[NodeKind::ArgumentList];
 
         TARGETS
     }
@@ -93,7 +91,7 @@ impl LintRule for NoAssignInArgumentRule {
 
     fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let Node::ArgumentList(argument_list) = node else {
-          return;
+            return;
         };
 
         for argument in argument_list.arguments.iter() {

@@ -179,10 +179,8 @@ pub struct AnalyzerConfiguration {
 impl AnalyzerConfiguration {
     pub fn to_settings(&self, php_version: PHPVersion, color_choice: ColorChoice, enable_diff: bool) -> Settings {
         // Backwards compatibility: if perform_heuristic_checks is set, use it for both options
-        let check_missing_override =
-            self.perform_heuristic_checks.unwrap_or(self.check_missing_override);
-        let find_unused_parameters =
-            self.perform_heuristic_checks.unwrap_or(self.find_unused_parameters);
+        let check_missing_override = self.perform_heuristic_checks.unwrap_or(self.check_missing_override);
+        let find_unused_parameters = self.perform_heuristic_checks.unwrap_or(self.find_unused_parameters);
 
         Settings {
             version: php_version,
