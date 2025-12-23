@@ -31,6 +31,8 @@ use crate::internal::format::misc::is_simple_single_line_expression;
 use crate::internal::format::misc::is_string_word_type;
 use crate::internal::format::misc::should_hug_expression;
 use crate::internal::utils::could_expand_value;
+use crate::internal::utils::foreach_binary_operand;
+use crate::internal::utils::get_expression_width;
 use crate::internal::utils::unwrap_parenthesized;
 use crate::internal::utils::will_break;
 
@@ -439,6 +441,20 @@ pub(super) fn print_partial_argument_list<'arena>(
     Document::Group(Group::new(contents))
 }
 
+/// Checks if an expression is a concatenation chain (3+ operands) that exceeds print width.
+/// This is used to determine if the parent call should break.
+pub fn is_breaking_binary(f: &FormatterState, expr: &Expression) -> bool {
+    let threshold = f.settings.print_width + f.settings.tab_width;
+
+    let mut estimated_total_width = 0;
+    foreach_binary_operand(expr, &mut |operand: &Expression| {
+        estimated_total_width += 3; // for the operator and spaces
+        estimated_total_width += get_expression_width(operand).unwrap_or(0);
+    });
+
+    estimated_total_width > threshold
+}
+
 #[inline]
 pub fn should_break_all_arguments(f: &FormatterState, argument_list: &ArgumentList, for_attributes: bool) -> bool {
     if f.settings.always_break_named_arguments_list
@@ -462,6 +478,13 @@ pub fn should_break_all_arguments(f: &FormatterState, argument_list: &ArgumentLi
 
     if argument_list.arguments.len() >= 2
         && argument_list.arguments.iter().any(|a| is_call_with_wrapping_arrow_function(a.value()))
+    {
+        return true;
+    }
+
+    if argument_list.arguments.len() == 1
+        && let Some(arg) = argument_list.arguments.first()
+        && is_breaking_binary(f, arg.value())
     {
         return true;
     }
