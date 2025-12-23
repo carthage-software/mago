@@ -7,11 +7,13 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_reporting::Level;
 use mago_span::HasSpan;
+use mago_span::Span;
 use mago_syntax::ast::Assignment;
 use mago_syntax::ast::AssignmentOperator;
 use mago_syntax::ast::Expression;
 use mago_syntax::ast::Node;
 use mago_syntax::ast::NodeKind;
+use mago_syntax::ast::PartialArgument;
 
 use crate::category::Category;
 use crate::context::LintContext;
@@ -72,7 +74,6 @@ impl LintRule for NoAssignInArgumentRule {
                 foo($x = 5);
             "},
             category: Category::Correctness,
-
             requirements: RuleRequirements::None,
         };
 
@@ -80,7 +81,7 @@ impl LintRule for NoAssignInArgumentRule {
     }
 
     fn targets() -> &'static [NodeKind] {
-        const TARGETS: &[NodeKind] = &[NodeKind::ArgumentList];
+        const TARGETS: &[NodeKind] = &[NodeKind::ArgumentList, NodeKind::PartialArgumentList];
 
         TARGETS
     }
@@ -90,31 +91,52 @@ impl LintRule for NoAssignInArgumentRule {
     }
 
     fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
-        let Node::ArgumentList(argument_list) = node else {
-            return;
-        };
+        match node {
+            Node::ArgumentList(list) => {
+                for argument in list.arguments.iter() {
+                    self.check_expression_for_assignment(ctx, argument.value(), list.span());
+                }
+            }
+            Node::PartialArgumentList(partial_list) => {
+                // Check expression for assignment on non-placeholder arguments
+                for argument in partial_list.arguments.iter() {
+                    let value = match argument {
+                        PartialArgument::Positional(pos) => &pos.value,
+                        PartialArgument::Named(named) => &named.value,
+                        _ => continue,
+                    };
+                    self.check_expression_for_assignment(ctx, value, partial_list.span());
+                }
+            }
+            _ => (),
+        }
+    }
+}
 
-        for argument in argument_list.arguments.iter() {
-            let value = argument.value();
-
-            if let Some(assignment) = get_assignment_from_expression(value) {
-                let mut issue = Issue::new(self.cfg.level(), "Avoid assignments in function call arguments.")
+impl NoAssignInArgumentRule {
+    fn check_expression_for_assignment<'arena>(
+        &self,
+        ctx: &mut LintContext<'_, 'arena>,
+        expression: &Expression<'arena>,
+        argument_list_span: Span,
+    ) {
+        if let Some(assignment) = get_assignment_from_expression(expression) {
+            let mut issue = Issue::new(self.cfg.level(), "Avoid assignments in function call arguments.")
                     .with_code(self.meta.code)
                     .with_annotation(
                         Annotation::primary(assignment.span()).with_message("This is an assignment"),
                     )
                     .with_annotation(
-                        Annotation::secondary(argument_list.span()).with_message("In this argument list"),
+                        Annotation::secondary(argument_list_span).with_message("In this argument list"),
                     )
                     .with_note("Assigning a value within a function call argument can lead to unexpected behavior and make the code harder to read and understand.")
                     .with_help("Consider assigning the variable before the function call.");
 
-                if matches!(&assignment.operator, AssignmentOperator::Assign(_)) {
-                    issue = issue.with_note("It's easy to confuse assignment (`=`) with comparison (`==`) in this context. Ensure you're using the correct operator.");
-                }
-
-                ctx.collector.report(issue);
+            if matches!(&assignment.operator, AssignmentOperator::Assign(_)) {
+                issue = issue.with_note("It's easy to confuse assignment (`=`) with comparison (`==`) in this context. Ensure you're using the correct operator.");
             }
+
+            ctx.collector.report(issue);
         }
     }
 }
@@ -204,6 +226,17 @@ mod tests {
         "}
     }
 
+    test_lint_failure! {
+        name = multiple_arguments_with_assignment_in_parial_arguments,
+        rule = NoAssignInArgumentRule,
+        count = 1,
+        code = indoc! {r"
+            <?php
+
+            foo(?, $a, $b = 5, $c);
+        "}
+    }
+
     test_lint_success! {
         name = variable_used_as_argument,
         rule = NoAssignInArgumentRule,
@@ -212,6 +245,17 @@ mod tests {
 
             $x = 5;
             foo($x);
+        "}
+    }
+
+    test_lint_success! {
+        name = variable_used_as_argument_in_partial_arguments,
+        rule = NoAssignInArgumentRule,
+        code = indoc! {r"
+            <?php
+
+            $x = 5;
+            foo(?, $x);
         "}
     }
 
