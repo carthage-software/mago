@@ -207,7 +207,7 @@ the code harder to read and understand.
 
 | Option | Type | Default |
 | :--- | :--- | :--- |
-| `enabled` | `boolean` | `true` |
+| `enabled` | `boolean` | `false` |
 | `level` | `string` | `"warning"` |
 
 ### Examples
