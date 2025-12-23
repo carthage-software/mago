@@ -227,7 +227,7 @@ mod tests {
     }
 
     test_lint_failure! {
-        name = multiple_arguments_with_assignment_in_parial_arguments,
+        name = multiple_arguments_with_assignment_in_partial_arguments,
         rule = NoAssignInArgumentRule,
         count = 1,
         code = indoc! {r"
