@@ -901,12 +901,23 @@ impl<'arena> Format<'arena> for MatchExpressionArm<'arena> {
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
         wrap!(f, self, MatchExpressionArm, {
             let len = self.conditions.len();
+
+            let must_break = self
+                .conditions
+                .iter()
+                .take(len.saturating_sub(1))
+                .any(|condition| f.has_comment(condition.span(), CommentFlags::Trailing | CommentFlags::Line));
+
             let mut contents = vec![in f.arena];
             for (i, condition) in self.conditions.iter().enumerate() {
                 contents.push(condition.format(f));
                 if i != (len - 1) {
                     contents.push(Document::String(","));
-                    contents.push(Document::Line(Line::default()));
+                    contents.push(if must_break {
+                        Document::Line(Line::hard())
+                    } else {
+                        Document::Line(Line::default())
+                    });
                 } else if f.settings.trailing_comma && i > 0 {
                     contents.push(Document::IfBreak(IfBreak::then(f.arena, Document::String(","))));
                 }
@@ -917,7 +928,7 @@ impl<'arena> Format<'arena> for MatchExpressionArm<'arena> {
                 group_id,
                 vec![
                     in f.arena;
-                    Document::Line(Line::default()),
+                    if must_break { Document::Line(Line::hard()) } else { Document::Line(Line::default()) },
                     format_token(f, self.arrow, "=> "),
                 ],
             )));
@@ -925,10 +936,11 @@ impl<'arena> Format<'arena> for MatchExpressionArm<'arena> {
             Document::Group(
                 Group::new(vec![
                     in f.arena;
-                    Document::Group(Group::new(contents)),
+                    Document::Group(Group::new(contents).with_break(must_break)),
                     self.expression.format(f),
                 ])
-                .with_id(group_id),
+                .with_id(group_id)
+                .with_break(must_break),
             )
         })
     }
