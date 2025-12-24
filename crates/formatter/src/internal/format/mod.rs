@@ -1396,10 +1396,13 @@ impl<'arena> Format<'arena> for Hint<'arena> {
                     };
 
                     if use_short_syntax {
+                        let non_null_hint =
+                            if matches!(union_hint.left, Hint::Null(_)) { &union_hint.right } else { &union_hint.left };
+
                         Document::Array(vec![
                             in f.arena;
                             Document::String("?"),
-                            union_hint.right.format(f),
+                            non_null_hint.format(f),
                         ])
                     } else {
                         Document::Array(vec![
