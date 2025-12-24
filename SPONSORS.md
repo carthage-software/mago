@@ -17,4 +17,8 @@ To become a sponsor, please visit [the sponsorship page](https://github.com/spon
 
 ---
 
+<a href="https://afilina.com" title="Anna Filina"><kbd><img src="https://avatars.githubusercontent.com/u/199835?u=d133afc4e19961b7da45b6bb485ed9ac9232e4bb&v=4&s=160" width="80" height="80" alt="Anna Filina" /></kbd></a>
+
+---
+
 <a href="https://github.com/Zuruuh" title="Zuruh"><kbd><img src="https://avatars.githubusercontent.com/u/77583853?u=568441a6191e891cf4c9f52c9c230c45930bed86&v=4&s=160" width="80" height="80" alt="Zuruh" /></kbd></a><a href="http://yigit.dev" title="Yigit Cukuren"><kbd><img src="https://avatars.githubusercontent.com/u/42731194?u=bb0fb4e3635f7fcab7ff91ff4b311fd5a99cb009&v=4&s=160" width="80" height="80" alt="Yigit Cukuren" /></kbd></a><a href="https://github.com/M-arcus" title="Marcus Müller"><kbd><img src="https://avatars.githubusercontent.com/u/25648755?u=ed5653c75b47a8da04dd642ce15a5efb09778b1e&v=4&s=160" width="80" height="80" alt="Marcus Müller" /></kbd></a><a href="https://innocenzi.dev" title="Enzo Innocenzi"><kbd><img src="https://avatars.githubusercontent.com/u/16060559?u=4c0ac72d014627d9dce1fa42e530b9491dc9cfae&v=4&s=160" width="80" height="80" alt="Enzo Innocenzi" /></kbd></a><a href="https://devnix.dev/" title="Pablo Largo Mohedano"><kbd><img src="https://avatars.githubusercontent.com/u/1777519?v=4&s=160" width="80" height="80" alt="Pablo Largo Mohedano" /></kbd></a><a href="https://github.com/JacerOmri" title="Jacer OMRI"><kbd><img src="https://avatars.githubusercontent.com/u/537996?u=6d425f3166884ff0c0da4ffc252d6388c9940714&v=4&s=160" width="80" height="80" alt="Jacer OMRI" /></kbd></a>
