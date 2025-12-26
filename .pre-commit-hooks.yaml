@@ -1,0 +1,15 @@
+---
+
+ - id: mago-lint
+   name: mago lint
+   description: An extremely fast PHP linter, formatter, and static analyzer, written in Rust.
+   entry: mago lint
+   language: rust
+   types: [php]
+
+ - id: mago-fmt
+   name: mago fmt
+   description: An extremely fast PHP linter, formatter, and static analyzer, written in Rust.
+   entry: mago fmt
+   language: rust
+   types: [php]
