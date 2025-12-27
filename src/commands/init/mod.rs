@@ -55,6 +55,8 @@ use crate::consts::DEFAULT_PHP_VERSION;
 use crate::error::Error;
 use crate::utils::version::extract_minimum_php_version;
 
+mod presets;
+
 /// TOML template for the generated `mago.toml` configuration file.
 ///
 /// This template uses placeholder markers (e.g., `{php_version}`, `{paths}`) that are
@@ -76,10 +78,7 @@ paths = [{paths}]
 includes = [{includes}]
 excludes = [{excludes}]
 
-[formatter]
-print-width = {print_width}
-tab-width = {tab_width}
-use-tabs = {use_tabs}
+{formatter_config}
 
 [linter]
 integrations = [{integrations}]
@@ -119,7 +118,11 @@ halstead = { effort-threshold = 7000 }
     about = "Initialize Mago for your project with a guided setup.",
     long_about = "Creates a new mago.toml configuration file by walking you through a setup process."
 )]
-pub struct InitCommand;
+pub struct InitCommand {
+    /// The name of a preset formatter configuration to import.
+    #[arg(long)]
+    pub import_fmt: Option<String>,
+}
 
 impl InitCommand {
     /// Executes the interactive initialization process.
@@ -192,7 +195,17 @@ impl InitCommand {
         let InitializationProjectSettings { php_version, paths, includes, excludes } = setup_project(&theme)?;
 
         let integrations = setup_linter(&theme)?;
-        let (print_width, tab_width, use_tabs) = setup_formatter(&theme)?;
+        let formatter_config = if let Some(preset_name) = &self.import_fmt {
+            let preset = presets::FormatterPreset::from_str(preset_name)
+                .map_err(|_| Error::UnknownFormatterPreset(preset_name.clone()))?;
+            presets::get_preset_config(preset).to_string()
+        } else {
+            let (print_width, tab_width, use_tabs) = setup_formatter(&theme)?;
+            format!(
+                "[formatter]\nprint-width = {}\ntab-width = {}\nuse-tabs = {}",
+                print_width, tab_width, use_tabs
+            )
+        };
         let analyzer_settings = setup_analyzer(&theme)?;
 
         print_step_header(5, "Review & Confirm");
@@ -205,9 +218,7 @@ impl InitCommand {
                 "{integrations}",
                 &quote_format_strings(&integrations.iter().map(|i| i.to_string().to_lowercase()).collect::<Vec<_>>()),
             )
-            .replace("{print_width}", &print_width.to_string())
-            .replace("{tab_width}", &tab_width.to_string())
-            .replace("{use_tabs}", &use_tabs.to_string())
+            .replace("{formatter_config}", &formatter_config)
             .replace("{analyzer_settings}", &build_analyzer_settings_string(&analyzer_settings));
 
         if write_configuration_if_confirmed(&theme, &configuration_file, &config_content)? {
@@ -717,9 +728,7 @@ mod tests {
         includes: &[String],
         excludes: &[String],
         integrations: &[Integration],
-        print_width: u16,
-        tab_width: u8,
-        use_tabs: bool,
+        formatter_config: &str,
         analyzer_settings: &InitializationAnalyzerSettings,
     ) -> String {
         CONFIGURATION_TEMPLATE
@@ -731,23 +740,21 @@ mod tests {
                 "{integrations}",
                 &quote_format_strings(&integrations.iter().map(|i| i.to_string().to_lowercase()).collect::<Vec<_>>()),
             )
-            .replace("{print_width}", &print_width.to_string())
-            .replace("{tab_width}", &tab_width.to_string())
-            .replace("{use_tabs}", &use_tabs.to_string())
+            .replace("{formatter_config}", formatter_config)
             .replace("{analyzer_settings}", &build_analyzer_settings_string(analyzer_settings))
     }
 
     #[test]
     fn test_generated_config_parses_with_defaults() {
+        let formatter_config =
+            format!("[formatter]\nprint-width = {}\ntab-width = {}\nuse-tabs = {}", 120, 4, false);
         let content = generate_config_content(
             "8.2",
             &["src".to_string()],
             &["vendor".to_string()],
             &[],
             &[],
-            120,
-            4,
-            false,
+            &formatter_config,
             &create_default_analyzer_settings(),
         );
 
@@ -771,6 +778,8 @@ mod tests {
             check_missing_type_hints: true,
             register_super_globals: false,
         };
+        let formatter_config =
+            format!("[formatter]\nprint-width = {}\ntab-width = {}\nuse-tabs = {}", 100, 2, true);
 
         let content = generate_config_content(
             "8.4",
@@ -778,9 +787,7 @@ mod tests {
             &["vendor".to_string()],
             &["tests".to_string()],
             &[Integration::Symfony, Integration::PHPUnit],
-            100,
-            2,
-            true,
+            &formatter_config,
             &settings,
         );
 
@@ -790,15 +797,15 @@ mod tests {
 
     #[test]
     fn test_generated_config_parses_with_integrations() {
+        let formatter_config =
+            format!("[formatter]\nprint-width = {}\ntab-width = {}\nuse-tabs = {}", 120, 4, false);
         let content = generate_config_content(
             "8.3",
             &["src".to_string()],
             &["vendor".to_string()],
             &[],
             &[Integration::Psl, Integration::Laravel, Integration::PHPUnit, Integration::Symfony],
-            120,
-            4,
-            false,
+            &formatter_config,
             &create_default_analyzer_settings(),
         );
 
