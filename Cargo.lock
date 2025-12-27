@@ -1646,6 +1646,7 @@ dependencies = [
  "serde",
  "serde_json",
  "strum",
+ "strum_macros",
  "temp-env",
  "tempfile",
  "termtree",
