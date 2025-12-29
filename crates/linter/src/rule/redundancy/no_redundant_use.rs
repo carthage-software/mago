@@ -107,7 +107,13 @@ impl LintRule for NoRedundantUseRule {
         // If `tempest` integration is enabled, and this file ends with `.view.php`,
         // check inline mentions as well.
         if ctx.registry.is_integration_enabled(Integration::Tempest)
-            && ctx.source_file.path.as_ref().and_then(|p| p.to_str()).is_some_and(|s| s.ends_with(".view.php"))
+            && ctx
+                .source_file
+                .path
+                .as_ref()
+                .and_then(|p| p.to_str())
+                .unwrap_or(ctx.source_file.name.as_ref())
+                .ends_with(".view.php")
         {
             check_inline_mentions = true;
         }
@@ -412,6 +418,9 @@ mod tests {
     use indoc::indoc;
 
     use super::NoRedundantUseRule;
+    use crate::integration::Integration;
+    use crate::integration::IntegrationSet;
+    use crate::settings::Settings;
     use crate::test_lint_failure;
     use crate::test_lint_success;
 
@@ -485,6 +494,25 @@ mod tests {
 
             $_ = PHP_VERSION;
         "}
+    }
+
+    test_lint_success! {
+        name = tempest_inline_usage,
+        rule = NoRedundantUseRule,
+        filename = "test.view.php",
+        settings = |settings: &mut Settings| {
+            settings.integrations = IntegrationSet::only(Integration::Tempest);
+        },
+        code = indoc! {r#"
+            <?php
+
+            use Tests\Tempest\Fixtures\Modules\Home\HomeController;
+            use function Tempest\Router\uri;
+
+            ?>
+
+            {{ uri(HomeController::class) }}
+        "#}
     }
 
     test_lint_failure! {
