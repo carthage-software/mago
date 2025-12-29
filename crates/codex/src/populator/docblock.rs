@@ -246,12 +246,12 @@ pub fn inherit_method_docblocks(codebase: &mut CodebaseMetadata) {
             if let Some(ref template_result) = template_result {
                 return_type = inferred_type_replacer::replace(&return_type, template_result, codebase);
             }
-            Some((return_type, parent_return.span))
+            Some((return_type, parent_return.span, parent_return.from_docblock))
         } else {
             None
         };
 
-        let substituted_param_types: Vec<Option<(TUnion, Span)>> = parent_parameters
+        let substituted_param_types: Vec<Option<(TUnion, Span, bool)>> = parent_parameters
             .iter()
             .map(|parent_param| {
                 if let Some(parent_param_type) = parent_param.type_metadata.as_ref() {
@@ -259,7 +259,7 @@ pub fn inherit_method_docblocks(codebase: &mut CodebaseMetadata) {
                     if let Some(ref template_result) = template_result {
                         param_type = inferred_type_replacer::replace(&param_type, template_result, codebase);
                     }
-                    Some((param_type, parent_param_type.span))
+                    Some((param_type, parent_param_type.span, parent_param_type.from_docblock))
                 } else {
                     None
                 }
@@ -374,16 +374,16 @@ pub fn inherit_method_docblocks(codebase: &mut CodebaseMetadata) {
             continue;
         };
 
-        if should_inherit_return && let Some((type_union, span)) = substituted_return_type {
-            child_method.return_type_metadata = Some(TypeMetadata::from_docblock(type_union, span));
+        if should_inherit_return && let Some((type_union, span, from_docblock)) = substituted_return_type {
+            child_method.return_type_metadata = Some(TypeMetadata { type_union, span, from_docblock, inferred: false });
         }
 
         for (i, substituted_param) in substituted_param_types.into_iter().enumerate() {
             if let Some(true) = params_to_inherit.get(i).copied()
                 && let Some(child_param) = child_method.parameters.get_mut(i)
-                && let Some((type_union, span)) = substituted_param
+                && let Some((type_union, span, from_docblock)) = substituted_param
             {
-                child_param.type_metadata = Some(TypeMetadata::from_docblock(type_union, span));
+                child_param.type_metadata = Some(TypeMetadata { type_union, span, from_docblock, inferred: false });
             }
         }
 

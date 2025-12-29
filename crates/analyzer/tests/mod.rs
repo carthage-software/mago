@@ -52,6 +52,7 @@ test_case!(conditional_return_resolved_to_left);
 test_case!(conditional_return_resolved_to_right);
 test_case!(conditional_return_with_assignment_in_condition);
 test_case!(const_array_key);
+test_case!(docblock_type_mismatch);
 test_case!(docblock_type_narrowing);
 test_case!(docblock_type_parsing_verification);
 test_case!(docblock_var_on_non_assignment);

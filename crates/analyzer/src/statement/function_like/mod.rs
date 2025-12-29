@@ -24,6 +24,7 @@ use mago_codex::ttype::atomic::object::named::TNamedObject;
 use mago_codex::ttype::atomic::reference::TReference;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::class_like_string::TClassLikeString;
+use mago_codex::ttype::comparator::ComparisonResult;
 use mago_codex::ttype::comparator::union_comparator;
 use mago_codex::ttype::expander;
 use mago_codex::ttype::expander::StaticClassType;
@@ -87,6 +88,49 @@ pub fn analyze_function_like<'ctx, 'ast, 'arena>(
     );
 
     let mut artifacts = AnalysisArtifacts::new();
+
+    if let Some(effective_return) = &function_like_metadata.return_type_metadata
+        && effective_return.from_docblock
+        && let Some(native_return) = &function_like_metadata.return_type_declaration_metadata
+    {
+        let expanded_docblock =
+            expand_type_metadata(context, block_context, &mut artifacts, function_like_metadata, effective_return);
+        let expanded_native =
+            expand_type_metadata(context, block_context, &mut artifacts, function_like_metadata, native_return);
+
+        let is_compatible = union_comparator::is_contained_by(
+            context.codebase,
+            &expanded_docblock,
+            &expanded_native,
+            false,
+            false,
+            false,
+            &mut ComparisonResult::default(),
+        );
+
+        if !is_compatible {
+            let docblock_type_str = effective_return.type_union.get_id();
+            let native_type_str = native_return.type_union.get_id();
+
+            let issue = Issue::error(format!(
+                "Docblock return type `{docblock_type_str}` is incompatible with native return type `{native_type_str}`."
+            ))
+            .with_annotation(
+                Annotation::primary(native_return.span)
+                    .with_message(format!("Native return type is `{native_type_str}`...")),
+            )
+            .with_annotation(
+                Annotation::secondary(effective_return.span)
+                    .with_message(format!("...but docblock declares `{docblock_type_str}`")),
+            )
+            .with_note("The docblock return type must be compatible with the native return type declaration.")
+            .with_help(format!(
+                "Either change the docblock return type to match `{native_type_str}`, or update the native return type to be compatible with `{docblock_type_str}`."
+            ));
+
+            context.collector.report_with_code(IssueCode::DocblockTypeMismatch, issue);
+        }
+    }
 
     add_parameter_types_to_context(
         context,
@@ -208,8 +252,52 @@ fn add_parameter_types_to_context<'ctx, 'arena>(
     for (i, parameter_metadata) in function_like_metadata.parameters.iter().enumerate() {
         let parameter_variable_str = parameter_metadata.get_name().0;
 
-        let declared_parameter_type = if let Some(type_metadata) = parameter_metadata.get_type_metadata() {
-            expand_type_metadata(context, block_context, artifacts, function_like_metadata, type_metadata)
+        let declared_parameter_type = if let Some(parameter_type) = parameter_metadata.get_type_metadata() {
+            let effective_type =
+                expand_type_metadata(context, block_context, artifacts, function_like_metadata, parameter_type);
+
+            if parameter_type.from_docblock
+                && let Some(native_type) = parameter_metadata.get_type_declaration_metadata()
+            {
+                let expanded_native =
+                    expand_type_metadata(context, block_context, artifacts, function_like_metadata, native_type);
+
+                let is_compatible = union_comparator::is_contained_by(
+                    context.codebase,
+                    &effective_type,
+                    &expanded_native,
+                    false,
+                    false,
+                    false,
+                    &mut ComparisonResult::default(),
+                );
+
+                if !is_compatible {
+                    let docblock_type_str = effective_type.get_id();
+                    let native_type_str = native_type.type_union.get_id();
+                    let param_name = parameter_metadata.name.0;
+
+                    let issue = Issue::error(format!(
+                        "Docblock type `{docblock_type_str}` for parameter `{param_name}` is incompatible with native type `{native_type_str}`."
+                    ))
+                    .with_annotation(
+                        Annotation::primary(native_type.span)
+                            .with_message(format!("Native type is `{native_type_str}`...")),
+                    )
+                    .with_annotation(
+                        Annotation::secondary(parameter_type.span)
+                            .with_message(format!("...but docblock declares `{docblock_type_str}`")),
+                    )
+                    .with_note("The docblock type must be compatible with the native type declaration.")
+                    .with_help(format!(
+                        "Either change the docblock type to match `{native_type_str}`, or update the native type to be compatible with `{docblock_type_str}`."
+                    ));
+
+                    context.collector.report_with_code(IssueCode::DocblockTypeMismatch, issue);
+                }
+            }
+
+            effective_type
         } else {
             get_mixed()
         };
