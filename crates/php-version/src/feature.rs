@@ -58,6 +58,7 @@ pub enum Feature {
     OverrideAttribute,
     DynamicClassConstantAccess,
     ReadonlyAnonymousClasses,
+    ReadonlyPropertyReinitializationInClone,
     CastsNumbersToStringsOnLooseComparison,
     NonNumericStringAndIntegerIsFalseOnLooseComparison,
     AbstractTraitMethods,
