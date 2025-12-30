@@ -9,12 +9,18 @@ use mago_codex::context::ScopeContext;
 use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_codex::metadata::function_like::FunctionLikeMetadata;
+use mago_codex::ttype::atomic::TAtomic;
+use mago_codex::ttype::atomic::scalar::TScalar;
+use mago_codex::ttype::atomic::scalar::string::TString;
+use mago_codex::ttype::atomic::scalar::string::TStringLiteral;
 use mago_codex::ttype::union::TUnion;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_span::Span;
 use mago_syntax::ast::Argument;
+use mago_syntax::ast::ClassLikeMemberSelector;
 use mago_syntax::ast::Expression;
+use mago_syntax::ast::PartialApplication;
 use mago_syntax::ast::PartialArgument;
 
 use crate::artifacts::AnalysisArtifacts;
@@ -95,6 +101,82 @@ impl<'a, 'b, 'c> ProviderContext<'a, 'b, 'c> {
                 self.codebase.get_closure(&span.file_id, &span.start)
             }
             _ => None,
+        }
+    }
+
+    /// Get metadata for a callable expression (closure, arrow function, or first-class callable).
+    ///
+    /// This method extends `get_closure_metadata` to also handle first-class callables
+    /// like `is_string(...)` or `SomeClass::method(...)`, as well as string literals representing callables.
+    #[inline]
+    pub fn get_callable_metadata<'arena>(&self, expr: &Expression<'arena>) -> Option<&'a FunctionLikeMetadata> {
+        match expr {
+            Expression::ArrowFunction(arrow_fn) => {
+                let span = arrow_fn.span();
+
+                self.codebase.get_closure(&span.file_id, &span.start)
+            }
+            Expression::Closure(closure) => {
+                let span = closure.span();
+
+                self.codebase.get_closure(&span.file_id, &span.start)
+            }
+            Expression::PartialApplication(partial) => match partial {
+                PartialApplication::Function(func_partial) => {
+                    if !func_partial.argument_list.is_first_class_callable() {
+                        return None;
+                    }
+
+                    if let Expression::Identifier(identifier) = func_partial.function {
+                        self.codebase.get_function(identifier.value())
+                    } else {
+                        None
+                    }
+                }
+                PartialApplication::StaticMethod(static_partial) => {
+                    if !static_partial.argument_list.is_first_class_callable() {
+                        return None;
+                    }
+
+                    if let Expression::Identifier(class_id) = static_partial.class {
+                        if let ClassLikeMemberSelector::Identifier(method_id) = &static_partial.method {
+                            self.codebase.get_method(class_id.value(), method_id.value)
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                }
+                PartialApplication::Method(_) => None,
+            },
+            _ => {
+                let expr_type = self.get_rc_expression_type(expr)?;
+                if !expr_type.is_single() {
+                    return None;
+                }
+
+                match expr_type.get_single() {
+                    TAtomic::Callable(first_callable) => {
+                        if let Some(identifier) = first_callable.get_alias() {
+                            self.codebase.get_function_like(identifier)
+                        } else {
+                            None
+                        }
+                    }
+                    TAtomic::Scalar(TScalar::String(TString {
+                        literal: Some(TStringLiteral::Value(literal_string)),
+                        ..
+                    })) => {
+                        if let Some((class_like, method_name)) = literal_string.split_once("::") {
+                            self.codebase.get_method(class_like, method_name)
+                        } else {
+                            self.codebase.get_function(literal_string)
+                        }
+                    }
+                    _ => None,
+                }
+            }
         }
     }
 
