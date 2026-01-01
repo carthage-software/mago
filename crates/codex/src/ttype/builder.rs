@@ -88,6 +88,7 @@ use crate::ttype::get_resource;
 use crate::ttype::get_scalar;
 use crate::ttype::get_string;
 use crate::ttype::get_true;
+use crate::ttype::get_truthy_mixed;
 use crate::ttype::get_truthy_string;
 use crate::ttype::get_unspecified_literal_float;
 use crate::ttype::get_unspecified_literal_int;
@@ -411,6 +412,7 @@ pub fn get_union_from_type_ast(
             )?)
         }
         Type::Mixed(_) => get_mixed(),
+        Type::NonEmptyMixed(_) => get_truthy_mixed(),
         Type::Null(_) => get_null(),
         Type::Void(_) => get_void(),
         Type::Never(_) => get_never(),
