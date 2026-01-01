@@ -5,6 +5,12 @@ use serde::Deserialize;
 use serde::Serialize;
 
 /// Format settings for the PHP printer.
+///
+/// **WARNING:** This structure is not to be considered exhaustive. New fields may be added in minor
+/// or patch releases. Do not construct this structure directly outside of the formatter crate.
+///
+/// New fields are added with default values to ensure backward compatibility,
+/// unless a breaking change is explicitly intended for PER-CS compliance updates.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, JsonSchema)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct FormatSettings {
@@ -924,6 +930,12 @@ pub struct FormatSettings {
     /// Default: true
     #[serde(default = "default_true")]
     pub separate_class_like_members: bool,
+
+    /// Whether to indent heredoc/nowdoc content.
+    ///
+    /// Default: true
+    #[serde(default = "default_true")]
+    pub indent_heredoc: bool,
 }
 
 impl Default for FormatSettings {
@@ -1002,6 +1014,7 @@ impl Default for FormatSettings {
             empty_line_before_return: false,
             empty_line_before_dangling_comments: true,
             separate_class_like_members: true,
+            indent_heredoc: true,
         }
     }
 }

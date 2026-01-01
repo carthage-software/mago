@@ -396,45 +396,45 @@ final class AnalyzerCodeModuleGenerator
 
         // Boilerplate trait impls
         $boilerplate = <<<RUST
-        impl std::fmt::Display for IssueCode {
-            fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-                write!(f, "{}", self.as_str())
+            impl std::fmt::Display for IssueCode {
+                fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                    write!(f, "{}", self.as_str())
+                }
             }
-        }
 
-        impl std::convert::TryFrom<&str> for IssueCode {
-            type Error = &'static str;
+            impl std::convert::TryFrom<&str> for IssueCode {
+                type Error = &'static str;
 
-            fn try_from(value: &str) -> Result<Self, Self::Error> {
-                <Self as std::str::FromStr>::from_str(value)
+                fn try_from(value: &str) -> Result<Self, Self::Error> {
+                    <Self as std::str::FromStr>::from_str(value)
+                }
             }
-        }
 
-        impl std::convert::From<IssueCode> for &'static str {
-            fn from(val: IssueCode) -> Self {
-                val.as_str()
+            impl std::convert::From<IssueCode> for &'static str {
+                fn from(val: IssueCode) -> Self {
+                    val.as_str()
+                }
             }
-        }
 
-        impl std::convert::From<IssueCode> for String {
-            fn from(val: IssueCode) -> Self {
-                val.as_str().to_string()
+            impl std::convert::From<IssueCode> for String {
+                fn from(val: IssueCode) -> Self {
+                    val.as_str().to_string()
+                }
             }
-        }
 
-        impl std::borrow::Borrow<str> for IssueCode {
-            fn borrow(&self) -> &'static str {
-                self.as_str()
+            impl std::borrow::Borrow<str> for IssueCode {
+                fn borrow(&self) -> &'static str {
+                    self.as_str()
+                }
             }
-        }
 
-        impl<'a> std::borrow::Borrow<str> for &'a IssueCode {
-            fn borrow(&self) -> &'a str {
-                self.as_str()
+            impl<'a> std::borrow::Borrow<str> for &'a IssueCode {
+                fn borrow(&self) -> &'a str {
+                    self.as_str()
+                }
             }
-        }
 
-        RUST;
+            RUST;
 
         return $fromStr . $boilerplate;
     }

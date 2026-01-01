@@ -1128,7 +1128,7 @@ impl<'arena> Format<'arena> for DocumentString<'arena> {
                 DocumentIndentation::Mixed(t, w) => t + w,
             };
 
-            contents.push(Document::Line(Line::hard()));
+            let mut inner = vec![in f.arena; Document::Line(Line::hard())];
 
             // Track the indentation from the last line of the previous literal part
             let mut last_part_indentation = Cow::Borrowed("");
@@ -1193,15 +1193,33 @@ impl<'arena> Format<'arena> for DocumentString<'arena> {
 
                     Document::Array(part_contents)
                 } else {
-                    let base_alignment = match self.indentation {
-                        DocumentIndentation::None => Cow::Borrowed(""),
-                        DocumentIndentation::Whitespace(n) => Cow::Owned(" ".repeat(n)),
-                        DocumentIndentation::Tab(n) => Cow::Owned("\t".repeat(n)),
-                        DocumentIndentation::Mixed(t, w) => Cow::Owned("\t".repeat(t) + &" ".repeat(w)),
+                    let (base_alignment, adjusted_last_part) = if f.settings.indent_heredoc {
+                        let scope = if f.settings.use_tabs {
+                            Cow::Borrowed("\t")
+                        } else {
+                            Cow::Owned(" ".repeat(f.settings.tab_width))
+                        };
+
+                        let adjusted = if !last_part_indentation.is_empty() {
+                            Cow::Owned(format!("{scope}{last_part_indentation}"))
+                        } else {
+                            Cow::Borrowed("")
+                        };
+
+                        (scope, adjusted)
+                    } else {
+                        let base = match self.indentation {
+                            DocumentIndentation::None => Cow::Borrowed(""),
+                            DocumentIndentation::Whitespace(n) => Cow::Owned(" ".repeat(n)),
+                            DocumentIndentation::Tab(n) => Cow::Owned("\t".repeat(n)),
+                            DocumentIndentation::Mixed(t, w) => Cow::Owned("\t".repeat(t) + &" ".repeat(w)),
+                        };
+
+                        (base, last_part_indentation.clone())
                     };
 
-                    let combined_alignment = if !base_alignment.is_empty() || !last_part_indentation.is_empty() {
-                        Cow::Owned(format!("{base_alignment}{last_part_indentation}"))
+                    let combined_alignment = if !base_alignment.is_empty() || !adjusted_last_part.is_empty() {
+                        Cow::Owned(format!("{base_alignment}{adjusted_last_part}"))
                     } else {
                         Cow::Borrowed("")
                     };
@@ -1215,10 +1233,16 @@ impl<'arena> Format<'arena> for DocumentString<'arena> {
                     })
                 };
 
-                contents.push(formatted);
+                inner.push(formatted);
             }
 
-            contents.push(Document::String(self.label));
+            inner.push(Document::String(self.label));
+
+            if f.settings.indent_heredoc {
+                contents.push(Document::Indent(inner));
+            } else {
+                contents.extend(inner);
+            }
 
             Document::Group(Group::new(contents))
         })
