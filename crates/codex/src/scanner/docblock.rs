@@ -59,6 +59,7 @@ pub struct ClassLikeDocblockComment {
     pub properties: Vec<PropertyTag>,
     pub type_aliases: Vec<TypeTag>,
     pub imported_type_aliases: Vec<ImportTypeTag>,
+    pub mixins: Vec<TypeString>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
@@ -147,6 +148,7 @@ impl ClassLikeDocblockComment {
         let mut properties = Vec::new();
         let mut type_aliases = Vec::new();
         let mut imported_type_aliases = Vec::new();
+        let mut mixins = Vec::new();
 
         let parsed_docblock = parse_trivia(context.arena, docblock)?;
 
@@ -280,6 +282,11 @@ impl ClassLikeDocblockComment {
                     let import_type_tag = parse_import_type_tag(tag.description, tag.description_span)?;
                     imported_type_aliases.push(import_type_tag);
                 }
+                TagKind::Mixin => {
+                    if let Some((mixin_type, _)) = split_tag_content(tag.description, tag.description_span) {
+                        mixins.push(mixin_type);
+                    }
+                }
                 _ => {
                     // Ignore other tags
                 }
@@ -307,6 +314,7 @@ impl ClassLikeDocblockComment {
             properties,
             type_aliases,
             imported_type_aliases,
+            mixins,
         }))
     }
 }

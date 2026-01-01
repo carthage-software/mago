@@ -24,6 +24,7 @@ pub type TemplateTuple = (Atom, Vec<(GenericParent, TUnion)>);
 ///
 /// This complements the more general `FunctionLikeMetadata`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[non_exhaustive]
 pub struct MethodMetadata {
     /// Marks whether this method is declared as `final`, preventing further overriding.
     pub is_final: bool,

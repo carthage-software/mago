@@ -32,6 +32,7 @@ type TemplateTuple = (Atom, Vec<(GenericParent, TUnion)>);
 /// Aggregates information about inheritance, traits, generics, methods, properties, constants,
 /// attributes, docblock tags, analysis flags, and more.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct ClassLikeMetadata {
     pub name: Atom,
     pub original_name: Atom,
@@ -85,6 +86,9 @@ pub struct ClassLikeMetadata {
     pub type_aliases: AtomMap<TypeMetadata>,
     /// Imported type aliases in the form of (`from_fqcn`, `type_name`, span)
     pub imported_type_aliases: AtomMap<(Atom, Atom, Span)>,
+    /// Mixin types from @mixin annotations - these types' methods/properties
+    /// can be accessed via magic methods (__call, __get, __set, __callStatic)
+    pub mixins: Vec<TUnion>,
 }
 
 impl ClassLikeMetadata {
@@ -148,6 +152,7 @@ impl ClassLikeMetadata {
             attribute_flags: None,
             type_aliases: AtomMap::default(),
             imported_type_aliases: AtomMap::default(),
+            mixins: Vec::default(),
         }
     }
 

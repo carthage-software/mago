@@ -91,6 +91,7 @@ final class AnalyzerCodeModuleGenerator
         'non-existent-method',
         'non-existent-property',
         'possibly-non-existent-property',
+        'possibly-non-existent-method',
         'never-return',
         'null-array-index',
         'nullable-return-statement',
@@ -351,8 +352,16 @@ final class AnalyzerCodeModuleGenerator
             throw new \RuntimeException('Too many issue codes; cannot be represented by a u16.');
         }
 
-        $enum = "#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]\n";
+        $enum = '//! This file is auto-generated. Do not edit manually.' . "\n\n";
+        $enum .= "/// An issue code representing a specific type of analysis issue.\n";
+        $enum .= "///\n";
+        $enum .= "/// Each issue code corresponds to a unique identifier for a particular\n";
+        $enum .= "/// kind of issue that the analyzer can detect during code analysis.\n";
+        $enum .= "///\n";
+        $enum .= "/// This enum is non-exhaustive; new issue codes may be added in future versions.\n";
+        $enum .= "#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]\n";
         $enum .= "#[repr(u16)]\n";
+        $enum .= "#[non_exhaustive]\n";
         $enum .= "pub enum IssueCode {\n";
         foreach ($this->allCodes as $code => $_) {
             $enum .= "    {$code},\n";

@@ -53,6 +53,7 @@ pub mod ttype;
 /// including details about classes, interfaces, traits, enums, functions, constants,
 /// their members, inheritance, dependencies, and associated types.
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
+#[non_exhaustive]
 pub struct CodebaseMetadata {
     /// Configuration flag: Should types be inferred based on usage patterns?
     pub infer_types_from_usage: bool,

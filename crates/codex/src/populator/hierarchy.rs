@@ -370,6 +370,18 @@ pub fn populate_class_like_types(
         );
     }
 
+    for mixin_type in &mut metadata.mixins {
+        if mixin_type.needs_population() || force_repopulation {
+            populate_union_type(
+                mixin_type,
+                codebase_symbols,
+                Some(&class_like_reference_source),
+                symbol_references,
+                force_repopulation,
+            );
+        }
+    }
+
     for (constant_name, constant) in &mut metadata.constants {
         let constant_reference_source = ReferenceSource::ClassLikeMember(true, name, *constant_name);
 

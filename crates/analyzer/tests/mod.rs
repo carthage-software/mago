@@ -367,6 +367,7 @@ test_case!(bad_path_redundant_nullsafe);
 test_case!(bad_path_assignment_to_this);
 test_case!(typed_property_null_coalesce);
 test_case!(docblock_var_override_foreach);
+test_case!(mixin);
 
 // Github Issues
 test_case!(issue_659);

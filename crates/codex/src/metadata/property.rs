@@ -15,6 +15,7 @@ use crate::visibility::Visibility;
 /// This includes information about its name, location, visibility (potentially asymmetric),
 /// type hints, default values, and various modifiers (`static`, `readonly`, `abstract`, etc.).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct PropertyMetadata {
     /// The identifier (name) of the property, including the leading '$'.
     pub name: VariableIdentifier,

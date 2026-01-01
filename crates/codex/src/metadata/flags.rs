@@ -3,6 +3,7 @@ use serde::Serialize;
 
 bitflags::bitflags! {
     #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+    #[non_exhaustive]
     pub struct MetadataFlags: u64 {
         const ABSTRACT                  = 1 << 0;
         const FINAL                     = 1 << 1;
