@@ -12,6 +12,9 @@ pub mod str_contains;
 pub mod str_starts_with;
 pub mod tagged_fixme;
 pub mod tagged_todo;
+pub mod use_dedicated_expectation;
+pub mod use_simpler_expectation;
+pub mod use_specific_expectations;
 pub mod valid_docblock;
 
 pub use explicit_octal::*;
@@ -28,4 +31,7 @@ pub use str_contains::*;
 pub use str_starts_with::*;
 pub use tagged_fixme::*;
 pub use tagged_todo::*;
+pub use use_dedicated_expectation::*;
+pub use use_simpler_expectation::*;
+pub use use_specific_expectations::*;
 pub use valid_docblock::*;

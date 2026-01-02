@@ -19,6 +19,7 @@ This document details the rules available in the `Correctness` category.
 | No Assign In Condition | [`no-assign-in-condition`](#no-assign-in-condition) |
 | No Boolean Literal Comparison | [`no-boolean-literal-comparison`](#no-boolean-literal-comparison) |
 | No Empty Catch Clause | [`no-empty-catch-clause`](#no-empty-catch-clause) |
+| No Only | [`no-only`](#no-only) |
 | Parameter Type | [`parameter-type`](#parameter-type) |
 | Property Type | [`property-type`](#property-type) |
 | Return Type | [`return-type`](#return-type) |
@@ -450,6 +451,56 @@ try {
 } catch(Exception $e) {
     // This block is empty and swallows the exception.
 }
+```
+
+
+## <a id="no-only"></a>`no-only`
+
+Detects usage of `->only()` in Pest tests which should not be committed.
+
+The `->only()` modifier causes only that specific test to run, which can lead to
+incomplete test coverage if accidentally committed to the repository.
+
+
+### Requirements
+
+- **Integration:** `Pest`
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `true` |
+| `level` | `string` | `"error"` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+
+test('example test', function () {
+    expect(true)->toBeTrue();
+});
+
+it('does something', function () {
+    expect(1)->toBe(1);
+});
+```
+
+#### Incorrect code
+
+```php
+<?php
+
+test('example test', function () {
+    expect(true)->toBeTrue();
+})->only();
+
+it('does something', function () {
+    expect(1)->toBe(1);
+})->only();
 ```
 
 
