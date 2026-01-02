@@ -12,9 +12,9 @@
 
 [![CI Status](https://github.com/carthage-software/mago/actions/workflows/ci.yml/badge.svg)](https://github.com/carthage-software/mago/actions/workflows/ci.yml)
 [![CD Status](https://github.com/carthage-software/mago/actions/workflows/cd.yml/badge.svg)](https://github.com/carthage-software/mago/actions/workflows/cd.yml)
+[![CodeQL](https://github.com/carthage-software/mago/actions/workflows/github-code-scanning/codeql/badge.svg)](https://github.com/carthage-software/mago/actions/workflows/github-code-scanning/codeql)
 [![Crates.io](https://img.shields.io/crates/v/mago.svg)](https://crates.io/crates/mago)
 [![Latest Stable Version for PHP](https://poser.pugx.org/carthage-software/mago/v)](https://packagist.org/packages/carthage-software/mago)
-[![Latest Unstable Version for PHP](https://poser.pugx.org/carthage-software/mago/v/unstable)](https://packagist.org/packages/carthage-software/mago)
 [![Total Composer Downloads](http://poser.pugx.org/carthage-software/mago/downloads)](https://packagist.org/packages/carthage-software/mago)
 [![License](https://img.shields.io/crates/l/mago.svg)](https://github.com/carthage-software/mago/blob/main/LICENSE-MIT)
 
@@ -68,6 +68,7 @@ To get started with Mago and learn how to configure your project, please visit o
 <p align="center"><a href="https://www.jetbrains.com/" title="JetBrains"><kbd><img src="https://avatars.githubusercontent.com/u/60931315?u=f9b545e50cace9e9028f77eaf1e83104d18d4d48&v=4&s=240" width="120" height="120" alt="JetBrains" /></kbd></a></p><p align="center"><a href="https://github.com/jasonrm" title="Jason R. McNeil"><kbd><img src="https://avatars.githubusercontent.com/u/39949?u=69c0e4fb08c439250978d41dbc3371d2f0609b98&v=4&s=160" width="80" height="80" alt="Jason R. McNeil" /></kbd></a><a href="https://ofcompute.rs/" title="Vincent Berset"><kbd><img src="https://avatars.githubusercontent.com/u/5173120?u=95efc76cd8fc804536dc6dd25781a95b650bf902&v=4&s=160" width="80" height="80" alt="Vincent Berset" /></kbd></a></p><p align="center"><a href="https://github.com/kambo-1st" title="Bohuslav Šimek"><kbd><img src="https://avatars.githubusercontent.com/u/6493048?u=5eddf1eb923810745d8bdd62496d245238833d07&v=4&s=96" width="48" height="48" alt="Bohuslav Šimek" /></kbd></a><a href="https://www.ticketswap.com" title="TicketSwap"><kbd><img src="https://avatars.githubusercontent.com/u/5766233?v=4&s=96" width="48" height="48" alt="TicketSwap" /></kbd></a></p>
 
 [See all sponsors](SPONSORS.md)
+
 <!-- END-SPONSORS -->
 
 ## Contributing
