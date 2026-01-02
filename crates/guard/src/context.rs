@@ -64,6 +64,11 @@ impl<'ctx, 'arena> GuardContext<'ctx, 'arena> {
 
     /// Consumes the context and generates a `FortressReport` containing all collected issues.
     pub fn report(self) -> FortressReport {
-        FortressReport { boundary_breaches: self.boundary_breaches, structural_flaws: self.structural_flaws }
+        FortressReport {
+            boundary_breaches: self.boundary_breaches,
+            structural_flaws: self.structural_flaws,
+            missing_perimeter_configuration: false,
+            missing_structural_configuration: false,
+        }
     }
 }

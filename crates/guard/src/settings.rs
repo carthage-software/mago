@@ -18,6 +18,7 @@ use crate::path::is_valid_identifier_part;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default, JsonSchema)]
 #[serde(default, rename_all = "kebab-case", deny_unknown_fields)]
 pub struct Settings {
+    pub mode: GuardMode,
     pub perimeter: PerimeterSettings,
     pub structural: StructuralSettings,
 }
@@ -298,6 +299,101 @@ impl fmt::Display for StructuralInheritanceConstraint {
 impl fmt::Display for StructuralSymbolKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.as_str())
+    }
+}
+
+impl PerimeterSettings {
+    /// Returns true if there are no perimeter rules or layering configured.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.rules.is_empty() && self.layering.is_empty()
+    }
+}
+
+impl StructuralSettings {
+    /// Returns true if there are no structural rules configured.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.rules.is_empty()
+    }
+}
+
+impl Settings {
+    /// Returns true if perimeter guard has configuration.
+    #[must_use]
+    pub fn has_perimeter_config(&self) -> bool {
+        !self.perimeter.is_empty()
+    }
+
+    /// Returns true if structural guard has configuration.
+    #[must_use]
+    pub fn has_structural_config(&self) -> bool {
+        !self.structural.is_empty()
+    }
+
+    /// Returns whether structural guard should run.
+    ///
+    /// - `None` - mode does not allow structural guard
+    /// - `Some(true)` - should run, configuration exists
+    /// - `Some(false)` - should run but no configuration
+    #[must_use]
+    pub fn should_run_structural(&self) -> Option<bool> {
+        if !self.mode.includes_structural() {
+            return None;
+        }
+
+        Some(self.has_structural_config())
+    }
+
+    /// Returns whether perimeter guard should run.
+    ///
+    /// - `None` - mode does not allow perimeter guard
+    /// - `Some(true)` - should run, configuration exists
+    /// - `Some(false)` - should run but no configuration
+    #[must_use]
+    pub fn should_run_perimeter(&self) -> Option<bool> {
+        if !self.mode.includes_perimeter() {
+            return None;
+        }
+
+        Some(self.has_perimeter_config())
+    }
+}
+
+/// Specifies which guard modes to run.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum GuardMode {
+    /// Run both structural and perimeter guards (default)
+    #[default]
+    Default,
+    /// Run only structural guard
+    Structural,
+    /// Run only perimeter guard
+    Perimeter,
+}
+
+impl GuardMode {
+    /// Returns true if the mode includes structural guard.
+    #[must_use]
+    pub const fn includes_structural(&self) -> bool {
+        matches!(self, GuardMode::Default | GuardMode::Structural)
+    }
+
+    /// Returns true if the mode includes perimeter guard.
+    #[must_use]
+    pub const fn includes_perimeter(&self) -> bool {
+        matches!(self, GuardMode::Default | GuardMode::Perimeter)
+    }
+
+    /// Returns the string representation of the guard mode.
+    #[must_use]
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            GuardMode::Default => "default",
+            GuardMode::Structural => "structural",
+            GuardMode::Perimeter => "perimeter",
+        }
     }
 }
 

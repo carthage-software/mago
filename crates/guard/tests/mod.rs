@@ -27,6 +27,21 @@ use mago_syntax::parser::parse_file;
 
 static PRELUDE: LazyLock<Prelude> = LazyLock::new(Prelude::build);
 
+/// Creates settings with a deny-all rule for the App\Module\ namespace.
+/// This is needed because the guard now skips when there's no perimeter config.
+fn deny_all_settings() -> Settings {
+    Settings {
+        perimeter: PerimeterSettings {
+            rules: vec![PerimeterRule {
+                namespace: NamespacePath::Specific("App\\Module\\".to_string()),
+                permit: vec![], // Deny everything
+            }],
+            ..Default::default()
+        },
+        ..Default::default()
+    }
+}
+
 fn test_guard(name: &'static str, code: &'static str, settings: Settings) -> FortressReport {
     let Prelude { mut database, mut metadata, mut symbol_references } = PRELUDE.clone();
 
@@ -58,7 +73,7 @@ pub fn test_extends_violation() {
             class MyClass extends \App\Core\BaseClass {}
         }
     "};
-    let settings = Settings::default(); // Deny by default
+    let settings = deny_all_settings();
     let result = test_guard("extends_violation", code, settings);
     assert_eq!(result.boundary_breaches.len(), 1);
     assert_eq!(result.boundary_breaches[0].vector, BreachVector::Extends);
@@ -76,7 +91,7 @@ pub fn test_implements_violation() {
         }
     "};
 
-    let settings = Settings::default();
+    let settings = deny_all_settings();
     let result = test_guard("implements_violation", code, settings);
     assert_eq!(result.boundary_breaches.len(), 1);
     assert_eq!(result.boundary_breaches[0].vector, BreachVector::Implements);
@@ -94,7 +109,7 @@ pub fn test_return_type_violation() {
         }
     "};
 
-    let settings = Settings::default();
+    let settings = deny_all_settings();
     let result = test_guard("return_type_violation", code, settings);
 
     assert_eq!(result.boundary_breaches.len(), 1);
@@ -113,7 +128,7 @@ pub fn test_instantiation_violation() {
         }
     "};
 
-    let settings = Settings::default();
+    let settings = deny_all_settings();
     let result = test_guard("instantiation_violation", code, settings);
     assert_eq!(result.boundary_breaches.len(), 1);
     assert_eq!(result.boundary_breaches[0].vector, BreachVector::Instantiation);
@@ -131,7 +146,7 @@ pub fn test_static_method_call_violation() {
         }
     "};
 
-    let settings = Settings::default();
+    let settings = deny_all_settings();
     let result = test_guard("static_method_call_violation", code, settings);
     assert_eq!(result.boundary_breaches.len(), 1);
     assert_eq!(result.boundary_breaches[0].vector, BreachVector::StaticMethodCall);
@@ -148,7 +163,7 @@ pub fn test_interface_dependency_violation() {
             class MyService implements \App\Core\ServiceInterface {}
         }
     "};
-    let settings = Settings::default();
+    let settings = deny_all_settings();
     let result = test_guard("interface_dependency_violation", code, settings);
 
     assert_eq!(result.boundary_breaches.len(), 1);
@@ -167,7 +182,7 @@ pub fn test_trait_dependency_violation() {
         }
     "};
 
-    let settings = Settings::default();
+    let settings = deny_all_settings();
     let result = test_guard("trait_dependency_violation", code, settings);
     assert_eq!(result.boundary_breaches.len(), 1);
     assert_eq!(result.boundary_breaches[0].dependency_kind, PermittedDependencyKind::ClassLike);
@@ -217,7 +232,7 @@ pub fn test_const_dependency_violation() {
         }
     "};
 
-    let settings = Settings::default();
+    let settings = deny_all_settings();
     let result = test_guard("const_dependency_violation", code, settings);
 
     assert_eq!(result.boundary_breaches.len(), 1);

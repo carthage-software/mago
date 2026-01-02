@@ -46,6 +46,7 @@ use clap::Parser;
 
 use mago_database::DatabaseReader;
 use mago_database::file::FileType;
+use mago_guard::settings::GuardMode;
 use mago_prelude::Prelude;
 
 use crate::commands::args::baseline_reporting::BaselineReportingArgs;
@@ -90,6 +91,20 @@ pub struct GuardCommand {
     #[arg(long, default_value_t = false)]
     pub no_stubs: bool,
 
+    /// Run only structural guard checks.
+    ///
+    /// When specified, only structural rules (naming conventions, modifiers,
+    /// inheritance constraints) are checked. Perimeter rules are skipped.
+    #[arg(long, conflicts_with = "perimeter")]
+    pub structural: bool,
+
+    /// Run only perimeter guard checks.
+    ///
+    /// When specified, only perimeter rules (dependency boundaries, layer
+    /// restrictions) are checked. Structural rules are skipped.
+    #[arg(long, conflicts_with = "structural")]
+    pub perimeter: bool,
+
     /// Arguments related to reporting issues with baseline support.
     #[clap(flatten)]
     pub baseline_reporting: BaselineReportingArgs,
@@ -124,12 +139,40 @@ impl GuardCommand {
     /// Rules are read from `configuration.guard.rules` and define which dependencies
     /// are allowed between different namespaces or layers. Violations are reported
     /// as issues with details about the forbidden dependency.
-    pub fn execute(self, configuration: Configuration, color_choice: ColorChoice) -> Result<ExitCode, Error> {
+    pub fn execute(self, mut configuration: Configuration, color_choice: ColorChoice) -> Result<ExitCode, Error> {
         let Prelude { database, metadata, .. } = if self.no_stubs {
             Prelude::default()
         } else {
             Prelude::decode(PRELUDE_BYTES).expect("Failed to decode embedded prelude")
         };
+
+        // Determine requested mode from CLI flags
+        let cli_mode = if self.structural {
+            Some(GuardMode::Structural)
+        } else if self.perimeter {
+            Some(GuardMode::Perimeter)
+        } else {
+            None
+        };
+
+        // Apply CLI mode override if specified
+        if let Some(mode) = cli_mode {
+            let config_mode = configuration.guard.settings.mode;
+            if config_mode != GuardMode::Default && config_mode != mode {
+                tracing::info!(
+                    "Overriding guard mode from configuration `{}` with CLI flag `{}`",
+                    config_mode.as_str(),
+                    mode.as_str()
+                );
+            } else if config_mode == mode {
+                tracing::warn!(
+                    "CLI flag --{} is redundant: same mode already set in configuration",
+                    if mode == GuardMode::Structural { "structural" } else { "perimeter" }
+                );
+            }
+
+            configuration.guard.settings.mode = mode;
+        }
 
         let mut orchestrator = create_orchestrator(&configuration, color_choice, false, true, false);
         orchestrator.add_exclude_patterns(configuration.guard.excludes.iter());
@@ -146,12 +189,23 @@ impl GuardCommand {
         }
 
         let service = orchestrator.get_guard_service(database.read_only(), metadata);
-        let issues = service.run()?;
+        let result = service.run()?;
+
+        // Emit warnings for skipped guards
+        if result.missing_perimeter_configuration {
+            tracing::warn!("Perimeter guard checks were skipped due to missing configuration.");
+            tracing::warn!("Please define perimeter rules in your mago.toml to enable these checks.");
+        }
+
+        if result.missing_structural_configuration {
+            tracing::warn!("Structural guard checks were skipped based on the current configuration.");
+            tracing::warn!("Please review your mago.toml guard settings to enable structural checks.");
+        }
 
         let baseline = configuration.guard.baseline.as_deref();
         let baseline_variant = configuration.guard.baseline_variant;
         let processor = self.baseline_reporting.get_processor(color_choice, baseline, baseline_variant);
 
-        processor.process_issues(&orchestrator, &mut database, issues)
+        processor.process_issues(&orchestrator, &mut database, result.issues)
     }
 }
