@@ -580,15 +580,27 @@ fn detect_integrations_from_composer(composer: &ComposerPackage) -> Vec<Integrat
     if has_package(composer, "azjezz/psl") {
         integrations.push(Integration::Psl);
     }
+
     if has_package_prefix(composer, "symfony/") {
         integrations.push(Integration::Symfony);
     }
+
     if has_package_prefix(composer, "laravel/") {
         integrations.push(Integration::Laravel);
     }
+
     if has_package(composer, "phpunit/phpunit") {
         integrations.push(Integration::PHPUnit);
     }
+
+    if has_package_prefix(composer, "pestphp/") {
+        integrations.push(Integration::Pest);
+    }
+
+    if has_package(composer, "tempest/framework") {
+        integrations.push(Integration::Tempest);
+    }
+
     integrations
 }
 
@@ -656,11 +668,20 @@ fn prompt_for_u8(theme: &ColorfulTheme, prompt: &str, default: u8) -> Result<u8,
 }
 
 fn prompt_for_integrations(theme: &ColorfulTheme) -> Result<Vec<Integration>, Error> {
-    let items = &[Integration::Psl, Integration::Laravel, Integration::PHPUnit, Integration::Symfony];
+    let items = &[
+        Integration::Psl,
+        Integration::Laravel,
+        Integration::Pest,
+        Integration::Tempest,
+        Integration::PHPUnit,
+        Integration::Symfony,
+    ];
+
     let selections = MultiSelect::with_theme(theme)
         .with_prompt(" │  Select integrations to enable (space to select, enter to confirm)")
         .items(items)
         .interact()?;
+
     Ok(selections.into_iter().map(|i| items[i]).collect())
 }
 
