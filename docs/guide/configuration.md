@@ -148,6 +148,21 @@ For details on configuring the linter, formatter, and analyzer, see their respec
 
 - [Linter Configuration](/tools/linter/configuration-reference.md)
 - [Formatter Configuration](/tools/formatter/configuration-reference.md)
+  
+### Formatter Settings
+
+The formatter supports several configuration options under the `[formatter]` section in `mago.toml`.
+
+One recent opt-in setting controls whether the formatter inserts an empty line immediately after the opening brace of class-like structures (classes, interfaces, traits, enums):
+
+```toml
+[formatter]
+# When true, the formatter will ensure an empty line after the opening brace of
+# class-like structures. Default: false
+empty_line_after_class_like_open = true
+```
+
+This setting is useful for projects that prefer an extra blank line after a class/trait/interface/enum opening brace (for example, certain Drupal or project-specific styles). The setting is opt-in to preserve backwards compatibility with existing formatting presets.
 - [Analyzer Configuration](/tools/analyzer/configuration-reference.md)
 - [Guard Configuration](/tools/guard/configuration-reference.md)
 

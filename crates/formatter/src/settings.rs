@@ -878,6 +878,12 @@ pub struct FormatSettings {
     #[serde(default = "default_false")]
     pub empty_line_after_class_like_constant: bool,
 
+    /// Whether to add an empty line immediately after a class-like opening brace.
+    ///
+    /// Default: false
+    #[serde(default = "default_false")]
+    pub empty_line_after_class_like_open: bool,
+
     /// Whether to add an empty line after enum case.
     ///
     /// Note: if an empty line already exists, it will be preserved regardless of this
@@ -1035,6 +1041,7 @@ pub fn merge_format_settings(preset: FormatSettings, individual: FormatSettings)
         empty_line_after_symbols,
         empty_line_between_same_symbols,
         empty_line_after_class_like_constant,
+        empty_line_after_class_like_open,
         empty_line_after_enum_case,
         empty_line_after_trait_use,
         empty_line_after_property,
