@@ -20,6 +20,7 @@ use crate::internal::printer::Printer;
 use crate::settings::FormatSettings;
 
 pub mod document;
+pub mod presets;
 pub mod settings;
 
 mod internal;

@@ -46,6 +46,7 @@ use dialoguer::theme::ColorfulTheme;
 use mago_composer::AutoloadPsr4value;
 use mago_composer::ComposerPackage;
 use mago_composer::ComposerPackageAutoloadDevPsr4value;
+use mago_formatter::presets::FormatterPreset;
 use mago_linter::integration::Integration;
 use mago_php_version::PHPVersion;
 
@@ -204,10 +205,7 @@ paths = [{paths}]
 includes = [{includes}]
 excludes = [{excludes}]
 
-[formatter]
-print-width = {print_width}
-tab-width = {tab_width}
-use-tabs = {use_tabs}
+{formatter_config}
 
 [linter]
 integrations = [{integrations}]
@@ -248,7 +246,7 @@ plugins = [{analyzer_plugins}]
     about = "Initialize Mago for your project with a guided setup.",
     long_about = "Creates a new mago.toml configuration file by walking you through a setup process."
 )]
-pub struct InitCommand;
+pub struct InitCommand {}
 
 impl InitCommand {
     /// Executes the interactive initialization process.
@@ -321,7 +319,7 @@ impl InitCommand {
         let InitializationProjectSettings { php_version, paths, includes, excludes } = setup_project(&theme)?;
 
         let integrations = setup_linter(&theme)?;
-        let (print_width, tab_width, use_tabs) = setup_formatter(&theme)?;
+        let formatter_config = setup_formatter(&theme)?;
         let analyzer_settings = setup_analyzer(&theme)?;
 
         print_step_header(5, "Review & Confirm");
@@ -334,9 +332,7 @@ impl InitCommand {
                 "{integrations}",
                 &quote_format_strings(&integrations.iter().map(|i| i.to_string().to_lowercase()).collect::<Vec<_>>()),
             )
-            .replace("{print_width}", &print_width.to_string())
-            .replace("{tab_width}", &tab_width.to_string())
-            .replace("{use_tabs}", &use_tabs.to_string())
+            .replace("{formatter_config}", &formatter_config)
             .replace(
                 "{analyzer_plugins}",
                 &quote_format_strings(&analyzer_settings.plugins.iter().map(|p| p.to_string()).collect::<Vec<_>>()),
@@ -503,33 +499,65 @@ fn setup_linter(theme: &ColorfulTheme) -> Result<Vec<Integration>, Error> {
     }
 }
 
-fn setup_formatter(theme: &ColorfulTheme) -> Result<(u16, u8, bool), Error> {
+fn setup_formatter(theme: &ColorfulTheme) -> Result<String, Error> {
     print_step_header(3, "Formatter Configuration");
     println!("  │  {}", "The Formatter automatically rewrites your files to a consistent style.".bright_black());
     println!("  │  {}", "This ends debates about spacing and helps you focus on the code.".bright_black());
     println!("  │");
 
-    let defaults = (120, 4, false);
-
     if Confirm::with_theme(theme)
-        .with_prompt(" │  The default settings are PER-CS compatible. Do you want to customize them?")
+        .with_prompt(" │  Do you want to use a preset formatter configuration?")
         .default(false)
         .interact()?
     {
         println!("  │");
-        let print_width = prompt_for_u16(theme, " │  Print width (line length)", defaults.0)?;
-        let tab_width = prompt_for_u8(theme, " │  Tab width (spaces)", defaults.1)?;
-        let use_tabs =
-            Confirm::with_theme(theme).with_prompt(" │  Use tabs instead of spaces?").default(defaults.2).interact()?;
+
+        let preset_values = FormatterPreset::all();
+        let preset_items = preset_values.iter().map(|p| p.description()).collect::<Vec<_>>();
+        let selection =
+            Select::with_theme(theme).with_prompt(" │  Select a preset").items(&preset_items).default(0).interact()?;
+
+        let selected_preset = preset_values[selection];
+
         println!("  │");
-        println!("  │  {}", "ℹ️  The formatter has many more options. Check the docs to customize it further.".blue());
+        println!("  │  {}", format!("Selected preset: {}", preset_items[selection]).green());
         println!("  ╰─");
-        Ok((print_width, tab_width, use_tabs))
+
+        Ok(format!("[formatter]\npreset = \"{}\"", selected_preset))
     } else {
-        println!("  │");
-        println!("  │  {}", "Great choice! Sticking to the defaults is highly recommended.".green());
-        println!("  ╰─");
-        Ok(defaults)
+        let defaults = (120, 4, false);
+
+        if Confirm::with_theme(theme)
+            .with_prompt(" │  The default settings are PER-CS compatible. Do you want to customize them?")
+            .default(false)
+            .interact()?
+        {
+            println!("  │");
+            let print_width = prompt_for_u16(theme, " │  Print width (line length)", defaults.0)?;
+            let tab_width = prompt_for_u8(theme, " │  Tab width (spaces)", defaults.1)?;
+            let use_tabs = Confirm::with_theme(theme)
+                .with_prompt(" │  Use tabs instead of spaces?")
+                .default(defaults.2)
+                .interact()?;
+            println!("  │");
+            println!(
+                "  │  {}",
+                "ℹ️  The formatter has many more options. Check the docs to customize it further.".blue()
+            );
+            println!("  ╰─");
+            Ok(format!(
+                "[formatter]\nprint-width = {}\ntab-width = {}\nuse-tabs = {}",
+                print_width, tab_width, use_tabs
+            ))
+        } else {
+            println!("  │");
+            println!("  │  {}", "Great choice! Sticking to the defaults is highly recommended.".green());
+            println!("  ╰─");
+            Ok(format!(
+                "[formatter]\nprint-width = {}\ntab-width = {}\nuse-tabs = {}",
+                defaults.0, defaults.1, defaults.2
+            ))
+        }
     }
 }
 
@@ -922,9 +950,7 @@ mod tests {
         includes: &[String],
         excludes: &[String],
         integrations: &[Integration],
-        print_width: u16,
-        tab_width: u8,
-        use_tabs: bool,
+        formatter_config: &str,
         analyzer_settings: &InitializationAnalyzerSettings,
     ) -> String {
         CONFIGURATION_TEMPLATE
@@ -936,9 +962,7 @@ mod tests {
                 "{integrations}",
                 &quote_format_strings(&integrations.iter().map(|i| i.to_string().to_lowercase()).collect::<Vec<_>>()),
             )
-            .replace("{print_width}", &print_width.to_string())
-            .replace("{tab_width}", &tab_width.to_string())
-            .replace("{use_tabs}", &use_tabs.to_string())
+            .replace("{formatter_config}", formatter_config)
             .replace(
                 "{analyzer_plugins}",
                 &quote_format_strings(&analyzer_settings.plugins.iter().map(|p| p.to_string()).collect::<Vec<_>>()),
@@ -948,15 +972,14 @@ mod tests {
 
     #[test]
     fn test_generated_config_parses_with_defaults() {
+        let formatter_config = format!("[formatter]\nprint-width = {}\ntab-width = {}\nuse-tabs = {}", 120, 4, false);
         let content = generate_config_content(
             "8.2",
             &["src".to_string()],
             &["vendor".to_string()],
             &[],
             &[],
-            120,
-            4,
-            false,
+            &formatter_config,
             &create_default_analyzer_settings(),
         );
 
@@ -981,6 +1004,7 @@ mod tests {
             check_missing_type_hints: true,
             register_super_globals: false,
         };
+        let formatter_config = format!("[formatter]\nprint-width = {}\ntab-width = {}\nuse-tabs = {}", 100, 2, true);
 
         let content = generate_config_content(
             "8.4",
@@ -988,9 +1012,7 @@ mod tests {
             &["vendor".to_string()],
             &["tests".to_string()],
             &[Integration::Symfony, Integration::PHPUnit],
-            100,
-            2,
-            true,
+            &formatter_config,
             &settings,
         );
 
@@ -1000,15 +1022,14 @@ mod tests {
 
     #[test]
     fn test_generated_config_parses_with_integrations() {
+        let formatter_config = format!("[formatter]\nprint-width = {}\ntab-width = {}\nuse-tabs = {}", 120, 4, false);
         let content = generate_config_content(
             "8.3",
             &["src".to_string()],
             &["vendor".to_string()],
             &[],
             &[Integration::Psl, Integration::Laravel, Integration::PHPUnit, Integration::Symfony],
-            120,
-            4,
-            false,
+            &formatter_config,
             &create_default_analyzer_settings(),
         );
 
@@ -1082,6 +1103,7 @@ mod tests {
     fn test_generated_config_with_analyzer_plugins() {
         let settings =
             InitializationAnalyzerSettings { plugins: vec![AnalyzerPlugin::Psl], ..create_default_analyzer_settings() };
+        let formatter_config = "[formatter]\nprint-width = 120\ntab-width = 4\nuse-tabs = false";
 
         let content = generate_config_content(
             "8.3",
@@ -1089,9 +1111,7 @@ mod tests {
             &["vendor".to_string()],
             &[],
             &[],
-            120,
-            4,
-            false,
+            formatter_config,
             &settings,
         );
 

@@ -226,6 +226,9 @@ pub enum Error {
     /// staged and unstaged changes. Formatting in this case could cause data loss,
     /// so the operation is aborted. The string contains the path to the problematic file.
     StagedFileHasUnstagedChanges(String),
+
+    /// An unknown formatter preset was requested.
+    UnknownFormatterPreset(String),
 }
 
 /// Formats the error for user-friendly display.
@@ -268,6 +271,9 @@ impl std::fmt::Display for Error {
             Self::NotAGitRepository => write!(f, "Not inside a git repository"),
             Self::StagedFileHasUnstagedChanges(path) => {
                 write!(f, "Cannot format staged files: '{path}' has both staged and unstaged changes")
+            }
+            Self::UnknownFormatterPreset(preset) => {
+                write!(f, "Unknown formatter preset: `{preset}`. Available presets are: laravel, psr12, default")
             }
         }
     }
