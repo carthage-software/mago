@@ -3,6 +3,7 @@ use std::borrow::Cow;
 use std::fs;
 
 use mago_formatter::Formatter;
+use mago_formatter::settings::BraceStyle;
 use mago_formatter::settings::FormatSettings;
 use mago_formatter::settings::NullTypeHint;
 use mago_php_version::PHPVersion;
@@ -169,6 +170,9 @@ test_case!(unary_prefix_prec);
 test_case!(rescue);
 test_case!(yield_kv_closure);
 test_case!(symfony_form_builder);
+test_case!(empty_line_after_class_like_open);
+test_case!(empty_line_after_class_like_open_add);
+test_case!(empty_line_after_class_like_open_drupal);
 test_case!(format_ignore_single_line_comment);
 test_case!(format_ignore_block_comment);
 test_case!(format_ignore_docblock);

@@ -67,6 +67,13 @@ pub fn print_class_like_body<'arena>(
             let mut last_has_line_after = false;
             let mut members = vec![in f.arena; Document::Line(Line::hard())];
 
+            // If enabled, add an empty line directly after the opening brace.
+            // This forces a blank line between the `{` and the first member
+            // regardless of the original source layout.
+            if f.settings.empty_line_after_class_like_open {
+                members.push(Document::Line(Line::hard()));
+            }
+
             // Conditionally sort members if sort_class_methods is enabled
             let members_to_format = if f.settings.sort_class_methods {
                 sort_class_members(f.arena, class_like_members)
