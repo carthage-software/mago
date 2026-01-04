@@ -39,6 +39,7 @@ use colored::Colorize;
 use dialoguer::Confirm;
 use dialoguer::Input;
 use dialoguer::MultiSelect;
+use dialoguer::Select;
 use dialoguer::console::style;
 use dialoguer::theme::ColorfulTheme;
 
@@ -54,6 +55,133 @@ use crate::consts::CONFIGURATION_FILE_NAME;
 use crate::consts::DEFAULT_PHP_VERSION;
 use crate::error::Error;
 use crate::utils::version::extract_minimum_php_version;
+
+/// Available analyzer plugins that can be enabled during initialization.
+///
+/// These plugins provide specialized type inference for specific libraries,
+/// improving the analyzer's understanding of library-specific functions.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum AnalyzerPlugin {
+    /// Type providers for azjezz/psl package
+    Psl,
+    /// Type providers for flow-php/etl package
+    FlowPhp,
+}
+
+impl std::fmt::Display for AnalyzerPlugin {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Psl => write!(f, "psl"),
+            Self::FlowPhp => write!(f, "flow-php"),
+        }
+    }
+}
+
+impl AnalyzerPlugin {
+    /// Returns a human-readable description of the plugin.
+    fn description(&self) -> &'static str {
+        match self {
+            Self::Psl => "PSL - Type providers for azjezz/psl package",
+            Self::FlowPhp => "Flow-PHP - Type providers for flow-php/etl package",
+        }
+    }
+}
+
+/// Strictness presets for the analyzer configuration.
+///
+/// These presets provide pre-configured sets of analyzer settings ranging from
+/// minimal checks (suitable for legacy codebases) to maximum strictness.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+enum AnalyzerStrictnessPreset {
+    /// Minimal checks, good for legacy codebases or gradual adoption
+    Relaxed,
+    /// Sensible defaults for most projects (default)
+    #[default]
+    Balanced,
+    /// Enable most checks for clean, well-maintained codebases
+    Strict,
+    /// All checks enabled, strictest possible settings
+    Maximum,
+}
+
+impl std::fmt::Display for AnalyzerStrictnessPreset {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Relaxed => write!(f, "Relaxed - Minimal checks, good for legacy codebases"),
+            Self::Balanced => write!(f, "Balanced - Sensible defaults for most projects"),
+            Self::Strict => write!(f, "Strict - Enable most checks for clean codebases"),
+            Self::Maximum => write!(f, "Maximum - All checks enabled, strictest settings"),
+        }
+    }
+}
+
+impl AnalyzerStrictnessPreset {
+    /// Converts this preset to concrete analyzer settings.
+    fn to_settings(self, plugins: Vec<AnalyzerPlugin>) -> InitializationAnalyzerSettings {
+        match self {
+            Self::Relaxed => InitializationAnalyzerSettings {
+                plugins,
+                find_unused_definitions: false,
+                find_unused_expressions: false,
+                analyze_dead_code: false,
+                check_throws: false,
+                allow_possibly_undefined_array_keys: true,
+                check_missing_override: false,
+                find_unused_parameters: false,
+                memoize_properties: true,
+                strict_list_index_checks: false,
+                no_boolean_literal_comparison: false,
+                check_missing_type_hints: false,
+                register_super_globals: true,
+            },
+            Self::Balanced => InitializationAnalyzerSettings {
+                plugins,
+                find_unused_definitions: true,
+                find_unused_expressions: false,
+                analyze_dead_code: false,
+                check_throws: false,
+                allow_possibly_undefined_array_keys: true,
+                check_missing_override: false,
+                find_unused_parameters: false,
+                memoize_properties: true,
+                strict_list_index_checks: false,
+                no_boolean_literal_comparison: false,
+                check_missing_type_hints: false,
+                register_super_globals: true,
+            },
+            Self::Strict => InitializationAnalyzerSettings {
+                plugins,
+                find_unused_definitions: true,
+                find_unused_expressions: true,
+                analyze_dead_code: false,
+                check_throws: true,
+                allow_possibly_undefined_array_keys: false,
+                check_missing_override: true,
+                find_unused_parameters: true,
+                memoize_properties: true,
+                strict_list_index_checks: true,
+                no_boolean_literal_comparison: false,
+                check_missing_type_hints: false,
+                register_super_globals: true,
+            },
+            Self::Maximum => InitializationAnalyzerSettings {
+                plugins,
+                find_unused_definitions: true,
+                find_unused_expressions: true,
+                analyze_dead_code: true,
+                check_throws: true,
+                allow_possibly_undefined_array_keys: false,
+                check_missing_override: true,
+                find_unused_parameters: true,
+                memoize_properties: true,
+                strict_list_index_checks: true,
+                no_boolean_literal_comparison: true,
+                check_missing_type_hints: true,
+                register_super_globals: true,
+            },
+        }
+    }
+}
 
 /// TOML template for the generated `mago.toml` configuration file.
 ///
@@ -90,6 +218,7 @@ literal-named-argument = { enabled = false }
 halstead = { effort-threshold = 7000 }
 
 [analyzer]
+plugins = [{analyzer_plugins}]
 {analyzer_settings}
 "#;
 
@@ -208,6 +337,10 @@ impl InitCommand {
             .replace("{print_width}", &print_width.to_string())
             .replace("{tab_width}", &tab_width.to_string())
             .replace("{use_tabs}", &use_tabs.to_string())
+            .replace(
+                "{analyzer_plugins}",
+                &quote_format_strings(&analyzer_settings.plugins.iter().map(|p| p.to_string()).collect::<Vec<_>>()),
+            )
             .replace("{analyzer_settings}", &build_analyzer_settings_string(&analyzer_settings));
 
         if write_configuration_if_confirmed(&theme, &configuration_file, &config_content)? {
@@ -245,6 +378,8 @@ struct InitializationProjectSettings {
 /// static analysis.
 #[derive(Debug)]
 struct InitializationAnalyzerSettings {
+    /// Analyzer plugins to enable
+    plugins: Vec<AnalyzerPlugin>,
     /// Whether to find unused definitions (classes, functions, methods)
     find_unused_definitions: bool,
     /// Whether to find unused expressions (statements with no effect)
@@ -404,109 +539,130 @@ fn setup_analyzer(theme: &ColorfulTheme) -> Result<InitializationAnalyzerSetting
     println!("  │  {}", "This is the most powerful part of Mago.".bright_black());
     println!("  │");
 
+    // Step 1: Plugin detection/selection
+    let plugins = setup_analyzer_plugins(theme)?;
+
+    // Step 2: Strictness preset selection
+    println!("  │");
+    println!("  │  {}", "Choose a strictness level for the analyzer:".bright_black());
+    println!("  │");
+
+    let presets = &[
+        AnalyzerStrictnessPreset::Relaxed,
+        AnalyzerStrictnessPreset::Balanced,
+        AnalyzerStrictnessPreset::Strict,
+        AnalyzerStrictnessPreset::Maximum,
+    ];
+
+    let selection = Select::with_theme(theme)
+        .with_prompt(" │  Strictness preset")
+        .items(presets)
+        .default(1) // Balanced
+        .interact()?;
+
+    let preset = presets[selection];
+    let mut settings = preset.to_settings(plugins);
+
+    // Step 3: Optional customization
+    println!("  │");
     if Confirm::with_theme(theme)
-        .with_prompt(" │  Would you like to go through the advanced setup for the analyzer?")
+        .with_prompt(" │  Would you like to customize individual settings?")
         .default(false)
         .interact()?
     {
         println!("  │");
         println!("  │  {}", "Detection Settings:".underline());
-        let find_unused_definitions = Confirm::with_theme(theme)
+        settings.find_unused_definitions = Confirm::with_theme(theme)
             .with_prompt(" │  Find unused definitions (e.g., private methods)?")
-            .default(true)
+            .default(settings.find_unused_definitions)
             .interact()?;
-        let find_unused_expressions = Confirm::with_theme(theme)
+        settings.find_unused_expressions = Confirm::with_theme(theme)
             .with_prompt(" │  Find unused expressions (e.g., `$a + $b;`)?")
-            .default(false)
+            .default(settings.find_unused_expressions)
             .interact()?;
-        let analyze_dead_code = Confirm::with_theme(theme)
+        settings.analyze_dead_code = Confirm::with_theme(theme)
             .with_prompt(" │  Analyze code that appears to be unreachable?")
-            .default(false)
+            .default(settings.analyze_dead_code)
             .interact()?;
 
         println!("  │");
         println!("  │  {}", "Type Checking:".underline());
-        let check_throws = Confirm::with_theme(theme)
+        settings.check_throws = Confirm::with_theme(theme)
             .with_prompt(" │  Check for unhandled thrown exceptions?")
-            .default(false)
+            .default(settings.check_throws)
             .interact()?;
-        let check_missing_type_hints =
-            Confirm::with_theme(theme).with_prompt(" │  Check for missing type hints?").default(false).interact()?;
-        let no_boolean_literal_comparison = Confirm::with_theme(theme)
+        settings.check_missing_type_hints = Confirm::with_theme(theme)
+            .with_prompt(" │  Check for missing type hints?")
+            .default(settings.check_missing_type_hints)
+            .interact()?;
+        settings.no_boolean_literal_comparison = Confirm::with_theme(theme)
             .with_prompt(" │  Disallow comparisons with boolean literals?")
-            .default(false)
+            .default(settings.no_boolean_literal_comparison)
             .interact()?;
 
         println!("  │");
         println!("  │  {}", "Array Handling:".underline());
-        let allow_possibly_undefined_array_keys = Confirm::with_theme(theme)
+        settings.allow_possibly_undefined_array_keys = Confirm::with_theme(theme)
             .with_prompt(" │  Allow accessing possibly undefined array keys?")
-            .default(true)
+            .default(settings.allow_possibly_undefined_array_keys)
             .interact()?;
-        let strict_list_index_checks = Confirm::with_theme(theme)
+        settings.strict_list_index_checks = Confirm::with_theme(theme)
             .with_prompt(" │  Enforce strict checks for list index access?")
-            .default(false)
+            .default(settings.strict_list_index_checks)
             .interact()?;
 
         println!("  │");
         println!("  │  {}", "Other Settings:".underline());
-        let check_missing_override = Confirm::with_theme(theme)
+        settings.check_missing_override = Confirm::with_theme(theme)
             .with_prompt(" │  Check for missing #[Override] attributes (PHP 8.3+)?")
-            .default(false)
+            .default(settings.check_missing_override)
             .interact()?;
-        let find_unused_parameters = Confirm::with_theme(theme)
+        settings.find_unused_parameters = Confirm::with_theme(theme)
             .with_prompt(" │  Find unused function/method parameters?")
-            .default(false)
+            .default(settings.find_unused_parameters)
             .interact()?;
-        let memoize_properties = Confirm::with_theme(theme)
+        settings.memoize_properties = Confirm::with_theme(theme)
             .with_prompt(" │  Track literal values of class properties?")
-            .default(true)
+            .default(settings.memoize_properties)
             .interact()?;
-        let register_super_globals = Confirm::with_theme(theme)
+        settings.register_super_globals = Confirm::with_theme(theme)
             .with_prompt(" │  Register superglobals ($_GET, $_POST, etc.)?")
-            .default(true)
+            .default(settings.register_super_globals)
             .interact()?;
+    }
 
-        println!("  ╰─");
-        Ok(InitializationAnalyzerSettings {
-            find_unused_definitions,
-            find_unused_expressions,
-            analyze_dead_code,
-            check_throws,
-            allow_possibly_undefined_array_keys,
-            check_missing_override,
-            find_unused_parameters,
-            memoize_properties,
-            strict_list_index_checks,
-            no_boolean_literal_comparison,
-            check_missing_type_hints,
-            register_super_globals,
-        })
+    println!("  ╰─");
+    Ok(settings)
+}
+
+fn setup_analyzer_plugins(theme: &ColorfulTheme) -> Result<Vec<AnalyzerPlugin>, Error> {
+    let composer_file = Path::new(COMPOSER_JSON_FILE);
+
+    if composer_file.exists()
+        && Confirm::with_theme(theme)
+            .with_prompt(" │  Use `composer.json` to auto-detect analyzer plugins?")
+            .default(true)
+            .interact()?
+    {
+        println!("  │");
+        println!("  │  {}", "Detecting plugins from composer.json...".bright_black());
+        let composer_json = std::fs::read_to_string(composer_file).map_err(Error::ReadingComposerJson)?;
+        let composer = ComposerPackage::from_str(&composer_json)?;
+        let plugins = detect_analyzer_plugins_from_composer(&composer);
+
+        if plugins.is_empty() {
+            println!("  │  {}", "No plugins detected.".bright_black());
+        } else {
+            for plugin in &plugins {
+                println!("  │  {} {}", "✓".green(), plugin.description());
+            }
+            println!("  │  {}", "Done!".green());
+        }
+
+        Ok(plugins)
     } else {
         println!("  │");
-        println!("  │  {}", "Let's enable the most common features:".bright_black());
-        println!("  │");
-        let find_unused_definitions =
-            Confirm::with_theme(theme).with_prompt(" │  Find unused definitions?").default(true).interact()?;
-        let check_throws = Confirm::with_theme(theme)
-            .with_prompt(" │  Check for unhandled thrown exceptions?")
-            .default(false)
-            .interact()?;
-        println!("  ╰─");
-        Ok(InitializationAnalyzerSettings {
-            find_unused_definitions,
-            find_unused_expressions: false,
-            analyze_dead_code: false,
-            check_throws,
-            allow_possibly_undefined_array_keys: true,
-            check_missing_override: false,
-            find_unused_parameters: false,
-            memoize_properties: true,
-            strict_list_index_checks: false,
-            no_boolean_literal_comparison: false,
-            check_missing_type_hints: false,
-            register_super_globals: true,
-        })
+        prompt_for_analyzer_plugins(theme)
     }
 }
 
@@ -604,6 +760,20 @@ fn detect_integrations_from_composer(composer: &ComposerPackage) -> Vec<Integrat
     integrations
 }
 
+fn detect_analyzer_plugins_from_composer(composer: &ComposerPackage) -> Vec<AnalyzerPlugin> {
+    let mut plugins = vec![];
+
+    if has_package(composer, "azjezz/psl") {
+        plugins.push(AnalyzerPlugin::Psl);
+    }
+
+    if has_package_prefix(composer, "flow-php/") {
+        plugins.push(AnalyzerPlugin::FlowPhp);
+    }
+
+    plugins
+}
+
 fn has_package_prefix(composer: &ComposerPackage, prefix: &str) -> bool {
     composer.require.keys().any(|k| k.starts_with(prefix)) || composer.require_dev.keys().any(|k| k.starts_with(prefix))
 }
@@ -685,6 +855,19 @@ fn prompt_for_integrations(theme: &ColorfulTheme) -> Result<Vec<Integration>, Er
     Ok(selections.into_iter().map(|i| items[i]).collect())
 }
 
+fn prompt_for_analyzer_plugins(theme: &ColorfulTheme) -> Result<Vec<AnalyzerPlugin>, Error> {
+    let items = &[AnalyzerPlugin::Psl, AnalyzerPlugin::FlowPhp];
+
+    let descriptions: Vec<&str> = items.iter().map(|p| p.description()).collect();
+
+    let selections = MultiSelect::with_theme(theme)
+        .with_prompt(" │  Select analyzer plugins (space to select, enter to confirm)")
+        .items(&descriptions)
+        .interact()?;
+
+    Ok(selections.into_iter().map(|i| items[i]).collect())
+}
+
 fn quote_format_strings(items: &[String]) -> String {
     items.iter().map(|p| format!("\"{}\"", p)).collect::<Vec<_>>().join(", ")
 }
@@ -716,6 +899,7 @@ mod tests {
 
     fn create_default_analyzer_settings() -> InitializationAnalyzerSettings {
         InitializationAnalyzerSettings {
+            plugins: vec![],
             find_unused_definitions: true,
             find_unused_expressions: false,
             analyze_dead_code: false,
@@ -755,6 +939,10 @@ mod tests {
             .replace("{print_width}", &print_width.to_string())
             .replace("{tab_width}", &tab_width.to_string())
             .replace("{use_tabs}", &use_tabs.to_string())
+            .replace(
+                "{analyzer_plugins}",
+                &quote_format_strings(&analyzer_settings.plugins.iter().map(|p| p.to_string()).collect::<Vec<_>>()),
+            )
             .replace("{analyzer_settings}", &build_analyzer_settings_string(analyzer_settings))
     }
 
@@ -779,6 +967,7 @@ mod tests {
     #[test]
     fn test_generated_config_parses_with_all_options() {
         let settings = InitializationAnalyzerSettings {
+            plugins: vec![AnalyzerPlugin::Psl, AnalyzerPlugin::FlowPhp],
             find_unused_definitions: true,
             find_unused_expressions: true,
             analyze_dead_code: true,
@@ -844,5 +1033,71 @@ mod tests {
         assert!(output.contains("no-boolean-literal-comparison = false"));
         assert!(output.contains("check-missing-type-hints = false"));
         assert!(output.contains("register-super-globals = true"));
+    }
+
+    #[test]
+    fn test_analyzer_strictness_presets() {
+        // Test Relaxed preset
+        let relaxed = AnalyzerStrictnessPreset::Relaxed.to_settings(vec![]);
+        assert!(!relaxed.find_unused_definitions);
+        assert!(!relaxed.find_unused_expressions);
+        assert!(!relaxed.analyze_dead_code);
+        assert!(!relaxed.check_throws);
+        assert!(relaxed.allow_possibly_undefined_array_keys);
+
+        // Test Balanced preset
+        let balanced = AnalyzerStrictnessPreset::Balanced.to_settings(vec![]);
+        assert!(balanced.find_unused_definitions);
+        assert!(!balanced.find_unused_expressions);
+        assert!(!balanced.check_throws);
+        assert!(balanced.allow_possibly_undefined_array_keys);
+
+        // Test Strict preset
+        let strict = AnalyzerStrictnessPreset::Strict.to_settings(vec![]);
+        assert!(strict.find_unused_definitions);
+        assert!(strict.find_unused_expressions);
+        assert!(strict.check_throws);
+        assert!(!strict.allow_possibly_undefined_array_keys);
+        assert!(strict.check_missing_override);
+        assert!(strict.find_unused_parameters);
+
+        // Test Maximum preset
+        let maximum = AnalyzerStrictnessPreset::Maximum.to_settings(vec![]);
+        assert!(maximum.find_unused_definitions);
+        assert!(maximum.find_unused_expressions);
+        assert!(maximum.analyze_dead_code);
+        assert!(maximum.check_throws);
+        assert!(!maximum.allow_possibly_undefined_array_keys);
+        assert!(maximum.check_missing_type_hints);
+        assert!(maximum.no_boolean_literal_comparison);
+    }
+
+    #[test]
+    fn test_analyzer_plugin_display() {
+        assert_eq!(AnalyzerPlugin::Psl.to_string(), "psl");
+        assert_eq!(AnalyzerPlugin::FlowPhp.to_string(), "flow-php");
+    }
+
+    #[test]
+    fn test_generated_config_with_analyzer_plugins() {
+        let settings =
+            InitializationAnalyzerSettings { plugins: vec![AnalyzerPlugin::Psl], ..create_default_analyzer_settings() };
+
+        let content = generate_config_content(
+            "8.3",
+            &["src".to_string()],
+            &["vendor".to_string()],
+            &[],
+            &[],
+            120,
+            4,
+            false,
+            &settings,
+        );
+
+        assert!(content.contains(r#"plugins = ["psl"]"#));
+
+        let result: Result<Configuration, _> = toml::from_str(&content);
+        assert!(result.is_ok(), "Generated config should parse. Error: {:?}\n\nConfig:\n{}", result.err(), content);
     }
 }
