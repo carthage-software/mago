@@ -884,6 +884,17 @@ pub struct FormatSettings {
     #[serde(default = "default_false")]
     pub empty_line_after_class_like_open: bool,
 
+    /// Whether to insert an empty line before the closing brace of class-like
+    /// structures when the class body is not empty.
+    ///
+    /// When enabled, a blank line will be inserted immediately before the `}`
+    /// that closes a class, trait, interface or enum, but only if the body
+    /// contains at least one member.
+    ///
+    /// Default: false
+    #[serde(default = "default_false")]
+    pub empty_line_before_class_like_close: bool,
+
     /// Whether to add an empty line after enum case.
     ///
     /// Note: if an empty line already exists, it will be preserved regardless of this
@@ -1042,6 +1053,7 @@ pub fn merge_format_settings(preset: FormatSettings, individual: FormatSettings)
         empty_line_between_same_symbols,
         empty_line_after_class_like_constant,
         empty_line_after_class_like_open,
+        empty_line_before_class_like_close,
         empty_line_after_enum_case,
         empty_line_after_trait_use,
         empty_line_after_property,

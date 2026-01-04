@@ -198,6 +198,10 @@ pub fn print_class_like_body<'arena>(
             contents.push(Document::Line(Line::hard()));
         }
 
+        if length > 0 && f.settings.empty_line_before_class_like_close {
+            contents.push(Document::Line(Line::hard()));
+        }
+
         contents.push(Document::String("}"));
         if let Some(comments) = f.print_trailing_comments(*right_brace) {
             contents.push(comments);
