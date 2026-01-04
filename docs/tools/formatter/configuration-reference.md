@@ -14,10 +14,50 @@ print-width = 100
 use-tabs = true
 ```
 
+## Presets
+
+Instead of configuring individual settings, you can use a preset that provides a complete set of formatter options optimized for specific coding standards.
+
+```toml
+[formatter]
+preset = "laravel"
+```
+
+Available presets:
+
+- **`"default"`** — PER-CS compliant settings (same as the default configuration)
+- **`"psr-12"`** — Optimized for PSR-12 coding standard
+- **`"laravel-pint"`** — Laravel Pint's 'laravel' preset
+
+### Preset Versions
+
+Presets support versioning to allow applications to pin to specific versions of coding standards:
+
+```toml
+[formatter]
+preset = "psr-12@latest"  # Use the latest PSR-12 rules
+preset = "psr-12"         # Same as above (latest is default)
+```
+
+Currently, only `latest` is supported for all presets. Future versions will allow pinning to specific standard versions (e.g., `psr-12@1.0`).
+
+### Combining presets with individual settings
+
+You can combine a preset with individual settings. When you specify both, the preset provides the base configuration, and any individual settings you specify will override the preset values:
+
+```toml
+[formatter]
+preset = "laravel"
+print-width = 140  # Overrides the preset's print-width
+```
+
+This allows you to start with a preset that matches your project's coding standard and then fine-tune specific options as needed.
+
 ## Configuration options
 
 | Option | Type | Default | Description |
 | :--- | :--- | :--- | :--- |
+| `preset` | `string` | `null` | Use a preset configuration. Available values: `"default"`, `"psr-12"`, `"laravel"`. |
 | `excludes` | `string[]` | `[]` | A list of paths or glob patterns to exclude from formatting. |
 
 :::tip Tool-Specific Excludes

@@ -1,5 +1,6 @@
 use std::str::FromStr;
 
+use crate::presets;
 use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
@@ -940,82 +941,108 @@ pub struct FormatSettings {
 
 impl Default for FormatSettings {
     /// Sets default values to align with best practices.
+    ///
+    /// This uses the default preset from the presets module to ensure consistency.
     fn default() -> Self {
-        Self {
-            print_width: default_print_width(),
-            tab_width: default_tab_width(),
-            use_tabs: false,
-            end_of_line: EndOfLine::default(),
-            single_quote: true,
-            trailing_comma: true,
-            closure_brace_style: BraceStyle::SameLine,
-            function_brace_style: BraceStyle::NextLine,
-            method_brace_style: BraceStyle::NextLine,
-            classlike_brace_style: BraceStyle::NextLine,
-            control_brace_style: BraceStyle::SameLine,
-            inline_empty_control_braces: false,
-            inline_empty_closure_braces: true,
-            inline_empty_function_braces: false,
-            inline_empty_method_braces: false,
-            inline_empty_constructor_braces: true,
-            inline_empty_classlike_braces: true,
-            inline_empty_anonymous_class_braces: true,
-            null_type_hint: NullTypeHint::default(),
-            break_promoted_properties_list: true,
-            method_chain_breaking_style: MethodChainBreakingStyle::NextLine,
-            first_method_chain_on_new_line: true,
-            line_before_binary_operator: true,
-            sort_uses: true,
-            sort_class_methods: false,
-            separate_use_types: true,
-            expand_use_groups: true,
-            remove_trailing_close_tag: true,
-            parentheses_around_new_in_member_access: false,
-            parentheses_in_new_expression: true,
-            parentheses_in_exit_and_die: true,
-            parentheses_in_attribute: false,
-            array_table_style_alignment: true,
-            align_assignment_like: false,
-            always_break_named_arguments_list: false,
-            always_break_attribute_named_argument_lists: false,
-            preserve_breaking_member_access_chain: false,
-            preserve_breaking_argument_list: false,
-            preserve_breaking_array_like: true,
-            preserve_breaking_parameter_list: false,
-            preserve_breaking_attribute_list: false,
-            preserve_breaking_conditional_expression: false,
-            space_before_arrow_function_parameter_list_parenthesis: false,
-            space_before_closure_parameter_list_parenthesis: true,
-            space_before_closure_use_clause_parenthesis: true,
-            space_around_assignment_in_declare: false,
-            space_within_grouping_parenthesis: false,
-            space_before_hook_parameter_list_parenthesis: false,
-            space_around_concatenation_binary_operator: true,
-            space_after_cast_unary_prefix_operators: true,
-            space_after_reference_unary_prefix_operator: false,
-            space_after_error_control_unary_prefix_operator: false,
-            space_after_logical_not_unary_prefix_operator: false,
-            space_after_bitwise_not_unary_prefix_operator: false,
-            space_after_increment_unary_prefix_operator: false,
-            space_after_decrement_unary_prefix_operator: false,
-            space_after_additive_unary_prefix_operator: false,
-            empty_line_after_control_structure: false,
-            empty_line_after_opening_tag: true,
-            empty_line_after_declare: true,
-            empty_line_after_namespace: true,
-            empty_line_after_use: true,
-            empty_line_after_symbols: true,
-            empty_line_between_same_symbols: true,
-            empty_line_after_class_like_constant: false,
-            empty_line_after_enum_case: false,
-            empty_line_after_trait_use: false,
-            empty_line_after_property: false,
-            empty_line_after_method: true,
-            empty_line_before_return: false,
-            empty_line_before_dangling_comments: true,
-            separate_class_like_members: true,
-            indent_heredoc: true,
-        }
+        presets::FormatterPreset::Default.settings()
+    }
+}
+
+/// Merges individual settings over a preset, applying overrides where individual
+/// settings differ from the default values (indicating they were explicitly set).
+pub fn merge_format_settings(preset: FormatSettings, individual: FormatSettings) -> FormatSettings {
+    let defaults = FormatSettings::default();
+
+    macro_rules! merge_fields {
+        ($($field:ident),* $(,)?) => {
+            FormatSettings {
+                $(
+                    $field: if individual.$field != defaults.$field {
+                        // User explicitly set this value (differs from default)
+                        individual.$field
+                    } else {
+                        // Use preset value
+                        preset.$field
+                    },
+                )*
+            }
+        };
+    }
+
+    merge_fields! {
+        print_width,
+        tab_width,
+        use_tabs,
+        end_of_line,
+        single_quote,
+        trailing_comma,
+        remove_trailing_close_tag,
+        control_brace_style,
+        closure_brace_style,
+        function_brace_style,
+        method_brace_style,
+        classlike_brace_style,
+        inline_empty_control_braces,
+        inline_empty_closure_braces,
+        inline_empty_function_braces,
+        inline_empty_method_braces,
+        inline_empty_constructor_braces,
+        inline_empty_classlike_braces,
+        inline_empty_anonymous_class_braces,
+        method_chain_breaking_style,
+        first_method_chain_on_new_line,
+        preserve_breaking_member_access_chain,
+        preserve_breaking_argument_list,
+        preserve_breaking_array_like,
+        preserve_breaking_parameter_list,
+        preserve_breaking_attribute_list,
+        preserve_breaking_conditional_expression,
+        break_promoted_properties_list,
+        line_before_binary_operator,
+        always_break_named_arguments_list,
+        always_break_attribute_named_argument_lists,
+        array_table_style_alignment,
+        align_assignment_like,
+        sort_uses,
+        sort_class_methods,
+        separate_use_types,
+        expand_use_groups,
+        null_type_hint,
+        parentheses_around_new_in_member_access,
+        parentheses_in_new_expression,
+        parentheses_in_exit_and_die,
+        parentheses_in_attribute,
+        space_before_arrow_function_parameter_list_parenthesis,
+        space_before_closure_parameter_list_parenthesis,
+        space_before_hook_parameter_list_parenthesis,
+        space_before_closure_use_clause_parenthesis,
+        space_after_cast_unary_prefix_operators,
+        space_after_reference_unary_prefix_operator,
+        space_after_error_control_unary_prefix_operator,
+        space_after_logical_not_unary_prefix_operator,
+        space_after_bitwise_not_unary_prefix_operator,
+        space_after_increment_unary_prefix_operator,
+        space_after_decrement_unary_prefix_operator,
+        space_after_additive_unary_prefix_operator,
+        space_around_concatenation_binary_operator,
+        space_around_assignment_in_declare,
+        space_within_grouping_parenthesis,
+        empty_line_after_control_structure,
+        empty_line_after_opening_tag,
+        empty_line_after_declare,
+        empty_line_after_namespace,
+        empty_line_after_use,
+        empty_line_after_symbols,
+        empty_line_between_same_symbols,
+        empty_line_after_class_like_constant,
+        empty_line_after_enum_case,
+        empty_line_after_trait_use,
+        empty_line_after_property,
+        empty_line_after_method,
+        empty_line_before_return,
+        empty_line_before_dangling_comments,
+        separate_class_like_members,
+        indent_heredoc,
     }
 }
 
