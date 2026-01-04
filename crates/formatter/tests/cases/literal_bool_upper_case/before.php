@@ -2,4 +2,4 @@
 $a = true;
 $b = False;
 $c = NULL;
-$d = [];
+$d = null;

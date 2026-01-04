@@ -3,4 +3,4 @@
 $a = TRUE;
 $b = FALSE;
 $c = NULL;
-$d = [];
+$d = NULL;
