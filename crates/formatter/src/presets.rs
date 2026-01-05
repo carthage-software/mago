@@ -173,6 +173,7 @@ const DEFAULT_PRESET: FormatSettings = FormatSettings {
     empty_line_before_dangling_comments: true,
     separate_class_like_members: true,
     indent_heredoc: true,
+    uppercase_literal_keyword: false,
 };
 
 /// The PSR-12 formatter preset.
@@ -252,6 +253,7 @@ const PSR12_PRESET: FormatSettings = FormatSettings {
     empty_line_before_dangling_comments: true,
     separate_class_like_members: true,
     indent_heredoc: true,
+    uppercase_literal_keyword: false,
 };
 
 /// The Pint formatter preset (Laravel Pint compatible).
@@ -331,6 +333,7 @@ const PINT_PRESET: FormatSettings = FormatSettings {
     empty_line_before_dangling_comments: true,
     separate_class_like_members: true,
     indent_heredoc: true,
+    uppercase_literal_keyword: false,
 };
 
 /// The Tempest formatter preset (Tempest framework compatible).
@@ -410,6 +413,7 @@ const TEMPEST_PRESET: FormatSettings = FormatSettings {
     empty_line_before_dangling_comments: true,
     separate_class_like_members: true,
     indent_heredoc: false,
+    uppercase_literal_keyword: false,
 };
 
 /// The Hack formatter preset (`hackfmt` compatible).
@@ -489,4 +493,5 @@ const HACK_PRESET: FormatSettings = FormatSettings {
     empty_line_before_dangling_comments: true,
     separate_class_like_members: true,
     indent_heredoc: false,
+    uppercase_literal_keyword: false,
 };

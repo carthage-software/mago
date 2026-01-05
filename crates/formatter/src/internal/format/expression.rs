@@ -122,6 +122,7 @@ use crate::internal::format::misc::print_modifiers;
 use crate::internal::format::print_lowercase_keyword;
 use crate::internal::format::return_value::format_return_value;
 use crate::internal::format::string::print_string;
+use crate::internal::format::string::print_uppercase_keyword;
 use crate::internal::utils;
 use crate::internal::utils::could_expand_value;
 use crate::internal::utils::unwrap_parenthesized;
@@ -307,9 +308,13 @@ impl<'arena> Format<'arena> for Literal<'arena> {
                 Literal::String(literal) => literal.format(f),
                 Literal::Integer(literal) => literal.format(f),
                 Literal::Float(literal) => literal.format(f),
-                Literal::True(keyword) => keyword.format(f),
-                Literal::False(keyword) => keyword.format(f),
-                Literal::Null(keyword) => keyword.format(f),
+                Literal::True(keyword) | Literal::False(keyword) | Literal::Null(keyword) => {
+                    if f.settings.uppercase_literal_keyword {
+                        wrap!(f, keyword, Keyword, { Document::String(print_uppercase_keyword(f, keyword.value)) })
+                    } else {
+                        wrap!(f, keyword, Keyword, { Document::String(print_lowercase_keyword(f, keyword.value)) })
+                    }
+                }
             }
         })
     }

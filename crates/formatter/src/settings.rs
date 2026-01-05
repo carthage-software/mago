@@ -954,6 +954,14 @@ pub struct FormatSettings {
     /// Default: true
     #[serde(default = "default_true")]
     pub indent_heredoc: bool,
+
+    /// Whether to print boolean and null literals in upper-case (e.g. `TRUE`, `FALSE`, `NULL`).
+    /// When enabled these literals are printed in uppercase; when disabled they are printed
+    /// in lowercase.
+    ///
+    /// Default: false
+    #[serde(default = "default_false")]
+    pub uppercase_literal_keyword: bool,
 }
 
 impl Default for FormatSettings {
@@ -1062,6 +1070,7 @@ pub fn merge_format_settings(preset: FormatSettings, individual: FormatSettings)
         empty_line_before_dangling_comments,
         separate_class_like_members,
         indent_heredoc,
+        uppercase_literal_keyword,
     }
 }
 
