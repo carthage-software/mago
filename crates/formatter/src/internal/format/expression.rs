@@ -309,7 +309,7 @@ impl<'arena> Format<'arena> for Literal<'arena> {
                 Literal::Integer(literal) => literal.format(f),
                 Literal::Float(literal) => literal.format(f),
                 Literal::True(keyword) | Literal::False(keyword) | Literal::Null(keyword) => {
-                    if f.settings.literal_bool_upper_case {
+                    if f.settings.uppercase_literal_keyword {
                         wrap!(f, keyword, Keyword, { Document::String(print_uppercase_keyword(f, keyword.value)) })
                     } else {
                         wrap!(f, keyword, Keyword, { Document::String(print_lowercase_keyword(f, keyword.value)) })

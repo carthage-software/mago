@@ -91,7 +91,7 @@ test_case!(closing_tag_preserved);
 test_case!(inline_comment_before_closing_tag);
 test_case!(single_quote_string);
 test_case!(double_quote_string);
-test_case!(literal_bool_upper_case);
+test_case!(uppercase_literal_keyword);
 test_case!(inline_if_statement);
 test_case!(top_level_inline_if);
 test_case!(trailing_comma_in_array_destructuring);
