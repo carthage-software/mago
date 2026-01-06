@@ -285,17 +285,4 @@ impl FunctionLikeMetadata {
     pub fn add_template_type(&mut self, template: TemplateTuple) {
         self.template_types.push(template);
     }
-
-    /// Determines if this function/method needs docblock inheritance.
-    ///
-    /// Returns `true` if:
-    /// - The method has an explicit `@inheritDoc` or `@inheritDocs` tag (`INHERITS_DOCS` flag set), OR
-    /// - The method has NO docblock at all (implicit inheritance)
-    ///
-    /// Returns `false` otherwise (method has a docblock but no @inheritDoc).
-    #[inline]
-    #[must_use]
-    pub fn needs_docblock_inheritance(&self) -> bool {
-        self.flags.contains(MetadataFlags::INHERITS_DOCS) || !self.has_docblock
-    }
 }

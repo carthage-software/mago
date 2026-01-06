@@ -155,16 +155,6 @@ pub fn inherit_method_docblocks(codebase: &mut CodebaseMetadata) {
 
     for (class_name, class_metadata) in &codebase.class_likes {
         for (method_name, method_ids) in &class_metadata.overridden_method_ids {
-            let child_method_id = (*class_name, *method_name);
-
-            let Some(child_method) = codebase.function_likes.get(&child_method_id) else {
-                continue;
-            };
-
-            if !child_method.needs_docblock_inheritance() {
-                continue;
-            }
-
             let mut parent_method_id = None;
 
             if let Some(parent_class) = &class_metadata.direct_parent_class
