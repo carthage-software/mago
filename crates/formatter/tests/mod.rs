@@ -48,6 +48,7 @@ test_case!(php84_instantiation_with_member_access_parentheses_disabled, PHPVersi
 test_case!(expand_last_argument);
 test_case!(expand_first_argument);
 test_case!(hug_new_expression);
+test_case!(array_indent_multiline);
 test_case!(hug_new_expression_with_simple_args);
 test_case!(hug_last_new_expression_with_named_args);
 test_case!(assignments);
