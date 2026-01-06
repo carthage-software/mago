@@ -89,6 +89,12 @@ pub struct FormatSettings {
     #[serde(default = "BraceStyle::same_line")]
     pub control_brace_style: BraceStyle,
 
+    /// Whether to place `else`, `elseif`, `catch` and `finally` on a new line.
+    ///
+    /// Default: false
+    #[serde(default = "default_false")]
+    pub following_clause_on_newline: bool,
+
     /// Brace placement for closures.
     ///
     /// Example with `same_line`:
@@ -1003,6 +1009,7 @@ pub fn merge_format_settings(preset: FormatSettings, individual: FormatSettings)
         trailing_comma,
         remove_trailing_close_tag,
         control_brace_style,
+        following_clause_on_newline,
         closure_brace_style,
         function_brace_style,
         method_brace_style,

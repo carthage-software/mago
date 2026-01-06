@@ -1703,12 +1703,20 @@ impl<'arena> Format<'arena> for Try<'arena> {
             let mut parts = vec![in f.arena; self.r#try.format(f), Document::space(), self.block.format(f)];
 
             for clause in &self.catch_clauses {
-                parts.push(Document::space());
+                if f.settings.following_clause_on_newline {
+                    parts.push(Document::Line(Line::hard()));
+                } else {
+                    parts.push(Document::space());
+                }
                 parts.push(clause.format(f));
             }
 
             if let Some(clause) = &self.finally_clause {
-                parts.push(Document::space());
+                if f.settings.following_clause_on_newline {
+                    parts.push(Document::Line(Line::hard()));
+                } else {
+                    parts.push(Document::space());
+                }
                 parts.push(clause.format(f));
             }
 
