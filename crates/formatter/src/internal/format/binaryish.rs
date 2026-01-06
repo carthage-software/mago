@@ -226,8 +226,7 @@ pub(super) fn print_binaryish_expression<'arena>(
     };
 
     let should_indent_if_inlining =
-        matches!(grandparent, Some(Node::Assignment(_) | Node::PropertyItem(_) | Node::ConstantItem(_)))
-            || matches!(grandparent, Some(Node::KeyValueArrayElement(_)));
+        matches!(grandparent, Some(Node::Assignment(_) | Node::PropertyItem(_) | Node::ConstantItem(_)));
 
     let same_precedence_sub_expression = match left {
         Expression::Binary(binary) => should_flatten(&BinaryishOperator::Binary(&binary.operator), &operator),
