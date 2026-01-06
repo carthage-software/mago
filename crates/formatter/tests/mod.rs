@@ -98,7 +98,7 @@ test_case!(top_level_inline_if);
 test_case!(trailing_comma_in_array_destructuring);
 test_case!(inline_control_structures);
 test_case!(aligned_inline_control_structures);
-test_case!(else_catch_on_newline);
+test_case!(following_clause_on_newline);
 test_case!(html_template);
 test_case!(complex_html_template);
 test_case!(attributes);

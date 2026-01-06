@@ -570,7 +570,7 @@ pub(super) fn adjust_clause<'arena>(
         if !is_block
             || f.is_followed_by_comment_on_next_line(node.span())
             || f.has_same_line_trailing_comment(node.span())
-            || (f.settings.else_catch_on_newline && !is_do_while)
+            || (f.settings.following_clause_on_newline && !is_do_while)
         {
             Document::Array(vec![in f.arena; clause, Document::Line(Line::hard())])
         } else {

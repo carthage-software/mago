@@ -93,7 +93,7 @@ pub struct FormatSettings {
     ///
     /// Default: false
     #[serde(default = "default_false")]
-    pub else_catch_on_newline: bool,
+    pub following_clause_on_newline: bool,
 
     /// Brace placement for closures.
     ///
@@ -1009,7 +1009,7 @@ pub fn merge_format_settings(preset: FormatSettings, individual: FormatSettings)
         trailing_comma,
         remove_trailing_close_tag,
         control_brace_style,
-        else_catch_on_newline,
+        following_clause_on_newline,
         closure_brace_style,
         function_brace_style,
         method_brace_style,
