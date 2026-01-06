@@ -21,6 +21,22 @@ pub(super) fn print_lowercase_keyword<'arena>(f: &FormatterState<'_, 'arena>, ke
     (unsafe { std::str::from_utf8_unchecked(lowercase_bytes.into_bump_slice()) }) as _
 }
 
+pub(super) fn print_uppercase_keyword<'arena>(f: &FormatterState<'_, 'arena>, keyword: &'arena str) -> &'arena str {
+    if keyword.chars().all(|c| c.is_ascii_uppercase()) {
+        return keyword;
+    }
+
+    let mut uppercase_bytes = Vec::with_capacity_in(keyword.len(), f.arena);
+    for c in keyword.chars() {
+        for upper_c in c.to_uppercase() {
+            let mut buf = [0; 4];
+            uppercase_bytes.extend_from_slice(upper_c.encode_utf8(&mut buf).as_bytes());
+        }
+    }
+
+    (unsafe { std::str::from_utf8_unchecked(uppercase_bytes.into_bump_slice()) }) as _
+}
+
 pub(super) fn print_string<'arena>(
     f: &FormatterState<'_, 'arena>,
     kind: Option<LiteralStringKind>,
