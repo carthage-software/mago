@@ -505,7 +505,13 @@ pub fn get_union_from_type_ast(
             Box::new(get_union_from_type_ast(&conditional.otherwise, scope, type_context, classname)?),
             conditional.is_negated(),
         )))),
-        Type::Variable(variable_type) => TUnion::from_single(Cow::Owned(TAtomic::Variable(atom(variable_type.value)))),
+        Type::Variable(variable_type) => {
+            if variable_type.value == "$this" {
+                TUnion::from_single(Cow::Owned(TAtomic::Object(TObject::Named(TNamedObject::new_this(atom("$this"))))))
+            } else {
+                TUnion::from_single(Cow::Owned(TAtomic::Variable(atom(variable_type.value))))
+            }
+        }
         Type::KeyOf(key_of_type) => TUnion::from_atomic(TAtomic::Derived(TDerived::KeyOf(TKeyOf::new(Box::new(
             get_union_from_type_ast(&key_of_type.parameter.entry.inner, scope, type_context, classname)?,
         ))))),
