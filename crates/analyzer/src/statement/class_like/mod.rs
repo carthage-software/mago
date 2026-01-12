@@ -901,6 +901,15 @@ fn check_class_like_extends<'ctx, 'arena>(
                         .with_note("A `readonly` class can only be extended by another `readonly` class.")
                         .with_help(format!("To resolve this, either make the `{using_name}` class `readonly`, or extend a different, non-readonly class.")),
                 );
+            } else if !extended_class_metadata.flags.is_readonly() && class_like_metadata.flags.is_readonly() {
+                context.collector.report_with_code(
+                    IssueCode::InvalidExtend,
+                    Issue::error(format!("Readonly class `{using_name}` cannot extend non-readonly class `{extended_name}`"))
+                        .with_annotation(Annotation::primary(using_class_span).with_message("This class is `readonly`..."))
+                        .with_annotation(Annotation::secondary(extended_class_span).with_message(format!("...but it extends `{extended_name}`, which is not `readonly`")))
+                        .with_note("A non-`readonly` class can only be extended by another non-`readonly` class.")
+                        .with_help(format!("To resolve this, either make the `{using_name}` class non-`readonly`, or extend a different, readonly class.")),
+                );
             }
 
             if let Some(required_interface) =
