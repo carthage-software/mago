@@ -1110,18 +1110,18 @@ pub enum EndOfLine {
 /// Specifies the style of line endings.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, JsonSchema)]
 pub enum BraceStyle {
-    #[serde(alias = "same_line")]
+    #[serde(alias = "same_line", alias = "same-line")]
     SameLine,
-    #[serde(alias = "next_line")]
+    #[serde(alias = "next_line", alias = "next-line")]
     NextLine,
 }
 
 #[derive(Default, Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, JsonSchema)]
 pub enum MethodChainBreakingStyle {
-    #[serde(alias = "same_line")]
+    #[serde(alias = "same_line", alias = "same-line")]
     SameLine,
     #[default]
-    #[serde(alias = "next_line")]
+    #[serde(alias = "next_line", alias = "next-line")]
     NextLine,
 }
 
