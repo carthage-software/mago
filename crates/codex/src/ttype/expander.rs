@@ -336,6 +336,14 @@ fn expand_member_reference(
         new_return_type_parts.push(TAtomic::Object(TObject::new_enum_case(class_like.original_name, *enum_case_name)));
     }
 
+    if let TReferenceMemberSelector::Identifier(member_name) = member_selector
+        && let Some(type_alias) = class_like.type_aliases.get(member_name)
+    {
+        let mut alias_type = type_alias.type_union.clone();
+        expand_union(codebase, &mut alias_type, options);
+        new_return_type_parts.extend(alias_type.types.into_owned());
+    }
+
     if new_return_type_parts.is_empty() {
         new_return_type_parts.push(TAtomic::Mixed(TMixed::new()));
     }
