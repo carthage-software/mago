@@ -1497,21 +1497,22 @@ fn check_abstract_method_signatures<'ctx>(
     for (method_name_atom, overridden_method_ids) in &class_like_metadata.overridden_method_ids {
         let method_name_str = method_name_atom.as_ref();
 
-        let Some(appearing_method_id) = class_like_metadata.appearing_method_ids.get(method_name_atom) else {
+        let Some(declaring_method_id) = class_like_metadata.declaring_method_ids.get(method_name_atom) else {
             continue;
         };
 
-        let appearing_fqcn_str = appearing_method_id.get_class_name().as_ref();
-        let appearing_method_opt = context.codebase.get_method(appearing_fqcn_str, method_name_str);
+        let declaring_fqcn_str = declaring_method_id.get_class_name().as_ref();
+        let declaring_method_opt = context.codebase.get_method(declaring_fqcn_str, method_name_str);
 
-        let (method_fqcn_str, appearing_method) = if let Some(method) = appearing_method_opt {
-            (appearing_fqcn_str, method)
-        } else if let Some(declaring_method_id) = class_like_metadata.declaring_method_ids.get(method_name_atom) {
-            let declaring_fqcn_str = declaring_method_id.get_class_name().as_ref();
-            let Some(method) = context.codebase.get_method(declaring_fqcn_str, method_name_str) else {
+        let (method_fqcn_str, appearing_method) = if let Some(method) = declaring_method_opt {
+            (declaring_fqcn_str, method)
+        } else if let Some(appearing_method_id) = class_like_metadata.appearing_method_ids.get(method_name_atom) {
+            let appearing_fqcn_str = appearing_method_id.get_class_name().as_ref();
+            let Some(method) = context.codebase.get_method(appearing_fqcn_str, method_name_str) else {
                 continue;
             };
-            (declaring_fqcn_str, method)
+
+            (appearing_fqcn_str, method)
         } else {
             continue;
         };
@@ -2103,7 +2104,7 @@ fn check_interface_method_signatures<'ctx>(
             continue;
         };
 
-        let Some(class_method_id) = class_like_metadata.appearing_method_ids.get(method_name_atom) else {
+        let Some(class_method_id) = class_like_metadata.declaring_method_ids.get(method_name_atom) else {
             continue;
         };
 
