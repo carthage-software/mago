@@ -27,6 +27,8 @@ pub struct TNamedObject {
     pub intersection_types: Option<Vec<TAtomic>>,
     /// Internal analysis flag: `true` if the type parameters have been remapped.
     pub remapped_parameters: bool,
+    /// Internal analysis flag: `true` if the type has already been expanded.
+    pub is_expanded: bool,
 }
 
 impl TNamedObject {
@@ -34,21 +36,42 @@ impl TNamedObject {
     #[inline]
     #[must_use]
     pub fn new(name: Atom) -> Self {
-        Self { name, type_parameters: None, is_this: false, remapped_parameters: false, intersection_types: None }
+        Self {
+            name,
+            type_parameters: None,
+            is_this: false,
+            remapped_parameters: false,
+            intersection_types: None,
+            is_expanded: false,
+        }
     }
 
     /// Creates metadata for a named object type with specified type parameters.
     #[inline]
     #[must_use]
     pub fn new_with_type_parameters(name: Atom, type_parameters: Option<Vec<TUnion>>) -> Self {
-        Self { name, type_parameters, is_this: false, remapped_parameters: false, intersection_types: None }
+        Self {
+            name,
+            type_parameters,
+            is_this: false,
+            remapped_parameters: false,
+            intersection_types: None,
+            is_expanded: false,
+        }
     }
 
     /// Creates metadata representing the `$this` variable for a specific class.
     #[inline]
     #[must_use]
     pub fn new_this(name: Atom) -> Self {
-        Self { name, type_parameters: None, is_this: true, remapped_parameters: false, intersection_types: None }
+        Self {
+            name,
+            type_parameters: None,
+            is_this: true,
+            remapped_parameters: false,
+            intersection_types: None,
+            is_expanded: false,
+        }
     }
 
     /// Returns the `Atom` for the primary class/interface name.
@@ -90,6 +113,10 @@ impl TNamedObject {
     #[must_use]
     pub const fn is_this(&self) -> bool {
         self.is_this
+    }
+
+    pub fn is_expanded(&self) -> bool {
+        self.is_expanded
     }
 
     /// Checks if this is part of an intersection type (has extra types).
