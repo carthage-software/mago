@@ -527,6 +527,7 @@ test_case!(issue_859);
 test_case!(issue_861);
 test_case!(issue_863);
 test_case!(issue_870);
+test_case!(issue_871);
 test_case!(issue_872);
 
 #[test]

@@ -1536,6 +1536,13 @@ fn check_abstract_method_signatures<'ctx>(
                 continue;
             };
 
+            if !class_like_metadata.kind.is_interface()
+                && overridden_class.kind.is_interface()
+                && class_like_metadata.direct_parent_interfaces.contains(&overridden_class.name)
+            {
+                continue;
+            }
+
             let Some(appearing_class) = context.codebase.get_class_like(method_fqcn_str) else {
                 continue;
             };
