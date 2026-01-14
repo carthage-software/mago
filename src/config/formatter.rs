@@ -1,5 +1,3 @@
-use std::str::FromStr;
-
 use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
@@ -8,8 +6,9 @@ use mago_formatter::presets::FormatterPreset;
 use mago_formatter::settings::*;
 
 /// Configuration options for formatting source code.
-#[derive(Default, Debug, Clone, PartialEq, Serialize, JsonSchema)]
-#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case", from = "RawFormatterConfiguration", deny_unknown_fields)]
+#[schemars(!from)]
 pub struct FormatterConfiguration {
     /// A list of patterns to exclude from formatting.
     ///
@@ -31,33 +30,20 @@ struct RawFormatterConfiguration {
     #[serde(default)]
     excludes: Vec<String>,
     #[serde(default)]
-    preset: Option<String>,
+    preset: Option<FormatterPreset>,
     #[serde(flatten)]
     settings: FormatSettings,
 }
 
-impl TryFrom<RawFormatterConfiguration> for FormatterConfiguration {
-    type Error = String;
-
-    fn try_from(raw: RawFormatterConfiguration) -> Result<Self, Self::Error> {
-        let settings = if let Some(preset_name) = raw.preset {
-            let preset = FormatterPreset::from_str(&preset_name)?;
+impl From<RawFormatterConfiguration> for FormatterConfiguration {
+    fn from(raw: RawFormatterConfiguration) -> Self {
+        let settings = if let Some(preset) = raw.preset {
             merge_format_settings(preset.settings(), raw.settings)
         } else {
             raw.settings
         };
 
-        Ok(Self { excludes: raw.excludes, settings })
-    }
-}
-
-impl<'de> Deserialize<'de> for FormatterConfiguration {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        let raw = RawFormatterConfiguration::deserialize(deserializer)?;
-        raw.try_into().map_err(serde::de::Error::custom)
+        Self { excludes: raw.excludes, settings }
     }
 }
 

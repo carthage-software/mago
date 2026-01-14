@@ -14,7 +14,7 @@ use crate::settings::*;
 
 /// Available formatter presets.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "kebab-case")]
+#[serde(rename_all = "kebab-case", try_from = "String")]
 pub enum FormatterPreset {
     /// Default preset (PER-CS compatible).
     #[default]
@@ -93,6 +93,14 @@ impl FromStr for FormatterPreset {
 impl fmt::Display for FormatterPreset {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(self.name())
+    }
+}
+
+impl TryFrom<String> for FormatterPreset {
+    type Error = String;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        Self::from_str(&value)
     }
 }
 
