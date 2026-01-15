@@ -35,6 +35,8 @@ use mago_syntax::ast::Class;
 use mago_syntax::ast::ClassLikeMember;
 use mago_syntax::ast::Enum;
 use mago_syntax::ast::Extends;
+use mago_syntax::ast::Hint;
+use mago_syntax::ast::Identifier;
 use mago_syntax::ast::Implements;
 use mago_syntax::ast::Interface;
 use mago_syntax::ast::Property;
@@ -770,6 +772,8 @@ pub(crate) fn analyze_class_like<'ctx, 'ast, 'arena>(
             _ => {}
         }
     }
+
+    check_undefined_types(context, members);
 
     // Check trait constant overrides AFTER constants have been analyzed
     // so we can compare their inferred values
@@ -3095,4 +3099,44 @@ fn check_readonly_class_trait_properties<'ctx, 'arena>(
             }
         }
     }
+}
+
+fn check_undefined_types<'ctx, 'arena>(context: &mut Context<'ctx, 'arena>, members: &[ClassLikeMember<'arena>]) {
+    for member in members {
+        if let ClassLikeMember::Property(property) = member
+            && let Some(hint) = property.hint()
+        {
+            if let Hint::Identifier(identifier) = hint
+                && !context.codebase.class_like_exists(context.resolve_function_name(identifier))
+            {
+                report_undefined_type(context, property, identifier);
+            } else if let Hint::Nullable(nullable) = hint
+                && let Hint::Identifier(identifier) = nullable.hint
+                && !context.codebase.class_like_exists(context.resolve_function_name(identifier))
+            {
+                report_undefined_type(context, property, identifier);
+            }
+        }
+    }
+}
+
+fn report_undefined_type<'ctx, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    property: &Property<'arena>,
+    non_existent_type: &Identifier<'arena>,
+) {
+    context.collector.report_with_code(
+        IssueCode::NonExistentClassLike,
+        Issue::error(format!(
+            "Property `{}` refers to a non-existent type `{}`",
+            property.first_variable().name,
+            non_existent_type.value()
+        ))
+        .with_annotation(Annotation::primary(property.span()).with_message("Property defined here"))
+        .with_note("All referenced types must be defined.")
+        .with_help(format!(
+            "Create the class, interface, enum, or trait `{}` to use this property type.",
+            non_existent_type.value()
+        )),
+    );
 }
