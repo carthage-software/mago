@@ -21,3 +21,27 @@ if (!$this->windows && !$this
 
     $this->windows = $this->getSession()->getWindowNames();
 }
+
+if (
+    $node->bundle() == 'organization_profile'
+    && \Drupal::service('example_recruiter_verification.example_recruiter_verification_helper')
+        ->isRecruiterVerificationEnabled()
+) {
+    $a = $b;
+}
+
+if (
+    $node->bundle() == 'organization_profile'
+    && \Drupal::service('example_recruiter_verification.example_recruiter_verification_helper')
+        ->somePublicProperty
+) {
+    $a = $b;
+}
+
+if (
+    $node->bundle() == 'organization_profile'
+    && $object->method('example_recruiter_verification.example_recruiter_verification_helper')
+        ->somePublicProperty
+) {
+    $a = $b;
+}
