@@ -80,4 +80,4 @@ publish:
 
 # Cleans all build artifacts from the workspace.
 clean:
-    cargo clean --workspace
+    cargo clean
