@@ -1355,9 +1355,7 @@ function strtolower(string $string): string
 }
 
 /**
- * @param int<0, max> $offset
- *
- * @return int<0, max>|false
+ * @return non-negative-int|false
  *
  * @pure
  */
