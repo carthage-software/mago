@@ -314,7 +314,7 @@ impl<'arena> MemberAccessChain<'arena> {
             return true;
         }
 
-        if accesses_len <= 3 {
+        if accesses_len <= 3 && !f.in_condition {
             // we must have at least 2 breaks for chains of length 3 or less
             return false;
         }
@@ -581,9 +581,10 @@ pub(super) fn print_member_access_chain<'arena>(
     let mut last_element_end = member_access_chain.base.span().end;
     // Handle the first access
 
-    if should_inline_first_access(f, member_access_chain)
-        && let Some((_, first_chain_link)) = accesses_iter.next()
-    {
+    let should_inline = should_inline_first_access(f, member_access_chain)
+        || (f.in_condition && member_access_chain.accesses.len() <= 3);
+
+    if should_inline && let Some((_, first_chain_link)) = accesses_iter.next() {
         // Format the base object and first method call together
         parts.push(format_access_operator(
             f,
@@ -642,7 +643,11 @@ pub(super) fn print_member_access_chain<'arena>(
         }
 
         if must_break {
-            parts.push(Document::Indent(contents));
+            if f.in_condition {
+                parts.push(Document::Array(contents));
+            } else {
+                parts.push(Document::Indent(contents));
+            }
         } else {
             parts.push(Document::IndentIfBreak(IndentIfBreak::new(group_id, contents)));
         }

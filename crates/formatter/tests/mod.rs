@@ -237,6 +237,7 @@ test_case!(idempotent_chain_with_array);
 test_case!(match_idempotency);
 test_case!(heredoc_indentation);
 test_case!(heredoc_indentation_disabled);
+test_case!(if_multiline_operator);
 
 // A special test case for regressions in the Psl codebase
 test_case!(psl_regressions);
