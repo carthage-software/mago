@@ -223,6 +223,10 @@ test_case!(align_run_breaking);
 test_case!(align_modifier_breaking);
 test_case!(inline_block_comments_in_arguments);
 test_case!(idempotent_chain_with_array);
+test_case!(fully_qualified_global_constant);
+test_case!(fully_qualified_global_function);
+test_case!(global_constant_not_imported);
+test_case!(global_function_not_imported);
 
 // A special test case for regressions in the Psl codebase
 test_case!(psl_regressions);
