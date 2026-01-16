@@ -233,6 +233,7 @@ pub fn analyze_function_like<'ctx, 'ast, 'arena>(
     }
 
     check_thrown_types(context, block_context, &mut artifacts, function_like_metadata);
+    check_undefined_types(context, function_like_metadata);
 
     std::mem::swap(&mut context.type_resolution_context, &mut previous_type_resolution_context);
     parent_artifacts.expression_types.extend(std::mem::take(&mut artifacts.expression_types));
@@ -883,5 +884,34 @@ pub fn check_unused_function_template_parameters<'ctx>(
                 "Remove the unused `@template {template_name}` from the docblock, or use it in a parameter or return type."
             )),
         );
+    }
+}
+
+fn check_undefined_types<'ctx, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    function_like_metadata: &'ctx FunctionLikeMetadata,
+) {
+    for parameter in function_like_metadata.parameters.iter() {
+        if let Some(type_metadata) = &parameter.type_metadata {
+            for type_node in type_metadata.type_union.types.iter() {
+                if let TAtomic::Reference(TReference::Symbol { name, .. }) = type_node
+                    && !context.codebase.class_like_exists(name)
+                {
+                    context.collector.report_with_code(
+                        IssueCode::NonExistentClassLike,
+                        Issue::error(format!(
+                            "Function-like parameter `{}` refers to a non-existent type `{}`",
+                            parameter.name.0, name
+                        ))
+                        .with_annotation(Annotation::primary(parameter.span()).with_message("Parameter defined here"))
+                        .with_note("All referenced types must be defined.")
+                        .with_help(format!(
+                            "Create the class, interface, enum, or trait `{}` to use this parameter type.",
+                            name,
+                        )),
+                    );
+                }
+            }
+        }
     }
 }
