@@ -362,10 +362,10 @@ fn expand_object(named_object: &mut TObject, codebase: &CodebaseMetadata, option
             StaticClassType::Object(TObject::Enum(static_enum)) => {
                 *named_object = TObject::Enum(static_enum.clone());
             }
-            StaticClassType::Object(TObject::Named(static_object))
-                if name_str_lc == "static" || name_str_lc == "$this" =>
-            {
-                if let TObject::Named(named_object) = named_object {
+            StaticClassType::Object(TObject::Named(static_object)) => {
+                if let TObject::Named(named_object) = named_object
+                    && !named_object.is_expanded
+                {
                     if let Some(static_object_intersections) = &static_object.intersection_types {
                         let intersections = named_object.intersection_types.get_or_insert_with(Vec::new);
                         intersections.extend(static_object_intersections.iter().cloned());
@@ -377,6 +377,7 @@ fn expand_object(named_object: &mut TObject, codebase: &CodebaseMetadata, option
 
                     named_object.name = static_object.name;
                     named_object.is_this = true;
+                    named_object.is_expanded = true;
                 }
             }
             StaticClassType::Name(static_class_name)
@@ -384,9 +385,12 @@ fn expand_object(named_object: &mut TObject, codebase: &CodebaseMetadata, option
                     || name_str_lc == "$this"
                     || (is_this && codebase.is_instance_of(static_class_name, &name)) =>
             {
-                if let TObject::Named(named_object) = named_object {
+                if let TObject::Named(named_object) = named_object
+                    && !named_object.is_expanded
+                {
                     named_object.name = *static_class_name;
                     named_object.is_this = false;
+                    named_object.is_expanded = true;
                 }
             }
             _ => {}
@@ -394,16 +398,20 @@ fn expand_object(named_object: &mut TObject, codebase: &CodebaseMetadata, option
     } else if name_str_lc == "self" {
         if let Some(self_class_name) = options.self_class
             && let TObject::Named(named_object) = named_object
+            && !named_object.is_expanded
         {
             named_object.name = self_class_name;
+            named_object.is_expanded = true;
         }
     } else if name_str_lc == "parent"
         && let Some(self_class_name) = options.self_class
         && let Some(class_metadata) = codebase.get_class_like(&self_class_name)
         && let Some(parent_name) = class_metadata.direct_parent_class
         && let TObject::Named(named_object) = named_object
+        && !named_object.is_expanded
     {
         named_object.name = parent_name;
+        named_object.is_expanded = true;
     }
 
     let TObject::Named(named_object) = named_object else {

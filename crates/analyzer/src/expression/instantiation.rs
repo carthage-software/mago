@@ -485,6 +485,7 @@ fn analyze_class_instantiation<'ctx, 'arena>(
         is_this: classname.is_static() || (classname.is_self() && metadata.flags.is_final()),
         intersection_types: None,
         remapped_parameters: false,
+        is_expanded: false,
     })));
 
     Ok(result_type)

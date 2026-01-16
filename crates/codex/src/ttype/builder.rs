@@ -877,6 +877,7 @@ fn get_reference_from_ast<'i>(
             intersection_types: None,
             is_this,
             remapped_parameters: false,
+            is_expanded: false,
         })))
     } else {
         Ok(TAtomic::Reference(TReference::Symbol {
