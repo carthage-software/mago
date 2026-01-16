@@ -291,14 +291,14 @@ final class SponsorsData
 function overwrite_sponsors_file(string $new_content): void
 {
     $header = <<<MD
-    # Sponsors
+        # Sponsors
 
-    A heartfelt thank you to the generous individuals and organizations listed below. Their support is instrumental in the continued development and maintenance of [Psl](https://github.com/azjezz/psl) and [Mago](https://github.com/carthage-software/mago).
+        A heartfelt thank you to the generous individuals and organizations listed below. Their support is instrumental in the continued development and maintenance of [Psl](https://github.com/azjezz/psl) and [Mago](https://github.com/carthage-software/mago).
 
-    To become a sponsor, please visit [the sponsorship page](https://github.com/sponsors/azjezz).
+        To become a sponsor, please visit [the sponsorship page](https://github.com/sponsors/azjezz).
 
-    ---
-    MD;
+        ---
+        MD;
 
     $full_content = $header . "\n" . $new_content;
     file_put_contents(SPONSORS_PATH, $full_content);

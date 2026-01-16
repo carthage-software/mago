@@ -55,6 +55,16 @@ pub fn populate_function_like_metadata(
     }
 
     for parameter_metadata in metadata.get_parameters_mut() {
+        if let Some(type_metadata) = parameter_metadata.type_declaration_metadata.as_mut() {
+            populate_union_type(
+                &mut type_metadata.type_union,
+                codebase_symbols,
+                Some(reference_source),
+                symbol_references,
+                force_type_population,
+            );
+        }
+
         if let Some(type_metadata) = parameter_metadata.type_metadata.as_mut() {
             populate_union_type(
                 &mut type_metadata.type_union,

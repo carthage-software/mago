@@ -379,11 +379,6 @@ pub fn analyze_logical_or_operation<'ctx, 'arena>(
                 BlockContext::remove_reconciled_clause_refs(&right_block_context.clauses, &changed_var_ids);
             right_block_context.clauses = partiioned_clauses.0;
             right_block_context.reconciled_expression_clauses.extend(partiioned_clauses.1);
-
-            let partiioned_clauses =
-                BlockContext::remove_reconciled_clause_refs(&block_context.clauses, &changed_var_ids);
-            block_context.clauses = partiioned_clauses.0;
-            block_context.reconciled_expression_clauses.extend(partiioned_clauses.1);
         }
 
         let pre_referenced_var_ids = right_block_context.conditionally_referenced_variable_ids.clone();

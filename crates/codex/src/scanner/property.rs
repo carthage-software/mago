@@ -265,9 +265,14 @@ pub fn scan_properties<'arena>(
             let (name, name_span, has_default, default_type) =
                 scan_property_item(&hooked_property.item, context, scope);
 
-            let visibility = match hooked_property.modifiers.get_first_visibility() {
+            let read_visibility = match hooked_property.modifiers.get_first_read_visibility() {
                 Some(visibility) => Visibility::try_from(visibility).unwrap_or(Visibility::Public),
                 None => Visibility::Public,
+            };
+
+            let write_visibility = match hooked_property.modifiers.get_first_write_visibility() {
+                Some(visibility) => Visibility::try_from(visibility).unwrap_or(Visibility::Public),
+                None => read_visibility,
             };
 
             if has_default {
@@ -287,7 +292,7 @@ pub fn scan_properties<'arena>(
             metadata.set_name_span(Some(name_span));
             metadata.set_default_type_metadata(default_type);
             metadata.set_span(Some(hooked_property.span()));
-            metadata.set_visibility(visibility, visibility);
+            metadata.set_visibility(read_visibility, write_visibility);
             metadata.set_type_declaration_metadata(
                 hooked_property
                     .hint

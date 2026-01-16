@@ -13,6 +13,17 @@ use crate::error::OrchestratorError;
 use crate::service::pipeline::StatelessParallelPipeline;
 use crate::service::pipeline::StatelessReducer;
 
+/// Result of running the guard service.
+#[derive(Debug)]
+pub struct GuardResult {
+    /// The collection of issues found during guarding.
+    pub issues: IssueCollection,
+    /// Whether perimeter guard was skipped due to missing configuration.
+    pub missing_perimeter_configuration: bool,
+    /// Whether structural guard was skipped due to missing configuration.
+    pub missing_structural_configuration: bool,
+}
+
 /// Service responsible for running the guard pipeline.
 #[derive(Debug)]
 pub struct GuardService {
@@ -22,7 +33,7 @@ pub struct GuardService {
     /// A codebase metadata of builtin symbols.
     codebase: CodebaseMetadata,
 
-    /// The guard settings to configure the linting process.
+    /// The guard settings to configure the guarding process.
     settings: Settings,
 
     /// Whether to display progress bars during guarding.
@@ -56,10 +67,14 @@ impl GuardService {
     ///
     /// # Returns
     ///
-    /// A `Result` containing the final, aggregated [`IssueCollection`] for the
-    /// entire project, or an [`OrchestratorError`].
-    pub fn run(self) -> Result<IssueCollection, OrchestratorError> {
+    /// A `Result` containing the [`GuardResult`] with all issues found and
+    /// information about which guards were skipped, or an [`OrchestratorError`].
+    pub fn run(self) -> Result<GuardResult, OrchestratorError> {
         const GUARD_PROGRESS_PREFIX: &str = "🛡️  Guarding";
+
+        // Determine upfront which guards will be skipped due to missing config
+        let skipped_perimeter = matches!(self.settings.should_run_perimeter(), Some(false));
+        let skipped_structural = matches!(self.settings.should_run_structural(), Some(false));
 
         let pipeline = StatelessParallelPipeline::new(
             GUARD_PROGRESS_PREFIX,
@@ -69,7 +84,7 @@ impl GuardService {
             self.use_progress_bars,
         );
 
-        pipeline.run(|(codebase, guard_settings), arena, source_file| {
+        let issues = pipeline.run(|(codebase, guard_settings), arena, source_file| {
             let mut issues = IssueCollection::new();
 
             let (program, parsing_error) = parse_file(arena, &source_file);
@@ -90,6 +105,12 @@ impl GuardService {
             );
 
             Ok(issues)
+        })?;
+
+        Ok(GuardResult {
+            issues,
+            missing_perimeter_configuration: skipped_perimeter,
+            missing_structural_configuration: skipped_structural,
         })
     }
 }

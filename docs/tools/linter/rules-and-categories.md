@@ -40,6 +40,13 @@ title: Rules & categories
 - [`strict-assertions`](./rules/correctness#strict-assertions)
 - [`use-specific-assertions`](./rules/correctness#use-specific-assertions)
 
+### Pest
+
+- [`use-dedicated-expectation`](./rules/clarity#use-dedicated-expectation)
+- [`use-simpler-expectation`](./rules/clarity#use-simpler-expectation)
+- [`use-specific-expectations`](./rules/clarity#use-specific-expectations)
+- [`no-only`](./rules/correctness#no-only)
+
 ### Psl
 
 - [`psl-array-functions`](./rules/best-practices#psl-array-functions)

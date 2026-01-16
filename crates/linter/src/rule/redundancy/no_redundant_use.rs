@@ -107,7 +107,13 @@ impl LintRule for NoRedundantUseRule {
         // If `tempest` integration is enabled, and this file ends with `.view.php`,
         // check inline mentions as well.
         if ctx.registry.is_integration_enabled(Integration::Tempest)
-            && ctx.source_file.path.as_ref().and_then(|p| p.to_str()).is_some_and(|s| s.ends_with(".view.php"))
+            && ctx
+                .source_file
+                .path
+                .as_ref()
+                .and_then(|p| p.to_str())
+                .unwrap_or(ctx.source_file.name.as_ref())
+                .ends_with(".view.php")
         {
             check_inline_mentions = true;
         }
@@ -259,7 +265,7 @@ mod utils {
                             parent_stmt: stmt,
                             item,
                             import_type,
-                            fqn: atom(item.name.value()),
+                            fqn: atom(item.name.value().trim_start_matches('\\')),
                         });
                     }
                 }
@@ -270,12 +276,12 @@ mod utils {
                             parent_stmt: stmt,
                             item,
                             import_type,
-                            fqn: atom(item.name.value()),
+                            fqn: atom(item.name.value().trim_start_matches('\\')),
                         });
                     }
                 }
                 UseItems::MixedList(list) => {
-                    let prefix = list.namespace.value();
+                    let prefix = list.namespace.value().trim_start_matches('\\');
                     for i in &list.items.nodes {
                         let import_type = match i.r#type.as_ref() {
                             Some(t) if t.is_function() => ImportType::Function,
@@ -287,7 +293,7 @@ mod utils {
                     }
                 }
                 UseItems::TypedList(list) => {
-                    let prefix = list.namespace.value();
+                    let prefix = list.namespace.value().trim_start_matches('\\');
                     let import_type =
                         if list.r#type.is_function() { ImportType::Function } else { ImportType::Constant };
                     for item in &list.items.nodes {
@@ -404,5 +410,179 @@ mod utils {
             let comma_span = list.items.tokens[index].span;
             typed_item_span.join(comma_span)
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use indoc::indoc;
+
+    use super::NoRedundantUseRule;
+    use crate::integration::Integration;
+    use crate::integration::IntegrationSet;
+    use crate::settings::Settings;
+    use crate::test_lint_failure;
+    use crate::test_lint_success;
+
+    test_lint_success! {
+        name = used_import_is_not_redundant,
+        rule = NoRedundantUseRule,
+        code = indoc! {r"
+            <?php
+
+            namespace App;
+
+            use App\Helpers\ArrayHelper;
+
+            $result = ArrayHelper::combine([]);
+        "}
+    }
+
+    test_lint_success! {
+        name = used_import_with_leading_backslash_is_not_redundant,
+        rule = NoRedundantUseRule,
+        code = indoc! {r"
+            <?php
+
+            namespace Example;
+
+            use \DOMDocument;
+
+            $_ = new DOMDocument();
+        "}
+    }
+
+    test_lint_success! {
+        name = multiple_used_imports_with_leading_backslash,
+        rule = NoRedundantUseRule,
+        code = indoc! {r"
+            <?php
+
+            namespace Example;
+
+            use \DOMDocument;
+            use \DOMElement;
+
+            $doc = new DOMDocument();
+            $elem = new DOMElement('div');
+        "}
+    }
+
+    test_lint_success! {
+        name = function_import_with_leading_backslash_is_not_redundant,
+        rule = NoRedundantUseRule,
+        code = indoc! {r"
+            <?php
+
+            namespace Example;
+
+            use function \array_map;
+
+            $_ = array_map(fn($x) => $x, []);
+        "}
+    }
+
+    test_lint_success! {
+        name = const_import_with_leading_backslash_is_not_redundant,
+        rule = NoRedundantUseRule,
+        code = indoc! {r"
+            <?php
+
+            namespace Example;
+
+            use const \PHP_VERSION;
+
+            $_ = PHP_VERSION;
+        "}
+    }
+
+    test_lint_success! {
+        name = tempest_inline_usage,
+        rule = NoRedundantUseRule,
+        filename = "test.view.php",
+        settings = |settings: &mut Settings| {
+            settings.integrations = IntegrationSet::only(Integration::Tempest);
+        },
+        code = indoc! {r#"
+            <?php
+
+            use Tests\Tempest\Fixtures\Modules\Home\HomeController;
+            use function Tempest\Router\uri;
+
+            ?>
+
+            {{ uri(HomeController::class) }}
+        "#}
+    }
+
+    test_lint_failure! {
+        name = unused_import_is_redundant,
+        rule = NoRedundantUseRule,
+        code = indoc! {r"
+            <?php
+
+            namespace App;
+
+            use App\Helpers\StringHelper;
+
+            $result = [];
+        "}
+    }
+
+    test_lint_failure! {
+        name = unused_import_with_leading_backslash_is_redundant,
+        rule = NoRedundantUseRule,
+        code = indoc! {r"
+            <?php
+
+            namespace Example;
+
+            use \DOMDocument;
+
+            $_ = 'no usage';
+        "}
+    }
+
+    test_lint_failure! {
+        name = unused_function_import_with_leading_backslash_is_redundant,
+        rule = NoRedundantUseRule,
+        code = indoc! {r"
+            <?php
+
+            namespace Example;
+
+            use function \array_map;
+
+            $_ = [];
+        "}
+    }
+
+    test_lint_failure! {
+        name = unused_const_import_with_leading_backslash_is_redundant,
+        rule = NoRedundantUseRule,
+        code = indoc! {r"
+            <?php
+
+            namespace Example;
+
+            use const \PHP_VERSION;
+
+            $_ = 1;
+        "}
+    }
+
+    test_lint_failure! {
+        name = partially_unused_imports,
+        rule = NoRedundantUseRule,
+        code = indoc! {r"
+            <?php
+
+            namespace App;
+
+            use App\Helpers\ArrayHelper;
+            use App\Helpers\StringHelper;
+
+            $result = ArrayHelper::combine([]);
+        "}
     }
 }

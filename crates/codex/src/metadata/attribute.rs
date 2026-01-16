@@ -6,6 +6,7 @@ use mago_span::HasSpan;
 use mago_span::Span;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct AttributeMetadata {
     pub name: Atom,
     pub span: Span,

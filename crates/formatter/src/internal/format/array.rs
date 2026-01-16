@@ -1,28 +1,14 @@
 use bumpalo::collections::CollectIn;
 use bumpalo::collections::Vec;
 use bumpalo::vec;
-use unicode_width::UnicodeWidthStr;
 
 use mago_span::HasSpan;
 use mago_span::Span;
-use mago_syntax::ast::Access;
-use mago_syntax::ast::Argument;
-use mago_syntax::ast::ArgumentList;
 use mago_syntax::ast::Array;
 use mago_syntax::ast::ArrayElement;
-use mago_syntax::ast::Call;
-use mago_syntax::ast::ClassConstantAccess;
-use mago_syntax::ast::ClassLikeConstantSelector;
-use mago_syntax::ast::ClassLikeMemberSelector;
-use mago_syntax::ast::ConstantAccess;
 use mago_syntax::ast::Expression;
-use mago_syntax::ast::FunctionCall;
-use mago_syntax::ast::Identifier;
 use mago_syntax::ast::LegacyArray;
 use mago_syntax::ast::List;
-use mago_syntax::ast::Literal;
-use mago_syntax::ast::StaticMethodCall;
-use mago_syntax::ast::Variable;
 
 use crate::document::Document;
 use crate::document::Group;
@@ -39,6 +25,7 @@ use crate::internal::format::assignment::AssignmentAlignment;
 use crate::internal::format::misc;
 use crate::internal::format::misc::is_expandable_expression;
 use crate::internal::format::misc::is_string_word_type;
+use crate::internal::utils::get_expression_width;
 use crate::internal::utils::string_width;
 
 #[derive(Debug, Clone, Copy)]
@@ -158,7 +145,7 @@ pub(super) fn print_array_like<'arena>(
     }
 
     let must_break = (f.settings.preserve_breaking_array_like
-        && misc::has_new_line_in_range(f.source_text, array_like.span().start.offset, elements[0].span().start.offset))
+        && misc::has_new_line_in_range(f.source_text, array_like.start_offset(), elements[0].start_offset()))
         || has_floating_comments(f, &array_like);
 
     if !must_break && let Some(element) = inline_single_element(f, &array_like) {
@@ -478,7 +465,7 @@ fn is_table_style<'arena>(f: &mut FormatterState<'_, 'arena>, array_like: &Array
                     for inner_element in elements {
                         match inner_element {
                             ArrayElement::Value(inner_value) => {
-                                match get_element_width(inner_value.value) {
+                                match get_expression_width(inner_value.value) {
                                     Some(width) => elements_width += width,
                                     None => {
                                         return false; // Only support simple elements
@@ -548,7 +535,7 @@ fn calculate_column_widths<'arena>(
         {
             for (col_idx, col_element) in elements.iter().enumerate() {
                 if let ArrayElement::Value(value_element) = col_element
-                    && let Some(width) = get_element_width(value_element.value)
+                    && let Some(width) = get_expression_width(value_element.value)
                 {
                     column_maximum_widths[col_idx] = column_maximum_widths[col_idx].max(width);
                 } else {
@@ -560,78 +547,6 @@ fn calculate_column_widths<'arena>(
     }
 
     Some(column_maximum_widths)
-}
-
-fn get_element_width(element: &Expression<'_>) -> Option<usize> {
-    fn get_argument_width(argument: &Argument<'_>) -> Option<usize> {
-        match argument {
-            Argument::Positional(arg) => match arg.ellipsis {
-                Some(_) => get_element_width(&arg.value).map(|width| width + 3),
-                None => get_element_width(&arg.value),
-            },
-            Argument::Named(arg) => get_element_width(&arg.value).map(|mut width| {
-                width += 2;
-                width += arg.name.value.width();
-                width
-            }),
-        }
-    }
-
-    fn get_argument_list_width(argument_list: &ArgumentList<'_>) -> Option<usize> {
-        let mut width = 2;
-        for (i, argument) in argument_list.arguments.iter().enumerate() {
-            if i > 0 {
-                width += 2;
-            }
-
-            width += get_argument_width(argument)?;
-        }
-
-        Some(width)
-    }
-
-    Some(match element {
-        Expression::Literal(literal) => match literal {
-            Literal::String(literal_string) => string_width(literal_string.raw),
-            Literal::Integer(literal_integer) => literal_integer.raw.width(),
-            Literal::Float(literal_float) => literal_float.raw.width(),
-            Literal::True(_) => 4,
-            Literal::False(_) => 5,
-            Literal::Null(_) => 4,
-        },
-        Expression::MagicConstant(magic_constant) => string_width(magic_constant.value().value),
-        Expression::ConstantAccess(ConstantAccess { name: Identifier::Local(local) })
-        | Expression::Identifier(Identifier::Local(local)) => string_width(local.value),
-        Expression::Variable(Variable::Direct(variable)) => string_width(variable.name),
-        Expression::Call(Call::Function(FunctionCall { function, argument_list })) => {
-            let function_width = get_element_width(function)?;
-            let args_width = get_argument_list_width(argument_list)?;
-
-            function_width + args_width
-        }
-        Expression::Call(Call::StaticMethod(StaticMethodCall {
-            class,
-            method: ClassLikeMemberSelector::Identifier(method),
-            argument_list,
-            ..
-        })) => {
-            let class_width = get_element_width(class)?;
-            let method_width = string_width(method.value);
-            let args_width = get_argument_list_width(argument_list)?;
-
-            class_width + 2 + method_width + args_width
-        }
-        Expression::Access(Access::ClassConstant(ClassConstantAccess {
-            class,
-            constant: ClassLikeConstantSelector::Identifier(constant),
-            ..
-        })) => {
-            return get_element_width(class).map(|class| class + 2 + string_width(constant.value));
-        }
-        _ => {
-            return None;
-        }
-    })
 }
 
 fn get_document_width(doc: &Document<'_>) -> usize {
@@ -721,7 +636,7 @@ fn calculate_array_element_widths(elements: &[&ArrayElement<'_>]) -> AlignmentWi
 
     for element in elements {
         if let ArrayElement::KeyValue(kv) = element {
-            let key_width = get_expression_width(kv.key);
+            let key_width = get_expression_span_width(kv.key);
             max_key_width = max_key_width.max(key_width);
         }
     }
@@ -729,8 +644,8 @@ fn calculate_array_element_widths(elements: &[&ArrayElement<'_>]) -> AlignmentWi
     AlignmentWidths::new(max_key_width)
 }
 
-fn get_expression_width(expr: &Expression<'_>) -> usize {
-    (expr.span().end.offset - expr.span().start.offset) as usize
+fn get_expression_span_width(expr: &Expression<'_>) -> usize {
+    (expr.end_offset() - expr.start_offset()) as usize
 }
 
 fn get_array_element_alignment(runs: &[AlignmentRun], index: usize) -> Option<AlignmentWidths> {
@@ -739,7 +654,7 @@ fn get_array_element_alignment(runs: &[AlignmentRun], index: usize) -> Option<Al
 
 fn calculate_array_element_alignment(element: &ArrayElement<'_>, widths: &AlignmentWidths) -> AssignmentAlignment {
     let current_key_width = match element {
-        ArrayElement::KeyValue(kv) => get_expression_width(kv.key),
+        ArrayElement::KeyValue(kv) => get_expression_span_width(kv.key),
         _ => 0,
     };
 

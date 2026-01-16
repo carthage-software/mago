@@ -2,6 +2,7 @@ pub mod call;
 pub mod consts;
 pub mod laravel;
 pub mod misc;
+pub mod pest;
 pub mod phpunit;
 pub mod security;
 

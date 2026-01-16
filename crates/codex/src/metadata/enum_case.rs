@@ -15,6 +15,7 @@ use crate::ttype::atomic::TAtomic;
 /// and "backed" enums (e.g., `case Ok = 200;` in `enum HttpStatus: int`),
 /// including associated attributes, values, and source locations.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct EnumCaseMetadata {
     pub attributes: Vec<AttributeMetadata>,
     pub name: Atom,

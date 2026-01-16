@@ -374,6 +374,48 @@ fn find_property_in_class<'ctx, 'ast, 'arena>(
     };
 
     let Some(property_metadata) = declaring_class_metadata.properties.get(&prop_name) else {
+        // Property not found on class. Check mixins.
+        if !declaring_class_metadata.mixins.is_empty() {
+            // Try to find property in mixin types
+            if let Some(resolved) = find_property_in_mixins(
+                context,
+                declaring_class_metadata,
+                object,
+                &declaring_class_metadata.mixins,
+                prop_name,
+            ) {
+                if has_magic_method {
+                    return Some(resolved);
+                } else {
+                    let magic_method_name = if for_assignment { "__set" } else { "__get" };
+                    if declaring_class_metadata.flags.is_final() {
+                        report_non_existent_mixin_property(
+                            context,
+                            object_expr.span(),
+                            selector.span(),
+                            declaring_class_id,
+                            prop_name,
+                            resolved.declaring_class_id.unwrap_or(declaring_class_id),
+                            magic_method_name,
+                        );
+                        result.has_invalid_path = true;
+                    } else {
+                        report_possibly_non_existent_mixin_property(
+                            context,
+                            object_expr.span(),
+                            selector.span(),
+                            declaring_class_id,
+                            prop_name,
+                            resolved.declaring_class_id.unwrap_or(declaring_class_id),
+                            magic_method_name,
+                        );
+                    }
+
+                    return Some(resolved);
+                }
+            }
+        }
+
         if has_magic_method {
             report_non_documented_property(
                 context,
@@ -830,6 +872,69 @@ pub(super) fn report_non_documented_property(
     );
 }
 
+/// Reports a warning when a property is found in a mixin but the target class lacks __get/__set.
+/// This is a warning because a subclass might implement __get/__set.
+fn report_possibly_non_existent_mixin_property(
+    context: &mut Context,
+    obj_span: Span,
+    selector_span: Span,
+    classname: Atom,
+    prop_name: Atom,
+    mixin_classname: Atom,
+    magic_method_name: &str,
+) {
+    context.collector.report_with_code(
+        IssueCode::PossiblyNonExistentProperty,
+        Issue::warning(format!(
+            "Property `{prop_name}` might not exist on type `{classname}` at runtime."
+        ))
+        .with_annotation(
+            Annotation::primary(selector_span).with_message("Property might not exist"),
+        )
+        .with_annotation(
+            Annotation::secondary(obj_span).with_message(format!("On an instance of `{classname}`")),
+        )
+        .with_note(format!(
+            "The property `{prop_name}` is defined in mixin class `{mixin_classname}`, but `{classname}` does not have a `{magic_method_name}` method to forward the access."
+        ))
+        .with_note(
+            "A subclass of this class could implement the magic method to handle this, so the access might succeed at runtime."
+        )
+        .with_help(format!(
+            "Add a `{magic_method_name}` method to `{classname}`, or make `{classname}` final if this should be an error."
+        )),
+    );
+}
+
+fn report_non_existent_mixin_property(
+    context: &mut Context,
+    obj_span: Span,
+    selector_span: Span,
+    classname: Atom,
+    prop_name: Atom,
+    mixin_classname: Atom,
+    magic_method_name: &str,
+) {
+    context.collector.report_with_code(
+        IssueCode::NonExistentProperty,
+        Issue::error(format!(
+            "Property `{prop_name}` does not exist on final type `{classname}`."
+        ))
+        .with_annotation(
+            Annotation::primary(selector_span).with_message("Property does not exist"),
+        )
+        .with_annotation(
+            Annotation::secondary(obj_span).with_message(format!("On an instance of final class `{classname}`")),
+        )
+        .with_note(format!(
+            "The property `{prop_name}` is defined in mixin class `{mixin_classname}`, but `{classname}` is final and does not have a `{magic_method_name}` method to forward the access."
+        ))
+        .with_help(format!(
+            "Add a `{magic_method_name}` method to `{classname}` to handle mixin property accesses."
+        )),
+    );
+}
+
 pub(super) fn report_magic_property_without_get_set_method(
     context: &mut Context,
     obj_span: Span,
@@ -874,5 +979,109 @@ fn type_has_property_assertion(intersection_types: Option<&[TAtomic]>, property_
             }
             _ => false,
         })
+    })
+}
+
+/// Searches for a property in mixin types.
+/// Returns Some(ResolvedProperty) if the property is found in a mixin, None otherwise.
+/// When the mixin type is a generic parameter (e.g., `@mixin T`), tries to resolve it
+/// using the outer_object's type_parameters.
+fn find_property_in_mixins(
+    context: &mut Context,
+    class_metadata: &ClassLikeMetadata,
+    outer_object: &TObject,
+    mixins: &[TUnion],
+    prop_name: Atom,
+) -> Option<ResolvedProperty> {
+    for mixin_type in mixins {
+        for mixin_atomic in mixin_type.types.as_ref() {
+            match mixin_atomic {
+                TAtomic::Object(TObject::Named(named)) => {
+                    if let Some(result) = find_property_in_single_mixin(context, named.name, prop_name) {
+                        return Some(result);
+                    }
+                }
+                TAtomic::Object(TObject::Enum(enum_type)) => {
+                    if let Some(result) = find_property_in_single_mixin(context, enum_type.name, prop_name) {
+                        return Some(result);
+                    }
+                }
+                TAtomic::GenericParameter(TGenericParameter {
+                    parameter_name, constraint, defining_entity, ..
+                }) => {
+                    let mut resolved = false;
+
+                    if let TObject::Named(named_object) = outer_object
+                        && let Some(type_params) = named_object.get_type_parameters()
+                        && let GenericParent::ClassLike(defining_class) = defining_entity
+                        && named_object.name.eq_ignore_ascii_case(defining_class)
+                        && let Some(index) = class_metadata.get_template_index_for_name(parameter_name)
+                        && let Some(concrete_type) = type_params.get(index)
+                    {
+                        for atomic in concrete_type.types.as_ref() {
+                            let class_name = match atomic {
+                                TAtomic::Object(TObject::Named(named)) => named.name,
+                                TAtomic::Object(TObject::Enum(enum_type)) => enum_type.name,
+                                _ => continue,
+                            };
+
+                            if let Some(result) = find_property_in_single_mixin(context, class_name, prop_name) {
+                                return Some(result);
+                            }
+                            resolved = true;
+                        }
+                    }
+
+                    // Fallback to constraint if we couldn't resolve
+                    if !resolved {
+                        for constraint_atomic in constraint.types.as_ref() {
+                            let constraint_class_name = match constraint_atomic {
+                                TAtomic::Object(TObject::Named(named)) => named.name,
+                                TAtomic::Object(TObject::Enum(enum_type)) => enum_type.name,
+                                _ => continue,
+                            };
+
+                            if let Some(result) =
+                                find_property_in_single_mixin(context, constraint_class_name, prop_name)
+                            {
+                                return Some(result);
+                            }
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+
+    None
+}
+
+/// Searches for a property in a single mixin class.
+fn find_property_in_single_mixin(
+    context: &mut Context,
+    mixin_class_name: Atom,
+    prop_name: Atom,
+) -> Option<ResolvedProperty> {
+    let mixin_metadata = context.codebase.get_class_like(&mixin_class_name)?;
+    let property_metadata = mixin_metadata.properties.get(&prop_name)?;
+
+    if !property_metadata.read_visibility.is_public() {
+        return None;
+    }
+
+    let property_type = property_metadata
+        .type_metadata
+        .as_ref()
+        .or(property_metadata.type_declaration_metadata.as_ref())
+        .map(|type_metadata| type_metadata.type_union.clone())
+        .unwrap_or_else(get_mixed);
+
+    Some(ResolvedProperty {
+        property_span: property_metadata.name_span.or(property_metadata.span),
+        property_name: prop_name,
+        declaring_class_id: Some(mixin_class_name),
+        property_type,
+        is_magic: false,
     })
 }

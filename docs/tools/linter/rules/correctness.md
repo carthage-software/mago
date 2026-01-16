@@ -15,9 +15,11 @@ This document details the rules available in the `Correctness` category.
 | Ineffective Format Ignore Next | [`ineffective-format-ignore-next`](#ineffective-format-ignore-next) |
 | Ineffective Format Ignore Region | [`ineffective-format-ignore-region`](#ineffective-format-ignore-region) |
 | Invalid Open Tag | [`invalid-open-tag`](#invalid-open-tag) |
+| No Assign In Argument | [`no-assign-in-argument`](#no-assign-in-argument) |
 | No Assign In Condition | [`no-assign-in-condition`](#no-assign-in-condition) |
 | No Boolean Literal Comparison | [`no-boolean-literal-comparison`](#no-boolean-literal-comparison) |
 | No Empty Catch Clause | [`no-empty-catch-clause`](#no-empty-catch-clause) |
+| No Only | [`no-only`](#no-only) |
 | Parameter Type | [`parameter-type`](#parameter-type) |
 | Property Type | [`property-type`](#property-type) |
 | Return Type | [`return-type`](#return-type) |
@@ -297,6 +299,40 @@ echo 'Hello, world!';
 ```
 
 
+## <a id="no-assign-in-argument"></a>`no-assign-in-argument`
+
+Detects assignments in function call arguments which can lead to unexpected behavior and make
+the code harder to read and understand.
+
+
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `false` |
+| `level` | `string` | `"warning"` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+
+$x = 5;
+foo($x);
+```
+
+#### Incorrect code
+
+```php
+<?php
+
+foo($x = 5);
+```
+
+
 ## <a id="no-assign-in-condition"></a>`no-assign-in-condition`
 
 Detects assignments in conditions which can lead to unexpected behavior and make the code harder
@@ -415,6 +451,56 @@ try {
 } catch(Exception $e) {
     // This block is empty and swallows the exception.
 }
+```
+
+
+## <a id="no-only"></a>`no-only`
+
+Detects usage of `->only()` in Pest tests which should not be committed.
+
+The `->only()` modifier causes only that specific test to run, which can lead to
+incomplete test coverage if accidentally committed to the repository.
+
+
+### Requirements
+
+- **Integration:** `Pest`
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `true` |
+| `level` | `string` | `"error"` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+
+test('example test', function () {
+    expect(true)->toBeTrue();
+});
+
+it('does something', function () {
+    expect(1)->toBe(1);
+});
+```
+
+#### Incorrect code
+
+```php
+<?php
+
+test('example test', function () {
+    expect(true)->toBeTrue();
+})->only();
+
+it('does something', function () {
+    expect(1)->toBe(1);
+})->only();
 ```
 
 

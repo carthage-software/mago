@@ -136,14 +136,15 @@ impl LintRule for PreferArrowFunctionRule {
                 .with_help("Consider rewriting this as an arrow function to improve readability.");
 
         ctx.collector.propose(issue, |edits| {
-            let to_replace_with_fn = closure.function.span;
+            let function_span = closure.function.span;
+            let to_replace_with_n = function_span.from_start(function_span.start.forward(1));
             let to_replace_with_arrow = match &closure.use_clause {
                 Some(use_clause) => use_clause.span().join(keyword.span),
                 None => closure.body.left_brace.join(keyword.span),
             };
             let to_remove = terminator.span().join(closure.body.right_brace);
 
-            edits.push(TextEdit::replace(to_replace_with_fn, "fn").with_safety(Safety::PotentiallyUnsafe));
+            edits.push(TextEdit::replace(to_replace_with_n, "n").with_safety(Safety::PotentiallyUnsafe));
             edits.push(TextEdit::replace(to_replace_with_arrow, "=>").with_safety(Safety::PotentiallyUnsafe));
             edits.push(TextEdit::delete(to_remove).with_safety(Safety::PotentiallyUnsafe));
         });

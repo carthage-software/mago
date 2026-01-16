@@ -23,6 +23,8 @@ bitflags = { workspace = true }
 unicode-width = { workspace = true }
 bumpalo = { workspace = true }
 schemars = { workspace = true }
+strum = { workspace = true }
+strum_macros = { workspace = true }
 
 [dev-dependencies]
 indoc = { workspace = true }

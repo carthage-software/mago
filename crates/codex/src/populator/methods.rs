@@ -86,7 +86,13 @@ pub fn inherit_methods_from_parent(
                 let implementing_class = implementing_method_id.get_class_name();
                 let implementing_method_name = implementing_method_id.get_method_name();
 
-                if !codebase.method_is_abstract(implementing_class, implementing_method_name) {
+                // Don't overwrite if:
+                // 1. The child has a concrete (non-abstract) method, OR
+                // 2. The child declared its own version (even if abstract) - this preserves
+                //    interface method overrides where a child interface narrows the return type
+                if !codebase.method_is_abstract(implementing_class, implementing_method_name)
+                    || *implementing_class == class_like_name
+                {
                     continue;
                 }
             }

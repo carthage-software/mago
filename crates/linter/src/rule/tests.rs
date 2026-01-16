@@ -20,6 +20,7 @@ use crate::settings::Settings;
 /// # Arguments
 ///
 /// * `code` - The PHP code to lint
+/// * `filename` - Optional custom file name (defaults to "test.php")
 /// * `expected_count` - Expected number of issues:
 ///   - `Some(0)` - Success test: code should produce no issues
 ///   - `Some(n)` - Exact count test: code should produce exactly n issues
@@ -31,12 +32,16 @@ use crate::settings::Settings;
 /// Panics if:
 /// - The code fails to parse
 /// - The actual issue count doesn't match the expected count
-pub fn run_lint_test<R: LintRule, F>(code: &str, expected_count: Option<usize>, settings_fn: Option<F>)
-where
+pub fn run_lint_test<R: LintRule, F>(
+    code: &str,
+    filename: Option<&'static str>,
+    expected_count: Option<usize>,
+    settings_fn: Option<F>,
+) where
     F: FnOnce(&mut Settings),
 {
     let arena = Bump::new();
-    let file = File::ephemeral(Cow::Owned("test.php".to_string()), Cow::Owned(code.to_string()));
+    let file = File::ephemeral(Cow::Borrowed(filename.unwrap_or("test.php")), Cow::Owned(code.to_string()));
 
     let (program, parse_error) = parse_file(&arena, &file);
     if let Some(err) = parse_error {
@@ -131,6 +136,7 @@ macro_rules! test_lint_success {
         fn $test_name() {
             $crate::rule::tests::run_lint_test::<$rule, fn(&mut $crate::settings::Settings)>(
                 $code,
+                None,
                 Some(0),
                 None,
             );
@@ -145,7 +151,37 @@ macro_rules! test_lint_success {
     } => {
         #[test]
         fn $test_name() {
-            $crate::rule::tests::run_lint_test::<$rule, _>($code, Some(0), Some($settings));
+            $crate::rule::tests::run_lint_test::<$rule, _>($code, None, Some(0), Some($settings));
+        }
+    };
+    // With filename
+    {
+        name = $test_name:ident,
+        rule = $rule:ty,
+        filename = $filename:expr,
+        code = $code:expr $(,)?
+    } => {
+        #[test]
+        fn $test_name() {
+            $crate::rule::tests::run_lint_test::<$rule, fn(&mut $crate::settings::Settings)>(
+                $code,
+                Some($filename),
+                Some(0),
+                None,
+            );
+        }
+    };
+    // With filename and settings
+    {
+        name = $test_name:ident,
+        rule = $rule:ty,
+        filename = $filename:expr,
+        settings = $settings:expr,
+        code = $code:expr $(,)?
+    } => {
+        #[test]
+        fn $test_name() {
+            $crate::rule::tests::run_lint_test::<$rule, _>($code, Some($filename), Some(0), Some($settings));
         }
     };
 }
@@ -222,6 +258,7 @@ macro_rules! test_lint_failure {
                 $code,
                 None,
                 None,
+                None,
             );
         }
     };
@@ -236,6 +273,7 @@ macro_rules! test_lint_failure {
         fn $test_name() {
             $crate::rule::tests::run_lint_test::<$rule, fn(&mut $crate::settings::Settings)>(
                 $code,
+                None,
                 Some($count),
                 None,
             );
@@ -250,7 +288,7 @@ macro_rules! test_lint_failure {
     } => {
         #[test]
         fn $test_name() {
-            $crate::rule::tests::run_lint_test::<$rule, _>($code, None, Some($settings));
+            $crate::rule::tests::run_lint_test::<$rule, _>($code, None, None, Some($settings));
         }
     };
     // Failure test with both count and settings
@@ -263,7 +301,69 @@ macro_rules! test_lint_failure {
     } => {
         #[test]
         fn $test_name() {
-            $crate::rule::tests::run_lint_test::<$rule, _>($code, Some($count), Some($settings));
+            $crate::rule::tests::run_lint_test::<$rule, _>($code, None, Some($count), Some($settings));
+        }
+    };
+    // Failure test with filename
+    {
+        name = $test_name:ident,
+        rule = $rule:ty,
+        filename = $filename:expr,
+        code = $code:expr $(,)?
+    } => {
+        #[test]
+        fn $test_name() {
+            $crate::rule::tests::run_lint_test::<$rule, fn(&mut $crate::settings::Settings)>(
+                $code,
+                Some($filename),
+                None,
+                None,
+            );
+        }
+    };
+    // Failure test with filename and count
+    {
+        name = $test_name:ident,
+        rule = $rule:ty,
+        filename = $filename:expr,
+        count = $count:expr,
+        code = $code:expr $(,)?
+    } => {
+        #[test]
+        fn $test_name() {
+            $crate::rule::tests::run_lint_test::<$rule, fn(&mut $crate::settings::Settings)>(
+                $code,
+                Some($filename),
+                Some($count),
+                None,
+            );
+        }
+    };
+    // Failure test with filename and settings
+    {
+        name = $test_name:ident,
+        rule = $rule:ty,
+        filename = $filename:expr,
+        settings = $settings:expr,
+        code = $code:expr $(,)?
+    } => {
+        #[test]
+        fn $test_name() {
+            $crate::rule::tests::run_lint_test::<$rule, _>($code, Some($filename), None, Some($settings));
+        }
+    };
+    // Failure test with filename, count, and settings
+    {
+        name = $test_name:ident,
+        rule = $rule:ty,
+        filename = $filename:expr,
+        count = $count:expr,
+        settings = $settings:expr,
+        code = $code:expr $(,)?
+    } => {
+        #[test]
+        fn $test_name() {
+            $crate::rule::tests::run_lint_test::<$rule, _>($code, Some($filename), Some($count), Some($settings));
         }
     };
 }

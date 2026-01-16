@@ -42,6 +42,7 @@ use crate::rule::LowercaseKeywordConfig;
 use crate::rule::LowercaseTypeHintConfig;
 use crate::rule::MiddlewareInRoutesConfig;
 use crate::rule::NoAliasFunctionConfig;
+use crate::rule::NoAssignInArgumentConfig;
 use crate::rule::NoAssignInConditionConfig;
 use crate::rule::NoBooleanFlagParameterConfig;
 use crate::rule::NoBooleanLiteralComparisonConfig;
@@ -67,6 +68,7 @@ use crate::rule::NoLiteralPasswordConfig;
 use crate::rule::NoMultiAssignmentsConfig;
 use crate::rule::NoNestedTernaryConfig;
 use crate::rule::NoNoopConfig;
+use crate::rule::NoOnlyConfig;
 use crate::rule::NoPhpTagTerminatorConfig;
 use crate::rule::NoProtectedInFinalConfig;
 use crate::rule::NoRedundantBlockConfig;
@@ -137,7 +139,10 @@ use crate::rule::TooManyMethodsConfig;
 use crate::rule::TooManyPropertiesConfig;
 use crate::rule::TraitNameConfig;
 use crate::rule::UseCompoundAssignmentConfig;
+use crate::rule::UseDedicatedExpectationConfig;
+use crate::rule::UseSimplerExpectationConfig;
 use crate::rule::UseSpecificAssertionsConfig;
+use crate::rule::UseSpecificExpectationsConfig;
 use crate::rule::UseWpFunctionsConfig;
 use crate::rule::ValidDocblockConfig;
 use crate::rule::VariableNameConfig;
@@ -165,6 +170,9 @@ pub struct RuleSettings<C: Config> {
 #[serde(default, rename_all = "kebab-case", deny_unknown_fields)]
 pub struct RulesSettings {
     pub ambiguous_function_call: RuleSettings<AmbiguousFunctionCallConfig>,
+    pub use_dedicated_expectation: RuleSettings<UseDedicatedExpectationConfig>,
+    pub use_simpler_expectation: RuleSettings<UseSimplerExpectationConfig>,
+    pub use_specific_expectations: RuleSettings<UseSpecificExpectationsConfig>,
     pub array_style: RuleSettings<ArrayStyleConfig>,
     pub assert_description: RuleSettings<AssertDescriptionConfig>,
     pub assertion_style: RuleSettings<AssertionStyleConfig>,
@@ -216,6 +224,7 @@ pub struct RulesSettings {
     pub no_protected_in_final: RuleSettings<NoProtectedInFinalConfig>,
     pub no_php_tag_terminator: RuleSettings<NoPhpTagTerminatorConfig>,
     pub no_noop: RuleSettings<NoNoopConfig>,
+    pub no_only: RuleSettings<NoOnlyConfig>,
     pub no_multi_assignments: RuleSettings<NoMultiAssignmentsConfig>,
     pub no_nested_ternary: RuleSettings<NoNestedTernaryConfig>,
     pub no_hash_emoji: RuleSettings<NoHashEmojiConfig>,
@@ -234,6 +243,7 @@ pub struct RulesSettings {
     pub no_closing_tag: RuleSettings<NoClosingTagConfig>,
     pub no_boolean_literal_comparison: RuleSettings<NoBooleanLiteralComparisonConfig>,
     pub no_boolean_flag_parameter: RuleSettings<NoBooleanFlagParameterConfig>,
+    pub no_assign_in_argument: RuleSettings<NoAssignInArgumentConfig>,
     pub no_assign_in_condition: RuleSettings<NoAssignInConditionConfig>,
     pub no_alias_function: RuleSettings<NoAliasFunctionConfig>,
     pub lowercase_type_hint: RuleSettings<LowercaseTypeHintConfig>,

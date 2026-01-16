@@ -31,7 +31,9 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_syntax::ast::Argument;
+use mago_syntax::ast::BinaryOperator;
 use mago_syntax::ast::Expression;
+use mago_syntax::ast::Literal;
 
 use crate::artifacts::AnalysisArtifacts;
 use crate::code::IssueCode;
@@ -49,6 +51,7 @@ use crate::invocation::resolver::resolve_invocation_type;
 use crate::reconciler;
 use crate::reconciler::assertion_reconciler::intersect_union_with_union;
 use crate::utils::expression::get_expression_id;
+use crate::utils::misc::unwrap_expression;
 
 pub fn post_invocation_process<'ctx, 'arena>(
     context: &mut Context<'ctx, 'arena>,
@@ -854,6 +857,25 @@ fn get_argument_for_parameter<'ctx, 'ast, 'arena>(
         context.resolved_names,
         Some(context.codebase),
     );
+
+    let argument_id = match argument_id {
+        Some(id) => Some(id),
+        None => {
+            if let Expression::Binary(binary) = unwrap_expression(argument_expression)
+                && matches!(binary.operator, BinaryOperator::NullCoalesce(_))
+                && matches!(unwrap_expression(binary.rhs), Expression::Literal(Literal::Null(_)))
+            {
+                get_expression_id(
+                    binary.lhs,
+                    block_context.scope.get_class_like_name(),
+                    context.resolved_names,
+                    Some(context.codebase),
+                )
+            } else {
+                None
+            }
+        }
+    };
 
     (Some(argument_expression), argument_id)
 }

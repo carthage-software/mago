@@ -565,7 +565,13 @@ pub(super) fn adjust_clause<'arena>(
     };
 
     if has_trailing_segment {
-        if !is_block || f.is_followed_by_comment_on_next_line(node.span()) {
+        let is_do_while = matches!(f.current_node(), Node::DoWhile(_));
+
+        if !is_block
+            || f.is_followed_by_comment_on_next_line(node.span())
+            || f.has_same_line_trailing_comment(node.span())
+            || (f.settings.following_clause_on_newline && !is_do_while)
+        {
             Document::Array(vec![in f.arena; clause, Document::Line(Line::hard())])
         } else {
             Document::Array(vec![in f.arena; clause, Document::space()])

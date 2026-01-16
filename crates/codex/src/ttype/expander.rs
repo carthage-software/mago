@@ -336,6 +336,14 @@ fn expand_member_reference(
         new_return_type_parts.push(TAtomic::Object(TObject::new_enum_case(class_like.original_name, *enum_case_name)));
     }
 
+    if let TReferenceMemberSelector::Identifier(member_name) = member_selector
+        && let Some(type_alias) = class_like.type_aliases.get(member_name)
+    {
+        let mut alias_type = type_alias.type_union.clone();
+        expand_union(codebase, &mut alias_type, options);
+        new_return_type_parts.extend(alias_type.types.into_owned());
+    }
+
     if new_return_type_parts.is_empty() {
         new_return_type_parts.push(TAtomic::Mixed(TMixed::new()));
     }
@@ -354,7 +362,9 @@ fn expand_object(named_object: &mut TObject, codebase: &CodebaseMetadata, option
             StaticClassType::Object(TObject::Enum(static_enum)) => {
                 *named_object = TObject::Enum(static_enum.clone());
             }
-            StaticClassType::Object(TObject::Named(static_object)) => {
+            StaticClassType::Object(TObject::Named(static_object))
+                if name_str_lc == "static" || name_str_lc == "$this" =>
+            {
                 if let TObject::Named(named_object) = named_object {
                     if let Some(static_object_intersections) = &static_object.intersection_types {
                         let intersections = named_object.intersection_types.get_or_insert_with(Vec::new);
@@ -372,7 +382,7 @@ fn expand_object(named_object: &mut TObject, codebase: &CodebaseMetadata, option
             StaticClassType::Name(static_class_name)
                 if name_str_lc == "static"
                     || name_str_lc == "$this"
-                    || codebase.is_instance_of(static_class_name, &name) =>
+                    || (is_this && codebase.is_instance_of(static_class_name, &name)) =>
             {
                 if let TObject::Named(named_object) = named_object {
                     named_object.name = *static_class_name;

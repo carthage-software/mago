@@ -23,6 +23,7 @@ pub(crate) enum ScanningIssueKind {
     InvalidRequireExtendsTag,
     InvalidRequireImplementsTag,
     InvalidInheritorsTag,
+    InvalidMixinTag,
     CircularTypeImport,
 }
 

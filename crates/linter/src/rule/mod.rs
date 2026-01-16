@@ -178,6 +178,10 @@ macro_rules! define_rules {
 
 define_rules! {
     AmbiguousFunctionCall(ambiguous_function_call @ AmbiguousFunctionCallRule),
+    UseDedicatedExpectation(use_dedicated_expectation @ UseDedicatedExpectationRule),
+    UseSimplerExpectation(use_simpler_expectation @ UseSimplerExpectationRule),
+    UseSpecificExpectations(use_specific_expectations @ UseSpecificExpectationsRule),
+    NoOnly(no_only @ NoOnlyRule),
     ArrayStyle(array_style @ ArrayStyleRule),
     AssertDescription(assert_description @ AssertDescriptionRule),
     AssertionStyle(assertion_style @ AssertionStyleRule),
@@ -248,6 +252,7 @@ define_rules! {
     NoClosingTag(no_closing_tag @ NoClosingTagRule),
     NoBooleanLiteralComparison(no_boolean_literal_comparison @ NoBooleanLiteralComparisonRule),
     NoBooleanFlagParameter(no_boolean_flag_parameter @ NoBooleanFlagParameterRule),
+    NoAssignInArgument(no_assign_in_argument @ NoAssignInArgumentRule),
     NoAssignInCondition(no_assign_in_condition @ NoAssignInConditionRule),
     NoAliasFunction(no_alias_function @ NoAliasFunctionRule),
     LowercaseTypeHint(lowercase_type_hint @ LowercaseTypeHintRule),

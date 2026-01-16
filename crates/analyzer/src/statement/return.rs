@@ -135,6 +135,16 @@ pub fn handle_return_value<'ctx>(
         check_constructor_early_return(context, block_context, return_span, class_name);
     }
 
+    let mut expansion_options = TypeExpansionOptions {
+        self_class: block_context.scope.get_class_like_name(),
+        static_class_type: if let Some(calling_class) = block_context.scope.get_class_like_name() {
+            StaticClassType::Name(calling_class)
+        } else {
+            StaticClassType::None
+        },
+        ..Default::default()
+    };
+
     // Check if we're in a property hook context
     if let Some((property_name, hook_metadata)) = block_context.scope.get_property_hook() {
         handle_property_hook_return(
@@ -142,9 +152,9 @@ pub fn handle_return_value<'ctx>(
             block_context,
             return_value,
             inferred_return_type,
-            return_span,
             property_name,
             hook_metadata,
+            &expansion_options,
         );
 
         return;
@@ -157,14 +167,16 @@ pub fn handle_return_value<'ctx>(
         return;
     };
 
+    expansion_options.function_is_final = if let Some(method_metadata) = &function_like_metadata.method_metadata {
+        method_metadata.is_final
+    } else {
+        false
+    };
+
     if inferred_return_type.is_expandable() {
         let mut inner_union = (*inferred_return_type).clone();
 
-        expand_union(
-            context.codebase,
-            &mut inner_union,
-            &TypeExpansionOptions { self_class: block_context.scope.get_class_like_name(), ..Default::default() },
-        );
+        expand_union(context.codebase, &mut inner_union, &expansion_options);
 
         inferred_return_type = Rc::new(inner_union);
     }
@@ -179,24 +191,24 @@ pub fn handle_return_value<'ctx>(
 
         if !is_referenceable {
             context.collector.report_with_code(
-                    IssueCode::InvalidReturnStatement,
-                    Issue::error(format!(
-                        "Cannot return a non-referenceable value from function `{function_name}`.",
-                    ))
-                    .with_annotation(Annotation::primary(return_value.span()).with_message(
-                        "This value cannot be returned by reference.",
-                    ))
-                    .with_annotation(
-                        Annotation::secondary(function_like_metadata.name_span.unwrap_or(function_like_metadata.span))
-                            .with_message("Function is declared to return by reference here."),
-                    )
-                    .with_note(
-                        "You can only return variables, properties, array elements, or the result of another function call that itself returns a reference."
-                    )
-                    .with_help(
-                        "To fix this, either return a valid reference or remove the `&` from the function declaration to return by value."
-                    ),
-                );
+                IssueCode::InvalidReturnStatement,
+                Issue::error(format!(
+                    "Cannot return a non-referenceable value from function `{function_name}`.",
+                ))
+                .with_annotation(Annotation::primary(return_value.span()).with_message(
+                    "This value cannot be returned by reference.",
+                ))
+                .with_annotation(
+                    Annotation::secondary(function_like_metadata.name_span.unwrap_or(function_like_metadata.span))
+                        .with_message("Function is declared to return by reference here."),
+                )
+                .with_note(
+                    "You can only return variables, properties, array elements, or the result of another function call that itself returns a reference."
+                )
+                .with_help(
+                    "To fix this, either return a valid reference or remove the `&` from the function declaration to return by value."
+                ),
+            );
         }
     }
 
@@ -521,9 +533,9 @@ fn handle_property_hook_return<'ctx>(
     block_context: &BlockContext<'ctx>,
     return_value: Option<&Expression>,
     mut inferred_return_type: Rc<TUnion>,
-    _return_span: Span,
     property_name: Atom,
     hook_metadata: &PropertyHookMetadata,
+    expansion_options: &TypeExpansionOptions,
 ) {
     if !hook_metadata.is_get() {
         return;
@@ -536,26 +548,11 @@ fn handle_property_hook_return<'ctx>(
     let Some(type_metadata) = &property.type_metadata else { return };
 
     let mut expected_return_type = type_metadata.type_union.clone();
-    expand_union(
-        context.codebase,
-        &mut expected_return_type,
-        &TypeExpansionOptions {
-            self_class: block_context.scope.get_class_like_name(),
-            static_class_type: block_context
-                .scope
-                .get_class_like_name()
-                .map_or(StaticClassType::None, StaticClassType::Name),
-            ..Default::default()
-        },
-    );
+    expand_union(context.codebase, &mut expected_return_type, expansion_options);
 
     if inferred_return_type.is_expandable() {
         let mut inner = (*inferred_return_type).clone();
-        expand_union(
-            context.codebase,
-            &mut inner,
-            &TypeExpansionOptions { self_class: block_context.scope.get_class_like_name(), ..Default::default() },
-        );
+        expand_union(context.codebase, &mut inner, expansion_options);
         inferred_return_type = Rc::new(inner);
     }
 

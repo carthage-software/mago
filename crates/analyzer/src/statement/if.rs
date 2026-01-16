@@ -1097,7 +1097,12 @@ fn analyze_else_statements<'ctx, 'arena>(
     }
 
     if !if_scope.negated_types.is_empty() {
-        let variables_to_update = if_scope.negated_types.keys().copied().collect::<AtomSet>();
+        let variables_to_update = if_scope
+            .negated_types
+            .keys()
+            .copied()
+            .filter(|var| outer_block_context.locals.contains_key(var))
+            .collect::<AtomSet>();
 
         outer_block_context.update(
             context,

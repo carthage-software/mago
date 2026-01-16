@@ -50,6 +50,7 @@ use crate::parser::internal::generic::parse_single_generic_parameter;
 use crate::parser::internal::generic::parse_single_generic_parameter_or_none;
 use crate::parser::internal::object::parse_object_type;
 use crate::parser::internal::stream::TypeTokenStream;
+use crate::token::TypePrecedence;
 use crate::token::TypeTokenKind;
 
 pub mod array_like;
@@ -58,10 +59,91 @@ pub mod generic;
 pub mod object;
 pub mod stream;
 
+/// Parses a complete type expression, including unions, intersections, and conditionals.
 #[inline]
 pub fn parse_type<'input>(stream: &mut TypeTokenStream<'input>) -> Result<Type<'input>, ParseError> {
+    parse_type_with_precedence(stream, TypePrecedence::Lowest)
+}
+
+/// Parses a type expression with the given minimum precedence.
+///
+/// This function controls what operators are consumed based on precedence:
+/// - `Lowest`: Parses everything including unions, intersections, and conditionals
+/// - `Callable`: Used for callable return types; stops before `|`, `&`, and `is`
+///
+/// For example, `Closure(): int|string` with:
+/// - `Lowest` precedence: parses as `Union(Closure(): int, string)` (correct PHPStan/Psalm behavior)
+/// - `Callable` precedence: parses only `int`, leaving `|string` for the parent to handle
+pub fn parse_type_with_precedence<'input>(
+    stream: &mut TypeTokenStream<'input>,
+    min_precedence: TypePrecedence,
+) -> Result<Type<'input>, ParseError> {
+    let mut inner = parse_primary_type(stream)?;
+
+    loop {
+        let is_inner_nullable = matches!(inner, Type::Nullable(_));
+
+        inner = match stream.lookahead(0)?.map(|t| t.kind) {
+            // Union types: T|U
+            Some(TypeTokenKind::Pipe) if !is_inner_nullable && min_precedence <= TypePrecedence::Union => {
+                Type::Union(UnionType {
+                    left: Box::new(inner),
+                    pipe: stream.consume()?.span,
+                    right: Box::new(parse_type_with_precedence(stream, TypePrecedence::Union)?),
+                })
+            }
+            // Intersection types: T&U
+            Some(TypeTokenKind::Ampersand) if !is_inner_nullable && min_precedence <= TypePrecedence::Intersection => {
+                Type::Intersection(IntersectionType {
+                    left: Box::new(inner),
+                    ampersand: stream.consume()?.span,
+                    right: Box::new(parse_type_with_precedence(stream, TypePrecedence::Intersection)?),
+                })
+            }
+            // Conditional types: T is U ? V : W
+            Some(TypeTokenKind::Is) if !is_inner_nullable && min_precedence <= TypePrecedence::Conditional => {
+                Type::Conditional(ConditionalType {
+                    subject: Box::new(inner),
+                    is: Keyword::from(stream.consume()?),
+                    not: if stream.is_at(TypeTokenKind::Not)? { Some(Keyword::from(stream.consume()?)) } else { None },
+                    target: Box::new(parse_type_with_precedence(stream, TypePrecedence::Conditional)?),
+                    question_mark: stream.eat(TypeTokenKind::Question)?.span,
+                    then: Box::new(parse_type_with_precedence(stream, TypePrecedence::Conditional)?),
+                    colon: stream.eat(TypeTokenKind::Colon)?.span,
+                    otherwise: Box::new(parse_type_with_precedence(stream, TypePrecedence::Conditional)?),
+                })
+            }
+            // Postfix operations: T[], T[K]
+            Some(TypeTokenKind::LeftBracket) if min_precedence <= TypePrecedence::Postfix => {
+                let left_bracket = stream.consume()?.span;
+
+                if stream.is_at(TypeTokenKind::RightBracket)? {
+                    Type::Slice(SliceType {
+                        inner: Box::new(inner),
+                        left_bracket,
+                        right_bracket: stream.consume()?.span,
+                    })
+                } else {
+                    Type::IndexAccess(IndexAccessType {
+                        target: Box::new(inner),
+                        left_bracket,
+                        index: Box::new(parse_type(stream)?),
+                        right_bracket: stream.eat(TypeTokenKind::RightBracket)?.span,
+                    })
+                }
+            }
+            _ => {
+                return Ok(inner);
+            }
+        };
+    }
+}
+
+/// Parses a primary (atomic) type without consuming any infix operators.
+#[inline]
+fn parse_primary_type<'input>(stream: &mut TypeTokenStream<'input>) -> Result<Type<'input>, ParseError> {
     let next = stream.peek()?;
-    let mut inner = match next.kind {
+    let inner = match next.kind {
         TypeTokenKind::Variable => Type::Variable(VariableType::from(stream.consume()?)),
         TypeTokenKind::Question => {
             Type::Nullable(NullableType { question_mark: stream.consume()?.span, inner: Box::new(parse_type(stream)?) })
@@ -72,6 +154,7 @@ pub fn parse_type<'input>(stream: &mut TypeTokenStream<'input>) -> Result<Type<'
             right_parenthesis: stream.eat(TypeTokenKind::RightParenthesis)?.span,
         }),
         TypeTokenKind::Mixed => Type::Mixed(Keyword::from(stream.consume()?)),
+        TypeTokenKind::NonEmptyMixed => Type::NonEmptyMixed(Keyword::from(stream.consume()?)),
         TypeTokenKind::Null => Type::Null(Keyword::from(stream.consume()?)),
         TypeTokenKind::Void => Type::Void(Keyword::from(stream.consume()?)),
         TypeTokenKind::Never => Type::Never(Keyword::from(stream.consume()?)),
@@ -445,53 +528,7 @@ pub fn parse_type<'input>(stream: &mut TypeTokenStream<'input>) -> Result<Type<'
         }
     };
 
-    loop {
-        let is_inner_nullable = matches!(inner, Type::Nullable(_));
-
-        inner = match stream.lookahead(0)?.map(|t| t.kind) {
-            Some(TypeTokenKind::Pipe) if !is_inner_nullable => Type::Union(UnionType {
-                left: Box::new(inner),
-                pipe: stream.consume()?.span,
-                right: Box::new(parse_type(stream)?),
-            }),
-            Some(TypeTokenKind::Ampersand) if !is_inner_nullable => Type::Intersection(IntersectionType {
-                left: Box::new(inner),
-                ampersand: stream.consume()?.span,
-                right: Box::new(parse_type(stream)?),
-            }),
-            Some(TypeTokenKind::Is) if !is_inner_nullable => Type::Conditional(ConditionalType {
-                subject: Box::new(inner),
-                is: Keyword::from(stream.consume()?),
-                not: if stream.is_at(TypeTokenKind::Not)? { Some(Keyword::from(stream.consume()?)) } else { None },
-                target: Box::new(parse_type(stream)?),
-                question_mark: stream.eat(TypeTokenKind::Question)?.span,
-                then: Box::new(parse_type(stream)?),
-                colon: stream.eat(TypeTokenKind::Colon)?.span,
-                otherwise: Box::new(parse_type(stream)?),
-            }),
-            Some(TypeTokenKind::LeftBracket) => {
-                let left_bracket = stream.consume()?.span;
-
-                if stream.is_at(TypeTokenKind::RightBracket)? {
-                    Type::Slice(SliceType {
-                        inner: Box::new(inner),
-                        left_bracket,
-                        right_bracket: stream.consume()?.span,
-                    })
-                } else {
-                    Type::IndexAccess(IndexAccessType {
-                        target: Box::new(inner),
-                        left_bracket,
-                        index: Box::new(parse_type(stream)?),
-                        right_bracket: stream.eat(TypeTokenKind::RightBracket)?.span,
-                    })
-                }
-            }
-            _ => {
-                return Ok(inner);
-            }
-        };
-    }
+    Ok(inner)
 }
 
 pub fn parse_literal_number_type<'input>(

@@ -88,6 +88,7 @@ use crate::ttype::get_resource;
 use crate::ttype::get_scalar;
 use crate::ttype::get_string;
 use crate::ttype::get_true;
+use crate::ttype::get_truthy_mixed;
 use crate::ttype::get_truthy_string;
 use crate::ttype::get_unspecified_literal_float;
 use crate::ttype::get_unspecified_literal_int;
@@ -411,6 +412,7 @@ pub fn get_union_from_type_ast(
             )?)
         }
         Type::Mixed(_) => get_mixed(),
+        Type::NonEmptyMixed(_) => get_truthy_mixed(),
         Type::Null(_) => get_null(),
         Type::Void(_) => get_void(),
         Type::Never(_) => get_never(),
@@ -503,7 +505,13 @@ pub fn get_union_from_type_ast(
             Box::new(get_union_from_type_ast(&conditional.otherwise, scope, type_context, classname)?),
             conditional.is_negated(),
         )))),
-        Type::Variable(variable_type) => TUnion::from_single(Cow::Owned(TAtomic::Variable(atom(variable_type.value)))),
+        Type::Variable(variable_type) => {
+            if variable_type.value == "$this" {
+                TUnion::from_single(Cow::Owned(TAtomic::Object(TObject::Named(TNamedObject::new_this(atom("$this"))))))
+            } else {
+                TUnion::from_single(Cow::Owned(TAtomic::Variable(atom(variable_type.value))))
+            }
+        }
         Type::KeyOf(key_of_type) => TUnion::from_atomic(TAtomic::Derived(TDerived::KeyOf(TKeyOf::new(Box::new(
             get_union_from_type_ast(&key_of_type.parameter.entry.inner, scope, type_context, classname)?,
         ))))),

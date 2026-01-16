@@ -18,11 +18,16 @@ foreach ($objs as $obj) {
 }
 
 // Also test with multiple @var annotations
-/** @var array<string, object> $map */
+/** @var array<int|string, object> $map */
 $map = ['key' => new DateTime()];
+
+function want_string(string $x): string {
+  return $x;
+}
 
 foreach ($map as $key => $value) {
     /** @var string $key */
     /** @var DateTime $value */
     $result = $value->format('Y-m-d');
+    want_string($key);
 }

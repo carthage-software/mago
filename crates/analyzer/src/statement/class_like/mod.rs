@@ -901,6 +901,15 @@ fn check_class_like_extends<'ctx, 'arena>(
                         .with_note("A `readonly` class can only be extended by another `readonly` class.")
                         .with_help(format!("To resolve this, either make the `{using_name}` class `readonly`, or extend a different, non-readonly class.")),
                 );
+            } else if !extended_class_metadata.flags.is_readonly() && class_like_metadata.flags.is_readonly() {
+                context.collector.report_with_code(
+                    IssueCode::InvalidExtend,
+                    Issue::error(format!("Readonly class `{using_name}` cannot extend non-readonly class `{extended_name}`"))
+                        .with_annotation(Annotation::primary(using_class_span).with_message("This class is `readonly`..."))
+                        .with_annotation(Annotation::secondary(extended_class_span).with_message(format!("...but it extends `{extended_name}`, which is not `readonly`")))
+                        .with_note("A non-`readonly` class can only be extended by another non-`readonly` class.")
+                        .with_help(format!("To resolve this, either make the `{using_name}` class non-`readonly`, or extend a different, readonly class.")),
+                );
             }
 
             if let Some(required_interface) =
@@ -1488,21 +1497,22 @@ fn check_abstract_method_signatures<'ctx>(
     for (method_name_atom, overridden_method_ids) in &class_like_metadata.overridden_method_ids {
         let method_name_str = method_name_atom.as_ref();
 
-        let Some(appearing_method_id) = class_like_metadata.appearing_method_ids.get(method_name_atom) else {
+        let Some(declaring_method_id) = class_like_metadata.declaring_method_ids.get(method_name_atom) else {
             continue;
         };
 
-        let appearing_fqcn_str = appearing_method_id.get_class_name().as_ref();
-        let appearing_method_opt = context.codebase.get_method(appearing_fqcn_str, method_name_str);
+        let declaring_fqcn_str = declaring_method_id.get_class_name().as_ref();
+        let declaring_method_opt = context.codebase.get_method(declaring_fqcn_str, method_name_str);
 
-        let (method_fqcn_str, appearing_method) = if let Some(method) = appearing_method_opt {
-            (appearing_fqcn_str, method)
-        } else if let Some(declaring_method_id) = class_like_metadata.declaring_method_ids.get(method_name_atom) {
-            let declaring_fqcn_str = declaring_method_id.get_class_name().as_ref();
-            let Some(method) = context.codebase.get_method(declaring_fqcn_str, method_name_str) else {
+        let (method_fqcn_str, appearing_method) = if let Some(method) = declaring_method_opt {
+            (declaring_fqcn_str, method)
+        } else if let Some(appearing_method_id) = class_like_metadata.appearing_method_ids.get(method_name_atom) {
+            let appearing_fqcn_str = appearing_method_id.get_class_name().as_ref();
+            let Some(method) = context.codebase.get_method(appearing_fqcn_str, method_name_str) else {
                 continue;
             };
-            (declaring_fqcn_str, method)
+
+            (appearing_fqcn_str, method)
         } else {
             continue;
         };
@@ -1526,6 +1536,13 @@ fn check_abstract_method_signatures<'ctx>(
             let Some(overridden_class) = context.codebase.get_class_like(declaring_class_name_str) else {
                 continue;
             };
+
+            if !class_like_metadata.kind.is_interface()
+                && overridden_class.kind.is_interface()
+                && class_like_metadata.direct_parent_interfaces.contains(&overridden_class.name)
+            {
+                continue;
+            }
 
             let Some(appearing_class) = context.codebase.get_class_like(method_fqcn_str) else {
                 continue;
@@ -2087,7 +2104,7 @@ fn check_interface_method_signatures<'ctx>(
             continue;
         };
 
-        let Some(class_method_id) = class_like_metadata.appearing_method_ids.get(method_name_atom) else {
+        let Some(class_method_id) = class_like_metadata.declaring_method_ids.get(method_name_atom) else {
             continue;
         };
 

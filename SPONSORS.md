@@ -9,11 +9,19 @@ To become a sponsor, please visit [the sponsorship page](https://github.com/spon
 
 ---
 
+<a href="http://www.dynasource.eu" title="Boudewijn Vahrmeijer"><kbd><img src="https://avatars.githubusercontent.com/u/125726?u=f2a45c40beb5e1071e9cd713793348fea08f7986&v=4&s=160" width="80" height="80" alt="Boudewijn Vahrmeijer" /></kbd></a>
+
+---
+
 <a href="https://github.com/jasonrm" title="Jason R. McNeil"><kbd><img src="https://avatars.githubusercontent.com/u/39949?u=69c0e4fb08c439250978d41dbc3371d2f0609b98&v=4&s=160" width="80" height="80" alt="Jason R. McNeil" /></kbd></a><a href="https://ofcompute.rs/" title="Vincent Berset"><kbd><img src="https://avatars.githubusercontent.com/u/5173120?u=95efc76cd8fc804536dc6dd25781a95b650bf902&v=4&s=160" width="80" height="80" alt="Vincent Berset" /></kbd></a>
 
 ---
 
 <a href="https://github.com/kambo-1st" title="Bohuslav Šimek"><kbd><img src="https://avatars.githubusercontent.com/u/6493048?u=5eddf1eb923810745d8bdd62496d245238833d07&v=4&s=160" width="80" height="80" alt="Bohuslav Šimek" /></kbd></a><a href="https://www.ticketswap.com" title="TicketSwap"><kbd><img src="https://avatars.githubusercontent.com/u/5766233?v=4&s=160" width="80" height="80" alt="TicketSwap" /></kbd></a>
+
+---
+
+<a href="https://afilina.com" title="Anna Filina"><kbd><img src="https://avatars.githubusercontent.com/u/199835?u=d133afc4e19961b7da45b6bb485ed9ac9232e4bb&v=4&s=160" width="80" height="80" alt="Anna Filina" /></kbd></a>
 
 ---
 

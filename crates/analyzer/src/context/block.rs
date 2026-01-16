@@ -568,6 +568,10 @@ impl<'ctx> BlockContext<'ctx> {
         vars_to_update: &AtomSet,
         updated_vars: &mut AtomSet,
     ) {
+        if vars_to_update.is_empty() {
+            return;
+        }
+
         for (variable_id, old_type) in &start_block_context.locals {
             if !vars_to_update.contains(variable_id) {
                 continue;

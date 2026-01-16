@@ -122,6 +122,7 @@ use crate::internal::format::misc::print_modifiers;
 use crate::internal::format::print_lowercase_keyword;
 use crate::internal::format::return_value::format_return_value;
 use crate::internal::format::string::print_string;
+use crate::internal::format::string::print_uppercase_keyword;
 use crate::internal::utils;
 use crate::internal::utils::could_expand_value;
 use crate::internal::utils::unwrap_parenthesized;
@@ -307,9 +308,13 @@ impl<'arena> Format<'arena> for Literal<'arena> {
                 Literal::String(literal) => literal.format(f),
                 Literal::Integer(literal) => literal.format(f),
                 Literal::Float(literal) => literal.format(f),
-                Literal::True(keyword) => keyword.format(f),
-                Literal::False(keyword) => keyword.format(f),
-                Literal::Null(keyword) => keyword.format(f),
+                Literal::True(keyword) | Literal::False(keyword) | Literal::Null(keyword) => {
+                    if f.settings.uppercase_literal_keyword {
+                        wrap!(f, keyword, Keyword, { Document::String(print_uppercase_keyword(f, keyword.value)) })
+                    } else {
+                        wrap!(f, keyword, Keyword, { Document::String(print_lowercase_keyword(f, keyword.value)) })
+                    }
+                }
             }
         })
     }
@@ -901,12 +906,23 @@ impl<'arena> Format<'arena> for MatchExpressionArm<'arena> {
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
         wrap!(f, self, MatchExpressionArm, {
             let len = self.conditions.len();
+
+            let must_break = self
+                .conditions
+                .iter()
+                .take(len.saturating_sub(1))
+                .any(|condition| f.has_comment(condition.span(), CommentFlags::Trailing | CommentFlags::Line));
+
             let mut contents = vec![in f.arena];
             for (i, condition) in self.conditions.iter().enumerate() {
                 contents.push(condition.format(f));
                 if i != (len - 1) {
                     contents.push(Document::String(","));
-                    contents.push(Document::Line(Line::default()));
+                    contents.push(if must_break {
+                        Document::Line(Line::hard())
+                    } else {
+                        Document::Line(Line::default())
+                    });
                 } else if f.settings.trailing_comma && i > 0 {
                     contents.push(Document::IfBreak(IfBreak::then(f.arena, Document::String(","))));
                 }
@@ -917,7 +933,7 @@ impl<'arena> Format<'arena> for MatchExpressionArm<'arena> {
                 group_id,
                 vec![
                     in f.arena;
-                    Document::Line(Line::default()),
+                    if must_break { Document::Line(Line::hard()) } else { Document::Line(Line::default()) },
                     format_token(f, self.arrow, "=> "),
                 ],
             )));
@@ -925,10 +941,11 @@ impl<'arena> Format<'arena> for MatchExpressionArm<'arena> {
             Document::Group(
                 Group::new(vec![
                     in f.arena;
-                    Document::Group(Group::new(contents)),
+                    Document::Group(Group::new(contents).with_break(must_break)),
                     self.expression.format(f),
                 ])
-                .with_id(group_id),
+                .with_id(group_id)
+                .with_break(must_break),
             )
         })
     }
@@ -1116,7 +1133,7 @@ impl<'arena> Format<'arena> for DocumentString<'arena> {
                 DocumentIndentation::Mixed(t, w) => t + w,
             };
 
-            contents.push(Document::Line(Line::hard()));
+            let mut inner = vec![in f.arena; Document::Line(Line::hard())];
 
             // Track the indentation from the last line of the previous literal part
             let mut last_part_indentation = Cow::Borrowed("");
@@ -1181,15 +1198,33 @@ impl<'arena> Format<'arena> for DocumentString<'arena> {
 
                     Document::Array(part_contents)
                 } else {
-                    let base_alignment = match self.indentation {
-                        DocumentIndentation::None => Cow::Borrowed(""),
-                        DocumentIndentation::Whitespace(n) => Cow::Owned(" ".repeat(n)),
-                        DocumentIndentation::Tab(n) => Cow::Owned("\t".repeat(n)),
-                        DocumentIndentation::Mixed(t, w) => Cow::Owned("\t".repeat(t) + &" ".repeat(w)),
+                    let (base_alignment, adjusted_last_part) = if f.settings.indent_heredoc {
+                        let scope = if f.settings.use_tabs {
+                            Cow::Borrowed("\t")
+                        } else {
+                            Cow::Owned(" ".repeat(f.settings.tab_width))
+                        };
+
+                        let adjusted = if !last_part_indentation.is_empty() {
+                            Cow::Owned(format!("{scope}{last_part_indentation}"))
+                        } else {
+                            Cow::Borrowed("")
+                        };
+
+                        (scope, adjusted)
+                    } else {
+                        let base = match self.indentation {
+                            DocumentIndentation::None => Cow::Borrowed(""),
+                            DocumentIndentation::Whitespace(n) => Cow::Owned(" ".repeat(n)),
+                            DocumentIndentation::Tab(n) => Cow::Owned("\t".repeat(n)),
+                            DocumentIndentation::Mixed(t, w) => Cow::Owned("\t".repeat(t) + &" ".repeat(w)),
+                        };
+
+                        (base, last_part_indentation.clone())
                     };
 
-                    let combined_alignment = if !base_alignment.is_empty() || !last_part_indentation.is_empty() {
-                        Cow::Owned(format!("{base_alignment}{last_part_indentation}"))
+                    let combined_alignment = if !base_alignment.is_empty() || !adjusted_last_part.is_empty() {
+                        Cow::Owned(format!("{base_alignment}{adjusted_last_part}"))
                     } else {
                         Cow::Borrowed("")
                     };
@@ -1203,10 +1238,16 @@ impl<'arena> Format<'arena> for DocumentString<'arena> {
                     })
                 };
 
-                contents.push(formatted);
+                inner.push(formatted);
             }
 
-            contents.push(Document::String(self.label));
+            inner.push(Document::String(self.label));
+
+            if f.settings.indent_heredoc {
+                contents.push(Document::Indent(inner));
+            } else {
+                contents.extend(inner);
+            }
 
             Document::Group(Group::new(contents))
         })

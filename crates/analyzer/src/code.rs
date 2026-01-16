@@ -1,5 +1,14 @@
+//! This file is auto-generated. Do not edit manually.
+
+/// An issue code representing a specific type of analysis issue.
+///
+/// Each issue code corresponds to a unique identifier for a particular
+/// kind of issue that the analyzer can detect during code analysis.
+///
+/// This enum is non-exhaustive; new issue codes may be added in future versions.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(u16)]
+#[non_exhaustive]
 pub enum IssueCode {
     AbstractClassUsedAsAttribute,
     AbstractInstantiation,
@@ -214,6 +223,7 @@ pub enum IssueCode {
     PossiblyInvalidClone,
     PossiblyInvalidIterator,
     PossiblyInvalidOperand,
+    PossiblyNonExistentMethod,
     PossiblyNonExistentProperty,
     PossiblyNullArgument,
     PossiblyNullArrayAccess,
@@ -507,6 +517,7 @@ impl IssueCode {
             Self::PossiblyInvalidClone => "possibly-invalid-clone",
             Self::PossiblyInvalidIterator => "possibly-invalid-iterator",
             Self::PossiblyInvalidOperand => "possibly-invalid-operand",
+            Self::PossiblyNonExistentMethod => "possibly-non-existent-method",
             Self::PossiblyNonExistentProperty => "possibly-non-existent-property",
             Self::PossiblyNullArgument => "possibly-null-argument",
             Self::PossiblyNullArrayAccess => "possibly-null-array-access",
@@ -808,6 +819,7 @@ impl std::str::FromStr for IssueCode {
             "possibly-invalid-clone" => Ok(Self::PossiblyInvalidClone),
             "possibly-invalid-iterator" => Ok(Self::PossiblyInvalidIterator),
             "possibly-invalid-operand" => Ok(Self::PossiblyInvalidOperand),
+            "possibly-non-existent-method" => Ok(Self::PossiblyNonExistentMethod),
             "possibly-non-existent-property" => Ok(Self::PossiblyNonExistentProperty),
             "possibly-null-argument" => Ok(Self::PossiblyNullArgument),
             "possibly-null-array-access" => Ok(Self::PossiblyNullArrayAccess),

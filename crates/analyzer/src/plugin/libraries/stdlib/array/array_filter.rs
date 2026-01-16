@@ -50,7 +50,8 @@ impl FunctionReturnTypeProvider for ArrayFilterProvider {
             let callback_type = context.get_expression_type(callback_arg)?;
 
             if !callback_type.is_null() {
-                if let Some(callback_metadata) = context.get_closure_metadata(callback_arg)
+                // Try to get metadata from closures OR first-class callables like is_string(...)
+                if let Some(callback_metadata) = context.get_callable_metadata(callback_arg)
                     && !callback_metadata.if_true_assertions.is_empty()
                     && let Some(first_param) = callback_metadata.parameters.first()
                 {

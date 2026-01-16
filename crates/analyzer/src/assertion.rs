@@ -417,23 +417,42 @@ fn scrape_special_function_call_assertions(
         found_assertions
     };
 
-    let extract_expression_id = |argument_expression| {
-        get_expression_id(
+    let extract_expression_id = |argument_expression: &Expression| {
+        if let Some(id) = get_expression_id(
             argument_expression,
             assertion_context.this_class_name,
             assertion_context.resolved_names,
             Some(assertion_context.codebase),
-        )
+        ) {
+            return Some((id, false));
+        }
+
+        if let Expression::Binary(binary) = unwrap_expression(argument_expression)
+            && matches!(binary.operator, BinaryOperator::NullCoalesce(_))
+            && matches!(unwrap_expression(binary.rhs), Expression::Literal(Literal::Null(_)))
+            && let Some(lhs_id) = get_expression_id(
+                binary.lhs,
+                assertion_context.this_class_name,
+                assertion_context.resolved_names,
+                Some(assertion_context.codebase),
+            )
+        {
+            return Some((lhs_id, true));
+        }
+
+        None
     };
 
-    if let Some(first_argument_variable_id) = function_call
-        .argument_list
-        .arguments
-        .get(argument_variable_id_position)
-        .map(mago_syntax::ast::Argument::value)
-        .and_then(extract_expression_id)
+    if let Some(argument) =
+        function_call.argument_list.arguments.get(argument_variable_id_position).map(mago_syntax::ast::Argument::value)
+        && let Some((variable_id, needs_isset)) = extract_expression_id(argument)
     {
-        if_types.insert(first_argument_variable_id, vec![function_assertions]);
+        let mut assertions = vec![function_assertions];
+        if needs_isset {
+            assertions.push(vec![Assertion::IsIsset]);
+        }
+
+        if_types.insert(variable_id, assertions);
     }
 
     if_types

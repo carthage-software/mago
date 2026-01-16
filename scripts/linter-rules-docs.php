@@ -416,18 +416,18 @@ function create_category_markdown_content(string $category_name, array $rules, a
     usort($rules, fn(array $a, array $b): int => $a['code'] <=> $b['code']);
 
     $content = <<<MD
-    ---
-    title: {$category_name} rules
-    outline: [2, 3]
-    ---
+        ---
+        title: {$category_name} rules
+        outline: [2, 3]
+        ---
 
-    # {$category_name} rules
+        # {$category_name} rules
 
-    This document details the rules available in the `{$category_name}` category.
+        This document details the rules available in the `{$category_name}` category.
 
-    | Rule | Code |
-    | :--- | :---------- |
-    MD;
+        | Rule | Code |
+        | :--- | :---------- |
+        MD;
 
     foreach ($rules as $rule) {
         $content .= "\n| {$rule['name']} | [`{$rule['code']}`](#{$rule['code']}) |";

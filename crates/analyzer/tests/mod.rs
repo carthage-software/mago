@@ -34,6 +34,8 @@ macro_rules! test_case {
 test_case!(accessing_undefined_class_constant);
 test_case!(argument_count);
 test_case!(array_list_reconciliation);
+test_case!(array_map_non_empty_array);
+test_case!(array_map_non_empty_list);
 test_case!(array_shape_fields);
 test_case!(array_unique_non_empty);
 test_case!(assert_concrete_to_template_type);
@@ -50,6 +52,7 @@ test_case!(conditional_return_resolved_to_left);
 test_case!(conditional_return_resolved_to_right);
 test_case!(conditional_return_with_assignment_in_condition);
 test_case!(const_array_key);
+test_case!(docblock_type_mismatch);
 test_case!(docblock_type_narrowing);
 test_case!(docblock_type_parsing_verification);
 test_case!(docblock_var_on_non_assignment);
@@ -364,6 +367,9 @@ test_case!(bad_path_redundant_nullsafe);
 test_case!(bad_path_assignment_to_this);
 test_case!(typed_property_null_coalesce);
 test_case!(docblock_var_override_foreach);
+test_case!(mixin);
+test_case!(issue_contravariant_params_diamond);
+test_case!(issue_contravariant_params_simple);
 
 // Github Issues
 test_case!(issue_659);
@@ -513,6 +519,18 @@ test_case!(issue_789);
 test_case!(issue_801);
 test_case!(issue_806);
 test_case!(issue_809);
+test_case!(issue_822);
+test_case!(issue_830);
+test_case!(issue_835);
+test_case!(issue_837);
+test_case!(issue_845);
+test_case!(issue_849);
+test_case!(issue_859);
+test_case!(issue_861);
+test_case!(issue_863);
+test_case!(issue_870);
+test_case!(issue_871);
+test_case!(issue_872);
 
 #[test]
 fn test_all_test_cases_are_ran() {

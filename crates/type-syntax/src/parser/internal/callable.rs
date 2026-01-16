@@ -5,7 +5,9 @@ use crate::ast::CallableTypeSpecification;
 use crate::ast::VariableType;
 use crate::error::ParseError;
 use crate::parser::internal::parse_type;
+use crate::parser::internal::parse_type_with_precedence;
 use crate::parser::internal::stream::TypeTokenStream;
+use crate::token::TypePrecedence;
 use crate::token::TypeTokenKind;
 
 #[inline]
@@ -50,7 +52,10 @@ pub fn parse_callable_type_specifications<'input>(
             right_parenthesis: stream.eat(TypeTokenKind::RightParenthesis)?.span,
         },
         return_type: if stream.is_at(TypeTokenKind::Colon)? {
-            Some(CallableTypeReturnType { colon: stream.consume()?.span, return_type: Box::new(parse_type(stream)?) })
+            Some(CallableTypeReturnType {
+                colon: stream.consume()?.span,
+                return_type: Box::new(parse_type_with_precedence(stream, TypePrecedence::Callable)?),
+            })
         } else {
             None
         },

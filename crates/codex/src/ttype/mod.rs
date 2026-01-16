@@ -72,6 +72,7 @@ use crate::ttype::shared::STRING_ATOMIC;
 use crate::ttype::shared::TRAIT_STRING_ATOMIC;
 use crate::ttype::shared::TRUE_ATOMIC;
 use crate::ttype::shared::TRUTHY_LOWERCASE_STRING_ATOMIC;
+use crate::ttype::shared::TRUTHY_MIXED_ATOMIC;
 use crate::ttype::shared::TRUTHY_STRING_ATOMIC;
 use crate::ttype::shared::UNSPECIFIED_LITERAL_FLOAT_ATOMIC;
 use crate::ttype::shared::UNSPECIFIED_LITERAL_INT_ATOMIC;
@@ -567,6 +568,12 @@ pub fn get_literal_float(v: f64) -> TUnion {
 #[must_use]
 pub fn get_mixed() -> TUnion {
     TUnion::from_single(Cow::Borrowed(MIXED_ATOMIC))
+}
+
+#[inline]
+#[must_use]
+pub fn get_truthy_mixed() -> TUnion {
+    TUnion::from_single(Cow::Borrowed(TRUTHY_MIXED_ATOMIC))
 }
 
 #[inline]

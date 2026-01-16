@@ -881,6 +881,25 @@ fn scan_class_like<'arena>(
             }
         }
 
+        for mixin in &docblock.mixins {
+            match builder::get_type_from_string(&mixin.value, mixin.span, scope, &type_context, Some(name)) {
+                Ok(mixin_type) => {
+                    class_like_metadata.mixins.push(mixin_type);
+                }
+                Err(typing_error) => {
+                    class_like_metadata.issues.push(
+                        Issue::error("Could not resolve the type in the `@mixin` tag.")
+                            .with_code(ScanningIssueKind::InvalidMixinTag)
+                            .with_annotation(
+                                Annotation::primary(typing_error.span()).with_message(typing_error.to_string()),
+                            )
+                            .with_note(typing_error.note())
+                            .with_help(typing_error.help()),
+                    );
+                }
+            }
+        }
+
         for method_tag in &docblock.methods {
             let method_name = ascii_lowercase_atom(&method_tag.method.name);
             class_like_metadata.methods.insert(method_name);

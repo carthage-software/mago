@@ -4,6 +4,7 @@ use mago_atom::atom;
 use mago_codex::metadata::function_like::FunctionLikeMetadata;
 
 use mago_codex::visibility::Visibility;
+use mago_php_version::feature::Feature;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::Span;
@@ -317,7 +318,23 @@ fn can_initialize_readonly_property(
     current_class_opt: Option<Atom>,
     current_function_opt: Option<&FunctionLikeMetadata>,
 ) -> bool {
-    current_function_opt.and_then(|func| func.method_metadata.as_ref()).is_some_and(|method| method.is_constructor)
+    let is_allowed_method = current_function_opt.is_some_and(|func| {
+        // Constructor is always allowed
+        if func.method_metadata.as_ref().is_some_and(|m| m.is_constructor) {
+            return true;
+        }
+
+        // __clone is allowed in PHP 8.3+
+        if context.settings.version.is_supported(Feature::ReadonlyPropertyReinitializationInClone)
+            && func.name.is_some_and(|name| name.eq_ignore_ascii_case("__clone"))
+        {
+            return true;
+        }
+
+        false
+    });
+
+    is_allowed_method
         && current_class_opt.is_some_and(|current_class_id| {
             current_class_id.eq_ignore_ascii_case(declaring_class_id)
                 || context.codebase.is_instance_of(&current_class_id, declaring_class_id)
@@ -383,20 +400,27 @@ fn report_readonly_issue<'ctx>(
 
     let primary_annotation_span = member_span.unwrap_or(access_span);
 
+    let (note, help) = if context.settings.version.is_supported(Feature::ReadonlyPropertyReinitializationInClone) {
+        (
+            "Readonly properties can only be initialized once, within `__construct` or `__clone` methods of the declaring class or its descendants.",
+            "Move this initialization to `__construct` or `__clone`.",
+        )
+    } else {
+        (
+            "Readonly properties can only be initialized once within `__construct`. Since PHP 8.3, re-initialization is also allowed in `__clone`.",
+            "Move this initialization to the constructor, or upgrade to PHP 8.3+ to use `__clone` for re-initialization.",
+        )
+    };
+
     let mut issue = Issue::error("Cannot modify a readonly property after initialization.")
         .with_annotation(
-            Annotation::primary(primary_annotation_span)
-                .with_message("Illegal write to readonly property"),
+            Annotation::primary(primary_annotation_span).with_message("Illegal write to readonly property"),
         )
         .with_annotation(
             Annotation::secondary(access_span).with_message(format!("Write attempt occurs here, {current_scope_str}")),
         )
-        .with_note(
-            "Readonly properties can only be initialized once, and this must occur within the scope of the class that declares them (i.e., in its `__construct` method or a child's `__construct`)."
-        )
-        .with_help(
-            "While PHP may permit this write if the property is uninitialized, it will cause a fatal `Error` if the property already has a value. To ensure correctness, move this initialization to the constructor."
-        );
+        .with_note(note)
+        .with_help(help);
 
     if let Some(definition_span) = definition_span {
         issue = issue.with_annotation(

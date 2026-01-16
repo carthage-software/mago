@@ -800,11 +800,17 @@ fn infer_templates_from_input_and_container_types(
         }
 
         let mut has_violation = false;
+        let mut constraint_has_unresolved_templates = false;
 
         if let Some(template_types) = template_result.template_types.get(template_parameter_name) {
             for (_, template_type) in template_types {
                 let resolved_template_type =
                     inferred_type_replacer::replace(template_type, template_result, context.codebase);
+
+                if resolved_template_type.has_template_types() {
+                    constraint_has_unresolved_templates = true;
+                    continue;
+                }
 
                 if !union_comparator::is_contained_by(
                     context.codebase,
@@ -827,8 +833,19 @@ fn infer_templates_from_input_and_container_types(
             }
         }
 
-        if has_violation {
+        if has_violation && !constraint_has_unresolved_templates {
             continue;
+        }
+
+        if container_generic.constraint.has_template_types() {
+            infer_templates_from_input_and_container_types(
+                context,
+                &container_generic.constraint,
+                &residual_input_type,
+                template_result,
+                InferenceOptions { infer_only_if_new: true, ..options },
+                violations,
+            );
         }
 
         insert_bound_type(
@@ -842,7 +859,28 @@ fn infer_templates_from_input_and_container_types(
         );
     }
 
-    for ((template_parameter_name, defining_entity), (inferred_type, constraint, _)) in potential_template_violations {
+    for ((template_parameter_name, defining_entity), (inferred_type, constraint, _container_generic)) in
+        potential_template_violations
+    {
+        let re_resolved_constraint = inferred_type_replacer::replace(&constraint, template_result, context.codebase);
+        if re_resolved_constraint.has_template_types() {
+            continue;
+        }
+
+        if re_resolved_constraint != constraint
+            && union_comparator::is_contained_by(
+                context.codebase,
+                &inferred_type,
+                &re_resolved_constraint,
+                false,
+                false,
+                false,
+                &mut ComparisonResult::default(),
+            )
+        {
+            continue;
+        }
+
         let is_unresolved = template_result
             .lower_bounds
             .get(&template_parameter_name)
@@ -853,14 +891,14 @@ fn infer_templates_from_input_and_container_types(
             violations.push(TemplateInferenceViolation {
                 template_name: template_parameter_name,
                 inferred_bound: inferred_type,
-                constraint: constraint.clone(),
+                constraint: re_resolved_constraint.clone(),
             });
 
             insert_bound_type(
                 template_result,
                 template_parameter_name,
                 &defining_entity,
-                constraint,
+                re_resolved_constraint,
                 StandinOptions { appearance_depth: 1, ..Default::default() },
                 options.argument_offset,
                 options.source_span,
