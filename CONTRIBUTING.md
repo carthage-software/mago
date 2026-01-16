@@ -33,10 +33,32 @@ Here is a small checklist to get you going:
    ```
 
 4. **Set up your environment**:
-   - Install [Rust](https://www.rust-lang.org/tools/install)
-   - Install [Just](https://github.com/casey/just)
-   - Run `just build` to set up the project.
-   - If you use [Nix](https://nixos.org): Run `nix develop` and `just build`.
+
+   Choose one of the following options:
+
+   **Option A: Local Development** (Recommended for active development)
+    - Install [Rust](https://www.rust-lang.org/tools/install)
+    - Install [Just](https://github.com/casey/just)
+    - Run `just build` to set up the project.
+    - If you use [Nix](https://nixos.org): Run `nix develop` and `just build`.
+
+   **Option B: Docker Development** (Recommended for quick testing)
+    - Install [Docker](https://www.docker.com/get-started)
+    - Build the Docker image:
+      ```bash
+      make build-image
+      ```
+    - Use `make` commands to run tasks inside Docker:
+      ```bash
+      make build       # Compile project in release mode
+      make test        # Run tests
+      make check       # Run checks (format, lint, analyze, clippy)
+      make fix         # Fix issues automatically
+      make build-wasm  # Build WebAssembly module
+      make clean       # Clean build artifacts
+      make shell       # Open interactive shell in container
+      make help        # Show all available commands
+      ```
 
 5. **Create a branch**:
    Create a new branch with a descriptive name:
@@ -52,13 +74,15 @@ Here is a small checklist to get you going:
    Run the tests to make sure your changes are correct:
 
    ```bash
-   just test
+   just test    # local
+   make test    # docker
    ```
 
    Check your code to ensure it follows the coding standards:
 
    ```bash
-   just check
+   just check   # local
+   make check   # docker
    ```
 
 8. **Commit your changes**:
@@ -92,14 +116,30 @@ Before we can merge your pull request, please follow these guidelines to maintai
 If you are submitting a bug-fix, please add a test case to reproduce the bug.
 If you are submitting a new feature, please make sure to add tests for all possible code paths.
 
-To run the tests, use `just test`.
+To run the tests:
+
+```bash
+just test    # local
+make test    # docker
+```
 
 ### Coding Standards
 
 Ensure your code follows the coding standards and conventions used in the project.
 
-- Run `just check` to check your code for style issues.
-- Run `just fix` to automatically fix style issues.
+Check your code for style issues:
+
+```bash
+just check   # local
+make check   # docker
+```
+
+Automatically fix style issues:
+
+```bash
+just fix    # local
+make fix     # docker
+```
 
 ### License
 

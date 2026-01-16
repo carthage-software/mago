@@ -1,0 +1,12 @@
+target/
+.git/
+.github/
+docs/
+.serena/
+.claude/
+.env
+.envrc
+*.swp
+*.swo
+*~
+.DS_Store
