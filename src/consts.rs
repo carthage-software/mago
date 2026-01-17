@@ -36,8 +36,11 @@ pub const ISSUE_URL: &str = "https://github.com/carthage-software/mago/issues/ne
 /// The name of the environment variable prefix for mago.
 pub const ENVIRONMENT_PREFIX: &str = "MAGO";
 
-/// The name of the configuration file for mago.
+/// the name of the configuration file for mago.
 pub const CONFIGURATION_FILE_NAME: &str = "mago";
+
+/// the name of the distributed configuration file for mago.
+pub const CONFIGURATION_DIST_FILE_NAME: &str = "mago.dist";
 
 /// The name of `composer.json` file.
 pub const COMPOSER_JSON_FILE: &str = "composer.json";
