@@ -325,6 +325,7 @@ test_case!(issue_812);
 test_case!(issue_813);
 test_case!(issue_816);
 test_case!(issue_825);
+test_case!(drupal_preset);
 
 #[test]
 fn test_all_test_cases_are_ran() {

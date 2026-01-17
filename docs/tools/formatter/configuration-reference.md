@@ -28,6 +28,7 @@ Available presets:
 - **`"default"`** — PER-CS compliant settings (same as the default configuration)
 - **`"psr-12"`** — Optimized for PSR-12 coding standard
 - **`"laravel-pint"`** — Laravel Pint's 'laravel' preset
+- **`"drupal"`** — Drupal's coding standard
 
 ### Preset Versions
 
@@ -57,7 +58,7 @@ This allows you to start with a preset that matches your project's coding standa
 
 | Option | Type | Default | Description |
 | :--- | :--- | :--- | :--- |
-| `preset` | `string` | `null` | Use a preset configuration. Available values: `"default"`, `"psr-12"`, `"laravel"`. |
+| `preset` | `string` | `null` | Use a preset configuration. Available values: `"default"`, `"psr-12"`, `"laravel"`, `"drupal"`. |
 | `excludes` | `string[]` | `[]` | A list of paths or glob patterns to exclude from formatting. |
 
 :::tip Tool-Specific Excludes
