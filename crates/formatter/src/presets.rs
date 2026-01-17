@@ -592,6 +592,6 @@ const DRUPAL_PRESET: FormatSettings = FormatSettings {
     empty_line_before_return: false,
     empty_line_before_dangling_comments: true,
     separate_class_like_members: true,
-    indent_heredoc: false,
+    indent_heredoc: true,
     uppercase_literal_keyword: true,
 };
