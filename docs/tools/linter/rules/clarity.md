@@ -14,6 +14,7 @@ This document details the rules available in the `Clarity` category.
 | Literal Named Argument | [`literal-named-argument`](#literal-named-argument) |
 | No Empty | [`no-empty`](#no-empty) |
 | No Hash Emoji | [`no-hash-emoji`](#no-hash-emoji) |
+| No Isset | [`no-isset`](#no-isset) |
 | No Multi Assignments | [`no-multi-assignments`](#no-multi-assignments) |
 | No Nested Ternary | [`no-nested-ternary`](#no-nested-ternary) |
 | No Shorthand Ternary | [`no-shorthand-ternary`](#no-shorthand-ternary) |
@@ -238,6 +239,49 @@ class Foo {}
 
 #️⃣[MyAttribute] <- not a valid attribute
 class Foo {}
+```
+
+
+## <a id="no-isset"></a>`no-isset`
+
+Detects the use of the `isset()` construct.
+
+The `isset()` language construct checks whether a variable is set and is not null.
+However, it can lead to ambiguous code because it conflates two distinct checks:
+variable existence and null comparison. Using explicit null checks or the null
+coalescing operator (`??`) is often clearer and more maintainable.
+
+
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `false` |
+| `level` | `string` | `"warning"` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+
+if ($value !== null) {
+    // ...
+}
+
+$result = $value ?? 'default';
+```
+
+#### Incorrect code
+
+```php
+<?php
+
+if (isset($value)) {
+    // ...
+}
 ```
 
 
