@@ -179,9 +179,10 @@ pub fn analyze_null_coalesce_operation<'ctx, 'arena>(
         .unwrap();
 
         let mut if_scope = IfScope::new();
+        let mut inner_block_context = block_context.clone();
+        inner_block_context.inside_isset = true;
         let (if_conditional_scope, _) =
-            conditional::analyze(context, block_context.clone(), artifacts, &mut if_scope, binary.lhs, false)?;
-
+            conditional::analyze(context, inner_block_context, artifacts, &mut if_scope, binary.lhs, false)?;
         let mut conditionally_referenced_variable_ids = if_conditional_scope.conditionally_referenced_variable_ids;
 
         let (reconcilable_if_types, active_if_types) = find_satisfying_assignments(
