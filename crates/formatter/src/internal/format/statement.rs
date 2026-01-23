@@ -39,6 +39,7 @@ use crate::internal::format::alignment::AlignmentWidths;
 use crate::internal::format::alignment::detect_statement_ref_alignment_runs;
 use crate::internal::format::alignment::get_statement_alignment;
 use crate::internal::format::assignment::AssignmentAlignment;
+use crate::internal::format::misc::has_new_line_in_range;
 
 pub fn print_statement_sequence<'arena>(
     f: &mut FormatterState<'_, 'arena>,
@@ -150,7 +151,7 @@ fn print_statement_slice<'ctx, 'arena>(
         }
 
         if let Some(widths) = get_statement_alignment(&alignment_runs, i) {
-            let alignment = calculate_statement_alignment(stmt, &widths);
+            let alignment = calculate_statement_alignment(f, stmt, &widths);
             f.set_alignment_context(Some(alignment));
         }
 
@@ -782,14 +783,21 @@ pub fn sort_maybe_typed_use_items<'arena>(
     items
 }
 
-fn calculate_statement_alignment(stmt: &Statement<'_>, widths: &AlignmentWidths) -> AssignmentAlignment {
+fn calculate_statement_alignment(
+    f: &mut FormatterState<'_, '_>,
+    stmt: &Statement<'_>,
+    widths: &AlignmentWidths,
+) -> AssignmentAlignment {
     let current_name_width = match stmt {
         Statement::Expression(expr_stmt) => {
             if let Expression::Assignment(assign) = &expr_stmt.expression {
-                if let Expression::Variable(var) = assign.lhs {
-                    (var.span().end.offset - var.span().start.offset) as usize
-                } else {
+                let lhs_span = assign.lhs.span();
+
+                // Skip multiline LHS expressions for alignment
+                if has_new_line_in_range(f.source_text, lhs_span.start_offset(), lhs_span.end_offset()) {
                     0
+                } else {
+                    lhs_span.length() as usize
                 }
             } else {
                 0
