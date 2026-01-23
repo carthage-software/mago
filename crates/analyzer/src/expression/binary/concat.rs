@@ -84,7 +84,7 @@ pub fn analyze_string_concat_operation<'ctx, 'arena>(
         analyze_string_concat_operand(context, artifacts, operand, side);
     }
 
-    let result_type = fold_concat_operands(&operands, artifacts);
+    let result_type = fold_concat_operands(&operands, artifacts, context.settings.string_concat_combination_threshold);
     artifacts.expression_types.insert(get_expression_range(binary), Rc::new(result_type));
 
     Ok(())
@@ -403,7 +403,7 @@ fn analyze_string_concat_operand<'arena>(
 ///
 /// This is used by the iterative concat analysis to compute the final type from
 /// a flattened list of operands.
-fn fold_concat_operands(operands: &[&Expression<'_>], artifacts: &AnalysisArtifacts) -> TUnion {
+fn fold_concat_operands(operands: &[&Expression<'_>], artifacts: &AnalysisArtifacts, threshold: u16) -> TUnion {
     if operands.is_empty() {
         return get_string();
     }
@@ -423,7 +423,7 @@ fn fold_concat_operands(operands: &[&Expression<'_>], artifacts: &AnalysisArtifa
             None => vec![TString::general()],
         };
 
-        current_strings = concat_string_lists(current_strings, &operand_strings);
+        current_strings = concat_string_lists(current_strings, &operand_strings, threshold);
     }
 
     if current_strings.is_empty() {
@@ -442,11 +442,11 @@ fn fold_concat_operands(operands: &[&Expression<'_>], artifacts: &AnalysisArtifa
 }
 
 /// Concatenates two lists of string types, producing all possible combinations.
-fn concat_string_lists(left_strings: Vec<TString>, right_strings: &[TString]) -> Vec<TString> {
+fn concat_string_lists(left_strings: Vec<TString>, right_strings: &[TString], threshold: u16) -> Vec<TString> {
     let has_literals =
         left_strings.iter().any(|s| s.literal.is_some()) || right_strings.iter().any(|s| s.literal.is_some());
 
-    if !has_literals {
+    if !has_literals || left_strings.len().saturating_mul(right_strings.len()) > threshold as usize {
         let is_non_empty = left_strings.iter().any(|s| s.is_non_empty) || right_strings.iter().any(|s| s.is_non_empty);
         let is_truthy = left_strings.iter().all(|s| s.is_truthy) || right_strings.iter().all(|s| s.is_truthy);
         let is_lowercase = left_strings.iter().all(|s| s.is_lowercase) && right_strings.iter().all(|s| s.is_lowercase);

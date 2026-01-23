@@ -7,6 +7,7 @@ use mago_algebra::DEFAULT_DISJUNCTION_COMPLEXITY;
 use mago_algebra::DEFAULT_NEGATION_COMPLEXITY;
 use mago_algebra::DEFAULT_SATURATION_COMPLEXITY;
 use mago_analyzer::settings::DEFAULT_FORMULA_SIZE_THRESHOLD;
+use mago_analyzer::settings::DEFAULT_STRING_CONCAT_COMBINATION_THRESHOLD;
 use mago_analyzer::settings::Settings;
 use mago_atom::ascii_lowercase_atom;
 use mago_atom::atom;
@@ -261,6 +262,14 @@ pub struct PerformanceConfiguration {
     ///
     /// Defaults to `512`.
     pub formula_size_threshold: u16,
+
+    /// Maximum number of combinations to track during string concatenation.
+    ///
+    /// Limits the number of possible string literal combinations to prevent
+    /// exponential blowup in large concatenation chains.
+    ///
+    /// Defaults to `4096`.
+    pub string_concat_combination_threshold: u16,
 }
 
 impl Default for PerformanceConfiguration {
@@ -271,6 +280,7 @@ impl Default for PerformanceConfiguration {
             negation_complexity_threshold: DEFAULT_NEGATION_COMPLEXITY,
             consensus_limit_threshold: DEFAULT_CONSENSUS_LIMIT,
             formula_size_threshold: DEFAULT_FORMULA_SIZE_THRESHOLD,
+            string_concat_combination_threshold: DEFAULT_STRING_CONCAT_COMBINATION_THRESHOLD,
         }
     }
 }
@@ -314,6 +324,7 @@ impl AnalyzerConfiguration {
             negation_complexity_threshold: self.performance.negation_complexity_threshold,
             consensus_limit_threshold: self.performance.consensus_limit_threshold,
             formula_size_threshold: self.performance.formula_size_threshold,
+            string_concat_combination_threshold: self.performance.string_concat_combination_threshold,
         }
     }
 }
