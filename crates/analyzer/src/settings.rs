@@ -226,7 +226,7 @@ pub struct Settings {
     /// Limits the number of possible string literal combinations to prevent
     /// exponential blowup in large concatenation chains.
     ///
-    /// Defaults to `4096`.
+    /// Defaults to `512`.
     pub string_concat_combination_threshold: u16,
 }
 

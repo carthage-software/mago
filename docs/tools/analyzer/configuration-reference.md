@@ -350,7 +350,7 @@ The analyzer uses internal thresholds to balance analysis depth against performa
 | `negation-complexity-threshold`       | `u16` | `4096`  | Maximum cumulative complexity when negating formulas.                    |
 | `consensus-limit-threshold`           | `u16` | `256`   | Upper limit for consensus optimization passes.                           |
 | `formula-size-threshold`              | `u16` | `512`   | Maximum logical formula size before simplification is skipped.           |
-| `string-concat-combination-threshold` | `u16` | `4096`  | Maximum combinations to track during string concatenation.               |
+| `string-concat-combination-threshold` | `u16` | `512`  | Maximum combinations to track during string concatenation.               |
 
 ### When to adjust thresholds
 
