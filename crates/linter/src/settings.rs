@@ -55,6 +55,7 @@ use crate::rule::NoEmptyCatchClauseConfig;
 use crate::rule::NoEmptyCommentConfig;
 use crate::rule::NoEmptyConfig;
 use crate::rule::NoEmptyLoopConfig;
+use crate::rule::NoIssetConfig;
 use crate::rule::NoErrorControlOperatorConfig;
 use crate::rule::NoEvalConfig;
 use crate::rule::NoFfiConfig;
@@ -236,6 +237,7 @@ pub struct RulesSettings {
     pub no_eval: RuleSettings<NoEvalConfig>,
     pub no_error_control_operator: RuleSettings<NoErrorControlOperatorConfig>,
     pub no_empty: RuleSettings<NoEmptyConfig>,
+    pub no_isset: RuleSettings<NoIssetConfig>,
     pub no_empty_loop: RuleSettings<NoEmptyLoopConfig>,
     pub no_empty_comment: RuleSettings<NoEmptyCommentConfig>,
     pub no_empty_catch_clause: RuleSettings<NoEmptyCatchClauseConfig>,
