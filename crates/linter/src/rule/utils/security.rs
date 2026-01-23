@@ -159,6 +159,11 @@ pub fn is_password_literal<'arena>(literal: &'arena LiteralString<'arena>) -> bo
 #[inline]
 #[must_use]
 pub fn is_password(mut str: &str) -> bool {
+    // cli flags, e.g `$foo === '--password'` -> ignore
+    if str.starts_with("--") {
+        return false;
+    }
+
     if str.starts_with('$') {
         str = &str[1..];
     }
