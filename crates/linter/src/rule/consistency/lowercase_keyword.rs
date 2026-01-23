@@ -1,4 +1,5 @@
 use indoc::indoc;
+use mago_text_edit::TextEdit;
 use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
@@ -106,6 +107,8 @@ impl LintRule for LowercaseKeywordRule {
             .with_note(format!("The keyword `{}` does not follow lowercase convention.", keyword.value))
             .with_help(format!("Consider using `{}` instead of `{}`.", lowercase, keyword.value));
 
-        ctx.collector.report(issue);
+        ctx.collector.propose(issue, |edits| {
+            edits.push(TextEdit::replace(keyword.span, lowercase));
+        });
     }
 }
