@@ -279,27 +279,10 @@ impl Configuration {
         } else {
             let formats = [FileFormat::Toml, FileFormat::Yaml, FileFormat::Json];
             // Check workspace first, then XDG, then home (workspace has highest precedence)
-            let config_roots =
-                [Some(workspace_dir), std::env::var_os("XDG_CONFIG_HOME").map(PathBuf::from), home_dir()];
-
-            if let Some((found_config, format)) = config_roots.iter().flatten().find_map(|config_root| {
-                let config_path = config_root.join(CONFIGURATION_FILE_NAME);
-
-                for format in formats {
-                    for ext in format.file_extensions() {
-                        let config_file = config_path.with_extension(ext);
-
-                        if !config_file.exists() {
-                            continue;
-                        }
-
-                        return Some((config_file, format));
-                    }
-                }
-                None
-            }) {
-                tracing::debug!("Sourcing configuration from {}.", found_config.display());
-                builder = builder.add_source(File::from(found_config).format(format).required(false));
+            let fallback_roots = [std::env::var_os("XDG_CONFIG_HOME").map(PathBuf::from), home_dir()];
+            if let Some((config_file, format)) = Self::find_config_files(&workspace_dir, &fallback_roots, &formats) {
+                tracing::debug!("Sourcing configuration from {}.", config_file.display());
+                builder = builder.add_source(File::from(config_file).format(format).required(false));
             } else {
                 tracing::debug!("No configuration file found, using defaults and environment variables.");
             }
@@ -337,6 +320,66 @@ impl Configuration {
         configuration.normalize()?;
 
         Ok(configuration)
+    }
+
+    /// Searches for configuration files in a project directory, falling back to global config locations.
+    ///
+    /// This function attempts to load at most one configuration file per supported config type.
+    /// It first searches the given `root_dir` (typically the workspace/project directory).  
+    /// If any configuration file is found there, those results are returned immediately and no
+    /// fallback locations are checked.
+    ///
+    /// If no config files are found in `root_dir`, the function searches each directory in
+    /// `fallback_roots` in order. The first matching format for each config file name is returned.
+    ///
+    /// # Arguments
+    ///
+    /// * `root_dir` - The primary directory to search (project root)
+    /// * `fallback_roots` - A list of additional directories to search if `root_dir` contains no matches
+    /// * `file_formats` - Supported configuration formats (`toml`, `yaml`, etc.), each with possible extensions
+    ///
+    /// # Returns
+    ///
+    /// A vector of `(PathBuf, FileFormat)` pairs, where:
+    /// * The path is the resolved config file
+    /// * The format indicates which file format identified it
+    ///
+    /// # Behavior Summary
+    ///
+    /// 1. Try to resolve `<root_dir>/<name>.<ext>` for each supported format
+    /// 2. Stop and return immediately if any matches are found
+    /// 3. Otherwise, search each directory in `fallback_roots` in order
+    /// 4. The first match (by name and directory order) wins
+    ///
+    /// This prevents global configuration files from overriding project-local configuration.
+    fn find_config_files(
+        root_dir: &Path,
+        fallback_roots: &[Option<PathBuf>],
+        file_formats: &[FileFormat],
+    ) -> Option<(PathBuf, FileFormat)> {
+        let config_files = [CONFIGURATION_FILE_NAME, CONFIGURATION_DIST_FILE_NAME];
+
+        for name in config_files.iter() {
+            let base = root_dir.join(name);
+
+            for format in file_formats.iter() {
+                if let Some(ext) = format.file_extensions().iter().find(|ext| base.with_added_extension(ext).exists()) {
+                    return Some((base.with_added_extension(ext), *format));
+                }
+            }
+        }
+
+        for root in fallback_roots.iter().flatten() {
+            let base = root.join(CONFIGURATION_FILE_NAME);
+
+            for format in file_formats.iter() {
+                if let Some(ext) = format.file_extensions().iter().find(|ext| base.with_added_extension(ext).exists()) {
+                    return Some((base.with_added_extension(ext), *format));
+                }
+            }
+        }
+
+        None
     }
 
     /// Creates a default configuration anchored to a specific workspace directory.
