@@ -6,7 +6,7 @@ use mago_php_version::PHPVersion;
 pub const DEFAULT_FORMULA_SIZE_THRESHOLD: u16 = 512;
 
 /// Default maximum number of combinations to track during string concatenation.
-pub const DEFAULT_STRING_CONCAT_COMBINATION_THRESHOLD: u16 = 4096;
+pub const DEFAULT_STRING_CONCAT_COMBINATION_THRESHOLD: u16 = 512;
 
 /// Configuration settings that control the behavior of the Mago analyzer.
 ///
