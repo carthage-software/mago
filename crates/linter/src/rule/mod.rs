@@ -245,6 +245,7 @@ define_rules! {
     NoEval(no_eval @ NoEvalRule),
     NoErrorControlOperator(no_error_control_operator @ NoErrorControlOperatorRule),
     NoEmpty(no_empty @ NoEmptyRule),
+    NoIsset(no_isset @ NoIssetRule),
     NoEmptyLoop(no_empty_loop @ NoEmptyLoopRule),
     NoEmptyComment(no_empty_comment @ NoEmptyCommentRule),
     NoEmptyCatchClause(no_empty_catch_clause @ NoEmptyCatchClauseRule),
