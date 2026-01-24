@@ -275,6 +275,7 @@ test_case!(inheritdoc_multiple_interfaces);
 test_case!(inheritdoc_nested_generics);
 test_case!(inheritdoc_priority);
 test_case!(inheritdoc_contravariant_parameters);
+test_case!(inherited_docblock_narrowing);
 test_case!(type_alias_basic);
 test_case!(type_alias_import);
 test_case!(type_alias_import_rename);
