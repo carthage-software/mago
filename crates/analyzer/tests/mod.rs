@@ -220,6 +220,7 @@ test_case!(redundant_var_docblock);
 test_case!(magic_method_trait);
 test_case!(real_pseudo_method);
 test_case!(pseudo_method_override);
+test_case!(parent_magic_method_call);
 test_case!(chunk);
 test_case!(chunk_with_keys);
 test_case!(trait_alias_vis_self);
