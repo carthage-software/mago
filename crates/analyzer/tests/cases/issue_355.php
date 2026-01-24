@@ -33,7 +33,7 @@ class Item
 class Example
 {
     /** @return WeakMap<Index, Item> */
-    private function doThing(A|B|C $dto): WeakMap
+    private function _doThing(A|B|C $dto): WeakMap
     {
         return match ($dto::class) {
             A::class => (static function (A $_): WeakMap {

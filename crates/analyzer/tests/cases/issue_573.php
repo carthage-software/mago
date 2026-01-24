@@ -15,7 +15,7 @@ class Foo
         'desc' => 'DESC',
     ];
 
-    private function bar(null|string $order, null|string $direction): void
+    private function _bar(null|string $order, null|string $direction): void
     {
         if (isset(self::ORDER_BY[$order], self::$DIRECTION[$direction])) {
             $order = self::ORDER_BY[$order];

@@ -134,13 +134,13 @@ class Child7 extends Base7 {
 
 // Test 8: Private final method from parent (OK - different scope)
 class Base8 {
-    final private function privateFinal() {
+    final private function _privateFinal() {
         return 'base';
     }
 }
 
 trait Trait8 {
-    private function privateFinal() {
+    private function _privateFinal() {
         return 'trait';
     }
 }

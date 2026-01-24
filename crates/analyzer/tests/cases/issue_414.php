@@ -21,7 +21,7 @@ final class Concrete extends Something
 
 class Caller
 {
-    private function call(): Concrete
+    private function _call(): Concrete
     {
         return Concrete::create();
     }

@@ -60,6 +60,7 @@ pub mod method;
 pub mod method_signature;
 pub mod override_attribute;
 pub mod property;
+pub mod unused_members;
 
 /// Helper function to check if a child type is compatible with (contained by) a parent type.
 ///
@@ -333,6 +334,25 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Class<'arena> {
             override_attribute::check_override_attribute(class_like_metadata, self.members.as_slice(), context);
         }
 
+        if context.settings.find_unused_definitions {
+            unused_members::check_unused_properties(
+                class_like_metadata.name,
+                self.span(),
+                class_like_metadata,
+                &artifacts.symbol_references,
+                context,
+            );
+
+            unused_members::check_unused_methods(
+                class_like_metadata.name,
+                self.span(),
+                class_like_metadata,
+                &artifacts.symbol_references,
+                context.codebase,
+                context,
+            );
+        }
+
         // Call plugin on_leave_class hooks
         if context.plugin_registry.has_class_hooks() {
             let mut hook_context = HookContext::new(context.codebase, block_context, artifacts);
@@ -508,6 +528,17 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Enum<'arena> {
 
         if context.settings.check_missing_override {
             override_attribute::check_override_attribute(class_like_metadata, self.members.as_slice(), context);
+        }
+
+        if context.settings.find_unused_definitions {
+            unused_members::check_unused_methods(
+                class_like_metadata.name,
+                self.span(),
+                class_like_metadata,
+                &artifacts.symbol_references,
+                context.codebase,
+                context,
+            );
         }
 
         // Call plugin on_leave_enum hooks

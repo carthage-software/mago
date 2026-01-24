@@ -350,7 +350,11 @@ impl SymbolReferences {
 
     #[inline]
     pub fn add_reference_for_method_call(&mut self, scope: &ScopeContext<'_>, method: &MethodIdentifier) {
-        self.add_reference_to_class_member(scope, (*method.get_class_name(), *method.get_method_name()), false);
+        self.add_reference_to_class_member(
+            scope,
+            (ascii_lowercase_atom(method.get_class_name()), *method.get_method_name()),
+            false,
+        );
     }
 
     #[inline]
@@ -360,7 +364,7 @@ impl SymbolReferences {
         class_name: Atom,
         property_name: Atom,
     ) {
-        self.add_reference_to_class_member(scope, (class_name, property_name), false);
+        self.add_reference_to_class_member(scope, (ascii_lowercase_atom(&class_name), property_name), false);
     }
 
     /// Convenience method to add a reference *from* the current function context *to* an overridden class member (e.g., `parent::foo`).

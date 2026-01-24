@@ -361,6 +361,13 @@ mod tests {
                     private int $nanoseconds,
                 ) {}
 
+                public function getTotalNanoseconds(): int {
+                    return ($this->hours * SECONDS_PER_HOUR * NANOSECONDS_PER_SECOND)
+                         + ($this->minutes * SECONDS_PER_MINUTE * NANOSECONDS_PER_SECOND)
+                         + ($this->seconds * NANOSECONDS_PER_SECOND)
+                         + $this->nanoseconds;
+                }
+
                 /**
                  * @pure
                  */
