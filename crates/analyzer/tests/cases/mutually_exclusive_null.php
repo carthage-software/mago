@@ -10,10 +10,14 @@ enum PersonEntityType: string
 
 class PersonEntity
 {
+    // @mago-expect analysis:write-only-property
     private PersonEntityType $type = PersonEntityType::INDIVIDUAL;
-    private null|string $companyName = null;
-    private null|string $firstName = null;
-    private null|string $lastName = null;
+    // @mago-expect analysis:write-only-property
+    private ?string $companyName = null;
+    // @mago-expect analysis:write-only-property
+    private ?string $firstName = null;
+    // @mago-expect analysis:write-only-property
+    private ?string $lastName = null;
 
     public function setType(PersonEntityType $type): void
     {
@@ -37,9 +41,9 @@ class PersonEntity
 }
 
 function createPersonEntity(
-    null|string $companyName = null,
-    null|string $firstName = null,
-    null|string $lastName = null,
+    ?string $companyName = null,
+    ?string $firstName = null,
+    ?string $lastName = null,
 ): PersonEntity {
     $entity = new PersonEntity();
 
@@ -58,11 +62,6 @@ function createPersonEntity(
 function test(): void
 {
     $corp = createPersonEntity(companyName: 'Acme Inc');
-
-    $person = createPersonEntity(
-        firstName: 'John',
-        lastName: 'Doe',
-    );
-
+    $person = createPersonEntity(firstName: 'John', lastName: 'Doe');
     $default = createPersonEntity();
 }

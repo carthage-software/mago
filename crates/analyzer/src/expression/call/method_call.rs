@@ -685,6 +685,9 @@ mod tests {
                 }
             }
         "},
+        issues = [
+            IssueCode::WriteOnlyProperty,
+        ]
     }
 
     test_analysis! {

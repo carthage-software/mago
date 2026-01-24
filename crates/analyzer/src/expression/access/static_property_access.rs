@@ -49,7 +49,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for StaticPropertyAccess<'arena> {
         if !resolution_result.has_error_path {
             for resolved_property in resolution_result.properties {
                 if let Some(declaring_class_id) = resolved_property.declaring_class_id {
-                    artifacts.symbol_references.add_reference_for_property_access(
+                    artifacts.symbol_references.add_reference_for_property_read(
                         &block_context.scope,
                         declaring_class_id,
                         resolved_property.property_name,
@@ -114,7 +114,7 @@ fn add_memoized_static_property_reference<'ctx, 'ast, 'arena>(
     }
 
     if let Some(declaring_class) = context.codebase.get_declaring_property_class(&class_name, &property_name) {
-        artifacts.symbol_references.add_reference_for_property_access(
+        artifacts.symbol_references.add_reference_for_property_read(
             &block_context.scope,
             declaring_class,
             property_name,

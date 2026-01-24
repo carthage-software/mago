@@ -184,7 +184,7 @@ fn add_memoized_property_reference<'ctx, 'ast, 'arena>(
 
     // Add references (after releasing the immutable borrow)
     for declaring_class in declaring_classes {
-        artifacts.symbol_references.add_reference_for_property_access(
+        artifacts.symbol_references.add_reference_for_property_read(
             &block_context.scope,
             declaring_class,
             property_name,

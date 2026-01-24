@@ -335,7 +335,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Class<'arena> {
         }
 
         if context.settings.find_unused_definitions {
-            unused_members::check_unused_properties(
+            let unused_members = unused_members::check_unused_members_with_transitivity(
                 class_like_metadata.name,
                 self.span(),
                 class_like_metadata,
@@ -343,12 +343,12 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Class<'arena> {
                 context,
             );
 
-            unused_members::check_unused_methods(
+            unused_members::check_write_only_properties(
                 class_like_metadata.name,
                 self.span(),
                 class_like_metadata,
                 &artifacts.symbol_references,
-                context.codebase,
+                &unused_members,
                 context,
             );
         }
@@ -531,12 +531,11 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Enum<'arena> {
         }
 
         if context.settings.find_unused_definitions {
-            unused_members::check_unused_methods(
+            unused_members::check_unused_members_with_transitivity(
                 class_like_metadata.name,
                 self.span(),
                 class_like_metadata,
                 &artifacts.symbol_references,
-                context.codebase,
                 context,
             );
         }

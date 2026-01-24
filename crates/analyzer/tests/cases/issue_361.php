@@ -1,11 +1,10 @@
 <?php
 
-class Item
-{
-}
+class Item {}
 
 class Example1
 {
+    // @mago-expect analysis:write-only-property
     /** @var list<Item> */
     private readonly array $defaultLineItems;
 
@@ -18,6 +17,7 @@ class Example1
 
 class Example1Array
 {
+    // @mago-expect analysis:write-only-property
     /** @var list<Item> */
     private readonly array $defaultLineItems;
 
@@ -30,6 +30,7 @@ class Example1Array
 
 class Example2
 {
+    // @mago-expect analysis:write-only-property
     /** @var array<string, Item> */
     private readonly array $defaultLineItems;
 
@@ -42,6 +43,7 @@ class Example2
 
 class Example2Array
 {
+    // @mago-expect analysis:write-only-property
     /** @var array<string, Item> */
     private readonly array $defaultLineItems;
 
@@ -54,6 +56,7 @@ class Example2Array
 
 class Example3
 {
+    // @mago-expect analysis:write-only-property
     /** @var array<Item> */
     private readonly array $defaultLineItems;
 
@@ -66,6 +69,7 @@ class Example3
 
 class Example3Array
 {
+    // @mago-expect analysis:write-only-property
     /** @var array<Item> */
     private readonly array $defaultLineItems;
 
@@ -81,6 +85,7 @@ class Example3Array
  */
 class Example4
 {
+    // @mago-expect analysis:write-only-property
     /** @var array<Item> */
     private readonly array $defaultLineItems;
 
@@ -96,6 +101,7 @@ class Example4
  */
 class Example4Traversable
 {
+    // @mago-expect analysis:write-only-property
     /** @var array<Item> */
     private readonly array $defaultLineItems;
 
@@ -111,6 +117,7 @@ class Example4Traversable
  */
 class Example4IteratorAggregate
 {
+    // @mago-expect analysis:write-only-property
     /** @var array<Item> */
     private readonly array $defaultLineItems;
 
@@ -126,6 +133,7 @@ class Example4IteratorAggregate
  */
 class Example4Generator
 {
+    // @mago-expect analysis:write-only-property
     /** @var array<Item> */
     private readonly array $defaultLineItems;
 

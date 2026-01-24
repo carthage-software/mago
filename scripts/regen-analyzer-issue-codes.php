@@ -263,6 +263,7 @@ final class AnalyzerCodeModuleGenerator
         'condition-is-too-complex',
         'expression-is-too-complex',
         'where-constraint-violation',
+        'write-only-property',
         'extend-final-class',
         'non-existent-class-constant',
         'possibly-false-argument',

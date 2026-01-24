@@ -279,6 +279,9 @@ mod tests {
                     $this->style = $style;
                 }
 
+                public function getLocale(): string { return $this->locale; }
+                public function getStyle(): int { return $this->style; }
+
                 public function formatCurrency(float $_value, string $_currency): string|false
                 {
                     return false;

@@ -2,7 +2,10 @@
 
 class A
 {
-    /** @var int */
+    /**
+     * @mago-expect analysis:write-only-property
+     * @var int
+     */
     private $foo;
 
     public function __construct(int &$foo)
@@ -13,7 +16,10 @@ class A
 
 class B
 {
-    /** @var string */
+    /**
+     * @mago-expect analysis:write-only-property
+     * @var string
+     */
     private $bar;
 
     public function __construct(string &$bar)

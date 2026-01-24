@@ -330,11 +330,19 @@ pub fn resolve_instance_properties<'ctx, 'ast, 'arena>(
             }
 
             if let Some(declaring_class_id) = resolved_property.declaring_class_id {
-                artifacts.symbol_references.add_reference_for_property_access(
-                    &block_context.scope,
-                    declaring_class_id,
-                    resolved_property.property_name,
-                );
+                if for_assignment {
+                    artifacts.symbol_references.add_reference_for_property_write(
+                        &block_context.scope,
+                        declaring_class_id,
+                        resolved_property.property_name,
+                    );
+                } else {
+                    artifacts.symbol_references.add_reference_for_property_read(
+                        &block_context.scope,
+                        declaring_class_id,
+                        resolved_property.property_name,
+                    );
+                }
             }
 
             result.properties.push(resolved_property);
