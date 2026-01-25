@@ -39,6 +39,9 @@ pub const ENVIRONMENT_PREFIX: &str = "MAGO";
 /// The name of the configuration file for mago.
 pub const CONFIGURATION_FILE_NAME: &str = "mago";
 
+/// The name of the distributed configuration file for mago.
+pub const CONFIGURATION_DIST_FILE_NAME: &str = "mago.dist";
+
 /// The name of `composer.json` file.
 pub const COMPOSER_JSON_FILE: &str = "composer.json";
 

@@ -94,6 +94,20 @@ pub fn check_override_attribute<'ctx, 'arena>(
             continue;
         }
 
+        let has_non_pseudo_parent_method = parent_class_names.values().any(|parent_method_id| {
+            let parent_class_name = parent_method_id.get_class_name();
+            let method_name = parent_method_id.get_method_name();
+
+            context.codebase.get_class_like(parent_class_name).is_some_and(|parent_metadata| {
+                !parent_metadata.pseudo_methods.contains(method_name)
+                    && !parent_metadata.static_pseudo_methods.contains(method_name)
+            })
+        });
+
+        if !has_non_pseudo_parent_method {
+            continue;
+        }
+
         let Some(parents_metadata) = parent_class_names
             .values()
             .find_map(|parent_method_id| context.codebase.get_class_like(parent_method_id.get_class_name()))

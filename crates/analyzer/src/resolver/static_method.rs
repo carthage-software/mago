@@ -54,6 +54,11 @@ pub fn resolve_static_method_targets<'ctx, 'ast, 'arena>(
     let mut result = MethodResolutionResult::default();
 
     let class_resolutions = resolve_classnames_from_expression(context, block_context, artifacts, class_expr, false)?;
+    if let Some(class_type) = artifacts.get_expression_type(class_expr)
+        && class_type.is_nullable()
+    {
+        result.encountered_null = true;
+    }
     let selector_resolutions = resolve_member_selector(context, block_context, artifacts, method_selector)?;
 
     let mut method_names = vec![];
@@ -95,6 +100,15 @@ pub fn resolve_static_method_targets<'ctx, 'ast, 'arena>(
             result.resolved_methods.extend(resolved_methods);
         }
     }
+
+    result.all_methods_non_nullable_return = !result.resolved_methods.is_empty()
+        && result.resolved_methods.iter().all(|resolved_method| {
+            context
+                .codebase
+                .get_method_by_id(&resolved_method.method_identifier)
+                .and_then(|method| method.return_type_metadata.as_ref())
+                .is_some_and(|return_type| !return_type.type_union.is_nullable())
+        });
 
     Ok(result)
 }
@@ -182,20 +196,21 @@ fn resolve_method_from_classname<'ctx, 'arena>(
     let mut resolved_methods = vec![];
     let mut could_method_ever_exist = false;
     let mut first_class_id = None;
-    let mut call_static_could_exist = false;
+    let mut magic_call_could_exist = false;
 
+    let magic_method_to_check = if classname.is_parent() { atom("__call") } else { atom("__callStatic") };
     if let Some(fq_class_id) = classname.fqcn {
-        let (_, resolved_call_static_method) = resolve_method_from_class_id(
+        let (_, resolved_magic_call_method) = resolve_method_from_class_id(
             fq_class_id,
             classname.is_relative(),
             classname.is_object_instance(),
             classname.is_from_class_string(),
-            atom("__callStatic"),
+            magic_method_to_check,
             true,
             None,
         );
 
-        call_static_could_exist |= resolved_call_static_method.is_some();
+        magic_call_could_exist |= resolved_magic_call_method.is_some();
 
         let (could_method_exist, resolved_method) = resolve_method_from_class_id(
             fq_class_id,
@@ -203,7 +218,7 @@ fn resolve_method_from_classname<'ctx, 'arena>(
             classname.is_object_instance(),
             classname.is_from_class_string(),
             method_name,
-            resolved_call_static_method.is_some(),
+            resolved_magic_call_method.is_some(),
             Some(result),
         );
 
@@ -220,17 +235,17 @@ fn resolve_method_from_classname<'ctx, 'arena>(
             continue;
         };
 
-        let (_, resolved_call_static_method) = resolve_method_from_class_id(
+        let (_, resolved_magic_call_method) = resolve_method_from_class_id(
             fq_class_id,
             intersection.is_relative() || classname.is_relative(),
             intersection.is_object_instance() || classname.is_object_instance(),
             intersection.is_from_class_string(),
-            atom("__callStatic"),
+            magic_method_to_check,
             true,
             None,
         );
 
-        call_static_could_exist |= resolved_call_static_method.is_some();
+        magic_call_could_exist |= resolved_magic_call_method.is_some();
 
         let (could_method_exist, resolved_method) = resolve_method_from_class_id(
             fq_class_id,
@@ -238,7 +253,7 @@ fn resolve_method_from_classname<'ctx, 'arena>(
             intersection.is_object_instance() || classname.is_object_instance(),
             intersection.is_from_class_string(),
             method_name,
-            resolved_call_static_method.is_some(),
+            resolved_magic_call_method.is_some(),
             Some(result),
         );
 
@@ -267,7 +282,7 @@ fn resolve_method_from_classname<'ctx, 'arena>(
             access_span,
         )
     {
-        if call_static_could_exist {
+        if magic_call_could_exist {
             resolved_methods.push(resolved_method);
         } else {
             if class_metadata.flags.is_final() {
@@ -301,7 +316,7 @@ fn resolve_method_from_classname<'ctx, 'arena>(
             result.has_invalid_target = true;
 
             if !could_method_ever_exist {
-                if call_static_could_exist {
+                if magic_call_could_exist {
                     report_non_documented_method(context, class_span, method_span, fq_class_id, method_name);
                 } else {
                     report_non_existent_method(context, class_span, method_span, fq_class_id, method_name);
@@ -347,13 +362,15 @@ fn resolve_method_from_metadata<'ctx, 'arena>(
     }
 
     if function_like.flags.is_magic_method() && !has_magic_static_call {
+        let is_static = !classname.is_parent();
+
         report_magic_call_without_call_method(
             context,
             class_span,
             selector.span(),
             *method_id.get_class_name(),
             method_name,
-            true,
+            is_static,
         );
     }
 

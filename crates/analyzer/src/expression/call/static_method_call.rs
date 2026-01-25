@@ -91,6 +91,8 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for StaticMethodCall<'arena> {
             });
         }
 
+        let class_has_nullsafe_null = artifacts.get_expression_type(self.class).is_some_and(|t| t.has_nullsafe_null());
+
         analyze_invocation_targets(
             context,
             block_context,
@@ -102,7 +104,9 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for StaticMethodCall<'arena> {
             None,
             method_resolution.has_invalid_target,
             method_resolution.encountered_mixed,
-            expression_is_nullsafe(self.class),
+            expression_is_nullsafe(self.class) || method_resolution.encountered_null,
+            class_has_nullsafe_null,
+            method_resolution.all_methods_non_nullable_return,
         )?;
 
         if context.plugin_registry.has_static_method_call_hooks() {

@@ -857,6 +857,9 @@ mod tests {
                     $this->elements = $elements;
                 }
 
+                /** @return array<Tk, Tv> */
+                public function getElements(): array { return $this->elements; }
+
                 /**
                  * @return static
                  */

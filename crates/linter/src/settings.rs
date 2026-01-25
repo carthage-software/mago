@@ -64,6 +64,7 @@ use crate::rule::NoHashCommentConfig;
 use crate::rule::NoHashEmojiConfig;
 use crate::rule::NoIniSetConfig;
 use crate::rule::NoInsecureComparisonConfig;
+use crate::rule::NoIssetConfig;
 use crate::rule::NoLiteralPasswordConfig;
 use crate::rule::NoMultiAssignmentsConfig;
 use crate::rule::NoNestedTernaryConfig;
@@ -236,6 +237,7 @@ pub struct RulesSettings {
     pub no_eval: RuleSettings<NoEvalConfig>,
     pub no_error_control_operator: RuleSettings<NoErrorControlOperatorConfig>,
     pub no_empty: RuleSettings<NoEmptyConfig>,
+    pub no_isset: RuleSettings<NoIssetConfig>,
     pub no_empty_loop: RuleSettings<NoEmptyLoopConfig>,
     pub no_empty_comment: RuleSettings<NoEmptyCommentConfig>,
     pub no_empty_catch_clause: RuleSettings<NoEmptyCatchClauseConfig>,

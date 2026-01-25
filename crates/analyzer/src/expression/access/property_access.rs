@@ -1,5 +1,7 @@
 use std::rc::Rc;
 
+use mago_atom::Atom;
+use mago_atom::concat_atom;
 use mago_codex::ttype::add_optional_union_type;
 use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::get_never;
@@ -10,6 +12,7 @@ use mago_syntax::ast::ClassLikeMemberSelector;
 use mago_syntax::ast::Expression;
 use mago_syntax::ast::NullSafePropertyAccess;
 use mago_syntax::ast::PropertyAccess;
+use mago_syntax::ast::Variable;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -70,13 +73,6 @@ fn analyze_property_access<'ctx, 'ast, 'arena>(
     property_selector: &'ast ClassLikeMemberSelector<'arena>,
     is_null_safe: bool,
 ) -> Result<(), AnalysisError> {
-    // When using nullsafe operator, mark that we're in a nullsafe chain
-    // This propagates to all subsequent accesses in the chain and persists
-    // through the entire expression evaluation
-    if is_null_safe {
-        block_context.inside_nullsafe_chain = true;
-    }
-
     let property_access_id = get_property_access_expression_id(
         object,
         property_selector,
@@ -90,6 +86,8 @@ fn analyze_property_access<'ctx, 'ast, 'arena>(
         && let Some(property_access_id) = &property_access_id
         && let Some(existing_type) = block_context.locals.get(property_access_id).cloned()
     {
+        add_memoized_property_reference(context, block_context, artifacts, object, property_selector)?;
+
         artifacts.set_rc_expression_type(&span, existing_type);
 
         return Ok(());
@@ -130,12 +128,70 @@ fn analyze_property_access<'ctx, 'ast, 'arena>(
         }
     }
 
-    let resulting_type = Rc::new(resulting_expression_type.unwrap_or_else(get_never));
+    let mut resulting_type = resulting_expression_type.unwrap_or_else(get_never);
+
+    let object_has_nullsafe_null = artifacts.get_expression_type(object).is_some_and(|t| t.has_nullsafe_null());
+    if resolution_result.all_properties_non_nullable
+        && ((is_null_safe && resolution_result.encountered_null) || object_has_nullsafe_null)
+    {
+        resulting_type.set_nullsafe_null(true);
+    }
+
+    let resulting_type = Rc::new(resulting_type);
     if let Some(property_access_id) = property_access_id {
         block_context.locals.insert(property_access_id, resulting_type.clone());
     }
 
     artifacts.set_rc_expression_type(&span, resulting_type);
+
+    Ok(())
+}
+
+/// Adds symbol reference for a memoized property access.
+///
+/// When property access is memoized, we still need to track the symbol reference
+/// so that unused property detection works correctly.
+fn add_memoized_property_reference<'ctx, 'ast, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    block_context: &mut BlockContext<'ctx>,
+    artifacts: &mut AnalysisArtifacts,
+    object: &'ast Expression<'arena>,
+    property_selector: &'ast ClassLikeMemberSelector<'arena>,
+) -> Result<(), AnalysisError> {
+    let property_name = match property_selector {
+        ClassLikeMemberSelector::Identifier(ident) => concat_atom!("$", ident.value),
+        _ => return Ok(()),
+    };
+
+    let is_this = matches!(object, Expression::Variable(Variable::Direct(var)) if var.name == "$this");
+    let mut declaring_classes: Vec<Atom> = Vec::new();
+
+    if is_this {
+        if let Some(class_name) = block_context.scope.get_class_like_name()
+            && let Some(declaring_class) = context.codebase.get_declaring_property_class(&class_name, &property_name)
+        {
+            declaring_classes.push(declaring_class);
+        }
+    } else if let Some(object_type) = artifacts.get_rc_expression_type(object) {
+        for atomic in object_type.types.iter() {
+            for class_name in atomic.get_all_object_names() {
+                if let Some(declaring_class) =
+                    context.codebase.get_declaring_property_class(&class_name, &property_name)
+                {
+                    declaring_classes.push(declaring_class);
+                }
+            }
+        }
+    }
+
+    // Add references (after releasing the immutable borrow)
+    for declaring_class in declaring_classes {
+        artifacts.symbol_references.add_reference_for_property_read(
+            &block_context.scope,
+            declaring_class,
+            property_name,
+        );
+    }
 
     Ok(())
 }

@@ -4,7 +4,6 @@ use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::identifier::method::MethodIdentifier;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::add_optional_union_type;
-use mago_codex::ttype::combine_union_types;
 use mago_codex::ttype::expander::StaticClassType;
 use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::get_null;
@@ -65,6 +64,8 @@ fn analyze_invocation_targets<'ctx, 'ast, 'arena>(
     encountered_invalid_targets: bool,
     encountered_mixed_targets: bool,
     should_add_null: bool,
+    object_has_nullsafe_null: bool,
+    all_targets_non_nullable_return: bool,
 ) -> Result<(), AnalysisError> {
     let mut resulting_type = None;
     for target in invocation_targets {
@@ -154,7 +155,16 @@ fn analyze_invocation_targets<'ctx, 'ast, 'arena>(
         } else if encountered_mixed_targets {
             get_mixed()
         } else if should_add_null {
-            combine_union_types(&resulting_type, &get_null(), context.codebase, false)
+            let mut result_with_null = add_optional_union_type(get_null(), Some(&resulting_type), context.codebase);
+            if all_targets_non_nullable_return {
+                result_with_null.set_nullsafe_null(true);
+            }
+
+            result_with_null
+        } else if object_has_nullsafe_null && all_targets_non_nullable_return {
+            let mut result_with_null = add_optional_union_type(get_null(), Some(&resulting_type), context.codebase);
+            result_with_null.set_nullsafe_null(true);
+            result_with_null
         } else {
             resulting_type
         }

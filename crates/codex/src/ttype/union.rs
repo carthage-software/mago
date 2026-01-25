@@ -62,6 +62,8 @@ bitflags! {
         const FROM_TEMPLATE_DEFAULT = 1 << 7;
         /// Indicates the type has been populated with codebase information.
         const POPULATED = 1 << 8;
+        /// Indicates the null in this union came from nullsafe short-circuit.
+        const NULLSAFE_NULL = 1 << 9;
     }
 }
 
@@ -223,6 +225,12 @@ impl TUnion {
     }
 
     #[inline]
+    #[must_use]
+    pub const fn has_nullsafe_null(&self) -> bool {
+        self.flags.contains(UnionFlags::NULLSAFE_NULL)
+    }
+
+    #[inline]
     pub fn set_had_template(&mut self, value: bool) {
         self.flags.set(UnionFlags::HAD_TEMPLATE, value);
     }
@@ -260,6 +268,11 @@ impl TUnion {
     #[inline]
     pub fn set_populated(&mut self, value: bool) {
         self.flags.set(UnionFlags::POPULATED, value);
+    }
+
+    #[inline]
+    pub fn set_nullsafe_null(&mut self, value: bool) {
+        self.flags.set(UnionFlags::NULLSAFE_NULL, value);
     }
 
     /// Creates a new `TUnion` with the same properties as the original, but with a new set of types.

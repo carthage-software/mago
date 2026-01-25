@@ -1596,29 +1596,55 @@ impl<'arena> Format<'arena> for PropertyHook<'arena> {
 impl<'arena> Format<'arena> for PropertyHookList<'arena> {
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
         wrap!(f, self, PropertyHookList, {
-            Document::Group(Group::new(vec![
-                in f.arena;
-                Document::String("{"),
-                f.print_trailing_comments(self.left_brace).unwrap_or_else(Document::empty),
-                if self.hooks.is_empty() {
-                    Document::empty()
-                } else {
-                    Document::Indent(vec![
-                        in f.arena;
-                        Document::Line(Line::hard()),
-                        Document::Array(Document::join(
-                            f.arena,
-                            self.hooks.iter().map(|hook| hook.format(f)),
-                            Separator::HardLine,
-                        )),
-                    ])
-                },
-                f.print_dangling_comments(self.span(), true).unwrap_or_else(|| {
-                    if self.hooks.is_empty() { Document::empty() } else { Document::Line(Line::hard()) }
-                }),
-                Document::String("}"),
-                f.print_trailing_comments(self.right_brace).unwrap_or_else(Document::empty),
-            ]))
+            let can_inline = f.settings.inline_abstract_property_hooks
+                && !self.hooks.is_empty()
+                && self.hooks.iter().all(|hook| {
+                    hook.attribute_lists.is_empty()
+                        && hook.modifiers.is_empty()
+                        && matches!(hook.body, PropertyHookBody::Abstract(_))
+                });
+
+            if can_inline {
+                Document::Group(Group::new(vec![
+                    in f.arena;
+                    Document::String("{"),
+                    f.print_trailing_comments(self.left_brace).unwrap_or_else(Document::empty),
+                    Document::String(" "),
+                    Document::Array(Document::join(
+                        f.arena,
+                        self.hooks.iter().map(|hook| hook.format(f)),
+                        Separator::Space,
+                    )),
+                    f.print_dangling_comments(self.span(), true).unwrap_or_else(Document::empty),
+                    Document::String(" "),
+                    Document::String("}"),
+                    f.print_trailing_comments(self.right_brace).unwrap_or_else(Document::empty),
+                ]))
+            } else {
+                Document::Group(Group::new(vec![
+                    in f.arena;
+                    Document::String("{"),
+                    f.print_trailing_comments(self.left_brace).unwrap_or_else(Document::empty),
+                    if self.hooks.is_empty() {
+                        Document::empty()
+                    } else {
+                        Document::Indent(vec![
+                            in f.arena;
+                            Document::Line(Line::hard()),
+                            Document::Array(Document::join(
+                                f.arena,
+                                self.hooks.iter().map(|hook| hook.format(f)),
+                                Separator::HardLine,
+                            )),
+                        ])
+                    },
+                    f.print_dangling_comments(self.span(), true).unwrap_or_else(|| {
+                        if self.hooks.is_empty() { Document::empty() } else { Document::Line(Line::hard()) }
+                    }),
+                    Document::String("}"),
+                    f.print_trailing_comments(self.right_brace).unwrap_or_else(Document::empty),
+                ]))
+            }
         })
     }
 }

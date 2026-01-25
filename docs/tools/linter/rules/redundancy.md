@@ -827,7 +827,8 @@ $foo = "Hello" . " World";
 
 ## <a id="no-redundant-use"></a>`no-redundant-use`
 
-Detects `use` statements that import items that are never used.
+Detects `use` statements that import items that are never used or are redundant
+because they import from the same namespace.
 
 
 

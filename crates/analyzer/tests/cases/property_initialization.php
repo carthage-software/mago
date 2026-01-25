@@ -19,14 +19,14 @@ class ConcreteChildNoConstructor extends AbstractParent
 // @mago-expect analysis:missing-constructor
 class NullableTypedPropertyNoConstructor
 {
-    private null|bool $foo;
+    private null|bool $_foo;
 }
 
 // @mago-expect analysis:missing-constructor
 class NullableTypedPropertyNoConstructorWithDocblock
 {
     /** @var ?bool */
-    private null|bool $foo;
+    private null|bool $_foo;
 }
 
 class EmptyConstructor
@@ -93,18 +93,18 @@ class PropertySetInPrivateMethodWithIf
 
 class ParentWithPrivateB
 {
-    private string $b;
+    private string $_b;
 
     public function __construct()
     {
-        $this->b = 'foo';
+        $this->_b = 'foo';
     }
 }
 
 class ChildWithOwnPrivateB extends ParentWithPrivateB
 {
     // @mago-expect analysis:uninitialized-property
-    private string $b;
+    private string $_b;
 }
 
 abstract class AbstractWithTypedProperty
@@ -162,7 +162,7 @@ class ChildWithOwnConstructor extends AbstractPrivateConstructor
 class NullableTypedPropertyEmptyConstructor
 {
     // @mago-expect analysis:uninitialized-property
-    private null|bool $foo;
+    private null|bool $_foo;
 
     public function __construct() {}
 }
@@ -171,7 +171,7 @@ class NullableTypedPropertyEmptyConstructorWithDocblock
 {
     /** @var ?bool */
     // @mago-expect analysis:uninitialized-property
-    private null|bool $foo;
+    private null|bool $_foo;
 
     public function __construct() {}
 }
@@ -310,11 +310,11 @@ class ConcreteChildImplicit extends AbstractWithConstructor
 
 class BaseWithConstructor
 {
-    private string $aString;
+    private string $_aString;
 
     public function __construct()
     {
-        $this->aString = 'hello';
+        $this->_aString = 'hello';
     }
 }
 

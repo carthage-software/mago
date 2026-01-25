@@ -9,8 +9,8 @@ class User
 {
     public string $name = '';
     public int $age = 0;
-    protected string $email = '';
-    private string $password = '';
+    protected string $_email = '';
+    private string $_password = '';
 }
 
 // Final class (produces sealed array)
@@ -28,10 +28,10 @@ class Admin extends User
 
 /**
  * properties-of<User> expands to:
- * array{name: string, age: int, email: string, password: string, ...}
+ * array{name: string, age: int, _email: string, _password: string, ...}
  * (unsealed because User is not final - subclasses may have more properties)
  *
- * @param array{name: string, age: int, email: string, password: string, ...} $_
+ * @param array{name: string, age: int, _email: string, _password: string, ...} $_
  */
 function accepts_user_properties(array $_): void
 {
@@ -78,8 +78,8 @@ function get_user_properties(User $u): array
     return [
         'name' => $u->name,
         'age' => $u->age,
-        'email' => get_email($u),
-        'password' => get_password($u),
+        '_email' => get_email($u),
+        '_password' => get_password($u),
     ];
 }
 

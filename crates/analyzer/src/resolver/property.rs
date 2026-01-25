@@ -61,6 +61,10 @@ pub struct PropertyResolutionResult {
     pub encountered_null: bool,
     pub encountered_mixed: bool,
     pub has_possibly_defined_property: bool,
+    /// True if all resolved properties are non-nullable.
+    /// When combined with `encountered_null` and nullsafe access, indicates
+    /// the null in the result type came ONLY from nullsafe short-circuit.
+    pub all_properties_non_nullable: bool,
 }
 
 /// Resolves all possible instance properties from an object expression and a member selector.
@@ -118,7 +122,7 @@ pub fn resolve_instance_properties<'ctx, 'ast, 'arena>(
         if object_atomic.is_null() || object_atomic.is_void() {
             result.encountered_null = true;
 
-            if !is_null_safe && !block_context.inside_nullsafe_chain {
+            if !is_null_safe && !object_type.has_nullsafe_null() {
                 report_access_on_null(
                     context,
                     block_context,
@@ -330,16 +334,27 @@ pub fn resolve_instance_properties<'ctx, 'ast, 'arena>(
             }
 
             if let Some(declaring_class_id) = resolved_property.declaring_class_id {
-                artifacts.symbol_references.add_reference_for_property_access(
-                    &block_context.scope,
-                    declaring_class_id,
-                    resolved_property.property_name,
-                );
+                if for_assignment {
+                    artifacts.symbol_references.add_reference_for_property_write(
+                        &block_context.scope,
+                        declaring_class_id,
+                        resolved_property.property_name,
+                    );
+                } else {
+                    artifacts.symbol_references.add_reference_for_property_read(
+                        &block_context.scope,
+                        declaring_class_id,
+                        resolved_property.property_name,
+                    );
+                }
             }
 
             result.properties.push(resolved_property);
         }
     }
+
+    result.all_properties_non_nullable =
+        !result.properties.is_empty() && result.properties.iter().all(|p| !p.property_type.is_nullable());
 
     Ok(result)
 }

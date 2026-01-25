@@ -39,6 +39,8 @@ use crate::settings::BraceStyle;
 
 use super::block::block_is_empty;
 
+/// Check if there is a newline character within a specified range of text.
+#[inline(always)]
 pub(super) fn has_new_line_in_range(text: &str, start: u32, end: u32) -> bool {
     text[start as usize..end as usize].contains('\n')
 }

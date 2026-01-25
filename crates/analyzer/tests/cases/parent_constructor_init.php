@@ -157,24 +157,24 @@ class ChildMissesOwnProp extends ParentOk
 
 class ParentPrivateB
 {
-    private string $b;
+    private string $_b;
 
     public function __construct()
     {
-        $this->b = 'parent b';
+        $this->_b = 'parent b';
     }
 }
 
 class ChildShadowsPrivate extends ParentPrivateB
 {
     // @mago-expect analysis:uninitialized-property
-    private string $b;
+    private string $_b;
 
     public function __construct()
     {
         parent::__construct();
 
-        // parent::__construct() initializes parent's $b, not child's $b
+        // parent::__construct() initializes parent's $_b, not child's $_b
     }
 }
 

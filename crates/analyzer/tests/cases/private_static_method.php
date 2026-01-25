@@ -1,10 +1,10 @@
 <?php
 
 class X {
-    private static function x(): void
+    private static function _x(): void
     {
     }
 }
 
 /** @mago-expect analysis:invalid-method-access */
-X::x();
+X::_x();

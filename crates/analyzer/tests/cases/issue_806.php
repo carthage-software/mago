@@ -9,6 +9,7 @@ final class Foo
 
 final class TakesClosure
 {
+    // @mago-expect analysis:write-only-property
     private Closure $callback;
 
     public function __construct(Closure $callback)

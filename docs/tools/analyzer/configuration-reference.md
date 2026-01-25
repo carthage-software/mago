@@ -350,6 +350,7 @@ The analyzer uses internal thresholds to balance analysis depth against performa
 | `negation-complexity-threshold`       | `u16` | `4096`  | Maximum cumulative complexity when negating formulas.                    |
 | `consensus-limit-threshold`           | `u16` | `256`   | Upper limit for consensus optimization passes.                           |
 | `formula-size-threshold`              | `u16` | `512`   | Maximum logical formula size before simplification is skipped.           |
+| `string-concat-combination-threshold` | `u16` | `512`  | Maximum combinations to track during string concatenation.               |
 
 ### When to adjust thresholds
 
@@ -367,6 +368,7 @@ The analyzer converts type constraints into CNF (Conjunctive Normal Form) logica
 - **Negation complexity**: Limits expansion when negating formulas (e.g., for `else` branches). Deeply nested conditions may hit this limit.
 - **Consensus limit**: Controls an optimization pass that detects logical tautologies. Higher values may find more simplifications.
 - **Formula size**: Overall limit on formula complexity before the analyzer falls back to simpler inference.
+- **String concat combinations**: Limits the number of possible string literal combinations during concatenation to prevent exponential blowup in large concatenation chains.
 
 ### Example configurations
 
@@ -381,6 +383,7 @@ disjunction-complexity-threshold = 1024
 negation-complexity-threshold = 1024
 consensus-limit-threshold = 64
 formula-size-threshold = 128
+string-concat-combination-threshold = 512
 ```
 
 #### Deep analysis (slower, more precise)
@@ -394,6 +397,7 @@ disjunction-complexity-threshold = 8192
 negation-complexity-threshold = 8192
 consensus-limit-threshold = 512
 formula-size-threshold = 1024
+string-concat-combination-threshold = 8192
 ```
 
 :::warning Performance impact

@@ -143,6 +143,8 @@ test_case!(preserve_breaking_conditional_expression);
 test_case!(preserve_breaking_conditional_expression_disabled);
 test_case!(preserve_breaking_parameter_list_promoted_properties);
 test_case!(hooks_always_break);
+test_case!(inline_abstract_property_hooks);
+test_case!(do_not_inline_abstract_property_hooks);
 test_case!(comments_are_preserved);
 test_case!(array_comment);
 test_case!(array_preserve_empty_lines);
@@ -326,6 +328,7 @@ test_case!(issue_813);
 test_case!(issue_816);
 test_case!(issue_825);
 test_case!(drupal_preset);
+test_case!(issue_926);
 
 #[test]
 fn test_all_test_cases_are_ran() {

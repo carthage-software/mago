@@ -758,6 +758,9 @@ class DateInterval
     }
 }
 
+/**
+ * @implements IteratorAggregate<int, DateTimeInterface>
+ */
 class DatePeriod implements IteratorAggregate
 {
     public const int EXCLUDE_START_DATE = UNKNOWN;

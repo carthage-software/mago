@@ -1,4 +1,5 @@
 use mago_atom::AtomMap;
+use mago_atom::ascii_lowercase_atom;
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::callable::TCallable;
@@ -33,22 +34,29 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for StaticMethodPartialApplication<'
         let method_resolution =
             resolve_static_method_targets(context, block_context, artifacts, self.class, &self.method, self.span())?;
 
-        let resulting_type = if self.argument_list.is_first_class_callable() {
-            let callable_types: Vec<TAtomic> = method_resolution
-                .resolved_methods
-                .into_iter()
-                .map(|resolved_method| {
-                    TAtomic::Callable(TCallable::Alias(FunctionLikeIdentifier::Method(
-                        resolved_method.classname,
-                        *resolved_method.method_identifier.get_method_name(),
-                    )))
-                })
-                .collect();
+        let mut identifiers = vec![];
+        for resolved_method in &method_resolution.resolved_methods {
+            let class_name = ascii_lowercase_atom(resolved_method.classname.as_ref());
+            let method_name = *resolved_method.method_identifier.get_method_name();
+            artifacts.symbol_references.add_reference_to_class_member(
+                &block_context.scope,
+                (class_name, method_name),
+                false,
+            );
 
-            if callable_types.is_empty() {
+            identifiers.push(FunctionLikeIdentifier::Method(
+                resolved_method.classname,
+                *resolved_method.method_identifier.get_method_name(),
+            ));
+        }
+
+        let resulting_type = if self.argument_list.is_first_class_callable() {
+            if identifiers.is_empty() {
                 if method_resolution.has_invalid_target { get_never() } else { get_mixed_closure() }
             } else {
-                TUnion::from_vec(callable_types)
+                TUnion::from_vec(
+                    identifiers.into_iter().map(|identifier| TAtomic::Callable(TCallable::Alias(identifier))).collect(),
+                )
             }
         } else {
             let mut closure_types = Vec::new();

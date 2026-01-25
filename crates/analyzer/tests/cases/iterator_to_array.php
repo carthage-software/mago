@@ -8,6 +8,8 @@ final class Map
 {
     /**
      * @var array<Tk, Tv> $elements
+     *
+     * @mago-expect analysis:write-only-property
      */
     private array $elements;
 

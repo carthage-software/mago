@@ -193,3 +193,25 @@ fn check<'arena>(
 
     ctx.collector.report(issue);
 }
+
+#[cfg(test)]
+mod tests {
+    use indoc::indoc;
+
+    use super::NoLiteralPasswordRule;
+    use crate::test_lint_success;
+
+    test_lint_success! {
+        name = allow_cli_flags,
+        rule = NoLiteralPasswordRule,
+        code = indoc! {r"
+            <?php
+
+            $arg = '--password';
+
+            if ($arg === '--password' || $arg === '-p') {
+                // do something
+            }
+        "}
+    }
+}

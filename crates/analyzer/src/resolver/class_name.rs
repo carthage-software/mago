@@ -15,6 +15,8 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_span::Span;
+use mago_syntax::ast::Access;
+use mago_syntax::ast::Call;
 use mago_syntax::ast::Expression;
 
 use crate::analyzable::Analyzable;
@@ -153,6 +155,12 @@ impl ResolvedClassname {
     #[inline]
     pub const fn is_named(&self) -> bool {
         matches!(self.origin, ResolutionOrigin::Named { .. })
+    }
+
+    /// Checks if the resolution is from the `parent` keyword.
+    #[inline]
+    pub const fn is_parent(&self) -> bool {
+        matches!(self.origin, ResolutionOrigin::Named { is_parent: true, .. })
     }
 
     /// Checks if the resolution is from a `self`, `static`, or `parent` keyword.
@@ -327,11 +335,41 @@ pub fn resolve_classnames_from_expression<'ctx, 'arena>(
 
             let expression_type = artifacts.get_expression_type(expression);
 
+            let is_directly_nullsafe = matches!(
+                expression.unparenthesized(),
+                Expression::Access(Access::NullSafeProperty(_)) | Expression::Call(Call::NullSafeMethod(_))
+            );
+
             for atomic in expression_type.map(|u| u.types.iter()).unwrap_or_default() {
                 if let Some(resolved_classname) = get_class_name_from_atomic(context.codebase, atomic) {
                     possible_types.push(resolved_classname);
-                } else if expression_is_nullsafe(expression) && atomic.is_null() {
-                    // Special case: nullsafe operator resulting in null type is ignored for class name resolution.
+                } else if atomic.is_null() && is_directly_nullsafe {
+                    context.collector.report_with_code(
+                        IssueCode::PossiblyNullPropertyAccess,
+                        Issue::error("Attempting static access on a possibly `null` value.")
+                            .with_annotation(
+                                Annotation::primary(expression.span())
+                                    .with_message("This expression can be `null` here"),
+                            )
+                            .with_note("PHP's nullsafe operator (`?->`) does not short-circuit static access (`::`).")
+                            .with_help(
+                                "Add a null check before the static access, or ensure the expression is never null.",
+                            ),
+                    );
+                } else if atomic.is_null() && expression_is_nullsafe(expression) {
+                    // Nullsafe in chain short-circuits, skip error
+                } else if atomic.is_null() {
+                    context.collector.report_with_code(
+                        IssueCode::PossiblyNullPropertyAccess,
+                        Issue::error("Attempting static access on a possibly `null` value.")
+                            .with_annotation(
+                                Annotation::primary(expression.span())
+                                    .with_message("This expression can be `null` here"),
+                            )
+                            .with_help(
+                                "Add a null check before the static access, or ensure the expression is never null.",
+                            ),
+                    );
                 } else {
                     possible_types.push(ResolvedClassname::invalid());
 

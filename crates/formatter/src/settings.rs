@@ -705,6 +705,15 @@ pub struct FormatSettings {
     #[serde(default = "default_false")]
     pub space_before_hook_parameter_list_parenthesis: bool,
 
+    /// Whether to keep abstract property hooks inline.
+    ///
+    /// When enabled: `public int $id { get; }`
+    /// When disabled: hook list is always expanded
+    ///
+    /// Default: true ([PER-CS 4.10](https://www.php-fig.org/per/coding-style/#410-interface-and-abstract-properties) compliant)
+    #[serde(default = "default_true")]
+    pub inline_abstract_property_hooks: bool,
+
     /// Whether to add a space before the opening parenthesis in closure use clause.
     ///
     /// When enabled: `function() use ($var)`
@@ -1047,6 +1056,7 @@ pub fn merge_format_settings(preset: FormatSettings, individual: FormatSettings)
         space_before_arrow_function_parameter_list_parenthesis,
         space_before_closure_parameter_list_parenthesis,
         space_before_hook_parameter_list_parenthesis,
+        inline_abstract_property_hooks,
         space_before_closure_use_clause_parenthesis,
         space_after_cast_unary_prefix_operators,
         space_after_reference_unary_prefix_operator,

@@ -39,10 +39,10 @@ interface TypeInterface
 class EnumValueType implements TypeInterface
 {
     /**
-     * @param enum-string<T> $enum
+     * @param enum-string<T> $_enum
      */
     public function __construct(
-        private string $enum,
+        private string $_enum,
     ) {}
 
     /**

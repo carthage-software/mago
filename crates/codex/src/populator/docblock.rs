@@ -365,7 +365,21 @@ pub fn inherit_method_docblocks(codebase: &mut CodebaseMetadata) {
         };
 
         if should_inherit_return && let Some((type_union, span, from_docblock)) = substituted_return_type {
-            child_method.return_type_metadata = Some(TypeMetadata { type_union, span, from_docblock, inferred: false });
+            // Narrow the inherited docblock type based on child's native return type.
+            // If child's native type is non-nullable, remove null from the inherited type.
+            // Example: Parent has `@return T|null` with `:?object`, child has `:object`
+            //          After template substitution: `stdClass|null` -> narrowed to `stdClass`
+            let narrowed_type = if let Some(child_native_return) = &child_method.return_type_declaration_metadata
+                && !child_native_return.type_union.accepts_null()
+                && type_union.has_null()
+            {
+                type_union.to_non_nullable()
+            } else {
+                type_union
+            };
+
+            child_method.return_type_metadata =
+                Some(TypeMetadata { type_union: narrowed_type, span, from_docblock, inferred: false });
         }
 
         for (i, substituted_param) in substituted_param_types.into_iter().enumerate() {

@@ -9,6 +9,7 @@ use mago_span::Span;
 use mago_syntax::ast::ClassLikeConstant;
 use mago_syntax::ast::ClassLikeMember;
 use mago_syntax::ast::EnumCaseItem;
+use mago_syntax::ast::Expression;
 use mago_syntax::ast::Modifier;
 use mago_syntax::ast::Property;
 use mago_syntax::ast::PropertyItem;
@@ -16,6 +17,7 @@ use mago_syntax::ast::Sequence;
 use mago_syntax::ast::Statement;
 
 use crate::internal::FormatterState;
+use crate::internal::format::misc::has_new_line_in_range;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AlignableKind {
@@ -341,8 +343,11 @@ pub fn detect_statement_ref_alignment_runs<'arena>(
     for (i, stmt) in statements.iter().enumerate() {
         let kind = match stmt {
             Statement::Expression(expr_stmt) => {
-                if let mago_syntax::ast::Expression::Assignment(assign) = &expr_stmt.expression {
-                    if matches!(assign.lhs, mago_syntax::ast::Expression::Variable(_)) {
+                if let Expression::Assignment(assign) = &expr_stmt.expression {
+                    if matches!(
+                        assign.lhs,
+                        Expression::Variable(_) | Expression::Access(_) | Expression::ArrayAccess(_)
+                    ) {
                         Some(AlignableKind::VariableAssignment)
                     } else {
                         None
@@ -375,7 +380,7 @@ pub fn detect_statement_ref_alignment_runs<'arena>(
             if let Some((start_idx, start_kind)) = run_start
                 && i - start_idx >= 2
             {
-                let widths = calculate_statement_ref_widths(&statements[start_idx..i], start_kind);
+                let widths = calculate_statement_ref_widths(f, &statements[start_idx..i], start_kind);
                 runs.push(AlignmentRun::new(start_idx, i, widths));
             }
             run_start = None;
@@ -389,7 +394,7 @@ pub fn detect_statement_ref_alignment_runs<'arena>(
             if let Some((start_idx, start_kind)) = run_start
                 && i - start_idx >= 2
             {
-                let widths = calculate_statement_ref_widths(&statements[start_idx..i], start_kind);
+                let widths = calculate_statement_ref_widths(f, &statements[start_idx..i], start_kind);
                 runs.push(AlignmentRun::new(start_idx, i, widths));
             }
             run_start = None;
@@ -399,7 +404,7 @@ pub fn detect_statement_ref_alignment_runs<'arena>(
     if let Some((start_idx, start_kind)) = run_start {
         let len = statements.len();
         if len - start_idx >= 2 {
-            let widths = calculate_statement_ref_widths(&statements[start_idx..], start_kind);
+            let widths = calculate_statement_ref_widths(f, &statements[start_idx..], start_kind);
             runs.push(AlignmentRun::new(start_idx, len, widths));
         }
     }
@@ -408,16 +413,23 @@ pub fn detect_statement_ref_alignment_runs<'arena>(
 }
 
 /// Calculate alignment widths for a slice of statement references.
-fn calculate_statement_ref_widths(statements: &[&Statement<'_>], kind: AlignableKind) -> AlignmentWidths {
+fn calculate_statement_ref_widths(
+    f: &FormatterState<'_, '_>,
+    statements: &[&Statement<'_>],
+    kind: AlignableKind,
+) -> AlignmentWidths {
     let mut max_name_width = 0usize;
 
     for stmt in statements {
         match (kind, *stmt) {
             (AlignableKind::VariableAssignment, Statement::Expression(expr_stmt)) => {
-                if let mago_syntax::ast::Expression::Assignment(assign) = &expr_stmt.expression
-                    && let mago_syntax::ast::Expression::Variable(var) = assign.lhs
-                {
-                    let name_width = (var.span().end_offset() - var.span().start_offset()) as usize;
+                if let Expression::Assignment(assign) = &expr_stmt.expression {
+                    let lhs_span = assign.lhs.span();
+                    if has_new_line_in_range(f.source_text, lhs_span.start_offset(), lhs_span.end_offset()) {
+                        continue;
+                    }
+
+                    let name_width = (lhs_span.end_offset() - lhs_span.start_offset()) as usize;
                     max_name_width = max_name_width.max(name_width);
                 }
             }

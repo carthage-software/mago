@@ -14,7 +14,7 @@ use Composer\IO\IOInterface;
 use Composer\Plugin\Capability\CommandProvider;
 use Composer\Plugin\Capable;
 use Composer\Plugin\PluginInterface;
-use Composer\Util\ProcessExecutor;
+use Composer\Util;
 use Symfony\Component\Process\PhpExecutableFinder;
 
 use function array_map;
@@ -83,13 +83,13 @@ final class MagoPlugin implements PluginInterface, EventSubscriberInterface, Cap
         $loop = $composer->getLoop();
         $command_executor = $loop->getProcessExecutor();
         assert(
-            $command_executor instanceof ProcessExecutor,
+            $command_executor instanceof Util\ProcessExecutor,
             'Expecting a process executor, but none was found on the composer loop.',
         );
 
         $command_executor->executeTty(implode(' ', [
             (new PhpExecutableFinder())->find() ?: 'php',
-            ...array_map(ProcessExecutor::escape(...), [
+            ...array_map(Util\ProcessExecutor::escape(...), [
                 getenv('COMPOSER_BINARY') ?: 'composer',
                 'mago:install-binary',
             ]),

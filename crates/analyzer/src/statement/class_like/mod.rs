@@ -51,6 +51,7 @@ use crate::plugin::context::HookContext;
 use crate::statement::attributes::AttributeTarget;
 use crate::statement::attributes::analyze_attributes;
 use crate::statement::class_like::method_signature::SignatureCompatibilityIssue;
+use crate::statement::function_like::report_undefined_type_references;
 use crate::utils::missing_type_hints;
 
 pub mod constant;
@@ -60,6 +61,7 @@ pub mod method;
 pub mod method_signature;
 pub mod override_attribute;
 pub mod property;
+pub mod unused_members;
 
 /// Helper function to check if a child type is compatible with (contained by) a parent type.
 ///
@@ -333,6 +335,25 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Class<'arena> {
             override_attribute::check_override_attribute(class_like_metadata, self.members.as_slice(), context);
         }
 
+        if context.settings.find_unused_definitions {
+            let unused_members = unused_members::check_unused_members_with_transitivity(
+                class_like_metadata.name,
+                self.span(),
+                class_like_metadata,
+                &artifacts.symbol_references,
+                context,
+            );
+
+            unused_members::check_write_only_properties(
+                class_like_metadata.name,
+                self.span(),
+                class_like_metadata,
+                &artifacts.symbol_references,
+                &unused_members,
+                context,
+            );
+        }
+
         // Call plugin on_leave_class hooks
         if context.plugin_registry.has_class_hooks() {
             let mut hook_context = HookContext::new(context.codebase, block_context, artifacts);
@@ -508,6 +529,16 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Enum<'arena> {
 
         if context.settings.check_missing_override {
             override_attribute::check_override_attribute(class_like_metadata, self.members.as_slice(), context);
+        }
+
+        if context.settings.find_unused_definitions {
+            unused_members::check_unused_members_with_transitivity(
+                class_like_metadata.name,
+                self.span(),
+                class_like_metadata,
+                &artifacts.symbol_references,
+                context,
+            );
         }
 
         // Call plugin on_leave_enum hooks
@@ -758,6 +789,27 @@ pub(crate) fn analyze_class_like<'ctx, 'ast, 'arena>(
             }
             ClassLikeMember::Property(property) => {
                 missing_type_hints::check_property_type_hint(context, class_like_metadata, property);
+
+                let property_names: Vec<Atom> = match property {
+                    Property::Plain(plain) => plain.items.iter().map(|item| atom(item.variable().name)).collect(),
+                    Property::Hooked(hooked) => {
+                        vec![atom(hooked.item.variable().name)]
+                    }
+                };
+
+                for property_name in property_names {
+                    if let Some(prop_meta) = class_like_metadata.properties.get(&property_name)
+                        && let Some(type_meta) = &prop_meta.type_metadata
+                    {
+                        report_undefined_type_references(context, type_meta);
+
+                        if type_meta.from_docblock
+                            && let Some(type_decl_meta) = &prop_meta.type_declaration_metadata
+                        {
+                            report_undefined_type_references(context, type_decl_meta);
+                        }
+                    }
+                }
 
                 property.analyze(context, &mut block_context, artifacts)?;
             }

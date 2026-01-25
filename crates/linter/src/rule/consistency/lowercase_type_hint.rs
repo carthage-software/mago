@@ -1,4 +1,5 @@
 use indoc::indoc;
+use mago_text_edit::TextEdit;
 use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
@@ -116,6 +117,8 @@ impl LintRule for LowercaseTypeHintRule {
             .with_annotation(Annotation::primary(identifier.span()))
             .with_help(format!("Consider using `{}` instead of `{}`.", lowercase, identifier.value));
 
-        ctx.collector.report(issue);
+        ctx.collector.propose(issue, |edits| {
+            edits.push(TextEdit::replace(identifier.span, lowercase));
+        });
     }
 }

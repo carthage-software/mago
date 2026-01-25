@@ -5,6 +5,9 @@ use mago_php_version::PHPVersion;
 /// Default maximum logical formula size during conditional analysis.
 pub const DEFAULT_FORMULA_SIZE_THRESHOLD: u16 = 512;
 
+/// Default maximum number of combinations to track during string concatenation.
+pub const DEFAULT_STRING_CONCAT_COMBINATION_THRESHOLD: u16 = 512;
+
 /// Configuration settings that control the behavior of the Mago analyzer.
 ///
 /// This struct allows you to enable/disable specific checks, suppress categories of issues,
@@ -217,6 +220,14 @@ pub struct Settings {
     ///
     /// Defaults to `512`.
     pub formula_size_threshold: u16,
+
+    /// Maximum number of combinations to track during string concatenation.
+    ///
+    /// Limits the number of possible string literal combinations to prevent
+    /// exponential blowup in large concatenation chains.
+    ///
+    /// Defaults to `512`.
+    pub string_concat_combination_threshold: u16,
 }
 
 impl Default for Settings {
@@ -259,6 +270,7 @@ impl Settings {
             negation_complexity_threshold: default_thresholds.negation_complexity,
             consensus_limit_threshold: default_thresholds.consensus_limit,
             formula_size_threshold: DEFAULT_FORMULA_SIZE_THRESHOLD,
+            string_concat_combination_threshold: DEFAULT_STRING_CONCAT_COMBINATION_THRESHOLD,
         }
     }
 

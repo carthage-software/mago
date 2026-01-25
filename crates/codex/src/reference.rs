@@ -76,6 +76,16 @@ pub struct SymbolReferences {
     /// Maps a file (represented by its hash as an Atom) to a set of referenced symbols/members `(Symbol, Member)`
     /// found within the file's global scope signatures (e.g., top-level type declarations).
     file_references_to_symbols_in_signature: HashMap<Atom, HashSet<SymbolIdentifier>>,
+
+    /// Maps a referencing symbol/member to a set of properties that are *written* (assigned to).
+    /// This is separate from read references to enable detection of write-only properties.
+    /// The key is the referencing symbol/member, the value is the set of properties being written.
+    property_write_references: HashMap<SymbolIdentifier, HashSet<SymbolIdentifier>>,
+
+    /// Maps a referencing symbol/member to a set of properties that are *read* (accessed for value).
+    /// This is separate from write references to enable accurate read/write tracking.
+    /// The key is the referencing symbol/member, the value is the set of properties being read.
+    property_read_references: HashMap<SymbolIdentifier, HashSet<SymbolIdentifier>>,
 }
 
 impl SymbolReferences {
@@ -90,6 +100,8 @@ impl SymbolReferences {
             functionlike_references_to_functionlike_returns: HashMap::default(),
             file_references_to_symbols: HashMap::default(),
             file_references_to_symbols_in_signature: HashMap::default(),
+            property_write_references: HashMap::default(),
+            property_read_references: HashMap::default(),
         }
     }
 
@@ -125,11 +137,42 @@ impl SymbolReferences {
         map.values().filter(|referenced_set| referenced_set.contains(symbol)).count()
     }
 
+    /// Counts how many symbols have a *read* reference to the given property.
+    ///
+    /// # Arguments
+    ///
+    /// * `property` - The property symbol identifier `(ClassName, PropertyName)` to check
+    ///
+    /// # Returns
+    ///
+    /// The number of symbols that read the given property
+    #[inline]
+    #[must_use]
+    pub fn count_property_reads(&self, property: &SymbolIdentifier) -> usize {
+        self.property_read_references.values().filter(|read_set| read_set.contains(property)).count()
+    }
+
+    /// Counts how many symbols have a *write* reference to the given property.
+    ///
+    /// # Arguments
+    ///
+    /// * `property` - The property symbol identifier `(ClassName, PropertyName)` to check
+    ///
+    /// # Returns
+    ///
+    /// The number of symbols that write to the given property
+    #[inline]
+    #[must_use]
+    pub fn count_property_writes(&self, property: &SymbolIdentifier) -> usize {
+        self.property_write_references.values().filter(|write_set| write_set.contains(property)).count()
+    }
+
     /// Records that a top-level symbol (e.g., a function) references a class member.
     ///
     /// Automatically adds a reference from the referencing symbol to the member's class.
     ///
     /// # Arguments
+    ///
     /// * `referencing_symbol`: The FQN of the function or global const making the reference.
     /// * `class_member`: A tuple `(ClassName, MemberName)` being referenced.
     /// * `in_signature`: `true` if the reference occurs in a signature context, `false` if in the body.
@@ -350,17 +393,57 @@ impl SymbolReferences {
 
     #[inline]
     pub fn add_reference_for_method_call(&mut self, scope: &ScopeContext<'_>, method: &MethodIdentifier) {
-        self.add_reference_to_class_member(scope, (*method.get_class_name(), *method.get_method_name()), false);
+        self.add_reference_to_class_member(
+            scope,
+            (ascii_lowercase_atom(method.get_class_name()), *method.get_method_name()),
+            false,
+        );
     }
 
+    /// Records a read reference to a property (e.g., `$this->prop` used as a value).
     #[inline]
-    pub fn add_reference_for_property_access(
+    pub fn add_reference_for_property_read(&mut self, scope: &ScopeContext<'_>, class_name: Atom, property_name: Atom) {
+        let normalized_class_name = ascii_lowercase_atom(&class_name);
+        let class_member = (normalized_class_name, property_name);
+
+        self.add_reference_to_class_member(scope, class_member, false);
+
+        let referencing_key = self.get_referencing_key_from_scope(scope);
+        self.property_read_references.entry(referencing_key).or_default().insert(class_member);
+    }
+
+    /// Records a write reference to a property (e.g., `$this->prop = value`).
+    /// This is tracked separately from read references to enable write-only property detection.
+    #[inline]
+    pub fn add_reference_for_property_write(
         &mut self,
         scope: &ScopeContext<'_>,
         class_name: Atom,
         property_name: Atom,
     ) {
-        self.add_reference_to_class_member(scope, (class_name, property_name), false);
+        let normalized_class_name = ascii_lowercase_atom(&class_name);
+        let class_member = (normalized_class_name, property_name);
+
+        self.add_reference_to_class_member(scope, class_member, false);
+
+        let referencing_key = self.get_referencing_key_from_scope(scope);
+        self.property_write_references.entry(referencing_key).or_default().insert(class_member);
+    }
+
+    /// Helper to get the referencing key from the current scope context.
+    #[inline]
+    fn get_referencing_key_from_scope(&self, scope: &ScopeContext<'_>) -> SymbolIdentifier {
+        if let Some(referencing_functionlike) = scope.get_function_like_identifier() {
+            match referencing_functionlike {
+                FunctionLikeIdentifier::Function(function_name) => (function_name, empty_atom()),
+                FunctionLikeIdentifier::Method(class_name, function_name) => (class_name, function_name),
+                _ => (empty_atom(), empty_atom()),
+            }
+        } else if let Some(calling_class) = scope.get_class_like_name() {
+            (ascii_lowercase_atom(&calling_class), empty_atom())
+        } else {
+            (empty_atom(), empty_atom())
+        }
     }
 
     /// Convenience method to add a reference *from* the current function context *to* an overridden class member (e.g., `parent::foo`).
@@ -446,6 +529,14 @@ impl SymbolReferences {
 
         for (k, v) in other.file_references_to_symbols_in_signature {
             self.file_references_to_symbols_in_signature.entry(k).or_default().extend(v);
+        }
+
+        for (k, v) in other.property_write_references {
+            self.property_write_references.entry(k).or_default().extend(v);
+        }
+
+        for (k, v) in other.property_read_references {
+            self.property_read_references.entry(k).or_default().extend(v);
         }
     }
 
@@ -691,6 +782,10 @@ impl SymbolReferences {
         self.symbol_references_to_symbols_in_signature
             .retain(|referencing_item, _| !invalid_symbols_and_members.contains(referencing_item));
         self.symbol_references_to_overridden_members
+            .retain(|referencing_item, _| !invalid_symbols_and_members.contains(referencing_item));
+        self.property_write_references
+            .retain(|referencing_item, _| !invalid_symbols_and_members.contains(referencing_item));
+        self.property_read_references
             .retain(|referencing_item, _| !invalid_symbols_and_members.contains(referencing_item));
     }
 

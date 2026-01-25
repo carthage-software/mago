@@ -80,15 +80,12 @@ pub struct CodebaseMetadata {
 }
 
 impl CodebaseMetadata {
-    // Construction
-
     /// Creates a new, empty `CodebaseMetadata` with default values.
     #[inline]
     #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
-    // Symbol Existence Checks
 
     /// Checks if a class exists in the codebase (case-insensitive).
     ///
@@ -135,6 +132,14 @@ impl CodebaseMetadata {
     pub fn class_like_exists(&self, name: &str) -> bool {
         let lowercase_name = ascii_lowercase_atom(name);
         self.symbols.contains(&lowercase_name)
+    }
+
+    /// Checks if a namespace exists (case-insensitive).
+    #[inline]
+    #[must_use]
+    pub fn namespace_exists(&self, name: &str) -> bool {
+        let lowercase_name = ascii_lowercase_atom(name);
+        self.symbols.contains_namespace(&lowercase_name)
     }
 
     /// Checks if a class or trait exists in the codebase (case-insensitive).
@@ -236,7 +241,6 @@ impl CodebaseMetadata {
         let property_name = atom(property);
         self.class_likes.get(&lowercase_class).is_some_and(|meta| meta.properties.contains_key(&property_name))
     }
-    // Metadata Retrieval - Class-likes
 
     /// Retrieves metadata for a class (case-insensitive).
     /// Returns `None` if the name doesn't correspond to a class.
@@ -278,7 +282,6 @@ impl CodebaseMetadata {
         let lowercase_name = ascii_lowercase_atom(name);
         self.class_likes.get(&lowercase_name)
     }
-    // Metadata Retrieval - Functions & Methods
 
     /// Retrieves metadata for a global function (case-insensitive).
     #[inline]
@@ -344,7 +347,6 @@ impl CodebaseMetadata {
             FunctionLikeIdentifier::Closure(file_id, position) => self.get_closure(file_id, position),
         }
     }
-    // Metadata Retrieval - Constants
 
     /// Retrieves metadata for a global constant.
     /// Namespace lookup is case-insensitive, constant name is case-sensitive.
@@ -373,7 +375,6 @@ impl CodebaseMetadata {
         let case_name = atom(case);
         self.class_likes.get(&lowercase_class).and_then(|meta| meta.enum_cases.get(&case_name))
     }
-    // Metadata Retrieval - Properties
 
     /// Retrieves metadata for a property directly from the class where it's declared.
     /// Class name is case-insensitive, property name is case-sensitive.
@@ -589,7 +590,6 @@ impl CodebaseMetadata {
         }
         ancestors
     }
-    // Method Resolution
 
     /// Gets the class where a method is declared (following inheritance).
     #[inline]
@@ -761,7 +761,6 @@ impl CodebaseMetadata {
 
         &[]
     }
-    // Property Resolution
 
     /// Gets the class where a property is declared.
     #[inline]
@@ -872,8 +871,6 @@ impl CodebaseMetadata {
     pub fn remove_file_signature(&mut self, file_id: &FileId) -> Option<FileSignature> {
         self.file_signatures.remove(file_id)
     }
-
-    // Utility Methods
 
     /// Merges information from another `CodebaseMetadata` into this one.
     pub fn extend(&mut self, other: CodebaseMetadata) {

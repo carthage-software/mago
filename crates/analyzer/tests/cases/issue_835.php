@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 class Test
 {
+    // @mago-expect analysis:write-only-property
     private readonly \DateTimeInterface $createdAt;
     public readonly string $name;
 
