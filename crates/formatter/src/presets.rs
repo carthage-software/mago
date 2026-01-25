@@ -568,6 +568,7 @@ const DRUPAL_PRESET: FormatSettings = FormatSettings {
     space_before_arrow_function_parameter_list_parenthesis: true,
     space_before_closure_parameter_list_parenthesis: true,
     space_before_hook_parameter_list_parenthesis: false,
+    inline_abstract_property_hooks: true,
     space_before_closure_use_clause_parenthesis: true,
     space_after_cast_unary_prefix_operators: true,
     space_after_reference_unary_prefix_operator: false,
