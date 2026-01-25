@@ -1,3 +1,5 @@
+use mago_atom::AtomSet;
+use mago_atom::atom;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -69,6 +71,7 @@ impl SymbolKind {
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
 pub struct Symbols {
     all: AtomMap<SymbolKind>,
+    namespaces: AtomSet,
 }
 
 impl Symbols {
@@ -76,30 +79,34 @@ impl Symbols {
     #[inline]
     #[must_use]
     pub fn new() -> Symbols {
-        Symbols { all: AtomMap::default() }
+        Symbols { all: AtomMap::default(), namespaces: AtomSet::default() }
     }
 
     /// Adds or updates a symbol name identified as a `Class`.
     #[inline]
     pub fn add_class_name(&mut self, name: Atom) {
+        self.namespaces.extend(get_symbol_namespaces(name));
         self.all.insert(name, SymbolKind::Class);
     }
 
     /// Adds or updates a symbol name identified as an `Interface`.
     #[inline]
     pub fn add_interface_name(&mut self, name: Atom) {
+        self.namespaces.extend(get_symbol_namespaces(name));
         self.all.insert(name, SymbolKind::Interface);
     }
 
     /// Adds or updates a symbol name identified as a `Trait`.
     #[inline]
     pub fn add_trait_name(&mut self, name: Atom) {
+        self.namespaces.extend(get_symbol_namespaces(name));
         self.all.insert(name, SymbolKind::Trait);
     }
 
     /// Adds or updates a symbol name identified as an `Enum`.
     #[inline]
     pub fn add_enum_name(&mut self, name: Atom) {
+        self.namespaces.extend(get_symbol_namespaces(name));
         self.all.insert(name, SymbolKind::Enum);
     }
 
@@ -131,6 +138,19 @@ impl Symbols {
     #[must_use]
     pub fn contains(&self, name: &Atom) -> bool {
         self.all.contains_key(name)
+    }
+
+    /// Check if any symbol within the table is part of the given namespace.
+    ///
+    /// # Arguments
+    ///
+    /// * `namespace`: The `Atom` of the namespace to check for.
+    ///
+    /// # Returns
+    ///
+    /// `true` if the namespace is present, `false` otherwise.
+    pub fn contains_namespace(&self, namespace: &Atom) -> bool {
+        self.namespaces.contains(namespace)
     }
 
     /// Checks if a symbol with the given name is a `Class`.
@@ -203,6 +223,7 @@ impl Symbols {
     /// Extends the current `Symbols` map with another one.
     #[inline]
     pub fn extend(&mut self, other: Symbols) {
+        self.namespaces.extend(other.namespaces);
         for (entry, kind) in other.all {
             self.all.entry(entry).or_insert(kind);
         }
@@ -215,4 +236,15 @@ impl Default for Symbols {
     fn default() -> Self {
         Self::new()
     }
+}
+/// Returns an iterator that yields all parent namespaces of a given symbol.
+///
+/// For example, if the symbol is `Foo\Bar\Baz\Qux`, the iterator yields:
+/// 1. `Foo`
+/// 2. `Foo\Bar`
+/// 3. `Foo\Bar\Baz`
+pub(super) fn get_symbol_namespaces(symbol_name: Atom) -> impl Iterator<Item = Atom> {
+    let s = symbol_name.as_str();
+
+    s.as_bytes().iter().enumerate().filter_map(move |(i, &byte)| if byte == b'\\' { Some(atom(&s[..i])) } else { None })
 }
