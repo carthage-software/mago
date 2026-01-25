@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 
 use mago_atom::AtomMap;
+use mago_atom::ascii_lowercase_atom;
 use mago_atom::atom;
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::ttype::TType;
@@ -170,6 +171,14 @@ fn resolve_function_callable_types<'ctx, 'arena, 'artifacts>(
 
             return Ok(vec![]);
         };
+
+        if let FunctionLikeIdentifier::Function(function_name) = identifier {
+            artifacts.symbol_references.add_reference_to_symbol(
+                &block_context.scope,
+                ascii_lowercase_atom(function_name.as_ref()),
+                false,
+            );
+        }
 
         return Ok(vec![Cow::Owned(TCallable::Alias(identifier))]);
     }

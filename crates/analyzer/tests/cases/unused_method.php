@@ -50,3 +50,59 @@ class PublicMethod
     {
     }
 }
+
+class UsedViaFirstClassCallable
+{
+    private function helper(string $name): string
+    {
+        return "Hello, $name";
+    }
+
+    public function main(): void
+    {
+        $closure = $this->helper(...);
+        $closure("World");
+    }
+}
+
+class UsedViaPartialApplication
+{
+    private function greet(string $greeting, string $name): string
+    {
+        return "$greeting, $name";
+    }
+
+    public function main(): void
+    {
+        $sayHello = $this->greet("Hello", ?);
+        $sayHello("World");
+    }
+}
+
+class UsedStaticViaFirstClassCallable
+{
+    private static function helper(int $x): int
+    {
+        return $x * 2;
+    }
+
+    public function main(): void
+    {
+        $closure = self::helper(...);
+        $closure(5);
+    }
+}
+
+class UsedStaticViaPartialApplication
+{
+    private static function add(int $a, int $b): int
+    {
+        return $a + $b;
+    }
+
+    public function main(): void
+    {
+        $addFive = self::add(5, ?);
+        $addFive(10);
+    }
+}
