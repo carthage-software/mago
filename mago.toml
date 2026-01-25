@@ -31,3 +31,4 @@ strict-list-index-checks = true
 no-boolean-literal-comparison = true
 allow-possibly-undefined-array-keys = false
 trust-existence-checks = false
+check-use-statements = true
