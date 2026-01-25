@@ -239,6 +239,7 @@ test_case!(idempotent_chain_with_array);
 test_case!(match_idempotency);
 test_case!(heredoc_indentation);
 test_case!(heredoc_indentation_disabled);
+test_case!(drupal_preset);
 
 // A special test case for regressions in the Psl codebase
 test_case!(psl_regressions);
@@ -327,7 +328,6 @@ test_case!(issue_812);
 test_case!(issue_813);
 test_case!(issue_816);
 test_case!(issue_825);
-test_case!(drupal_preset);
 test_case!(issue_926);
 
 #[test]
