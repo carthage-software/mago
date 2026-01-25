@@ -51,6 +51,7 @@ use crate::plugin::context::HookContext;
 use crate::statement::attributes::AttributeTarget;
 use crate::statement::attributes::analyze_attributes;
 use crate::statement::class_like::method_signature::SignatureCompatibilityIssue;
+use crate::statement::function_like::report_undefined_type_references;
 use crate::utils::missing_type_hints;
 
 pub mod constant;
@@ -788,6 +789,27 @@ pub(crate) fn analyze_class_like<'ctx, 'ast, 'arena>(
             }
             ClassLikeMember::Property(property) => {
                 missing_type_hints::check_property_type_hint(context, class_like_metadata, property);
+
+                let property_names: Vec<Atom> = match property {
+                    Property::Plain(plain) => plain.items.iter().map(|item| atom(item.variable().name)).collect(),
+                    Property::Hooked(hooked) => {
+                        vec![atom(hooked.item.variable().name)]
+                    }
+                };
+
+                for property_name in property_names {
+                    if let Some(prop_meta) = class_like_metadata.properties.get(&property_name)
+                        && let Some(type_meta) = &prop_meta.type_metadata
+                    {
+                        report_undefined_type_references(context, type_meta);
+
+                        if type_meta.from_docblock
+                            && let Some(type_decl_meta) = &prop_meta.type_declaration_metadata
+                        {
+                            report_undefined_type_references(context, type_decl_meta);
+                        }
+                    }
+                }
 
                 property.analyze(context, &mut block_context, artifacts)?;
             }

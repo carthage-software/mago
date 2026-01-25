@@ -89,6 +89,17 @@ pub fn analyze_function_like<'ctx, 'ast, 'arena>(
 
     let mut artifacts = AnalysisArtifacts::new();
 
+    if let Some(return_type) = &function_like_metadata.return_type_metadata {
+        report_undefined_type_references(context, return_type);
+
+        // Only check native declaration if effective type is from docblock (to avoid duplicates)
+        if return_type.from_docblock
+            && let Some(native_return) = &function_like_metadata.return_type_declaration_metadata
+        {
+            report_undefined_type_references(context, native_return);
+        }
+    }
+
     if let Some(effective_return) = &function_like_metadata.return_type_metadata
         && effective_return.from_docblock
         && let Some(native_return) = &function_like_metadata.return_type_declaration_metadata
@@ -251,6 +262,17 @@ fn add_parameter_types_to_context<'ctx, 'arena>(
 ) -> Result<(), AnalysisError> {
     for (i, parameter_metadata) in function_like_metadata.parameters.iter().enumerate() {
         let parameter_variable_str = parameter_metadata.get_name().0;
+
+        if let Some(parameter_type) = parameter_metadata.get_type_metadata() {
+            report_undefined_type_references(context, parameter_type);
+
+            // Only check native declaration if effective type is from docblock (to avoid duplicates)
+            if parameter_type.from_docblock
+                && let Some(native_type) = parameter_metadata.get_type_declaration_metadata()
+            {
+                report_undefined_type_references(context, native_type);
+            }
+        }
 
         let declared_parameter_type = if let Some(parameter_type) = parameter_metadata.get_type_metadata() {
             let effective_type =
@@ -882,6 +904,34 @@ pub fn check_unused_function_template_parameters<'ctx>(
             .with_help(format!(
                 "Remove the unused `@template {template_name}` from the docblock, or use it in a parameter or return type."
             )),
+        );
+    }
+}
+
+/// Reports errors for any undefined type references in the given type metadata.
+///
+/// This function scans the type union for unresolved `TReference::Symbol` entries,
+/// which indicate types that were not found during the population phase.
+pub fn report_undefined_type_references(context: &mut Context<'_, '_>, type_metadata: &TypeMetadata) {
+    if type_metadata.inferred {
+        return;
+    }
+
+    for type_ref in type_metadata.type_union.get_all_child_nodes() {
+        let TypeRef::Atomic(TAtomic::Reference(TReference::Symbol { name, .. })) = type_ref else {
+            continue;
+        };
+
+        context.collector.report_with_code(
+            IssueCode::NonExistentClassLike,
+            Issue::error(format!("Cannot find class, interface, enum, or type alias `{name}`."))
+                .with_annotation(
+                    Annotation::primary(type_metadata.span)
+                        .with_message(format!("`{name}` is not defined in the current codebase")),
+                )
+                .with_note("This error occurs when a type is referenced but not found in any analyzed source files or stubs.")
+                .with_note("If this type comes from an optional dependency or extension, you can safely suppress this issue using `@mago-ignore` or `@mago-expect`.")
+                .with_help("Verify the type name is spelled correctly, the file containing it is included in analysis, and any required `use` statements are present."),
         );
     }
 }

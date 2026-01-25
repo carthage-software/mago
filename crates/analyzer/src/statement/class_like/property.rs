@@ -26,6 +26,7 @@ use crate::statement::attributes::AttributeTarget;
 use crate::statement::attributes::analyze_attributes;
 use crate::statement::function_like::add_properties_to_context;
 use crate::statement::function_like::get_this_type;
+use crate::statement::function_like::report_undefined_type_references;
 use crate::statement::r#return::handle_return_value;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for Property<'arena> {
@@ -155,6 +156,19 @@ fn analyze_property_hook<'ctx, 'arena>(
         && let Some(hook_meta) = property.hooks.get(&atom(hook.name.value))
     {
         scope.set_property_hook(Some((property_name, hook_meta)));
+
+        if let Some(param) = &hook_meta.parameter
+            && let Some(param_type) = param.get_type_metadata()
+        {
+            report_undefined_type_references(context, param_type);
+
+            // Only check native declaration if effective type is from docblock
+            if param_type.from_docblock
+                && let Some(param_type_decl) = param.get_type_declaration_metadata()
+            {
+                report_undefined_type_references(context, param_type_decl);
+            }
+        }
     }
 
     let mut hook_block_context = BlockContext::new(scope, context.settings.register_super_globals);
