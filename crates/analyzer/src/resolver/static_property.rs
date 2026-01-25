@@ -35,6 +35,11 @@ pub fn resolve_static_properties<'ctx, 'ast, 'arena>(
     let mut result = PropertyResolutionResult::default();
 
     let classnames = resolve_classnames_from_expression(context, block_context, artifacts, class_expression, false)?;
+    if let Some(class_type) = artifacts.get_expression_type(class_expression)
+        && class_type.is_nullable()
+    {
+        result.encountered_null = true;
+    }
 
     let mut property_names = vec![];
 

@@ -78,6 +78,10 @@ pub struct MethodResolutionResult {
     pub encountered_mixed: bool,
     /// True if an access on a `null` type was encountered.
     pub encountered_null: bool,
+    /// True if all resolved methods have non-nullable return types.
+    /// When combined with `encountered_null` and nullsafe access, indicates
+    /// the null in the result type came ONLY from nullsafe short-circuit.
+    pub all_methods_non_nullable_return: bool,
 }
 
 /// Resolves all possible method targets from an object expression and a member selector.
@@ -134,7 +138,7 @@ pub fn resolve_method_targets<'ctx, 'ast, 'arena>(
 
             if object_atomic.is_null() {
                 result.encountered_null = true;
-                if !object_type.ignore_nullable_issues() && !is_null_safe && !block_context.inside_nullsafe_chain {
+                if !object_type.ignore_nullable_issues() && !is_null_safe && !object_type.has_nullsafe_null() {
                     result.has_invalid_target = true;
 
                     context.collector.report_with_code(
@@ -259,6 +263,17 @@ pub fn resolve_method_targets<'ctx, 'ast, 'arena>(
         result.encountered_mixed = true;
         report_call_on_non_object(context, &TAtomic::Mixed(TMixed::new()), object.span(), selector.span());
     }
+
+    // Compute whether all resolved methods have non-nullable return types.
+    // This is used to determine if null in the result type came only from nullsafe short-circuit.
+    result.all_methods_non_nullable_return = !result.resolved_methods.is_empty()
+        && result.resolved_methods.iter().all(|resolved_method| {
+            context
+                .codebase
+                .get_method_by_id(&resolved_method.method_identifier)
+                .and_then(|method| method.return_type_metadata.as_ref())
+                .is_some_and(|return_type| !return_type.type_union.is_nullable())
+        });
 
     Ok(result)
 }

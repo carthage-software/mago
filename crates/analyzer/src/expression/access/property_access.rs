@@ -73,13 +73,6 @@ fn analyze_property_access<'ctx, 'ast, 'arena>(
     property_selector: &'ast ClassLikeMemberSelector<'arena>,
     is_null_safe: bool,
 ) -> Result<(), AnalysisError> {
-    // When using nullsafe operator, mark that we're in a nullsafe chain
-    // This propagates to all subsequent accesses in the chain and persists
-    // through the entire expression evaluation
-    if is_null_safe {
-        block_context.inside_nullsafe_chain = true;
-    }
-
     let property_access_id = get_property_access_expression_id(
         object,
         property_selector,
@@ -135,7 +128,16 @@ fn analyze_property_access<'ctx, 'ast, 'arena>(
         }
     }
 
-    let resulting_type = Rc::new(resulting_expression_type.unwrap_or_else(get_never));
+    let mut resulting_type = resulting_expression_type.unwrap_or_else(get_never);
+
+    let object_has_nullsafe_null = artifacts.get_expression_type(object).is_some_and(|t| t.has_nullsafe_null());
+    if resolution_result.all_properties_non_nullable
+        && ((is_null_safe && resolution_result.encountered_null) || object_has_nullsafe_null)
+    {
+        resulting_type.set_nullsafe_null(true);
+    }
+
+    let resulting_type = Rc::new(resulting_type);
     if let Some(property_access_id) = property_access_id {
         block_context.locals.insert(property_access_id, resulting_type.clone());
     }

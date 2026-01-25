@@ -68,6 +68,8 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for FunctionCall<'arena> {
             encountered_invalid_targets,
             false,
             false,
+            false, // object_has_nullsafe_null - not applicable for function calls
+            false, // all_targets_non_nullable_return - not applicable for function calls
         )?;
 
         if context.plugin_registry.has_function_call_hooks() {

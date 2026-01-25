@@ -321,6 +321,7 @@ test_case!(trait_require_implements_self_return);
 test_case!(trait_require_extends_self_return);
 test_case!(trait_require_combined);
 test_case!(interface_assertion);
+test_case!(nullsafe_chain_bug);
 test_case!(class_string_instantiation);
 test_case!(class_string_comparison);
 test_case!(static_var_lazy_init);

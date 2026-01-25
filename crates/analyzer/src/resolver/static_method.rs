@@ -54,6 +54,11 @@ pub fn resolve_static_method_targets<'ctx, 'ast, 'arena>(
     let mut result = MethodResolutionResult::default();
 
     let class_resolutions = resolve_classnames_from_expression(context, block_context, artifacts, class_expr, false)?;
+    if let Some(class_type) = artifacts.get_expression_type(class_expr)
+        && class_type.is_nullable()
+    {
+        result.encountered_null = true;
+    }
     let selector_resolutions = resolve_member_selector(context, block_context, artifacts, method_selector)?;
 
     let mut method_names = vec![];
@@ -95,6 +100,15 @@ pub fn resolve_static_method_targets<'ctx, 'ast, 'arena>(
             result.resolved_methods.extend(resolved_methods);
         }
     }
+
+    result.all_methods_non_nullable_return = !result.resolved_methods.is_empty()
+        && result.resolved_methods.iter().all(|resolved_method| {
+            context
+                .codebase
+                .get_method_by_id(&resolved_method.method_identifier)
+                .and_then(|method| method.return_type_metadata.as_ref())
+                .is_some_and(|return_type| !return_type.type_union.is_nullable())
+        });
 
     Ok(result)
 }
