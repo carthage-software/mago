@@ -45,7 +45,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for StaticMethodPartialApplication<'
             );
 
             identifiers.push(FunctionLikeIdentifier::Method(
-                *resolved_method.method_identifier.get_class_name(),
+                resolved_method.classname,
                 *resolved_method.method_identifier.get_method_name(),
             ));
         }
