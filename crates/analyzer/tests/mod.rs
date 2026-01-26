@@ -541,6 +541,7 @@ test_case!(issue_871);
 test_case!(issue_872);
 test_case!(issue_923);
 test_case!(issue_932);
+test_case!(issue_940);
 test_case!(undefined_type_reference);
 test_case!(duplicate_definition);
 

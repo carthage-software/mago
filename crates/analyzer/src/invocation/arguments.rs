@@ -1,3 +1,5 @@
+use std::collections::hash_map::Entry;
+
 use ahash::HashMap;
 
 use mago_codex::ttype::TType;
@@ -84,7 +86,17 @@ pub fn analyze_and_store_argument_type<'ctx, 'arena>(
                 parameter.get_type_signature().map(|param_type| (parameter_index, param_type.clone()))
             })
             .for_each(|(parameter_index, parameter_type)| {
-                inferred_parameters.insert(parameter_index, parameter_type);
+                match inferred_parameters.entry(parameter_index) {
+                    Entry::Occupied(occupied_entry) => {
+                        let existing_type: TUnion = occupied_entry.remove();
+                        let updated_type = add_union_type(existing_type, &parameter_type, context.codebase, false);
+
+                        inferred_parameters.insert(parameter_index, updated_type);
+                    }
+                    Entry::Vacant(vacant_entry) => {
+                        vacant_entry.insert(parameter_type);
+                    }
+                };
             });
 
         inferred_parameters
