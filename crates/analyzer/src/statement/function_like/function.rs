@@ -1,11 +1,14 @@
 use mago_atom::atom;
 use mago_codex::context::ScopeContext;
-
+use mago_reporting::Annotation;
+use mago_reporting::Issue;
 use mago_span::HasSpan;
+use mago_span::Span;
 use mago_syntax::ast::Function;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
+use crate::code::IssueCode;
 use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
@@ -16,6 +19,26 @@ use crate::statement::function_like::FunctionLikeBody;
 use crate::statement::function_like::analyze_function_like;
 use crate::statement::function_like::check_unused_function_template_parameters;
 use crate::statement::function_like::unused_parameter;
+
+/// Reports a duplicate function definition issue.
+fn report_duplicate_function_definition(
+    context: &mut Context<'_, '_>,
+    name: &str,
+    duplicate_span: Span,
+    original_span: Span,
+) {
+    context.collector.report_with_code(
+        IssueCode::DuplicateDefinition,
+        Issue::error(format!("Function `{name}` is already defined elsewhere."))
+            .with_annotation(Annotation::primary(duplicate_span).with_message("Duplicate function definition here"))
+            .with_annotation(Annotation::secondary(original_span).with_message("Original function defined here"))
+            .with_note("Each function must have a unique name within the same namespace.")
+            .with_note("The duplicate definition will be ignored during analysis.")
+            .with_help(
+                "Consider using namespaces to avoid naming conflicts, or remove one of the duplicate definitions.",
+            ),
+    );
+}
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for Function<'arena> {
     fn analyze<'ctx>(
@@ -44,6 +67,12 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Function<'arena> {
                 self.span(),
             ));
         };
+
+        if function_metadata.span != self.span() {
+            report_duplicate_function_definition(context, function_name.as_ref(), self.span(), function_metadata.span);
+
+            return Ok(());
+        }
 
         // Call plugin on_enter_function hooks
         if context.plugin_registry.has_function_decl_hooks() {

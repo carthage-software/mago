@@ -58,6 +58,11 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Method<'arena> {
             return Ok(());
         };
 
+        // Skip duplicate methods; semantics reports the error
+        if method_metadata.span != self.span() {
+            return Ok(());
+        }
+
         let mut scope = ScopeContext::new();
         scope.set_class_like(Some(class_like_metadata));
         scope.set_function_like(Some(method_metadata));

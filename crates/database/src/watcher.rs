@@ -253,8 +253,9 @@ impl<'a> DatabaseWatcher<'a> {
                 continue;
             }
 
-            let logical_name = path.strip_prefix(workspace).unwrap_or(&path).to_string_lossy();
-            let file_id = FileId::new(logical_name.as_ref());
+            // Normalize to forward slashes for cross-platform determinism
+            let logical_name = path.strip_prefix(workspace).unwrap_or(&path).to_string_lossy().replace('\\', "/");
+            let file_id = FileId::new(&logical_name);
 
             changed_files.push(ChangedFile { id: file_id, path: path.clone() });
         }

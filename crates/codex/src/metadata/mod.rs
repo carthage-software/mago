@@ -18,12 +18,14 @@ use mago_atom::u64_atom;
 use mago_database::file::FileId;
 use mago_reporting::IssueCollection;
 use mago_span::Position;
+use mago_span::Span;
 
 use crate::identifier::method::MethodIdentifier;
 use crate::metadata::class_like::ClassLikeMetadata;
 use crate::metadata::class_like_constant::ClassLikeConstantMetadata;
 use crate::metadata::constant::ConstantMetadata;
 use crate::metadata::enum_case::EnumCaseMetadata;
+use crate::metadata::flags::MetadataFlags;
 use crate::metadata::function_like::FunctionLikeMetadata;
 use crate::metadata::property::PropertyMetadata;
 use crate::metadata::ttype::TypeMetadata;
@@ -873,68 +875,47 @@ impl CodebaseMetadata {
     }
 
     /// Merges information from another `CodebaseMetadata` into this one.
+    ///
+    /// When both metadata have the same priority, the one with the smaller span is kept
+    /// for deterministic results regardless of scan order.
     pub fn extend(&mut self, other: CodebaseMetadata) {
         for (k, v) in other.class_likes {
-            let metadata_to_keep = match self.class_likes.entry(k) {
-                Entry::Occupied(entry) => {
-                    let existing = entry.remove();
-                    if v.flags.is_user_defined() {
-                        v
-                    } else if existing.flags.is_user_defined() {
-                        existing
-                    } else if v.flags.is_built_in() {
-                        v
-                    } else if existing.flags.is_built_in() {
-                        existing
-                    } else {
-                        v
+            match self.class_likes.entry(k) {
+                Entry::Occupied(mut entry) => {
+                    if should_replace_metadata(entry.get().flags, entry.get().span, v.flags, v.span) {
+                        entry.insert(v);
                     }
                 }
-                Entry::Vacant(_) => v,
-            };
-            self.class_likes.insert(k, metadata_to_keep);
+                Entry::Vacant(entry) => {
+                    entry.insert(v);
+                }
+            }
         }
 
         for (k, v) in other.function_likes {
-            let metadata_to_keep = match self.function_likes.entry(k) {
-                Entry::Occupied(entry) => {
-                    let existing = entry.remove();
-                    if v.flags.is_user_defined() {
-                        v
-                    } else if existing.flags.is_user_defined() {
-                        existing
-                    } else if v.flags.is_built_in() {
-                        v
-                    } else if existing.flags.is_built_in() {
-                        existing
-                    } else {
-                        v
+            match self.function_likes.entry(k) {
+                Entry::Occupied(mut entry) => {
+                    if should_replace_metadata(entry.get().flags, entry.get().span, v.flags, v.span) {
+                        entry.insert(v);
                     }
                 }
-                Entry::Vacant(_) => v,
-            };
-            self.function_likes.insert(k, metadata_to_keep);
+                Entry::Vacant(entry) => {
+                    entry.insert(v);
+                }
+            }
         }
 
         for (k, v) in other.constants {
-            let metadata_to_keep = match self.constants.entry(k) {
-                Entry::Occupied(entry) => {
-                    let existing = entry.remove();
-                    if v.flags.is_user_defined() {
-                        v
-                    } else if existing.flags.is_user_defined() {
-                        existing
-                    } else if v.flags.is_built_in() {
-                        v
-                    } else if existing.flags.is_built_in() {
-                        existing
-                    } else {
-                        v
+            match self.constants.entry(k) {
+                Entry::Occupied(mut entry) => {
+                    if should_replace_metadata(entry.get().flags, entry.get().span, v.flags, v.span) {
+                        entry.insert(v);
                     }
                 }
-                Entry::Vacant(_) => v,
-            };
-            self.constants.insert(k, metadata_to_keep);
+                Entry::Vacant(entry) => {
+                    entry.insert(v);
+                }
+            }
         }
 
         self.symbols.extend(other.symbols);
@@ -1005,4 +986,31 @@ impl Default for CodebaseMetadata {
             file_signatures: HashMap::default(),
         }
     }
+}
+
+/// Determines which metadata value to keep when merging duplicates.
+///
+/// Priority: user-defined > built-in > other. Uses smaller span as tie-breaker.
+/// Returns `true` if the new value should replace the existing one.
+fn should_replace_metadata(
+    existing_flags: MetadataFlags,
+    existing_span: Span,
+    new_flags: MetadataFlags,
+    new_span: Span,
+) -> bool {
+    let new_is_user_defined = new_flags.is_user_defined();
+    let existing_is_user_defined = existing_flags.is_user_defined();
+
+    if new_is_user_defined != existing_is_user_defined {
+        return new_is_user_defined;
+    }
+
+    let new_is_built_in = new_flags.is_built_in();
+    let existing_is_built_in = existing_flags.is_built_in();
+
+    if new_is_built_in != existing_is_built_in {
+        return new_is_built_in;
+    }
+
+    new_span < existing_span
 }

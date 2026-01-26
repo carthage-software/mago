@@ -178,6 +178,7 @@ final class AnalyzerCodeModuleGenerator
         'invalid-foreach-value',
         'undefined-variable-in-closure-use',
         'duplicate-closure-use-variable',
+        'duplicate-definition',
         'invalid-yield-value-type',
         'invalid-yield-key-type',
         'unknown-yield-from-iterator-type',

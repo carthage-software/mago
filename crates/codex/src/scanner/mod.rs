@@ -183,7 +183,7 @@ impl<'ctx, 'arena> MutWalker<'arena, 'arena, Context<'ctx, 'arena>> for Scanner 
             constraints
         });
 
-        self.codebase.function_likes.insert(identifier, metadata);
+        self.codebase.function_likes.entry(identifier).or_insert(metadata);
     }
 
     #[inline]
@@ -218,7 +218,7 @@ impl<'ctx, 'arena> MutWalker<'arena, 'arena, Context<'ctx, 'arena>> for Scanner 
             constraints
         });
 
-        self.codebase.function_likes.insert(identifier, metadata);
+        self.codebase.function_likes.entry(identifier).or_insert(metadata);
     }
 
     #[inline]
@@ -257,7 +257,7 @@ impl<'ctx, 'arena> MutWalker<'arena, 'arena, Context<'ctx, 'arena>> for Scanner 
 
             constraints
         });
-        self.codebase.function_likes.insert(identifier, metadata);
+        self.codebase.function_likes.entry(identifier).or_insert(metadata);
     }
 
     #[inline]
@@ -275,7 +275,7 @@ impl<'ctx, 'arena> MutWalker<'arena, 'arena, Context<'ctx, 'arena>> for Scanner 
 
         for constant_metadata in constants {
             let constant_name = constant_metadata.name;
-            self.codebase.constants.insert(constant_name, constant_metadata);
+            self.codebase.constants.entry(constant_name).or_insert(constant_metadata);
         }
     }
 
@@ -291,7 +291,7 @@ impl<'ctx, 'arena> MutWalker<'arena, 'arena, Context<'ctx, 'arena>> for Scanner 
             return;
         };
 
-        self.codebase.constants.insert(constant_metadata.name, constant_metadata);
+        self.codebase.constants.entry(constant_metadata.name).or_insert(constant_metadata);
     }
 
     #[inline]
@@ -479,8 +479,8 @@ impl<'ctx, 'arena> MutWalker<'arena, 'arena, Context<'ctx, 'arena>> for Scanner 
             constraints
         });
 
-        self.codebase.class_likes.insert(current_class, class_like_metadata);
-        self.codebase.function_likes.insert(method_id, function_like_metadata);
+        self.codebase.class_likes.entry(current_class).or_insert(class_like_metadata);
+        self.codebase.function_likes.entry(method_id).or_insert(function_like_metadata);
     }
 
     #[inline]

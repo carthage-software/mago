@@ -542,6 +542,7 @@ test_case!(issue_872);
 test_case!(issue_923);
 test_case!(issue_932);
 test_case!(undefined_type_reference);
+test_case!(duplicate_definition);
 
 #[test]
 fn test_all_test_cases_are_ran() {

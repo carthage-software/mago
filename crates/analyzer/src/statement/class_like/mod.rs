@@ -63,6 +63,30 @@ pub mod override_attribute;
 pub mod property;
 pub mod unused_members;
 
+/// Reports a duplicate definition issue for class-like types.
+fn report_duplicate_definition(
+    context: &mut Context<'_, '_>,
+    title: &str,
+    kind: &str,
+    name: &str,
+    duplicate_span: Span,
+    original_span: Span,
+) {
+    context.collector.report_with_code(
+        IssueCode::DuplicateDefinition,
+        Issue::error(format!("{title} `{name}` is already defined elsewhere."))
+            .with_annotation(
+                Annotation::primary(duplicate_span).with_message(format!("Duplicate {kind} definition here")),
+            )
+            .with_annotation(Annotation::secondary(original_span).with_message(format!("Original {kind} defined here")))
+            .with_note("Each class, interface, trait, or enum must have a unique name within the same namespace.")
+            .with_note("The duplicate definition will be ignored during analysis.")
+            .with_help(
+                "Consider using namespaces to avoid naming conflicts, or remove one of the duplicate definitions.",
+            ),
+    );
+}
+
 /// Helper function to check if a child type is compatible with (contained by) a parent type.
 ///
 /// This is a convenience wrapper around `union_comparator::is_contained_by` with standard
@@ -311,6 +335,11 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Class<'arena> {
             return Ok(());
         };
 
+        if class_like_metadata.span != self.span() {
+            report_duplicate_definition(context, "Class", "class", name, self.span(), class_like_metadata.span);
+            return Ok(());
+        }
+
         // Call plugin on_enter_class hooks
         if context.plugin_registry.has_class_hooks() {
             let mut hook_context = HookContext::new(context.codebase, block_context, artifacts);
@@ -389,6 +418,11 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Interface<'arena> {
             return Ok(());
         };
 
+        if class_like_metadata.span != self.span() {
+            report_duplicate_definition(context, "Interface", "interface", name, self.span(), class_like_metadata.span);
+            return Ok(());
+        }
+
         // Call plugin on_enter_interface hooks
         if context.plugin_registry.has_interface_hooks() {
             let mut hook_context = HookContext::new(context.codebase, block_context, artifacts);
@@ -448,6 +482,11 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Trait<'arena> {
             return Ok(());
         };
 
+        if class_like_metadata.span != self.span() {
+            report_duplicate_definition(context, "Trait", "trait", name, self.span(), class_like_metadata.span);
+            return Ok(());
+        }
+
         // Call plugin on_enter_trait hooks
         if context.plugin_registry.has_trait_hooks() {
             let mut hook_context = HookContext::new(context.codebase, block_context, artifacts);
@@ -506,6 +545,11 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Enum<'arena> {
 
             return Ok(());
         };
+
+        if class_like_metadata.span != self.span() {
+            report_duplicate_definition(context, "Enum", "enum", name, self.span(), class_like_metadata.span);
+            return Ok(());
+        }
 
         // Call plugin on_enter_enum hooks
         if context.plugin_registry.has_enum_hooks() {
