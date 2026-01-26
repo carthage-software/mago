@@ -303,7 +303,7 @@ impl IssueProcessor {
         fail_on_out_of_sync_baseline: bool,
     ) -> Result<ExitCode, Error> {
         if self.fix {
-            self.handle_fix_mode(orchestrator, database, issues)
+            self.handle_fix_mode(orchestrator, database, issues, baseline)
         } else {
             self.handle_report_mode(database, issues, baseline, fail_on_out_of_sync_baseline)
         }
@@ -321,7 +321,11 @@ impl IssueProcessor {
         orchestrator: &Orchestrator<'_>,
         database: &mut Database<'_>,
         issues: IssueCollection,
+        baseline: Option<Baseline>,
     ) -> Result<ExitCode, Error> {
+        let issues =
+            if let Some(baseline) = baseline { baseline.filter_issues(issues, &database.read_only()) } else { issues };
+
         let dry_run = self.dry_run;
         let (applied_fixes, skipped_unsafe, skipped_potentially_unsafe, bugs) =
             self.apply_fixes(orchestrator, database, issues)?;
