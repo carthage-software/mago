@@ -54,10 +54,14 @@ export function useUrlState() {
       }
 
       const { uuid } = await response.json();
-      shareUrl.value = `${window.location.origin}${window.location.pathname}#${uuid}`;
+      const params = new URLSearchParams(window.location.search);
+      const tab = state.t || params.get('tab') || 'issues';
+      params.set('tab', tab);
+      const query = `?${params.toString()}`;
+      shareUrl.value = `${window.location.origin}${window.location.pathname}${query}#${uuid}`;
       lastStateHash = stateHash;
 
-      window.history.replaceState(null, '', `#${uuid}`);
+      window.history.replaceState(null, '', `${query}#${uuid}`);
 
       return shareUrl.value;
     } catch (e) {
