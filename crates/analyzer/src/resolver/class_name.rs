@@ -327,10 +327,10 @@ pub fn resolve_classnames_from_expression<'ctx, 'arena>(
         expression => {
             // If the expression is not already analyzed, we analyze it now.
             if !class_is_analyzed {
-                let was_inside_call = block_context.inside_call;
-                block_context.inside_call = true;
+                let was_inside_call = block_context.flags.inside_call();
+                block_context.flags.set_inside_call(true);
                 expression.analyze(context, block_context, artifacts)?;
-                block_context.inside_call = was_inside_call;
+                block_context.flags.set_inside_call(was_inside_call);
             }
 
             let expression_type = artifacts.get_expression_type(expression);

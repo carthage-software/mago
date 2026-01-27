@@ -96,7 +96,7 @@ pub fn reconcile_keyed_types<'ctx>(
         }
     }
 
-    let inside_loop = block_context.inside_loop;
+    let inside_loop = block_context.flags.inside_loop();
     let old_new_types = new_types.clone();
     let mut new_types = new_types.clone();
 

@@ -106,10 +106,10 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
     }
 
     pub fn analyze(mut self, switch: &Switch<'arena>) -> Result<(), AnalysisError> {
-        let was_inside_conditional = self.block_context.inside_conditional;
-        self.block_context.inside_conditional = true;
+        let was_inside_conditional = self.block_context.flags.inside_conditional();
+        self.block_context.flags.set_inside_conditional(true);
         switch.expression.analyze(self.context, self.block_context, self.artifacts)?;
-        self.block_context.inside_conditional = was_inside_conditional;
+        self.block_context.flags.set_inside_conditional(was_inside_conditional);
 
         let subject_type = match self.artifacts.get_rc_expression_type(&switch.expression).cloned() {
             Some(t) => t,
@@ -231,7 +231,7 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
 
         self.artifacts.fully_matched_switch_offsets.insert(switch.start_position().offset);
         self.block_context.assigned_variable_ids.extend(self.new_assigned_variable_ids);
-        self.block_context.has_returned = all_options_returned && is_exhaustive;
+        self.block_context.flags.set_has_returned(all_options_returned && is_exhaustive);
 
         Ok(())
     }

@@ -251,7 +251,7 @@ fn analyze_method_call<'ctx, 'ast, 'arena>(
     is_null_safe: bool,
     span: Span,
 ) -> Result<(), AnalysisError> {
-    if block_context.collect_initializations
+    if block_context.flags.collect_initializations()
         && let ClassLikeMemberSelector::Identifier(method_ident) = selector
         && is_this_or_self_returning_chain(object, context, block_context)
     {

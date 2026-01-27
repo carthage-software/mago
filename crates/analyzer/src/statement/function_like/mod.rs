@@ -194,9 +194,9 @@ pub fn analyze_function_like<'ctx, 'ast, 'arena>(
                 analyze_statements(statements, context, block_context, &mut artifacts)?;
             }
             FunctionLikeBody::Expression(value) => {
-                block_context.inside_return = true;
+                block_context.flags.set_inside_return(true);
                 value.analyze(context, block_context, &mut artifacts)?;
-                block_context.inside_return = false;
+                block_context.flags.set_inside_return(false);
                 block_context.conditionally_referenced_variable_ids = Default::default();
 
                 let value_type =
@@ -208,7 +208,7 @@ pub fn analyze_function_like<'ctx, 'ast, 'arena>(
     }
 
     if let Some(function_metadata) = block_context.scope.get_function_like()
-        && !block_context.has_returned
+        && !block_context.flags.has_returned()
         && let Some(return_type) = &function_metadata.return_type_metadata
         && !return_type.type_union.is_void()
         && !function_like_metadata.flags.has_yield()

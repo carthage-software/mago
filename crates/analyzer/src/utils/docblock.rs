@@ -229,7 +229,8 @@ pub fn get_type_from_var_docblock<'ctx>(
     value_expression_variable_id: Option<&str>,
     mut allow_unnamed: bool,
 ) -> Option<(TUnion, Span)> {
-    allow_unnamed = allow_unnamed && !block_context.inside_return && !block_context.inside_loop_expressions;
+    allow_unnamed =
+        allow_unnamed && !block_context.flags.inside_return() && !block_context.flags.inside_loop_expressions();
 
     get_docblock_variables(context, block_context, artifacts, false)
         .into_iter()

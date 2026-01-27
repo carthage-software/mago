@@ -174,13 +174,13 @@ fn analyze_invocation_targets<'ctx, 'ast, 'arena>(
                 argument_list.analyze(context, block_context, artifacts)?;
             }
             InvocationArgumentsSource::PipeInput(pipe) => {
-                let was_inside_call = block_context.inside_call;
-                let was_inside_general_use = block_context.inside_general_use;
-                block_context.inside_call = true;
-                block_context.inside_general_use = true;
+                let was_inside_call = block_context.flags.inside_call();
+                let was_inside_general_use = block_context.flags.inside_general_use();
+                block_context.flags.set_inside_call(true);
+                block_context.flags.set_inside_general_use(true);
                 pipe.input.analyze(context, block_context, artifacts)?;
-                block_context.inside_call = was_inside_call;
-                block_context.inside_general_use = was_inside_general_use;
+                block_context.flags.set_inside_call(was_inside_call);
+                block_context.flags.set_inside_general_use(was_inside_general_use);
             }
             _ => {}
         }
@@ -192,10 +192,10 @@ fn analyze_invocation_targets<'ctx, 'ast, 'arena>(
         }
     };
 
-    if resulting_type.is_never() && !block_context.inside_loop {
+    if resulting_type.is_never() && !block_context.flags.inside_loop() {
         artifacts.set_expression_type(&call_span, resulting_type);
 
-        block_context.has_returned = true;
+        block_context.flags.set_has_returned(true);
         block_context.control_actions.insert(ControlAction::End);
         return Ok(());
     }
@@ -354,13 +354,13 @@ fn inspect_arguments<'ctx, 'arena>(
             argument_list.analyze(context, block_context, artifacts)?;
         }
         InvocationArgumentsSource::PipeInput(pipe) => {
-            let was_inside_call = block_context.inside_call;
-            let was_inside_general_use = block_context.inside_general_use;
-            block_context.inside_call = true;
-            block_context.inside_general_use = true;
+            let was_inside_call = block_context.flags.inside_call();
+            let was_inside_general_use = block_context.flags.inside_general_use();
+            block_context.flags.set_inside_call(true);
+            block_context.flags.set_inside_general_use(true);
             pipe.input.analyze(context, block_context, artifacts)?;
-            block_context.inside_call = was_inside_call;
-            block_context.inside_general_use = was_inside_general_use;
+            block_context.flags.set_inside_call(was_inside_call);
+            block_context.flags.set_inside_general_use(was_inside_general_use);
         }
         _ => {}
     }
@@ -412,13 +412,13 @@ fn confirm_argument_type<'ctx, 'arena>(
             argument_list.analyze(context, block_context, artifacts)?;
         }
         InvocationArgumentsSource::PipeInput(pipe) => {
-            let was_inside_call = block_context.inside_call;
-            let was_inside_general_use = block_context.inside_general_use;
-            block_context.inside_call = true;
-            block_context.inside_general_use = true;
+            let was_inside_call = block_context.flags.inside_call();
+            let was_inside_general_use = block_context.flags.inside_general_use();
+            block_context.flags.set_inside_call(true);
+            block_context.flags.set_inside_general_use(true);
             pipe.input.analyze(context, block_context, artifacts)?;
-            block_context.inside_call = was_inside_call;
-            block_context.inside_general_use = was_inside_general_use;
+            block_context.flags.set_inside_call(was_inside_call);
+            block_context.flags.set_inside_general_use(was_inside_general_use);
         }
         _ => {}
     }

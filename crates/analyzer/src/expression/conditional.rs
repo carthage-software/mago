@@ -253,10 +253,10 @@ pub(super) fn analyze_conditional<'ctx, 'ast, 'arena>(
     // Extract function_exists/defined assertions for the "else" branch.
     extract_function_constant_existence(condition, artifacts, &mut else_block_context, true);
 
-    let was_inside_general_use = else_block_context.inside_general_use;
-    else_block_context.inside_general_use = true;
+    let was_inside_general_use = else_block_context.flags.inside_general_use();
+    else_block_context.flags.set_inside_general_use(true);
     r#else.analyze(context, &mut else_block_context, artifacts)?;
-    else_block_context.inside_general_use = was_inside_general_use;
+    else_block_context.flags.set_inside_general_use(was_inside_general_use);
 
     let if_assigned_variables = if_block_context.assigned_variable_ids.keys().copied().collect::<AtomSet>();
     let else_assigned_variables = else_block_context.assigned_variable_ids.keys().copied().collect::<AtomSet>();
@@ -358,7 +358,7 @@ pub(super) fn analyze_conditional<'ctx, 'ast, 'arena>(
             &Assertion::Truthy,
             Some(condition_type.as_ref()),
             Some(""),
-            block_context.inside_loop,
+            block_context.flags.inside_loop(),
             Some(&condition.span()),
             false,
             false,

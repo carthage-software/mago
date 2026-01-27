@@ -170,7 +170,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Break<'arena> {
             );
         }
 
-        block_context.has_returned = true;
+        block_context.flags.set_has_returned(true);
 
         Ok(())
     }

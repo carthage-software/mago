@@ -33,11 +33,11 @@ pub fn analyze_arithmetic_operation<'ctx, 'arena>(
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
 ) -> Result<(), AnalysisError> {
-    let was_inside_general_use = block_context.inside_general_use;
-    block_context.inside_general_use = true;
+    let was_inside_general_use = block_context.flags.inside_general_use();
+    block_context.flags.set_inside_general_use(true);
     binary.lhs.analyze(context, block_context, artifacts)?;
     binary.rhs.analyze(context, block_context, artifacts)?;
-    block_context.inside_general_use = was_inside_general_use;
+    block_context.flags.set_inside_general_use(was_inside_general_use);
 
     let fallback = Rc::new(get_mixed());
     let left_type = artifacts.get_rc_expression_type(&binary.lhs).cloned().unwrap_or_else(|| fallback.clone());
@@ -334,8 +334,12 @@ pub fn analyze_arithmetic_operation<'ctx, 'arena>(
                     invalid_pair = true;
                 }
             } else if left_atomic.is_numeric() && right_atomic.is_numeric() {
-                let numeric_results =
-                    determine_numeric_result(&binary.operator, &left_atomic, &right_atomic, block_context.inside_loop);
+                let numeric_results = determine_numeric_result(
+                    &binary.operator,
+                    &left_atomic,
+                    &right_atomic,
+                    block_context.flags.inside_loop(),
+                );
 
                 if numeric_results.iter().any(|a| matches!(a, TAtomic::Never)) {
                     invalid_pair = true;

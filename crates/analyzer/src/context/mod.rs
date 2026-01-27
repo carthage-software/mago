@@ -27,6 +27,7 @@ use crate::settings::Settings;
 
 pub mod assertion;
 pub mod block;
+pub mod block_flags;
 pub mod scope;
 pub mod utils;
 

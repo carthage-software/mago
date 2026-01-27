@@ -77,9 +77,9 @@ pub(crate) fn analyze<'ctx, 'arena>(
         if_body_context = Some(externally_applied_context.clone());
     }
 
-    let was_inside_conditional = externally_applied_context.inside_conditional;
+    let was_inside_conditional = externally_applied_context.flags.inside_conditional();
 
-    externally_applied_context.inside_conditional = true;
+    externally_applied_context.flags.set_inside_conditional(true);
     let tmp_if_body_context = std::mem::take(&mut externally_applied_context.if_body_context);
     externally_applied_if_cond_expr.analyze(context, &mut externally_applied_context, artifacts)?;
     externally_applied_context.if_body_context = tmp_if_body_context;
@@ -89,7 +89,7 @@ pub(crate) fn analyze<'ctx, 'arena>(
 
     externally_applied_context.assigned_variable_ids.extend(pre_assigned_var_ids);
     externally_applied_context.conditionally_referenced_variable_ids.extend(pre_referenced_var_ids);
-    externally_applied_context.inside_conditional = was_inside_conditional;
+    externally_applied_context.flags.set_inside_conditional(was_inside_conditional);
 
     let mut if_body_context = if_body_context.unwrap_or_else(|| externally_applied_context.clone());
 
@@ -106,10 +106,10 @@ pub(crate) fn analyze<'ctx, 'arena>(
         if_conditional_context.assigned_variable_ids = AtomMap::default();
         if_conditional_context.conditionally_referenced_variable_ids = AtomSet::default();
 
-        let was_inside_conditional = if_conditional_context.inside_conditional;
-        if_conditional_context.inside_conditional = true;
+        let was_inside_conditional = if_conditional_context.flags.inside_conditional();
+        if_conditional_context.flags.set_inside_conditional(true);
         condition.analyze(context, &mut if_conditional_context, artifacts)?;
-        if_conditional_context.inside_conditional = was_inside_conditional;
+        if_conditional_context.flags.set_inside_conditional(was_inside_conditional);
 
         if_conditional_context.conditionally_referenced_variable_ids.extend(first_cond_referenced_var_ids);
         if_conditional_context.assigned_variable_ids.extend(first_cond_assigned_var_ids);

@@ -72,18 +72,18 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for UnaryPrefix<'arena> {
         let is_variable_reference = matches!(self.operator, UnaryPrefixOperator::Reference(_))
             && matches!(self.operand, Expression::Variable(Variable::Direct(_)));
 
-        let was_in_negation = block_context.inside_negation;
-        let was_in_variable_reference = block_context.inside_variable_reference;
-        let was_in_general_use = block_context.inside_general_use;
-        block_context.inside_general_use = true;
-        block_context.inside_variable_reference = is_variable_reference;
-        block_context.inside_negation = if is_negation { !was_in_negation } else { was_in_negation };
+        let was_in_negation = block_context.flags.inside_negation();
+        let was_in_variable_reference = block_context.flags.inside_variable_reference();
+        let was_in_general_use = block_context.flags.inside_general_use();
+        block_context.flags.set_inside_general_use(true);
+        block_context.flags.set_inside_variable_reference(is_variable_reference);
+        block_context.flags.set_inside_negation(if is_negation { !was_in_negation } else { was_in_negation });
 
         self.operand.analyze(context, block_context, artifacts)?;
 
-        block_context.inside_negation = was_in_negation;
-        block_context.inside_general_use = was_in_general_use;
-        block_context.inside_variable_reference = was_in_variable_reference;
+        block_context.flags.set_inside_negation(was_in_negation);
+        block_context.flags.set_inside_general_use(was_in_general_use);
+        block_context.flags.set_inside_variable_reference(was_in_variable_reference);
 
         let operand_type = artifacts.get_rc_expression_type(&self.operand).cloned();
         match self.operator {
@@ -417,10 +417,10 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for UnaryPostfix<'arena> {
         block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
-        let was_in_general_use = block_context.inside_general_use;
-        block_context.inside_general_use = true;
+        let was_in_general_use = block_context.flags.inside_general_use();
+        block_context.flags.set_inside_general_use(true);
         self.operand.analyze(context, block_context, artifacts)?;
-        block_context.inside_general_use = was_in_general_use;
+        block_context.flags.set_inside_general_use(was_in_general_use);
 
         match self.operator {
             UnaryPostfixOperator::PostIncrement(span) => {
@@ -474,7 +474,7 @@ fn increment_operand<'ctx, 'arena>(
                 TScalar::Integer(int_scalar) => {
                     let resulting_integer = int_scalar.add(TInteger::literal(1));
 
-                    if block_context.inside_loop {
+                    if block_context.flags.inside_loop() {
                         possibilities.push(TAtomic::Scalar(TScalar::Integer(match resulting_integer {
                             TInteger::Literal(value) => TInteger::From(value),
                             integer => integer,
@@ -484,7 +484,7 @@ fn increment_operand<'ctx, 'arena>(
                     }
                 }
                 TScalar::Float(float_scalar) => {
-                    if block_context.inside_loop {
+                    if block_context.flags.inside_loop() {
                         // Do not set literal value in loop context.
                         possibilities.push(TAtomic::Scalar(TScalar::float()));
                     } else if let TFloat::Literal(value) = float_scalar {
@@ -497,7 +497,7 @@ fn increment_operand<'ctx, 'arena>(
                     possibilities.push(TAtomic::Scalar(TScalar::numeric()));
                 }
                 TScalar::String(string_scalar) => {
-                    if block_context.inside_loop {
+                    if block_context.flags.inside_loop() {
                         possibilities.push(TAtomic::Scalar(TScalar::String(string_scalar.without_literal())));
                     } else if let Some(TStringLiteral::Value(string_val)) = &string_scalar.literal {
                         if string_val.is_empty() {
@@ -705,7 +705,7 @@ fn decrement_operand<'ctx, 'arena>(
             TAtomic::Scalar(scalar) => {
                 match scalar {
                     TScalar::Integer(int_scalar) => {
-                        if block_context.inside_loop {
+                        if block_context.flags.inside_loop() {
                             // Do not set literal value in loop context.
                             // TODO(azjez): we should set the type to a range here.
                             possibilities.push(TAtomic::Scalar(TScalar::int()));
@@ -715,7 +715,7 @@ fn decrement_operand<'ctx, 'arena>(
                     }
                     TScalar::Float(float_scalar) => {
                         if let TFloat::Literal(value) = float_scalar
-                            && !block_context.inside_loop
+                            && !block_context.flags.inside_loop()
                         {
                             possibilities.push(TAtomic::Scalar(TScalar::literal_float(value.0 - 1.0)));
                         } else {
@@ -726,7 +726,7 @@ fn decrement_operand<'ctx, 'arena>(
                         possibilities.push(TAtomic::Scalar(TScalar::numeric()));
                     }
                     TScalar::String(string_scalar) => {
-                        if block_context.inside_loop {
+                        if block_context.flags.inside_loop() {
                             possibilities.push(TAtomic::Scalar(TScalar::String(string_scalar.without_literal())));
                         } else if !string_scalar.is_numeric {
                             context.collector.report_with_code(

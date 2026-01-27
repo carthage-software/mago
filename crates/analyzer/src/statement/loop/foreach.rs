@@ -65,7 +65,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Foreach<'arena> {
         }
 
         let mut loop_block_context = block_context.clone();
-        loop_block_context.inside_loop = true;
+        loop_block_context.flags.set_inside_loop(true);
         loop_block_context.break_types.push(BreakContext::Loop);
 
         if let Some(key_expression) = self.target.key() {

@@ -78,20 +78,20 @@ pub fn resolve_member_selector<'ctx, 'arena>(
     match selector {
         ClassLikeMemberSelector::Identifier(ident) => Ok(vec![ResolvedSelector::Identifier(atom(ident.value))]),
         ClassLikeMemberSelector::Expression(expr) => {
-            let was_inside_general_use = block_context.inside_general_use;
-            block_context.inside_general_use = true;
+            let was_inside_general_use = block_context.flags.inside_general_use();
+            block_context.flags.set_inside_general_use(true);
             expr.expression.analyze(context, block_context, artifacts)?;
-            block_context.inside_general_use = was_inside_general_use;
+            block_context.flags.set_inside_general_use(was_inside_general_use);
 
             let selector_type = artifacts.get_expression_type(&expr.expression);
 
             Ok(resolve_selector_from_type(context, selector_type, expr.span(), SelectorKind::Member))
         }
         ClassLikeMemberSelector::Variable(var) => {
-            let was_inside_general_use = block_context.inside_general_use;
-            block_context.inside_general_use = true;
+            let was_inside_general_use = block_context.flags.inside_general_use();
+            block_context.flags.set_inside_general_use(true);
             var.analyze(context, block_context, artifacts)?;
-            block_context.inside_general_use = was_inside_general_use;
+            block_context.flags.set_inside_general_use(was_inside_general_use);
 
             let selector_type = artifacts.get_expression_type(&var);
 
@@ -112,10 +112,10 @@ pub fn resolve_constant_selector<'ctx, 'arena>(
     match selector {
         ClassLikeConstantSelector::Identifier(ident) => Ok(vec![ResolvedSelector::Identifier(atom(ident.value))]),
         ClassLikeConstantSelector::Expression(expr) => {
-            let was_inside_general_use = block_context.inside_general_use;
-            block_context.inside_general_use = true;
+            let was_inside_general_use = block_context.flags.inside_general_use();
+            block_context.flags.set_inside_general_use(true);
             expr.expression.analyze(context, block_context, artifacts)?;
-            block_context.inside_general_use = was_inside_general_use;
+            block_context.flags.set_inside_general_use(was_inside_general_use);
 
             let selector_type = artifacts.get_expression_type(&expr.expression);
 

@@ -50,10 +50,10 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for YieldValue<'arena> {
     ) -> Result<(), AnalysisError> {
         let key_type = get_int();
         let value_type = if let Some(value) = self.value.as_ref() {
-            let was_inside_call = block_context.inside_call;
-            block_context.inside_call = true;
+            let was_inside_call = block_context.flags.inside_call();
+            block_context.flags.set_inside_call(true);
             value.analyze(context, block_context, artifacts)?;
-            block_context.inside_call = was_inside_call;
+            block_context.flags.set_inside_call(was_inside_call);
 
             artifacts.get_expression_type(value).cloned().unwrap_or_else(get_mixed)
         } else {
@@ -134,19 +134,19 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for YieldPair<'arena> {
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
         let key_type = {
-            let was_inside_call = block_context.inside_call;
-            block_context.inside_call = true;
+            let was_inside_call = block_context.flags.inside_call();
+            block_context.flags.set_inside_call(true);
             self.key.analyze(context, block_context, artifacts)?;
-            block_context.inside_call = was_inside_call;
+            block_context.flags.set_inside_call(was_inside_call);
 
             artifacts.get_expression_type(&self.key).cloned().unwrap_or_else(get_mixed)
         };
 
         let value_type = {
-            let was_inside_call = block_context.inside_call;
-            block_context.inside_call = true;
+            let was_inside_call = block_context.flags.inside_call();
+            block_context.flags.set_inside_call(true);
             self.value.analyze(context, block_context, artifacts)?;
-            block_context.inside_call = was_inside_call;
+            block_context.flags.set_inside_call(was_inside_call);
 
             artifacts.get_expression_type(&self.value).cloned().unwrap_or_else(get_mixed)
         };
@@ -224,10 +224,10 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for YieldFrom<'arena> {
         block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
-        let was_inside_call = block_context.inside_call;
-        block_context.inside_call = true;
+        let was_inside_call = block_context.flags.inside_call();
+        block_context.flags.set_inside_call(true);
         self.iterator.analyze(context, block_context, artifacts)?;
-        block_context.inside_call = was_inside_call;
+        block_context.flags.set_inside_call(was_inside_call);
 
         let Some((k, v, s, _)) = get_current_generator_parameters(context, block_context, self.span()) else {
             return Ok(());

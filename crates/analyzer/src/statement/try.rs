@@ -65,12 +65,12 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
 
         let assigned_variable_ids = std::mem::take(&mut block_context.assigned_variable_ids);
 
-        let was_inside_try = block_context.inside_try;
-        block_context.inside_try = true;
+        let was_inside_try = block_context.flags.inside_try();
+        block_context.flags.set_inside_try(true);
         analyze_statements(self.block.statements.as_slice(), context, block_context, artifacts)?;
-        block_context.inside_try = was_inside_try;
+        block_context.flags.set_inside_try(was_inside_try);
         if !self.catch_clauses.is_empty() {
-            block_context.has_returned = false;
+            block_context.flags.set_has_returned(false);
         }
 
         let try_block_control_actions = ControlAction::from_statements(
@@ -146,7 +146,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
 
         for (i, catch_clause) in self.catch_clauses.iter().enumerate() {
             let mut catch_block_context = original_block_context.clone();
-            catch_block_context.has_returned = false;
+            catch_block_context.flags.set_has_returned(false);
             for (variable_id, variable_type) in &mut catch_block_context.locals {
                 if let Some(old_type) = old_block_context_locals.get(variable_id) {
                     *variable_type =
@@ -311,7 +311,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
             finally_block_context.assigned_variable_ids = AtomMap::default();
             finally_block_context.possibly_assigned_variable_ids = AtomSet::default();
             finally_block_context.locals = finally_scope.locals;
-            finally_block_context.has_returned = false;
+            finally_block_context.flags.set_has_returned(false);
 
             analyze_statements(
                 finally_clause.block.statements.as_slice(),
@@ -320,7 +320,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
                 artifacts,
             )?;
 
-            finally_has_returned = finally_block_context.has_returned;
+            finally_has_returned = finally_block_context.flags.has_returned();
 
             for (variable_id, _) in finally_block_context.assigned_variable_ids {
                 let finally_variable_type = finally_block_context.locals.remove(&variable_id);
@@ -370,13 +370,13 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
             block_context.possibly_thrown_exceptions.entry(possibly_thrown_exception).or_default().extend(throw_spans);
         }
 
-        block_context.has_returned = if finally_has_returned {
+        block_context.flags.set_has_returned(if finally_has_returned {
             true
         } else if !try_block_control_actions.contains(ControlAction::None) {
             self.catch_clauses.is_empty() || all_catches_leave
         } else {
             false
-        };
+        });
 
         Ok(())
     }

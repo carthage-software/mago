@@ -44,12 +44,12 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for StaticMethodCall<'arena> {
             }
         }
 
-        if block_context.collect_initializations
+        if block_context.flags.collect_initializations()
             && let Expression::Parent(_) = self.class
             && let ClassLikeMemberSelector::Identifier(method_ident) = &self.method
         {
             if method_ident.value.eq_ignore_ascii_case("__construct") {
-                block_context.calls_parent_constructor = true;
+                block_context.flags.set_calls_parent_constructor(true);
             } else {
                 let method_name = mago_atom::ascii_lowercase_atom(method_ident.value);
                 if context.settings.class_initializers.contains(&method_name) {

@@ -51,18 +51,18 @@ pub fn resolve_static_properties<'ctx, 'ast, 'arena>(
                 break 'resolve_names;
             }
             Variable::Indirect(indirect_variable) => {
-                let was_inside_general_use = block_context.inside_general_use;
-                block_context.inside_general_use = true;
+                let was_inside_general_use = block_context.flags.inside_general_use();
+                block_context.flags.set_inside_general_use(true);
                 indirect_variable.expression.analyze(context, block_context, artifacts)?;
-                block_context.inside_general_use = was_inside_general_use;
+                block_context.flags.set_inside_general_use(was_inside_general_use);
 
                 artifacts.get_rc_expression_type(indirect_variable.expression)
             }
             Variable::Nested(nested_variable) => {
-                let was_inside_general_use = block_context.inside_general_use;
-                block_context.inside_general_use = true;
+                let was_inside_general_use = block_context.flags.inside_general_use();
+                block_context.flags.set_inside_general_use(true);
                 nested_variable.variable.analyze(context, block_context, artifacts)?;
-                block_context.inside_general_use = was_inside_general_use;
+                block_context.flags.set_inside_general_use(was_inside_general_use);
 
                 artifacts.get_rc_expression_type(nested_variable.variable)
             }

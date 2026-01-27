@@ -91,7 +91,7 @@ fn analyze_for_or_while_loop<'ctx, 'ast, 'arena>(
     block_context.assigned_variable_ids.extend(pre_assigned_var_ids);
 
     let mut loop_block_context = block_context.clone();
-    loop_block_context.inside_loop = true;
+    loop_block_context.flags.set_inside_loop(true);
     loop_block_context.break_types.push(BreakContext::Loop);
     let previous_loop_bounds = loop_block_context.loop_bounds;
     loop_block_context.loop_bounds = span.to_offset_tuple();
@@ -167,7 +167,7 @@ fn inherit_loop_block_context<'ctx>(
         }
     } else {
         block_context.control_actions.insert(ControlAction::End);
-        block_context.has_returned = true;
+        block_context.flags.set_has_returned(true);
     }
 
     if can_leave_loop {
@@ -301,11 +301,11 @@ fn analyze<'ctx, 'ast, 'arena>(
 
         update_loop_scope_contexts(&mut loop_scope, loop_context, &mut continue_context, loop_parent_context, context);
 
-        loop_context.inside_loop_expressions = true;
+        loop_context.flags.set_inside_loop_expressions(true);
         for post_expression in post_expressions {
             post_expression.analyze(context, loop_context, artifacts)?;
         }
-        loop_context.inside_loop_expressions = true;
+        loop_context.flags.set_inside_loop_expressions(true);
     } else {
         let original_parent_context = loop_parent_context.clone();
 
@@ -376,12 +376,12 @@ fn analyze<'ctx, 'ast, 'arena>(
                 pre_conditions_applied = true;
             }
 
-            continue_context.inside_loop_expressions = true;
+            continue_context.flags.set_inside_loop_expressions(true);
             for post_expression in &post_expressions {
                 post_expression.analyze(context, &mut continue_context, artifacts)?;
             }
 
-            continue_context.inside_loop_expressions = false;
+            continue_context.flags.set_inside_loop_expressions(false);
 
             Result::<_, AnalysisError>::Ok((loop_scope, continue_context))
         });
@@ -462,15 +462,15 @@ fn analyze<'ctx, 'ast, 'arena>(
                 }
             }
 
-            continue_context.has_returned = false;
+            continue_context.flags.set_has_returned(false);
 
             // if there are no changes to the types, no need to re-examine
             if !has_changes {
-                continue_context.inside_loop_expressions = true;
+                continue_context.flags.set_inside_loop_expressions(true);
                 for post_expression in &post_expressions {
                     post_expression.analyze(context, &mut continue_context, artifacts)?;
                 }
-                continue_context.inside_loop_expressions = false;
+                continue_context.flags.set_inside_loop_expressions(false);
 
                 break;
             }
@@ -567,11 +567,11 @@ fn analyze<'ctx, 'ast, 'arena>(
                     pre_conditions_applied = true;
                 }
 
-                continue_context.inside_loop_expressions = true;
+                continue_context.flags.set_inside_loop_expressions(true);
                 for post_expression in &post_expressions {
                     post_expression.analyze(context, &mut continue_context, artifacts)?;
                 }
-                continue_context.inside_loop_expressions = false;
+                continue_context.flags.set_inside_loop_expressions(false);
 
                 Ok(loop_scope)
             });
@@ -792,13 +792,13 @@ fn apply_pre_condition_to_loop_context<'ctx, 'arena>(
     let pre_condition_span = pre_condition.span();
     let pre_referenced_variable_ids = std::mem::take(&mut loop_context.conditionally_referenced_variable_ids);
 
-    loop_context.inside_conditional = true;
-    loop_context.inside_loop_expressions = true;
+    loop_context.flags.set_inside_conditional(true);
+    loop_context.flags.set_inside_loop_expressions(true);
 
     pre_condition.analyze(context, loop_context, artifacts)?;
 
-    loop_context.inside_loop_expressions = false;
-    loop_context.inside_conditional = false;
+    loop_context.flags.set_inside_loop_expressions(false);
+    loop_context.flags.set_inside_conditional(false);
 
     if first_application {
         let is_truthy = if let Some(condition_type) = artifacts.get_expression_type(pre_condition) {
@@ -931,10 +931,10 @@ fn analyze_iterator<'ctx, 'ast, 'arena>(
     iterator_variable_id: Option<&Atom>,
     foreach: &'ast Foreach<'arena>,
 ) -> Result<(bool, TUnion, TUnion), AnalysisError> {
-    let was_inside_general_use = block_context.inside_general_use;
-    block_context.inside_general_use = true;
+    let was_inside_general_use = block_context.flags.inside_general_use();
+    block_context.flags.set_inside_general_use(true);
     iterator.analyze(context, block_context, artifacts)?;
-    block_context.inside_general_use = was_inside_general_use;
+    block_context.flags.set_inside_general_use(was_inside_general_use);
 
     let iterator_type = if let Some(it_type) = artifacts.get_rc_expression_type(iterator).cloned() {
         it_type

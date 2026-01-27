@@ -103,10 +103,10 @@ pub fn resolve_method_targets<'ctx, 'ast, 'arena>(
 ) -> Result<MethodResolutionResult, AnalysisError> {
     let mut result = MethodResolutionResult::default();
 
-    let was_inside_general_use = block_context.inside_general_use;
-    block_context.inside_general_use = true;
+    let was_inside_general_use = block_context.flags.inside_general_use();
+    block_context.flags.set_inside_general_use(true);
     object.analyze(context, block_context, artifacts)?;
-    block_context.inside_general_use = was_inside_general_use;
+    block_context.flags.set_inside_general_use(was_inside_general_use);
 
     let resolved_selectors = resolve_member_selector(context, block_context, artifacts, selector)?;
     let mut method_names = Vec::new();

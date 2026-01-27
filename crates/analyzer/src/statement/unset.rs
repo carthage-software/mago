@@ -29,14 +29,14 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Unset<'arena> {
         block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
-        let was_inside_unset = block_context.inside_unset;
-        block_context.inside_unset = true;
+        let was_inside_unset = block_context.flags.inside_unset();
+        block_context.flags.set_inside_unset(true);
 
         for value in &self.values {
-            let was_inside_general_use = block_context.inside_general_use;
-            block_context.inside_general_use = true;
+            let was_inside_general_use = block_context.flags.inside_general_use();
+            block_context.flags.set_inside_general_use(true);
             value.analyze(context, block_context, artifacts)?;
-            block_context.inside_general_use = was_inside_general_use;
+            block_context.flags.set_inside_general_use(was_inside_general_use);
 
             let value_id = get_expression_id(
                 value,
@@ -311,7 +311,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Unset<'arena> {
             };
         }
 
-        block_context.inside_unset = was_inside_unset;
+        block_context.flags.set_inside_unset(was_inside_unset);
 
         Ok(())
     }

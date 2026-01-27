@@ -137,7 +137,7 @@ fn read_variable<'ctx>(
                 );
 
                 Rc::new(get_mixed())
-            } else if block_context.inside_variable_reference {
+            } else if block_context.flags.inside_variable_reference() {
                 context.collector.report_with_code(
                     IssueCode::ReferenceToUndefinedVariable,
                     Issue::help(format!("Reference created from a previously undefined variable `{variable_name}`.",))
@@ -171,9 +171,9 @@ fn read_variable<'ctx>(
                 );
 
                 Rc::new(get_mixed())
-            } else if block_context.inside_unset {
+            } else if block_context.flags.inside_unset() {
                 Rc::new(get_null())
-            } else if block_context.inside_isset {
+            } else if block_context.flags.inside_isset() {
                 Rc::new(get_mixed())
             } else {
                 let mut issue = Issue::error(format!("Undefined variable: `{variable_name}`.")).with_annotation(
@@ -214,7 +214,7 @@ fn read_variable<'ctx>(
         }
     };
 
-    if variable_type.possibly_undefined_from_try() && !block_context.inside_isset {
+    if variable_type.possibly_undefined_from_try() && !block_context.flags.inside_isset() {
         context.collector.report_with_code(
             IssueCode::PossiblyUndefinedVariable,
             Issue::warning(format!(

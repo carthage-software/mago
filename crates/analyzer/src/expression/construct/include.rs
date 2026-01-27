@@ -106,10 +106,10 @@ fn analyze_include<'ctx, 'arena>(
     is_include: bool,
     is_once: bool,
 ) -> Result<(), AnalysisError> {
-    let was_inside_call = block_context.inside_call;
-    block_context.inside_call = true;
+    let was_inside_call = block_context.flags.inside_call();
+    block_context.flags.set_inside_call(true);
     included_file.analyze(context, block_context, artifacts)?;
-    block_context.inside_call = was_inside_call;
+    block_context.flags.set_inside_call(was_inside_call);
 
     let construct_kind = if is_include {
         if is_once { "include_once" } else { "include" }

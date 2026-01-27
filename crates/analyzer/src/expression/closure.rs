@@ -68,10 +68,10 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Closure<'arena> {
         let mut variable_spans = HashMap::default();
         if let Some(use_clause) = self.use_clause.as_ref() {
             for use_variable in &use_clause.variables {
-                let was_inside_general_use = block_context.inside_general_use;
-                block_context.inside_general_use = true;
+                let was_inside_general_use = block_context.flags.inside_general_use();
+                block_context.flags.set_inside_general_use(true);
                 use_variable.variable.analyze(context, block_context, artifacts)?;
-                block_context.inside_general_use = was_inside_general_use;
+                block_context.flags.set_inside_general_use(was_inside_general_use);
 
                 let variable = use_variable.variable.name;
                 let variable_span = use_variable.variable.span;
@@ -212,7 +212,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Closure<'arena> {
             if let Some(inferred_return_type) = inferred_return_type {
                 signature.return_type = Some(Box::new(inferred_return_type));
             } else if !function_metadata.flags.has_yield() {
-                if inner_block_context.has_returned {
+                if inner_block_context.flags.has_returned() {
                     signature.return_type = Some(Box::new(get_never()));
                 } else {
                     signature.return_type = Some(Box::new(get_void()));

@@ -35,6 +35,16 @@ pub enum BreakType {
 }
 
 impl ControlAction {
+    pub const ALL: [ControlAction; 7] = [
+        ControlAction::End,
+        ControlAction::Break,
+        ControlAction::BreakImmediateLoop,
+        ControlAction::Continue,
+        ControlAction::LeaveSwitch,
+        ControlAction::None,
+        ControlAction::Return,
+    ];
+
     pub fn from_statements(
         statements: Vec<&Statement>,
         break_type: Vec<BreakType>,
@@ -498,17 +508,7 @@ impl ControlActionSet {
     where
         F: FnMut(ControlAction) -> bool,
     {
-        const ALL_ACTIONS: [ControlAction; 7] = [
-            ControlAction::End,
-            ControlAction::Break,
-            ControlAction::BreakImmediateLoop,
-            ControlAction::Continue,
-            ControlAction::LeaveSwitch,
-            ControlAction::None,
-            ControlAction::Return,
-        ];
-
-        for action in ALL_ACTIONS {
+        for action in ControlAction::ALL {
             if self.contains(action) && !f(action) {
                 self.0 &= !(action as u8);
             }
@@ -518,17 +518,7 @@ impl ControlActionSet {
     /// Iterator over all actions in the set
     #[inline]
     pub fn iter(&self) -> impl Iterator<Item = ControlAction> + '_ {
-        const ALL_ACTIONS: [ControlAction; 7] = [
-            ControlAction::End,
-            ControlAction::Break,
-            ControlAction::BreakImmediateLoop,
-            ControlAction::Continue,
-            ControlAction::LeaveSwitch,
-            ControlAction::None,
-            ControlAction::Return,
-        ];
-
-        ALL_ACTIONS.into_iter().filter(|&action| self.contains(action))
+        ControlAction::ALL.into_iter().filter(|&action| self.contains(action))
     }
 }
 

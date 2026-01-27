@@ -116,8 +116,8 @@ pub fn analyze_assignment<'ctx, 'ast, 'arena>(
     }
 
     if let Some(source_expression) = source_expression {
-        let was_inside_general_use = block_context.inside_general_use;
-        block_context.inside_general_use = true;
+        let was_inside_general_use = block_context.flags.inside_general_use();
+        block_context.flags.set_inside_general_use(true);
 
         match assignment_operator {
             None => {
@@ -126,7 +126,7 @@ pub fn analyze_assignment<'ctx, 'ast, 'arena>(
             // this rewrites $a += 4 and $a ??= 4 to $a = $a + 4 and $a = $a ?? 4 respectively
             Some(assignment_operator) => {
                 let previous_expression_types = artifacts.expression_types.clone();
-                block_context.inside_assignment_operation = true;
+                block_context.flags.set_inside_assignment_operation(true);
 
                 let binary_expression = Expression::Binary(Binary {
                     lhs: context.arena.alloc(target_expression.clone()),
@@ -150,7 +150,7 @@ pub fn analyze_assignment<'ctx, 'ast, 'arena>(
                 });
 
                 binary_expression.analyze(context, block_context, artifacts)?;
-                block_context.inside_assignment_operation = false;
+                block_context.flags.set_inside_assignment_operation(false);
                 let assignment_type = if let Some(assignment_span) = assignment_span {
                     artifacts.get_rc_expression_type(&assignment_span).cloned()
                 } else {
@@ -168,7 +168,7 @@ pub fn analyze_assignment<'ctx, 'ast, 'arena>(
             find_expression_logic_issues(source_expression, context, block_context, artifacts);
         }
 
-        block_context.inside_general_use = was_inside_general_use;
+        block_context.flags.set_inside_general_use(was_inside_general_use);
     }
 
     let source_type = if let Some(source_type) = source_type {
@@ -184,8 +184,8 @@ pub fn analyze_assignment<'ctx, 'ast, 'arena>(
     };
 
     if let (Some(target_variable_id), None) = (&target_variable_id, assignment_operator)
-        && block_context.inside_loop
-        && !block_context.inside_assignment_operation
+        && block_context.flags.inside_loop()
+        && !block_context.flags.inside_assignment_operation()
         && let Some(Expression::Clone(clone_expression)) = source_expression
         && let Expression::Variable(Variable::Direct(cloned_var)) = clone_expression.object
         && cloned_var.name == target_variable_id

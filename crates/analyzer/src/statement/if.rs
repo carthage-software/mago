@@ -345,11 +345,11 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for If<'arena> {
         }
 
         if has_returned {
-            block_context.has_returned = true;
+            block_context.flags.set_has_returned(true);
         }
 
         // Propagate initialization results back to outer context
-        if block_context.collect_initializations {
+        if block_context.flags.collect_initializations() {
             if let Some(props) = if_scope.definitely_initialized_properties.take() {
                 block_context.definitely_initialized_properties.extend(props);
             }
@@ -958,7 +958,7 @@ fn analyze_else_statements<'ctx, 'arena>(
         if_scope.reasonable_clauses = vec![];
 
         // No else branch means we can't guarantee initialization - clear intersection sets
-        if outer_block_context.collect_initializations {
+        if outer_block_context.flags.collect_initializations() {
             if_scope.definitely_initialized_properties = None;
             if_scope.definitely_called_methods = None;
         }
@@ -1162,12 +1162,12 @@ fn add_conditionally_assigned_variables_to_context<'ctx, 'arena>(
             let negated_expression = new_synthetic_negation(context.arena, expression);
             let assertion = new_synthetic_call(context.arena, "assert", negated_expression);
 
-            let was_inside_negation = post_leaving_if_block_context.inside_negation;
-            post_leaving_if_block_context.inside_negation = true;
+            let was_inside_negation = post_leaving_if_block_context.flags.inside_negation();
+            post_leaving_if_block_context.flags.set_inside_negation(true);
 
             assertion.analyze(context, post_leaving_if_block_context, artifacts)?;
 
-            post_leaving_if_block_context.inside_negation = was_inside_negation;
+            post_leaving_if_block_context.flags.set_inside_negation(was_inside_negation);
         }
 
         Result::<_, AnalysisError>::Ok(())
@@ -1197,7 +1197,7 @@ fn update_if_scope<'ctx>(
     update_new_variables: bool,
 ) {
     // Handle definitely_initialized_properties with INTERSECTION semantics
-    if outer_block_context.collect_initializations {
+    if outer_block_context.flags.collect_initializations() {
         let branch_initialized = std::mem::take(&mut if_block_context.definitely_initialized_properties);
         match &mut if_scope.definitely_initialized_properties {
             Some(existing) => {

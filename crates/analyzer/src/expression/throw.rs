@@ -22,11 +22,11 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Throw<'arena> {
         block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
-        let was_inside_throw = block_context.inside_throw;
-        block_context.inside_throw = true;
+        let was_inside_throw = block_context.flags.inside_throw();
+        block_context.flags.set_inside_throw(true);
         self.exception.analyze(context, block_context, artifacts)?;
-        block_context.inside_throw = was_inside_throw;
-        block_context.has_returned = true;
+        block_context.flags.set_inside_throw(was_inside_throw);
+        block_context.flags.set_has_returned(true);
         if let Some(scope) = block_context.finally_scope.as_ref() {
             let mut finally_scope = scope.borrow_mut();
 

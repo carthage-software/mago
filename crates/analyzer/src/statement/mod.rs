@@ -224,7 +224,7 @@ pub fn analyze_statements<'ctx, 'arena>(
     artifacts: &mut AnalysisArtifacts,
 ) -> Result<(), AnalysisError> {
     for statement in statements {
-        if block.has_returned {
+        if block.flags.has_returned() {
             if context.settings.find_unused_expressions {
                 let is_harmless = match &statement {
                     Statement::Break(_) => true,

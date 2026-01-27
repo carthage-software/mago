@@ -132,10 +132,10 @@ fn analyze_array_elements<'ctx, 'arena>(
     for element in elements {
         let (item_key_value, key_type, item_is_list_item, value) = match element {
             ArrayElement::KeyValue(key_value_array_element) => {
-                let was_inside_general_use = block_context.inside_general_use;
-                block_context.inside_general_use = true;
+                let was_inside_general_use = block_context.flags.inside_general_use();
+                block_context.flags.set_inside_general_use(true);
                 key_value_array_element.key.analyze(context, block_context, artifacts)?;
-                block_context.inside_general_use = was_inside_general_use;
+                block_context.flags.set_inside_general_use(was_inside_general_use);
 
                 let (item_key_value, key_type) = artifacts
                     .get_expression_type(key_value_array_element.key)
@@ -234,10 +234,10 @@ fn analyze_array_elements<'ctx, 'arena>(
                 )
             }
             ArrayElement::Variadic(variadic_array_element) => {
-                let was_inside_general_use = block_context.inside_general_use;
-                block_context.inside_general_use = true;
+                let was_inside_general_use = block_context.flags.inside_general_use();
+                block_context.flags.set_inside_general_use(true);
                 variadic_array_element.value.analyze(context, block_context, artifacts)?;
-                block_context.inside_general_use = was_inside_general_use;
+                block_context.flags.set_inside_general_use(was_inside_general_use);
 
                 if let Some(variadic_array_element_type) = artifacts.get_expression_type(&variadic_array_element.value)
                 {
@@ -275,10 +275,10 @@ fn analyze_array_elements<'ctx, 'arena>(
             }
         };
 
-        let was_inside_general_use = block_context.inside_general_use;
-        block_context.inside_general_use = true;
+        let was_inside_general_use = block_context.flags.inside_general_use();
+        block_context.flags.set_inside_general_use(true);
         value.analyze(context, block_context, artifacts)?;
-        block_context.inside_general_use = was_inside_general_use;
+        block_context.flags.set_inside_general_use(was_inside_general_use);
 
         array_creation_info.can_be_empty = false;
         array_creation_info.is_list &= item_is_list_item;

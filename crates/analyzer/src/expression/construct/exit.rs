@@ -32,7 +32,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ExitConstruct<'arena> {
             true,
         )?;
 
-        block_context.has_returned = true;
+        block_context.flags.set_has_returned(true);
         block_context.control_actions.insert(ControlAction::End);
 
         artifacts.set_expression_type(self, get_never());
@@ -61,7 +61,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for DieConstruct<'arena> {
             true,
         )?;
 
-        block_context.has_returned = true;
+        block_context.flags.set_has_returned(true);
         block_context.control_actions.insert(ControlAction::End);
 
         artifacts.set_expression_type(self, get_never());

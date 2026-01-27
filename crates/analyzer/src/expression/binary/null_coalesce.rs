@@ -48,10 +48,10 @@ pub fn analyze_null_coalesce_operation<'ctx, 'arena>(
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
 ) -> Result<(), AnalysisError> {
-    let was_inside_isset = block_context.inside_isset;
-    block_context.inside_isset = true;
+    let was_inside_isset = block_context.flags.inside_isset();
+    block_context.flags.set_inside_isset(true);
     binary.lhs.analyze(context, block_context, artifacts)?;
-    block_context.inside_isset = was_inside_isset;
+    block_context.flags.set_inside_isset(was_inside_isset);
 
     let lhs_type_option = artifacts.get_rc_expression_type(&binary.lhs);
 
@@ -120,10 +120,10 @@ pub fn analyze_null_coalesce_operation<'ctx, 'arena>(
         binary.rhs.analyze(context, block_context, artifacts)?;
     } else {
         let non_null_lhs_type = lhs_type.to_non_nullable();
-        let has_returned = block_context.has_returned;
-        block_context.has_returned = false;
+        let has_returned = block_context.flags.has_returned();
+        block_context.flags.set_has_returned(false);
         binary.rhs.analyze(context, block_context, artifacts)?;
-        block_context.has_returned &= has_returned;
+        block_context.flags.set_has_returned(block_context.flags.has_returned() && has_returned);
 
         let rhs_type =
             artifacts.get_expression_type(&binary.rhs).map_or_else(|| Cow::Owned(get_mixed()), Cow::Borrowed);
@@ -180,7 +180,7 @@ pub fn analyze_null_coalesce_operation<'ctx, 'arena>(
 
         let mut if_scope = IfScope::new();
         let mut inner_block_context = block_context.clone();
-        inner_block_context.inside_isset = true;
+        inner_block_context.flags.set_inside_isset(true);
         let (if_conditional_scope, _) =
             conditional::analyze(context, inner_block_context, artifacts, &mut if_scope, binary.lhs, false)?;
         let mut conditionally_referenced_variable_ids = if_conditional_scope.conditionally_referenced_variable_ids;

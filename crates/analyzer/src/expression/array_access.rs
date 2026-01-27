@@ -36,18 +36,18 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ArrayAccess<'arena> {
             Some(context.codebase),
         );
 
-        let was_inside_use = block_context.inside_general_use;
-        block_context.inside_general_use = true;
-        block_context.inside_unset = false;
+        let was_inside_use = block_context.flags.inside_general_use();
+        block_context.flags.set_inside_general_use(true);
+        block_context.flags.set_inside_unset(false);
         self.index.analyze(context, block_context, artifacts)?;
-        block_context.inside_general_use = was_inside_use;
+        block_context.flags.set_inside_general_use(was_inside_use);
 
         let index_type = artifacts.get_expression_type(&self.index).cloned().unwrap_or_else(get_arraykey);
 
-        let was_inside_general_use = block_context.inside_general_use;
-        block_context.inside_general_use = true;
+        let was_inside_general_use = block_context.flags.inside_general_use();
+        block_context.flags.set_inside_general_use(true);
         self.array.analyze(context, block_context, artifacts)?;
-        block_context.inside_general_use = was_inside_general_use;
+        block_context.flags.set_inside_general_use(was_inside_general_use);
 
         if let Some(keyed_array_var_id) = &keyed_array_var_id
             && block_context.has_variable(keyed_array_var_id)
@@ -79,9 +79,9 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ArrayAccess<'arena> {
             );
 
             if let Some(keyed_array_var_id) = &keyed_array_var_id {
-                let can_store_result = block_context.inside_assignment || !container_type.is_mixed();
+                let can_store_result = block_context.flags.inside_assignment() || !container_type.is_mixed();
 
-                if !block_context.inside_isset
+                if !block_context.flags.inside_isset()
                     && can_store_result
                     && keyed_array_var_id.contains("[$")
                     && !block_context.locals.contains_key(keyed_array_var_id)

@@ -128,7 +128,7 @@ pub(crate) fn get_array_target_type_given_index<'ctx>(
         );
     }
 
-    if !block_context.inside_isset {
+    if !block_context.flags.inside_isset() {
         if index_type.is_nullable() && !index_type.ignore_nullable_issues() {
             context.collector.report_with_code(
                 IssueCode::PossiblyNullArrayIndex,
@@ -404,7 +404,7 @@ pub(crate) fn get_array_target_type_given_index<'ctx>(
 
             // Report warning for possibly undefined array keys when accessing union types
             // Only report if we detected that some variants have the key while others don't
-            if has_union_key_mismatch && !block_context.inside_isset && !in_assignment {
+            if has_union_key_mismatch && !block_context.flags.inside_isset() && !in_assignment {
                 // Determine if this is likely a string or integer key based on the index type
                 let is_likely_string_key =
                     index_type.types.iter().any(|t| matches!(t, TAtomic::Scalar(TScalar::String(_))));
@@ -501,8 +501,8 @@ pub(crate) fn handle_array_access_on_list<'ctx>(
                 if *actual_possibly_undefined {
                     resulting_type.set_possibly_undefined(true, None);
 
-                    if !block_context.inside_isset
-                        && !block_context.inside_unset
+                    if !block_context.flags.inside_isset()
+                        && !block_context.flags.inside_unset()
                         && !in_assignment
                         && let Some(span) = span
                     {
@@ -578,8 +578,8 @@ pub(crate) fn handle_array_access_on_list<'ctx>(
     } else if let TAtomic::Array(TArray::List(TList { element_type, .. })) = list {
         return if element_type.is_never() {
             if !in_assignment
-                && !block_context.inside_isset
-                && !block_context.inside_unset
+                && !block_context.flags.inside_isset()
+                && !block_context.flags.inside_unset()
                 && let Some(span) = span
             {
                 context.collector.report_with_code(
@@ -625,7 +625,7 @@ pub(crate) fn handle_array_access_on_keyed_array<'ctx>(
         return get_never();
     };
 
-    let key_parameter = if in_assignment || block_context.inside_isset {
+    let key_parameter = if in_assignment || block_context.flags.inside_isset() {
         Cow::Owned(get_arraykey())
     } else if let Some(parameters) = keyed_array.get_generic_parameters() {
         Cow::Borrowed(parameters.0)
@@ -662,7 +662,7 @@ pub(crate) fn handle_array_access_on_keyed_array<'ctx>(
                 if actual_possibly_undefined {
                     *has_possibly_undefined = true;
                     expression_type.set_possibly_undefined(true, None);
-                    if !in_assignment && !block_context.inside_isset && !block_context.inside_unset {
+                    if !in_assignment && !block_context.flags.inside_isset() && !block_context.flags.inside_unset() {
                         context.collector.report_with_code(
                             match &array_key {
                                 ArrayKey::Integer(_) => IssueCode::PossiblyUndefinedIntArrayIndex,
@@ -712,7 +712,7 @@ pub(crate) fn handle_array_access_on_keyed_array<'ctx>(
                 // This handles cases like $_SERVER (which has ...<non-empty-string, string>)
                 // But NOT unsealed arrays with just `...` (which have mixed as value type)
                 value_parameter.into_owned()
-            } else if !block_context.inside_isset {
+            } else if !block_context.flags.inside_isset() {
                 // Check if we're in a union type and if ANY other member has this key
                 let key_exists_in_other_variant = if array_like_type.types.len() > 1 {
                     array_like_type.types.iter().any(|atomic_type| {
@@ -859,7 +859,7 @@ pub(crate) fn handle_array_access_on_keyed_array<'ctx>(
         value_parameter.into_owned()
     } else {
         // TODO Handle Assignments
-        // if (block_context.inside_assignment && replacement_type) {
+        // if (block_context.flags.inside_assignment() && replacement_type) {
 
         // }
         if has_value_parameter {
@@ -867,8 +867,8 @@ pub(crate) fn handle_array_access_on_keyed_array<'ctx>(
                 *has_possibly_undefined = true;
 
                 if !context.settings.allow_possibly_undefined_array_keys
-                    && !block_context.inside_isset
-                    && !block_context.inside_unset
+                    && !block_context.flags.inside_isset()
+                    && !block_context.flags.inside_unset()
                     && index_type.get_single_array_key().is_some()
                 {
                     let index_type_str = index_type.get_id();
@@ -1121,8 +1121,8 @@ pub(crate) fn handle_array_access_on_mixed<'ctx>(
     span: Span,
     mixed: &TAtomic,
 ) -> TUnion {
-    if !block_context.inside_isset {
-        if block_context.inside_assignment {
+    if !block_context.flags.inside_isset() {
+        if block_context.flags.inside_assignment() {
             if let TAtomic::Never = mixed {
                 context.collector.report_with_code(
                     IssueCode::ImpossibleArrayAssignment,

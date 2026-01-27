@@ -32,7 +32,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for DoWhile<'arena> {
     ) -> Result<(), AnalysisError> {
         let mut loop_block_context = block_context.clone();
         loop_block_context.break_types.push(BreakContext::Loop);
-        loop_block_context.inside_loop = true;
+        loop_block_context.flags.set_inside_loop(true);
 
         let loop_scope = LoopScope::new(self.span(), block_context.locals.clone(), None);
 

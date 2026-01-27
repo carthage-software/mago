@@ -16,10 +16,10 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for EmptyConstruct<'arena> {
         block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
-        let was_inside_isset = block_context.inside_isset;
-        block_context.inside_isset = true;
+        let was_inside_isset = block_context.flags.inside_isset();
+        block_context.flags.set_inside_isset(true);
         self.value.analyze(context, block_context, artifacts)?;
-        block_context.inside_isset = was_inside_isset;
+        block_context.flags.set_inside_isset(was_inside_isset);
 
         artifacts.set_expression_type(
             self,

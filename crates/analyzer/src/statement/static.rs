@@ -49,10 +49,10 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Static<'arena> {
 
             let mut inferred_type = None;
             if let Some(initial_value) = initial_value {
-                let was_inside_general_use = block_context.inside_general_use;
-                block_context.inside_general_use = true;
+                let was_inside_general_use = block_context.flags.inside_general_use();
+                block_context.flags.set_inside_general_use(true);
                 initial_value.analyze(context, block_context, artifacts)?;
-                block_context.inside_general_use = was_inside_general_use;
+                block_context.flags.set_inside_general_use(was_inside_general_use);
 
                 inferred_type = artifacts.get_rc_expression_type(initial_value).cloned();
             }

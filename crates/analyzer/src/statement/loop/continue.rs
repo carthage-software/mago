@@ -88,7 +88,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Continue<'arena> {
 
                 context.collector.report_with_code(IssueCode::InvalidContinue, issue);
 
-                block_context.has_returned = true;
+                block_context.flags.set_has_returned(true);
 
                 return Ok(());
             } else {
@@ -107,7 +107,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Continue<'arena> {
                 ),
             );
 
-            block_context.has_returned = true;
+            block_context.flags.set_has_returned(true);
 
             return Ok(());
         };
@@ -161,7 +161,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Continue<'arena> {
             }
         }
 
-        block_context.has_returned = true;
+        block_context.flags.set_has_returned(true);
 
         Ok(())
     }
