@@ -21,7 +21,7 @@ To become a sponsor, please visit [the sponsorship page](https://github.com/spon
 
 ---
 
-<a href="https://afilina.com" title="Anna Filina"><kbd><img src="https://avatars.githubusercontent.com/u/199835?u=d133afc4e19961b7da45b6bb485ed9ac9232e4bb&v=4&s=160" width="80" height="80" alt="Anna Filina" /></kbd></a>
+<a href="http://julian.center" title="Julian Schramm"><kbd><img src="https://avatars.githubusercontent.com/u/79840527?u=2e15d0ec9e6d0bf6554ef69af6b1dba32a051417&v=4&s=160" width="80" height="80" alt="Julian Schramm" /></kbd></a><a href="https://afilina.com" title="Anna Filina"><kbd><img src="https://avatars.githubusercontent.com/u/199835?u=d133afc4e19961b7da45b6bb485ed9ac9232e4bb&v=4&s=160" width="80" height="80" alt="Anna Filina" /></kbd></a>
 
 ---
 
