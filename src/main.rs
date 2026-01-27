@@ -64,7 +64,10 @@ mod macros;
 mod service;
 mod utils;
 
-#[cfg(all(not(feature = "dhat-heap"), any(target_os = "macos", target_os = "windows", target_env = "musl")))]
+#[cfg(all(
+    not(feature = "dhat-heap"),
+    any(target_os = "macos", target_os = "windows", target_env = "musl", target_env = "gnu")
+))]
 #[global_allocator]
 static ALLOC: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
