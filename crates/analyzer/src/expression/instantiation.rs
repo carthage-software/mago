@@ -1,3 +1,4 @@
+use ahash::HashMap;
 use ahash::RandomState;
 use indexmap::IndexMap;
 
@@ -281,10 +282,7 @@ fn analyze_class_instantiation<'ctx, 'arena>(
         !metadata.flags.is_final() && metadata.name_span.is_some() && !metadata.flags.has_consistent_constructor();
     let mut constructor_span = None;
 
-    let mut template_result = TemplateResult::new(
-        IndexMap::with_hasher(RandomState::default()),
-        IndexMap::with_hasher(RandomState::default()),
-    );
+    let mut template_result = TemplateResult::new(IndexMap::with_hasher(RandomState::default()), HashMap::default());
 
     let is_spl_object_storage = classname_str.eq_ignore_ascii_case("splobjectstorage");
     if let Some(constructor) = context.codebase.get_method_by_id(&constructor_declraing_id) {

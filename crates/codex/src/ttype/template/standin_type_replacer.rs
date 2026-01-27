@@ -176,12 +176,12 @@ fn handle_atomic_standin(
 
     if let TAtomic::GenericParameter(TGenericParameter { parameter_name, defining_entity, .. }) = parameter_atomic
         && let Some(template_type) =
-            template_types_contains(&template_result.template_types.clone(), *parameter_name, defining_entity)
+            template_types_contains(&template_result.template_types, *parameter_name, defining_entity).cloned()
     {
         return handle_template_param_standin(
             parameter_atomic,
             normalized_key,
-            template_type,
+            &template_type,
             template_result,
             codebase,
             argument_type,
@@ -195,7 +195,7 @@ fn handle_atomic_standin(
     if let TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::Generic {
         parameter_name, defining_entity, ..
     })) = parameter_atomic
-        && template_types_contains(&template_result.template_types.clone(), *parameter_name, defining_entity).is_some()
+        && template_types_contains(&template_result.template_types, *parameter_name, defining_entity).is_some()
     {
         return handle_template_param_class_standin(
             parameter_atomic,
@@ -970,11 +970,9 @@ fn template_types_contains<'a>(
     parameter_name: Atom,
     defining_entity: &GenericParent,
 ) -> Option<&'a TUnion> {
-    if let Some(mapped_classes) = template_types.get(&parameter_name) {
-        return mapped_classes.iter().filter(|(e, _)| e == defining_entity).map(|(_, v)| v).next();
-    }
-
-    None
+    template_types
+        .get(&parameter_name)
+        .and_then(|mapped_classes| mapped_classes.iter().find(|(e, _)| e == defining_entity).map(|(_, v)| v))
 }
 
 fn find_matching_atomic_types_for_template(
@@ -1151,7 +1149,7 @@ pub fn get_mapped_generic_type_parameters(
     let input_template_types = &input_class_metadata.template_types;
 
     let mut i = 0;
-    let mut replacement_templates = IndexMap::with_hasher(RandomState::new());
+    let mut replacement_templates: HashMap<Atom, HashMap<GenericParent, TUnion>> = HashMap::default();
     if matches!(input_type_part, TAtomic::Object(TObject::Named(o)) if !o.remapped_parameters)
         && !container_remapped_parameters
     {
@@ -1159,7 +1157,7 @@ pub fn get_mapped_generic_type_parameters(
             if let Some(input_type) = input_type_parameters.get(i) {
                 replacement_templates
                     .entry(*template_name)
-                    .or_insert_with(HashMap::default)
+                    .or_default()
                     .insert(GenericParent::ClassLike(input_name), input_type.clone().1);
 
                 i += 1;
@@ -1269,7 +1267,7 @@ pub fn get_extended_templated_types<'a>(
 }
 
 pub(crate) fn get_root_template_type(
-    lower_bounds: &IndexMap<Atom, HashMap<GenericParent, Vec<TemplateBound>>, RandomState>,
+    lower_bounds: &HashMap<Atom, HashMap<GenericParent, Vec<TemplateBound>>>,
     parameter_name: Atom,
     defining_entity: &GenericParent,
     mut visited_entities: HashSet<GenericParent>,

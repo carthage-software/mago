@@ -18,6 +18,9 @@ use mago_codex::ttype::wrap_atomic;
 
 use crate::context::Context;
 
+/// Type alias for template lower bounds - maps parameter names to their bounds per defining entity.
+pub type TemplateLowerBounds = HashMap<Atom, HashMap<GenericParent, TUnion>>;
+
 /// Resolves and expands template types applicable to a class member (method or property)
 /// within a specific call context.
 ///
@@ -51,7 +54,7 @@ pub fn get_template_types_for_class_member(
     calling_class_meta: Option<&ClassLikeMetadata>,
     existing_template_types: &[(Atom, Vec<(GenericParent, TUnion)>)],
     class_template_parameters: &IndexMap<Atom, Vec<(GenericParent, TUnion)>, RandomState>,
-) -> IndexMap<Atom, HashMap<GenericParent, TUnion>, RandomState> {
+) -> TemplateLowerBounds {
     let codebase = context.codebase;
 
     let mut template_types: IndexMap<Atom, Vec<(GenericParent, TUnion)>, RandomState> =
@@ -125,7 +128,7 @@ pub fn get_template_types_for_class_member(
         }
     }
 
-    let mut expanded_template_types = IndexMap::with_hasher(RandomState::new());
+    let mut expanded_template_types: TemplateLowerBounds = HashMap::default();
     for (template_name, type_map_vec) in template_types {
         let final_map_entry: &mut HashMap<GenericParent, TUnion> =
             expanded_template_types.entry(template_name).or_default();

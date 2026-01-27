@@ -22,13 +22,12 @@ pub(crate) fn collect(
     class_metadata: &ClassLikeMetadata,
     static_class_metadata: &ClassLikeMetadata,
     object_type: Option<&TObject>,
-) -> Option<IndexMap<Atom, HashMap<GenericParent, TUnion>, RandomState>> {
+) -> Option<HashMap<Atom, HashMap<GenericParent, TUnion>>> {
     if class_metadata.template_types.is_empty() {
         return None;
     }
 
-    let mut class_template_parameters: IndexMap<Atom, HashMap<GenericParent, TUnion>, RandomState> =
-        IndexMap::default();
+    let mut class_template_parameters: HashMap<Atom, HashMap<GenericParent, TUnion>> = HashMap::default();
 
     if let Some(TObject::Named(TNamedObject { type_parameters: Some(parameters), .. })) = &object_type {
         if class_metadata.name == static_class_metadata.name && !static_class_metadata.template_types.is_empty() {

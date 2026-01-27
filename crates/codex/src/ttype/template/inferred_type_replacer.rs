@@ -1,7 +1,5 @@
 use ahash::HashMap;
 use ahash::HashSet;
-use ahash::RandomState;
-use indexmap::IndexMap;
 
 use mago_atom::Atom;
 
@@ -129,7 +127,7 @@ pub fn replace(union: &TUnion, template_result: &TemplateResult, codebase: &Code
 
 #[allow(clippy::too_many_arguments)]
 fn replace_template_parameter(
-    inferred_lower_bounds: &IndexMap<Atom, HashMap<GenericParent, Vec<TemplateBound>>, RandomState>,
+    inferred_lower_bounds: &HashMap<Atom, HashMap<GenericParent, Vec<TemplateBound>>>,
     parameter_name: Atom,
     defining_entity: &GenericParent,
     codebase: &CodebaseMetadata,
@@ -197,7 +195,7 @@ fn replace_template_parameter(
 
         template_type = Some(template_type_inner);
     } else {
-        for (_, template_type_map) in inferred_lower_bounds {
+        for template_type_map in inferred_lower_bounds.values() {
             for map_defining_entity in template_type_map.keys() {
                 if let GenericParent::ClassLike(classlike_name) = map_defining_entity
                     && let Some(metadata) = codebase.get_class_like(classlike_name)

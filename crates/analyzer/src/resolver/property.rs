@@ -1,5 +1,4 @@
 use ahash::HashMap;
-use ahash::RandomState;
 use indexmap::IndexMap;
 
 use mago_atom::Atom;
@@ -594,14 +593,14 @@ pub fn localize_property_type(
 
     inferred_type_replacer::replace(
         class_property_type,
-        &TemplateResult::new(IndexMap::default(), template_types),
+        &TemplateResult::new(Default::default(), template_types),
         context.codebase,
     )
 }
 
 fn update_template_types(
     context: &Context<'_, '_>,
-    template_types: &mut IndexMap<Atom, HashMap<GenericParent, TUnion>, RandomState>,
+    template_types: &mut HashMap<Atom, HashMap<GenericParent, TUnion>>,
     property_class_metadata: &ClassLikeMetadata,
     lhs_type_params: &[TUnion],
     property_declaring_class_metadata: &ClassLikeMetadata,

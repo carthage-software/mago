@@ -15,8 +15,8 @@ pub mod variance;
 #[derive(Clone, Debug, Default)]
 pub struct TemplateResult {
     pub template_types: IndexMap<Atom, Vec<(GenericParent, TUnion)>, RandomState>,
-    pub lower_bounds: IndexMap<Atom, HashMap<GenericParent, Vec<TemplateBound>>, RandomState>,
-    pub upper_bounds: IndexMap<Atom, HashMap<GenericParent, TemplateBound>, RandomState>,
+    pub lower_bounds: HashMap<Atom, HashMap<GenericParent, Vec<TemplateBound>>>,
+    pub upper_bounds: HashMap<Atom, HashMap<GenericParent, TemplateBound>>,
     pub readonly: bool,
     pub upper_bounds_unintersectable_types: Vec<TUnion>,
 }
@@ -25,9 +25,9 @@ impl TemplateResult {
     #[must_use]
     pub fn new(
         template_types: IndexMap<Atom, Vec<(GenericParent, TUnion)>, RandomState>,
-        lower_bounds: IndexMap<Atom, HashMap<GenericParent, TUnion>, RandomState>,
+        lower_bounds: HashMap<Atom, HashMap<GenericParent, TUnion>>,
     ) -> TemplateResult {
-        let mut new_lower_bounds = IndexMap::with_hasher(RandomState::new());
+        let mut new_lower_bounds = HashMap::default();
 
         for (k, v) in lower_bounds {
             let mut th = HashMap::default();
@@ -42,7 +42,7 @@ impl TemplateResult {
         TemplateResult {
             template_types,
             lower_bounds: new_lower_bounds,
-            upper_bounds: IndexMap::with_hasher(RandomState::new()),
+            upper_bounds: HashMap::default(),
             readonly: false,
             upper_bounds_unintersectable_types: Vec::new(),
         }
@@ -53,7 +53,7 @@ impl TemplateResult {
         !self.template_types.is_empty()
     }
 
-    pub fn add_lower_bounds(&mut self, lower_bounds: IndexMap<Atom, HashMap<GenericParent, TUnion>, RandomState>) {
+    pub fn add_lower_bounds(&mut self, lower_bounds: HashMap<Atom, HashMap<GenericParent, TUnion>>) {
         for (k, v) in lower_bounds {
             let mut th = HashMap::default();
 
