@@ -101,7 +101,7 @@ pub fn analyze_assignment<'ctx, 'ast, 'arena>(
     let mut existing_target_type = None;
     if let Some(target_variable_id) = &target_variable_id {
         block_context.conditionally_referenced_variable_ids.remove(target_variable_id);
-        block_context.assigned_variable_ids.insert(*target_variable_id, target_expression.span().start.offset);
+        block_context.assigned_variable_ids.insert(*target_variable_id, target_expression.start_offset());
         block_context.possibly_assigned_variable_ids.insert(*target_variable_id);
 
         existing_target_type = block_context.locals.get(target_variable_id).cloned();

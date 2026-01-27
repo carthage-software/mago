@@ -1,6 +1,5 @@
 use std::cell::RefCell;
-use std::collections::BTreeMap;
-use std::collections::btree_map::Entry;
+use std::collections::hash_map::Entry;
 use std::rc::Rc;
 
 use ahash::HashSetExt;
@@ -52,7 +51,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
                 true,
             );
 
-            all_catches_leave = all_catches_leave && !actions.contains(&ControlAction::None);
+            all_catches_leave = all_catches_leave && !actions.contains(ControlAction::None);
             catch_actions.push(actions);
         }
 
@@ -61,7 +60,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
         let mut try_block_context = block_context.clone();
 
         if self.finally_clause.is_some() {
-            try_block_context.finally_scope = Some(Rc::new(RefCell::new(FinallyScope { locals: BTreeMap::new() })));
+            try_block_context.finally_scope = Some(Rc::new(RefCell::new(FinallyScope::new())));
         }
 
         let assigned_variable_ids = std::mem::take(&mut block_context.assigned_variable_ids);
@@ -130,7 +129,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
         let try_leaves_loop = artifacts
             .loop_scope
             .as_ref()
-            .is_some_and(|loop_scope| !loop_scope.final_actions.contains(&ControlAction::None));
+            .is_some_and(|loop_scope| !loop_scope.final_actions.contains(ControlAction::None));
 
         if all_catches_leave {
             for assigned_variable_id in newly_assigned_variable_ids.keys() {
@@ -222,7 +221,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
                 );
             }
 
-            all_catches_leave = catch_actions.iter().all(|actions| !actions.contains(&ControlAction::None));
+            all_catches_leave = catch_actions.iter().all(|actions| !actions.contains(ControlAction::None));
 
             let new_catch_assigned_variables_ids = catch_block_context.assigned_variable_ids.clone();
             catch_block_context.assigned_variable_ids.extend(old_catch_assigned_variable_ids);
@@ -233,9 +232,9 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
                 let catch_actions = &catch_actions[i];
 
                 if catch_actions.len() == 1 {
-                    !catch_actions.contains(&ControlAction::End)
-                        && !catch_actions.contains(&ControlAction::Continue)
-                        && !catch_actions.contains(&ControlAction::Break)
+                    !catch_actions.contains(ControlAction::End)
+                        && !catch_actions.contains(ControlAction::Continue)
+                        && !catch_actions.contains(ControlAction::Break)
                 } else {
                     true
                 }
@@ -249,7 +248,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
                     .collect();
 
                 let end_action_only =
-                    try_block_control_actions.len() == 1 && try_block_control_actions.contains(&ControlAction::End);
+                    try_block_control_actions.len() == 1 && try_block_control_actions.contains(ControlAction::End);
 
                 for (variable_id, variable_type) in &catch_block_context.locals {
                     if end_action_only {
@@ -373,7 +372,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
 
         block_context.has_returned = if finally_has_returned {
             true
-        } else if !try_block_control_actions.contains(&ControlAction::None) {
+        } else if !try_block_control_actions.contains(ControlAction::None) {
             self.catch_clauses.is_empty() || all_catches_leave
         } else {
             false

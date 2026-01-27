@@ -37,6 +37,7 @@ use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::context::scope::conditional_scope::IfConditionalScope;
 use crate::context::scope::control_action::ControlAction;
+use crate::context::scope::control_action::ControlActionSet;
 use crate::context::scope::if_scope::IfScope;
 use crate::context::utils::inherit_branch_context_properties;
 use crate::error::AnalysisError;
@@ -63,8 +64,8 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for If<'arena> {
             let final_actions =
                 ControlAction::from_statements(self.body.statements().iter().collect(), vec![], Some(artifacts), true);
 
-            let has_leaving_statements = final_actions.len() == 1 && final_actions.contains(&ControlAction::End)
-                || (!final_actions.is_empty() && !final_actions.contains(&ControlAction::None));
+            let has_leaving_statements = final_actions.len() == 1 && final_actions.contains(ControlAction::End)
+                || (!final_actions.is_empty() && !final_actions.contains(ControlAction::None));
 
             if has_leaving_statements {
                 if_scope.post_leaving_if_context = Some(block_context.clone());
@@ -221,7 +222,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for If<'arena> {
             );
         }
 
-        let pre_assignment_else_redefined_locals: AtomMap<TUnion> = temporary_else_context
+        let pre_assignment_else_redefined_locals: AtomMap<Rc<TUnion>> = temporary_else_context
             .get_redefined_locals(&if_block_context.locals, true, &mut AtomSet::default())
             .into_iter()
             .filter(|(k, _)| changed_variable_ids.contains(k))
@@ -266,10 +267,10 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for If<'arena> {
             self.span(),
         )?;
 
-        let has_returned = !if_scope.final_actions.contains(&ControlAction::None);
+        let has_returned = !if_scope.final_actions.contains(ControlAction::None);
 
         if !if_scope.if_actions.is_empty()
-            && !if_scope.if_actions.contains(&ControlAction::None)
+            && !if_scope.if_actions.contains(ControlAction::None)
             && !self.body.has_else_if_clauses()
         {
             block_context.clauses = else_block_context.clauses;
@@ -290,13 +291,13 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for If<'arena> {
 
         if let Some(new_variables) = if_scope.new_variables {
             for (variable_id, variable_type) in new_variables {
-                block_context.locals.insert(variable_id, Rc::new(variable_type));
+                block_context.locals.insert(variable_id, variable_type);
             }
         }
 
         if let Some(redefined_variables) = if_scope.redefined_variables {
             for (variable_id, variable_type) in redefined_variables {
-                block_context.locals.insert(variable_id, Rc::new(variable_type));
+                block_context.locals.insert(variable_id, variable_type);
 
                 if !if_scope.reasonable_clauses.is_empty() {
                     if_scope.reasonable_clauses = BlockContext::filter_clauses(
@@ -380,7 +381,7 @@ fn analyze_if_statement_block<'ctx, 'arena>(
     mut if_block_context: BlockContext<'ctx>,
     outer_block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
-    pre_assignment_else_redefined_locals: &AtomMap<TUnion>,
+    pre_assignment_else_redefined_locals: &AtomMap<Rc<TUnion>>,
     if_statement: &If<'arena>,
 ) -> Result<(), AnalysisError> {
     let mut conditionally_referenced_variable_ids = if_block_context.conditionally_referenced_variable_ids.clone();
@@ -477,14 +478,14 @@ fn analyze_if_statement_block<'ctx, 'arena>(
         true,
     );
 
-    let has_ending_statements = final_actions.len() == 1 && final_actions.contains(&ControlAction::End);
-    let has_break_statement = final_actions.len() == 1 && final_actions.contains(&ControlAction::Break);
-    let has_continue_statement = final_actions.len() == 1 && final_actions.contains(&ControlAction::Continue);
+    let has_ending_statements = final_actions.len() == 1 && final_actions.contains(ControlAction::End);
+    let has_break_statement = final_actions.len() == 1 && final_actions.contains(ControlAction::Break);
+    let has_continue_statement = final_actions.len() == 1 && final_actions.contains(ControlAction::Continue);
     let has_leaving_statements =
-        has_ending_statements || (!final_actions.is_empty() && !final_actions.contains(&ControlAction::None));
+        has_ending_statements || (!final_actions.is_empty() && !final_actions.contains(ControlAction::None));
 
-    if_scope.if_actions = final_actions.iter().copied().collect();
-    if_scope.final_actions = final_actions.iter().copied().collect();
+    if_scope.if_actions = final_actions;
+    if_scope.final_actions = final_actions;
 
     let new_assigned_variable_ids = if_block_context.assigned_variable_ids.clone();
     let new_possibly_assigned_variable_ids = if_block_context.possibly_assigned_variable_ids.clone();
@@ -842,10 +843,10 @@ fn analyze_else_if_clause<'ctx, 'ast, 'arena>(
     let has_leaving_statements;
 
     if has_actions {
-        has_ending_statements = final_actions.len() == 1 && final_actions.contains(&ControlAction::End);
-        has_break_statement = final_actions.len() == 1 && final_actions.contains(&ControlAction::Break);
-        has_continue_statement = final_actions.len() == 1 && final_actions.contains(&ControlAction::Continue);
-        has_leaving_statements = has_ending_statements || !final_actions.contains(&ControlAction::None);
+        has_ending_statements = final_actions.len() == 1 && final_actions.contains(ControlAction::End);
+        has_break_statement = final_actions.len() == 1 && final_actions.contains(ControlAction::Break);
+        has_continue_statement = final_actions.len() == 1 && final_actions.contains(ControlAction::Continue);
+        has_leaving_statements = has_ending_statements || !final_actions.contains(ControlAction::None);
     } else {
         has_ending_statements = false;
         has_break_statement = false;
@@ -853,7 +854,7 @@ fn analyze_else_if_clause<'ctx, 'ast, 'arena>(
         has_leaving_statements = false;
     }
 
-    if_scope.if_actions.extend(final_actions.iter().copied());
+    if_scope.if_actions.extend(final_actions);
 
     if has_leaving_statements {
         if_scope.reasonable_clauses = vec![];
@@ -1058,7 +1059,7 @@ fn analyze_else_statements<'ctx, 'arena>(
         Some(else_statements) => {
             ControlAction::from_statements(else_statements.iter().collect(), vec![], Some(artifacts), true)
         }
-        None => HashSet::from_iter([ControlAction::None]),
+        None => ControlActionSet::from_single(ControlAction::None),
     };
 
     let has_actions = !final_actions.is_empty();
@@ -1068,10 +1069,10 @@ fn analyze_else_statements<'ctx, 'arena>(
     let has_leaving_statements;
 
     if has_actions {
-        has_ending_statements = final_actions.len() == 1 && final_actions.contains(&ControlAction::End);
-        has_break_statement = final_actions.len() == 1 && final_actions.contains(&ControlAction::Break);
-        has_continue_statement = final_actions.len() == 1 && final_actions.contains(&ControlAction::Continue);
-        has_leaving_statements = has_ending_statements || !final_actions.contains(&ControlAction::None);
+        has_ending_statements = final_actions.len() == 1 && final_actions.contains(ControlAction::End);
+        has_break_statement = final_actions.len() == 1 && final_actions.contains(ControlAction::Break);
+        has_continue_statement = final_actions.len() == 1 && final_actions.contains(ControlAction::Continue);
+        has_leaving_statements = has_ending_statements || !final_actions.contains(ControlAction::None);
     } else {
         has_ending_statements = false;
         has_break_statement = false;
@@ -1236,10 +1237,14 @@ fn update_if_scope<'ctx>(
             for (new_variable, new_variable_type) in new_variables.iter_mut() {
                 if !if_block_context.has_variable(new_variable) {
                     to_remove.push(*new_variable);
-                } else if let Some(variable_type) = if_block_context.locals.get(new_variable) {
-                    *new_variable_type = combine_union_types(new_variable_type, variable_type, context.codebase, false);
                 } else {
-                    unreachable!("variable is known to be in if_block_context");
+                    *new_variable_type = Rc::new(combine_union_types(
+                        new_variable_type,
+                        // SAFETY: has_variable returned true
+                        unsafe { if_block_context.locals.get(new_variable).unwrap_unchecked() },
+                        context.codebase,
+                        false,
+                    ));
                 }
             }
 
@@ -1254,7 +1259,7 @@ fn update_if_scope<'ctx>(
                         .locals
                         .iter()
                         .filter(|(variable_id, _)| !outer_block_context.locals.contains_key(*variable_id))
-                        .map(|(variable_id, variable_type)| (*variable_id, variable_type.as_ref().clone()))
+                        .map(|(variable_id, variable_type)| (*variable_id, variable_type.clone()))
                         .collect(),
                 );
             }
@@ -1289,7 +1294,7 @@ fn update_if_scope<'ctx>(
                 continue;
             };
 
-            *variable_type = combine_union_types(&redefined_type, variable_type, context.codebase, false);
+            *variable_type = Rc::new(combine_union_types(&redefined_type, variable_type, context.codebase, false));
         }
 
         for variable in variables_to_remove {
@@ -1298,7 +1303,9 @@ fn update_if_scope<'ctx>(
 
         for (variable_id, variable_type) in possibly_redefined_variables {
             let resulting_type = match if_scope.possibly_redefined_variables.get(&variable_id) {
-                Some(existing_type) => combine_union_types(&variable_type, existing_type, context.codebase, false),
+                Some(existing_type) => {
+                    Rc::new(combine_union_types(&variable_type, existing_type, context.codebase, false))
+                }
                 None => variable_type,
             };
 

@@ -3,7 +3,6 @@ use std::rc::Rc;
 use mago_atom::AtomSet;
 
 use mago_codex::ttype::TType;
-use mago_codex::ttype::add_optional_union_type;
 use mago_codex::ttype::combine_union_types;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
@@ -126,8 +125,12 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Continue<'arena> {
         loop_scope.redefined_loop_variables.retain(|redefined_var, current_redefined_type| {
             match redefined_vars.get(redefined_var) {
                 Some(outer_redefined_type) => {
-                    *current_redefined_type =
-                        combine_union_types(outer_redefined_type, current_redefined_type, context.codebase, false);
+                    *current_redefined_type = Rc::new(combine_union_types(
+                        outer_redefined_type,
+                        current_redefined_type,
+                        context.codebase,
+                        false,
+                    ));
 
                     true
                 }
@@ -138,11 +141,12 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Continue<'arena> {
         for (var_id, var_type) in redefined_vars {
             loop_scope.possibly_redefined_loop_variables.insert(
                 var_id,
-                add_optional_union_type(
-                    var_type,
-                    loop_scope.possibly_redefined_loop_variables.get(&var_id),
-                    context.codebase,
-                ),
+                match loop_scope.possibly_redefined_loop_variables.get(&var_id) {
+                    Some(existing_type) => {
+                        Rc::new(combine_union_types(existing_type, &var_type, context.codebase, false))
+                    }
+                    None => var_type.clone(),
+                },
             );
         }
 

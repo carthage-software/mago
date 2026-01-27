@@ -743,7 +743,7 @@ fn get_value_for_key(
     };
 
     let base_key_atom = atom(&base_key);
-    if let std::collections::btree_map::Entry::Vacant(e) = block_context.locals.entry(base_key_atom) {
+    if let std::collections::hash_map::Entry::Vacant(e) = block_context.locals.entry(base_key_atom) {
         if base_key.contains("::") {
             let base_key_parts = &base_key.split("::").collect::<Vec<&str>>();
             let fq_class_name = &base_key_parts[0];

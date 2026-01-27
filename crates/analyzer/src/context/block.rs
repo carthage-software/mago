@@ -1,5 +1,4 @@
 use std::cell::RefCell;
-use std::collections::BTreeMap;
 use std::rc::Rc;
 
 use ahash::HashSet;
@@ -24,7 +23,7 @@ use mago_span::Span;
 
 use crate::common::global::get_super_globals;
 use crate::context::Context;
-use crate::context::scope::control_action::ControlAction;
+use crate::context::scope::control_action::ControlActionSet;
 use crate::context::scope::finally_scope::FinallyScope;
 use crate::context::scope::var_has_root;
 use crate::reconciler::assertion_reconciler;
@@ -54,7 +53,7 @@ pub struct ReferenceConstraint {
 #[derive(Clone, Debug)]
 pub struct BlockContext<'ctx> {
     pub scope: ScopeContext<'ctx>,
-    pub locals: BTreeMap<Atom, Rc<TUnion>>,
+    pub locals: AtomMap<Rc<TUnion>>,
     pub static_locals: AtomSet,
     pub variables_possibly_in_scope: AtomSet,
     pub conditionally_referenced_variable_ids: AtomSet,
@@ -107,7 +106,7 @@ pub struct BlockContext<'ctx> {
     pub parent_conflicting_clause_variables: AtomSet,
     pub loop_bounds: (u32, u32),
     pub if_body_context: Option<Rc<RefCell<Self>>>,
-    pub control_actions: HashSet<ControlAction>,
+    pub control_actions: ControlActionSet,
     pub possibly_thrown_exceptions: AtomMap<HashSet<Span>>,
 
     /// Properties that are DEFINITELY initialized in ALL code paths.
@@ -174,7 +173,7 @@ impl<'ctx> BlockContext<'ctx> {
     pub fn new(scope: ScopeContext<'ctx>, register_super_globals: bool) -> Self {
         let mut block_context = Self {
             scope,
-            locals: BTreeMap::new(),
+            locals: AtomMap::default(),
             static_locals: AtomSet::default(),
             variables_possibly_in_scope: AtomSet::default(),
             conditionally_referenced_variable_ids: AtomSet::default(),
@@ -209,7 +208,7 @@ impl<'ctx> BlockContext<'ctx> {
             parent_conflicting_clause_variables: AtomSet::default(),
             loop_bounds: (0, 0),
             if_body_context: None,
-            control_actions: HashSet::default(),
+            control_actions: ControlActionSet::new(),
             possibly_thrown_exceptions: AtomMap::default(),
             definitely_initialized_properties: AtomSet::default(),
             possibly_initialized_properties: AtomSet::default(),
@@ -253,10 +252,10 @@ impl<'ctx> BlockContext<'ctx> {
 
     pub fn get_redefined_locals(
         &self,
-        new_locals: &BTreeMap<Atom, Rc<TUnion>>,
+        new_locals: &AtomMap<Rc<TUnion>>,
         include_new_vars: bool,
         removed_vars: &mut AtomSet,
-    ) -> AtomMap<TUnion> {
+    ) -> AtomMap<Rc<TUnion>> {
         let mut redefined_vars = AtomMap::default();
 
         let mut var_ids = self.locals.keys().collect::<Vec<_>>();
@@ -266,10 +265,10 @@ impl<'ctx> BlockContext<'ctx> {
             if let Some(this_type) = self.locals.get(var_id) {
                 if let Some(new_type) = new_locals.get(var_id) {
                     if new_type != this_type {
-                        redefined_vars.insert(*var_id, (**this_type).clone());
+                        redefined_vars.insert(*var_id, this_type.clone());
                     }
                 } else if include_new_vars {
-                    redefined_vars.insert(*var_id, (**this_type).clone());
+                    redefined_vars.insert(*var_id, this_type.clone());
                 }
             } else {
                 removed_vars.insert(*var_id);

@@ -1,11 +1,9 @@
 use std::rc::Rc;
 
-use mago_atom::AtomMap;
 use mago_atom::AtomSet;
 
 use mago_codex::ttype::TType;
 use mago_codex::ttype::add_optional_union_type;
-use mago_codex::ttype::combine_optional_union_types;
 use mago_codex::ttype::combine_union_types;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
@@ -108,14 +106,12 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Break<'arena> {
             for (var_id, var_type) in redefined_vars {
                 loop_scope.possibly_redefined_loop_parent_variables.insert(
                     var_id,
-                    Rc::new(add_optional_union_type(
-                        var_type,
-                        loop_scope
-                            .possibly_redefined_loop_parent_variables
-                            .get(&var_id)
-                            .map(std::convert::AsRef::as_ref),
-                        context.codebase,
-                    )),
+                    match loop_scope.possibly_redefined_loop_parent_variables.get(&var_id) {
+                        Some(existing_type) => {
+                            Rc::new(combine_union_types(existing_type, &var_type, context.codebase, false))
+                        }
+                        None => var_type.clone(),
+                    },
                 );
             }
 
@@ -124,11 +120,12 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Break<'arena> {
                     if !loop_scope.parent_context_variables.contains_key(var_id) {
                         loop_scope.possibly_defined_loop_parent_variables.insert(
                             *var_id,
-                            add_optional_union_type(
-                                var_type.as_ref().clone(),
-                                loop_scope.possibly_defined_loop_parent_variables.get(var_id),
-                                context.codebase,
-                            ),
+                            match loop_scope.possibly_defined_loop_parent_variables.get(var_id) {
+                                Some(existing_type) => {
+                                    Rc::new(combine_union_types(existing_type, var_type, context.codebase, false))
+                                }
+                                None => var_type.clone(),
+                            },
                         );
                     }
                 }
@@ -148,16 +145,20 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Break<'arena> {
 
         if let Some(case_scope) = artifacts.case_scopes.last_mut() {
             if leaving_switch {
-                let mut new_break_vars = case_scope.break_vars.clone().unwrap_or(AtomMap::default());
+                let mut break_vars = case_scope.break_vars.take().unwrap_or_default();
 
                 for (var_id, var_type) in &block_context.locals {
-                    new_break_vars.insert(
-                        *var_id,
-                        combine_optional_union_types(Some(var_type), new_break_vars.get(var_id), context.codebase),
-                    );
+                    let resulting_type = match break_vars.get(var_id) {
+                        Some(break_var_type) => {
+                            Rc::new(combine_union_types(var_type, break_var_type, context.codebase, false))
+                        }
+                        None => var_type.clone(),
+                    };
+
+                    break_vars.insert(*var_id, resulting_type);
                 }
 
-                case_scope.break_vars = Some(new_break_vars);
+                case_scope.break_vars = Some(break_vars);
             }
         } else if !leaving_loop {
             // `break` outside of a loop or switch

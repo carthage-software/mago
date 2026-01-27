@@ -139,8 +139,8 @@ fn inherit_loop_block_context<'ctx>(
     always_enters_loop: bool,
     known_infinite_loop: bool,
 ) {
-    let has_break = loop_scope.final_actions.contains(&ControlAction::Break);
-    let has_continue = loop_scope.final_actions.contains(&ControlAction::Continue);
+    let has_break = loop_scope.final_actions.contains(ControlAction::Break);
+    let has_continue = loop_scope.final_actions.contains(ControlAction::Continue);
     let has_break_or_continue = has_break || has_continue;
     let can_leave_loop = !known_infinite_loop || has_break;
 
@@ -263,7 +263,7 @@ fn analyze<'ctx, 'ast, 'arena>(
     }
 
     let final_actions = ControlAction::from_statements(statements.iter().collect(), vec![], Some(artifacts), true);
-    let does_always_break = final_actions.len() == 1 && final_actions.contains(&ControlAction::Break);
+    let does_always_break = final_actions.len() == 1 && final_actions.contains(ControlAction::Break);
 
     let mut continue_context;
     let mut inner_do_context = None;
@@ -591,7 +591,7 @@ fn analyze<'ctx, 'ast, 'arena>(
 
     debug_assert!(pre_conditions_applied, "Pre-conditions should have been applied at least once.");
 
-    let does_sometimes_break = loop_scope.final_actions.contains(&ControlAction::Break);
+    let does_sometimes_break = loop_scope.final_actions.contains(ControlAction::Break);
     let does_always_break = does_sometimes_break && loop_scope.final_actions.len() == 1;
 
     if does_sometimes_break {
@@ -721,7 +721,7 @@ fn analyze<'ctx, 'ast, 'arena>(
     }
 
     if always_enters_loop {
-        let does_sometimes_continue = loop_scope.final_actions.contains(&ControlAction::Continue);
+        let does_sometimes_continue = loop_scope.final_actions.contains(ControlAction::Continue);
 
         for (variable_id, variable_type) in &continue_context.locals {
             // if there are break statements in the loop it's not certain
@@ -874,9 +874,9 @@ fn update_loop_scope_contexts<'ctx>(
     pre_outer_context: &BlockContext<'ctx>,
     context: &Context<'ctx, '_>,
 ) {
-    if loop_scope.final_actions.contains(&ControlAction::Continue) {
+    if loop_scope.final_actions.contains(ControlAction::Continue) {
         for (variable_id, variable_type) in &loop_scope.redefined_loop_variables {
-            continue_context.locals.insert(*variable_id, Rc::new(variable_type.clone()));
+            continue_context.locals.insert(*variable_id, variable_type.clone());
         }
 
         for (variable_id, variable_type) in &loop_scope.possibly_redefined_loop_variables {
