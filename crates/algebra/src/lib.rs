@@ -94,6 +94,12 @@ impl Default for AlgebraThresholds {
 ///    their consensus is `(X ∨ Y)`. If `(X ∨ Y)` also exists in the set, it is removed
 ///    as it is logically redundant.
 ///
+/// # Time Complexity
+///
+/// O(N² × K) where N = number of clauses, K = average variables per clause.
+/// In practice, N is typically small (10-50 clauses), making the quadratic loops fast.
+/// The function uses index-based tracking to avoid expensive Clause cloning.
+///
 /// # Arguments
 ///
 /// * `clauses` - A slice of clauses to be simplified.
@@ -117,11 +123,11 @@ pub fn saturate_clauses<'a>(
             return vec![];
         }
 
-        let mut removed_clauses = HashSet::with_capacity(unique_clauses_len);
-        let mut added_clauses = vec![];
+        let mut removed_indices: HashSet<usize> = HashSet::default();
+        let mut added_clauses: Vec<Clause> = Vec::new();
 
         // Main simplification loop for resolution and unit propagation.
-        'outer: for clause_a in &unique_clauses {
+        'outer: for (clause_a_idx, clause_a) in unique_clauses.iter().enumerate() {
             if !clause_a.reconcilable || clause_a.wedge {
                 continue;
             }
@@ -137,111 +143,146 @@ pub fn saturate_clauses<'a>(
                 let negated_clause_type = only_type.get_negation();
                 let negated_hash = negated_clause_type.to_hash();
 
-                for clause_b in &unique_clauses {
-                    if clause_a == clause_b || !clause_b.reconcilable || clause_b.wedge {
+                // Simple O(N) scan - fast for typical small N
+                for (clause_b_idx, clause_b) in unique_clauses.iter().enumerate() {
+                    if clause_a_idx == clause_b_idx || removed_indices.contains(&clause_b_idx) {
                         continue;
                     }
 
-                    if let Some(matching_clause_possibilities) = clause_b.possibilities.get(clause_var)
-                        && matching_clause_possibilities.contains_key(&negated_hash)
-                    {
-                        let mut clause_var_possibilities = matching_clause_possibilities.clone();
-                        clause_var_possibilities.retain(|k, _| k != &negated_hash);
+                    if !clause_b.reconcilable || clause_b.wedge {
+                        continue;
+                    }
 
-                        removed_clauses.insert(*clause_b);
+                    // Check if clause_b contains the negated literal
+                    let Some(matching_clause_possibilities) = clause_b.possibilities.get(clause_var) else {
+                        continue;
+                    };
 
-                        if clause_var_possibilities.is_empty() {
-                            if let Some(updated_clause) = clause_b.remove_possibilities(clause_var) {
-                                added_clauses.push(updated_clause);
-                            }
-                        } else {
-                            let updated_clause = clause_b.add_possibility(*clause_var, clause_var_possibilities);
+                    if !matching_clause_possibilities.contains_key(&negated_hash) {
+                        continue;
+                    }
+
+                    let mut clause_var_possibilities = matching_clause_possibilities.clone();
+                    clause_var_possibilities.retain(|k, _| k != &negated_hash);
+
+                    removed_indices.insert(clause_b_idx);
+
+                    if clause_var_possibilities.is_empty() {
+                        if let Some(updated_clause) = clause_b.remove_possibilities(clause_var) {
                             added_clauses.push(updated_clause);
                         }
+                    } else {
+                        let updated_clause = clause_b.add_possibility(*clause_var, clause_var_possibilities);
+                        added_clauses.push(updated_clause);
                     }
                 }
             } else {
-                'inner: for clause_b in &unique_clauses {
-                    if clause_a == clause_b || !clause_b.reconcilable || clause_b.wedge {
+                // Resolution: check all other clauses with the same size
+                let clause_a_size = clause_a.possibilities.len();
+
+                'inner: for (clause_b_idx, clause_b) in unique_clauses.iter().enumerate() {
+                    if clause_a_idx >= clause_b_idx || removed_indices.contains(&clause_b_idx) {
                         continue;
                     }
 
-                    // Check for resolution candidates more efficiently in a single pass.
-                    if clause_a.possibilities.len() == clause_b.possibilities.len() {
-                        let mut opposing_key = None;
-                        let mut mismatch = false;
+                    if !clause_b.reconcilable || clause_b.wedge {
+                        continue;
+                    }
 
-                        for (key, a_possibilities) in &clause_a.possibilities {
-                            if let Some(b_possibilities) = clause_b.possibilities.get(key) {
-                                if index_keys_match(a_possibilities, b_possibilities) {
-                                    continue;
-                                }
+                    // Quick size check before detailed comparison
+                    if clause_b.possibilities.len() != clause_a_size {
+                        continue;
+                    }
 
-                                if a_possibilities.len() == 1
-                                    && b_possibilities.len() == 1
-                                    && a_possibilities.values().next().is_some_and(|a| {
-                                        b_possibilities.values().next().is_some_and(|b| a.is_negation_of(b))
-                                    })
-                                {
-                                    if opposing_key.is_some() {
-                                        mismatch = true;
-                                        break;
-                                    }
-                                    opposing_key = Some(key);
-                                } else {
+                    let mut opposing_key = None;
+                    let mut mismatch = false;
+                    for (key, a_possibilities) in &clause_a.possibilities {
+                        if let Some(b_possibilities) = clause_b.possibilities.get(key) {
+                            if index_keys_match(a_possibilities, b_possibilities) {
+                                continue;
+                            }
+
+                            if a_possibilities.len() == 1
+                                && b_possibilities.len() == 1
+                                && a_possibilities.values().next().is_some_and(|a| {
+                                    b_possibilities.values().next().is_some_and(|b| a.is_negation_of(b))
+                                })
+                            {
+                                if opposing_key.is_some() {
                                     mismatch = true;
                                     break;
                                 }
+                                opposing_key = Some(key);
                             } else {
                                 mismatch = true;
                                 break;
                             }
+                        } else {
+                            mismatch = true;
+                            break;
                         }
+                    }
 
-                        if mismatch {
-                            continue 'inner;
-                        }
+                    if mismatch {
+                        continue 'inner;
+                    }
 
-                        if let Some(key_to_remove) = opposing_key {
-                            removed_clauses.insert(*clause_a);
-                            let maybe_new_clause = clause_a.remove_possibilities(key_to_remove);
+                    if let Some(key_to_remove) = opposing_key {
+                        removed_indices.insert(clause_a_idx);
+                        let maybe_new_clause = clause_a.remove_possibilities(key_to_remove);
 
-                            if let Some(new_clause) = maybe_new_clause {
-                                added_clauses.push(new_clause);
-                            } else {
-                                // If removing the possibility makes the clause empty, it's a success,
-                                // but no new clause is added.
-                                continue 'outer;
-                            }
+                        if let Some(new_clause) = maybe_new_clause {
+                            added_clauses.push(new_clause);
+                        } else {
+                            // If removing the possibility makes the clause empty, it's a success,
+                            // but no new clause is added.
+                            continue 'outer;
                         }
                     }
                 }
             }
         }
 
-        // Combine original clauses (minus removed ones) with newly added clauses, ensuring uniqueness.
-        let mut unique_clauses: Vec<Clause> = unique_clauses
-            .into_iter()
-            .filter(|f| !removed_clauses.contains(f))
-            .cloned()
-            .chain(added_clauses)
-            .unique()
-            .collect();
+        // Combine original clauses (minus removed ones) with newly added clauses.
+        let mut seen_hashes: HashSet<u32> = HashSet::with_capacity(unique_clauses_len);
+        let mut combined_clauses: Vec<Clause> = Vec::with_capacity(unique_clauses_len);
+
+        for (idx, clause) in unique_clauses.iter().enumerate() {
+            if !removed_indices.contains(&idx) && seen_hashes.insert(clause.hash) {
+                combined_clauses.push((*clause).clone());
+            }
+        }
+
+        for clause in added_clauses {
+            if seen_hashes.insert(clause.hash) {
+                combined_clauses.push(clause);
+            }
+        }
 
         // Absorption rule: remove redundant clauses. e.g., (A | B) is redundant if A exists.
         // A clause `a` is redundant if a smaller clause `b` exists that is a subset of `a`.
-        unique_clauses.sort_by_key(|c| c.possibilities.len());
-        let mut simplified_clauses = Vec::with_capacity(unique_clauses.len());
+        let mut simplified_clauses: Vec<Clause> = Vec::with_capacity(combined_clauses.len());
 
-        for clause_a in &unique_clauses {
+        for clause_a in &combined_clauses {
+            if clause_a.wedge {
+                simplified_clauses.push(clause_a.clone());
+                continue;
+            }
+
             let mut is_redundant = false;
-            // Optimization: only check clauses smaller or equal in size.
-            // Since `unique_clauses` is sorted by length, we can break early.
-            for clause_b in &unique_clauses {
-                if clause_b.possibilities.len() > clause_a.possibilities.len() {
-                    break;
+
+            // Check if any smaller clause is a subset of clause_a
+            for clause_b in &combined_clauses {
+                if std::ptr::eq(clause_a, clause_b) {
+                    continue;
                 }
-                if clause_a == clause_b || !clause_b.reconcilable || clause_b.wedge || clause_a.wedge {
+
+                if !clause_b.reconcilable || clause_b.wedge {
+                    continue;
+                }
+
+                // Only check if clause_b is strictly smaller
+                if clause_b.possibilities.len() >= clause_a.possibilities.len() {
                     continue;
                 }
 
@@ -260,28 +301,29 @@ pub fn saturate_clauses<'a>(
         // (A | X) & (!A | Y) implies (X | Y). If (X | Y) already exists, it is redundant.
         let simplified_clauses_len = simplified_clauses.len();
         if simplified_clauses_len > 2 && simplified_clauses_len < consensus_limit {
-            let mut compared_clauses = HashSet::default();
-            let mut removed_clauses_by_consensus = HashSet::default();
+            let mut compared_clauses: HashSet<(u32, u32)> = HashSet::default();
+            let mut removed_hashes: HashSet<u32> = HashSet::default();
 
-            for clause_a in &simplified_clauses {
-                for clause_b in &simplified_clauses {
-                    if clause_a == clause_b || compared_clauses.contains(&(clause_b.hash, clause_a.hash)) {
+            for (clause_a_idx, clause_a) in simplified_clauses.iter().enumerate() {
+                for clause_b in simplified_clauses.iter().skip(clause_a_idx + 1) {
+                    if compared_clauses.contains(&(clause_b.hash, clause_a.hash)) {
                         continue;
                     }
 
                     compared_clauses.insert((clause_a.hash, clause_b.hash));
 
-                    let common_keys: HashSet<_> =
+                    // Find common keys between the two clauses
+                    let common_keys: Vec<_> =
                         clause_a.possibilities.keys().filter(|k| clause_b.possibilities.contains_key(*k)).collect();
 
                     if common_keys.is_empty() {
                         continue;
                     }
 
-                    let mut common_negated_keys = HashSet::default();
-                    for common_key in common_keys {
-                        let clause_a_possibilities = &clause_a.possibilities[common_key];
-                        let clause_b_possibilities = &clause_b.possibilities[common_key];
+                    let mut common_negated_keys: HashSet<&Atom> = HashSet::default();
+                    for common_key in &common_keys {
+                        let clause_a_possibilities = &clause_a.possibilities[*common_key];
+                        let clause_b_possibilities = &clause_b.possibilities[*common_key];
 
                         if clause_a_possibilities.len() == 1
                             && clause_b_possibilities.len() == 1
@@ -289,7 +331,7 @@ pub fn saturate_clauses<'a>(
                                 clause_b_possibilities.values().next().is_some_and(|b| a.is_negation_of(b))
                             })
                         {
-                            common_negated_keys.insert(common_key);
+                            common_negated_keys.insert(*common_key);
                         }
                     }
 
@@ -316,12 +358,12 @@ pub fn saturate_clauses<'a>(
 
                         let conflict_clause =
                             Clause::new(new_possibilities, clause_a.condition_span, clause_a.span, None, None, None);
-                        removed_clauses_by_consensus.insert(conflict_clause);
+                        removed_hashes.insert(conflict_clause.hash);
                     }
                 }
             }
 
-            simplified_clauses.retain(|f| !removed_clauses_by_consensus.contains(f));
+            simplified_clauses.retain(|f| !removed_hashes.contains(&f.hash));
         }
 
         simplified_clauses
