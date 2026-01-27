@@ -71,13 +71,17 @@ pub type AtomSet = HashSet<Atom, BuildHasherDefault<IdentityHasher>>;
 /// The maximum size in bytes for a string to be processed on the stack.
 const STACK_BUF_SIZE: usize = 256;
 
+thread_local! {
+    static EMPTY_ATOM: Atom = atom("");
+}
+
 /// Returns the canonical `Atom` for an empty string.
 ///
 /// This is a very cheap operation.
 #[inline]
 #[must_use]
 pub fn empty_atom() -> Atom {
-    atom("")
+    EMPTY_ATOM.with(|&atom| atom)
 }
 
 /// A macro to concatenate between 2 and 12 string slices into a single `Atom`.
