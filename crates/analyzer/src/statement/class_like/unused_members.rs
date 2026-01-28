@@ -134,6 +134,15 @@ pub fn check_unused_members_with_transitivity<'ctx, 'arena>(
             continue;
         }
 
+        if class_like_metadata
+            .used_traits
+            .iter()
+            .any(|trait_name| context.codebase.method_exists(trait_name, method_name))
+        {
+            // non-abstract trait method override, could be used in the trait itself.
+            continue;
+        }
+
         let method_span = method_metadata.name_span.unwrap_or(method_metadata.span);
         checkable_members.push(CheckableMember {
             symbol_id: (class_name, *method_name),

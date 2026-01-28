@@ -544,6 +544,7 @@ test_case!(issue_923);
 test_case!(issue_932);
 test_case!(issue_940);
 test_case!(issue_941);
+test_case!(issue_945);
 test_case!(issue_946);
 test_case!(issue_949);
 test_case!(issue_954);
