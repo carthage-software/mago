@@ -116,7 +116,31 @@ fn should_inherit_docblock_type(
             &mut ComparisonResult::new(),
         ) && child_contained_in_parent;
 
-        types_equal || !child_contained_in_parent
+        if types_equal || !child_contained_in_parent {
+            return true;
+        }
+
+        if let Some(parent_docblock) = parent_docblock {
+            let docblock_type = if !child_native.accepts_null() && parent_docblock.type_union.has_null() {
+                parent_docblock.type_union.to_non_nullable()
+            } else {
+                parent_docblock.type_union.clone()
+            };
+
+            let docblock_compatible_with_child = union_comparator::is_contained_by(
+                codebase,
+                &docblock_type,
+                child_native,
+                false,
+                false,
+                false,
+                &mut ComparisonResult::new(),
+            );
+
+            return docblock_compatible_with_child;
+        }
+
+        false
     } else {
         let parent_contained_in_child = union_comparator::is_contained_by(
             codebase,
@@ -206,6 +230,7 @@ pub fn inherit_method_docblocks(codebase: &mut CodebaseMetadata) {
         };
 
         let parent_return_type = parent_method.return_type_metadata.as_ref();
+        let parent_native_return_type = parent_method.return_type_declaration_metadata.as_ref();
         let parent_parameters = &parent_method.parameters;
         let parent_template_types = &parent_method.template_types;
         let parent_thrown_types = &parent_method.thrown_types;
@@ -284,7 +309,7 @@ pub fn inherit_method_docblocks(codebase: &mut CodebaseMetadata) {
             let has_explicit_inherit_doc = child_method.flags.contains(MetadataFlags::INHERITS_DOCS);
 
             let should_inherit_return = should_inherit_docblock_type(
-                parent_return_type.filter(|m| !m.from_docblock).map(|m| &m.type_union),
+                parent_native_return_type.map(|m| &m.type_union),
                 parent_return_type.filter(|m| m.from_docblock),
                 child_method.return_type_declaration_metadata.as_ref().map(|m| &m.type_union),
                 child_method.return_type_metadata.as_ref().filter(|m| m.from_docblock),
