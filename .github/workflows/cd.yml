@@ -170,17 +170,13 @@ jobs:
           - { target: x86_64-pc-windows-gnu, os: windows-latest }
           # FreeBSD: x86_64
           - { target: x86_64-unknown-freebsd, os: ubuntu-latest }
-          # Linux: arm, armv7, powerpc, powerpc64, powerpc64le, s390x
+          # Linux: arm, armv7
           - { target: arm-unknown-linux-gnueabi, os: ubuntu-latest }
           - { target: arm-unknown-linux-gnueabihf, os: ubuntu-latest }
           - { target: arm-unknown-linux-musleabi, os: ubuntu-latest }
           - { target: arm-unknown-linux-musleabihf, os: ubuntu-latest }
           - { target: armv7-unknown-linux-gnueabihf, os: ubuntu-latest }
           - { target: armv7-unknown-linux-musleabihf, os: ubuntu-latest }
-          - { target: powerpc-unknown-linux-gnu, os: ubuntu-latest }
-          - { target: powerpc64-unknown-linux-gnu, os: ubuntu-latest }
-          - { target: powerpc64le-unknown-linux-gnu, os: ubuntu-latest }
-          - { target: s390x-unknown-linux-gnu, os: ubuntu-latest }
 
     env:
       BUILD_CMD: cargo
@@ -238,8 +234,6 @@ jobs:
           case ${{ matrix.job.target }} in
             x86_64-unknown-linux-gnu) IMAGE="quay.io/pypa/manylinux2014_x86_64" ;;
             aarch64-unknown-linux-gnu) IMAGE="quay.io/pypa/manylinux2014_aarch64" ;;
-            powerpc64le-unknown-linux-gnu) IMAGE="quay.io/pypa/manylinux2014_ppc64le" ;;
-            s390x-unknown-linux-gnu) IMAGE="quay.io/pypa/manylinux2014_s390x" ;;
           esac
           if [[ -n "$IMAGE" ]]; then
             echo "Using custom image for glibc 2.17: $IMAGE"
