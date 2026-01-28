@@ -927,7 +927,7 @@ impl TInteger {
             };
         }
 
-        intervals.sort_unstable_by(|a, b| a.0.cmp(&b.0));
+        intervals.sort_unstable_by_key(|a| a.0);
 
         let mut merged = Vec::with_capacity(intervals.len() + 1);
         if has_unspecified_literal {

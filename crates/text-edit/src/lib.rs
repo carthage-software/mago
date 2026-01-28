@@ -301,7 +301,7 @@ impl<'a> TextEditor<'a> {
 
         self.edits.reserve(new_edits.len());
         self.edits.extend(new_edits);
-        self.edits.sort_by(|a, b| a.range.start.cmp(&b.range.start));
+        self.edits.sort_by_key(|a| a.range.start);
 
         ApplyResult::Applied
     }

@@ -7,7 +7,7 @@ license = "MIT OR Apache-2.0"
 description = "A comprehensive suite of PHP tooling inspired by Rust’s approach, providing parsing, linting, formatting, and more through a unified CLI and library interface."
 homepage = "https://mago.carthage.software"
 repository = "https://github.com/carthage-software/mago"
-rust-version = "1.91.1"
+rust-version = "1.93.0"
 exclude = ["docs", "composer", "scripts"]
 
 [workspace]
@@ -17,7 +17,7 @@ package.license = "MIT OR Apache-2.0"
 package.version = "1.2.2"
 package.homepage = "https://mago.carthage.software"
 package.repository = "https://github.com/carthage-software/mago"
-package.rust-version = "1.91.1"
+package.rust-version = "1.93.0"
 members = ["crates/*"]
 
 [workspace.lints.clippy]
