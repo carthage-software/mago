@@ -239,6 +239,10 @@ test_case!(idempotent_chain_with_array);
 test_case!(match_idempotency);
 test_case!(heredoc_indentation);
 test_case!(heredoc_indentation_disabled);
+test_case!(fully_qualified_global_constant);
+test_case!(fully_qualified_global_function);
+test_case!(global_constant_not_imported);
+test_case!(global_function_not_imported);
 
 // A special test case for regressions in the Psl codebase
 test_case!(psl_regressions);
