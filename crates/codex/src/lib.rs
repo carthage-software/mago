@@ -5,6 +5,7 @@ use mago_span::Span;
 pub mod assertion;
 pub mod consts;
 pub mod context;
+pub mod dependency;
 pub mod diff;
 pub mod differ;
 pub mod flags;

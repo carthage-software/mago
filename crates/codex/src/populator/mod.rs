@@ -1,23 +1,43 @@
+//! Codebase population system.
+//!
+//! # Architecture
+//!
+//! The population process is divided into phases:
+//!
+//! 1. **Class Population** - Process classes level-by-level based on dependency depth.
+//!    Classes at the same level have no dependencies on each other and can be
+//!    processed in parallel.
+//! 2. **Function Population** - Populate function-like metadata.
+//! 3. **Type Population** - Populate class types.
+//! 4. **Constant Population** - Populate constants.
+//! 5. **Docblock Inheritance** - Inherit docblocks from parent methods.
+//! 6. **Descendant Maps** - Build class descendant maps for efficient lookup.
+
+mod class_like;
 mod docblock;
 mod hierarchy;
-mod merge;
-mod methods;
-mod properties;
+mod result;
 mod signatures;
-mod sorter;
-mod templates;
 
 use ahash::HashSet;
 use mago_atom::AtomMap;
 use mago_atom::AtomSet;
+use rayon::prelude::*;
 
+use crate::dependency::DependencyGraph;
 use crate::metadata::CodebaseMetadata;
+use crate::populator::docblock::inherit_method_docblocks;
+use crate::populator::hierarchy::populate_class_like_types;
+use crate::populator::signatures::populate_function_like_metadata;
 use crate::reference::ReferenceSource;
 use crate::reference::SymbolReferences;
 use crate::symbol::SymbolIdentifier;
 use crate::ttype::union::populate_union_type;
 
-/// Populates the codebase metadata, resolving types and inheritance.
+pub use result::AccumulatedReferences;
+pub use result::ClassPopulationResult;
+
+/// Populates the codebase metadata using parallel processing.
 ///
 /// This function processes class-likes, function-likes, and constants to:
 ///
@@ -26,22 +46,83 @@ use crate::ttype::union::populate_union_type;
 /// - Determine method and property origins (declaring vs. appearing).
 /// - Build descendant maps for efficient lookup.
 ///
-/// TODO(azjezz): This function is a performance bottleneck.
+/// # Arguments
+///
+/// * `codebase` - The codebase metadata to populate
+/// * `symbol_references` - Reference tracker for symbol dependencies
+/// * `safe_symbols` - Set of symbols that don't need repopulation
+/// * `safe_symbol_members` - Set of symbol members that don't need repopulation
 pub fn populate_codebase(
     codebase: &mut CodebaseMetadata,
     symbol_references: &mut SymbolReferences,
     safe_symbols: AtomSet,
     safe_symbol_members: HashSet<SymbolIdentifier>,
 ) {
-    let mut class_likes_to_repopulate = AtomSet::default();
-    for (name, metadata) in &codebase.class_likes {
-        // Repopulate if not populated OR if user-defined and not marked safe.
-        if !metadata.flags.is_populated() || (metadata.flags.is_user_defined() && !safe_symbols.contains(name)) {
-            class_likes_to_repopulate.insert(*name);
+    let classes_to_repopulate = identify_classes_to_repopulate(codebase, &safe_symbols);
+
+    reset_class_flags(codebase, &classes_to_repopulate);
+
+    let graph = DependencyGraph::build(codebase, &classes_to_repopulate);
+
+    for level in graph.levels() {
+        if level.is_empty() {
+            continue;
+        }
+
+        let level_classes: Vec<_> =
+            level.iter().filter_map(|name| codebase.class_likes.remove(name).map(|m| (*name, m))).collect();
+
+        let results: Vec<ClassPopulationResult> = level_classes
+            .into_par_iter()
+            .map(|(name, metadata)| class_like::populate(name, metadata, codebase))
+            .collect();
+
+        for result in results {
+            codebase.class_likes.insert(result.name, result.metadata);
+
+            for (from, to, userland) in result.symbol_references {
+                symbol_references.add_symbol_reference_to_symbol(from, to, userland);
+            }
+
+            for ((class_name, method_name), context) in result.method_contexts {
+                if let Some(method_metadata) = codebase.function_likes.get_mut(&(class_name, method_name)) {
+                    if let Some(existing) = method_metadata.type_resolution_context.take() {
+                        let mut updated = existing;
+                        updated.merge(context);
+                        method_metadata.type_resolution_context = Some(updated);
+                    } else {
+                        method_metadata.type_resolution_context = Some(context);
+                    }
+                }
+            }
         }
     }
 
-    for class_like_name in &class_likes_to_repopulate {
+    populate_function_likes(codebase, symbol_references, &safe_symbols);
+    populate_class_types(codebase, symbol_references, &safe_symbols);
+    populate_constants(codebase, symbol_references, &safe_symbols);
+    inherit_method_docblocks(codebase);
+    build_descendant_maps(codebase);
+
+    codebase.safe_symbols = safe_symbols;
+    codebase.safe_symbol_members = safe_symbol_members;
+}
+
+/// Identify classes that need (re)population.
+fn identify_classes_to_repopulate(codebase: &CodebaseMetadata, safe_symbols: &AtomSet) -> AtomSet {
+    let mut classes_to_repopulate = AtomSet::default();
+
+    for (name, metadata) in &codebase.class_likes {
+        if !metadata.flags.is_populated() || (metadata.flags.is_user_defined() && !safe_symbols.contains(name)) {
+            classes_to_repopulate.insert(*name);
+        }
+    }
+
+    classes_to_repopulate
+}
+
+fn reset_class_flags(codebase: &mut CodebaseMetadata, classes_to_repopulate: &AtomSet) {
+    for class_like_name in classes_to_repopulate {
         if let Some(classlike_info) = codebase.class_likes.get_mut(class_like_name) {
             classlike_info.flags &= !crate::metadata::flags::MetadataFlags::POPULATED;
             classlike_info.declaring_property_ids.clear();
@@ -50,56 +131,93 @@ pub fn populate_codebase(
             classlike_info.appearing_method_ids.clear();
         }
     }
+}
 
-    let sorted_classes = sorter::sort_class_likes(codebase, &class_likes_to_repopulate);
-    for class_name in sorted_classes {
-        hierarchy::populate_class_like_metadata_iterative(class_name, codebase, symbol_references);
-    }
+fn populate_function_likes(
+    codebase: &mut CodebaseMetadata,
+    symbol_references: &mut SymbolReferences,
+    safe_symbols: &AtomSet,
+) {
+    let function_names: Vec<_> = codebase.function_likes.keys().cloned().collect();
 
-    for (name, function_like_metadata) in &mut codebase.function_likes {
-        let force_repopulation = function_like_metadata.flags.is_user_defined() && !safe_symbols.contains(&name.0);
+    for name in function_names {
+        let force_repopulation = {
+            let Some(function_like_metadata) = codebase.function_likes.get(&name) else {
+                continue;
+            };
 
-        let reference_source = if name.1.is_empty() || function_like_metadata.get_kind().is_closure() {
-            // Top-level function or closure
-            ReferenceSource::Symbol(true, name.0)
-        } else {
-            // Class method
-            ReferenceSource::ClassLikeMember(true, name.0, name.1)
+            function_like_metadata.flags.is_user_defined() && !safe_symbols.contains(&name.0)
         };
 
-        signatures::populate_function_like_metadata(
-            function_like_metadata,
-            &codebase.symbols,
-            &reference_source,
-            symbol_references,
-            force_repopulation,
-        );
+        let reference_source = {
+            let Some(function_like_metadata) = codebase.function_likes.get(&name) else {
+                continue;
+            };
+
+            if name.1.is_empty() || function_like_metadata.get_kind().is_closure() {
+                ReferenceSource::Symbol(true, name.0)
+            } else {
+                ReferenceSource::ClassLikeMember(true, name.0, name.1)
+            }
+        };
+
+        if let Some(function_like_metadata) = codebase.function_likes.get_mut(&name) {
+            populate_function_like_metadata(
+                function_like_metadata,
+                &codebase.symbols,
+                &reference_source,
+                symbol_references,
+                force_repopulation,
+            );
+        }
     }
+}
 
-    for (name, metadata) in &mut codebase.class_likes {
-        let userland_force_repopulation = metadata.flags.is_user_defined() && !safe_symbols.contains(name);
+fn populate_class_types(
+    codebase: &mut CodebaseMetadata,
+    symbol_references: &mut SymbolReferences,
+    safe_symbols: &AtomSet,
+) {
+    let class_names: Vec<_> = codebase.class_likes.keys().cloned().collect();
 
-        hierarchy::populate_class_like_types(
-            *name,
-            metadata,
-            &codebase.symbols,
-            symbol_references,
-            userland_force_repopulation,
-        );
+    for name in class_names {
+        let force_repopulation = {
+            let Some(metadata) = codebase.class_likes.get(&name) else {
+                continue;
+            };
+
+            metadata.flags.is_user_defined() && !safe_symbols.contains(&name)
+        };
+
+        if let Some(metadata) = codebase.class_likes.get_mut(&name) {
+            populate_class_like_types(name, metadata, &codebase.symbols, symbol_references, force_repopulation);
+        }
     }
+}
 
-    for (name, constant) in &mut codebase.constants {
+fn populate_constants(
+    codebase: &mut CodebaseMetadata,
+    symbol_references: &mut SymbolReferences,
+    safe_symbols: &AtomSet,
+) {
+    let constant_names: Vec<_> = codebase.constants.keys().cloned().collect();
+
+    for name in constant_names {
+        let Some(constant) = codebase.constants.get_mut(&name) else {
+            continue;
+        };
+
         for attribute_metadata in &constant.attributes {
-            symbol_references.add_symbol_reference_to_symbol(*name, attribute_metadata.name, true);
+            symbol_references.add_symbol_reference_to_symbol(name, attribute_metadata.name, true);
         }
 
         if let Some(type_metadata) = &mut constant.type_metadata {
             populate_union_type(
                 &mut type_metadata.type_union,
                 &codebase.symbols,
-                Some(&ReferenceSource::Symbol(true, *name)),
+                Some(&ReferenceSource::Symbol(true, name)),
                 symbol_references,
-                !safe_symbols.contains(name),
+                !safe_symbols.contains(&name),
             );
         }
 
@@ -107,13 +225,15 @@ pub fn populate_codebase(
             populate_union_type(
                 inferred_type,
                 &codebase.symbols,
-                Some(&ReferenceSource::Symbol(true, *name)),
+                Some(&ReferenceSource::Symbol(true, name)),
                 symbol_references,
-                !safe_symbols.contains(name),
+                !safe_symbols.contains(&name),
             );
         }
     }
+}
 
+fn build_descendant_maps(codebase: &mut CodebaseMetadata) {
     let mut direct_classlike_descendants = AtomMap::default();
     let mut all_classlike_descendants = AtomMap::default();
 
@@ -145,11 +265,6 @@ pub fn populate_codebase(
         }
     }
 
-    // Perform docblock inheritance for methods with @inheritDoc or no docblock
-    docblock::inherit_method_docblocks(codebase);
-
     codebase.all_class_like_descendants = all_classlike_descendants;
     codebase.direct_classlike_descendants = direct_classlike_descendants;
-    codebase.safe_symbols = safe_symbols;
-    codebase.safe_symbol_members = safe_symbol_members;
 }

@@ -99,6 +99,7 @@ glob = "0.3.2"
 walkdir = "2"
 globset = "0.4"
 rayon = "1.10.0"
+parking_lot = "0.12"
 bumpalo = { version = "3", features = ["collections", "serde"] }
 dhat = "0.3"
 ustr = { version = "1.1.0", features = ["serde"] }
