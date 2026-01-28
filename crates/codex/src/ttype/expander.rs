@@ -363,7 +363,9 @@ fn expand_object(named_object: &mut TObject, codebase: &CodebaseMetadata, option
                 *named_object = TObject::Enum(static_enum.clone());
             }
             StaticClassType::Object(TObject::Named(static_object))
-                if name_str_lc == "static" || name_str_lc == "$this" =>
+                if name_str_lc == "static"
+                    || name_str_lc == "$this"
+                    || (is_this && codebase.is_instance_of(&static_object.name, &name)) =>
             {
                 if let TObject::Named(named_object) = named_object {
                     if let Some(static_object_intersections) = &static_object.intersection_types {
