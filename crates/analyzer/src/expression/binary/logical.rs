@@ -33,6 +33,7 @@ use crate::formula::get_formula;
 use crate::formula::negate_or_synthesize;
 use crate::reconciler;
 use crate::utils::conditional;
+use crate::utils::symbol_existence::extract_function_constant_existence;
 
 #[inline]
 pub fn analyze_logical_and_operation<'ctx, 'arena>(
@@ -52,6 +53,8 @@ pub fn analyze_logical_and_operation<'ctx, 'arena>(
     left_block_context.flags.set_inside_general_use(true);
     binary.lhs.analyze(context, &mut left_block_context, artifacts)?;
     left_block_context.flags.set_inside_general_use(left_was_inside_general_use);
+
+    extract_function_constant_existence(binary.lhs, artifacts, &mut left_block_context, false);
 
     let lhs_type = match artifacts.get_rc_expression_type(&binary.lhs).cloned() {
         Some(lhs_type) => {
@@ -111,8 +114,9 @@ pub fn analyze_logical_and_operation<'ctx, 'arena>(
     } else {
         right_block_context = block_context.clone();
 
-        // Don't report issues when applying LHS assertions to prepare RHS context
-        // Issues will be reported when actually analyzing the RHS expression
+        right_block_context.known_functions.extend(left_block_context.known_functions.iter().copied());
+        right_block_context.known_constants.extend(left_block_context.known_constants.iter().copied());
+
         let empty_referenced_vars = AtomSet::default();
 
         reconciler::reconcile_keyed_types(
