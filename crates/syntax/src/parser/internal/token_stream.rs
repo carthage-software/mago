@@ -34,13 +34,16 @@ pub struct TokenStream<'input, 'arena> {
 }
 
 impl<'input, 'arena> TokenStream<'input, 'arena> {
+    /// Initial capacity for the token lookahead buffer.
+    const BUFFER_INITIAL_CAPACITY: usize = 8;
+
     pub fn new(arena: &'arena Bump, lexer: Lexer<'input, 'arena>) -> TokenStream<'input, 'arena> {
         let position = lexer.get_position();
 
         TokenStream {
             arena,
             lexer,
-            buffer: VecDeque::new(),
+            buffer: VecDeque::with_capacity(Self::BUFFER_INITIAL_CAPACITY),
             trivia: Vec::new_in(arena),
             position,
             state: State::default(),

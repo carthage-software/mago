@@ -24,8 +24,8 @@ pub enum SyntaxError {
 #[derive(Debug, Clone, Eq, PartialEq, Serialize)]
 pub enum ParseError {
     SyntaxError(SyntaxError),
-    UnexpectedEndOfFile(Vec<TokenKind>, FileId, Position),
-    UnexpectedToken(Vec<TokenKind>, TokenKind, Span),
+    UnexpectedEndOfFile(Box<[TokenKind]>, FileId, Position),
+    UnexpectedToken(Box<[TokenKind]>, TokenKind, Span),
     UnclosedLiteralString(LiteralStringKind, Span),
 }
 

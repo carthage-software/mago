@@ -55,6 +55,9 @@ pub struct Lexer<'input, 'arena> {
 }
 
 impl<'input, 'arena> Lexer<'input, 'arena> {
+    /// Initial capacity for the token buffer used during string interpolation.
+    const BUFFER_INITIAL_CAPACITY: usize = 8;
+
     /// Creates a new `Lexer` instance.
     ///
     /// # Parameters
@@ -66,7 +69,13 @@ impl<'input, 'arena> Lexer<'input, 'arena> {
     ///
     /// A new `Lexer` instance that reads from the provided byte slice.
     pub fn new(arena: &'arena Bump, input: Input<'input>) -> Lexer<'input, 'arena> {
-        Lexer { arena, input, mode: LexerMode::Inline, interpolating: false, buffer: VecDeque::new() }
+        Lexer {
+            arena,
+            input,
+            mode: LexerMode::Inline,
+            interpolating: false,
+            buffer: VecDeque::with_capacity(Self::BUFFER_INITIAL_CAPACITY),
+        }
     }
 
     /// Creates a new `Lexer` instance for parsing a script block.
@@ -80,7 +89,13 @@ impl<'input, 'arena> Lexer<'input, 'arena> {
     ///
     /// A new `Lexer` instance that reads from the provided byte slice.
     pub fn scripting(arena: &'arena Bump, input: Input<'input>) -> Lexer<'input, 'arena> {
-        Lexer { arena, input, mode: LexerMode::Script, interpolating: false, buffer: VecDeque::new() }
+        Lexer {
+            arena,
+            input,
+            mode: LexerMode::Script,
+            interpolating: false,
+            buffer: VecDeque::with_capacity(Self::BUFFER_INITIAL_CAPACITY),
+        }
     }
 
     /// Check if the lexer has reached the end of the input.

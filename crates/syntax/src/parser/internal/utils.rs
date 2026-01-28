@@ -136,9 +136,10 @@ pub fn to_keyword(token: Token) -> Keyword {
 
 #[inline]
 pub fn unexpected(stream: &mut TokenStream<'_, '_>, token: Option<Token>, one_of: &[TokenKind]) -> ParseError {
+    let expected: Box<[TokenKind]> = one_of.into();
     if let Some(token) = token {
-        ParseError::UnexpectedToken(one_of.to_vec(), token.kind, token.span)
+        ParseError::UnexpectedToken(expected, token.kind, token.span)
     } else {
-        ParseError::UnexpectedEndOfFile(one_of.to_vec(), stream.file_id(), stream.get_position())
+        ParseError::UnexpectedEndOfFile(expected, stream.file_id(), stream.get_position())
     }
 }
