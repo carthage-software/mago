@@ -27,6 +27,7 @@ use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::expander;
 use mago_codex::ttype::expander::StaticClassType;
 use mago_codex::ttype::expander::TypeExpansionOptions;
+use mago_codex::ttype::get_arraykey;
 use mago_codex::ttype::get_iterable_value_parameter;
 use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::get_mixed_maybe_from_loop;
@@ -342,6 +343,21 @@ fn adjust_array_type(
                         *known_elements = Some(BTreeMap::from([(arraykey_offset, (false, result_type.clone()))]));
                     }
                 }
+            }
+            TAtomic::Mixed(_) => {
+                let key = if has_string_offset {
+                    ArrayKey::String(atom(&arraykey_offset))
+                } else if let Ok(arraykey_value) = arraykey_offset.parse::<i64>() {
+                    ArrayKey::Integer(arraykey_value)
+                } else {
+                    continue;
+                };
+
+                *base_atomic_type = TAtomic::Array(TArray::Keyed(TKeyedArray {
+                    known_items: Some(BTreeMap::from([(key, (false, result_type.clone()))])),
+                    parameters: Some((Box::new(get_arraykey()), Box::new(get_mixed()))),
+                    non_empty: true,
+                }));
             }
             _ => {
                 continue;
