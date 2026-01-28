@@ -90,7 +90,7 @@ pub fn to_class_case(non_class_case_string: &str) -> String {
         if character.is_lowercase() && prefix_length > 0 {
             prefix_length += 1;
 
-            while let Some(character) = characters.next() {
+            for character in characters.by_ref() {
                 if character.is_lowercase() || character.is_numeric() {
                     prefix_length += 1;
                 } else {
