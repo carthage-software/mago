@@ -349,115 +349,162 @@ fn expand_member_reference(
     }
 }
 
-fn expand_object(named_object: &mut TObject, codebase: &CodebaseMetadata, options: &TypeExpansionOptions) {
-    let Some(name) = named_object.get_name().copied() else {
+fn expand_object(object: &mut TObject, codebase: &CodebaseMetadata, options: &TypeExpansionOptions) {
+    resolve_special_class_names(object, codebase, options);
+
+    let TObject::Named(named) = object else {
         return;
     };
 
-    let is_this = if let TObject::Named(named_object) = named_object { named_object.is_this() } else { false };
-    let name_str_lc = ascii_lowercase_atom(&name);
+    let Some(_guard) = ObjectParamsExpansionGuard::try_new(named.name) else {
+        return;
+    };
 
-    if is_this || name_str_lc == "static" || name_str_lc == "$this" {
-        match &options.static_class_type {
-            StaticClassType::Object(TObject::Enum(static_enum)) => {
-                *named_object = TObject::Enum(static_enum.clone());
-            }
-            StaticClassType::Object(TObject::Named(static_object))
-                if name_str_lc == "static"
-                    || name_str_lc == "$this"
-                    || (is_this
-                        && (codebase.is_instance_of(&static_object.name, &name)
-                            || static_object
-                                .intersection_types
-                                .as_ref()
-                                .iter()
-                                .flat_map(|types| types.iter())
-                                .filter_map(|t| if let TAtomic::Object(obj) = t { obj.get_name() } else { None })
-                                .any(|intersection_name| codebase.is_instance_of(intersection_name, &name)))) =>
-            {
-                if let TObject::Named(named_object) = named_object {
-                    if let Some(static_object_intersections) = &static_object.intersection_types {
-                        let intersections = named_object.intersection_types.get_or_insert_with(Vec::new);
-                        intersections.extend(static_object_intersections.iter().cloned());
-                    }
-
-                    if named_object.type_parameters.is_none() {
-                        named_object.type_parameters.clone_from(&static_object.type_parameters);
-                    }
-
-                    named_object.name = static_object.name;
-                    named_object.is_this = true;
-                }
-            }
-            StaticClassType::Name(static_class_name)
-                if name_str_lc == "static"
-                    || name_str_lc == "$this"
-                    || (is_this && codebase.is_instance_of(static_class_name, &name)) =>
-            {
-                if let TObject::Named(named_object) = named_object {
-                    named_object.name = *static_class_name;
-                    named_object.is_this = false;
-                }
-            }
-            _ => {}
+    if let Some(class_metadata) = codebase.get_class_like(&named.name) {
+        for &required in class_metadata.require_extends.iter().chain(&class_metadata.require_implements) {
+            named.add_intersection_type(TAtomic::Object(TObject::Named(TNamedObject::new(required))));
         }
-    } else if name_str_lc == "self" {
-        if let Some(self_class_name) = options.self_class
-            && let TObject::Named(named_object) = named_object
+    }
+
+    expand_or_fill_type_parameters(named, codebase, options);
+}
+
+/// Resolves `static`, `$this`, `self`, and `parent` to their concrete class names.
+fn resolve_special_class_names(object: &mut TObject, codebase: &CodebaseMetadata, options: &TypeExpansionOptions) {
+    if let TObject::Named(named) = object {
+        let name_lc = ascii_lowercase_atom(&named.name);
+        let needs_static_resolution = matches!(name_lc.as_str(), "static" | "$this") || named.is_this;
+
+        if needs_static_resolution
+            && let StaticClassType::Object(TObject::Enum(static_enum)) = &options.static_class_type
         {
-            named_object.name = self_class_name;
-        }
-    } else if name_str_lc == "parent"
-        && let Some(self_class_name) = options.self_class
-        && let Some(class_metadata) = codebase.get_class_like(&self_class_name)
-        && let Some(parent_name) = class_metadata.direct_parent_class
-        && let TObject::Named(named_object) = named_object
-    {
-        named_object.name = parent_name;
-    }
-
-    let TObject::Named(named_object) = named_object else {
-        return;
-    };
-
-    let Some(_guard) = ObjectParamsExpansionGuard::try_new(named_object.name) else {
-        return;
-    };
-
-    if let Some(class_like_metadata) = codebase.get_class_like(&named_object.name) {
-        for required_parent in &class_like_metadata.require_extends {
-            named_object.add_intersection_type(TAtomic::Object(TObject::Named(TNamedObject::new(*required_parent))));
-        }
-
-        for required_interface in &class_like_metadata.require_implements {
-            named_object.add_intersection_type(TAtomic::Object(TObject::Named(TNamedObject::new(*required_interface))));
+            *object = TObject::Enum(static_enum.clone());
+            return;
         }
     }
 
-    match &mut named_object.type_parameters {
-        Some(type_parameters) if !type_parameters.is_empty() => {
-            for type_parameter in type_parameters.iter_mut() {
-                expand_union(codebase, type_parameter, options);
+    let TObject::Named(named) = object else {
+        return;
+    };
+
+    let name_lc = ascii_lowercase_atom(&named.name);
+    let is_this = named.is_this;
+
+    match name_lc.as_str() {
+        "static" | "$this" => resolve_static_type(named, false, codebase, options),
+        "self" => {
+            if let Some(self_class) = options.self_class {
+                named.name = self_class;
             }
         }
-        _ => {
-            if let Some(class_like_metadata) = codebase.get_class_like(&named_object.name)
-                && !class_like_metadata.template_types.is_empty()
+        "parent" => {
+            if let Some(self_class) = options.self_class
+                && let Some(class_metadata) = codebase.get_class_like(&self_class)
+                && let Some(parent) = class_metadata.direct_parent_class
             {
-                let default_params: Vec<TUnion> = class_like_metadata
-                    .template_types
-                    .iter()
-                    .map(|(_, template_map)| {
-                        template_map.iter().map(|(_, t)| t).next().cloned().unwrap_or_else(get_mixed)
-                    })
-                    .collect();
-
-                if !default_params.is_empty() {
-                    named_object.type_parameters = Some(default_params);
-                }
+                named.name = parent;
             }
         }
+        _ if is_this => resolve_static_type(named, true, codebase, options),
+        _ => {}
     }
+}
+
+/// Resolves a `static` or `$this` type to a named object using the static class type from options.
+/// When `check_compatibility` is true, verifies the static type is compatible before resolving.
+fn resolve_static_type(
+    named: &mut TNamedObject,
+    check_compatibility: bool,
+    codebase: &CodebaseMetadata,
+    options: &TypeExpansionOptions,
+) {
+    match &options.static_class_type {
+        StaticClassType::Object(TObject::Named(static_obj)) => {
+            if check_compatibility && !is_static_type_compatible(named, static_obj, codebase) {
+                return;
+            }
+
+            if let Some(intersections) = &static_obj.intersection_types {
+                named.intersection_types.get_or_insert_with(Vec::new).extend(intersections.iter().cloned());
+            }
+
+            if static_obj.type_parameters.is_some() && should_use_static_type_params(named, static_obj, codebase) {
+                named.type_parameters.clone_from(&static_obj.type_parameters);
+            }
+
+            named.name = static_obj.name;
+            named.is_this = true;
+        }
+        StaticClassType::Name(static_class) => {
+            if !check_compatibility || codebase.is_instance_of(static_class, &named.name) {
+                named.name = *static_class;
+                named.is_this = false;
+            }
+        }
+        _ => {}
+    }
+}
+
+/// Checks if the static object type is compatible with a type that has is_this=true.
+fn is_static_type_compatible(named: &TNamedObject, static_obj: &TNamedObject, codebase: &CodebaseMetadata) -> bool {
+    codebase.is_instance_of(&static_obj.name, &named.name)
+        || static_obj
+            .intersection_types
+            .iter()
+            .flatten()
+            .filter_map(|t| if let TAtomic::Object(obj) = t { obj.get_name() } else { None })
+            .any(|name| codebase.is_instance_of(name, &named.name))
+}
+
+/// Returns true if we should use the static object's type parameters instead of the current ones.
+/// This is true when current params are None or match the class's default template bounds.
+fn should_use_static_type_params(named: &TNamedObject, static_obj: &TNamedObject, codebase: &CodebaseMetadata) -> bool {
+    let Some(current_params) = &named.type_parameters else {
+        return true;
+    };
+
+    let Some(class_metadata) = codebase.get_class_like(&static_obj.name) else {
+        return false;
+    };
+
+    let templates = &class_metadata.template_types;
+
+    current_params.len() == templates.len()
+        && current_params.iter().zip(templates.iter()).all(|(current, (_, template_map))| {
+            template_map.iter().next().map_or_else(|| current.is_mixed(), |(_, bound)| current == bound)
+        })
+}
+
+/// Expands existing type parameters or fills them with default template bounds.
+fn expand_or_fill_type_parameters(
+    named: &mut TNamedObject,
+    codebase: &CodebaseMetadata,
+    options: &TypeExpansionOptions,
+) {
+    if let Some(params) = &mut named.type_parameters
+        && !params.is_empty()
+    {
+        for param in params.iter_mut() {
+            expand_union(codebase, param, options);
+        }
+        return;
+    }
+
+    let Some(class_metadata) = codebase.get_class_like(&named.name) else {
+        return;
+    };
+
+    if class_metadata.template_types.is_empty() {
+        return;
+    }
+
+    let defaults: Vec<TUnion> = class_metadata
+        .template_types
+        .iter()
+        .map(|(_, template_map)| template_map.iter().next().map_or_else(get_mixed, |(_, t)| t.clone()))
+        .collect();
+
+    named.type_parameters = Some(defaults);
 }
 
 #[must_use]

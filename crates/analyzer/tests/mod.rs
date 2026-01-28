@@ -554,6 +554,7 @@ test_case!(issue_957);
 test_case!(issue_958);
 test_case!(issue_960);
 test_case!(issue_962);
+test_case!(issue_964);
 test_case!(anonymous_class_constructor_args);
 test_case!(undefined_type_reference);
 test_case!(duplicate_definition);
