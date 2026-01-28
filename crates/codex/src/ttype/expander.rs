@@ -365,7 +365,15 @@ fn expand_object(named_object: &mut TObject, codebase: &CodebaseMetadata, option
             StaticClassType::Object(TObject::Named(static_object))
                 if name_str_lc == "static"
                     || name_str_lc == "$this"
-                    || (is_this && codebase.is_instance_of(&static_object.name, &name)) =>
+                    || (is_this
+                        && (codebase.is_instance_of(&static_object.name, &name)
+                            || static_object
+                                .intersection_types
+                                .as_ref()
+                                .iter()
+                                .flat_map(|types| types.iter())
+                                .filter_map(|t| if let TAtomic::Object(obj) = t { obj.get_name() } else { None })
+                                .any(|intersection_name| codebase.is_instance_of(intersection_name, &name)))) =>
             {
                 if let TObject::Named(named_object) = named_object {
                     if let Some(static_object_intersections) = &static_object.intersection_types {

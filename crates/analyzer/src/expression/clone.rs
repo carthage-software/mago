@@ -36,11 +36,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Clone<'arena> {
         let mut has_cloneable_object = false;
 
         let mut atomic_types = object_type.types.iter().collect::<Vec<_>>();
-        loop {
-            let Some(atomic_type) = atomic_types.pop() else {
-                break;
-            };
-
+        while let Some(atomic_type) = atomic_types.pop() {
             match atomic_type {
                 TAtomic::Object(object) => match object {
                     TObject::Any | TObject::WithProperties(_) | TObject::HasMethod(_) | TObject::HasProperty(_) => {

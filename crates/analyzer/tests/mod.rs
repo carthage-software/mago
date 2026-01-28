@@ -549,6 +549,7 @@ test_case!(issue_946);
 test_case!(issue_949);
 test_case!(issue_954);
 test_case!(issue_955);
+test_case!(issue_957);
 test_case!(issue_958);
 test_case!(anonymous_class_constructor_args);
 test_case!(undefined_type_reference);

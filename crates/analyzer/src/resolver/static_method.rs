@@ -382,6 +382,12 @@ fn resolve_method_from_metadata<'ctx, 'arena>(
         StaticClassType::Object(object)
     } else if defining_class_metadata.kind.is_enum() {
         StaticClassType::Object(TObject::Enum(TEnum { name: defining_class_metadata.original_name, case: None }))
+    } else if !classname.intersections.is_empty() {
+        if let TAtomic::Object(object) = classname.get_object_type(context.codebase) {
+            StaticClassType::Object(object)
+        } else {
+            StaticClassType::Name(fq_class_id)
+        }
     } else {
         StaticClassType::Name(fq_class_id)
     };
