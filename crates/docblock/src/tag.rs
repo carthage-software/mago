@@ -954,7 +954,12 @@ pub fn split_tag_content(content: &str, input_span: Span) -> Option<(TypeString,
                     if next_char.is_whitespace() {
                         temp_iter.next();
                     } else {
-                        found_continuation = next_char == ':' || next_char == '|' || next_char == '&';
+                        found_continuation = next_char == ':'
+                            || next_char == '|'
+                            || (next_char == '&' && {
+                                temp_iter.next(); // consume '&'
+                                !temp_iter.peek().is_some_and(|&(_, c)| c == '$' || c == '.')
+                            });
                         break;
                     }
                 }
