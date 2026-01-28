@@ -1,4 +1,3 @@
-use std::io::IsTerminal;
 use std::path::PathBuf;
 
 use clap::ColorChoice;
@@ -16,6 +15,8 @@ use mago_reporting::baseline::BaselineVariant;
 use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
+
+use crate::utils::should_use_colors;
 
 /// Configuration options for the static analyzer.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
@@ -309,11 +310,7 @@ impl AnalyzerConfiguration {
             check_closure_missing_type_hints: self.check_closure_missing_type_hints,
             check_arrow_function_missing_type_hints: self.check_arrow_function_missing_type_hints,
             register_super_globals: self.register_super_globals,
-            use_colors: match color_choice {
-                ColorChoice::Always => true,
-                ColorChoice::Never => false,
-                ColorChoice::Auto => std::io::stdout().is_terminal(),
-            },
+            use_colors: should_use_colors(color_choice),
             diff: enable_diff,
             trust_existence_checks: self.trust_existence_checks,
             class_initializers: self.class_initializers.iter().map(|s| ascii_lowercase_atom(s.as_str())).collect(),

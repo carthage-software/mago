@@ -52,6 +52,7 @@ use crate::config::Configuration;
 use crate::consts::MAXIMUM_PHP_VERSION;
 use crate::consts::MINIMUM_PHP_VERSION;
 use crate::error::Error;
+use crate::utils::configure_colors;
 use crate::utils::logger::initialize_logger;
 
 mod baseline;
@@ -133,6 +134,11 @@ pub fn main() -> ExitCode {
 #[inline(always)]
 pub fn run() -> Result<ExitCode, Error> {
     let arguments = CliArguments::parse();
+
+    // Configure global color settings based on the color choice.
+    // This must be done before initializing the logger or any other
+    // component that uses colors.
+    configure_colors(arguments.colors);
 
     initialize_logger(
         if cfg!(debug_assertions) { LevelFilter::DEBUG } else { LevelFilter::INFO },
