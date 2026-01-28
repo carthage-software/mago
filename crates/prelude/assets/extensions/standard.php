@@ -1958,7 +1958,7 @@ function strchr(string $haystack, string $needle, bool $before_needle = false): 
 }
 
 /**
- * @param string|int|float|Stringable ...$values
+ * @param string|int|float|bool|null|Stringable ...$values
  *
  * @pure
  */
@@ -1967,7 +1967,7 @@ function sprintf(string $format, mixed ...$values): string
 }
 
 /**
- * @param string|int|float|Stringable ...$values
+ * @param string|int|float|bool|null|Stringable ...$values
  *
  * @return int<0, max>
  */
@@ -1976,7 +1976,7 @@ function printf(string $format, mixed ...$values): int
 }
 
 /**
- * @param array<string|int|float|Stringable> $values
+ * @param array<string|int|float|bool|null|Stringable> $values
  *
  * @pure
  */
@@ -1985,7 +1985,7 @@ function vprintf(string $format, array $values): int
 }
 
 /**
- * @param array<string|int|float|Stringable> $values
+ * @param array<string|int|float|bool|null|Stringable> $values
  *
  * @pure
  */
@@ -1995,7 +1995,7 @@ function vsprintf(string $format, array $values): string
 
 /**
  * @param resource $stream
- * @param string|int|float|Stringable ...$values
+ * @param string|int|float|bool|null|Stringable ...$values
  *
  * @pure
  */
@@ -2005,7 +2005,7 @@ function fprintf($stream, string $format, mixed ...$values): int
 
 /**
  * @param resource $stream
- * @param array<string|int|float|Stringable> $values
+ * @param array<string|int|float|bool|null|Stringable> $values
  *
  * @pure
  */
