@@ -544,6 +544,7 @@ test_case!(issue_923);
 test_case!(issue_932);
 test_case!(issue_940);
 test_case!(issue_949);
+test_case!(issue_954);
 test_case!(issue_955);
 test_case!(issue_958);
 test_case!(anonymous_class_constructor_args);

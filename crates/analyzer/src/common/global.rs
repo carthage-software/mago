@@ -338,7 +338,7 @@ std::thread_local! {
                     non_empty: true,
                 })))),
             )),
-            non_empty: true,
+            non_empty: false,
         })))));
 
         map.insert("$_SESSION", Rc::new({
