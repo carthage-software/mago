@@ -2,6 +2,7 @@ use indexmap::IndexMap;
 
 use mago_algebra::clause::Clause;
 use mago_algebra::find_satisfying_assignments;
+use mago_atom::AtomSet;
 use mago_atom::atom;
 
 use mago_codex::ttype::get_literal_string;
@@ -308,13 +309,13 @@ pub fn find_expression_logic_issues<'ctx, 'arena>(
     expression_clauses = expression_clauses
         .into_iter()
         .map(|c| {
-            let keys = c.possibilities.keys().copied().collect::<Vec<mago_atom::Atom>>();
+            let keys: AtomSet = c.possibilities.keys().copied().collect();
 
             mixed_var_ids.retain(|i| !keys.contains(i));
 
-            for key in &keys {
+            for key in keys {
                 for mixed_var_id in &mixed_var_ids {
-                    if var_has_root(*key, *mixed_var_id) {
+                    if var_has_root(key, *mixed_var_id) {
                         return Clause::new(
                             IndexMap::default(),
                             expression.span(),

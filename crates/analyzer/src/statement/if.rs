@@ -122,10 +122,10 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for If<'arena> {
         });
 
         for clause in &mut if_clauses {
-            let keys = clause.possibilities.keys().copied().collect::<Vec<Atom>>();
+            let keys: AtomSet = clause.possibilities.keys().copied().collect();
             mixed_variables.retain(|i| !keys.contains(i));
 
-            'outer: for key in keys {
+            'outer: for key in keys.iter().copied() {
                 for mixed_var_id in &mixed_variables {
                     if is_derived_access_path(key, *mixed_var_id) {
                         let has_explicit_type_assertion = clause
@@ -644,10 +644,10 @@ fn analyze_else_if_clause<'ctx, 'ast, 'arena>(
     });
 
     for clause in &mut else_if_clauses {
-        let keys = clause.possibilities.keys().copied().collect::<Vec<Atom>>();
+        let keys: AtomSet = clause.possibilities.keys().copied().collect();
         mixed_variables.retain(|i| !keys.contains(i));
 
-        'outer: for key in keys {
+        'outer: for key in keys.iter().copied() {
             for mixed_var_id in &mixed_variables {
                 if !is_derived_access_path(key, *mixed_var_id) {
                     continue;

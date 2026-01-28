@@ -7,6 +7,7 @@ use mago_algebra::disjoin_clauses;
 use mago_algebra::negate_formula;
 use mago_atom::Atom;
 use mago_atom::AtomMap;
+use mago_atom::AtomSet;
 use mago_codex::assertion::Assertion;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::scalar::TScalar;
@@ -564,8 +565,7 @@ pub fn remove_clauses_with_mixed_variables(
     clauses
         .into_iter()
         .map(|c| {
-            let keys = c.possibilities.keys().copied().collect::<Vec<Atom>>();
-
+            let keys: AtomSet = c.possibilities.keys().copied().collect();
             let mut new_mixed_var_ids = vec![];
             for i in &mixed_var_ids {
                 if !keys.contains(i) {
@@ -574,9 +574,9 @@ pub fn remove_clauses_with_mixed_variables(
             }
 
             mixed_var_ids = new_mixed_var_ids;
-            for key in &keys {
+            for key in keys {
                 for mixed_var_id in &mixed_var_ids {
-                    if var_has_root(*key, **mixed_var_id) {
+                    if var_has_root(key, **mixed_var_id) {
                         return Clause::new(IndexMap::new(), cond_object_id, cond_object_id, Some(true), None, None);
                     }
                 }

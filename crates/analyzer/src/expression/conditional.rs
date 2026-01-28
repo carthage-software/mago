@@ -1,11 +1,10 @@
 use std::ops::Deref;
 use std::rc::Rc;
 
-use mago_atom::AtomSet;
-
 use mago_algebra::clause::Clause;
 use mago_algebra::find_satisfying_assignments;
 use mago_algebra::saturate_clauses;
+use mago_atom::AtomSet;
 use mago_codex::assertion::Assertion;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::combine_optional_union_types;
@@ -106,7 +105,7 @@ pub(super) fn analyze_conditional<'ctx, 'ast, 'arena>(
     }
 
     for clause in &mut if_clauses {
-        let keys = clause.possibilities.keys().copied().collect::<Vec<mago_atom::Atom>>();
+        let keys: AtomSet = clause.possibilities.keys().copied().collect();
         mixed_variables.retain(|i| !keys.contains(i));
 
         'outer: for key in keys {
