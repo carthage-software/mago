@@ -96,6 +96,22 @@ fn should_inherit_docblock_type(
     };
 
     if covariant {
+        if let Some(parent_docblock) = parent_docblock {
+            let child_contained_in_parent_docblock = union_comparator::is_contained_by(
+                codebase,
+                child_native,
+                &parent_docblock.type_union,
+                false,
+                false,
+                false,
+                &mut ComparisonResult::new(),
+            );
+
+            if child_contained_in_parent_docblock {
+                return false;
+            }
+        }
+
         let child_contained_in_parent = union_comparator::is_contained_by(
             codebase,
             child_native,
