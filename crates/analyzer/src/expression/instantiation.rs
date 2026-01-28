@@ -488,6 +488,90 @@ fn analyze_class_instantiation<'ctx, 'arena>(
     Ok(result_type)
 }
 
+/// Analyzes the constructor invocation for an anonymous class.
+///
+/// This function validates that the arguments passed to an anonymous class instantiation
+/// match the constructor signature, similar to how regular class instantiation is validated.
+pub fn analyze_anonymous_class_constructor<'ctx, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    block_context: &mut BlockContext<'ctx>,
+    artifacts: &mut AnalysisArtifacts,
+    class_like_metadata: &'ctx mago_codex::metadata::class_like::ClassLikeMetadata,
+    argument_list: Option<&mago_syntax::ast::ArgumentList<'arena>>,
+    instantiation_span: Span,
+) -> Result<(), AnalysisError> {
+    let classlike_name = class_like_metadata.name;
+
+    let constructor_id = MethodIdentifier::new(classlike_name, atom("__construct"));
+    let constructor_declaring_id = context.codebase.get_declaring_method_identifier(&constructor_id);
+
+    artifacts.symbol_references.add_reference_for_method_call(&block_context.scope, &constructor_id);
+
+    if let Some(constructor) = context.codebase.get_method_by_id(&constructor_declaring_id) {
+        artifacts.symbol_references.add_reference_for_method_call(&block_context.scope, &constructor_declaring_id);
+
+        let constructor_call = Invocation {
+            target: InvocationTarget::FunctionLike {
+                identifier: FunctionLikeIdentifier::Method(
+                    *constructor_declaring_id.get_class_name(),
+                    *constructor_declaring_id.get_method_name(),
+                ),
+                metadata: constructor,
+                inferred_return_type: None,
+                method_context: Some(MethodTargetContext {
+                    declaring_method_id: Some(constructor_declaring_id),
+                    class_like_metadata,
+                    class_type: StaticClassType::None,
+                }),
+                span: instantiation_span,
+            },
+            arguments_source: match argument_list {
+                Some(arg_list) => InvocationArgumentsSource::ArgumentList(arg_list),
+                None => InvocationArgumentsSource::None(instantiation_span),
+            },
+            span: instantiation_span,
+        };
+
+        let mut template_result =
+            TemplateResult::new(IndexMap::with_hasher(RandomState::default()), HashMap::default());
+        let mut argument_types = AtomMap::default();
+
+        analyze_invocation(
+            context,
+            block_context,
+            artifacts,
+            &constructor_call,
+            Some((class_like_metadata.name, None)),
+            &mut template_result,
+            &mut argument_types,
+        )?;
+
+        post_invocation_process(
+            context,
+            block_context,
+            artifacts,
+            &constructor_call,
+            None,
+            &template_result,
+            &argument_types,
+            true,
+        )?;
+    } else if let Some(argument_list) = argument_list
+        && !argument_list.arguments.is_empty()
+    {
+        context.collector.report_with_code(
+            IssueCode::TooManyArguments,
+            Issue::error("Anonymous class has no `__construct` method, but arguments were provided.")
+                .with_annotation(Annotation::primary(argument_list.span()).with_message("Arguments provided here"))
+                .with_help("Remove the arguments, or define a `__construct` method in the anonymous class."),
+        );
+
+        argument_list.analyze(context, block_context, artifacts)?;
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use indoc::indoc;

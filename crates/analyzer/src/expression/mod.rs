@@ -22,6 +22,7 @@ use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::context::scope::var_has_root;
 use crate::error::AnalysisError;
+use crate::expression::instantiation::analyze_anonymous_class_constructor;
 use crate::formula::get_formula;
 use crate::plugin::ExpressionHookResult;
 use crate::plugin::context::HookContext;
@@ -119,6 +120,15 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Expression<'arena> {
                 let Some(class_like_metadata) = context.codebase.get_anonymous_class(self.span()) else {
                     return Ok(());
                 };
+
+                analyze_anonymous_class_constructor(
+                    context,
+                    block_context,
+                    artifacts,
+                    class_like_metadata,
+                    anonymous_class.argument_list.as_ref(),
+                    anonymous_class.span(),
+                )?;
 
                 analyze_class_like(
                     context,
