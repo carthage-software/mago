@@ -5,8 +5,26 @@ use mago_php_version::PHPVersion;
 /// Default maximum logical formula size during conditional analysis.
 pub const DEFAULT_FORMULA_SIZE_THRESHOLD: u16 = 512;
 
-/// Default maximum number of combinations to track during string concatenation.
-pub const DEFAULT_STRING_CONCAT_COMBINATION_THRESHOLD: u16 = 512;
+/// Default maximum number of literal strings to track before generalizing.
+///
+/// When combining types with many different literal string values, tracking each
+/// literal individually causes O(n) memory and O(n²) comparison time.
+/// Once the threshold is exceeded, we generalize to the base string type.
+pub const DEFAULT_STRING_COMBINATION_THRESHOLD: u16 = 128;
+
+/// Default maximum number of literal integers to track before generalizing.
+///
+/// When combining types with many different literal integer values, tracking each
+/// literal individually causes O(n) memory and O(n²) comparison time.
+/// Once the threshold is exceeded, we generalize to the base int type.
+pub const DEFAULT_INTEGER_COMBINATION_THRESHOLD: u16 = 128;
+
+/// Default maximum number of array elements to track individually.
+///
+/// When building array types through repeated push operations (`$arr[] = ...`),
+/// this limits how many individual elements are tracked before generalizing.
+/// This prevents memory explosion on files with thousands of array pushes.
+pub const DEFAULT_ARRAY_COMBINATION_THRESHOLD: u16 = 128;
 
 /// Configuration settings that control the behavior of the Mago analyzer.
 ///
@@ -221,13 +239,33 @@ pub struct Settings {
     /// Defaults to `512`.
     pub formula_size_threshold: u16,
 
-    /// Maximum number of combinations to track during string concatenation.
+    /// Maximum number of literal strings to track before generalizing.
     ///
-    /// Limits the number of possible string literal combinations to prevent
-    /// exponential blowup in large concatenation chains.
+    /// When combining types with many different literal string values, tracking each
+    /// literal individually causes O(n) memory and O(n²) comparison time.
+    /// Once the threshold is exceeded, we generalize to the base string type.
     ///
-    /// Defaults to `512`.
-    pub string_concat_combination_threshold: u16,
+    /// Defaults to `128`.
+    pub string_combination_threshold: u16,
+
+    /// Maximum number of literal integers to track before generalizing.
+    ///
+    /// When combining types with many different literal integer values, tracking each
+    /// literal individually causes O(n) memory and O(n²) comparison time.
+    /// Once the threshold is exceeded, we generalize to the base int type.
+    ///
+    /// Defaults to `128`.
+    pub integer_combination_threshold: u16,
+
+    /// Maximum number of array elements to track individually.
+    ///
+    /// When building array types through repeated push operations (`$arr[] = ...`),
+    /// this limits how many individual elements are tracked before generalizing
+    /// to a simpler array type. This prevents memory explosion on files with
+    /// thousands of array pushes.
+    ///
+    /// Defaults to `128`.
+    pub array_combination_threshold: u16,
 }
 
 impl Default for Settings {
@@ -270,7 +308,9 @@ impl Settings {
             negation_complexity_threshold: default_thresholds.negation_complexity,
             consensus_limit_threshold: default_thresholds.consensus_limit,
             formula_size_threshold: DEFAULT_FORMULA_SIZE_THRESHOLD,
-            string_concat_combination_threshold: DEFAULT_STRING_CONCAT_COMBINATION_THRESHOLD,
+            string_combination_threshold: DEFAULT_STRING_COMBINATION_THRESHOLD,
+            integer_combination_threshold: DEFAULT_INTEGER_COMBINATION_THRESHOLD,
+            array_combination_threshold: DEFAULT_ARRAY_COMBINATION_THRESHOLD,
         }
     }
 

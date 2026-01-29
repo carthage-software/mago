@@ -24,6 +24,7 @@ use mago_codex::ttype::atomic::array::list::TList;
 use mago_codex::ttype::atomic::generic::TGenericParameter;
 use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::atomic::scalar::TScalar;
+use mago_codex::ttype::combiner::CombinerOptions;
 use mago_codex::ttype::expander;
 use mago_codex::ttype::expander::StaticClassType;
 use mago_codex::ttype::expander::TypeExpansionOptions;
@@ -874,8 +875,12 @@ fn get_value_for_key(
                                 && new_assertions.contains_key(&new_base_key_atom)
                             {
                                 if has_inverted_isset && new_base_key_atom == key {
-                                    new_base_type_candidate =
-                                        add_union_type(new_base_type_candidate, &get_null(), context.codebase, false);
+                                    new_base_type_candidate = add_union_type(
+                                        new_base_type_candidate,
+                                        &get_null(),
+                                        context.codebase,
+                                        CombinerOptions::default(),
+                                    );
                                 }
 
                                 new_base_type_candidate.set_possibly_undefined(true, None);
@@ -908,8 +913,12 @@ fn get_value_for_key(
                                 && new_assertions.contains_key(&new_base_key_atom)
                             {
                                 if has_inverted_isset && new_base_key_atom == key {
-                                    new_base_type_candidate =
-                                        add_union_type(new_base_type_candidate, &get_null(), context.codebase, false);
+                                    new_base_type_candidate = add_union_type(
+                                        new_base_type_candidate,
+                                        &get_null(),
+                                        context.codebase,
+                                        CombinerOptions::default(),
+                                    );
                                 }
 
                                 new_base_type_candidate.set_possibly_undefined(true, None);
@@ -933,7 +942,12 @@ fn get_value_for_key(
                     }
 
                     let resulting_type = Rc::new(if let Some(new_base_type) = &new_base_type {
-                        add_union_type(new_base_type_candidate, new_base_type, context.codebase, false)
+                        add_union_type(
+                            new_base_type_candidate,
+                            new_base_type,
+                            context.codebase,
+                            CombinerOptions::default(),
+                        )
                     } else {
                         new_base_type_candidate.clone()
                     });

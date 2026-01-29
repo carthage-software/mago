@@ -122,7 +122,7 @@ pub fn replace(union: &TUnion, template_result: &TemplateResult, codebase: &Code
         return get_never();
     }
 
-    union.clone_with_types(combiner::combine(new_types, codebase, false))
+    union.clone_with_types(combiner::combine(new_types, codebase, combiner::CombinerOptions::default()))
 }
 
 #[allow(clippy::too_many_arguments)]

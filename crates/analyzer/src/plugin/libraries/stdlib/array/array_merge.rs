@@ -8,6 +8,7 @@ use mago_codex::ttype::atomic::array::key::ArrayKey;
 use mago_codex::ttype::atomic::array::keyed::TKeyedArray;
 use mago_codex::ttype::atomic::array::list::TList;
 use mago_codex::ttype::combine_union_types;
+use mago_codex::ttype::combiner::CombinerOptions;
 use mago_codex::ttype::get_array_parameters;
 use mago_codex::ttype::get_arraykey;
 use mago_codex::ttype::get_int;
@@ -102,11 +103,15 @@ impl FunctionReturnTypeProvider for ArrayMergeProvider {
                         if let Some((key_type, value_type)) = &keyed.parameters {
                             has_parameters = true;
                             merged_key_type = Some(match merged_key_type {
-                                Some(existing) => combine_union_types(&existing, key_type, codebase, false),
+                                Some(existing) => {
+                                    combine_union_types(&existing, key_type, codebase, CombinerOptions::default())
+                                }
                                 None => (**key_type).clone(),
                             });
                             merged_value_type = Some(match merged_value_type {
-                                Some(existing) => combine_union_types(&existing, value_type, codebase, false),
+                                Some(existing) => {
+                                    combine_union_types(&existing, value_type, codebase, CombinerOptions::default())
+                                }
                                 None => (**value_type).clone(),
                             });
                         }
@@ -137,14 +142,18 @@ impl FunctionReturnTypeProvider for ArrayMergeProvider {
 
                         has_parameters = true;
                         merged_value_type = Some(match merged_value_type {
-                            Some(existing) => combine_union_types(&existing, &list_value_type, codebase, false),
+                            Some(existing) => {
+                                combine_union_types(&existing, &list_value_type, codebase, CombinerOptions::default())
+                            }
                             None => list_value_type,
                         });
 
                         if !all_arguments_are_lists {
                             let key_type = get_int();
                             merged_key_type = Some(match merged_key_type {
-                                Some(existing) => combine_union_types(&existing, &key_type, codebase, false),
+                                Some(existing) => {
+                                    combine_union_types(&existing, &key_type, codebase, CombinerOptions::default())
+                                }
                                 None => key_type,
                             });
                         }
@@ -154,11 +163,15 @@ impl FunctionReturnTypeProvider for ArrayMergeProvider {
                 all_arguments_are_lists = false;
                 has_parameters = true;
                 merged_key_type = Some(match merged_key_type {
-                    Some(existing) => combine_union_types(&existing, &iterable_key, codebase, false),
+                    Some(existing) => {
+                        combine_union_types(&existing, &iterable_key, codebase, CombinerOptions::default())
+                    }
                     None => iterable_key,
                 });
                 merged_value_type = Some(match merged_value_type {
-                    Some(existing) => combine_union_types(&existing, &iterable_value, codebase, false),
+                    Some(existing) => {
+                        combine_union_types(&existing, &iterable_value, codebase, CombinerOptions::default())
+                    }
                     None => iterable_value,
                 });
             } else {

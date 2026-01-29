@@ -17,6 +17,7 @@ use mago_codex::ttype::atomic::mixed::TMixed;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::string::TString;
 use mago_codex::ttype::combine_union_types;
+use mago_codex::ttype::combiner::CombinerOptions;
 use mago_codex::ttype::combiner::combine;
 use mago_codex::ttype::comparator::ComparisonResult;
 use mago_codex::ttype::comparator::union_comparator;
@@ -350,13 +351,21 @@ fn analyze_array_elements<'ctx, 'arena>(
     let item_key_type = if array_creation_info.item_key_atomic_types.is_empty() {
         None
     } else {
-        Some(TUnion::from_vec(combine(array_creation_info.item_key_atomic_types, context.codebase, false)))
+        Some(TUnion::from_vec(combine(
+            array_creation_info.item_key_atomic_types,
+            context.codebase,
+            CombinerOptions::default(),
+        )))
     };
 
     let item_value_type = if array_creation_info.item_value_atomic_types.is_empty() {
         None
     } else {
-        Some(TUnion::from_vec(combine(array_creation_info.item_value_atomic_types, context.codebase, false)))
+        Some(TUnion::from_vec(combine(
+            array_creation_info.item_value_atomic_types,
+            context.codebase,
+            CombinerOptions::default(),
+        )))
     };
 
     let array_type = if !array_creation_info.property_types.is_empty() {
@@ -683,7 +692,8 @@ fn handle_variadic_array_element<'arena>(
                     false,
                     &mut ComparisonResult::new(),
                 ) {
-                    let new_prop_val = combine_union_types(&v.1, &value_type, context.codebase, false);
+                    let new_prop_val =
+                        combine_union_types(&v.1, &value_type, context.codebase, CombinerOptions::default());
 
                     *v = (v.0, new_prop_val);
                 }

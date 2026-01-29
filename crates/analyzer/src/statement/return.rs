@@ -8,6 +8,7 @@ use mago_codex::metadata::property::PropertyMetadata;
 use mago_codex::metadata::property_hook::PropertyHookMetadata;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::combine_union_types;
+use mago_codex::ttype::combiner::CombinerOptions;
 use mago_codex::ttype::comparator::ComparisonResult;
 use mago_codex::ttype::comparator::union_comparator::is_contained_by;
 use mago_codex::ttype::expander::StaticClassType;
@@ -116,7 +117,8 @@ pub fn handle_return_value<'ctx>(
         let mut finally_scope = (*finally_scope).borrow_mut();
         for (var_id, var_type) in &block_context.locals {
             if let Some(finally_type) = finally_scope.locals.get_mut(var_id) {
-                *finally_type = Rc::new(combine_union_types(finally_type, var_type, context.codebase, false));
+                *finally_type =
+                    Rc::new(combine_union_types(finally_type, var_type, context.codebase, CombinerOptions::default()));
             } else {
                 finally_scope.locals.insert(*var_id, var_type.clone());
             }
@@ -770,8 +772,12 @@ fn get_generator_return_type(context: &Context, return_type: &TUnion) -> Option<
 
         match generator_return.as_mut() {
             Some(existing_return) => {
-                *existing_return =
-                    combine_union_types(existing_return, &generator_parameters.3, context.codebase, false);
+                *existing_return = combine_union_types(
+                    existing_return,
+                    &generator_parameters.3,
+                    context.codebase,
+                    CombinerOptions::default(),
+                );
             }
             None => {
                 generator_return = Some(generator_parameters.3);

@@ -8,6 +8,7 @@ use mago_atom::atom;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::combine_optional_union_types;
 use mago_codex::ttype::combine_union_types;
+use mago_codex::ttype::combiner::CombinerOptions;
 use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::get_never;
 use mago_codex::ttype::union::TUnion;
@@ -224,7 +225,7 @@ impl<'anlyz, 'ctx, 'ast, 'arena> MatchAnalyzer<'anlyz, 'ctx, 'ast, 'arena> {
         }
 
         let final_type = arm_body_types.into_iter().reduce(|acc, item| {
-            Rc::new(combine_union_types(acc.as_ref(), item.as_ref(), self.context.codebase, false))
+            Rc::new(combine_union_types(acc.as_ref(), item.as_ref(), self.context.codebase, CombinerOptions::default()))
         });
 
         self.artifacts.set_rc_expression_type(self.stmt, final_type.unwrap_or_else(|| Rc::new(get_mixed())));

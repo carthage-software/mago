@@ -350,7 +350,13 @@ The analyzer uses internal thresholds to balance analysis depth against performa
 | `negation-complexity-threshold`       | `u16` | `4096`  | Maximum cumulative complexity when negating formulas.                    |
 | `consensus-limit-threshold`           | `u16` | `256`   | Upper limit for consensus optimization passes.                           |
 | `formula-size-threshold`              | `u16` | `512`   | Maximum logical formula size before simplification is skipped.           |
-| `string-concat-combination-threshold` | `u16` | `512`  | Maximum combinations to track during string concatenation.               |
+| `string-combination-threshold`        | `u16` | `128`   | Maximum literal strings to track before generalizing to `string`.        |
+| `integer-combination-threshold`       | `u16` | `128`   | Maximum literal integers to track before generalizing to `int`.          |
+| `array-combination-threshold`         | `u16` | `128`   | Maximum array elements to track individually before generalizing.        |
+
+:::tip Backward compatibility
+The `string-concat-combination-threshold` option is still supported as an alias for `string-combination-threshold`.
+:::
 
 ### When to adjust thresholds
 
@@ -368,7 +374,9 @@ The analyzer converts type constraints into CNF (Conjunctive Normal Form) logica
 - **Negation complexity**: Limits expansion when negating formulas (e.g., for `else` branches). Deeply nested conditions may hit this limit.
 - **Consensus limit**: Controls an optimization pass that detects logical tautologies. Higher values may find more simplifications.
 - **Formula size**: Overall limit on formula complexity before the analyzer falls back to simpler inference.
-- **String concat combinations**: Limits the number of possible string literal combinations during concatenation to prevent exponential blowup in large concatenation chains.
+- **String combination**: Limits the number of literal string values tracked during type combination. When combining many different string literals (e.g., in large arrays or switch statements), the analyzer generalizes to `string` after this threshold to prevent O(n²) complexity.
+- **Integer combination**: Limits the number of literal integer values tracked during type combination. When exceeded, the analyzer generalizes to `int`.
+- **Array combination**: Limits the number of array elements tracked individually. When building array types through repeated push operations (`$arr[] = ...`), elements beyond this threshold are generalized to prevent memory explosion.
 
 ### Example configurations
 
@@ -383,7 +391,9 @@ disjunction-complexity-threshold = 1024
 negation-complexity-threshold = 1024
 consensus-limit-threshold = 64
 formula-size-threshold = 128
-string-concat-combination-threshold = 512
+string-combination-threshold = 64
+integer-combination-threshold = 64
+array-combination-threshold = 64
 ```
 
 #### Deep analysis (slower, more precise)
@@ -397,9 +407,11 @@ disjunction-complexity-threshold = 8192
 negation-complexity-threshold = 8192
 consensus-limit-threshold = 512
 formula-size-threshold = 1024
-string-concat-combination-threshold = 8192
+string-combination-threshold = 256
+integer-combination-threshold = 256
+array-combination-threshold = 256
 ```
 
 :::warning Performance impact
-Increasing these thresholds can significantly impact analysis time on codebases with complex conditional logic. Test on your codebase before deploying to CI.
+Increasing these thresholds can significantly impact analysis time on codebases with complex conditional logic or files with thousands of array operations. Test on your codebase before deploying to CI.
 :::

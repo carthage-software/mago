@@ -4,6 +4,7 @@ use mago_atom::AtomSet;
 
 use mago_codex::ttype::TType;
 use mago_codex::ttype::combine_union_types;
+use mago_codex::ttype::combiner::CombinerOptions;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
@@ -129,7 +130,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Continue<'arena> {
                         outer_redefined_type,
                         current_redefined_type,
                         context.codebase,
-                        false,
+                        CombinerOptions::default(),
                     ));
 
                     true
@@ -142,9 +143,12 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Continue<'arena> {
             loop_scope.possibly_redefined_loop_variables.insert(
                 var_id,
                 match loop_scope.possibly_redefined_loop_variables.get(&var_id) {
-                    Some(existing_type) => {
-                        Rc::new(combine_union_types(existing_type, &var_type, context.codebase, false))
-                    }
+                    Some(existing_type) => Rc::new(combine_union_types(
+                        existing_type,
+                        &var_type,
+                        context.codebase,
+                        CombinerOptions::default(),
+                    )),
                     None => var_type.clone(),
                 },
             );
@@ -154,7 +158,12 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Continue<'arena> {
             let mut finally_scope = (*finally_scope).borrow_mut();
             for (var_id, var_type) in &block_context.locals {
                 if let Some(finally_type) = finally_scope.locals.get_mut(var_id) {
-                    *finally_type = Rc::new(combine_union_types(finally_type, var_type, context.codebase, false));
+                    *finally_type = Rc::new(combine_union_types(
+                        finally_type,
+                        var_type,
+                        context.codebase,
+                        CombinerOptions::default(),
+                    ));
                 } else {
                     finally_scope.locals.insert(*var_id, var_type.clone());
                 }

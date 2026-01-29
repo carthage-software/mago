@@ -15,6 +15,7 @@ use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::int::TInteger;
 use mago_codex::ttype::atomic::scalar::string::TStringLiteral;
+use mago_codex::ttype::combiner::CombinerOptions;
 use mago_codex::ttype::comparator::ComparisonResult;
 use mago_codex::ttype::comparator::union_comparator::is_contained_by;
 use mago_codex::ttype::get_arraykey;
@@ -195,7 +196,8 @@ pub(crate) fn get_array_target_type_given_index<'ctx>(
                 );
 
                 if let Some(existing_type) = value_type {
-                    value_type = Some(add_union_type(existing_type, &new_type, context.codebase, false));
+                    value_type =
+                        Some(add_union_type(existing_type, &new_type, context.codebase, CombinerOptions::default()));
                 } else {
                     value_type = Some(new_type);
                 }
@@ -225,7 +227,8 @@ pub(crate) fn get_array_target_type_given_index<'ctx>(
                 }
 
                 if let Some(existing_type) = value_type {
-                    value_type = Some(add_union_type(existing_type, &new_type, context.codebase, false));
+                    value_type =
+                        Some(add_union_type(existing_type, &new_type, context.codebase, CombinerOptions::default()));
                 } else {
                     value_type = Some(new_type);
                 }
@@ -240,7 +243,8 @@ pub(crate) fn get_array_target_type_given_index<'ctx>(
                 );
 
                 if let Some(existing_type) = value_type {
-                    value_type = Some(add_union_type(existing_type, &new_type, context.codebase, false));
+                    value_type =
+                        Some(add_union_type(existing_type, &new_type, context.codebase, CombinerOptions::default()));
                 } else {
                     value_type = Some(new_type);
                 }
@@ -249,7 +253,8 @@ pub(crate) fn get_array_target_type_given_index<'ctx>(
                 let new_type = handle_array_access_on_mixed(context, block_context, access_span, atomic_var_type);
 
                 if let Some(existing_type) = value_type {
-                    value_type = Some(add_union_type(existing_type, &new_type, context.codebase, false));
+                    value_type =
+                        Some(add_union_type(existing_type, &new_type, context.codebase, CombinerOptions::default()));
                 } else {
                     value_type = Some(new_type);
                 }
@@ -260,7 +265,8 @@ pub(crate) fn get_array_target_type_given_index<'ctx>(
                 let new_type = handle_array_access_on_mixed(context, block_context, access_span, atomic_var_type);
 
                 if let Some(existing_type) = value_type {
-                    value_type = Some(add_union_type(existing_type, &new_type, context.codebase, false));
+                    value_type =
+                        Some(add_union_type(existing_type, &new_type, context.codebase, CombinerOptions::default()));
                 } else {
                     value_type = Some(new_type);
                 }
@@ -571,7 +577,12 @@ pub(crate) fn handle_array_access_on_list<'ctx>(
         }
 
         for (_, known_item) in known_elements.values() {
-            type_param = Cow::Owned(add_union_type(type_param.into_owned(), known_item, context.codebase, false));
+            type_param = Cow::Owned(add_union_type(
+                type_param.into_owned(),
+                known_item,
+                context.codebase,
+                CombinerOptions::default(),
+            ));
         }
 
         return if type_param.is_never() { get_mixed() } else { type_param.into_owned() };
@@ -828,14 +839,22 @@ pub(crate) fn handle_array_access_on_keyed_array<'ctx>(
         if !possible_keys.is_empty() && possible_keys.len() == index_type.types.len() {
             for key in &possible_keys {
                 if let Some((_, known_item)) = known_items.get(key) {
-                    value_parameter =
-                        Cow::Owned(add_union_type(value_parameter.into_owned(), known_item, context.codebase, false));
+                    value_parameter = Cow::Owned(add_union_type(
+                        value_parameter.into_owned(),
+                        known_item,
+                        context.codebase,
+                        CombinerOptions::default(),
+                    ));
                 }
             }
         } else {
             for (_, known_item) in known_items.values() {
-                value_parameter =
-                    Cow::Owned(add_union_type(value_parameter.into_owned(), known_item, context.codebase, false));
+                value_parameter = Cow::Owned(add_union_type(
+                    value_parameter.into_owned(),
+                    known_item,
+                    context.codebase,
+                    CombinerOptions::default(),
+                ));
             }
         }
 

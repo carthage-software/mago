@@ -37,6 +37,7 @@ test_case!(array_list_reconciliation);
 test_case!(array_map_non_empty_array);
 test_case!(array_map_non_empty_list);
 test_case!(array_shape_fields);
+test_case!(array_type_combination_threshold);
 test_case!(array_unique_non_empty);
 test_case!(assert_concrete_to_template_type);
 test_case!(assert_generic_array_key_is_array_key);

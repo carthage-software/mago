@@ -8,6 +8,7 @@ use mago_codex::ttype::atomic::mixed::TMixed;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::int::TInteger;
 use mago_codex::ttype::combiner;
+use mago_codex::ttype::combiner::CombinerOptions;
 use mago_codex::ttype::comparator::ComparisonResult;
 use mago_codex::ttype::comparator::atomic_comparator;
 use mago_codex::ttype::get_mixed;
@@ -291,8 +292,11 @@ pub fn analyze_arithmetic_operation<'ctx, 'arena>(
                     // PHP array addition: $a + $b keeps all keys from $a and adds keys from $b that don't exist in $a
                     // If either operand is non-empty, the result is non-empty
                     // We use the combiner for merging types but fix the non_empty flag afterwards
-                    let mut combined =
-                        combiner::combine(vec![left_atomic.clone(), right_atomic.clone()], context.codebase, false);
+                    let mut combined = combiner::combine(
+                        vec![left_atomic.clone(), right_atomic.clone()],
+                        context.codebase,
+                        CombinerOptions::default(),
+                    );
 
                     // Fix the non_empty flag: if either operand is non-empty, result is non-empty
                     if let (TAtomic::Array(left_array), TAtomic::Array(right_array)) = (&left_atomic, right_atomic) {
@@ -469,7 +473,7 @@ pub fn analyze_arithmetic_operation<'ctx, 'arena>(
         // Otherwise, default to mixed.
         get_mixed()
     } else {
-        TUnion::from_vec(combiner::combine(result_atomic_types, context.codebase, false))
+        TUnion::from_vec(combiner::combine(result_atomic_types, context.codebase, CombinerOptions::default()))
     };
 
     assign_arithmetic_type(artifacts, final_type, binary);

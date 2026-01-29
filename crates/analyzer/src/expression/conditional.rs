@@ -9,6 +9,7 @@ use mago_codex::assertion::Assertion;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::combine_optional_union_types;
 use mago_codex::ttype::combine_union_types;
+use mago_codex::ttype::combiner::CombinerOptions;
 use mago_codex::ttype::get_mixed;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
@@ -272,7 +273,12 @@ pub(super) fn analyze_conditional<'ctx, 'ast, 'arena>(
 
         block_context.locals.insert(
             assigned_variable,
-            Rc::new(combine_union_types(if_type.as_ref(), else_type.as_ref(), context.codebase, false)),
+            Rc::new(combine_union_types(
+                if_type.as_ref(),
+                else_type.as_ref(),
+                context.codebase,
+                CombinerOptions::default(),
+            )),
         );
     }
 
@@ -485,7 +491,12 @@ pub(super) fn analyze_conditional<'ctx, 'ast, 'arena>(
                 Rc::new(get_mixed())
             }
         } else if let (Some(then_type), Some(else_type)) = (then_type, artifacts.get_rc_expression_type(r#else)) {
-            Rc::new(combine_union_types(then_type.as_ref(), else_type.as_ref(), context.codebase, false))
+            Rc::new(combine_union_types(
+                then_type.as_ref(),
+                else_type.as_ref(),
+                context.codebase,
+                CombinerOptions::default(),
+            ))
         } else {
             Rc::new(get_mixed())
         },

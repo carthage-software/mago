@@ -8,6 +8,7 @@ use mago_codex::assertion::Assertion;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::combine_union_types;
+use mago_codex::ttype::combiner::CombinerOptions;
 use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::union::TUnion;
 use mago_reporting::Annotation;
@@ -130,7 +131,7 @@ pub fn analyze_null_coalesce_operation<'ctx, 'arena>(
 
         rhs_is_never = rhs_type.is_never();
 
-        result_type = combine_union_types(&non_null_lhs_type, &rhs_type, context.codebase, false);
+        result_type = combine_union_types(&non_null_lhs_type, &rhs_type, context.codebase, CombinerOptions::default());
     }
 
     // Check if clauses guarantee non-null result from OR assertion

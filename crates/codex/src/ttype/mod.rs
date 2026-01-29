@@ -816,7 +816,11 @@ pub fn get_keyed_array(key_parameter: TUnion, value_parameter: TUnion) -> TUnion
 #[inline]
 #[must_use]
 pub fn add_optional_union_type(base_type: TUnion, maybe_type: Option<&TUnion>, codebase: &CodebaseMetadata) -> TUnion {
-    if let Some(type_2) = maybe_type { add_union_type(base_type, type_2, codebase, false) } else { base_type }
+    if let Some(type_2) = maybe_type {
+        add_union_type(base_type, type_2, codebase, combiner::CombinerOptions::default())
+    } else {
+        base_type
+    }
 }
 
 #[inline]
@@ -827,7 +831,9 @@ pub fn combine_optional_union_types(
     codebase: &CodebaseMetadata,
 ) -> TUnion {
     match (type_1, type_2) {
-        (Some(type_1), Some(type_2)) => combine_union_types(type_1, type_2, codebase, false),
+        (Some(type_1), Some(type_2)) => {
+            combine_union_types(type_1, type_2, codebase, combiner::CombinerOptions::default())
+        }
         (Some(type_1), None) => type_1.clone(),
         (None, Some(type_2)) => type_2.clone(),
         (None, None) => get_mixed(),
@@ -840,7 +846,7 @@ pub fn combine_union_types(
     type_1: &TUnion,
     type_2: &TUnion,
     codebase: &CodebaseMetadata,
-    overwrite_empty_array: bool,
+    options: combiner::CombinerOptions,
 ) -> TUnion {
     if type_1 == type_2 {
         return type_1.clone();
@@ -856,7 +862,7 @@ pub fn combine_union_types(
         let mut all_atomic_types = type_1.types.to_vec();
         all_atomic_types.extend(type_2.types.iter().cloned());
 
-        let mut result = TUnion::from_vec(combiner::combine(all_atomic_types, codebase, overwrite_empty_array));
+        let mut result = TUnion::from_vec(combiner::combine(all_atomic_types, codebase, options));
 
         if type_1.had_template() && type_2.had_template() {
             result.set_had_template(true);
@@ -890,13 +896,13 @@ pub fn add_union_type(
     mut base_type: TUnion,
     other_type: &TUnion,
     codebase: &CodebaseMetadata,
-    overwrite_empty_array: bool,
+    options: combiner::CombinerOptions,
 ) -> TUnion {
     if &base_type != other_type {
         base_type.types = if base_type.is_vanilla_mixed() && other_type.is_vanilla_mixed() {
             base_type.types
         } else {
-            combine_union_types(&base_type, other_type, codebase, overwrite_empty_array).types
+            combine_union_types(&base_type, other_type, codebase, options).types
         };
 
         if !other_type.had_template() {
@@ -959,7 +965,7 @@ pub fn intersect_union_types(type_1: &TUnion, type_2: &TUnion, codebase: &Codeba
 
     let mut combined_type: Option<TUnion> = None;
     if !intersected_atomic_types.is_empty() {
-        let combined_vec = combiner::combine(intersected_atomic_types, codebase, false);
+        let combined_vec = combiner::combine(intersected_atomic_types, codebase, combiner::CombinerOptions::default());
         if !combined_vec.is_empty() {
             combined_type = Some(TUnion::from_vec(combined_vec));
         }
@@ -1270,11 +1276,12 @@ pub fn get_array_parameters(array_type: &TArray, codebase: &CodebaseMetadata) ->
             if let Some(known_items) = &keyed_data.known_items {
                 for (key, (_, item_type)) in known_items {
                     key_types.push(key.to_atomic());
-                    value_param = add_union_type(value_param, item_type, codebase, false);
+                    value_param =
+                        add_union_type(value_param, item_type, codebase, combiner::CombinerOptions::default());
                 }
             }
 
-            let combined_key_types = combiner::combine(key_types, codebase, false);
+            let combined_key_types = combiner::combine(key_types, codebase, combiner::CombinerOptions::default());
             let key_param_union = TUnion::from_vec(combined_key_types);
 
             (key_param_union, value_param)
@@ -1287,7 +1294,8 @@ pub fn get_array_parameters(array_type: &TArray, codebase: &CodebaseMetadata) ->
                 for (key_idx, (_, element_type)) in known_elements {
                     key_types.push(TAtomic::Scalar(TScalar::literal_int(*key_idx as i64)));
 
-                    value_type = combine_union_types(element_type, &value_type, codebase, false);
+                    value_type =
+                        combine_union_types(element_type, &value_type, codebase, combiner::CombinerOptions::default());
                 }
             }
 
@@ -1299,7 +1307,8 @@ pub fn get_array_parameters(array_type: &TArray, codebase: &CodebaseMetadata) ->
                 }
             }
 
-            let key_type = TUnion::from_vec(combiner::combine(key_types, codebase, false));
+            let key_type =
+                TUnion::from_vec(combiner::combine(key_types, codebase, combiner::CombinerOptions::default()));
 
             (key_type, value_type)
         }
@@ -1367,7 +1376,8 @@ pub fn get_array_value_parameter(array_type: &TArray, codebase: &CodebaseMetadat
 
             if let Some(known_items) = &keyed_data.known_items {
                 for (_, item_type) in known_items.values() {
-                    value_param = combine_union_types(item_type, &value_param, codebase, false);
+                    value_param =
+                        combine_union_types(item_type, &value_param, codebase, combiner::CombinerOptions::default());
                 }
             }
 
@@ -1378,7 +1388,8 @@ pub fn get_array_value_parameter(array_type: &TArray, codebase: &CodebaseMetadat
 
             if let Some(known_elements) = &list_data.known_elements {
                 for (_, element_type) in known_elements.values() {
-                    value_param = combine_union_types(element_type, &value_param, codebase, false);
+                    value_param =
+                        combine_union_types(element_type, &value_param, codebase, combiner::CombinerOptions::default());
                 }
             }
 

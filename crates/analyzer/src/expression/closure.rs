@@ -9,6 +9,7 @@ use mago_codex::ttype::add_optional_union_type;
 use mago_codex::ttype::add_union_type;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::callable::TCallable;
+use mago_codex::ttype::combiner::CombinerOptions;
 use mago_codex::ttype::expander::TypeExpansionOptions;
 use mago_codex::ttype::expander::get_signature_of_function_like_metadata;
 use mago_codex::ttype::get_mixed;
@@ -181,9 +182,12 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Closure<'arena> {
             };
 
             let variable_type = match block_context.locals.remove(&referenced_variable) {
-                Some(existing_type) => {
-                    Rc::new(add_union_type(Rc::unwrap_or_clone(inner_type), &existing_type, context.codebase, false))
-                }
+                Some(existing_type) => Rc::new(add_union_type(
+                    Rc::unwrap_or_clone(inner_type),
+                    &existing_type,
+                    context.codebase,
+                    CombinerOptions::default(),
+                )),
                 None => inner_type,
             };
 

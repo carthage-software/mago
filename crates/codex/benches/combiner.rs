@@ -13,6 +13,7 @@ use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::atomic::object::named::TNamedObject;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::int::TInteger;
+use mago_codex::ttype::combiner::CombinerOptions;
 use mago_codex::ttype::combiner::combine;
 use mago_codex::ttype::get_int;
 use mago_codex::ttype::get_string;
@@ -31,7 +32,7 @@ fn bench_combiner(c: &mut Criterion) {
                 TAtomic::Scalar(TScalar::float()),
                 TAtomic::Scalar(TScalar::bool()),
             ];
-            std::hint::black_box(combine(types, &codebase, false))
+            std::hint::black_box(combine(types, &codebase, CombinerOptions::default()))
         });
     });
 
@@ -40,7 +41,7 @@ fn bench_combiner(c: &mut Criterion) {
         b.iter(|| {
             let types: Vec<TAtomic> =
                 (0..50).map(|i| TAtomic::Scalar(TScalar::Integer(TInteger::literal(i)))).collect();
-            std::hint::black_box(combine(types, &codebase, false))
+            std::hint::black_box(combine(types, &codebase, CombinerOptions::default()))
         });
     });
 
@@ -50,7 +51,7 @@ fn bench_combiner(c: &mut Criterion) {
             let types: Vec<TAtomic> = (0..50)
                 .map(|i| TAtomic::Scalar(TScalar::literal_string(ascii_lowercase_atom(&format!("s{i}")))))
                 .collect();
-            std::hint::black_box(combine(types, &codebase, false))
+            std::hint::black_box(combine(types, &codebase, CombinerOptions::default()))
         });
     });
 
@@ -65,7 +66,7 @@ fn bench_combiner(c: &mut Criterion) {
                     ]))))
                 })
                 .collect();
-            std::hint::black_box(combine(types, &codebase, false))
+            std::hint::black_box(combine(types, &codebase, CombinerOptions::default()))
         });
     });
 
@@ -75,7 +76,7 @@ fn bench_combiner(c: &mut Criterion) {
             let types: Vec<TAtomic> = (0..50)
                 .map(|i| TAtomic::Object(TObject::Named(TNamedObject::new(ascii_lowercase_atom(&format!("C{i}"))))))
                 .collect();
-            std::hint::black_box(combine(types, &codebase, false))
+            std::hint::black_box(combine(types, &codebase, CombinerOptions::default()))
         });
     });
 
@@ -92,7 +93,7 @@ fn bench_combiner(c: &mut Criterion) {
                     )))
                 })
                 .collect();
-            std::hint::black_box(combine(types, &codebase, false))
+            std::hint::black_box(combine(types, &codebase, CombinerOptions::default()))
         });
     });
 
@@ -115,7 +116,7 @@ fn bench_combiner(c: &mut Criterion) {
                     (false, get_int()),
                 )])))));
             }
-            std::hint::black_box(combine(types, &codebase, false))
+            std::hint::black_box(combine(types, &codebase, CombinerOptions::default()))
         });
     });
 
@@ -144,7 +145,7 @@ fn bench_combiner(c: &mut Criterion) {
                     (false, get_int()),
                 )])))));
             }
-            std::hint::black_box(combine(types, &codebase, false))
+            std::hint::black_box(combine(types, &codebase, CombinerOptions::default()))
         });
     });
 
@@ -154,7 +155,7 @@ fn bench_combiner(c: &mut Criterion) {
             let types: Vec<TAtomic> = (0..5000)
                 .map(|i| TAtomic::Scalar(TScalar::literal_string(ascii_lowercase_atom(&format!("s{i}")))))
                 .collect();
-            std::hint::black_box(combine(types, &codebase, false))
+            std::hint::black_box(combine(types, &codebase, CombinerOptions::default()))
         });
     });
 
@@ -163,7 +164,7 @@ fn bench_combiner(c: &mut Criterion) {
         b.iter(|| {
             let types: Vec<TAtomic> =
                 (0..5000).map(|i| TAtomic::Scalar(TScalar::Integer(TInteger::literal(i)))).collect();
-            std::hint::black_box(combine(types, &codebase, false))
+            std::hint::black_box(combine(types, &codebase, CombinerOptions::default()))
         });
     });
 }

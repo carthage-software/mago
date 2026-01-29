@@ -22,6 +22,7 @@ use mago_codex::ttype::atomic::object::named::TNamedObject;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::class_like_string::TClassLikeString;
 use mago_codex::ttype::cast::cast_atomic_to_callable;
+use mago_codex::ttype::combiner::CombinerOptions;
 use mago_codex::ttype::comparator::ComparisonResult;
 use mago_codex::ttype::comparator::atomic_comparator;
 use mago_codex::ttype::comparator::union_comparator;
@@ -172,7 +173,7 @@ fn infer_templates_from_input_and_container_types(
                                                     input_element.clone(),
                                                     input_value_type.as_ref(),
                                                     context.codebase,
-                                                    false,
+                                                    CombinerOptions::default(),
                                                 ));
                                             }
                                         }
@@ -335,7 +336,7 @@ fn infer_templates_from_input_and_container_types(
                                                     input_item.clone(),
                                                     input_value_type.as_ref(),
                                                     context.codebase,
-                                                    false,
+                                                    CombinerOptions::default(),
                                                 ));
                                             }
                                         }

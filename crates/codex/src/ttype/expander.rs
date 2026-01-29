@@ -167,12 +167,12 @@ pub fn expand_union(codebase: &CodebaseMetadata, return_type: &mut TUnion, optio
         }
 
         types = if new_return_type_parts.len() > 1 {
-            combiner::combine(new_return_type_parts, codebase, false)
+            combiner::combine(new_return_type_parts, codebase, combiner::CombinerOptions::default())
         } else {
             new_return_type_parts
         };
     } else if types.len() > 1 {
-        types = combiner::combine(types, codebase, false);
+        types = combiner::combine(types, codebase, combiner::CombinerOptions::default());
     }
 
     return_type.types = Cow::Owned(types);

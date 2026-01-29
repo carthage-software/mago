@@ -22,6 +22,7 @@ use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::float::TFloat;
 use mago_codex::ttype::atomic::scalar::int::TInteger;
 use mago_codex::ttype::atomic::scalar::string::TStringLiteral;
+use mago_codex::ttype::combiner::CombinerOptions;
 use mago_codex::ttype::combiner::combine;
 use mago_codex::ttype::get_arraykey;
 use mago_codex::ttype::get_bool;
@@ -264,7 +265,8 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for UnaryPrefix<'arena> {
                 if resulting_types.is_empty() {
                     artifacts.set_expression_type(self, get_never());
                 } else {
-                    let resulting_type = TUnion::from_vec(combine(resulting_types, context.codebase, false));
+                    let resulting_type =
+                        TUnion::from_vec(combine(resulting_types, context.codebase, CombinerOptions::default()));
                     artifacts.set_expression_type(self, resulting_type);
                 }
             }
@@ -633,7 +635,7 @@ fn increment_operand<'ctx, 'arena>(
     let resulting_type_union = if possibilities.is_empty() {
         get_mixed()
     } else {
-        TUnion::from_vec(combine(possibilities, context.codebase, false))
+        TUnion::from_vec(combine(possibilities, context.codebase, CombinerOptions::default()))
     };
 
     let operand_id = get_expression_id(
@@ -870,7 +872,7 @@ fn decrement_operand<'ctx, 'arena>(
     let resulting_type_union = if possibilities.is_empty() {
         get_mixed()
     } else {
-        TUnion::from_vec(combine(possibilities, context.codebase, false))
+        TUnion::from_vec(combine(possibilities, context.codebase, CombinerOptions::default()))
     };
 
     let operand_id = get_expression_id(
@@ -1057,7 +1059,7 @@ fn cast_type_to_array<'arena>(
     }
 
     // Combine all potential array types resulting from the cast.
-    TUnion::from_vec(combine(resulting_array_atomics, context.codebase, false))
+    TUnion::from_vec(combine(resulting_array_atomics, context.codebase, CombinerOptions::default()))
 }
 
 fn cast_type_to_bool<'arena>(
@@ -1264,7 +1266,7 @@ fn cast_type_to_float<'arena>(
         return get_float();
     }
 
-    TUnion::from_vec(combine(resulting_float_atomics, context.codebase, false))
+    TUnion::from_vec(combine(resulting_float_atomics, context.codebase, CombinerOptions::default()))
 }
 
 fn cast_type_to_int(operand_type: &TUnion, context: &mut Context<'_, '_>) -> TUnion {
@@ -1342,7 +1344,7 @@ fn cast_type_to_int(operand_type: &TUnion, context: &mut Context<'_, '_>) -> TUn
         possibilities.push(possible);
     }
 
-    TUnion::from_vec(combine(possibilities, context.codebase, false))
+    TUnion::from_vec(combine(possibilities, context.codebase, CombinerOptions::default()))
 }
 
 fn cast_type_to_object<'arena>(
@@ -1406,7 +1408,7 @@ fn cast_type_to_object<'arena>(
         return get_named_object(atom("stdClass"), None);
     }
 
-    TUnion::from_vec(combine(possibilities, context.codebase, false))
+    TUnion::from_vec(combine(possibilities, context.codebase, CombinerOptions::default()))
 }
 
 pub fn cast_type_to_string<'ctx>(
@@ -1696,7 +1698,7 @@ pub fn cast_type_to_string<'ctx>(
         possibilities.push(TAtomic::Scalar(TScalar::string()));
     }
 
-    Ok(TUnion::from_vec(combine(possibilities, context.codebase, false)))
+    Ok(TUnion::from_vec(combine(possibilities, context.codebase, CombinerOptions::default())))
 }
 
 fn find_to_string_in_intersections<'ctx>(

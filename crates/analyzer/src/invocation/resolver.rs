@@ -9,6 +9,7 @@ use mago_codex::misc::GenericParent;
 use mago_codex::ttype::add_union_type;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::object::TObject;
+use mago_codex::ttype::combiner::CombinerOptions;
 use mago_codex::ttype::comparator::ComparisonResult;
 use mago_codex::ttype::comparator::union_comparator;
 use mago_codex::ttype::expander;
@@ -258,5 +259,5 @@ fn resolve_atomic<'ctx, 'arena>(
         }
     }
 
-    Either::Right(add_union_type(then_type, &otherwise_type, context.codebase, false))
+    Either::Right(add_union_type(then_type, &otherwise_type, context.codebase, CombinerOptions::default()))
 }

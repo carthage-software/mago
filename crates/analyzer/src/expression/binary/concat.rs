@@ -84,7 +84,7 @@ pub fn analyze_string_concat_operation<'ctx, 'arena>(
         analyze_string_concat_operand(context, artifacts, operand, side);
     }
 
-    let result_type = fold_concat_operands(&operands, artifacts, context.settings.string_concat_combination_threshold);
+    let result_type = fold_concat_operands(&operands, artifacts, context.settings.string_combination_threshold);
     artifacts.expression_types.insert(get_expression_range(binary), Rc::new(result_type));
 
     Ok(())

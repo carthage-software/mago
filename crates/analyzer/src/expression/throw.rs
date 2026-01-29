@@ -2,6 +2,7 @@ use std::rc::Rc;
 
 use mago_codex::ttype::TType;
 use mago_codex::ttype::combine_union_types;
+use mago_codex::ttype::combiner::CombinerOptions;
 use mago_codex::ttype::get_never;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
@@ -32,8 +33,12 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Throw<'arena> {
 
             for (variable, previous_type) in &block_context.locals {
                 if let Some(finally_type) = finally_scope.locals.get_mut(variable) {
-                    let resulting_type =
-                        combine_union_types(previous_type.as_ref(), finally_type.as_ref(), context.codebase, false);
+                    let resulting_type = combine_union_types(
+                        previous_type.as_ref(),
+                        finally_type.as_ref(),
+                        context.codebase,
+                        CombinerOptions::default(),
+                    );
 
                     finally_scope.locals.insert(*variable, Rc::new(resulting_type));
                 } else {

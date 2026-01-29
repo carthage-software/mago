@@ -4,6 +4,7 @@ use mago_codex::ttype::TType;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::combine_union_types;
+use mago_codex::ttype::combiner::CombinerOptions;
 use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::get_never;
 use mago_reporting::Annotation;
@@ -137,7 +138,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Clone<'arena> {
             Rc::new(if has_mixed_type {
                 get_mixed()
             } else if has_cloneable_object {
-                combine_union_types(&object_type, &get_never(), context.codebase, false)
+                combine_union_types(&object_type, &get_never(), context.codebase, CombinerOptions::default())
             } else {
                 get_never()
             })

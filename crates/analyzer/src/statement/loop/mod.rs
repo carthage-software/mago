@@ -21,6 +21,7 @@ use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::bool::TBool;
 use mago_codex::ttype::combine_union_types;
+use mago_codex::ttype::combiner::CombinerOptions;
 use mago_codex::ttype::get_array_parameters;
 use mago_codex::ttype::get_arraykey;
 use mago_codex::ttype::get_iterable_parameters;
@@ -161,7 +162,12 @@ fn inherit_loop_block_context<'ctx>(
             if let Some(possible_type) = loop_scope.possibly_defined_loop_parent_variables.get(&variable) {
                 block_context.locals.insert(
                     variable,
-                    Rc::new(ttype::combine_union_types(&variable_type, possible_type, context.codebase, false)),
+                    Rc::new(ttype::combine_union_types(
+                        &variable_type,
+                        possible_type,
+                        context.codebase,
+                        CombinerOptions::default(),
+                    )),
                 );
             }
         }
@@ -428,7 +434,7 @@ fn analyze<'ctx, 'ast, 'arena>(
                                 &continue_context_type,
                                 parent_context_type,
                                 context.codebase,
-                                false,
+                                CombinerOptions::default(),
                             )),
                         );
 
@@ -445,7 +451,12 @@ fn analyze<'ctx, 'ast, 'arena>(
                         // widen the foreach context type with the initial context type
                         continue_context.locals.insert(
                             variable_id,
-                            Rc::new(combine_union_types(&continue_context_type, loop_context_type, codebase, false)),
+                            Rc::new(combine_union_types(
+                                &continue_context_type,
+                                loop_context_type,
+                                codebase,
+                                CombinerOptions::default(),
+                            )),
                         );
 
                         // if there's a change, invalidate related clauses
@@ -606,7 +617,7 @@ fn analyze<'ctx, 'ast, 'arena>(
                             possibly_redefined_variable_type,
                             do_context_type,
                             codebase,
-                            always_enters_loop,
+                            CombinerOptions { overwrite_empty_array: always_enters_loop, ..CombinerOptions::default() },
                         ))
                     };
                 }
@@ -622,7 +633,7 @@ fn analyze<'ctx, 'ast, 'arena>(
                         variable_type,
                         loop_parent_context_type,
                         codebase,
-                        always_enters_loop,
+                        CombinerOptions { overwrite_empty_array: always_enters_loop, ..CombinerOptions::default() },
                     ));
                 }
 
@@ -636,7 +647,12 @@ fn analyze<'ctx, 'ast, 'arena>(
             if loop_context_type != variable_type {
                 loop_parent_context.locals.insert(
                     *variable_id,
-                    Rc::new(combine_union_types(variable_type, loop_context_type, codebase, always_enters_loop)),
+                    Rc::new(combine_union_types(
+                        variable_type,
+                        loop_context_type,
+                        codebase,
+                        CombinerOptions { overwrite_empty_array: always_enters_loop, ..CombinerOptions::default() },
+                    )),
                 );
 
                 loop_parent_context.remove_variable_from_conflicting_clauses(context, *variable_id, None);
@@ -663,7 +679,7 @@ fn analyze<'ctx, 'ast, 'arena>(
                             &variable_type,
                             continue_context_type,
                             codebase,
-                            always_enters_loop,
+                            CombinerOptions { overwrite_empty_array: always_enters_loop, ..CombinerOptions::default() },
                         )),
                     );
                     loop_parent_context.remove_variable_from_conflicting_clauses(context, variable_id, None);
@@ -732,14 +748,24 @@ fn analyze<'ctx, 'ast, 'arena>(
                 {
                     loop_parent_context.locals.insert(
                         *variable_id,
-                        Rc::new(combine_union_types(variable_type, possibly_defined_type, codebase, true)),
+                        Rc::new(combine_union_types(
+                            variable_type,
+                            possibly_defined_type,
+                            codebase,
+                            CombinerOptions::default().with_overwrite_empty_array(),
+                        )),
                     );
                 } else if let Some(possibly_redefined_type) =
                     loop_scope.possibly_redefined_loop_parent_variables.get(variable_id)
                 {
                     loop_parent_context.locals.insert(
                         *variable_id,
-                        Rc::new(combine_union_types(variable_type, possibly_redefined_type, codebase, true)),
+                        Rc::new(combine_union_types(
+                            variable_type,
+                            possibly_redefined_type,
+                            codebase,
+                            CombinerOptions::default().with_overwrite_empty_array(),
+                        )),
                     );
                 }
             } else {
@@ -890,7 +916,7 @@ fn update_loop_scope_contexts<'ctx>(
                         },
                         variable_type,
                         context.codebase,
-                        false,
+                        CombinerOptions::default(),
                     )),
                 );
             }

@@ -9,6 +9,7 @@ use mago_atom::AtomSet;
 use mago_algebra::clause::Clause;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::combine_union_types;
+use mago_codex::ttype::combiner::CombinerOptions;
 use mago_codex::ttype::comparator::union_comparator::can_expression_types_be_identical;
 use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::union::TUnion;
@@ -195,7 +196,12 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
             if let Some(context_type) = self.block_context.locals.get(&var_id).cloned() {
                 self.block_context.locals.insert(
                     var_id,
-                    Rc::new(combine_union_types(&var_type, &context_type, self.context.codebase, false)),
+                    Rc::new(combine_union_types(
+                        &var_type,
+                        &context_type,
+                        self.context.codebase,
+                        CombinerOptions::default(),
+                    )),
                 );
             }
         }
@@ -600,7 +606,7 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
                                 var_type,
                                 possibly_redefined_var_type,
                                 self.context.codebase,
-                                false,
+                                CombinerOptions::default(),
                             )),
                             None => var_type.clone(),
                         },
@@ -622,8 +628,12 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
                     if let Some(break_var_type) = break_vars.get(&var_id) {
                         if case_block_context.locals.contains_key(&var_id) {
                             let var_type = new_locals.get(&var_id).unwrap();
-                            let combined =
-                                Rc::new(combine_union_types(break_var_type, var_type, self.context.codebase, false));
+                            let combined = Rc::new(combine_union_types(
+                                break_var_type,
+                                var_type,
+                                self.context.codebase,
+                                CombinerOptions::default(),
+                            ));
                             new_locals.insert(var_id, combined);
                         } else {
                             new_locals.remove(&var_id);
@@ -639,8 +649,12 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
                 for var_id in var_ids {
                     if let Some(break_var_type) = break_vars.get(&var_id) {
                         let var_type = redefined_vars.get(&var_id).unwrap();
-                        let combined =
-                            Rc::new(combine_union_types(break_var_type, var_type, self.context.codebase, false));
+                        let combined = Rc::new(combine_union_types(
+                            break_var_type,
+                            var_type,
+                            self.context.codebase,
+                            CombinerOptions::default(),
+                        ));
                         redefined_vars.insert(var_id, combined);
                     } else {
                         redefined_vars.remove(&var_id);
@@ -675,7 +689,7 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
                             var_type,
                             possibly_redefined_var_type,
                             self.context.codebase,
-                            false,
+                            CombinerOptions::default(),
                         )),
                         None => var_type.clone(),
                     },
@@ -696,7 +710,12 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
             for var_id in var_ids {
                 if let Some(break_var_type) = case_redefined_vars.get(&var_id) {
                     let var_type = redefined_vars.get(&var_id).unwrap();
-                    let combined = Rc::new(combine_union_types(break_var_type, var_type, self.context.codebase, false));
+                    let combined = Rc::new(combine_union_types(
+                        break_var_type,
+                        var_type,
+                        self.context.codebase,
+                        CombinerOptions::default(),
+                    ));
                     redefined_vars.insert(var_id, combined);
                 } else {
                     redefined_vars.remove(&var_id);
@@ -711,8 +730,12 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
             for var_id in var_ids {
                 if let Some(existing_var_type) = case_block_context.locals.get(&var_id) {
                     let var_type = new_locals.get(&var_id).unwrap();
-                    let combined =
-                        Rc::new(combine_union_types(existing_var_type, var_type, self.context.codebase, false));
+                    let combined = Rc::new(combine_union_types(
+                        existing_var_type,
+                        var_type,
+                        self.context.codebase,
+                        CombinerOptions::default(),
+                    ));
                     new_locals.insert(var_id, combined);
                 } else {
                     new_locals.remove(&var_id);

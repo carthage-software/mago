@@ -47,7 +47,87 @@ use crate::ttype::template::variance::Variance;
 use crate::ttype::union::TUnion;
 use crate::utils::str_is_numeric;
 
-pub fn combine(types: Vec<TAtomic>, codebase: &CodebaseMetadata, overwrite_empty_array: bool) -> Vec<TAtomic> {
+/// Default maximum number of sealed arrays to track before generalizing.
+///
+/// When combining array types, sealed arrays (arrays with known literal elements)
+/// are accumulated for later comparison. If the number of sealed arrays exceeds
+/// this threshold, they are immediately generalized to prevent O(n²) complexity
+/// in `finalize_sealed_arrays` and excessive memory usage.
+pub const DEFAULT_ARRAY_COMBINATION_THRESHOLD: u16 = 128;
+
+/// Default maximum number of literal strings to track before generalizing to string.
+///
+/// When combining types with many different literal string values, tracking each
+/// literal individually causes O(n) memory and O(n²) comparison time.
+/// Once the threshold is exceeded, we generalize to the base string type.
+pub const DEFAULT_STRING_COMBINATION_THRESHOLD: u16 = 128;
+
+/// Default maximum number of literal integers to track before generalizing to int.
+///
+/// When combining types with many different literal integer values, tracking each
+/// literal individually causes O(n) memory and O(n²) comparison time.
+/// Once the threshold is exceeded, we generalize to the base int type.
+pub const DEFAULT_INTEGER_COMBINATION_THRESHOLD: u16 = 128;
+
+/// Options for controlling type combination behavior.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CombinerOptions {
+    /// When true, empty arrays are overwritten by non-empty arrays during combination.
+    pub overwrite_empty_array: bool,
+    /// Maximum number of sealed arrays to track before generalizing.
+    pub array_combination_threshold: u16,
+    /// Maximum number of literal strings to track before generalizing to string.
+    pub string_combination_threshold: u16,
+    /// Maximum number of literal integers to track before generalizing to int.
+    pub integer_combination_threshold: u16,
+}
+
+impl Default for CombinerOptions {
+    fn default() -> Self {
+        Self {
+            overwrite_empty_array: false,
+            array_combination_threshold: DEFAULT_ARRAY_COMBINATION_THRESHOLD,
+            string_combination_threshold: DEFAULT_STRING_COMBINATION_THRESHOLD,
+            integer_combination_threshold: DEFAULT_INTEGER_COMBINATION_THRESHOLD,
+        }
+    }
+}
+
+impl CombinerOptions {
+    /// Create options with overwrite_empty_array set to true.
+    #[inline]
+    #[must_use]
+    pub fn with_overwrite_empty_array(mut self) -> Self {
+        self.overwrite_empty_array = true;
+        self
+    }
+
+    /// Create options with a custom array combination threshold.
+    #[inline]
+    #[must_use]
+    pub fn with_array_combination_threshold(mut self, threshold: u16) -> Self {
+        self.array_combination_threshold = threshold;
+        self
+    }
+
+    /// Create options with a custom string combination threshold.
+    #[inline]
+    #[must_use]
+    pub fn with_string_combination_threshold(mut self, threshold: u16) -> Self {
+        self.string_combination_threshold = threshold;
+        self
+    }
+
+    /// Create options with a custom integer combination threshold.
+    #[inline]
+    #[must_use]
+    pub fn with_integer_combination_threshold(mut self, threshold: u16) -> Self {
+        self.integer_combination_threshold = threshold;
+        self
+    }
+}
+
+pub fn combine(types: Vec<TAtomic>, codebase: &CodebaseMetadata, options: CombinerOptions) -> Vec<TAtomic> {
     if types.len() == 1 {
         return types;
     }
@@ -60,7 +140,7 @@ pub fn combine(types: Vec<TAtomic>, codebase: &CodebaseMetadata, overwrite_empty
             continue;
         }
 
-        scrape_type_properties(atomic, &mut combination, codebase, overwrite_empty_array);
+        scrape_type_properties(atomic, &mut combination, codebase, options);
     }
 
     combination.integers.sort_unstable();
@@ -316,7 +396,7 @@ fn scrape_type_properties(
     atomic: TAtomic,
     combination: &mut TypeCombination,
     codebase: &CodebaseMetadata,
-    overwrite_empty_array: bool,
+    options: CombinerOptions,
 ) {
     if combination.flags.contains(CombinationFlags::GENERIC_MIXED) {
         return;
@@ -497,16 +577,20 @@ fn scrape_type_properties(
     }
 
     if let TAtomic::Array(array) = atomic {
-        if overwrite_empty_array && array.is_empty() {
+        if options.overwrite_empty_array && array.is_empty() {
             combination.flags.insert(CombinationFlags::HAS_EMPTY_ARRAY);
 
             return;
         }
 
+        // Accumulate sealed arrays for later comparison, but only up to a threshold.
+        // Once we exceed the threshold, we let the arrays fall through to be processed
+        // immediately, which generalizes them and prevents O(n²) complexity.
         if !array.is_empty()
             && array.is_sealed()
             && combination.list_array_parameter.is_some()
             && !combination.flags.contains(CombinationFlags::HAS_KEYED_ARRAY)
+            && combination.sealed_arrays.len() < options.array_combination_threshold as usize
         {
             combination.sealed_arrays.push(array);
             return;
@@ -538,12 +622,7 @@ fn scrape_type_properties(
                             let new_entry = if let Some((existing_optional, existing_type)) = existing_entry {
                                 (
                                     *existing_optional || candidate_optional,
-                                    combine_union_types(
-                                        existing_type,
-                                        &candidate_element_type,
-                                        codebase,
-                                        overwrite_empty_array,
-                                    ),
+                                    combine_union_types(existing_type, &candidate_element_type, codebase, options),
                                 )
                             } else {
                                 (
@@ -554,7 +633,7 @@ fn scrape_type_properties(
                                                 existing_value_parameter,
                                                 &candidate_element_type,
                                                 codebase,
-                                                overwrite_empty_array,
+                                                options,
                                             );
 
                                             continue;
@@ -577,7 +656,7 @@ fn scrape_type_properties(
                         if !has_defined_keys {
                             combination.flags.remove(CombinationFlags::LIST_ARRAY_ALWAYS_FILLED);
                         }
-                    } else if !overwrite_empty_array {
+                    } else if !options.overwrite_empty_array {
                         if element_type.is_never() {
                             for (pu, _) in combination.list_array_entries.values_mut() {
                                 *pu = true;
@@ -585,12 +664,8 @@ fn scrape_type_properties(
                         } else {
                             for (_, entry_type) in combination.list_array_entries.values() {
                                 if let Some(ref mut existing_value_param) = combination.list_array_parameter {
-                                    *existing_value_param = combine_union_types(
-                                        existing_value_param,
-                                        entry_type,
-                                        codebase,
-                                        overwrite_empty_array,
-                                    );
+                                    *existing_value_param =
+                                        combine_union_types(existing_value_param, entry_type, codebase, options);
                                 }
                             }
 
@@ -600,7 +675,7 @@ fn scrape_type_properties(
 
                     combination.list_array_parameter = if let Some(ref existing_type) = combination.list_array_parameter
                     {
-                        Some(combine_union_types(existing_type, &element_type, codebase, overwrite_empty_array))
+                        Some(combine_union_types(existing_type, &element_type, codebase, options))
                     } else {
                         Some((*element_type).clone())
                     };
@@ -631,12 +706,8 @@ fn scrape_type_properties(
                                     *eu = true;
                                 }
                                 if &candidate_item_type != existing_type {
-                                    *existing_type = combine_union_types(
-                                        existing_type,
-                                        &candidate_item_type,
-                                        codebase,
-                                        overwrite_empty_array,
-                                    );
+                                    *existing_type =
+                                        combine_union_types(existing_type, &candidate_item_type, codebase, options);
                                 }
                             } else {
                                 let new_item_value_type =
@@ -647,7 +718,7 @@ fn scrape_type_properties(
                                             existing_value_param,
                                             &candidate_item_type,
                                             codebase,
-                                            overwrite_empty_array,
+                                            options,
                                             &candidate_item_name,
                                             existing_key_param,
                                         );
@@ -679,7 +750,7 @@ fn scrape_type_properties(
                                 *pu = true;
                             }
                         }
-                    } else if !overwrite_empty_array {
+                    } else if !options.overwrite_empty_array {
                         if match &parameters {
                             Some((_, value_param)) => value_param.is_never(),
                             None => true,
@@ -696,7 +767,7 @@ fn scrape_type_properties(
                                         existing_value_param,
                                         entry_type,
                                         codebase,
-                                        overwrite_empty_array,
+                                        options,
                                         key,
                                         existing_key_param,
                                     );
@@ -712,8 +783,8 @@ fn scrape_type_properties(
                         (Some(existing_types), None) => Some(existing_types.clone()),
                         (None, Some(params)) => Some(((*params.0).clone(), (*params.1).clone())),
                         (Some(existing_types), Some(params)) => Some((
-                            combine_union_types(&existing_types.0, &params.0, codebase, overwrite_empty_array),
-                            combine_union_types(&existing_types.1, &params.1, codebase, overwrite_empty_array),
+                            combine_union_types(&existing_types.0, &params.0, codebase, options),
+                            combine_union_types(&existing_types.1, &params.1, codebase, options),
                         )),
                     };
                 }
@@ -756,7 +827,7 @@ fn scrape_type_properties(
                             existing_type_param,
                             type_param,
                             codebase,
-                            overwrite_empty_array,
+                            options,
                         ));
                     }
                 }
@@ -929,7 +1000,13 @@ fn scrape_type_properties(
                         || (existing_string_type.is_lowercase && lit_value.chars().any(char::is_uppercase));
 
                     if is_incompatible {
-                        combination.literal_strings.insert(lit_atom);
+                        // Check threshold before adding literal string
+                        if combination.literal_strings.len() >= options.string_combination_threshold as usize {
+                            // Exceeded threshold - just merge into the base string type
+                            *existing_string_type = combine_string_scalars(existing_string_type, string_scalar);
+                        } else {
+                            combination.literal_strings.insert(lit_atom);
+                        }
                     } else {
                         *existing_string_type = combine_string_scalars(existing_string_type, string_scalar);
                     }
@@ -938,7 +1015,14 @@ fn scrape_type_properties(
                 }
             }
         } else if let Some(atom) = string_scalar.get_known_literal_atom() {
-            combination.literal_strings.insert(atom);
+            // Check threshold before adding literal string
+            if combination.literal_strings.len() >= options.string_combination_threshold as usize {
+                // Exceeded threshold - generalize to base string type
+                combination.literal_strings.clear();
+                combination.value_types.insert(*ATOM_STRING, TAtomic::Scalar(TScalar::string()));
+            } else {
+                combination.literal_strings.insert(atom);
+            }
         } else {
             // When we have a constrained string type (like numeric-string) and literals,
             // we need to decide whether to merge them or keep them separate.
@@ -983,6 +1067,19 @@ fn scrape_type_properties(
     }
 
     if let TAtomic::Scalar(TScalar::Integer(integer)) = &atomic {
+        // If we already have the base int type, no need to track literals
+        if combination.value_types.contains_key(&*ATOM_INT) {
+            return;
+        }
+
+        // Check if adding this integer would exceed the threshold
+        if integer.is_literal() && combination.integers.len() >= options.integer_combination_threshold as usize {
+            // Exceeded threshold - generalize to base int type
+            combination.integers.clear();
+            combination.value_types.insert(*ATOM_INT, TAtomic::Scalar(TScalar::int()));
+            return;
+        }
+
         combination.integers.push(*integer);
 
         return;
@@ -994,6 +1091,13 @@ fn scrape_type_properties(
         }
 
         if let TFloat::Literal(literal_value) = float_scalar {
+            // Check if adding this float would exceed the threshold (using string threshold for floats)
+            if combination.literal_floats.len() >= options.string_combination_threshold as usize {
+                // Exceeded threshold - generalize to base float type
+                combination.literal_floats.clear();
+                combination.value_types.insert(*ATOM_FLOAT, TAtomic::Scalar(TScalar::float()));
+                return;
+            }
             combination.literal_floats.push(*literal_value);
         } else {
             combination.literal_floats.clear();
@@ -1010,13 +1114,13 @@ fn adjust_keyed_array_parameters(
     existing_value_param: &mut TUnion,
     entry_type: &TUnion,
     codebase: &CodebaseMetadata,
-    overwrite_empty_array: bool,
+    options: CombinerOptions,
     key: &ArrayKey,
     existing_key_param: &mut TUnion,
 ) {
-    *existing_value_param = combine_union_types(existing_value_param, entry_type, codebase, overwrite_empty_array);
+    *existing_value_param = combine_union_types(existing_value_param, entry_type, codebase, options);
     let new_key_type = key.to_union();
-    *existing_key_param = combine_union_types(existing_key_param, &new_key_type, codebase, overwrite_empty_array);
+    *existing_key_param = combine_union_types(existing_key_param, &new_key_type, codebase, options);
 }
 
 const COMBINER_KEY_STACK_BUF: usize = 256;
@@ -1128,7 +1232,8 @@ mod tests {
             TAtomic::Scalar(TScalar::bool()),
         ];
 
-        let combined = combine(types, &CodebaseMetadata::default(), true);
+        let combined =
+            combine(types, &CodebaseMetadata::default(), CombinerOptions::default().with_overwrite_empty_array());
 
         assert_eq!(combined.len(), 1);
         assert!(matches!(combined[0], TAtomic::Scalar(TScalar::Generic)));
@@ -1147,7 +1252,8 @@ mod tests {
             ])))),
         ];
 
-        let combined = combine(types, &CodebaseMetadata::default(), true);
+        let combined =
+            combine(types, &CodebaseMetadata::default(), CombinerOptions::default().with_overwrite_empty_array());
 
         assert_eq!(combined.len(), 2);
         assert!(matches!(combined[0], TAtomic::Array(TArray::List(_))));
@@ -1167,7 +1273,8 @@ mod tests {
             ])))),
         ];
 
-        let combined = combine(types, &CodebaseMetadata::default(), true);
+        let combined =
+            combine(types, &CodebaseMetadata::default(), CombinerOptions::default().with_overwrite_empty_array());
 
         assert_eq!(combined.len(), 2);
         assert!(matches!(combined[0], TAtomic::Array(TArray::List(_))));
@@ -1187,7 +1294,8 @@ mod tests {
             ])))),
         ];
 
-        let combined = combine(types, &CodebaseMetadata::default(), true);
+        let combined =
+            combine(types, &CodebaseMetadata::default(), CombinerOptions::default().with_overwrite_empty_array());
 
         assert_eq!(combined.len(), 2);
         assert!(matches!(combined[0], TAtomic::Array(TArray::List(_))));
@@ -1207,7 +1315,8 @@ mod tests {
             ])))),
         ];
 
-        let combined = combine(types, &CodebaseMetadata::default(), true);
+        let combined =
+            combine(types, &CodebaseMetadata::default(), CombinerOptions::default().with_overwrite_empty_array());
 
         assert_eq!(combined.len(), 2);
         assert!(matches!(combined[0], TAtomic::Array(TArray::List(_))));
@@ -1224,7 +1333,8 @@ mod tests {
             TAtomic::Array(TArray::List(TList::new(Box::new(TUnion::from_atomic(TAtomic::Scalar(TScalar::int())))))), // list<int>
         ];
 
-        let combined = combine(types, &CodebaseMetadata::default(), true);
+        let combined =
+            combine(types, &CodebaseMetadata::default(), CombinerOptions::default().with_overwrite_empty_array());
 
         // Expecting list{1,2} and list<int> = list<int>
         assert_eq!(combined.len(), 1);

@@ -15,6 +15,7 @@ use mago_algebra::negate_formula;
 use mago_algebra::saturate_clauses;
 use mago_codex::assertion::Assertion;
 use mago_codex::ttype::combine_union_types;
+use mago_codex::ttype::combiner::CombinerOptions;
 use mago_codex::ttype::union::TUnion;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
@@ -335,7 +336,8 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for If<'arena> {
                 continue;
             }
 
-            let new_type = combine_union_types(&existing_type, &variable_type, context.codebase, false);
+            let new_type =
+                combine_union_types(&existing_type, &variable_type, context.codebase, CombinerOptions::default());
 
             if !new_type.eq(&existing_type) {
                 block_context.remove_descendants(context, variable_id, &existing_type, Some(&new_type));
@@ -1243,7 +1245,7 @@ fn update_if_scope<'ctx>(
                         // SAFETY: has_variable returned true
                         unsafe { if_block_context.locals.get(new_variable).unwrap_unchecked() },
                         context.codebase,
-                        false,
+                        CombinerOptions::default(),
                     ));
                 }
             }
@@ -1294,7 +1296,12 @@ fn update_if_scope<'ctx>(
                 continue;
             };
 
-            *variable_type = Rc::new(combine_union_types(&redefined_type, variable_type, context.codebase, false));
+            *variable_type = Rc::new(combine_union_types(
+                &redefined_type,
+                variable_type,
+                context.codebase,
+                CombinerOptions::default(),
+            ));
         }
 
         for variable in variables_to_remove {
@@ -1303,9 +1310,12 @@ fn update_if_scope<'ctx>(
 
         for (variable_id, variable_type) in possibly_redefined_variables {
             let resulting_type = match if_scope.possibly_redefined_variables.get(&variable_id) {
-                Some(existing_type) => {
-                    Rc::new(combine_union_types(&variable_type, existing_type, context.codebase, false))
-                }
+                Some(existing_type) => Rc::new(combine_union_types(
+                    &variable_type,
+                    existing_type,
+                    context.codebase,
+                    CombinerOptions::default(),
+                )),
                 None => variable_type,
             };
 

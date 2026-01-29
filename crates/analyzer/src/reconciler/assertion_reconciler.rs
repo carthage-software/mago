@@ -21,6 +21,7 @@ use mago_codex::ttype::atomic::scalar::int::TInteger;
 use mago_codex::ttype::atomic::scalar::string::TString;
 use mago_codex::ttype::atomic::scalar::string::TStringLiteral;
 use mago_codex::ttype::combiner;
+use mago_codex::ttype::combiner::CombinerOptions;
 use mago_codex::ttype::comparator::ComparisonResult;
 use mago_codex::ttype::comparator::atomic_comparator;
 use mago_codex::ttype::comparator::atomic_comparator::is_contained_by;
@@ -254,7 +255,7 @@ fn intersect_union_with_atomic(
 
     if !acceptable_types.is_empty() {
         if acceptable_types.len() > 1 {
-            acceptable_types = combiner::combine(acceptable_types, context.codebase, false);
+            acceptable_types = combiner::combine(acceptable_types, context.codebase, CombinerOptions::default());
         }
 
         return Some(TUnion::from_vec(acceptable_types));
@@ -583,7 +584,8 @@ pub(crate) fn intersect_union_with_union(
                     })
                     .collect::<Vec<_>>();
 
-                let combined_union = TUnion::from_vec(combiner::combine(new_types, context.codebase, false));
+                let combined_union =
+                    TUnion::from_vec(combiner::combine(new_types, context.codebase, CombinerOptions::default()));
 
                 if combined_union.is_never() { None } else { Some(combined_union) }
             }

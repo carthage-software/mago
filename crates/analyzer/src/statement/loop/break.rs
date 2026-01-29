@@ -5,6 +5,7 @@ use mago_atom::AtomSet;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::add_optional_union_type;
 use mago_codex::ttype::combine_union_types;
+use mago_codex::ttype::combiner::CombinerOptions;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
@@ -107,9 +108,12 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Break<'arena> {
                 loop_scope.possibly_redefined_loop_parent_variables.insert(
                     var_id,
                     match loop_scope.possibly_redefined_loop_parent_variables.get(&var_id) {
-                        Some(existing_type) => {
-                            Rc::new(combine_union_types(existing_type, &var_type, context.codebase, false))
-                        }
+                        Some(existing_type) => Rc::new(combine_union_types(
+                            existing_type,
+                            &var_type,
+                            context.codebase,
+                            CombinerOptions::default(),
+                        )),
                         None => var_type.clone(),
                     },
                 );
@@ -121,9 +125,12 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Break<'arena> {
                         loop_scope.possibly_defined_loop_parent_variables.insert(
                             *var_id,
                             match loop_scope.possibly_defined_loop_parent_variables.get(var_id) {
-                                Some(existing_type) => {
-                                    Rc::new(combine_union_types(existing_type, var_type, context.codebase, false))
-                                }
+                                Some(existing_type) => Rc::new(combine_union_types(
+                                    existing_type,
+                                    var_type,
+                                    context.codebase,
+                                    CombinerOptions::default(),
+                                )),
                                 None => var_type.clone(),
                             },
                         );
@@ -135,7 +142,12 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Break<'arena> {
                 let mut finally_scope = (*finally_scope).borrow_mut();
                 for (var_id, var_type) in &block_context.locals {
                     if let Some(finally_type) = finally_scope.locals.get_mut(var_id) {
-                        *finally_type = Rc::new(combine_union_types(finally_type, var_type, context.codebase, false));
+                        *finally_type = Rc::new(combine_union_types(
+                            finally_type,
+                            var_type,
+                            context.codebase,
+                            CombinerOptions::default(),
+                        ));
                     } else {
                         finally_scope.locals.insert(*var_id, var_type.clone());
                     }
@@ -149,9 +161,12 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Break<'arena> {
 
                 for (var_id, var_type) in &block_context.locals {
                     let resulting_type = match break_vars.get(var_id) {
-                        Some(break_var_type) => {
-                            Rc::new(combine_union_types(var_type, break_var_type, context.codebase, false))
-                        }
+                        Some(break_var_type) => Rc::new(combine_union_types(
+                            var_type,
+                            break_var_type,
+                            context.codebase,
+                            CombinerOptions::default(),
+                        )),
                         None => var_type.clone(),
                     };
 

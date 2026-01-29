@@ -14,6 +14,7 @@ use mago_codex::ttype;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::atomic::object::named::TNamedObject;
+use mago_codex::ttype::combiner::CombinerOptions;
 use mago_codex::ttype::union::TUnion;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
@@ -91,7 +92,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
                         occupied_entry.get(),
                         variable_type.as_ref(),
                         context.codebase,
-                        false,
+                        CombinerOptions::default(),
                     );
 
                     occupied_entry.insert(Rc::new(combined_type));
@@ -113,8 +114,12 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
 
             for (variable_id, variable_type) in &block_context.locals {
                 if let Some(existing_type) = mutable_try_scope.locals.get_mut(variable_id) {
-                    let combined_type =
-                        ttype::combine_union_types(existing_type, variable_type.as_ref(), context.codebase, false);
+                    let combined_type = ttype::combine_union_types(
+                        existing_type,
+                        variable_type.as_ref(),
+                        context.codebase,
+                        CombinerOptions::default(),
+                    );
 
                     *existing_type = Rc::new(combined_type);
                 } else {
@@ -149,8 +154,12 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
             catch_block_context.flags.set_has_returned(false);
             for (variable_id, variable_type) in &mut catch_block_context.locals {
                 if let Some(old_type) = old_block_context_locals.get(variable_id) {
-                    *variable_type =
-                        Rc::new(ttype::combine_union_types(variable_type.as_ref(), old_type, context.codebase, false));
+                    *variable_type = Rc::new(ttype::combine_union_types(
+                        variable_type.as_ref(),
+                        old_type,
+                        context.codebase,
+                        CombinerOptions::default(),
+                    ));
                 } else {
                     let mut possibly_undefined_type = (**variable_type).clone();
                     possibly_undefined_type.set_possibly_undefined(variable_type.possibly_undefined(), Some(true));
@@ -260,7 +269,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
                                 existing_type.as_ref(),
                                 variable_type.as_ref(),
                                 context.codebase,
-                                false,
+                                CombinerOptions::default(),
                             )),
                         );
                     }
@@ -278,7 +287,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
                             finally_variable_type.as_ref(),
                             variable_type.as_ref(),
                             context.codebase,
-                            false,
+                            CombinerOptions::default(),
                         )
                     } else {
                         let mut finally_variable_type = (**variable_type).clone();
@@ -334,7 +343,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
                                 existing_type.as_ref(),
                                 finally_variable_type.as_ref(),
                                 context.codebase,
-                                false,
+                                CombinerOptions::default(),
                             );
 
                             if possibly_undefined {

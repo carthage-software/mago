@@ -27,6 +27,7 @@ use crate::ttype::atomic::scalar::TScalar;
 use crate::ttype::atomic::scalar::class_like_string::TClassLikeString;
 use crate::ttype::atomic::scalar::class_like_string::TClassLikeStringKind;
 use crate::ttype::combiner;
+use crate::ttype::combiner::CombinerOptions;
 use crate::ttype::comparator::union_comparator;
 use crate::ttype::expander;
 use crate::ttype::expander::StaticClassType;
@@ -142,7 +143,7 @@ pub fn replace(
     }
 
     let mut new_union_type = TUnion::from_vec(if new_parameter_atomics.len() > 1 {
-        combiner::combine(new_parameter_atomics, codebase, false)
+        combiner::combine(new_parameter_atomics, codebase, combiner::CombinerOptions::default())
     } else {
         new_parameter_atomics
     });
@@ -896,7 +897,7 @@ fn handle_template_param_class_standin(
                         generic_param,
                         &get_most_specific_type_from_bounds(template_bounds, codebase),
                         codebase,
-                        false,
+                        CombinerOptions::default(),
                     ),
                     appearance_depth: options.appearance_depth,
                     argument_offset: input_argument_offset,
@@ -1200,7 +1201,12 @@ pub fn get_mapped_generic_type_parameters(
                 candidate_parameter_type.set_from_template_default(true);
 
                 new_input_parameter = if let Some(new_input_param) = new_input_parameter {
-                    Some(add_union_type(new_input_param, &candidate_parameter_type, codebase, true))
+                    Some(add_union_type(
+                        new_input_param,
+                        &candidate_parameter_type,
+                        codebase,
+                        CombinerOptions::default().with_overwrite_empty_array(),
+                    ))
                 } else {
                     Some(candidate_parameter_type.clone())
                 };
@@ -1318,7 +1324,7 @@ pub fn get_most_specific_type_from_bounds(lower_bounds: &[TemplateBound], codeba
     let mut specific_type = relevant_bounds[0].bound_type.clone();
 
     for bound in relevant_bounds {
-        specific_type = add_union_type(specific_type, &bound.bound_type, codebase, false);
+        specific_type = add_union_type(specific_type, &bound.bound_type, codebase, CombinerOptions::default());
     }
 
     specific_type

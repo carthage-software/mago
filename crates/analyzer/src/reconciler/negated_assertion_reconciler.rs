@@ -12,6 +12,7 @@ use mago_codex::ttype::atomic::object::named::TNamedObject;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::string::TString;
 use mago_codex::ttype::combiner;
+use mago_codex::ttype::combiner::CombinerOptions;
 use mago_codex::ttype::comparator::ComparisonResult;
 use mago_codex::ttype::comparator::atomic_comparator;
 use mago_codex::ttype::comparator::union_comparator;
@@ -231,7 +232,7 @@ fn subtract_complex_type(
     if acceptable_types.is_empty() {
         acceptable_types.push(TAtomic::Never);
     } else if acceptable_types.len() > 1 && *can_be_disjunct {
-        acceptable_types = combiner::combine(acceptable_types, context.codebase, false);
+        acceptable_types = combiner::combine(acceptable_types, context.codebase, CombinerOptions::default());
     }
 
     existing_var_type.types = Cow::Owned(acceptable_types);
