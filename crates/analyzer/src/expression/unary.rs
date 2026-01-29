@@ -1492,6 +1492,7 @@ pub fn cast_type_to_string<'ctx>(
                         .with_note("Casting a callable to `string` is ambiguous and may not yield a meaningful result.")
                         .with_help("Ensure the callable can be represented as a string or use a specific callable type that guarantees string representation."),
                     );
+
                     possibilities.push(TAtomic::Scalar(TScalar::string()));
                 }
             }
@@ -1536,6 +1537,7 @@ pub fn cast_type_to_string<'ctx>(
                                 "Ensure the object is stringable before casting, use a more specific object type, or avoid the cast."
                             ),
                         );
+
                         possibilities.push(TAtomic::Scalar(TScalar::string()));
                         continue;
                     }
@@ -1554,6 +1556,7 @@ pub fn cast_type_to_string<'ctx>(
                         .with_note("Casting an object to `string` requires the class to exist and implement `Stringable` or have a `__toString()` method.")
                         .with_help("Ensure the class exists or avoid casting this object type to `string`."),
                     );
+
                     possibilities.push(TAtomic::Scalar(TScalar::string()));
                     continue;
                 };
@@ -1572,6 +1575,7 @@ pub fn cast_type_to_string<'ctx>(
                         .with_note("Casting an enum instance to `string` is not allowed and will throw a fatal error at runtime.")
                         .with_help("Use the enum's name or value instead, or avoid casting the enum instance to `string`."),
                     );
+
                     possibilities.push(TAtomic::Scalar(TScalar::string()));
                     continue;
                 }
@@ -1598,6 +1602,7 @@ pub fn cast_type_to_string<'ctx>(
                         None,
                         expression_span,
                     )?;
+
                     possibilities.extend(result.types.into_owned());
                 } else {
                     let class_name_str = class_metadata.original_name;
@@ -1624,10 +1629,10 @@ pub fn cast_type_to_string<'ctx>(
                             )
                         ),
                     );
+
                     possibilities.push(TAtomic::Scalar(TScalar::string()));
                 }
             }
-
             TAtomic::Array(_) => {
                 if is_mixed_union {
                     context.collector.report_with_code(
@@ -1683,6 +1688,12 @@ pub fn cast_type_to_string<'ctx>(
                 }
             }
         }
+    }
+
+    if possibilities.is_empty() {
+        // If no possibilities were found, push a default string type
+        // This likely indicates that the operand type is `never`
+        possibilities.push(TAtomic::Scalar(TScalar::string()));
     }
 
     Ok(TUnion::from_vec(combine(possibilities, context.codebase, false)))

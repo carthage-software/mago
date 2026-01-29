@@ -48,7 +48,7 @@ use crate::ttype::union::TUnion;
 use crate::utils::str_is_numeric;
 
 pub fn combine(types: Vec<TAtomic>, codebase: &CodebaseMetadata, overwrite_empty_array: bool) -> Vec<TAtomic> {
-    if types.len() == 1 || types.is_empty() {
+    if types.len() == 1 {
         return types;
     }
 
