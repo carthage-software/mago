@@ -1,8 +1,12 @@
 <script setup>
-import { computed, ref } from 'vue';
+import { computed, ref, onMounted, watch, nextTick } from 'vue';
 
 const props = defineProps({
-  results: {
+  analyzerResults: {
+    type: Object,
+    default: null,
+  },
+  formatterResults: {
     type: Object,
     default: null,
   },
@@ -10,11 +14,25 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  activeTab: {
+    type: String,
+    default: 'issues',
+  },
+  code: {
+    type: String,
+    default: '',
+  },
+  phpVersion: {
+    type: String,
+    default: '8.4',
+  },
 });
 
-const emit = defineEmits(['highlight-line']);
+const emit = defineEmits(['highlight-line', 'update-active-tab']);
 
 const activeFilter = ref(null);
+const formattedCodeRef = ref(null);
+let Prism = null;
 
 const severityOrder = {
   error: 0,
@@ -24,8 +42,8 @@ const severityOrder = {
 };
 
 const allIssues = computed(() => {
-  if (!props.results) return [];
-  return props.results.issues || [];
+  if (!props.analyzerResults) return [];
+  return props.analyzerResults.issues || [];
 });
 
 function matchesSource(issueSource, filterSource) {
@@ -55,16 +73,20 @@ const analyzerCount = computed(() => {
   return allIssues.value.filter((i) => i.source === 'analyzer' || i.source === 'both').length;
 });
 
-const analysisTime = computed(() => {
-  if (!props.results || props.results.analysisTimeMs === undefined) return null;
-  const ms = props.results.analysisTimeMs;
-  if (ms < 1) {
-    return `${(ms * 1000).toFixed(0)}µs`;
-  } else if (ms < 1000) {
-    return `${ms.toFixed(1)}ms`;
-  } else {
-    return `${(ms / 1000).toFixed(2)}s`;
-  }
+function formatDuration(ms) {
+  if (ms === null || ms === undefined) return null;
+  if (ms < 1) return `${(ms * 1000).toFixed(0)}µs`;
+  if (ms < 1000) return `${ms.toFixed(1)}ms`;
+  return `${(ms / 1000).toFixed(2)}s`;
+}
+
+const analysisTime = computed(() => formatDuration(props.analyzerResults?.analysisTimeMs));
+const formatTime = computed(() => formatDuration(props.formatterResults?.timeMs));
+
+const showError = computed(() => {
+  return props.activeTab === 'formatter'
+    ? Boolean(props.formatterResults?.error)
+    : Boolean(props.analyzerResults?.error);
 });
 
 function toggleFilter(source) {
@@ -73,6 +95,10 @@ function toggleFilter(source) {
   } else {
     activeFilter.value = source;
   }
+}
+
+function setActiveTab(tab) {
+  emit('update-active-tab', tab);
 }
 
 function getLevelClass(level) {
@@ -123,17 +149,69 @@ function handleIssueHover(issue) {
 function handleIssueLeave() {
   emit('highlight-line', null);
 }
+
+function highlightFormatted(el) {
+  if (!el) return;
+  const code = (props.formatterResults?.code ?? props.code) || '';
+  if (Prism && Prism.languages.php) {
+    el.innerHTML = Prism.highlight(code, Prism.languages.php, 'php');
+  } else {
+    el.textContent = code;
+  }
+}
+
+onMounted(async () => {
+  if (typeof window !== 'undefined') {
+    const prismModule = await import('prismjs');
+    Prism = prismModule.default || prismModule;
+    await import('prismjs/components/prism-markup-templating');
+    await import('prismjs/components/prism-php');
+  }
+  await nextTick();
+  highlightFormatted(formattedCodeRef.value);
+});
+
+watch(
+  () => [props.activeTab, props.code, props.formatterResults?.code],
+  async () => {
+    await nextTick();
+    highlightFormatted(formattedCodeRef.value);
+  }
+);
 </script>
 
 <template>
   <div class="playground-output">
     <div class="output-header">
-      <span class="header-title">Issues</span>
+      <div class="tabs">
+        <button
+          :class="['btn', 'btn-secondary', 'tab-btn', { active: activeTab === 'issues' }]"
+          @click="setActiveTab('issues')"
+        >
+          Issues
+        </button>
+        <button
+          :class="['btn', 'btn-secondary', 'tab-btn', { active: activeTab === 'formatter' }]"
+          @click="setActiveTab('formatter')"
+        >
+          Formatter
+        </button>
+      </div>
       <div class="header-right">
-        <span v-if="analysisTime" class="analysis-time" title="Analysis time">
+        <button
+          v-if="showError"
+          class="badge error-badge"
+          title="Invalid input"
+        >
+          ERROR
+        </button>
+        <span v-if="activeTab === 'issues' && analysisTime" class="execution-time" title="Analysis time">
           ⚡ {{ analysisTime }}
         </span>
-        <div class="header-badges">
+        <span v-if="activeTab === 'formatter' && formatTime" class="execution-time" title="Format time">
+          ⚡ {{ formatTime }}
+        </span>
+        <div v-if="activeTab === 'issues'" class="header-badges">
           <button
             :class="['badge', 'linter-badge', { active: activeFilter === null || activeFilter === 'linter', inactive: activeFilter === 'analyzer' }]"
             :title="activeFilter === 'linter' ? 'Show all issues' : 'Show only linter issues'"
@@ -155,27 +233,27 @@ function handleIssueLeave() {
     </div>
 
     <div class="output-content">
-      <div v-if="isLoading" class="loading">
+      <div v-if="isLoading && activeTab === 'issues'" class="loading">
         <div class="spinner"></div>
         <span>Analyzing...</span>
       </div>
 
-      <div v-else-if="!results" class="placeholder">
+      <div v-else-if="activeTab === 'issues' && !analyzerResults" class="placeholder">
         <div class="spinner"></div>
         <p>Preparing analysis...</p>
       </div>
 
-      <div v-else-if="displayedIssues.length === 0 && allIssues.length === 0" class="no-issues">
+      <div v-else-if="activeTab === 'issues' && displayedIssues.length === 0 && allIssues.length === 0" class="no-issues">
         <span class="success-icon">✓</span>
         <p>No issues found!</p>
       </div>
 
-      <div v-else-if="displayedIssues.length === 0 && allIssues.length > 0" class="no-issues filtered">
+      <div v-else-if="activeTab === 'issues' && displayedIssues.length === 0 && allIssues.length > 0" class="no-issues filtered">
         <p>No {{ activeFilter }} issues to show</p>
         <button class="clear-filter" @click="activeFilter = null">Show all issues</button>
       </div>
 
-      <div v-else class="issues-list">
+      <div v-if="activeTab === 'issues' && displayedIssues.length > 0" class="issues-list">
         <div
           v-for="(issue, index) in displayedIssues"
           :key="index"
@@ -216,6 +294,10 @@ function handleIssueLeave() {
           </div>
         </div>
       </div>
+
+      <div v-if="activeTab === 'formatter'" class="formatted-view">
+        <pre class="formatted-pre"><code ref="formattedCodeRef" class="language-php"></code></pre>
+      </div>
     </div>
   </div>
 </template>
@@ -237,6 +319,41 @@ function handleIssueLeave() {
   background: var(--vp-c-bg-soft);
 }
 
+.tabs {
+  display: flex;
+  gap: 8px;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 16px;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-secondary {
+  background: var(--vp-c-bg);
+  color: var(--vp-c-text-1);
+  border: 1px solid var(--vp-c-divider);
+}
+
+.tab-btn:hover {
+  background: var(--vp-c-bg-soft);
+  border-color: #10b981;
+}
+
+.tab-btn.active {
+  background: var(--vp-c-brand-soft);
+  color: var(--vp-c-brand-1);
+  border-color: var(--vp-c-brand-1);
+}
+
 .header-title {
   font-size: 14px;
   font-weight: 600;
@@ -249,7 +366,7 @@ function handleIssueLeave() {
   gap: 12px;
 }
 
-.analysis-time {
+.execution-time {
   font-size: 12px;
   font-weight: 500;
   color: var(--vp-c-text-2);
@@ -311,10 +428,83 @@ function handleIssueLeave() {
   background: rgba(168, 85, 247, 0.05);
 }
 
+.error-badge {
+  background: rgba(220, 38, 38, 0.1);
+  color: #dc2626;
+}
+
 .output-content {
   flex: 1;
   overflow: auto;
   padding: 0;
+}
+
+.formatted-view {
+  padding: 0;
+  height: 100%;
+  overflow: auto;
+}
+
+.formatted-pre {
+  margin: 0;
+  padding: 16px;
+  height: 100%;
+  background: var(--vp-c-bg);
+}
+
+.formatted-pre :deep(.token.comment),
+.formatted-pre :deep(.token.prolog),
+.formatted-pre :deep(.token.doctype),
+.formatted-pre :deep(.token.cdata) {
+  color: var(--vp-c-text-3);
+}
+
+.formatted-pre :deep(.token.punctuation) {
+  color: var(--vp-c-text-2);
+}
+
+.formatted-pre :deep(.token.property),
+.formatted-pre :deep(.token.tag),
+.formatted-pre :deep(.token.boolean),
+.formatted-pre :deep(.token.number),
+.formatted-pre :deep(.token.constant),
+.formatted-pre :deep(.token.symbol),
+.formatted-pre :deep(.token.deleted) {
+  color: #e06c75;
+}
+
+.formatted-pre :deep(.token.selector),
+.formatted-pre :deep(.token.attr-name),
+.formatted-pre :deep(.token.string),
+.formatted-pre :deep(.token.char),
+.formatted-pre :deep(.token.builtin),
+.formatted-pre :deep(.token.inserted) {
+  color: #98c379;
+}
+
+.formatted-pre :deep(.token.operator),
+.formatted-pre :deep(.token.entity),
+.formatted-pre :deep(.token.url),
+.formatted-pre :deep(.language-css .token.string),
+.formatted-pre :deep(.style .token.string) {
+  color: #56b6c2;
+}
+
+.formatted-pre :deep(.token.atrule),
+.formatted-pre :deep(.token.attr-value),
+.formatted-pre :deep(.token.keyword) {
+  color: #c678dd;
+}
+
+.formatted-pre :deep(.token.function),
+.formatted-pre :deep(.token.class-name) {
+  color: #61afef;
+}
+
+.formatted-pre :deep(.token.regex),
+.formatted-pre :deep(.token.important),
+.formatted-pre :deep(.token.variable) {
+  color: #c678dd;
 }
 
 .loading,
