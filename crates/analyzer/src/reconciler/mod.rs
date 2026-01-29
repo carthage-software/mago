@@ -579,11 +579,7 @@ fn add_nested_assertions(
                             }
                         }
                     } else {
-                        entry.push(vec![if array_key.contains('\'') {
-                            Assertion::HasStringArrayAccess
-                        } else {
-                            Assertion::HasIntOrStringArrayAccess
-                        }]);
+                        entry.push(vec![Assertion::HasIntOrStringArrayAccess]);
                     }
 
                     base_key = new_base_key;
@@ -649,12 +645,24 @@ pub fn break_up_path_into_parts(path: &str) -> Vec<String> {
             let mut token_found: Option<&'static str> = None;
             match c {
                 '[' => {
+                    if brackets == 0 {
+                        token_found = Some("[");
+                    } else {
+                        unsafe {
+                            parts.last_mut().unwrap_unchecked().push(c);
+                        }
+                    }
                     brackets += 1;
-                    token_found = Some("[");
                 }
                 ']' => {
                     brackets -= 1;
-                    token_found = Some("]");
+                    if brackets == 0 {
+                        token_found = Some("]");
+                    } else {
+                        unsafe {
+                            parts.last_mut().unwrap_unchecked().push(c);
+                        }
+                    }
                 }
                 '\'' | '"' => {
                     string_char = Some(c);
