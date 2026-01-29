@@ -38,7 +38,7 @@ pub(crate) fn is_contained_by(
 
     let mut all_parameters_match = true;
     for (parameter_offset, container_type_parameter) in container_type_parameters.iter().enumerate() {
-        let Some((template_name, _)) = container_metadata.template_types.get(parameter_offset) else {
+        let Some((template_name, _)) = container_metadata.template_types.get_index(parameter_offset) else {
             continue;
         };
 

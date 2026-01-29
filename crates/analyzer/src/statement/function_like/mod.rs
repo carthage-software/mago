@@ -591,7 +591,7 @@ pub fn get_this_type(
     }
 
     let mut type_parameters = vec![];
-    for (template_name, template_map) in &class_like_metadata.template_types {
+    for (template_name, template) in &class_like_metadata.template_types {
         // Check for method-level where constraints if function_like_metadata is provided
         if let Some(constraint) = function_like_metadata
             .and_then(|flm| flm.method_metadata.as_ref())
@@ -599,15 +599,13 @@ pub fn get_this_type(
         {
             type_parameters.push(constraint.type_union.clone());
         } else {
-            let (defining_entry, constraint) = unsafe {
-                // SAFETY: This is safe because we are guaranteed that the template_map is not empty
-                template_map.iter().next().unwrap_unchecked()
-            };
+            let defining_entity = &template.defining_entity;
+            let constraint = &template.constraint;
 
             type_parameters.push(wrap_atomic(TAtomic::GenericParameter(TGenericParameter {
                 parameter_name: *template_name,
                 constraint: Box::new(constraint.clone()),
-                defining_entity: *defining_entry,
+                defining_entity: *defining_entity,
                 intersection_types: None,
             })));
         }
@@ -848,15 +846,13 @@ pub fn check_unused_function_template_parameters<'ctx>(
         return;
     }
 
-    let Some((_, constraints)) = function_like_metadata.template_types.first() else {
+    let Some((_, template)) = function_like_metadata.template_types.first() else {
         return;
     };
 
-    let Some((GenericParent::FunctionLike(function_identifier), _)) = constraints.first() else {
+    let GenericParent::FunctionLike(function_identifier) = template.defining_entity else {
         return;
     };
-
-    let function_identifier = *function_identifier;
 
     for (template_name, _) in &function_like_metadata.template_types {
         if template_name.as_str().starts_with('_') {

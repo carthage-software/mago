@@ -15,6 +15,7 @@ use mago_codex::ttype::atomic::object::named::TNamedObject;
 use mago_codex::ttype::expander::StaticClassType;
 use mago_codex::ttype::get_never;
 use mago_codex::ttype::get_object;
+use mago_codex::ttype::template::GenericTemplate;
 use mago_codex::ttype::template::TemplateResult;
 use mago_codex::ttype::template::standin_type_replacer::get_most_specific_type_from_bounds;
 use mago_codex::ttype::union::TUnion;
@@ -363,7 +364,7 @@ fn analyze_class_instantiation<'ctx, 'arena>(
                             lower_bounds_map
                                 .iter()
                                 .map(|(generic_parent, lower_bounds)| {
-                                    (
+                                    GenericTemplate::new(
                                         *generic_parent,
                                         get_most_specific_type_from_bounds(lower_bounds, context.codebase),
                                     )
@@ -382,7 +383,7 @@ fn analyze_class_instantiation<'ctx, 'arena>(
             } else if is_spl_object_storage {
                 get_never()
             } else {
-                base_type.first().map(|(_, constraint)| constraint).cloned().unwrap_or_else(get_never)
+                base_type.constraint.clone()
             };
 
             resolved_template_types.push(template_type);
@@ -413,13 +414,7 @@ fn analyze_class_instantiation<'ctx, 'arena>(
             metadata
                 .template_types
                 .iter()
-                .map(|(_, map)| {
-                    if is_spl_object_storage {
-                        get_never()
-                    } else {
-                        map.iter().next().map(|(_, i)| i).cloned().unwrap_or_else(get_never)
-                    }
-                })
+                .map(|(_, template)| if is_spl_object_storage { get_never() } else { template.constraint.clone() })
                 .collect(),
         );
     }

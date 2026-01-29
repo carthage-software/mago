@@ -208,7 +208,7 @@ fn subtract_complex_type(
                     continue;
                 }
 
-                for (enum_case, _) in &enum_metadata.enum_cases {
+                for enum_case in enum_metadata.enum_cases.keys() {
                     if enum_case == assertion_case {
                         continue;
                     }

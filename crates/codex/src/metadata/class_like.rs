@@ -18,14 +18,16 @@ use crate::metadata::enum_case::EnumCaseMetadata;
 use crate::metadata::flags::MetadataFlags;
 use crate::metadata::property::PropertyMetadata;
 use crate::metadata::ttype::TypeMetadata;
-use crate::misc::GenericParent;
 use crate::symbol::SymbolKind;
 use crate::ttype::atomic::TAtomic;
+use crate::ttype::template::GenericTemplate;
 use crate::ttype::template::variance::Variance;
 use crate::ttype::union::TUnion;
 use crate::visibility::Visibility;
 
-type TemplateTuple = (Atom, Vec<(GenericParent, TUnion)>);
+/// Type alias for template types stored in metadata.
+/// Maps template parameter names to their defining entity and constraint type.
+pub type TemplateTypes = IndexMap<Atom, GenericTemplate, RandomState>;
 
 /// Contains comprehensive metadata for a PHP class-like structure (class, interface, trait, enum).
 ///
@@ -50,7 +52,7 @@ pub struct ClassLikeMetadata {
     pub child_class_likes: Option<AtomSet>,
     pub name_span: Option<Span>,
     pub kind: SymbolKind,
-    pub template_types: Vec<TemplateTuple>,
+    pub template_types: TemplateTypes,
     pub template_readonly: AtomSet,
     pub template_variance: HashMap<usize, Variance>,
     pub template_extended_offsets: AtomMap<Vec<TUnion>>,
@@ -136,7 +138,7 @@ impl ClassLikeMetadata {
             template_extended_offsets: AtomMap::default(),
             template_type_implements_count: AtomMap::default(),
             template_type_uses_count: AtomMap::default(),
-            template_types: Vec::default(),
+            template_types: TemplateTypes::default(),
             used_traits: AtomSet::default(),
             trait_alias_map: AtomMap::default(),
             trait_visibility_map: AtomMap::default(),
@@ -167,39 +169,36 @@ impl ClassLikeMetadata {
     #[inline]
     #[must_use]
     pub fn get_template_type_names(&self) -> Vec<Atom> {
-        self.template_types.iter().map(|(name, _)| *name).collect()
+        self.template_types.keys().copied().collect()
     }
 
     /// Returns type parameters for a specific generic parameter name.
     #[inline]
     #[must_use]
-    pub fn get_template_type(&self, name: &Atom) -> Option<&Vec<(GenericParent, TUnion)>> {
-        self.template_types.iter().find_map(|(param_name, types)| if param_name == name { Some(types) } else { None })
+    pub fn get_template_type(&self, name: &Atom) -> Option<&GenericTemplate> {
+        self.template_types.get(name)
     }
 
     /// Returns type parameters for a specific generic parameter name with its index.
     #[inline]
     #[must_use]
-    pub fn get_template_type_with_index(&self, name: &Atom) -> Option<(usize, &Vec<(GenericParent, TUnion)>)> {
-        self.template_types
-            .iter()
-            .enumerate()
-            .find_map(|(index, (param_name, types))| if param_name == name { Some((index, types)) } else { None })
+    pub fn get_template_type_with_index(&self, name: &Atom) -> Option<(usize, &GenericTemplate)> {
+        self.template_types.get_full(name).map(|(index, _, types)| (index, types))
     }
 
     #[must_use]
-    pub fn get_template_for_index(&self, index: usize) -> Option<(Atom, &Vec<(GenericParent, TUnion)>)> {
-        self.template_types.get(index).map(|(name, types)| (*name, types))
+    pub fn get_template_for_index(&self, index: usize) -> Option<(Atom, &GenericTemplate)> {
+        self.template_types.get_index(index).map(|(name, types)| (*name, types))
     }
 
     #[must_use]
     pub fn get_template_name_for_index(&self, index: usize) -> Option<Atom> {
-        self.template_types.get(index).map(|(name, _)| *name)
+        self.template_types.get_index(index).map(|(name, _)| *name)
     }
 
     #[must_use]
     pub fn get_template_index_for_name(&self, name: &Atom) -> Option<usize> {
-        self.template_types.iter().position(|(param_name, _)| param_name == name)
+        self.template_types.get_index_of(name)
     }
 
     /// Checks if a specific parent is either a parent class or interface.
@@ -301,8 +300,8 @@ impl ClassLikeMetadata {
 
     /// Adds a single template type definition.
     #[inline]
-    pub fn add_template_type(&mut self, template: TemplateTuple) {
-        self.template_types.push(template);
+    pub fn add_template_type(&mut self, name: Atom, constraint: GenericTemplate) {
+        self.template_types.insert(name, constraint);
     }
 
     /// Adds or updates the variance for a specific parameter index. Returns the previous variance if one existed.

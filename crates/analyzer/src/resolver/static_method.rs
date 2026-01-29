@@ -465,7 +465,7 @@ fn get_metadata_object<'ctx>(
                 class_like_metadata
                     .template_types
                     .iter()
-                    .map(|(parameter_name, template_map)| {
+                    .map(|(parameter_name, template)| {
                         if let Some(parameter) = get_specialized_template_type(
                             context.codebase,
                             parameter_name,
@@ -475,15 +475,13 @@ fn get_metadata_object<'ctx>(
                         ) {
                             parameter
                         } else {
-                            let (defining_entry, constraint) = unsafe {
-                                // SAFETY: `template_map` is guaranteed to have at least one entry
-                                template_map.iter().next().unwrap_unchecked()
-                            };
+                            let defining_entity = &template.defining_entity;
+                            let constraint = &template.constraint;
 
                             wrap_atomic(TAtomic::GenericParameter(TGenericParameter {
                                 parameter_name: *parameter_name,
                                 constraint: Box::new(constraint.clone()),
-                                defining_entity: *defining_entry,
+                                defining_entity: *defining_entity,
                                 intersection_types: None,
                             }))
                         }

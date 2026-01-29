@@ -76,7 +76,7 @@ impl TValueOf {
                     };
 
                     if class_like_metadata.kind.is_enum() {
-                        for (_, case_metadata) in &class_like_metadata.enum_cases {
+                        for case_metadata in class_like_metadata.enum_cases.values() {
                             if let Some(case_value_type) = case_metadata.value_type.as_ref() {
                                 value_types.push(case_value_type.clone());
                             }

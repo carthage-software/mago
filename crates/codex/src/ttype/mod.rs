@@ -775,11 +775,12 @@ pub fn get_named_object(name: Atom, type_resolution_context: Option<&TypeResolut
     if let Some(type_resolution_context) = type_resolution_context
         && let Some(defining_entities) = type_resolution_context.get_template_definition(&name)
     {
+        let first = &defining_entities[0];
         return wrap_atomic(TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::Generic {
             kind: TClassLikeStringKind::Class,
             parameter_name: name,
-            defining_entity: defining_entities[0].0,
-            constraint: Box::new((*(defining_entities[0].1.get_single())).clone()),
+            defining_entity: first.defining_entity,
+            constraint: Box::new((*(first.constraint.get_single())).clone()),
         })));
     }
 
@@ -1216,12 +1217,12 @@ pub fn get_iterable_parameters(atomic: &TAtomic, codebase: &CodebaseMetadata) ->
                 }
 
                 let traversable_metadata = codebase.get_class_like(&traversable)?;
-                let key_template = traversable_metadata.template_types.first().map(|(name, _)| name)?;
-                let value_template = traversable_metadata.template_types.get(1).map(|(name, _)| name)?;
+                let key_template = traversable_metadata.template_types.get_index(0).map(|(name, _)| *name)?;
+                let value_template = traversable_metadata.template_types.get_index(1).map(|(name, _)| *name)?;
 
                 let key_type = get_specialized_template_type(
                     codebase,
-                    key_template,
+                    &key_template,
                     &traversable,
                     class_metadata,
                     object.get_type_parameters(),
@@ -1230,7 +1231,7 @@ pub fn get_iterable_parameters(atomic: &TAtomic, codebase: &CodebaseMetadata) ->
 
                 let value_type = get_specialized_template_type(
                     codebase,
-                    value_template,
+                    &value_template,
                     &traversable,
                     class_metadata,
                     object.get_type_parameters(),
@@ -1334,11 +1335,11 @@ pub fn get_iterable_value_parameter(atomic: &TAtomic, codebase: &CodebaseMetadat
             }
 
             let traversable_metadata = codebase.get_class_like(&traversable)?;
-            let value_template = traversable_metadata.template_types.get(1).map(|(name, _)| name)?;
+            let value_template = traversable_metadata.template_types.get_index(1).map(|(name, _)| *name)?;
 
             get_specialized_template_type(
                 codebase,
-                value_template,
+                &value_template,
                 &traversable,
                 class_metadata,
                 object.get_type_parameters(),
@@ -1416,8 +1417,8 @@ pub fn get_specialized_template_type(
         let index = instantiated_class_metadata.get_template_index_for_name(template_name)?;
 
         let Some(instantiated_type_parameters) = instantiated_type_parameters else {
-            let type_map = instantiated_class_metadata.get_template_type(template_name)?;
-            let mut result = type_map.first().map(|(_, constraint)| constraint).cloned()?;
+            let template = instantiated_class_metadata.get_template_type(template_name)?;
+            let mut result = template.constraint.clone();
 
             expander::expand_union(codebase, &mut result, &TypeExpansionOptions::default());
 
@@ -1431,24 +1432,17 @@ pub fn get_specialized_template_type(
         return Some(result);
     }
 
-    let defining_template_type = defining_class_metadata.get_template_type(template_name)?;
-    let template_union = TUnion::from_vec(
-        defining_template_type
-            .iter()
-            .map(|(defining_entity, constraint)| {
-                TAtomic::GenericParameter(TGenericParameter {
-                    parameter_name: *template_name,
-                    defining_entity: *defining_entity,
-                    constraint: Box::new(constraint.clone()),
-                    intersection_types: None,
-                })
-            })
-            .collect::<Vec<_>>(),
-    );
+    let template = defining_class_metadata.get_template_type(template_name)?;
+    let template_union = wrap_atomic(TAtomic::GenericParameter(TGenericParameter {
+        parameter_name: *template_name,
+        defining_entity: template.defining_entity,
+        constraint: Box::new(template.constraint.clone()),
+        intersection_types: None,
+    }));
 
     let mut template_result = TemplateResult::default();
-    for (defining_class, type_parameters_map) in &instantiated_class_metadata.template_extended_parameters {
-        for (parameter_name, parameter_type) in type_parameters_map {
+    for (defining_class, template_parameters) in &instantiated_class_metadata.template_extended_parameters {
+        for (parameter_name, parameter_type) in template_parameters {
             template_result.add_lower_bound(
                 *parameter_name,
                 GenericParent::ClassLike(*defining_class),

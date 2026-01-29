@@ -5,6 +5,7 @@ use indexmap::IndexMap;
 use mago_atom::Atom;
 use mago_atom::AtomMap;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
+use mago_codex::metadata::class_like::TemplateTypes;
 use mago_codex::misc::GenericParent;
 use mago_codex::ttype::add_optional_union_type;
 use mago_codex::ttype::atomic::TAtomic;
@@ -13,6 +14,7 @@ use mago_codex::ttype::expander;
 use mago_codex::ttype::expander::StaticClassType;
 use mago_codex::ttype::expander::TypeExpansionOptions;
 use mago_codex::ttype::get_mixed;
+use mago_codex::ttype::template::GenericTemplate;
 use mago_codex::ttype::union::TUnion;
 use mago_codex::ttype::wrap_atomic;
 
@@ -52,13 +54,14 @@ pub fn get_template_types_for_class_member(
     declaring_class_meta: Option<&ClassLikeMetadata>,
     appearing_class_name: Option<Atom>,
     calling_class_meta: Option<&ClassLikeMetadata>,
-    existing_template_types: &[(Atom, Vec<(GenericParent, TUnion)>)],
-    class_template_parameters: &IndexMap<Atom, Vec<(GenericParent, TUnion)>, RandomState>,
+    existing_template_types: &TemplateTypes,
+    class_template_parameters: &IndexMap<Atom, Vec<GenericTemplate>, RandomState>,
 ) -> TemplateLowerBounds {
     let codebase = context.codebase;
 
-    let mut template_types: IndexMap<Atom, Vec<(GenericParent, TUnion)>, RandomState> =
-        existing_template_types.iter().cloned().collect();
+    // Convert existing_template_types to internal Vec-based format for accumulation
+    let mut template_types: IndexMap<Atom, Vec<GenericTemplate>, RandomState> =
+        existing_template_types.iter().map(|(name, template)| (*name, vec![template.clone()])).collect();
 
     if let Some(declaring_class_meta) = declaring_class_meta {
         let declaring_class_name = declaring_class_meta.name;
@@ -109,21 +112,25 @@ pub fn get_template_types_for_class_member(
                         template_types
                             .entry(*template_name)
                             .or_default()
-                            .push((GenericParent::ClassLike(declaring_class_name), resolved_type));
+                            .push(GenericTemplate::new(GenericParent::ClassLike(declaring_class_name), resolved_type));
                     }
                 }
             }
         } else if !declaring_class_meta.template_types.is_empty() {
-            for (template_name, type_map) in &declaring_class_meta.template_types {
-                for (defining_parent, default_type) in type_map {
-                    let concrete_type = class_template_parameters.get(template_name).and_then(|parameters| {
-                        parameters.iter().find(|(p, _)| p == defining_parent).map(|(_, t)| t.clone())
-                    });
+            for (template_name, template) in &declaring_class_meta.template_types {
+                let concrete_type = class_template_parameters.get(template_name).and_then(|parameters| {
+                    parameters
+                        .iter()
+                        .find(|t| t.defining_entity == template.defining_entity)
+                        .map(|t| t.constraint.clone())
+                });
 
-                    let resolved_type = concrete_type.unwrap_or_else(|| default_type.clone());
+                let resolved_type = concrete_type.unwrap_or_else(|| template.constraint.clone());
 
-                    template_types.entry(*template_name).or_default().push((*defining_parent, resolved_type));
-                }
+                template_types
+                    .entry(*template_name)
+                    .or_default()
+                    .push(GenericTemplate::new(template.defining_entity, resolved_type));
             }
         }
     }
@@ -133,10 +140,10 @@ pub fn get_template_types_for_class_member(
         let final_map_entry: &mut HashMap<GenericParent, TUnion> =
             expanded_template_types.entry(template_name).or_default();
 
-        for (generic_parent, mut expanded_union) in type_map_vec {
+        for GenericTemplate { defining_entity: template_source, constraint: mut template_type } in type_map_vec {
             expander::expand_union(
                 codebase,
-                &mut expanded_union,
+                &mut template_type,
                 &TypeExpansionOptions {
                     self_class: appearing_class_name,
                     static_class_type: if let Some(calling_meta) = calling_class_meta {
@@ -151,7 +158,7 @@ pub fn get_template_types_for_class_member(
                 },
             );
 
-            final_map_entry.insert(generic_parent, expanded_union);
+            final_map_entry.insert(template_source, template_type);
         }
     }
 
@@ -174,13 +181,13 @@ pub fn get_generic_parameter_for_offset(
     class_like_name: Atom,
     template_name: Atom,
     template_extended_parameters: &AtomMap<IndexMap<Atom, TUnion, RandomState>>,
-    found_generic_parameters: &AtomMap<Vec<(GenericParent, TUnion)>>,
+    found_generic_parameters: &AtomMap<Vec<GenericTemplate>>,
 ) -> TUnion {
     if let Some(result_map) = found_generic_parameters.get(&template_name)
         && let Some(found_parameter_type) = result_map
             .iter()
-            .find(|(parent, _)| parent == &GenericParent::ClassLike(class_like_name))
-            .map(|(_, type_arc)| type_arc)
+            .find(|t| t.defining_entity == GenericParent::ClassLike(class_like_name))
+            .map(|t| &t.constraint)
     {
         return found_parameter_type.clone();
     }

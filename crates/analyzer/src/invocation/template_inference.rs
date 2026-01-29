@@ -625,7 +625,7 @@ fn infer_templates_from_input_and_container_types(
                         for generic_parameter in generic_parameters {
                             has_direct_generic = true;
 
-                            let Some((template_name, _)) = container_meta.template_types.get(index) else {
+                            let Some((template_name, _)) = container_meta.template_types.get_index(index) else {
                                 continue;
                             };
 
@@ -735,11 +735,11 @@ fn infer_templates_from_input_and_container_types(
                 }
 
                 if let Some(template_types) = template_result.template_types.get(parameter_name) {
-                    for (_, template_type) in template_types {
+                    for template in template_types {
                         if !union_comparator::is_contained_by(
                             context.codebase,
                             &lower_bound_type,
-                            template_type,
+                            &template.constraint,
                             false,
                             false,
                             false,
@@ -748,7 +748,7 @@ fn infer_templates_from_input_and_container_types(
                             violations.push(TemplateInferenceViolation {
                                 template_name: *parameter_name,
                                 inferred_bound: lower_bound_type.clone(),
-                                constraint: template_type.clone(),
+                                constraint: template.constraint.clone(),
                             });
                         }
                     }
@@ -804,9 +804,9 @@ fn infer_templates_from_input_and_container_types(
         let mut constraint_has_unresolved_templates = false;
 
         if let Some(template_types) = template_result.template_types.get(template_parameter_name) {
-            for (_, template_type) in template_types {
+            for template in template_types {
                 let resolved_template_type =
-                    inferred_type_replacer::replace(template_type, template_result, context.codebase);
+                    inferred_type_replacer::replace(&template.constraint, template_result, context.codebase);
 
                 if resolved_template_type.has_template_types() {
                     constraint_has_unresolved_templates = true;

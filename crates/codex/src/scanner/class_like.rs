@@ -33,6 +33,7 @@ use crate::identifier::method::MethodIdentifier;
 use crate::issue::ScanningIssueKind;
 use crate::metadata::CodebaseMetadata;
 use crate::metadata::class_like::ClassLikeMetadata;
+use crate::metadata::class_like::TemplateTypes;
 use crate::metadata::flags::MetadataFlags;
 use crate::metadata::function_like::FunctionLikeKind;
 use crate::metadata::function_like::FunctionLikeMetadata;
@@ -66,6 +67,7 @@ use crate::ttype::get_named_object;
 use crate::ttype::get_non_empty_list;
 use crate::ttype::get_string;
 use crate::ttype::resolution::TypeResolutionContext;
+use crate::ttype::template::GenericTemplate;
 use crate::ttype::template::variance::Variance;
 use crate::ttype::union::TUnion;
 use crate::visibility::Visibility;
@@ -485,10 +487,10 @@ fn scan_class_like<'arena>(
                 get_mixed()
             };
 
-            let definition = vec![(GenericParent::ClassLike(name), template_as_type)];
+            let definition = GenericTemplate::new(GenericParent::ClassLike(name), template_as_type);
 
-            class_like_metadata.add_template_type((template_name, definition.clone()));
-            type_context = type_context.with_template_definition(template_name, definition);
+            class_like_metadata.add_template_type(template_name, definition.clone());
+            type_context = type_context.with_template_definition(template_name, vec![definition]);
 
             let variance = if template.covariant {
                 Variance::Covariant
@@ -1445,7 +1447,7 @@ fn create_enum_from_method(enum_name: &str, enum_method_span: Span, backing_type
             TUnion::from_vec(vec![TAtomic::Object(TObject::Enum(TEnum { name: atom(enum_name), case: None }))]),
             enum_method_span,
         )),
-        template_types: vec![],
+        template_types: TemplateTypes::default(),
         attributes: vec![],
         method_metadata: Some(MethodMetadata {
             is_final: true,
@@ -1501,7 +1503,7 @@ fn create_enum_try_from_method(enum_name: &str, enum_method_span: Span, backing_
             ]),
             enum_method_span,
         )),
-        template_types: vec![],
+        template_types: TemplateTypes::default(),
         attributes: vec![],
         method_metadata: Some(MethodMetadata {
             is_final: true,
@@ -1558,7 +1560,7 @@ fn create_enum_cases_method(enum_name: &str, enum_method_span: Span, has_cases: 
             },
             enum_method_span,
         )),
-        template_types: vec![],
+        template_types: TemplateTypes::default(),
         attributes: vec![],
         method_metadata: Some(MethodMetadata {
             is_final: true,

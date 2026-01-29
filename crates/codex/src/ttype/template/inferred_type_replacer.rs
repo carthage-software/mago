@@ -195,15 +195,15 @@ fn replace_template_parameter(
 
         template_type = Some(template_type_inner);
     } else {
-        for template_type_map in inferred_lower_bounds.values() {
-            for map_defining_entity in template_type_map.keys() {
-                if let GenericParent::ClassLike(classlike_name) = map_defining_entity
+        for lower_bounds_by_source in inferred_lower_bounds.values() {
+            for defining_entity in lower_bounds_by_source.keys() {
+                if let GenericParent::ClassLike(classlike_name) = defining_entity
                     && let Some(metadata) = codebase.get_class_like(classlike_name)
                     && let Some(extended_parameter_map) = metadata.template_extended_parameters.get(&metadata.name)
                     && let Some(param) = extended_parameter_map.get(&key)
                     && let TAtomic::GenericParameter(TGenericParameter { parameter_name, .. }) = param.get_single()
                     && let Some(bounds_map) = inferred_lower_bounds.get(parameter_name)
-                    && let Some(bounds) = bounds_map.get(map_defining_entity)
+                    && let Some(bounds) = bounds_map.get(defining_entity)
                 {
                     template_type = Some(standin_type_replacer::get_most_specific_type_from_bounds(bounds, codebase));
                 }

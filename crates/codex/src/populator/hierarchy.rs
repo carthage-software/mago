@@ -324,10 +324,10 @@ pub fn populate_class_like_types(
         }
     }
 
-    for v in metadata.template_types.iter_mut().flat_map(|m| m.1.iter_mut()).map(|template| &mut template.1) {
-        if v.needs_population() || force_repopulation {
+    for template in metadata.template_types.values_mut() {
+        if template.constraint.needs_population() || force_repopulation {
             populate_union_type(
-                v,
+                &mut template.constraint,
                 codebase_symbols,
                 Some(&class_like_reference_source),
                 symbol_references,

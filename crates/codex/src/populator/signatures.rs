@@ -106,26 +106,24 @@ pub fn populate_function_like_metadata(
         }
     }
 
-    for (_, type_parameter_map) in &mut metadata.template_types {
-        for (_, type_parameter) in type_parameter_map {
-            if force_type_population || type_parameter.needs_population() {
-                populate_union_type(
-                    type_parameter,
-                    codebase_symbols,
-                    Some(reference_source),
-                    symbol_references,
-                    force_type_population,
-                );
-            }
+    for template in metadata.template_types.values_mut() {
+        if force_type_population || template.constraint.needs_population() {
+            populate_union_type(
+                &mut template.constraint,
+                codebase_symbols,
+                Some(reference_source),
+                symbol_references,
+                force_type_population,
+            );
         }
     }
 
     if let Some(type_resolution_context) = metadata.type_resolution_context.as_mut() {
-        for (_, type_parameter_map) in type_resolution_context.get_template_definitions_mut() {
-            for (_, type_parameter) in type_parameter_map {
-                if force_type_population || type_parameter.needs_population() {
+        for type_parameter_map in type_resolution_context.get_template_definitions_mut().values_mut() {
+            for template in type_parameter_map {
+                if force_type_population || template.constraint.needs_population() {
                     populate_union_type(
-                        type_parameter,
+                        &mut template.constraint,
                         codebase_symbols,
                         Some(reference_source),
                         symbol_references,

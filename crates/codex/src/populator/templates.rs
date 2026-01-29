@@ -30,18 +30,16 @@ pub fn extend_template_parameters(metadata: &mut ClassLikeMetadata, parent_metad
             }
 
             let current_child_extended_params = metadata.template_extended_parameters.clone();
-            for (grandparent_fqcn, type_map) in &parent_metadata.template_extended_parameters {
-                for (template_name, type_to_resolve_arc) in type_map {
+            for (grandparent_fqcn, extended_parameters) in &parent_metadata.template_extended_parameters {
+                for (template_name, type_to_resolve_arc) in extended_parameters {
                     let resolved_type = extend_type(type_to_resolve_arc, &current_child_extended_params);
 
                     metadata.add_template_extended_parameter(*grandparent_fqcn, *template_name, resolved_type);
                 }
             }
         } else {
-            for (parameter_name, parameter_type_map) in &parent_metadata.template_types {
-                for (_, parameter_type) in parameter_type_map {
-                    metadata.add_template_extended_parameter(parent_name, *parameter_name, parameter_type.clone());
-                }
+            for (parameter_name, template) in &parent_metadata.template_types {
+                metadata.add_template_extended_parameter(parent_name, *parameter_name, template.constraint.clone());
             }
 
             metadata.extend_template_extended_parameters(parent_metadata.template_extended_parameters.clone());

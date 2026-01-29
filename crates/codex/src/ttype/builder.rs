@@ -27,7 +27,6 @@ use mago_type_syntax::ast::Type;
 use mago_type_syntax::ast::UnionType;
 use mago_type_syntax::ast::object::ObjectType;
 
-use crate::misc::GenericParent;
 use crate::ttype::TType;
 use crate::ttype::atomic::TAtomic;
 use crate::ttype::atomic::alias::TAlias;
@@ -95,6 +94,7 @@ use crate::ttype::get_unspecified_literal_int;
 use crate::ttype::get_unspecified_literal_string;
 use crate::ttype::get_void;
 use crate::ttype::resolution::TypeResolutionContext;
+use crate::ttype::template::GenericTemplate;
 use crate::ttype::union::TUnion;
 use crate::ttype::wrap_atomic;
 
@@ -804,10 +804,11 @@ fn get_reference_from_ast<'i>(
 
         classname.unwrap_or_else(|| atom("static"))
     } else {
-        if let Some(defining_entities) = type_context.get_template_definition(reference_name)
+        let reference_name_atom = atom(reference_name);
+        if let Some(defining_entities) = type_context.get_template_definition(&reference_name_atom)
             && generics.is_none()
         {
-            return Ok(get_template_atomic(defining_entities, atom(reference_name)));
+            return Ok(get_template_atomic(defining_entities, reference_name_atom));
         }
 
         let (fq_reference_name, _) = scope.resolve(NameKind::Default, reference_name);
@@ -992,13 +993,13 @@ fn get_class_string_type_from_ast(
 }
 
 #[inline]
-fn get_template_atomic(defining_entities: &[(GenericParent, TUnion)], parameter_name: Atom) -> TAtomic {
-    let (defining_entity, constraint) = &defining_entities[0];
+fn get_template_atomic(defining_entities: &[GenericTemplate], parameter_name: Atom) -> TAtomic {
+    let GenericTemplate { defining_entity: template_source, constraint: template_type } = &defining_entities[0];
 
     TAtomic::GenericParameter(TGenericParameter {
         parameter_name,
-        constraint: Box::new(constraint.clone()),
-        defining_entity: *defining_entity,
+        constraint: Box::new(template_type.clone()),
+        defining_entity: *template_source,
         intersection_types: None,
     })
 }

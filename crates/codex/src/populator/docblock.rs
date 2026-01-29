@@ -258,11 +258,11 @@ pub fn inherit_method_docblocks(codebase: &mut CodebaseMetadata) {
             continue;
         };
 
-        let template_map = child_class.template_extended_parameters.get(&parent_class);
+        let parent_template_params = child_class.template_extended_parameters.get(&parent_class);
 
-        let template_result = template_map.map(|template_map| {
+        let template_result = parent_template_params.map(|parent_params| {
             let mut template_result = TemplateResult::default();
-            for (template_name, concrete_type) in template_map {
+            for (template_name, concrete_type) in parent_params {
                 template_result.add_lower_bound(
                     *template_name,
                     GenericParent::ClassLike(parent_class),

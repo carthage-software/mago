@@ -30,7 +30,6 @@ use crate::ttype::atomic::reference::TReferenceMemberSelector;
 use crate::ttype::atomic::scalar::TScalar;
 use crate::ttype::atomic::scalar::class_like_string::TClassLikeString;
 use crate::ttype::combiner;
-use crate::ttype::get_mixed;
 use crate::ttype::union::TUnion;
 
 thread_local! {
@@ -470,9 +469,7 @@ fn should_use_static_type_params(named: &TNamedObject, static_obj: &TNamedObject
     let templates = &class_metadata.template_types;
 
     current_params.len() == templates.len()
-        && current_params.iter().zip(templates.iter()).all(|(current, (_, template_map))| {
-            template_map.iter().next().map_or_else(|| current.is_mixed(), |(_, bound)| current == bound)
-        })
+        && current_params.iter().zip(templates.values()).all(|(current, template)| current == &template.constraint)
 }
 
 /// Expands existing type parameters or fills them with default template bounds.
@@ -498,11 +495,8 @@ fn expand_or_fill_type_parameters(
         return;
     }
 
-    let defaults: Vec<TUnion> = class_metadata
-        .template_types
-        .iter()
-        .map(|(_, template_map)| template_map.iter().next().map_or_else(get_mixed, |(_, t)| t.clone()))
-        .collect();
+    let defaults: Vec<TUnion> =
+        class_metadata.template_types.values().map(|template| template.constraint.clone()).collect();
 
     named.type_parameters = Some(defaults);
 }

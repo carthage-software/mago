@@ -646,7 +646,7 @@ fn update_template_types(
                         .template_types
                         .iter()
                         .enumerate()
-                        .filter(|(_, (k, _))| k == parameter_name)
+                        .filter(|(_, (k, _))| *k == parameter_name)
                         .map(|(i, _)| i)
                         .next();
 

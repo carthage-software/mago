@@ -32,6 +32,7 @@ use crate::scanner::ttype::merge_type_preserving_nullability;
 use crate::ttype::builder;
 use crate::ttype::get_mixed;
 use crate::ttype::resolution::TypeResolutionContext;
+use crate::ttype::template::GenericTemplate;
 use crate::visibility::Visibility;
 
 #[inline]
@@ -367,10 +368,10 @@ fn scan_function_like_docblock(
             get_mixed()
         };
 
-        let definition = vec![(GenericParent::FunctionLike(functionlike_id), template_as_type)];
+        let definition = GenericTemplate::new(GenericParent::FunctionLike(functionlike_id), template_as_type);
 
-        metadata.add_template_type((template_name, definition.clone()));
-        type_context = type_context.with_template_definition(template_name, definition);
+        metadata.add_template_type(template_name, definition.clone());
+        type_context = type_context.with_template_definition(template_name, vec![definition]);
     }
 
     for parameter_tag in docblock.parameters {

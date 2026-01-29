@@ -955,17 +955,18 @@ pub(crate) fn handle_array_access_on_named_object(
                 break 'metadata None;
             };
 
-            let Some(key_template_name) = array_access_metadata.template_types.first().map(|(name, _)| name) else {
+            let Some(key_template_name) = array_access_metadata.template_types.first().map(|(name, _)| *name) else {
                 break 'metadata None;
             };
 
-            let Some(value_template_name) = array_access_metadata.template_types.get(1).map(|(name, _)| name) else {
+            let Some(value_template_name) = array_access_metadata.template_types.get_index(1).map(|(name, _)| *name)
+            else {
                 break 'metadata None;
             };
 
             let key_type = get_specialized_template_type(
                 context.codebase,
-                key_template_name,
+                &key_template_name,
                 &array_access,
                 metadata,
                 named_object.get_type_parameters(),
@@ -974,7 +975,7 @@ pub(crate) fn handle_array_access_on_named_object(
 
             let value_type = get_specialized_template_type(
                 context.codebase,
-                value_template_name,
+                &value_template_name,
                 &array_access,
                 metadata,
                 named_object.get_type_parameters(),

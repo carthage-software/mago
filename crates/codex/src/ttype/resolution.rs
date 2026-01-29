@@ -4,7 +4,7 @@ use mago_atom::AtomSet;
 use serde::Deserialize;
 use serde::Serialize;
 
-use crate::misc::GenericParent;
+use crate::ttype::template::GenericTemplate;
 use crate::ttype::union::TUnion;
 
 /// Holds contextual information necessary for resolving generic template types (`@template`).
@@ -15,11 +15,11 @@ use crate::ttype::union::TUnion;
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TypeResolutionContext {
     /// Definitions of template types available in this context, including their constraints.
-    template_definitions: Vec<(Atom, Vec<(GenericParent, TUnion)>)>,
+    template_definitions: AtomMap<Vec<GenericTemplate>>,
 
     /// Concrete types that template parameters (often from an outer scope) resolve to
     /// within this specific context.
-    resolved_template_types: Vec<(Atom, TUnion)>,
+    resolved_template_types: AtomMap<TUnion>,
 
     /// Type aliases defined in the current class scope (from @type tags).
     type_aliases: AtomSet,
@@ -41,8 +41,8 @@ impl TypeResolutionContext {
     #[must_use]
     pub fn new() -> Self {
         Self {
-            template_definitions: vec![],
-            resolved_template_types: vec![],
+            template_definitions: AtomMap::default(),
+            resolved_template_types: AtomMap::default(),
             type_aliases: AtomSet::default(),
             imported_type_aliases: AtomMap::default(),
         }
@@ -63,10 +63,10 @@ impl TypeResolutionContext {
     /// # Arguments
     ///
     /// * `name`: The name of the template parameter (e.g., `"T"`).
-    /// * `constraints`: A list of constraints, each specifying the origin (parent) and the constraint type.
+    /// * `constraints`: A list of constraints for the template parameter.
     #[must_use]
-    pub fn with_template_definition(mut self, name: Atom, constraints: Vec<(GenericParent, TUnion)>) -> Self {
-        self.template_definitions.push((name, constraints));
+    pub fn with_template_definition(mut self, name: Atom, constraints: Vec<GenericTemplate>) -> Self {
+        self.template_definitions.insert(name, constraints);
         self
     }
 
@@ -79,33 +79,33 @@ impl TypeResolutionContext {
     /// * `resolved_type`: The concrete `TUnion` type that `name` resolves to here.
     #[must_use]
     pub fn with_resolved_template_type(mut self, name: Atom, resolved_type: TUnion) -> Self {
-        self.resolved_template_types.push((name, resolved_type));
+        self.resolved_template_types.insert(name, resolved_type);
         self
     }
 
-    /// Returns a slice of the defined template parameters and their constraints for this context.
+    /// Returns a reference to the template definitions map.
     #[inline]
     #[must_use]
-    pub fn get_template_definitions(&self) -> &[(Atom, Vec<(GenericParent, TUnion)>)] {
+    pub fn get_template_definitions(&self) -> &AtomMap<Vec<GenericTemplate>> {
         &self.template_definitions
     }
 
-    /// Returns a mutable slice of the defined template parameters and their constraints for this context.
+    /// Returns a mutable reference to the template definitions map.
     #[inline]
-    pub fn get_template_definitions_mut(&mut self) -> &mut [(Atom, Vec<(GenericParent, TUnion)>)] {
+    pub fn get_template_definitions_mut(&mut self) -> &mut AtomMap<Vec<GenericTemplate>> {
         &mut self.template_definitions
     }
 
-    /// Returns a slice of the template parameters that have resolved to concrete types in this context.
+    /// Returns a reference to the resolved template types map.
     #[inline]
     #[must_use]
-    pub fn get_resolved_template_types(&self) -> &[(Atom, TUnion)] {
+    pub fn get_resolved_template_types(&self) -> &AtomMap<TUnion> {
         &self.resolved_template_types
     }
 
-    /// Returns a mutable slice of the template parameters that have resolved to concrete types in this context.
+    /// Returns a mutable reference to the resolved template types map.
     #[inline]
-    pub fn get_resolved_template_types_mut(&mut self) -> &mut [(Atom, TUnion)] {
+    pub fn get_resolved_template_types_mut(&mut self) -> &mut AtomMap<TUnion> {
         &mut self.resolved_template_types
     }
 
@@ -119,8 +119,8 @@ impl TypeResolutionContext {
     ///
     /// `Some` containing a reference to the vector of constraints if the template is defined, `None` otherwise.
     #[must_use]
-    pub fn get_template_definition(&self, name: &str) -> Option<&Vec<(GenericParent, TUnion)>> {
-        self.template_definitions.iter().find(|(n, _)| n == name).map(|(_, constraints)| constraints)
+    pub fn get_template_definition(&self, name: &Atom) -> Option<&Vec<GenericTemplate>> {
+        self.template_definitions.get(name)
     }
 
     /// Checks if a specific template parameter is defined in this context.
@@ -133,8 +133,8 @@ impl TypeResolutionContext {
     ///
     /// `true` if the template parameter is defined, `false` otherwise.
     #[must_use]
-    pub fn has_template_definition(&self, name: &str) -> bool {
-        self.template_definitions.iter().any(|(n, _)| n == name)
+    pub fn has_template_definition(&self, name: &Atom) -> bool {
+        self.template_definitions.contains_key(name)
     }
 
     /// Adds type aliases from a class to this context.
@@ -215,16 +215,9 @@ impl TypeResolutionContext {
     /// # Returns
     ///
     /// `Some` containing a reference to the resolved `TUnion` type if found, `None` otherwise.
-    /// Note: If multiple entries exist for the same name (due to shadowing or errors),
-    /// this currently returns the first match found.
     #[must_use]
-    pub fn get_resolved_template_type(&self, name: &str) -> Option<&TUnion> {
-        self.resolved_template_types
-            .iter()
-            // Iterate in reverse if shadowing means the *last* added binding is correct
-            // .rev()
-            .find(|(n, _)| n == name)
-            .map(|(_, resolved_type)| resolved_type)
+    pub fn get_resolved_template_type(&self, name: &Atom) -> Option<&TUnion> {
+        self.resolved_template_types.get(name)
     }
 
     /// Checks if this context contains any template definitions or resolved template types.
@@ -237,8 +230,8 @@ impl TypeResolutionContext {
     /// Checks if a specific template parameter has a concrete resolved type in this context.
     #[inline]
     #[must_use]
-    pub fn is_template_resolved(&self, name: &str) -> bool {
-        self.resolved_template_types.iter().any(|(n, _)| n == name)
+    pub fn is_template_resolved(&self, name: &Atom) -> bool {
+        self.resolved_template_types.contains_key(name)
     }
 
     /// Merges another `TypeResolutionContext` into this one, combining their template definitions

@@ -40,7 +40,6 @@ use crate::metadata::CodebaseMetadata;
 use crate::metadata::flags::MetadataFlags;
 use crate::metadata::function_like::FunctionLikeKind;
 use crate::metadata::function_like::FunctionLikeMetadata;
-use crate::misc::GenericParent;
 use crate::scanner::class_like::register_anonymous_class;
 use crate::scanner::class_like::register_class;
 use crate::scanner::class_like::register_enum;
@@ -54,7 +53,7 @@ use crate::scanner::function_like::scan_function;
 use crate::scanner::function_like::scan_method;
 use crate::scanner::property::scan_promoted_property;
 use crate::ttype::resolution::TypeResolutionContext;
-use crate::ttype::union::TUnion;
+use crate::ttype::template::GenericTemplate;
 
 mod attribute;
 mod class_like;
@@ -106,7 +105,7 @@ impl<'ctx, 'arena> Context<'ctx, 'arena> {
     }
 }
 
-type TemplateConstraint = (Atom, Vec<(GenericParent, TUnion)>);
+type TemplateConstraint = (Atom, GenericTemplate);
 type TemplateConstraintList = Vec<TemplateConstraint>;
 
 #[derive(Debug, Default)]
@@ -135,9 +134,9 @@ impl Scanner {
         }
 
         for template_constraint_list in self.template_constraints.iter().rev() {
-            for (name, constraints) in template_constraint_list {
+            for (name, constraint) in template_constraint_list {
                 if !context.has_template_definition(name) {
-                    context = context.with_template_definition(*name, constraints.clone());
+                    context = context.with_template_definition(*name, vec![constraint.clone()]);
                 }
             }
         }

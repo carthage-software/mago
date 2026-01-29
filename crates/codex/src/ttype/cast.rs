@@ -16,6 +16,7 @@ use crate::ttype::atomic::array::keyed::TKeyedArray;
 use crate::ttype::atomic::array::list::TList;
 use crate::ttype::atomic::callable::TCallable;
 use crate::ttype::atomic::object::TObject;
+use crate::ttype::template::GenericTemplate;
 use crate::ttype::template::TemplateResult;
 use crate::ttype::union::TUnion;
 
@@ -193,6 +194,6 @@ fn populate_template_result(
             .template_types
             .entry(template_name)
             .or_default()
-            .push((GenericParent::ClassLike(object_name), parameter.clone()));
+            .push(GenericTemplate::new(GenericParent::ClassLike(object_name), parameter.clone()));
     }
 }

@@ -45,11 +45,12 @@ pub fn resolve_invocation_type<'ctx, 'arena>(
                 }
             };
 
-            let method_templates = invocation.target.get_template_types().unwrap_or(&[]);
+            let method_templates = invocation.target.get_template_types();
 
             let all_template_names: Vec<_> = method_templates
-                .iter()
-                .map(|(name, _)| *name)
+                .map(|m| m.keys().copied().collect::<Vec<_>>())
+                .unwrap_or_default()
+                .into_iter()
                 .chain(template_result.template_types.keys().copied())
                 .collect();
 
@@ -61,15 +62,14 @@ pub fn resolve_invocation_type<'ctx, 'arena>(
                     .is_some_and(|bounds| !bounds.is_empty());
 
                 let method_parents: Vec<_> = method_templates
-                    .iter()
-                    .filter(|(name, _)| name == &template_name)
-                    .flat_map(|(_, constraints)| constraints.iter().map(|(parent, _)| parent))
-                    .collect();
+                    .and_then(|m| m.get(&template_name))
+                    .map(|t| vec![&t.defining_entity])
+                    .unwrap_or_default();
 
                 let result_parents: Vec<_> = template_result
                     .template_types
                     .get(&template_name)
-                    .map(|v| v.iter().map(|(parent, _)| parent).collect())
+                    .map(|v| v.iter().map(|t| &t.defining_entity).collect())
                     .unwrap_or_default();
 
                 let has_bound_for_template_parent =

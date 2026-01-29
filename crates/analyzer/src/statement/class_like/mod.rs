@@ -20,6 +20,7 @@ use mago_codex::ttype::comparator::ComparisonResult;
 use mago_codex::ttype::comparator::union_comparator;
 use mago_codex::ttype::expander::TypeExpansionOptions;
 use mago_codex::ttype::expander::expand_union;
+use mago_codex::ttype::template::GenericTemplate;
 use mago_codex::ttype::template::TemplateResult;
 use mago_codex::ttype::template::inferred_type_replacer;
 use mago_codex::ttype::template::standin_type_replacer;
@@ -1374,29 +1375,24 @@ fn check_template_parameters<'ctx>(
         && let Some(extended_parameters) = class_like_metadata.template_extended_parameters.get(&parent_metadata.name)
     {
         let mut i = 0;
-        let mut previous_extended_types: IndexMap<Atom, Vec<(GenericParent, TUnion)>, RandomState> =
-            IndexMap::default();
+        let mut previous_extended_types: IndexMap<Atom, Vec<GenericTemplate>, RandomState> = IndexMap::default();
 
         for (template_name, _) in &parent_metadata.template_types {
             if let Some(extended_type) = extended_parameters.get(template_name) {
                 previous_extended_types
                     .entry(*template_name)
                     .or_default()
-                    .push((GenericParent::ClassLike(parent_metadata.name), extended_type.clone()));
+                    .push(GenericTemplate::new(GenericParent::ClassLike(parent_metadata.name), extended_type.clone()));
             }
         }
 
-        for (template_name, template_type_map) in &parent_metadata.template_types {
+        for (template_name, parent_template) in &parent_metadata.template_types {
             let Some(mut extended_type) = extended_parameters.get(template_name).cloned() else {
                 i += 1;
                 continue;
             };
 
-            let Some(mut template_type) = template_type_map.last().map(|(_, template_type)| template_type).cloned()
-            else {
-                i += 1;
-                continue;
-            };
+            let mut template_type = parent_template.constraint.clone();
 
             expand_union(
                 context.codebase,
@@ -1464,8 +1460,8 @@ fn check_template_parameters<'ctx>(
                                 .with_help(format!("Change this to a template parameter defined on `{class_name}`.")),
                         );
                     } else if let Some(child_template_name) = extended_as_template
-                        && let Some(child_template_map) = class_like_metadata.get_template_type(&child_template_name)
-                        && let Some((_, child_template_type)) = child_template_map.last()
+                        && let Some(child_template) = class_like_metadata.get_template_type(&child_template_name)
+                        && let child_template_type = &child_template.constraint
                         && child_template_type.get_id() != template_type.get_id()
                     {
                         context.collector.report_with_code(
@@ -1484,7 +1480,7 @@ fn check_template_parameters<'ctx>(
                 previous_extended_types
                     .entry(*template_name)
                     .or_default()
-                    .push((GenericParent::ClassLike(parent_metadata.name), extended_type));
+                    .push(GenericTemplate::new(GenericParent::ClassLike(parent_metadata.name), extended_type));
             } else {
                 let mut template_result = TemplateResult::new(previous_extended_types.clone(), Default::default());
                 let mut replaced_template_type = standin_type_replacer::replace(
@@ -1507,7 +1503,7 @@ fn check_template_parameters<'ctx>(
                     previous_extended_types
                         .entry(*template_name)
                         .or_default()
-                        .push((GenericParent::ClassLike(parent_metadata.name), extended_type));
+                        .push(GenericTemplate::new(GenericParent::ClassLike(parent_metadata.name), extended_type));
                 } else {
                     let replaced_type_str = replaced_template_type.get_id();
 

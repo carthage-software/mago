@@ -13,10 +13,10 @@ use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::comparator::ComparisonResult;
 use mago_codex::ttype::comparator::union_comparator;
 use mago_codex::ttype::expander::StaticClassType;
+use mago_codex::ttype::template::GenericTemplate;
 use mago_codex::ttype::template::TemplateBound;
 use mago_codex::ttype::template::TemplateResult;
 use mago_codex::ttype::template::standin_type_replacer::get_most_specific_type_from_bounds;
-use mago_codex::ttype::union::TUnion;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::Span;
@@ -55,7 +55,7 @@ pub fn populate_template_result_from_invocation<'ctx, 'arena>(
     };
 
     for (template_name, template_details) in &metadata.template_types {
-        template_result.template_types.insert(*template_name, template_details.clone());
+        template_result.template_types.entry(*template_name).or_default().push(template_details.clone());
     }
 
     let Some(method_metadata) = &metadata.method_metadata else {
@@ -76,7 +76,7 @@ pub fn populate_template_result_from_invocation<'ctx, 'arena>(
 
     for (template_name, template_details) in &method_context.class_like_metadata.template_types {
         if !template_result.template_types.contains_key(template_name) {
-            template_result.template_types.insert(*template_name, template_details.clone());
+            template_result.template_types.entry(*template_name).or_default().push(template_details.clone());
         }
     }
 
@@ -136,8 +136,8 @@ pub fn populate_template_result_from_invocation<'ctx, 'arena>(
 pub(super) fn get_class_template_parameters_from_result(
     template_result: &TemplateResult,
     context: &Context<'_, '_>,
-) -> IndexMap<Atom, Vec<(GenericParent, TUnion)>, RandomState> {
-    let mut class_generic_parameters: IndexMap<Atom, Vec<(GenericParent, TUnion)>, RandomState> =
+) -> IndexMap<Atom, Vec<GenericTemplate>, RandomState> {
+    let mut class_generic_parameters: IndexMap<Atom, Vec<GenericTemplate>, RandomState> =
         IndexMap::with_hasher(RandomState::new());
 
     for (template_name, type_map) in &template_result.lower_bounds {
@@ -148,7 +148,7 @@ pub(super) fn get_class_template_parameters_from_result(
                 class_generic_parameters
                     .entry(*template_name)
                     .or_default()
-                    .push((*generic_parent, specific_bound_type));
+                    .push(GenericTemplate::new(*generic_parent, specific_bound_type));
             }
         }
     }
@@ -175,7 +175,7 @@ pub(super) fn refine_template_result_for_function_like<'ctx>(
     base_class_metadata: Option<&'ctx ClassLikeMetadata>,
     calling_class_like_metadata: Option<&'ctx ClassLikeMetadata>,
     function_like_metadata: &'ctx FunctionLikeMetadata,
-    class_template_parameters: &IndexMap<Atom, Vec<(GenericParent, TUnion)>, RandomState>,
+    class_template_parameters: &IndexMap<Atom, Vec<GenericTemplate>, RandomState>,
 ) {
     if !template_result.template_types.is_empty() {
         return;
@@ -196,7 +196,15 @@ pub(super) fn refine_template_result_for_function_like<'ctx>(
 
     template_result.template_types = resolved_template_types
         .into_iter()
-        .map(|(template_name, type_map)| (template_name, type_map.into_iter().collect()))
+        .map(|(template_name, type_map)| {
+            (
+                template_name,
+                type_map
+                    .into_iter()
+                    .map(|(source, template_type)| GenericTemplate::new(source, template_type))
+                    .collect(),
+            )
+        })
         .collect::<IndexMap<_, _, RandomState>>();
 }
 

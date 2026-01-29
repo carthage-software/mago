@@ -10,15 +10,13 @@ use mago_span::Span;
 
 use crate::assertion::Assertion;
 use crate::metadata::attribute::AttributeMetadata;
+use crate::metadata::class_like::TemplateTypes;
 use crate::metadata::flags::MetadataFlags;
 use crate::metadata::parameter::FunctionLikeParameterMetadata;
 use crate::metadata::ttype::TypeMetadata;
-use crate::misc::GenericParent;
 use crate::ttype::resolution::TypeResolutionContext;
-use crate::ttype::union::TUnion;
+use crate::ttype::template::GenericTemplate;
 use crate::visibility::Visibility;
-
-pub type TemplateTuple = (Atom, Vec<(GenericParent, TUnion)>);
 
 /// Contains metadata specific to methods defined within classes, interfaces, enums, or traits.
 ///
@@ -100,9 +98,9 @@ pub struct FunctionLikeMetadata {
     pub return_type_metadata: Option<TypeMetadata>,
 
     /// Generic type parameters (templates) defined for the function/method (e.g., `@template T`).
-    /// Stores the template name and its constraints (parent type and bound type).
-    /// Example: `[("T", [(GenericParent::Function("funcName"), Arc<TUnion::object()>)])]`
-    pub template_types: Vec<TemplateTuple>,
+    /// Stores the template name and its constraint (defining entity and bound type).
+    /// Example: `{ "T" => (GenericParent::FunctionLike(("funcName", "")), TUnion::object()) }`
+    pub template_types: TemplateTypes,
 
     /// Attributes attached to the function/method/closure declaration (`#[Attribute] function foo() {}`).
     pub attributes: Vec<AttributeMetadata>,
@@ -189,7 +187,7 @@ impl FunctionLikeMetadata {
             parameters: vec![],
             return_type_declaration_metadata: None,
             return_type_metadata: None,
-            template_types: vec![],
+            template_types: TemplateTypes::default(),
             attributes: vec![],
             method_metadata,
             type_resolution_context: None,
@@ -228,9 +226,9 @@ impl FunctionLikeMetadata {
         self.parameters.iter_mut().find(|parameter| parameter.get_name().0 == name)
     }
 
-    /// Returns a mutable slice of the template type parameters.
+    /// Returns a mutable reference to the template type parameters.
     #[inline]
-    pub fn get_template_types_mut(&mut self) -> &mut [TemplateTuple] {
+    pub fn get_template_types_mut(&mut self) -> &mut TemplateTypes {
         &mut self.template_types
     }
 
@@ -282,7 +280,7 @@ impl FunctionLikeMetadata {
 
     /// Adds a single template type definition.
     #[inline]
-    pub fn add_template_type(&mut self, template: TemplateTuple) {
-        self.template_types.push(template);
+    pub fn add_template_type(&mut self, name: Atom, constraint: GenericTemplate) {
+        self.template_types.insert(name, constraint);
     }
 }

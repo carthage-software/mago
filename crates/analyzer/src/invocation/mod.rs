@@ -2,8 +2,8 @@ use mago_atom::Atom;
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::identifier::method::MethodIdentifier;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
+use mago_codex::metadata::class_like::TemplateTypes;
 use mago_codex::metadata::function_like::FunctionLikeMetadata;
-use mago_codex::metadata::function_like::TemplateTuple;
 use mago_codex::metadata::parameter::FunctionLikeParameterMetadata;
 use mago_codex::misc::VariableIdentifier;
 use mago_codex::ttype::atomic::callable::TCallableSignature;
@@ -237,7 +237,7 @@ impl<'ctx> InvocationTarget<'ctx> {
 
     /// Returns the template type definitions if the target is a generic function or method.
     #[inline]
-    pub fn get_template_types(&self) -> Option<&'ctx [TemplateTuple]> {
+    pub fn get_template_types(&self) -> Option<&'ctx TemplateTypes> {
         match self {
             InvocationTarget::FunctionLike { metadata, .. } => Some(&metadata.template_types),
             _ => None,

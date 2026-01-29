@@ -465,13 +465,13 @@ pub fn analyze_invocation<'ctx, 'arena>(
         }
     }
 
-    for (template_name, constraints) in invocation.target.get_template_types().into_iter().flatten() {
-        for (generic_parent, type_constraint) in constraints {
-            if template_result.has_lower_bound(template_name, generic_parent) {
+    if let Some(template_types) = invocation.target.get_template_types() {
+        for (template_name, template) in template_types {
+            if template_result.has_lower_bound(template_name, &template.defining_entity) {
                 continue;
             }
 
-            template_result.add_lower_bound(*template_name, *generic_parent, type_constraint.clone());
+            template_result.add_lower_bound(*template_name, template.defining_entity, template.constraint.clone());
         }
     }
 

@@ -36,6 +36,7 @@ use crate::ttype::get_iterable_parameters;
 use crate::ttype::get_iterable_value_parameter;
 use crate::ttype::get_mixed;
 use crate::ttype::get_mixed_maybe_from_loop;
+use crate::ttype::template::GenericTemplate;
 use crate::ttype::template::TemplateBound;
 use crate::ttype::template::TemplateResult;
 use crate::ttype::template::inferred_type_replacer;
@@ -923,8 +924,8 @@ fn handle_template_param_class_standin(
             .get(parameter_name)
             .unwrap()
             .iter()
-            .filter(|(e, _)| e == defining_entity)
-            .map(|(_, v)| v)
+            .filter(|t| &t.defining_entity == defining_entity)
+            .map(|t| &t.constraint)
             .next()
             .unwrap();
 
@@ -967,13 +968,16 @@ pub fn get_actual_type_from_literal(name: &Atom, codebase: &CodebaseMetadata) ->
 }
 
 fn template_types_contains<'a>(
-    template_types: &'a IndexMap<Atom, Vec<(GenericParent, TUnion)>, RandomState>,
+    template_types: &'a IndexMap<Atom, Vec<GenericTemplate>, RandomState>,
     parameter_name: Atom,
     defining_entity: &GenericParent,
 ) -> Option<&'a TUnion> {
-    template_types
-        .get(&parameter_name)
-        .and_then(|mapped_classes| mapped_classes.iter().find(|(e, _)| e == defining_entity).map(|(_, v)| v))
+    template_types.get(&parameter_name).and_then(|mapped_classes| {
+        mapped_classes
+            .iter()
+            .find(|template| &template.defining_entity == defining_entity)
+            .map(|template| &template.constraint)
+    })
 }
 
 fn find_matching_atomic_types_for_template(
@@ -1184,9 +1188,9 @@ pub fn get_mapped_generic_type_parameters(
                 let mut candidate_parameter_type: Option<_> = None;
 
                 if let Some(TAtomic::GenericParameter(parameter)) = extended_input_parameter_types.first()
-                    && let Some((old_parameters_offset, defining_classes)) =
+                    && let Some((old_parameters_offset, GenericTemplate { defining_entity, .. })) =
                         input_class_metadata.get_template_type_with_index(&parameter.parameter_name)
-                    && defining_classes.iter().any(|(e, _)| parameter.defining_entity == *e)
+                    && parameter.defining_entity == *defining_entity
                 {
                     let candidate_parameter_type_inner =
                         input_type_parameters.get(old_parameters_offset).unwrap_or(&(None, get_mixed())).clone().1;
