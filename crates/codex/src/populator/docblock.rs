@@ -222,7 +222,7 @@ pub fn inherit_method_docblocks(codebase: &mut CodebaseMetadata) {
             }
 
             if parent_method_id.is_none()
-                && let Some((declaring_class, method_id)) = method_ids.iter().next()
+                && let Some((declaring_class, method_id)) = method_ids.first()
             {
                 parent_method_id = Some((*declaring_class, *method_id.get_method_name()));
             }

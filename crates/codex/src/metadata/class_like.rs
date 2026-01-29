@@ -64,7 +64,7 @@ pub struct ClassLikeMetadata {
     pub declaring_method_ids: AtomMap<MethodIdentifier>,
     pub appearing_method_ids: AtomMap<MethodIdentifier>,
     pub inheritable_method_ids: AtomMap<MethodIdentifier>,
-    pub overridden_method_ids: AtomMap<HashMap<Atom, MethodIdentifier>>,
+    pub overridden_method_ids: AtomMap<IndexMap<Atom, MethodIdentifier, RandomState>>,
     pub properties: AtomMap<PropertyMetadata>,
     pub appearing_property_ids: AtomMap<Atom>,
     pub declaring_property_ids: AtomMap<Atom>,

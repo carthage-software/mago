@@ -636,7 +636,7 @@ impl CodebaseMetadata {
 
         if class_meta.flags.is_abstract()
             && let Some(overridden_map) = class_meta.overridden_method_ids.get(&lowercase_method)
-            && let Some((_, first_method_id)) = overridden_map.iter().next()
+            && let Some((_, first_method_id)) = overridden_map.first()
         {
             return *first_method_id;
         }
