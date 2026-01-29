@@ -218,6 +218,7 @@ pub fn print_class_like_body<'arena>(
             match anonymous_class_signature_id {
                 Some(signature_id) => match f.settings.closure_brace_style {
                     BraceStyle::SameLine => Document::space(),
+                    BraceStyle::AlwaysNextLine => Document::Array(vec![in f.arena; Document::Line(Line::hard()), Document::BreakParent]),
                     BraceStyle::NextLine => Document::IfBreak(
                         IfBreak::new(
                             f.arena,
@@ -229,7 +230,7 @@ pub fn print_class_like_body<'arena>(
                 },
                 None => match f.settings.classlike_brace_style {
                     BraceStyle::SameLine => Document::space(),
-                    BraceStyle::NextLine => Document::Array(vec![in f.arena; Document::Line(Line::hard()), Document::BreakParent]),
+                    BraceStyle::NextLine | BraceStyle::AlwaysNextLine => Document::Array(vec![in f.arena; Document::Line(Line::hard()), Document::BreakParent]),
                 },
             }
         },

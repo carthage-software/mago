@@ -172,15 +172,15 @@ pub struct FormatSettings {
     /// }
     /// ```
     ///
-    /// Example with `next_line`:
+    /// Example with `next_line` or `always_next_line`:
     /// ```php
     /// class Foo
     /// {
     /// }
     /// ```
     ///
-    /// Default: `next_line`
-    #[serde(default = "BraceStyle::next_line")]
+    /// Default: `always_next_line`
+    #[serde(default = "BraceStyle::always_next_line")]
     pub classlike_brace_style: BraceStyle,
 
     /// Place empty control structure bodies on the same line.
@@ -1117,13 +1117,21 @@ pub enum EndOfLine {
     Cr,
 }
 
-/// Specifies the style of line endings.
+/// Specifies brace placement style for various constructs.
+///
+/// - `SameLine`: Opening brace on the same line as the declaration
+/// - `NextLine`: Opening brace on the next line for single-line signatures;
+///   on the same line when the signature breaks across multiple lines
+/// - `AlwaysNextLine`: Opening brace always on the next line, regardless of
+///   whether the signature breaks
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, JsonSchema)]
 pub enum BraceStyle {
     #[serde(alias = "same_line", alias = "same-line")]
     SameLine,
     #[serde(alias = "next_line", alias = "next-line")]
     NextLine,
+    #[serde(alias = "always_next_line", alias = "always-next-line")]
+    AlwaysNextLine,
 }
 
 #[derive(Default, Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, JsonSchema)]
@@ -1146,10 +1154,21 @@ impl BraceStyle {
         Self::NextLine
     }
 
+    #[must_use]
+    pub fn always_next_line() -> Self {
+        Self::AlwaysNextLine
+    }
+
     #[inline]
     #[must_use]
     pub fn is_next_line(&self) -> bool {
         *self == Self::NextLine
+    }
+
+    #[inline]
+    #[must_use]
+    pub fn is_always_next_line(&self) -> bool {
+        *self == Self::AlwaysNextLine
     }
 }
 

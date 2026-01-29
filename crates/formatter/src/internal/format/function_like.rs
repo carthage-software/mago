@@ -231,6 +231,13 @@ impl<'arena> FunctionLikeParts<'arena> {
     ) -> Document<'arena> {
         match settings.brace_style {
             BraceStyle::SameLine => Document::space(),
+            BraceStyle::AlwaysNextLine => {
+                if inlined_braces {
+                    Document::space()
+                } else {
+                    Document::Line(Line::hard())
+                }
+            }
             BraceStyle::NextLine => {
                 if inlined_braces {
                     return Document::space();

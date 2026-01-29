@@ -972,6 +972,9 @@ impl<'arena> Format<'arena> for Match<'arena> {
                 BraceStyle::NextLine => {
                     contents.push(Document::Line(Line::default()));
                 }
+                BraceStyle::AlwaysNextLine => {
+                    contents.push(Document::Line(Line::hard()));
+                }
             }
 
             contents.push(format_token(f, self.left_brace, "{"));

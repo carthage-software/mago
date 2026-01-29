@@ -555,6 +555,13 @@ pub(super) fn adjust_clause<'arena>(
                         Document::Array(vec![in f.arena; Document::Line(Line::default()), clause])
                     }
                 }
+                BraceStyle::AlwaysNextLine => {
+                    if f.settings.inline_empty_control_braces && is_block_empty {
+                        Document::Array(vec![in f.arena; Document::space(), clause])
+                    } else {
+                        Document::Array(vec![in f.arena; Document::Line(Line::hard()), clause])
+                    }
+                }
             }
         }
         _ => {

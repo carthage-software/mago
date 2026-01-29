@@ -358,7 +358,7 @@ impl<'arena> Format<'arena> for SwitchBody<'arena> {
                     in f.arena;
                     match f.settings.control_brace_style {
                         BraceStyle::SameLine => Document::space(),
-                        BraceStyle::NextLine => {
+                        BraceStyle::NextLine | BraceStyle::AlwaysNextLine => {
                             if b.cases.is_empty() && f.settings.inline_empty_control_braces {
                                 Document::space()
                             } else {
