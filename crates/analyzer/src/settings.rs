@@ -1,30 +1,10 @@
 use mago_algebra::AlgebraThresholds;
 use mago_atom::AtomSet;
+use mago_codex::ttype::combiner::CombinerOptions;
 use mago_php_version::PHPVersion;
 
 /// Default maximum logical formula size during conditional analysis.
 pub const DEFAULT_FORMULA_SIZE_THRESHOLD: u16 = 512;
-
-/// Default maximum number of literal strings to track before generalizing.
-///
-/// When combining types with many different literal string values, tracking each
-/// literal individually causes O(n) memory and O(n²) comparison time.
-/// Once the threshold is exceeded, we generalize to the base string type.
-pub const DEFAULT_STRING_COMBINATION_THRESHOLD: u16 = 128;
-
-/// Default maximum number of literal integers to track before generalizing.
-///
-/// When combining types with many different literal integer values, tracking each
-/// literal individually causes O(n) memory and O(n²) comparison time.
-/// Once the threshold is exceeded, we generalize to the base int type.
-pub const DEFAULT_INTEGER_COMBINATION_THRESHOLD: u16 = 128;
-
-/// Default maximum number of array elements to track individually.
-///
-/// When building array types through repeated push operations (`$arr[] = ...`),
-/// this limits how many individual elements are tracked before generalizing.
-/// This prevents memory explosion on files with thousands of array pushes.
-pub const DEFAULT_ARRAY_COMBINATION_THRESHOLD: u16 = 128;
 
 /// Configuration settings that control the behavior of the Mago analyzer.
 ///
@@ -278,6 +258,7 @@ impl Settings {
     #[must_use]
     pub fn new(version: PHPVersion) -> Self {
         let default_thresholds = AlgebraThresholds::default();
+        let default_combiner_options = CombinerOptions::default();
 
         Self {
             version,
@@ -308,9 +289,9 @@ impl Settings {
             negation_complexity_threshold: default_thresholds.negation_complexity,
             consensus_limit_threshold: default_thresholds.consensus_limit,
             formula_size_threshold: DEFAULT_FORMULA_SIZE_THRESHOLD,
-            string_combination_threshold: DEFAULT_STRING_COMBINATION_THRESHOLD,
-            integer_combination_threshold: DEFAULT_INTEGER_COMBINATION_THRESHOLD,
-            array_combination_threshold: DEFAULT_ARRAY_COMBINATION_THRESHOLD,
+            string_combination_threshold: default_combiner_options.string_combination_threshold,
+            integer_combination_threshold: default_combiner_options.integer_combination_threshold,
+            array_combination_threshold: default_combiner_options.array_combination_threshold,
         }
     }
 
@@ -322,6 +303,17 @@ impl Settings {
             disjunction_complexity: self.disjunction_complexity_threshold,
             negation_complexity: self.negation_complexity_threshold,
             consensus_limit: self.consensus_limit_threshold,
+        }
+    }
+
+    /// Returns the combiner options derived from the settings.
+    #[must_use]
+    pub fn combiner_options(&self) -> CombinerOptions {
+        CombinerOptions {
+            overwrite_empty_array: false,
+            array_combination_threshold: self.array_combination_threshold,
+            string_combination_threshold: self.string_combination_threshold,
+            integer_combination_threshold: self.integer_combination_threshold,
         }
     }
 }

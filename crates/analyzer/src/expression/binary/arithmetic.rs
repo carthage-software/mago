@@ -8,7 +8,6 @@ use mago_codex::ttype::atomic::mixed::TMixed;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::int::TInteger;
 use mago_codex::ttype::combiner;
-use mago_codex::ttype::combiner::CombinerOptions;
 use mago_codex::ttype::comparator::ComparisonResult;
 use mago_codex::ttype::comparator::atomic_comparator;
 use mago_codex::ttype::get_mixed;
@@ -295,7 +294,7 @@ pub fn analyze_arithmetic_operation<'ctx, 'arena>(
                     let mut combined = combiner::combine(
                         vec![left_atomic.clone(), right_atomic.clone()],
                         context.codebase,
-                        CombinerOptions::default(),
+                        context.settings.combiner_options(),
                     );
 
                     // Fix the non_empty flag: if either operand is non-empty, result is non-empty
@@ -473,7 +472,7 @@ pub fn analyze_arithmetic_operation<'ctx, 'arena>(
         // Otherwise, default to mixed.
         get_mixed()
     } else {
-        TUnion::from_vec(combiner::combine(result_atomic_types, context.codebase, CombinerOptions::default()))
+        TUnion::from_vec(combiner::combine(result_atomic_types, context.codebase, context.settings.combiner_options()))
     };
 
     assign_arithmetic_type(artifacts, final_type, binary);

@@ -17,7 +17,6 @@ use mago_codex::ttype::atomic::mixed::TMixed;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::string::TString;
 use mago_codex::ttype::combine_union_types;
-use mago_codex::ttype::combiner::CombinerOptions;
 use mago_codex::ttype::combiner::combine;
 use mago_codex::ttype::comparator::ComparisonResult;
 use mago_codex::ttype::comparator::union_comparator;
@@ -354,7 +353,7 @@ fn analyze_array_elements<'ctx, 'arena>(
         Some(TUnion::from_vec(combine(
             array_creation_info.item_key_atomic_types,
             context.codebase,
-            CombinerOptions::default(),
+            context.settings.combiner_options(),
         )))
     };
 
@@ -364,7 +363,7 @@ fn analyze_array_elements<'ctx, 'arena>(
         Some(TUnion::from_vec(combine(
             array_creation_info.item_value_atomic_types,
             context.codebase,
-            CombinerOptions::default(),
+            context.settings.combiner_options(),
         )))
     };
 
@@ -693,7 +692,7 @@ fn handle_variadic_array_element<'arena>(
                     &mut ComparisonResult::new(),
                 ) {
                     let new_prop_val =
-                        combine_union_types(&v.1, &value_type, context.codebase, CombinerOptions::default());
+                        combine_union_types(&v.1, &value_type, context.codebase, context.settings.combiner_options());
 
                     *v = (v.0, new_prop_val);
                 }

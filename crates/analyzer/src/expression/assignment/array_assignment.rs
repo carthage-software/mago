@@ -14,7 +14,6 @@ use mago_codex::ttype::atomic::generic::TGenericParameter;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::string::TString;
 use mago_codex::ttype::combiner;
-use mago_codex::ttype::combiner::CombinerOptions;
 use mago_codex::ttype::get_arraykey;
 use mago_codex::ttype::get_int;
 use mago_codex::ttype::get_iterable_parameters;
@@ -202,7 +201,7 @@ fn update_atomic_given_key(
         };
 
         let combined_value_type =
-            add_union_type(array_value_type, current_type, context.codebase, CombinerOptions::default());
+            add_union_type(array_value_type, current_type, context.codebase, context.settings.combiner_options());
 
         if array.is_empty() && key_type.is_none() {
             *array = TArray::List(TList {
@@ -226,7 +225,7 @@ fn update_atomic_given_key(
                             array_key_type,
                             &key_type.as_ref().map_or_else(get_int, |rc| (**rc).clone()),
                             context.codebase,
-                            CombinerOptions::default(),
+                            context.settings.combiner_options(),
                         )),
                         Box::new(combined_value_type),
                     ));
@@ -468,13 +467,13 @@ fn update_array_assignment_child_type<'ctx>(
     }
 
     let collection_type =
-        TUnion::from_vec(combiner::combine(collection_types, context.codebase, CombinerOptions::default()));
+        TUnion::from_vec(combiner::combine(collection_types, context.codebase, context.settings.combiner_options()));
 
     add_union_type(
         root_type,
         &collection_type,
         context.codebase,
-        CombinerOptions::default().with_overwrite_empty_array(),
+        context.settings.combiner_options().with_overwrite_empty_array(),
     )
 }
 
