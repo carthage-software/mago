@@ -130,11 +130,11 @@ impl LintRule for PreferEarlyContinueRule {
         let Some(if_stmt) = if_statement else { return };
 
         let has_else = match &if_stmt.body {
-            IfBody::Statement(body) => body.else_if_clauses.is_empty() && body.else_clause.is_none(),
-            IfBody::ColonDelimited(body) => body.else_if_clauses.is_empty() && body.else_clause.is_none(),
+            IfBody::Statement(body) => !body.else_if_clauses.is_empty() || body.else_clause.is_some(),
+            IfBody::ColonDelimited(body) => !body.else_if_clauses.is_empty() || body.else_clause.is_some(),
         };
 
-        if !has_else {
+        if has_else {
             return;
         }
 
