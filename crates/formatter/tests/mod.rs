@@ -343,6 +343,7 @@ test_case!(issue_897_anonymous_class_brace_next_line);
 test_case!(issue_897_anonymous_class_brace_always_next_line);
 test_case!(issue_974);
 test_case!(issue_994);
+test_case!(issue_978);
 
 #[test]
 fn test_all_test_cases_are_ran() {
