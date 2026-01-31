@@ -44,7 +44,10 @@ impl<'arena> Parser<'arena> {
                 break;
             }
 
-            statements.push(self.parse_statement(stream)?);
+            match self.parse_statement(stream) {
+                Ok(statement) => statements.push(statement),
+                Err(err) => self.errors.push(err),
+            }
         }
 
         Ok(NamespaceImplicitBody { terminator, statements: Sequence::new(statements) })
