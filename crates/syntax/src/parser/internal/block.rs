@@ -12,10 +12,23 @@ impl<'input, 'arena> Parser<'input, 'arena> {
         loop {
             match self.stream.lookahead(0)?.map(|t| t.kind) {
                 Some(T!["}"]) => break,
-                Some(_) => match self.parse_statement() {
-                    Ok(statement) => statements.push(statement),
-                    Err(err) => self.errors.push(err),
-                },
+                Some(_) => {
+                    let position_before = self.stream.current_position();
+                    match self.parse_statement() {
+                        Ok(statement) => statements.push(statement),
+                        Err(err) => self.errors.push(err),
+                    }
+                    // Safety: prevent infinite loop if statement parsing didn't advance
+                    if self.stream.current_position() == position_before
+                        && let Ok(Some(token)) = self.stream.lookahead(0)
+                    {
+                        if token.kind == T!["}"] {
+                            break;
+                        }
+                        self.errors.push(self.stream.unexpected(Some(token), &[]));
+                        let _ = self.stream.consume();
+                    }
+                }
                 None => {
                     // EOF without closing brace
                     return Err(self.stream.unexpected(None, &[T!["}"]]));

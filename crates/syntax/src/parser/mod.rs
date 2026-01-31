@@ -61,9 +61,23 @@ impl<'input, 'arena> Parser<'input, 'arena> {
                 break;
             }
 
+            // Record position before parsing to detect infinite loops
+            let position_before = self.stream.current_position();
+
             match self.parse_statement() {
                 Ok(statement) => statements.push(statement),
                 Err(err) => self.errors.push(err),
+            }
+
+            // Safety check: if we didn't advance at all, skip a token to prevent infinite loop.
+            // This can happen with orphan keywords like `finally`, `catch`, `else`, etc.
+            // that are preserved by the expression parser but not handled by the statement parser.
+            let position_after = self.stream.current_position();
+            if position_after == position_before
+                && let Ok(Some(token)) = self.stream.lookahead(0)
+            {
+                self.errors.push(self.stream.unexpected(Some(token), &[]));
+                let _ = self.stream.consume();
             }
         }
 

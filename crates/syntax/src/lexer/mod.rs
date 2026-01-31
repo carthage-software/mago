@@ -524,12 +524,16 @@ impl<'input, 'arena> Lexer<'input, 'arena> {
                     [b'.', start_of_number!(), ..] => {
                         let mut length = read_digits_of_base(&self.input, 2, 10);
                         if let float_exponent!() = self.input.peek(length, 1) {
-                            length += 1;
-                            if let number_sign!() = self.input.peek(length, 1) {
-                                length += 1;
+                            // Only include exponent if there are digits after it
+                            let mut exp_length = length + 1;
+                            if let number_sign!() = self.input.peek(exp_length, 1) {
+                                exp_length += 1;
                             }
-
-                            length = read_digits_of_base(&self.input, length, 10);
+                            let after_exp = read_digits_of_base(&self.input, exp_length, 10);
+                            if after_exp > exp_length {
+                                // There are digits after the exponent marker
+                                length = after_exp;
+                            }
                         }
 
                         (TokenKind::LiteralFloat, length)
@@ -578,12 +582,16 @@ impl<'input, 'arena> Lexer<'input, 'arena> {
                         }
 
                         if let float_exponent!() = self.input.peek(length, 1) {
-                            length += 1;
-                            if let number_sign!() = self.input.peek(length, 1) {
-                                length += 1;
+                            // Only include exponent if there are digits after it
+                            let mut exp_length = length + 1;
+                            if let number_sign!() = self.input.peek(exp_length, 1) {
+                                exp_length += 1;
                             }
-
-                            length = read_digits_of_base(&self.input, length, 10);
+                            let after_exp = read_digits_of_base(&self.input, exp_length, 10);
+                            if after_exp > exp_length {
+                                // There are digits after the exponent marker
+                                length = after_exp;
+                            }
                         }
 
                         (TokenKind::LiteralFloat, length)

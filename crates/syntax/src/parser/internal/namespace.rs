@@ -34,9 +34,22 @@ impl<'input, 'arena> Parser<'input, 'arena> {
                 break;
             }
 
+            let position_before = self.stream.current_position();
             match self.parse_statement() {
                 Ok(statement) => statements.push(statement),
                 Err(err) => self.errors.push(err),
+            }
+            // Safety: prevent infinite loop
+            if self.stream.current_position() == position_before {
+                if let Ok(Some(token)) = self.stream.lookahead(0) {
+                    if token.kind == T!["namespace"] {
+                        break;
+                    }
+                    self.errors.push(self.stream.unexpected(Some(token), &[]));
+                    let _ = self.stream.consume();
+                } else {
+                    break;
+                }
             }
         }
 

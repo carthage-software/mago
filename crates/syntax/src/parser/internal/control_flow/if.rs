@@ -85,11 +85,20 @@ impl<'input, 'arena> Parser<'input, 'arena> {
             statements: {
                 let mut statements = self.new_vec();
                 loop {
-                    if matches!(self.stream.lookahead(0)?.map(|t| t.kind), Some(T!["elseif" | "else" | "endif"])) {
+                    if matches!(self.stream.lookahead(0)?.map(|t| t.kind), None | Some(T!["elseif" | "else" | "endif"]))
+                    {
                         break;
                     }
-
+                    let position_before = self.stream.current_position();
                     statements.push(self.parse_statement()?);
+                    if self.stream.current_position() == position_before {
+                        if let Ok(Some(token)) = self.stream.lookahead(0) {
+                            self.errors.push(self.stream.unexpected(Some(token), &[]));
+                            let _ = self.stream.consume();
+                        } else {
+                            break;
+                        }
+                    }
                 }
 
                 Sequence::new(statements)
@@ -129,11 +138,20 @@ impl<'input, 'arena> Parser<'input, 'arena> {
             statements: {
                 let mut statements = self.new_vec();
                 loop {
-                    if matches!(self.stream.lookahead(0)?.map(|t| t.kind), Some(T!["elseif" | "else" | "endif"])) {
+                    if matches!(self.stream.lookahead(0)?.map(|t| t.kind), None | Some(T!["elseif" | "else" | "endif"]))
+                    {
                         break;
                     }
-
+                    let position_before = self.stream.current_position();
                     statements.push(self.parse_statement()?);
+                    if self.stream.current_position() == position_before {
+                        if let Ok(Some(token)) = self.stream.lookahead(0) {
+                            self.errors.push(self.stream.unexpected(Some(token), &[]));
+                            let _ = self.stream.consume();
+                        } else {
+                            break;
+                        }
+                    }
                 }
 
                 Sequence::new(statements)
@@ -159,11 +177,19 @@ impl<'input, 'arena> Parser<'input, 'arena> {
             statements: {
                 let mut statements = self.new_vec();
                 loop {
-                    if matches!(self.stream.lookahead(0)?.map(|t| t.kind), Some(T!["endif"])) {
+                    if matches!(self.stream.lookahead(0)?.map(|t| t.kind), None | Some(T!["endif"])) {
                         break;
                     }
-
+                    let position_before = self.stream.current_position();
                     statements.push(self.parse_statement()?);
+                    if self.stream.current_position() == position_before {
+                        if let Ok(Some(token)) = self.stream.lookahead(0) {
+                            self.errors.push(self.stream.unexpected(Some(token), &[]));
+                            let _ = self.stream.consume();
+                        } else {
+                            break;
+                        }
+                    }
                 }
                 Sequence::new(statements)
             },

@@ -458,6 +458,7 @@ pub enum NodeKind {
     IndirectVariable,
     NestedVariable,
     Variable,
+    Error,
     ErrorExpression,
     ErrorStatement,
     MissingTerminator,

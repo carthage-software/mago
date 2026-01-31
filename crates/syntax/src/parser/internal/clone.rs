@@ -72,12 +72,13 @@ impl<'input, 'arena> Parser<'input, 'arena> {
             })));
         }
 
-        let is_function_call = partial_args.arguments.len() > 1 || {
-            matches!(
+        // Empty arguments case: clone() with no args is a function call
+        let is_function_call = partial_args.arguments.is_empty()
+            || partial_args.arguments.len() > 1
+            || matches!(
                 partial_args.arguments.first(),
                 Some(PartialArgument::Positional(arg)) if arg.ellipsis.is_some()
-            )
-        };
+            );
 
         if is_function_call {
             return Ok(Expression::Call(Call::Function(FunctionCall {
@@ -89,10 +90,16 @@ impl<'input, 'arena> Parser<'input, 'arena> {
             })));
         }
 
+        // At this point we know there's exactly one argument without ellipsis
         let cloned_expression = match partial_args.arguments.into_iter().next() {
             Some(PartialArgument::Positional(arg)) => arg.value,
             Some(PartialArgument::Named(arg)) => arg.value,
-            _ => unreachable!("Should have at least one argument"),
+            None => unreachable!("handled by is_function_call check above"),
+            Some(
+                PartialArgument::Placeholder(_)
+                | PartialArgument::NamedPlaceholder(_)
+                | PartialArgument::VariadicPlaceholder(_),
+            ) => unreachable!("handled by has_placeholders check above"),
         };
 
         Ok(Expression::Clone(Clone {

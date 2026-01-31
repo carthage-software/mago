@@ -94,11 +94,22 @@ impl<'input, 'arena> Parser<'input, 'arena> {
     fn parse_switch_statements(&mut self) -> Result<Sequence<'arena, Statement<'arena>>, ParseError> {
         let mut statements = self.new_vec();
         loop {
-            if matches!(self.stream.lookahead(0)?.map(|t| t.kind), Some(T!["case" | "default" | "endswitch" | "}"])) {
+            if matches!(
+                self.stream.lookahead(0)?.map(|t| t.kind),
+                None | Some(T!["case" | "default" | "endswitch" | "}"])
+            ) {
                 break;
             }
-
+            let position_before = self.stream.current_position();
             statements.push(self.parse_statement()?);
+            if self.stream.current_position() == position_before {
+                if let Ok(Some(token)) = self.stream.lookahead(0) {
+                    self.errors.push(self.stream.unexpected(Some(token), &[]));
+                    let _ = self.stream.consume();
+                } else {
+                    break;
+                }
+            }
         }
 
         Ok(Sequence::new(statements))
