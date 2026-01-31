@@ -471,6 +471,7 @@ This improves code readability by reducing nesting and making the control flow m
 | :--- | :--- | :--- |
 | `enabled` | `boolean` | `true` |
 | `level` | `string` | `"help"` |
+| `max_allowed_statements` | `integer` | `0` |
 
 ### Examples
 

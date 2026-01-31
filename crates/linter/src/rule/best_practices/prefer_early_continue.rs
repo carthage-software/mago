@@ -8,6 +8,7 @@ use mago_reporting::Issue;
 use mago_reporting::Level;
 use mago_span::HasSpan;
 use mago_syntax::ast::BinaryOperator;
+use mago_syntax::ast::Block;
 use mago_syntax::ast::Expression;
 use mago_syntax::ast::ForBody;
 use mago_syntax::ast::ForeachBody;
@@ -38,11 +39,12 @@ pub struct PreferEarlyContinueRule {
 #[serde(default)]
 pub struct PreferEarlyContinueConfig {
     pub level: Level,
+    pub max_allowed_statements: usize,
 }
 
 impl Default for PreferEarlyContinueConfig {
     fn default() -> Self {
-        Self { level: Level::Help }
+        Self { level: Level::Help, max_allowed_statements: 0 }
     }
 }
 
@@ -130,20 +132,20 @@ impl LintRule for PreferEarlyContinueRule {
         let Some(if_stmt) = if_statement else { return };
 
         let has_else = match &if_stmt.body {
-            IfBody::Statement(body) => body.else_if_clauses.is_empty() && body.else_clause.is_none(),
-            IfBody::ColonDelimited(body) => body.else_if_clauses.is_empty() && body.else_clause.is_none(),
+            IfBody::Statement(body) => !body.else_if_clauses.is_empty() || body.else_clause.is_some(),
+            IfBody::ColonDelimited(body) => !body.else_if_clauses.is_empty() || body.else_clause.is_some(),
         };
 
-        if !has_else {
+        if has_else {
             return;
         }
 
-        let has_body_content = match &if_stmt.body {
-            IfBody::Statement(body) => !is_empty_statement(body.statement),
-            IfBody::ColonDelimited(body) => !body.statements.is_empty(),
+        let body_len = match &if_stmt.body {
+            IfBody::Statement(body) => statement_len(body.statement),
+            IfBody::ColonDelimited(body) => body.statements.len(),
         };
 
-        if !has_body_content {
+        if body_len <= self.cfg.max_allowed_statements {
             return;
         }
 
@@ -247,7 +249,7 @@ fn extract_single_if_from_statement<'ast, 'arena>(stmt: &'ast Statement<'arena>)
 }
 
 fn extract_single_if_from_statements<'ast, 'arena>(stmts: &'ast [Statement<'arena>]) -> Option<&'ast If<'arena>> {
-    let non_empty: Vec<_> = stmts.iter().filter(|s| !is_empty_statement(s)).collect();
+    let non_empty: Vec<_> = stmts.iter().filter(|s| statement_len(s) > 0).collect();
 
     if non_empty.len() != 1 {
         return None;
@@ -256,6 +258,10 @@ fn extract_single_if_from_statements<'ast, 'arena>(stmts: &'ast [Statement<'aren
     extract_single_if_from_statement(non_empty[0])
 }
 
-fn is_empty_statement(stmt: &Statement) -> bool {
-    matches!(stmt, Statement::Noop(_))
+fn statement_len(stmt: &Statement) -> usize {
+    match stmt {
+        Statement::Noop(_) => 0,
+        Statement::Block(Block { statements, .. }) => statements.len(),
+        _ => 1,
+    }
 }
