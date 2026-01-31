@@ -46,10 +46,9 @@ fn test_code_snippet(rule_code: &str, code: &str, should_have_issues: bool) -> R
 
     let file = File::ephemeral(Cow::Owned("test.php".to_string()), Cow::Owned(code.to_string()));
 
-    let (program, parse_error) = parse_file(&arena, &file);
-
-    if let Some(err) = parse_error {
-        return Err(format!("Parse error: {err:?}"));
+    let program = parse_file(&arena, &file);
+    if program.has_errors() {
+        return Err("Failed to parse code snippet.".to_string());
     }
 
     let resolver = NameResolver::new(&arena);

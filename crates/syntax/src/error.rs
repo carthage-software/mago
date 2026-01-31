@@ -14,14 +14,14 @@ use crate::token::TokenKind;
 const SYNTAX_ERROR_CODE: &str = "syntax";
 const PARSE_ERROR_CODE: &str = "parse";
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub enum SyntaxError {
     UnexpectedToken(FileId, u8, Position),
     UnrecognizedToken(FileId, u8, Position),
     UnexpectedEndOfFile(FileId, Position),
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Serialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub enum ParseError {
     SyntaxError(SyntaxError),
     UnexpectedEndOfFile(Box<[TokenKind]>, FileId, Position),
@@ -160,7 +160,7 @@ impl From<&ParseError> for Issue {
         if let ParseError::SyntaxError(syntax_error) = error {
             syntax_error.into()
         } else {
-            Issue::error("Fatal parse error encountered")
+            Issue::error("Parse error encountered during parsing")
                 .with_code(PARSE_ERROR_CODE)
                 .with_annotation(Annotation::primary(error.span()).with_message(error.to_string()))
                 .with_note("This error indicates that the parser encountered a parse issue.")

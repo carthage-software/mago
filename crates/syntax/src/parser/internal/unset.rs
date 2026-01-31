@@ -1,43 +1,21 @@
 use crate::T;
 use crate::ast::ast::Unset;
-use crate::ast::sequence::TokenSeparatedSequence;
 use crate::error::ParseError;
-use crate::parser::internal::expression::parse_expression;
-use crate::parser::internal::terminator::parse_terminator;
-use crate::parser::internal::token_stream::TokenStream;
-use crate::parser::internal::utils;
+use crate::parser::Parser;
+use crate::parser::stream::TokenStream;
 
-pub fn parse_unset<'arena>(stream: &mut TokenStream<'_, 'arena>) -> Result<Unset<'arena>, ParseError> {
-    let unset = utils::expect_keyword(stream, T!["unset"])?;
-    let left_parenthesis = utils::expect_span(stream, T!["("])?;
+impl<'arena> Parser<'arena> {
+    pub(crate) fn parse_unset(&mut self, stream: &mut TokenStream<'_, 'arena>) -> Result<Unset<'arena>, ParseError> {
+        let unset = self.expect_keyword(stream, T!["unset"])?;
+        let result = self.parse_comma_separated_sequence(stream, T!["("], T![")"], |p, s| p.parse_expression(s))?;
+        let terminator = self.parse_terminator(stream)?;
 
-    let mut values = stream.new_vec();
-    let mut commas = stream.new_vec();
-    loop {
-        if matches!(utils::peek(stream)?.kind, T![")"]) {
-            break;
-        }
-
-        values.push(parse_expression(stream)?);
-
-        match utils::peek(stream)?.kind {
-            T![","] => {
-                commas.push(utils::expect_any(stream)?);
-            }
-            _ => {
-                break;
-            }
-        }
+        Ok(Unset {
+            unset,
+            left_parenthesis: result.open,
+            values: result.sequence,
+            right_parenthesis: result.close,
+            terminator,
+        })
     }
-
-    let right_parenthesis = utils::expect_span(stream, T![")"])?;
-    let terminator = parse_terminator(stream)?;
-
-    Ok(Unset {
-        unset,
-        left_parenthesis,
-        values: TokenSeparatedSequence::new(values, commas),
-        right_parenthesis,
-        terminator,
-    })
 }

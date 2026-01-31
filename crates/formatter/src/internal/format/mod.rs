@@ -1021,6 +1021,9 @@ impl<'arena> Format<'arena> for Terminator<'arena> {
                 Terminator::ClosingTag(t) => {
                     Document::Array(vec![in f.arena; Document::Space(Space::soft()), t.format(f)])
                 }
+                Terminator::Missing(span) => {
+                    unreachable!("Syntax error: a terminator was expected but missing at {:#?}", span)
+                }
             }
         })
     }

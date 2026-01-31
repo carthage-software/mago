@@ -5,183 +5,147 @@ use crate::ast::ast::ExpressionStatement;
 use crate::ast::ast::Statement;
 use crate::ast::sequence::Sequence;
 use crate::error::ParseError;
-use crate::parser::internal::attribute::parse_attribute_list_sequence;
-use crate::parser::internal::block::parse_block;
-use crate::parser::internal::class_like::parse_class_with_attributes;
-use crate::parser::internal::class_like::parse_enum_with_attributes;
-use crate::parser::internal::class_like::parse_interface_with_attributes;
-use crate::parser::internal::class_like::parse_trait_with_attributes;
-use crate::parser::internal::constant::parse_constant_with_attributes;
-use crate::parser::internal::control_flow::r#if::parse_if;
-use crate::parser::internal::control_flow::switch::parse_switch;
-use crate::parser::internal::declare::parse_declare;
-use crate::parser::internal::echo::parse_echo;
-use crate::parser::internal::echo::parse_echo_tag;
-use crate::parser::internal::expression::parse_expression;
-use crate::parser::internal::function_like::arrow_function::parse_arrow_function_with_attributes;
-use crate::parser::internal::function_like::closure::parse_closure_with_attributes;
-use crate::parser::internal::function_like::function::parse_function_with_attributes;
-use crate::parser::internal::global::parse_global;
-use crate::parser::internal::goto::parse_goto;
-use crate::parser::internal::goto::parse_label;
-use crate::parser::internal::halt_compiler::parse_halt_compiler;
-use crate::parser::internal::inline::parse_inline;
-use crate::parser::internal::r#loop::do_while::parse_do_while;
-use crate::parser::internal::r#loop::r#for::parse_for;
-use crate::parser::internal::r#loop::foreach::parse_foreach;
-use crate::parser::internal::r#loop::parse_break;
-use crate::parser::internal::r#loop::parse_continue;
-use crate::parser::internal::r#loop::r#while::parse_while;
-use crate::parser::internal::namespace::parse_namespace;
-use crate::parser::internal::r#return::parse_return;
-use crate::parser::internal::r#static::parse_static;
-use crate::parser::internal::tag::parse_closing_tag;
-use crate::parser::internal::tag::parse_opening_tag;
-use crate::parser::internal::terminator::parse_terminator;
-use crate::parser::internal::token_stream::TokenStream;
-use crate::parser::internal::r#try::parse_try;
-use crate::parser::internal::unset::parse_unset;
-use crate::parser::internal::r#use::parse_use;
-use crate::parser::internal::utils;
+use crate::parser::Parser;
+use crate::parser::stream::TokenStream;
 
-pub fn parse_statement<'arena>(stream: &mut TokenStream<'_, 'arena>) -> Result<Statement<'arena>, ParseError> {
-    Ok(match utils::peek(stream)?.kind {
-        T![InlineText | InlineShebang] => Statement::Inline(parse_inline(stream)?),
-        T!["<?php"] | T!["<?"] => Statement::OpeningTag(parse_opening_tag(stream)?),
-        T!["<?="] => Statement::EchoTag(parse_echo_tag(stream)?),
-        T!["?>"] => Statement::ClosingTag(parse_closing_tag(stream)?),
-        T!["declare"] => Statement::Declare(parse_declare(stream)?),
-        T!["namespace"] => Statement::Namespace(parse_namespace(stream)?),
-        T!["use"] => Statement::Use(parse_use(stream)?),
-        T!["return"] => Statement::Return(parse_return(stream)?),
-        T!["#["] => {
-            let attributes = parse_attribute_list_sequence(stream)?;
-            let next = utils::peek(stream)?;
-            let maybe_after = utils::maybe_peek_nth(stream, 1)?.map(|t| t.kind);
+impl<'arena> Parser<'arena> {
+    pub(crate) fn parse_statement(
+        &mut self,
+        stream: &mut TokenStream<'_, 'arena>,
+    ) -> Result<Statement<'arena>, ParseError> {
+        let token = stream.lookahead(0)?.ok_or_else(|| stream.unexpected(None, &[]))?;
+        Ok(match token.kind {
+            T![InlineText | InlineShebang] => Statement::Inline(self.parse_inline(stream)?),
+            T!["<?php"] | T!["<?"] => Statement::OpeningTag(self.parse_opening_tag(stream)?),
+            T!["<?="] => Statement::EchoTag(self.parse_echo_tag(stream)?),
+            T!["?>"] => Statement::ClosingTag(self.parse_closing_tag(stream)?),
+            T!["declare"] => Statement::Declare(self.parse_declare(stream)?),
+            T!["namespace"] => Statement::Namespace(self.parse_namespace(stream)?),
+            T!["use"] => Statement::Use(self.parse_use(stream)?),
+            T!["return"] => Statement::Return(self.parse_return(stream)?),
+            T!["#["] => {
+                let attributes = self.parse_attribute_list_sequence(stream)?;
+                let next = stream.lookahead(0)?.ok_or_else(|| stream.unexpected(None, &[]))?;
+                let maybe_after = stream.lookahead(1)?.map(|t| t.kind);
 
-            match next.kind {
-                T!["interface"] => Statement::Interface(parse_interface_with_attributes(stream, attributes)?),
-                T!["trait"] => Statement::Trait(parse_trait_with_attributes(stream, attributes)?),
-                T!["enum"] => Statement::Enum(parse_enum_with_attributes(stream, attributes)?),
-                T!["class"] => Statement::Class(parse_class_with_attributes(stream, attributes)?),
-                T!["const"] => Statement::Constant(parse_constant_with_attributes(stream, attributes)?),
-                T!["function"] => {
-                    // unlike when we have modifiers, here, we don't know if this is meant to be a closure or a function
-                    parse_closure_or_function(stream, attributes)?
-                }
-                T!["fn"] => Statement::Expression(ExpressionStatement {
-                    expression: {
-                        let expression =
-                            Expression::ArrowFunction(parse_arrow_function_with_attributes(stream, attributes)?);
-
-                        stream.alloc(expression)
-                    },
-                    terminator: parse_terminator(stream)?,
-                }),
-                T!["static"] if maybe_after == Some(T!["fn"]) => Statement::Expression(ExpressionStatement {
-                    expression: {
-                        let expression =
-                            Expression::ArrowFunction(parse_arrow_function_with_attributes(stream, attributes)?);
-
-                        stream.alloc(expression)
-                    },
-                    terminator: parse_terminator(stream)?,
-                }),
-                T!["static"] if maybe_after == Some(T!["function"]) => Statement::Expression(ExpressionStatement {
-                    expression: {
-                        let expression = Expression::Closure(parse_closure_with_attributes(stream, attributes)?);
-
-                        stream.alloc(expression)
-                    },
-                    terminator: parse_terminator(stream)?,
-                }),
-                kind if kind.is_modifier() => Statement::Class(parse_class_with_attributes(stream, attributes)?),
-                _ => {
-                    return Err(utils::unexpected(
-                        stream,
-                        Some(next),
-                        T![
-                            "interface",
-                            "trait",
-                            "enum",
-                            "class",
-                            "function",
-                            "fn",
-                            "readonly",
-                            "abstract",
-                            "final",
-                            "static",
-                        ],
-                    ));
+                match next.kind {
+                    T!["interface"] => Statement::Interface(self.parse_interface_with_attributes(stream, attributes)?),
+                    T!["trait"] => Statement::Trait(self.parse_trait_with_attributes(stream, attributes)?),
+                    T!["enum"] => Statement::Enum(self.parse_enum_with_attributes(stream, attributes)?),
+                    T!["class"] => Statement::Class(self.parse_class_with_attributes(stream, attributes)?),
+                    T!["const"] => Statement::Constant(self.parse_constant_with_attributes(stream, attributes)?),
+                    T!["function"] => self.parse_closure_or_function(stream, attributes)?,
+                    T!["fn"] => Statement::Expression(ExpressionStatement {
+                        expression: {
+                            self.arena.alloc(Expression::ArrowFunction(
+                                self.parse_arrow_function_with_attributes(stream, attributes)?,
+                            ))
+                        },
+                        terminator: self.parse_terminator(stream)?,
+                    }),
+                    T!["static"] if maybe_after == Some(T!["fn"]) => Statement::Expression(ExpressionStatement {
+                        expression: {
+                            self.arena.alloc(Expression::ArrowFunction(
+                                self.parse_arrow_function_with_attributes(stream, attributes)?,
+                            ))
+                        },
+                        terminator: self.parse_terminator(stream)?,
+                    }),
+                    T!["static"] if maybe_after == Some(T!["function"]) => Statement::Expression(ExpressionStatement {
+                        expression: {
+                            self.arena
+                                .alloc(Expression::Closure(self.parse_closure_with_attributes(stream, attributes)?))
+                        },
+                        terminator: self.parse_terminator(stream)?,
+                    }),
+                    kind if kind.is_modifier() => {
+                        Statement::Class(self.parse_class_with_attributes(stream, attributes)?)
+                    }
+                    _ => {
+                        return Err(stream.unexpected(
+                            Some(next),
+                            T![
+                                "interface",
+                                "trait",
+                                "enum",
+                                "class",
+                                "function",
+                                "fn",
+                                "readonly",
+                                "abstract",
+                                "final",
+                                "static",
+                            ],
+                        ));
+                    }
                 }
             }
-        }
-        T!["interface"] => {
-            Statement::Interface(parse_interface_with_attributes(stream, Sequence::empty(stream.arena()))?)
-        }
-        T!["trait"] => Statement::Trait(parse_trait_with_attributes(stream, Sequence::empty(stream.arena()))?),
-        T!["enum"] => Statement::Enum(parse_enum_with_attributes(stream, Sequence::empty(stream.arena()))?),
-        T!["class"] => Statement::Class(parse_class_with_attributes(stream, Sequence::empty(stream.arena()))?),
-        T!["function"] => {
-            // just like when we have attributes, we don't know if this is meant to be a closure or a function
-            parse_closure_or_function(stream, Sequence::empty(stream.arena()))?
-        }
-        T!["global"] => Statement::Global(parse_global(stream)?),
-        T!["static"] if matches!(utils::peek_nth(stream, 1)?.kind, T!["$variable"]) => {
-            Statement::Static(parse_static(stream)?)
-        }
-        kind if kind.is_modifier()
-            && !matches!(utils::peek_nth(stream, 1)?.kind, T!["::" | "(" | "->" | "?->" | "[" | "fn" | "function"]) =>
-        {
-            Statement::Class(parse_class_with_attributes(stream, Sequence::empty(stream.arena()))?)
-        }
-        T!["__halt_compiler"] => Statement::HaltCompiler(parse_halt_compiler(stream)?),
-        T![";"] => Statement::Noop(utils::expect(stream, T![";"])?.span),
-        T!["const"] => Statement::Constant(parse_constant_with_attributes(stream, Sequence::empty(stream.arena()))?),
-        T!["if"] => Statement::If(parse_if(stream)?),
-        T!["switch"] => Statement::Switch(parse_switch(stream)?),
-        T!["foreach"] => Statement::Foreach(parse_foreach(stream)?),
-        T!["for"] => Statement::For(parse_for(stream)?),
-        T!["while"] => Statement::While(parse_while(stream)?),
-        T!["do"] => Statement::DoWhile(parse_do_while(stream)?),
-        T!["continue"] => Statement::Continue(parse_continue(stream)?),
-        T!["break"] => Statement::Break(parse_break(stream)?),
-        T!["unset"] => Statement::Unset(parse_unset(stream)?),
-        T!["{"] => Statement::Block(parse_block(stream)?),
-        T!["try"] => Statement::Try(parse_try(stream)?),
-        T!["echo"] => Statement::Echo(parse_echo(stream)?),
-        T!["goto"] => Statement::Goto(parse_goto(stream)?),
-        kind if kind.is_identifier_maybe_reserved() && matches!(utils::peek_nth(stream, 1)?.kind, T![":"]) => {
-            Statement::Label(parse_label(stream)?)
-        }
-        _ => Statement::Expression(ExpressionStatement {
-            expression: {
-                let expression = parse_expression(stream)?;
+            T!["interface"] => {
+                Statement::Interface(self.parse_interface_with_attributes(stream, Sequence::empty(self.arena))?)
+            }
+            T!["trait"] => Statement::Trait(self.parse_trait_with_attributes(stream, Sequence::empty(self.arena))?),
+            T!["enum"] => Statement::Enum(self.parse_enum_with_attributes(stream, Sequence::empty(self.arena))?),
+            T!["class"] => Statement::Class(self.parse_class_with_attributes(stream, Sequence::empty(self.arena))?),
+            T!["function"] => self.parse_closure_or_function(stream, Sequence::empty(self.arena))?,
+            T!["global"] => Statement::Global(self.parse_global(stream)?),
+            T!["static"] if matches!(stream.lookahead(1)?.map(|t| t.kind), Some(T!["$variable"])) => {
+                Statement::Static(self.parse_static(stream)?)
+            }
+            kind if kind.is_modifier()
+                && !matches!(
+                    stream.lookahead(1)?.map(|t| t.kind),
+                    Some(T!["::" | "(" | "->" | "?->" | "[" | "fn" | "function"])
+                ) =>
+            {
+                Statement::Class(self.parse_class_with_attributes(stream, Sequence::empty(self.arena))?)
+            }
+            T!["__halt_compiler"] => Statement::HaltCompiler(self.parse_halt_compiler(stream)?),
+            T![";"] => Statement::Noop(stream.consume()?.span),
+            T!["const"] => {
+                Statement::Constant(self.parse_constant_with_attributes(stream, Sequence::empty(self.arena))?)
+            }
+            T!["if"] => Statement::If(self.parse_if(stream)?),
+            T!["switch"] => Statement::Switch(self.parse_switch(stream)?),
+            T!["foreach"] => Statement::Foreach(self.parse_foreach(stream)?),
+            T!["for"] => Statement::For(self.parse_for(stream)?),
+            T!["while"] => Statement::While(self.parse_while(stream)?),
+            T!["do"] => Statement::DoWhile(self.parse_do_while(stream)?),
+            T!["continue"] => Statement::Continue(self.parse_continue(stream)?),
+            T!["break"] => Statement::Break(self.parse_break(stream)?),
+            T!["unset"] => Statement::Unset(self.parse_unset(stream)?),
+            T!["{"] => Statement::Block(self.parse_block(stream)?),
+            T!["try"] => Statement::Try(self.parse_try(stream)?),
+            T!["echo"] => Statement::Echo(self.parse_echo(stream)?),
+            T!["goto"] => Statement::Goto(self.parse_goto(stream)?),
+            kind if kind.is_identifier_maybe_reserved()
+                && matches!(stream.lookahead(1)?.map(|t| t.kind), Some(T![":"])) =>
+            {
+                Statement::Label(self.parse_label(stream)?)
+            }
+            _ => Statement::Expression(ExpressionStatement {
+                expression: self.arena.alloc(self.parse_expression(stream)?),
+                terminator: self.parse_terminator(stream)?,
+            }),
+        })
+    }
 
-                stream.alloc(expression)
-            },
-            terminator: parse_terminator(stream)?,
-        }),
-    })
-}
-
-fn parse_closure_or_function<'arena>(
-    stream: &mut TokenStream<'_, 'arena>,
-    attributes: Sequence<'arena, AttributeList<'arena>>,
-) -> Result<Statement<'arena>, ParseError> {
-    Ok(match (utils::maybe_peek_nth(stream, 1)?.map(|t| t.kind), utils::maybe_peek_nth(stream, 2)?.map(|t| t.kind)) {
-        // if the next token is `(` or `&` followed by `(`, then we know this is a closure
-        (Some(T!["("]), _) | (Some(T!["&"]), Some(T!["("])) => Statement::Expression(ExpressionStatement {
-            expression: {
-                let expression = Expression::Closure(parse_closure_with_attributes(stream, attributes)?);
-
-                stream.alloc(expression)
-            },
-            terminator: parse_terminator(stream)?,
-        }),
-        _ => {
-            // otherwise, we know this is a function
-            Statement::Function(parse_function_with_attributes(stream, attributes)?)
-        }
-    })
+    fn parse_closure_or_function(
+        &mut self,
+        stream: &mut TokenStream<'_, 'arena>,
+        attributes: Sequence<'arena, AttributeList<'arena>>,
+    ) -> Result<Statement<'arena>, ParseError> {
+        Ok(match (stream.lookahead(1)?.map(|t| t.kind), stream.lookahead(2)?.map(|t| t.kind)) {
+            // if the next token is `(` or `&` followed by `(`, then we know this is a closure
+            (Some(T!["("]), _) | (Some(T!["&"]), Some(T!["("])) => Statement::Expression(ExpressionStatement {
+                expression: {
+                    self.arena.alloc(Expression::Closure(self.parse_closure_with_attributes(stream, attributes)?))
+                },
+                terminator: self.parse_terminator(stream)?,
+            }),
+            _ => {
+                // otherwise, we know this is a function
+                Statement::Function(self.parse_function_with_attributes(stream, attributes)?)
+            }
+        })
+    }
 }

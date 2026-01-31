@@ -1,4 +1,5 @@
 use bumpalo::Bump;
+use bumpalo::collections::Vec;
 
 use mago_database::file::File;
 use mago_database::file::FileId;
@@ -7,65 +8,89 @@ use mago_syntax_core::input::Input;
 
 use crate::ast::Program;
 use crate::ast::sequence::Sequence;
-use crate::lexer::Lexer;
-
 use crate::error::ParseError;
-use crate::parser::internal::statement::parse_statement;
-use crate::parser::internal::token_stream::TokenStream;
+use crate::lexer::Lexer;
+use crate::parser::stream::TokenStream;
 
 mod internal;
 
-pub fn parse_file<'arena>(arena: &'arena Bump, file: &File) -> (&'arena Program<'arena>, Option<ParseError>) {
-    parse_file_content(arena, file.file_id(), file.contents.as_ref())
+pub mod stream;
+
+#[derive(Debug, Default)]
+pub struct State {
+    pub within_indirect_variable: bool,
+    pub within_string_interpolation: bool,
 }
 
-pub fn parse_file_content<'arena>(
-    arena: &'arena Bump,
-    file_id: FileId,
-    content: &str,
-) -> (&'arena Program<'arena>, Option<ParseError>) {
-    let source_text = arena.alloc_str(content);
-    let input = Input::new(file_id, source_text.as_bytes());
-    let lexer = Lexer::new(arena, input);
+/// The main parser for PHP source code.
+///
+/// The parser holds an arena reference for allocations and provides methods
+/// for parsing PHP files into AST nodes.
+#[derive(Debug)]
+pub struct Parser<'arena> {
+    pub(crate) arena: &'arena Bump,
+    pub(crate) state: State,
+    errors: Vec<'arena, ParseError>,
+}
 
-    let mut stream = TokenStream::new(arena, lexer);
+impl<'arena> Parser<'arena> {
+    /// Creates a new parser with the given arena for allocations.
+    #[inline]
+    pub fn new(arena: &'arena Bump) -> Self {
+        Self { arena, state: Default::default(), errors: Vec::new_in(arena) }
+    }
 
-    let mut error = None;
-    let statements = {
-        let mut statements = stream.new_vec();
+    /// Parses a file and returns the program AST along with any parse errors.
+    pub fn parse(self, file: &File) -> &'arena Program<'arena> {
+        self.parse_content(file.file_id(), file.contents.as_ref())
+    }
+
+    /// Parses content with a given file ID and returns the program AST along with any parse errors.
+    pub fn parse_content<'input>(mut self, file_id: FileId, content: &'input str) -> &'arena Program<'arena> {
+        let source_text = self.arena.alloc_str(content);
+
+        let input = Input::new(file_id, source_text.as_bytes());
+        let lexer = Lexer::new(self.arena, input);
+        let mut stream = TokenStream::new(self.arena, lexer);
+        let mut statements = Vec::new_in(self.arena);
 
         loop {
-            match stream.has_reached_eof() {
-                Ok(false) => match parse_statement(&mut stream) {
-                    Ok(statement) => {
-                        statements.push(statement);
-                    }
-                    Err(parse_error) => {
-                        error = Some(parse_error);
-
-                        break;
-                    }
-                },
-                Ok(true) => {
+            let reached_eof = match stream.has_reached_eof() {
+                Ok(eof) => eof,
+                Err(err) => {
+                    self.errors.push(ParseError::from(err));
                     break;
                 }
-                Err(syntax_error) => {
-                    error = Some(ParseError::from(syntax_error));
+            };
+
+            if reached_eof {
+                break;
+            }
+
+            match self.parse_statement(&mut stream) {
+                Ok(statement) => statements.push(statement),
+                Err(err) => {
+                    self.errors.push(err);
 
                     break;
                 }
             }
         }
 
-        statements
-    };
+        self.arena.alloc(Program {
+            file_id,
+            source_text,
+            statements: Sequence::new(statements),
+            trivia: stream.get_trivia(),
+            errors: self.errors,
+        })
+    }
+}
 
-    let program = arena.alloc(Program {
-        file_id: stream.file_id(),
-        source_text,
-        statements: Sequence::new(statements),
-        trivia: stream.get_trivia(),
-    });
+pub fn parse_file<'arena>(arena: &'arena Bump, file: &File) -> &'arena Program<'arena> {
+    Parser::new(arena).parse(file)
+}
 
-    (program, error)
+pub fn parse_file_content<'arena>(arena: &'arena Bump, file_id: FileId, content: &str) -> &'arena Program<'arena> {
+    Parser::new(arena).parse_content(file_id, content)
 }

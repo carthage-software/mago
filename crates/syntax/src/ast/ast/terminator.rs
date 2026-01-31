@@ -20,6 +20,9 @@ pub enum Terminator<'arena> {
     ClosingTag(ClosingTag),
     /// A closing tag followed immediately by an opening tag.
     TagPair(ClosingTag, OpeningTag<'arena>),
+    /// Missing terminator.
+    #[strum(disabled)]
+    Missing(Span),
 }
 
 impl Terminator<'_> {
@@ -42,6 +45,7 @@ impl HasSpan for Terminator<'_> {
             Terminator::Semicolon(s) => *s,
             Terminator::ClosingTag(t) => t.span(),
             Terminator::TagPair(c, o) => c.span().join(o.span()),
+            Terminator::Missing(s) => *s,
         }
     }
 }

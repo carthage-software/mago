@@ -7,136 +7,70 @@ use crate::ast::ast::List;
 use crate::ast::ast::MissingArrayElement;
 use crate::ast::ast::ValueArrayElement;
 use crate::ast::ast::VariadicArrayElement;
-use crate::ast::sequence::TokenSeparatedSequence;
 use crate::error::ParseError;
-use crate::parser::internal::expression::parse_expression;
-use crate::parser::internal::token_stream::TokenStream;
-use crate::parser::internal::utils;
+use crate::parser::Parser;
+use crate::parser::stream::TokenStream;
 
-pub fn parse_array<'arena>(stream: &mut TokenStream<'_, 'arena>) -> Result<Array<'arena>, ParseError> {
-    Ok(Array {
-        left_bracket: utils::expect_span(stream, T!["["])?,
-        elements: {
-            let mut element = stream.new_vec();
-            let mut commas = stream.new_vec();
-            loop {
-                let next = utils::peek(stream)?;
-                if next.kind == T!["]"] {
-                    break;
-                }
+impl<'arena> Parser<'arena> {
+    pub(crate) fn parse_array(&mut self, stream: &mut TokenStream<'_, 'arena>) -> Result<Array<'arena>, ParseError> {
+        let result = self.parse_comma_separated_sequence(stream, T!["["], T!["]"], |p, s| p.parse_array_element(s))?;
 
-                element.push(parse_array_element(stream)?);
+        Ok(Array { left_bracket: result.open, elements: result.sequence, right_bracket: result.close })
+    }
 
-                let next = utils::peek(stream)?;
-                if next.kind == T![","] {
-                    commas.push(utils::expect_any(stream)?);
-                } else {
-                    break;
+    pub(crate) fn parse_list(&mut self, stream: &mut TokenStream<'_, 'arena>) -> Result<List<'arena>, ParseError> {
+        let list = self.expect_keyword(stream, T!["list"])?;
+        let result = self.parse_comma_separated_sequence(stream, T!["("], T![")"], |p, s| p.parse_array_element(s))?;
+
+        Ok(List { list, left_parenthesis: result.open, elements: result.sequence, right_parenthesis: result.close })
+    }
+
+    pub(crate) fn parse_legacy_array(
+        &mut self,
+        stream: &mut TokenStream<'_, 'arena>,
+    ) -> Result<LegacyArray<'arena>, ParseError> {
+        let array = self.expect_keyword(stream, T!["array"])?;
+        let result = self.parse_comma_separated_sequence(stream, T!["("], T![")"], |p, s| p.parse_array_element(s))?;
+
+        Ok(LegacyArray {
+            array,
+            left_parenthesis: result.open,
+            elements: result.sequence,
+            right_parenthesis: result.close,
+        })
+    }
+
+    pub(crate) fn parse_array_element(
+        &mut self,
+        stream: &mut TokenStream<'_, 'arena>,
+    ) -> Result<ArrayElement<'arena>, ParseError> {
+        Ok(match stream.lookahead(0)?.map(|t| t.kind) {
+            Some(T!["..."]) => {
+                let ellipsis = stream.consume()?.span;
+                ArrayElement::Variadic(VariadicArrayElement {
+                    ellipsis,
+                    value: self.arena.alloc(self.parse_expression(stream)?),
+                })
+            }
+            Some(T![","]) => {
+                let next = stream.lookahead(0)?.ok_or_else(|| stream.unexpected(None, &[]))?;
+                ArrayElement::Missing(MissingArrayElement { comma: next.span })
+            }
+            _ => {
+                let expr = self.arena.alloc(self.parse_expression(stream)?);
+
+                match stream.lookahead(0)?.map(|t| t.kind) {
+                    Some(T!["=>"]) => {
+                        let double_arrow = stream.consume()?.span;
+                        ArrayElement::KeyValue(KeyValueArrayElement {
+                            key: expr,
+                            double_arrow,
+                            value: self.arena.alloc(self.parse_expression(stream)?),
+                        })
+                    }
+                    _ => ArrayElement::Value(ValueArrayElement { value: expr }),
                 }
             }
-
-            TokenSeparatedSequence::new(element, commas)
-        },
-        right_bracket: utils::expect_span(stream, T!["]"])?,
-    })
-}
-
-pub fn parse_list<'arena>(stream: &mut TokenStream<'_, 'arena>) -> Result<List<'arena>, ParseError> {
-    Ok(List {
-        list: utils::expect_keyword(stream, T!["list"])?,
-        left_parenthesis: utils::expect_span(stream, T!["("])?,
-        elements: {
-            let mut element = stream.new_vec();
-            let mut commas = stream.new_vec();
-            loop {
-                let next = utils::peek(stream)?;
-                if next.kind == T![")"] {
-                    break;
-                }
-
-                element.push(parse_array_element(stream)?);
-
-                let next = utils::peek(stream)?;
-                if next.kind == T![","] {
-                    commas.push(utils::expect_any(stream)?);
-                } else {
-                    break;
-                }
-            }
-            TokenSeparatedSequence::new(element, commas)
-        },
-        right_parenthesis: utils::expect_span(stream, T![")"])?,
-    })
-}
-
-pub fn parse_legacy_array<'arena>(stream: &mut TokenStream<'_, 'arena>) -> Result<LegacyArray<'arena>, ParseError> {
-    Ok(LegacyArray {
-        array: utils::expect_keyword(stream, T!["array"])?,
-        left_parenthesis: utils::expect_span(stream, T!["("])?,
-        elements: {
-            let mut element = stream.new_vec();
-            let mut commas = stream.new_vec();
-            loop {
-                let next = utils::peek(stream)?;
-                if next.kind == T![")"] {
-                    break;
-                }
-
-                element.push(parse_array_element(stream)?);
-
-                let next = utils::peek(stream)?;
-                if next.kind == T![","] {
-                    commas.push(utils::expect_any(stream)?);
-                } else {
-                    break;
-                }
-            }
-            TokenSeparatedSequence::new(element, commas)
-        },
-        right_parenthesis: utils::expect_span(stream, T![")"])?,
-    })
-}
-
-pub fn parse_array_element<'arena>(stream: &mut TokenStream<'_, 'arena>) -> Result<ArrayElement<'arena>, ParseError> {
-    Ok(match utils::maybe_peek(stream)?.map(|t| t.kind) {
-        Some(T!["..."]) => {
-            let ellipsis = utils::expect_any(stream)?.span;
-            let value = {
-                let expression = parse_expression(stream)?;
-
-                stream.alloc(expression)
-            };
-
-            ArrayElement::Variadic(VariadicArrayElement { ellipsis, value })
-        }
-        Some(T![","]) => {
-            let comma = utils::peek(stream)?.span;
-
-            ArrayElement::Missing(MissingArrayElement { comma })
-        }
-        _ => {
-            let expression = {
-                let expression = parse_expression(stream)?;
-
-                stream.alloc(expression)
-            };
-
-            match utils::maybe_peek(stream)?.map(|t| t.kind) {
-                Some(T!["=>"]) => {
-                    let double_arrow = utils::expect_any(stream)?.span;
-
-                    ArrayElement::KeyValue(KeyValueArrayElement {
-                        key: expression,
-                        double_arrow,
-                        value: {
-                            let expression = parse_expression(stream)?;
-
-                            stream.alloc(expression)
-                        },
-                    })
-                }
-                _ => ArrayElement::Value(ValueArrayElement { value: expression }),
-            }
-        }
-    })
+        })
+    }
 }

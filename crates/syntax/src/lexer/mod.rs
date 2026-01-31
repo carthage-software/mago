@@ -107,8 +107,8 @@ impl<'input, 'arena> Lexer<'input, 'arena> {
     }
 
     /// Get the current position of the lexer in the input source code.
-    #[must_use]
-    pub fn get_position(&self) -> Position {
+    #[inline]
+    pub const fn current_position(&self) -> Position {
         self.input.current_position()
     }
 

@@ -4,7 +4,6 @@ use std::fmt::Debug;
 use bumpalo::Bump;
 use bumpalo::collections::CollectIn;
 use bumpalo::collections::Vec;
-use bumpalo::vec;
 
 use mago_database::file::HasFileId;
 use mago_span::Position;
@@ -12,16 +11,11 @@ use mago_span::Position;
 use crate::ast::sequence::Sequence;
 use crate::ast::trivia::Trivia;
 use crate::ast::trivia::TriviaKind;
+use crate::error::ParseError;
 use crate::error::SyntaxError;
 use crate::lexer::Lexer;
 use crate::token::Token;
 use crate::token::TokenKind;
-
-#[derive(Debug, Default)]
-pub struct State {
-    pub within_indirect_variable: bool,
-    pub within_string_interpolation: bool,
-}
 
 #[derive(Debug)]
 pub struct TokenStream<'input, 'arena> {
@@ -30,7 +24,6 @@ pub struct TokenStream<'input, 'arena> {
     buffer: VecDeque<Token<'arena>>,
     trivia: Vec<'arena, Token<'arena>>,
     position: Position,
-    pub(crate) state: State,
 }
 
 impl<'input, 'arena> TokenStream<'input, 'arena> {
@@ -38,7 +31,7 @@ impl<'input, 'arena> TokenStream<'input, 'arena> {
     const BUFFER_INITIAL_CAPACITY: usize = 8;
 
     pub fn new(arena: &'arena Bump, lexer: Lexer<'input, 'arena>) -> TokenStream<'input, 'arena> {
-        let position = lexer.get_position();
+        let position = lexer.current_position();
 
         TokenStream {
             arena,
@@ -46,29 +39,52 @@ impl<'input, 'arena> TokenStream<'input, 'arena> {
             buffer: VecDeque::with_capacity(Self::BUFFER_INITIAL_CAPACITY),
             trivia: Vec::new_in(arena),
             position,
-            state: State::default(),
         }
     }
 
-    pub fn str(&self, string: &str) -> &'arena str {
-        self.arena.alloc_str(string)
-    }
-
-    pub fn new_vec<T>(&self) -> Vec<'arena, T> {
-        Vec::new_in(self.arena)
-    }
-
-    pub fn new_vec_of<T>(&self, value: T) -> Vec<'arena, T> {
-        vec![in self.arena; value]
-    }
-
-    pub fn alloc<T>(&self, value: T) -> &'arena T {
-        self.arena().alloc(value)
+    /// Returns the current position of the stream within the source file.
+    ///
+    /// This position represents the end location of the most recently
+    /// consumed significant token via `advance()` or `consume()`.
+    #[inline]
+    pub const fn current_position(&self) -> Position {
+        self.position
     }
 
     #[inline]
-    pub const fn arena(&self) -> &'arena Bump {
-        self.arena
+    pub fn has_reached_eof(&mut self) -> Result<bool, SyntaxError> {
+        Ok(self.fill_buffer(1)?.is_none())
+    }
+
+    /// Consumes and returns the next significant token.
+    ///
+    /// Returns an error if EOF is reached or a lexer error occurs.
+    #[inline]
+    pub fn consume(&mut self) -> Result<Token<'arena>, ParseError> {
+        match self.advance() {
+            Some(Ok(token)) => Ok(token),
+            Some(Err(error)) => Err(error.into()),
+            None => Err(self.unexpected(None, &[])),
+        }
+    }
+
+    /// Consumes the next token only if it matches the expected kind.
+    ///
+    /// Returns the token if it matches, otherwise returns an error.
+    #[inline]
+    pub fn eat(&mut self, kind: TokenKind) -> Result<Token<'arena>, ParseError> {
+        let current = self.lookahead(0)?;
+        if let Some(token) = current {
+            if token.kind != kind {
+                return Err(self.unexpected(Some(token), &[kind]));
+            }
+
+            let token = self.consume()?;
+
+            Ok(token)
+        } else {
+            Err(self.unexpected(None, &[kind]))
+        }
     }
 
     /// Advances the stream to the next token in the input source code and returns it.
@@ -94,42 +110,37 @@ impl<'input, 'arena> TokenStream<'input, 'arena> {
         }
     }
 
-    /// Return the current position of the stream in the input source code.
+    /// Checks if the next token matches the given kind without consuming it.
+    ///
+    /// Returns `false` if at EOF.
     #[inline]
-    pub const fn get_position(&self) -> Position {
-        self.position
+    pub fn is_at(&mut self, kind: TokenKind) -> Result<bool, ParseError> {
+        match self.lookahead(0)? {
+            Some(token) => Ok(token.kind == kind),
+            None => Ok(false),
+        }
     }
 
-    #[inline]
-    pub fn has_reached_eof(&mut self) -> Result<bool, SyntaxError> {
-        Ok(self.fill_buffer(1)?.is_none())
-    }
-
-    /// Peeks at the next token in the input source code without consuming it.
+    /// Peeks at the nth (0-indexed) significant token ahead without consuming it.
     ///
-    /// This method returns the next token that the lexer would produce if `advance` were called.
-    ///
-    /// If the lexer has already read the entire input source code, this method will return `None`.
-    #[inline]
-    pub fn peek(&mut self) -> Option<Result<Token<'arena>, SyntaxError>> {
-        self.peek_nth(0)
-    }
-
-    /// Peeks at the `n`-th token in the input source code without consuming it.
-    ///
-    /// This method returns the `n`-th token that the lexer would produce if `advance` were called `n` times.
-    ///
-    /// If the lexer has already read the entire input source code, this method will return `None`.
-    #[inline]
-    pub fn peek_nth(&mut self, n: usize) -> Option<Result<Token<'arena>, SyntaxError>> {
-        // Ensure the buffer has at least n+1 tokens.
+    /// Returns `Ok(None)` if EOF is reached before the nth token.
+    #[inline(always)]
+    pub fn lookahead(&mut self, n: usize) -> Result<Option<Token<'arena>>, ParseError> {
         match self.fill_buffer(n + 1) {
-            Ok(Some(_)) => {
-                // Return the nth token (0-indexed) if available.
-                self.buffer.get(n).copied().map(Ok)
-            }
-            Ok(None) => None,
-            Err(error) => Some(Err(error)),
+            Ok(Some(_)) => Ok(self.buffer.get(n).copied()),
+            Ok(None) => Ok(None),
+            Err(error) => Err(error.into()),
+        }
+    }
+
+    /// Creates a `ParseError` for an unexpected token or EOF.
+    #[inline]
+    pub fn unexpected(&self, found: Option<Token<'_>>, expected: &[TokenKind]) -> ParseError {
+        let expected_kinds: Box<[TokenKind]> = expected.into();
+        if let Some(token) = found {
+            ParseError::UnexpectedToken(expected_kinds, token.kind, token.span)
+        } else {
+            ParseError::UnexpectedEndOfFile(expected_kinds, self.file_id(), self.current_position())
         }
     }
 

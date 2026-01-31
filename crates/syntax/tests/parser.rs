@@ -11,10 +11,9 @@ mod runner {
     pub fn smoke_test(name: &'static str, code: &'static str) {
         let arena = Bump::new();
         let file = File::ephemeral(Cow::Borrowed(name), Cow::Borrowed(code));
-
-        let (_program, error) = parse_file(&arena, &file);
-        if let Some(parse_error) = error {
-            panic!("Test case '{name}' failed to parse. Error: {parse_error}");
+        let program = parse_file(&arena, &file);
+        if !program.errors.is_empty() {
+            panic!("Test case '{name}' failed to parse. Errors: {:?}", program.errors);
         }
     }
 
@@ -204,9 +203,9 @@ mod runner {
         let arena = Bump::new();
         let file = File::ephemeral(Cow::Borrowed(name), Cow::Owned(code));
 
-        let (program, error) = parse_file(&arena, &file);
-        if let Some(parse_error) = error {
-            panic!("Test case '{name}' failed to parse. Error: {parse_error}");
+        let program = parse_file(&arena, &file);
+        if !program.errors.is_empty() {
+            panic!("Test case '{name}' failed to parse. Errors: {:?}", program.errors);
         }
 
         let statement = program.statements.get(1).expect("Expected an expression statement here");

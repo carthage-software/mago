@@ -42,6 +42,7 @@
 //! The `--names` mode shows how identifiers are resolved to fully-qualified names,
 //! taking into account use statements and namespace context.
 
+use std::path::Path;
 use std::path::PathBuf;
 use std::process::ExitCode;
 
@@ -54,13 +55,13 @@ use termtree::Tree;
 use unicode_width::UnicodeWidthStr;
 
 use mago_database::Database;
+use mago_database::DatabaseConfiguration;
 use mago_database::file::File;
 use mago_database::file::FileType;
 use mago_names::resolver::NameResolver;
 use mago_reporting::Issue;
 use mago_reporting::IssueCollection;
 use mago_syntax::ast::*;
-use mago_syntax::error::ParseError;
 use mago_syntax::lexer::Lexer;
 use mago_syntax::parser::parse_file;
 use mago_syntax_core::input::Input;
@@ -138,21 +139,10 @@ impl AstCommand {
             return self.print_tokens(configuration, color_choice, &arena, file);
         }
 
-        let (program, error) = parse_file(&arena, &file);
-
-        if self.json {
-            print_ast_json(program, error.as_ref())?;
-        } else if self.names {
-            print_names(&arena, program)?;
-        } else {
-            print_ast_tree(program);
-        }
-
-        if let Some(error) = error {
-            let issues = IssueCollection::from([Into::<Issue>::into(&error)]);
-            let config =
-                mago_database::DatabaseConfiguration::new(std::path::Path::new("/"), vec![], vec![], vec![], vec![])
-                    .into_static();
+        let program = parse_file(&arena, &file);
+        if program.has_errors() {
+            let issues = IssueCollection::from(program.errors.iter().map(Issue::from).collect::<Vec<_>>());
+            let config = DatabaseConfiguration::new(Path::new("/"), vec![], vec![], vec![], vec![]).into_static();
             let mut database = Database::single(file, config);
             let orchestrator = create_orchestrator(&configuration, color_choice, false, true, false);
 
@@ -163,6 +153,14 @@ impl AstCommand {
                 None,
                 false,
             );
+        }
+
+        if self.json {
+            print_ast_json(program)?;
+        } else if self.names {
+            print_names(&arena, program)?;
+        } else {
+            print_ast_tree(program);
         }
 
         Ok(ExitCode::SUCCESS)
@@ -183,14 +181,8 @@ impl AstCommand {
                 Some(Ok(token)) => tokens.push(token),
                 Some(Err(err)) => {
                     let issue = Into::<Issue>::into(&err);
-                    let config = mago_database::DatabaseConfiguration::new(
-                        std::path::Path::new("/"),
-                        vec![],
-                        vec![],
-                        vec![],
-                        vec![],
-                    )
-                    .into_static();
+                    let config =
+                        DatabaseConfiguration::new(Path::new("/"), vec![], vec![], vec![], vec![]).into_static();
                     let mut database = Database::single(file, config);
                     let orchestrator = create_orchestrator(&configuration, color_choice, false, true, false);
 
@@ -246,10 +238,9 @@ fn print_ast_tree(program: &Program) {
 }
 
 /// Prints the AST in a machine-readable, pretty-printed JSON format.
-fn print_ast_json(program: &Program, error: Option<&ParseError>) -> Result<(), Error> {
+fn print_ast_json(program: &Program) -> Result<(), Error> {
     let result = json!({
         "program": program,
-        "error": error.map(Into::<Issue>::into),
     });
 
     println!("{}", serde_json::to_string_pretty(&result)?);

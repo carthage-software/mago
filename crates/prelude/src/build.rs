@@ -73,7 +73,11 @@ fn get_prelude_metadata(arena: &Bump, database: &ReadDatabase) -> CodebaseMetada
 }
 
 fn scan_file_for_metadata(source_file: &File, arena: &Bump) -> CodebaseMetadata {
-    let (program, _) = parse_file(arena, source_file);
+    let program = parse_file(arena, source_file);
+    if program.has_errors() {
+        panic!("Prelude file '{}' has parse errors, which is not allowed.", source_file.name);
+    }
+
     let resolver = NameResolver::new(arena);
     let resolved_names = resolver.resolve(program);
 

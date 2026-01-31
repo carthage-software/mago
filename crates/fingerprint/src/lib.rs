@@ -157,7 +157,8 @@ mod tests {
     pub(crate) fn fingerprint_code(code: &'static str) -> u64 {
         let arena = Bump::new();
         let file = File::ephemeral("code.php".into(), code.into());
-        let (program, _parse_error) = parse_file(&arena, &file);
+        let program = parse_file(&arena, &file);
+        assert!(!program.has_errors(), "Failed to parse code, errors: {:?}", program.errors);
         let resolved_names = NameResolver::new(&arena).resolve(program);
         let options = FingerprintOptions::default();
 

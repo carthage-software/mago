@@ -3,67 +3,64 @@ use crate::ast::ast::Echo;
 use crate::ast::ast::EchoTag;
 use crate::ast::sequence::TokenSeparatedSequence;
 use crate::error::ParseError;
-use crate::parser::internal::expression::parse_expression;
-use crate::parser::internal::terminator::parse_terminator;
-use crate::parser::internal::token_stream::TokenStream;
-use crate::parser::internal::utils;
+use crate::parser::Parser;
+use crate::parser::stream::TokenStream;
 
-pub fn parse_echo_tag<'arena>(stream: &mut TokenStream<'_, 'arena>) -> Result<EchoTag<'arena>, ParseError> {
-    Ok(EchoTag {
-        tag: utils::expect_span(stream, T!["<?="])?,
-        values: {
-            let mut values = stream.new_vec();
-            let mut commas = stream.new_vec();
+impl<'arena> Parser<'arena> {
+    pub(crate) fn parse_echo_tag(
+        &mut self,
+        stream: &mut TokenStream<'_, 'arena>,
+    ) -> Result<EchoTag<'arena>, ParseError> {
+        Ok(EchoTag {
+            tag: stream.eat(T!["<?="])?.span,
+            values: {
+                let mut values = self.new_vec();
+                let mut commas = self.new_vec();
 
-            loop {
-                if matches!(utils::peek(stream)?.kind, T!["?>" | ";"]) {
-                    break;
-                }
-
-                values.push(parse_expression(stream)?);
-
-                match utils::peek(stream)?.kind {
-                    T![","] => {
-                        commas.push(utils::expect_any(stream)?);
+                loop {
+                    if matches!(stream.lookahead(0)?.map(|t| t.kind), Some(T!["?>" | ";"])) {
+                        break;
                     }
-                    _ => {
+
+                    values.push(self.parse_expression(stream)?);
+
+                    if let Some(T![","]) = stream.lookahead(0)?.map(|t| t.kind) {
+                        commas.push(stream.consume()?);
+                    } else {
                         break;
                     }
                 }
-            }
 
-            TokenSeparatedSequence::new(values, commas)
-        },
-        terminator: parse_terminator(stream)?,
-    })
-}
+                TokenSeparatedSequence::new(values, commas)
+            },
+            terminator: self.parse_terminator(stream)?,
+        })
+    }
 
-pub fn parse_echo<'arena>(stream: &mut TokenStream<'_, 'arena>) -> Result<Echo<'arena>, ParseError> {
-    Ok(Echo {
-        echo: utils::expect_keyword(stream, T!["echo"])?,
-        values: {
-            let mut values = stream.new_vec();
-            let mut commas = stream.new_vec();
+    pub(crate) fn parse_echo(&mut self, stream: &mut TokenStream<'_, 'arena>) -> Result<Echo<'arena>, ParseError> {
+        Ok(Echo {
+            echo: self.expect_keyword(stream, T!["echo"])?,
+            values: {
+                let mut values = self.new_vec();
+                let mut commas = self.new_vec();
 
-            loop {
-                if matches!(utils::peek(stream)?.kind, T!["?>" | ";"]) {
-                    break;
-                }
-
-                values.push(parse_expression(stream)?);
-
-                match utils::peek(stream)?.kind {
-                    T![","] => {
-                        commas.push(utils::expect_any(stream)?);
+                loop {
+                    if matches!(stream.lookahead(0)?.map(|t| t.kind), Some(T!["?>" | ";"])) {
+                        break;
                     }
-                    _ => {
+
+                    values.push(self.parse_expression(stream)?);
+
+                    if let Some(T![","]) = stream.lookahead(0)?.map(|t| t.kind) {
+                        commas.push(stream.consume()?);
+                    } else {
                         break;
                     }
                 }
-            }
 
-            TokenSeparatedSequence::new(values, commas)
-        },
-        terminator: parse_terminator(stream)?,
-    })
+                TokenSeparatedSequence::new(values, commas)
+            },
+            terminator: self.parse_terminator(stream)?,
+        })
+    }
 }

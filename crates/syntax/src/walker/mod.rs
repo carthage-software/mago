@@ -475,6 +475,9 @@ generate_ast_walker! {
                 walker.walk_closing_tag(closing_tag, context);
                 walker.walk_opening_tag(opening_tag, context);
             }
+            Terminator::Missing(_) => {
+                // Do nothing by default
+            }
         }
     }
 

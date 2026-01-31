@@ -1,20 +1,19 @@
 use crate::T;
 use crate::ast::ast::Instantiation;
 use crate::error::ParseError;
-use crate::parser::internal::argument::parse_optional_argument_list;
-use crate::parser::internal::expression::parse_expression_with_precedence;
-use crate::parser::internal::token_stream::TokenStream;
-use crate::parser::internal::utils;
+use crate::parser::Parser;
+use crate::parser::stream::TokenStream;
 use crate::token::Precedence;
 
-pub fn parse_instantiation<'arena>(stream: &mut TokenStream<'_, 'arena>) -> Result<Instantiation<'arena>, ParseError> {
-    Ok(Instantiation {
-        new: utils::expect_keyword(stream, T!["new"])?,
-        class: {
-            let expression = parse_expression_with_precedence(stream, Precedence::New)?;
-
-            stream.alloc(expression)
-        },
-        argument_list: parse_optional_argument_list(stream)?,
-    })
+impl<'arena> Parser<'arena> {
+    pub(crate) fn parse_instantiation(
+        &mut self,
+        stream: &mut TokenStream<'_, 'arena>,
+    ) -> Result<Instantiation<'arena>, ParseError> {
+        Ok(Instantiation {
+            new: self.expect_keyword(stream, T!["new"])?,
+            class: self.arena.alloc(self.parse_expression_with_precedence(stream, Precedence::New)?),
+            argument_list: self.parse_optional_argument_list(stream)?,
+        })
+    }
 }

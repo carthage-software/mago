@@ -2,26 +2,27 @@ use crate::T;
 use crate::ast::ast::Block;
 use crate::ast::sequence::Sequence;
 use crate::error::ParseError;
-use crate::parser::internal::statement::parse_statement;
-use crate::parser::internal::token_stream::TokenStream;
-use crate::parser::internal::utils;
+use crate::parser::Parser;
+use crate::parser::stream::TokenStream;
 
-pub fn parse_block<'arena>(stream: &mut TokenStream<'_, 'arena>) -> Result<Block<'arena>, ParseError> {
-    Ok(Block {
-        left_brace: utils::expect_span(stream, T!["{"])?,
-        statements: {
-            let mut statements = stream.new_vec();
-            loop {
-                let next = utils::peek(stream)?;
-                if matches!(next.kind, T!["}"]) {
-                    break;
+impl<'arena> Parser<'arena> {
+    pub(crate) fn parse_block(&mut self, stream: &mut TokenStream<'_, 'arena>) -> Result<Block<'arena>, ParseError> {
+        let left_brace = stream.eat(T!["{"])?.span;
+        let mut statements = self.new_vec();
+
+        loop {
+            match stream.lookahead(0)?.map(|t| t.kind) {
+                Some(T!["}"]) => break,
+                Some(_) => statements.push(self.parse_statement(stream)?),
+                None => {
+                    // EOF without closing brace
+                    return Err(stream.unexpected(None, &[T!["}"]]));
                 }
-
-                statements.push(parse_statement(stream)?);
             }
+        }
 
-            Sequence::new(statements)
-        },
-        right_brace: utils::expect_span(stream, T!["}"])?,
-    })
+        let right_brace = stream.eat(T!["}"])?.span;
+
+        Ok(Block { left_brace, statements: Sequence::new(statements), right_brace })
+    }
 }

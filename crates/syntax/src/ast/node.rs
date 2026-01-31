@@ -2271,6 +2271,7 @@ impl<'ast, 'arena> Node<'ast, 'arena> {
                 Terminator::TagPair(closing_tag, opening_tag) => {
                     vec![Node::ClosingTag(closing_tag), Node::OpeningTag(opening_tag)]
                 }
+                Terminator::Missing(_) => vec![],
             },
             Node::Throw(node) => vec![Node::Keyword(&node.throw), Node::Expression(node.exception)],
             Node::Hint(node) => match &node {

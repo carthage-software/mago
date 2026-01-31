@@ -50,8 +50,10 @@ fn test_guard(name: &'static str, code: &'static str, settings: Settings) -> For
     let source_file = database.get_ref(&file_id).expect("File just added should exist");
 
     let arena = Bump::new();
-    let (program, parse_issues) = parse_file(&arena, source_file);
-    assert!(parse_issues.is_none(), "Test '{name}' failed during parsing:\n{parse_issues:#?}");
+    let program = parse_file(&arena, source_file);
+    if program.has_errors() {
+        panic!("Failed to parse code for guard test, errors: {:?}", program.errors);
+    }
 
     let resolver = NameResolver::new(&arena);
     let resolved_names = resolver.resolve(program);

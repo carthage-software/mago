@@ -5,118 +5,114 @@ use crate::ast::ast::ForColonDelimitedBody;
 use crate::ast::sequence::Sequence;
 use crate::ast::sequence::TokenSeparatedSequence;
 use crate::error::ParseError;
-use crate::parser::internal::expression::parse_expression;
-use crate::parser::internal::statement::parse_statement;
-use crate::parser::internal::terminator::parse_terminator;
-use crate::parser::internal::token_stream::TokenStream;
-use crate::parser::internal::utils;
+use crate::parser::Parser;
+use crate::parser::stream::TokenStream;
 
-pub fn parse_for<'arena>(stream: &mut TokenStream<'_, 'arena>) -> Result<For<'arena>, ParseError> {
-    Ok(For {
-        r#for: utils::expect_keyword(stream, T!["for"])?,
-        left_parenthesis: utils::expect_span(stream, T!["("])?,
-        initializations: {
-            let mut initializations = stream.new_vec();
-            let mut commas = stream.new_vec();
-            loop {
-                if matches!(utils::peek(stream)?.kind, T![";"]) {
-                    break;
-                }
-
-                initializations.push(parse_expression(stream)?);
-
-                match utils::peek(stream)?.kind {
-                    T![","] => {
-                        commas.push(utils::expect_any(stream)?);
-                    }
-                    _ => {
+impl<'arena> Parser<'arena> {
+    pub(crate) fn parse_for(&mut self, stream: &mut TokenStream<'_, 'arena>) -> Result<For<'arena>, ParseError> {
+        Ok(For {
+            r#for: self.expect_keyword(stream, T!["for"])?,
+            left_parenthesis: stream.eat(T!["("])?.span,
+            initializations: {
+                let mut initializations = self.new_vec();
+                let mut commas = self.new_vec();
+                loop {
+                    if matches!(stream.lookahead(0)?.map(|t| t.kind), Some(T![";"])) {
                         break;
                     }
-                }
-            }
 
-            TokenSeparatedSequence::new(initializations, commas)
-        },
-        initializations_semicolon: utils::expect_span(stream, T![";"])?,
-        conditions: {
-            let mut conditions = stream.new_vec();
-            let mut commas = stream.new_vec();
-            loop {
-                if matches!(utils::peek(stream)?.kind, T![";"]) {
-                    break;
-                }
+                    initializations.push(self.parse_expression(stream)?);
 
-                conditions.push(parse_expression(stream)?);
-
-                match utils::peek(stream)?.kind {
-                    T![","] => {
-                        commas.push(utils::expect_any(stream)?);
+                    match stream.lookahead(0)?.map(|t| t.kind) {
+                        Some(T![","]) => {
+                            commas.push(stream.consume()?);
+                        }
+                        _ => {
+                            break;
+                        }
                     }
-                    _ => {
+                }
+
+                TokenSeparatedSequence::new(initializations, commas)
+            },
+            initializations_semicolon: stream.eat(T![";"])?.span,
+            conditions: {
+                let mut conditions = self.new_vec();
+                let mut commas = self.new_vec();
+                loop {
+                    if matches!(stream.lookahead(0)?.map(|t| t.kind), Some(T![";"])) {
                         break;
                     }
-                }
-            }
 
-            TokenSeparatedSequence::new(conditions, commas)
-        },
-        conditions_semicolon: utils::expect_span(stream, T![";"])?,
-        increments: {
-            let mut increments = stream.new_vec();
-            let mut commas = stream.new_vec();
-            loop {
-                if matches!(utils::peek(stream)?.kind, T![")"]) {
-                    break;
-                }
+                    conditions.push(self.parse_expression(stream)?);
 
-                increments.push(parse_expression(stream)?);
-
-                match utils::peek(stream)?.kind {
-                    T![","] => {
-                        commas.push(utils::expect_any(stream)?);
+                    match stream.lookahead(0)?.map(|t| t.kind) {
+                        Some(T![","]) => {
+                            commas.push(stream.consume()?);
+                        }
+                        _ => {
+                            break;
+                        }
                     }
-                    _ => {
+                }
+
+                TokenSeparatedSequence::new(conditions, commas)
+            },
+            conditions_semicolon: stream.eat(T![";"])?.span,
+            increments: {
+                let mut increments = self.new_vec();
+                let mut commas = self.new_vec();
+                loop {
+                    if matches!(stream.lookahead(0)?.map(|t| t.kind), Some(T![")"])) {
                         break;
                     }
-                }
-            }
 
-            TokenSeparatedSequence::new(increments, commas)
-        },
-        right_parenthesis: utils::expect_span(stream, T![")"])?,
-        body: parse_for_body(stream)?,
-    })
-}
+                    increments.push(self.parse_expression(stream)?);
 
-pub fn parse_for_body<'arena>(stream: &mut TokenStream<'_, 'arena>) -> Result<ForBody<'arena>, ParseError> {
-    Ok(match utils::peek(stream)?.kind {
-        T![":"] => ForBody::ColonDelimited(parse_for_colon_delimited_body(stream)?),
-        _ => ForBody::Statement({
-            let stmt = parse_statement(stream)?;
-
-            stream.alloc(stmt)
-        }),
-    })
-}
-
-pub fn parse_for_colon_delimited_body<'arena>(
-    stream: &mut TokenStream<'_, 'arena>,
-) -> Result<ForColonDelimitedBody<'arena>, ParseError> {
-    Ok(ForColonDelimitedBody {
-        colon: utils::expect_span(stream, T![":"])?,
-        statements: {
-            let mut statements = stream.new_vec();
-            loop {
-                if matches!(utils::peek(stream)?.kind, T!["endfor"]) {
-                    break;
+                    match stream.lookahead(0)?.map(|t| t.kind) {
+                        Some(T![","]) => {
+                            commas.push(stream.consume()?);
+                        }
+                        _ => {
+                            break;
+                        }
+                    }
                 }
 
-                statements.push(parse_statement(stream)?);
-            }
+                TokenSeparatedSequence::new(increments, commas)
+            },
+            right_parenthesis: stream.eat(T![")"])?.span,
+            body: self.parse_for_body(stream)?,
+        })
+    }
 
-            Sequence::new(statements)
-        },
-        end_for: utils::expect_keyword(stream, T!["endfor"])?,
-        terminator: parse_terminator(stream)?,
-    })
+    fn parse_for_body(&mut self, stream: &mut TokenStream<'_, 'arena>) -> Result<ForBody<'arena>, ParseError> {
+        Ok(match stream.lookahead(0)?.map(|t| t.kind) {
+            Some(T![":"]) => ForBody::ColonDelimited(self.parse_for_colon_delimited_body(stream)?),
+            _ => ForBody::Statement(self.arena.alloc(self.parse_statement(stream)?)),
+        })
+    }
+
+    fn parse_for_colon_delimited_body(
+        &mut self,
+        stream: &mut TokenStream<'_, 'arena>,
+    ) -> Result<ForColonDelimitedBody<'arena>, ParseError> {
+        Ok(ForColonDelimitedBody {
+            colon: stream.eat(T![":"])?.span,
+            statements: {
+                let mut statements = self.new_vec();
+                loop {
+                    if matches!(stream.lookahead(0)?.map(|t| t.kind), Some(T!["endfor"])) {
+                        break;
+                    }
+
+                    statements.push(self.parse_statement(stream)?);
+                }
+
+                Sequence::new(statements)
+            },
+            end_for: self.expect_keyword(stream, T!["endfor"])?,
+            terminator: self.parse_terminator(stream)?,
+        })
+    }
 }

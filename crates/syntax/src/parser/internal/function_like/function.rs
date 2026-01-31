@@ -3,24 +3,23 @@ use crate::ast::ast::AttributeList;
 use crate::ast::ast::Function;
 use crate::ast::sequence::Sequence;
 use crate::error::ParseError;
-use crate::parser::internal::block::parse_block;
-use crate::parser::internal::function_like::parameter::parse_function_like_parameter_list;
-use crate::parser::internal::function_like::r#return::parse_optional_function_like_return_type_hint;
-use crate::parser::internal::identifier::parse_local_identifier;
-use crate::parser::internal::token_stream::TokenStream;
-use crate::parser::internal::utils;
+use crate::parser::Parser;
+use crate::parser::stream::TokenStream;
 
-pub fn parse_function_with_attributes<'arena>(
-    stream: &mut TokenStream<'_, 'arena>,
-    attributes: Sequence<'arena, AttributeList<'arena>>,
-) -> Result<Function<'arena>, ParseError> {
-    Ok(Function {
-        attribute_lists: attributes,
-        function: utils::expect_keyword(stream, T!["function"])?,
-        ampersand: utils::maybe_expect(stream, T!["&"])?.map(|t| t.span),
-        name: parse_local_identifier(stream)?,
-        parameter_list: parse_function_like_parameter_list(stream)?,
-        return_type_hint: parse_optional_function_like_return_type_hint(stream)?,
-        body: parse_block(stream)?,
-    })
+impl<'arena> Parser<'arena> {
+    pub(crate) fn parse_function_with_attributes(
+        &mut self,
+        stream: &mut TokenStream<'_, 'arena>,
+        attributes: Sequence<'arena, AttributeList<'arena>>,
+    ) -> Result<Function<'arena>, ParseError> {
+        Ok(Function {
+            attribute_lists: attributes,
+            function: self.expect_keyword(stream, T!["function"])?,
+            ampersand: if stream.is_at(T!["&"])? { Some(stream.eat(T!["&"])?.span) } else { None },
+            name: self.parse_local_identifier(stream)?,
+            parameter_list: self.parse_function_like_parameter_list(stream)?,
+            return_type_hint: self.parse_optional_function_like_return_type_hint(stream)?,
+            body: self.parse_block(stream)?,
+        })
+    }
 }

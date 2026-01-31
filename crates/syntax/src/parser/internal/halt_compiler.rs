@@ -1,15 +1,19 @@
 use crate::T;
 use crate::ast::ast::HaltCompiler;
 use crate::error::ParseError;
-use crate::parser::internal::terminator::parse_terminator;
-use crate::parser::internal::token_stream::TokenStream;
-use crate::parser::internal::utils;
+use crate::parser::Parser;
+use crate::parser::stream::TokenStream;
 
-pub fn parse_halt_compiler<'arena>(stream: &mut TokenStream<'_, 'arena>) -> Result<HaltCompiler<'arena>, ParseError> {
-    Ok(HaltCompiler {
-        halt_compiler: utils::expect_one_of_keyword(stream, &[T!["__halt_compiler"]])?,
-        left_parenthesis: utils::expect_span(stream, T!["("])?,
-        right_parenthesis: utils::expect_span(stream, T![")"])?,
-        terminator: parse_terminator(stream)?,
-    })
+impl<'arena> Parser<'arena> {
+    pub(crate) fn parse_halt_compiler(
+        &mut self,
+        stream: &mut TokenStream<'_, 'arena>,
+    ) -> Result<HaltCompiler<'arena>, ParseError> {
+        Ok(HaltCompiler {
+            halt_compiler: self.expect_one_of_keyword(stream, &[T!["__halt_compiler"]])?,
+            left_parenthesis: stream.eat(T!["("])?.span,
+            right_parenthesis: stream.eat(T![")"])?.span,
+            terminator: self.parse_terminator(stream)?,
+        })
+    }
 }

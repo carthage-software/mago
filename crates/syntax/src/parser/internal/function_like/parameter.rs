@@ -2,83 +2,60 @@ use crate::T;
 use crate::ast::ast::FunctionLikeParameter;
 use crate::ast::ast::FunctionLikeParameterDefaultValue;
 use crate::ast::ast::FunctionLikeParameterList;
-use crate::ast::sequence::TokenSeparatedSequence;
 use crate::error::ParseError;
-use crate::parser::internal::attribute;
-use crate::parser::internal::class_like::property;
-use crate::parser::internal::expression;
-use crate::parser::internal::modifier;
-use crate::parser::internal::token_stream::TokenStream;
-use crate::parser::internal::type_hint;
-use crate::parser::internal::utils;
-use crate::parser::internal::variable;
-use crate::token::Token;
+use crate::parser::Parser;
+use crate::parser::stream::TokenStream;
 
-pub fn parse_optional_function_like_parameter_list<'arena>(
-    stream: &mut TokenStream<'_, 'arena>,
-) -> Result<Option<FunctionLikeParameterList<'arena>>, ParseError> {
-    Ok(match utils::maybe_peek(stream)?.map(|t| t.kind) {
-        Some(T!["("]) => Some(parse_function_like_parameter_list(stream)?),
-        _ => None,
-    })
-}
+impl<'arena> Parser<'arena> {
+    pub(crate) fn parse_optional_function_like_parameter_list(
+        &mut self,
+        stream: &mut TokenStream<'_, 'arena>,
+    ) -> Result<Option<FunctionLikeParameterList<'arena>>, ParseError> {
+        Ok(match stream.lookahead(0)?.map(|t| t.kind) {
+            Some(T!["("]) => Some(self.parse_function_like_parameter_list(stream)?),
+            _ => None,
+        })
+    }
 
-pub fn parse_function_like_parameter_list<'arena>(
-    stream: &mut TokenStream<'_, 'arena>,
-) -> Result<FunctionLikeParameterList<'arena>, ParseError> {
-    Ok(FunctionLikeParameterList {
-        left_parenthesis: utils::expect_span(stream, T!["("])?,
-        parameters: {
-            let mut parameters = stream.new_vec();
-            let mut commas = stream.new_vec();
-            loop {
-                let token = utils::peek(stream)?;
-                if T![")"] == token.kind {
-                    break;
-                }
+    pub(crate) fn parse_function_like_parameter_list(
+        &mut self,
+        stream: &mut TokenStream<'_, 'arena>,
+    ) -> Result<FunctionLikeParameterList<'arena>, ParseError> {
+        let result =
+            self.parse_comma_separated_sequence(stream, T!["("], T![")"], Self::parse_function_like_parameter)?;
 
-                let parameter = parse_function_like_parameter(stream)?;
-                parameters.push(parameter);
+        Ok(FunctionLikeParameterList {
+            left_parenthesis: result.open,
+            parameters: result.sequence,
+            right_parenthesis: result.close,
+        })
+    }
 
-                match utils::maybe_expect(stream, T![","])? {
-                    Some(comma) => {
-                        commas.push(comma);
-                    }
-                    None => break,
-                }
-            }
+    pub(crate) fn parse_function_like_parameter(
+        &mut self,
+        stream: &mut TokenStream<'_, 'arena>,
+    ) -> Result<FunctionLikeParameter<'arena>, ParseError> {
+        Ok(FunctionLikeParameter {
+            attribute_lists: self.parse_attribute_list_sequence(stream)?,
+            modifiers: self.parse_modifier_sequence(stream)?,
+            hint: self.parse_optional_type_hint(stream)?,
+            ampersand: if stream.is_at(T!["&"])? { Some(stream.eat(T!["&"])?.span) } else { None },
+            ellipsis: if stream.is_at(T!["..."])? { Some(stream.eat(T!["..."])?.span) } else { None },
+            variable: self.parse_direct_variable(stream)?,
+            default_value: self.parse_optional_function_like_parameter_default_value(stream)?,
+            hooks: self.parse_optional_property_hook_list(stream)?,
+        })
+    }
 
-            TokenSeparatedSequence::new(parameters, commas)
-        },
-        right_parenthesis: utils::expect_span(stream, T![")"])?,
-    })
-}
-
-pub fn parse_function_like_parameter<'arena>(
-    stream: &mut TokenStream<'_, 'arena>,
-) -> Result<FunctionLikeParameter<'arena>, ParseError> {
-    Ok(FunctionLikeParameter {
-        attribute_lists: attribute::parse_attribute_list_sequence(stream)?,
-        modifiers: modifier::parse_modifier_sequence(stream)?,
-        hint: type_hint::parse_optional_type_hint(stream)?,
-        ampersand: utils::maybe_expect(stream, T!["&"])?.map(|token| token.span),
-        ellipsis: utils::maybe_expect(stream, T!["..."])?.map(|token| token.span),
-        variable: variable::parse_direct_variable(stream)?,
-        default_value: parse_optional_function_like_parameter_default_value(stream)?,
-        hooks: property::parse_optional_property_hook_list(stream)?,
-    })
-}
-
-pub fn parse_optional_function_like_parameter_default_value<'arena>(
-    stream: &mut TokenStream<'_, 'arena>,
-) -> Result<Option<FunctionLikeParameterDefaultValue<'arena>>, ParseError> {
-    let token = utils::maybe_peek(stream)?;
-    if let Some(Token { kind: T!["="], .. }) = token {
-        Ok(Some(FunctionLikeParameterDefaultValue {
-            equals: utils::expect_any(stream)?.span,
-            value: expression::parse_expression(stream)?,
-        }))
-    } else {
-        Ok(None)
+    fn parse_optional_function_like_parameter_default_value(
+        &mut self,
+        stream: &mut TokenStream<'_, 'arena>,
+    ) -> Result<Option<FunctionLikeParameterDefaultValue<'arena>>, ParseError> {
+        Ok(if stream.is_at(T!["="])? {
+            let equals = stream.eat(T!["="])?.span;
+            Some(FunctionLikeParameterDefaultValue { equals, value: self.parse_expression(stream)? })
+        } else {
+            None
+        })
     }
 }
