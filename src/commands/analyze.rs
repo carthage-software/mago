@@ -33,23 +33,36 @@
 //! checking even for external symbols. Stubs can be disabled with `--no-stubs`
 //! for debugging or testing purposes.
 
+use std::borrow::Cow;
+use std::path::Path;
 use std::path::PathBuf;
 use std::process::ExitCode;
 use std::time::Duration;
+use std::time::UNIX_EPOCH;
 
 use clap::ColorChoice;
 use clap::Parser;
 
 use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::reference::SymbolReferences;
+use mago_codex::scanner::scan_program;
+use mago_codex::signature_builder;
 use mago_database::Database;
 use mago_database::DatabaseReader;
+use mago_database::DatabaseConfiguration;
+use mago_database::exclusion::Exclusion;
 use mago_database::file::FileType;
+use mago_database::loader::DatabaseLoader;
 use mago_database::watcher::DatabaseWatcher;
 use mago_database::watcher::WatchOptions;
+use mago_names::resolver::NameResolver;
 use mago_orchestrator::Orchestrator;
 use mago_orchestrator::incremental::IncrementalAnalysis;
 use mago_prelude::Prelude;
+use mago_reporting::Issue;
+use mago_reporting::IssueCollection;
+use mago_syntax::parser::parse_file;
+use rayon::prelude::*;
 
 use crate::commands::args::baseline_reporting::BaselineReportingArgs;
 use crate::config::Configuration;
@@ -115,6 +128,10 @@ pub struct AnalyzeCommand {
     #[arg(long, default_value_t = false)]
     pub watch: bool,
 
+    /// Cache includes to avoid re-scanning large vendor trees for targeted runs.
+    #[arg(long, default_value_t = false)]
+    pub cache_includes: bool,
+
     /// Arguments related to reporting issues with baseline support.
     #[clap(flatten)]
     pub baseline_reporting: BaselineReportingArgs,
@@ -155,11 +172,14 @@ impl AnalyzeCommand {
     /// the symbol table and type graph.
     pub fn execute(self, configuration: Configuration, color_choice: ColorChoice) -> Result<ExitCode, Error> {
         // 1. Establish the base prelude data.
-        let Prelude { database, metadata, symbol_references } = if self.no_stubs {
+        let Prelude { database, mut metadata, mut symbol_references } = if self.no_stubs {
             Prelude::default()
         } else {
             Prelude::decode(PRELUDE_BYTES).expect("Failed to decode embedded prelude")
         };
+
+        let original_paths = configuration.source.paths.clone();
+        let original_includes = configuration.source.includes.clone();
 
         let mut orchestrator = create_orchestrator(&configuration, color_choice, false, !self.watch, self.watch);
         orchestrator.add_exclude_patterns(configuration.analyzer.excludes.iter());
@@ -180,7 +200,49 @@ impl AnalyzeCommand {
             );
         }
 
-        let mut database = orchestrator.load_database(&configuration.source.workspace, true, Some(database))?;
+        let use_includes_cache = self.cache_includes && !original_includes.is_empty();
+        if use_includes_cache {
+            let includes = original_includes.clone();
+            let excludes = collect_excludes(&configuration);
+            let extensions = configuration.source.extensions.clone();
+            let cache_path = includes_cache_path(
+                &configuration.source.workspace,
+                &includes,
+                &excludes,
+                &extensions,
+            );
+
+            if let Some((cached_metadata, cached_references)) = load_includes_cache(&cache_path) {
+                metadata.extend(cached_metadata);
+                symbol_references.extend(cached_references);
+            } else {
+                let (cached_metadata, cached_references) = build_includes_codebase(
+                    &configuration.source.workspace,
+                    &includes,
+                    &excludes,
+                    &extensions,
+                )?;
+                save_includes_cache(&cache_path, cached_metadata.clone(), cached_references.clone());
+
+                metadata.extend(cached_metadata);
+                symbol_references.extend(cached_references);
+            }
+        }
+
+        let mut database = if use_includes_cache {
+            let live_includes = if self.path.is_empty() { Vec::new() } else { original_paths.clone() };
+            let include_externals = !live_includes.is_empty();
+            load_database_with_includes(
+                &configuration,
+                &orchestrator,
+                &configuration.source.workspace,
+                include_externals,
+                &live_includes,
+                Some(database),
+            )?
+        } else {
+            orchestrator.load_database(&configuration.source.workspace, true, Some(database))?
+        };
 
         if !database.files().any(|f| f.file_type == FileType::Host) {
             tracing::warn!("No files found to analyze.");
@@ -199,6 +261,10 @@ impl AnalyzeCommand {
 
         let mut issues = analysis_result.issues;
         issues.filter_out_ignored(&configuration.analyzer.ignore);
+        if use_includes_cache {
+            let database_view = database.read_only();
+            issues = filter_issues_for_database(issues, &database_view);
+        }
 
         let baseline = configuration.analyzer.baseline.as_deref();
         let baseline_variant = configuration.analyzer.baseline_variant;
@@ -298,4 +364,250 @@ impl AnalyzeCommand {
             tracing::info!("Analysis complete. Watching for changes...");
         }
     }
+}
+
+const INCLUDES_CACHE_VERSION: u32 = 1;
+
+#[derive(serde::Serialize, serde::Deserialize)]
+struct IncludesCacheData {
+    version: u32,
+    codebase: CodebaseMetadata,
+    references: SymbolReferences,
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+struct IncludesCacheFingerprint {
+    includes: Vec<String>,
+    excludes: Vec<String>,
+    extensions: Vec<String>,
+    composer_lock: Option<FileStamp>,
+    installed_json: Option<FileStamp>,
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+struct FileStamp {
+    len: u64,
+    modified_secs: u64,
+}
+
+fn includes_cache_path(
+    workspace: &Path,
+    includes: &[String],
+    excludes: &[String],
+    extensions: &[String],
+) -> PathBuf {
+    let fingerprint = IncludesCacheFingerprint {
+        includes: includes.to_vec(),
+        excludes: excludes.to_vec(),
+        extensions: extensions.to_vec(),
+        composer_lock: file_stamp(&workspace.join("composer.lock")),
+        installed_json: file_stamp(&workspace.join("vendor/composer/installed.json")),
+    };
+
+    let encoded = serde_json::to_vec(&fingerprint).unwrap_or_default();
+    let hash = blake3::hash(&encoded).to_hex().to_string();
+
+    workspace.join(".mago/cache").join(format!("includes-{hash}.bin"))
+}
+
+fn file_stamp(path: &Path) -> Option<FileStamp> {
+    let metadata = std::fs::metadata(path).ok()?;
+    let modified = metadata.modified().ok()?.duration_since(UNIX_EPOCH).ok()?;
+
+    Some(FileStamp {
+        len: metadata.len(),
+        modified_secs: modified.as_secs(),
+    })
+}
+
+fn load_includes_cache(path: &Path) -> Option<(CodebaseMetadata, SymbolReferences)> {
+    let bytes = std::fs::read(path).ok()?;
+    let config = bincode::config::standard();
+    let (data, _len): (IncludesCacheData, usize) = bincode::serde::decode_from_slice(&bytes, config).ok()?;
+
+    if data.version != INCLUDES_CACHE_VERSION {
+        tracing::debug!("Includes cache version mismatch, ignoring '{}'", path.display());
+        return None;
+    }
+
+    Some((data.codebase, data.references))
+}
+
+fn save_includes_cache(path: &Path, codebase: CodebaseMetadata, references: SymbolReferences) {
+    let cache_dir = match path.parent() {
+        Some(parent) => parent,
+        None => return,
+    };
+
+    if let Err(error) = std::fs::create_dir_all(cache_dir) {
+        tracing::warn!("Failed to create includes cache directory '{}': {error}", cache_dir.display());
+        return;
+    }
+
+    let data = IncludesCacheData {
+        version: INCLUDES_CACHE_VERSION,
+        codebase,
+        references,
+    };
+
+    let config = bincode::config::standard();
+    let bytes = match bincode::serde::encode_to_vec(&data, config) {
+        Ok(bytes) => bytes,
+        Err(error) => {
+            tracing::warn!("Failed to encode includes cache '{}': {error}", path.display());
+            return;
+        }
+    };
+
+    if let Err(error) = std::fs::write(path, bytes) {
+        tracing::warn!("Failed to write includes cache '{}': {error}", path.display());
+    }
+}
+
+fn collect_excludes(configuration: &Configuration) -> Vec<String> {
+    let mut excludes = configuration.source.excludes.clone();
+    excludes.extend(configuration.analyzer.excludes.iter().cloned());
+    excludes
+}
+
+fn build_includes_codebase(
+    workspace: &Path,
+    includes: &[String],
+    excludes: &[String],
+    extensions: &[String],
+) -> Result<(CodebaseMetadata, SymbolReferences), Error> {
+    let configuration = DatabaseConfiguration {
+        workspace: Cow::Owned(workspace.to_path_buf()),
+        paths: Vec::new(),
+        includes: includes.iter().cloned().map(Cow::Owned).collect(),
+        excludes: create_excludes_from_patterns(excludes, workspace),
+        extensions: extensions.iter().cloned().map(Cow::Owned).collect(),
+    };
+
+    let database = DatabaseLoader::new(configuration).load()?;
+    let database = database.read_only();
+
+    let files = database
+        .files()
+        .filter(|file| file.file_type == FileType::Vendored)
+        .collect::<Vec<_>>();
+
+    if files.is_empty() {
+        return Ok((CodebaseMetadata::new(), SymbolReferences::new()));
+    }
+
+    let partials: Vec<CodebaseMetadata> = files
+        .into_par_iter()
+        .map_init(bumpalo::Bump::new, |arena, file| {
+            let (program, parsing_error) = parse_file(arena, &file);
+            if parsing_error.is_some() {
+                tracing::warn!("Parsing issues in '{}'. Include cache may be incomplete.", file.name);
+            }
+
+            let resolved_names = NameResolver::new(arena).resolve(program);
+            let file_signature = signature_builder::build_file_signature(&file, program, &resolved_names);
+
+            let mut metadata = scan_program(arena, &file, program, &resolved_names);
+            metadata.set_file_signature(file.id, file_signature);
+
+            arena.reset();
+
+            metadata
+        })
+        .collect();
+
+    let mut merged = CodebaseMetadata::new();
+    for partial in partials {
+        merged.extend(partial);
+    }
+
+    let mut references = SymbolReferences::new();
+    mago_codex::populator::populate_codebase(&mut merged, &mut references, Default::default(), Default::default());
+
+    Ok((merged, references))
+}
+
+fn create_excludes_from_patterns(patterns: &[String], root: &Path) -> Vec<Exclusion<'static>> {
+    patterns
+        .iter()
+        .map(|pattern| {
+            if pattern.contains('*') {
+                if let Some(stripped) = pattern.strip_prefix("./") {
+                    let rooted_pattern = root.join(stripped).to_string_lossy().into_owned();
+
+                    Exclusion::Pattern(Cow::Owned(rooted_pattern))
+                } else {
+                    Exclusion::Pattern(Cow::Owned(pattern.clone()))
+                }
+            } else {
+                let path = PathBuf::from(pattern);
+                let path_buf = if path.is_absolute() { path } else { root.join(path) };
+
+                Exclusion::Path(Cow::Owned(path_buf.canonicalize().unwrap_or(path_buf)))
+            }
+        })
+        .collect()
+}
+
+fn load_database_with_includes(
+    configuration: &Configuration,
+    orchestrator: &Orchestrator<'_>,
+    workspace: &Path,
+    include_externals: bool,
+    includes: &[String],
+    prelude_database: Option<Database<'static>>,
+) -> Result<Database<'static>, Error> {
+    let paths = orchestrator
+        .config
+        .paths
+        .iter()
+        .cloned()
+        .map(Cow::Owned)
+        .collect::<Vec<_>>();
+    let includes = if include_externals {
+        includes.iter().cloned().map(Cow::Owned).collect::<Vec<_>>()
+    } else {
+        Vec::new()
+    };
+
+    let excludes = create_excludes_from_patterns(&collect_excludes(configuration), workspace);
+    let extensions = configuration
+        .source
+        .extensions
+        .iter()
+        .cloned()
+        .map(Cow::Owned)
+        .collect::<Vec<_>>();
+
+    let configuration = DatabaseConfiguration {
+        workspace: Cow::Owned(workspace.to_path_buf()),
+        paths,
+        includes,
+        excludes,
+        extensions,
+    };
+
+    let mut loader = DatabaseLoader::new(configuration);
+    if let Some(prelude) = prelude_database {
+        loader = loader.with_database(prelude);
+    }
+
+    Ok(loader.load()?)
+}
+
+fn filter_issues_for_database(issues: IssueCollection, database: &mago_database::ReadDatabase) -> IssueCollection {
+    issues
+        .into_iter()
+        .filter(|issue| issue_files_available(issue, database))
+        .collect()
+}
+
+fn issue_files_available(issue: &Issue, database: &mago_database::ReadDatabase) -> bool {
+    let annotations_ok = issue
+        .annotations
+        .iter()
+        .all(|annotation| database.get_ref(&annotation.span.file_id).is_ok());
+    let edits_ok = issue.edits.keys().all(|file_id| database.get_ref(file_id).is_ok());
+
+    annotations_ok && edits_ok
 }
