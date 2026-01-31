@@ -55,7 +55,7 @@ std::thread_local! {
 
         map.insert("$GLOBALS", Rc::new({
             let mut known_items = BTreeMap::new();
-            known_items.insert(ArrayKey::String(atom("arvc")), (true, get_positive_int()));
+            known_items.insert(ArrayKey::String(atom("argc")), (true, get_positive_int()));
             known_items.insert(
                 ArrayKey::String(atom("argv")),
                 (true, TUnion::from_atomic(TAtomic::Array(TArray::List(TList::new_non_empty(Box::new(get_string())))))),
@@ -207,7 +207,7 @@ std::thread_local! {
             known_items.insert(ArrayKey::String(atom("DB_USERNAME")), (true, get_non_empty_string()));
             known_items.insert(ArrayKey::String(atom("DB_PASSWORD")), (true, get_string()));
 
-            known_items.insert(ArrayKey::String(atom("arvc")), (true, get_positive_int()));
+            known_items.insert(ArrayKey::String(atom("argc")), (true, get_positive_int()));
             known_items.insert(
                 ArrayKey::String(atom("argv")),
                 (true, TUnion::from_atomic(TAtomic::Array(TArray::List(TList::new_non_empty(Box::new(get_string())))))),
