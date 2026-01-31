@@ -69,11 +69,7 @@ impl<'arena> Parser<'arena> {
 
             match self.parse_statement(&mut stream) {
                 Ok(statement) => statements.push(statement),
-                Err(err) => {
-                    self.errors.push(err);
-
-                    break;
-                }
+                Err(err) => self.errors.push(err),
             }
         }
 

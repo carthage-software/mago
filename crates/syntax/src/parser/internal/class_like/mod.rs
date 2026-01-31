@@ -39,7 +39,10 @@ impl<'arena> Parser<'arena> {
                         break;
                     }
 
-                    members.push(self.parse_classlike_member(stream)?);
+                    match self.parse_classlike_member(stream) {
+                        Ok(member) => members.push(member),
+                        Err(err) => self.errors.push(err),
+                    }
                 }
 
                 Sequence::new(members)
@@ -79,7 +82,10 @@ impl<'arena> Parser<'arena> {
                         break;
                     }
 
-                    members.push(self.parse_classlike_member(stream)?);
+                    match self.parse_classlike_member(stream) {
+                        Ok(member) => members.push(member),
+                        Err(err) => self.errors.push(err),
+                    }
                 }
 
                 Sequence::new(members)
@@ -108,7 +114,10 @@ impl<'arena> Parser<'arena> {
                         break;
                     }
 
-                    members.push(self.parse_classlike_member(stream)?);
+                    match self.parse_classlike_member(stream) {
+                        Ok(member) => members.push(member),
+                        Err(err) => self.errors.push(err),
+                    }
                 }
 
                 Sequence::new(members)
@@ -134,7 +143,10 @@ impl<'arena> Parser<'arena> {
                         break;
                     }
 
-                    members.push(self.parse_classlike_member(stream)?);
+                    match self.parse_classlike_member(stream) {
+                        Ok(member) => members.push(member),
+                        Err(err) => self.errors.push(err),
+                    }
                 }
                 Sequence::new(members)
             },
@@ -161,7 +173,10 @@ impl<'arena> Parser<'arena> {
                         break;
                     }
 
-                    members.push(self.parse_classlike_member(stream)?);
+                    match self.parse_classlike_member(stream) {
+                        Ok(member) => members.push(member),
+                        Err(err) => self.errors.push(err),
+                    }
                 }
                 Sequence::new(members)
             },

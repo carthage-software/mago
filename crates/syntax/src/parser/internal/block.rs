@@ -13,7 +13,10 @@ impl<'arena> Parser<'arena> {
         loop {
             match stream.lookahead(0)?.map(|t| t.kind) {
                 Some(T!["}"]) => break,
-                Some(_) => statements.push(self.parse_statement(stream)?),
+                Some(_) => match self.parse_statement(stream) {
+                    Ok(statement) => statements.push(statement),
+                    Err(err) => self.errors.push(err),
+                },
                 None => {
                     // EOF without closing brace
                     return Err(stream.unexpected(None, &[T!["}"]]));

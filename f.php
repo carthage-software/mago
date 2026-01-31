@@ -16,4 +16,23 @@ function f(int $a, int: int {
 
     echo "Done!\n";
     try {}
+
+    if
 }
+
+class Foo {
+    var
+
+    private string $qux
+
+    public function baz
+
+    public function bar(): void {
+        echo "In bar method\n";
+    }
+}
+
+$f = new Foo()
+$f->bar();
+$f->baz();
+$f->qux = "Test";
