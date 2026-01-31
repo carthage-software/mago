@@ -400,13 +400,22 @@ mod utils {
         // Get the namespace part of the FQN (everything before the last segment)
         let import_namespace = fqn.rfind('\\').map(|pos| &fqn[..pos]);
 
-        match (&decl.namespace, import_namespace) {
+        let is_same_namespace = match (&decl.namespace, import_namespace) {
             // Both in root namespace
             (None, None) => true,
             // Current namespace matches import's parent namespace (case-insensitive)
             (Some(ns), Some(import_ns)) => ns.as_str().eq_ignore_ascii_case(import_ns),
             // One is root, other is not
             _ => false,
+        };
+
+        if !is_same_namespace {
+            return false;
+        }
+
+        match &decl.item.alias {
+            Some(alias) => alias.identifier.value.eq_ignore_ascii_case(decl.item.name.last_segment()),
+            None => true,
         }
     }
 
@@ -703,6 +712,20 @@ mod tests {
         "}
     }
 
+    test_lint_success! {
+        name = same_namespace_import_with_alias_is_not_redundant,
+        rule = NoRedundantUseRule,
+        code = indoc! {r"
+            <?php
+
+            namespace Foo\Bar;
+
+            use Foo\Bar\Baz as Qux;
+
+            $_ = new Qux();
+        "}
+    }
+
     test_lint_failure! {
         name = same_namespace_import_is_redundant,
         rule = NoRedundantUseRule,
@@ -834,6 +857,32 @@ mod tests {
             use Foo\Bar\Baz;
 
             $_ = new Baz();
+        "}
+    }
+
+    test_lint_failure! {
+        name = same_namespace_import_with_same_name_alias_is_redundant,
+        rule = NoRedundantUseRule,
+        code = indoc! {r"
+            <?php
+
+            namespace Foo\Bar;
+
+            use Foo\Bar\Baz as Baz;
+
+            $_ = new Baz();
+        "}
+    }
+
+    test_lint_failure! {
+        name = root_namespace_import_with_same_name_alias_is_redundant,
+        rule = NoRedundantUseRule,
+        code = indoc! {r"
+            <?php
+
+            use Foo as Foo;
+
+            $_ = new Foo();
         "}
     }
 }
