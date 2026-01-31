@@ -1183,19 +1183,15 @@ pub fn parse_method_tag(mut content: &str, mut span: Span) -> Result<MethodTag, 
 }
 
 fn consume_whitespace(input: &str) -> (&str, usize) {
-    let mut iter = input.chars().peekable();
-    let mut count = 0;
-
-    while let Some(ch) = iter.peek() {
+    let mut byte_count = 0;
+    for ch in input.chars() {
         if ch.is_whitespace() {
-            iter.next();
-            count += 1;
+            byte_count += ch.len_utf8();
         } else {
             break;
         }
     }
-
-    (&input[count..], count)
+    (&input[byte_count..], byte_count)
 }
 
 fn try_consume<'a>(input: &'a str, token: &str) -> Option<(&'a str, usize)> {
@@ -1697,5 +1693,30 @@ mod tests {
         let (ts3, rest3) = split_tag_content(input3, span3).unwrap();
         assert_eq!(ts3.value, "callable(string): string");
         assert_eq!(rest3, "$callback");
+    }
+
+    #[test]
+    fn test_consume_whitespace_with_fullwidth_space() {
+        // Test case for multi-byte whitespace (Issue #967)
+        // Full-width space U+3000 is 3 bytes, but chars().count() returns 1
+        // The function should return byte count, not character count
+
+        // Single full-width space (3 bytes)
+        let input = "\u{3000}rest";
+        let (rest, count) = consume_whitespace(input);
+        assert_eq!(rest, "rest", "Should skip the full-width space");
+        assert_eq!(count, 3, "Should return byte count (3), not char count (1)");
+
+        // Multiple full-width spaces (6 bytes)
+        let input2 = "\u{3000}\u{3000}rest";
+        let (rest2, count2) = consume_whitespace(input2);
+        assert_eq!(rest2, "rest", "Should skip both full-width spaces");
+        assert_eq!(count2, 6, "Should return byte count (6), not char count (2)");
+
+        // Mixed ASCII and full-width spaces
+        let input3 = " \u{3000} rest";
+        let (rest3, count3) = consume_whitespace(input3);
+        assert_eq!(rest3, "rest", "Should skip all whitespace");
+        assert_eq!(count3, 5, "Should return byte count: 1 (space) + 3 (U+3000) + 1 (space) = 5");
     }
 }
