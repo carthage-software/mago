@@ -37,6 +37,7 @@ mod runner {
                 ClassLikeMemberSelector::Expression(s) => {
                     format!("{{{}}}", format_expression(s.expression))
                 }
+                ClassLikeMemberSelector::Missing(_) => "<missing>".to_string(),
             }
         }
 
@@ -46,6 +47,7 @@ mod runner {
                 ClassLikeConstantSelector::Expression(s) => {
                     format!("{{{}}}", format_expression(s.expression))
                 }
+                ClassLikeConstantSelector::Missing(_) => "<missing>".to_string(),
             }
         }
 
@@ -188,6 +190,7 @@ mod runner {
                         )
                     }
                 },
+                Expression::Error(_) => "<error>".to_string(),
                 _ => {
                     let expression_kind = Node::Expression(expr)
                         .children()

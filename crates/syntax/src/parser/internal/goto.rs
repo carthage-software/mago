@@ -3,18 +3,17 @@ use crate::ast::ast::Goto;
 use crate::ast::ast::Label;
 use crate::error::ParseError;
 use crate::parser::Parser;
-use crate::parser::stream::TokenStream;
 
-impl<'arena> Parser<'arena> {
-    pub(crate) fn parse_goto(&mut self, stream: &mut TokenStream<'_, 'arena>) -> Result<Goto<'arena>, ParseError> {
+impl<'input, 'arena> Parser<'input, 'arena> {
+    pub(crate) fn parse_goto(&mut self) -> Result<Goto<'arena>, ParseError> {
         Ok(Goto {
-            goto: self.expect_keyword(stream, T!["goto"])?,
-            label: self.parse_local_identifier(stream)?,
-            terminator: self.parse_terminator(stream)?,
+            goto: self.expect_keyword(T!["goto"])?,
+            label: self.parse_local_identifier()?,
+            terminator: self.parse_terminator()?,
         })
     }
 
-    pub(crate) fn parse_label(&self, stream: &mut TokenStream<'_, 'arena>) -> Result<Label<'arena>, ParseError> {
-        Ok(Label { name: self.parse_local_identifier(stream)?, colon: stream.eat(T![":"])?.span })
+    pub(crate) fn parse_label(&mut self) -> Result<Label<'arena>, ParseError> {
+        Ok(Label { name: self.parse_local_identifier()?, colon: self.stream.eat(T![":"])?.span })
     }
 }

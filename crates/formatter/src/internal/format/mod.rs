@@ -795,7 +795,7 @@ impl<'arena> Format<'arena> for ClassLikeConstantItem<'arena> {
                 AssignmentLikeNode::ClassLikeConstantItem(self),
                 lhs,
                 Document::String("="),
-                &self.value,
+                self.value,
                 f.alignment_context(),
             )
         })
@@ -849,7 +849,7 @@ impl<'arena> Format<'arena> for EnumCaseBackedItem<'arena> {
                 AssignmentLikeNode::EnumCaseBackedItem(self),
                 lhs,
                 operator,
-                &self.value,
+                self.value,
                 f.alignment_context(),
             )
         })
@@ -1000,7 +1000,7 @@ impl<'arena> Format<'arena> for PropertyConcreteItem<'arena> {
                 AssignmentLikeNode::PropertyConcreteItem(self),
                 lhs,
                 operator,
-                &self.value,
+                self.value,
                 f.alignment_context(),
             )
         })
@@ -1305,7 +1305,7 @@ impl<'arena> Format<'arena> for ConstantItem<'arena> {
                 AssignmentLikeNode::ConstantItem(self),
                 lhs,
                 Document::String("="),
-                &self.value,
+                self.value,
                 f.alignment_context(),
             )
         })

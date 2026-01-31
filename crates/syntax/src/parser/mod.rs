@@ -24,38 +24,32 @@ pub struct State {
 
 /// The main parser for PHP source code.
 ///
-/// The parser holds an arena reference for allocations and provides methods
-/// for parsing PHP files into AST nodes.
+/// The parser holds an arena reference, the token stream, and parsing state.
 #[derive(Debug)]
-pub struct Parser<'arena> {
+pub struct Parser<'input, 'arena> {
     pub(crate) arena: &'arena Bump,
     pub(crate) state: State,
-    errors: Vec<'arena, ParseError>,
+    pub(crate) stream: TokenStream<'input, 'arena>,
+    pub(crate) errors: Vec<'arena, ParseError>,
 }
 
-impl<'arena> Parser<'arena> {
-    /// Creates a new parser with the given arena for allocations.
+impl<'input, 'arena> Parser<'input, 'arena> {
+    /// Creates a new parser for the given content.
     #[inline]
-    pub fn new(arena: &'arena Bump) -> Self {
-        Self { arena, state: Default::default(), errors: Vec::new_in(arena) }
+    fn new(arena: &'arena Bump, file_id: FileId, content: &'input str) -> Self {
+        let input = Input::new(file_id, content.as_bytes());
+        let lexer = Lexer::new(arena, input);
+        let stream = TokenStream::new(arena, lexer);
+
+        Self { arena, state: State::default(), stream, errors: Vec::new_in(arena) }
     }
 
-    /// Parses a file and returns the program AST along with any parse errors.
-    pub fn parse(self, file: &File) -> &'arena Program<'arena> {
-        self.parse_content(file.file_id(), file.contents.as_ref())
-    }
-
-    /// Parses content with a given file ID and returns the program AST along with any parse errors.
-    pub fn parse_content<'input>(mut self, file_id: FileId, content: &'input str) -> &'arena Program<'arena> {
-        let source_text = self.arena.alloc_str(content);
-
-        let input = Input::new(file_id, source_text.as_bytes());
-        let lexer = Lexer::new(self.arena, input);
-        let mut stream = TokenStream::new(self.arena, lexer);
+    /// Parses and returns the program AST.
+    fn parse(mut self, source_text: &'arena str, file_id: FileId) -> &'arena Program<'arena> {
         let mut statements = Vec::new_in(self.arena);
 
         loop {
-            let reached_eof = match stream.has_reached_eof() {
+            let reached_eof = match self.stream.has_reached_eof() {
                 Ok(eof) => eof,
                 Err(err) => {
                     self.errors.push(ParseError::from(err));
@@ -67,7 +61,7 @@ impl<'arena> Parser<'arena> {
                 break;
             }
 
-            match self.parse_statement(&mut stream) {
+            match self.parse_statement() {
                 Ok(statement) => statements.push(statement),
                 Err(err) => self.errors.push(err),
             }
@@ -77,16 +71,17 @@ impl<'arena> Parser<'arena> {
             file_id,
             source_text,
             statements: Sequence::new(statements),
-            trivia: stream.get_trivia(),
+            trivia: self.stream.get_trivia(),
             errors: self.errors,
         })
     }
 }
 
 pub fn parse_file<'arena>(arena: &'arena Bump, file: &File) -> &'arena Program<'arena> {
-    Parser::new(arena).parse(file)
+    parse_file_content(arena, file.file_id(), file.contents.as_ref())
 }
 
 pub fn parse_file_content<'arena>(arena: &'arena Bump, file_id: FileId, content: &str) -> &'arena Program<'arena> {
-    Parser::new(arena).parse_content(file_id, content)
+    let source_text = arena.alloc_str(content);
+    Parser::new(arena, file_id, source_text).parse(source_text, file_id)
 }

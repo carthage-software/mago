@@ -3,7 +3,7 @@ use bumpalo::vec;
 
 use crate::parser::Parser;
 
-impl<'arena> Parser<'arena> {
+impl<'input, 'arena> Parser<'input, 'arena> {
     /// Creates a new empty vector in the parser's arena.
     #[inline]
     pub fn new_vec<T>(&self) -> Vec<'arena, T> {

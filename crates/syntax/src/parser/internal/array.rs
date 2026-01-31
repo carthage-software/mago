@@ -9,28 +9,24 @@ use crate::ast::ast::ValueArrayElement;
 use crate::ast::ast::VariadicArrayElement;
 use crate::error::ParseError;
 use crate::parser::Parser;
-use crate::parser::stream::TokenStream;
 
-impl<'arena> Parser<'arena> {
-    pub(crate) fn parse_array(&mut self, stream: &mut TokenStream<'_, 'arena>) -> Result<Array<'arena>, ParseError> {
-        let result = self.parse_comma_separated_sequence(stream, T!["["], T!["]"], |p, s| p.parse_array_element(s))?;
+impl<'input, 'arena> Parser<'input, 'arena> {
+    pub(crate) fn parse_array(&mut self) -> Result<Array<'arena>, ParseError> {
+        let result = self.parse_comma_separated_sequence(T!["["], T!["]"], |p| p.parse_array_element())?;
 
         Ok(Array { left_bracket: result.open, elements: result.sequence, right_bracket: result.close })
     }
 
-    pub(crate) fn parse_list(&mut self, stream: &mut TokenStream<'_, 'arena>) -> Result<List<'arena>, ParseError> {
-        let list = self.expect_keyword(stream, T!["list"])?;
-        let result = self.parse_comma_separated_sequence(stream, T!["("], T![")"], |p, s| p.parse_array_element(s))?;
+    pub(crate) fn parse_list(&mut self) -> Result<List<'arena>, ParseError> {
+        let list = self.expect_keyword(T!["list"])?;
+        let result = self.parse_comma_separated_sequence(T!["("], T![")"], |p| p.parse_array_element())?;
 
         Ok(List { list, left_parenthesis: result.open, elements: result.sequence, right_parenthesis: result.close })
     }
 
-    pub(crate) fn parse_legacy_array(
-        &mut self,
-        stream: &mut TokenStream<'_, 'arena>,
-    ) -> Result<LegacyArray<'arena>, ParseError> {
-        let array = self.expect_keyword(stream, T!["array"])?;
-        let result = self.parse_comma_separated_sequence(stream, T!["("], T![")"], |p, s| p.parse_array_element(s))?;
+    pub(crate) fn parse_legacy_array(&mut self) -> Result<LegacyArray<'arena>, ParseError> {
+        let array = self.expect_keyword(T!["array"])?;
+        let result = self.parse_comma_separated_sequence(T!["("], T![")"], |p| p.parse_array_element())?;
 
         Ok(LegacyArray {
             array,
@@ -40,32 +36,29 @@ impl<'arena> Parser<'arena> {
         })
     }
 
-    pub(crate) fn parse_array_element(
-        &mut self,
-        stream: &mut TokenStream<'_, 'arena>,
-    ) -> Result<ArrayElement<'arena>, ParseError> {
-        Ok(match stream.lookahead(0)?.map(|t| t.kind) {
+    pub(crate) fn parse_array_element(&mut self) -> Result<ArrayElement<'arena>, ParseError> {
+        Ok(match self.stream.lookahead(0)?.map(|t| t.kind) {
             Some(T!["..."]) => {
-                let ellipsis = stream.consume()?.span;
+                let ellipsis = self.stream.consume()?.span;
                 ArrayElement::Variadic(VariadicArrayElement {
                     ellipsis,
-                    value: self.arena.alloc(self.parse_expression(stream)?),
+                    value: self.arena.alloc(self.parse_expression()?),
                 })
             }
             Some(T![","]) => {
-                let next = stream.lookahead(0)?.ok_or_else(|| stream.unexpected(None, &[]))?;
+                let next = self.stream.lookahead(0)?.ok_or_else(|| self.stream.unexpected(None, &[]))?;
                 ArrayElement::Missing(MissingArrayElement { comma: next.span })
             }
             _ => {
-                let expr = self.arena.alloc(self.parse_expression(stream)?);
+                let expr = self.arena.alloc(self.parse_expression()?);
 
-                match stream.lookahead(0)?.map(|t| t.kind) {
+                match self.stream.lookahead(0)?.map(|t| t.kind) {
                     Some(T!["=>"]) => {
-                        let double_arrow = stream.consume()?.span;
+                        let double_arrow = self.stream.consume()?.span;
                         ArrayElement::KeyValue(KeyValueArrayElement {
                             key: expr,
                             double_arrow,
-                            value: self.arena.alloc(self.parse_expression(stream)?),
+                            value: self.arena.alloc(self.parse_expression()?),
                         })
                     }
                     _ => ArrayElement::Value(ValueArrayElement { value: expr }),

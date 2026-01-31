@@ -36,3 +36,19 @@ $f = new Foo()
 $f->bar();
 $f->baz();
 $f->qux = "Test";
+
+$f->;
+
+Mago\inspect($f->);
+
+$f:: ?>
+hy!
+<?php
+
+echo Foo:: ;
+
+$a = 1 +
+
+if ($f instanceof ) {
+    $f->bar();
+}

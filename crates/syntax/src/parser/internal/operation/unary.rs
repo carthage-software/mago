@@ -3,15 +3,11 @@ use crate::ast::ast::UnaryPrefix;
 use crate::ast::ast::UnaryPrefixOperator;
 use crate::error::ParseError;
 use crate::parser::Parser;
-use crate::parser::stream::TokenStream;
 use crate::token::GetPrecedence;
 
-impl<'arena> Parser<'arena> {
-    pub(crate) fn parse_unary_prefix_operation(
-        &mut self,
-        stream: &mut TokenStream<'_, 'arena>,
-    ) -> Result<UnaryPrefix<'arena>, ParseError> {
-        let token = stream.consume()?;
+impl<'input, 'arena> Parser<'input, 'arena> {
+    pub(crate) fn parse_unary_prefix_operation(&mut self) -> Result<UnaryPrefix<'arena>, ParseError> {
+        let token = self.stream.consume()?;
 
         let operator = match token.kind {
             T!["(array)"] => UnaryPrefixOperator::ArrayCast(token.span, token.value),
@@ -36,7 +32,7 @@ impl<'arena> Parser<'arena> {
             T!["--"] => UnaryPrefixOperator::PreDecrement(token.span),
             T!["&"] => UnaryPrefixOperator::Reference(token.span),
             _ => {
-                return Err(stream.unexpected(
+                return Err(self.stream.unexpected(
                     Some(token),
                     T![
                         "(array)",
@@ -64,7 +60,7 @@ impl<'arena> Parser<'arena> {
             }
         };
 
-        let operand = self.parse_expression_with_precedence(stream, operator.precedence())?;
+        let operand = self.parse_expression_with_precedence(operator.precedence())?;
 
         Ok(UnaryPrefix { operator, operand: self.arena.alloc(operand) })
     }

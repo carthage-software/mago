@@ -105,16 +105,16 @@ pub fn get_assignment_from_expression<'a, 'arena>(
             Construct::Exit(exit_construct) => exit_construct.arguments.as_ref().and_then(|arguments| {
                 arguments.arguments.iter().find_map(|argument| {
                     get_assignment_from_expression(match &argument {
-                        Argument::Positional(positional_argument) => &positional_argument.value,
-                        Argument::Named(named_argument) => &named_argument.value,
+                        Argument::Positional(positional_argument) => positional_argument.value,
+                        Argument::Named(named_argument) => named_argument.value,
                     })
                 })
             }),
             Construct::Die(die_construct) => die_construct.arguments.as_ref().and_then(|arguments| {
                 arguments.arguments.iter().find_map(|argument| {
                     get_assignment_from_expression(match &argument {
-                        Argument::Positional(positional_argument) => &positional_argument.value,
-                        Argument::Named(named_argument) => &named_argument.value,
+                        Argument::Positional(positional_argument) => positional_argument.value,
+                        Argument::Named(named_argument) => named_argument.value,
                     })
                 })
             }),
@@ -125,9 +125,9 @@ pub fn get_assignment_from_expression<'a, 'arena>(
             Call::Function(function_call) => get_assignment_from_expression(function_call.function).or_else(|| {
                 function_call.argument_list.arguments.iter().find_map(|argument| match &argument {
                     Argument::Positional(positional_argument) => {
-                        get_assignment_from_expression(&positional_argument.value)
+                        get_assignment_from_expression(positional_argument.value)
                     }
-                    Argument::Named(named_argument) => get_assignment_from_expression(&named_argument.value),
+                    Argument::Named(named_argument) => get_assignment_from_expression(named_argument.value),
                 })
             }),
             Call::Method(method_call) => get_assignment_from_expression(method_call.object)
@@ -140,9 +140,9 @@ pub fn get_assignment_from_expression<'a, 'arena>(
                 .or_else(|| {
                     method_call.argument_list.arguments.iter().find_map(|argument| match &argument {
                         Argument::Positional(positional_argument) => {
-                            get_assignment_from_expression(&positional_argument.value)
+                            get_assignment_from_expression(positional_argument.value)
                         }
-                        Argument::Named(named_argument) => get_assignment_from_expression(&named_argument.value),
+                        Argument::Named(named_argument) => get_assignment_from_expression(named_argument.value),
                     })
                 }),
             Call::NullSafeMethod(null_safe_method_call) => get_assignment_from_expression(null_safe_method_call.object)
@@ -155,9 +155,9 @@ pub fn get_assignment_from_expression<'a, 'arena>(
                 .or_else(|| {
                     null_safe_method_call.argument_list.arguments.iter().find_map(|argument| match &argument {
                         Argument::Positional(positional_argument) => {
-                            get_assignment_from_expression(&positional_argument.value)
+                            get_assignment_from_expression(positional_argument.value)
                         }
-                        Argument::Named(named_argument) => get_assignment_from_expression(&named_argument.value),
+                        Argument::Named(named_argument) => get_assignment_from_expression(named_argument.value),
                     })
                 }),
             Call::StaticMethod(static_method_call) => get_assignment_from_expression(static_method_call.class)
@@ -170,9 +170,9 @@ pub fn get_assignment_from_expression<'a, 'arena>(
                 .or_else(|| {
                     static_method_call.argument_list.arguments.iter().find_map(|argument| match &argument {
                         Argument::Positional(positional_argument) => {
-                            get_assignment_from_expression(&positional_argument.value)
+                            get_assignment_from_expression(positional_argument.value)
                         }
-                        Argument::Named(named_argument) => get_assignment_from_expression(&named_argument.value),
+                        Argument::Named(named_argument) => get_assignment_from_expression(named_argument.value),
                     })
                 }),
         },
@@ -235,9 +235,9 @@ pub fn get_assignment_from_expression<'a, 'arena>(
             instantiation.argument_list.as_ref().and_then(|arguments| {
                 arguments.arguments.iter().find_map(|argument| match &argument {
                     Argument::Positional(positional_argument) => {
-                        get_assignment_from_expression(&positional_argument.value)
+                        get_assignment_from_expression(positional_argument.value)
                     }
-                    Argument::Named(named_argument) => get_assignment_from_expression(&named_argument.value),
+                    Argument::Named(named_argument) => get_assignment_from_expression(named_argument.value),
                 })
             })
         }),

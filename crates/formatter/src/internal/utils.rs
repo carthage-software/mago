@@ -288,10 +288,10 @@ pub fn get_expression_width(element: &Expression<'_>) -> Option<usize> {
     fn get_argument_width(argument: &Argument<'_>) -> Option<usize> {
         match argument {
             Argument::Positional(arg) => match arg.ellipsis {
-                Some(_) => get_expression_width(&arg.value).map(|width| width + 3),
-                None => get_expression_width(&arg.value),
+                Some(_) => get_expression_width(arg.value).map(|width| width + 3),
+                None => get_expression_width(arg.value),
             },
-            Argument::Named(arg) => get_expression_width(&arg.value).map(|mut width| {
+            Argument::Named(arg) => get_expression_width(arg.value).map(|mut width| {
                 width += 2;
                 width += arg.name.value.width();
                 width

@@ -3,25 +3,24 @@ use crate::ast::ast::Global;
 use crate::ast::sequence::TokenSeparatedSequence;
 use crate::error::ParseError;
 use crate::parser::Parser;
-use crate::parser::stream::TokenStream;
 
-impl<'arena> Parser<'arena> {
-    pub(crate) fn parse_global(&mut self, stream: &mut TokenStream<'_, 'arena>) -> Result<Global<'arena>, ParseError> {
+impl<'input, 'arena> Parser<'input, 'arena> {
+    pub(crate) fn parse_global(&mut self) -> Result<Global<'arena>, ParseError> {
         Ok(Global {
-            global: self.expect_keyword(stream, T!["global"])?,
+            global: self.expect_keyword(T!["global"])?,
             variables: {
                 let mut variables = self.new_vec();
                 let mut commas = self.new_vec();
 
                 loop {
-                    if matches!(stream.lookahead(0)?.map(|t| t.kind), Some(T!["?>" | ";"])) {
+                    if matches!(self.stream.lookahead(0)?.map(|t| t.kind), Some(T!["?>" | ";"])) {
                         break;
                     }
 
-                    variables.push(self.parse_variable(stream)?);
+                    variables.push(self.parse_variable()?);
 
-                    if let Some(T![","]) = stream.lookahead(0)?.map(|t| t.kind) {
-                        commas.push(stream.consume()?);
+                    if let Some(T![","]) = self.stream.lookahead(0)?.map(|t| t.kind) {
+                        commas.push(self.stream.consume()?);
                     } else {
                         break;
                     }
@@ -29,7 +28,7 @@ impl<'arena> Parser<'arena> {
 
                 TokenSeparatedSequence::new(variables, commas)
             },
-            terminator: self.parse_terminator(stream)?,
+            terminator: self.parse_terminator()?,
         })
     }
 }

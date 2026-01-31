@@ -5,46 +5,42 @@ use crate::ast::ast::WhileColonDelimitedBody;
 use crate::ast::sequence::Sequence;
 use crate::error::ParseError;
 use crate::parser::Parser;
-use crate::parser::stream::TokenStream;
 
-impl<'arena> Parser<'arena> {
-    pub(crate) fn parse_while(&mut self, stream: &mut TokenStream<'_, 'arena>) -> Result<While<'arena>, ParseError> {
+impl<'input, 'arena> Parser<'input, 'arena> {
+    pub(crate) fn parse_while(&mut self) -> Result<While<'arena>, ParseError> {
         Ok(While {
-            r#while: self.expect_keyword(stream, T!["while"])?,
-            left_parenthesis: stream.eat(T!["("])?.span,
-            condition: self.arena.alloc(self.parse_expression(stream)?),
-            right_parenthesis: stream.eat(T![")"])?.span,
-            body: self.parse_while_body(stream)?,
+            r#while: self.expect_keyword(T!["while"])?,
+            left_parenthesis: self.stream.eat(T!["("])?.span,
+            condition: self.arena.alloc(self.parse_expression()?),
+            right_parenthesis: self.stream.eat(T![")"])?.span,
+            body: self.parse_while_body()?,
         })
     }
 
-    fn parse_while_body(&mut self, stream: &mut TokenStream<'_, 'arena>) -> Result<WhileBody<'arena>, ParseError> {
-        Ok(match stream.lookahead(0)?.map(|t| t.kind) {
-            Some(T![":"]) => WhileBody::ColonDelimited(self.parse_while_colon_delimited_body(stream)?),
-            _ => WhileBody::Statement(self.arena.alloc(self.parse_statement(stream)?)),
+    fn parse_while_body(&mut self) -> Result<WhileBody<'arena>, ParseError> {
+        Ok(match self.stream.lookahead(0)?.map(|t| t.kind) {
+            Some(T![":"]) => WhileBody::ColonDelimited(self.parse_while_colon_delimited_body()?),
+            _ => WhileBody::Statement(self.arena.alloc(self.parse_statement()?)),
         })
     }
 
-    fn parse_while_colon_delimited_body(
-        &mut self,
-        stream: &mut TokenStream<'_, 'arena>,
-    ) -> Result<WhileColonDelimitedBody<'arena>, ParseError> {
+    fn parse_while_colon_delimited_body(&mut self) -> Result<WhileColonDelimitedBody<'arena>, ParseError> {
         Ok(WhileColonDelimitedBody {
-            colon: stream.eat(T![":"])?.span,
+            colon: self.stream.eat(T![":"])?.span,
             statements: {
                 let mut statements = self.new_vec();
                 loop {
-                    if matches!(stream.lookahead(0)?.map(|t| t.kind), Some(T!["endwhile"])) {
+                    if matches!(self.stream.lookahead(0)?.map(|t| t.kind), Some(T!["endwhile"])) {
                         break;
                     }
 
-                    statements.push(self.parse_statement(stream)?);
+                    statements.push(self.parse_statement()?);
                 }
 
                 Sequence::new(statements)
             },
-            end_while: self.expect_keyword(stream, T!["endwhile"])?,
-            terminator: self.parse_terminator(stream)?,
+            end_while: self.expect_keyword(T!["endwhile"])?,
+            terminator: self.parse_terminator()?,
         })
     }
 }

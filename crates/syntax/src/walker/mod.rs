@@ -410,7 +410,7 @@ generate_ast_walker! {
             Statement::Static(r#static) => walker.walk_static(r#static, context),
             Statement::HaltCompiler(halt_compiler) => walker.walk_halt_compiler(halt_compiler, context),
             Statement::Unset(unset) => walker.walk_unset(unset, context),
-            Statement::Noop(_) => {
+            Statement::Noop(_) | Statement::Error(_) => {
                 // Do nothing by default
             },
         }
@@ -623,12 +623,12 @@ generate_ast_walker! {
     }
 
     'arena PositionalArgument as positional_argument => {
-        walker.walk_expression(&positional_argument.value, context);
+        walker.walk_expression(positional_argument.value, context);
     }
 
     'arena NamedArgument as named_argument => {
         walker.walk_local_identifier(&named_argument.name, context);
-        walker.walk_expression(&named_argument.value, context);
+        walker.walk_expression(named_argument.value, context);
     }
 
     _ PlaceholderArgument as placeholder_argument => {
@@ -884,7 +884,7 @@ generate_ast_walker! {
 
     'arena ClassLikeConstantItem as class_like_constant_item => {
         walker.walk_local_identifier(&class_like_constant_item.name, context);
-        walker.walk_expression(&class_like_constant_item.value, context);
+        walker.walk_expression(class_like_constant_item.value, context);
     }
 
     'arena Property as property => {
@@ -939,7 +939,7 @@ generate_ast_walker! {
 
     'arena PropertyConcreteItem as property_concrete_item => {
         walker.walk_direct_variable(&property_concrete_item.variable, context);
-        walker.walk_expression(&property_concrete_item.value, context);
+        walker.walk_expression(property_concrete_item.value, context);
     }
 
     'arena HookedProperty as hooked_property => {
@@ -1013,7 +1013,7 @@ generate_ast_walker! {
     }
 
     'arena PropertyHookConcreteExpressionBody as property_hook_concrete_expression_body => {
-        walker.walk_expression(&property_hook_concrete_expression_body.expression, context);
+        walker.walk_expression(property_hook_concrete_expression_body.expression, context);
     }
 
     'arena FunctionLikeParameterList as function_like_parameter_list => {
@@ -1046,7 +1046,7 @@ generate_ast_walker! {
     }
 
     'arena FunctionLikeParameterDefaultValue as function_like_parameter_default_value => {
-        walker.walk_expression(&function_like_parameter_default_value.value, context);
+        walker.walk_expression(function_like_parameter_default_value.value, context);
     }
 
     'arena EnumCase as enum_case => {
@@ -1076,7 +1076,7 @@ generate_ast_walker! {
 
     'arena EnumCaseBackedItem as enum_case_backed_item => {
         walker.walk_local_identifier(&enum_case_backed_item.name, context);
-        walker.walk_expression(&enum_case_backed_item.value, context);
+        walker.walk_expression(enum_case_backed_item.value, context);
     }
 
     'arena Method as method => {
@@ -1138,7 +1138,7 @@ generate_ast_walker! {
 
     'arena ConstantItem as constant_item => {
         walker.walk_local_identifier(&constant_item.name, context);
-        walker.walk_expression(&constant_item.value, context);
+        walker.walk_expression(constant_item.value, context);
     }
 
     'arena Function as function => {
@@ -1167,7 +1167,7 @@ generate_ast_walker! {
 
     'arena DeclareItem as declare_item => {
         walker.walk_local_identifier(&declare_item.name, context);
-        walker.walk_expression(&declare_item.value, context);
+        walker.walk_expression(declare_item.value, context);
     }
 
     'arena DeclareBody as declare_body => {
@@ -1574,7 +1574,7 @@ generate_ast_walker! {
 
     'arena StaticConcreteItem as static_concrete_item => {
         walker.walk_direct_variable(&static_concrete_item.variable, context);
-        walker.walk_expression(&static_concrete_item.value, context);
+        walker.walk_expression(static_concrete_item.value, context);
     }
 
     'arena HaltCompiler as halt_compiler => {
@@ -1631,6 +1631,9 @@ generate_ast_walker! {
             Expression::Instantiation(instantiation) => walker.walk_instantiation(instantiation, context),
             Expression::MagicConstant(magic_constant) => walker.walk_magic_constant(magic_constant, context),
             Expression::Pipe(pipe) => walker.walk_pipe(pipe, context),
+            Expression::Error(_) => {
+                // Nothing to walk for error expressions
+            }
         }
     }
 
@@ -2211,9 +2214,11 @@ generate_ast_walker! {
             ClassLikeMemberSelector::Expression(class_like_member_expression_selector) => {
                 walker.walk_class_like_member_expression_selector(
                     class_like_member_expression_selector,
-
                     context,
                 );
+            }
+            ClassLikeMemberSelector::Missing(_) => {
+                // Nothing to walk for missing selectors
             }
         }
     }
@@ -2271,9 +2276,11 @@ generate_ast_walker! {
             ClassLikeConstantSelector::Expression(class_like_constant_expression_selector) => {
                 walker.walk_class_like_member_expression_selector(
                     class_like_constant_expression_selector,
-
                     context,
                 );
+            }
+            ClassLikeConstantSelector::Missing(_) => {
+                // Nothing to walk for missing selectors
             }
         }
     }

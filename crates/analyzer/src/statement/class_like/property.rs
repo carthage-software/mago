@@ -210,7 +210,7 @@ fn analyze_property_hook<'ctx, 'arena>(
                     context,
                     &mut hook_block_context,
                     artifacts,
-                    Some(&expr_body.expression),
+                    Some(expr_body.expression),
                     value_type,
                     expr_body.expression.span(),
                 );

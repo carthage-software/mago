@@ -13,11 +13,10 @@ use crate::ast::ast::LiteralString;
 use crate::ast::ast::LiteralStringKind;
 use crate::error::ParseError;
 use crate::parser::Parser;
-use crate::parser::stream::TokenStream;
 
-impl<'arena> Parser<'arena> {
-    pub(crate) fn parse_literal(&self, stream: &mut TokenStream<'_, 'arena>) -> Result<Literal<'arena>, ParseError> {
-        let token = stream.consume()?;
+impl<'input, 'arena> Parser<'input, 'arena> {
+    pub(crate) fn parse_literal(&mut self) -> Result<Literal<'arena>, ParseError> {
+        let token = self.stream.consume()?;
 
         Ok(match &token.kind {
             T![LiteralFloat] => Literal::Float(LiteralFloat {
@@ -55,7 +54,7 @@ impl<'arena> Parser<'arena> {
                 return Err(ParseError::UnclosedLiteralString(kind, token.span));
             }
             _ => {
-                return Err(stream.unexpected(
+                return Err(self.stream.unexpected(
                     Some(token),
                     T!["true", "false", "null", LiteralFloat, LiteralInteger, LiteralString, PartialLiteralString],
                 ));

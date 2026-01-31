@@ -13,11 +13,10 @@ use crate::ast::ast::PartialArgumentList;
 use crate::ast::sequence::TokenSeparatedSequence;
 use crate::error::ParseError;
 use crate::parser::Parser;
-use crate::parser::stream::TokenStream;
 use crate::token::Precedence;
 use crate::token::TokenKind;
 
-impl<'arena> Parser<'arena> {
+impl<'input, 'arena> Parser<'input, 'arena> {
     /// Parses a `clone` expression, handling the syntactic ambiguity introduced in PHP 8.5.
     ///
     /// PHP 8.5 allows `clone` to be used like a function (e.g., `clone($foo, $bar)`). This
@@ -28,33 +27,30 @@ impl<'arena> Parser<'arena> {
     /// next token is not a comma and the argument is a simple positional one, it assumes
     /// the legacy `clone (expr)` structure. Otherwise, it parses the expression as a
     /// standard function call.
-    pub(crate) fn parse_ambiguous_clone_expression(
-        &mut self,
-        stream: &mut TokenStream<'_, 'arena>,
-    ) -> Result<Expression<'arena>, ParseError> {
-        let clone = self.expect_keyword(stream, T!["clone"])?;
-        let next = stream.lookahead(0)?.ok_or_else(|| stream.unexpected(None, &[]))?;
+    pub(crate) fn parse_ambiguous_clone_expression(&mut self) -> Result<Expression<'arena>, ParseError> {
+        let clone = self.expect_keyword(T!["clone"])?;
+        let next = self.stream.lookahead(0)?.ok_or_else(|| self.stream.unexpected(None, &[]))?;
         if next.kind != TokenKind::LeftParenthesis {
             return Ok(Expression::Clone(Clone {
                 clone,
-                object: self.arena.alloc(self.parse_expression_with_precedence(stream, Precedence::Clone)?),
+                object: self.arena.alloc(self.parse_expression_with_precedence(Precedence::Clone)?),
             }));
         }
 
-        let left_parenthesis = stream.eat(T!["("])?.span;
+        let left_parenthesis = self.stream.eat(T!["("])?.span;
 
         let mut arguments = self.new_vec();
         let mut commas = self.new_vec();
         loop {
-            let next = stream.lookahead(0)?;
+            let next = self.stream.lookahead(0)?;
             if matches!(next.map(|t| t.kind), Some(T![")"])) {
                 break;
             }
 
-            arguments.push(self.parse_partial_argument(stream)?);
+            arguments.push(self.parse_partial_argument()?);
 
-            if let Some(T![","]) = stream.lookahead(0)?.map(|t| t.kind) {
-                commas.push(stream.consume()?);
+            if let Some(T![","]) = self.stream.lookahead(0)?.map(|t| t.kind) {
+                commas.push(self.stream.consume()?);
             } else {
                 break;
             }
@@ -63,7 +59,7 @@ impl<'arena> Parser<'arena> {
         let partial_args = PartialArgumentList {
             left_parenthesis,
             arguments: TokenSeparatedSequence::new(arguments, commas),
-            right_parenthesis: stream.eat(T![")"])?.span,
+            right_parenthesis: self.stream.eat(T![")"])?.span,
         };
 
         if partial_args.has_placeholders() {

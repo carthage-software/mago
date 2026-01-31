@@ -12,21 +12,16 @@ use crate::ast::ast::RequireConstruct;
 use crate::ast::ast::RequireOnceConstruct;
 use crate::error::ParseError;
 use crate::parser::Parser;
-use crate::parser::stream::TokenStream;
 use crate::token::Precedence;
 
-impl<'arena> Parser<'arena> {
-    pub(crate) fn parse_construct(
-        &mut self,
-        stream: &mut TokenStream<'_, 'arena>,
-    ) -> Result<Construct<'arena>, ParseError> {
-        let token = stream.lookahead(0)?.ok_or_else(|| stream.unexpected(None, &[]))?;
+impl<'input, 'arena> Parser<'input, 'arena> {
+    pub(crate) fn parse_construct(&mut self) -> Result<Construct<'arena>, ParseError> {
+        let token = self.stream.lookahead(0)?.ok_or_else(|| self.stream.unexpected(None, &[]))?;
 
         Ok(match token.kind {
             T!["isset"] => {
-                let isset = self.expect_keyword(stream, T!["isset"])?;
-                let result =
-                    self.parse_comma_separated_sequence(stream, T!["("], T![")"], |p, s| p.parse_expression(s))?;
+                let isset = self.expect_keyword(T!["isset"])?;
+                let result = self.parse_comma_separated_sequence(T!["("], T![")"], |p| p.parse_expression())?;
 
                 Construct::Isset(IssetConstruct {
                     isset,
@@ -36,47 +31,47 @@ impl<'arena> Parser<'arena> {
                 })
             }
             T!["empty"] => Construct::Empty(EmptyConstruct {
-                empty: self.expect_keyword(stream, T!["empty"])?,
-                left_parenthesis: stream.eat(T!["("])?.span,
-                value: self.arena.alloc(self.parse_expression(stream)?),
-                right_parenthesis: stream.eat(T![")"])?.span,
+                empty: self.expect_keyword(T!["empty"])?,
+                left_parenthesis: self.stream.eat(T!["("])?.span,
+                value: self.arena.alloc(self.parse_expression()?),
+                right_parenthesis: self.stream.eat(T![")"])?.span,
             }),
             T!["eval"] => Construct::Eval(EvalConstruct {
-                eval: self.expect_keyword(stream, T!["eval"])?,
-                left_parenthesis: stream.eat(T!["("])?.span,
-                value: self.arena.alloc(self.parse_expression(stream)?),
-                right_parenthesis: stream.eat(T![")"])?.span,
+                eval: self.expect_keyword(T!["eval"])?,
+                left_parenthesis: self.stream.eat(T!["("])?.span,
+                value: self.arena.alloc(self.parse_expression()?),
+                right_parenthesis: self.stream.eat(T![")"])?.span,
             }),
             T!["print"] => Construct::Print(PrintConstruct {
-                print: self.expect_keyword(stream, T!["print"])?,
-                value: self.arena.alloc(self.parse_expression_with_precedence(stream, Precedence::Print)?),
+                print: self.expect_keyword(T!["print"])?,
+                value: self.arena.alloc(self.parse_expression_with_precedence(Precedence::Print)?),
             }),
             T!["require"] => Construct::Require(RequireConstruct {
-                require: self.expect_any_keyword(stream)?,
-                value: self.arena.alloc(self.parse_expression(stream)?),
+                require: self.expect_any_keyword()?,
+                value: self.arena.alloc(self.parse_expression()?),
             }),
             T!["require_once"] => Construct::RequireOnce(RequireOnceConstruct {
-                require_once: self.expect_any_keyword(stream)?,
-                value: self.arena.alloc(self.parse_expression(stream)?),
+                require_once: self.expect_any_keyword()?,
+                value: self.arena.alloc(self.parse_expression()?),
             }),
             T!["include"] => Construct::Include(IncludeConstruct {
-                include: self.expect_any_keyword(stream)?,
-                value: self.arena.alloc(self.parse_expression(stream)?),
+                include: self.expect_any_keyword()?,
+                value: self.arena.alloc(self.parse_expression()?),
             }),
             T!["include_once"] => Construct::IncludeOnce(IncludeOnceConstruct {
-                include_once: self.expect_any_keyword(stream)?,
-                value: self.arena.alloc(self.parse_expression(stream)?),
+                include_once: self.expect_any_keyword()?,
+                value: self.arena.alloc(self.parse_expression()?),
             }),
             T!["exit"] => Construct::Exit(ExitConstruct {
-                exit: self.expect_any_keyword(stream)?,
-                arguments: self.parse_optional_argument_list(stream)?,
+                exit: self.expect_any_keyword()?,
+                arguments: self.parse_optional_argument_list()?,
             }),
             T!["die"] => Construct::Die(DieConstruct {
-                die: self.expect_any_keyword(stream)?,
-                arguments: self.parse_optional_argument_list(stream)?,
+                die: self.expect_any_keyword()?,
+                arguments: self.parse_optional_argument_list()?,
             }),
             _ => {
-                return Err(stream.unexpected(
+                return Err(self.stream.unexpected(
                     Some(token),
                     T![
                         "isset",

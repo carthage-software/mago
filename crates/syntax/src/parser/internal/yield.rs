@@ -5,30 +5,29 @@ use crate::ast::ast::YieldPair;
 use crate::ast::ast::YieldValue;
 use crate::error::ParseError;
 use crate::parser::Parser;
-use crate::parser::stream::TokenStream;
 use crate::token::Precedence;
 
-impl<'arena> Parser<'arena> {
-    pub(crate) fn parse_yield(&mut self, stream: &mut TokenStream<'_, 'arena>) -> Result<Yield<'arena>, ParseError> {
-        let r#yield = self.expect_keyword(stream, T!["yield"])?;
+impl<'input, 'arena> Parser<'input, 'arena> {
+    pub(crate) fn parse_yield(&mut self) -> Result<Yield<'arena>, ParseError> {
+        let r#yield = self.expect_keyword(T!["yield"])?;
 
-        let next = stream.lookahead(0)?.ok_or_else(|| stream.unexpected(None, &[]))?;
+        let next = self.stream.lookahead(0)?.ok_or_else(|| self.stream.unexpected(None, &[]))?;
         Ok(match next.kind {
             T![";" | "?>"] => Yield::Value(YieldValue { r#yield, value: None }),
             T!["from"] => Yield::From(YieldFrom {
                 r#yield,
-                from: self.expect_keyword(stream, T!["from"])?,
-                iterator: self.arena.alloc(self.parse_expression_with_precedence(stream, Precedence::YieldFrom)?),
+                from: self.expect_keyword(T!["from"])?,
+                iterator: self.arena.alloc(self.parse_expression_with_precedence(Precedence::YieldFrom)?),
             }),
             _ => {
-                let key_or_value = self.parse_expression_with_precedence(stream, Precedence::Yield)?;
+                let key_or_value = self.parse_expression_with_precedence(Precedence::Yield)?;
 
-                if matches!(stream.lookahead(0)?.map(|t| t.kind), Some(T!["=>"])) {
+                if matches!(self.stream.lookahead(0)?.map(|t| t.kind), Some(T!["=>"])) {
                     Yield::Pair(YieldPair {
                         r#yield,
                         key: self.arena.alloc(key_or_value),
-                        arrow: stream.eat(T!["=>"])?.span,
-                        value: self.arena.alloc(self.parse_expression_with_precedence(stream, Precedence::Yield)?),
+                        arrow: self.stream.eat(T!["=>"])?.span,
+                        value: self.arena.alloc(self.parse_expression_with_precedence(Precedence::Yield)?),
                     })
                 } else {
                     Yield::Value(YieldValue { r#yield, value: Some(self.arena.alloc(key_or_value)) })

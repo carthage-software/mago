@@ -21,7 +21,7 @@ use crate::ast::ast::terminator::Terminator;
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub struct Return<'arena> {
     pub r#return: Keyword<'arena>,
-    pub value: Option<Expression<'arena>>,
+    pub value: Option<&'arena Expression<'arena>>,
     pub terminator: Terminator<'arena>,
 }
 

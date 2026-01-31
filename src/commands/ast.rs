@@ -146,13 +146,13 @@ impl AstCommand {
             let mut database = Database::single(file, config);
             let orchestrator = create_orchestrator(&configuration, color_choice, false, true, false);
 
-            return self.reporting.get_processor(color_choice).process_issues(
+            self.reporting.get_processor(color_choice).process_issues(
                 &orchestrator,
                 &mut database,
                 issues,
                 None,
                 false,
-            );
+            )?;
         }
 
         if self.json {
@@ -277,6 +277,9 @@ fn node_to_tree(node: Node) -> Tree<String> {
         Node::Terminator(Terminator::Semicolon(_)) => {
             format!("{} {}", "Terminator".dimmed(), ";".red().bold())
         }
+        Node::Terminator(Terminator::Missing(_)) => {
+            format!("{} {}", "Terminator".dimmed(), "<missing>".red().bold())
+        }
         // Structural nodes
         Node::Program(_) => "Program".bold().underline().to_string(),
         Node::Statement(_) => "Statement".bold().underline().to_string(),
@@ -302,6 +305,10 @@ fn node_to_tree(node: Node) -> Tree<String> {
         Node::UnaryPrefixOperator(op) => format!("{} {}", "UnaryPrefixOperator".magenta(), op.as_str().bold()),
         Node::UnaryPostfixOperator(op) => format!("{} {}", "UnaryPostfixOperator".magenta(), op.as_str().bold()),
         Node::AssignmentOperator(op) => format!("{} {}", "AssignmentOperator".magenta(), op.as_str().bold()),
+        Node::ClassLikeMemberMissingSelector(_) | Node::ClassLikeConstantMissingSelector(_) => {
+            "<missing>".bold().underline().red().to_string()
+        }
+        Node::ErrorExpression(_) | Node::ErrorStatement(_) => "<error>".bold().underline().red().to_string(),
         // Everything else -> Dimmed
         _ => format!("{}", node.kind().to_string().dimmed()),
     };

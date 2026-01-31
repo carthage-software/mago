@@ -46,7 +46,7 @@ pub fn scan_enum_case<'arena>(
 
             meta.attributes = attributes;
             meta.value_type =
-                infer(context, scope, &item.value).map(super::super::ttype::union::TUnion::get_single_owned);
+                infer(context, scope, item.value).map(super::super::ttype::union::TUnion::get_single_owned);
 
             meta
         }

@@ -273,14 +273,14 @@ pub fn expression_has_yield(expression: &Expression) -> bool {
             expression_has_yield(r#match.expression)
                 || r#match.arms.iter().any(|arm| match arm {
                     MatchArm::Expression(match_expression_arm) => {
-                        match_expression_arm.conditions.iter().any(expression_has_yield)
+                        match_expression_arm.conditions.iter().any(|e| expression_has_yield(e))
                             || expression_has_yield(match_expression_arm.expression)
                     }
                     MatchArm::Default(match_default_arm) => expression_has_yield(match_default_arm.expression),
                 })
         }
         Expression::Construct(construct) => match construct {
-            Construct::Isset(isset_construct) => isset_construct.values.iter().any(expression_has_yield),
+            Construct::Isset(isset_construct) => isset_construct.values.iter().any(|e| expression_has_yield(e)),
             Construct::Empty(empty_construct) => expression_has_yield(empty_construct.value),
             Construct::Eval(eval_construct) => expression_has_yield(eval_construct.value),
             Construct::Include(include_construct) => expression_has_yield(include_construct.value),
@@ -290,14 +290,14 @@ pub fn expression_has_yield(expression: &Expression) -> bool {
             Construct::Print(print_construct) => expression_has_yield(print_construct.value),
             Construct::Exit(exit_construct) => exit_construct.arguments.as_ref().is_some_and(|arguments| {
                 arguments.arguments.iter().any(|argument| match argument {
-                    Argument::Positional(positional_argument) => expression_has_yield(&positional_argument.value),
-                    Argument::Named(named_argument) => expression_has_yield(&named_argument.value),
+                    Argument::Positional(positional_argument) => expression_has_yield(positional_argument.value),
+                    Argument::Named(named_argument) => expression_has_yield(named_argument.value),
                 })
             }),
             Construct::Die(die_construct) => die_construct.arguments.as_ref().is_some_and(|arguments| {
                 arguments.arguments.iter().any(|argument| match argument {
-                    Argument::Positional(positional_argument) => expression_has_yield(&positional_argument.value),
-                    Argument::Named(named_argument) => expression_has_yield(&named_argument.value),
+                    Argument::Positional(positional_argument) => expression_has_yield(positional_argument.value),
+                    Argument::Named(named_argument) => expression_has_yield(named_argument.value),
                 })
             }),
         },
@@ -307,32 +307,32 @@ pub fn expression_has_yield(expression: &Expression) -> bool {
             Call::Function(function_call) => {
                 expression_has_yield(function_call.function)
                     || function_call.argument_list.arguments.iter().any(|argument| match argument {
-                        Argument::Positional(positional_argument) => expression_has_yield(&positional_argument.value),
-                        Argument::Named(named_argument) => expression_has_yield(&named_argument.value),
+                        Argument::Positional(positional_argument) => expression_has_yield(positional_argument.value),
+                        Argument::Named(named_argument) => expression_has_yield(named_argument.value),
                     })
             }
             Call::Method(method_call) => {
                 expression_has_yield(method_call.object)
                     || matches!(&method_call.method, ClassLikeMemberSelector::Expression(selector) if expression_has_yield(selector.expression))
                     || method_call.argument_list.arguments.iter().any(|argument| match argument {
-                        Argument::Positional(positional_argument) => expression_has_yield(&positional_argument.value),
-                        Argument::Named(named_argument) => expression_has_yield(&named_argument.value),
+                        Argument::Positional(positional_argument) => expression_has_yield(positional_argument.value),
+                        Argument::Named(named_argument) => expression_has_yield(named_argument.value),
                     })
             }
             Call::NullSafeMethod(null_safe_method_call) => {
                 expression_has_yield(null_safe_method_call.object)
                     || matches!(&null_safe_method_call.method, ClassLikeMemberSelector::Expression(selector) if expression_has_yield(selector.expression))
                     || null_safe_method_call.argument_list.arguments.iter().any(|argument| match argument {
-                        Argument::Positional(positional_argument) => expression_has_yield(&positional_argument.value),
-                        Argument::Named(named_argument) => expression_has_yield(&named_argument.value),
+                        Argument::Positional(positional_argument) => expression_has_yield(positional_argument.value),
+                        Argument::Named(named_argument) => expression_has_yield(named_argument.value),
                     })
             }
             Call::StaticMethod(static_method_call) => {
                 expression_has_yield(static_method_call.class)
                     || matches!(&static_method_call.method, ClassLikeMemberSelector::Expression(selector) if expression_has_yield(selector.expression))
                     || static_method_call.argument_list.arguments.iter().any(|argument| match argument {
-                        Argument::Positional(positional_argument) => expression_has_yield(&positional_argument.value),
-                        Argument::Named(named_argument) => expression_has_yield(&named_argument.value),
+                        Argument::Positional(positional_argument) => expression_has_yield(positional_argument.value),
+                        Argument::Named(named_argument) => expression_has_yield(named_argument.value),
                     })
             }
         },
@@ -368,8 +368,8 @@ pub fn expression_has_yield(expression: &Expression) -> bool {
             expression_has_yield(instantiation.class)
                 || instantiation.argument_list.as_ref().is_some_and(|arguments| {
                     arguments.arguments.iter().any(|argument| match argument {
-                        Argument::Positional(positional_argument) => expression_has_yield(&positional_argument.value),
-                        Argument::Named(named_argument) => expression_has_yield(&named_argument.value),
+                        Argument::Positional(positional_argument) => expression_has_yield(positional_argument.value),
+                        Argument::Named(named_argument) => expression_has_yield(named_argument.value),
                     })
                 })
         }
