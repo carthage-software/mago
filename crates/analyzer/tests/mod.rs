@@ -560,6 +560,10 @@ test_case!(issue_964);
 test_case!(anonymous_class_constructor_args);
 test_case!(undefined_type_reference);
 test_case!(duplicate_definition);
+test_case!(issue_1002_part_1);
+test_case!(issue_1002_part_2);
+test_case!(issue_1002_part_3);
+test_case!(issue_1002_part_4);
 
 #[test]
 fn test_all_test_cases_are_ran() {
