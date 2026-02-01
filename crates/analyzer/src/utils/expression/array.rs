@@ -585,7 +585,12 @@ pub(crate) fn handle_array_access_on_list<'ctx>(
             ));
         }
 
-        return if type_param.is_never() { get_mixed() } else { type_param.into_owned() };
+        let mut result = if type_param.is_never() { get_mixed() } else { type_param.into_owned() };
+        if !in_assignment {
+            result.set_possibly_undefined(true, None);
+        }
+
+        return result;
     } else if let TAtomic::Array(TArray::List(TList { element_type, .. })) = list {
         return if element_type.is_never() {
             if !in_assignment
