@@ -1,3 +1,8 @@
+// Parser impl blocks (new architecture)
+mod alloc;
+mod common;
+
+// Parsing modules
 pub(crate) mod argument;
 pub(crate) mod array;
 pub(crate) mod attribute;
@@ -24,17 +29,16 @@ pub(crate) mod modifier;
 pub(crate) mod namespace;
 pub(crate) mod operation;
 pub(crate) mod r#return;
+pub(crate) mod sequence;
 pub(crate) mod statement;
 pub(crate) mod r#static;
 pub(crate) mod string;
 pub(crate) mod tag;
 pub(crate) mod terminator;
 pub(crate) mod throw;
-pub(crate) mod token_stream;
 pub(crate) mod r#try;
 pub(crate) mod type_hint;
 pub(crate) mod unset;
 pub(crate) mod r#use;
-pub(crate) mod utils;
 pub(crate) mod variable;
 pub(crate) mod r#yield;

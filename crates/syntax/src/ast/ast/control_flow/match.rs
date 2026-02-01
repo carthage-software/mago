@@ -32,7 +32,7 @@ pub enum MatchArm<'arena> {
 /// Represents a single arm within a match statement.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub struct MatchExpressionArm<'arena> {
-    pub conditions: TokenSeparatedSequence<'arena, Expression<'arena>>,
+    pub conditions: TokenSeparatedSequence<'arena, &'arena Expression<'arena>>,
     pub arrow: Span,
     pub expression: &'arena Expression<'arena>,
 }

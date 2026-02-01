@@ -107,8 +107,8 @@ impl<'input, 'arena> Lexer<'input, 'arena> {
     }
 
     /// Get the current position of the lexer in the input source code.
-    #[must_use]
-    pub fn get_position(&self) -> Position {
+    #[inline]
+    pub const fn current_position(&self) -> Position {
         self.input.current_position()
     }
 
@@ -524,12 +524,16 @@ impl<'input, 'arena> Lexer<'input, 'arena> {
                     [b'.', start_of_number!(), ..] => {
                         let mut length = read_digits_of_base(&self.input, 2, 10);
                         if let float_exponent!() = self.input.peek(length, 1) {
-                            length += 1;
-                            if let number_sign!() = self.input.peek(length, 1) {
-                                length += 1;
+                            // Only include exponent if there are digits after it
+                            let mut exp_length = length + 1;
+                            if let number_sign!() = self.input.peek(exp_length, 1) {
+                                exp_length += 1;
                             }
-
-                            length = read_digits_of_base(&self.input, length, 10);
+                            let after_exp = read_digits_of_base(&self.input, exp_length, 10);
+                            if after_exp > exp_length {
+                                // There are digits after the exponent marker
+                                length = after_exp;
+                            }
                         }
 
                         (TokenKind::LiteralFloat, length)
@@ -578,23 +582,26 @@ impl<'input, 'arena> Lexer<'input, 'arena> {
                         }
 
                         if let float_exponent!() = self.input.peek(length, 1) {
-                            length += 1;
-                            if let number_sign!() = self.input.peek(length, 1) {
-                                length += 1;
+                            // Only include exponent if there are digits after it
+                            let mut exp_length = length + 1;
+                            if let number_sign!() = self.input.peek(exp_length, 1) {
+                                exp_length += 1;
                             }
-
-                            length = read_digits_of_base(&self.input, length, 10);
+                            let after_exp = read_digits_of_base(&self.input, exp_length, 10);
+                            if after_exp > exp_length {
+                                // There are digits after the exponent marker
+                                length = after_exp;
+                            }
                         }
 
                         (TokenKind::LiteralFloat, length)
                     }
                     [b'.', ..] => (TokenKind::Dot, 1),
                     [unknown_byte, ..] => {
-                        return Some(Err(SyntaxError::UnrecognizedToken(
-                            self.file_id(),
-                            *unknown_byte,
-                            self.input.current_position(),
-                        )));
+                        let position = self.input.current_position();
+                        self.input.consume(1);
+
+                        return Some(Err(SyntaxError::UnrecognizedToken(self.file_id(), *unknown_byte, position)));
                     }
                     [] => {
                         // we check for EOF before entering scripting section,
@@ -920,11 +927,11 @@ impl<'input, 'arena> Lexer<'input, 'arena> {
 
                             Some(Ok(self.token(TokenKind::LeftParenthesis, buffer, start, end)))
                         } else {
-                            Some(Err(SyntaxError::UnexpectedToken(
-                                self.file_id(),
-                                self.input.read(1)[0],
-                                self.input.current_position(),
-                            )))
+                            let byte = self.input.read(1)[0];
+                            let position = self.input.current_position();
+                            // Consume the unexpected byte to avoid infinite loops
+                            self.input.consume(1);
+                            Some(Err(SyntaxError::UnexpectedToken(self.file_id(), byte, position)))
                         }
                     }
                     HaltStage::LookingForRightParenthesis => {
@@ -936,11 +943,10 @@ impl<'input, 'arena> Lexer<'input, 'arena> {
 
                             Some(Ok(self.token(TokenKind::RightParenthesis, buffer, start, end)))
                         } else {
-                            Some(Err(SyntaxError::UnexpectedToken(
-                                self.file_id(),
-                                self.input.read(1)[0],
-                                self.input.current_position(),
-                            )))
+                            let byte = self.input.read(1)[0];
+                            let position = self.input.current_position();
+                            self.input.consume(1);
+                            Some(Err(SyntaxError::UnexpectedToken(self.file_id(), byte, position)))
                         }
                     }
                     HaltStage::LookingForTerminator => {
@@ -959,11 +965,10 @@ impl<'input, 'arena> Lexer<'input, 'arena> {
 
                             Some(Ok(self.token(TokenKind::CloseTag, buffer, start, end)))
                         } else {
-                            Some(Err(SyntaxError::UnexpectedToken(
-                                self.file_id(),
-                                self.input.read(1)[0],
-                                self.input.current_position(),
-                            )))
+                            let byte = self.input.read(1)[0];
+                            let position = self.input.current_position();
+                            self.input.consume(1);
+                            Some(Err(SyntaxError::UnexpectedToken(self.file_id(), byte, position)))
                         }
                     }
                     _ => unreachable!(),

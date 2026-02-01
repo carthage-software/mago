@@ -795,7 +795,7 @@ impl<'arena> Format<'arena> for ClassLikeConstantItem<'arena> {
                 AssignmentLikeNode::ClassLikeConstantItem(self),
                 lhs,
                 Document::String("="),
-                &self.value,
+                self.value,
                 f.alignment_context(),
             )
         })
@@ -849,7 +849,7 @@ impl<'arena> Format<'arena> for EnumCaseBackedItem<'arena> {
                 AssignmentLikeNode::EnumCaseBackedItem(self),
                 lhs,
                 operator,
-                &self.value,
+                self.value,
                 f.alignment_context(),
             )
         })
@@ -1000,7 +1000,7 @@ impl<'arena> Format<'arena> for PropertyConcreteItem<'arena> {
                 AssignmentLikeNode::PropertyConcreteItem(self),
                 lhs,
                 operator,
-                &self.value,
+                self.value,
                 f.alignment_context(),
             )
         })
@@ -1020,6 +1020,9 @@ impl<'arena> Format<'arena> for Terminator<'arena> {
                 Terminator::Semicolon(_) | Terminator::TagPair(_, _) => Document::String(";"),
                 Terminator::ClosingTag(t) => {
                     Document::Array(vec![in f.arena; Document::Space(Space::soft()), t.format(f)])
+                }
+                Terminator::Missing(span) => {
+                    unreachable!("Syntax error: a terminator was expected but missing at {:#?}", span)
                 }
             }
         })
@@ -1302,7 +1305,7 @@ impl<'arena> Format<'arena> for ConstantItem<'arena> {
                 AssignmentLikeNode::ConstantItem(self),
                 lhs,
                 Document::String("="),
-                &self.value,
+                self.value,
                 f.alignment_context(),
             )
         })

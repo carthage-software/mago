@@ -37,7 +37,7 @@ pub struct Declare<'arena> {
 pub struct DeclareItem<'arena> {
     pub name: LocalIdentifier<'arena>,
     pub equal: Span,
-    pub value: Expression<'arena>,
+    pub value: &'arena Expression<'arena>,
 }
 
 /// Represents the body of a declare statement.

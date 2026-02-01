@@ -95,7 +95,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Return<'arena> {
             Rc::new(get_void())
         };
 
-        handle_return_value(context, block_context, artifacts, self.value.as_ref(), inferred_return_type, self.span());
+        handle_return_value(context, block_context, artifacts, self.value, inferred_return_type, self.span());
 
         Ok(())
     }

@@ -70,11 +70,11 @@ impl<'arena> Formatter<'arena> {
     ///
     /// # Errors
     ///
-    /// Returns a [`ParseError`] if the file's content contains syntax errors.
+    /// Returns the first [`ParseError`] if the file's content contains syntax errors.
     pub fn format_file<'ctx>(&self, file: &'ctx File) -> Result<&'arena str, ParseError> {
-        let (program, error) = parse_file(self.arena, file);
-        if let Some(error) = error {
-            return Err(error);
+        let program = parse_file(self.arena, file);
+        if let Some(error) = program.errors.first() {
+            return Err(error.clone());
         }
 
         Ok(self.format(file, program))

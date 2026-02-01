@@ -39,7 +39,7 @@ pub struct FunctionLikeParameter<'arena> {
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub struct FunctionLikeParameterDefaultValue<'arena> {
     pub equals: Span,
-    pub value: Expression<'arena>,
+    pub value: &'arena Expression<'arena>,
 }
 
 impl FunctionLikeParameter<'_> {

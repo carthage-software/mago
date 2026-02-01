@@ -261,7 +261,10 @@ impl<'arena> Format<'arena> for For<'arena> {
                 format_token(f, self.left_parenthesis, "("),
             ];
 
-            let format_expressions = |f: &mut FormatterState<'_, 'arena>, exprs: &'arena [Expression<'arena>]| {
+            fn format_expressions<'a, 'arena>(
+                f: &mut FormatterState<'a, 'arena>,
+                exprs: &'arena [&'arena Expression<'arena>],
+            ) -> Document<'arena> {
                 let Some(first) = exprs.first() else {
                     return Document::empty();
                 };
@@ -283,7 +286,7 @@ impl<'arena> Format<'arena> for For<'arena> {
 
                     Document::Group(Group::new(contents))
                 }
-            };
+            }
 
             contents.push(Document::Group(Group::new(vec![
                 in f.arena;

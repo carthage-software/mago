@@ -118,7 +118,7 @@ pub struct PropertyAbstractItem<'arena> {
 pub struct PropertyConcreteItem<'arena> {
     pub variable: DirectVariable<'arena>,
     pub equals: Span,
-    pub value: Expression<'arena>,
+    pub value: &'arena Expression<'arena>,
 }
 
 /// Represents a list of property hooks in a class-like property declaration in PHP.
@@ -199,7 +199,7 @@ pub enum PropertyHookConcreteBody<'arena> {
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub struct PropertyHookConcreteExpressionBody<'arena> {
     pub arrow: Span,
-    pub expression: Expression<'arena>,
+    pub expression: &'arena Expression<'arena>,
     pub semicolon: Span,
 }
 

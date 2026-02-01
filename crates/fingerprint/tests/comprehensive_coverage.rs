@@ -10,7 +10,8 @@ const COMPREHENSIVE_PHP: &str = include_str!("fixtures/comprehensive.php");
 fn fingerprint_code(code: &'static str) -> u64 {
     let arena = Bump::new();
     let file = File::ephemeral("test.php".into(), code.into());
-    let (program, _) = parse_file(&arena, &file);
+    let program = parse_file(&arena, &file);
+    assert!(!program.has_errors(), "Parse failed: {:?}", program.errors);
     let resolved_names = NameResolver::new(&arena).resolve(program);
     let options = FingerprintOptions::default();
     program.fingerprint(&resolved_names, &options)
@@ -20,9 +21,8 @@ fn fingerprint_code(code: &'static str) -> u64 {
 fn test_comprehensive_file_parses() {
     let arena = Bump::new();
     let file = File::ephemeral("comprehensive.php".into(), COMPREHENSIVE_PHP.into());
-    let (program, errors) = parse_file(&arena, &file);
-
-    assert!(errors.is_none(), "Parse should succeed without errors");
+    let program = parse_file(&arena, &file);
+    assert!(!program.has_errors(), "Parse should succeed without errors: {:?}", program.errors);
 
     let resolved_names = NameResolver::new(&arena).resolve(program);
     let options = FingerprintOptions::default();
@@ -265,7 +265,8 @@ fn test_use_statement_change_detected_when_enabled() {
     fn fingerprint_with_use(code: &'static str) -> u64 {
         let arena = Bump::new();
         let file = File::ephemeral("test.php".into(), code.into());
-        let (program, _) = parse_file(&arena, &file);
+        let program = parse_file(&arena, &file);
+        assert!(!program.has_errors(), "Parse failed: {:?}", program.errors);
         let resolved_names = NameResolver::new(&arena).resolve(program);
         let options = FingerprintOptions::default().with_use_statements(true);
         program.fingerprint(&resolved_names, &options)

@@ -280,7 +280,7 @@ impl<'anlyz, 'ctx, 'ast, 'arena> MatchAnalyzer<'anlyz, 'ctx, 'ast, 'arena> {
             self.context.arena,
             subject_expr,
             expression_arm.conditions.get(0).unwrap(),
-            expression_arm.conditions.iter().skip(1).collect(),
+            expression_arm.conditions.iter().skip(1).copied().collect(),
         );
 
         let was_inside_conditional = running_else_context.flags.inside_conditional();

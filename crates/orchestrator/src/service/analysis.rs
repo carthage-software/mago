@@ -117,13 +117,14 @@ impl AnalysisService {
 
         let arena = Bump::new();
 
-        let (program, parsing_error) = parse_file(&arena, file);
+        let program = parse_file(&arena, file);
         let resolved_names = NameResolver::new(&arena).resolve(program);
 
         let mut issues = IssueCollection::new();
-        if let Some(error) = parsing_error {
-            issues.push(Issue::from(&error));
-            return issues;
+        if program.has_errors() {
+            for error in program.errors.iter() {
+                issues.push(Issue::from(error));
+            }
         }
 
         let semantics_checker = SemanticsChecker::new(self.settings.version);
@@ -217,11 +218,11 @@ impl AnalysisService {
             pipeline.run(move |settings, arena, source_file, codebase| {
                 let mut analysis_result = AnalysisResult::new(SymbolReferences::new());
 
-                let (program, parsing_error) = parse_file(arena, &source_file);
+                let program = parse_file(arena, &source_file);
                 let resolved_names = NameResolver::new(arena).resolve(program);
 
-                if let Some(parsing_error) = parsing_error {
-                    analysis_result.issues.push(Issue::from(&parsing_error));
+                if program.has_errors() {
+                    analysis_result.issues.extend(program.errors.iter().map(Issue::from));
                 }
 
                 let semantics_checker = SemanticsChecker::new(settings.version);
@@ -311,11 +312,11 @@ impl AnalysisService {
             pipeline.run(move |settings, arena, source_file, codebase| {
                 let mut analysis_result = AnalysisResult::new(SymbolReferences::new());
 
-                let (program, parsing_error) = parse_file(arena, &source_file);
+                let program = parse_file(arena, &source_file);
                 let resolved_names = NameResolver::new(arena).resolve(program);
 
-                if let Some(parsing_error) = parsing_error {
-                    analysis_result.issues.push(Issue::from(&parsing_error));
+                if program.has_errors() {
+                    analysis_result.issues.extend(program.errors.iter().map(Issue::from));
                 }
 
                 let semantics_checker = SemanticsChecker::new(settings.version);

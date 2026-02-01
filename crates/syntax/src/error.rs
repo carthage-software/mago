@@ -14,19 +14,20 @@ use crate::token::TokenKind;
 const SYNTAX_ERROR_CODE: &str = "syntax";
 const PARSE_ERROR_CODE: &str = "parse";
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub enum SyntaxError {
     UnexpectedToken(FileId, u8, Position),
     UnrecognizedToken(FileId, u8, Position),
     UnexpectedEndOfFile(FileId, Position),
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Serialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub enum ParseError {
     SyntaxError(SyntaxError),
     UnexpectedEndOfFile(Box<[TokenKind]>, FileId, Position),
     UnexpectedToken(Box<[TokenKind]>, TokenKind, Span),
     UnclosedLiteralString(LiteralStringKind, Span),
+    RecursionLimitExceeded(Span),
 }
 
 impl HasFileId for SyntaxError {
@@ -46,6 +47,7 @@ impl HasFileId for ParseError {
             ParseError::UnexpectedEndOfFile(_, file_id, _) => *file_id,
             ParseError::UnexpectedToken(_, _, span) => span.file_id,
             ParseError::UnclosedLiteralString(_, span) => span.file_id,
+            ParseError::RecursionLimitExceeded(span) => span.file_id,
         }
     }
 }
@@ -69,6 +71,7 @@ impl HasSpan for ParseError {
             ParseError::UnexpectedEndOfFile(_, file_id, position) => Span::new(*file_id, *position, *position),
             ParseError::UnexpectedToken(_, _, span) => *span,
             ParseError::UnclosedLiteralString(_, span) => *span,
+            ParseError::RecursionLimitExceeded(span) => *span,
         }
     }
 }
@@ -121,6 +124,7 @@ impl std::fmt::Display for ParseError {
                 LiteralStringKind::SingleQuoted => "Unclosed single-quoted string".to_string(),
                 LiteralStringKind::DoubleQuoted => "Unclosed double-quoted string".to_string(),
             },
+            ParseError::RecursionLimitExceeded(_) => "Maximum recursion depth exceeded".to_string(),
         };
 
         write!(f, "{message}")
@@ -160,7 +164,7 @@ impl From<&ParseError> for Issue {
         if let ParseError::SyntaxError(syntax_error) = error {
             syntax_error.into()
         } else {
-            Issue::error("Fatal parse error encountered")
+            Issue::error("Parse error encountered during parsing")
                 .with_code(PARSE_ERROR_CODE)
                 .with_annotation(Annotation::primary(error.span()).with_message(error.to_string()))
                 .with_note("This error indicates that the parser encountered a parse issue.")

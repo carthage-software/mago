@@ -90,6 +90,7 @@ pub enum Statement<'arena> {
     HaltCompiler(HaltCompiler<'arena>),
     Unset(Unset<'arena>),
     Noop(Span),
+    Error(Span),
 }
 
 impl Statement<'_> {
@@ -225,7 +226,7 @@ impl HasSpan for Statement<'_> {
             Statement::Static(statement) => statement.span(),
             Statement::Unset(statement) => statement.span(),
             Statement::HaltCompiler(statement) => statement.span(),
-            Statement::Noop(span) => *span,
+            Statement::Noop(span) | Statement::Error(span) => *span,
         }
     }
 }

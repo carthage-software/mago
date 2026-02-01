@@ -27,7 +27,7 @@ pub struct Constant<'arena> {
 pub struct ConstantItem<'arena> {
     pub name: LocalIdentifier<'arena>,
     pub equals: Span,
-    pub value: Expression<'arena>,
+    pub value: &'arena Expression<'arena>,
 }
 
 impl HasSpan for Constant<'_> {

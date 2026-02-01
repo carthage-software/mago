@@ -95,12 +95,12 @@ pub fn parse_literal_string_in<'arena>(
                 consumed = false;
             }
             c if quote_char == Some('"') && c.is_ascii_digit() => {
-                let mut octal_val = 0u8;
+                let mut octal_val = 0u16;
                 let mut octal_len = 0;
 
                 while let Some(peeked) = chars.peek() {
                     if octal_len < 3 && peeked.is_ascii_digit() && *peeked <= '7' {
-                        octal_val = octal_val * 8 + peeked.to_digit(8).unwrap() as u8;
+                        octal_val = octal_val * 8 + peeked.to_digit(8).unwrap() as u16;
                         octal_len += 1;
                         chars.next(); // Consume the digit
                     } else {
@@ -108,7 +108,8 @@ pub fn parse_literal_string_in<'arena>(
                     }
                 }
                 if octal_len > 0 {
-                    result.push(octal_val);
+                    // Truncate to u8 (matches PHP behavior for octal sequences > 255)
+                    result.push(octal_val as u8);
                 } else {
                     result.push(b'\\');
                     result.push(b'0');

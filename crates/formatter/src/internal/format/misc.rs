@@ -158,7 +158,7 @@ pub(super) fn should_hug_expression<'arena>(
                     Argument::Named(_) => false,
                     Argument::Positional(positional) => {
                         matches!(positional.value, Expression::Instantiation(_))
-                            || should_hug_expression(f, &positional.value, arrow_function_recursion)
+                            || should_hug_expression(f, positional.value, arrow_function_recursion)
                     }
                 }
             } else {
@@ -167,7 +167,7 @@ pub(super) fn should_hug_expression<'arena>(
                 // d. The instantiation has less than 4 non-named arguments,
                 // all of which are simple expressions
                 (arguments_len < 4 && argument_list.arguments.iter().all(|arg| {
-                    matches!(arg, Argument::Positional(positional) if is_simple_expression(&positional.value))
+                    matches!(arg, Argument::Positional(positional) if is_simple_expression(positional.value))
                 }))
             }
         }

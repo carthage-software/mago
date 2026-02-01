@@ -87,12 +87,9 @@ impl GuardService {
         let issues = pipeline.run(|(codebase, guard_settings), arena, source_file| {
             let mut issues = IssueCollection::new();
 
-            let (program, parsing_error) = parse_file(arena, &source_file);
-
-            if let Some(parsing_error) = parsing_error {
-                issues.push(Issue::from(&parsing_error));
-
-                return Ok(issues);
+            let program = parse_file(arena, &source_file);
+            if program.has_errors() {
+                issues.extend(program.errors.iter().map(Issue::from));
             }
 
             let resolved_names = NameResolver::new(arena).resolve(program);

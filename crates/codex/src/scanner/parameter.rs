@@ -53,7 +53,7 @@ pub fn scan_function_like_parameter<'arena>(
 
     if let Some(default_value) = &parameter.default_value {
         metadata.flags |= MetadataFlags::HAS_DEFAULT;
-        metadata.default_type = infer(context, scope, &default_value.value).map(|u| {
+        metadata.default_type = infer(context, scope, default_value.value).map(|u| {
             let mut type_metadata = TypeMetadata::new(u, default_value.span());
             type_metadata.inferred = true;
             type_metadata

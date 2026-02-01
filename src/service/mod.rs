@@ -860,7 +860,5 @@ impl BaselineIssueProcessor {
 ///
 /// * `true` if the code is syntactically valid, `false` otherwise.
 fn check_php_code(arena: &Bump, file_id: FileId, code: &str) -> bool {
-    let parse_result = parse_file_content(arena, file_id, code);
-
-    parse_result.1.is_none()
+    !parse_file_content(arena, file_id, code).has_errors()
 }

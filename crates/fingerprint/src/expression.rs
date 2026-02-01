@@ -45,6 +45,9 @@ impl Fingerprintable for Expression<'_> {
             Expression::Instantiation(node) => node.fingerprint_with_hasher(hasher, resolved_names, options),
             Expression::MagicConstant(node) => node.fingerprint_with_hasher(hasher, resolved_names, options),
             Expression::Pipe(node) => node.fingerprint_with_hasher(hasher, resolved_names, options),
+            Expression::Error(_) => {
+                hasher.write(b"__error__");
+            }
             _ => unreachable!("An expression variant was not handled in fingerprinting: {self:?}"),
         }
     }

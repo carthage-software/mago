@@ -95,6 +95,7 @@ pub fn get_member_selector_id<'ast, 'arena>(
             )?;
             Some(concat_atom!("{", expr_id.as_str(), "}"))
         }
+        ClassLikeMemberSelector::Missing(_) => None,
     }
 }
 
@@ -115,6 +116,7 @@ pub fn get_constant_selector_id<'ast, 'arena>(
             )?;
             Some(concat_atom!("{", expr_id.as_str(), "}"))
         }
+        ClassLikeConstantSelector::Missing(_) => None,
     }
 }
 

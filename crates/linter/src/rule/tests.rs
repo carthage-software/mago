@@ -43,9 +43,9 @@ pub fn run_lint_test<R: LintRule, F>(
     let arena = Bump::new();
     let file = File::ephemeral(Cow::Borrowed(filename.unwrap_or("test.php")), Cow::Owned(code.to_string()));
 
-    let (program, parse_error) = parse_file(&arena, &file);
-    if let Some(err) = parse_error {
-        panic!("Parse error in test code: {err:?}");
+    let program = parse_file(&arena, &file);
+    if program.has_errors() {
+        panic!("Failed to parse code for lint test, errors: {:?}", program.errors);
     }
 
     let resolver = NameResolver::new(&arena);

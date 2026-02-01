@@ -59,7 +59,7 @@ pub enum PartialArgument<'arena> {
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub struct PositionalArgument<'arena> {
     pub ellipsis: Option<Span>,
-    pub value: Expression<'arena>,
+    pub value: &'arena Expression<'arena>,
 }
 
 /// Represents a named argument.
@@ -69,7 +69,7 @@ pub struct PositionalArgument<'arena> {
 pub struct NamedArgument<'arena> {
     pub name: LocalIdentifier<'arena>,
     pub colon: Span,
-    pub value: Expression<'arena>,
+    pub value: &'arena Expression<'arena>,
 }
 
 /// Represents a named placeholder in a partial function application.
@@ -162,10 +162,10 @@ impl<'arena> Argument<'arena> {
 
     #[inline]
     #[must_use]
-    pub const fn value(&self) -> &Expression<'arena> {
+    pub const fn value(&self) -> &'arena Expression<'arena> {
         match self {
-            Argument::Positional(arg) => &arg.value,
-            Argument::Named(arg) => &arg.value,
+            Argument::Positional(arg) => arg.value,
+            Argument::Named(arg) => arg.value,
         }
     }
 }

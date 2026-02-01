@@ -34,7 +34,7 @@ pub struct StaticAbstractItem<'arena> {
 pub struct StaticConcreteItem<'arena> {
     pub variable: DirectVariable<'arena>,
     pub equals: Span,
-    pub value: Expression<'arena>,
+    pub value: &'arena Expression<'arena>,
 }
 
 impl<'arena> StaticItem<'arena> {
@@ -47,10 +47,10 @@ impl<'arena> StaticItem<'arena> {
     }
 
     #[must_use]
-    pub fn value(&self) -> Option<&Expression<'arena>> {
+    pub fn value(&self) -> Option<&'arena Expression<'arena>> {
         match self {
             StaticItem::Abstract(_) => None,
-            StaticItem::Concrete(item) => Some(&item.value),
+            StaticItem::Concrete(item) => Some(item.value),
         }
     }
 }

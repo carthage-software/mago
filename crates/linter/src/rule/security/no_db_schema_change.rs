@@ -138,7 +138,7 @@ impl LintRule for NoDbSchemaChangeRule {
             return;
         };
 
-        if !contains_schema_change_keywords(&first_arg.value) {
+        if !contains_schema_change_keywords(first_arg.value) {
             return;
         }
 

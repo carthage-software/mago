@@ -224,6 +224,11 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Expression<'arena> {
 
                 Ok(())
             }
+            Expression::Error(_) => {
+                artifacts.set_expression_type(&self, get_never());
+
+                Ok(())
+            }
             _ => unreachable!("An expression variant was not handled in analyzer: {self:?}"),
         };
 

@@ -31,7 +31,7 @@ pub fn new_synthetic_call<'arena>(arena: &'arena Bump, f: &str, expression: Expr
         argument_list: ArgumentList {
             left_parenthesis: Span::zero(),
             arguments: TokenSeparatedSequence::new(
-                vec![in arena; Argument::Positional(PositionalArgument { ellipsis: None, value: expression })],
+                vec![in arena; Argument::Positional(PositionalArgument { ellipsis: None, value: arena.alloc(expression) })],
                 vec![in arena],
             ),
             right_parenthesis: Span::zero(),

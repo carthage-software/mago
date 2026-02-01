@@ -387,14 +387,14 @@ fn get_argument<'ast, 'arena>(
     match call_arguments {
         InvocationArgumentsSource::ArgumentList(argument_list) => {
             if let Some(Argument::Positional(argument)) = argument_list.arguments.get(index) {
-                return Some(&argument.value);
+                return Some(argument.value);
             }
 
             for argument in &argument_list.arguments {
                 if let Argument::Named(named_argument) = argument
                     && names.contains(&named_argument.name.value)
                 {
-                    return Some(&named_argument.value);
+                    return Some(named_argument.value);
                 }
             }
 
@@ -402,14 +402,14 @@ fn get_argument<'ast, 'arena>(
         }
         InvocationArgumentsSource::PartialArgumentList(partial_argument_list) => {
             if let Some(PartialArgument::Positional(argument)) = partial_argument_list.arguments.get(index) {
-                return Some(&argument.value);
+                return Some(argument.value);
             }
 
             for argument in &partial_argument_list.arguments {
                 if let PartialArgument::Named(named_argument) = argument
                     && names.contains(&named_argument.name.value)
                 {
-                    return Some(&named_argument.value);
+                    return Some(named_argument.value);
                 }
             }
 

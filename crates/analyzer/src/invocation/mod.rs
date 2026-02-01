@@ -442,8 +442,8 @@ impl<'ast, 'arena> InvocationArgument<'ast, 'arena> {
     pub const fn value(&self) -> Option<&'ast Expression<'arena>> {
         match self {
             InvocationArgument::PipedValue(expr) => Some(expr),
-            InvocationArgument::Positional(pos_arg) => Some(&pos_arg.value),
-            InvocationArgument::Named(named_arg) => Some(&named_arg.value),
+            InvocationArgument::Positional(pos_arg) => Some(pos_arg.value),
+            InvocationArgument::Named(named_arg) => Some(named_arg.value),
             _ => None,
         }
     }
