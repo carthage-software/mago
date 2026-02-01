@@ -212,10 +212,10 @@ fn has_reference_capture(expr: &Expression<'_>, var_name: &str) -> bool {
 
     impl<'arena> MutWalker<'_, 'arena, ()> for RefCaptureChecker<'_> {
         fn walk_closure(&mut self, closure: &'_ Closure<'arena>, _: &mut ()) {
-            if let Some(use_clause) = &closure.use_clause {
-                if use_clause.variables.iter().any(|v| v.ampersand.is_some() && v.variable.name == self.var_name) {
-                    self.found = true;
-                }
+            if let Some(use_clause) = &closure.use_clause
+                && use_clause.variables.iter().any(|v| v.ampersand.is_some() && v.variable.name == self.var_name)
+            {
+                self.found = true;
             }
         }
     }
