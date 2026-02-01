@@ -234,7 +234,9 @@ fn parse_indented_code<'arena>(
                     break;
                 }
 
-                let line_content = &content[indent_len..];
+                // Calculate byte offset from original indent character count
+                let current_indent_bytes: usize = content.chars().take(indent_len).map(|c| c.len_utf8()).sum();
+                let line_content = &content[current_indent_bytes..];
                 if !code_content.is_empty() {
                     code_content.push('\n');
                 }
