@@ -27,6 +27,7 @@ pub enum ParseError {
     UnexpectedEndOfFile(Box<[TokenKind]>, FileId, Position),
     UnexpectedToken(Box<[TokenKind]>, TokenKind, Span),
     UnclosedLiteralString(LiteralStringKind, Span),
+    RecursionLimitExceeded(Span),
 }
 
 impl HasFileId for SyntaxError {
@@ -46,6 +47,7 @@ impl HasFileId for ParseError {
             ParseError::UnexpectedEndOfFile(_, file_id, _) => *file_id,
             ParseError::UnexpectedToken(_, _, span) => span.file_id,
             ParseError::UnclosedLiteralString(_, span) => span.file_id,
+            ParseError::RecursionLimitExceeded(span) => span.file_id,
         }
     }
 }
@@ -69,6 +71,7 @@ impl HasSpan for ParseError {
             ParseError::UnexpectedEndOfFile(_, file_id, position) => Span::new(*file_id, *position, *position),
             ParseError::UnexpectedToken(_, _, span) => *span,
             ParseError::UnclosedLiteralString(_, span) => *span,
+            ParseError::RecursionLimitExceeded(span) => *span,
         }
     }
 }
@@ -121,6 +124,7 @@ impl std::fmt::Display for ParseError {
                 LiteralStringKind::SingleQuoted => "Unclosed single-quoted string".to_string(),
                 LiteralStringKind::DoubleQuoted => "Unclosed double-quoted string".to_string(),
             },
+            ParseError::RecursionLimitExceeded(_) => "Maximum recursion depth exceeded".to_string(),
         };
 
         write!(f, "{message}")

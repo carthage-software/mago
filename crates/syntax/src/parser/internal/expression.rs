@@ -38,6 +38,7 @@ use crate::ast::ast::UnaryPostfixOperator;
 use crate::ast::ast::UnaryPrefix;
 use crate::ast::ast::UnaryPrefixOperator;
 use crate::error::ParseError;
+use crate::parser::MAX_RECURSION_DEPTH;
 use crate::parser::Parser;
 use crate::token::Associativity;
 use crate::token::GetPrecedence;
@@ -51,6 +52,25 @@ impl<'input, 'arena> Parser<'input, 'arena> {
     /// Internal expression parsing that uses arena-allocated references to reduce stack usage.
     /// Returns `&'arena Expression<'arena>` (8 bytes) instead of `Expression<'arena>` (488 bytes).
     pub(crate) fn parse_expression_with_precedence(
+        &mut self,
+        precedence: Precedence,
+    ) -> Result<&'arena Expression<'arena>, ParseError> {
+        self.state.recursion_depth += 1;
+        if self.state.recursion_depth > MAX_RECURSION_DEPTH {
+            self.state.recursion_depth -= 1;
+            let span = self.stream.lookahead(0)?.map(|t| t.span).unwrap_or_else(|| {
+                Span::new(self.stream.file_id(), self.stream.current_position(), self.stream.current_position())
+            });
+
+            return Err(ParseError::RecursionLimitExceeded(span));
+        }
+
+        let result = self.parse_expression_with_precedence_inner(precedence);
+        self.state.recursion_depth -= 1;
+        result
+    }
+
+    fn parse_expression_with_precedence_inner(
         &mut self,
         precedence: Precedence,
     ) -> Result<&'arena Expression<'arena>, ParseError> {

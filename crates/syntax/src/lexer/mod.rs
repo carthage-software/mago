@@ -598,11 +598,10 @@ impl<'input, 'arena> Lexer<'input, 'arena> {
                     }
                     [b'.', ..] => (TokenKind::Dot, 1),
                     [unknown_byte, ..] => {
-                        return Some(Err(SyntaxError::UnrecognizedToken(
-                            self.file_id(),
-                            *unknown_byte,
-                            self.input.current_position(),
-                        )));
+                        let position = self.input.current_position();
+                        self.input.consume(1);
+
+                        return Some(Err(SyntaxError::UnrecognizedToken(self.file_id(), *unknown_byte, position)));
                     }
                     [] => {
                         // we check for EOF before entering scripting section,
@@ -928,11 +927,11 @@ impl<'input, 'arena> Lexer<'input, 'arena> {
 
                             Some(Ok(self.token(TokenKind::LeftParenthesis, buffer, start, end)))
                         } else {
-                            Some(Err(SyntaxError::UnexpectedToken(
-                                self.file_id(),
-                                self.input.read(1)[0],
-                                self.input.current_position(),
-                            )))
+                            let byte = self.input.read(1)[0];
+                            let position = self.input.current_position();
+                            // Consume the unexpected byte to avoid infinite loops
+                            self.input.consume(1);
+                            Some(Err(SyntaxError::UnexpectedToken(self.file_id(), byte, position)))
                         }
                     }
                     HaltStage::LookingForRightParenthesis => {
@@ -944,11 +943,10 @@ impl<'input, 'arena> Lexer<'input, 'arena> {
 
                             Some(Ok(self.token(TokenKind::RightParenthesis, buffer, start, end)))
                         } else {
-                            Some(Err(SyntaxError::UnexpectedToken(
-                                self.file_id(),
-                                self.input.read(1)[0],
-                                self.input.current_position(),
-                            )))
+                            let byte = self.input.read(1)[0];
+                            let position = self.input.current_position();
+                            self.input.consume(1);
+                            Some(Err(SyntaxError::UnexpectedToken(self.file_id(), byte, position)))
                         }
                     }
                     HaltStage::LookingForTerminator => {
@@ -967,11 +965,10 @@ impl<'input, 'arena> Lexer<'input, 'arena> {
 
                             Some(Ok(self.token(TokenKind::CloseTag, buffer, start, end)))
                         } else {
-                            Some(Err(SyntaxError::UnexpectedToken(
-                                self.file_id(),
-                                self.input.read(1)[0],
-                                self.input.current_position(),
-                            )))
+                            let byte = self.input.read(1)[0];
+                            let position = self.input.current_position();
+                            self.input.consume(1);
+                            Some(Err(SyntaxError::UnexpectedToken(self.file_id(), byte, position)))
                         }
                     }
                     _ => unreachable!(),
