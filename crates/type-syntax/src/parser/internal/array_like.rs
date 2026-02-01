@@ -27,7 +27,7 @@ pub fn parse_array_like_type<'input>(stream: &mut TypeTokenStream<'input>) -> Re
     let next = stream.peek()?;
     let (keyword, kind) = match next.kind {
         TypeTokenKind::Array => {
-            let keyword = Keyword::from(stream.consume()?);
+            let keyword = Keyword::from_token(stream.consume()?, stream.file_id());
             if !stream.is_at(TypeTokenKind::LeftBrace)? {
                 return Ok(Type::Array(ArrayType { keyword, parameters: parse_generic_parameters_or_none(stream)? }));
             }
@@ -35,7 +35,7 @@ pub fn parse_array_like_type<'input>(stream: &mut TypeTokenStream<'input>) -> Re
             (keyword, ShapeTypeKind::Array)
         }
         TypeTokenKind::NonEmptyArray => {
-            let keyword = Keyword::from(stream.consume()?);
+            let keyword = Keyword::from_token(stream.consume()?, stream.file_id());
             if !stream.is_at(TypeTokenKind::LeftBrace)? {
                 return Ok(Type::NonEmptyArray(NonEmptyArrayType {
                     keyword,
@@ -46,7 +46,7 @@ pub fn parse_array_like_type<'input>(stream: &mut TypeTokenStream<'input>) -> Re
             (keyword, ShapeTypeKind::NonEmptyArray)
         }
         TypeTokenKind::AssociativeArray => {
-            let keyword = Keyword::from(stream.consume()?);
+            let keyword = Keyword::from_token(stream.consume()?, stream.file_id());
             if !stream.is_at(TypeTokenKind::LeftBrace)? {
                 return Ok(Type::AssociativeArray(AssociativeArrayType {
                     keyword,
@@ -57,7 +57,7 @@ pub fn parse_array_like_type<'input>(stream: &mut TypeTokenStream<'input>) -> Re
             (keyword, ShapeTypeKind::AssociativeArray)
         }
         TypeTokenKind::List => {
-            let keyword = Keyword::from(stream.consume()?);
+            let keyword = Keyword::from_token(stream.consume()?, stream.file_id());
             if !stream.is_at(TypeTokenKind::LeftBrace)? {
                 return Ok(Type::List(ListType { keyword, parameters: parse_generic_parameters_or_none(stream)? }));
             }
@@ -65,7 +65,7 @@ pub fn parse_array_like_type<'input>(stream: &mut TypeTokenStream<'input>) -> Re
             (keyword, ShapeTypeKind::List)
         }
         TypeTokenKind::NonEmptyList => {
-            let keyword = Keyword::from(stream.consume()?);
+            let keyword = Keyword::from_token(stream.consume()?, stream.file_id());
             if !stream.is_at(TypeTokenKind::LeftBrace)? {
                 return Ok(Type::NonEmptyList(NonEmptyListType {
                     keyword,
@@ -85,7 +85,7 @@ pub fn parse_array_like_type<'input>(stream: &mut TypeTokenStream<'input>) -> Re
                     TypeTokenKind::NonEmptyList,
                 ],
                 next.kind,
-                next.span,
+                next.span_for(stream.file_id()),
             ));
         }
     };
@@ -93,7 +93,7 @@ pub fn parse_array_like_type<'input>(stream: &mut TypeTokenStream<'input>) -> Re
     Ok(Type::Shape(ShapeType {
         kind,
         keyword,
-        left_brace: stream.eat(TypeTokenKind::LeftBrace)?.span,
+        left_brace: stream.eat(TypeTokenKind::LeftBrace)?.span_for(stream.file_id()),
         fields: {
             let mut fields = Vec::new();
             while !stream.is_at(TypeTokenKind::RightBrace)? && !stream.is_at(TypeTokenKind::Ellipsis)? {
@@ -147,17 +147,21 @@ pub fn parse_array_like_type<'input>(stream: &mut TypeTokenStream<'input>) -> Re
                         Some(ShapeFieldKey {
                             key: parse_shape_field_key(stream)?,
                             question_mark: if stream.is_at(TypeTokenKind::Question)? {
-                                Some(stream.consume()?.span)
+                                Some(stream.consume()?.span_for(stream.file_id()))
                             } else {
                                 None
                             },
-                            colon: stream.eat(TypeTokenKind::Colon)?.span,
+                            colon: stream.eat(TypeTokenKind::Colon)?.span_for(stream.file_id()),
                         })
                     } else {
                         None
                     },
                     value: Box::new(parse_type(stream)?),
-                    comma: if stream.is_at(TypeTokenKind::Comma)? { Some(stream.consume()?.span) } else { None },
+                    comma: if stream.is_at(TypeTokenKind::Comma)? {
+                        Some(stream.consume()?.span_for(stream.file_id()))
+                    } else {
+                        None
+                    },
                 };
 
                 if field.comma.is_none() {
@@ -173,15 +177,19 @@ pub fn parse_array_like_type<'input>(stream: &mut TypeTokenStream<'input>) -> Re
         additional_fields: {
             if stream.is_at(TypeTokenKind::Ellipsis)? {
                 Some(ShapeAdditionalFields {
-                    ellipsis: stream.consume()?.span,
+                    ellipsis: stream.consume()?.span_for(stream.file_id()),
                     parameters: parse_generic_parameters_or_none(stream)?,
-                    comma: if stream.is_at(TypeTokenKind::Comma)? { Some(stream.consume()?.span) } else { None },
+                    comma: if stream.is_at(TypeTokenKind::Comma)? {
+                        Some(stream.consume()?.span_for(stream.file_id()))
+                    } else {
+                        None
+                    },
                 })
             } else {
                 None
             }
         },
-        right_brace: stream.eat(TypeTokenKind::RightBrace)?.span,
+        right_brace: stream.eat(TypeTokenKind::RightBrace)?.span_for(stream.file_id()),
     }))
 }
 
@@ -190,7 +198,7 @@ pub fn parse_shape_field_key<'input>(stream: &mut TypeTokenStream<'input>) -> Re
         let token = stream.consume()?;
         let value = &token.value[1..token.value.len() - 1];
 
-        return Ok(ShapeKey::String { value, span: token.span });
+        return Ok(ShapeKey::String { value, span: token.span_for(stream.file_id()) });
     }
 
     if stream.is_at(TypeTokenKind::LiteralInteger)? {
@@ -199,7 +207,7 @@ pub fn parse_shape_field_key<'input>(stream: &mut TypeTokenStream<'input>) -> Re
             unreachable!("lexer generated invalid integer `{}`; this should never happen.", token.value)
         }) as i64;
 
-        return Ok(ShapeKey::Integer { value, span: token.span });
+        return Ok(ShapeKey::Integer { value, span: token.span_for(stream.file_id()) });
     }
 
     if (stream.is_at(TypeTokenKind::Plus)? || stream.is_at(TypeTokenKind::Minus)?)
@@ -218,20 +226,20 @@ pub fn parse_shape_field_key<'input>(stream: &mut TypeTokenStream<'input>) -> Re
 
             return Ok(ShapeKey::Integer {
                 value: if is_negative { -value } else { value },
-                span: Span::new(stream.file_id(), sign_token.span.start, token.span.end),
+                span: Span::new(stream.file_id(), sign_token.start, token.end()),
             });
         } else if stream.is_at(TypeTokenKind::LiteralFloat)? {
             let token = stream.consume()?;
             return Ok(ShapeKey::String {
-                value: stream.lexer.slice_in_range(sign_token.span.start.offset, token.span.end.offset),
-                span: Span::new(stream.file_id(), sign_token.span.start, token.span.end),
+                value: stream.lexer.slice_in_range(sign_token.start.offset, token.end().offset),
+                span: Span::new(stream.file_id(), sign_token.start, token.end()),
             });
         }
     }
 
     if stream.is_at(TypeTokenKind::LiteralFloat)? {
         let token = stream.consume()?;
-        return Ok(ShapeKey::String { value: token.value, span: token.span });
+        return Ok(ShapeKey::String { value: token.value, span: token.span_for(stream.file_id()) });
     }
 
     let mut key_parts = Vec::new();
@@ -265,18 +273,19 @@ pub fn parse_shape_field_key<'input>(stream: &mut TypeTokenStream<'input>) -> Re
         let token = stream.consume()?;
 
         if start_offset.is_none() {
-            start_offset = Some(token.span.start.offset);
+            start_offset = Some(token.start.offset);
         }
-        end_offset = Some(token.span.end.offset);
+        end_offset = Some(token.end().offset);
 
         key_parts.push(token.value);
     }
 
     if key_parts.is_empty() {
+        let token = stream.peek()?;
         return Err(ParseError::UnexpectedToken(
             vec![TypeTokenKind::LiteralString, TypeTokenKind::LiteralInteger, TypeTokenKind::Identifier],
-            stream.peek()?.kind,
-            stream.peek()?.span,
+            token.kind,
+            token.span_for(stream.file_id()),
         ));
     }
 

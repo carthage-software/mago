@@ -22,10 +22,12 @@ pub struct TypeTokenStream<'input> {
 
 impl<'input> TypeTokenStream<'input> {
     /// Creates a new `TypeTokenStream` wrapping the given `TypeLexer`.
+    #[inline]
     pub fn new(lexer: TypeLexer<'input>) -> TypeTokenStream<'input> {
         let position = lexer.current_position();
 
-        TypeTokenStream { lexer, buffer: VecDeque::new(), position }
+        // Pre-allocate buffer - typical lookahead is 1-2 tokens
+        TypeTokenStream { lexer, buffer: VecDeque::with_capacity(4), position }
     }
 
     /// Returns the current position of the stream within the source file.
@@ -89,7 +91,7 @@ impl<'input> TypeTokenStream<'input> {
         match self.fill_buffer(1) {
             Ok(true) => {
                 if let Some(token) = self.buffer.pop_front() {
-                    self.position = token.span.end;
+                    self.position = token.end();
 
                     Some(Ok(token))
                 } else {
@@ -101,10 +103,27 @@ impl<'input> TypeTokenStream<'input> {
         }
     }
 
+    /// Returns the kind of the next significant token without consuming it.
+    /// More efficient than `peek()` when only the kind is needed.
+    ///
+    /// # Returns
+    ///
+    /// - `Ok(Some(TypeTokenKind))`: The kind of the next token.
+    /// - `Ok(None)`: If EOF is reached.
+    /// - `Err(ParseError)`: If the underlying lexer produced an error.
+    #[inline]
+    pub fn peek_kind(&mut self) -> Result<Option<TypeTokenKind>, ParseError> {
+        match self.fill_buffer(1) {
+            Ok(true) => Ok(self.buffer.front().map(|t| t.kind)),
+            Ok(false) => Ok(None),
+            Err(e) => Err(e.into()),
+        }
+    }
+
     #[inline]
     pub fn is_at(&mut self, kind: TypeTokenKind) -> Result<bool, ParseError> {
-        Ok(match self.lookahead(0)? {
-            Some(token) => token.kind == kind,
+        Ok(match self.peek_kind()? {
+            Some(k) => k == kind,
             None => false,
         })
     }
@@ -152,7 +171,7 @@ impl<'input> TypeTokenStream<'input> {
     fn unexpected(&self, found: Option<TypeToken<'input>>, expected_one_of: &[TypeTokenKind]) -> ParseError {
         if let Some(token) = found {
             // Found a token, but it was the wrong kind
-            ParseError::UnexpectedToken(expected_one_of.to_vec(), token.kind, token.span)
+            ParseError::UnexpectedToken(expected_one_of.to_vec(), token.kind, token.span_for(self.file_id()))
         } else {
             // Reached EOF when expecting specific kinds
             ParseError::UnexpectedEndOfFile(self.file_id(), expected_one_of.to_vec(), self.current_position())

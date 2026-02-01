@@ -1,5 +1,6 @@
 use serde::Serialize;
 
+use mago_database::file::FileId;
 use mago_span::HasSpan;
 use mago_span::Span;
 
@@ -17,9 +18,10 @@ impl HasSpan for Keyword<'_> {
     }
 }
 
-impl<'input> From<TypeToken<'input>> for Keyword<'input> {
+impl<'input> Keyword<'input> {
+    /// Creates a Keyword from a TypeToken and file_id.
     #[inline]
-    fn from(token: TypeToken<'input>) -> Self {
+    pub fn from_token(token: TypeToken<'input>, file_id: FileId) -> Self {
         debug_assert!(
             token.kind.is_keyword()
                 || (token.kind.is_identifier() && token.value.to_ascii_lowercase().ends_with("closure")),
@@ -28,7 +30,7 @@ impl<'input> From<TypeToken<'input>> for Keyword<'input> {
             token.value
         );
 
-        Keyword { span: token.span, value: token.value }
+        Keyword { span: token.span_for(file_id), value: token.value }
     }
 }
 
