@@ -627,7 +627,7 @@ interface BackedEnum extends UnitEnum
 /**
  * @enum-interface
  */
-interface IntBackedEnum extends BackedEnum
+interface __INTERNAL_DO_NOT_USE__IntBackedEnum extends BackedEnum
 {
     public readonly int $value;
 
@@ -647,7 +647,7 @@ interface IntBackedEnum extends BackedEnum
 /**
  * @enum-interface
  */
-interface StringBackedEnum extends BackedEnum
+interface __INTERNAL_DO_NOT_USE__StringBackedEnum extends BackedEnum
 {
     public readonly string $value;
 

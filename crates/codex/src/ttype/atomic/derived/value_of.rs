@@ -96,12 +96,15 @@ impl TValueOf {
                         continue;
                     }
 
-                    if codebase.is_instance_of(&class_like_metadata.name, &atom("stringbackedenum")) {
+                    if codebase
+                        .is_instance_of(&class_like_metadata.name, &atom("__internal_do_not_use__stringbackedenum"))
+                    {
                         value_types.push(TAtomic::Scalar(TScalar::string()));
                         continue;
                     }
 
-                    if codebase.is_instance_of(&class_like_metadata.name, &atom("intbackedenum")) {
+                    if codebase.is_instance_of(&class_like_metadata.name, &atom("__internal_do_not_use__intbackedenum"))
+                    {
                         value_types.push(TAtomic::Scalar(TScalar::int()));
                         continue;
                     }
