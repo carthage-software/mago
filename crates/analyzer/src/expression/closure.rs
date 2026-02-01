@@ -68,15 +68,18 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Closure<'arena> {
         let mut variable_spans = HashMap::default();
         if let Some(use_clause) = self.use_clause.as_ref() {
             for use_variable in &use_clause.variables {
-                let was_inside_general_use = block_context.flags.inside_general_use();
-                block_context.flags.set_inside_general_use(true);
-                use_variable.variable.analyze(context, block_context, artifacts)?;
-                block_context.flags.set_inside_general_use(was_inside_general_use);
-
                 let variable = use_variable.variable.name;
-                let variable_span = use_variable.variable.span;
-
                 let is_by_reference = use_variable.ampersand.is_some();
+
+                // has_variable() has side effects, so use contains_key() directly.
+                if !is_by_reference || block_context.locals.contains_key(&atom(variable)) {
+                    let was_inside_general_use = block_context.flags.inside_general_use();
+                    block_context.flags.set_inside_general_use(true);
+                    use_variable.variable.analyze(context, block_context, artifacts)?;
+                    block_context.flags.set_inside_general_use(was_inside_general_use);
+                }
+
+                let variable_span = use_variable.variable.span;
 
                 if let Some(previous_span) = variable_spans.get(&variable) {
                     context.collector.report_with_code(
@@ -97,7 +100,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Closure<'arena> {
                     );
                 }
 
-                if !block_context.has_variable(variable) {
+                if !is_by_reference && !block_context.has_variable(variable) {
                     context.collector.report_with_code(
                         IssueCode::UndefinedVariableInClosureUse,
                         Issue::error(format!(
@@ -423,8 +426,8 @@ mod tests {
     }
 
     test_analysis! {
-    name = get_current_closure_in_global_scope,
-    code = indoc! {r"
+        name = get_current_closure_in_global_scope,
+        code = indoc! {r"
             <?php
 
             class Closure {
@@ -439,6 +442,30 @@ mod tests {
         issues = [
             IssueCode::InvalidStaticMethodCall,
             IssueCode::ImpossibleAssignment,
+        ]
+    }
+
+    test_analysis! {
+        name = undefined_reference_capture,
+        code = indoc! {r"
+            <?php
+
+            $fn = function () use (&$value) { $value = 1; };
+            $fn();
+            echo $value;
+        "},
+    }
+
+    test_analysis! {
+        name = undefined_value_capture,
+        code = indoc! {r"
+            <?php
+
+            $fn = function () use ($value) { $value = 1; };
+        "},
+        issues = [
+            IssueCode::UndefinedVariable,
+            IssueCode::UndefinedVariableInClosureUse,
         ]
     }
 }
