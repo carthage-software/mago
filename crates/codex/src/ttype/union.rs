@@ -283,7 +283,7 @@ impl TUnion {
 
     #[must_use]
     pub fn to_non_nullable(&self) -> TUnion {
-        TUnion { types: Cow::Owned(self.get_non_nullable_types()), flags: self.flags }
+        TUnion { types: Cow::Owned(self.get_non_nullable_types()), flags: self.flags & !UnionFlags::NULLSAFE_NULL }
     }
 
     #[must_use]

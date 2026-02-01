@@ -2422,5 +2422,9 @@ pub(crate) fn get_acceptable_type(
     }
 
     new_var_type.types = Cow::Owned(acceptable_types);
+    if new_var_type.has_nullsafe_null() && !new_var_type.is_nullable() {
+        new_var_type.set_nullsafe_null(false);
+    }
+
     new_var_type
 }
