@@ -4,7 +4,6 @@ use indexmap::IndexMap;
 use mago_atom::Atom;
 use mago_atom::atom;
 use mago_atom::concat_atom;
-
 use mago_codex::identifier::method::MethodIdentifier;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_codex::misc::GenericParent;
@@ -12,6 +11,7 @@ use mago_codex::ttype::TType;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::generic::TGenericParameter;
 use mago_codex::ttype::atomic::object::TObject;
+use mago_codex::ttype::atomic::object::named::TNamedObject;
 use mago_codex::ttype::expander::StaticClassType;
 use mago_codex::ttype::expander::TypeExpansionOptions;
 use mago_codex::ttype::expander::{self};
@@ -428,6 +428,12 @@ fn find_property_in_class<'ctx, 'ast, 'arena>(
                     return Some(resolved);
                 }
             }
+        }
+
+        if let TObject::Named(named_object) = object
+            && let Some(resolved) = find_property_in_intersection_types(context, named_object, prop_name)
+        {
+            return Some(resolved);
         }
 
         if has_magic_method {
@@ -1098,4 +1104,54 @@ fn find_property_in_single_mixin(
         property_type,
         is_magic: false,
     })
+}
+
+/// Searches for a property in intersection types of a named object.
+/// For example, if the type is `Foo&Baz`, this will look for the property on `Baz`.
+fn find_property_in_intersection_types(
+    context: &mut Context,
+    named_object: &TNamedObject,
+    prop_name: Atom,
+) -> Option<ResolvedProperty> {
+    let intersection_types = named_object.get_intersection_types()?;
+
+    for atomic in intersection_types {
+        let class_name = match atomic {
+            TAtomic::Object(TObject::Named(named)) => named.name,
+            TAtomic::Object(TObject::Enum(enum_type)) => enum_type.name,
+            _ => continue,
+        };
+
+        let declaring_class_id =
+            context.codebase.get_declaring_property_class(&class_name, &prop_name).unwrap_or(class_name);
+
+        let Some(class_metadata) = context.codebase.get_class_like(&declaring_class_id) else {
+            continue;
+        };
+
+        let Some(property_metadata) = class_metadata.properties.get(&prop_name) else {
+            continue;
+        };
+
+        if !property_metadata.read_visibility.is_public() {
+            continue;
+        }
+
+        let property_type = property_metadata
+            .type_metadata
+            .as_ref()
+            .or(property_metadata.type_declaration_metadata.as_ref())
+            .map(|type_metadata| type_metadata.type_union.clone())
+            .unwrap_or_else(get_mixed);
+
+        return Some(ResolvedProperty {
+            property_span: property_metadata.name_span.or(property_metadata.span),
+            property_name: prop_name,
+            declaring_class_id: Some(declaring_class_id),
+            property_type,
+            is_magic: false,
+        });
+    }
+
+    None
 }
