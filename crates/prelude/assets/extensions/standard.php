@@ -5608,9 +5608,9 @@ function array_multisort(&$array, $sort_order = SORT_ASC, $sort_flags = SORT_REG
  * @param array<K, V> $array
  * @param T ...$values
  *
- * @param-out array<K, V|T> $array
+ * @param-out ($array is list<V> ? non-empty-list<V|T> : non-empty-array<K, V|T>) $array
  *
- * @return int<0, max>
+ * @return int<1, max>
  *
  * @pure
  */
