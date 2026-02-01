@@ -298,31 +298,33 @@ pub fn analyze_comparison_operation<'ctx, 'arena>(
                 }
             }
             BinaryOperator::Identical(_) => {
+                let inside_loop = block_context.flags.inside_loop();
                 let involves_static = involves_static_variable(binary.lhs, block_context)
                     || involves_static_variable(binary.rhs, block_context);
 
                 if is_always_identical_to(lhs_type, rhs_type) {
-                    if !block_context.flags.inside_loop_expressions() && !involves_static {
+                    if !block_context.flags.inside_loop_expressions() && !inside_loop && !involves_static {
                         report_redundant_comparison(context, artifacts, binary, "always identical to", "`true`");
                     }
 
-                    if involves_static { get_bool() } else { get_true() }
+                    if involves_static || inside_loop { get_bool() } else { get_true() }
                 } else if are_definitely_not_identical(context.codebase, lhs_type, rhs_type, false) {
-                    if !block_context.flags.inside_loop_expressions() && !involves_static {
+                    if !block_context.flags.inside_loop_expressions() && !inside_loop && !involves_static {
                         report_redundant_comparison(context, artifacts, binary, "never identical to", "`false`");
                     }
 
-                    if involves_static { get_bool() } else { get_false() }
+                    if involves_static || inside_loop { get_bool() } else { get_false() }
                 } else {
                     get_bool()
                 }
             }
             BinaryOperator::NotIdentical(_) => {
+                let inside_loop = block_context.flags.inside_loop();
                 let involves_static = involves_static_variable(binary.lhs, block_context)
                     || involves_static_variable(binary.rhs, block_context);
 
                 if is_always_identical_to(lhs_type, rhs_type) {
-                    if !block_context.flags.inside_loop_expressions() && !involves_static {
+                    if !block_context.flags.inside_loop_expressions() && !inside_loop && !involves_static {
                         report_redundant_comparison(
                             context,
                             artifacts,
@@ -332,12 +334,13 @@ pub fn analyze_comparison_operation<'ctx, 'arena>(
                         );
                     }
 
-                    if involves_static { get_bool() } else { get_false() }
+                    if involves_static || inside_loop { get_bool() } else { get_false() }
                 } else if are_definitely_not_identical(context.codebase, lhs_type, rhs_type, false) {
-                    if !block_context.flags.inside_loop_expressions() && !involves_static {
+                    if !block_context.flags.inside_loop_expressions() && !inside_loop && !involves_static {
                         report_redundant_comparison(context, artifacts, binary, "always not identical to", "`true`");
                     }
-                    if involves_static { get_bool() } else { get_true() }
+
+                    if involves_static || inside_loop { get_bool() } else { get_true() }
                 } else {
                     get_bool()
                 }

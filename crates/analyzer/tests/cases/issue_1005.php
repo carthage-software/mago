@@ -44,11 +44,3 @@ function test_list_with_known_elements_literal_union(array $items, int $index): 
 {
     return $items[$index] ?? 'fallback';
 }
-
-/**
- * @param list{string, string, string} $items
- */
-function test_list_with_known_elements_literal_union2(array $items, int $index): string
-{
-    return $items[$index] ?? 'fallback';
-}
