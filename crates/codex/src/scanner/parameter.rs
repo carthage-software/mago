@@ -1,16 +1,18 @@
 use mago_atom::Atom;
+use mago_atom::AtomMap;
 use mago_atom::atom;
 use mago_names::scope::NamespaceScope;
 use mago_span::HasSpan;
 use mago_syntax::ast::FunctionLikeParameter;
 
+use crate::metadata::constant::ConstantMetadata;
 use crate::metadata::flags::MetadataFlags;
 use crate::metadata::parameter::FunctionLikeParameterMetadata;
 use crate::metadata::ttype::TypeMetadata;
 use crate::misc::VariableIdentifier;
 use crate::scanner::Context;
 use crate::scanner::attribute::scan_attribute_lists;
-use crate::scanner::inference::infer;
+use crate::scanner::inference::infer_with_constants;
 use crate::scanner::ttype::get_type_metadata_from_hint;
 
 #[inline]
@@ -19,6 +21,17 @@ pub fn scan_function_like_parameter<'arena>(
     classname: Option<Atom>,
     context: &mut Context<'_, 'arena>,
     scope: &NamespaceScope,
+) -> FunctionLikeParameterMetadata {
+    scan_function_like_parameter_with_constants(parameter, classname, context, scope, None)
+}
+
+#[inline]
+pub fn scan_function_like_parameter_with_constants<'arena>(
+    parameter: &'arena FunctionLikeParameter<'arena>,
+    classname: Option<Atom>,
+    context: &mut Context<'_, 'arena>,
+    scope: &NamespaceScope,
+    constants: Option<&AtomMap<ConstantMetadata>>,
 ) -> FunctionLikeParameterMetadata {
     let mut flags = MetadataFlags::empty();
     if context.file.file_type.is_host() {
@@ -53,7 +66,7 @@ pub fn scan_function_like_parameter<'arena>(
 
     if let Some(default_value) = &parameter.default_value {
         metadata.flags |= MetadataFlags::HAS_DEFAULT;
-        metadata.default_type = infer(context, scope, default_value.value).map(|u| {
+        metadata.default_type = infer_with_constants(context, scope, default_value.value, constants).map(|u| {
             let mut type_metadata = TypeMetadata::new(u, default_value.span());
             type_metadata.inferred = true;
             type_metadata

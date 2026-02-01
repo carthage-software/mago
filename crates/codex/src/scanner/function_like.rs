@@ -1,6 +1,9 @@
 use mago_atom::Atom;
+use mago_atom::AtomMap;
 use mago_atom::ascii_lowercase_atom;
 use mago_atom::atom;
+
+use crate::metadata::constant::ConstantMetadata;
 use mago_docblock::tag::TypeString;
 use mago_names::scope::NamespaceScope;
 use mago_reporting::Annotation;
@@ -26,6 +29,7 @@ use crate::scanner::Context;
 use crate::scanner::attribute::scan_attribute_lists;
 use crate::scanner::docblock::FunctionLikeDocblockComment;
 use crate::scanner::parameter::scan_function_like_parameter;
+use crate::scanner::parameter::scan_function_like_parameter_with_constants;
 use crate::scanner::ttype::get_type_metadata_from_hint;
 use crate::scanner::ttype::get_type_metadata_from_type_string;
 use crate::scanner::ttype::merge_type_preserving_nullability;
@@ -121,6 +125,7 @@ pub fn scan_function<'arena>(
     context: &mut Context<'_, 'arena>,
     scope: &mut NamespaceScope,
     type_resolution_context: TypeResolutionContext,
+    constants: Option<&AtomMap<ConstantMetadata>>,
 ) -> FunctionLikeMetadata {
     let mut flags = MetadataFlags::empty();
     if context.file.file_type.is_host() {
@@ -152,7 +157,7 @@ pub fn scan_function<'arena>(
         .parameter_list
         .parameters
         .iter()
-        .map(|p| scan_function_like_parameter(p, classname, context, scope))
+        .map(|p| scan_function_like_parameter_with_constants(p, classname, context, scope, constants))
         .collect();
 
     metadata.attributes = scan_attribute_lists(&function.attribute_lists, context);

@@ -380,6 +380,9 @@ test_case!(docblock_var_override_foreach);
 test_case!(mixin);
 test_case!(issue_contravariant_params_diamond);
 test_case!(issue_contravariant_params_simple);
+test_case!(anonymous_class_constructor_args);
+test_case!(undefined_type_reference);
+test_case!(duplicate_definition);
 
 // Github Issues
 test_case!(issue_659);
@@ -558,9 +561,7 @@ test_case!(issue_958);
 test_case!(issue_960);
 test_case!(issue_962);
 test_case!(issue_964);
-test_case!(anonymous_class_constructor_args);
-test_case!(undefined_type_reference);
-test_case!(duplicate_definition);
+test_case!(issue_969);
 test_case!(issue_970);
 test_case!(issue_973);
 test_case!(issue_984);

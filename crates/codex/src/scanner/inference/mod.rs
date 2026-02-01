@@ -2,8 +2,12 @@ use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::sync::LazyLock;
 
+use mago_atom::AtomMap;
+use mago_atom::ascii_lowercase_constant_name_atom;
 use mago_atom::atom;
 use mago_atom::concat_atom;
+
+use crate::metadata::constant::ConstantMetadata;
 use mago_names::ResolvedNames;
 use mago_names::scope::NamespaceScope;
 use mago_span::HasPosition;
@@ -69,6 +73,16 @@ pub fn infer<'arena>(
     context: &Context<'_, 'arena>,
     scope: &NamespaceScope,
     expression: &'arena Expression<'arena>,
+) -> Option<TUnion> {
+    infer_with_constants(context, scope, expression, None)
+}
+
+#[inline]
+pub fn infer_with_constants<'arena>(
+    context: &Context<'_, 'arena>,
+    scope: &NamespaceScope,
+    expression: &'arena Expression<'arena>,
+    constants: Option<&AtomMap<ConstantMetadata>>,
 ) -> Option<TUnion> {
     match expression {
         Expression::MagicConstant(magic_constant) => Some(match magic_constant {
@@ -144,7 +158,7 @@ pub fn infer<'arena>(
             if contains_content { Some(get_non_empty_string()) } else { Some(get_string()) }
         }
         Expression::UnaryPrefix(UnaryPrefix { operator, operand }) => {
-            let operand_type = infer(context, scope, operand)?;
+            let operand_type = infer_with_constants(context, scope, operand, constants)?;
 
             match operator {
                 UnaryPrefixOperator::Plus(_) => {
@@ -185,8 +199,12 @@ pub fn infer<'arena>(
             }
         }
         Expression::Binary(Binary { operator: BinaryOperator::StringConcat(_), lhs, rhs }) => {
-            let Some(lhs_type) = infer(context, scope, lhs) else { return Some(get_string()) };
-            let Some(rhs_type) = infer(context, scope, rhs) else { return Some(get_string()) };
+            let Some(lhs_type) = infer_with_constants(context, scope, lhs, constants) else {
+                return Some(get_string());
+            };
+            let Some(rhs_type) = infer_with_constants(context, scope, rhs, constants) else {
+                return Some(get_string());
+            };
 
             let lhs_string = match lhs_type.get_single_owned() {
                 TAtomic::Scalar(TScalar::String(s)) => s.clone(),
@@ -220,8 +238,8 @@ pub fn infer<'arena>(
             Some(wrap_atomic(TAtomic::Scalar(TScalar::String(final_string_type))))
         }
         Expression::Binary(Binary { operator, lhs, rhs }) if operator.is_bitwise() => {
-            let lhs = infer(context, scope, lhs);
-            let rhs = infer(context, scope, rhs);
+            let lhs = infer_with_constants(context, scope, lhs, constants);
+            let rhs = infer_with_constants(context, scope, rhs, constants);
 
             Some(wrap_atomic(
                 match (
@@ -247,8 +265,8 @@ pub fn infer<'arena>(
             ))
         }
         Expression::Binary(Binary { operator, lhs, rhs }) if operator.is_arithmetic() => {
-            let lhs = infer(context, scope, lhs);
-            let rhs = infer(context, scope, rhs);
+            let lhs = infer_with_constants(context, scope, lhs, constants);
+            let rhs = infer_with_constants(context, scope, rhs, constants);
 
             match (
                 lhs.and_then(|v| v.get_single_literal_int_value()),
@@ -282,7 +300,7 @@ pub fn infer<'arena>(
             Construct::Print(_) => Some(get_literal_int(1)),
             _ => None,
         },
-        Expression::ConstantAccess(access) => infer_constant(context.resolved_names, &access.name),
+        Expression::ConstantAccess(access) => infer_constant(context.resolved_names, &access.name, constants),
         Expression::Access(Access::ClassConstant(ClassConstantAccess {
             class,
             constant: ClassLikeConstantSelector::Identifier(identifier),
@@ -334,7 +352,7 @@ pub fn infer<'arena>(
                     return None;
                 };
 
-                entries.insert(i, (false, infer(context, scope, element.value)?));
+                entries.insert(i, (false, infer_with_constants(context, scope, element.value, constants)?));
             }
 
             Some(wrap_atomic(TAtomic::Array(TArray::List(TList {
@@ -353,8 +371,9 @@ pub fn infer<'arena>(
                     return None;
                 };
 
-                let key_type = infer(context, scope, element.key).and_then(|v| v.get_single_array_key())?;
-                known_items.insert(key_type, (false, infer(context, scope, element.value)?));
+                let key_type = infer_with_constants(context, scope, element.key, constants)
+                    .and_then(|v| v.get_single_array_key())?;
+                known_items.insert(key_type, (false, infer_with_constants(context, scope, element.value, constants)?));
 
                 if known_items.len() > 100 {
                     return None;
@@ -391,6 +410,7 @@ pub fn infer<'arena>(
 fn infer_constant<'ctx, 'arena>(
     names: &'ctx ResolvedNames<'arena>,
     constant: &'ctx Identifier<'arena>,
+    constants_map: Option<&AtomMap<ConstantMetadata>>,
 ) -> Option<TUnion> {
     static DIR_SEPARATOR_SLICE: LazyLock<[TAtomic; 2]> = LazyLock::new(|| {
         [
@@ -434,13 +454,23 @@ fn infer_constant<'ctx, 'arena>(
         TAtomic::Scalar(TScalar::Integer(TInteger::Literal(90))),
     ];
 
-    let (short_name, _) = if names.is_imported(constant) {
+    let (short_name, fqn) = if names.is_imported(constant) {
         (names.get(constant), names.get(constant))
     } else if let Some(stripped) = constant.value().strip_prefix('\\') {
         (stripped, names.get(constant))
     } else {
         (constant.value(), names.get(constant))
     };
+
+    if let Some(constants) = constants_map {
+        let normalized_name = ascii_lowercase_constant_name_atom(fqn);
+
+        if let Some(constant_metadata) = constants.get(&normalized_name)
+            && let Some(inferred_type) = &constant_metadata.inferred_type
+        {
+            return Some(inferred_type.clone());
+        }
+    }
 
     Some(match short_name {
         "PHP_MAXPATHLEN"

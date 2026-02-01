@@ -170,8 +170,15 @@ impl<'ctx, 'arena> MutWalker<'arena, 'arena, Context<'ctx, 'arena>> for Scanner 
 
         let name = ascii_lowercase_atom(context.resolved_names.get(&function.name));
         let identifier = (empty_atom(), name);
-        let metadata =
-            scan_function(identifier, function, self.stack.last().copied(), context, &mut self.scope, type_context);
+        let metadata = scan_function(
+            identifier,
+            function,
+            self.stack.last().copied(),
+            context,
+            &mut self.scope,
+            type_context,
+            Some(&self.codebase.constants),
+        );
 
         self.template_constraints.push({
             let mut constraints: TemplateConstraintList = vec![];
