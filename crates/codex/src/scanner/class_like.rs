@@ -364,7 +364,8 @@ fn scan_class_like<'arena>(
             match enum_type {
                 Some(backing_type) => {
                     if backing_type.hint.is_string() {
-                        class_like_metadata.add_direct_parent_interface(atom("__internal_do_not_use__stringbackedenum"));
+                        class_like_metadata
+                            .add_direct_parent_interface(atom("__internal_do_not_use__stringbackedenum"));
                     } else if backing_type.hint.is_int() {
                         class_like_metadata.add_direct_parent_interface(atom("__internal_do_not_use__intbackedenum"));
                     } else {
