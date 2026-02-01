@@ -5192,6 +5192,7 @@ function count(Countable|array $value, int $mode = COUNT_NORMAL): int
  * @template T
  *
  * @param object|array<T> $array
+ * @param-out ($array is object ? object : ($array is list<T> ? list<T> : array<array-key, T>)) $array
  *
  * @return ($array is non-empty-array|non-empty-list ? T : false)
  */
@@ -5203,6 +5204,7 @@ function end(object|array &$array): mixed
  * @template T
  *
  * @param object|array<T> $array
+ * @param-out ($array is object ? object : ($array is list<T> ? list<T> : array<array-key, T>)) $array
  *
  * @return T|false
  */
@@ -5214,6 +5216,7 @@ function prev(object|array &$array): mixed
  * @template T
  *
  * @param object|array<T> $array
+ * @param-out ($array is object ? object : ($array is list<T> ? list<T> : array<array-key, T>)) $array
  *
  * @return T|false
  */
@@ -5225,6 +5228,7 @@ function next(object|array &$array): mixed
  * @template T
  *
  * @param object|array<T> $array
+ * @param-out ($array is object ? object : ($array is list<T> ? list<T> : array<array-key, T>)) $array
  *
  * @return T|false
  */

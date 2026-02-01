@@ -560,6 +560,7 @@ test_case!(issue_964);
 test_case!(anonymous_class_constructor_args);
 test_case!(undefined_type_reference);
 test_case!(duplicate_definition);
+test_case!(issue_984);
 test_case!(issue_998);
 test_case!(issue_1002_part_1);
 test_case!(issue_1002_part_2);
