@@ -459,8 +459,6 @@ pub enum NodeKind {
     NestedVariable,
     Variable,
     Error,
-    ErrorExpression,
-    ErrorStatement,
     MissingTerminator,
     ClassLikeMemberMissingSelector,
     ClassLikeConstantMissingSelector,
@@ -694,8 +692,7 @@ pub enum Node<'ast, 'arena> {
     NestedVariable(&'ast NestedVariable<'arena>),
     Variable(&'ast Variable<'arena>),
     Pipe(&'ast Pipe<'arena>),
-    ErrorExpression(Span),
-    ErrorStatement(Span),
+    Error(Span),
     MissingTerminator(Span),
     ClassLikeMemberMissingSelector(Span),
     ClassLikeConstantMissingSelector(Span),
@@ -1006,8 +1003,7 @@ impl<'ast, 'arena> Node<'ast, 'arena> {
             Self::NestedVariable(_) => NodeKind::NestedVariable,
             Self::Variable(_) => NodeKind::Variable,
             Self::Pipe(_) => NodeKind::Pipe,
-            Self::ErrorExpression(_) => NodeKind::ErrorExpression,
-            Self::ErrorStatement(_) => NodeKind::ErrorStatement,
+            Self::Error(_) => NodeKind::Error,
             Self::MissingTerminator(_) => NodeKind::MissingTerminator,
             Self::ClassLikeMemberMissingSelector(_) => NodeKind::ClassLikeMemberMissingSelector,
             Self::ClassLikeConstantMissingSelector(_) => NodeKind::ClassLikeConstantMissingSelector,
@@ -1749,7 +1745,7 @@ impl<'ast, 'arena> Node<'ast, 'arena> {
                 Expression::Instantiation(node) => Node::Instantiation(node),
                 Expression::MagicConstant(node) => Node::MagicConstant(node),
                 Expression::Pipe(node) => Node::Pipe(node),
-                Expression::Error(span) => return vec![Node::ErrorExpression(*span)],
+                Expression::Error(span) => return vec![Node::Error(*span)],
             }],
             Node::Binary(node) => {
                 vec![Node::Expression(node.lhs), Node::BinaryOperator(&node.operator), Node::Expression(node.rhs)]
@@ -2237,7 +2233,6 @@ impl<'ast, 'arena> Node<'ast, 'arena> {
                 Statement::HaltCompiler(node) => vec![Node::HaltCompiler(node)],
                 Statement::Unset(node) => vec![Node::Unset(node)],
                 Statement::Noop(_) => vec![],
-                Statement::Error(span) => vec![Node::ErrorStatement(*span)],
             },
             Node::ExpressionStatement(node) => {
                 vec![Node::Expression(node.expression), Node::Terminator(&node.terminator)]
@@ -2344,8 +2339,7 @@ impl<'ast, 'arena> Node<'ast, 'arena> {
             Node::Pipe(pipe) => {
                 vec![Node::Expression(pipe.input), Node::Expression(pipe.callable)]
             }
-            Node::ErrorExpression(_)
-            | Node::ErrorStatement(_)
+            Node::Error(_)
             | Node::MissingTerminator(_)
             | Node::ClassLikeMemberMissingSelector(_)
             | Node::ClassLikeConstantMissingSelector(_) => vec![],
@@ -2579,8 +2573,7 @@ impl HasSpan for Node<'_, '_> {
             Self::NestedVariable(node) => node.span(),
             Self::Variable(node) => node.span(),
             Self::Pipe(node) => node.span(),
-            Self::ErrorExpression(span)
-            | Self::ErrorStatement(span)
+            Self::Error(span)
             | Self::MissingTerminator(span)
             | Self::ClassLikeMemberMissingSelector(span)
             | Self::ClassLikeConstantMissingSelector(span) => *span,

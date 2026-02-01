@@ -308,7 +308,7 @@ fn node_to_tree(node: Node) -> Tree<String> {
         Node::ClassLikeMemberMissingSelector(_) | Node::ClassLikeConstantMissingSelector(_) => {
             "<missing>".bold().underline().red().to_string()
         }
-        Node::ErrorExpression(_) | Node::ErrorStatement(_) => "<error>".bold().underline().red().to_string(),
+        Node::Error(_) => "<error>".bold().underline().red().to_string(),
         // Everything else -> Dimmed
         _ => format!("{}", node.kind().to_string().dimmed()),
     };

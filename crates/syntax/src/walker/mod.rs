@@ -410,7 +410,7 @@ generate_ast_walker! {
             Statement::Static(r#static) => walker.walk_static(r#static, context),
             Statement::HaltCompiler(halt_compiler) => walker.walk_halt_compiler(halt_compiler, context),
             Statement::Unset(unset) => walker.walk_unset(unset, context),
-            Statement::Noop(_) | Statement::Error(_) => {
+            Statement::Noop(_) => {
                 // Do nothing by default
             },
         }
