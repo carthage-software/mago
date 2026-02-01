@@ -2,6 +2,8 @@ use serde::Deserialize;
 use serde::Serialize;
 use strum::Display;
 
+use mago_database::file::FileId;
+use mago_span::Position;
 use mago_span::Span;
 
 /// Type parsing precedence levels.
@@ -132,8 +134,31 @@ pub enum TypeTokenKind {
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 pub struct TypeToken<'input> {
     pub kind: TypeTokenKind,
+    pub start: Position,
     pub value: &'input str,
-    pub span: Span,
+}
+
+impl<'input> TypeToken<'input> {
+    /// Creates a new TypeToken.
+    #[inline]
+    #[must_use]
+    pub const fn new(kind: TypeTokenKind, value: &'input str, start: Position) -> Self {
+        Self { kind, start, value }
+    }
+
+    /// Computes the end position from start + value length.
+    #[inline]
+    #[must_use]
+    pub const fn end(&self) -> Position {
+        Position::new(self.start.offset + self.value.len() as u32)
+    }
+
+    /// Creates a span with the provided file_id.
+    #[inline]
+    #[must_use]
+    pub const fn span_for(&self, file_id: FileId) -> Span {
+        Span::new(file_id, self.start, self.end())
+    }
 }
 
 impl TypeTokenKind {

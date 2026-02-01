@@ -9,16 +9,7 @@ use crate::ast::ast::Modifier;
 use crate::ast::ast::Trait;
 use crate::ast::sequence::Sequence;
 use crate::error::ParseError;
-use crate::parser::internal::argument::parse_optional_argument_list;
-use crate::parser::internal::attribute::parse_attribute_list_sequence;
-use crate::parser::internal::class_like::inheritance::parse_optional_extends;
-use crate::parser::internal::class_like::inheritance::parse_optional_implements;
-use crate::parser::internal::class_like::member::parse_classlike_member;
-use crate::parser::internal::identifier::parse_local_identifier;
-use crate::parser::internal::modifier::parse_modifier_sequence;
-use crate::parser::internal::token_stream::TokenStream;
-use crate::parser::internal::type_hint::parse_type_hint;
-use crate::parser::internal::utils;
+use crate::parser::Parser;
 
 pub mod constant;
 pub mod enum_case;
@@ -28,155 +19,228 @@ pub mod method;
 pub mod property;
 pub mod trait_use;
 
-pub fn parse_interface_with_attributes<'arena>(
-    stream: &mut TokenStream<'_, 'arena>,
-    attributes: Sequence<'arena, AttributeList<'arena>>,
-) -> Result<Interface<'arena>, ParseError> {
-    Ok(Interface {
-        attribute_lists: attributes,
-        interface: utils::expect_keyword(stream, T!["interface"])?,
-        name: parse_local_identifier(stream)?,
-        extends: parse_optional_extends(stream)?,
-        left_brace: utils::expect_span(stream, T!["{"])?,
-        members: {
-            let mut members = stream.new_vec();
-            loop {
-                if matches!(utils::maybe_peek(stream)?.map(|t| t.kind), Some(T!["}"])) {
-                    break;
+impl<'input, 'arena> Parser<'input, 'arena> {
+    pub(crate) fn parse_interface_with_attributes(
+        &mut self,
+        attributes: Sequence<'arena, AttributeList<'arena>>,
+    ) -> Result<Interface<'arena>, ParseError> {
+        Ok(Interface {
+            attribute_lists: attributes,
+            interface: self.expect_keyword(T!["interface"])?,
+            name: self.parse_local_identifier()?,
+            extends: self.parse_optional_extends()?,
+            left_brace: self.stream.eat_span(T!["{"])?,
+            members: {
+                let mut members = self.new_vec();
+                loop {
+                    if matches!(self.stream.peek_kind(0)?, Some(T!["}"])) {
+                        break;
+                    }
+
+                    let position_before = self.stream.current_position();
+                    match self.parse_classlike_member() {
+                        Ok(member) => members.push(member),
+                        Err(err) => self.errors.push(err),
+                    }
+                    if self.stream.current_position() == position_before {
+                        if let Ok(Some(token)) = self.stream.lookahead(0) {
+                            if token.kind == T!["}"] {
+                                break;
+                            }
+                            self.errors.push(self.stream.unexpected(Some(token), &[]));
+                            let _ = self.stream.consume();
+                        } else {
+                            break;
+                        }
+                    }
                 }
 
-                members.push(parse_classlike_member(stream)?);
-            }
+                Sequence::new(members)
+            },
+            right_brace: self.stream.eat_span(T!["}"])?,
+        })
+    }
 
-            Sequence::new(members)
-        },
-        right_brace: utils::expect_span(stream, T!["}"])?,
-    })
-}
+    pub(crate) fn parse_class_with_attributes(
+        &mut self,
+        attributes: Sequence<'arena, AttributeList<'arena>>,
+    ) -> Result<Class<'arena>, ParseError> {
+        let modifiers = self.parse_modifier_sequence()?;
 
-pub fn parse_class_with_attributes<'arena>(
-    stream: &mut TokenStream<'_, 'arena>,
-    attributes: Sequence<'arena, AttributeList<'arena>>,
-) -> Result<Class<'arena>, ParseError> {
-    let modifiers = parse_modifier_sequence(stream)?;
+        self.parse_class_with_attributes_and_modifiers(attributes, modifiers)
+    }
 
-    parse_class_with_attributes_and_modifiers(stream, attributes, modifiers)
-}
+    fn parse_class_with_attributes_and_modifiers(
+        &mut self,
+        attributes: Sequence<'arena, AttributeList<'arena>>,
+        modifiers: Sequence<'arena, Modifier<'arena>>,
+    ) -> Result<Class<'arena>, ParseError> {
+        Ok(Class {
+            attribute_lists: attributes,
+            modifiers,
+            class: self.expect_keyword(T!["class"])?,
+            name: self.parse_local_identifier()?,
+            extends: self.parse_optional_extends()?,
+            implements: self.parse_optional_implements()?,
+            left_brace: self.stream.eat_span(T!["{"])?,
+            members: {
+                let mut members = self.new_vec();
+                loop {
+                    if matches!(self.stream.peek_kind(0)?, Some(T!["}"])) {
+                        break;
+                    }
 
-pub fn parse_class_with_attributes_and_modifiers<'arena>(
-    stream: &mut TokenStream<'_, 'arena>,
-    attributes: Sequence<'arena, AttributeList<'arena>>,
-    modifiers: Sequence<'arena, Modifier<'arena>>,
-) -> Result<Class<'arena>, ParseError> {
-    Ok(Class {
-        attribute_lists: attributes,
-        modifiers,
-        class: utils::expect_keyword(stream, T!["class"])?,
-        name: parse_local_identifier(stream)?,
-        extends: parse_optional_extends(stream)?,
-        implements: parse_optional_implements(stream)?,
-        left_brace: utils::expect_span(stream, T!["{"])?,
-        members: {
-            let mut members = stream.new_vec();
-            loop {
-                if matches!(utils::maybe_peek(stream)?.map(|t| t.kind), Some(T!["}"])) {
-                    break;
+                    let position_before = self.stream.current_position();
+                    match self.parse_classlike_member() {
+                        Ok(member) => members.push(member),
+                        Err(err) => self.errors.push(err),
+                    }
+                    if self.stream.current_position() == position_before {
+                        if let Ok(Some(token)) = self.stream.lookahead(0) {
+                            if token.kind == T!["}"] {
+                                break;
+                            }
+                            self.errors.push(self.stream.unexpected(Some(token), &[]));
+                            let _ = self.stream.consume();
+                        } else {
+                            break;
+                        }
+                    }
                 }
 
-                members.push(parse_classlike_member(stream)?);
-            }
+                Sequence::new(members)
+            },
+            right_brace: self.stream.eat_span(T!["}"])?,
+        })
+    }
 
-            Sequence::new(members)
-        },
-        right_brace: utils::expect_span(stream, T!["}"])?,
-    })
-}
+    pub(crate) fn parse_anonymous_class(&mut self) -> Result<AnonymousClass<'arena>, ParseError> {
+        Ok(AnonymousClass {
+            new: self.expect_keyword(T!["new"])?,
+            attribute_lists: self.parse_attribute_list_sequence()?,
+            modifiers: self.parse_modifier_sequence()?,
+            class: self.expect_keyword(T!["class"])?,
+            argument_list: self.parse_optional_argument_list()?,
+            extends: self.parse_optional_extends()?,
+            implements: self.parse_optional_implements()?,
+            left_brace: self.stream.eat_span(T!["{"])?,
+            members: {
+                let mut members = self.new_vec();
+                loop {
+                    if matches!(self.stream.peek_kind(0)?, Some(T!["}"])) {
+                        break;
+                    }
 
-pub fn parse_anonymous_class<'arena>(
-    stream: &mut TokenStream<'_, 'arena>,
-) -> Result<AnonymousClass<'arena>, ParseError> {
-    Ok(AnonymousClass {
-        new: utils::expect_keyword(stream, T!["new"])?,
-        attribute_lists: parse_attribute_list_sequence(stream)?,
-        modifiers: parse_modifier_sequence(stream)?,
-        class: utils::expect_keyword(stream, T!["class"])?,
-        argument_list: parse_optional_argument_list(stream)?,
-        extends: parse_optional_extends(stream)?,
-        implements: parse_optional_implements(stream)?,
-        left_brace: utils::expect_span(stream, T!["{"])?,
-        members: {
-            let mut members = stream.new_vec();
-            loop {
-                if matches!(utils::maybe_peek(stream)?.map(|t| t.kind), Some(T!["}"])) {
-                    break;
+                    let position_before = self.stream.current_position();
+                    match self.parse_classlike_member() {
+                        Ok(member) => members.push(member),
+                        Err(err) => self.errors.push(err),
+                    }
+                    if self.stream.current_position() == position_before {
+                        if let Ok(Some(token)) = self.stream.lookahead(0) {
+                            if token.kind == T!["}"] {
+                                break;
+                            }
+                            self.errors.push(self.stream.unexpected(Some(token), &[]));
+                            let _ = self.stream.consume();
+                        } else {
+                            break;
+                        }
+                    }
                 }
 
-                members.push(parse_classlike_member(stream)?);
-            }
+                Sequence::new(members)
+            },
+            right_brace: self.stream.eat_span(T!["}"])?,
+        })
+    }
 
-            Sequence::new(members)
-        },
-        right_brace: utils::expect_span(stream, T!["}"])?,
-    })
-}
+    pub(crate) fn parse_trait_with_attributes(
+        &mut self,
+        attributes: Sequence<'arena, AttributeList<'arena>>,
+    ) -> Result<Trait<'arena>, ParseError> {
+        Ok(Trait {
+            attribute_lists: attributes,
+            r#trait: self.expect_keyword(T!["trait"])?,
+            name: self.parse_local_identifier()?,
+            left_brace: self.stream.eat_span(T!["{"])?,
+            members: {
+                let mut members = self.new_vec();
+                loop {
+                    if matches!(self.stream.peek_kind(0)?, Some(T!["}"])) {
+                        break;
+                    }
 
-pub fn parse_trait_with_attributes<'arena>(
-    stream: &mut TokenStream<'_, 'arena>,
-    attributes: Sequence<'arena, AttributeList<'arena>>,
-) -> Result<Trait<'arena>, ParseError> {
-    Ok(Trait {
-        attribute_lists: attributes,
-        r#trait: utils::expect_keyword(stream, T!["trait"])?,
-        name: parse_local_identifier(stream)?,
-        left_brace: utils::expect_span(stream, T!["{"])?,
-        members: {
-            let mut members = stream.new_vec();
-            loop {
-                if matches!(utils::maybe_peek(stream)?.map(|t| t.kind), Some(T!["}"])) {
-                    break;
+                    let position_before = self.stream.current_position();
+                    match self.parse_classlike_member() {
+                        Ok(member) => members.push(member),
+                        Err(err) => self.errors.push(err),
+                    }
+                    if self.stream.current_position() == position_before {
+                        if let Ok(Some(token)) = self.stream.lookahead(0) {
+                            if token.kind == T!["}"] {
+                                break;
+                            }
+                            self.errors.push(self.stream.unexpected(Some(token), &[]));
+                            let _ = self.stream.consume();
+                        } else {
+                            break;
+                        }
+                    }
                 }
+                Sequence::new(members)
+            },
+            right_brace: self.stream.eat_span(T!["}"])?,
+        })
+    }
 
-                members.push(parse_classlike_member(stream)?);
-            }
-            Sequence::new(members)
-        },
-        right_brace: utils::expect_span(stream, T!["}"])?,
-    })
-}
+    pub(crate) fn parse_enum_with_attributes(
+        &mut self,
+        attributes: Sequence<'arena, AttributeList<'arena>>,
+    ) -> Result<Enum<'arena>, ParseError> {
+        Ok(Enum {
+            attribute_lists: attributes,
+            r#enum: self.expect_keyword(T!["enum"])?,
+            name: self.parse_local_identifier()?,
+            backing_type_hint: self.parse_optional_enum_backing_type_hint()?,
+            implements: self.parse_optional_implements()?,
+            left_brace: self.stream.eat_span(T!["{"])?,
+            members: {
+                let mut members = self.new_vec();
+                loop {
+                    if matches!(self.stream.peek_kind(0)?, Some(T!["}"])) {
+                        break;
+                    }
 
-pub fn parse_enum_with_attributes<'arena>(
-    stream: &mut TokenStream<'_, 'arena>,
-    attributes: Sequence<'arena, AttributeList<'arena>>,
-) -> Result<Enum<'arena>, ParseError> {
-    Ok(Enum {
-        attribute_lists: attributes,
-        r#enum: utils::expect_keyword(stream, T!["enum"])?,
-        name: parse_local_identifier(stream)?,
-        backing_type_hint: parse_optional_enum_backing_type_hint(stream)?,
-        implements: parse_optional_implements(stream)?,
-        left_brace: utils::expect_span(stream, T!["{"])?,
-        members: {
-            let mut members = stream.new_vec();
-            loop {
-                if matches!(utils::maybe_peek(stream)?.map(|t| t.kind), Some(T!["}"])) {
-                    break;
+                    let position_before = self.stream.current_position();
+                    match self.parse_classlike_member() {
+                        Ok(member) => members.push(member),
+                        Err(err) => self.errors.push(err),
+                    }
+                    if self.stream.current_position() == position_before {
+                        if let Ok(Some(token)) = self.stream.lookahead(0) {
+                            if token.kind == T!["}"] {
+                                break;
+                            }
+                            self.errors.push(self.stream.unexpected(Some(token), &[]));
+                            let _ = self.stream.consume();
+                        } else {
+                            break;
+                        }
+                    }
                 }
+                Sequence::new(members)
+            },
+            right_brace: self.stream.eat_span(T!["}"])?,
+        })
+    }
 
-                members.push(parse_classlike_member(stream)?);
+    fn parse_optional_enum_backing_type_hint(&mut self) -> Result<Option<EnumBackingTypeHint<'arena>>, ParseError> {
+        Ok(match self.stream.peek_kind(0)? {
+            Some(T![":"]) => {
+                Some(EnumBackingTypeHint { colon: self.stream.consume_span()?, hint: self.parse_type_hint()? })
             }
-            Sequence::new(members)
-        },
-        right_brace: utils::expect_span(stream, T!["}"])?,
-    })
-}
-
-pub fn parse_optional_enum_backing_type_hint<'arena>(
-    stream: &mut TokenStream<'_, 'arena>,
-) -> Result<Option<EnumBackingTypeHint<'arena>>, ParseError> {
-    Ok(match utils::maybe_peek(stream)?.map(|t| t.kind) {
-        Some(T![":"]) => {
-            Some(EnumBackingTypeHint { colon: utils::expect_any(stream)?.span, hint: parse_type_hint(stream)? })
-        }
-        _ => None,
-    })
+            _ => None,
+        })
+    }
 }

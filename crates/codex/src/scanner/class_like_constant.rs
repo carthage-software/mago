@@ -20,6 +20,8 @@ use crate::scanner::ttype::merge_type_preserving_nullability;
 use crate::ttype::resolution::TypeResolutionContext;
 use crate::visibility::Visibility;
 
+use super::super::ttype::union::TUnion;
+
 #[inline]
 pub fn scan_class_like_constants<'arena>(
     class_like_metadata: &mut ClassLikeMetadata,
@@ -68,8 +70,7 @@ pub fn scan_class_like_constants<'arena>(
             }
 
             meta.attributes.clone_from(&attributes);
-            meta.inferred_type =
-                infer(context, scope, &item.value).map(super::super::ttype::union::TUnion::get_single_owned);
+            meta.inferred_type = infer(context, scope, item.value).map(TUnion::get_single_owned);
 
             if let Some(ref docblock) = docblock {
                 if docblock.is_deprecated {

@@ -2,45 +2,40 @@ use crate::T;
 use crate::ast::ast::Modifier;
 use crate::ast::sequence::Sequence;
 use crate::error::ParseError;
-use crate::parser::internal::token_stream::TokenStream;
-use crate::parser::internal::utils;
+use crate::parser::Parser;
 
-pub fn parse_modifier_sequence<'arena>(
-    stream: &mut TokenStream<'_, 'arena>,
-) -> Result<Sequence<'arena, Modifier<'arena>>, ParseError> {
-    let mut modifiers = stream.new_vec();
-    while let Some(modifier) = parse_optional_modifier(stream)? {
-        modifiers.push(modifier);
+impl<'input, 'arena> Parser<'input, 'arena> {
+    pub(crate) fn parse_modifier_sequence(&mut self) -> Result<Sequence<'arena, Modifier<'arena>>, ParseError> {
+        let mut modifiers = self.new_vec();
+        while let Some(modifier) = self.parse_optional_modifier()? {
+            modifiers.push(modifier);
+        }
+
+        Ok(Sequence::new(modifiers))
     }
 
-    Ok(Sequence::new(modifiers))
-}
+    pub(crate) fn parse_optional_read_visibility_modifier(&mut self) -> Result<Option<Modifier<'arena>>, ParseError> {
+        Ok(Some(match self.stream.peek_kind(0)? {
+            Some(T!["public"]) => Modifier::Public(self.expect_any_keyword()?),
+            Some(T!["protected"]) => Modifier::Protected(self.expect_any_keyword()?),
+            Some(T!["private"]) => Modifier::Private(self.expect_any_keyword()?),
+            _ => return Ok(None),
+        }))
+    }
 
-pub fn parse_optional_read_visibility_modifier<'arena>(
-    stream: &mut TokenStream<'_, 'arena>,
-) -> Result<Option<Modifier<'arena>>, ParseError> {
-    Ok(Some(match utils::maybe_peek(stream)?.map(|t| t.kind) {
-        Some(T!["public"]) => Modifier::Public(utils::expect_any_keyword(stream)?),
-        Some(T!["protected"]) => Modifier::Protected(utils::expect_any_keyword(stream)?),
-        Some(T!["private"]) => Modifier::Private(utils::expect_any_keyword(stream)?),
-        _ => return Ok(None),
-    }))
-}
-
-pub fn parse_optional_modifier<'arena>(
-    stream: &mut TokenStream<'_, 'arena>,
-) -> Result<Option<Modifier<'arena>>, ParseError> {
-    Ok(Some(match utils::maybe_peek(stream)?.map(|t| t.kind) {
-        Some(T!["public"]) => Modifier::Public(utils::expect_any_keyword(stream)?),
-        Some(T!["protected"]) => Modifier::Protected(utils::expect_any_keyword(stream)?),
-        Some(T!["private"]) => Modifier::Private(utils::expect_any_keyword(stream)?),
-        Some(T!["static"]) => Modifier::Static(utils::expect_any_keyword(stream)?),
-        Some(T!["final"]) => Modifier::Final(utils::expect_any_keyword(stream)?),
-        Some(T!["abstract"]) => Modifier::Abstract(utils::expect_any_keyword(stream)?),
-        Some(T!["readonly"]) => Modifier::Readonly(utils::expect_any_keyword(stream)?),
-        Some(T!["private(set)"]) => Modifier::PrivateSet(utils::expect_any_keyword(stream)?),
-        Some(T!["protected(set)"]) => Modifier::ProtectedSet(utils::expect_any_keyword(stream)?),
-        Some(T!["public(set)"]) => Modifier::PublicSet(utils::expect_any_keyword(stream)?),
-        _ => return Ok(None),
-    }))
+    pub(crate) fn parse_optional_modifier(&mut self) -> Result<Option<Modifier<'arena>>, ParseError> {
+        Ok(Some(match self.stream.peek_kind(0)? {
+            Some(T!["public"]) => Modifier::Public(self.expect_any_keyword()?),
+            Some(T!["protected"]) => Modifier::Protected(self.expect_any_keyword()?),
+            Some(T!["private"]) => Modifier::Private(self.expect_any_keyword()?),
+            Some(T!["static"]) => Modifier::Static(self.expect_any_keyword()?),
+            Some(T!["final"]) => Modifier::Final(self.expect_any_keyword()?),
+            Some(T!["abstract"]) => Modifier::Abstract(self.expect_any_keyword()?),
+            Some(T!["readonly"]) => Modifier::Readonly(self.expect_any_keyword()?),
+            Some(T!["private(set)"]) => Modifier::PrivateSet(self.expect_any_keyword()?),
+            Some(T!["protected(set)"]) => Modifier::ProtectedSet(self.expect_any_keyword()?),
+            Some(T!["public(set)"]) => Modifier::PublicSet(self.expect_any_keyword()?),
+            _ => return Ok(None),
+        }))
+    }
 }

@@ -483,10 +483,10 @@ where
     for argument in &argument_list.arguments {
         match argument {
             Argument::Positional(positional_argument) => {
-                references.extend(find_method_references_in_expression(&positional_argument.value, predicate));
+                references.extend(find_method_references_in_expression(positional_argument.value, predicate));
             }
             Argument::Named(named_argument) => {
-                references.extend(find_method_references_in_expression(&named_argument.value, predicate));
+                references.extend(find_method_references_in_expression(named_argument.value, predicate));
             }
         }
     }

@@ -188,9 +188,13 @@ where
         let partial_codebases: Result<Vec<CodebaseMetadata>, OrchestratorError> = source_files
             .into_par_iter()
             .map_init(Bump::new, |arena, file| -> Result<CodebaseMetadata, OrchestratorError> {
-                let (program, parse_issues) = parse_file(arena, &file);
-                if parse_issues.is_some() {
-                    tracing::warn!("Parsing issues in '{}'. Codebase analysis may be incomplete.", file.name);
+                let program = parse_file(arena, &file);
+                if program.has_errors() {
+                    tracing::warn!(
+                        "Encountered {} parsing errors in file '{}'. Codebase analysis may be incomplete.",
+                        program.errors.len(),
+                        file.name
+                    );
                 }
 
                 let resolver = NameResolver::new(arena);

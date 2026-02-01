@@ -1,3 +1,4 @@
+use mago_database::file::HasFileId;
 use mago_php_version::feature::Feature;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
@@ -82,13 +83,13 @@ pub fn check_argument_list<'ast, 'arena>(
         && let Some(last_comma) = argument_list.arguments.get_trailing_token()
     {
         context.report(
-                Issue::error("Trailing comma in function calls is only available in PHP 7.3 and later.")
-                    .with_annotation(
-                        Annotation::primary(last_comma.span).with_message("Trailing comma found here."),
-                    )
-                    .with_help(
-                        "Remove the trailing comma to make the code compatible with PHP 7.2 and earlier versions, or upgrade to PHP 7.3 or later.",
-                    )
-            );
+            Issue::error("Trailing comma in function calls is only available in PHP 7.3 and later.")
+                .with_annotation(
+                    Annotation::primary(last_comma.span_for(context.source_file.file_id())).with_message("Trailing comma found here."),
+                )
+                .with_help(
+                    "Remove the trailing comma to make the code compatible with PHP 7.2 and earlier versions, or upgrade to PHP 7.3 or later.",
+                )
+        );
     }
 }

@@ -273,10 +273,9 @@ pub fn format(code: String, php_version: &str) -> Result<String, JsValue> {
     let file = File::ephemeral(Cow::Borrowed("code.php"), Cow::Owned(code));
 
     let arena = bumpalo::Bump::new();
-    let (program, parse_error) = parse_file(&arena, &file);
-
-    if let Some(error) = parse_error {
-        return Err(JsValue::from_str(&format!("Parse error: {error}")));
+    let program = parse_file(&arena, &file);
+    if let Some(e) = program.errors.first() {
+        return Err(JsValue::from_str(&format!("Parse error: {e}")));
     }
 
     let formatter = Formatter::new(&arena, version, FormatSettings::default());

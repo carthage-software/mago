@@ -1,28 +1,18 @@
 use crate::T;
 use crate::ast::ast::DoWhile;
 use crate::error::ParseError;
-use crate::parser::internal::expression::parse_expression;
-use crate::parser::internal::statement::parse_statement;
-use crate::parser::internal::terminator::parse_terminator;
-use crate::parser::internal::token_stream::TokenStream;
-use crate::parser::internal::utils;
+use crate::parser::Parser;
 
-pub fn parse_do_while<'arena>(stream: &mut TokenStream<'_, 'arena>) -> Result<DoWhile<'arena>, ParseError> {
-    Ok(DoWhile {
-        r#do: utils::expect_keyword(stream, T!["do"])?,
-        statement: {
-            let inner = parse_statement(stream)?;
-
-            stream.alloc(inner)
-        },
-        r#while: utils::expect_keyword(stream, T!["while"])?,
-        left_parenthesis: utils::expect_span(stream, T!["("])?,
-        condition: {
-            let inner = parse_expression(stream)?;
-
-            stream.alloc(inner)
-        },
-        right_parenthesis: utils::expect_span(stream, T![")"])?,
-        terminator: parse_terminator(stream)?,
-    })
+impl<'input, 'arena> Parser<'input, 'arena> {
+    pub(crate) fn parse_do_while(&mut self) -> Result<DoWhile<'arena>, ParseError> {
+        Ok(DoWhile {
+            r#do: self.expect_keyword(T!["do"])?,
+            statement: self.arena.alloc(self.parse_statement()?),
+            r#while: self.expect_keyword(T!["while"])?,
+            left_parenthesis: self.stream.eat_span(T!["("])?,
+            condition: self.arena.alloc(self.parse_expression()?),
+            right_parenthesis: self.stream.eat_span(T![")"])?,
+            terminator: self.parse_terminator()?,
+        })
+    }
 }

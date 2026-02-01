@@ -2,6 +2,7 @@
 
 use std::fmt::Debug;
 
+use bumpalo::collections::Vec;
 use serde::Serialize;
 
 use mago_database::file::FileId;
@@ -14,6 +15,7 @@ pub use crate::ast::node::*;
 pub use crate::ast::sequence::Sequence;
 pub use crate::ast::trivia::Trivia;
 pub use crate::ast::trivia::TriviaKind;
+use crate::error::ParseError;
 
 pub mod ast;
 pub mod node;
@@ -26,9 +28,17 @@ pub struct Program<'arena> {
     pub source_text: &'arena str,
     pub trivia: Sequence<'arena, Trivia<'arena>>,
     pub statements: Sequence<'arena, Statement<'arena>>,
+    pub errors: Vec<'arena, ParseError>,
 }
 
 impl Program<'_> {
+    /// Returns `true` if the program contains any parsing errors.
+    #[inline]
+    pub fn has_errors(&self) -> bool {
+        !self.errors.is_empty()
+    }
+
+    /// Returns `true` if the program contains any non-inline script statements.
     #[must_use]
     pub fn has_script(&self) -> bool {
         for statement in &self.statements {

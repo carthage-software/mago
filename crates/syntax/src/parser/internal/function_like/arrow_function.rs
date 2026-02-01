@@ -3,28 +3,22 @@ use crate::ast::ast::ArrowFunction;
 use crate::ast::ast::AttributeList;
 use crate::ast::sequence::Sequence;
 use crate::error::ParseError;
-use crate::parser::internal::expression::parse_expression;
-use crate::parser::internal::function_like::parameter::parse_function_like_parameter_list;
-use crate::parser::internal::function_like::r#return::parse_optional_function_like_return_type_hint;
-use crate::parser::internal::token_stream::TokenStream;
-use crate::parser::internal::utils;
+use crate::parser::Parser;
 
-pub fn parse_arrow_function_with_attributes<'arena>(
-    stream: &mut TokenStream<'_, 'arena>,
-    attributes: Sequence<'arena, AttributeList<'arena>>,
-) -> Result<ArrowFunction<'arena>, ParseError> {
-    Ok(ArrowFunction {
-        attribute_lists: attributes,
-        r#static: utils::maybe_expect_keyword(stream, T!["static"])?,
-        r#fn: utils::expect_keyword(stream, T!["fn"])?,
-        ampersand: utils::maybe_expect(stream, T!["&"])?.map(|t| t.span),
-        parameter_list: parse_function_like_parameter_list(stream)?,
-        return_type_hint: parse_optional_function_like_return_type_hint(stream)?,
-        arrow: utils::expect_span(stream, T!["=>"])?,
-        expression: {
-            let expression = parse_expression(stream)?;
-
-            stream.alloc(expression)
-        },
-    })
+impl<'input, 'arena> Parser<'input, 'arena> {
+    pub(crate) fn parse_arrow_function_with_attributes(
+        &mut self,
+        attributes: Sequence<'arena, AttributeList<'arena>>,
+    ) -> Result<ArrowFunction<'arena>, ParseError> {
+        Ok(ArrowFunction {
+            attribute_lists: attributes,
+            r#static: self.maybe_expect_keyword(T!["static"])?,
+            r#fn: self.expect_keyword(T!["fn"])?,
+            ampersand: if self.stream.is_at(T!["&"])? { Some(self.stream.eat_span(T!["&"])?) } else { None },
+            parameter_list: self.parse_function_like_parameter_list()?,
+            return_type_hint: self.parse_optional_function_like_return_type_hint()?,
+            arrow: self.stream.eat_span(T!["=>"])?,
+            expression: self.arena.alloc(self.parse_expression()?),
+        })
+    }
 }

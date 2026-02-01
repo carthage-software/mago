@@ -10,6 +10,7 @@ use mago_atom::Atom;
 use mago_atom::AtomSet;
 use mago_atom::atom;
 use mago_atom::starts_with_ignore_case;
+use mago_database::file::HasFileId;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_reporting::Level;
@@ -156,7 +157,9 @@ impl LintRule for NoRedundantUseRule {
                     .with_help("Remove the import; the symbol is already accessible without it.");
 
                 ctx.collector.propose(issue, |edits| {
-                    if let Some(range) = utils::calculate_delete_range_for_item(decl.parent_stmt, decl.item) {
+                    if let Some(range) =
+                        utils::calculate_delete_range_for_item(decl.parent_stmt, decl.item, ctx.source_file.file_id())
+                    {
                         edits.push(TextEdit::delete(range));
                     }
                 });
@@ -236,9 +239,11 @@ impl LintRule for NoRedundantUseRule {
 
                 ctx.collector.propose(issue, |edits| {
                     for unused_decl in unused_items.iter().rev() {
-                        if let Some(delete_range) =
-                            utils::calculate_delete_range_for_item(parent_stmt, unused_decl.item)
-                        {
+                        if let Some(delete_range) = utils::calculate_delete_range_for_item(
+                            parent_stmt,
+                            unused_decl.item,
+                            ctx.source_file.file_id(),
+                        ) {
                             edits.push(TextEdit::delete(delete_range));
                         }
                     }
@@ -250,6 +255,7 @@ impl LintRule for NoRedundantUseRule {
 
 mod utils {
     use mago_atom::concat_atom;
+    use mago_database::file::FileId;
     use mago_span::Span;
     use mago_syntax::walker::MutWalker;
 
@@ -447,14 +453,18 @@ mod utils {
         atom(item.alias.as_ref().map_or_else(|| item.name.last_segment(), |alias| alias.identifier.value))
     }
 
-    pub(super) fn calculate_delete_range_for_item(parent_stmt: &Statement, item_to_delete: &UseItem) -> Option<Span> {
+    pub(super) fn calculate_delete_range_for_item(
+        parent_stmt: &Statement,
+        item_to_delete: &UseItem,
+        file_id: FileId,
+    ) -> Option<Span> {
         let Statement::Use(use_stmt) = parent_stmt else { return None };
 
         let items = match &use_stmt.items {
             UseItems::Sequence(s) => &s.items,
             UseItems::TypedSequence(s) => &s.items,
             UseItems::TypedList(l) => &l.items,
-            UseItems::MixedList(l) => return Some(find_range_in_mixed_list(l, item_to_delete)),
+            UseItems::MixedList(l) => return Some(find_range_in_mixed_list(l, item_to_delete, file_id)),
         };
 
         let Some(index) = items.nodes.iter().position(|i| std::ptr::eq(i, item_to_delete)) else {
@@ -466,17 +476,17 @@ mod utils {
         }
 
         let delete_span = if index > 0 {
-            let comma_span = items.tokens[index - 1].span;
+            let comma_span = items.tokens[index - 1].span_for(file_id);
             comma_span.join(item_to_delete.span())
         } else {
-            let comma_span = items.tokens[index].span;
+            let comma_span = items.tokens[index].span_for(file_id);
             item_to_delete.span().join(comma_span)
         };
 
         Some(delete_span)
     }
 
-    fn find_range_in_mixed_list(list: &MixedUseItemList, item_to_delete: &UseItem) -> Span {
+    fn find_range_in_mixed_list(list: &MixedUseItemList, item_to_delete: &UseItem, file_id: FileId) -> Span {
         let Some(index) = list.items.nodes.iter().position(|i| std::ptr::eq(&raw const i.item, item_to_delete)) else {
             return item_to_delete.span();
         };
@@ -488,10 +498,10 @@ mod utils {
         let typed_item_span = list.items.nodes[index].span();
 
         if index > 0 {
-            let comma_span = list.items.tokens[index - 1].span;
+            let comma_span = list.items.tokens[index - 1].span_for(file_id);
             comma_span.join(typed_item_span)
         } else {
-            let comma_span = list.items.tokens[index].span;
+            let comma_span = list.items.tokens[index].span_for(file_id);
             typed_item_span.join(comma_span)
         }
     }

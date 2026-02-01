@@ -32,6 +32,7 @@ pub enum ClassLikeMemberSelector<'arena> {
     Identifier(LocalIdentifier<'arena>),
     Variable(Variable<'arena>),
     Expression(ClassLikeMemberExpressionSelector<'arena>),
+    Missing(Span),
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
@@ -40,6 +41,7 @@ pub enum ClassLikeMemberSelector<'arena> {
 pub enum ClassLikeConstantSelector<'arena> {
     Identifier(LocalIdentifier<'arena>),
     Expression(ClassLikeMemberExpressionSelector<'arena>),
+    Missing(Span),
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
@@ -99,6 +101,32 @@ impl ClassLikeMemberSelector<'_> {
     pub const fn is_expression(&self) -> bool {
         matches!(self, ClassLikeMemberSelector::Expression(_))
     }
+
+    #[inline]
+    #[must_use]
+    pub const fn is_missing(&self) -> bool {
+        matches!(self, ClassLikeMemberSelector::Missing(_))
+    }
+}
+
+impl ClassLikeConstantSelector<'_> {
+    #[inline]
+    #[must_use]
+    pub const fn is_identifier(&self) -> bool {
+        matches!(self, ClassLikeConstantSelector::Identifier(_))
+    }
+
+    #[inline]
+    #[must_use]
+    pub const fn is_expression(&self) -> bool {
+        matches!(self, ClassLikeConstantSelector::Expression(_))
+    }
+
+    #[inline]
+    #[must_use]
+    pub const fn is_missing(&self) -> bool {
+        matches!(self, ClassLikeConstantSelector::Missing(_))
+    }
 }
 
 impl<'arena> Sequence<'arena, ClassLikeMember<'arena>> {
@@ -146,6 +174,7 @@ impl HasSpan for ClassLikeMemberSelector<'_> {
             ClassLikeMemberSelector::Identifier(i) => i.span(),
             ClassLikeMemberSelector::Variable(v) => v.span(),
             ClassLikeMemberSelector::Expression(e) => e.span(),
+            ClassLikeMemberSelector::Missing(span) => *span,
         }
     }
 }
@@ -155,6 +184,7 @@ impl HasSpan for ClassLikeConstantSelector<'_> {
         match self {
             ClassLikeConstantSelector::Identifier(i) => i.span(),
             ClassLikeConstantSelector::Expression(e) => e.span(),
+            ClassLikeConstantSelector::Missing(span) => *span,
         }
     }
 }

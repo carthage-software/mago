@@ -31,7 +31,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for While<'arena> {
             block_context,
             artifacts,
             &[],
-            std::slice::from_ref(self.condition),
+            &[self.condition],
             &[],
             self.body.statements(),
             self.span(),

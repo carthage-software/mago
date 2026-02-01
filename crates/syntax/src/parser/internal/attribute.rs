@@ -2,60 +2,28 @@ use crate::T;
 use crate::ast::ast::Attribute;
 use crate::ast::ast::AttributeList;
 use crate::ast::sequence::Sequence;
-use crate::ast::sequence::TokenSeparatedSequence;
 use crate::error::ParseError;
-use crate::parser::internal::argument;
-use crate::parser::internal::identifier;
-use crate::parser::internal::token_stream::TokenStream;
-use crate::parser::internal::utils;
+use crate::parser::Parser;
 
-pub fn parse_attribute_list_sequence<'arena>(
-    stream: &mut TokenStream<'_, 'arena>,
-) -> Result<Sequence<'arena, AttributeList<'arena>>, ParseError> {
-    let mut inner = stream.new_vec();
-    loop {
-        let next = utils::peek(stream)?;
-        if next.kind == T!["#["] {
-            inner.push(parse_attribute_list(stream)?);
-        } else {
-            break;
+impl<'input, 'arena> Parser<'input, 'arena> {
+    pub(crate) fn parse_attribute_list_sequence(
+        &mut self,
+    ) -> Result<Sequence<'arena, AttributeList<'arena>>, ParseError> {
+        let mut inner = self.new_vec();
+        while let Some(T!["#["]) = self.stream.peek_kind(0)? {
+            inner.push(self.parse_attribute_list()?);
         }
+
+        Ok(Sequence::new(inner))
     }
 
-    Ok(Sequence::new(inner))
-}
+    pub(crate) fn parse_attribute_list(&mut self) -> Result<AttributeList<'arena>, ParseError> {
+        let result = self.parse_comma_separated_sequence(T!["#["], T!["]"], |p| p.parse_attribute())?;
 
-pub fn parse_attribute_list<'arena>(stream: &mut TokenStream<'_, 'arena>) -> Result<AttributeList<'arena>, ParseError> {
-    Ok(AttributeList {
-        hash_left_bracket: utils::expect_span(stream, T!["#["])?,
-        attributes: {
-            let mut attributes = stream.new_vec();
-            let mut commas = stream.new_vec();
-            loop {
-                let next = utils::peek(stream)?;
-                if next.kind == T!["]"] {
-                    break;
-                }
+        Ok(AttributeList { hash_left_bracket: result.open, attributes: result.sequence, right_bracket: result.close })
+    }
 
-                attributes.push(parse_attribute(stream)?);
-
-                let next = utils::peek(stream)?;
-                if next.kind == T![","] {
-                    commas.push(utils::expect_any(stream)?);
-                } else {
-                    break;
-                }
-            }
-
-            TokenSeparatedSequence::new(attributes, commas)
-        },
-        right_bracket: utils::expect_span(stream, T!["]"])?,
-    })
-}
-
-pub fn parse_attribute<'arena>(stream: &mut TokenStream<'_, 'arena>) -> Result<Attribute<'arena>, ParseError> {
-    Ok(Attribute {
-        name: identifier::parse_identifier(stream)?,
-        argument_list: argument::parse_optional_argument_list(stream)?,
-    })
+    pub(crate) fn parse_attribute(&mut self) -> Result<Attribute<'arena>, ParseError> {
+        Ok(Attribute { name: self.parse_identifier()?, argument_list: self.parse_optional_argument_list()? })
+    }
 }

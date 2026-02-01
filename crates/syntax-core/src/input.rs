@@ -7,6 +7,40 @@ use mago_database::file::File;
 use mago_database::file::FileId;
 use mago_span::Position;
 
+/// Lookup table for ASCII whitespace (space, tab, newline, carriage return, form feed, vertical tab)
+const WHITESPACE_TABLE: [bool; 256] = {
+    let mut table = [false; 256];
+    table[b' ' as usize] = true;
+    table[b'\t' as usize] = true;
+    table[b'\n' as usize] = true;
+    table[b'\r' as usize] = true;
+    table[0x0C] = true;
+    table[0x0B] = true;
+    table
+};
+
+/// Lookup table for identifier continuation characters (a-z, A-Z, 0-9, _, 0x80-0xFF)
+const IDENT_PART_TABLE: [bool; 256] = {
+    let mut table = [false; 256];
+    let mut i = 0usize;
+    while i < 256 {
+        table[i] = matches!(i as u8, b'a'..=b'z' | b'A'..=b'Z' | b'0'..=b'9' | b'_' | 0x80..=0xFF);
+        i += 1;
+    }
+    table
+};
+
+/// Lookup table for identifier start characters (a-z, A-Z, _, 0x80-0xFF)
+const IDENT_START_TABLE: [bool; 256] = {
+    let mut table = [false; 256];
+    let mut i = 0usize;
+    while i < 256 {
+        table[i] = matches!(i as u8, b'a'..=b'z' | b'A'..=b'Z' | b'_' | 0x80..=0xFF);
+        i += 1;
+    }
+    table
+};
+
 /// A struct representing the input code being lexed.
 ///
 /// The `Input` struct provides methods to read, peek, consume, and skip characters
@@ -139,7 +173,7 @@ impl<'a> Input<'a> {
     /// # Returns
     ///
     /// `true` if the current offset is greater than or equal to the input length; `false` otherwise.
-    #[inline]
+    #[inline(always)]
     #[must_use]
     pub const fn has_reached_eof(&self) -> bool {
         self.offset >= self.length
@@ -198,9 +232,9 @@ impl<'a> Input<'a> {
     /// Handles different line endings (`\n`, `\r`, `\r\n`) and updates line and column counters accordingly.
     ///
     /// If the end of input is reached, no action is taken.
-    #[inline]
+    #[inline(always)]
     pub fn next(&mut self) {
-        if !self.has_reached_eof() {
+        if self.offset < self.length {
             self.offset += 1;
         }
     }
@@ -228,13 +262,13 @@ impl<'a> Input<'a> {
     /// # Returns
     ///
     /// A byte slice containing the consumed characters.
-    #[inline]
+    #[inline(always)]
     pub fn consume(&mut self, count: usize) -> &'a [u8] {
-        let (from, until) = self.calculate_bound(count);
-
-        self.skip(count);
-
-        &self.bytes[from..until]
+        let from = self.offset;
+        let until = (from + count).min(self.length);
+        self.offset = until;
+        // SAFETY: from <= until <= self.length is guaranteed
+        unsafe { self.bytes.get_unchecked(from..until) }
     }
 
     /// Consumes all remaining characters from the current position to the end of input.
@@ -317,16 +351,59 @@ impl<'a> Input<'a> {
     /// # Returns
     ///
     /// A byte slice containing the consumed whitespaces.
-    #[inline]
+    #[inline(always)]
     pub fn consume_whitespaces(&mut self) -> &'a [u8] {
         let start = self.offset;
         let bytes = self.bytes;
         let len = self.length;
-        while self.offset < len && bytes[self.offset].is_ascii_whitespace() {
+
+        // SAFETY: offset < len is checked in condition, table lookup is always valid
+        while self.offset < len {
+            let b = unsafe { *bytes.get_unchecked(self.offset) };
+            if !WHITESPACE_TABLE[b as usize] {
+                break;
+            }
             self.offset += 1;
         }
 
-        &bytes[start..self.offset]
+        // SAFETY: start <= self.offset <= len
+        unsafe { bytes.get_unchecked(start..self.offset) }
+    }
+
+    /// Scans identifier characters starting at `offset_from_current` without consuming them.
+    /// Returns the length of identifier characters found (not including any trailing `\`).
+    /// Also returns whether the identifier ends with `\` followed by an identifier start character.
+    ///
+    /// This is optimized for the common case of scanning simple identifiers.
+    #[inline(always)]
+    pub fn scan_identifier(&self, offset_from_current: usize) -> (usize, bool) {
+        let start = self.offset + offset_from_current;
+        if start >= self.length {
+            return (0, false);
+        }
+
+        let bytes = self.bytes;
+        let len = self.length;
+        let mut pos = start + 1; // Skip first byte (already validated by caller)
+
+        // SAFETY: pos < len checked in condition, table lookups are always valid
+        while pos < len {
+            let b = unsafe { *bytes.get_unchecked(pos) };
+            if IDENT_PART_TABLE[b as usize] {
+                pos += 1;
+            } else if b == b'\\' && pos + 1 < len {
+                let next = unsafe { *bytes.get_unchecked(pos + 1) };
+                if IDENT_START_TABLE[next as usize] {
+                    // Found \ followed by identifier start
+                    return (pos - start, true);
+                }
+                break;
+            } else {
+                break;
+            }
+        }
+
+        (pos - start, false)
     }
 
     /// Reads the next `n` characters without advancing the position.
@@ -338,12 +415,13 @@ impl<'a> Input<'a> {
     /// # Returns
     ///
     /// A byte slice containing the next `n` characters.
-    #[inline]
+    #[inline(always)]
     #[must_use]
     pub fn read(&self, n: usize) -> &'a [u8] {
-        let (from, until) = self.calculate_bound(n);
-
-        &self.bytes[from..until]
+        let from = self.offset;
+        let until = (from + n).min(self.length);
+        // SAFETY: from <= until <= self.length is guaranteed by min()
+        unsafe { self.bytes.get_unchecked(from..until) }
     }
 
     /// Reads a single byte at a specific byte offset within the input slice,
@@ -379,12 +457,18 @@ impl<'a> Input<'a> {
     /// # Returns
     ///
     /// `true` if the next bytes match `search`; `false` otherwise.
-    #[inline]
+    #[inline(always)]
     #[must_use]
     pub fn is_at(&self, search: &[u8], ignore_ascii_case: bool) -> bool {
-        let (from, until) = self.calculate_bound(search.len());
-        let slice = &self.bytes[from..until];
+        let len = search.len();
+        let from = self.offset;
+        let until = (from + len).min(self.length);
 
+        if until - from != len {
+            return false;
+        }
+
+        let slice = &self.bytes[from..until];
         if ignore_ascii_case { slice.eq_ignore_ascii_case(search) } else { slice == search }
     }
 
@@ -460,46 +544,17 @@ impl<'a> Input<'a> {
     /// # Returns
     ///
     /// A byte slice containing the peeked characters.
-    #[inline]
+    #[inline(always)]
     #[must_use]
     pub fn peek(&self, offset: usize, n: usize) -> &'a [u8] {
         let from = self.offset + offset;
-        if from >= self.length {
-            return &self.bytes[self.length..self.length];
+        let len = self.length;
+        if from >= len {
+            return &[];
         }
-
-        let mut until = from + n;
-        if until >= self.length {
-            until = self.length;
-        }
-
-        &self.bytes[from..until]
-    }
-
-    /// Calculates the bounds for slicing the input safely.
-    ///
-    /// Ensures that slicing does not go beyond the input length.
-    ///
-    /// # Arguments
-    ///
-    /// * `n` - The number of characters to include in the slice.
-    ///
-    /// # Returns
-    ///
-    /// A tuple `(from, until)` representing the start and end indices for slicing.
-    #[inline]
-    const fn calculate_bound(&self, n: usize) -> (usize, usize) {
-        if self.has_reached_eof() {
-            return (self.length, self.length);
-        }
-
-        let mut until = self.offset + n;
-
-        if until >= self.length {
-            until = self.length;
-        }
-
-        (self.offset, until)
+        let until = (from + n).min(len);
+        // SAFETY: We verified from < len and until <= len above
+        unsafe { self.bytes.get_unchecked(from..until) }
     }
 }
 
@@ -647,17 +702,5 @@ mod tests {
         assert_eq!(peeked, b"cde");
         assert_eq!(input.current_position(), Position::new(0));
         // Position should not change
-    }
-
-    #[test]
-    fn test_to_bound() {
-        let bytes = b"abcdef";
-        let input = Input::new(FileId::zero(), bytes);
-
-        let (from, until) = input.calculate_bound(3);
-        assert_eq!((from, until), (0, 3));
-
-        let (from, until) = input.calculate_bound(10); // Exceeds length
-        assert_eq!((from, until), (0, 6));
     }
 }

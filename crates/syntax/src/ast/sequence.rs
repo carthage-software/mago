@@ -146,13 +146,14 @@ impl<'arena, T: HasSpan> TokenSeparatedSequence<'arena, T> {
 
     #[inline]
     #[must_use]
-    pub fn first_span(&self) -> Option<Span> {
+    pub fn first_span(&self, file_id: FileId) -> Option<Span> {
         match (self.tokens.first(), self.nodes.first()) {
             (Some(token), Some(node)) => {
                 // check if the token comes before the node
-                if token.span.end <= node.span().start { Some(token.span) } else { Some(node.span()) }
+                let token_end = token.start.offset + token.value.len() as u32;
+                if token_end <= node.span().start.offset { Some(token.span_for(file_id)) } else { Some(node.span()) }
             }
-            (Some(token), None) => Some(token.span),
+            (Some(token), None) => Some(token.span_for(file_id)),
             (None, Some(node)) => Some(node.span()),
             (None, None) => None,
         }
@@ -166,13 +167,17 @@ impl<'arena, T: HasSpan> TokenSeparatedSequence<'arena, T> {
 
     #[inline]
     #[must_use]
-    pub fn last_span(&self) -> Option<Span> {
+    pub fn last_span(&self, file_id: FileId) -> Option<Span> {
         match (self.tokens.last(), self.nodes.last()) {
             (Some(token), Some(node)) => {
                 // check if the token comes after the node
-                if token.span.start >= node.span().end { Some(token.span) } else { Some(node.span()) }
+                if token.start.offset >= node.span().end.offset {
+                    Some(token.span_for(file_id))
+                } else {
+                    Some(node.span())
+                }
             }
-            (Some(token), None) => Some(token.span),
+            (Some(token), None) => Some(token.span_for(file_id)),
             (None, Some(node)) => Some(node.span()),
             (None, None) => None,
         }
@@ -181,7 +186,7 @@ impl<'arena, T: HasSpan> TokenSeparatedSequence<'arena, T> {
     #[inline]
     #[must_use]
     pub fn span(&self, file_id: FileId, from: Position) -> Span {
-        match (self.first_span(), self.last_span()) {
+        match (self.first_span(file_id), self.last_span(file_id)) {
             (Some(first), Some(last)) => Span::new(file_id, first.start, last.end),
             _ => Span::new(file_id, from, from),
         }
@@ -192,7 +197,7 @@ impl<'arena, T: HasSpan> TokenSeparatedSequence<'arena, T> {
     pub fn has_trailing_token(&self) -> bool {
         self.tokens
             .last()
-            .is_some_and(|token| token.span.start.offset >= self.nodes.last().map_or(0, |node| node.span().end.offset))
+            .is_some_and(|token| token.start.offset >= self.nodes.last().map_or(0, |node| node.span().end.offset))
     }
 
     #[inline]
@@ -200,7 +205,7 @@ impl<'arena, T: HasSpan> TokenSeparatedSequence<'arena, T> {
     pub fn get_trailing_token(&self) -> Option<&Token<'arena>> {
         self.tokens
             .last()
-            .filter(|token| token.span.start.offset >= self.nodes.last().map_or(0, |node| node.span().end.offset))
+            .filter(|token| token.start.offset >= self.nodes.last().map_or(0, |node| node.span().end.offset))
     }
 
     #[inline]

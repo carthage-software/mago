@@ -1,39 +1,38 @@
 use crate::T;
 use crate::ast::ast::MagicConstant;
 use crate::error::ParseError;
-use crate::parser::internal::identifier::parse_local_identifier;
-use crate::parser::internal::token_stream::TokenStream;
-use crate::parser::internal::utils;
+use crate::parser::Parser;
 
-pub fn parse_magic_constant<'arena>(stream: &mut TokenStream<'_, 'arena>) -> Result<MagicConstant<'arena>, ParseError> {
-    let token = utils::peek(stream)?;
+impl<'input, 'arena> Parser<'input, 'arena> {
+    pub(crate) fn parse_magic_constant(&mut self) -> Result<MagicConstant<'arena>, ParseError> {
+        let token = self.stream.lookahead(0)?.ok_or_else(|| self.stream.unexpected(None, &[]))?;
 
-    Ok(match token.kind {
-        T!["__CLASS__"] => MagicConstant::Class(parse_local_identifier(stream)?),
-        T!["__DIR__"] => MagicConstant::Directory(parse_local_identifier(stream)?),
-        T!["__FILE__"] => MagicConstant::File(parse_local_identifier(stream)?),
-        T!["__FUNCTION__"] => MagicConstant::Function(parse_local_identifier(stream)?),
-        T!["__LINE__"] => MagicConstant::Line(parse_local_identifier(stream)?),
-        T!["__METHOD__"] => MagicConstant::Method(parse_local_identifier(stream)?),
-        T!["__NAMESPACE__"] => MagicConstant::Namespace(parse_local_identifier(stream)?),
-        T!["__PROPERTY__"] => MagicConstant::Property(parse_local_identifier(stream)?),
-        T!["__TRAIT__"] => MagicConstant::Trait(parse_local_identifier(stream)?),
-        _ => {
-            return Err(utils::unexpected(
-                stream,
-                Some(token),
-                T![
-                    "__CLASS__",
-                    "__DIR__",
-                    "__FILE__",
-                    "__FUNCTION__",
-                    "__LINE__",
-                    "__METHOD__",
-                    "__NAMESPACE__",
-                    "__PROPERTY__",
-                    "__TRAIT__"
-                ],
-            ));
-        }
-    })
+        Ok(match token.kind {
+            T!["__CLASS__"] => MagicConstant::Class(self.parse_local_identifier()?),
+            T!["__DIR__"] => MagicConstant::Directory(self.parse_local_identifier()?),
+            T!["__FILE__"] => MagicConstant::File(self.parse_local_identifier()?),
+            T!["__FUNCTION__"] => MagicConstant::Function(self.parse_local_identifier()?),
+            T!["__LINE__"] => MagicConstant::Line(self.parse_local_identifier()?),
+            T!["__METHOD__"] => MagicConstant::Method(self.parse_local_identifier()?),
+            T!["__NAMESPACE__"] => MagicConstant::Namespace(self.parse_local_identifier()?),
+            T!["__PROPERTY__"] => MagicConstant::Property(self.parse_local_identifier()?),
+            T!["__TRAIT__"] => MagicConstant::Trait(self.parse_local_identifier()?),
+            _ => {
+                return Err(self.stream.unexpected(
+                    Some(token),
+                    T![
+                        "__CLASS__",
+                        "__DIR__",
+                        "__FILE__",
+                        "__FUNCTION__",
+                        "__LINE__",
+                        "__METHOD__",
+                        "__NAMESPACE__",
+                        "__PROPERTY__",
+                        "__TRAIT__"
+                    ],
+                ));
+            }
+        })
+    }
 }

@@ -23,7 +23,7 @@ use crate::error::AnalysisError;
 pub enum ConstructInput<'ast, 'arena> {
     ArgumentList(Option<&'ast ArgumentList<'arena>>),
     Expression(&'ast Expression<'arena>),
-    ExpressionList(&'ast [Expression<'arena>]),
+    ExpressionList(&'ast [&'arena Expression<'arena>]),
 }
 
 /// Analyzes inputs for a language construct (e.g., `echo`, `exit`, `return`).

@@ -2,19 +2,18 @@ use crate::T;
 use crate::ast::ast::Goto;
 use crate::ast::ast::Label;
 use crate::error::ParseError;
-use crate::parser::internal::identifier::parse_local_identifier;
-use crate::parser::internal::terminator::parse_terminator;
-use crate::parser::internal::token_stream::TokenStream;
-use crate::parser::internal::utils;
+use crate::parser::Parser;
 
-pub fn parse_goto<'arena>(stream: &mut TokenStream<'_, 'arena>) -> Result<Goto<'arena>, ParseError> {
-    Ok(Goto {
-        goto: utils::expect_keyword(stream, T!["goto"])?,
-        label: parse_local_identifier(stream)?,
-        terminator: parse_terminator(stream)?,
-    })
-}
+impl<'input, 'arena> Parser<'input, 'arena> {
+    pub(crate) fn parse_goto(&mut self) -> Result<Goto<'arena>, ParseError> {
+        Ok(Goto {
+            goto: self.expect_keyword(T!["goto"])?,
+            label: self.parse_local_identifier()?,
+            terminator: self.parse_terminator()?,
+        })
+    }
 
-pub fn parse_label<'arena>(stream: &mut TokenStream<'_, 'arena>) -> Result<Label<'arena>, ParseError> {
-    Ok(Label { name: parse_local_identifier(stream)?, colon: utils::expect_span(stream, T![":"])? })
+    pub(crate) fn parse_label(&mut self) -> Result<Label<'arena>, ParseError> {
+        Ok(Label { name: self.parse_local_identifier()?, colon: self.stream.eat_span(T![":"])? })
+    }
 }

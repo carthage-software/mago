@@ -47,8 +47,8 @@ fn run_test_case_inner(config: TestCase) {
     let source_file = database.get_ref(&file_id).expect("File just added should exist");
 
     let arena = Bump::new();
-    let (program, parse_issues) = parse_file(&arena, source_file);
-    assert!(parse_issues.is_none(), "Test '{}' failed during parsing:\n{:#?}", config.name, parse_issues);
+    let program = parse_file(&arena, source_file);
+    assert!(!program.has_errors(), "Parse failed: {:?}", program.errors);
 
     let resolver = NameResolver::new(&arena);
     let resolved_names = resolver.resolve(program);

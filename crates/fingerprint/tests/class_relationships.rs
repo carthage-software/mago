@@ -9,8 +9,8 @@ use mago_syntax::parser::parse_file;
 fn get_fingerprint(code: &'static str) -> u64 {
     let arena = Bump::new();
     let file = File::ephemeral("test.php".into(), code.into());
-    let (program, error) = parse_file(&arena, &file);
-    assert!(error.is_none(), "Parse error: {error:?}");
+    let program = parse_file(&arena, &file);
+    assert!(!program.has_errors(), "Parse failed: {:?}", program.errors);
 
     let resolved_names = NameResolver::new(&arena).resolve(program);
     let options = FingerprintOptions::default();

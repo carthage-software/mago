@@ -27,7 +27,7 @@ pub struct ClassLikeConstant<'arena> {
 pub struct ClassLikeConstantItem<'arena> {
     pub name: LocalIdentifier<'arena>,
     pub equals: Span,
-    pub value: Expression<'arena>,
+    pub value: &'arena Expression<'arena>,
 }
 
 impl<'arena> ClassLikeConstant<'arena> {

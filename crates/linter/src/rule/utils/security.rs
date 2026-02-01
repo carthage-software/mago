@@ -104,6 +104,7 @@ pub fn get_password_from_selector(selector: &ClassLikeMemberSelector<'_>) -> Opt
         ClassLikeMemberSelector::Expression(class_like_member_expression_selector) => {
             get_password(class_like_member_expression_selector.expression)
         }
+        ClassLikeMemberSelector::Missing(_) => None,
     }
 }
 
@@ -121,6 +122,7 @@ pub fn get_password_from_constant_selector(selector: &ClassLikeConstantSelector<
         ClassLikeConstantSelector::Expression(class_like_member_expression_selector) => {
             get_password(class_like_member_expression_selector.expression)
         }
+        ClassLikeConstantSelector::Missing(_) => None,
     }
 }
 

@@ -1,3 +1,4 @@
+use mago_database::file::HasFileId;
 use mago_php_version::feature::Feature;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
@@ -353,7 +354,7 @@ pub fn check_closure<'arena>(closure: &Closure<'arena>, context: &mut Context<'_
         context.report(
                 Issue::error("Trailing comma in closure use list is only available in PHP 8.0 and later.")
                 .with_annotation(
-                    Annotation::primary(trailing_comma.span).with_message("Trailing comma found here."),
+                    Annotation::primary(trailing_comma.span_for(context.source_file.file_id())).with_message("Trailing comma found here."),
                 )
                 .with_help(
                     "Remove the trailing comma to make the code compatible with PHP 7.4 and earlier versions, or upgrade to PHP 8.0 or later.",

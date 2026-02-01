@@ -1,3 +1,5 @@
+use mago_database::file::HasFileId;
+
 use crate::ast::CallableTypeParameter;
 use crate::ast::CallableTypeParameters;
 use crate::ast::CallableTypeReturnType;
@@ -16,7 +18,7 @@ pub fn parse_callable_type_specifications<'input>(
 ) -> Result<CallableTypeSpecification<'input>, ParseError> {
     Ok(CallableTypeSpecification {
         parameters: CallableTypeParameters {
-            left_parenthesis: stream.eat(TypeTokenKind::LeftParenthesis)?.span,
+            left_parenthesis: stream.eat(TypeTokenKind::LeftParenthesis)?.span_for(stream.file_id()),
             entries: {
                 let mut entries = Vec::new();
 
@@ -25,18 +27,26 @@ pub fn parse_callable_type_specifications<'input>(
                         parameter_type: {
                             if stream.is_at(TypeTokenKind::Ellipsis)? { None } else { Some(parse_type(stream)?) }
                         },
-                        equals: if stream.is_at(TypeTokenKind::Equals)? { Some(stream.consume()?.span) } else { None },
+                        equals: if stream.is_at(TypeTokenKind::Equals)? {
+                            Some(stream.consume()?.span_for(stream.file_id()))
+                        } else {
+                            None
+                        },
                         ellipsis: if stream.is_at(TypeTokenKind::Ellipsis)? {
-                            Some(stream.consume()?.span)
+                            Some(stream.consume()?.span_for(stream.file_id()))
                         } else {
                             None
                         },
                         variable: if stream.is_at(TypeTokenKind::Variable)? {
-                            Some(VariableType::from(stream.consume()?))
+                            Some(VariableType::from_token(stream.consume()?, stream.file_id()))
                         } else {
                             None
                         },
-                        comma: if stream.is_at(TypeTokenKind::Comma)? { Some(stream.consume()?.span) } else { None },
+                        comma: if stream.is_at(TypeTokenKind::Comma)? {
+                            Some(stream.consume()?.span_for(stream.file_id()))
+                        } else {
+                            None
+                        },
                     };
 
                     if entry.comma.is_none() {
@@ -49,11 +59,11 @@ pub fn parse_callable_type_specifications<'input>(
 
                 entries
             },
-            right_parenthesis: stream.eat(TypeTokenKind::RightParenthesis)?.span,
+            right_parenthesis: stream.eat(TypeTokenKind::RightParenthesis)?.span_for(stream.file_id()),
         },
         return_type: if stream.is_at(TypeTokenKind::Colon)? {
             Some(CallableTypeReturnType {
-                colon: stream.consume()?.span,
+                colon: stream.consume()?.span_for(stream.file_id()),
                 return_type: Box::new(parse_type_with_precedence(stream, TypePrecedence::Callable)?),
             })
         } else {

@@ -45,7 +45,7 @@ pub fn scan_constant<'arena>(
 
             let mut metadata = ConstantMetadata::new(name, item.span(), flags);
             metadata.attributes.clone_from(&attributes);
-            metadata.inferred_type = infer(context, scope, &item.value);
+            metadata.inferred_type = infer(context, scope, item.value);
 
             process_constant_docblock(&mut metadata, &docblock, None, type_context, scope);
 

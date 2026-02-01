@@ -24,6 +24,15 @@ either = { workspace = true }
 paste = { workspace = true }
 ordered-float = { workspace = true, features = ["serde", "rand"] }
 bumpalo = { workspace = true }
+memchr = { workspace = true }
 
 [dev-dependencies]
 pretty_assertions = { workspace = true }
+# TODO: remove the following before merging:
+criterion = { workspace = true }
+tree-sitter = "0.24"
+tree-sitter-php = "0.23"
+
+[[bench]]
+name = "parser"
+harness = false

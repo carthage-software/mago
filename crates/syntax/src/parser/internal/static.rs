@@ -5,52 +5,47 @@ use crate::ast::ast::StaticConcreteItem;
 use crate::ast::ast::StaticItem;
 use crate::ast::sequence::TokenSeparatedSequence;
 use crate::error::ParseError;
-use crate::parser::internal::expression::parse_expression;
-use crate::parser::internal::terminator::parse_terminator;
-use crate::parser::internal::token_stream::TokenStream;
-use crate::parser::internal::utils;
-use crate::parser::internal::variable::parse_direct_variable;
+use crate::parser::Parser;
 
-pub fn parse_static<'arena>(stream: &mut TokenStream<'_, 'arena>) -> Result<Static<'arena>, ParseError> {
-    let r#static = utils::expect_keyword(stream, T!["static"])?;
-    let items = {
-        let mut items = stream.new_vec();
-        let mut commas = stream.new_vec();
+impl<'input, 'arena> Parser<'input, 'arena> {
+    pub(crate) fn parse_static(&mut self) -> Result<Static<'arena>, ParseError> {
+        let r#static = self.expect_keyword(T!["static"])?;
+        let items = {
+            let mut items = self.new_vec();
+            let mut commas = self.new_vec();
 
-        loop {
-            if matches!(utils::peek(stream)?.kind, T!["?>" | ";"]) {
-                break;
-            }
-
-            items.push(parse_static_item(stream)?);
-
-            match utils::peek(stream)?.kind {
-                T![","] => {
-                    commas.push(utils::expect_any(stream)?);
+            loop {
+                if matches!(self.stream.peek_kind(0)?, Some(T!["?>" | ";"])) {
+                    break;
                 }
-                _ => {
+
+                items.push(self.parse_static_item()?);
+
+                if let Some(T![","]) = self.stream.peek_kind(0)? {
+                    commas.push(self.stream.consume()?);
+                } else {
                     break;
                 }
             }
-        }
 
-        TokenSeparatedSequence::new(items, commas)
-    };
-    let terminator = parse_terminator(stream)?;
+            TokenSeparatedSequence::new(items, commas)
+        };
+        let terminator = self.parse_terminator()?;
 
-    Ok(Static { r#static, items, terminator })
-}
+        Ok(Static { r#static, items, terminator })
+    }
 
-pub fn parse_static_item<'arena>(stream: &mut TokenStream<'_, 'arena>) -> Result<StaticItem<'arena>, ParseError> {
-    let variable = parse_direct_variable(stream)?;
+    pub(crate) fn parse_static_item(&mut self) -> Result<StaticItem<'arena>, ParseError> {
+        let var = self.parse_direct_variable()?;
 
-    Ok(match utils::maybe_peek(stream)?.map(|t| t.kind) {
-        Some(T!["="]) => {
-            let equals = utils::expect_span(stream, T!["="])?;
-            let value = parse_expression(stream)?;
+        Ok(match self.stream.peek_kind(0)? {
+            Some(T!["="]) => {
+                let equals = self.stream.eat_span(T!["="])?;
+                let value = self.parse_expression()?;
 
-            StaticItem::Concrete(StaticConcreteItem { variable, equals, value })
-        }
-        _ => StaticItem::Abstract(StaticAbstractItem { variable }),
-    })
+                StaticItem::Concrete(StaticConcreteItem { variable: var, equals, value })
+            }
+            _ => StaticItem::Abstract(StaticAbstractItem { variable: var }),
+        })
+    }
 }

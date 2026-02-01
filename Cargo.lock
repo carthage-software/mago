@@ -1976,17 +1976,21 @@ name = "mago-syntax"
 version = "1.3.0"
 dependencies = [
  "bumpalo",
+ "criterion",
  "either",
  "mago-database",
  "mago-php-version",
  "mago-reporting",
  "mago-span",
  "mago-syntax-core",
+ "memchr",
  "ordered-float",
  "paste",
  "pretty_assertions",
  "serde",
  "strum",
+ "tree-sitter",
+ "tree-sitter-php",
 ]
 
 [[package]]
@@ -2013,6 +2017,7 @@ dependencies = [
 name = "mago-type-syntax"
 version = "1.3.0"
 dependencies = [
+ "criterion",
  "mago-database",
  "mago-span",
  "mago-syntax-core",
@@ -3286,6 +3291,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6ce2be8dc25455e1f91df71bfa12ad37d7af1092ae736f3a6cd0e37bc7810596"
 
 [[package]]
+name = "streaming-iterator"
+version = "0.1.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2b2231b7c3057d5e4ad0156fb3dc807d900806020c5ffa3ee6ff2c8c76fb8520"
+
+[[package]]
 name = "strsim"
 version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3706,6 +3717,35 @@ dependencies = [
  "tracing",
  "tracing-core",
  "tracing-log",
+]
+
+[[package]]
+name = "tree-sitter"
+version = "0.24.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a5387dffa7ffc7d2dae12b50c6f7aab8ff79d6210147c6613561fc3d474c6f75"
+dependencies = [
+ "cc",
+ "regex",
+ "regex-syntax",
+ "streaming-iterator",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "tree-sitter-language"
+version = "0.1.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4ae62f7eae5eb549c71b76658648b72cc6111f2d87d24a1e31fa907f4943e3ce"
+
+[[package]]
+name = "tree-sitter-php"
+version = "0.23.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f066e94e9272cfe4f1dcb07a1c50c66097eca648f2d7233d299c8ae9ed8c130c"
+dependencies = [
+ "cc",
+ "tree-sitter-language",
 ]
 
 [[package]]

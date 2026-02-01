@@ -97,6 +97,7 @@ pub fn resolve_member_selector<'ctx, 'arena>(
 
             Ok(resolve_selector_from_type(context, selector_type, var.span(), SelectorKind::Member))
         }
+        ClassLikeMemberSelector::Missing(_) => Ok(vec![]),
     }
 }
 
@@ -121,6 +122,7 @@ pub fn resolve_constant_selector<'ctx, 'arena>(
 
             Ok(resolve_selector_from_type(context, selector_type, expr.span(), SelectorKind::Constant))
         }
+        ClassLikeConstantSelector::Missing(_) => Ok(vec![]),
     }
 }
 

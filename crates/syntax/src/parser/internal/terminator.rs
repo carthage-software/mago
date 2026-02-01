@@ -1,34 +1,46 @@
+use mago_database::file::HasFileId;
+
 use crate::T;
 use crate::ast::ast::ClosingTag;
 use crate::ast::ast::Terminator;
 use crate::error::ParseError;
-use crate::parser::internal::tag::parse_opening_tag;
-use crate::parser::internal::token_stream::TokenStream;
-use crate::parser::internal::utils;
+use crate::parser::Parser;
+use crate::token::TokenKind;
 
-pub fn parse_optional_terminator<'arena>(
-    stream: &mut TokenStream<'_, 'arena>,
-) -> Result<Option<Terminator<'arena>>, ParseError> {
-    Ok(match utils::maybe_peek(stream)?.map(|t| t.kind) {
-        Some(T![";" | "?>"]) => Some(parse_terminator(stream)?),
-        _ => None,
-    })
-}
+impl<'input, 'arena> Parser<'input, 'arena> {
+    pub(crate) fn parse_optional_terminator(&mut self) -> Result<Option<Terminator<'arena>>, ParseError> {
+        let next = self.stream.lookahead(0)?;
+        Ok(match next.map(|t| t.kind) {
+            Some(T![";" | "?>"]) => Some(self.parse_terminator()?),
+            _ => None,
+        })
+    }
 
-pub fn parse_terminator<'arena>(stream: &mut TokenStream<'_, 'arena>) -> Result<Terminator<'arena>, ParseError> {
-    let token = utils::expect_one_of(stream, T![";", "?>"])?;
+    pub(crate) fn parse_terminator(&mut self) -> Result<Terminator<'arena>, ParseError> {
+        if self.stream.is_at(TokenKind::Semicolon)? {
+            let token = self.stream.consume()?;
 
-    match token.kind {
-        T![";"] => Ok(Terminator::Semicolon(token.span)),
-        T!["?>"] => {
-            let closing_tag = ClosingTag { span: token.span };
+            return Ok(Terminator::Semicolon(token.span_for(self.stream.file_id())));
+        }
 
-            if matches!(utils::maybe_peek(stream)?.map(|t| t.kind), Some(T!["<?php" | "<?"])) {
-                Ok(Terminator::TagPair(closing_tag, parse_opening_tag(stream)?))
+        if self.stream.is_at(TokenKind::CloseTag)? {
+            let closing_tag_token = self.stream.consume()?;
+            let closing_tag = ClosingTag { span: closing_tag_token.span_for(self.stream.file_id()) };
+
+            let next = self.stream.lookahead(0)?;
+            if matches!(next.map(|t| t.kind), Some(T!["<?php" | "<?"])) {
+                return Ok(Terminator::TagPair(closing_tag, self.parse_opening_tag()?));
             } else {
-                Ok(Terminator::ClosingTag(closing_tag))
+                return Ok(Terminator::ClosingTag(closing_tag));
             }
         }
-        _ => unreachable!(),
+
+        let Some(next) = self.stream.lookahead(0)? else {
+            return Err(self.stream.unexpected(None, T![";", "?>"]));
+        };
+
+        self.errors.push(self.stream.unexpected(Some(next), T![";", "?>"]));
+
+        Ok(Terminator::Missing(next.span_for(self.stream.file_id())))
     }
 }

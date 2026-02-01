@@ -501,7 +501,7 @@ pub fn scan_property_item<'arena>(
             let name = VariableIdentifier(atom(property_concrete_item.variable.name));
             let name_span = property_concrete_item.variable.span;
             let has_default = true;
-            let default_type = infer(context, scope, &property_concrete_item.value).map(|u| {
+            let default_type = infer(context, scope, property_concrete_item.value).map(|u| {
                 let mut type_metadata = TypeMetadata::new(u, property_concrete_item.value.span());
                 type_metadata.inferred = true;
                 type_metadata

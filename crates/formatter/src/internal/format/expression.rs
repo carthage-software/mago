@@ -189,6 +189,7 @@ impl<'arena> Format<'arena> for Expression<'arena> {
                 Expression::Instantiation(i) => i.format(f),
                 Expression::MagicConstant(c) => c.format(f),
                 Expression::Pipe(p) => p.format(f),
+                Expression::Error(_) => Document::empty(),
                 Expression::Parenthesized(_) => unreachable!("Parenthesized expressions are handled separately"),
                 _ => unreachable!("An expression variant was not handled in formatter: {self:?}"),
             }
@@ -749,6 +750,7 @@ impl<'arena> Format<'arena> for ClassLikeMemberSelector<'arena> {
                 ClassLikeMemberSelector::Identifier(s) => s.format(f),
                 ClassLikeMemberSelector::Variable(s) => s.format(f),
                 ClassLikeMemberSelector::Expression(s) => s.format(f),
+                ClassLikeMemberSelector::Missing(_) => Document::empty(),
             }
         })
     }
@@ -770,6 +772,7 @@ impl<'arena> Format<'arena> for ClassLikeConstantSelector<'arena> {
             match self {
                 ClassLikeConstantSelector::Identifier(s) => s.format(f),
                 ClassLikeConstantSelector::Expression(s) => s.format(f),
+                ClassLikeConstantSelector::Missing(_) => Document::empty(),
             }
         })
     }

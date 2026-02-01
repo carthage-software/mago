@@ -95,12 +95,12 @@ pub fn parse_literal_string_in<'arena>(
                 consumed = false;
             }
             c if quote_char == Some('"') && c.is_ascii_digit() => {
-                let mut octal_val = 0u8;
+                let mut octal_val = 0u16;
                 let mut octal_len = 0;
 
                 while let Some(peeked) = chars.peek() {
                     if octal_len < 3 && peeked.is_ascii_digit() && *peeked <= '7' {
-                        octal_val = octal_val * 8 + peeked.to_digit(8).unwrap() as u8;
+                        octal_val = octal_val * 8 + peeked.to_digit(8).unwrap() as u16;
                         octal_len += 1;
                         chars.next(); // Consume the digit
                     } else {
@@ -108,7 +108,8 @@ pub fn parse_literal_string_in<'arena>(
                     }
                 }
                 if octal_len > 0 {
-                    result.push(octal_val);
+                    // Truncate to u8 (matches PHP behavior for octal sequences > 255)
+                    result.push(octal_val as u8);
                 } else {
                     result.push(b'\\');
                     result.push(b'0');
@@ -287,57 +288,82 @@ pub fn parse_literal_string(s: &str, quote_char: Option<char>, has_quote: bool) 
     Some(result)
 }
 
+/// Parses a PHP literal float, handling underscore separators.
 #[inline]
 #[must_use]
 pub fn parse_literal_float(value: &str) -> Option<f64> {
-    let source = value.replace('_', "");
+    if memchr::memchr(b'_', value.as_bytes()).is_none() {
+        return value.parse::<f64>().ok();
+    }
 
-    source.parse::<f64>().ok()
+    let mut buf = [0u8; 64];
+    let mut len = 0;
+
+    for &b in value.as_bytes() {
+        if b != b'_' {
+            if len < 64 {
+                buf[len] = b;
+                len += 1;
+            } else {
+                let source = value.replace('_', "");
+                return source.parse::<f64>().ok();
+            }
+        }
+    }
+
+    // SAFETY: We only copied ASCII bytes from a valid UTF-8 string
+    let s = unsafe { std::str::from_utf8_unchecked(&buf[..len]) };
+    s.parse::<f64>().ok()
 }
 
+/// Parses a PHP literal integer with support for binary, octal, decimal, and hex.
+///
+/// Optimized to use byte-level iteration instead of Unicode chars.
 #[inline]
 #[must_use]
 pub fn parse_literal_integer(value: &str) -> Option<u64> {
-    if value.is_empty() {
+    let bytes = value.as_bytes();
+    if bytes.is_empty() {
         return None;
     }
 
-    let mut s = value;
-    let radix = if s.starts_with("0x") || s.starts_with("0X") {
-        s = &s[2..];
-        16
-    } else if s.starts_with("0o") || s.starts_with("0O") {
-        s = &s[2..];
-        8
-    } else if s.starts_with("0b") || s.starts_with("0B") {
-        s = &s[2..];
-        2
-    } else if s.starts_with('0') && s.len() > 1 {
-        s = &s[1..];
-        8
-    } else {
-        10
+    let (radix, start) = match bytes {
+        [b'0', b'x' | b'X', ..] => (16u128, 2),
+        [b'0', b'o' | b'O', ..] => (8u128, 2),
+        [b'0', b'b' | b'B', ..] => (2u128, 2),
+        [b'0', _, ..] => (8u128, 1), // Legacy octal
+        _ => (10u128, 0),
     };
 
     let mut result: u128 = 0;
     let mut has_digits = false;
 
-    for c in s.chars() {
-        if c == '_' {
+    for &b in &bytes[start..] {
+        if b == b'_' {
             continue;
         }
 
-        let digit = match c.to_digit(radix) {
-            Some(d) => u128::from(d),
-            None => return None,
+        let digit = if b.is_ascii_digit() {
+            (b - b'0') as u128
+        } else if (b'a'..=b'f').contains(&b) {
+            (b - b'a' + 10) as u128
+        } else if (b'A'..=b'F').contains(&b) {
+            (b - b'A' + 10) as u128
+        } else {
+            return None;
         };
+
+        if digit >= radix {
+            return None;
+        }
 
         has_digits = true;
 
-        result = match result.checked_mul(u128::from(radix)) {
+        result = match result.checked_mul(radix) {
             Some(r) => r,
             None => return Some(u64::MAX),
         };
+
         result = match result.checked_add(digit) {
             Some(r) => r,
             None => return Some(u64::MAX),
@@ -348,24 +374,74 @@ pub fn parse_literal_integer(value: &str) -> Option<u64> {
         return None;
     }
 
-    // Clamp the result to u64::MAX if it's too large.
-    Some(if result > u128::from(u64::MAX) { u64::MAX } else { result as u64 })
+    Some(result.min(u64::MAX as u128) as u64)
 }
 
-#[inline]
+/// Lookup table for identifier start characters (a-z, A-Z, _)
+/// Index by byte value, true if valid start of identifier
+static IS_IDENT_START: [bool; 256] = {
+    let mut table = [false; 256];
+    let mut i = 0u8;
+    loop {
+        table[i as usize] = matches!(i, b'a'..=b'z' | b'A'..=b'Z' | b'_');
+        if i == 255 {
+            break;
+        }
+        i += 1;
+    }
+
+    table
+};
+
+/// Lookup table for identifier continuation characters (a-z, A-Z, 0-9, _, or >= 0x80)
+/// Index by byte value, true if valid part of identifier
+static IS_IDENT_PART: [bool; 256] = {
+    let mut table = [false; 256];
+    let mut i = 0u8;
+    loop {
+        table[i as usize] = matches!(i, b'a'..=b'z' | b'A'..=b'Z' | b'0'..=b'9' | b'_' | 0x80..=0xFF);
+        if i == 255 {
+            break;
+        }
+        i += 1;
+    }
+    table
+};
+
+/// Check if a byte can start an identifier (a-z, A-Z, _)
+#[inline(always)]
 #[must_use]
-pub fn is_start_of_identifier(byte: &u8) -> bool {
-    byte.is_ascii_lowercase() || byte.is_ascii_uppercase() || (*byte == b'_')
+pub const fn is_start_of_identifier(byte: &u8) -> bool {
+    IS_IDENT_START[*byte as usize]
 }
 
-#[inline]
+/// Check if a byte can be part of an identifier (a-z, A-Z, 0-9, _, or >= 0x80)
+#[inline(always)]
 #[must_use]
-pub fn is_part_of_identifier(byte: &u8) -> bool {
-    byte.is_ascii_digit()
-        || byte.is_ascii_lowercase()
-        || byte.is_ascii_uppercase()
-        || (*byte == b'_')
-        || (*byte >= 0x80)
+pub const fn is_part_of_identifier(byte: &u8) -> bool {
+    IS_IDENT_PART[*byte as usize]
+}
+
+/// Scans an identifier starting at `offset` in the byte slice and returns the length.
+/// Assumes the first byte is already validated as a start of identifier.
+/// Returns the total length of the identifier (including the first byte).
+///
+/// Stops at the first byte that is not a valid identifier character.
+#[inline(always)]
+#[must_use]
+pub fn scan_identifier_length(bytes: &[u8], offset: usize) -> usize {
+    let mut len = 1;
+    let remaining = &bytes[offset + 1..];
+
+    for &b in remaining {
+        if IS_IDENT_PART[b as usize] {
+            len += 1;
+        } else {
+            break;
+        }
+    }
+
+    len
 }
 
 /// Reads a sequence of bytes representing digits in a specific numerical base.

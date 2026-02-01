@@ -90,12 +90,12 @@ impl LintService {
     #[must_use]
     pub fn lint_file(&self, file: &File, mode: LintMode, only: Option<&[String]>) -> IssueCollection {
         let arena = Bump::new();
-        let (program, parsing_error) = parse_file(&arena, file);
+        let program = parse_file(&arena, file);
         let resolved_names = NameResolver::new(&arena).resolve(program);
 
         let mut issues = IssueCollection::new();
-        if let Some(error) = parsing_error {
-            issues.push(Issue::from(&error));
+        if program.has_errors() {
+            issues.extend(program.errors.iter().map(Issue::from));
         }
 
         let semantics_checker = SemanticsChecker::new(self.settings.php_version);
@@ -138,12 +138,13 @@ impl LintService {
         );
 
         pipeline.run(|context, arena, file| {
-            let (program, parsing_error) = parse_file(arena, &file);
+            let program = parse_file(arena, &file);
             let resolved_names = NameResolver::new(arena).resolve(program);
 
             let mut issues = IssueCollection::new();
-            if let Some(error) = parsing_error {
-                issues.push(Issue::from(&error));
+
+            if program.has_errors() {
+                issues.extend(program.errors.iter().map(Issue::from));
             }
 
             let semantics_checker = SemanticsChecker::new(context.php_version);
