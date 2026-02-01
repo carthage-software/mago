@@ -6,11 +6,11 @@ use crate::parser::Parser;
 
 impl<'input, 'arena> Parser<'input, 'arena> {
     pub(crate) fn parse_block(&mut self) -> Result<Block<'arena>, ParseError> {
-        let left_brace = self.stream.eat(T!["{"])?.span;
+        let left_brace = self.stream.eat_span(T!["{"])?;
         let mut statements = self.new_vec();
 
         loop {
-            match self.stream.lookahead(0)?.map(|t| t.kind) {
+            match self.stream.peek_kind(0)? {
                 Some(T!["}"]) => break,
                 Some(_) => {
                     let position_before = self.stream.current_position();
@@ -36,7 +36,7 @@ impl<'input, 'arena> Parser<'input, 'arena> {
             }
         }
 
-        let right_brace = self.stream.eat(T!["}"])?.span;
+        let right_brace = self.stream.eat_span(T!["}"])?;
 
         Ok(Block { left_brace, statements: Sequence::new(statements), right_brace })
     }

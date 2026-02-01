@@ -29,11 +29,11 @@ impl<'input, 'arena> Parser<'input, 'arena> {
             interface: self.expect_keyword(T!["interface"])?,
             name: self.parse_local_identifier()?,
             extends: self.parse_optional_extends()?,
-            left_brace: self.stream.eat(T!["{"])?.span,
+            left_brace: self.stream.eat_span(T!["{"])?,
             members: {
                 let mut members = self.new_vec();
                 loop {
-                    if matches!(self.stream.lookahead(0)?.map(|t| t.kind), Some(T!["}"])) {
+                    if matches!(self.stream.peek_kind(0)?, Some(T!["}"])) {
                         break;
                     }
 
@@ -57,7 +57,7 @@ impl<'input, 'arena> Parser<'input, 'arena> {
 
                 Sequence::new(members)
             },
-            right_brace: self.stream.eat(T!["}"])?.span,
+            right_brace: self.stream.eat_span(T!["}"])?,
         })
     }
 
@@ -82,11 +82,11 @@ impl<'input, 'arena> Parser<'input, 'arena> {
             name: self.parse_local_identifier()?,
             extends: self.parse_optional_extends()?,
             implements: self.parse_optional_implements()?,
-            left_brace: self.stream.eat(T!["{"])?.span,
+            left_brace: self.stream.eat_span(T!["{"])?,
             members: {
                 let mut members = self.new_vec();
                 loop {
-                    if matches!(self.stream.lookahead(0)?.map(|t| t.kind), Some(T!["}"])) {
+                    if matches!(self.stream.peek_kind(0)?, Some(T!["}"])) {
                         break;
                     }
 
@@ -110,7 +110,7 @@ impl<'input, 'arena> Parser<'input, 'arena> {
 
                 Sequence::new(members)
             },
-            right_brace: self.stream.eat(T!["}"])?.span,
+            right_brace: self.stream.eat_span(T!["}"])?,
         })
     }
 
@@ -123,11 +123,11 @@ impl<'input, 'arena> Parser<'input, 'arena> {
             argument_list: self.parse_optional_argument_list()?,
             extends: self.parse_optional_extends()?,
             implements: self.parse_optional_implements()?,
-            left_brace: self.stream.eat(T!["{"])?.span,
+            left_brace: self.stream.eat_span(T!["{"])?,
             members: {
                 let mut members = self.new_vec();
                 loop {
-                    if matches!(self.stream.lookahead(0)?.map(|t| t.kind), Some(T!["}"])) {
+                    if matches!(self.stream.peek_kind(0)?, Some(T!["}"])) {
                         break;
                     }
 
@@ -151,7 +151,7 @@ impl<'input, 'arena> Parser<'input, 'arena> {
 
                 Sequence::new(members)
             },
-            right_brace: self.stream.eat(T!["}"])?.span,
+            right_brace: self.stream.eat_span(T!["}"])?,
         })
     }
 
@@ -163,11 +163,11 @@ impl<'input, 'arena> Parser<'input, 'arena> {
             attribute_lists: attributes,
             r#trait: self.expect_keyword(T!["trait"])?,
             name: self.parse_local_identifier()?,
-            left_brace: self.stream.eat(T!["{"])?.span,
+            left_brace: self.stream.eat_span(T!["{"])?,
             members: {
                 let mut members = self.new_vec();
                 loop {
-                    if matches!(self.stream.lookahead(0)?.map(|t| t.kind), Some(T!["}"])) {
+                    if matches!(self.stream.peek_kind(0)?, Some(T!["}"])) {
                         break;
                     }
 
@@ -190,7 +190,7 @@ impl<'input, 'arena> Parser<'input, 'arena> {
                 }
                 Sequence::new(members)
             },
-            right_brace: self.stream.eat(T!["}"])?.span,
+            right_brace: self.stream.eat_span(T!["}"])?,
         })
     }
 
@@ -204,11 +204,11 @@ impl<'input, 'arena> Parser<'input, 'arena> {
             name: self.parse_local_identifier()?,
             backing_type_hint: self.parse_optional_enum_backing_type_hint()?,
             implements: self.parse_optional_implements()?,
-            left_brace: self.stream.eat(T!["{"])?.span,
+            left_brace: self.stream.eat_span(T!["{"])?,
             members: {
                 let mut members = self.new_vec();
                 loop {
-                    if matches!(self.stream.lookahead(0)?.map(|t| t.kind), Some(T!["}"])) {
+                    if matches!(self.stream.peek_kind(0)?, Some(T!["}"])) {
                         break;
                     }
 
@@ -231,14 +231,14 @@ impl<'input, 'arena> Parser<'input, 'arena> {
                 }
                 Sequence::new(members)
             },
-            right_brace: self.stream.eat(T!["}"])?.span,
+            right_brace: self.stream.eat_span(T!["}"])?,
         })
     }
 
     fn parse_optional_enum_backing_type_hint(&mut self) -> Result<Option<EnumBackingTypeHint<'arena>>, ParseError> {
-        Ok(match self.stream.lookahead(0)?.map(|t| t.kind) {
+        Ok(match self.stream.peek_kind(0)? {
             Some(T![":"]) => {
-                Some(EnumBackingTypeHint { colon: self.stream.consume()?.span, hint: self.parse_type_hint()? })
+                Some(EnumBackingTypeHint { colon: self.stream.consume_span()?, hint: self.parse_type_hint()? })
             }
             _ => None,
         })

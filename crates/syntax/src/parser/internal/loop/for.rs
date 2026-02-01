@@ -11,18 +11,18 @@ impl<'input, 'arena> Parser<'input, 'arena> {
     pub(crate) fn parse_for(&mut self) -> Result<For<'arena>, ParseError> {
         Ok(For {
             r#for: self.expect_keyword(T!["for"])?,
-            left_parenthesis: self.stream.eat(T!["("])?.span,
+            left_parenthesis: self.stream.eat_span(T!["("])?,
             initializations: {
                 let mut initializations = self.new_vec();
                 let mut commas = self.new_vec();
                 loop {
-                    if matches!(self.stream.lookahead(0)?.map(|t| t.kind), Some(T![";"])) {
+                    if matches!(self.stream.peek_kind(0)?, Some(T![";"])) {
                         break;
                     }
 
                     initializations.push(self.parse_expression()?);
 
-                    match self.stream.lookahead(0)?.map(|t| t.kind) {
+                    match self.stream.peek_kind(0)? {
                         Some(T![","]) => {
                             commas.push(self.stream.consume()?);
                         }
@@ -34,18 +34,18 @@ impl<'input, 'arena> Parser<'input, 'arena> {
 
                 TokenSeparatedSequence::new(initializations, commas)
             },
-            initializations_semicolon: self.stream.eat(T![";"])?.span,
+            initializations_semicolon: self.stream.eat_span(T![";"])?,
             conditions: {
                 let mut conditions = self.new_vec();
                 let mut commas = self.new_vec();
                 loop {
-                    if matches!(self.stream.lookahead(0)?.map(|t| t.kind), Some(T![";"])) {
+                    if matches!(self.stream.peek_kind(0)?, Some(T![";"])) {
                         break;
                     }
 
                     conditions.push(self.parse_expression()?);
 
-                    match self.stream.lookahead(0)?.map(|t| t.kind) {
+                    match self.stream.peek_kind(0)? {
                         Some(T![","]) => {
                             commas.push(self.stream.consume()?);
                         }
@@ -57,18 +57,18 @@ impl<'input, 'arena> Parser<'input, 'arena> {
 
                 TokenSeparatedSequence::new(conditions, commas)
             },
-            conditions_semicolon: self.stream.eat(T![";"])?.span,
+            conditions_semicolon: self.stream.eat_span(T![";"])?,
             increments: {
                 let mut increments = self.new_vec();
                 let mut commas = self.new_vec();
                 loop {
-                    if matches!(self.stream.lookahead(0)?.map(|t| t.kind), Some(T![")"])) {
+                    if matches!(self.stream.peek_kind(0)?, Some(T![")"])) {
                         break;
                     }
 
                     increments.push(self.parse_expression()?);
 
-                    match self.stream.lookahead(0)?.map(|t| t.kind) {
+                    match self.stream.peek_kind(0)? {
                         Some(T![","]) => {
                             commas.push(self.stream.consume()?);
                         }
@@ -80,13 +80,13 @@ impl<'input, 'arena> Parser<'input, 'arena> {
 
                 TokenSeparatedSequence::new(increments, commas)
             },
-            right_parenthesis: self.stream.eat(T![")"])?.span,
+            right_parenthesis: self.stream.eat_span(T![")"])?,
             body: self.parse_for_body()?,
         })
     }
 
     fn parse_for_body(&mut self) -> Result<ForBody<'arena>, ParseError> {
-        Ok(match self.stream.lookahead(0)?.map(|t| t.kind) {
+        Ok(match self.stream.peek_kind(0)? {
             Some(T![":"]) => ForBody::ColonDelimited(self.parse_for_colon_delimited_body()?),
             _ => ForBody::Statement(self.arena.alloc(self.parse_statement()?)),
         })
@@ -94,11 +94,11 @@ impl<'input, 'arena> Parser<'input, 'arena> {
 
     fn parse_for_colon_delimited_body(&mut self) -> Result<ForColonDelimitedBody<'arena>, ParseError> {
         Ok(ForColonDelimitedBody {
-            colon: self.stream.eat(T![":"])?.span,
+            colon: self.stream.eat_span(T![":"])?,
             statements: {
                 let mut statements = self.new_vec();
                 loop {
-                    if matches!(self.stream.lookahead(0)?.map(|t| t.kind), Some(T!["endfor"])) {
+                    if matches!(self.stream.peek_kind(0)?, Some(T!["endfor"])) {
                         break;
                     }
 

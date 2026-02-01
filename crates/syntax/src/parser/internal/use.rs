@@ -25,14 +25,14 @@ impl<'input, 'arena> Parser<'input, 'arena> {
     }
 
     pub(crate) fn parse_use_items(&mut self) -> Result<UseItems<'arena>, ParseError> {
-        let next = self.stream.lookahead(0)?.map(|t| t.kind);
+        let next = self.stream.peek_kind(0)?;
 
         Ok(match next {
             Some(T!["const" | "function"]) => match self.stream.lookahead(2)?.map(|t| t.kind) {
                 Some(T!["\\"]) => UseItems::TypedList(self.parse_typed_use_item_list()?),
                 _ => UseItems::TypedSequence(self.parse_typed_use_item_sequence()?),
             },
-            _ => match self.stream.lookahead(1)?.map(|t| t.kind) {
+            _ => match self.stream.peek_kind(1)? {
                 Some(T!["\\"]) => UseItems::MixedList(self.parse_mixed_use_item_list()?),
                 _ => UseItems::Sequence(self.parse_use_item_sequence()?),
             },
@@ -40,14 +40,14 @@ impl<'input, 'arena> Parser<'input, 'arena> {
     }
 
     pub(crate) fn parse_use_item_sequence(&mut self) -> Result<UseItemSequence<'arena>, ParseError> {
-        let start = self.stream.lookahead(0)?.ok_or_else(|| self.stream.unexpected(None, &[]))?.span.start;
+        let start = self.stream.lookahead(0)?.ok_or_else(|| self.stream.unexpected(None, &[]))?.start;
 
         let mut items = self.new_vec();
         let mut commas = self.new_vec();
         loop {
             items.push(self.parse_use_item()?);
 
-            if let Some(T![","]) = self.stream.lookahead(0)?.map(|t| t.kind) {
+            if let Some(T![","]) = self.stream.peek_kind(0)? {
                 commas.push(self.stream.consume()?);
             } else {
                 break;
@@ -64,7 +64,7 @@ impl<'input, 'arena> Parser<'input, 'arena> {
         loop {
             items.push(self.parse_use_item()?);
 
-            if let Some(T![","]) = self.stream.lookahead(0)?.map(|t| t.kind) {
+            if let Some(T![","]) = self.stream.peek_kind(0)? {
                 commas.push(self.stream.consume()?);
             } else {
                 break;
@@ -77,24 +77,24 @@ impl<'input, 'arena> Parser<'input, 'arena> {
     pub(crate) fn parse_typed_use_item_list(&mut self) -> Result<TypedUseItemList<'arena>, ParseError> {
         let r#type = self.parse_use_type()?;
         let namespace = self.parse_identifier()?;
-        let namespace_separator = self.stream.eat(T!["\\"])?.span;
-        let left_brace = self.stream.eat(T!["{"])?.span;
+        let namespace_separator = self.stream.eat_span(T!["\\"])?;
+        let left_brace = self.stream.eat_span(T!["{"])?;
         let mut items = self.new_vec();
         let mut commas = self.new_vec();
         loop {
-            if let Some(T!["}"]) = self.stream.lookahead(0)?.map(|t| t.kind) {
+            if let Some(T!["}"]) = self.stream.peek_kind(0)? {
                 break;
             }
 
             items.push(self.parse_use_item()?);
 
-            if let Some(T![","]) = self.stream.lookahead(0)?.map(|t| t.kind) {
+            if let Some(T![","]) = self.stream.peek_kind(0)? {
                 commas.push(self.stream.consume()?);
             } else {
                 break;
             }
         }
-        let right_brace = self.stream.eat(T!["}"])?.span;
+        let right_brace = self.stream.eat_span(T!["}"])?;
 
         Ok(TypedUseItemList {
             r#type,
@@ -108,24 +108,24 @@ impl<'input, 'arena> Parser<'input, 'arena> {
 
     pub(crate) fn parse_mixed_use_item_list(&mut self) -> Result<MixedUseItemList<'arena>, ParseError> {
         let namespace = self.parse_identifier()?;
-        let namespace_separator = self.stream.eat(T!["\\"])?.span;
-        let left_brace = self.stream.eat(T!["{"])?.span;
+        let namespace_separator = self.stream.eat_span(T!["\\"])?;
+        let left_brace = self.stream.eat_span(T!["{"])?;
         let mut items = self.new_vec();
         let mut commas = self.new_vec();
         loop {
-            if let Some(T!["}"]) = self.stream.lookahead(0)?.map(|t| t.kind) {
+            if let Some(T!["}"]) = self.stream.peek_kind(0)? {
                 break;
             }
 
             items.push(self.parse_maybe_typed_use_item()?);
 
-            if let Some(T![","]) = self.stream.lookahead(0)?.map(|t| t.kind) {
+            if let Some(T![","]) = self.stream.peek_kind(0)? {
                 commas.push(self.stream.consume()?);
             } else {
                 break;
             }
         }
-        let right_brace = self.stream.eat(T!["}"])?.span;
+        let right_brace = self.stream.eat_span(T!["}"])?;
 
         Ok(MixedUseItemList {
             namespace,
@@ -141,7 +141,7 @@ impl<'input, 'arena> Parser<'input, 'arena> {
     }
 
     pub(crate) fn parse_optional_use_type(&mut self) -> Result<Option<UseType<'arena>>, ParseError> {
-        Ok(match self.stream.lookahead(0)?.map(|t| t.kind) {
+        Ok(match self.stream.peek_kind(0)? {
             Some(T!["function"]) => Some(UseType::Function(self.expect_any_keyword()?)),
             Some(T!["const"]) => Some(UseType::Const(self.expect_any_keyword()?)),
             _ => None,
@@ -163,7 +163,7 @@ impl<'input, 'arena> Parser<'input, 'arena> {
     }
 
     pub(crate) fn parse_optional_use_item_alias(&mut self) -> Result<Option<UseItemAlias<'arena>>, ParseError> {
-        Ok(match self.stream.lookahead(0)?.map(|t| t.kind) {
+        Ok(match self.stream.peek_kind(0)? {
             Some(T!["as"]) => Some(self.parse_use_item_alias()?),
             _ => None,
         })

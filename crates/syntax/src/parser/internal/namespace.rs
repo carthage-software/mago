@@ -9,7 +9,7 @@ use crate::parser::Parser;
 impl<'input, 'arena> Parser<'input, 'arena> {
     pub(crate) fn parse_namespace(&mut self) -> Result<Namespace<'arena>, ParseError> {
         let namespace = self.expect_keyword(T!["namespace"])?;
-        let name = match self.stream.lookahead(0)?.map(|t| t.kind) {
+        let name = match self.stream.peek_kind(0)? {
             Some(T![";" | "?>" | "{"]) => None,
             _ => Some(self.parse_identifier()?),
         };
@@ -19,7 +19,7 @@ impl<'input, 'arena> Parser<'input, 'arena> {
     }
 
     pub(crate) fn parse_namespace_body(&mut self) -> Result<NamespaceBody<'arena>, ParseError> {
-        match self.stream.lookahead(0)?.map(|t| t.kind) {
+        match self.stream.peek_kind(0)? {
             Some(T!["{"]) => Ok(NamespaceBody::BraceDelimited(self.parse_block()?)),
             _ => Ok(NamespaceBody::Implicit(self.parse_namespace_implicit_body()?)),
         }
@@ -29,7 +29,7 @@ impl<'input, 'arena> Parser<'input, 'arena> {
         let terminator = self.parse_terminator()?;
         let mut statements = self.new_vec();
         loop {
-            let next = self.stream.lookahead(0)?.map(|t| t.kind);
+            let next = self.stream.peek_kind(0)?;
             if matches!(next, None | Some(T!["namespace"])) {
                 break;
             }

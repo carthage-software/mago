@@ -22,11 +22,11 @@ impl<'input, 'arena> Parser<'input, 'arena> {
             _ => {
                 let key_or_value = self.parse_expression_with_precedence(Precedence::Yield)?;
 
-                if matches!(self.stream.lookahead(0)?.map(|t| t.kind), Some(T!["=>"])) {
+                if matches!(self.stream.peek_kind(0)?, Some(T!["=>"])) {
                     Yield::Pair(YieldPair {
                         r#yield,
                         key: self.arena.alloc(key_or_value),
-                        arrow: self.stream.eat(T!["=>"])?.span,
+                        arrow: self.stream.eat_span(T!["=>"])?,
                         value: self.arena.alloc(self.parse_expression_with_precedence(Precedence::Yield)?),
                     })
                 } else {

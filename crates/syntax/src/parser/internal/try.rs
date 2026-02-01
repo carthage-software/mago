@@ -24,16 +24,16 @@ impl<'input, 'arena> Parser<'input, 'arena> {
     }
 
     pub(crate) fn parse_optional_try_catch_clause(&mut self) -> Result<Option<TryCatchClause<'arena>>, ParseError> {
-        Ok(match self.stream.lookahead(0)?.map(|t| t.kind) {
+        Ok(match self.stream.peek_kind(0)? {
             Some(T!["catch"]) => {
                 let catch = self.expect_any_keyword()?;
-                let left_parenthesis = self.stream.eat(T!["("])?.span;
+                let left_parenthesis = self.stream.eat_span(T!["("])?;
                 let hint = self.parse_type_hint()?;
-                let var = match self.stream.lookahead(0)?.map(|t| t.kind) {
+                let var = match self.stream.peek_kind(0)? {
                     Some(T!["$variable"]) => Some(self.parse_direct_variable()?),
                     _ => None,
                 };
-                let right_parenthesis = self.stream.eat(T![")"])?.span;
+                let right_parenthesis = self.stream.eat_span(T![")"])?;
                 let blk = self.parse_block()?;
 
                 Some(TryCatchClause { catch, left_parenthesis, hint, variable: var, right_parenthesis, block: blk })
@@ -43,7 +43,7 @@ impl<'input, 'arena> Parser<'input, 'arena> {
     }
 
     pub(crate) fn parse_optional_try_finally_clause(&mut self) -> Result<Option<TryFinallyClause<'arena>>, ParseError> {
-        Ok(match self.stream.lookahead(0)?.map(|t| t.kind) {
+        Ok(match self.stream.peek_kind(0)? {
             Some(T!["finally"]) => {
                 Some(TryFinallyClause { finally: self.expect_any_keyword()?, block: self.parse_block()? })
             }

@@ -13,13 +13,13 @@ impl<'input, 'arena> Parser<'input, 'arena> {
                 let mut commas = self.new_vec();
 
                 loop {
-                    if matches!(self.stream.lookahead(0)?.map(|t| t.kind), Some(T!["?>" | ";"])) {
+                    if matches!(self.stream.peek_kind(0)?, Some(T!["?>" | ";"])) {
                         break;
                     }
 
                     variables.push(self.parse_variable()?);
 
-                    if let Some(T![","]) = self.stream.lookahead(0)?.map(|t| t.kind) {
+                    if let Some(T![","]) = self.stream.peek_kind(0)? {
                         commas.push(self.stream.consume()?);
                     } else {
                         break;

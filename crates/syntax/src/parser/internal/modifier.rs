@@ -15,7 +15,7 @@ impl<'input, 'arena> Parser<'input, 'arena> {
     }
 
     pub(crate) fn parse_optional_read_visibility_modifier(&mut self) -> Result<Option<Modifier<'arena>>, ParseError> {
-        Ok(Some(match self.stream.lookahead(0)?.map(|t| t.kind) {
+        Ok(Some(match self.stream.peek_kind(0)? {
             Some(T!["public"]) => Modifier::Public(self.expect_any_keyword()?),
             Some(T!["protected"]) => Modifier::Protected(self.expect_any_keyword()?),
             Some(T!["private"]) => Modifier::Private(self.expect_any_keyword()?),
@@ -24,7 +24,7 @@ impl<'input, 'arena> Parser<'input, 'arena> {
     }
 
     pub(crate) fn parse_optional_modifier(&mut self) -> Result<Option<Modifier<'arena>>, ParseError> {
-        Ok(Some(match self.stream.lookahead(0)?.map(|t| t.kind) {
+        Ok(Some(match self.stream.peek_kind(0)? {
             Some(T!["public"]) => Modifier::Public(self.expect_any_keyword()?),
             Some(T!["protected"]) => Modifier::Protected(self.expect_any_keyword()?),
             Some(T!["private"]) => Modifier::Private(self.expect_any_keyword()?),

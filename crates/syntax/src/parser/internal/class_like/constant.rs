@@ -18,7 +18,7 @@ impl<'input, 'arena> Parser<'input, 'arena> {
             attribute_lists: attributes,
             modifiers,
             r#const: self.expect_keyword(T!["const"])?,
-            hint: match self.stream.lookahead(1)?.map(|t| t.kind) {
+            hint: match self.stream.peek_kind(1)? {
                 Some(
                     crate::token::TokenKind::Equal
                     | crate::token::TokenKind::Semicolon
@@ -30,13 +30,13 @@ impl<'input, 'arena> Parser<'input, 'arena> {
                 let mut items = self.new_vec();
                 let mut commas = self.new_vec();
                 loop {
-                    if matches!(self.stream.lookahead(0)?.map(|t| t.kind), Some(T![";" | "?>"])) {
+                    if matches!(self.stream.peek_kind(0)?, Some(T![";" | "?>"])) {
                         break;
                     }
 
                     items.push(self.parse_class_like_constant_item()?);
 
-                    match self.stream.lookahead(0)?.map(|t| t.kind) {
+                    match self.stream.peek_kind(0)? {
                         Some(T![","]) => commas.push(self.stream.consume()?),
                         _ => {
                             break;
@@ -53,7 +53,7 @@ impl<'input, 'arena> Parser<'input, 'arena> {
     fn parse_class_like_constant_item(&mut self) -> Result<ClassLikeConstantItem<'arena>, ParseError> {
         Ok(ClassLikeConstantItem {
             name: self.parse_local_identifier()?,
-            equals: self.stream.eat(T!["="])?.span,
+            equals: self.stream.eat_span(T!["="])?,
             value: self.parse_expression()?,
         })
     }

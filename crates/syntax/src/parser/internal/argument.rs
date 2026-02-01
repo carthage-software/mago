@@ -13,11 +13,7 @@ use crate::parser::Parser;
 
 impl<'input, 'arena> Parser<'input, 'arena> {
     pub(crate) fn parse_optional_argument_list(&mut self) -> Result<Option<ArgumentList<'arena>>, ParseError> {
-        if let Some(T!["("]) = self.stream.lookahead(0)?.map(|t| t.kind) {
-            Ok(Some(self.parse_argument_list()?))
-        } else {
-            Ok(None)
-        }
+        if let Some(T!["("]) = self.stream.peek_kind(0)? { Ok(Some(self.parse_argument_list()?)) } else { Ok(None) }
     }
 
     pub(crate) fn parse_argument_list(&mut self) -> Result<ArgumentList<'arena>, ParseError> {
@@ -28,18 +24,16 @@ impl<'input, 'arena> Parser<'input, 'arena> {
 
     pub(crate) fn parse_argument(&mut self) -> Result<Argument<'arena>, ParseError> {
         let current = self.stream.lookahead(0)?.ok_or_else(|| self.stream.unexpected(None, &[]))?;
-        if current.kind.is_identifier_maybe_reserved()
-            && matches!(self.stream.lookahead(1)?.map(|t| t.kind), Some(T![":"]))
-        {
+        if current.kind.is_identifier_maybe_reserved() && matches!(self.stream.peek_kind(1)?, Some(T![":"])) {
             return Ok(Argument::Named(NamedArgument {
                 name: self.parse_local_identifier()?,
-                colon: self.stream.consume()?.span,
+                colon: self.stream.consume_span()?,
                 value: self.parse_expression()?,
             }));
         }
 
         Ok(Argument::Positional(PositionalArgument {
-            ellipsis: if self.stream.is_at(T!["..."])? { Some(self.stream.eat(T!["..."])?.span) } else { None },
+            ellipsis: if self.stream.is_at(T!["..."])? { Some(self.stream.eat_span(T!["..."])?) } else { None },
             value: self.parse_expression()?,
         }))
     }
@@ -58,7 +52,7 @@ impl<'input, 'arena> Parser<'input, 'arena> {
         let current = self.stream.lookahead(0)?.ok_or_else(|| self.stream.unexpected(None, &[]))?;
 
         if current.kind == T!["?"] {
-            return Ok(PartialArgument::Placeholder(PlaceholderArgument { span: self.stream.consume()?.span }));
+            return Ok(PartialArgument::Placeholder(PlaceholderArgument { span: self.stream.consume_span()? }));
         }
 
         if current.kind == T!["..."] {
@@ -66,21 +60,19 @@ impl<'input, 'arena> Parser<'input, 'arena> {
             match next.map(|t| t.kind) {
                 Some(crate::token::TokenKind::Comma | crate::token::TokenKind::RightParenthesis) | None => {
                     return Ok(PartialArgument::VariadicPlaceholder(VariadicPlaceholderArgument {
-                        span: self.stream.consume()?.span,
+                        span: self.stream.consume_span()?,
                     }));
                 }
                 _ => {}
             }
         }
 
-        if current.kind.is_identifier_maybe_reserved()
-            && matches!(self.stream.lookahead(1)?.map(|t| t.kind), Some(T![":"]))
-        {
+        if current.kind.is_identifier_maybe_reserved() && matches!(self.stream.peek_kind(1)?, Some(T![":"])) {
             let name = self.parse_local_identifier()?;
-            let colon = self.stream.consume()?.span;
+            let colon = self.stream.consume_span()?;
 
             if self.stream.is_at(T!["?"])? {
-                let question_mark = self.stream.eat(T!["?"])?.span;
+                let question_mark = self.stream.eat_span(T!["?"])?;
                 return Ok(PartialArgument::NamedPlaceholder(NamedPlaceholderArgument { name, colon, question_mark }));
             }
 
@@ -88,7 +80,7 @@ impl<'input, 'arena> Parser<'input, 'arena> {
         }
 
         Ok(PartialArgument::Positional(PositionalArgument {
-            ellipsis: if self.stream.is_at(T!["..."])? { Some(self.stream.eat(T!["..."])?.span) } else { None },
+            ellipsis: if self.stream.is_at(T!["..."])? { Some(self.stream.eat_span(T!["..."])?) } else { None },
             value: self.parse_expression()?,
         }))
     }

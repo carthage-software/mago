@@ -10,7 +10,7 @@ impl<'input, 'arena> Parser<'input, 'arena> {
         &mut self,
     ) -> Result<Sequence<'arena, AttributeList<'arena>>, ParseError> {
         let mut inner = self.new_vec();
-        while let Some(T!["#["]) = self.stream.lookahead(0)?.map(|t| t.kind) {
+        while let Some(T!["#["]) = self.stream.peek_kind(0)? {
             inner.push(self.parse_attribute_list()?);
         }
 

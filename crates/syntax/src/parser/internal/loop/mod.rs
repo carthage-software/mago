@@ -13,7 +13,7 @@ impl<'input, 'arena> Parser<'input, 'arena> {
     pub(crate) fn parse_continue(&mut self) -> Result<Continue<'arena>, ParseError> {
         Ok(Continue {
             r#continue: self.expect_keyword(T!["continue"])?,
-            level: match self.stream.lookahead(0)?.map(|t| t.kind) {
+            level: match self.stream.peek_kind(0)? {
                 Some(T![";" | "?>"]) => None,
                 _ => Some(self.parse_expression()?),
             },
@@ -24,7 +24,7 @@ impl<'input, 'arena> Parser<'input, 'arena> {
     pub(crate) fn parse_break(&mut self) -> Result<Break<'arena>, ParseError> {
         Ok(Break {
             r#break: self.expect_keyword(T!["break"])?,
-            level: match self.stream.lookahead(0)?.map(|t| t.kind) {
+            level: match self.stream.peek_kind(0)? {
                 Some(T![";" | "?>"]) => None,
                 _ => Some(self.parse_expression()?),
             },

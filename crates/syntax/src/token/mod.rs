@@ -1,6 +1,8 @@
 use serde::Serialize;
 use strum::Display;
 
+use mago_database::file::FileId;
+use mago_span::Position;
 use mago_span::Span;
 
 use crate::T;
@@ -266,10 +268,10 @@ pub enum TokenKind {
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
-pub struct Token<'arena> {
+pub struct Token<'a> {
     pub kind: TokenKind,
-    pub value: &'arena str,
-    pub span: Span,
+    pub start: Position,
+    pub value: &'a str,
 }
 
 impl Precedence {
@@ -767,9 +769,20 @@ impl TokenKind {
 }
 
 impl<'arena> Token<'arena> {
+    #[inline]
     #[must_use]
-    pub const fn new(kind: TokenKind, value: &'arena str, span: Span) -> Self {
-        Self { kind, value, span }
+    pub const fn new(kind: TokenKind, value: &'arena str, start: Position) -> Self {
+        Self { kind, start, value }
+    }
+
+    /// Constructs a `Span` for this token given the file ID.
+    ///
+    /// The span is computed from the token's start position and its value length.
+    #[inline]
+    #[must_use]
+    pub const fn span_for(&self, file_id: FileId) -> Span {
+        let end = Position::new(self.start.offset + self.value.len() as u32);
+        Span::new(file_id, self.start, end)
     }
 }
 

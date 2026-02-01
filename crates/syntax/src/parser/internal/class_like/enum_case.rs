@@ -24,9 +24,9 @@ impl<'input, 'arena> Parser<'input, 'arena> {
     fn parse_enum_case_item(&mut self) -> Result<EnumCaseItem<'arena>, ParseError> {
         let name = self.parse_local_identifier()?;
 
-        Ok(match self.stream.lookahead(0)?.map(|t| t.kind) {
+        Ok(match self.stream.peek_kind(0)? {
             Some(T!["="]) => {
-                let equals = self.stream.eat(T!["="])?.span;
+                let equals = self.stream.eat_span(T!["="])?;
                 let value = self.parse_expression()?;
 
                 EnumCaseItem::Backed(EnumCaseBackedItem { name, equals, value })

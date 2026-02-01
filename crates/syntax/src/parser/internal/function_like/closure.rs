@@ -16,7 +16,7 @@ impl<'input, 'arena> Parser<'input, 'arena> {
             attribute_lists: attributes,
             r#static: self.maybe_expect_keyword(T!["static"])?,
             function: self.expect_keyword(T!["function"])?,
-            ampersand: if self.stream.is_at(T!["&"])? { Some(self.stream.eat(T!["&"])?.span) } else { None },
+            ampersand: if self.stream.is_at(T!["&"])? { Some(self.stream.eat_span(T!["&"])?) } else { None },
             parameter_list: self.parse_function_like_parameter_list()?,
             use_clause: self.parse_optional_closure_use_clause()?,
             return_type_hint: self.parse_optional_function_like_return_type_hint()?,
@@ -25,7 +25,7 @@ impl<'input, 'arena> Parser<'input, 'arena> {
     }
 
     fn parse_optional_closure_use_clause(&mut self) -> Result<Option<ClosureUseClause<'arena>>, ParseError> {
-        Ok(match self.stream.lookahead(0)?.map(|t| t.kind) {
+        Ok(match self.stream.peek_kind(0)? {
             Some(T!["use"]) => Some(self.parse_closure_use_clause()?),
             _ => None,
         })
@@ -46,7 +46,7 @@ impl<'input, 'arena> Parser<'input, 'arena> {
 
     fn parse_closure_use_clause_variable(&mut self) -> Result<ClosureUseClauseVariable<'arena>, ParseError> {
         Ok(ClosureUseClauseVariable {
-            ampersand: if self.stream.is_at(T!["&"])? { Some(self.stream.eat(T!["&"])?.span) } else { None },
+            ampersand: if self.stream.is_at(T!["&"])? { Some(self.stream.eat_span(T!["&"])?) } else { None },
             variable: self.parse_direct_variable()?,
         })
     }

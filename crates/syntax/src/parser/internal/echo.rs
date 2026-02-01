@@ -8,19 +8,19 @@ use crate::parser::Parser;
 impl<'input, 'arena> Parser<'input, 'arena> {
     pub(crate) fn parse_echo_tag(&mut self) -> Result<EchoTag<'arena>, ParseError> {
         Ok(EchoTag {
-            tag: self.stream.eat(T!["<?="])?.span,
+            tag: self.stream.eat_span(T!["<?="])?,
             values: {
                 let mut values = self.new_vec();
                 let mut commas = self.new_vec();
 
                 loop {
-                    if matches!(self.stream.lookahead(0)?.map(|t| t.kind), Some(T!["?>" | ";"])) {
+                    if matches!(self.stream.peek_kind(0)?, Some(T!["?>" | ";"])) {
                         break;
                     }
 
                     values.push(self.parse_expression()?);
 
-                    if let Some(T![","]) = self.stream.lookahead(0)?.map(|t| t.kind) {
+                    if let Some(T![","]) = self.stream.peek_kind(0)? {
                         commas.push(self.stream.consume()?);
                     } else {
                         break;
@@ -41,13 +41,13 @@ impl<'input, 'arena> Parser<'input, 'arena> {
                 let mut commas = self.new_vec();
 
                 loop {
-                    if matches!(self.stream.lookahead(0)?.map(|t| t.kind), Some(T!["?>" | ";"])) {
+                    if matches!(self.stream.peek_kind(0)?, Some(T!["?>" | ";"])) {
                         break;
                     }
 
                     values.push(self.parse_expression()?);
 
-                    if let Some(T![","]) = self.stream.lookahead(0)?.map(|t| t.kind) {
+                    if let Some(T![","]) = self.stream.peek_kind(0)? {
                         commas.push(self.stream.consume()?);
                     } else {
                         break;

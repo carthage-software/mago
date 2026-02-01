@@ -1,17 +1,46 @@
 use std::collections::VecDeque;
 use std::fmt::Debug;
+use std::hint::unreachable_unchecked;
 
-use bumpalo::Bump;
+use memchr::memchr2;
+use memchr::memmem;
+
+/// Lookup table for single-character tokens that are ALWAYS single-char
+/// (i.e., they can never be part of a multi-character token).
+/// Maps byte -> Option<TokenKind>
+const SIMPLE_TOKEN_TABLE: [Option<TokenKind>; 256] = {
+    let mut table: [Option<TokenKind>; 256] = [None; 256];
+    table[b';' as usize] = Some(TokenKind::Semicolon);
+    table[b',' as usize] = Some(TokenKind::Comma);
+    table[b')' as usize] = Some(TokenKind::RightParenthesis);
+    table[b'[' as usize] = Some(TokenKind::LeftBracket);
+    table[b']' as usize] = Some(TokenKind::RightBracket);
+    table[b'{' as usize] = Some(TokenKind::LeftBrace);
+    table[b'}' as usize] = Some(TokenKind::RightBrace);
+    table[b'~' as usize] = Some(TokenKind::Tilde);
+    table[b'@' as usize] = Some(TokenKind::At);
+    table
+};
+
+/// Lookup table for identifier start characters (a-z, A-Z, _, 0x80-0xFF)
+const IDENT_START_TABLE: [bool; 256] = {
+    let mut table = [false; 256];
+    let mut i = 0usize;
+    while i < 256 {
+        table[i] = matches!(i as u8, b'a'..=b'z' | b'A'..=b'Z' | b'_' | 0x80..=0xFF);
+        i += 1;
+    }
+
+    table
+};
+
 use mago_database::file::FileId;
 use mago_database::file::HasFileId;
 use mago_span::Position;
-use mago_span::Span;
-
 use mago_syntax_core::float_exponent;
 use mago_syntax_core::float_separator;
 use mago_syntax_core::input::Input;
 use mago_syntax_core::number_sign;
-use mago_syntax_core::part_of_identifier;
 use mago_syntax_core::start_of_binary_number;
 use mago_syntax_core::start_of_float_number;
 use mago_syntax_core::start_of_hexadecimal_number;
@@ -46,31 +75,30 @@ mod internal;
 /// and produces tokens incrementally. This allows for efficient processing of large source files and
 /// minimizes memory usage.
 #[derive(Debug)]
-pub struct Lexer<'input, 'arena> {
-    arena: &'arena Bump,
+pub struct Lexer<'input> {
     input: Input<'input>,
-    mode: LexerMode<'arena>,
+    mode: LexerMode<'input>,
     interpolating: bool,
-    buffer: VecDeque<Token<'arena>>,
+    /// Buffer for tokens during string interpolation.
+    buffer: VecDeque<Token<'input>>,
 }
 
-impl<'input, 'arena> Lexer<'input, 'arena> {
-    /// Initial capacity for the token buffer used during string interpolation.
-    const BUFFER_INITIAL_CAPACITY: usize = 8;
-
+impl<'input> Lexer<'input> {
     /// Creates a new `Lexer` instance.
     ///
     /// # Parameters
     ///
-    /// - `arena`: The arena to use for allocating tokens.
     /// - `input`: The input source code to tokenize.
     ///
     /// # Returns
     ///
     /// A new `Lexer` instance that reads from the provided byte slice.
-    pub fn new(arena: &'arena Bump, input: Input<'input>) -> Lexer<'input, 'arena> {
+    /// Initial capacity for the token buffer used during string interpolation.
+    /// Pre-allocating avoids reallocation during interpolation processing.
+    const BUFFER_INITIAL_CAPACITY: usize = 8;
+
+    pub fn new(input: Input<'input>) -> Lexer<'input> {
         Lexer {
-            arena,
             input,
             mode: LexerMode::Inline,
             interpolating: false,
@@ -82,15 +110,13 @@ impl<'input, 'arena> Lexer<'input, 'arena> {
     ///
     /// # Parameters
     ///
-    /// - `arena`: The arena to use for allocating tokens.
     /// - `input`: The input source code to tokenize.
     ///
     /// # Returns
     ///
     /// A new `Lexer` instance that reads from the provided byte slice.
-    pub fn scripting(arena: &'arena Bump, input: Input<'input>) -> Lexer<'input, 'arena> {
+    pub fn scripting(input: Input<'input>) -> Lexer<'input> {
         Lexer {
-            arena,
             input,
             mode: LexerMode::Script,
             interpolating: false,
@@ -145,7 +171,8 @@ impl<'input, 'arena> Lexer<'input, 'arena> {
     /// - [`Token`]: Represents a lexical token with its kind, value, and span.
     /// - [`SyntaxError`]: Represents errors that can occur during lexing.
     #[inline]
-    pub fn advance(&mut self) -> Option<Result<Token<'arena>, SyntaxError>> {
+    pub fn advance(&mut self) -> Option<Result<Token<'input>, SyntaxError>> {
+        // Check if there are buffered tokens from string interpolation.
         if !self.interpolating
             && let Some(token) = self.buffer.pop_front()
         {
@@ -198,6 +225,42 @@ impl<'input, 'arena> Lexer<'input, 'arena> {
                         start,
                         self.input.current_position(),
                     )));
+                }
+
+                let first_byte = match self.input.read(1).first() {
+                    Some(&b) => b,
+                    None => {
+                        // SAFETY: we check for EOF before entering scripting section,
+                        unsafe { unreachable_unchecked() }
+                    }
+                };
+
+                if let Some(kind) = SIMPLE_TOKEN_TABLE[first_byte as usize] {
+                    let buffer = self.input.consume(1);
+                    let end = self.input.current_position();
+                    return Some(Ok(self.token(kind, buffer, start, end)));
+                }
+
+                if IDENT_START_TABLE[first_byte as usize] {
+                    let (token_kind, len) = self.scan_identifier_or_keyword_info();
+
+                    if token_kind == TokenKind::HaltCompiler {
+                        self.mode = LexerMode::Halt(HaltStage::LookingForLeftParenthesis);
+                    }
+
+                    let buffer = self.input.consume(len);
+                    let end = self.input.current_position();
+                    return Some(Ok(self.token(token_kind, buffer, start, end)));
+                }
+
+                if first_byte == b'$'
+                    && let Some(&next) = self.input.read(2).get(1)
+                    && IDENT_START_TABLE[next as usize]
+                {
+                    let (ident_len, _) = self.input.scan_identifier(1);
+                    let buffer = self.input.consume(1 + ident_len);
+                    let end = self.input.current_position();
+                    return Some(Ok(self.token(TokenKind::Variable, buffer, start, end)));
                 }
 
                 let mut document_label: &[u8] = &[];
@@ -262,130 +325,57 @@ impl<'input, 'arena> Lexer<'input, 'arena> {
                     [b'*', b'=', ..] => (TokenKind::AsteriskEqual, 2),
                     [b'|', b'>', ..] => (TokenKind::PipeGreaterThan, 2),
                     [b'/', b'/', ..] => {
-                        let mut length = 2;
-                        loop {
-                            match self.input.peek(length, 3) {
-                                [b'\n' | b'\r', ..] => {
-                                    break;
-                                }
-                                [w, b'?', b'>'] if w.is_ascii_whitespace() => {
-                                    break;
-                                }
-                                [b'?', b'>', ..] | [] => {
-                                    break;
-                                }
-                                [_, ..] => {
-                                    length += 1;
-                                }
-                            }
-                        }
-
-                        (TokenKind::SingleLineComment, length)
+                        let remaining = self.input.peek(2, self.input.len() - self.input.current_offset());
+                        let comment_len = scan_single_line_comment(remaining);
+                        (TokenKind::SingleLineComment, 2 + comment_len)
                     }
                     [b'/', b'*', asterisk] => {
-                        let mut length = 2;
-                        let mut is_multiline = false;
-                        let mut terminated = false;
-                        loop {
-                            match self.input.peek(length, 2) {
-                                [b'*', b'/'] => {
-                                    if length == 2 {
-                                        is_multiline = true;
-                                    }
-
-                                    length += 2;
-
-                                    terminated = true;
-                                    break;
-                                }
-                                [_, ..] => {
-                                    length += 1;
-                                }
-                                [] => {
-                                    break;
+                        let remaining = self.input.peek(2, self.input.len() - self.input.current_offset());
+                        match scan_multi_line_comment(remaining) {
+                            Some(len) => {
+                                let is_docblock = asterisk == &b'*' && len > 2;
+                                if is_docblock {
+                                    (TokenKind::DocBlockComment, len + 2)
+                                } else {
+                                    (TokenKind::MultiLineComment, len + 2)
                                 }
                             }
-                        }
-
-                        if !terminated {
-                            self.input.consume(length);
-
-                            return Some(Err(SyntaxError::UnexpectedEndOfFile(
-                                self.file_id(),
-                                self.input.current_position(),
-                            )));
-                        }
-
-                        if !is_multiline && asterisk == &b'*' {
-                            (TokenKind::DocBlockComment, length)
-                        } else {
-                            (TokenKind::MultiLineComment, length)
+                            None => {
+                                self.input.consume(remaining.len() + 2);
+                                return Some(Err(SyntaxError::UnexpectedEndOfFile(
+                                    self.file_id(),
+                                    self.input.current_position(),
+                                )));
+                            }
                         }
                     }
                     [b'\\', start_of_identifier!(), ..] => {
-                        let mut length = 2;
-                        let mut last_was_slash = false;
+                        let mut length = 1;
                         loop {
-                            match self.input.peek(length, 1) {
-                                [start_of_identifier!(), ..] if last_was_slash => {
-                                    length += 1;
-                                    last_was_slash = false;
-                                }
-                                [part_of_identifier!(), ..] if !last_was_slash => {
-                                    length += 1;
-                                }
-                                [b'\\', ..] => {
-                                    if last_was_slash {
-                                        length -= 1;
-
-                                        break;
-                                    }
-
-                                    length += 1;
-                                    last_was_slash = true;
-                                }
-                                _ => {
-                                    break;
-                                }
+                            let (ident_len, ends_with_ns) = self.input.scan_identifier(length);
+                            length += ident_len;
+                            if ends_with_ns {
+                                length += 1; // Include the backslash
+                            } else {
+                                break;
                             }
-                        }
-
-                        if last_was_slash {
-                            length -= 1;
                         }
 
                         (TokenKind::FullyQualifiedIdentifier, length)
                     }
-                    [b'$', start_of_identifier!(), ..] => {
-                        let mut length = 2;
-                        while let [part_of_identifier!(), ..] = self.input.peek(length, 1) {
-                            length += 1;
-                        }
-
-                        (TokenKind::Variable, length)
-                    }
                     [b'$', b'{', ..] => (TokenKind::DollarLeftBrace, 2),
                     [b'$', ..] => (TokenKind::Dollar, 1),
-                    [b'@', ..] => (TokenKind::At, 1),
                     [b'!', ..] => (TokenKind::Bang, 1),
                     [b'&', ..] => (TokenKind::Ampersand, 1),
                     [b'?', ..] => (TokenKind::Question, 1),
                     [b'=', ..] => (TokenKind::Equal, 1),
                     [b'`', ..] => (TokenKind::Backtick, 1),
-                    [b')', ..] => (TokenKind::RightParenthesis, 1),
-                    [b';', ..] => (TokenKind::Semicolon, 1),
                     [b'+', ..] => (TokenKind::Plus, 1),
                     [b'%', ..] => (TokenKind::Percent, 1),
                     [b'-', ..] => (TokenKind::Minus, 1),
                     [b'<', ..] => (TokenKind::LessThan, 1),
                     [b'>', ..] => (TokenKind::GreaterThan, 1),
-                    [b',', ..] => (TokenKind::Comma, 1),
-                    [b'[', ..] => (TokenKind::LeftBracket, 1),
-                    [b']', ..] => (TokenKind::RightBracket, 1),
-                    [b'{', ..] => (TokenKind::LeftBrace, 1),
-                    [b'}', ..] => (TokenKind::RightBrace, 1),
                     [b':', ..] => (TokenKind::Colon, 1),
-                    [b'~', ..] => (TokenKind::Tilde, 1),
                     [b'|', ..] => (TokenKind::Pipe, 1),
                     [b'^', ..] => (TokenKind::Caret, 1),
                     [b'*', ..] => (TokenKind::Asterisk, 1),
@@ -396,6 +386,20 @@ impl<'input, 'arena> Lexer<'input, 'arena> {
                     }
                     [b'"', ..] => (TokenKind::DoubleQuote, 1),
                     [b'(', ..] => 'parenthesis: {
+                        let mut peek_offset = 1;
+                        while let Some(&b) = self.input.read(peek_offset + 1).get(peek_offset) {
+                            if b.is_ascii_whitespace() {
+                                peek_offset += 1;
+                            } else {
+                                // Check if this byte could start a cast type (case-insensitive)
+                                let lower = b | 0x20; // ASCII lowercase
+                                if !matches!(lower, b'i' | b'b' | b'f' | b'd' | b'r' | b's' | b'a' | b'o' | b'u') {
+                                    break 'parenthesis (TokenKind::LeftParenthesis, 1);
+                                }
+                                break;
+                            }
+                        }
+
                         for (value, kind) in internal::consts::CAST_TYPES {
                             if let Some(length) = self.input.match_sequence_ignore_whitespace(value, true) {
                                 break 'parenthesis (kind, length);
@@ -405,133 +409,21 @@ impl<'input, 'arena> Lexer<'input, 'arena> {
                         (TokenKind::LeftParenthesis, 1)
                     }
                     [b'#', ..] => {
-                        let mut length = 1;
-                        loop {
-                            match self.input.peek(length, 3) {
-                                [b'\n' | b'\r', ..] => {
-                                    break;
-                                }
-                                [w, b'?', b'>'] if w.is_ascii_whitespace() => {
-                                    break;
-                                }
-                                [b'?', b'>', ..] | [] => {
-                                    break;
-                                }
-                                [_, ..] => {
-                                    length += 1;
-                                }
-                            }
-                        }
-
-                        (TokenKind::HashComment, length)
+                        let remaining = self.input.peek(1, self.input.len() - self.input.current_offset());
+                        let comment_len = scan_single_line_comment(remaining);
+                        (TokenKind::HashComment, 1 + comment_len)
                     }
                     [b'\\', ..] => (TokenKind::NamespaceSeparator, 1),
-                    [start_of_identifier!(), ..] => 'identifier: {
-                        let mut length = 1;
-                        let mut ended_with_slash = false;
-                        loop {
-                            match self.input.peek(length, 2) {
-                                [part_of_identifier!(), ..] => {
-                                    length += 1;
-                                }
-                                [b'\\', start_of_identifier!(), ..] => {
-                                    ended_with_slash = true;
-                                    break;
-                                }
-                                // special case for `private(set)`
-                                [b'(', ..] if length == 7 => {
-                                    if self.input.is_at(b"private(set)", true) {
-                                        break 'identifier (TokenKind::PrivateSet, 7 + 5);
-                                    }
-
-                                    break;
-                                }
-                                // special case for `public(set)`
-                                [b'(', ..] if length == 6 => {
-                                    if self.input.is_at(b"public(set)", true) {
-                                        break 'identifier (TokenKind::PublicSet, 6 + 5);
-                                    }
-
-                                    break;
-                                }
-                                // special case for `protected(set)`
-                                [b'(', ..] if length == 9 => {
-                                    if self.input.is_at(b"protected(set)", true) {
-                                        break 'identifier (TokenKind::ProtectedSet, 9 + 5);
-                                    }
-
-                                    break;
-                                }
-                                _ => {
-                                    break;
-                                }
-                            }
-                        }
-
-                        if !ended_with_slash {
-                            for (value, kind) in internal::consts::KEYWORD_TYPES {
-                                if value.len() != length {
-                                    continue;
-                                }
-
-                                if self.input.is_at(value, true) {
-                                    break 'identifier (kind, value.len());
-                                }
-                            }
-                        }
-
-                        let mut slashes = 0;
-                        let mut last_was_slash = false;
-                        loop {
-                            match self.input.peek(length, 1) {
-                                [start_of_identifier!(), ..] if last_was_slash => {
-                                    length += 1;
-                                    last_was_slash = false;
-                                }
-                                [part_of_identifier!(), ..] if !last_was_slash => {
-                                    length += 1;
-                                }
-                                [b'\\', ..] if !self.interpolating => {
-                                    if last_was_slash {
-                                        length -= 1;
-                                        slashes -= 1;
-                                        last_was_slash = false;
-
-                                        break;
-                                    }
-
-                                    length += 1;
-                                    slashes += 1;
-                                    last_was_slash = true;
-                                }
-                                _ => {
-                                    break;
-                                }
-                            }
-                        }
-
-                        if last_was_slash {
-                            length -= 1;
-                            slashes -= 1;
-                        }
-
-                        if slashes > 0 {
-                            (TokenKind::QualifiedIdentifier, length)
-                        } else {
-                            (TokenKind::Identifier, length)
-                        }
-                    }
                     [b'.', start_of_number!(), ..] => {
                         let mut length = read_digits_of_base(&self.input, 2, 10);
                         if let float_exponent!() = self.input.peek(length, 1) {
-                            // Only include exponent if there are digits after it
                             let mut exp_length = length + 1;
                             if let number_sign!() = self.input.peek(exp_length, 1) {
                                 exp_length += 1;
                             }
+
                             let after_exp = read_digits_of_base(&self.input, exp_length, 10);
                             if after_exp > exp_length {
-                                // There are digits after the exponent marker
                                 length = after_exp;
                             }
                         }
@@ -615,11 +507,9 @@ impl<'input, 'arena> Lexer<'input, 'arena> {
                     TokenKind::Backtick => LexerMode::ShellExecuteString(Interpolation::None),
                     TokenKind::CloseTag => LexerMode::Inline,
                     TokenKind::HaltCompiler => LexerMode::Halt(HaltStage::LookingForLeftParenthesis),
-                    TokenKind::DocumentStart(document_kind) => LexerMode::DocumentString(
-                        document_kind,
-                        self.arena.alloc_slice_copy(document_label),
-                        Interpolation::None,
-                    ),
+                    TokenKind::DocumentStart(document_kind) => {
+                        LexerMode::DocumentString(document_kind, document_label, Interpolation::None)
+                    }
                     _ => LexerMode::Script,
                 };
 
@@ -977,23 +867,94 @@ impl<'input, 'arena> Lexer<'input, 'arena> {
         }
     }
 
+    /// Fast path for scanning identifiers and keywords.
+    /// Called when we know the first byte is an identifier start character.
+    /// Returns (TokenKind, length) to allow proper mode switching.
     #[inline]
-    fn token(&mut self, kind: TokenKind, v: &[u8], from: Position, to: Position) -> Token<'arena> {
+    fn scan_identifier_or_keyword_info(&self) -> (TokenKind, usize) {
+        let (mut length, ended_with_slash) = self.input.scan_identifier(0);
+
+        if !ended_with_slash {
+            match length {
+                6 => {
+                    if self.input.is_at(b"public(set)", true) {
+                        return (TokenKind::PublicSet, 11);
+                    }
+                }
+                7 => {
+                    if self.input.is_at(b"private(set)", true) {
+                        return (TokenKind::PrivateSet, 12);
+                    }
+                }
+                9 => {
+                    if self.input.is_at(b"protected(set)", true) {
+                        return (TokenKind::ProtectedSet, 14);
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        if !ended_with_slash && let Some(kind) = internal::keyword::lookup_keyword(self.input.read(length)) {
+            return (kind, length);
+        }
+
+        let mut slashes = 0;
+        let mut last_was_slash = false;
+        loop {
+            match self.input.peek(length, 1) {
+                [b'a'..=b'z' | b'A'..=b'Z' | b'_' | 0x80..=0xFF] if last_was_slash => {
+                    length += 1;
+                    last_was_slash = false;
+                }
+                [b'a'..=b'z' | b'A'..=b'Z' | b'0'..=b'9' | b'_' | 0x80..=0xFF] if !last_was_slash => {
+                    length += 1;
+                }
+                [b'\\'] if !self.interpolating => {
+                    if last_was_slash {
+                        length -= 1;
+                        slashes -= 1;
+                        last_was_slash = false;
+                        break;
+                    }
+
+                    length += 1;
+                    slashes += 1;
+                    last_was_slash = true;
+                }
+                _ => {
+                    break;
+                }
+            }
+        }
+
+        if last_was_slash {
+            length -= 1;
+            slashes -= 1;
+        }
+
+        let kind = if slashes > 0 { TokenKind::QualifiedIdentifier } else { TokenKind::Identifier };
+
+        (kind, length)
+    }
+
+    #[inline]
+    fn token(&self, kind: TokenKind, v: &'input [u8], start: Position, _end: Position) -> Token<'input> {
         // SAFETY: The input bytes are guaranteed to be valid UTF-8 because:
         // 1. File contents are validated via simdutf8 during database loading
         // 2. Invalid UTF-8 is converted lossily before reaching the lexer
         // 3. All byte slices here are subslices of the validated input
-        let string = unsafe { std::str::from_utf8_unchecked(v) };
+        let value = unsafe { std::str::from_utf8_unchecked(v) };
 
-        Token { kind, value: self.arena.alloc_str(string), span: Span::new(self.file_id(), from, to) }
+        Token { kind, start, value }
     }
 
     #[inline]
     fn interpolation(
         &mut self,
         end_offset: u32,
-        post_interpolation_mode: LexerMode<'arena>,
-    ) -> Option<Result<Token<'arena>, SyntaxError>> {
+        post_interpolation_mode: LexerMode<'input>,
+    ) -> Option<Result<Token<'input>, SyntaxError>> {
         self.mode = LexerMode::Script;
 
         let was_interpolating = self.interpolating;
@@ -1001,7 +962,10 @@ impl<'input, 'arena> Lexer<'input, 'arena> {
 
         loop {
             let subsequent_token = self.advance()?.ok()?;
-            let is_final_token = subsequent_token.span.has_offset(end_offset);
+            // Check if this token contains the end offset
+            let token_start = subsequent_token.start.offset;
+            let token_end = token_start + subsequent_token.value.len() as u32;
+            let is_final_token = token_start <= end_offset && end_offset <= token_end;
 
             self.buffer.push_back(subsequent_token);
 
@@ -1017,7 +981,7 @@ impl<'input, 'arena> Lexer<'input, 'arena> {
     }
 }
 
-impl HasFileId for Lexer<'_, '_> {
+impl HasFileId for Lexer<'_> {
     #[inline]
     fn file_id(&self) -> FileId {
         self.input.file_id()
@@ -1196,7 +1160,6 @@ fn read_start_of_heredoc_document(input: &Input, double_quoted: bool) -> (usize,
     let total = input.len();
     let base = input.current_offset();
 
-    // --- Block 1: Consume Whitespace ---
     // Start reading at offset base+3 (the fixed opener length).
     let mut pos = base + 3;
     let mut whitespaces = 0;
@@ -1205,14 +1168,12 @@ fn read_start_of_heredoc_document(input: &Input, double_quoted: bool) -> (usize,
         pos += 1;
     }
 
-    // --- Block 2: Calculate Initial Label Offset ---
     // The label (or delimiter) starts after:
     //   3 bytes + whitespace bytes + an extra offset:
     //      if double-quoted: 2 bytes (opening and closing quotes around the label)
     //      else: 1 byte.
     let mut length = 3 + whitespaces + if double_quoted { 2 } else { 1 };
 
-    // --- Block 3: Read the Label ---
     let mut label_length = 1; // Start with at least one byte for the label.
     let mut terminated = false; // For double-quoted heredoc, to track the closing quote.
     loop {
@@ -1255,7 +1216,6 @@ fn read_start_of_nowdoc_document(input: &Input) -> (usize, usize, usize) {
     let total = input.len();
     let base = input.current_offset();
 
-    // --- Block 1: Consume Whitespace ---
     let mut pos = base + 3;
     let mut whitespaces = 0;
     while pos < total && input.read_at(pos).is_ascii_whitespace() {
@@ -1263,11 +1223,9 @@ fn read_start_of_nowdoc_document(input: &Input) -> (usize, usize, usize) {
         pos += 1;
     }
 
-    // --- Block 2: Calculate Initial Label Offset ---
     // For nowdoc, the fixed extra offset is always 2.
     let mut length = 3 + whitespaces + 2;
 
-    // --- Block 3: Read the Label ---
     let mut label_length = 1;
     let mut terminated = false;
     loop {
@@ -1308,34 +1266,30 @@ fn read_literal_string(input: &Input, quote: u8) -> (TokenKind, usize) {
     let total = input.len();
     let start = input.current_offset();
     let mut length = 1; // We assume the opening quote is already consumed.
-    let mut last_was_backslash = false;
-    let mut partial = false;
 
+    let bytes = input.peek(length, total - start - length);
     loop {
-        let pos = start + length;
-        if pos >= total {
-            // Reached EOF before closing quote.
-            partial = true;
-            break;
-        }
+        match memchr2(quote, b'\\', &bytes[length - 1..]) {
+            Some(pos) => {
+                let abs_pos = length - 1 + pos;
+                let byte = bytes[abs_pos];
 
-        let byte = input.read_at(pos);
-        if *byte == b'\\' {
-            // Toggle the backslash flag.
-            last_was_backslash = !last_was_backslash;
-            length += 1;
-        } else {
-            // If we see the closing quote and the previous byte was not an escape.
-            if *byte == quote && !last_was_backslash {
-                length += 1; // Include the closing quote.
-                break;
+                if byte == b'\\' {
+                    length = abs_pos + 2 + 1; // +1 because bytes starts at offset 1
+                    if length > total - start {
+                        return (TokenKind::PartialLiteralString, total - start);
+                    }
+                } else {
+                    length = abs_pos + 2; // +1 for the quote, +1 because bytes starts at offset 1
+                    return (TokenKind::LiteralString, length);
+                }
             }
-            length += 1;
-            last_was_backslash = false;
+            None => {
+                // No quote or backslash found - EOF
+                return (TokenKind::PartialLiteralString, total - start);
+            }
         }
     }
-
-    if partial { (TokenKind::PartialLiteralString, length) } else { (TokenKind::LiteralString, length) }
 }
 
 #[inline]
@@ -1456,4 +1410,46 @@ fn read_until_end_of_brace_interpolation(input: &Input, from: usize) -> u32 {
     }
 
     offset as u32
+}
+
+/// Scan a multi-line comment using SIMD-accelerated search.
+/// Returns Some(length) including the closing */, or None if unterminated.
+#[inline]
+fn scan_multi_line_comment(bytes: &[u8]) -> Option<usize> {
+    // Use SIMD to find */ quickly
+    memmem::find(bytes, b"*/").map(|pos| pos + 2)
+}
+
+/// Scan a single-line comment using SIMD-accelerated search.
+/// Returns the length of the comment body (not including the //).
+/// Stops at newline or ?>.
+#[inline]
+fn scan_single_line_comment(bytes: &[u8]) -> usize {
+    let mut pos = 0;
+    while pos < bytes.len() {
+        match memchr::memchr3(b'\n', b'\r', b'?', &bytes[pos..]) {
+            Some(offset) => {
+                let found_pos = pos + offset;
+                match bytes[found_pos] {
+                    b'\n' | b'\r' => return found_pos,
+                    b'?' => {
+                        // Check if it's ?>
+                        if found_pos + 1 < bytes.len() && bytes[found_pos + 1] == b'>' {
+                            // Also check for whitespace before ?>
+                            if found_pos > 0 && bytes[found_pos - 1].is_ascii_whitespace() {
+                                return found_pos - 1;
+                            }
+                            return found_pos;
+                        }
+                        // Not ?>, continue searching
+                        pos = found_pos + 1;
+                    }
+                    _ => unreachable!(),
+                }
+            }
+            None => return bytes.len(),
+        }
+    }
+
+    bytes.len()
 }

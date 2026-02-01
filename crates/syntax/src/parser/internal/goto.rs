@@ -14,6 +14,6 @@ impl<'input, 'arena> Parser<'input, 'arena> {
     }
 
     pub(crate) fn parse_label(&mut self) -> Result<Label<'arena>, ParseError> {
-        Ok(Label { name: self.parse_local_identifier()?, colon: self.stream.eat(T![":"])?.span })
+        Ok(Label { name: self.parse_local_identifier()?, colon: self.stream.eat_span(T![":"])? })
     }
 }

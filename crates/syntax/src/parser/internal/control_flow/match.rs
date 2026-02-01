@@ -10,9 +10,9 @@ use crate::parser::Parser;
 impl<'input, 'arena> Parser<'input, 'arena> {
     pub(crate) fn parse_match(&mut self) -> Result<Match<'arena>, ParseError> {
         let r#match = self.expect_keyword(T!["match"])?;
-        let left_parenthesis = self.stream.eat(T!["("])?.span;
+        let left_parenthesis = self.stream.eat_span(T!["("])?;
         let expression = self.arena.alloc(self.parse_expression()?);
-        let right_parenthesis = self.stream.eat(T![")"])?.span;
+        let right_parenthesis = self.stream.eat_span(T![")"])?;
         let arms_result = self.parse_comma_separated_sequence(T!["{"], T!["}"], |p| p.parse_match_arm())?;
 
         Ok(Match {
@@ -40,13 +40,13 @@ impl<'input, 'arena> Parser<'input, 'arena> {
                 let mut conditions = self.new_vec();
                 let mut commas = self.new_vec();
                 loop {
-                    if matches!(self.stream.lookahead(0)?.map(|t| t.kind), Some(T!["=>"])) {
+                    if matches!(self.stream.peek_kind(0)?, Some(T!["=>"])) {
                         break;
                     }
 
                     conditions.push(self.parse_expression()?);
 
-                    match self.stream.lookahead(0)?.map(|t| t.kind) {
+                    match self.stream.peek_kind(0)? {
                         Some(T![","]) => {
                             commas.push(self.stream.consume()?);
                         }
@@ -58,7 +58,7 @@ impl<'input, 'arena> Parser<'input, 'arena> {
 
                 TokenSeparatedSequence::new(conditions, commas)
             },
-            arrow: self.stream.eat(T!["=>"])?.span,
+            arrow: self.stream.eat_span(T!["=>"])?,
             expression: self.arena.alloc(self.parse_expression()?),
         })
     }
@@ -66,7 +66,7 @@ impl<'input, 'arena> Parser<'input, 'arena> {
     fn parse_match_default_arm(&mut self) -> Result<MatchDefaultArm<'arena>, ParseError> {
         Ok(MatchDefaultArm {
             default: self.expect_keyword(T!["default"])?,
-            arrow: self.stream.eat(T!["=>"])?.span,
+            arrow: self.stream.eat_span(T!["=>"])?,
             expression: self.arena.alloc(self.parse_expression()?),
         })
     }

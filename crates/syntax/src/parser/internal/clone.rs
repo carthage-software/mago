@@ -37,7 +37,7 @@ impl<'input, 'arena> Parser<'input, 'arena> {
             }));
         }
 
-        let left_parenthesis = self.stream.eat(T!["("])?.span;
+        let left_parenthesis = self.stream.eat_span(T!["("])?;
 
         let mut arguments = self.new_vec();
         let mut commas = self.new_vec();
@@ -49,7 +49,7 @@ impl<'input, 'arena> Parser<'input, 'arena> {
 
             arguments.push(self.parse_partial_argument()?);
 
-            if let Some(T![","]) = self.stream.lookahead(0)?.map(|t| t.kind) {
+            if let Some(T![","]) = self.stream.peek_kind(0)? {
                 commas.push(self.stream.consume()?);
             } else {
                 break;
@@ -59,7 +59,7 @@ impl<'input, 'arena> Parser<'input, 'arena> {
         let partial_args = PartialArgumentList {
             left_parenthesis,
             arguments: TokenSeparatedSequence::new(arguments, commas),
-            right_parenthesis: self.stream.eat(T![")"])?.span,
+            right_parenthesis: self.stream.eat_span(T![")"])?,
         };
 
         if partial_args.has_placeholders() {

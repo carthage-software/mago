@@ -9,9 +9,9 @@ impl<'input, 'arena> Parser<'input, 'arena> {
             r#do: self.expect_keyword(T!["do"])?,
             statement: self.arena.alloc(self.parse_statement()?),
             r#while: self.expect_keyword(T!["while"])?,
-            left_parenthesis: self.stream.eat(T!["("])?.span,
+            left_parenthesis: self.stream.eat_span(T!["("])?,
             condition: self.arena.alloc(self.parse_expression()?),
-            right_parenthesis: self.stream.eat(T![")"])?.span,
+            right_parenthesis: self.stream.eat_span(T![")"])?,
             terminator: self.parse_terminator()?,
         })
     }

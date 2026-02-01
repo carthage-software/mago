@@ -9,7 +9,7 @@ impl<'input, 'arena> Parser<'input, 'arena> {
     pub(crate) fn parse_optional_function_like_parameter_list(
         &mut self,
     ) -> Result<Option<FunctionLikeParameterList<'arena>>, ParseError> {
-        Ok(match self.stream.lookahead(0)?.map(|t| t.kind) {
+        Ok(match self.stream.peek_kind(0)? {
             Some(T!["("]) => Some(self.parse_function_like_parameter_list()?),
             _ => None,
         })
@@ -32,8 +32,8 @@ impl<'input, 'arena> Parser<'input, 'arena> {
             attribute_lists: self.parse_attribute_list_sequence()?,
             modifiers: self.parse_modifier_sequence()?,
             hint: self.parse_optional_type_hint()?,
-            ampersand: if self.stream.is_at(T!["&"])? { Some(self.stream.eat(T!["&"])?.span) } else { None },
-            ellipsis: if self.stream.is_at(T!["..."])? { Some(self.stream.eat(T!["..."])?.span) } else { None },
+            ampersand: if self.stream.is_at(T!["&"])? { Some(self.stream.eat_span(T!["&"])?) } else { None },
+            ellipsis: if self.stream.is_at(T!["..."])? { Some(self.stream.eat_span(T!["..."])?) } else { None },
             variable: self.parse_direct_variable()?,
             default_value: self.parse_optional_function_like_parameter_default_value()?,
             hooks: self.parse_optional_property_hook_list()?,
@@ -44,7 +44,7 @@ impl<'input, 'arena> Parser<'input, 'arena> {
         &mut self,
     ) -> Result<Option<FunctionLikeParameterDefaultValue<'arena>>, ParseError> {
         Ok(if self.stream.is_at(T!["="])? {
-            let equals = self.stream.eat(T!["="])?.span;
+            let equals = self.stream.eat_span(T!["="])?;
             Some(FunctionLikeParameterDefaultValue { equals, value: self.parse_expression()? })
         } else {
             None

@@ -10,7 +10,7 @@ use crate::parser::Parser;
 impl<'input, 'arena> Parser<'input, 'arena> {
     pub(crate) fn is_at_type_hint(&mut self) -> Result<bool, ParseError> {
         Ok(matches!(
-            self.stream.lookahead(0)?.map(|t| t.kind),
+            self.stream.peek_kind(0)?,
             Some(T!["?"
                 | "("
                 | "array"
@@ -90,19 +90,14 @@ impl<'input, 'arena> Parser<'input, 'arena> {
         Ok(match next.map(|t| t.kind) {
             Some(T!["|"]) => {
                 let left = hint;
-                let pipe = self.stream.eat(T!["|"])?.span;
+                let pipe = self.stream.eat_span(T!["|"])?;
                 let right = self.parse_type_hint()?;
 
                 Hint::Union(UnionHint { left: self.arena.alloc(left), pipe, right: self.arena.alloc(right) })
             }
-            Some(T!["&"])
-                if !matches!(
-                    self.stream.lookahead(1)?.map(|t| t.kind),
-                    Some(T!["$variable"] | T!["..."] | T!["&"])
-                ) =>
-            {
+            Some(T!["&"]) if !matches!(self.stream.peek_kind(1)?, Some(T!["$variable"] | T!["..."] | T!["&"])) => {
                 let left = hint;
-                let ampersand = self.stream.eat(T!["&"])?.span;
+                let ampersand = self.stream.eat_span(T!["&"])?;
                 let right = self.parse_type_hint()?;
 
                 Hint::Intersection(IntersectionHint {
@@ -116,16 +111,16 @@ impl<'input, 'arena> Parser<'input, 'arena> {
     }
 
     pub(crate) fn parse_nullable_type_hint(&mut self) -> Result<NullableHint<'arena>, ParseError> {
-        let question_mark = self.stream.eat(T!["?"])?.span;
+        let question_mark = self.stream.eat_span(T!["?"])?;
         let hint = self.parse_type_hint()?;
 
         Ok(NullableHint { question_mark, hint: self.arena.alloc(hint) })
     }
 
     pub(crate) fn parse_parenthesized_type_hint(&mut self) -> Result<ParenthesizedHint<'arena>, ParseError> {
-        let left_parenthesis = self.stream.eat(T!["("])?.span;
+        let left_parenthesis = self.stream.eat_span(T!["("])?;
         let hint = self.parse_type_hint()?;
-        let right_parenthesis = self.stream.eat(T![")"])?.span;
+        let right_parenthesis = self.stream.eat_span(T![")"])?;
 
         Ok(ParenthesizedHint { left_parenthesis, hint: self.arena.alloc(hint), right_parenthesis })
     }

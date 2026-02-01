@@ -22,7 +22,7 @@ impl<'input, 'arena> Parser<'input, 'arena> {
             T!["#["] => {
                 let attributes = self.parse_attribute_list_sequence()?;
                 let next = self.stream.lookahead(0)?.ok_or_else(|| self.stream.unexpected(None, &[]))?;
-                let maybe_after = self.stream.lookahead(1)?.map(|t| t.kind);
+                let maybe_after = self.stream.peek_kind(1)?;
 
                 match next.kind {
                     T!["interface"] => Statement::Interface(self.parse_interface_with_attributes(attributes)?),
@@ -79,19 +79,19 @@ impl<'input, 'arena> Parser<'input, 'arena> {
             T!["class"] => Statement::Class(self.parse_class_with_attributes(Sequence::empty(self.arena))?),
             T!["function"] => self.parse_closure_or_function(Sequence::empty(self.arena))?,
             T!["global"] => Statement::Global(self.parse_global()?),
-            T!["static"] if matches!(self.stream.lookahead(1)?.map(|t| t.kind), Some(T!["$variable"])) => {
+            T!["static"] if matches!(self.stream.peek_kind(1)?, Some(T!["$variable"])) => {
                 Statement::Static(self.parse_static()?)
             }
             kind if kind.is_modifier()
                 && !matches!(
-                    self.stream.lookahead(1)?.map(|t| t.kind),
+                    self.stream.peek_kind(1)?,
                     Some(T!["::" | "(" | "->" | "?->" | "[" | "fn" | "function"])
                 ) =>
             {
                 Statement::Class(self.parse_class_with_attributes(Sequence::empty(self.arena))?)
             }
             T!["__halt_compiler"] => Statement::HaltCompiler(self.parse_halt_compiler()?),
-            T![";"] => Statement::Noop(self.stream.consume()?.span),
+            T![";"] => Statement::Noop(self.stream.consume_span()?),
             T!["const"] => Statement::Constant(self.parse_constant_with_attributes(Sequence::empty(self.arena))?),
             T!["if"] => Statement::If(self.parse_if()?),
             T!["switch"] => Statement::Switch(self.parse_switch()?),
@@ -106,9 +106,7 @@ impl<'input, 'arena> Parser<'input, 'arena> {
             T!["try"] => Statement::Try(self.parse_try()?),
             T!["echo"] => Statement::Echo(self.parse_echo()?),
             T!["goto"] => Statement::Goto(self.parse_goto()?),
-            kind if kind.is_identifier_maybe_reserved()
-                && matches!(self.stream.lookahead(1)?.map(|t| t.kind), Some(T![":"])) =>
-            {
+            kind if kind.is_identifier_maybe_reserved() && matches!(self.stream.peek_kind(1)?, Some(T![":"])) => {
                 Statement::Label(self.parse_label()?)
             }
             _ => Statement::Expression(ExpressionStatement {
@@ -122,7 +120,7 @@ impl<'input, 'arena> Parser<'input, 'arena> {
         &mut self,
         attributes: Sequence<'arena, AttributeList<'arena>>,
     ) -> Result<Statement<'arena>, ParseError> {
-        Ok(match (self.stream.lookahead(1)?.map(|t| t.kind), self.stream.lookahead(2)?.map(|t| t.kind)) {
+        Ok(match (self.stream.peek_kind(1)?, self.stream.lookahead(2)?.map(|t| t.kind)) {
             // if the next token is `(` or `&` followed by `(`, then we know this is a closure
             (Some(T!["("]), _) | (Some(T!["&"]), Some(T!["("])) => Statement::Expression(ExpressionStatement {
                 expression: { self.arena.alloc(Expression::Closure(self.parse_closure_with_attributes(attributes)?)) },

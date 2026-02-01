@@ -1,3 +1,5 @@
+use mago_database::file::HasFileId;
+
 use crate::T;
 use crate::ast::ast::Array;
 use crate::ast::ast::ArrayElement;
@@ -37,9 +39,9 @@ impl<'input, 'arena> Parser<'input, 'arena> {
     }
 
     pub(crate) fn parse_array_element(&mut self) -> Result<ArrayElement<'arena>, ParseError> {
-        Ok(match self.stream.lookahead(0)?.map(|t| t.kind) {
+        Ok(match self.stream.peek_kind(0)? {
             Some(T!["..."]) => {
-                let ellipsis = self.stream.consume()?.span;
+                let ellipsis = self.stream.consume_span()?;
                 ArrayElement::Variadic(VariadicArrayElement {
                     ellipsis,
                     value: self.arena.alloc(self.parse_expression()?),
@@ -47,14 +49,14 @@ impl<'input, 'arena> Parser<'input, 'arena> {
             }
             Some(T![","]) => {
                 let next = self.stream.lookahead(0)?.ok_or_else(|| self.stream.unexpected(None, &[]))?;
-                ArrayElement::Missing(MissingArrayElement { comma: next.span })
+                ArrayElement::Missing(MissingArrayElement { comma: next.span_for(self.stream.file_id()) })
             }
             _ => {
                 let expr = self.arena.alloc(self.parse_expression()?);
 
-                match self.stream.lookahead(0)?.map(|t| t.kind) {
+                match self.stream.peek_kind(0)? {
                     Some(T!["=>"]) => {
-                        let double_arrow = self.stream.consume()?.span;
+                        let double_arrow = self.stream.consume_span()?;
                         ArrayElement::KeyValue(KeyValueArrayElement {
                             key: expr,
                             double_arrow,

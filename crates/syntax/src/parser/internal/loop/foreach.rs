@@ -13,11 +13,11 @@ impl<'input, 'arena> Parser<'input, 'arena> {
     pub(crate) fn parse_foreach(&mut self) -> Result<Foreach<'arena>, ParseError> {
         Ok(Foreach {
             foreach: self.expect_keyword(T!["foreach"])?,
-            left_parenthesis: self.stream.eat(T!["("])?.span,
+            left_parenthesis: self.stream.eat_span(T!["("])?,
             expression: self.arena.alloc(self.parse_expression()?),
             r#as: self.expect_keyword(T!["as"])?,
             target: self.parse_foreach_target()?,
-            right_parenthesis: self.stream.eat(T![")"])?.span,
+            right_parenthesis: self.stream.eat_span(T![")"])?,
             body: self.parse_foreach_body()?,
         })
     }
@@ -25,10 +25,10 @@ impl<'input, 'arena> Parser<'input, 'arena> {
     fn parse_foreach_target(&mut self) -> Result<ForeachTarget<'arena>, ParseError> {
         let key_or_value = self.arena.alloc(self.parse_expression()?);
 
-        Ok(match self.stream.lookahead(0)?.map(|t| t.kind) {
+        Ok(match self.stream.peek_kind(0)? {
             Some(T!["=>"]) => ForeachTarget::KeyValue(ForeachKeyValueTarget {
                 key: key_or_value,
-                double_arrow: self.stream.consume()?.span,
+                double_arrow: self.stream.consume_span()?,
                 value: self.arena.alloc(self.parse_expression()?),
             }),
             _ => ForeachTarget::Value(ForeachValueTarget { value: key_or_value }),
@@ -36,7 +36,7 @@ impl<'input, 'arena> Parser<'input, 'arena> {
     }
 
     fn parse_foreach_body(&mut self) -> Result<ForeachBody<'arena>, ParseError> {
-        Ok(match self.stream.lookahead(0)?.map(|t| t.kind) {
+        Ok(match self.stream.peek_kind(0)? {
             Some(T![":"]) => ForeachBody::ColonDelimited(self.parse_foreach_colon_delimited_body()?),
             _ => ForeachBody::Statement(self.arena.alloc(self.parse_statement()?)),
         })
@@ -44,11 +44,11 @@ impl<'input, 'arena> Parser<'input, 'arena> {
 
     fn parse_foreach_colon_delimited_body(&mut self) -> Result<ForeachColonDelimitedBody<'arena>, ParseError> {
         Ok(ForeachColonDelimitedBody {
-            colon: self.stream.eat(T![":"])?.span,
+            colon: self.stream.eat_span(T![":"])?,
             statements: {
                 let mut statements = self.new_vec();
                 loop {
-                    if matches!(self.stream.lookahead(0)?.map(|t| t.kind), Some(T!["endforeach"])) {
+                    if matches!(self.stream.peek_kind(0)?, Some(T!["endforeach"])) {
                         break;
                     }
 

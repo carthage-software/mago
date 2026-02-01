@@ -1,3 +1,5 @@
+use mago_database::file::HasFileId;
+
 use crate::ast::ast::Keyword;
 use crate::error::ParseError;
 use crate::parser::Parser;
@@ -8,7 +10,7 @@ impl<'input, 'arena> Parser<'input, 'arena> {
     #[inline]
     pub(crate) fn expect_keyword(&mut self, kind: TokenKind) -> Result<Keyword<'arena>, ParseError> {
         let token = self.stream.eat(kind)?;
-        Ok(Keyword { span: token.span, value: token.value })
+        Ok(Keyword { span: token.span_for(self.stream.file_id()), value: token.value })
     }
 
     /// Optionally consumes a keyword token if present.
@@ -21,7 +23,7 @@ impl<'input, 'arena> Parser<'input, 'arena> {
     #[inline]
     pub(crate) fn expect_any_keyword(&mut self) -> Result<Keyword<'arena>, ParseError> {
         let token = self.stream.consume()?;
-        Ok(Keyword { span: token.span, value: token.value })
+        Ok(Keyword { span: token.span_for(self.stream.file_id()), value: token.value })
     }
 
     /// Expects and consumes one of the given token kinds.
@@ -29,7 +31,7 @@ impl<'input, 'arena> Parser<'input, 'arena> {
     pub(crate) fn expect_one_of_keyword(&mut self, kinds: &[TokenKind]) -> Result<Keyword<'arena>, ParseError> {
         let token = self.stream.consume()?;
         if kinds.contains(&token.kind) {
-            Ok(Keyword { span: token.span, value: token.value })
+            Ok(Keyword { span: token.span_for(self.stream.file_id()), value: token.value })
         } else {
             Err(self.stream.unexpected(Some(token), kinds))
         }

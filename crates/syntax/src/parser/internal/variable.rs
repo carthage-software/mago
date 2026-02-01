@@ -1,3 +1,5 @@
+use mago_database::file::HasFileId;
+
 use crate::T;
 use crate::ast::ast::DirectVariable;
 use crate::ast::ast::IndirectVariable;
@@ -21,14 +23,14 @@ impl<'input, 'arena> Parser<'input, 'arena> {
     pub(crate) fn parse_direct_variable(&mut self) -> Result<DirectVariable<'arena>, ParseError> {
         let token = self.stream.eat(T!["$variable"])?;
 
-        Ok(DirectVariable { span: token.span, name: token.value })
+        Ok(DirectVariable { span: token.span_for(self.stream.file_id()), name: token.value })
     }
 
     pub(crate) fn parse_indirect_variable(&mut self) -> Result<IndirectVariable<'arena>, ParseError> {
         let within_indirect_variable = self.state.within_indirect_variable;
 
         Ok(IndirectVariable {
-            dollar_left_brace: self.stream.eat(T!["${"])?.span,
+            dollar_left_brace: self.stream.eat_span(T!["${"])?,
             expression: {
                 self.state.within_indirect_variable = true;
                 let expr = self.parse_expression()?;
@@ -36,13 +38,13 @@ impl<'input, 'arena> Parser<'input, 'arena> {
 
                 self.arena.alloc(expr)
             },
-            right_brace: self.stream.eat(T!["}"])?.span,
+            right_brace: self.stream.eat_span(T!["}"])?,
         })
     }
 
     pub(crate) fn parse_nested_variable(&mut self) -> Result<NestedVariable<'arena>, ParseError> {
         Ok(NestedVariable {
-            dollar: self.stream.eat(T!["$"])?.span,
+            dollar: self.stream.eat_span(T!["$"])?,
             variable: self.arena.alloc(self.parse_variable()?),
         })
     }

@@ -32,15 +32,15 @@ impl<'input, 'arena> Parser<'input, 'arena> {
             }
             T!["empty"] => Construct::Empty(EmptyConstruct {
                 empty: self.expect_keyword(T!["empty"])?,
-                left_parenthesis: self.stream.eat(T!["("])?.span,
+                left_parenthesis: self.stream.eat_span(T!["("])?,
                 value: self.arena.alloc(self.parse_expression()?),
-                right_parenthesis: self.stream.eat(T![")"])?.span,
+                right_parenthesis: self.stream.eat_span(T![")"])?,
             }),
             T!["eval"] => Construct::Eval(EvalConstruct {
                 eval: self.expect_keyword(T!["eval"])?,
-                left_parenthesis: self.stream.eat(T!["("])?.span,
+                left_parenthesis: self.stream.eat_span(T!["("])?,
                 value: self.arena.alloc(self.parse_expression()?),
-                right_parenthesis: self.stream.eat(T![")"])?.span,
+                right_parenthesis: self.stream.eat_span(T![")"])?,
             }),
             T!["print"] => Construct::Print(PrintConstruct {
                 print: self.expect_keyword(T!["print"])?,

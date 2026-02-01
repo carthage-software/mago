@@ -13,7 +13,7 @@ impl<'input, 'arena> Parser<'input, 'arena> {
         Ok(Function {
             attribute_lists: attributes,
             function: self.expect_keyword(T!["function"])?,
-            ampersand: if self.stream.is_at(T!["&"])? { Some(self.stream.eat(T!["&"])?.span) } else { None },
+            ampersand: if self.stream.is_at(T!["&"])? { Some(self.stream.eat_span(T!["&"])?) } else { None },
             name: self.parse_local_identifier()?,
             parameter_list: self.parse_function_like_parameter_list()?,
             return_type_hint: self.parse_optional_function_like_return_type_hint()?,

@@ -1,3 +1,4 @@
+use mago_database::file::HasFileId;
 use mago_php_version::feature::Feature;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
@@ -17,7 +18,10 @@ pub fn check_list(list: &List, context: &mut Context<'_, '_, '_>) {
     {
         context.report(
             Issue::error("Trailing comma in list syntax is only available in PHP 7.2 and above.")
-                .with_annotation(Annotation::primary(token.span).with_message("Trailing comma used here."))
+                .with_annotation(
+                    Annotation::primary(token.span_for(context.source_file.file_id()))
+                        .with_message("Trailing comma used here."),
+                )
                 .with_help("Upgrade to PHP 7.2 or later to use trailing commas in list syntax."),
         );
     }

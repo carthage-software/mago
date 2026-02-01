@@ -15,13 +15,13 @@ impl<'input, 'arena> Parser<'input, 'arena> {
             let mut commas = self.new_vec();
 
             loop {
-                if matches!(self.stream.lookahead(0)?.map(|t| t.kind), Some(T!["?>" | ";"])) {
+                if matches!(self.stream.peek_kind(0)?, Some(T!["?>" | ";"])) {
                     break;
                 }
 
                 items.push(self.parse_static_item()?);
 
-                if let Some(T![","]) = self.stream.lookahead(0)?.map(|t| t.kind) {
+                if let Some(T![","]) = self.stream.peek_kind(0)? {
                     commas.push(self.stream.consume()?);
                 } else {
                     break;
@@ -38,9 +38,9 @@ impl<'input, 'arena> Parser<'input, 'arena> {
     pub(crate) fn parse_static_item(&mut self) -> Result<StaticItem<'arena>, ParseError> {
         let var = self.parse_direct_variable()?;
 
-        Ok(match self.stream.lookahead(0)?.map(|t| t.kind) {
+        Ok(match self.stream.peek_kind(0)? {
             Some(T!["="]) => {
-                let equals = self.stream.eat(T!["="])?.span;
+                let equals = self.stream.eat_span(T!["="])?;
                 let value = self.parse_expression()?;
 
                 StaticItem::Concrete(StaticConcreteItem { variable: var, equals, value })

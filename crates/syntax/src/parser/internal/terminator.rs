@@ -1,3 +1,5 @@
+use mago_database::file::HasFileId;
+
 use crate::T;
 use crate::ast::ast::ClosingTag;
 use crate::ast::ast::Terminator;
@@ -18,12 +20,12 @@ impl<'input, 'arena> Parser<'input, 'arena> {
         if self.stream.is_at(TokenKind::Semicolon)? {
             let token = self.stream.consume()?;
 
-            return Ok(Terminator::Semicolon(token.span));
+            return Ok(Terminator::Semicolon(token.span_for(self.stream.file_id())));
         }
 
         if self.stream.is_at(TokenKind::CloseTag)? {
             let closing_tag_token = self.stream.consume()?;
-            let closing_tag = ClosingTag { span: closing_tag_token.span };
+            let closing_tag = ClosingTag { span: closing_tag_token.span_for(self.stream.file_id()) };
 
             let next = self.stream.lookahead(0)?;
             if matches!(next.map(|t| t.kind), Some(T!["<?php" | "<?"])) {
@@ -39,6 +41,6 @@ impl<'input, 'arena> Parser<'input, 'arena> {
 
         self.errors.push(self.stream.unexpected(Some(next), T![";", "?>"]));
 
-        Ok(Terminator::Missing(next.span))
+        Ok(Terminator::Missing(next.span_for(self.stream.file_id())))
     }
 }

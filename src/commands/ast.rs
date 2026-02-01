@@ -171,10 +171,10 @@ impl AstCommand {
         self,
         configuration: Configuration,
         color_choice: ColorChoice,
-        arena: &Bump,
+        _arena: &Bump,
         file: File,
     ) -> Result<ExitCode, Error> {
-        let mut lexer = Lexer::new(arena, Input::from_file(&file));
+        let mut lexer = Lexer::new(Input::from_file(&file));
         let mut tokens = Vec::new();
         loop {
             match lexer.advance() {
@@ -219,7 +219,7 @@ impl AstCommand {
                     "  {: <25} {} {}",
                     kind_str,
                     value_str,
-                    format!("[{}..{}]", token.span.start, token.span.end).dimmed()
+                    format!("[{}..{}]", token.start, token.start.offset + token.value.len() as u32).dimmed()
                 );
             }
             println!();

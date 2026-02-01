@@ -1,3 +1,5 @@
+use mago_database::file::HasFileId;
+
 use crate::T;
 use crate::ast::ast::ArrayAccess;
 use crate::ast::ast::BracedExpressionStringPart;
@@ -40,34 +42,35 @@ impl<'input, 'arena> Parser<'input, 'arena> {
     }
 
     pub(crate) fn parse_interpolated_string(&mut self) -> Result<InterpolatedString<'arena>, ParseError> {
-        let left_double_quote = self.stream.eat(T!["\""])?.span;
+        let left_double_quote = self.stream.eat_span(T!["\""])?;
         let mut parts = self.new_vec();
         while let Some(part) = self.parse_optional_string_part(T!["\""])? {
             parts.push(part);
         }
 
-        let right_double_quote = self.stream.eat(T!["\""])?.span;
+        let right_double_quote = self.stream.eat_span(T!["\""])?;
 
         Ok(InterpolatedString { left_double_quote, parts: Sequence::new(parts), right_double_quote })
     }
 
     pub(crate) fn parse_shell_execute_string(&mut self) -> Result<ShellExecuteString<'arena>, ParseError> {
-        let left_backtick = self.stream.eat(T!["`"])?.span;
+        let left_backtick = self.stream.eat_span(T!["`"])?;
         let mut parts = self.new_vec();
         while let Some(part) = self.parse_optional_string_part(T!["`"])? {
             parts.push(part);
         }
 
-        let right_backtick = self.stream.eat(T!["`"])?.span;
+        let right_backtick = self.stream.eat_span(T!["`"])?;
 
         Ok(ShellExecuteString { left_backtick, parts: Sequence::new(parts), right_backtick })
     }
 
     pub(crate) fn parse_document_string(&mut self) -> Result<DocumentString<'arena>, ParseError> {
         let current = self.stream.consume()?;
+        let current_span = current.span_for(self.stream.file_id());
         let (open, kind) = match current.kind {
-            TokenKind::DocumentStart(DocumentKind::Heredoc) => (current.span, AstDocumentKind::Heredoc),
-            TokenKind::DocumentStart(DocumentKind::Nowdoc) => (current.span, AstDocumentKind::Nowdoc),
+            TokenKind::DocumentStart(DocumentKind::Heredoc) => (current_span, AstDocumentKind::Heredoc),
+            TokenKind::DocumentStart(DocumentKind::Nowdoc) => (current_span, AstDocumentKind::Nowdoc),
             _ => {
                 return Err(self.stream.unexpected(
                     Some(current),
@@ -116,7 +119,7 @@ impl<'input, 'arena> Parser<'input, 'arena> {
             indentation,
             parts: Sequence::new(parts),
             label: self.str(&label),
-            close: close.span,
+            close: close.span_for(self.stream.file_id()),
         })
     }
 
@@ -129,7 +132,10 @@ impl<'input, 'arena> Parser<'input, 'arena> {
             T!["{"] => Some(StringPart::BracedExpression(self.parse_braced_expression_string_part()?)),
             T![StringPart] => {
                 let token = self.stream.consume()?;
-                Some(StringPart::Literal(LiteralStringPart { span: token.span, value: token.value }))
+                Some(StringPart::Literal(LiteralStringPart {
+                    span: token.span_for(self.stream.file_id()),
+                    value: token.value,
+                }))
             }
             kind if kind == closing_kind => None,
             _ => {
@@ -142,9 +148,9 @@ impl<'input, 'arena> Parser<'input, 'arena> {
     pub(crate) fn parse_braced_expression_string_part(
         &mut self,
     ) -> Result<BracedExpressionStringPart<'arena>, ParseError> {
-        let left_brace = self.stream.eat(T!["{"])?.span;
+        let left_brace = self.stream.eat_span(T!["{"])?;
         let expr = self.parse_expression()?;
-        let right_brace = self.stream.eat(T!["}"])?.span;
+        let right_brace = self.stream.eat_span(T!["}"])?;
 
         Ok(BracedExpressionStringPart { left_brace, expression: expr, right_brace })
     }

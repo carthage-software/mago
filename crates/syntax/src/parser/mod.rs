@@ -43,7 +43,7 @@ impl<'input, 'arena> Parser<'input, 'arena> {
     #[inline]
     fn new(arena: &'arena Bump, file_id: FileId, content: &'input str) -> Self {
         let input = Input::new(file_id, content.as_bytes());
-        let lexer = Lexer::new(arena, input);
+        let lexer = Lexer::new(input);
         let stream = TokenStream::new(arena, lexer);
 
         Self { arena, state: State::default(), stream, errors: Vec::new_in(arena) }

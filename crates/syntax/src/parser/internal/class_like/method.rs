@@ -18,7 +18,7 @@ impl<'input, 'arena> Parser<'input, 'arena> {
             attribute_lists: attributes,
             modifiers,
             function: self.expect_keyword(T!["function"])?,
-            ampersand: if self.stream.is_at(T!["&"])? { Some(self.stream.eat(T!["&"])?.span) } else { None },
+            ampersand: if self.stream.is_at(T!["&"])? { Some(self.stream.eat_span(T!["&"])?) } else { None },
             name: self.parse_local_identifier()?,
             parameter_list: self.parse_function_like_parameter_list()?,
             return_type_hint: self.parse_optional_function_like_return_type_hint()?,
@@ -27,8 +27,8 @@ impl<'input, 'arena> Parser<'input, 'arena> {
     }
 
     fn parse_method_body(&mut self) -> Result<MethodBody<'arena>, ParseError> {
-        Ok(match self.stream.lookahead(0)?.map(|t| t.kind) {
-            Some(T![";"]) => MethodBody::Abstract(MethodAbstractBody { semicolon: self.stream.consume()?.span }),
+        Ok(match self.stream.peek_kind(0)? {
+            Some(T![";"]) => MethodBody::Abstract(MethodAbstractBody { semicolon: self.stream.consume_span()? }),
             _ => MethodBody::Concrete(self.parse_block()?),
         })
     }

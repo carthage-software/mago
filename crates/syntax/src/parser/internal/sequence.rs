@@ -1,3 +1,4 @@
+use mago_database::file::HasFileId;
 use mago_span::HasSpan;
 use mago_span::Span;
 
@@ -56,13 +57,13 @@ impl<'input, 'arena> Parser<'input, 'arena> {
         T: HasSpan,
         F: FnMut(&mut Self) -> Result<T, ParseError>,
     {
-        let open = self.stream.eat(open_kind)?.span;
+        let open = self.stream.eat_span(open_kind)?;
 
         let mut elements = self.new_vec();
         let mut separators = self.new_vec();
 
         loop {
-            match self.stream.lookahead(0)?.map(|t| t.kind) {
+            match self.stream.peek_kind(0)? {
                 Some(kind) if kind == close_kind => break,
                 None => return Err(self.stream.unexpected(None, &[close_kind])),
                 _ => {}
@@ -75,7 +76,7 @@ impl<'input, 'arena> Parser<'input, 'arena> {
                 }
             }
 
-            match self.stream.lookahead(0)?.map(|t| t.kind) {
+            match self.stream.peek_kind(0)? {
                 Some(kind) if kind == separator_kind => separators.push(self.stream.consume()?),
                 _ => break,
             }
@@ -94,7 +95,7 @@ impl<'input, 'arena> Parser<'input, 'arena> {
         Ok(TokenSeparatedSequenceResult {
             open,
             sequence: TokenSeparatedSequence::new(elements, separators),
-            close: current.span,
+            close: current.span_for(self.stream.file_id()),
         })
     }
 }

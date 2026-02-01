@@ -1,3 +1,5 @@
+use mago_database::file::HasFileId;
+
 use crate::T;
 use crate::ast::ast::FullyQualifiedIdentifier;
 use crate::ast::ast::Identifier;
@@ -24,18 +26,18 @@ impl<'input, 'arena> Parser<'input, 'arena> {
             return Err(self.stream.unexpected(Some(token), &[T![Identifier]]));
         }
 
-        Ok(LocalIdentifier { span: token.span, value: token.value })
+        Ok(LocalIdentifier { span: token.span_for(self.stream.file_id()), value: token.value })
     }
 
     pub(crate) fn parse_qualified_identifier(&mut self) -> Result<QualifiedIdentifier<'arena>, ParseError> {
         let token = self.stream.eat(T![QualifiedIdentifier])?;
 
-        Ok(QualifiedIdentifier { span: token.span, value: token.value })
+        Ok(QualifiedIdentifier { span: token.span_for(self.stream.file_id()), value: token.value })
     }
 
     pub(crate) fn parse_fully_qualified_identifier(&mut self) -> Result<FullyQualifiedIdentifier<'arena>, ParseError> {
         let token = self.stream.eat(T![FullyQualifiedIdentifier])?;
 
-        Ok(FullyQualifiedIdentifier { span: token.span, value: token.value })
+        Ok(FullyQualifiedIdentifier { span: token.span_for(self.stream.file_id()), value: token.value })
     }
 }

@@ -7,7 +7,7 @@ use crate::parser::Parser;
 
 impl<'input, 'arena> Parser<'input, 'arena> {
     pub(crate) fn parse_optional_implements(&mut self) -> Result<Option<Implements<'arena>>, ParseError> {
-        Ok(match self.stream.lookahead(0)?.map(|t| t.kind) {
+        Ok(match self.stream.peek_kind(0)? {
             Some(T!["implements"]) => Some(Implements {
                 implements: self.expect_any_keyword()?,
                 types: {
@@ -16,7 +16,7 @@ impl<'input, 'arena> Parser<'input, 'arena> {
                     loop {
                         types.push(self.parse_identifier()?);
 
-                        match self.stream.lookahead(0)?.map(|t| t.kind) {
+                        match self.stream.peek_kind(0)? {
                             Some(T![","]) => {
                                 commas.push(self.stream.consume()?);
                             }
@@ -32,7 +32,7 @@ impl<'input, 'arena> Parser<'input, 'arena> {
     }
 
     pub(crate) fn parse_optional_extends(&mut self) -> Result<Option<Extends<'arena>>, ParseError> {
-        Ok(match self.stream.lookahead(0)?.map(|t| t.kind) {
+        Ok(match self.stream.peek_kind(0)? {
             Some(T!["extends"]) => Some(Extends {
                 extends: self.expect_any_keyword()?,
                 types: {
@@ -41,7 +41,7 @@ impl<'input, 'arena> Parser<'input, 'arena> {
                     loop {
                         types.push(self.parse_identifier()?);
 
-                        match self.stream.lookahead(0)?.map(|t| t.kind) {
+                        match self.stream.peek_kind(0)? {
                             Some(T![","]) => {
                                 commas.push(self.stream.consume()?);
                             }

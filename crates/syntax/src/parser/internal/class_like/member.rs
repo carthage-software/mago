@@ -100,9 +100,9 @@ impl<'input, 'arena> Parser<'input, 'arena> {
         Ok(match token.kind {
             T!["$"] | T!["${"] | T!["$variable"] => ClassLikeMemberSelector::Variable(self.parse_variable()?),
             T!["{"] => ClassLikeMemberSelector::Expression(ClassLikeMemberExpressionSelector {
-                left_brace: self.stream.eat(T!["{"])?.span,
+                left_brace: self.stream.eat_span(T!["{"])?,
                 expression: self.parse_expression()?,
-                right_brace: self.stream.eat(T!["}"])?.span,
+                right_brace: self.stream.eat_span(T!["}"])?,
             }),
             kind if kind.is_identifier_maybe_reserved() => {
                 ClassLikeMemberSelector::Identifier(self.parse_local_identifier()?)
@@ -132,9 +132,9 @@ impl<'input, 'arena> Parser<'input, 'arena> {
         Ok(match token.kind {
             T!["$"] | T!["${"] | T!["$variable"] => Either::Right(self.parse_variable()?),
             T!["{"] => Either::Left(ClassLikeConstantSelector::Expression(ClassLikeMemberExpressionSelector {
-                left_brace: self.stream.eat(T!["{"])?.span,
+                left_brace: self.stream.eat_span(T!["{"])?,
                 expression: self.parse_expression()?,
-                right_brace: self.stream.eat(T!["}"])?.span,
+                right_brace: self.stream.eat_span(T!["}"])?,
             })),
             kind if kind.is_identifier_maybe_reserved() => {
                 Either::Left(ClassLikeConstantSelector::Identifier(self.parse_local_identifier()?))
