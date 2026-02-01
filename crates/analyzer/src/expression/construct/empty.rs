@@ -24,8 +24,9 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for EmptyConstruct<'arena> {
         artifacts.set_expression_type(
             self,
             match artifacts.get_expression_type(&self.value) {
-                Some(value_type) if value_type.is_always_truthy() => get_true(),
-                Some(value_type) if value_type.is_always_falsy() => get_false(),
+                Some(value_type) if value_type.possibly_undefined() => get_bool(),
+                Some(value_type) if value_type.is_always_truthy() => get_false(),
+                Some(value_type) if value_type.is_always_falsy() => get_true(),
                 _ => get_bool(),
             },
         );

@@ -1319,7 +1319,7 @@ fn reconcile_truthy_or_non_empty(
     negated: bool,
     span: Option<&Span>,
 ) -> TUnion {
-    let mut did_remove_type = existing_var_type.possibly_undefined_from_try();
+    let mut did_remove_type = existing_var_type.possibly_undefined() || existing_var_type.possibly_undefined_from_try();
     let mut new_var_type = existing_var_type.clone();
     let mut acceptable_types = vec![];
 
@@ -1376,6 +1376,7 @@ fn reconcile_truthy_or_non_empty(
     }
 
     new_var_type.set_possibly_undefined_from_try(false);
+    new_var_type.set_possibly_undefined(false, None);
 
     get_acceptable_type(
         context,

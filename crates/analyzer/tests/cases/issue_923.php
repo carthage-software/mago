@@ -18,5 +18,8 @@ function use_int(int $int): void
 $foo = get_arr();
 
 use_int($foo['id'] ?? 1);
-use_int($foo['id'] ?? throw new RuntimeException('Well, shit...'));
-use_int($foo['id'] ?? die());
+if (rand(0, 1)) {
+    use_int($foo['id'] ?? throw new RuntimeException('Well, shit...'));
+} else {
+    use_int($foo['id'] ?? die());
+}
