@@ -24,14 +24,27 @@ pub mod version;
 ///
 /// This function considers:
 /// - The explicit color choice (Always/Never/Auto)
-/// - The NO_COLOR environment variable (if Auto)
+/// - The FORCE_COLOR environment variable (if Auto) - forces colors when set to non-empty value
+/// - The NO_COLOR environment variable (if Auto) - disables colors when set
 /// - Whether stdout is a terminal (if Auto)
+///
+/// Priority (for Auto mode): FORCE_COLOR > NO_COLOR > TTY check
+///
+/// See: <https://force-color.org/> and <https://no-color.org/>
 #[inline]
 pub fn should_use_colors(color_choice: ColorChoice) -> bool {
     match color_choice {
         ColorChoice::Always => true,
         ColorChoice::Never => false,
-        ColorChoice::Auto => std::io::stdout().is_terminal() && std::env::var_os("NO_COLOR").is_none(),
+        ColorChoice::Auto => {
+            // FORCE_COLOR takes precedence - any non-empty value forces colors
+            if let Some(force_color) = std::env::var_os("FORCE_COLOR") {
+                return !force_color.is_empty();
+            }
+
+            // Then check NO_COLOR and TTY
+            std::io::stdout().is_terminal() && std::env::var_os("NO_COLOR").is_none()
+        }
     }
 }
 
