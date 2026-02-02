@@ -1,6 +1,6 @@
 name: "Feature Request"
 description: "Suggest a new feature or improvement for Mago."
-labels: ["Type: Enhancement"]
+labels: ["t-enhancement", "needs-triage"]
 assignees: []
 body:
   - type: textarea
