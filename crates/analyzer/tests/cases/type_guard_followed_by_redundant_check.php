@@ -7,7 +7,7 @@ function foo(string $_x): void
 /**
  * @mago-expect analysis:redundant-condition - second if condition
  * @mago-expect analysis:redundant-logical-operation - `||` in second `if`
- * @mago-expect analysis:no-value - `$x` in `else if`
+ * @mago-expect analysis:unreachable-else-clause - `else if` is unreachable
  * @mago-expect analysis:redundant-type-comparison
  */
 function bar(string|null|false $x): void

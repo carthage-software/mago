@@ -273,6 +273,7 @@ final class AnalyzerCodeModuleGenerator
         'null-argument',
         'never-matching-switch-case',
         'always-matching-switch-case',
+        'unreachable-else-clause',
         'unreachable-switch-case',
         'unreachable-switch-default',
         'invalid-isset-expression',
