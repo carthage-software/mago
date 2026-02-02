@@ -80,7 +80,7 @@ final class SponsorsData
         /**
          * @var array<
          *  int<0, max>,
-         *  list<array{login: string, name: string, avatarUrl: string, websiteUrl: ?string, monthlyPriceInDollars: int, isCustomAmount: bool, isOneTime: bool}>
+         *  list<array{login: string, name?: null|string, avatarUrl: string, websiteUrl: ?string, monthlyPriceInDollars: int, isCustomAmount: bool, isOneTime: bool}>
          * > $sponsors_by_tier
          */
         $sponsors_by_tier = json_decode($sponsors_json, true, 512, JSON_THROW_ON_ERROR);
@@ -91,7 +91,7 @@ final class SponsorsData
             foreach ($sponsors as $sponsor) {
                 $sponsor = new Sponsor(
                     login: $sponsor['login'],
-                    name: $sponsor['name'],
+                    name: $sponsor['name'] ?? $sponsor['login'],
                     /** @mago-expect lint:no-shorthand-ternary */
                     avatarUrl: preg_replace('/\?s=\d+$/', '', $sponsor['avatarUrl']) ?: $sponsor['avatarUrl'],
                     websiteUrl: $sponsor['websiteUrl'] ?? null,
