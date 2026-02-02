@@ -8,16 +8,10 @@ stubs/** linguist-vendored
 .rustfmt.toml export-ignore
 .typos.toml export-ignore
 .github/ export-ignore
-CODE_OF_CONDUCT.md export-ignore
-CONTRIBUTING.md export-ignore
-SECURITY.md export-ignore
-SPONSORS.md export-ignore
 Justfile export-ignore
-README.md export-ignore
 build.rs export-ignore
 Cargo.toml export-ignore
 Cargo.lock export-ignore
-composer.lock export-ignore
 corpus/ export-ignore
 crates/ export-ignore
 docs/ export-ignore
