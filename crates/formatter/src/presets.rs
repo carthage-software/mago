@@ -333,7 +333,7 @@ const PINT_PRESET: FormatSettings = FormatSettings {
     space_after_decrement_unary_prefix_operator: false,
     space_after_additive_unary_prefix_operator: false,
     space_around_concatenation_binary_operator: false,
-    space_around_assignment_in_declare: true,
+    space_around_assignment_in_declare: false,
     space_within_grouping_parenthesis: true,
     empty_line_after_control_structure: false,
     empty_line_after_opening_tag: true,
