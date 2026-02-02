@@ -1,3 +1,5 @@
+#![allow(clippy::too_many_arguments)]
+
 use std::sync::Arc;
 
 use ahash::HashMap;
@@ -17,7 +19,8 @@ use mago_database::file::File;
 use mago_database::file::FileId;
 use mago_database::file::FileType;
 use mago_names::resolver::NameResolver;
-use mago_syntax::parser::parse_file;
+use mago_syntax::parser::parse_file_with_settings;
+use mago_syntax::settings::ParserSettings;
 
 use crate::error::OrchestratorError;
 use crate::service::pipeline::Reducer;
@@ -45,6 +48,7 @@ pub struct IncrementalParallelPipeline<T, I, R> {
     codebase: CodebaseMetadata,
     symbol_references: SymbolReferences,
     shared_context: T,
+    parser_settings: ParserSettings,
     reducer: Box<dyn Reducer<I, R> + Send + Sync>,
     after_scanning: Option<PostScanCallback>,
     previous_file_states: HashMap<FileId, FileState>,
@@ -61,6 +65,7 @@ where
             .field("codebase", &self.codebase)
             .field("symbol_references", &self.symbol_references)
             .field("shared_context", &self.shared_context)
+            .field("parser_settings", &self.parser_settings)
             .field("reducer", &"<reducer>")
             .field("after_scanning", &self.after_scanning.is_some())
             .field("previous_file_states", &format!("{} tracked files", self.previous_file_states.len()))
@@ -81,6 +86,7 @@ where
         codebase: CodebaseMetadata,
         symbol_references: SymbolReferences,
         shared_context: T,
+        parser_settings: ParserSettings,
         reducer: Box<dyn Reducer<I, R> + Send + Sync>,
         previous_file_states: HashMap<FileId, FileState>,
     ) -> Self {
@@ -90,6 +96,7 @@ where
             codebase,
             symbol_references,
             shared_context,
+            parser_settings,
             reducer,
             after_scanning: None,
             previous_file_states,
@@ -172,10 +179,11 @@ where
             if source_files.is_empty() { 0 } else { (unchanged_files.len() * 100) / source_files.len() }
         );
 
+        let parser_settings = self.parser_settings;
         let partial_codebases: Vec<CodebaseMetadata> = changed_files
             .into_par_iter()
             .map_init(Bump::new, |arena, file| {
-                let program = parse_file(arena, file);
+                let program = parse_file_with_settings(arena, file, parser_settings);
                 if program.has_errors() {
                     tracing::warn!(
                         "Encountered {} parsing error(s) in '{}'. Codebase analysis may be incomplete.",

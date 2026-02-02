@@ -12,7 +12,8 @@ use mago_php_version::PHPVersion;
 use mago_reporting::Issue;
 use mago_reporting::IssueCollection;
 use mago_semantics::SemanticsChecker;
-use mago_syntax::parser::parse_file;
+use mago_syntax::parser::parse_file_with_settings;
+use mago_syntax::settings::ParserSettings;
 
 use crate::OrchestratorError;
 use crate::service::pipeline::StatelessParallelPipeline;
@@ -36,6 +37,9 @@ pub struct LintService {
     /// The linter settings to configure the linting process.
     settings: Settings,
 
+    /// The parser settings to configure the parsing process.
+    parser_settings: ParserSettings,
+
     /// Whether to display progress bars during linting.
     use_progress_bars: bool,
 }
@@ -47,14 +51,20 @@ impl LintService {
     ///
     /// * `database` - The read-only database containing source files to lint.
     /// * `settings` - The linter settings to configure the linting process.
+    /// * `parser_settings` - The parser settings to configure the parsing process.
     /// * `use_progress_bars` - Whether to display progress bars during linting.
     ///
     /// # Returns
     ///
     /// A new `LintService` instance.
     #[must_use]
-    pub fn new(database: ReadDatabase, settings: Settings, use_progress_bars: bool) -> Self {
-        Self { database, settings, use_progress_bars }
+    pub fn new(
+        database: ReadDatabase,
+        settings: Settings,
+        parser_settings: ParserSettings,
+        use_progress_bars: bool,
+    ) -> Self {
+        Self { database, settings, parser_settings, use_progress_bars }
     }
 
     /// Creates a `RuleRegistry` based on the current settings.
@@ -90,7 +100,7 @@ impl LintService {
     #[must_use]
     pub fn lint_file(&self, file: &File, mode: LintMode, only: Option<&[String]>) -> IssueCollection {
         let arena = Bump::new();
-        let program = parse_file(&arena, file);
+        let program = parse_file_with_settings(&arena, file, self.parser_settings);
         let resolved_names = NameResolver::new(&arena).resolve(program);
 
         let mut issues = IssueCollection::new();
@@ -125,6 +135,7 @@ impl LintService {
 
         let context = LintContext {
             php_version: self.settings.php_version,
+            parser_settings: self.parser_settings,
             registry: Arc::new(self.create_registry(only, false)),
             mode,
         };
@@ -138,7 +149,7 @@ impl LintService {
         );
 
         pipeline.run(|context, arena, file| {
-            let program = parse_file(arena, &file);
+            let program = parse_file_with_settings(arena, &file, context.parser_settings);
             let resolved_names = NameResolver::new(arena).resolve(program);
 
             let mut issues = IssueCollection::new();
@@ -166,6 +177,8 @@ impl LintService {
 struct LintContext {
     /// The target PHP version for analysis.
     pub php_version: PHPVersion,
+    /// The parser settings to use.
+    pub parser_settings: ParserSettings,
     /// A pre-configured `RuleRegistry` instance.
     pub registry: Arc<RuleRegistry>,
     /// The operational mode, determining which checks to run.

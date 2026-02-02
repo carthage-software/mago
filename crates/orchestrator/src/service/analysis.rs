@@ -21,7 +21,8 @@ use mago_names::resolver::NameResolver;
 use mago_reporting::Issue;
 use mago_reporting::IssueCollection;
 use mago_semantics::SemanticsChecker;
-use mago_syntax::parser::parse_file;
+use mago_syntax::parser::parse_file_with_settings;
+use mago_syntax::settings::ParserSettings;
 
 use crate::error::OrchestratorError;
 use crate::incremental::IncrementalAnalysis;
@@ -35,6 +36,7 @@ pub struct AnalysisService {
     codebase: CodebaseMetadata,
     symbol_references: SymbolReferences,
     settings: Settings,
+    parser_settings: ParserSettings,
     use_progress_bars: bool,
     incremental: Option<IncrementalAnalysis>,
     file_states: HashMap<FileId, FileState>,
@@ -48,6 +50,7 @@ impl std::fmt::Debug for AnalysisService {
             .field("codebase", &self.codebase)
             .field("symbol_references", &self.symbol_references)
             .field("settings", &self.settings)
+            .field("parser_settings", &self.parser_settings)
             .field("use_progress_bars", &self.use_progress_bars)
             .field("incremental", &self.incremental)
             .field("file_states", &format!("{} tracked files", self.file_states.len()))
@@ -63,6 +66,7 @@ impl AnalysisService {
         codebase: CodebaseMetadata,
         symbol_references: SymbolReferences,
         settings: Settings,
+        parser_settings: ParserSettings,
         use_progress_bars: bool,
         plugin_registry: Arc<PluginRegistry>,
     ) -> Self {
@@ -71,6 +75,7 @@ impl AnalysisService {
             codebase,
             symbol_references,
             settings,
+            parser_settings,
             use_progress_bars,
             incremental: None,
             file_states: HashMap::default(),
@@ -117,7 +122,7 @@ impl AnalysisService {
 
         let arena = Bump::new();
 
-        let program = parse_file(&arena, file);
+        let program = parse_file_with_settings(&arena, file, self.parser_settings);
         let resolved_names = NameResolver::new(&arena).resolve(program);
 
         let mut issues = IssueCollection::new();
@@ -183,7 +188,8 @@ impl AnalysisService {
             database,
             codebase,
             symbol_references,
-            self.settings.clone(),
+            (self.settings.clone(), self.parser_settings),
+            self.parser_settings,
             Box::new(AnalysisResultReducer),
             self.use_progress_bars,
         );
@@ -215,10 +221,10 @@ impl AnalysisService {
 
         let plugin_registry = Arc::clone(&self.plugin_registry);
         let (analysis_result, codebase, symbol_references) =
-            pipeline.run(move |settings, arena, source_file, codebase| {
+            pipeline.run(move |(settings, parser_settings), arena, source_file, codebase| {
                 let mut analysis_result = AnalysisResult::new(SymbolReferences::new());
 
-                let program = parse_file(arena, &source_file);
+                let program = parse_file_with_settings(arena, &source_file, parser_settings);
                 let resolved_names = NameResolver::new(arena).resolve(program);
 
                 if program.has_errors() {
@@ -277,7 +283,8 @@ impl AnalysisService {
             database,
             codebase,
             symbol_references,
-            self.settings.clone(),
+            (self.settings.clone(), self.parser_settings),
+            self.parser_settings,
             Box::new(AnalysisResultReducer),
             file_states,
         );
@@ -309,10 +316,10 @@ impl AnalysisService {
 
         let plugin_registry = Arc::clone(&self.plugin_registry);
         let (analysis_result, codebase, symbol_references, new_file_states) =
-            pipeline.run(move |settings, arena, source_file, codebase| {
+            pipeline.run(move |(settings, parser_settings), arena, source_file, codebase| {
                 let mut analysis_result = AnalysisResult::new(SymbolReferences::new());
 
-                let program = parse_file(arena, &source_file);
+                let program = parse_file_with_settings(arena, &source_file, parser_settings);
                 let resolved_names = NameResolver::new(arena).resolve(program);
 
                 if program.has_errors() {

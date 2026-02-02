@@ -29,6 +29,7 @@ use mago_orchestrator::service::lint::LintService;
 use mago_php_version::PHPVersion;
 use mago_prelude::Prelude;
 use mago_syntax::parser::parse_file;
+use mago_syntax::settings::ParserSettings;
 
 use crate::types::IssueSource;
 use crate::types::WasmIssue;
@@ -81,7 +82,7 @@ pub fn run(code: String, settings_js: JsValue) -> Result<JsValue, JsValue> {
 
     let linter_settings = LinterSettings { php_version: version, ..Default::default() };
     let database = ReadDatabase::empty();
-    let service = LintService::new(database, linter_settings, false);
+    let service = LintService::new(database, linter_settings, ParserSettings::default(), false);
     let linter_issues = service.lint_file(&file, LintMode::Full, None);
 
     let mut issue_map: HashMap<(String, u32, u32), WasmIssue> = HashMap::new();
@@ -136,6 +137,7 @@ pub fn run(code: String, settings_js: JsValue) -> Result<JsValue, JsValue> {
         prelude.metadata,
         prelude.symbol_references,
         analyzer_settings,
+        ParserSettings::default(),
         false,
         plugin_registry,
     );
@@ -185,7 +187,7 @@ pub fn lint(code: String, php_version: &str) -> Result<JsValue, JsValue> {
     let settings = LinterSettings { php_version: version, ..Default::default() };
 
     let database = ReadDatabase::empty();
-    let service = LintService::new(database, settings, false);
+    let service = LintService::new(database, settings, ParserSettings::default(), false);
     let issues = service.lint_file(&file, LintMode::Full, None);
 
     let wasm_issues: Vec<WasmIssue> =
@@ -240,6 +242,7 @@ pub fn analyze(code: String, php_version: &str) -> Result<JsValue, JsValue> {
         prelude.metadata,
         prelude.symbol_references,
         settings,
+        ParserSettings::default(),
         false,
         plugin_registry,
     );

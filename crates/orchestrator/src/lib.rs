@@ -234,7 +234,12 @@ impl<'a> Orchestrator<'a> {
     ///
     /// A [`LintService`] configured with the orchestrator's linter settings and progress bar preferences.
     pub fn get_lint_service(&self, database: ReadDatabase) -> LintService {
-        LintService::new(database, self.config.linter_settings.clone(), self.config.use_progress_bars)
+        LintService::new(
+            database,
+            self.config.linter_settings.clone(),
+            self.config.parser_settings,
+            self.config.use_progress_bars,
+        )
     }
 
     /// Creates an architectural guard service with the current configuration.
@@ -251,7 +256,13 @@ impl<'a> Orchestrator<'a> {
     ///
     /// A [`GuardService`] configured with the orchestrator's guard settings and progress bar preferences.
     pub fn get_guard_service(&self, database: ReadDatabase, codebase: CodebaseMetadata) -> GuardService {
-        GuardService::new(database, codebase, self.config.guard_settings.clone(), self.config.use_progress_bars)
+        GuardService::new(
+            database,
+            codebase,
+            self.config.guard_settings.clone(),
+            self.config.parser_settings,
+            self.config.use_progress_bars,
+        )
     }
 
     /// Creates a static analysis service with the current configuration.
@@ -281,6 +292,7 @@ impl<'a> Orchestrator<'a> {
             codebase,
             symbol_references,
             self.config.analyzer_settings.clone(),
+            self.config.parser_settings,
             self.config.use_progress_bars,
             self.get_analyzer_plugin_registry(),
         );
@@ -310,6 +322,7 @@ impl<'a> Orchestrator<'a> {
             database,
             self.config.php_version,
             self.config.formatter_settings,
+            self.config.parser_settings,
             self.config.use_progress_bars,
         )
     }

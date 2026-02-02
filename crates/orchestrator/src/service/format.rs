@@ -9,6 +9,7 @@ use mago_formatter::Formatter;
 use mago_formatter::settings::FormatSettings;
 use mago_php_version::PHPVersion;
 use mago_syntax::error::ParseError;
+use mago_syntax::settings::ParserSettings;
 
 use crate::error::OrchestratorError;
 use crate::service::pipeline::StatelessParallelPipeline;
@@ -31,6 +32,7 @@ pub struct FormatService {
     database: ReadDatabase,
     php_version: PHPVersion,
     settings: FormatSettings,
+    parser_settings: ParserSettings,
     use_progress_bars: bool,
 }
 
@@ -40,9 +42,10 @@ impl FormatService {
         database: ReadDatabase,
         php_version: PHPVersion,
         settings: FormatSettings,
+        parser_settings: ParserSettings,
         use_progress_bars: bool,
     ) -> Self {
-        Self { database, php_version, settings, use_progress_bars }
+        Self { database, php_version, settings, parser_settings, use_progress_bars }
     }
 
     pub fn format_file(self, file: &File) -> Result<FileFormatStatus, OrchestratorError> {
@@ -52,7 +55,8 @@ impl FormatService {
     }
 
     pub fn format_file_in(self, file: &File, arena: &Bump) -> Result<FileFormatStatus, OrchestratorError> {
-        let formatter = Formatter::new(arena, self.php_version, self.settings);
+        let formatter =
+            Formatter::new(arena, self.php_version, self.settings).with_parser_settings(self.parser_settings);
 
         match formatter.format_file(file) {
             Ok(formatted_content) => {
@@ -67,7 +71,11 @@ impl FormatService {
     }
 
     pub fn run(self) -> Result<FormatResult, OrchestratorError> {
-        let context = FormatContext { php_version: self.php_version, settings: self.settings };
+        let context = FormatContext {
+            php_version: self.php_version,
+            settings: self.settings,
+            parser_settings: self.parser_settings,
+        };
 
         let pipeline = StatelessParallelPipeline::new(
             "✨ Formatting",
@@ -78,7 +86,8 @@ impl FormatService {
         );
 
         pipeline.run(|context, arena, file| {
-            let formatter = Formatter::new(arena, context.php_version, context.settings);
+            let formatter = Formatter::new(arena, context.php_version, context.settings)
+                .with_parser_settings(context.parser_settings);
             let status = match formatter.format_file(&file) {
                 Ok(formatted_content) => {
                     if file.contents == formatted_content {
@@ -114,7 +123,11 @@ impl FormatService {
     where
         Iter: IntoIterator<Item = FileId>,
     {
-        let context = FormatContext { php_version: self.php_version, settings: self.settings };
+        let context = FormatContext {
+            php_version: self.php_version,
+            settings: self.settings,
+            parser_settings: self.parser_settings,
+        };
 
         let pipeline = StatelessParallelPipeline::new(
             "✨ Formatting",
@@ -125,7 +138,8 @@ impl FormatService {
         );
 
         pipeline.run_on_files(file_ids, |context, arena, file| {
-            let formatter = Formatter::new(arena, context.php_version, context.settings);
+            let formatter = Formatter::new(arena, context.php_version, context.settings)
+                .with_parser_settings(context.parser_settings);
             let status = match formatter.format_file(&file) {
                 Ok(formatted_content) => {
                     if file.contents == formatted_content {
@@ -196,12 +210,14 @@ impl FormatResult {
 }
 
 /// Shared, read-only context provided to each parallel formatting task.
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 struct FormatContext {
     /// The target PHP version for formatting rules.
     php_version: PHPVersion,
     /// The configured settings for the formatter.
     settings: FormatSettings,
+    /// The parser settings.
+    parser_settings: ParserSettings,
 }
 
 #[derive(Debug, Clone)]

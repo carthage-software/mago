@@ -36,6 +36,7 @@ use crate::config::Configuration;
 use crate::config::analyzer::AnalyzerConfiguration;
 use crate::config::formatter::FormatterConfiguration;
 use crate::config::linter::LinterConfiguration;
+use crate::config::parser::ParserConfiguration;
 use crate::config::source::SourceConfiguration;
 use crate::consts::CURRENT_DIR;
 use crate::error::Error;
@@ -51,6 +52,7 @@ enum ConfigSection {
     Linter,
     Formatter,
     Analyzer,
+    Parser,
 }
 
 /// Display the final, merged configuration that Mago is using.
@@ -147,6 +149,10 @@ impl ConfigCommand {
                         let schema = schema_for!(AnalyzerConfiguration);
                         serde_json::to_string_pretty(&schema)?
                     }
+                    ConfigSection::Parser => {
+                        let schema = schema_for!(ParserConfiguration);
+                        serde_json::to_string_pretty(&schema)?
+                    }
                 }
             } else {
                 let schema = schema_for!(Configuration);
@@ -182,6 +188,13 @@ impl ConfigCommand {
                         serde_json::to_string_pretty(&AnalyzerConfiguration::default())?
                     } else {
                         serde_json::to_string_pretty(&configuration.analyzer)?
+                    }
+                }
+                ConfigSection::Parser => {
+                    if self.default {
+                        serde_json::to_string_pretty(&ParserConfiguration::default())?
+                    } else {
+                        serde_json::to_string_pretty(&configuration.parser)?
                     }
                 }
             }

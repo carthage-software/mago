@@ -8,6 +8,7 @@ use criterion::criterion_main;
 use mago_database::file::FileId;
 use mago_syntax::lexer::Lexer;
 use mago_syntax::parser::parse_file_content;
+use mago_syntax::settings::LexerSettings;
 use mago_syntax_core::input::Input;
 
 const SMALL_PHP: &str = r#"<?php
@@ -99,7 +100,7 @@ fn benchmark_mago_lexer(c: &mut Criterion) {
         b.iter(|| {
             let file_id = FileId::new("bench.php");
             let input = Input::new(file_id, black_box(LARGE_PHP.as_bytes()));
-            let mut lexer = Lexer::new(input);
+            let mut lexer = Lexer::new(input, LexerSettings::default());
             let mut count = 0usize;
             while let Some(result) = lexer.advance() {
                 if result.is_ok() {

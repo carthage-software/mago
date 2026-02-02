@@ -67,6 +67,7 @@ use crate::config::analyzer::AnalyzerConfiguration;
 use crate::config::formatter::FormatterConfiguration;
 use crate::config::guard::GuardConfiguration;
 use crate::config::linter::LinterConfiguration;
+use crate::config::parser::ParserConfiguration;
 use crate::config::source::SourceConfiguration;
 use crate::consts::*;
 use crate::error::Error;
@@ -75,6 +76,7 @@ pub mod analyzer;
 pub mod formatter;
 pub mod guard;
 pub mod linter;
+pub mod parser;
 pub mod source;
 
 /// Default value for threads configuration field.
@@ -165,6 +167,14 @@ pub struct Configuration {
     /// if not specified in the config file.
     #[serde(default)]
     pub linter: LinterConfiguration,
+
+    /// Parser configuration.
+    ///
+    /// Controls how PHP code is parsed, including lexer-level settings
+    /// like short open tag support. Defaults to standard PHP parsing behavior
+    /// if not specified in the config file.
+    #[serde(default)]
+    pub parser: ParserConfiguration,
 
     /// Formatter service configuration.
     ///
@@ -420,6 +430,7 @@ impl Configuration {
             allow_unsupported_php_version: false,
             source: SourceConfiguration::from_workspace(workspace),
             linter: LinterConfiguration::default(),
+            parser: ParserConfiguration::default(),
             formatter: FormatterConfiguration::default(),
             analyzer: AnalyzerConfiguration::default(),
             guard: GuardConfiguration::default(),
@@ -442,6 +453,7 @@ impl Configuration {
             "allow-unsupported-php-version": self.allow_unsupported_php_version,
             "source": self.source,
             "linter": self.linter.to_filtered_value(self.php_version),
+            "parser": self.parser,
             "formatter": self.formatter,
             "analyzer": self.analyzer,
             "guard": self.guard,

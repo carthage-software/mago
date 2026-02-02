@@ -7,7 +7,8 @@ use mago_guard::settings::Settings;
 use mago_names::resolver::NameResolver;
 use mago_reporting::Issue;
 use mago_reporting::IssueCollection;
-use mago_syntax::parser::parse_file;
+use mago_syntax::parser::parse_file_with_settings;
+use mago_syntax::settings::ParserSettings;
 
 use crate::error::OrchestratorError;
 use crate::service::pipeline::StatelessParallelPipeline;
@@ -36,6 +37,9 @@ pub struct GuardService {
     /// The guard settings to configure the guarding process.
     settings: Settings,
 
+    /// The parser settings to configure the parsing process.
+    parser_settings: ParserSettings,
+
     /// Whether to display progress bars during guarding.
     use_progress_bars: bool,
 }
@@ -48,6 +52,7 @@ impl GuardService {
     /// * `database` - The read-only database containing source files to guard.
     /// * `codebase` - A codebase metadata of builtin symbols.
     /// * `settings` - The guard settings to configure the guarding process.
+    /// * `parser_settings` - The parser settings to configure the parsing process.
     /// * `use_progress_bars` - Whether to display progress bars during guarding.
     ///
     /// # Returns
@@ -58,9 +63,10 @@ impl GuardService {
         database: ReadDatabase,
         codebase: CodebaseMetadata,
         settings: Settings,
+        parser_settings: ParserSettings,
         use_progress_bars: bool,
     ) -> Self {
-        Self { database, codebase, settings, use_progress_bars }
+        Self { database, codebase, settings, parser_settings, use_progress_bars }
     }
 
     /// Runs the guard pipeline on the codebase.
@@ -79,15 +85,15 @@ impl GuardService {
         let pipeline = StatelessParallelPipeline::new(
             GUARD_PROGRESS_PREFIX,
             self.database,
-            (Arc::new(self.codebase), self.settings),
+            (Arc::new(self.codebase), self.settings, self.parser_settings),
             Box::new(GuardResultReducer),
             self.use_progress_bars,
         );
 
-        let issues = pipeline.run(|(codebase, guard_settings), arena, source_file| {
+        let issues = pipeline.run(|(codebase, guard_settings, parser_settings), arena, source_file| {
             let mut issues = IssueCollection::new();
 
-            let program = parse_file(arena, &source_file);
+            let program = parse_file_with_settings(arena, &source_file, parser_settings);
             if program.has_errors() {
                 issues.extend(program.errors.iter().map(Issue::from));
             }

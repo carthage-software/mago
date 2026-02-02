@@ -57,6 +57,7 @@ use crate::lexer::internal::mode::HaltStage;
 use crate::lexer::internal::mode::Interpolation;
 use crate::lexer::internal::mode::LexerMode;
 use crate::lexer::internal::utils::NumberKind;
+use crate::settings::LexerSettings;
 use crate::token::DocumentKind;
 use crate::token::Token;
 use crate::token::TokenKind;
@@ -77,6 +78,7 @@ mod internal;
 #[derive(Debug)]
 pub struct Lexer<'input> {
     input: Input<'input>,
+    settings: LexerSettings,
     mode: LexerMode<'input>,
     interpolating: bool,
     /// Buffer for tokens during string interpolation.
@@ -84,22 +86,24 @@ pub struct Lexer<'input> {
 }
 
 impl<'input> Lexer<'input> {
+    /// Initial capacity for the token buffer used during string interpolation.
+    /// Pre-allocating avoids reallocation during interpolation processing.
+    const BUFFER_INITIAL_CAPACITY: usize = 8;
+
     /// Creates a new `Lexer` instance.
     ///
     /// # Parameters
     ///
     /// - `input`: The input source code to tokenize.
+    /// - `settings`: The lexer settings.
     ///
     /// # Returns
     ///
     /// A new `Lexer` instance that reads from the provided byte slice.
-    /// Initial capacity for the token buffer used during string interpolation.
-    /// Pre-allocating avoids reallocation during interpolation processing.
-    const BUFFER_INITIAL_CAPACITY: usize = 8;
-
-    pub fn new(input: Input<'input>) -> Lexer<'input> {
+    pub fn new(input: Input<'input>, settings: LexerSettings) -> Lexer<'input> {
         Lexer {
             input,
+            settings,
             mode: LexerMode::Inline,
             interpolating: false,
             buffer: VecDeque::with_capacity(Self::BUFFER_INITIAL_CAPACITY),
@@ -111,13 +115,15 @@ impl<'input> Lexer<'input> {
     /// # Parameters
     ///
     /// - `input`: The input source code to tokenize.
+    /// - `settings`: The lexer settings.
     ///
     /// # Returns
     ///
     /// A new `Lexer` instance that reads from the provided byte slice.
-    pub fn scripting(input: Input<'input>) -> Lexer<'input> {
+    pub fn scripting(input: Input<'input>, settings: LexerSettings) -> Lexer<'input> {
         Lexer {
             input,
+            settings,
             mode: LexerMode::Script,
             interpolating: false,
             buffer: VecDeque::with_capacity(Self::BUFFER_INITIAL_CAPACITY),
@@ -186,34 +192,117 @@ impl<'input> Lexer<'input> {
         match self.mode {
             LexerMode::Inline => {
                 let start = self.input.current_position();
-                if self.input.is_at(b"<?", false) {
-                    let (kind, buffer) = if self.input.is_at(b"<?php", true) {
-                        (TokenKind::OpenTag, self.input.consume(5))
-                    } else if self.input.is_at(b"<?=", false) {
-                        (TokenKind::EchoTag, self.input.consume(3))
-                    } else {
-                        (TokenKind::ShortOpenTag, self.input.consume(2))
-                    };
+                let offset = self.input.current_offset();
 
-                    let end = self.input.current_position();
-                    let tag = self.token(kind, buffer, start, end);
-
-                    self.mode = LexerMode::Script;
-
-                    return Some(Ok(tag));
-                }
-
-                if self.input.is_at(b"#!", true) {
+                // Shebang is only valid at the absolute start of the file (offset 0).
+                if offset == 0
+                    && self.input.len() >= 2
+                    && unsafe { *self.input.read_at_unchecked(0) } == b'#'
+                    && unsafe { *self.input.read_at_unchecked(1) } == b'!'
+                {
                     let buffer = self.input.consume_through(b'\n');
                     let end = self.input.current_position();
 
-                    Some(Ok(self.token(TokenKind::InlineShebang, buffer, start, end)))
-                } else {
-                    let buffer = self.input.consume_until(b"<?", false);
-                    let end = self.input.current_position();
-
-                    Some(Ok(self.token(TokenKind::InlineText, buffer, start, end)))
+                    return Some(Ok(self.token(TokenKind::InlineShebang, buffer, start, end)));
                 }
+
+                // Get the remaining bytes to scan.
+                let bytes = self.input.read_remaining();
+
+                if self.settings.enable_short_tags {
+                    if let Some(pos) = memchr::memmem::find(bytes, b"<?") {
+                        if pos > 0 {
+                            let buffer = self.input.consume(pos);
+                            let end = self.input.current_position();
+
+                            return Some(Ok(self.token(TokenKind::InlineText, buffer, start, end)));
+                        }
+
+                        if self.input.is_at(b"<?php", true) {
+                            let buffer = self.input.consume(5);
+                            self.mode = LexerMode::Script;
+                            return Some(Ok(self.token(
+                                TokenKind::OpenTag,
+                                buffer,
+                                start,
+                                self.input.current_position(),
+                            )));
+                        }
+
+                        if self.input.is_at(b"<?=", false) {
+                            let buffer = self.input.consume(3);
+                            self.mode = LexerMode::Script;
+                            return Some(Ok(self.token(
+                                TokenKind::EchoTag,
+                                buffer,
+                                start,
+                                self.input.current_position(),
+                            )));
+                        }
+
+                        let buffer = self.input.consume(2);
+                        self.mode = LexerMode::Script;
+                        return Some(Ok(self.token(
+                            TokenKind::ShortOpenTag,
+                            buffer,
+                            start,
+                            self.input.current_position(),
+                        )));
+                    }
+                } else {
+                    let iter = memchr::memmem::find_iter(bytes, b"<?");
+
+                    for pos in iter {
+                        // SAFETY: `pos` is guaranteed to be within `bytes` by `find_iter`.
+                        let candidate = unsafe { bytes.get_unchecked(pos..) };
+
+                        if candidate.len() >= 5
+                            && (unsafe { *candidate.get_unchecked(2) } | 0x20) == b'p'
+                            && (unsafe { *candidate.get_unchecked(3) } | 0x20) == b'h'
+                            && (unsafe { *candidate.get_unchecked(4) } | 0x20) == b'p'
+                        {
+                            if pos > 0 {
+                                let buffer = self.input.consume(pos);
+                                let end = self.input.current_position();
+                                return Some(Ok(self.token(TokenKind::InlineText, buffer, start, end)));
+                            }
+
+                            let buffer = self.input.consume(5);
+                            self.mode = LexerMode::Script;
+                            return Some(Ok(self.token(
+                                TokenKind::OpenTag,
+                                buffer,
+                                start,
+                                self.input.current_position(),
+                            )));
+                        }
+
+                        if candidate.len() >= 3 && unsafe { *candidate.get_unchecked(2) } == b'=' {
+                            if pos > 0 {
+                                let buffer = self.input.consume(pos);
+                                let end = self.input.current_position();
+                                return Some(Ok(self.token(TokenKind::InlineText, buffer, start, end)));
+                            }
+
+                            let buffer = self.input.consume(3);
+                            self.mode = LexerMode::Script;
+                            return Some(Ok(self.token(
+                                TokenKind::EchoTag,
+                                buffer,
+                                start,
+                                self.input.current_position(),
+                            )));
+                        }
+                    }
+                }
+
+                if self.input.has_reached_eof() {
+                    return None;
+                }
+
+                let buffer = self.input.consume_remaining();
+                let end = self.input.current_position();
+                Some(Ok(self.token(TokenKind::InlineText, buffer, start, end)))
             }
             LexerMode::Script => {
                 let start = self.input.current_position();

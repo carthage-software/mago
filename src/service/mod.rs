@@ -58,7 +58,8 @@ use std::sync::Arc;
 use bumpalo::Bump;
 use clap::ColorChoice;
 use mago_database::file::FileId;
-use mago_syntax::parser::parse_file_content;
+use mago_syntax::parser::parse_file_content_with_settings;
+use mago_syntax::settings::ParserSettings;
 use rayon::iter::IntoParallelIterator;
 use rayon::iter::ParallelIterator;
 
@@ -495,13 +496,14 @@ impl IssueProcessor {
         let format_after_fix = self.format_after_fix;
         let dry_run = self.dry_run;
         let color_choice = self.color_choice;
+        let parser_settings = orchestrator.config.parser_settings;
 
         let results: Vec<(bool, usize, usize, usize)> = batches_by_file
             .into_par_iter()
             .map_init(Bump::new, |arena, (file_id, batches)| {
                 let file = read_database.get_ref(&file_id)?;
                 let mut editor = TextEditor::with_safety(&file.contents, safety_threshold);
-                let checker = |code: &str| check_php_code(arena, file_id, code);
+                let checker = |code: &str| check_php_code(arena, file_id, code, parser_settings);
 
                 let mut skipped_unsafe = 0usize;
                 let mut skipped_potentially_unsafe = 0usize;
@@ -855,10 +857,11 @@ impl BaselineIssueProcessor {
 /// * `arena` - The memory arena to use for parsing.
 /// * `file_id` - The identifier for the temporary file.
 /// * `code` - The PHP code snippet to check.
+/// * `parser_settings` - The parser settings to use for parsing.
 ///
 /// # Returns
 ///
 /// * `true` if the code is syntactically valid, `false` otherwise.
-fn check_php_code(arena: &Bump, file_id: FileId, code: &str) -> bool {
-    !parse_file_content(arena, file_id, code).has_errors()
+fn check_php_code(arena: &Bump, file_id: FileId, code: &str, parser_settings: ParserSettings) -> bool {
+    !parse_file_content_with_settings(arena, file_id, code, parser_settings).has_errors()
 }

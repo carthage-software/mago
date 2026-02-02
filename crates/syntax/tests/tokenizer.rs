@@ -5,6 +5,7 @@ use mago_syntax_core::input::Input;
 
 use mago_syntax::error::SyntaxError;
 use mago_syntax::lexer::Lexer;
+use mago_syntax::settings::LexerSettings;
 use mago_syntax::token::DocumentKind;
 use mago_syntax::token::TokenKind;
 
@@ -1055,8 +1056,16 @@ fn test_use_fully_qualified() -> Result<(), SyntaxError> {
 }
 
 fn test_lexer(code: &[u8], expected_kinds: &[TokenKind]) -> Result<(), SyntaxError> {
+    test_lexer_with_settings(code, expected_kinds, LexerSettings::default())
+}
+
+fn test_lexer_with_settings(
+    code: &[u8],
+    expected_kinds: &[TokenKind],
+    settings: LexerSettings,
+) -> Result<(), SyntaxError> {
     let input = Input::new(FileId::zero(), code);
-    let mut lexer = Lexer::new(input);
+    let mut lexer = Lexer::new(input, settings);
 
     let mut tokens = Vec::new();
     let mut error = None;
@@ -1084,6 +1093,82 @@ fn test_lexer(code: &[u8], expected_kinds: &[TokenKind]) -> Result<(), SyntaxErr
     }
 
     assert_eq!(code, found.as_bytes());
+
+    Ok(())
+}
+
+#[test]
+fn test_short_tags_disabled_treats_short_open_tag_as_inline_text() -> Result<(), SyntaxError> {
+    let settings = LexerSettings { enable_short_tags: false };
+
+    // `<?` should be treated as inline text when short tags are disabled
+    // The lexer returns a single InlineText token containing everything
+    let code = b"hello <? world";
+    let expected = &[TokenKind::InlineText];
+    test_lexer_with_settings(code, expected, settings)?;
+
+    // `<?php` should still work
+    let code = b"hello <?php echo 1;";
+    let expected = &[
+        TokenKind::InlineText,
+        TokenKind::OpenTag,
+        TokenKind::Whitespace,
+        TokenKind::Echo,
+        TokenKind::Whitespace,
+        TokenKind::LiteralInteger,
+        TokenKind::Semicolon,
+    ];
+    test_lexer_with_settings(code, expected, settings)?;
+
+    // `<?=` should still work
+    let code = b"hello <?= $x ?> world";
+    let expected = &[
+        TokenKind::InlineText,
+        TokenKind::EchoTag,
+        TokenKind::Whitespace,
+        TokenKind::Variable,
+        TokenKind::Whitespace,
+        TokenKind::CloseTag,
+        TokenKind::InlineText,
+    ];
+    test_lexer_with_settings(code, expected, settings)?;
+
+    // XML declaration should be treated as inline text (multiple tokens)
+    // "<?xml version=\"1.0\"?>", then PHP code
+    let code = b"<?xml version=\"1.0\"?><?php echo 1;";
+    let expected = &[
+        TokenKind::InlineText, // <?xml version="1.0"?>
+        TokenKind::OpenTag,
+        TokenKind::Whitespace,
+        TokenKind::Echo,
+        TokenKind::Whitespace,
+        TokenKind::LiteralInteger,
+        TokenKind::Semicolon,
+    ];
+    test_lexer_with_settings(code, expected, settings)?;
+
+    Ok(())
+}
+
+#[test]
+fn test_short_tags_enabled_treats_short_open_tag_as_php() -> Result<(), SyntaxError> {
+    let settings = LexerSettings { enable_short_tags: true };
+
+    // `<?` should be treated as PHP open tag when short tags are enabled
+    let code = b"hello <? echo 1; ?> world";
+    let expected = &[
+        TokenKind::InlineText,
+        TokenKind::ShortOpenTag,
+        TokenKind::Whitespace,
+        TokenKind::Echo,
+        TokenKind::Whitespace,
+        TokenKind::LiteralInteger,
+        TokenKind::Semicolon,
+        TokenKind::Whitespace,
+        TokenKind::CloseTag,
+        TokenKind::InlineText,
+    ];
+    test_lexer_with_settings(code, expected, settings)?;
 
     Ok(())
 }

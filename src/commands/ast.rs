@@ -50,6 +50,7 @@ use bumpalo::Bump;
 use clap::ColorChoice;
 use clap::Parser;
 use colored::Colorize;
+use mago_syntax::parser::parse_file_with_settings;
 use serde_json::json;
 use termtree::Tree;
 use unicode_width::UnicodeWidthStr;
@@ -63,7 +64,6 @@ use mago_reporting::Issue;
 use mago_reporting::IssueCollection;
 use mago_syntax::ast::*;
 use mago_syntax::lexer::Lexer;
-use mago_syntax::parser::parse_file;
 use mago_syntax_core::input::Input;
 
 use crate::commands::args::reporting::ReportingArgs;
@@ -136,10 +136,10 @@ impl AstCommand {
         let file = File::read(&configuration.source.workspace, &self.file, FileType::Host)?;
 
         if self.tokens {
-            return self.print_tokens(configuration, color_choice, &arena, file);
+            return self.print_tokens(configuration, color_choice, file);
         }
 
-        let program = parse_file(&arena, &file);
+        let program = parse_file_with_settings(&arena, &file, configuration.parser.to_settings());
         if program.has_errors() {
             let issues = IssueCollection::from(program.errors.iter().map(Issue::from).collect::<Vec<_>>());
             let config = DatabaseConfiguration::new(Path::new("/"), vec![], vec![], vec![], vec![]).into_static();
@@ -171,10 +171,9 @@ impl AstCommand {
         self,
         configuration: Configuration,
         color_choice: ColorChoice,
-        _arena: &Bump,
         file: File,
     ) -> Result<ExitCode, Error> {
-        let mut lexer = Lexer::new(Input::from_file(&file));
+        let mut lexer = Lexer::new(Input::from_file(&file), configuration.parser.to_settings().lexer);
         let mut tokens = Vec::new();
         loop {
             match lexer.advance() {

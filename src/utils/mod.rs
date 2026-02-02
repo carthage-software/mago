@@ -81,6 +81,7 @@ pub(crate) fn create_orchestrator<'a>(
 
     let orchestrator_config = OrchestratorConfiguration {
         php_version: configuration.php_version,
+        parser_settings: configuration.parser.to_settings(),
         analyzer_settings: configuration.analyzer.to_settings(configuration.php_version, color_choice, enable_diff),
         linter_settings,
         guard_settings: configuration.guard.settings.clone(),

@@ -8,6 +8,7 @@ use mago_formatter::settings::FormatSettings;
 use mago_guard::settings::Settings as GuardSettings;
 use mago_linter::settings::Settings as LinterSettings;
 use mago_php_version::PHPVersion;
+use mago_syntax::settings::ParserSettings;
 
 /// The complete configuration for the orchestrator and all its services.
 ///
@@ -76,6 +77,12 @@ pub struct OrchestratorConfiguration<'a> {
     /// Only files with these extensions will be processed. The default is typically
     /// just `["php"]`, but you can add others like `"phtml"`, `"php8"`, etc.
     pub extensions: Vec<&'a str>,
+
+    /// Settings for the parser.
+    ///
+    /// Controls lexer and parser behavior, such as whether short open tags (`<?`) are enabled.
+    /// See [`mago_syntax::settings::ParserSettings`] for available options.
+    pub parser_settings: ParserSettings,
 
     /// Settings for the static analyzer.
     ///

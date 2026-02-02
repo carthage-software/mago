@@ -1,3 +1,5 @@
+#![allow(clippy::too_many_arguments)]
+
 use std::sync::Arc;
 
 use ahash::HashSet;
@@ -16,7 +18,8 @@ use mago_database::file::File;
 use mago_database::file::FileId;
 use mago_database::file::FileType;
 use mago_names::resolver::NameResolver;
-use mago_syntax::parser::parse_file;
+use mago_syntax::parser::parse_file_with_settings;
+use mago_syntax::settings::ParserSettings;
 
 use crate::error::OrchestratorError;
 use crate::progress::ProgressBarTheme;
@@ -75,6 +78,7 @@ pub struct ParallelPipeline<T, I, R> {
     codebase: CodebaseMetadata,
     symbol_references: SymbolReferences,
     shared_context: T,
+    parser_settings: ParserSettings,
     reducer: Box<dyn Reducer<I, R> + Send + Sync>,
     should_use_progress_bar: bool,
     after_scanning: Option<PostScanCallback>,
@@ -91,6 +95,7 @@ where
             .field("codebase", &self.codebase)
             .field("symbol_references", &self.symbol_references)
             .field("shared_context", &self.shared_context)
+            .field("parser_settings", &self.parser_settings)
             .field("reducer", &"<reducer>")
             .field("should_use_progress_bar", &self.should_use_progress_bar)
             .field("after_scanning", &self.after_scanning.is_some())
@@ -124,6 +129,7 @@ where
         codebase: CodebaseMetadata,
         symbol_references: SymbolReferences,
         shared_context: T,
+        parser_settings: ParserSettings,
         reducer: Box<dyn Reducer<I, R> + Send + Sync>,
         should_use_progress_bar: bool,
     ) -> Self {
@@ -133,6 +139,7 @@ where
             codebase,
             symbol_references,
             shared_context,
+            parser_settings,
             reducer,
             should_use_progress_bar,
             after_scanning: None,
@@ -185,10 +192,11 @@ where
             None
         };
 
+        let parser_settings = self.parser_settings;
         let partial_codebases: Result<Vec<CodebaseMetadata>, OrchestratorError> = source_files
             .into_par_iter()
             .map_init(Bump::new, |arena, file| -> Result<CodebaseMetadata, OrchestratorError> {
-                let program = parse_file(arena, &file);
+                let program = parse_file_with_settings(arena, &file, parser_settings);
                 if program.has_errors() {
                     tracing::warn!(
                         "Encountered {} parsing errors in file '{}'. Codebase analysis may be incomplete.",

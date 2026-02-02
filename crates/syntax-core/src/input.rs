@@ -1,10 +1,10 @@
 use bumpalo::Bump;
-use mago_database::file::HasFileId;
 use memchr::memchr;
 use memchr::memmem::find;
 
 use mago_database::file::File;
 use mago_database::file::FileId;
+use mago_database::file::HasFileId;
 use mago_span::Position;
 
 /// Lookup table for ASCII whitespace (space, tab, newline, carriage return, form feed, vertical tab)
@@ -241,7 +241,7 @@ impl<'a> Input<'a> {
 
     /// Skips the next `count` characters, advancing the position accordingly.
     ///
-    /// Updates line and column numbers as it advances.
+    /// Updates offset by `count`, clamping to the input length.
     ///
     /// # Arguments
     ///
@@ -424,6 +424,15 @@ impl<'a> Input<'a> {
         unsafe { self.bytes.get_unchecked(from..until) }
     }
 
+    /// Reads all remaining characters from the current position to the end of input,
+    /// without advancing the position.
+    #[inline(always)]
+    pub fn read_remaining(&self) -> &'a [u8] {
+        let from = self.offset;
+
+        unsafe { self.bytes.get_unchecked(from..) }
+    }
+
     /// Reads a single byte at a specific byte offset within the input slice,
     /// without advancing the internal cursor.
     ///
@@ -445,6 +454,19 @@ impl<'a> Input<'a> {
     #[must_use]
     pub fn read_at(&self, at: usize) -> &'a u8 {
         &self.bytes[at]
+    }
+
+    /// Reads a single byte at a specific byte offset within the input slice,
+    /// without advancing the internal cursor.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that `at` is a valid index within the bounds of the input slice
+    /// (i.e., `at < self.bytes.len()`). Failing to do so results in undefined behavior.
+    #[inline(always)]
+    pub unsafe fn read_at_unchecked(&self, at: usize) -> &'a u8 {
+        // SAFETY: Caller must ensure at < self.length
+        unsafe { self.bytes.get_unchecked(at) }
     }
 
     /// Checks if the input at the current position matches the given byte slice.

@@ -142,6 +142,36 @@ mago list-files --command analyzer
 This helps verify your `paths`, `includes`, and `excludes` configuration is working as expected.
 :::
 
+## `[parser]` Section
+
+This section configures how Mago parses PHP code, including lexer-level settings that affect tokenization behavior.
+
+### Example
+
+```toml
+[parser]
+enable-short-tags = false
+```
+
+### Configuration Reference
+
+| Option              | Type      | Default | Description                                                                                                                                                                                             |
+| :------------------ | :-------- | :------ | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `enable-short-tags` | `boolean` | `true`  | Whether to enable PHP short open tags (`<?`). When disabled, only `<?php` and `<?=` are recognized as PHP open tags. Equivalent to PHP's `short_open_tag` ini directive.                               |
+
+### When to Disable Short Open Tags
+
+You might want to disable short open tags if:
+
+- Your project contains XML files with `.php` extensions that use `<?xml` declarations
+- You're working with template files that mix PHP and XML/HTML containing `<?` sequences
+- Your coding standards require explicit `<?php` tags for clarity
+- You want to match the behavior of PHP installations where `short_open_tag` is disabled
+
+:::warning
+When `enable-short-tags` is `false`, sequences like `<?xml version="1.0"?>` will be treated as inline text rather than causing parse errors. However, any code using `<?` as a PHP open tag will no longer be recognized as PHP code.
+:::
+
 ## Tool-Specific Configuration
 
 For details on configuring the linter, formatter, and analyzer, see their respective reference pages:
@@ -197,7 +227,7 @@ Usage: mago config [OPTIONS]
 
 | Flag, Alias(es)    | Description                                                                                                        |
 | :----------------- | :----------------------------------------------------------------------------------------------------------------- |
-| `--show <SECTION>` | Display only a specific section of the configuration. <br/>**Values:** `source`, `linter`, `formatter`, `analyzer` |
+| `--show <SECTION>` | Display only a specific section of the configuration. <br/>**Values:** `source`, `parser`, `linter`, `formatter`, `analyzer` |
 | `--default`        | Show the default configuration values instead of the current merged configuration.                                 |
 | `--schema`         | Output JSON schema instead of configuration values. Useful for documentation and IDE integration.                  |
 | `-h`, `--help`     | Print help information.                                                                                            |
