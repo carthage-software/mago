@@ -2,16 +2,21 @@
 crates/formatter/tests/cases/issue_225/before.php -text eol=crlf
 crates/formatter/tests/cases/issue_225/after.php -text eol=crlf
 stubs/** linguist-vendored
-/crates/ export-ignore
-/src/ export-ignore
-/.github/ export-ignore
-/scripts/ export-ignore
-/build.rs export-ignore
-/Cargo.toml export-ignore
-/Cargo.lock export-ignore
-/flake.nix export-ignore
-/flake.lock export-ignore
-/.rustfmt.toml export-ignore
-/.typos.toml export-ignore
-/mago.toml export-ignore
-/corpus/ export-ignore
+.envrc export-ignore
+.gitattributes export-ignore
+.gitignore export-ignore
+.rustfmt.toml export-ignore
+.typos.toml export-ignore
+.github/ export-ignore
+Justfile export-ignore
+build.rs export-ignore
+Cargo.toml export-ignore
+Cargo.lock export-ignore
+corpus/ export-ignore
+crates/ export-ignore
+docs/ export-ignore
+flake.nix export-ignore
+flake.lock export-ignore
+mago.toml export-ignore
+scripts/ export-ignore
+src/ export-ignore
