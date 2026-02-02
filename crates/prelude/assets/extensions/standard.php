@@ -5213,39 +5213,37 @@ function prev(object|array &$array): mixed
 }
 
 /**
- * @template T
+ * @template K
+ * @template V
  *
- * @param object|array<T> $array
- * @param-out ($array is object ? object : ($array is list<T> ? list<T> : array<array-key, T>)) $array
+ * @param object|array<K, V> $array
+ * @param-out ($array is object ? object : ($array is list<V> ? list<V> : array<K, V>)) $array
  *
- * @return T|false
+ * @return V|false
  */
 function next(object|array &$array): mixed
 {
 }
 
 /**
- * @template T
+ * @template K
+ * @template V
  *
- * @param object|array<T> $array
- * @param-out ($array is object ? object : ($array is list<T> ? list<T> : array<array-key, T>)) $array
+ * @param object|array<K, V> $array
+ * @param-out ($array is object ? object : ($array is list<V> ? list<V> : array<K, V>)) $array
  *
- * @return T|false
+ * @return V|false
  */
 function reset(object|array &$array): mixed
 {
 }
 
 /**
- * @template T
+ * @template V
  *
- * @param object|array<T> $array
+ * @param object|array<array-key, V> $array
  *
- * @return (
- *   $array is object ? mixed : (
- *     $array is non-empty-array|non-empty-list ? T : T|false
- *   )
- * )
+ * @return ($array is object ? mixed : (V|false))
  *
  * @pure
  */

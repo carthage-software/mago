@@ -564,16 +564,17 @@ test_case!(issue_964);
 test_case!(issue_969);
 test_case!(issue_970);
 test_case!(issue_973);
+test_case!(issue_980);
 test_case!(issue_984);
 test_case!(issue_985);
-test_case!(issue_998);
-test_case!(issue_1005);
-test_case!(issue_1006);
 test_case!(issue_996);
+test_case!(issue_998);
 test_case!(issue_1002_part_1);
 test_case!(issue_1002_part_2);
 test_case!(issue_1002_part_3);
 test_case!(issue_1002_part_4);
+test_case!(issue_1005);
+test_case!(issue_1006);
 
 #[test]
 fn test_all_test_cases_are_ran() {
