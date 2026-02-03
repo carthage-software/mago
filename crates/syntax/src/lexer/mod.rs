@@ -482,7 +482,8 @@ impl<'input> Lexer<'input> {
                             } else {
                                 // Check if this byte could start a cast type (case-insensitive)
                                 let lower = b | 0x20; // ASCII lowercase
-                                if !matches!(lower, b'i' | b'b' | b'f' | b'd' | b'r' | b's' | b'a' | b'o' | b'u') {
+                                if !matches!(lower, b'i' | b'b' | b'f' | b'd' | b'r' | b's' | b'a' | b'o' | b'u' | b'v')
+                                {
                                     break 'parenthesis (TokenKind::LeftParenthesis, 1);
                                 }
                                 break;

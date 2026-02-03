@@ -76,7 +76,7 @@ fn test_emoji_attribute() -> Result<(), SyntaxError> {
 
 #[test]
 fn test_casts() -> Result<(), SyntaxError> {
-    let code = b"hello <?= ( string ) + - / ??= ?-> ... ( int   ) (integer    ) (    double) &&  ?> world";
+    let code = b"hello <?= ( string ) + - / ??= ?-> ... ( int   ) (integer    ) (    double) ( void ) &&  ?> world";
     let expected = &[
         TokenKind::InlineText,
         TokenKind::EchoTag,
@@ -100,6 +100,8 @@ fn test_casts() -> Result<(), SyntaxError> {
         TokenKind::IntegerCast,
         TokenKind::Whitespace,
         TokenKind::DoubleCast,
+        TokenKind::Whitespace,
+        TokenKind::VoidCast,
         TokenKind::Whitespace,
         TokenKind::AmpersandAmpersand,
         TokenKind::Whitespace,
