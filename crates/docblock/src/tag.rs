@@ -236,7 +236,7 @@ fn parse_var_ident(raw: &str, allow_property_access: bool) -> Option<Variable> {
             pos += 1;
         }
 
-        // Now parse any property/array access chains
+        // Now parse any property/call/array access chains
         while pos < bytes.len() {
             if pos + 1 < bytes.len() && &bytes[pos..pos + 2] == b"->" {
                 // Object property access: ->identifier
@@ -267,6 +267,10 @@ fn parse_var_ident(raw: &str, allow_property_access: bool) -> Option<Variable> {
                 if bracket_depth != 0 {
                     return None; // Unmatched brackets
                 }
+            } else if bytes[pos] == b'(' && bytes.get(pos + 1).is_some_and(|b| *b == b')') {
+                pos += 2; // Skip ()
+                // Method calls terminate the property access chain
+                break;
             } else {
                 // End of valid property access chain
                 break;
@@ -1624,7 +1628,26 @@ mod tests {
         let content = " int $x,";
         let span = test_span_for(content);
         let result = parse_assertion_tag(content, span).unwrap();
+        assert_eq!(result.type_string.value, "int");
         assert_eq!(result.variable.name, "$x");
+    }
+
+    #[test]
+    fn test_assertion_method_call() {
+        let content = " Statement $this->first()";
+        let span = test_span_for(content);
+        let result = parse_assertion_tag(content, span).unwrap();
+        assert_eq!(result.type_string.value, "Statement");
+        assert_eq!(result.variable.name, "$this->first()");
+    }
+
+    #[test]
+    fn test_assertion_property_access() {
+        let content = " Statement $this->property";
+        let span = test_span_for(content);
+        let result = parse_assertion_tag(content, span).unwrap();
+        assert_eq!(result.type_string.value, "Statement");
+        assert_eq!(result.variable.name, "$this->property");
     }
 
     #[test]

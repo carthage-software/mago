@@ -147,6 +147,16 @@ pub(crate) fn analyze<'ctx, 'arena>(
 
     if_body_context.if_body_context = tmp_if_body_context_nested;
 
+    let condition_span = condition.span();
+    let condition_range = (condition_span.start_offset(), condition_span.end_offset());
+    if let Some(assertions) = artifacts.if_true_assertions.get(&condition_range) {
+        for (key, assertion_set) in assertions {
+            if key.ends_with("()") {
+                if_body_context.active_method_call_assertions.entry(*key).or_default().extend(assertion_set.clone());
+            }
+        }
+    }
+
     Ok((
         IfConditionalScope {
             if_body_context,

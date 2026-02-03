@@ -383,6 +383,7 @@ test_case!(issue_contravariant_params_simple);
 test_case!(anonymous_class_constructor_args);
 test_case!(undefined_type_reference);
 test_case!(duplicate_definition);
+test_case!(method_call_assertions);
 
 // Github Issues
 test_case!(issue_659);

@@ -3,6 +3,7 @@ use std::rc::Rc;
 
 use ahash::HashSet;
 
+use mago_algebra::assertion_set::AssertionSet;
 use mago_algebra::clause::Clause;
 use mago_atom::Atom;
 use mago_atom::AtomMap;
@@ -117,6 +118,14 @@ pub struct BlockContext<'ctx> {
     /// If this method calls `parent::`<method>() where <method> is a class initializer,
     /// this holds the initializer method name.
     pub calls_parent_initializer: Option<Atom>,
+
+    /// Active method call assertions from guard methods.
+    /// When inside a conditional like `if ($obj->isValid())`, this tracks assertions
+    /// about method return types that should be applied.
+    ///
+    /// Key: method call expression id (e.g., "$statements->first()")
+    /// Value: assertion set to apply to the method's return type
+    pub active_method_call_assertions: AtomMap<AssertionSet>,
 }
 
 impl BreakContext {
@@ -183,6 +192,7 @@ impl<'ctx> BlockContext<'ctx> {
             definitely_called_methods: HashSet::default(),
             called_methods: HashSet::default(),
             calls_parent_initializer: None,
+            active_method_call_assertions: AtomMap::default(),
         };
 
         if register_super_globals {
