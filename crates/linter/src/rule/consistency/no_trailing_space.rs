@@ -10,6 +10,7 @@ use mago_span::HasSpan;
 use mago_span::Span;
 use mago_syntax::ast::Node;
 use mago_syntax::ast::NodeKind;
+use mago_text_edit::TextEdit;
 
 use crate::category::Category;
 use crate::context::LintContext;
@@ -119,7 +120,9 @@ impl LintRule for NoTrailingSpaceRule {
                         .with_note("Trailing whitespaces can cause unnecessary diffs and formatting issues.")
                         .with_help("Remove the extra whitespace.");
 
-                    ctx.collector.report(issue);
+                    ctx.collector.propose(issue, |edits| {
+                        edits.push(TextEdit::delete(whitespace_span));
+                    });
                 }
 
                 offset += line.len() + 1;
