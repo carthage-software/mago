@@ -218,31 +218,6 @@ pub fn ascii_lowercase_atom(s: &str) -> Atom {
         );
     }
 
-    // Non-ASCII path: handle Unicode lowercasing
-    if s.len() <= STACK_BUF_SIZE {
-        let mut stack_buf = [0u8; STACK_BUF_SIZE];
-        let mut index = 0;
-
-        for c in s.chars() {
-            for lower_c in c.to_lowercase() {
-                let mut char_buf = [0u8; 4];
-                let encoded = lower_c.encode_utf8(&mut char_buf).as_bytes();
-
-                if index + encoded.len() > STACK_BUF_SIZE {
-                    return atom(&s.to_lowercase());
-                }
-
-                stack_buf[index..index + encoded.len()].copy_from_slice(encoded);
-                index += encoded.len();
-            }
-        }
-
-        return atom(
-            // SAFETY: We only write valid UTF-8 bytes into the stack buffer.
-            unsafe { std::str::from_utf8_unchecked(&stack_buf[..index]) },
-        );
-    }
-
     atom(&s.to_lowercase())
 }
 
