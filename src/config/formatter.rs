@@ -32,16 +32,13 @@ struct RawFormatterConfiguration {
     #[serde(default)]
     preset: Option<FormatterPreset>,
     #[serde(flatten)]
-    settings: FormatSettings,
+    settings: RawFormatSettings,
 }
 
 impl From<RawFormatterConfiguration> for FormatterConfiguration {
     fn from(raw: RawFormatterConfiguration) -> Self {
-        let settings = if let Some(preset) = raw.preset {
-            merge_format_settings(preset.settings(), raw.settings)
-        } else {
-            raw.settings
-        };
+        let base = raw.preset.map(|p| p.settings()).unwrap_or_default();
+        let settings = raw.settings.merge_with(base);
 
         Self { excludes: raw.excludes, settings }
     }
@@ -209,10 +206,9 @@ mod tests {
     }
 
     #[test]
-    fn test_deserialize_pint_preset_uses_preset_for_default_values() {
-        // When a value matches FormatSettings::default(), the preset value is used.
-        // This is because we cannot distinguish between "user didn't set a value"
-        // and "user set a value that happens to match the default".
+    fn test_explicit_value_overrides_preset_even_if_matching_default() {
+        // When a user explicitly sets a value (even if it matches FormatSettings::default()),
+        // it should override the preset value.
         let toml = r#"
             preset = "pint"
             end-of-line = "auto"
@@ -221,12 +217,23 @@ mod tests {
         let config: FormatterConfiguration = toml::from_str(toml).unwrap();
         let pint_preset = FormatterPreset::Pint.settings();
 
-        // Preset value is used because "auto" matches the default
-        assert_eq!(config.settings.end_of_line, pint_preset.end_of_line);
-        assert_eq!(config.settings.end_of_line, EndOfLine::Lf);
+        // User's explicit value "auto" should be used, not the preset value "lf"
+        assert_eq!(config.settings.end_of_line, EndOfLine::Auto);
+        assert_ne!(config.settings.end_of_line, pint_preset.end_of_line);
 
-        // Other Pint preset values should still be used
+        // Other Pint preset values should still be used for non-overridden fields
         assert_eq!(config.settings.print_width, pint_preset.print_width);
         assert_eq!(config.settings.tab_width, pint_preset.tab_width);
+    }
+
+    #[test]
+    fn test_issue_1010_explicit_default_value_overrides_preset() {
+        let toml = r#"
+            preset = "hack"
+            print-width = 120
+        "#;
+
+        let config: FormatterConfiguration = toml::from_str(toml).unwrap();
+        assert_eq!(config.settings.print_width, 120);
     }
 }

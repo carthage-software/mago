@@ -1,43 +1,90 @@
 use std::str::FromStr;
 
-use crate::presets;
+use crate::presets::FormatterPreset;
 use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
 
-/// Format settings for the PHP printer.
+/// Macro to generate both `FormatSettings` and `RawFormatSettings` from a single definition.
 ///
-/// **WARNING:** This structure is not to be considered exhaustive. New fields may be added in minor
-/// or patch releases. Do not construct this structure directly outside of the formatter crate.
+/// This ensures the two structs stay in sync. `RawFormatSettings` has all fields as `Option<T>`
+/// to track which fields were explicitly set by the user during deserialization.
 ///
-/// New fields are added with default values to ensure backward compatibility,
-/// unless a breaking change is explicitly intended for PER-CS compliance updates.
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, JsonSchema)]
-#[serde(rename_all = "kebab-case", deny_unknown_fields)]
-pub struct FormatSettings {
+/// All fields MUST have an explicit default function specified using `=> "default_fn"` syntax.
+/// For types that implement Default, use the type's default method (e.g., `=> "EndOfLine::default"`).
+macro_rules! generate_formatter_settings {
+    (
+        $(
+            $(#[$field_meta:meta])*
+            $field:ident : $type:ty => $default:literal
+        ),* $(,)?
+    ) => {
+        /// Format settings for the PHP printer.
+        ///
+        /// **WARNING:** This structure is not to be considered exhaustive. New fields may be added in minor
+        /// or patch releases. Do not construct this structure directly outside of the formatter crate.
+        ///
+        /// New fields are added with default values to ensure backward compatibility,
+        /// unless a breaking change is explicitly intended for PER-CS compliance updates.
+        #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, JsonSchema)]
+        #[serde(rename_all = "kebab-case", deny_unknown_fields)]
+        pub struct FormatSettings {
+            $(
+                $(#[$field_meta])*
+                #[serde(default = $default)]
+                pub $field: $type,
+            )*
+        }
+
+        /// Raw format settings with all fields optional.
+        ///
+        /// Used during deserialization to track which fields were explicitly set by the user.
+        /// This allows us to distinguish between "user set a value" and "serde applied a default".
+        #[derive(Debug, Clone, Default, Deserialize)]
+        #[serde(rename_all = "kebab-case")]
+        pub struct RawFormatSettings {
+            $(
+                $(#[$field_meta])*
+                pub $field: Option<$type>,
+            )*
+        }
+
+        impl RawFormatSettings {
+            /// Merge raw user settings over a base (preset or default).
+            ///
+            /// If user explicitly set a field (Some), use their value.
+            /// Otherwise, use the base value.
+            pub fn merge_with(self, base: FormatSettings) -> FormatSettings {
+                FormatSettings {
+                    $(
+                        $field: self.$field.unwrap_or(base.$field),
+                    )*
+                }
+            }
+        }
+    };
+}
+
+generate_formatter_settings! {
     /// Maximum line length that the printer will wrap on.
     ///
     /// Default: 120
-    #[serde(default = "default_print_width")]
-    pub print_width: usize,
+    print_width: usize => "default_print_width",
 
     /// Number of spaces per indentation level.
     ///
     /// Default: 4
-    #[serde(default = "default_tab_width")]
-    pub tab_width: usize,
+    tab_width: usize => "default_tab_width",
 
     /// Whether to use tabs instead of spaces for indentation.
     ///
     /// Default: false
-    #[serde(default = "default_false")]
-    pub use_tabs: bool,
+    use_tabs: bool => "default_false",
 
     /// End-of-line characters to use.
     ///
     /// Default: "lf"
-    #[serde(default)]
-    pub end_of_line: EndOfLine,
+    end_of_line: EndOfLine => "EndOfLine::default",
 
     /// Whether to use single quotes instead of double quotes for strings.
     ///
@@ -50,8 +97,7 @@ pub struct FormatSettings {
     /// - If equal number of both, single quotes are used if this option is true
     ///
     /// Default: true
-    #[serde(default = "default_true")]
-    pub single_quote: bool,
+    single_quote: bool => "default_true",
 
     /// Whether to add a trailing comma to the last element in multi-line syntactic structures.
     ///
@@ -59,14 +105,12 @@ pub struct FormatSettings {
     /// argument lists, and other similar structures when they span multiple lines.
     ///
     /// Default: true
-    #[serde(default = "default_true")]
-    pub trailing_comma: bool,
+    trailing_comma: bool => "default_true",
 
     /// Whether to remove the trailing PHP close tag (`?>`) from files.
     ///
     /// Default: true
-    #[serde(default = "default_true")]
-    pub remove_trailing_close_tag: bool,
+    remove_trailing_close_tag: bool => "default_true",
 
     /// Brace placement for control structures (if, for, while, etc.).
     ///
@@ -86,14 +130,12 @@ pub struct FormatSettings {
     /// ```
     ///
     /// Default: `same_line`
-    #[serde(default = "BraceStyle::same_line")]
-    pub control_brace_style: BraceStyle,
+    control_brace_style: BraceStyle => "BraceStyle::same_line",
 
     /// Whether to place `else`, `elseif`, `catch` and `finally` on a new line.
     ///
     /// Default: false
-    #[serde(default = "default_false")]
-    pub following_clause_on_newline: bool,
+    following_clause_on_newline: bool => "default_false",
 
     /// Brace placement for closures.
     ///
@@ -113,8 +155,7 @@ pub struct FormatSettings {
     /// ```
     ///
     /// Default: `same_line`
-    #[serde(default = "BraceStyle::same_line")]
-    pub closure_brace_style: BraceStyle,
+    closure_brace_style: BraceStyle => "BraceStyle::same_line",
 
     /// Brace placement for function declarations.
     ///
@@ -134,8 +175,7 @@ pub struct FormatSettings {
     /// ```
     ///
     /// Default: `next_line`
-    #[serde(default = "BraceStyle::next_line")]
-    pub function_brace_style: BraceStyle,
+    function_brace_style: BraceStyle => "BraceStyle::next_line",
 
     /// Brace placement for method declarations.
     ///
@@ -161,8 +201,7 @@ pub struct FormatSettings {
     /// ```
     ///
     /// Default: `next_line`
-    #[serde(default = "BraceStyle::next_line")]
-    pub method_brace_style: BraceStyle,
+    method_brace_style: BraceStyle => "BraceStyle::next_line",
 
     /// Brace placement for class-like structures (classes, interfaces, traits, enums).
     ///
@@ -180,8 +219,7 @@ pub struct FormatSettings {
     /// ```
     ///
     /// Default: `always_next_line`
-    #[serde(default = "BraceStyle::always_next_line")]
-    pub classlike_brace_style: BraceStyle,
+    classlike_brace_style: BraceStyle => "BraceStyle::always_next_line",
 
     /// Place empty control structure bodies on the same line.
     ///
@@ -198,8 +236,7 @@ pub struct FormatSettings {
     /// ```
     ///
     /// Default: false
-    #[serde(default = "default_false")]
-    pub inline_empty_control_braces: bool,
+    inline_empty_control_braces: bool => "default_false",
 
     /// Place empty closure bodies on the same line.
     ///
@@ -216,8 +253,7 @@ pub struct FormatSettings {
     /// ```
     ///
     /// Default: true
-    #[serde(default = "default_true")]
-    pub inline_empty_closure_braces: bool,
+    inline_empty_closure_braces: bool => "default_true",
 
     /// Place empty function bodies on the same line.
     ///
@@ -234,8 +270,7 @@ pub struct FormatSettings {
     /// ```
     ///
     /// Default: false
-    #[serde(default = "default_false")]
-    pub inline_empty_function_braces: bool,
+    inline_empty_function_braces: bool => "default_false",
 
     /// Place empty method bodies on the same line.
     ///
@@ -258,8 +293,7 @@ pub struct FormatSettings {
     /// ```
     ///
     /// Default: false
-    #[serde(default = "default_false")]
-    pub inline_empty_method_braces: bool,
+    inline_empty_method_braces: bool => "default_false",
 
     /// Place empty constructor bodies on the same line.
     ///
@@ -280,8 +314,7 @@ pub struct FormatSettings {
     /// ```
     ///
     /// Default: true
-    #[serde(default = "default_true")]
-    pub inline_empty_constructor_braces: bool,
+    inline_empty_constructor_braces: bool => "default_true",
 
     /// Place empty class-like bodies on the same line.
     ///
@@ -298,8 +331,7 @@ pub struct FormatSettings {
     /// ```
     ///
     /// Default: true
-    #[serde(default = "default_true")]
-    pub inline_empty_classlike_braces: bool,
+    inline_empty_classlike_braces: bool => "default_true",
 
     /// Place empty anonymous class bodies on the same line.
     ///
@@ -316,8 +348,7 @@ pub struct FormatSettings {
     /// ```
     ///
     /// Default: true
-    #[serde(default = "default_true")]
-    pub inline_empty_anonymous_class_braces: bool,
+    inline_empty_anonymous_class_braces: bool => "default_true",
 
     /// How to format broken method/property chains.
     ///
@@ -335,8 +366,7 @@ pub struct FormatSettings {
     /// ```
     ///
     /// Default: `next_line`
-    #[serde(default)]
-    pub method_chain_breaking_style: MethodChainBreakingStyle,
+    method_chain_breaking_style: MethodChainBreakingStyle => "MethodChainBreakingStyle::default",
 
     /// When method chaining breaks across lines, place the first method on a new line.
     ///
@@ -356,44 +386,37 @@ pub struct FormatSettings {
     /// ```
     ///
     /// Default: `true`
-    #[serde(default = "default_true")]
-    pub first_method_chain_on_new_line: bool,
+    first_method_chain_on_new_line: bool => "default_true",
 
     /// Whether to preserve line breaks in method chains, even if they could fit on a single line.
     ///
     /// Default: false
-    #[serde(default = "default_false")]
-    pub preserve_breaking_member_access_chain: bool,
+    preserve_breaking_member_access_chain: bool => "default_false",
 
     /// Whether to preserve line breaks in argument lists, even if they could fit on a single line.
     ///
     /// Default: false
-    #[serde(default = "default_false")]
-    pub preserve_breaking_argument_list: bool,
+    preserve_breaking_argument_list: bool => "default_false",
 
     /// Whether to preserve line breaks in array-like structures, even if they could fit on a single line.
     ///
     /// Default: true
-    #[serde(default = "default_true")]
-    pub preserve_breaking_array_like: bool,
+    preserve_breaking_array_like: bool => "default_true",
 
     /// Whether to preserve line breaks in parameter lists, even if they could fit on a single line.
     ///
     /// Default: false
-    #[serde(default = "default_false")]
-    pub preserve_breaking_parameter_list: bool,
+    preserve_breaking_parameter_list: bool => "default_false",
 
     /// Whether to preserve line breaks in attribute lists, even if they could fit on a single line.
     ///
     /// Default: false
-    #[serde(default = "default_false")]
-    pub preserve_breaking_attribute_list: bool,
+    preserve_breaking_attribute_list: bool => "default_false",
 
     /// Whether to preserve line breaks in conditional (ternary) expressions.
     ///
     /// Default: false
-    #[serde(default = "default_false")]
-    pub preserve_breaking_conditional_expression: bool,
+    preserve_breaking_conditional_expression: bool => "default_false",
 
     /// Whether to break a parameter list with one or more promoted properties into multiple lines.
     ///
@@ -415,8 +438,7 @@ pub struct FormatSettings {
     /// ```
     ///
     /// Default: true
-    #[serde(default = "default_true")]
-    pub break_promoted_properties_list: bool,
+    break_promoted_properties_list: bool => "default_true",
 
     /// Whether to add a line before binary operators or after when breaking.
     ///
@@ -435,8 +457,7 @@ pub struct FormatSettings {
     /// Note: If the right side has a leading comment, this setting is always false.
     ///
     /// Default: true
-    #[serde(default = "default_true")]
-    pub line_before_binary_operator: bool,
+    line_before_binary_operator: bool => "default_true",
 
     /// Whether to always break named argument lists into multiple lines.
     ///
@@ -449,8 +470,7 @@ pub struct FormatSettings {
     /// ```
     ///
     /// Default: false
-    #[serde(default = "default_false")]
-    pub always_break_named_arguments_list: bool,
+    always_break_named_arguments_list: bool => "default_false",
 
     /// Whether to always break named argument lists in attributes into multiple lines.
     ///
@@ -464,8 +484,7 @@ pub struct FormatSettings {
     /// ```
     ///
     /// Default: false
-    #[serde(default = "default_false")]
-    pub always_break_attribute_named_argument_lists: bool,
+    always_break_attribute_named_argument_lists: bool => "default_false",
 
     /// Whether to use table-style alignment for arrays.
     ///
@@ -481,8 +500,7 @@ pub struct FormatSettings {
     /// ```
     ///
     /// Default: true
-    #[serde(default = "default_true")]
-    pub array_table_style_alignment: bool,
+    array_table_style_alignment: bool => "default_true",
 
     /// Whether to align consecutive assignment-like constructs in columns.
     ///
@@ -512,14 +530,12 @@ pub struct FormatSettings {
     /// different member types (properties vs constants) are aligned separately.
     ///
     /// Default: false
-    #[serde(default = "default_false")]
-    pub align_assignment_like: bool,
+    align_assignment_like: bool => "default_false",
 
     /// Whether to sort use statements alphabetically.
     ///
     /// Default: true
-    #[serde(default = "default_true")]
-    pub sort_uses: bool,
+    sort_uses: bool => "default_true",
 
     /// Whether to sort class methods by visibility and name.
     ///
@@ -539,8 +555,7 @@ pub struct FormatSettings {
     /// Other members (constants, properties, trait uses, enum cases) remain in their original positions.
     ///
     /// Default: false
-    #[serde(default = "default_false")]
-    pub sort_class_methods: bool,
+    sort_class_methods: bool => "default_false",
 
     /// Whether to insert a blank line between different types of use statements.
     ///
@@ -567,8 +582,7 @@ pub struct FormatSettings {
     /// ```
     ///
     /// Default: true
-    #[serde(default = "default_true")]
-    pub separate_use_types: bool,
+    separate_use_types: bool => "default_true",
 
     /// Whether to expand grouped use statements into individual statements.
     ///
@@ -584,8 +598,7 @@ pub struct FormatSettings {
     /// ```
     ///
     /// Default: true
-    #[serde(default = "default_true")]
-    pub expand_use_groups: bool,
+    expand_use_groups: bool => "default_true",
 
     /// How to format null type hints.
     ///
@@ -604,8 +617,7 @@ pub struct FormatSettings {
     /// ```
     ///
     /// Default: `Question`
-    #[serde(default)]
-    pub null_type_hint: NullTypeHint,
+    null_type_hint: NullTypeHint => "NullTypeHint::default",
 
     /// Whether to include parentheses around `new` when followed by a member access.
     ///
@@ -623,8 +635,7 @@ pub struct FormatSettings {
     /// ```
     ///
     /// Default: false
-    #[serde(default = "default_false")]
-    pub parentheses_around_new_in_member_access: bool,
+    parentheses_around_new_in_member_access: bool => "default_false",
 
     /// Whether to include parentheses in `new` expressions when no arguments are provided.
     ///
@@ -639,8 +650,7 @@ pub struct FormatSettings {
     /// ```
     ///
     /// Default: true
-    #[serde(default = "default_true")]
-    pub parentheses_in_new_expression: bool,
+    parentheses_in_new_expression: bool => "default_true",
 
     /// Whether to include parentheses in `exit` and `die` constructs.
     ///
@@ -657,8 +667,7 @@ pub struct FormatSettings {
     /// ```
     ///
     /// Default: true
-    #[serde(default = "default_true")]
-    pub parentheses_in_exit_and_die: bool,
+    parentheses_in_exit_and_die: bool => "default_true",
 
     /// Whether to include parentheses in attributes with no arguments.
     ///
@@ -675,8 +684,7 @@ pub struct FormatSettings {
     /// ```
     ///
     /// Default: false
-    #[serde(default = "default_false")]
-    pub parentheses_in_attribute: bool,
+    parentheses_in_attribute: bool => "default_false",
 
     /// Whether to add a space before the opening parameters in arrow functions.
     ///
@@ -684,8 +692,7 @@ pub struct FormatSettings {
     /// When disabled: `fn($x) => $x * 2`
     ///
     /// Default: false
-    #[serde(default = "default_false")]
-    pub space_before_arrow_function_parameter_list_parenthesis: bool,
+    space_before_arrow_function_parameter_list_parenthesis: bool => "default_false",
 
     /// Whether to add a space before the opening parameters in closures.
     ///
@@ -693,8 +700,7 @@ pub struct FormatSettings {
     /// When disabled: `function($x) use ($y)`
     ///
     /// Default: true
-    #[serde(default = "default_true")]
-    pub space_before_closure_parameter_list_parenthesis: bool,
+    space_before_closure_parameter_list_parenthesis: bool => "default_true",
 
     /// Whether to add a space before the opening parameters in hooks.
     ///
@@ -702,8 +708,7 @@ pub struct FormatSettings {
     /// When disabled: `$hook($param)`
     ///
     /// Default: false
-    #[serde(default = "default_false")]
-    pub space_before_hook_parameter_list_parenthesis: bool,
+    space_before_hook_parameter_list_parenthesis: bool => "default_false",
 
     /// Whether to keep abstract property hooks inline.
     ///
@@ -711,8 +716,7 @@ pub struct FormatSettings {
     /// When disabled: hook list is always expanded
     ///
     /// Default: true ([PER-CS 4.10](https://www.php-fig.org/per/coding-style/#410-interface-and-abstract-properties) compliant)
-    #[serde(default = "default_true")]
-    pub inline_abstract_property_hooks: bool,
+    inline_abstract_property_hooks: bool => "default_true",
 
     /// Whether to add a space before the opening parenthesis in closure use clause.
     ///
@@ -720,8 +724,7 @@ pub struct FormatSettings {
     /// When disabled: `function() use($var)`
     ///
     /// Default: true
-    #[serde(default = "default_true")]
-    pub space_before_closure_use_clause_parenthesis: bool,
+    space_before_closure_use_clause_parenthesis: bool => "default_true",
 
     /// Whether to add a space after cast operators (int, float, string, etc.).
     ///
@@ -729,8 +732,7 @@ pub struct FormatSettings {
     /// When disabled: `(int)$foo`
     ///
     /// Default: true
-    #[serde(default = "default_true")]
-    pub space_after_cast_unary_prefix_operators: bool,
+    space_after_cast_unary_prefix_operators: bool => "default_true",
 
     /// Whether to add a space after the reference operator (&).
     ///
@@ -738,8 +740,7 @@ pub struct FormatSettings {
     /// When disabled: `&$foo`
     ///
     /// Default: false
-    #[serde(default = "default_false")]
-    pub space_after_reference_unary_prefix_operator: bool,
+    space_after_reference_unary_prefix_operator: bool => "default_false",
 
     /// Whether to add a space after the error control operator (@).
     ///
@@ -747,8 +748,7 @@ pub struct FormatSettings {
     /// When disabled: `@$foo`
     ///
     /// Default: false
-    #[serde(default = "default_false")]
-    pub space_after_error_control_unary_prefix_operator: bool,
+    space_after_error_control_unary_prefix_operator: bool => "default_false",
 
     /// Whether to add a space after the logical not operator (!).
     ///
@@ -756,8 +756,7 @@ pub struct FormatSettings {
     /// When disabled: `!$foo`
     ///
     /// Default: false
-    #[serde(default = "default_false")]
-    pub space_after_logical_not_unary_prefix_operator: bool,
+    space_after_logical_not_unary_prefix_operator: bool => "default_false",
 
     /// Whether to add a space after the bitwise not operator (~).
     ///
@@ -765,8 +764,7 @@ pub struct FormatSettings {
     /// When disabled: `~$foo`
     ///
     /// Default: false
-    #[serde(default = "default_false")]
-    pub space_after_bitwise_not_unary_prefix_operator: bool,
+    space_after_bitwise_not_unary_prefix_operator: bool => "default_false",
 
     /// Whether to add a space after the increment prefix operator (++).
     ///
@@ -774,8 +772,7 @@ pub struct FormatSettings {
     /// When disabled: `++$i`
     ///
     /// Default: false
-    #[serde(default = "default_false")]
-    pub space_after_increment_unary_prefix_operator: bool,
+    space_after_increment_unary_prefix_operator: bool => "default_false",
 
     /// Whether to add a space after the decrement prefix operator (--).
     ///
@@ -783,8 +780,7 @@ pub struct FormatSettings {
     /// When disabled: `--$i`
     ///
     /// Default: false
-    #[serde(default = "default_false")]
-    pub space_after_decrement_unary_prefix_operator: bool,
+    space_after_decrement_unary_prefix_operator: bool => "default_false",
 
     /// Whether to add a space after the additive unary operators (+ and -).
     ///
@@ -792,8 +788,7 @@ pub struct FormatSettings {
     /// When disabled: `+$i`
     ///
     /// Default: false
-    #[serde(default = "default_false")]
-    pub space_after_additive_unary_prefix_operator: bool,
+    space_after_additive_unary_prefix_operator: bool => "default_false",
 
     /// Whether to add spaces around the concatenation operator (.)
     ///
@@ -801,8 +796,7 @@ pub struct FormatSettings {
     /// When disabled: `$a.$b`
     ///
     /// Default: true
-    #[serde(default = "default_true")]
-    pub space_around_concatenation_binary_operator: bool,
+    space_around_concatenation_binary_operator: bool => "default_true",
 
     /// Whether to add spaces around the assignment in declare statements.
     ///
@@ -810,8 +804,7 @@ pub struct FormatSettings {
     /// When disabled: `declare(strict_types=1)`
     ///
     /// Default: false
-    #[serde(default = "default_false")]
-    pub space_around_assignment_in_declare: bool,
+    space_around_assignment_in_declare: bool => "default_false",
 
     /// Whether to add spaces within grouping parentheses.
     ///
@@ -819,8 +812,7 @@ pub struct FormatSettings {
     /// When disabled: `($expr) - $expr`
     ///
     /// Default: false
-    #[serde(default = "default_false")]
-    pub space_within_grouping_parenthesis: bool,
+    space_within_grouping_parenthesis: bool => "default_false",
 
     /// Whether to add an empty line after control structures (if, for, foreach, while, do, switch).
     ///
@@ -828,8 +820,7 @@ pub struct FormatSettings {
     /// settings value.
     ///
     /// Default: false
-    #[serde(default = "default_false")]
-    pub empty_line_after_control_structure: bool,
+    empty_line_after_control_structure: bool => "default_false",
 
     /// Whether to add an empty line after opening tag.
     ///
@@ -837,8 +828,7 @@ pub struct FormatSettings {
     /// settings value.
     ///
     /// Default: true
-    #[serde(default = "default_true")]
-    pub empty_line_after_opening_tag: bool,
+    empty_line_after_opening_tag: bool => "default_true",
 
     /// Whether to add an empty line after declare statement.
     ///
@@ -846,8 +836,7 @@ pub struct FormatSettings {
     /// settings value.
     ///
     /// Default: true
-    #[serde(default = "default_true")]
-    pub empty_line_after_declare: bool,
+    empty_line_after_declare: bool => "default_true",
 
     /// Whether to add an empty line after namespace.
     ///
@@ -855,8 +844,7 @@ pub struct FormatSettings {
     /// settings value.
     ///
     /// Default: true
-    #[serde(default = "default_true")]
-    pub empty_line_after_namespace: bool,
+    empty_line_after_namespace: bool => "default_true",
 
     /// Whether to add an empty line after use statements.
     ///
@@ -864,8 +852,7 @@ pub struct FormatSettings {
     /// settings value.
     ///
     /// Default: true
-    #[serde(default = "default_true")]
-    pub empty_line_after_use: bool,
+    empty_line_after_use: bool => "default_true",
 
     /// Whether to add an empty line after symbols (class, enum, interface, trait, function, const).
     ///
@@ -873,16 +860,14 @@ pub struct FormatSettings {
     /// settings value.
     ///
     /// Default: true
-    #[serde(default = "default_true")]
-    pub empty_line_after_symbols: bool,
+    empty_line_after_symbols: bool => "default_true",
 
     /// Whether to add an empty line between consecutive symbols of the same type.
     ///
     /// Only applies when `empty_line_after_symbols` is true.
     ///
     /// Default: true
-    #[serde(default = "default_true")]
-    pub empty_line_between_same_symbols: bool,
+    empty_line_between_same_symbols: bool => "default_true",
 
     /// Whether to add an empty line after class-like constant.
     ///
@@ -890,14 +875,12 @@ pub struct FormatSettings {
     /// settings value.
     ///
     /// Default: false
-    #[serde(default = "default_false")]
-    pub empty_line_after_class_like_constant: bool,
+    empty_line_after_class_like_constant: bool => "default_false",
 
     /// Whether to add an empty line immediately after a class-like opening brace.
     ///
     /// Default: false
-    #[serde(default = "default_false")]
-    pub empty_line_after_class_like_open: bool,
+    empty_line_after_class_like_open: bool => "default_false",
 
     /// Whether to insert an empty line before the closing brace of class-like
     /// structures when the class body is not empty.
@@ -907,8 +890,7 @@ pub struct FormatSettings {
     /// contains at least one member.
     ///
     /// Default: false
-    #[serde(default = "default_false")]
-    pub empty_line_before_class_like_close: bool,
+    empty_line_before_class_like_close: bool => "default_false",
 
     /// Whether to add an empty line after enum case.
     ///
@@ -916,8 +898,7 @@ pub struct FormatSettings {
     /// settings value.
     ///
     /// Default: false
-    #[serde(default = "default_false")]
-    pub empty_line_after_enum_case: bool,
+    empty_line_after_enum_case: bool => "default_false",
 
     /// Whether to add an empty line after trait use.
     ///
@@ -925,8 +906,7 @@ pub struct FormatSettings {
     /// settings value.
     ///
     /// Default: false
-    #[serde(default = "default_false")]
-    pub empty_line_after_trait_use: bool,
+    empty_line_after_trait_use: bool => "default_false",
 
     /// Whether to add an empty line after property.
     ///
@@ -934,8 +914,7 @@ pub struct FormatSettings {
     /// settings value.
     ///
     /// Default: false
-    #[serde(default = "default_false")]
-    pub empty_line_after_property: bool,
+    empty_line_after_property: bool => "default_false",
 
     /// Whether to add an empty line after method.
     ///
@@ -943,40 +922,34 @@ pub struct FormatSettings {
     /// settings value.
     ///
     /// Default: true
-    #[serde(default = "default_true")]
-    pub empty_line_after_method: bool,
+    empty_line_after_method: bool => "default_true",
 
     /// Whether to add an empty line before return statements.
     ///
     /// Default: false
-    #[serde(default = "default_false")]
-    pub empty_line_before_return: bool,
+    empty_line_before_return: bool => "default_false",
 
     /// Whether to add an empty line before dangling comments.
     ///
     /// Default: true
-    #[serde(default = "default_true")]
-    pub empty_line_before_dangling_comments: bool,
+    empty_line_before_dangling_comments: bool => "default_true",
 
     /// Whether to separate class-like members of different kinds with a blank line.
     ///
     /// Default: true
-    #[serde(default = "default_true")]
-    pub separate_class_like_members: bool,
+    separate_class_like_members: bool => "default_true",
 
     /// Whether to indent heredoc/nowdoc content.
     ///
     /// Default: true
-    #[serde(default = "default_true")]
-    pub indent_heredoc: bool,
+    indent_heredoc: bool => "default_true",
 
     /// Whether to print boolean and null literals in upper-case (e.g. `TRUE`, `FALSE`, `NULL`).
     /// When enabled these literals are printed in uppercase; when disabled they are printed
     /// in lowercase.
     ///
     /// Default: false
-    #[serde(default = "default_false")]
-    pub uppercase_literal_keyword: bool,
+    uppercase_literal_keyword: bool => "default_false",
 }
 
 impl Default for FormatSettings {
@@ -984,122 +957,7 @@ impl Default for FormatSettings {
     ///
     /// This uses the default preset from the presets module to ensure consistency.
     fn default() -> Self {
-        presets::FormatterPreset::Default.settings()
-    }
-}
-
-/// Merges individual settings over a preset, applying overrides where individual
-/// settings differ from the default values (indicating they were explicitly set).
-pub fn merge_format_settings(preset: FormatSettings, individual: FormatSettings) -> FormatSettings {
-    let defaults = FormatSettings::default();
-
-    macro_rules! merge_fields {
-        ($($field:ident),* $(,)?) => {
-            FormatSettings {
-                $(
-                    $field: if individual.$field != defaults.$field {
-                        // User explicitly set this value (differs from default)
-                        individual.$field
-                    } else {
-                        // Use preset value
-                        preset.$field
-                    },
-                )*
-            }
-        };
-    }
-
-    merge_fields! {
-        print_width,
-        tab_width,
-        use_tabs,
-        end_of_line,
-        single_quote,
-        trailing_comma,
-        remove_trailing_close_tag,
-        control_brace_style,
-        following_clause_on_newline,
-        closure_brace_style,
-        function_brace_style,
-        method_brace_style,
-        classlike_brace_style,
-        inline_empty_control_braces,
-        inline_empty_closure_braces,
-        inline_empty_function_braces,
-        inline_empty_method_braces,
-        inline_empty_constructor_braces,
-        inline_empty_classlike_braces,
-        inline_empty_anonymous_class_braces,
-        method_chain_breaking_style,
-        first_method_chain_on_new_line,
-        preserve_breaking_member_access_chain,
-        preserve_breaking_argument_list,
-        preserve_breaking_array_like,
-        preserve_breaking_parameter_list,
-        preserve_breaking_attribute_list,
-        preserve_breaking_conditional_expression,
-        break_promoted_properties_list,
-        line_before_binary_operator,
-        always_break_named_arguments_list,
-        always_break_attribute_named_argument_lists,
-        array_table_style_alignment,
-        align_assignment_like,
-        sort_uses,
-        sort_class_methods,
-        separate_use_types,
-        expand_use_groups,
-        null_type_hint,
-        parentheses_around_new_in_member_access,
-        parentheses_in_new_expression,
-        parentheses_in_exit_and_die,
-        parentheses_in_attribute,
-        space_before_arrow_function_parameter_list_parenthesis,
-        space_before_closure_parameter_list_parenthesis,
-        space_before_hook_parameter_list_parenthesis,
-        inline_abstract_property_hooks,
-        space_before_closure_use_clause_parenthesis,
-        space_after_cast_unary_prefix_operators,
-        space_after_reference_unary_prefix_operator,
-        space_after_error_control_unary_prefix_operator,
-        space_after_logical_not_unary_prefix_operator,
-        space_after_bitwise_not_unary_prefix_operator,
-        space_after_increment_unary_prefix_operator,
-        space_after_decrement_unary_prefix_operator,
-        space_after_additive_unary_prefix_operator,
-        space_around_concatenation_binary_operator,
-        space_around_assignment_in_declare,
-        space_within_grouping_parenthesis,
-        empty_line_after_control_structure,
-        empty_line_after_opening_tag,
-        empty_line_after_declare,
-        empty_line_after_namespace,
-        empty_line_after_use,
-        empty_line_after_symbols,
-        empty_line_between_same_symbols,
-        empty_line_after_class_like_constant,
-        empty_line_after_class_like_open,
-        empty_line_before_class_like_close,
-        empty_line_after_enum_case,
-        empty_line_after_trait_use,
-        empty_line_after_property,
-        empty_line_after_method,
-        empty_line_before_return,
-        empty_line_before_dangling_comments,
-        separate_class_like_members,
-        indent_heredoc,
-        uppercase_literal_keyword,
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn consistent_default() {
-        let default_settings = FormatSettings::default();
-        let default_deserialized: FormatSettings = serde_json::from_str("{}").unwrap();
-        assert_eq!(default_settings, default_deserialized);
+        FormatterPreset::Default.settings()
     }
 }
 
@@ -1237,4 +1095,16 @@ fn default_false() -> bool {
 
 fn default_true() -> bool {
     true
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn consistent_default() {
+        let default_settings = FormatSettings::default();
+        let default_deserialized: FormatSettings = serde_json::from_str("{}").unwrap();
+        assert_eq!(default_settings, default_deserialized);
+    }
 }
