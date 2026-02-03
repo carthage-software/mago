@@ -531,7 +531,7 @@ pub(crate) fn analyze_nested_array_assignment<'ctx, 'ast, 'arena>(
             return Ok(array_target.get_index());
         };
 
-        if array_expression_type.is_never() && !block_context.flags.inside_loop() {
+        if array_expression_type.is_never() {
             let atomic = wrap_atomic(TAtomic::Array(TArray::Keyed(TKeyedArray {
                 known_items: None,
                 parameters: None,
