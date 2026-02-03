@@ -120,6 +120,7 @@ pub struct OrchestratorConfiguration<'a> {
     /// - `stdlib` (aliases: `standard`, `std`, `php-stdlib`)
     /// - `psl` (aliases: `php-standard-library`, `azjezz-psl`)
     /// - `flow-php` (aliases: `flow`, `flow-etl`)
+    /// - `psr-container` (aliases: `psr-11`)
     pub analyzer_plugins: Vec<String>,
 
     /// Whether to display progress bars during long-running operations.

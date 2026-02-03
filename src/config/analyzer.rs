@@ -58,6 +58,7 @@ pub struct AnalyzerConfiguration {
     /// - `stdlib` (aliases: `standard`, `std`, `php-stdlib`)
     /// - `psl` (aliases: `php-standard-library`, `azjezz-psl`)
     /// - `flow-php` (aliases: `flow`, `flow-etl`)
+    /// - `psr-container` (aliases: `psr-11`)
     ///
     /// Example: `plugins = ["stdlib", "psl"]`
     pub plugins: Vec<String>,
