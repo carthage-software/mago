@@ -2,6 +2,9 @@
 
 declare(strict_types=1);
 
+/**
+ * @mago-expect analysis:mismatched-array-index
+ */
 class Statements
 {
     /**
