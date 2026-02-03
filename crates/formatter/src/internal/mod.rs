@@ -180,6 +180,24 @@ impl<'ctx, 'arena> FormatterState<'ctx, 'arena> {
         self.alignment_context = context;
     }
 
+    /// Get the current next comment index.
+    #[inline]
+    pub(crate) fn get_next_comment_index(&self) -> usize {
+        self.next_comment_index
+    }
+
+    /// Set the next comment index (used when formatting sorted members).
+    #[inline]
+    pub(crate) fn set_next_comment_index(&mut self, index: usize) {
+        self.next_comment_index = index;
+    }
+
+    /// Get the all_comments slice.
+    #[inline]
+    pub(crate) fn all_comments(&self) -> &'arena [Trivia<'arena>] {
+        self.all_comments
+    }
+
     fn next_id(&mut self) -> GroupIdentifier {
         self.id_builder.next_id()
     }
