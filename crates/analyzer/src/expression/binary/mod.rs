@@ -1,13 +1,19 @@
-use std::rc::Rc;
-
+use mago_atom::atom;
+use mago_codex::ttype::atomic::TAtomic;
+use mago_codex::ttype::atomic::object::TObject;
+use mago_codex::ttype::atomic::object::named::TNamedObject;
+use mago_codex::ttype::comparator::ComparisonResult;
+use mago_codex::ttype::comparator::union_comparator;
 use mago_codex::ttype::get_bool;
+use mago_codex::ttype::get_false;
+use mago_codex::ttype::get_true;
+use mago_codex::ttype::union::TUnion;
 use mago_syntax::ast::Binary;
 use mago_syntax::ast::BinaryOperator;
 use mago_syntax::ast::Expression;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
-use crate::artifacts::get_expression_range;
 use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
@@ -81,11 +87,57 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Binary<'arena> {
                     self.rhs.analyze(context, block_context, artifacts)?;
                 }
 
-                artifacts.expression_types.insert(get_expression_range(self), Rc::new(get_bool()));
+                artifacts.set_expression_type(self, compute_instanceof_type(self, context, artifacts));
 
                 Ok(())
             }
         }
+    }
+}
+
+/// Computes the result type of an instanceof expression.
+///
+/// Returns:
+///
+/// - `true` if the LHS is already known to be an instance of the target class
+/// - `false` if the LHS can never be an instance of the target class
+/// - `bool` otherwise
+fn compute_instanceof_type(binary: &Binary<'_>, context: &Context<'_, '_>, artifacts: &AnalysisArtifacts) -> TUnion {
+    let Some(lhs_type) = artifacts.get_rc_expression_type(binary.lhs) else {
+        return get_bool();
+    };
+
+    if lhs_type.is_mixed() {
+        return get_bool();
+    }
+
+    let Expression::Identifier(identifier) = binary.rhs else {
+        return get_bool();
+    };
+
+    let class_name = context.resolved_names.get(identifier);
+
+    let target_type = TUnion::from_atomic(TAtomic::Object(TObject::Named(TNamedObject::new(atom(class_name)))));
+
+    let mut comparison_result = ComparisonResult::new();
+    let is_already_subtype = union_comparator::is_contained_by(
+        context.codebase,
+        lhs_type,
+        &target_type,
+        false,
+        false,
+        true,
+        &mut comparison_result,
+    );
+
+    if is_already_subtype {
+        return get_true();
+    }
+
+    if !union_comparator::can_expression_types_be_identical(context.codebase, lhs_type, &target_type, true, false) {
+        get_false()
+    } else {
+        get_bool()
     }
 }
 

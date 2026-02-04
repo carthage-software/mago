@@ -1040,22 +1040,23 @@ fn analyze_else_statements<'ctx, 'arena>(
     let is_unreachable =
         else_types.keys().any(|var_id| else_block_context.locals.get(var_id).is_some_and(|t| t.is_never()));
 
-    if is_unreachable && else_statements.is_some() {
-        context.collector.report_with_code(
-            IssueCode::UnreachableElseClause,
-            Issue::error("Unreachable else clause")
-                .with_annotation(Annotation::primary(else_span).with_message("this else clause is unreachable"))
-                .with_annotation(
-                    Annotation::secondary(if_span)
-                        .with_message("all possible values have been handled by the preceding conditions"),
-                )
-                .with_note(
-                    "The preceding `if` and `elseif` conditions have exhausted all possible values, making this `else` clause unreachable.",
-                )
-                .with_help("Remove this `else` clause or adjust the preceding conditions."),
-        );
+    if is_unreachable {
+        if else_statements.is_some() {
+            context.collector.report_with_code(
+                IssueCode::UnreachableElseClause,
+                Issue::error("Unreachable else clause")
+                    .with_annotation(Annotation::primary(else_span).with_message("this else clause is unreachable"))
+                    .with_annotation(
+                        Annotation::secondary(if_span)
+                            .with_message("all possible values have been handled by the preceding conditions"),
+                    )
+                    .with_note(
+                        "The preceding `if` and `elseif` conditions have exhausted all possible values, making this `else` clause unreachable.",
+                    )
+                    .with_help("Remove this `else` clause or adjust the preceding conditions."),
+            );
+        }
 
-        // Skip analyzing the else statements since they are unreachable
         if_scope.final_actions.insert(ControlAction::None);
 
         return Ok(());
