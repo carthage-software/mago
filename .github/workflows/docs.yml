@@ -55,7 +55,8 @@ jobs:
 
       - name: Optimize images
         run: |
-          convert docs/public/assets/logo.png -resize 500x500\> -quality 85 docs/public/assets/logo.png
+          sudo apt-get update && sudo apt-get install -y imagemagick optipng
+          magick docs/public/assets/logo.png -resize 500x500\> -quality 85 docs/public/assets/logo.png
           optipng -o5 docs/public/assets/*.png || true
 
       - name: Install dependencies
