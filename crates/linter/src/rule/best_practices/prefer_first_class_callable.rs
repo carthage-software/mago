@@ -219,20 +219,20 @@ pub(super) fn is_call_forwarding<'ast, 'arena>(
 }
 
 pub(super) fn is_convertible_to_first_class_callable<'ast, 'arena>(call: &'ast Call<'arena>) -> bool {
-    match call {
-        Call::Function(FunctionCall { function: Expression::Identifier(_) | Expression::Variable(_), .. }) => true,
-        Call::Method(MethodCall {
-            object: Expression::Variable(_),
-            method: ClassLikeMemberSelector::Identifier(_),
-            ..
-        }) => true,
-        Call::StaticMethod(StaticMethodCall {
-            class: Expression::Identifier(_) | Expression::Self_(_) | Expression::Static(_) | Expression::Parent(_),
-            method: ClassLikeMemberSelector::Identifier(_),
-            ..
-        }) => true,
-        _ => false,
-    }
+    matches!(
+        call,
+        Call::Function(FunctionCall { function: Expression::Identifier(_) | Expression::Variable(_), .. })
+            | Call::Method(MethodCall {
+                object: Expression::Variable(_),
+                method: ClassLikeMemberSelector::Identifier(_),
+                ..
+            })
+            | Call::StaticMethod(StaticMethodCall {
+                class: Expression::Identifier(_) | Expression::Self_(_) | Expression::Static(_) | Expression::Parent(_),
+                method: ClassLikeMemberSelector::Identifier(_),
+                ..
+            })
+    )
 }
 
 #[cfg(test)]
