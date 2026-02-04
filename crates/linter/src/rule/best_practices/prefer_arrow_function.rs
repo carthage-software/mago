@@ -22,6 +22,7 @@ use crate::requirements::RuleRequirements;
 use crate::rule::Config;
 use crate::rule::LintRule;
 use crate::rule::best_practices::is_call_forwarding;
+use crate::rule::best_practices::is_convertible_to_first_class_callable;
 use crate::rule::utils::misc::get_single_return_statement;
 use crate::rule_meta::RuleMeta;
 use crate::settings::RuleSettings;
@@ -115,6 +116,7 @@ impl LintRule for PreferArrowFunctionRule {
         if ctx.registry.is_rule_enabled("prefer-first-class-callable")
             && let Expression::Call(call) = value
             && is_call_forwarding(&closure.parameter_list, call)
+            && is_convertible_to_first_class_callable(call)
         {
             // If the "prefer-first-class-callable" rule is enabled,
             // we skip reporting this issue to avoid overlapping suggestions.
