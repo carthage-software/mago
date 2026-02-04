@@ -10,19 +10,6 @@ export default defineConfig({
       target: "esnext",
       cssMinify: true,
       minify: "esbuild",
-      rollupOptions: {
-        output: {
-          manualChunks: {
-            playground: [
-              "./theme/components/playground/MagoPlayground.vue",
-              "./theme/components/playground/PlaygroundEditor.vue",
-              "./theme/components/playground/PlaygroundOutput.vue",
-              "./theme/components/playground/PlaygroundSettings.vue",
-              "./theme/components/playground/PlaygroundToolbar.vue",
-            ],
-          },
-        },
-      },
     },
     optimizeDeps: {
       exclude: ["mago-wasm"],
