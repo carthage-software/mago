@@ -60,6 +60,12 @@ const availablePlugins = [
     description: 'Type providers for flow-php/etl package',
     defaultEnabled: false,
   },
+  {
+    id: 'psr-container',
+    name: 'PSR-11 Container',
+    description: 'Type providers for psr/container package',
+    defaultEnabled: false,
+  },
 ];
 
 const analyzerOptions = [

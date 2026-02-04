@@ -68,8 +68,8 @@ These flags control specific, powerful analysis capabilities.
 
 These options control how the analyzer checks property initialization.
 
-| Option                           | Type       | Default | Description                                                                         |
-| :------------------------------- | :--------- | :------ | :---------------------------------------------------------------------------------- |
+| Option                           | Type       | Default | Description                                                                          |
+| :------------------------------- | :--------- | :------ | :----------------------------------------------------------------------------------- |
 | `check-property-initialization`  | `bool`     | `false` | Enable/disable property initialization checking entirely.                            |
 | `class-initializers`             | `string[]` | `[]`    | Method names treated as class initializers (like `__construct`).                     |
 
@@ -176,11 +176,12 @@ Plugins extend the analyzer with specialized type information for libraries and 
 
 ### Available plugins
 
-| Plugin ID   | Aliases                                    | Default | Description                                                    |
-| :---------- | :----------------------------------------- | :------ | :------------------------------------------------------------- |
-| `stdlib`    | `standard`, `std`, `php-stdlib`            | Enabled | Type providers for PHP built-in functions (`strlen`, `array_*`, `json_*`, etc.) |
-| `psl`       | `php-standard-library`, `azjezz-psl`       | Disabled| Type providers for [azjezz/psl](https://github.com/azjezz/psl) package |
-| `flow-php`  | `flow`, `flow-etl`                         | Disabled| Type providers for [flow-php/etl](https://github.com/flow-php/etl) package |
+| Plugin ID       | Aliases                                    | Default  | Description                                                                      |
+| :-------------- | :----------------------------------------- | :------- | :------------------------------------------------------------------------------- |
+| `stdlib`        | `standard`, `std`, `php-stdlib`            | Enabled  | Type providers for PHP built-in functions (`strlen`, `array_*`, `json_*`, etc.)  |
+| `psl`           | `php-standard-library`, `azjezz-psl`       | Disabled | Type providers for [azjezz/psl](https://github.com/azjezz/psl) package           |
+| `flow-php`      | `flow`, `flow-etl`                         | Disabled | Type providers for [flow-php/etl](https://github.com/flow-php/etl) package       |
+| `psr-container` | `psr-11`                                   | Disabled | Type providers for [psr/container](https://github.com/php-fig/container) package |
 
 ### How plugins work
 
@@ -207,7 +208,7 @@ By default, the `stdlib` plugin is enabled:
 
 ```toml
 [analyzer]
-plugins = ["psl", "flow-php"]
+plugins = ["psl", "flow-php", "psr-container"]
 ```
 
 #### Disabling all plugins

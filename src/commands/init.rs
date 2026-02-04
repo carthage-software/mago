@@ -67,6 +67,8 @@ enum AnalyzerPlugin {
     Psl,
     /// Type providers for flow-php/etl package
     FlowPhp,
+    /// Type providers for psr/container package
+    PsrContainer,
 }
 
 impl std::fmt::Display for AnalyzerPlugin {
@@ -74,6 +76,7 @@ impl std::fmt::Display for AnalyzerPlugin {
         match self {
             Self::Psl => write!(f, "psl"),
             Self::FlowPhp => write!(f, "flow-php"),
+            Self::PsrContainer => write!(f, "psr-container"),
         }
     }
 }
@@ -84,6 +87,7 @@ impl AnalyzerPlugin {
         match self {
             Self::Psl => "PSL - Type providers for azjezz/psl package",
             Self::FlowPhp => "Flow-PHP - Type providers for flow-php/etl package",
+            Self::PsrContainer => "PSR-11 Container - Type providers for psr/container package",
         }
     }
 }
@@ -884,7 +888,7 @@ fn prompt_for_integrations(theme: &ColorfulTheme) -> Result<Vec<Integration>, Er
 }
 
 fn prompt_for_analyzer_plugins(theme: &ColorfulTheme) -> Result<Vec<AnalyzerPlugin>, Error> {
-    let items = &[AnalyzerPlugin::Psl, AnalyzerPlugin::FlowPhp];
+    let items = &[AnalyzerPlugin::Psl, AnalyzerPlugin::FlowPhp, AnalyzerPlugin::PsrContainer];
 
     let descriptions: Vec<&str> = items.iter().map(|p| p.description()).collect();
 
@@ -990,7 +994,7 @@ mod tests {
     #[test]
     fn test_generated_config_parses_with_all_options() {
         let settings = InitializationAnalyzerSettings {
-            plugins: vec![AnalyzerPlugin::Psl, AnalyzerPlugin::FlowPhp],
+            plugins: vec![AnalyzerPlugin::Psl, AnalyzerPlugin::FlowPhp, AnalyzerPlugin::PsrContainer],
             find_unused_definitions: true,
             find_unused_expressions: true,
             analyze_dead_code: true,
@@ -1097,12 +1101,15 @@ mod tests {
     fn test_analyzer_plugin_display() {
         assert_eq!(AnalyzerPlugin::Psl.to_string(), "psl");
         assert_eq!(AnalyzerPlugin::FlowPhp.to_string(), "flow-php");
+        assert_eq!(AnalyzerPlugin::PsrContainer.to_string(), "psr-container");
     }
 
     #[test]
     fn test_generated_config_with_analyzer_plugins() {
-        let settings =
-            InitializationAnalyzerSettings { plugins: vec![AnalyzerPlugin::Psl], ..create_default_analyzer_settings() };
+        let settings = InitializationAnalyzerSettings {
+            plugins: vec![AnalyzerPlugin::Psl, AnalyzerPlugin::PsrContainer],
+            ..create_default_analyzer_settings()
+        };
         let formatter_config = "[formatter]\nprint-width = 120\ntab-width = 4\nuse-tabs = false";
 
         let content = generate_config_content(
@@ -1115,7 +1122,7 @@ mod tests {
             &settings,
         );
 
-        assert!(content.contains(r#"plugins = ["psl"]"#));
+        assert!(content.contains(r#"plugins = ["psl", "psr-container"]"#));
 
         let result: Result<Configuration, _> = toml::from_str(&content);
         assert!(result.is_ok(), "Generated config should parse. Error: {:?}\n\nConfig:\n{}", result.err(), content);
