@@ -87,20 +87,6 @@ pub fn scrape_assertions(
                         function_call,
                     ));
                 }
-                // If its a null-safe method call, assert that
-                // the lhs is non-null.
-                Call::NullSafeMethod(null_safe_method_call) => {
-                    let object_var_id = get_expression_id(
-                        null_safe_method_call.object,
-                        assertion_context.this_class_name,
-                        assertion_context.resolved_names,
-                        Some(assertion_context.codebase),
-                    );
-
-                    if let Some(object_var_id) = object_var_id {
-                        if_types.insert(object_var_id, vec![vec![Assertion::IsNotType(TAtomic::Null)]]);
-                    }
-                }
                 _ => {}
             }
         }
@@ -205,18 +191,6 @@ pub fn scrape_assertions(
             }
             _ => {}
         },
-        Expression::Access(Access::NullSafeProperty(null_safe_property_access)) => {
-            let object_var_id = get_expression_id(
-                null_safe_property_access.object,
-                assertion_context.this_class_name,
-                assertion_context.resolved_names,
-                Some(assertion_context.codebase),
-            );
-
-            if let Some(object_var_id) = object_var_id {
-                if_types.insert(object_var_id, vec![vec![Assertion::IsNotType(TAtomic::Null)]]);
-            }
-        }
         _ => {}
     }
 

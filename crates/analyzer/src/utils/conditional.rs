@@ -2,9 +2,11 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use indexmap::IndexMap;
+
+use mago_atom::Atom;
 use mago_atom::AtomMap;
 use mago_atom::AtomSet;
-
+use mago_codex::assertion::Assertion;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::union::TUnion;
 use mago_reporting::Annotation;
@@ -154,6 +156,28 @@ pub(crate) fn analyze<'ctx, 'arena>(
             if key.ends_with("()") {
                 if_body_context.active_method_call_assertions.entry(*key).or_default().extend(assertion_set.clone());
             }
+        }
+    }
+
+    if let Some(assertions) = artifacts.true_branch_only_assertions.get(&condition_range) {
+        let mut var_assertions: IndexMap<Atom, Vec<Vec<Assertion>>> = IndexMap::new();
+        for (key, assertion_set) in assertions {
+            var_assertions.entry(*key).or_default().extend(assertion_set.clone());
+        }
+
+        if !var_assertions.is_empty() {
+            let mut changed_var_ids = AtomSet::default();
+            reconcile_keyed_types(
+                context,
+                &var_assertions,
+                IndexMap::new(),
+                &mut if_body_context,
+                &mut changed_var_ids,
+                &AtomSet::default(),
+                &condition_span,
+                false,
+                false,
+            );
         }
     }
 

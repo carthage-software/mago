@@ -300,6 +300,16 @@ fn analyze_method_call<'ctx, 'ast, 'arena>(
         Some(context.codebase),
     );
 
+    if is_null_safe && let Some(ref var_id) = this_variable {
+        artifacts
+            .true_branch_only_assertions
+            .entry((span.start.offset, span.end.offset))
+            .or_default()
+            .entry(*var_id)
+            .or_default()
+            .push(vec![mago_codex::assertion::Assertion::IsNotType(mago_codex::ttype::atomic::TAtomic::Null)]);
+    }
+
     analyze_invocation_targets(
         context,
         block_context,

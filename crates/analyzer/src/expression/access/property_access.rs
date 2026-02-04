@@ -20,6 +20,7 @@ use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
 use crate::resolver::property::resolve_instance_properties;
+use crate::utils::expression::get_expression_id;
 use crate::utils::expression::get_property_access_expression_id;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for PropertyAccess<'arena> {
@@ -129,6 +130,23 @@ fn analyze_property_access<'ctx, 'ast, 'arena>(
     }
 
     let mut resulting_type = resulting_expression_type.unwrap_or_else(get_never);
+
+    if is_null_safe
+        && let Some(var_id) = get_expression_id(
+            object,
+            block_context.scope.get_class_like_name(),
+            context.resolved_names,
+            Some(context.codebase),
+        )
+    {
+        artifacts
+            .true_branch_only_assertions
+            .entry((span.start.offset, span.end.offset))
+            .or_default()
+            .entry(var_id)
+            .or_default()
+            .push(vec![mago_codex::assertion::Assertion::IsNotType(mago_codex::ttype::atomic::TAtomic::Null)]);
+    }
 
     let object_has_nullsafe_null = artifacts.get_expression_type(object).is_some_and(|t| t.has_nullsafe_null());
     if resolution_result.all_properties_non_nullable
