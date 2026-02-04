@@ -30,6 +30,15 @@ You can specify which functions or extensions should be disallowed through the
 `functions` or `extensions` options. This helps enforce coding standards,
 security restrictions, or the usage of preferred alternatives.
 
+Each entry can be a simple string or an object with `name` and optional `help`:
+
+```toml
+functions = [
+    'eval',
+    { name = 'error_log', help = 'Use MyLogger instead.' },
+]
+```
+
 
 
 ### Configuration

@@ -1,12 +1,12 @@
 use std::borrow::Cow;
 
 use bumpalo::Bump;
-use mago_atom::AtomSet;
-use mago_atom::atom;
+
 use mago_database::file::File;
 use mago_linter::Linter;
 use mago_linter::integration::IntegrationSet;
 use mago_linter::registry::RuleRegistry;
+use mago_linter::rule::DisallowedEntry;
 use mago_linter::rule::DisallowedFunctionsConfig;
 use mago_linter::settings::RuleSettings;
 use mago_linter::settings::RulesSettings;
@@ -59,7 +59,7 @@ fn test_code_snippet(rule_code: &str, code: &str, should_have_issues: bool) -> R
         rules: RulesSettings {
             disallowed_functions: RuleSettings {
                 config: DisallowedFunctionsConfig {
-                    extensions: AtomSet::from_iter([atom("curl")]),
+                    extensions: vec![DisallowedEntry::Simple("curl".to_string())],
                     ..Default::default()
                 },
                 ..Default::default()
