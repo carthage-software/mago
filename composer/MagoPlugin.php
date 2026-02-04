@@ -71,7 +71,7 @@ final class MagoPlugin implements PluginInterface, EventSubscriberInterface, Cap
     }
 
     /**
-     * @mago-expect lint:strictness/no-shorthand-ternary
+     * @mago-expect lint:no-shorthand-ternary
      */
     public function onPackageEvent(PackageEvent $event): void
     {
@@ -97,7 +97,7 @@ final class MagoPlugin implements PluginInterface, EventSubscriberInterface, Cap
     }
 
     /**
-     * @mago-expect lint:best-practices/no-else-clause
+     * @mago-expect lint:no-else-clause
      */
     private function isMagoPackageEvent(PackageEvent $event): bool
     {

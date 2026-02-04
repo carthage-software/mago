@@ -203,7 +203,7 @@ final class InstallMagoBinaryCommand extends BaseCommand
     }
 
     /**
-     * @mago-expect lint:best-practices/no-else-clause
+     * @mago-expect lint:no-else-clause
      *
      * @return array{platform: string, executable: string, storage_dir: string}
      */

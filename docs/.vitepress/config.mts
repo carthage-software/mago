@@ -70,7 +70,7 @@ export default defineConfig({
       { text: "Playground", link: "/playground" },
       { text: "Benchmarks", link: "/benchmarks" },
       { text: "FAQ", link: "/faq" },
-      { text: "Sponsor", link: "https://github.com/sponsors/azjezz" },
+      { text: "Sponsors", link: "/#our-sponsors" },
     ],
     sidebar: [
       {

@@ -21,20 +21,29 @@ This benchmark measures the time it takes to check the formatting of an entire c
 <BenchmarkChart
   title="Speed"
   :data="[
-    { label: 'Mago', value: 0.416, highlight: true },
-    { label: 'Pretty PHP', value: 35.83 }
+    { label: 'Mago', value: 0.365, highlight: true },
+    { label: 'Pretty PHP', value: 31.44 }
   ]"
   unit="seconds"
 />
 
+<div class="memory-toggle">
+<details>
+<summary>Show Memory Usage</summary>
+<div class="memory-content">
+
 <BenchmarkChart
   title="Peak Memory (RSS)"
   :data="[
-    { label: 'Mago', value: 663, highlight: true },
-    { label: 'Pretty PHP', value: 150 }
+    { label: 'Mago', value: 632, highlight: true },
+    { label: 'Pretty PHP', value: 155 }
   ]"
   unit="mb"
 />
+
+</div>
+</details>
+</div>
 
 ## Linter
 
@@ -43,22 +52,31 @@ This benchmark measures the time it takes to lint an entire codebase.
 <BenchmarkChart
   title="Speed"
   :data="[
-    { label: 'Mago', value: 0.530, highlight: true },
-    { label: 'Pint', value: 38.85 },
-    { label: 'PHP-CS-Fixer', value: 53.28 }
+    { label: 'Mago', value: 0.547, highlight: true },
+    { label: 'Pint', value: 31.08 },
+    { label: 'PHP-CS-Fixer', value: 49.64 }
   ]"
   unit="seconds"
 />
 
+<div class="memory-toggle">
+<details>
+<summary>Show Memory Usage</summary>
+<div class="memory-content">
+
 <BenchmarkChart
   title="Peak Memory (RSS)"
   :data="[
-    { label: 'Mago', value: 504, highlight: true },
-    { label: 'Pint', value: 78 },
-    { label: 'PHP-CS-Fixer', value: 167 }
+    { label: 'Mago', value: 460, highlight: true },
+    { label: 'Pint', value: 81 },
+    { label: 'PHP-CS-Fixer', value: 123 }
   ]"
   unit="mb"
 />
+
+</div>
+</details>
+</div>
 
 ## Analyzer
 
@@ -67,36 +85,102 @@ This benchmark measures the time it takes to perform a full static analysis.
 <BenchmarkChart
   title="Speed"
   :data="[
-    { label: 'Mago', value: 3.88, highlight: true },
-    { label: 'Psalm', value: 45.53 },
-    { label: 'PHPStan', value: 120.35 }
+    { label: 'Mago', value: 2.13, highlight: true },
+    { label: 'Psalm', value: 21.15 },
+    { label: 'PHPStan', value: 79.63 }
   ]"
   unit="seconds"
 />
 
+<div class="memory-toggle">
+<details>
+<summary>Show Memory Usage</summary>
+<div class="memory-content">
+
 <BenchmarkChart
   title="Peak Memory (RSS)"
   :data="[
-    { label: 'Mago', value: 930, highlight: true },
-    { label: 'Psalm', value: 1464 },
-    { label: 'PHPStan', value: 802 }
+    { label: 'Mago', value: 1058, highlight: true },
+    { label: 'Psalm', value: 3693 },
+    { label: 'PHPStan', value: 882 }
   ]"
   unit="mb"
 />
 
+</div>
+</details>
+</div>
+
 ## Environment
 
-- **Mago:** 1.0.0
-- **Codebase:** `wordpress-develop@5b01d24`
-- **Hardware:** MacBook Pro (Apple M1 Pro, 32GB RAM)
-- **PHP:** 8.4.15 (Zend v4.4.15, Zend OPcache v8.4.15)
+- **Hardware:** MacBook Pro (Apple M1 Pro, 32GB RAM), idle system
+- **Codebase:** `wordpress-develop@5b01d24d8c5f2cfa4b96349967a9759e52888d03`
+- **PHP:** 8.5.0 (Zend Engine v4.5.0, Zend OPcache v8.5.0)
+- **Mago:** 1.4.0
+- **Psalm:** 7.0.0-beta14
+- **PHPStan:** 2.1.38
+- **PHP-CS-Fixer:** 3.93.1
+- **Pint:** 1.27.0
+- **Pretty PHP:** 0.4.95
 
 ## A note on memory usage
 
-You might notice that Mago sometimes uses more memory than other tools, especially on large codebases. This is a deliberate and fundamental design choice.
+Mago's memory usage varies depending on the task. In some cases, like static analysis, Mago actually uses **significantly less memory** than alternatives (3.5x less than Psalm). In other cases, such as linting or formatting, Mago may use more memory than single-threaded PHP tools.
 
-**Mago prioritizes your time over machine resources.**
+This is a deliberate architectural choice. **Mago prioritizes your time over machine resources.**
 
-To achieve its blazing-fast speeds, Mago uses per-thread arena allocators. Instead of asking the operating system for memory for every little object (which is slow), it reserves large chunks of memory upfront and then allocates objects within that arena with near-zero cost. The trade-off is that this can lead to a higher peak memory footprint.
+To achieve its blazing-fast speeds, Mago uses per-thread arena allocators. Instead of asking the operating system for memory for every little object (which is slow), it reserves large chunks of memory upfront and then allocates objects within that arena with near-zero cost. This enables massive parallelism but can lead to a higher peak memory footprint for some operations.
 
-We believe that in modern development environments, saving a developer several seconds—or even minutes—is a worthwhile trade for a temporary increase in RAM usage.
+We believe that in modern development environments, saving a developer several seconds, or even minutes, is a worthwhile trade for a temporary increase in RAM usage.
+
+<style>
+.memory-toggle {
+  margin-top: 1.5rem;
+}
+
+.memory-toggle details {
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 8px;
+  background: var(--vp-c-bg-soft);
+}
+
+.memory-toggle summary {
+  padding: 0 1rem;
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 0.9rem;
+  color: var(--vp-c-text-2);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  list-style: none;
+}
+
+.memory-toggle summary::-webkit-details-marker {
+  display: none;
+}
+
+.memory-toggle summary::before {
+  content: "▶";
+  font-size: 0.7rem;
+  transition: transform 0.2s;
+}
+
+.memory-toggle details[open] summary::before {
+  transform: rotate(90deg);
+}
+
+.memory-toggle summary:hover {
+  color: var(--vp-c-text-1);
+  background: var(--vp-c-bg-mute);
+  border-radius: 8px 8px 0 0;
+}
+
+.memory-toggle details:not([open]) summary:hover {
+  border-radius: 8px;
+}
+
+.memory-toggle .memory-content {
+  border-top: 1px solid var(--vp-c-divider);
+}
+</style>

@@ -18,9 +18,6 @@ use function ucwords;
  *
  * This utility class is used internally to keep the list of issue codes
  * in sync without manual editing of Rust files.
- *
- * @mago-expect lint:kan-defect
- * @mago-expect lint:cyclomatic-complexity
  */
 final class AnalyzerCodeModuleGenerator
 {
