@@ -41,7 +41,7 @@ jobs:
       - name: Build WASM module
         run: |
           cd crates/wasm
-          wasm-pack build --target web --out-dir pkg-web
+          wasm-pack build --target web --out-dir pkg-web --release
 
       - name: Copy WASM to docs
         run: |
@@ -53,11 +53,21 @@ jobs:
         with:
           bun-version: latest
 
+      - name: Optimize images
+        run: |
+          convert docs/public/assets/logo.png -resize 500x500\> -quality 85 docs/public/assets/logo.png
+          optipng -o5 docs/public/assets/*.png || true
+
       - name: Install dependencies
         run: cd docs && bun install --frozen-lockfile
 
       - name: Build docs
         run: cd docs && bun run build
+
+      - name: Optimize WASM size
+        run: |
+          sudo apt-get install -y binaryen
+          wasm-opt -Oz docs/.vitepress/dist/wasm/mago_wasm_bg.wasm -o docs/.vitepress/dist/wasm/mago_wasm_bg.wasm
 
       - name: Upload GitHub Pages artifact
         uses: actions/upload-pages-artifact@v3

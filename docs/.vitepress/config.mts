@@ -8,6 +8,21 @@ export default defineConfig({
     assetsInclude: ["**/*.wasm"],
     build: {
       target: "esnext",
+      cssMinify: true,
+      minify: "esbuild",
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            playground: [
+              "./theme/components/playground/MagoPlayground.vue",
+              "./theme/components/playground/PlaygroundEditor.vue",
+              "./theme/components/playground/PlaygroundOutput.vue",
+              "./theme/components/playground/PlaygroundSettings.vue",
+              "./theme/components/playground/PlaygroundToolbar.vue",
+            ],
+          },
+        },
+      },
     },
     optimizeDeps: {
       exclude: ["mago-wasm"],
@@ -19,6 +34,18 @@ export default defineConfig({
   sitemap: { hostname },
   lang: "en-US",
   head: [
+    [
+      "link",
+      { rel: "dns-prefetch", href: "https://avatars.githubusercontent.com" },
+    ],
+    [
+      "link",
+      {
+        rel: "preconnect",
+        href: "https://avatars.githubusercontent.com",
+        crossorigin: "",
+      },
+    ],
     ["link", { rel: "apple-touch-icon", href: "/assets/apple-touch-icon.png" }],
     [
       "link",
@@ -63,7 +90,7 @@ export default defineConfig({
   lastUpdated: true,
   cleanUrls: true,
   themeConfig: {
-    logo: "/assets/icon.svg",
+    logo: "/assets/icon.png",
     nav: [
       { text: "Guide", link: "/guide/getting-started" },
       { text: "Tools", link: "/tools/overview" },
