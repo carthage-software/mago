@@ -59,11 +59,6 @@ jobs:
       - name: Build docs
         run: cd docs && bun run build
 
-      - name: Optimize WASM size
-        run: |
-          sudo apt-get install -y binaryen
-          wasm-opt -Oz docs/.vitepress/dist/wasm/mago_wasm_bg.wasm -o docs/.vitepress/dist/wasm/mago_wasm_bg.wasm
-
       - name: Upload GitHub Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
