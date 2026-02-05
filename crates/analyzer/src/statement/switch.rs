@@ -181,31 +181,6 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
             previous_empty_cases = vec![];
         }
 
-        let mut possibly_redefined_vars = self.possibly_redefined_variables.unwrap_or_default();
-        if let Some(new_locals) = self.new_locals {
-            possibly_redefined_vars.retain(|k, _| !new_locals.contains_key(k));
-            self.block_context.locals.extend(new_locals);
-        }
-
-        if let Some(redefined_vars) = self.redefined_variables {
-            possibly_redefined_vars.retain(|k, _| !redefined_vars.contains_key(k));
-            self.block_context.locals.extend(redefined_vars.iter().map(|(k, v)| (*k, v.clone())));
-        }
-
-        for (var_id, var_type) in possibly_redefined_vars {
-            if let Some(context_type) = self.block_context.locals.get(&var_id).cloned() {
-                self.block_context.locals.insert(
-                    var_id,
-                    Rc::new(combine_union_types(
-                        &var_type,
-                        &context_type,
-                        self.context.codebase,
-                        CombinerOptions::default(),
-                    )),
-                );
-            }
-        }
-
         let is_exhaustive = self.has_default_case || {
             let mut final_else_context = original_context.clone();
             let final_else_clauses: Vec<_> =
@@ -234,6 +209,37 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
                     .as_ref()
                     .is_some_and(|id| final_else_context.locals.get(id).is_some_and(|t| t.is_never()))
         };
+
+        let mut possibly_redefined_vars = self.possibly_redefined_variables.unwrap_or_default();
+        if let Some(new_locals) = self.new_locals {
+            possibly_redefined_vars.retain(|k, _| !new_locals.contains_key(k));
+            self.block_context.locals.extend(new_locals);
+        }
+
+        if let Some(redefined_vars) = self.redefined_variables {
+            if is_exhaustive {
+                possibly_redefined_vars.retain(|k, _| !redefined_vars.contains_key(k));
+                self.block_context.locals.extend(redefined_vars.iter().map(|(k, v)| (*k, v.clone())));
+            } else {
+                for (var_id, var_type) in redefined_vars {
+                    possibly_redefined_vars.insert(var_id, var_type);
+                }
+            }
+        }
+
+        for (var_id, var_type) in possibly_redefined_vars {
+            if let Some(context_type) = self.block_context.locals.get(&var_id).cloned() {
+                self.block_context.locals.insert(
+                    var_id,
+                    Rc::new(combine_union_types(
+                        &var_type,
+                        &context_type,
+                        self.context.codebase,
+                        CombinerOptions::default(),
+                    )),
+                );
+            }
+        }
 
         self.artifacts.fully_matched_switch_offsets.insert(switch.start_position().offset);
         self.block_context.assigned_variable_ids.extend(self.new_assigned_variable_ids);
