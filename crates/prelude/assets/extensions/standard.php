@@ -3414,16 +3414,12 @@ function set_include_path(string $include_path): string|false
 function setcookie(
     string $name,
     string $value = '',
-    int $expires_or_options = 0,
+    array|int $expires_or_options = 0,
     string $path = '',
     string $domain = '',
     bool $secure = false,
     bool $httponly = false,
 ): bool {
-}
-
-function setcookie(string $name, string $value = '', array $options = []): bool
-{
 }
 
 /**
