@@ -166,7 +166,7 @@ function curl_reset(CurlHandle $handle): void
 }
 
 /**
- * @param int &$still_running
+ * @param-out int $still_running
  */
 function curl_multi_exec(CurlMultiHandle $multi_handle, &$still_running = 0): int
 {
