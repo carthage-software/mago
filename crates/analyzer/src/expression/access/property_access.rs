@@ -250,7 +250,7 @@ mod tests {
     }
 
     test_analysis! {
-        name = accessing_enum_properties,
+        name = accessing_string_enum_properties,
         code = indoc! {r"
             <?php
 
@@ -272,6 +272,88 @@ mod tests {
              */
             function get_color_value(Color $color): string {
                 return $color->value;
+            }
+
+            /**
+             * @return 'Red'
+             */
+            function get_specific_case_name(): string {
+                return Color::Red->name;
+            }
+
+            /**
+             * @return 'red'
+             */
+            function get_specific_case_value(): string {
+                return Color::Red->value;
+            }
+        "}
+    }
+
+    test_analysis! {
+        name = accessing_int_enum_properties,
+        code = indoc! {r"
+            <?php
+
+            enum Color: int {
+                case Red = 0;
+                case Green = 1;
+                case Blue = 2;
+            }
+
+            /**
+             * @return 'Red'|'Green'|'Blue'
+             */
+            function get_color_name(Color $color): string {
+                return $color->name;
+            }
+
+            /**
+             * @return 0|1|2
+             */
+            function get_color_value(Color $color): int {
+                return $color->value;
+            }
+
+            /**
+             * @return 'Red'
+             */
+            function get_specific_case_name(): string {
+                return Color::Red->name;
+            }
+
+            /**
+             * @return 0
+             */
+            function get_specific_case_value(): int {
+                return Color::Red->value;
+            }
+        "}
+    }
+
+    test_analysis! {
+        name = accessing_enum_properties,
+        code = indoc! {r"
+            <?php
+
+            enum Color {
+                case Red;
+                case Green;
+                case Blue;
+            }
+
+            /**
+             * @return 'Red'|'Green'|'Blue'
+             */
+            function get_color_name(Color $color): string {
+                return $color->name;
+            }
+
+            /**
+             * @return 'Red'
+             */
+            function get_specific_case_name(): string {
+                return Color::Red->name;
             }
         "}
     }
