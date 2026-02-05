@@ -54,9 +54,9 @@ impl Formatter for CodeCountFormatter {
         for (code, (count, level)) in counts_vec {
             if use_colors {
                 let ansi_code = level_ansi_code(level);
-                writeln!(writer, "\x1b[{ansi_code}m\x1b[1m{code}:\x1b[0m {count}")?;
+                writeln!(writer, "\x1b[{ansi_code}m\x1b[1m{level}[{code}]:\x1b[0m {count}")?;
             } else {
-                writeln!(writer, "{code}: {count}")?;
+                writeln!(writer, "{level}[{code}]: {count}")?;
             }
         }
 
