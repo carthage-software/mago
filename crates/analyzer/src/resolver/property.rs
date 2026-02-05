@@ -11,7 +11,9 @@ use mago_codex::ttype::TType;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::generic::TGenericParameter;
 use mago_codex::ttype::atomic::object::TObject;
+use mago_codex::ttype::atomic::object::r#enum::TEnum;
 use mago_codex::ttype::atomic::object::named::TNamedObject;
+use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::expander::StaticClassType;
 use mago_codex::ttype::expander::TypeExpansionOptions;
 use mago_codex::ttype::expander::{self};
@@ -295,6 +297,13 @@ pub fn resolve_instance_properties<'ctx, 'ast, 'arena>(
         let magic_method = context.codebase.get_method_by_id(&magic_method_identifier);
 
         for prop_name in &property_names {
+            if let TObject::Enum(enum_type) = object
+                && let Some(resolved) = resolve_enum_builtin_property(context, enum_type, *prop_name)
+            {
+                result.properties.push(resolved);
+                continue;
+            }
+
             let resolved_property = find_property_in_class(
                 context,
                 block_context,
@@ -356,6 +365,66 @@ pub fn resolve_instance_properties<'ctx, 'ast, 'arena>(
         !result.properties.is_empty() && result.properties.iter().all(|p| !p.property_type.is_nullable());
 
     Ok(result)
+}
+
+/// Resolves built-in enum properties (`name` and `value`) with literal types.
+///
+/// For a specific enum case like `Foo::Bar`, returns the literal type:
+/// - `name` returns `string('Bar')`
+/// - `value` returns `string('bar')` or `int(123)` for backed enums
+///
+/// For a general enum type like `Color $c`, returns a union of all case literals:
+/// - `name` returns `'Red'|'Green'|'Blue'`
+/// - `value` returns `'red'|'green'|'blue'`
+fn resolve_enum_builtin_property(context: &Context, enum_type: &TEnum, prop_name: Atom) -> Option<ResolvedProperty> {
+    let prop_str = prop_name.as_str().trim_start_matches('$');
+    if prop_str != "name" && prop_str != "value" {
+        return None;
+    }
+
+    let class_metadata = context.codebase.get_class_like(&enum_type.name)?;
+
+    // Determine which cases to process: Either it's a specific case, or all cases
+    let cases: Vec<_> = if let Some(case_name) = enum_type.case {
+        class_metadata.enum_cases.get(&case_name).into_iter().collect()
+    } else {
+        class_metadata.enum_cases.values().collect()
+    };
+
+    if prop_str == "name" {
+        let name_types: Vec<TAtomic> =
+            cases.iter().map(|case| TAtomic::Scalar(TScalar::literal_string(case.name))).collect();
+
+        if name_types.is_empty() {
+            return None;
+        }
+
+        Some(ResolvedProperty {
+            property_span: None,
+            property_name: prop_name,
+            declaring_class_id: Some(atom("UnitEnum")),
+            property_type: TUnion::from_vec(name_types),
+            is_magic: false,
+        })
+    } else if prop_str == "value" {
+        let value_types: Vec<TAtomic> = cases.iter().filter_map(|case| case.value_type.clone()).collect();
+
+        if value_types.is_empty() {
+            // Unit enum - value property doesn't exist, fall through to normal resolution
+            // which will report an appropriate error
+            return None;
+        }
+
+        Some(ResolvedProperty {
+            property_span: None,
+            property_name: prop_name,
+            declaring_class_id: Some(atom("BackedEnum")),
+            property_type: TUnion::from_vec(value_types),
+            is_magic: false,
+        })
+    } else {
+        None
+    }
 }
 
 /// Checks if this is a backing store access: `$this->prop` inside a hook for that property.
