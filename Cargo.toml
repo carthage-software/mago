@@ -182,9 +182,14 @@ debug-assertions = false
 overflow-checks = false
 lto = 'fat'
 panic = 'abort'
-incremental = true
+incremental = false
 codegen-units = 1
 rpath = true
+
+[profile.memory-debug]
+inherits = 'release'
+debug = true
+strip = 'none'
 
 [profile.dev]
 debug = 'full'
