@@ -6,6 +6,8 @@ use mago_codex::ttype::builder::get_type_from_string;
 use mago_codex::ttype::comparator::ComparisonResult;
 use mago_codex::ttype::comparator::union_comparator::can_expression_types_be_identical;
 use mago_codex::ttype::comparator::union_comparator::is_contained_by;
+use mago_codex::ttype::expander;
+use mago_codex::ttype::expander::TypeExpansionOptions;
 use mago_codex::ttype::union::TUnion;
 use mago_codex::ttype::union::populate_union_type;
 use mago_docblock::document::Element;
@@ -180,6 +182,15 @@ pub fn get_docblock_variables<'ctx>(
                         block_context.scope.get_reference_source().as_ref(),
                         &mut artifacts.symbol_references,
                         true,
+                    );
+
+                    expander::expand_union(
+                        context.codebase,
+                        &mut variable_type,
+                        &TypeExpansionOptions {
+                            self_class: block_context.scope.get_class_like_name(),
+                            ..Default::default()
+                        },
                     );
 
                     Some((variable_name, variable_type, type_string.span))
