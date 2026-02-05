@@ -96,7 +96,7 @@ curl --proto '=https' --tlsv1.2 -sSf https://carthage.software/mago.sh | bash
       <div class="step-number">3</div>
       <div class="step-content">
         <h3>Run</h3>
-        <p>Use <code>mago check</code> to analyze, <code>mago lint</code> to lint, <code>mago fmt</code> to format.</p>
+        <p>Use <code>mago analyze</code> to analyze, <code>mago lint</code> to lint, <code>mago fmt</code> to format.</p>
       </div>
     </div>
   </div>
