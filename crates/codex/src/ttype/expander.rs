@@ -2,7 +2,9 @@ use std::borrow::Cow;
 use std::cell::RefCell;
 use std::sync::Arc;
 
-use ahash::HashSet;
+use std::collections::HashSet;
+
+use foldhash::fast::FixedState;
 use mago_atom::Atom;
 use mago_atom::ascii_lowercase_atom;
 
@@ -36,10 +38,10 @@ use crate::ttype::union::TUnion;
 thread_local! {
     /// Thread-local set for tracking currently expanding aliases (cycle detection).
     /// Uses a HashSet for accurate tracking without false positives from hash collisions.
-    static EXPANDING_ALIASES: RefCell<HashSet<(Atom, Atom)>> = const { RefCell::new(HashSet::with_hasher(ahash::RandomState::with_seeds(0, 0, 0, 0))) };
+    static EXPANDING_ALIASES: RefCell<HashSet<(Atom, Atom), FixedState>> = const { RefCell::new(HashSet::with_hasher(FixedState::with_seed(0))) };
 
     /// Thread-local set for tracking objects whose type parameters are being expanded (cycle detection).
-    static EXPANDING_OBJECT_PARAMS: RefCell<HashSet<Atom>> = const { RefCell::new(HashSet::with_hasher(ahash::RandomState::with_seeds(0, 0, 0, 0))) };
+    static EXPANDING_OBJECT_PARAMS: RefCell<HashSet<Atom, FixedState>> = const { RefCell::new(HashSet::with_hasher(FixedState::with_seed(0))) };
 }
 
 /// Resets the thread-local alias expansion state.

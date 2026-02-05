@@ -1,7 +1,7 @@
 use schemars::JsonSchema;
 use std::sync::LazyLock;
 
-use ahash::HashMap;
+use foldhash::HashMap;
 use indoc::indoc;
 use serde::Deserialize;
 use serde::Serialize;

@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use ahash::RandomState;
+use foldhash::fast::RandomState;
 use indexmap::IndexMap;
 
 use mago_atom::Atom;
@@ -138,7 +138,7 @@ pub(super) fn get_class_template_parameters_from_result(
     context: &Context<'_, '_>,
 ) -> IndexMap<Atom, Vec<GenericTemplate>, RandomState> {
     let mut class_generic_parameters: IndexMap<Atom, Vec<GenericTemplate>, RandomState> =
-        IndexMap::with_hasher(RandomState::new());
+        IndexMap::with_hasher(RandomState::default());
 
     for (template_name, type_map) in &template_result.lower_bounds {
         for (generic_parent, lower_bounds) in type_map {

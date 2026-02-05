@@ -1,5 +1,5 @@
-use ahash::HashMap;
-use ahash::HashSet;
+use foldhash::HashMap;
+use foldhash::HashSet;
 use mago_atom::ascii_lowercase_atom;
 use mago_atom::empty_atom;
 use serde::Deserialize;

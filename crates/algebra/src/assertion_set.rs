@@ -1,8 +1,7 @@
-use std::hash::Hash;
-use std::hash::Hasher;
+use std::hash::BuildHasher;
 
-use ahash::AHasher;
-use ahash::HashSet;
+use foldhash::HashSet;
+use foldhash::fast::FixedState;
 
 use mago_codex::assertion::Assertion;
 
@@ -146,11 +145,10 @@ pub fn and_assertion_sets(set_a: AssertionSet, set_b: AssertionSet) -> Assertion
 
 /// Calculates a stable hash for a disjunctive clause (an `Or<Assertion>`).
 fn hash_disjunction(disjunction: &Disjunction<Assertion>) -> u64 {
-    let mut hasher = AHasher::default();
     let mut assertion_hashes: Vec<_> = disjunction.iter().map(mago_codex::assertion::Assertion::to_hash).collect();
     assertion_hashes.sort_unstable();
-    assertion_hashes.hash(&mut hasher);
-    hasher.finish()
+
+    FixedState::default().hash_one(&assertion_hashes)
 }
 
 #[cfg(test)]

@@ -14,8 +14,8 @@ use std::cmp::Ordering;
 use std::iter::Once;
 use std::str::FromStr;
 
-use ahash::HashMap;
-use ahash::HashMapExt;
+use foldhash::HashMap;
+use foldhash::HashMapExt;
 use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;

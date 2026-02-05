@@ -4,8 +4,8 @@ use std::borrow::Cow;
 use std::ffi::OsString;
 use std::path::Path;
 
-use ahash::HashMap;
-use ahash::HashSet;
+use foldhash::HashMap;
+use foldhash::HashSet;
 use globset::Glob;
 use globset::GlobSet;
 use globset::GlobSetBuilder;

@@ -162,7 +162,7 @@ mod tests {
     use std::borrow::Cow;
     use std::collections::BTreeMap;
 
-    use ahash::HashSet;
+    use foldhash::HashSet;
 
     use mago_atom::AtomSet;
     use mago_codex::metadata::CodebaseMetadata;

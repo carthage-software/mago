@@ -34,7 +34,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5a15f179cd60c4584b8a8c596927aadc462e27f2ca70c04e0071964a73ba7a75"
 dependencies = [
  "cfg-if",
- "const-random",
  "once_cell",
  "version_check",
  "zerocopy",
@@ -940,6 +939,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d9c4f5dac5e15c24eb999c26181a6ca40b39fe946cbe4c263c7209467bc83af2"
 
 [[package]]
+name = "foldhash"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "77ce24cb58228fbb8aa041425bb1050850ac19177686ea6e0f41a70416f56fdb"
+
+[[package]]
 name = "foreign-types"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1126,7 +1131,7 @@ version = "0.15.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9229cfe53dfd69f0609a49f65461bd93001ea1ef889cd5529dd176593f5338a1"
 dependencies = [
- "foldhash",
+ "foldhash 0.1.5",
 ]
 
 [[package]]
@@ -1660,7 +1665,7 @@ dependencies = [
 name = "mago-algebra"
 version = "1.5.0"
 dependencies = [
- "ahash",
+ "foldhash 0.2.0",
  "indexmap",
  "itertools 0.14.0",
  "mago-atom",
@@ -1672,10 +1677,10 @@ dependencies = [
 name = "mago-analyzer"
 version = "1.5.0"
 dependencies = [
- "ahash",
  "bumpalo",
  "diffy",
  "either",
+ "foldhash 0.2.0",
  "indexmap",
  "indoc",
  "itertools 0.14.0",
@@ -1717,11 +1722,11 @@ dependencies = [
 name = "mago-codex"
 version = "1.5.0"
 dependencies = [
- "ahash",
  "bitflags 2.10.0",
  "bumpalo",
  "criterion",
  "derivative",
+ "foldhash 0.2.0",
  "indexmap",
  "itertools 0.14.0",
  "mago-atom",
@@ -1743,8 +1748,8 @@ dependencies = [
 name = "mago-collector"
 version = "1.5.0"
 dependencies = [
- "ahash",
  "bumpalo",
+ "foldhash 0.2.0",
  "mago-database",
  "mago-reporting",
  "mago-span",
@@ -1756,7 +1761,7 @@ dependencies = [
 name = "mago-composer"
 version = "1.5.0"
 dependencies = [
- "ahash",
+ "foldhash 0.2.0",
  "serde",
  "serde_json",
 ]
@@ -1765,7 +1770,7 @@ dependencies = [
 name = "mago-database"
 version = "1.5.0"
 dependencies = [
- "ahash",
+ "foldhash 0.2.0",
  "glob",
  "globset",
  "memchr",
@@ -1793,8 +1798,8 @@ dependencies = [
 name = "mago-fingerprint"
 version = "1.5.0"
 dependencies = [
- "ahash",
  "bumpalo",
+ "foldhash 0.2.0",
  "indoc",
  "mago-atom",
  "mago-database",
@@ -1808,9 +1813,9 @@ dependencies = [
 name = "mago-formatter"
 version = "1.5.0"
 dependencies = [
- "ahash",
  "bitflags 2.10.0",
  "bumpalo",
+ "foldhash 0.2.0",
  "indoc",
  "mago-database",
  "mago-php-version",
@@ -1829,8 +1834,8 @@ dependencies = [
 name = "mago-guard"
 version = "1.5.0"
 dependencies = [
- "ahash",
  "bumpalo",
+ "foldhash 0.2.0",
  "indoc",
  "mago-atom",
  "mago-codex",
@@ -1851,8 +1856,8 @@ dependencies = [
 name = "mago-linter"
 version = "1.5.0"
 dependencies = [
- "ahash",
  "bumpalo",
+ "foldhash 0.2.0",
  "indoc",
  "mago-atom",
  "mago-casing",
@@ -1876,8 +1881,8 @@ dependencies = [
 name = "mago-names"
 version = "1.5.0"
 dependencies = [
- "ahash",
  "bumpalo",
+ "foldhash 0.2.0",
  "mago-span",
  "mago-syntax",
  "serde",
@@ -1888,8 +1893,8 @@ dependencies = [
 name = "mago-orchestrator"
 version = "1.5.0"
 dependencies = [
- "ahash",
  "bumpalo",
+ "foldhash 0.2.0",
  "indicatif 0.18.3",
  "mago-analyzer",
  "mago-atom",
@@ -1935,11 +1940,11 @@ dependencies = [
 name = "mago-reporting"
 version = "1.5.0"
 dependencies = [
- "ahash",
  "ariadne",
  "atty",
  "blake3",
  "codespan-reporting",
+ "foldhash 0.2.0",
  "mago-database",
  "mago-span",
  "mago-text-edit",

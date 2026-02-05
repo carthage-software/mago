@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use std::rc::Rc;
 use std::sync::Arc;
 
-use ahash::HashSet;
+use foldhash::HashSet;
 
 use mago_atom::AtomSet;
 use mago_atom::atom;

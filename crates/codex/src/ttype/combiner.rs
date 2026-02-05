@@ -1,7 +1,7 @@
 use std::sync::Arc;
 use std::sync::LazyLock;
 
-use ahash::HashSet;
+use foldhash::HashSet;
 
 use mago_atom::Atom;
 use mago_atom::atom;

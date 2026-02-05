@@ -1,5 +1,5 @@
-use ahash::HashMap;
-use ahash::HashSet;
+use foldhash::HashMap;
+use foldhash::HashSet;
 
 use mago_atom::empty_atom;
 use mago_database::file::FileId;

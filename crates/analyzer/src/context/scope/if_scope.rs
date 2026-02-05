@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-use ahash::HashSet;
+use foldhash::HashSet;
 use indexmap::IndexMap;
 
 use mago_algebra::assertion_set::AssertionSet;

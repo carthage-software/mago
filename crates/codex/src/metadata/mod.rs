@@ -1,8 +1,8 @@
 use std::borrow::Cow;
 use std::collections::hash_map::Entry;
 
-use ahash::HashMap;
-use ahash::HashSet;
+use foldhash::HashMap;
+use foldhash::HashSet;
 use serde::Deserialize;
 use serde::Serialize;
 

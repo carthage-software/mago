@@ -2,9 +2,9 @@
 
 use std::sync::Arc;
 
-use ahash::HashMap;
-use ahash::HashSet;
 use bumpalo::Bump;
+use foldhash::HashMap;
+use foldhash::HashSet;
 use rayon::prelude::*;
 
 use mago_atom::AtomSet;

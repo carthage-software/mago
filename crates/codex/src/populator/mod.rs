@@ -7,7 +7,7 @@ mod signatures;
 mod sorter;
 mod templates;
 
-use ahash::HashSet;
+use foldhash::HashSet;
 use mago_atom::AtomMap;
 use mago_atom::AtomSet;
 

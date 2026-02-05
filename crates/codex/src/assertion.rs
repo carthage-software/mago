@@ -1,8 +1,9 @@
 use std::borrow::Cow;
+use std::hash::BuildHasher;
 use std::hash::Hash;
-use std::hash::Hasher;
 
-use ahash::AHasher;
+use foldhash::fast::FixedState;
+
 use mago_atom::Atom;
 use mago_atom::atom;
 use mago_atom::concat_atom;
@@ -112,9 +113,7 @@ impl Assertion {
 
     #[must_use]
     pub fn to_hash(&self) -> u64 {
-        let mut state = AHasher::default();
-        self.to_atom().hash(&mut state);
-        state.finish()
+        FixedState::default().hash_one(self.to_atom())
     }
 
     #[must_use]

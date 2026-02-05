@@ -16,6 +16,6 @@ workspace = true
 mago-codex = { workspace = true }
 mago-span = { workspace = true }
 mago-atom = { workspace = true }
-ahash = { workspace = true }
+foldhash = { workspace = true }
 itertools = { workspace = true }
 indexmap = { workspace = true }

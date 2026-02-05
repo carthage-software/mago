@@ -1,4 +1,4 @@
-use ahash::HashSet;
+use foldhash::HashSet;
 
 use mago_atom::Atom;
 use mago_codex::ttype::get_mixed;

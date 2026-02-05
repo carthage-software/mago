@@ -1,6 +1,6 @@
 use std::fmt;
 
-use ahash::HashMap;
+use foldhash::HashMap;
 use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;

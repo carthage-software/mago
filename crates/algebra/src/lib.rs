@@ -1,7 +1,7 @@
 use std::hash::Hash;
 
-use ahash::HashSet;
-use ahash::HashSetExt;
+use foldhash::HashSet;
+use foldhash::HashSetExt;
 use indexmap::IndexMap;
 use itertools::Itertools;
 

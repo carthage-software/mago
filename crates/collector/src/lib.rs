@@ -1,7 +1,7 @@
-use ahash::HashMap;
 use bumpalo::Bump;
 use bumpalo::collections::CollectIn;
 use bumpalo::collections::Vec;
+use foldhash::HashMap;
 
 use mago_database::file::File;
 use mago_reporting::Annotation;

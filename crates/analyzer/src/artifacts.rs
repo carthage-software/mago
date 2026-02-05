@@ -1,7 +1,7 @@
 use std::rc::Rc;
 
-use ahash::HashMap;
-use ahash::HashSet;
+use foldhash::HashMap;
+use foldhash::HashSet;
 use mago_atom::Atom;
 use mago_atom::AtomMap;
 use mago_atom::AtomSet;

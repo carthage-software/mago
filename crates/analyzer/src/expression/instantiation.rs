@@ -1,5 +1,5 @@
-use ahash::HashMap;
-use ahash::RandomState;
+use foldhash::HashMap;
+use foldhash::fast::RandomState;
 use indexmap::IndexMap;
 
 use mago_atom::AtomMap;

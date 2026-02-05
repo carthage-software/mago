@@ -1,5 +1,5 @@
-use ahash::HashMap;
-use ahash::HashSet;
+use foldhash::HashMap;
+use foldhash::HashSet;
 use serde::Deserialize;
 use serde::Serialize;
 

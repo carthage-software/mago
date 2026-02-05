@@ -1,7 +1,7 @@
 use std::rc::Rc;
 use std::sync::Arc;
 
-use ahash::HashMap;
+use foldhash::HashMap;
 
 use mago_atom::Atom;
 use mago_atom::atom;

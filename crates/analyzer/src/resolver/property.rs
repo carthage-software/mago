@@ -1,4 +1,4 @@
-use ahash::HashMap;
+use foldhash::HashMap;
 use indexmap::IndexMap;
 
 use mago_atom::Atom;

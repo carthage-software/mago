@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use ahash::HashMap;
+use foldhash::HashMap;
 use serde::Deserialize;
 use serde::Serialize;
 

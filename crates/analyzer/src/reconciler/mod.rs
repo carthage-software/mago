@@ -4,7 +4,7 @@ use std::rc::Rc;
 use std::sync::Arc;
 use std::sync::LazyLock;
 
-use ahash::HashSet;
+use foldhash::HashSet;
 use indexmap::IndexMap;
 use regex::Regex;
 

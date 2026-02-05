@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use ahash::HashSet;
+use foldhash::HashSet;
 
 use mago_algebra::assertion_set::AssertionSet;
 use mago_algebra::clause::Clause;

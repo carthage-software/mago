@@ -2,9 +2,9 @@ use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::sync::Arc;
 
-use ahash::HashMap;
-use ahash::HashSet;
-use ahash::RandomState;
+use foldhash::HashMap;
+use foldhash::HashSet;
+use foldhash::fast::RandomState;
 use indexmap::IndexMap;
 
 use mago_atom::Atom;
@@ -1222,7 +1222,10 @@ pub fn get_mapped_generic_type_parameters(
                     mapped_input_offset,
                     inferred_type_replacer::replace(
                         &new_input_parameter,
-                        &TemplateResult::new(IndexMap::with_hasher(RandomState::new()), replacement_templates.clone()),
+                        &TemplateResult::new(
+                            IndexMap::with_hasher(RandomState::default()),
+                            replacement_templates.clone(),
+                        ),
                         codebase,
                     ),
                 ));

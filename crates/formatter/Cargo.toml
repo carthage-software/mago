@@ -17,7 +17,7 @@ mago-syntax = { workspace = true }
 mago-database = { workspace = true }
 mago-span = { workspace = true }
 mago-php-version = { workspace = true }
-ahash = { workspace = true }
+foldhash = { workspace = true }
 serde = { workspace = true }
 bitflags = { workspace = true }
 unicode-width = { workspace = true }

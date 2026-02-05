@@ -1,6 +1,7 @@
+use std::hash::BuildHasher;
 use std::hash::Hasher;
 
-use ahash::AHasher;
+use foldhash::fast::FixedState;
 
 use mago_names::ResolvedNames;
 
@@ -56,7 +57,7 @@ const DEFAULT_IMPORTANT_COMMENT_PATTERNS: &[&str] = &["@mago-", "@"];
 
 pub trait Fingerprintable {
     fn fingerprint(&self, resolved_names: &ResolvedNames, options: &FingerprintOptions<'_>) -> u64 {
-        let mut hasher = AHasher::default();
+        let mut hasher = FixedState::default().build_hasher();
         self.fingerprint_with_hasher(&mut hasher, resolved_names, options);
         hasher.finish()
     }
@@ -162,7 +163,7 @@ mod tests {
         let resolved_names = NameResolver::new(&arena).resolve(program);
         let options = FingerprintOptions::default();
 
-        let mut hasher = ahash::AHasher::default();
+        let mut hasher = foldhash::fast::FixedState::default().build_hasher();
         program.fingerprint_with_hasher(&mut hasher, &resolved_names, &options);
         hasher.finish()
     }

@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-use ahash::HashSet;
+use foldhash::HashSet;
 use mago_atom::AtomMap;
 
 use mago_algebra::find_satisfying_assignments;

@@ -1,8 +1,8 @@
 use std::borrow::Cow;
 use std::sync::LazyLock;
 
-use ahash::HashSet;
 use bumpalo::Bump;
+use foldhash::HashSet;
 use indoc::indoc;
 
 use mago_atom::AtomSet;

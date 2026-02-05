@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use ahash::HashSet;
+use foldhash::HashSet;
 use ordered_float::OrderedFloat;
 
 use mago_atom::Atom;

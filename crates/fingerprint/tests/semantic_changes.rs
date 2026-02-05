@@ -12,9 +12,10 @@ fn get_fingerprint(code: &'static str) -> u64 {
     let resolved_names = mago_names::resolver::NameResolver::new(&arena).resolve(program);
     let options = FingerprintOptions::default();
 
-    use ahash::AHasher;
+    use foldhash::fast::FixedState;
+    use std::hash::BuildHasher;
     use std::hash::Hasher;
-    let mut hasher = AHasher::default();
+    let mut hasher = FixedState::default().build_hasher();
     for statement in &program.statements {
         statement.fingerprint_with_hasher(&mut hasher, &resolved_names, &options);
     }

@@ -1,9 +1,10 @@
 use std::collections::BTreeMap;
+use std::hash::BuildHasher;
 use std::hash::Hash;
 use std::hash::Hasher;
 use std::num::Wrapping;
 
-use ahash::AHasher;
+use foldhash::fast::FixedState;
 use indexmap::IndexMap;
 
 use mago_atom::Atom;
@@ -185,7 +186,7 @@ fn get_hash(
             + Wrapping(if wedge { 100_000 } else { 0 }))
         .0
     } else {
-        let mut hasher = AHasher::default();
+        let mut hasher = FixedState::default().build_hasher();
         for possibility in possibilities {
             possibility.0.hash(&mut hasher);
             0.hash(&mut hasher);

@@ -1,4 +1,4 @@
-use ahash::HashMap;
+use foldhash::HashMap;
 
 use mago_codex::flags::attribute::AttributeFlags;
 

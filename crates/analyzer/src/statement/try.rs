@@ -2,8 +2,6 @@ use std::cell::RefCell;
 use std::collections::hash_map::Entry;
 use std::rc::Rc;
 
-use ahash::HashSetExt;
-
 use mago_atom::Atom;
 use mago_atom::AtomMap;
 use mago_atom::AtomSet;
@@ -446,7 +444,7 @@ fn get_caught_classes<'arena>(context: &mut Context<'_, 'arena>, hint: &Hint<'ar
     walk(context, hint, &mut caught_identifiers);
 
     let throwable = atom("Throwable");
-    let mut caught_classes = AtomSet::with_capacity(caught_identifiers.len());
+    let mut caught_classes = AtomSet::with_capacity_and_hasher(caught_identifiers.len(), Default::default());
     for (caught_type, caught_span) in caught_identifiers {
         let lowercase_caught_type = ascii_lowercase_atom(&caught_type);
 

@@ -1,6 +1,6 @@
 use std::collections::hash_map::Entry;
 
-use ahash::HashMap;
+use foldhash::HashMap;
 
 use mago_codex::ttype::TType;
 use mago_codex::ttype::add_union_type;

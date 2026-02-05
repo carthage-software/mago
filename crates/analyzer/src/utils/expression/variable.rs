@@ -1,4 +1,4 @@
-use ahash::HashSet;
+use foldhash::HashSet;
 
 use mago_span::Span;
 use mago_syntax::ast::ArrowFunction;

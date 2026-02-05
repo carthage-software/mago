@@ -2,7 +2,7 @@ use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::sync::LazyLock;
 
-use ahash::HashSet;
+use foldhash::HashSet;
 
 use bumpalo::Bump;
 use mago_analyzer::Analyzer;

@@ -18,5 +18,5 @@ mago-database = { workspace = true }
 mago-text-edit = { workspace = true }
 mago-reporting = { workspace = true }
 mago-syntax = { workspace = true }
-ahash = { workspace = true }
+foldhash = { workspace = true }
 bumpalo = { workspace = true }

@@ -2,9 +2,9 @@ use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use ahash::HashMap;
+use foldhash::HashMap;
 
-use ahash::HashSet;
+use foldhash::HashSet;
 use mago_atom::Atom;
 
 use mago_codex::metadata::class_like::ClassLikeMetadata;

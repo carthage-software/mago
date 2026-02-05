@@ -65,8 +65,8 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use ahash::HashMap;
-use ahash::HashMapExt;
+use foldhash::HashMap;
+use foldhash::HashMapExt;
 use rayon::iter::IntoParallelIterator;
 use rayon::iter::ParallelIterator;
 use serde::Deserialize;

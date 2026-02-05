@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::rc::Rc;
 
-use ahash::HashSet;
+use foldhash::HashSet;
 use indexmap::IndexMap;
 
 use mago_algebra::clause::Clause;

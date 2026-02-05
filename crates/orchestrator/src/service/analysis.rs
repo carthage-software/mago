@@ -1,9 +1,9 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use ahash::HashMap;
-use ahash::HashSet;
 use bumpalo::Bump;
+use foldhash::HashMap;
+use foldhash::HashSet;
 
 use mago_analyzer::Analyzer;
 use mago_analyzer::analysis_result::AnalysisResult;

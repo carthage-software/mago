@@ -1,5 +1,5 @@
-use ahash::HashMap;
-use ahash::HashMapExt;
+use foldhash::HashMap;
+use foldhash::HashMapExt;
 
 use bumpalo::Bump;
 use mago_database::ReadDatabase;

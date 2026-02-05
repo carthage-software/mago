@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use ahash::HashSet;
+use foldhash::HashSet;
 
 use mago_atom::atom;
 use mago_codex::context::ScopeContext;

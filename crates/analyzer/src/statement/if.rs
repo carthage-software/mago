@@ -1,7 +1,7 @@
 use std::ops::Deref;
 use std::rc::Rc;
 
-use ahash::HashSet;
+use foldhash::HashSet;
 use indexmap::IndexMap;
 use itertools::Itertools;
 use mago_atom::Atom;

@@ -1,7 +1,7 @@
 use std::cmp::Ordering;
 use std::io::Write;
 
-use ahash::HashMap;
+use foldhash::HashMap;
 
 use mago_database::ReadDatabase;
 

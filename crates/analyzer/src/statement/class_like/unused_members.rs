@@ -11,7 +11,7 @@
 //! and are not reported. This also covers magic methods (`__construct`, `__call`, etc.)
 //! since they all start with double underscore.
 
-use ahash::HashSet;
+use foldhash::HashSet;
 
 use mago_atom::Atom;
 use mago_codex::metadata::class_like::ClassLikeMetadata;

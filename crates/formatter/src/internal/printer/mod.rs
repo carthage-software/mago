@@ -1,7 +1,7 @@
-use ahash::HashMap;
 use bumpalo::Bump;
 use bumpalo::collections::Vec;
 use bumpalo::vec;
+use foldhash::HashMap;
 
 use crate::document::Align;
 use crate::document::Document;
