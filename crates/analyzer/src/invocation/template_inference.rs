@@ -72,17 +72,16 @@ fn infer_templates_from_input_and_container_types(
         return;
     }
 
-    let (generic_container_parts, concrete_container_parts) = container_type.types.iter().partition::<Vec<_>, _>(|t| {
-        matches!(
-            t,
+    let (generic_container_parts, concrete_container_parts) =
+        container_type.types.iter().partition::<Vec<_>, _>(|t| match t {
             TAtomic::GenericParameter(_)
-                | TAtomic::Array(_)
-                | TAtomic::Iterable(_)
-                | TAtomic::Object(TObject::Named(_))
-                | TAtomic::Callable(_)
-                | TAtomic::Scalar(TScalar::ClassLikeString(_))
-        )
-    });
+            | TAtomic::Array(_)
+            | TAtomic::Iterable(_)
+            | TAtomic::Callable(_)
+            | TAtomic::Scalar(TScalar::ClassLikeString(_)) => true,
+            TAtomic::Object(TObject::Named(named)) => named.type_parameters.as_ref().is_some_and(|p| !p.is_empty()),
+            _ => false,
+        });
 
     let has_generic_class_string = generic_container_parts
         .iter()
