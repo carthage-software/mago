@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
 use mago_atom::Atom;
 use mago_atom::atom;
@@ -367,7 +368,7 @@ pub(crate) fn intersect_atomic_with_atomic(
                 let mut type_1_atomic = first_type.clone();
 
                 if let TAtomic::GenericParameter(TGenericParameter { constraint, .. }) = &mut type_1_atomic {
-                    **constraint = new_as;
+                    *Arc::make_mut(constraint) = new_as;
                 }
 
                 return Some(type_1_atomic);
@@ -380,7 +381,7 @@ pub(crate) fn intersect_atomic_with_atomic(
                 let mut type_2_atomic = second_type.clone();
 
                 if let TAtomic::GenericParameter(TGenericParameter { constraint, .. }) = &mut type_2_atomic {
-                    **constraint = new_as;
+                    *Arc::make_mut(constraint) = new_as;
                 }
 
                 return Some(type_2_atomic);
@@ -416,7 +417,7 @@ fn intersect_list_arrays(context: &mut Context<'_, '_>, first_list: &TList, seco
             if let Some(element_type) = element_type {
                 return Some(TAtomic::Array(TArray::List(TList {
                     known_elements: Some(second_list_known_elements),
-                    element_type: Box::new(element_type),
+                    element_type: Arc::new(element_type),
                     non_empty: true,
                     known_count: None,
                 })));
@@ -434,7 +435,7 @@ fn intersect_list_arrays(context: &mut Context<'_, '_>, first_list: &TList, seco
             if let Some(element_type) = element_type {
                 return Some(TAtomic::Array(TArray::List(TList {
                     known_elements: Some(second_known_elements),
-                    element_type: Box::new(element_type),
+                    element_type: Arc::new(element_type),
                     non_empty: false,
                     known_count: None,
                 })));
@@ -452,7 +453,7 @@ fn intersect_list_arrays(context: &mut Context<'_, '_>, first_list: &TList, seco
             if let Some(element_type) = element_type {
                 return Some(TAtomic::Array(TArray::List(TList {
                     known_elements: Some(first_known_elements),
-                    element_type: Box::new(element_type),
+                    element_type: Arc::new(element_type),
                     non_empty: false,
                     known_count: None,
                 })));
@@ -464,7 +465,7 @@ fn intersect_list_arrays(context: &mut Context<'_, '_>, first_list: &TList, seco
             if let Some(element_type) = element_type {
                 return Some(TAtomic::Array(TArray::List(TList {
                     known_elements: None,
-                    element_type: Box::new(element_type),
+                    element_type: Arc::new(element_type),
                     non_empty: true,
                     known_count: None,
                 })));
@@ -486,7 +487,7 @@ fn intersect_keyed_arrays(
             let value = intersect_union_with_union(context, &first_parameters.1, &second_parameters.1);
 
             if let (Some(key), Some(value)) = (key, value) {
-                Some((Box::new(key), Box::new(value)))
+                Some((Arc::new(key), Arc::new(value)))
             } else {
                 return None;
             }
@@ -642,7 +643,7 @@ fn intersect_contained_atomic_with_another(
         let first_type_as = intersect_union_with_atomic(context, first_type_constraint, sub_atomic);
 
         if let Some(first_type_as) = first_type_as {
-            **first_type_constraint = first_type_as;
+            *Arc::make_mut(first_type_constraint) = first_type_as;
         } else {
             return None;
         }

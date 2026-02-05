@@ -613,10 +613,10 @@ pub(crate) fn handle_array_access_on_list<'ctx>(
 
             get_null()
         } else {
-            let mut element_type = *element_type.clone();
-            element_type.set_possibly_undefined(true, None);
+            let mut elem_type = TUnion::clone(element_type);
+            elem_type.set_possibly_undefined(true, None);
 
-            element_type
+            elem_type
         };
     }
 

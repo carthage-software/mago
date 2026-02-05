@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use mago_atom::Atom;
 use mago_atom::atom;
 use mago_atom::concat_atom;
@@ -15,23 +17,23 @@ use crate::ttype::get_array_parameters;
 use crate::ttype::union::TUnion;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Eq, Hash, PartialOrd, Ord)]
-pub struct TValueOf(Box<TUnion>);
+pub struct TValueOf(Arc<TUnion>);
 
 impl TValueOf {
     #[must_use]
-    pub fn new(object: Box<TUnion>) -> Self {
+    pub fn new(object: Arc<TUnion>) -> Self {
         Self(object)
     }
 
     #[inline]
     #[must_use]
-    pub const fn get_target_type(&self) -> &TUnion {
+    pub fn get_target_type(&self) -> &TUnion {
         &self.0
     }
 
     #[inline]
-    pub const fn get_target_type_mut(&mut self) -> &mut TUnion {
-        &mut self.0
+    pub fn get_target_type_mut(&mut self) -> &mut TUnion {
+        Arc::make_mut(&mut self.0)
     }
 
     #[inline]

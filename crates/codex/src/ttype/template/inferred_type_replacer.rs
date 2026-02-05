@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use ahash::HashMap;
 use ahash::HashSet;
 
@@ -81,7 +83,7 @@ pub fn replace(union: &TUnion, template_result: &TemplateResult, codebase: &Code
                             class_template_type =
                                 Some(TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::OfType {
                                     kind: *kind,
-                                    constraint: Box::new(template_type_part.clone()),
+                                    constraint: Arc::new(template_type_part.clone()),
                                 })));
                         } else if let TAtomic::GenericParameter(TGenericParameter {
                             constraint,
@@ -96,7 +98,7 @@ pub fn replace(union: &TUnion, template_result: &TemplateResult, codebase: &Code
                                 Some(TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::Generic {
                                     kind: *kind,
                                     parameter_name: *parameter_name,
-                                    constraint: Box::new(first_atomic_type.clone()),
+                                    constraint: Arc::new(first_atomic_type.clone()),
                                     defining_entity: *defining_entity,
                                 })));
                         }
@@ -217,14 +219,15 @@ fn replace_template_parameter(
 fn replace_atomic(mut atomic: TAtomic, template_result: &TemplateResult, codebase: &CodebaseMetadata) -> TAtomic {
     match &mut atomic {
         TAtomic::Conditional(conditional) => {
-            *conditional.subject = replace(&conditional.subject, template_result, codebase);
-            *conditional.target = replace(&conditional.target, template_result, codebase);
-            *conditional.then = replace(&conditional.then, template_result, codebase);
-            *conditional.otherwise = replace(&conditional.otherwise, template_result, codebase);
+            *Arc::make_mut(&mut conditional.subject) = replace(&conditional.subject, template_result, codebase);
+            *Arc::make_mut(&mut conditional.target) = replace(&conditional.target, template_result, codebase);
+            *Arc::make_mut(&mut conditional.then) = replace(&conditional.then, template_result, codebase);
+            *Arc::make_mut(&mut conditional.otherwise) = replace(&conditional.otherwise, template_result, codebase);
         }
         TAtomic::Array(array_type) => match array_type {
             TArray::List(list_data) => {
-                *list_data.element_type = replace(&list_data.element_type, template_result, codebase);
+                *Arc::make_mut(&mut list_data.element_type) =
+                    replace(&list_data.element_type, template_result, codebase);
 
                 if let Some(known_elements) = &mut list_data.known_elements {
                     for (_, element_type) in known_elements.values_mut() {
@@ -234,8 +237,8 @@ fn replace_atomic(mut atomic: TAtomic, template_result: &TemplateResult, codebas
             }
             TArray::Keyed(keyed_data) => {
                 if let Some((key_parameter, value_parameter)) = &mut keyed_data.parameters {
-                    **key_parameter = replace(key_parameter, template_result, codebase);
-                    **value_parameter = replace(value_parameter, template_result, codebase);
+                    *Arc::make_mut(key_parameter) = replace(key_parameter, template_result, codebase);
+                    *Arc::make_mut(value_parameter) = replace(value_parameter, template_result, codebase);
                 }
 
                 if let Some(known_items) = &mut keyed_data.known_items {

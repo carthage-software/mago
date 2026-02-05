@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::rc::Rc;
+use std::sync::Arc;
 use std::sync::LazyLock;
 
 use ahash::HashSet;
@@ -356,7 +357,7 @@ fn adjust_array_type(
 
                 *base_atomic_type = TAtomic::Array(TArray::Keyed(TKeyedArray {
                     known_items: Some(BTreeMap::from([(key, (false, result_type.clone()))])),
-                    parameters: Some((Box::new(get_arraykey()), Box::new(get_mixed()))),
+                    parameters: Some((Arc::new(get_arraykey()), Arc::new(get_mixed()))),
                     non_empty: true,
                 }));
             }
@@ -828,7 +829,7 @@ fn get_value_for_key(
                 atomic_types.reverse();
                 while let Some(existing_key_type_part) = atomic_types.pop() {
                     if let TAtomic::GenericParameter(TGenericParameter { constraint, .. }) = existing_key_type_part {
-                        atomic_types.extend(constraint.types.into_owned());
+                        atomic_types.extend(Arc::unwrap_or_clone(constraint).types.into_owned());
                         continue;
                     }
 
@@ -970,7 +971,7 @@ fn get_value_for_key(
 
                 while let Some(existing_key_type_part) = atomic_types.pop() {
                     if let TAtomic::GenericParameter(TGenericParameter { constraint, .. }) = existing_key_type_part {
-                        atomic_types.extend(constraint.types.into_owned());
+                        atomic_types.extend(Arc::unwrap_or_clone(constraint).types.into_owned());
                         continue;
                     }
 

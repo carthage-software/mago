@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
 use mago_atom::Atom;
 use mago_atom::atom;
@@ -592,9 +593,9 @@ fn intersect_array_list(
 ) -> TUnion {
     if existing_var_type.is_mixed() {
         return wrap_atomic(if is_non_empty {
-            TAtomic::Array(TArray::List(TList::new_non_empty(Box::new(get_mixed()))))
+            TAtomic::Array(TArray::List(TList::new_non_empty(Arc::new(get_mixed()))))
         } else {
-            TAtomic::Array(TArray::List(TList::new(Box::new(get_mixed()))))
+            TAtomic::Array(TArray::List(TList::new(Arc::new(get_mixed()))))
         });
     }
 
@@ -621,7 +622,7 @@ fn intersect_array_list(
 
                     value_parameter.clone()
                 } else {
-                    Box::new(get_mixed())
+                    Arc::new(get_mixed())
                 };
 
                 did_remove_type = true;
@@ -638,9 +639,9 @@ fn intersect_array_list(
                 let element_type = iterable.get_value_type();
 
                 acceptable_types.push(if is_non_empty {
-                    TAtomic::Array(TArray::List(TList::new_non_empty(Box::new(element_type.clone()))))
+                    TAtomic::Array(TArray::List(TList::new_non_empty(Arc::new(element_type.clone()))))
                 } else {
-                    TAtomic::Array(TArray::List(TList::new(Box::new(element_type.clone()))))
+                    TAtomic::Array(TArray::List(TList::new(Arc::new(element_type.clone()))))
                 });
             }
             TAtomic::GenericParameter(generic_parameter) => {
@@ -751,8 +752,8 @@ fn intersect_keyed_array(
                 let value_type = iterable.get_value_type();
 
                 acceptable_types.push(TAtomic::Array(TArray::Keyed(TKeyedArray::new_with_parameters(
-                    Box::new(key_type),
-                    Box::new(value_type.clone()),
+                    Arc::new(key_type),
+                    Arc::new(value_type.clone()),
                 ))));
             }
             TAtomic::GenericParameter(generic_parameter) => {
@@ -1681,8 +1682,8 @@ fn reconcile_countable(
         } else if let TAtomic::Iterable(iterable) = atomic {
             if iterable.key_type.is_array_key() || iterable.key_type.is_int() || iterable.key_type.is_any_string() {
                 countable_types.push(TAtomic::Array(TArray::Keyed(TKeyedArray::new_with_parameters(
-                    Box::new(iterable.get_key_type().clone()),
-                    Box::new(iterable.get_value_type().clone()),
+                    Arc::new(iterable.get_key_type().clone()),
+                    Arc::new(iterable.get_value_type().clone()),
                 ))));
             }
 
@@ -2045,7 +2046,7 @@ fn reconcile_has_array_key(
                     acceptable_types.push(atomic);
                 } else {
                     let acceptable_atomic = TAtomic::GenericParameter(TGenericParameter {
-                        constraint: Box::new(reconcile_has_array_key(
+                        constraint: Arc::new(reconcile_has_array_key(
                             context, assertion, constraint, None, key_name, negated, None,
                         )),
                         parameter_name: *parameter_name,
@@ -2190,7 +2191,7 @@ fn reconcile_has_nonnull_entry_for_key(
                         *key_name,
                         (false, subtract_null(context, assertion, &get_mixed(), None, negated, None)),
                     )])),
-                    parameters: Some((Box::new(get_arraykey()), Box::new(get_mixed()))),
+                    parameters: Some((Arc::new(get_arraykey()), Arc::new(get_mixed()))),
                     non_empty: false,
                 }));
                 acceptable_types.extend(keyed_array.types.into_owned());

@@ -1,6 +1,7 @@
 //! `Psl\Regex\capture_groups()` return type provider.
 
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
 use mago_atom::atom;
 use mago_codex::ttype::atomic::TAtomic;
@@ -102,7 +103,7 @@ impl FunctionReturnTypeProvider for CaptureGroupsProvider {
         Some(TUnion::from_atomic(TAtomic::Object(TObject::Named(TNamedObject::new_with_type_parameters(
             atom("Psl\\Type\\TypeInterface"),
             Some(vec![TUnion::from_atomic(TAtomic::Array(TArray::Keyed(TKeyedArray {
-                parameters: if has_extra { Some((Box::new(get_arraykey()), Box::new(get_string()))) } else { None },
+                parameters: if has_extra { Some((Arc::new(get_arraykey()), Arc::new(get_string()))) } else { None },
                 non_empty: true,
                 known_items: Some(known_items),
             })))]),
@@ -114,8 +115,8 @@ fn capture_groups_fallback_type() -> TUnion {
     TUnion::from_atomic(TAtomic::Object(TObject::Named(TNamedObject::new_with_type_parameters(
         atom("Psl\\Type\\TypeInterface"),
         Some(vec![TUnion::from_atomic(TAtomic::Array(TArray::Keyed(TKeyedArray::new_with_parameters(
-            Box::new(get_arraykey()),
-            Box::new(get_string()),
+            Arc::new(get_arraykey()),
+            Arc::new(get_string()),
         ))))]),
     ))))
 }

@@ -1,5 +1,7 @@
 //! `UnitEnum::cases()` return type provider.
 
+use std::sync::Arc;
+
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::array::TArray;
 use mago_codex::ttype::atomic::array::list::TList;
@@ -57,9 +59,9 @@ impl MethodReturnTypeProvider for EnumCasesProvider {
         })));
 
         if class_metadata.enum_cases.is_empty() {
-            Some(TUnion::from_atomic(TAtomic::Array(TArray::List(TList::new(Box::new(enum_type))))))
+            Some(TUnion::from_atomic(TAtomic::Array(TArray::List(TList::new(Arc::new(enum_type))))))
         } else {
-            Some(TUnion::from_atomic(TAtomic::Array(TArray::List(TList::new_non_empty(Box::new(enum_type))))))
+            Some(TUnion::from_atomic(TAtomic::Array(TArray::List(TList::new_non_empty(Arc::new(enum_type))))))
         }
     }
 }

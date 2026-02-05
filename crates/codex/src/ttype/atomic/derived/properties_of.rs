@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
 use mago_atom::Atom;
 use mago_atom::atom;
@@ -25,31 +26,31 @@ use crate::visibility::Visibility;
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Eq, Hash, PartialOrd, Ord)]
 pub struct TPropertiesOf {
     pub visibility: Option<Visibility>,
-    pub target_type: Box<TUnion>,
+    pub target_type: Arc<TUnion>,
 }
 
 impl TPropertiesOf {
     #[inline]
     #[must_use]
-    pub const fn new(target_type: Box<TUnion>) -> Self {
+    pub fn new(target_type: Arc<TUnion>) -> Self {
         TPropertiesOf { visibility: None, target_type }
     }
 
     #[inline]
     #[must_use]
-    pub const fn public(target_type: Box<TUnion>) -> Self {
+    pub fn public(target_type: Arc<TUnion>) -> Self {
         TPropertiesOf { visibility: Some(Visibility::Public), target_type }
     }
 
     #[inline]
     #[must_use]
-    pub const fn protected(target_type: Box<TUnion>) -> Self {
+    pub fn protected(target_type: Arc<TUnion>) -> Self {
         TPropertiesOf { visibility: Some(Visibility::Protected), target_type }
     }
 
     #[inline]
     #[must_use]
-    pub const fn private(target_type: Box<TUnion>) -> Self {
+    pub fn private(target_type: Arc<TUnion>) -> Self {
         TPropertiesOf { visibility: Some(Visibility::Private), target_type }
     }
 
@@ -61,13 +62,13 @@ impl TPropertiesOf {
 
     #[inline]
     #[must_use]
-    pub const fn get_target_type(&self) -> &TUnion {
+    pub fn get_target_type(&self) -> &TUnion {
         &self.target_type
     }
 
     #[inline]
-    pub const fn get_target_type_mut(&mut self) -> &mut TUnion {
-        &mut self.target_type
+    pub fn get_target_type_mut(&mut self) -> &mut TUnion {
+        Arc::make_mut(&mut self.target_type)
     }
 
     /// Extracts properties from the given target types as a keyed array shape,
@@ -210,7 +211,7 @@ impl TPropertiesOf {
             let mut keyed_array = TKeyedArray::new().with_known_items(known_items);
 
             if needs_unsealed {
-                keyed_array = keyed_array.with_parameters(Box::new(get_non_empty_string()), Box::new(get_mixed()));
+                keyed_array = keyed_array.with_parameters(Arc::new(get_non_empty_string()), Arc::new(get_mixed()));
             }
 
             if has_known_items {

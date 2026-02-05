@@ -1,5 +1,6 @@
 use std::collections::VecDeque;
 use std::rc::Rc;
+use std::sync::Arc;
 
 use mago_codex::ttype::TType;
 use mago_codex::ttype::atomic::TAtomic;
@@ -192,7 +193,7 @@ pub fn analyze_arithmetic_operation<'ctx, 'arena>(
         .cloned()
         .flat_map(|atomic| {
             if let TAtomic::GenericParameter(parameter) = atomic {
-                parameter.constraint.types.into_owned()
+                Arc::unwrap_or_clone(parameter.constraint).types.into_owned()
             } else {
                 vec![atomic]
             }
@@ -205,7 +206,7 @@ pub fn analyze_arithmetic_operation<'ctx, 'arena>(
         .cloned()
         .flat_map(|atomic| {
             if let TAtomic::GenericParameter(parameter) = atomic {
-                parameter.constraint.types.into_owned()
+                Arc::unwrap_or_clone(parameter.constraint).types.into_owned()
             } else {
                 vec![atomic]
             }

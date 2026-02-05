@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use mago_atom::Atom;
 use mago_atom::concat_atom;
 use serde::Deserialize;
@@ -15,36 +17,36 @@ use crate::ttype::union::TUnion;
 /// This type resolves to the type of elements in `T` at index `K`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Eq, Hash, PartialOrd, Ord)]
 pub struct TIndexAccess {
-    target_type: Box<TUnion>,
-    index_type: Box<TUnion>,
+    target_type: Arc<TUnion>,
+    index_type: Arc<TUnion>,
 }
 
 impl TIndexAccess {
     #[must_use]
     pub fn new(target: TUnion, index: TUnion) -> Self {
-        Self { target_type: Box::new(target), index_type: Box::new(index) }
+        Self { target_type: Arc::new(target), index_type: Arc::new(index) }
     }
 
     #[inline]
     #[must_use]
-    pub const fn get_target_type(&self) -> &TUnion {
+    pub fn get_target_type(&self) -> &TUnion {
         &self.target_type
     }
 
     #[inline]
-    pub const fn get_target_type_mut(&mut self) -> &mut TUnion {
-        &mut self.target_type
+    pub fn get_target_type_mut(&mut self) -> &mut TUnion {
+        Arc::make_mut(&mut self.target_type)
     }
 
     #[inline]
     #[must_use]
-    pub const fn get_index_type(&self) -> &TUnion {
+    pub fn get_index_type(&self) -> &TUnion {
         &self.index_type
     }
 
     #[inline]
-    pub const fn get_index_type_mut(&mut self) -> &mut TUnion {
-        &mut self.index_type
+    pub fn get_index_type_mut(&mut self) -> &mut TUnion {
+        Arc::make_mut(&mut self.index_type)
     }
 
     #[must_use]

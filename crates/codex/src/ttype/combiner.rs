@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use std::sync::LazyLock;
 
 use ahash::HashSet;
@@ -238,7 +239,7 @@ pub fn combine(types: Vec<TAtomic>, codebase: &CodebaseMetadata, options: Combin
                 Some(combination.keyed_array_entries)
             },
             parameters: if let Some((k, v)) = combination.keyed_array_parameters {
-                Some((Box::new(k), Box::new(v)))
+                Some((Arc::new(k), Arc::new(v)))
             } else {
                 None
             },
@@ -253,7 +254,7 @@ pub fn combine(types: Vec<TAtomic>, codebase: &CodebaseMetadata, options: Combin
             } else {
                 Some(combination.list_array_entries)
             },
-            element_type: Box::new(list_parameter),
+            element_type: Arc::new(list_parameter),
             non_empty: combination.flags.contains(CombinationFlags::LIST_ARRAY_ALWAYS_FILLED),
             known_count: None,
         }));
@@ -1330,7 +1331,7 @@ mod tests {
                 (0, (false, TUnion::from_atomic(TAtomic::Scalar(TScalar::Integer(TInteger::literal(1)))))),
                 (1, (false, TUnion::from_atomic(TAtomic::Scalar(TScalar::Integer(TInteger::literal(2)))))),
             ])))),
-            TAtomic::Array(TArray::List(TList::new(Box::new(TUnion::from_atomic(TAtomic::Scalar(TScalar::int())))))), // list<int>
+            TAtomic::Array(TArray::List(TList::new(Arc::new(TUnion::from_atomic(TAtomic::Scalar(TScalar::int())))))), // list<int>
         ];
 
         let combined =

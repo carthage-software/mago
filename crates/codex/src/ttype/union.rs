@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 use std::hash::Hash;
 use std::hash::Hasher;
+use std::sync::Arc;
 
 use bitflags::bitflags;
 use derivative::Derivative;
@@ -301,7 +302,7 @@ impl TUnion {
                     parameter_name: parameter.parameter_name,
                     defining_entity: parameter.defining_entity,
                     intersection_types: parameter.intersection_types.clone(),
-                    constraint: Box::new(parameter.constraint.to_non_nullable()),
+                    constraint: Arc::new(parameter.constraint.to_non_nullable()),
                 })),
                 TAtomic::Mixed(mixed) => Some(TAtomic::Mixed(mixed.with_is_non_null(true))),
                 atomic => Some(atomic.clone()),
@@ -318,7 +319,7 @@ impl TUnion {
                     parameter_name: parameter.parameter_name,
                     defining_entity: parameter.defining_entity,
                     intersection_types: parameter.intersection_types.clone(),
-                    constraint: Box::new(parameter.constraint.to_truthy()),
+                    constraint: Arc::new(parameter.constraint.to_truthy()),
                 })),
                 TAtomic::Mixed(mixed) => Some(TAtomic::Mixed(mixed.with_truthiness(TMixedTruthiness::Truthy))),
                 atomic => {
@@ -1196,7 +1197,7 @@ impl TUnion {
             TAtomic::Array(array) => match array {
                 TArray::List(_) => Some(get_int()),
                 TArray::Keyed(keyed_array) => match &keyed_array.parameters {
-                    Some((k, _)) => Some(*k.clone()),
+                    Some((k, _)) => Some((**k).clone()),
                     None => Some(get_arraykey()),
                 },
             },
@@ -1463,11 +1464,13 @@ pub fn populate_union_type(
             TAtomic::Scalar(TScalar::ClassLikeString(
                 TClassLikeString::Generic { constraint, .. } | TClassLikeString::OfType { constraint, .. },
             )) => {
-                let mut new_constraint = (**constraint).clone();
-
-                populate_atomic_type(&mut new_constraint, codebase_symbols, reference_source, symbol_references, force);
-
-                **constraint = new_constraint;
+                populate_atomic_type(
+                    Arc::make_mut(constraint),
+                    codebase_symbols,
+                    reference_source,
+                    symbol_references,
+                    force,
+                );
             }
             _ => {
                 populate_atomic_type(unpopulated_atomic, codebase_symbols, reference_source, symbol_references, force);

@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use mago_atom::Atom;
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::identifier::method::MethodIdentifier;
@@ -76,7 +78,7 @@ pub enum InvocationTarget<'ctx> {
         /// Function/method metadata.
         metadata: &'ctx FunctionLikeMetadata,
         /// Inferred return type (used for closures/arrow functions).
-        inferred_return_type: Option<Box<TUnion>>,
+        inferred_return_type: Option<Arc<TUnion>>,
         /// Method call context, if applicable.
         method_context: Option<MethodTargetContext<'ctx>>,
         /// The span of the callable part.

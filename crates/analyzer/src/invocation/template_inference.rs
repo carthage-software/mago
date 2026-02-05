@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
 use ahash::HashMap;
 
@@ -1098,7 +1099,7 @@ fn resolve_atomic_unbound_templates(atomic: &TAtomic) -> TAtomic {
             let new_array = match array {
                 TArray::List(list) => {
                     let mut new_list = list.clone();
-                    *new_list.element_type = resolve_unbound_templates_to_constraints(&list.element_type);
+                    new_list.element_type = Arc::new(resolve_unbound_templates_to_constraints(&list.element_type));
                     if let Some(known_elements) = &list.known_elements {
                         let new_elements: BTreeMap<usize, (bool, TUnion)> = known_elements
                             .iter()
@@ -1112,8 +1113,8 @@ fn resolve_atomic_unbound_templates(atomic: &TAtomic) -> TAtomic {
                     let mut new_keyed = keyed.clone();
                     if let Some(params) = &keyed.parameters {
                         new_keyed.parameters = Some((
-                            Box::new(resolve_unbound_templates_to_constraints(&params.0)),
-                            Box::new(resolve_unbound_templates_to_constraints(&params.1)),
+                            Arc::new(resolve_unbound_templates_to_constraints(&params.0)),
+                            Arc::new(resolve_unbound_templates_to_constraints(&params.1)),
                         ));
                     }
                     if let Some(known_items) = &keyed.known_items {
@@ -1133,7 +1134,7 @@ fn resolve_atomic_unbound_templates(atomic: &TAtomic) -> TAtomic {
                 TCallable::Signature(sig) => {
                     let mut new_sig = sig.clone();
                     if let Some(return_type) = &sig.return_type {
-                        new_sig.return_type = Some(Box::new(resolve_unbound_templates_to_constraints(return_type)));
+                        new_sig.return_type = Some(Arc::new(resolve_unbound_templates_to_constraints(return_type)));
                     }
                     TCallable::Signature(new_sig)
                 }

@@ -1,4 +1,5 @@
 use std::rc::Rc;
+use std::sync::Arc;
 
 use ahash::HashMap;
 
@@ -385,7 +386,7 @@ fn add_parameter_types_to_context<'ctx, 'arena>(
         }
 
         let final_parameter_type = if parameter_metadata.flags.is_variadic() {
-            wrap_atomic(TAtomic::Array(TArray::List(TList::new(Box::new(final_parameter_type)))))
+            wrap_atomic(TAtomic::Array(TArray::List(TList::new(Arc::new(final_parameter_type)))))
         } else {
             final_parameter_type
         };
@@ -604,7 +605,7 @@ pub fn get_this_type(
 
             type_parameters.push(wrap_atomic(TAtomic::GenericParameter(TGenericParameter {
                 parameter_name: *template_name,
-                constraint: Box::new(constraint.clone()),
+                constraint: Arc::new(constraint.clone()),
                 defining_entity: *defining_entity,
                 intersection_types: None,
             })));

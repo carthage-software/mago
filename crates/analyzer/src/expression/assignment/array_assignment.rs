@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 use std::rc::Rc;
+use std::sync::Arc;
 
 use mago_atom::Atom;
 use mago_atom::atom;
@@ -184,7 +185,7 @@ fn update_atomic_given_key(
 
     if atomic_type.is_null() || atomic_type.is_void() {
         atomic_type = TAtomic::Array(TArray::List(TList {
-            element_type: Box::new(get_never()),
+            element_type: Arc::new(get_never()),
             known_elements: None,
             known_count: None,
             non_empty: false,
@@ -205,7 +206,7 @@ fn update_atomic_given_key(
 
         if array.is_empty() && key_type.is_none() {
             *array = TArray::List(TList {
-                element_type: Box::new(combined_value_type),
+                element_type: Arc::new(combined_value_type),
                 known_elements: None,
                 known_count: None,
                 non_empty: true,
@@ -213,7 +214,7 @@ fn update_atomic_given_key(
         } else {
             match array {
                 TArray::List(list) => {
-                    *list.element_type = combined_value_type;
+                    list.element_type = Arc::new(combined_value_type);
 
                     list.known_elements = None;
                     list.known_count = None;
@@ -221,13 +222,13 @@ fn update_atomic_given_key(
                 }
                 TArray::Keyed(keyed_array) => {
                     keyed_array.parameters = Some((
-                        Box::new(add_union_type(
+                        Arc::new(add_union_type(
                             array_key_type,
                             &key_type.as_ref().map_or_else(get_int, |rc| (**rc).clone()),
                             context.codebase,
                             context.settings.combiner_options(),
                         )),
-                        Box::new(combined_value_type),
+                        Arc::new(combined_value_type),
                     ));
 
                     keyed_array.known_items = None;
@@ -271,7 +272,7 @@ fn update_atomic_given_key(
                             let parameters = if list.element_type.is_never() {
                                 None
                             } else {
-                                Some((Box::new(get_non_negative_int()), list.element_type.clone()))
+                                Some((Arc::new(get_non_negative_int()), list.element_type.clone()))
                             };
 
                             let mut known_items = BTreeMap::new();
@@ -348,7 +349,7 @@ fn update_array_assignment_child_type<'ctx>(
                 TAtomic::Array(array_type) => match array_type {
                     TArray::List(list) => {
                         collection_types.push(TAtomic::Array(TArray::List(TList {
-                            element_type: Box::new(value_type.clone()),
+                            element_type: Arc::new(value_type.clone()),
                             known_elements: list.known_elements.clone(),
                             known_count: None,
                             non_empty: true,
@@ -356,7 +357,7 @@ fn update_array_assignment_child_type<'ctx>(
                     }
                     TArray::Keyed(keyed_array) => {
                         collection_types.push(TAtomic::Array(TArray::Keyed(TKeyedArray {
-                            parameters: Some((Box::new((*key_type).clone()), Box::new(value_type.clone()))),
+                            parameters: Some((Arc::new((*key_type).clone()), Arc::new(value_type.clone()))),
                             known_items: keyed_array.get_known_items().map(|known_items| {
                                 known_items
                                     .iter()
@@ -369,7 +370,7 @@ fn update_array_assignment_child_type<'ctx>(
                 },
                 TAtomic::Null | TAtomic::Void => {
                     collection_types.push(TAtomic::Array(TArray::Keyed(TKeyedArray {
-                        parameters: Some((Box::new((*key_type).clone()), Box::new(value_type.clone()))),
+                        parameters: Some((Arc::new((*key_type).clone()), Arc::new(value_type.clone()))),
                         known_items: None,
                         non_empty: true,
                     })));
@@ -391,7 +392,7 @@ fn update_array_assignment_child_type<'ctx>(
                             && current_known_count < context.settings.array_combination_threshold as usize
                         {
                             collection_types.push(TAtomic::Array(TArray::List(TList {
-                                element_type: Box::new(get_never()),
+                                element_type: Arc::new(get_never()),
                                 known_elements: Some(BTreeMap::from([(
                                     current_known_count,
                                     (false, value_type.clone()),
@@ -401,7 +402,7 @@ fn update_array_assignment_child_type<'ctx>(
                             })));
                         } else {
                             collection_types.push(TAtomic::Array(TArray::List(TList {
-                                element_type: Box::new(value_type.clone()),
+                                element_type: Arc::new(value_type.clone()),
                                 known_elements: None,
                                 known_count: None,
                                 non_empty: true,
@@ -433,14 +434,14 @@ fn update_array_assignment_child_type<'ctx>(
 
                         if let Some(index) = next_index.filter(|index| *index > 0) {
                             collection_types.push(TAtomic::Array(TArray::List(TList {
-                                element_type: Box::new(value_type.clone()),
+                                element_type: Arc::new(value_type.clone()),
                                 known_elements: Some(BTreeMap::from([(index as usize, (false, value_type.clone()))])),
                                 known_count: None,
                                 non_empty: true,
                             })));
                         } else {
                             collection_types.push(TAtomic::Array(TArray::List(TList {
-                                element_type: Box::new(value_type.clone()),
+                                element_type: Arc::new(value_type.clone()),
                                 known_elements: None,
                                 known_count: None,
                                 non_empty: true,
@@ -450,7 +451,7 @@ fn update_array_assignment_child_type<'ctx>(
                 },
                 TAtomic::Null | TAtomic::Void => {
                     collection_types.push(TAtomic::Array(TArray::List(TList {
-                        element_type: Box::new(value_type.clone()),
+                        element_type: Arc::new(value_type.clone()),
                         known_elements: None,
                         known_count: None,
                         non_empty: true,

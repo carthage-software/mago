@@ -217,10 +217,11 @@ fn resolve_atomic<'ctx, 'arena>(
         return Either::Left(atomic_to_resolve);
     };
 
-    let subject = resolve_union(context, invocation, template_result, parameters, *conditional.subject);
-    let target = resolve_union(context, invocation, template_result, parameters, *conditional.target);
-    let then_type = resolve_union(context, invocation, template_result, parameters, *conditional.then);
-    let otherwise_type = resolve_union(context, invocation, template_result, parameters, *conditional.otherwise);
+    let subject = resolve_union(context, invocation, template_result, parameters, (*conditional.subject).clone());
+    let target = resolve_union(context, invocation, template_result, parameters, (*conditional.target).clone());
+    let then_type = resolve_union(context, invocation, template_result, parameters, (*conditional.then).clone());
+    let otherwise_type =
+        resolve_union(context, invocation, template_result, parameters, (*conditional.otherwise).clone());
     let negated = conditional.negated;
 
     let subject = inferred_type_replacer::replace(&subject, template_result, context.codebase);

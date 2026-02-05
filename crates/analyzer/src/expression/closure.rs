@@ -1,4 +1,5 @@
 use std::rc::Rc;
+use std::sync::Arc;
 
 use ahash::HashMap;
 
@@ -216,12 +217,12 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Closure<'arena> {
             }
 
             if let Some(inferred_return_type) = inferred_return_type {
-                signature.return_type = Some(Box::new(inferred_return_type));
+                signature.return_type = Some(Arc::new(inferred_return_type));
             } else if !function_metadata.flags.has_yield() {
                 if inner_block_context.flags.has_returned() {
-                    signature.return_type = Some(Box::new(get_never()));
+                    signature.return_type = Some(Arc::new(get_never()));
                 } else {
-                    signature.return_type = Some(Box::new(get_void()));
+                    signature.return_type = Some(Arc::new(get_void()));
                 }
             }
         }

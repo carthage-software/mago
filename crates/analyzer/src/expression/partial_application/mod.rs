@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use mago_atom::atom;
 use mago_atom::concat_atom;
 use mago_codex::metadata::CodebaseMetadata;
@@ -104,7 +106,7 @@ fn create_closure_from_partial_application(
                     {
                         let substituted_type = inferred_type_replacer::replace(type_sig, template_result, codebase);
                         new_param = TCallableParameter::new(
-                            Some(Box::new(substituted_type)),
+                            Some(Arc::new(substituted_type)),
                             new_param.is_by_reference(),
                             new_param.is_variadic(),
                             new_param.has_default(),
@@ -129,7 +131,7 @@ fn create_closure_from_partial_application(
                     {
                         let substituted_type = inferred_type_replacer::replace(type_sig, template_result, codebase);
                         new_param = TCallableParameter::new(
-                            Some(Box::new(substituted_type)),
+                            Some(Arc::new(substituted_type)),
                             new_param.is_by_reference(),
                             new_param.is_variadic(),
                             new_param.has_default(),
@@ -147,7 +149,7 @@ fn create_closure_from_partial_application(
                         last_param.clone()
                     } else {
                         TCallableParameter::new(
-                            last_param.get_type_signature().map(|t| Box::new(t.clone())),
+                            last_param.get_type_signature().map(|t| Arc::new(t.clone())),
                             false,
                             true,
                             false,
@@ -159,7 +161,7 @@ fn create_closure_from_partial_application(
                     {
                         let substituted_type = inferred_type_replacer::replace(type_sig, template_result, codebase);
                         new_param = TCallableParameter::new(
-                            Some(Box::new(substituted_type)),
+                            Some(Arc::new(substituted_type)),
                             new_param.is_by_reference(),
                             new_param.is_variadic(),
                             new_param.has_default(),
@@ -179,7 +181,7 @@ fn create_closure_from_partial_application(
 
     let return_type = if let Some(ret_type) = &callable_signature.return_type {
         if template_result.has_template_types() || !template_result.lower_bounds.is_empty() {
-            Some(Box::new(inferred_type_replacer::replace(ret_type, template_result, codebase)))
+            Some(Arc::new(inferred_type_replacer::replace(ret_type, template_result, codebase)))
         } else {
             Some(ret_type.clone())
         }

@@ -1,6 +1,7 @@
 //! `array_merge()` return type provider.
 
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::array::TArray;
@@ -183,7 +184,7 @@ impl FunctionReturnTypeProvider for ArrayMergeProvider {
             let element_type =
                 if all_lists_are_closed { get_never() } else { merged_value_type.unwrap_or_else(get_mixed) };
 
-            let mut result_list = TList::new(Box::new(element_type));
+            let mut result_list = TList::new(Arc::new(element_type));
             result_list.non_empty = any_argument_non_empty;
 
             if !merged_list_elements.is_empty() {
@@ -203,8 +204,8 @@ impl FunctionReturnTypeProvider for ArrayMergeProvider {
 
             if has_parameters {
                 result_array.parameters = Some((
-                    Box::new(merged_key_type.unwrap_or_else(get_arraykey)),
-                    Box::new(merged_value_type.unwrap_or_else(get_mixed)),
+                    Arc::new(merged_key_type.unwrap_or_else(get_arraykey)),
+                    Arc::new(merged_value_type.unwrap_or_else(get_mixed)),
                 ));
             }
 

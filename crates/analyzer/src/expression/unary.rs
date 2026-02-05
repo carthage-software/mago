@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 use std::ops::Add;
 use std::ops::Sub;
 use std::rc::Rc;
+use std::sync::Arc;
 
 use mago_atom::atom;
 use mago_atom::empty_atom;
@@ -979,7 +980,7 @@ fn cast_type_to_array<'arena>(
             }
             TAtomic::Scalar(_) | TAtomic::Resource(_) | TAtomic::Callable(_) => {
                 // Scalars (int, float, string, bool) become a list with one element at key 0.
-                let mut scalar_list = TList::new(Box::new(get_never()));
+                let mut scalar_list = TList::new(Arc::new(get_never()));
                 scalar_list.known_count = Some(1);
                 scalar_list.non_empty = true;
                 scalar_list.known_elements =
@@ -1012,7 +1013,7 @@ fn cast_type_to_array<'arena>(
                 }
 
                 let mut obj_array = TKeyedArray::new();
-                obj_array.parameters = Some((Box::new(get_string()), Box::new(get_mixed())));
+                obj_array.parameters = Some((Arc::new(get_string()), Arc::new(get_mixed())));
 
                 resulting_array_atomics.push(TAtomic::Array(TArray::Keyed(obj_array)));
             }
@@ -1031,8 +1032,8 @@ fn cast_type_to_array<'arena>(
                 }
 
                 resulting_array_atomics.push(TAtomic::Array(TArray::Keyed(TKeyedArray::new_with_parameters(
-                    Box::new(get_arraykey()),
-                    Box::new(get_mixed()),
+                    Arc::new(get_arraykey()),
+                    Arc::new(get_mixed()),
                 ))));
             }
             _ => {
@@ -1053,8 +1054,8 @@ fn cast_type_to_array<'arena>(
 
                 // Fallback to a generic array type if cast is ambiguous
                 resulting_array_atomics.push(TAtomic::Array(TArray::Keyed(TKeyedArray::new_with_parameters(
-                    Box::new(get_arraykey()),
-                    Box::new(get_mixed()),
+                    Arc::new(get_arraykey()),
+                    Arc::new(get_mixed()),
                 ))));
             }
         }

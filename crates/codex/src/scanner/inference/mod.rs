@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 use std::collections::BTreeMap;
+use std::sync::Arc;
 use std::sync::LazyLock;
 
 use mago_atom::AtomMap;
@@ -358,7 +359,7 @@ pub fn infer_with_constants<'arena>(
             Some(wrap_atomic(TAtomic::Array(TArray::List(TList {
                 known_count: Some(entries.len()),
                 known_elements: Some(entries),
-                element_type: Box::new(get_never()),
+                element_type: Arc::new(get_never()),
                 non_empty: true,
             }))))
         }

@@ -1,6 +1,7 @@
 //! `Flow\Types\DSL\type_structure()` return type provider.
 
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
 use mago_atom::atom;
 use mago_codex::ttype::atomic::TAtomic;
@@ -119,7 +120,7 @@ impl FunctionReturnTypeProvider for TypeStructureProvider {
             atom("Flow\\Types\\Type"),
             Some(vec![TUnion::from_atomic(TAtomic::Array(TArray::Keyed(TKeyedArray {
                 parameters: if allows_extra_fields {
-                    Some((Box::new(get_arraykey()), Box::new(get_mixed())))
+                    Some((Arc::new(get_arraykey()), Arc::new(get_mixed())))
                 } else {
                     None
                 },

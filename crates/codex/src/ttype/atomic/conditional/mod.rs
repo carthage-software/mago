@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -10,20 +12,20 @@ use crate::ttype::union::TUnion;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 pub struct TConditional {
-    pub subject: Box<TUnion>,
-    pub target: Box<TUnion>,
-    pub then: Box<TUnion>,
-    pub otherwise: Box<TUnion>,
+    pub subject: Arc<TUnion>,
+    pub target: Arc<TUnion>,
+    pub then: Arc<TUnion>,
+    pub otherwise: Arc<TUnion>,
     pub negated: bool,
 }
 
 impl TConditional {
     #[must_use]
     pub fn new(
-        subject: Box<TUnion>,
-        target: Box<TUnion>,
-        then: Box<TUnion>,
-        otherwise: Box<TUnion>,
+        subject: Arc<TUnion>,
+        target: Arc<TUnion>,
+        then: Arc<TUnion>,
+        otherwise: Arc<TUnion>,
         negated: bool,
     ) -> Self {
         Self { subject, target, then, otherwise, negated }
@@ -35,7 +37,7 @@ impl TConditional {
     }
 
     pub fn get_subject_mut(&mut self) -> &mut TUnion {
-        &mut self.subject
+        Arc::make_mut(&mut self.subject)
     }
 
     #[must_use]
@@ -44,7 +46,7 @@ impl TConditional {
     }
 
     pub fn get_target_mut(&mut self) -> &mut TUnion {
-        &mut self.target
+        Arc::make_mut(&mut self.target)
     }
 
     #[must_use]
@@ -53,7 +55,7 @@ impl TConditional {
     }
 
     pub fn get_then_mut(&mut self) -> &mut TUnion {
-        &mut self.then
+        Arc::make_mut(&mut self.then)
     }
 
     #[must_use]
@@ -62,7 +64,7 @@ impl TConditional {
     }
 
     pub fn get_otherwise_mut(&mut self) -> &mut TUnion {
-        &mut self.otherwise
+        Arc::make_mut(&mut self.otherwise)
     }
 
     #[must_use]

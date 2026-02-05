@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
 use mago_atom::Atom;
 use mago_atom::ascii_lowercase_atom;
@@ -455,7 +456,7 @@ pub fn get_union_from_type_ast(
                     let value_type =
                         get_union_from_type_ast(&parameters.entries[0].inner, scope, type_context, classname)?;
 
-                    wrap_atomic(TAtomic::Iterable(TIterable::of_value(Box::new(value_type))))
+                    wrap_atomic(TAtomic::Iterable(TIterable::of_value(Arc::new(value_type))))
                 }
                 _ => {
                     let key_type =
@@ -464,7 +465,7 @@ pub fn get_union_from_type_ast(
                     let value_type =
                         get_union_from_type_ast(&parameters.entries[1].inner, scope, type_context, classname)?;
 
-                    wrap_atomic(TAtomic::Iterable(TIterable::new(Box::new(key_type), Box::new(value_type))))
+                    wrap_atomic(TAtomic::Iterable(TIterable::new(Arc::new(key_type), Arc::new(value_type))))
                 }
             },
             None => wrap_atomic(TAtomic::Iterable(TIterable::mixed())),
@@ -499,10 +500,10 @@ pub fn get_union_from_type_ast(
             TUnion::from_single(Cow::Owned(TAtomic::Scalar(TScalar::Integer(TInteger::from_bounds(min, max)))))
         }
         Type::Conditional(conditional) => TUnion::from_single(Cow::Owned(TAtomic::Conditional(TConditional::new(
-            Box::new(get_union_from_type_ast(&conditional.subject, scope, type_context, classname)?),
-            Box::new(get_union_from_type_ast(&conditional.target, scope, type_context, classname)?),
-            Box::new(get_union_from_type_ast(&conditional.then, scope, type_context, classname)?),
-            Box::new(get_union_from_type_ast(&conditional.otherwise, scope, type_context, classname)?),
+            Arc::new(get_union_from_type_ast(&conditional.subject, scope, type_context, classname)?),
+            Arc::new(get_union_from_type_ast(&conditional.target, scope, type_context, classname)?),
+            Arc::new(get_union_from_type_ast(&conditional.then, scope, type_context, classname)?),
+            Arc::new(get_union_from_type_ast(&conditional.otherwise, scope, type_context, classname)?),
             conditional.is_negated(),
         )))),
         Type::Variable(variable_type) => {
@@ -512,11 +513,11 @@ pub fn get_union_from_type_ast(
                 TUnion::from_single(Cow::Owned(TAtomic::Variable(atom(variable_type.value))))
             }
         }
-        Type::KeyOf(key_of_type) => TUnion::from_atomic(TAtomic::Derived(TDerived::KeyOf(TKeyOf::new(Box::new(
+        Type::KeyOf(key_of_type) => TUnion::from_atomic(TAtomic::Derived(TDerived::KeyOf(TKeyOf::new(Arc::new(
             get_union_from_type_ast(&key_of_type.parameter.entry.inner, scope, type_context, classname)?,
         ))))),
         Type::ValueOf(value_of_type) => TUnion::from_atomic(TAtomic::Derived(TDerived::ValueOf(TValueOf::new(
-            Box::new(get_union_from_type_ast(&value_of_type.parameter.entry.inner, scope, type_context, classname)?),
+            Arc::new(get_union_from_type_ast(&value_of_type.parameter.entry.inner, scope, type_context, classname)?),
         )))),
         Type::IntMask(int_mask_type) => {
             let mut values = Vec::new();
@@ -526,31 +527,31 @@ pub fn get_union_from_type_ast(
             TUnion::from_atomic(TAtomic::Derived(TDerived::IntMask(TIntMask::new(values))))
         }
         Type::IntMaskOf(int_mask_of_type) => {
-            TUnion::from_atomic(TAtomic::Derived(TDerived::IntMaskOf(TIntMaskOf::new(Box::new(
+            TUnion::from_atomic(TAtomic::Derived(TDerived::IntMaskOf(TIntMaskOf::new(Arc::new(
                 get_union_from_type_ast(&int_mask_of_type.parameter.entry.inner, scope, type_context, classname)?,
             )))))
         }
         Type::PropertiesOf(properties_of_type) => {
             TUnion::from_atomic(TAtomic::Derived(TDerived::PropertiesOf(match properties_of_type.filter {
-                PropertiesOfFilter::All => TPropertiesOf::new(Box::new(get_union_from_type_ast(
+                PropertiesOfFilter::All => TPropertiesOf::new(Arc::new(get_union_from_type_ast(
                     &properties_of_type.parameter.entry.inner,
                     scope,
                     type_context,
                     classname,
                 )?)),
-                PropertiesOfFilter::Public => TPropertiesOf::public(Box::new(get_union_from_type_ast(
+                PropertiesOfFilter::Public => TPropertiesOf::public(Arc::new(get_union_from_type_ast(
                     &properties_of_type.parameter.entry.inner,
                     scope,
                     type_context,
                     classname,
                 )?)),
-                PropertiesOfFilter::Protected => TPropertiesOf::protected(Box::new(get_union_from_type_ast(
+                PropertiesOfFilter::Protected => TPropertiesOf::protected(Arc::new(get_union_from_type_ast(
                     &properties_of_type.parameter.entry.inner,
                     scope,
                     type_context,
                     classname,
                 )?)),
-                PropertiesOfFilter::Private => TPropertiesOf::private(Box::new(get_union_from_type_ast(
+                PropertiesOfFilter::Private => TPropertiesOf::private(Arc::new(get_union_from_type_ast(
                     &properties_of_type.parameter.entry.inner,
                     scope,
                     type_context,
@@ -612,14 +613,14 @@ fn get_shape_from_ast(
     if shape.kind.is_list() {
         let mut list = TList::new(match &shape.additional_fields {
             Some(additional_fields) => match &additional_fields.parameters {
-                Some(parameters) => Box::new(if let Some(k) = parameters.entries.first().map(|g| &g.inner) {
+                Some(parameters) => Arc::new(if let Some(k) = parameters.entries.first().map(|g| &g.inner) {
                     get_union_from_type_ast(k, scope, type_context, classname)?
                 } else {
                     get_mixed()
                 }),
-                None => Box::new(get_mixed()),
+                None => Arc::new(get_mixed()),
             },
-            None => Box::new(get_never()),
+            None => Arc::new(get_never()),
         });
 
         list.known_elements = Some({
@@ -682,18 +683,18 @@ fn get_shape_from_ast(
         keyed_array.parameters = match &shape.additional_fields {
             Some(additional_fields) => Some(match &additional_fields.parameters {
                 Some(parameters) => (
-                    Box::new(if let Some(k) = parameters.entries.first().map(|g| &g.inner) {
+                    Arc::new(if let Some(k) = parameters.entries.first().map(|g| &g.inner) {
                         get_union_from_type_ast(k, scope, type_context, classname)?
                     } else {
                         get_mixed()
                     }),
-                    Box::new(if let Some(v) = parameters.entries.get(1).map(|g| &g.inner) {
+                    Arc::new(if let Some(v) = parameters.entries.get(1).map(|g| &g.inner) {
                         get_union_from_type_ast(v, scope, type_context, classname)?
                     } else {
                         get_mixed()
                     }),
                 ),
-                None => (Box::new(get_arraykey()), Box::new(get_mixed())),
+                None => (Arc::new(get_arraykey()), Arc::new(get_mixed())),
             }),
             None => None,
         };
@@ -762,7 +763,7 @@ fn get_callable_from_ast(
             };
 
             parameters.push(TCallableParameter::new(
-                Some(Box::new(parameter_type)),
+                Some(Arc::new(parameter_type)),
                 false,
                 parameter_ast.is_variadic(),
                 parameter_ast.is_optional(),
@@ -775,14 +776,14 @@ fn get_callable_from_ast(
     } else {
         // `callable` without a specification should be treated the same as
         // `callable(mixed...): mixed`
-        parameters.push(TCallableParameter::new(Some(Box::new(get_mixed())), false, true, false));
+        parameters.push(TCallableParameter::new(Some(Arc::new(get_mixed())), false, true, false));
         return_type = Some(get_mixed());
     }
 
     Ok(TAtomic::Callable(TCallable::Signature(
         TCallableSignature::new(callable.kind.is_pure(), callable.kind.is_closure())
             .with_parameters(parameters)
-            .with_return_type(return_type.map(Box::new)),
+            .with_return_type(return_type.map(Arc::new)),
     )))
 }
 
@@ -817,8 +818,8 @@ fn get_reference_from_ast<'i>(
         if fq_reference_name.eq_ignore_ascii_case("Closure") && generics.is_none() {
             return Ok(TAtomic::Callable(TCallable::Signature(
                 TCallableSignature::new(false, true)
-                    .with_parameters(vec![TCallableParameter::new(Some(Box::new(get_mixed())), false, true, false)])
-                    .with_return_type(Some(Box::new(get_mixed()))),
+                    .with_parameters(vec![TCallableParameter::new(Some(Arc::new(get_mixed())), false, true, false)])
+                    .with_return_type(Some(Arc::new(get_mixed()))),
             )));
         }
 
@@ -902,12 +903,12 @@ fn get_array_type_from_ast<'i, 'p>(
     }
 
     let mut array = TKeyedArray::new_with_parameters(
-        Box::new(if let Some(k) = key {
+        Arc::new(if let Some(k) = key {
             get_union_from_type_ast(k, scope, type_context, classname)?
         } else {
             get_arraykey()
         }),
-        Box::new(if let Some(v) = value {
+        Arc::new(if let Some(v) = value {
             get_union_from_type_ast(v, scope, type_context, classname)?
         } else {
             get_mixed()
@@ -928,7 +929,7 @@ fn get_list_type_from_ast(
     classname: Option<Atom>,
 ) -> Result<TAtomic, TypeError> {
     Ok(TAtomic::Array(TArray::List(TList {
-        element_type: Box::new(if let Some(v) = value {
+        element_type: Arc::new(if let Some(v) = value {
             get_union_from_type_ast(v, scope, type_context, classname)?
         } else {
             get_mixed()
@@ -964,7 +965,7 @@ fn get_class_string_type_from_ast(
                         constraint,
                         ..
                     }) => {
-                        for constraint_atomic in constraint.types.into_owned() {
+                        for constraint_atomic in Arc::unwrap_or_clone(constraint).types.into_owned() {
                             class_strings.push(TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::generic(
                                 kind,
                                 parameter_name,
@@ -998,7 +999,7 @@ fn get_template_atomic(defining_entities: &[GenericTemplate], parameter_name: At
 
     TAtomic::GenericParameter(TGenericParameter {
         parameter_name,
-        constraint: Box::new(template_type.clone()),
+        constraint: Arc::new(template_type.clone()),
         defining_entity: *template_source,
         intersection_types: None,
     })

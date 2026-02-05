@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::rc::Rc;
+use std::sync::Arc;
 
 use ahash::HashSet;
 
@@ -379,7 +380,7 @@ fn analyze_array_elements<'ctx, 'arena>(
                         .map(|(index, (_, value_tuple))| (index, (value_tuple.0, value_tuple.1)))
                         .collect(),
                 ),
-                element_type: Box::new(match item_value_type {
+                element_type: Arc::new(match item_value_type {
                     Some(value) => value,
                     None => get_never(),
                 }),
@@ -394,10 +395,10 @@ fn analyze_array_elements<'ctx, 'arena>(
                     None
                 } else {
                     match (item_key_type, item_value_type) {
-                        (Some(key), Some(value)) => Some((Box::new(key), Box::new(value))),
-                        (Some(key), None) => Some((Box::new(key), Box::new(get_mixed()))),
-                        (None, Some(value)) => Some((Box::new(get_arraykey()), Box::new(value))),
-                        _ => Some((Box::new(get_arraykey()), Box::new(get_mixed()))),
+                        (Some(key), Some(value)) => Some((Arc::new(key), Arc::new(value))),
+                        (Some(key), None) => Some((Arc::new(key), Arc::new(get_mixed()))),
+                        (None, Some(value)) => Some((Arc::new(get_arraykey()), Arc::new(value))),
+                        _ => Some((Arc::new(get_arraykey()), Arc::new(get_mixed()))),
                     }
                 },
                 non_empty: true,
@@ -408,7 +409,7 @@ fn analyze_array_elements<'ctx, 'arena>(
     } else if array_creation_info.is_list {
         TUnion::from_vec(vec![TAtomic::Array(TArray::List(TList {
             known_elements: None,
-            element_type: Box::new(item_value_type.unwrap_or_else(get_mixed)),
+            element_type: Arc::new(item_value_type.unwrap_or_else(get_mixed)),
             known_count: None,
             non_empty: !array_creation_info.can_be_empty,
         }))])
@@ -416,10 +417,10 @@ fn analyze_array_elements<'ctx, 'arena>(
         TUnion::from_vec(vec![TAtomic::Array(TArray::Keyed(TKeyedArray {
             known_items: None,
             parameters: match (item_key_type, item_value_type) {
-                (Some(key), Some(value)) => Some((Box::new(key), Box::new(value))),
-                (Some(key), None) => Some((Box::new(key), Box::new(get_mixed()))),
-                (None, Some(value)) => Some((Box::new(get_arraykey()), Box::new(value))),
-                _ => Some((Box::new(get_arraykey()), Box::new(get_mixed()))),
+                (Some(key), Some(value)) => Some((Arc::new(key), Arc::new(value))),
+                (Some(key), None) => Some((Arc::new(key), Arc::new(get_mixed()))),
+                (None, Some(value)) => Some((Arc::new(get_arraykey()), Arc::new(value))),
+                _ => Some((Arc::new(get_arraykey()), Arc::new(get_mixed()))),
             },
             non_empty: !array_creation_info.can_be_empty,
         }))])

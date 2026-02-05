@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
 use serde::Deserialize;
 use serde::Serialize;
@@ -21,7 +22,7 @@ pub struct TKeyedArray {
     pub known_items: Option<BTreeMap<ArrayKey, (bool, TUnion)>>,
     /// The general key and value types (`TKey`, `TValue` in `array<TKey, TValue>`).
     /// `None` if only `known_items` are present or types are unknown/mixed.
-    pub parameters: Option<(Box<TUnion>, Box<TUnion>)>,
+    pub parameters: Option<(Arc<TUnion>, Arc<TUnion>)>,
     /// Flag indicating if the array is known to contain at least one element.
     pub non_empty: bool,
 }
@@ -38,7 +39,7 @@ impl TKeyedArray {
     /// Creates new metadata for a keyed array with specified generic key and value types.
     #[inline]
     #[must_use]
-    pub fn new_with_parameters(key_type: Box<TUnion>, value_type: Box<TUnion>) -> Self {
+    pub fn new_with_parameters(key_type: Arc<TUnion>, value_type: Arc<TUnion>) -> Self {
         Self { known_items: None, parameters: Some((key_type, value_type)), non_empty: false }
     }
 
@@ -56,7 +57,7 @@ impl TKeyedArray {
 
     #[inline]
     #[must_use]
-    pub fn with_parameters(self, key_type: Box<TUnion>, value_type: Box<TUnion>) -> Self {
+    pub fn with_parameters(self, key_type: Arc<TUnion>, value_type: Arc<TUnion>) -> Self {
         Self { parameters: Some((key_type, value_type)), ..self }
     }
 

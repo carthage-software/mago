@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
 use serde::Deserialize;
 use serde::Serialize;
@@ -17,7 +18,7 @@ use crate::ttype::union::TUnion;
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Eq, Hash, PartialOrd, Ord)]
 pub struct TList {
     /// The general type of elements in the list (`TValue` in `list<TValue>`).
-    pub element_type: Box<TUnion>,
+    pub element_type: Arc<TUnion>,
     /// Specific types known for certain integer indices. The bool indicates if the element is optional.
     pub known_elements: Option<BTreeMap<usize, (bool, TUnion)>>,
     /// The known exact number of elements, if determined (e.g., from `count()` or literal definition).
@@ -32,10 +33,10 @@ impl TList {
     ///
     /// # Arguments
     ///
-    /// * `element_type`: The general type (`TUnion`) of elements in the list, boxed.
+    /// * `element_type`: The general type (`TUnion`) of elements in the list, Arced.
     #[inline]
     #[must_use]
-    pub fn new(element_type: Box<TUnion>) -> Self {
+    pub fn new(element_type: Arc<TUnion>) -> Self {
         Self { element_type, known_elements: None, known_count: None, non_empty: false }
     }
 
@@ -50,7 +51,7 @@ impl TList {
     #[must_use]
     pub fn from_known_elements(known_elements: BTreeMap<usize, (bool, TUnion)>) -> Self {
         Self {
-            element_type: Box::new(get_never()),
+            element_type: Arc::new(get_never()),
             known_count: if known_elements.values().all(|(optional, _)| !*optional) {
                 Some(known_elements.len())
             } else {
@@ -63,7 +64,7 @@ impl TList {
 
     #[inline]
     #[must_use]
-    pub fn new_non_empty(element_type: Box<TUnion>) -> Self {
+    pub fn new_non_empty(element_type: Arc<TUnion>) -> Self {
         Self { element_type, known_elements: None, known_count: None, non_empty: true }
     }
 

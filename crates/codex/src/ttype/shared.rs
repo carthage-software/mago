@@ -3,6 +3,7 @@
 //! This module provides canonical, reusable instances for common PHP types.
 //! Using these constants avoids repeated allocations for frequently used types.
 
+use std::sync::Arc;
 use std::sync::LazyLock;
 
 use mago_atom::empty_atom;
@@ -133,8 +134,8 @@ pub const SCALAR_ATOMIC: &TAtomic = &TAtomic::Scalar(TScalar::Generic);
 /// A lazily-initialized static `TAtomic` for a mixed iterable (`iterable<mixed, mixed>`).
 pub static MIXED_ITERABLE_ATOMIC: LazyLock<TAtomic> = LazyLock::new(|| {
     TAtomic::Iterable(TIterable {
-        key_type: Box::new(get_mixed()),
-        value_type: Box::new(get_mixed()),
+        key_type: Arc::new(get_mixed()),
+        value_type: Arc::new(get_mixed()),
         intersection_types: None,
     })
 });
@@ -144,7 +145,7 @@ pub static EMPTY_KEYED_ARRAY_ATOMIC: LazyLock<TAtomic> =
     LazyLock::new(|| TAtomic::Array(TArray::Keyed(TKeyedArray::new())));
 /// A lazily-initialized static `TAtomic` for a mixed array (`array<array-key, mixed>`).
 pub static MIXED_KEYED_ARRAY_ATOMIC: LazyLock<TAtomic> = LazyLock::new(|| {
-    TAtomic::Array(TArray::Keyed(TKeyedArray::new_with_parameters(Box::new(get_arraykey()), Box::new(get_mixed()))))
+    TAtomic::Array(TArray::Keyed(TKeyedArray::new_with_parameters(Arc::new(get_arraykey()), Arc::new(get_mixed()))))
 });
 /// A lazily-initialized static `TAtomic` for a mixed callable (`callable`).
 pub static MIXED_CALLABLE_ATOMIC: LazyLock<TAtomic> =

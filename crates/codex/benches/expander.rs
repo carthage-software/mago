@@ -1,4 +1,5 @@
 use std::hint::black_box;
+use std::sync::Arc;
 
 use criterion::Criterion;
 use criterion::criterion_group;
@@ -101,7 +102,7 @@ fn bench_nested_array(c: &mut Criterion) {
 
     c.bench_function("list_of_self", |b| {
         b.iter(|| {
-            let list = TList::new(Box::new(make_self_object()));
+            let list = TList::new(Arc::new(make_self_object()));
             let mut t = TUnion::from_atomic(TAtomic::Array(TArray::List(list)));
             expand_union(black_box(&codebase), black_box(&mut t), black_box(&options));
             t
@@ -110,9 +111,9 @@ fn bench_nested_array(c: &mut Criterion) {
 
     c.bench_function("nested_list_3_deep", |b| {
         b.iter(|| {
-            let inner = TList::new(Box::new(make_self_object()));
-            let middle = TList::new(Box::new(TUnion::from_atomic(TAtomic::Array(TArray::List(inner)))));
-            let outer = TList::new(Box::new(TUnion::from_atomic(TAtomic::Array(TArray::List(middle)))));
+            let inner = TList::new(Arc::new(make_self_object()));
+            let middle = TList::new(Arc::new(TUnion::from_atomic(TAtomic::Array(TArray::List(inner)))));
+            let outer = TList::new(Arc::new(TUnion::from_atomic(TAtomic::Array(TArray::List(middle)))));
             let mut t = TUnion::from_atomic(TAtomic::Array(TArray::List(outer)));
             expand_union(black_box(&codebase), black_box(&mut t), black_box(&options));
             t

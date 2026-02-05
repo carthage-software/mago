@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 use std::cmp::Ordering;
+use std::sync::Arc;
 
 use ahash::HashMap;
 use ahash::HashSet;
@@ -299,7 +300,7 @@ fn replace_atomic(
                         let input_parameters =
                             if let Some(input) = &input_type { get_iterable_parameters(input, codebase) } else { None };
 
-                        *parameters.0 = self::replace(
+                        *Arc::make_mut(&mut parameters.0) = self::replace(
                             &parameters.0,
                             template_result,
                             codebase,
@@ -309,7 +310,7 @@ fn replace_atomic(
                             StandinOptions { iteration_depth: opts.iteration_depth + 1, ..opts },
                         );
 
-                        *parameters.1 = self::replace(
+                        *Arc::make_mut(&mut parameters.1) = self::replace(
                             &parameters.1, // Pass &TUnion
                             template_result,
                             codebase,
@@ -350,7 +351,7 @@ fn replace_atomic(
                             None
                         };
 
-                        *list_data.element_type = self::replace(
+                        *Arc::make_mut(&mut list_data.element_type) = self::replace(
                             &list_data.element_type,
                             template_result,
                             codebase,
@@ -469,7 +470,7 @@ fn replace_atomic(
             return atomic_type;
         }
         TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::OfType { constraint, .. })) => {
-            **constraint = replace_atomic(
+            *Arc::make_mut(constraint) = replace_atomic(
                 constraint,
                 template_result,
                 codebase,
@@ -478,7 +479,7 @@ fn replace_atomic(
                     ..
                 }))) = input_type
                 {
-                    Some(*input_constraint)
+                    Some(Arc::unwrap_or_clone(input_constraint))
                 } else {
                     None
                 },
@@ -632,7 +633,7 @@ fn handle_template_param_standin(
 
     let mut matching_input_keys: Vec<Atom> = Vec::new();
 
-    let mut as_type = constraint.clone();
+    let mut as_type = constraint.as_ref().clone();
 
     expander::expand_union(
         codebase,
@@ -827,7 +828,7 @@ fn handle_template_param_class_standin(
         )
     };
 
-    let mut atomic_type_as = *constraint.clone();
+    let mut atomic_type_as = constraint.as_ref().clone();
     if let Some(calling_class) = options.calling_class
         && defining_entity == &GenericParent::ClassLike(calling_class)
     {
@@ -849,7 +850,7 @@ fn handle_template_param_class_standin(
                     TClassLikeString::Generic { parameter_name, defining_entity, constraint, .. } => {
                         TAtomic::GenericParameter(TGenericParameter {
                             parameter_name: *parameter_name,
-                            constraint: Box::new(wrap_atomic(*constraint.clone())),
+                            constraint: Arc::new(wrap_atomic(constraint.as_ref().clone())),
                             defining_entity: *defining_entity,
                             intersection_types: None,
                         })
@@ -933,7 +934,7 @@ fn handle_template_param_class_standin(
             if let TAtomic::Object(_) = &template_atomic_type {
                 atomic_types.push(TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::OfType {
                     kind: *kind,
-                    constraint: Box::new(template_atomic_type.clone()),
+                    constraint: Arc::new(template_atomic_type.clone()),
                 })));
             }
         }
@@ -945,12 +946,12 @@ fn handle_template_param_class_standin(
                 kind: *kind,
                 parameter_name: parameter.parameter_name,
                 defining_entity: parameter.defining_entity,
-                constraint: Box::new(atomic_type_as.clone()),
+                constraint: Arc::new(atomic_type_as.clone()),
             })));
         } else {
             atomic_types.push(TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::OfType {
                 kind: *kind,
-                constraint: Box::new(atomic_type_as.clone()),
+                constraint: Arc::new(atomic_type_as.clone()),
             })));
         }
     }
@@ -1020,7 +1021,7 @@ fn find_matching_atomic_types_for_template(
                         matching_atomic_types.push(TAtomic::Scalar(TScalar::ClassLikeString(
                             TClassLikeString::OfType {
                                 kind: TClassLikeStringKind::Class,
-                                constraint: Box::new(constraint_object),
+                                constraint: Arc::new(constraint_object),
                             },
                         )));
                     }

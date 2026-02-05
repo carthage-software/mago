@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use mago_atom::Atom;
 use mago_atom::AtomMap;
 use mago_atom::ascii_lowercase_atom;
@@ -277,7 +279,7 @@ fn get_function_like_target<'ctx>(
     function_like: FunctionLikeIdentifier,
     alternative: Option<FunctionLikeIdentifier>,
     span: Span,
-    inferred_return_type: Option<Box<TUnion>>,
+    inferred_return_type: Option<Arc<TUnion>>,
 ) -> Option<InvocationTarget<'ctx>> {
     get_function_like_target_inner(context, function_like, alternative, span, inferred_return_type, false)
 }
@@ -287,7 +289,7 @@ pub(super) fn get_function_like_target_with_skip<'ctx>(
     function_like: FunctionLikeIdentifier,
     alternative: Option<FunctionLikeIdentifier>,
     span: Span,
-    inferred_return_type: Option<Box<TUnion>>,
+    inferred_return_type: Option<Arc<TUnion>>,
     skip_error_on_not_found: bool,
 ) -> Option<InvocationTarget<'ctx>> {
     get_function_like_target_inner(
@@ -305,7 +307,7 @@ fn get_function_like_target_inner<'ctx>(
     function_like: FunctionLikeIdentifier,
     alternative: Option<FunctionLikeIdentifier>,
     span: Span,
-    inferred_return_type: Option<Box<TUnion>>,
+    inferred_return_type: Option<Arc<TUnion>>,
     skip_error_on_not_found: bool,
 ) -> Option<InvocationTarget<'ctx>> {
     let mut identifier = function_like;

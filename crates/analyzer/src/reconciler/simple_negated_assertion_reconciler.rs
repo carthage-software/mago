@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
 use mago_atom::ascii_lowercase_atom;
 use mago_atom::atom;
@@ -244,8 +245,10 @@ pub(crate) fn reconcile(
                 match existing_atomic {
                     TAtomic::Array(_) => {}
                     TAtomic::Iterable(iterable) => {
-                        let mut traversable = TNamedObject::new(atom("Traversable"))
-                            .with_type_parameters(Some(vec![*iterable.key_type.clone(), *iterable.value_type.clone()]));
+                        let mut traversable = TNamedObject::new(atom("Traversable")).with_type_parameters(Some(vec![
+                            (*iterable.key_type).clone(),
+                            (*iterable.value_type).clone(),
+                        ]));
 
                         if let Some(intersections) = iterable.get_intersection_types() {
                             for intersection in intersections.iter().cloned() {
@@ -1144,7 +1147,7 @@ fn reconcile_falsy_or_empty(
                     acceptable_types.push(atomic);
                 }
                 TAtomic::Array(TArray::List(_)) => {
-                    acceptable_types.push(TAtomic::Array(TArray::List(TList::new(Box::new(get_never())))));
+                    acceptable_types.push(TAtomic::Array(TArray::List(TList::new(Arc::new(get_never())))));
                 }
                 TAtomic::Array(TArray::Keyed(_)) => {
                     acceptable_types.push(TAtomic::Array(TArray::Keyed(TKeyedArray::new())));
@@ -1243,7 +1246,7 @@ fn reconcile_empty_countable(
             did_remove_type = true;
 
             if !atomic.is_truthy() {
-                acceptable_types.push(TAtomic::Array(TArray::List(TList::new(Box::new(get_never())))));
+                acceptable_types.push(TAtomic::Array(TArray::List(TList::new(Arc::new(get_never())))));
             }
         } else if let TAtomic::Array(TArray::Keyed(_)) = atomic {
             did_remove_type = true;
@@ -1531,7 +1534,7 @@ fn subtract_list_elements(existing_list: &TList, list_to_subtract: &TList) -> Op
                     known_elements.insert(element_index, (false, single_element_union));
                 }
 
-                let mut result_list = TList::new(Box::new(get_never()));
+                let mut result_list = TList::new(Arc::new(get_never()));
                 result_list.known_elements = Some(known_elements);
                 result_list.known_count = Some(existing_size);
                 result_list.non_empty = existing_list.non_empty || existing_size > 0;

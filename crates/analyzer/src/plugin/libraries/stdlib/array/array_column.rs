@@ -1,6 +1,7 @@
 //! `array_column()` return type provider.
 
 use std::borrow::Cow;
+use std::sync::Arc;
 
 use mago_atom::concat_atom;
 use mago_codex::ttype::atomic::TAtomic;
@@ -94,14 +95,14 @@ impl FunctionReturnTypeProvider for ArrayColumnProvider {
 
         if let Some(index_type) = index_type {
             let keyed_array = TKeyedArray::new_with_parameters(
-                Box::new(TUnion::from_atomic(TAtomic::Scalar(index_type.clone()))),
-                Box::new(column_type),
+                Arc::new(TUnion::from_atomic(TAtomic::Scalar(index_type.clone()))),
+                Arc::new(column_type),
             );
 
             return Some(TUnion::from_atomic(TAtomic::Array(TArray::Keyed(keyed_array))));
         }
 
-        let list = TList::new(Box::new(column_type));
+        let list = TList::new(Arc::new(column_type));
 
         Some(TUnion::from_single(Cow::Owned(TAtomic::Array(TArray::List(list)))))
     }

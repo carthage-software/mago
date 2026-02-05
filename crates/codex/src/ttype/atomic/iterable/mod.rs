@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -14,10 +16,10 @@ use crate::ttype::union::TUnion;
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 pub struct TIterable {
     /// The key type of the iterable (e.g., `K` in `iterable<K, V>`).
-    pub key_type: Box<TUnion>,
+    pub key_type: Arc<TUnion>,
 
     /// The value type of the iterable (e.g., `V` in `iterable<K, V>`).
-    pub value_type: Box<TUnion>,
+    pub value_type: Arc<TUnion>,
 
     /// Additional types intersected with this iterable (e.g., `&Other` in `iterable<K, V>&Other`).
     /// Contains boxed atomic types (`TAtomic`) because intersections can involve various types.
@@ -33,15 +35,15 @@ impl TIterable {
     /// * `value_type`: The value type of the iterable (e.g., `V`).
     #[inline]
     #[must_use]
-    pub fn new(key_type: Box<TUnion>, value_type: Box<TUnion>) -> Self {
+    pub fn new(key_type: Arc<TUnion>, value_type: Arc<TUnion>) -> Self {
         Self { key_type, value_type, intersection_types: None }
     }
 
     /// Creates a new iterable type with the given value type,
     /// and a default key type of `Mixed`.
     #[must_use]
-    pub fn of_value(value_type: Box<TUnion>) -> Self {
-        Self::new(Box::new(get_mixed()), value_type)
+    pub fn of_value(value_type: Arc<TUnion>) -> Self {
+        Self::new(Arc::new(get_mixed()), value_type)
     }
 
     /// Creates a new iterable with both key and value types set to `Mixed`.
@@ -49,7 +51,7 @@ impl TIterable {
     /// This is useful for cases where the specific types are not known or are generic.
     #[must_use]
     pub fn mixed() -> Self {
-        Self::new(Box::new(get_mixed()), Box::new(get_mixed()))
+        Self::new(Arc::new(get_mixed()), Arc::new(get_mixed()))
     }
 
     /// Returns the key type of the iterable.
@@ -62,7 +64,7 @@ impl TIterable {
     /// Returns a mutable reference to the key type of the iterable.
     #[inline]
     pub fn get_key_type_mut(&mut self) -> &mut TUnion {
-        &mut self.key_type
+        Arc::make_mut(&mut self.key_type)
     }
 
     /// Returns the value type of the iterable.
@@ -75,7 +77,7 @@ impl TIterable {
     /// Returns a mutable reference to the value type of the iterable.
     #[inline]
     pub fn get_value_type_mut(&mut self) -> &mut TUnion {
-        &mut self.value_type
+        Arc::make_mut(&mut self.value_type)
     }
 }
 

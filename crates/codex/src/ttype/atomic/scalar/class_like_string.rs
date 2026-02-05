@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::sync::Arc;
 
 use serde::Deserialize;
 use serde::Serialize;
@@ -45,14 +46,14 @@ pub enum TClassLikeString {
         kind: TClassLikeStringKind,
         parameter_name: Atom,
         defining_entity: GenericParent,
-        constraint: Box<TAtomic>,
+        constraint: Arc<TAtomic>,
     },
     Literal {
         value: Atom,
     },
     OfType {
         kind: TClassLikeStringKind,
-        constraint: Box<TAtomic>,
+        constraint: Arc<TAtomic>,
     },
 }
 
@@ -80,7 +81,7 @@ impl TClassLikeString {
     #[inline]
     #[must_use]
     pub fn of_type(kind: TClassLikeStringKind, constraint: TAtomic) -> Self {
-        Self::OfType { kind, constraint: Box::new(constraint) }
+        Self::OfType { kind, constraint: Arc::new(constraint) }
     }
 
     /// Creates a new `class-string<T>` instance with a generic parameter.
@@ -92,7 +93,7 @@ impl TClassLikeString {
         defining_entity: GenericParent,
         constraint: TAtomic,
     ) -> Self {
-        Self::Generic { kind, parameter_name, defining_entity, constraint: Box::new(constraint) }
+        Self::Generic { kind, parameter_name, defining_entity, constraint: Arc::new(constraint) }
     }
 
     /// Creates a new `class-string` instance with a literal value.
@@ -113,7 +114,7 @@ impl TClassLikeString {
     #[inline]
     #[must_use]
     pub fn class_string_of_type(constraint: TAtomic) -> Self {
-        Self::OfType { kind: TClassLikeStringKind::Class, constraint: Box::new(constraint) }
+        Self::OfType { kind: TClassLikeStringKind::Class, constraint: Arc::new(constraint) }
     }
 
     /// Creates a new `interface-string` instance.
@@ -127,7 +128,7 @@ impl TClassLikeString {
     #[inline]
     #[must_use]
     pub fn interface_string_of_type(constraint: TAtomic) -> Self {
-        Self::OfType { kind: TClassLikeStringKind::Interface, constraint: Box::new(constraint) }
+        Self::OfType { kind: TClassLikeStringKind::Interface, constraint: Arc::new(constraint) }
     }
 
     /// Creates a new `enum-string` instance.
@@ -141,7 +142,7 @@ impl TClassLikeString {
     #[inline]
     #[must_use]
     pub fn enum_string_of_type(constraint: TAtomic) -> Self {
-        Self::OfType { kind: TClassLikeStringKind::Enum, constraint: Box::new(constraint) }
+        Self::OfType { kind: TClassLikeStringKind::Enum, constraint: Arc::new(constraint) }
     }
 
     /// Creates a new `trait-string` instance.
@@ -155,7 +156,7 @@ impl TClassLikeString {
     #[inline]
     #[must_use]
     pub fn trait_string_of_type(constraint: TAtomic) -> Self {
-        Self::OfType { kind: TClassLikeStringKind::Trait, constraint: Box::new(constraint) }
+        Self::OfType { kind: TClassLikeStringKind::Trait, constraint: Arc::new(constraint) }
     }
 
     /// Checks if this represents a general class-like string (`Any` variant).
@@ -292,7 +293,7 @@ impl TClassLikeString {
             TClassLikeString::Generic { parameter_name, defining_entity, constraint, .. } => {
                 TAtomic::GenericParameter(TGenericParameter::new(
                     *parameter_name,
-                    Box::new(TUnion::from_single(Cow::Owned(constraint.as_ref().clone()))),
+                    Arc::new(TUnion::from_single(Cow::Owned(constraint.as_ref().clone()))),
                     *defining_entity,
                 ))
             }

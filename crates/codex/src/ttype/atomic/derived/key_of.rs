@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -12,23 +14,23 @@ use crate::ttype::get_array_parameters;
 use crate::ttype::union::TUnion;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Eq, Hash, PartialOrd, Ord)]
-pub struct TKeyOf(Box<TUnion>);
+pub struct TKeyOf(Arc<TUnion>);
 
 impl TKeyOf {
     #[must_use]
-    pub fn new(object: Box<TUnion>) -> Self {
+    pub fn new(object: Arc<TUnion>) -> Self {
         Self(object)
     }
 
     #[inline]
     #[must_use]
-    pub const fn get_target_type(&self) -> &TUnion {
+    pub fn get_target_type(&self) -> &TUnion {
         &self.0
     }
 
     #[inline]
-    pub const fn get_target_type_mut(&mut self) -> &mut TUnion {
-        &mut self.0
+    pub fn get_target_type_mut(&mut self) -> &mut TUnion {
+        Arc::make_mut(&mut self.0)
     }
 
     #[must_use]

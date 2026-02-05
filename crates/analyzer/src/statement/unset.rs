@@ -1,4 +1,5 @@
 use std::rc::Rc;
+use std::sync::Arc;
 
 use mago_codex::ttype::TType;
 use mago_codex::ttype::atomic::TAtomic;
@@ -120,7 +121,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Unset<'arena> {
                             let Some(mut known_elements) = known_elements else {
                                 atomics.push(TAtomic::Array(TArray::Keyed(TKeyedArray {
                                     known_items: None,
-                                    parameters: Some((Box::new(get_int()), element_type)),
+                                    parameters: Some((Arc::new(get_int()), element_type)),
                                     non_empty: if let Some(known_count) = known_count {
                                         known_count > 1 // we removed 1, so we are non-empty if we had more than 1
                                     } else {
@@ -236,7 +237,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Unset<'arena> {
                                     parameters: if element_type.is_never() {
                                         None
                                     } else {
-                                        Some((Box::new(get_int()), element_type))
+                                        Some((Arc::new(get_int()), element_type))
                                     },
                                     non_empty,
                                 })));

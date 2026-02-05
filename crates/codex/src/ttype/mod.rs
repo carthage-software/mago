@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::sync::Arc;
 
 use mago_atom::Atom;
 use mago_atom::atom;
@@ -113,7 +114,7 @@ pub trait TType {
     /// Returns a vector of all child type nodes, including nested ones.
     fn get_all_child_nodes(&self) -> Vec<TypeRef<'_>> {
         let mut child_nodes = self.get_child_nodes();
-        let mut all_child_nodes = vec![];
+        let mut all_child_nodes = Vec::with_capacity(16);
 
         while let Some(child_node) = child_nodes.pop() {
             let new_child_nodes = match child_node {
@@ -780,7 +781,7 @@ pub fn get_named_object(name: Atom, type_resolution_context: Option<&TypeResolut
             kind: TClassLikeStringKind::Class,
             parameter_name: name,
             defining_entity: first.defining_entity,
-            constraint: Box::new((*(first.constraint.get_single())).clone()),
+            constraint: Arc::new((*(first.constraint.get_single())).clone()),
         })));
     }
 
@@ -790,27 +791,27 @@ pub fn get_named_object(name: Atom, type_resolution_context: Option<&TypeResolut
 #[inline]
 #[must_use]
 pub fn get_iterable(key_parameter: TUnion, value_parameter: TUnion) -> TUnion {
-    wrap_atomic(TAtomic::Iterable(TIterable::new(Box::new(key_parameter), Box::new(value_parameter))))
+    wrap_atomic(TAtomic::Iterable(TIterable::new(Arc::new(key_parameter), Arc::new(value_parameter))))
 }
 
 #[inline]
 #[must_use]
 pub fn get_list(element_type: TUnion) -> TUnion {
-    wrap_atomic(TAtomic::Array(TArray::List(TList::new(Box::new(element_type)))))
+    wrap_atomic(TAtomic::Array(TArray::List(TList::new(Arc::new(element_type)))))
 }
 
 #[inline]
 #[must_use]
 pub fn get_non_empty_list(element_type: TUnion) -> TUnion {
-    wrap_atomic(TAtomic::Array(TArray::List(TList::new_non_empty(Box::new(element_type)))))
+    wrap_atomic(TAtomic::Array(TArray::List(TList::new_non_empty(Arc::new(element_type)))))
 }
 
 #[inline]
 #[must_use]
 pub fn get_keyed_array(key_parameter: TUnion, value_parameter: TUnion) -> TUnion {
     wrap_atomic(TAtomic::Array(TArray::Keyed(TKeyedArray::new_with_parameters(
-        Box::new(key_parameter),
-        Box::new(value_parameter),
+        Arc::new(key_parameter),
+        Arc::new(value_parameter),
     ))))
 }
 
@@ -1436,7 +1437,7 @@ pub fn get_specialized_template_type(
     let template_union = wrap_atomic(TAtomic::GenericParameter(TGenericParameter {
         parameter_name: *template_name,
         defining_entity: template.defining_entity,
-        constraint: Box::new(template.constraint.clone()),
+        constraint: Arc::new(template.constraint.clone()),
         intersection_types: None,
     }));
 

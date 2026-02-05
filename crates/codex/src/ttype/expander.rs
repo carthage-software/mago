@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 use std::cell::RefCell;
+use std::sync::Arc;
 
 use ahash::HashSet;
 use mago_atom::Atom;
@@ -188,8 +189,8 @@ pub(crate) fn expand_atomic(
         TAtomic::Array(array_type) => match array_type {
             TArray::Keyed(keyed_data) => {
                 if let Some((key_parameter, value_parameter)) = &mut keyed_data.parameters {
-                    expand_union(codebase, key_parameter, options);
-                    expand_union(codebase, value_parameter, options);
+                    expand_union(codebase, Arc::make_mut(key_parameter), options);
+                    expand_union(codebase, Arc::make_mut(value_parameter), options);
                 }
 
                 if let Some(known_items) = &mut keyed_data.known_items {
@@ -199,7 +200,7 @@ pub(crate) fn expand_atomic(
                 }
             }
             TArray::List(list_data) => {
-                expand_union(codebase, &mut list_data.element_type, options);
+                expand_union(codebase, Arc::make_mut(&mut list_data.element_type), options);
 
                 if let Some(known_elements) = &mut list_data.known_elements {
                     for (_, element_type) in known_elements.values_mut() {
@@ -223,14 +224,14 @@ pub(crate) fn expand_atomic(
             }
         }
         TAtomic::GenericParameter(parameter) => {
-            expand_union(codebase, parameter.constraint.as_mut(), options);
+            expand_union(codebase, Arc::make_mut(&mut parameter.constraint), options);
         }
         TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::OfType { constraint, .. })) => {
             let mut atomic_return_type_parts = vec![];
-            expand_atomic(constraint, codebase, options, &mut false, &mut atomic_return_type_parts);
+            expand_atomic(Arc::make_mut(constraint), codebase, options, &mut false, &mut atomic_return_type_parts);
 
             if !atomic_return_type_parts.is_empty() {
-                **constraint = atomic_return_type_parts.remove(0);
+                *Arc::make_mut(constraint) = atomic_return_type_parts.remove(0);
             }
         }
         TAtomic::Reference(TReference::Member { class_like_name, member_selector }) => {
@@ -246,8 +247,8 @@ pub(crate) fn expand_atomic(
         TAtomic::Conditional(conditional) => {
             *skip_key = true;
 
-            let mut then = conditional.then.clone();
-            let mut otherwise = conditional.otherwise.clone();
+            let mut then = (*conditional.then).clone();
+            let mut otherwise = (*conditional.otherwise).clone();
 
             expand_union(codebase, &mut then, options);
             expand_union(codebase, &mut otherwise, options);
@@ -286,8 +287,8 @@ pub(crate) fn expand_atomic(
             }
         },
         TAtomic::Iterable(iterable) => {
-            expand_union(codebase, &mut iterable.key_type, options);
-            expand_union(codebase, &mut iterable.value_type, options);
+            expand_union(codebase, Arc::make_mut(&mut iterable.key_type), options);
+            expand_union(codebase, Arc::make_mut(&mut iterable.value_type), options);
         }
         _ => {}
     }
@@ -568,7 +569,7 @@ pub fn get_signature_of_function_like_metadata(
             let type_signature = if let Some(t) = parameter_metadata.get_type_metadata() {
                 let mut t = t.type_union.clone();
                 expand_union(codebase, &mut t, options);
-                Some(Box::new(t))
+                Some(Arc::new(t))
             } else {
                 None
             };
@@ -585,7 +586,7 @@ pub fn get_signature_of_function_like_metadata(
     let return_type = if let Some(type_metadata) = function_like_metadata.return_type_metadata.as_ref() {
         let mut return_type = type_metadata.type_union.clone();
         expand_union(codebase, &mut return_type, options);
-        Some(Box::new(return_type))
+        Some(Arc::new(return_type))
     } else {
         None
     };
@@ -745,6 +746,7 @@ mod tests {
     use super::*;
 
     use std::borrow::Cow;
+    use std::sync::Arc;
 
     use bumpalo::Bump;
 
@@ -909,7 +911,7 @@ mod tests {
         let codebase = create_test_codebase(code);
 
         let mut keyed = TKeyedArray::new();
-        keyed.parameters = Some((Box::new(make_self_object()), Box::new(get_int())));
+        keyed.parameters = Some((Arc::new(make_self_object()), Arc::new(get_int())));
         let input = TUnion::from_atomic(TAtomic::Array(TArray::Keyed(keyed)));
 
         let options = options_with_self("Foo");
@@ -935,7 +937,7 @@ mod tests {
         let codebase = create_test_codebase(code);
 
         let mut keyed = TKeyedArray::new();
-        keyed.parameters = Some((Box::new(get_string()), Box::new(make_self_object())));
+        keyed.parameters = Some((Arc::new(get_string()), Arc::new(make_self_object())));
         let input = TUnion::from_atomic(TAtomic::Array(TArray::Keyed(keyed)));
 
         let options = options_with_self("Foo");
@@ -992,7 +994,7 @@ mod tests {
         let code = r"<?php class Foo {}";
         let codebase = create_test_codebase(code);
 
-        let list = TList::new(Box::new(make_self_object()));
+        let list = TList::new(Arc::new(make_self_object()));
         let input = TUnion::from_atomic(TAtomic::Array(TArray::List(list)));
 
         let options = options_with_self("Foo");
@@ -1017,7 +1019,7 @@ mod tests {
 
         use std::collections::BTreeMap;
 
-        let mut list = TList::new(Box::new(get_mixed()));
+        let mut list = TList::new(Arc::new(get_mixed()));
         let mut known_elements = BTreeMap::new();
         known_elements.insert(0, (false, make_self_object()));
         list.known_elements = Some(known_elements);
@@ -1046,11 +1048,11 @@ mod tests {
         let code = r"<?php class Foo {}";
         let codebase = create_test_codebase(code);
 
-        let inner_list = TList::new(Box::new(make_self_object()));
+        let inner_list = TList::new(Arc::new(make_self_object()));
         let inner_array = TUnion::from_atomic(TAtomic::Array(TArray::List(inner_list)));
 
         let mut outer = TKeyedArray::new();
-        outer.parameters = Some((Box::new(make_self_object()), Box::new(inner_array)));
+        outer.parameters = Some((Arc::new(make_self_object()), Arc::new(inner_array)));
         let input = TUnion::from_atomic(TAtomic::Array(TArray::Keyed(outer)));
 
         let options = options_with_self("Foo");
@@ -1093,7 +1095,7 @@ mod tests {
         let code = r"<?php class Foo {}";
         let codebase = create_test_codebase(code);
 
-        let mut list = TList::new(Box::new(make_self_object()));
+        let mut list = TList::new(Arc::new(make_self_object()));
         list.non_empty = true;
         let input = TUnion::from_atomic(TAtomic::Array(TArray::List(list)));
 
@@ -1352,7 +1354,7 @@ mod tests {
         let code = r"<?php class Foo {}";
         let codebase = create_test_codebase(code);
 
-        let sig = TCallableSignature::new(false, false).with_return_type(Some(Box::new(make_self_object())));
+        let sig = TCallableSignature::new(false, false).with_return_type(Some(Arc::new(make_self_object())));
         let input = TUnion::from_atomic(TAtomic::Callable(TCallable::Signature(sig)));
 
         let options = options_with_self("Foo");
@@ -1377,7 +1379,7 @@ mod tests {
         let code = r"<?php class Foo {}";
         let codebase = create_test_codebase(code);
 
-        let param = TCallableParameter::new(Some(Box::new(make_self_object())), false, false, false);
+        let param = TCallableParameter::new(Some(Arc::new(make_self_object())), false, false, false);
         let sig = TCallableSignature::new(false, false).with_parameters(vec![param]);
         let input = TUnion::from_atomic(TAtomic::Callable(TCallable::Signature(sig)));
 
@@ -1452,7 +1454,7 @@ mod tests {
         let code = r"<?php class Foo {}";
         let codebase = create_test_codebase(code);
 
-        let sig = TCallableSignature::new(false, true).with_return_type(Some(Box::new(make_self_object())));
+        let sig = TCallableSignature::new(false, true).with_return_type(Some(Arc::new(make_self_object())));
         let input = TUnion::from_atomic(TAtomic::Callable(TCallable::Signature(sig)));
 
         let options = options_with_self("Foo");
@@ -1479,7 +1481,7 @@ mod tests {
 
         let generic = TGenericParameter::new(
             atom("T"),
-            Box::new(make_self_object()),
+            Arc::new(make_self_object()),
             GenericParent::ClassLike(ascii_lowercase_atom("foo")),
         );
         let input = TUnion::from_atomic(TAtomic::GenericParameter(generic));
@@ -1510,7 +1512,7 @@ mod tests {
 
         let generic = TGenericParameter::new(
             atom("T"),
-            Box::new(constraint),
+            Arc::new(constraint),
             GenericParent::ClassLike(ascii_lowercase_atom("bar")),
         );
         let input = TUnion::from_atomic(TAtomic::GenericParameter(generic));
@@ -1543,7 +1545,7 @@ mod tests {
 
         let mut generic = TGenericParameter::new(
             atom("T"),
-            Box::new(make_self_object()),
+            Arc::new(make_self_object()),
             GenericParent::ClassLike(ascii_lowercase_atom("foo")),
         );
         generic.intersection_types =
@@ -1571,7 +1573,7 @@ mod tests {
         let code = r"<?php class Foo {}";
         let codebase = create_test_codebase(code);
 
-        let constraint = Box::new(TAtomic::Object(TObject::Named(TNamedObject::new(atom("self")))));
+        let constraint = Arc::new(TAtomic::Object(TObject::Named(TNamedObject::new(atom("self")))));
         let class_string = TClassLikeString::OfType { kind: TClassLikeStringKind::Class, constraint };
         let input = TUnion::from_atomic(TAtomic::Scalar(TScalar::ClassLikeString(class_string)));
 
@@ -1591,7 +1593,7 @@ mod tests {
         let code = r"<?php class Foo {}";
         let codebase = create_test_codebase(code);
 
-        let constraint = Box::new(TAtomic::Object(TObject::Named(TNamedObject::new(atom("static")))));
+        let constraint = Arc::new(TAtomic::Object(TObject::Named(TNamedObject::new(atom("static")))));
         let class_string = TClassLikeString::OfType { kind: TClassLikeStringKind::Class, constraint };
         let input = TUnion::from_atomic(TAtomic::Scalar(TScalar::ClassLikeString(class_string)));
 
@@ -1611,7 +1613,7 @@ mod tests {
         let code = r"<?php interface MyInterface {}";
         let codebase = create_test_codebase(code);
 
-        let constraint = Box::new(TAtomic::Object(TObject::Named(TNamedObject::new(atom("self")))));
+        let constraint = Arc::new(TAtomic::Object(TObject::Named(TNamedObject::new(atom("self")))));
         let class_string = TClassLikeString::OfType { kind: TClassLikeStringKind::Interface, constraint };
         let input = TUnion::from_atomic(TAtomic::Scalar(TScalar::ClassLikeString(class_string)));
 
@@ -1826,10 +1828,10 @@ mod tests {
         let codebase = create_test_codebase(code);
 
         let conditional = TConditional::new(
-            Box::new(get_mixed()),
-            Box::new(get_string()),
-            Box::new(make_self_object()),
-            Box::new(make_self_object()),
+            Arc::new(get_mixed()),
+            Arc::new(get_string()),
+            Arc::new(make_self_object()),
+            Arc::new(make_self_object()),
             false,
         );
         let input = TUnion::from_atomic(TAtomic::Conditional(conditional));
@@ -1853,10 +1855,10 @@ mod tests {
         let codebase = create_test_codebase(code);
 
         let conditional = TConditional::new(
-            Box::new(get_mixed()),
-            Box::new(get_string()),
-            Box::new(make_self_object()),
-            Box::new(get_int()),
+            Arc::new(get_mixed()),
+            Arc::new(get_string()),
+            Arc::new(make_self_object()),
+            Arc::new(get_int()),
             false,
         );
         let input = TUnion::from_atomic(TAtomic::Conditional(conditional));
@@ -1874,10 +1876,10 @@ mod tests {
         let codebase = create_test_codebase(code);
 
         let conditional = TConditional::new(
-            Box::new(get_mixed()),
-            Box::new(get_string()),
-            Box::new(get_int()),
-            Box::new(make_self_object()),
+            Arc::new(get_mixed()),
+            Arc::new(get_string()),
+            Arc::new(get_int()),
+            Arc::new(make_self_object()),
             false,
         );
         let input = TUnion::from_atomic(TAtomic::Conditional(conditional));
@@ -1976,10 +1978,10 @@ mod tests {
         let codebase = CodebaseMetadata::new();
 
         let mut keyed = TKeyedArray::new();
-        keyed.parameters = Some((Box::new(get_string()), Box::new(get_int())));
+        keyed.parameters = Some((Arc::new(get_string()), Arc::new(get_int())));
         let array_type = TUnion::from_atomic(TAtomic::Array(TArray::Keyed(keyed)));
 
-        let key_of = TKeyOf::new(Box::new(array_type));
+        let key_of = TKeyOf::new(Arc::new(array_type));
         let input = TUnion::from_atomic(TAtomic::Derived(TDerived::KeyOf(key_of)));
 
         let mut actual = input.clone();
@@ -1994,10 +1996,10 @@ mod tests {
         let codebase = create_test_codebase(code);
 
         let mut keyed = TKeyedArray::new();
-        keyed.parameters = Some((Box::new(make_self_object()), Box::new(get_int())));
+        keyed.parameters = Some((Arc::new(make_self_object()), Arc::new(get_int())));
         let array_type = TUnion::from_atomic(TAtomic::Array(TArray::Keyed(keyed)));
 
-        let key_of = TKeyOf::new(Box::new(array_type));
+        let key_of = TKeyOf::new(Arc::new(array_type));
         let input = TUnion::from_atomic(TAtomic::Derived(TDerived::KeyOf(key_of)));
 
         let options = options_with_self("Foo");
@@ -2012,10 +2014,10 @@ mod tests {
         let codebase = CodebaseMetadata::new();
 
         let mut keyed = TKeyedArray::new();
-        keyed.parameters = Some((Box::new(get_string()), Box::new(get_int())));
+        keyed.parameters = Some((Arc::new(get_string()), Arc::new(get_int())));
         let array_type = TUnion::from_atomic(TAtomic::Array(TArray::Keyed(keyed)));
 
-        let value_of = TValueOf::new(Box::new(array_type));
+        let value_of = TValueOf::new(Arc::new(array_type));
         let input = TUnion::from_atomic(TAtomic::Derived(TDerived::ValueOf(value_of)));
 
         let mut actual = input.clone();
@@ -2036,7 +2038,7 @@ mod tests {
 
         let enum_type = TUnion::from_atomic(TAtomic::Object(TObject::Enum(TEnum::new(ascii_lowercase_atom("status")))));
 
-        let value_of = TValueOf::new(Box::new(enum_type));
+        let value_of = TValueOf::new(Arc::new(enum_type));
         let input = TUnion::from_atomic(TAtomic::Derived(TDerived::ValueOf(value_of)));
 
         let mut actual = input.clone();
@@ -2102,7 +2104,7 @@ mod tests {
         let code = r"<?php class Foo {}";
         let codebase = create_test_codebase(code);
 
-        let iterable = TIterable::new(Box::new(make_self_object()), Box::new(get_int()));
+        let iterable = TIterable::new(Arc::new(make_self_object()), Arc::new(get_int()));
         let input = TUnion::from_atomic(TAtomic::Iterable(iterable));
 
         let options = options_with_self("Foo");
@@ -2125,7 +2127,7 @@ mod tests {
         let code = r"<?php class Foo {}";
         let codebase = create_test_codebase(code);
 
-        let iterable = TIterable::new(Box::new(get_int()), Box::new(make_self_object()));
+        let iterable = TIterable::new(Arc::new(get_int()), Arc::new(make_self_object()));
         let input = TUnion::from_atomic(TAtomic::Iterable(iterable));
 
         let options = options_with_self("Foo");
@@ -2273,9 +2275,9 @@ mod tests {
         let code = r"<?php class Foo {}";
         let codebase = create_test_codebase(code);
 
-        let inner = TList::new(Box::new(make_self_object()));
-        let middle = TList::new(Box::new(TUnion::from_atomic(TAtomic::Array(TArray::List(inner)))));
-        let outer = TList::new(Box::new(TUnion::from_atomic(TAtomic::Array(TArray::List(middle)))));
+        let inner = TList::new(Arc::new(make_self_object()));
+        let middle = TList::new(Arc::new(TUnion::from_atomic(TAtomic::Array(TArray::List(inner)))));
+        let outer = TList::new(Arc::new(TUnion::from_atomic(TAtomic::Array(TArray::List(middle)))));
         let input = TUnion::from_atomic(TAtomic::Array(TArray::List(outer)));
 
         let options = options_with_self("Foo");

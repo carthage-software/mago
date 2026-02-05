@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 use std::rc::Rc;
+use std::sync::Arc;
 use std::sync::LazyLock;
 
 use ahash::HashMap;
@@ -31,7 +32,7 @@ std::thread_local! {
         map.insert("$argv", Rc::new({
             let mut type_union = TUnion::from_vec(vec![
                 TAtomic::Null,
-                TAtomic::Array(TArray::List(TList::new_non_empty(Box::new(get_string())))),
+                TAtomic::Array(TArray::List(TList::new_non_empty(Arc::new(get_string())))),
             ]);
 
             type_union.set_ignore_nullable_issues(true);
@@ -47,7 +48,7 @@ std::thread_local! {
 
         map.insert("$http_response_header", Rc::new({
             let mut type_union =
-                TUnion::from_atomic(TAtomic::Array(TArray::List(TList::new_non_empty(Box::new(get_truthy_string())))));
+                TUnion::from_atomic(TAtomic::Array(TArray::List(TList::new_non_empty(Arc::new(get_truthy_string())))));
 
             type_union.set_possibly_undefined(true, None);
             type_union
@@ -58,37 +59,37 @@ std::thread_local! {
             known_items.insert(ArrayKey::String(atom("argc")), (true, get_positive_int()));
             known_items.insert(
                 ArrayKey::String(atom("argv")),
-                (true, TUnion::from_atomic(TAtomic::Array(TArray::List(TList::new_non_empty(Box::new(get_string())))))),
+                (true, TUnion::from_atomic(TAtomic::Array(TArray::List(TList::new_non_empty(Arc::new(get_string())))))),
             );
 
             TUnion::from_atomic(TAtomic::Array(TArray::Keyed(TKeyedArray {
                 known_items: Some(known_items),
-                parameters: Some((Box::new(get_non_empty_string()), Box::new(get_mixed()))),
+                parameters: Some((Arc::new(get_non_empty_string()), Arc::new(get_mixed()))),
                 non_empty: true,
             })))
         }));
 
         let user_input_type_union = Rc::new(TUnion::from_atomic(TAtomic::Array(TArray::Keyed(TKeyedArray::new_with_parameters(
-            Box::new(TUnion::from_vec(vec![
+            Arc::new(TUnion::from_vec(vec![
                 TAtomic::Scalar(TScalar::non_empty_string()),
                 TAtomic::Scalar(TScalar::int()),
             ])),
-            Box::new(TUnion::from_vec(vec![
+            Arc::new(TUnion::from_vec(vec![
                 TAtomic::Scalar(TScalar::string()),
                 TAtomic::Array(TArray::Keyed(
                     TKeyedArray::new_with_parameters(
-                        Box::new(TUnion::from_vec(vec![
+                        Arc::new(TUnion::from_vec(vec![
                             TAtomic::Scalar(TScalar::non_empty_string()),
                             TAtomic::Scalar(TScalar::int()),
                         ])),
-                        Box::new(TUnion::from_vec(vec![
+                        Arc::new(TUnion::from_vec(vec![
                             TAtomic::Scalar(TScalar::string()),
                             TAtomic::Array(TArray::Keyed(TKeyedArray::new_with_parameters(
-                                Box::new(TUnion::from_vec(vec![
+                                Arc::new(TUnion::from_vec(vec![
                                     TAtomic::Scalar(TScalar::non_empty_string()),
                                     TAtomic::Scalar(TScalar::int()),
                                 ])),
-                                Box::new(get_mixed()),
+                                Arc::new(get_mixed()),
                             ))),
                         ])),
                     )
@@ -210,12 +211,12 @@ std::thread_local! {
             known_items.insert(ArrayKey::String(atom("argc")), (true, get_positive_int()));
             known_items.insert(
                 ArrayKey::String(atom("argv")),
-                (true, TUnion::from_atomic(TAtomic::Array(TArray::List(TList::new_non_empty(Box::new(get_string())))))),
+                (true, TUnion::from_atomic(TAtomic::Array(TArray::List(TList::new_non_empty(Arc::new(get_string())))))),
             );
 
             TUnion::from_atomic(TAtomic::Array(TArray::Keyed(TKeyedArray {
                 known_items: Some(known_items),
-                parameters: Some((Box::new(get_non_empty_string()), Box::new(get_string()))),
+                parameters: Some((Arc::new(get_non_empty_string()), Arc::new(get_string()))),
                 non_empty: true,
             })))
         }));
@@ -250,7 +251,7 @@ std::thread_local! {
 
             TUnion::from_atomic(TAtomic::Array(TArray::Keyed(TKeyedArray {
                 known_items: Some(known_items),
-                parameters: Some((Box::new(get_non_empty_string()), Box::new(get_string()))),
+                parameters: Some((Arc::new(get_non_empty_string()), Arc::new(get_string()))),
                 non_empty: true,
             })))
         }));
@@ -258,8 +259,8 @@ std::thread_local! {
         map.insert("$_FILES", Rc::new(TUnion::from_atomic(TAtomic::Array(TArray::Keyed(TKeyedArray {
             known_items: None,
             parameters: Some((
-                Box::new(get_non_empty_string()),
-                Box::new(TUnion::from_atomic(TAtomic::Array(TArray::Keyed(TKeyedArray {
+                Arc::new(get_non_empty_string()),
+                Arc::new(TUnion::from_atomic(TAtomic::Array(TArray::Keyed(TKeyedArray {
                     known_items: Some(BTreeMap::from([
                         (
                             ArrayKey::String(atom("name")),
@@ -268,7 +269,7 @@ std::thread_local! {
                                 TUnion::from_vec(vec![
                                     TAtomic::Scalar(TScalar::String(TString::non_empty())),
                                     TAtomic::Array(TArray::List(TList::new_non_empty(
-                                        Box::new(get_non_empty_string()),
+                                        Arc::new(get_non_empty_string()),
                                     ))),
                                 ]),
                             ),
@@ -280,7 +281,7 @@ std::thread_local! {
                                 TUnion::from_vec(vec![
                                     TAtomic::Scalar(TScalar::String(TString::non_empty())),
                                     TAtomic::Array(TArray::List(TList::new_non_empty(
-                                        Box::new(get_non_empty_string()),
+                                        Arc::new(get_non_empty_string()),
                                     ))),
                                 ]),
                             ),
@@ -292,7 +293,7 @@ std::thread_local! {
                                 TUnion::from_vec(vec![
                                     TAtomic::Scalar(TScalar::String(TString::non_empty())),
                                     TAtomic::Array(TArray::List(TList::new_non_empty(
-                                        Box::new(get_non_empty_string()),
+                                        Arc::new(get_non_empty_string()),
                                     ))),
                                 ]),
                             ),
@@ -304,7 +305,7 @@ std::thread_local! {
                                 TUnion::from_vec(vec![
                                     TAtomic::Scalar(TScalar::String(TString::non_empty())),
                                     TAtomic::Array(TArray::List(TList::new_non_empty(
-                                        Box::new(get_non_empty_string()),
+                                        Arc::new(get_non_empty_string()),
                                     ))),
                                 ]),
                             ),
@@ -315,7 +316,7 @@ std::thread_local! {
                                 true,
                                 TUnion::from_vec(vec![
                                     TAtomic::Scalar(TScalar::Integer(TInteger::Range(0, 8))),
-                                    TAtomic::Array(TArray::List(TList::new_non_empty(Box::new(TUnion::from_atomic(
+                                    TAtomic::Array(TArray::List(TList::new_non_empty(Arc::new(TUnion::from_atomic(
                                         TAtomic::Scalar(TScalar::Integer(TInteger::Range(0, 8))),
                                     ))))),
                                 ]),
@@ -328,7 +329,7 @@ std::thread_local! {
                                 TUnion::from_vec(vec![
                                     TAtomic::Scalar(TScalar::Integer(TInteger::From(0))),
                                     TAtomic::Array(TArray::List(TList::new_non_empty(
-                                        Box::new(get_non_negative_int()),
+                                        Arc::new(get_non_negative_int()),
                                     ))),
                                 ]),
                             ),
@@ -343,8 +344,8 @@ std::thread_local! {
 
         map.insert("$_SESSION", Rc::new({
             let mut type_union = TUnion::from_atomic(TAtomic::Array(TArray::Keyed(TKeyedArray::new_with_parameters(
-                Box::new(get_non_empty_string()),
-                Box::new(get_mixed()),
+                Arc::new(get_non_empty_string()),
+                Arc::new(get_mixed()),
             ))));
 
             type_union.set_possibly_undefined(true, None);

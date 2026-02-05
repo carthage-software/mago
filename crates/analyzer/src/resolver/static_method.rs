@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use mago_atom::Atom;
 use mago_atom::atom;
 
@@ -480,7 +482,7 @@ fn get_metadata_object<'ctx>(
 
                             wrap_atomic(TAtomic::GenericParameter(TGenericParameter {
                                 parameter_name: *parameter_name,
-                                constraint: Box::new(constraint.clone()),
+                                constraint: Arc::new(constraint.clone()),
                                 defining_entity: *defining_entity,
                                 intersection_types: None,
                             }))
