@@ -1,4 +1,5 @@
 use std::cmp::Ordering;
+use std::io::IsTerminal;
 use std::io::Write;
 
 use foldhash::HashMap;
@@ -38,7 +39,7 @@ impl Formatter for CountFormatter {
         });
 
         // Determine if we should use colors
-        let use_colors = config.color_choice.should_use_colors(atty::is(atty::Stream::Stdout));
+        let use_colors = config.color_choice.should_use_colors(std::io::stdout().is_terminal());
 
         // Write counts to the writer
         for (level, count) in counts_vec {

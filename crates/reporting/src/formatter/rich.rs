@@ -1,4 +1,5 @@
 use std::cmp::Ordering;
+use std::io::IsTerminal;
 use std::io::Write;
 use std::ops::Range;
 
@@ -58,7 +59,7 @@ pub(super) fn codespan_format_with_config(
     let issues = apply_filters(issues, config);
 
     // Determine if we should use colors
-    let use_colors = config.color_choice.should_use_colors(atty::is(atty::Stream::Stdout));
+    let use_colors = config.color_choice.should_use_colors(std::io::stdout().is_terminal());
 
     // Create a buffer for codespan (it requires WriteColor)
     let mut buffer = if use_colors { Buffer::ansi() } else { Buffer::no_color() };

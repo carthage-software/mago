@@ -24,6 +24,5 @@ termcolor = { workspace = true }
 strum = { workspace = true }
 blake3 = { workspace = true }
 ariadne = { workspace = true }
-atty = { workspace = true }
 serde-sarif = { workspace = true }
 schemars = { workspace = true }
