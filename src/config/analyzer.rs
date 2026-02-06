@@ -13,6 +13,7 @@ use mago_codex::ttype::combiner::DEFAULT_ARRAY_COMBINATION_THRESHOLD;
 use mago_codex::ttype::combiner::DEFAULT_INTEGER_COMBINATION_THRESHOLD;
 use mago_codex::ttype::combiner::DEFAULT_STRING_COMBINATION_THRESHOLD;
 use mago_php_version::PHPVersion;
+use mago_reporting::IgnoreEntry;
 use mago_reporting::baseline::BaselineVariant;
 use schemars::JsonSchema;
 use serde::Deserialize;
@@ -27,8 +28,8 @@ pub struct AnalyzerConfiguration {
     /// A list of patterns to exclude from analysis.
     pub excludes: Vec<String>,
 
-    /// Ignore specific issues based on their code.
-    pub ignore: Vec<String>,
+    /// Ignore specific issues based on their code, optionally scoped to paths.
+    pub ignore: Vec<IgnoreEntry>,
 
     /// Path to a baseline file to ignore listed issues.
     pub baseline: Option<PathBuf>,

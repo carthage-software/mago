@@ -198,7 +198,10 @@ impl AnalyzeCommand {
         let analysis_result = service.run()?;
 
         let mut issues = analysis_result.issues;
-        issues.filter_out_ignored(&configuration.analyzer.ignore);
+        let read_db = database.read_only();
+        issues.filter_out_ignored(&configuration.analyzer.ignore, |file_id| {
+            read_db.get_ref(&file_id).ok().map(|f| f.name.to_string())
+        });
 
         let baseline = configuration.analyzer.baseline.as_deref();
         let baseline_variant = configuration.analyzer.baseline_variant;
@@ -268,7 +271,10 @@ impl AnalyzeCommand {
         let analysis_result = service.run()?;
 
         let mut issues = analysis_result.issues;
-        issues.filter_out_ignored(&configuration.analyzer.ignore);
+        let read_db = watcher.read_only_database();
+        issues.filter_out_ignored(&configuration.analyzer.ignore, |file_id| {
+            read_db.get_ref(&file_id).ok().map(|f| f.name.to_string())
+        });
         let baseline = configuration.analyzer.baseline.as_deref();
         let baseline_variant = configuration.analyzer.baseline_variant;
 
@@ -291,7 +297,10 @@ impl AnalyzeCommand {
             let analysis_result = service.run_incremental()?;
 
             let mut issues = analysis_result.issues;
-            issues.filter_out_ignored(&configuration.analyzer.ignore);
+            let read_db = watcher.read_only_database();
+            issues.filter_out_ignored(&configuration.analyzer.ignore, |file_id| {
+                read_db.get_ref(&file_id).ok().map(|f| f.name.to_string())
+            });
 
             watcher.with_database_mut(|database| processor.process_issues(&orchestrator, database, issues))?;
 

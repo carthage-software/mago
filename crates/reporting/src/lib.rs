@@ -26,6 +26,40 @@ use mago_database::file::FileId;
 use mago_span::Span;
 use mago_text_edit::TextEdit;
 
+/// Represents an entry in the analyzer's `ignore` configuration.
+///
+/// Can be either a plain code string (ignored everywhere) or a scoped entry
+/// that only ignores a code in specific paths.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(untagged)]
+pub enum IgnoreEntry {
+    /// Ignore a code everywhere: `"code1"`
+    Code(String),
+    /// Ignore a code in specific paths: `{ code = "code2", in = "path/" }`
+    Scoped {
+        code: String,
+        #[serde(rename = "in", deserialize_with = "one_or_many")]
+        paths: Vec<String>,
+    },
+}
+
+fn one_or_many<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum OneOrMany {
+        One(String),
+        Many(Vec<String>),
+    }
+
+    match OneOrMany::deserialize(deserializer)? {
+        OneOrMany::One(s) => Ok(vec![s]),
+        OneOrMany::Many(v) => Ok(v),
+    }
+}
+
 mod formatter;
 mod internal;
 
@@ -538,8 +572,41 @@ impl IssueCollection {
         self.issues.iter().map(|issue| issue.level).min()
     }
 
-    pub fn filter_out_ignored(&mut self, ignore: &[String]) {
-        self.issues.retain(|issue| if let Some(code) = &issue.code { !ignore.contains(code) } else { true });
+    pub fn filter_out_ignored<F>(&mut self, ignore: &[IgnoreEntry], resolve_file_name: F)
+    where
+        F: Fn(FileId) -> Option<String>,
+    {
+        if ignore.is_empty() {
+            return;
+        }
+
+        self.issues.retain(|issue| {
+            let Some(code) = &issue.code else {
+                return true;
+            };
+
+            for entry in ignore {
+                match entry {
+                    IgnoreEntry::Code(ignored) if ignored == code => return false,
+                    IgnoreEntry::Scoped { code: ignored, paths } if ignored == code => {
+                        let file_name = issue
+                            .annotations
+                            .iter()
+                            .find(|a| a.is_primary())
+                            .and_then(|a| resolve_file_name(a.span.file_id));
+
+                        if let Some(name) = file_name
+                            && is_path_match(&name, paths)
+                        {
+                            return false;
+                        }
+                    }
+                    _ => {}
+                }
+            }
+
+            true
+        });
     }
 
     pub fn filter_retain_codes(&mut self, retain_codes: &[String]) {
@@ -660,6 +727,17 @@ impl FromIterator<Issue> for IssueCollection {
     fn from_iter<T: IntoIterator<Item = Issue>>(iter: T) -> Self {
         Self { issues: iter.into_iter().collect() }
     }
+}
+
+fn is_path_match(file_name: &str, patterns: &[String]) -> bool {
+    patterns.iter().any(|pattern| {
+        if pattern.ends_with('/') {
+            file_name.starts_with(pattern.as_str())
+        } else {
+            let dir_prefix = format!("{pattern}/");
+            file_name.starts_with(&dir_prefix) || file_name == pattern
+        }
+    })
 }
 
 #[cfg(test)]

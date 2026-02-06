@@ -8,11 +8,14 @@ title: Analyzer configuration Reference
 
 ```toml
 [analyzer]
-# Disable a specific issue category
-redundancy-issues = false
-
 # Ignore a specific error code across the whole project
 ignore = ["mixed-argument"]
+
+# Ignore an error code only in specific paths
+ignore = [
+  "mixed-argument",
+  { code = "missing-return-type", in = "tests/" },
+]
 
 # Use a baseline file to ignore existing issues
 baseline = "analyzer-baseline.toml"
@@ -23,7 +26,7 @@ baseline = "analyzer-baseline.toml"
 | Option             | Type       | Default   | Description                                                |
 | :----------------- | :--------- | :-------- | :--------------------------------------------------------- |
 | `excludes`         | `string[]` | `[]`      | A list of paths or glob patterns to exclude from analysis. |
-| `ignore`           | `string[]` | `[]`      | A list of specific issue codes to ignore globally.         |
+| `ignore`           | `(string \| object)[]` | `[]` | Issue codes to ignore, optionally scoped to specific paths. See [Path-scoped ignoring](#path-scoped-ignoring). |
 | `baseline`         | `string`   | `null`    | Path to a baseline file to ignore listed issues. When specified, the analyzer will use this file as the default baseline, eliminating the need to pass `--baseline` on every run. Command-line `--baseline` arguments will override this setting. |
 | `baseline-variant` | `string`   | `"loose"` | The baseline format variant to use when generating new baselines. Options: `"loose"` (count-based, resilient to line changes) or `"strict"` (exact line matching). See [Baseline Variants](/fundamentals/baseline#baseline-variants) for details. |
 
@@ -38,6 +41,46 @@ excludes = ["cache/**"]  # Excluded from ALL tools
 [analyzer]
 excludes = ["tests/**/*.php"]  # Additionally excluded from analyzer only
 ```
+:::
+
+### Path-scoped ignoring
+
+The `ignore` option accepts three formats:
+
+**Plain string** — ignore a code everywhere:
+```toml
+ignore = ["missing-return-type"]
+```
+
+**Object with single path** — ignore a code only in a specific directory or file:
+```toml
+ignore = [
+  { code = "missing-return-type", in = "tests/" },
+]
+```
+
+**Object with multiple paths** — ignore a code in several locations:
+```toml
+ignore = [
+  { code = "missing-return-type", in = ["tests/", "src/Legacy/"] },
+]
+```
+
+All three formats can be mixed in the same `ignore` list:
+```toml
+ignore = [
+  "mixed-argument",
+  { code = "missing-return-type", in = "tests/" },
+  { code = "unused-parameter", in = ["tests/", "src/Generated/"] },
+]
+```
+
+Paths are matched as prefixes against relative file paths from the project root. Both `"tests"` and `"tests/"` will match all files under the `tests` directory.
+
+:::tip
+Path-scoped ignoring is different from `excludes`:
+- `excludes` removes files from analysis entirely — they won't be parsed for type information.
+- `ignore` with `in` still analyzes the files but suppresses specific issue codes in the output.
 :::
 
 ## Feature flags
