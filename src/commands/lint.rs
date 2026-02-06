@@ -153,7 +153,7 @@ pub struct LintCommand {
     /// Provide a comma-separated list of rule codes to run only those rules.
     /// This overrides your mago.toml configuration and is useful for targeted
     /// analysis or testing specific rules.
-    #[arg(short, long, conflicts_with = "semantics")]
+    #[arg(short, long, conflicts_with = "semantics", num_args = 1.., value_delimiter = ',')]
     pub only: Vec<String>,
 
     #[clap(flatten)]
