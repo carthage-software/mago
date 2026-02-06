@@ -316,6 +316,7 @@ final class AnalyzerCodeModuleGenerator
         'missing-return-type',
         'invalid-array-access-assignment-value',
         'non-existent-use-import',
+        'class-must-be-final',
     ];
 
     /**

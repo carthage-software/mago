@@ -448,6 +448,10 @@ fn scan_class_like<'arena>(
             class_like_metadata.flags |= MetadataFlags::INTERNAL;
         }
 
+        if docblock.is_api {
+            class_like_metadata.flags |= MetadataFlags::API;
+        }
+
         if docblock.has_consistent_constructor {
             class_like_metadata.flags |= MetadataFlags::CONSISTENT_CONSTRUCTOR;
         }

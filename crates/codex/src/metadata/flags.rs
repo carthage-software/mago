@@ -37,6 +37,7 @@ bitflags::bitflags! {
         const WRITEONLY                 = 1 << 33;
         const MAGIC_PROPERTY            = 1 << 34;
         const MAGIC_METHOD              = 1 << 35;
+        const API                       = 1 << 36;
     }
 }
 
@@ -232,5 +233,11 @@ impl MetadataFlags {
     #[must_use]
     pub const fn is_static(self) -> bool {
         self.contains(Self::STATIC)
+    }
+
+    #[inline]
+    #[must_use]
+    pub const fn is_public_api(self) -> bool {
+        self.contains(Self::API)
     }
 }

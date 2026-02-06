@@ -87,6 +87,14 @@ pub struct Settings {
     /// Defaults to `false`.
     pub no_boolean_literal_comparison: bool,
 
+    /// Enforce that concrete classes are declared `final`.
+    ///
+    /// When enabled, the analyzer reports a warning for any class that is not
+    /// `final`, `abstract`, or annotated with `@api`, provided the class has no children.
+    ///
+    /// Defaults to `false`.
+    pub enforce_class_finality: bool,
+
     /// Check for missing type hints on parameters, properties, and return types.
     ///
     /// When enabled, the analyzer will report warnings for function parameters, class properties,
@@ -275,6 +283,7 @@ impl Settings {
             find_unused_parameters: false,
             strict_list_index_checks: false,
             no_boolean_literal_comparison: false,
+            enforce_class_finality: false,
             check_missing_type_hints: false,
             check_closure_missing_type_hints: false,
             check_arrow_function_missing_type_hints: false,

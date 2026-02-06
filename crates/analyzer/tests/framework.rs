@@ -22,20 +22,40 @@ use mago_syntax::parser::parse_file;
 static PRELUDE: LazyLock<Prelude> = LazyLock::new(Prelude::build);
 static PLUGIN_REGISTRY: LazyLock<PluginRegistry> = LazyLock::new(PluginRegistry::with_library_providers);
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct TestCase<'a> {
     name: &'a str,
     content: &'a str,
+    settings: Option<Settings>,
 }
 
 impl<'a> TestCase<'a> {
     #[must_use]
     pub fn new(name: &'a str, content: &'a str) -> Self {
-        Self { name, content }
+        Self { name, content, settings: None }
+    }
+
+    #[must_use]
+    pub fn settings(mut self, settings: Settings) -> Self {
+        self.settings = Some(settings);
+        self
     }
 
     pub fn run(self) {
         run_test_case_inner(self);
+    }
+}
+
+#[must_use]
+pub fn default_test_settings() -> Settings {
+    Settings {
+        find_unused_expressions: true,
+        find_unused_definitions: true,
+        check_throws: true,
+        allow_possibly_undefined_array_keys: false,
+        strict_list_index_checks: true,
+        check_property_initialization: true,
+        ..Default::default()
     }
 }
 
@@ -57,6 +77,8 @@ fn run_test_case_inner(config: TestCase) {
 
     populate_codebase(&mut metadata, &mut symbol_references, AtomSet::default(), HashSet::default());
 
+    let settings = config.settings.unwrap_or_else(default_test_settings);
+
     let mut analysis_result = AnalysisResult::new(symbol_references);
     let analyzer = Analyzer::new(
         &arena,
@@ -64,15 +86,7 @@ fn run_test_case_inner(config: TestCase) {
         &resolved_names,
         &metadata,
         &PLUGIN_REGISTRY,
-        Settings {
-            find_unused_expressions: true,
-            find_unused_definitions: true,
-            check_throws: true,
-            allow_possibly_undefined_array_keys: false,
-            strict_list_index_checks: true,
-            check_property_initialization: true,
-            ..Default::default()
-        },
+        settings,
     );
 
     let analysis_run_result = analyzer.analyze(program, &mut analysis_result);

@@ -361,6 +361,25 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Class<'arena> {
             self.members.as_slice(),
         )?;
 
+        if context.settings.enforce_class_finality
+            && !class_like_metadata.flags.is_final()
+            && !class_like_metadata.flags.is_abstract()
+            && !class_like_metadata.flags.is_public_api()
+            && class_like_metadata.child_class_likes.as_ref().map_or(true, |children| children.is_empty())
+        {
+            context.collector.report_with_code(
+                IssueCode::ClassMustBeFinal,
+                Issue::warning(format!("Class `{}` should be declared `final`.", class_like_metadata.original_name))
+                    .with_annotation(
+                        Annotation::primary(self.name.span)
+                            .with_message("This class is not `final`, `abstract`, or marked with `@api`."),
+                    )
+                    .with_help(
+                        "Declare the class as `final` to prevent inheritance, as `abstract` if it is meant to be extended, or add the `@api` tag to its docblock if backward compatibility must be preserved.",
+                    ),
+            );
+        }
+
         if context.settings.check_missing_override {
             override_attribute::check_override_attribute(class_like_metadata, self.members.as_slice(), context);
         }

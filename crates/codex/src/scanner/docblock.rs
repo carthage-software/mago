@@ -43,6 +43,7 @@ pub struct ClassLikeDocblockComment {
     pub is_deprecated: bool,
     pub is_final: bool,
     pub is_internal: bool,
+    pub is_api: bool,
     pub is_enum_interface: bool,
     pub has_consistent_constructor: bool,
     pub has_consistent_templates: bool,
@@ -132,6 +133,7 @@ impl ClassLikeDocblockComment {
         let mut is_final = false;
         let mut is_deprecated = false;
         let mut is_internal = false;
+        let mut is_api = false;
         let mut has_consistent_constructor = false;
         let mut has_consistent_templates = false;
         let mut has_sealed_properties = None;
@@ -175,6 +177,9 @@ impl ClassLikeDocblockComment {
                 }
                 TagKind::PsalmInternal | TagKind::Internal => {
                     is_internal = true;
+                }
+                TagKind::Api | TagKind::PsalmApi => {
+                    is_api = true;
                 }
                 TagKind::PsalmSealProperties | TagKind::SealProperties => {
                     has_sealed_properties = Some(true);
@@ -298,6 +303,7 @@ impl ClassLikeDocblockComment {
             is_deprecated,
             is_final,
             is_internal,
+            is_api,
             is_enum_interface,
             has_sealed_properties,
             has_sealed_methods,

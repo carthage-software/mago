@@ -385,6 +385,11 @@ test_case!(anonymous_class_constructor_args);
 test_case!(undefined_type_reference);
 test_case!(duplicate_definition);
 test_case!(method_call_assertions);
+test_case!(class_must_be_final, {
+    let mut s = crate::framework::default_test_settings();
+    s.enforce_class_finality = true;
+    s
+});
 
 // Github Issues
 test_case!(issue_659);
@@ -601,9 +606,8 @@ fn test_all_test_cases_are_ran() {
         }
 
         let file_name = path.file_stem().unwrap().to_str().unwrap();
-        assert!(
-            test_case_file.contains(&format!("test_case!({file_name})")),
-            "File '{file_name}' was not found as a test case"
-        );
+        let has_test = test_case_file.contains(&format!("test_case!({file_name})"))
+            || test_case_file.contains(&format!("test_case!({file_name},"));
+        assert!(has_test, "File '{file_name}' was not found as a test case");
     }
 }

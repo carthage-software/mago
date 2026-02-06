@@ -145,6 +145,12 @@ pub fn populate_codebase(
         }
     }
 
+    for (parent_name, children) in &direct_classlike_descendants {
+        if let Some(parent_metadata) = codebase.class_likes.get_mut(parent_name) {
+            parent_metadata.child_class_likes = Some(children.clone());
+        }
+    }
+
     // Perform docblock inheritance for methods with @inheritDoc or no docblock
     docblock::inherit_method_docblocks(codebase);
 

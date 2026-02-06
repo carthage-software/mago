@@ -106,6 +106,7 @@ These flags control specific, powerful analysis capabilities.
 | `trust-existence-checks`              | `true`  | When `true`, narrows types based on `method_exists()`, `property_exists()`, `function_exists()`, and `defined()` checks. |
 | `check-property-initialization`       | `false` | When `true`, checks that typed properties are initialized in constructors or class initializers.      |
 | `check-use-statements`                | `false` | When `true`, reports use statements that import non-existent classes, functions, or constants.        |
+| `enforce-class-finality`              | `false` | When `true`, reports classes that are not `final`, `abstract`, or annotated with `@api` and have no children. |
 
 ## Property initialization
 
@@ -293,6 +294,7 @@ find-unused-parameters = true
 check-missing-type-hints = true
 check-closure-missing-type-hints = true
 check-arrow-function-missing-type-hints = true
+enforce-class-finality = true
 
 # Enable strict checks
 strict-list-index-checks = true
@@ -353,6 +355,7 @@ function process(object $obj): mixed
 | `check-missing-override` | `true` | Reports missing `#[Override]` attributes on overriding methods (PHP 8.3+). |
 | `find-unused-parameters` | `true` | Reports unused function/method parameters. |
 | `no-boolean-literal-comparison` | `true` | Disallows comparisons like `$a === true` or `$b == false`. |
+| `enforce-class-finality` | `true` | Reports classes not declared `final`, `abstract`, or annotated with `@api`. |
 
 #### Exception handling
 
@@ -370,6 +373,7 @@ For a more lenient analysis (useful for legacy codebases or gradual adoption), u
 check-missing-type-hints = false
 strict-list-index-checks = false
 no-boolean-literal-comparison = false
+enforce-class-finality = false
 
 # Enable lenient behaviors
 allow-possibly-undefined-array-keys = true
