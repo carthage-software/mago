@@ -508,6 +508,53 @@ fn scan_class_like<'arena>(
             class_like_metadata.add_template_variance_parameter(i, variance);
         }
 
+        // Process imported type aliases first so they're available when building
+        // type alias definitions AND when resolving @template-extends/@template-implements
+        for imported_type_alias in docblock.imported_type_aliases {
+            let fqcn = ascii_lowercase_atom(&scope.resolve_str(NameKind::Default, &imported_type_alias.from).0);
+            let type_name = atom(&imported_type_alias.name);
+            let alias = imported_type_alias.alias.as_deref().map_or(type_name, atom);
+
+            if fqcn == name {
+                class_like_metadata.issues.push(
+                    Issue::help("Type alias is importing from itself, which is unnecessary.")
+                        .with_code(ScanningIssueKind::CircularTypeImport)
+                        .with_annotation(
+                            Annotation::primary(imported_type_alias.span)
+                                .with_message(format!("Type alias `{type_name}` is already defined in this class")),
+                        )
+                        .with_help("Remove this import statement as the type is already available locally."),
+                );
+
+                continue;
+            }
+
+            class_like_metadata.imported_type_aliases.insert(alias, (fqcn, type_name, imported_type_alias.span));
+            type_context = type_context.with_imported_type_alias(alias, fqcn, type_name);
+        }
+
+        for type_alias in &docblock.type_aliases {
+            let alias_name = atom(&type_alias.name);
+            match get_type_metadata_from_type_string(&type_alias.type_string, Some(name), &type_context, scope) {
+                Ok(type_metadata) => {
+                    type_context = type_context.with_type_alias(alias_name);
+
+                    class_like_metadata.type_aliases.insert(alias_name, type_metadata);
+                }
+                Err(typing_error) => {
+                    class_like_metadata.issues.push(
+                        Issue::error("Could not resolve the type in the `@type` tag.")
+                            .with_code(ScanningIssueKind::InvalidTypeTag)
+                            .with_annotation(
+                                Annotation::primary(typing_error.span()).with_message(typing_error.to_string()),
+                            )
+                            .with_note(typing_error.note())
+                            .with_help(typing_error.help()),
+                    );
+                }
+            }
+        }
+
         for extended_type in docblock.template_extends {
             let extended_union = match builder::get_type_from_string(
                 &extended_type.value,
@@ -1013,55 +1060,6 @@ fn scan_class_like<'arena>(
             new_property.flags.set(MetadataFlags::MAGIC_PROPERTY, true);
 
             class_like_metadata.add_property_metadata(new_property);
-        }
-
-        // Process imported type aliases FIRST so they're available when building type alias definitions
-        for imported_type_alias in docblock.imported_type_aliases {
-            let fqcn = ascii_lowercase_atom(&scope.resolve_str(NameKind::Default, &imported_type_alias.from).0);
-            let type_name = atom(&imported_type_alias.name);
-            let alias = imported_type_alias.alias.as_deref().map_or(type_name, atom);
-
-            // Skip self-imports to prevent infinite recursion during type expansion
-            // Self-imports are useless since the type is already available locally
-            if fqcn == name {
-                class_like_metadata.issues.push(
-                    Issue::help("Type alias is importing from itself, which is unnecessary.")
-                        .with_code(ScanningIssueKind::CircularTypeImport)
-                        .with_annotation(
-                            Annotation::primary(imported_type_alias.span)
-                                .with_message(format!("Type alias `{type_name}` is already defined in this class")),
-                        )
-                        .with_help("Remove this import statement as the type is already available locally."),
-                );
-
-                continue;
-            }
-
-            class_like_metadata.imported_type_aliases.insert(alias, (fqcn, type_name, imported_type_alias.span));
-            type_context = type_context.with_imported_type_alias(alias, fqcn, type_name);
-        }
-
-        // Now build type alias definitions (can reference imported aliases)
-        for type_alias in &docblock.type_aliases {
-            let alias_name = atom(&type_alias.name);
-            match get_type_metadata_from_type_string(&type_alias.type_string, Some(name), &type_context, scope) {
-                Ok(type_metadata) => {
-                    type_context = type_context.with_type_alias(alias_name);
-
-                    class_like_metadata.type_aliases.insert(alias_name, type_metadata);
-                }
-                Err(typing_error) => {
-                    class_like_metadata.issues.push(
-                        Issue::error("Could not resolve the type in the `@type` tag.")
-                            .with_code(ScanningIssueKind::InvalidTypeTag)
-                            .with_annotation(
-                                Annotation::primary(typing_error.span()).with_message(typing_error.to_string()),
-                            )
-                            .with_note(typing_error.note())
-                            .with_help(typing_error.help()),
-                    );
-                }
-            }
         }
     }
 
