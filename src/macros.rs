@@ -4,7 +4,10 @@ macro_rules! enum_variants {
         use clap::builder::TypedValueParser;
         use strum::VariantNames;
 
-        clap::builder::PossibleValuesParser::new(<$e>::VARIANTS).map(|s| s.parse::<$e>().unwrap())
+        clap::builder::PossibleValuesParser::new(
+            <$e>::VARIANTS.iter().copied().filter(|v| v.parse::<$e>().is_ok()).collect::<Vec<_>>(),
+        )
+        .map(|s| s.parse::<$e>().unwrap())
     }};
 }
 
