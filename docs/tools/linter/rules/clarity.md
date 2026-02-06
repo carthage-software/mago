@@ -257,7 +257,7 @@ coalescing operator (`??`) is often clearer and more maintainable.
 
 | Option | Type | Default |
 | :--- | :--- | :--- |
-| `enabled` | `boolean` | `false` |
+| `enabled` | `boolean` | `true` |
 | `level` | `string` | `"warning"` |
 
 ### Examples
@@ -444,7 +444,7 @@ Enforces using underscore separators in numeric literals for improved readabilit
 
 | Option | Type | Default |
 | :--- | :--- | :--- |
-| `enabled` | `boolean` | `false` |
+| `enabled` | `boolean` | `true` |
 | `level` | `string` | `"warning"` |
 | `min-digits` | `integer` | `5` |
 

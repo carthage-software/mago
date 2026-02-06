@@ -37,10 +37,6 @@ impl Default for NoIssetConfig {
 }
 
 impl Config for NoIssetConfig {
-    fn default_enabled() -> bool {
-        false
-    }
-
     fn level(&self) -> Level {
         self.level
     }

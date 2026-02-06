@@ -48,10 +48,6 @@ impl Config for ReadableLiteralConfig {
     fn level(&self) -> Level {
         self.level
     }
-
-    fn default_enabled() -> bool {
-        false
-    }
 }
 
 impl LintRule for ReadableLiteralRule {
