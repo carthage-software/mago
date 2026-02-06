@@ -8,6 +8,7 @@ jobs:
   label:
     runs-on: ubuntu-latest
     permissions:
+      contents: read
       issues: write
     steps:
       - name: Add needs-triage label
