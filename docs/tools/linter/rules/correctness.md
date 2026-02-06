@@ -10,19 +10,14 @@ This document details the rules available in the `Correctness` category.
 | Rule | Code |
 | :--- | :---------- |
 | Assert Description | [`assert-description`](#assert-description) |
-| Constant Type | [`constant-type`](#constant-type) |
 | Identity Comparison | [`identity-comparison`](#identity-comparison) |
 | Ineffective Format Ignore Next | [`ineffective-format-ignore-next`](#ineffective-format-ignore-next) |
 | Ineffective Format Ignore Region | [`ineffective-format-ignore-region`](#ineffective-format-ignore-region) |
 | Invalid Open Tag | [`invalid-open-tag`](#invalid-open-tag) |
 | No Assign In Argument | [`no-assign-in-argument`](#no-assign-in-argument) |
 | No Assign In Condition | [`no-assign-in-condition`](#no-assign-in-condition) |
-| No Boolean Literal Comparison | [`no-boolean-literal-comparison`](#no-boolean-literal-comparison) |
 | No Empty Catch Clause | [`no-empty-catch-clause`](#no-empty-catch-clause) |
 | No Only | [`no-only`](#no-only) |
-| Parameter Type | [`parameter-type`](#parameter-type) |
-| Property Type | [`property-type`](#property-type) |
-| Return Type | [`return-type`](#return-type) |
 | Strict Assertions | [`strict-assertions`](#strict-assertions) |
 | Strict Behavior | [`strict-behavior`](#strict-behavior) |
 | Strict Types | [`strict-types`](#strict-types) |
@@ -60,69 +55,6 @@ assert($user->isActivated(), 'User MUST be activated at this point.');
 <?php
 
 assert($user->isActivated());
-```
-
-
-## <a id="constant-type"></a>`constant-type`
-
-Detects class constants that are missing a type hint.
-
-
-### Requirements
-
-- **PHP version:** >= `8.3.0`
-
-### Configuration
-
-| Option | Type | Default |
-| :--- | :--- | :--- |
-| `enabled` | `boolean` | `false` |
-| `level` | `string` | `"warning"` |
-
-### Examples
-
-#### Correct code
-
-```php
-<?php
-
-declare(strict_types=1);
-
-namespace Psl\IO\Internal;
-
-use Psl\IO;
-
-class ResourceHandle implements IO\CloseSeekReadWriteStreamHandleInterface {
-    use IO\ReadHandleConvenienceMethodsTrait;
-    use IO\WriteHandleConvenienceMethodsTrait;
-
-    public const int DEFAULT_READ_BUFFER_SIZE = 4096;
-    public const int MAXIMUM_READ_BUFFER_SIZE = 786432;
-
-    // ...
-}
-```
-
-#### Incorrect code
-
-```php
-<?php
-
-declare(strict_types=1);
-
-namespace Psl\IO\Internal;
-
-use Psl\IO;
-
-class ResourceHandle implements IO\CloseSeekReadWriteStreamHandleInterface {
-    use IO\ReadHandleConvenienceMethodsTrait;
-    use IO\WriteHandleConvenienceMethodsTrait;
-
-    public const DEFAULT_READ_BUFFER_SIZE = 4096;
-    public const MAXIMUM_READ_BUFFER_SIZE = 786432;
-
-    // ...
-}
 ```
 
 
@@ -371,44 +303,6 @@ if ($x = 1) {
 ```
 
 
-## <a id="no-boolean-literal-comparison"></a>`no-boolean-literal-comparison`
-
-Disallows comparisons where a boolean literal is used as an operand.
-
-Comparing with a boolean literal (`true` or `false`) is redundant and can often be simplified.
-For example, `if ($x === true)` is equivalent to the more concise `if ($x)`, and
-`if ($y !== false)` is the same as `if ($y)`.
-
-
-
-### Configuration
-
-| Option | Type | Default |
-| :--- | :--- | :--- |
-| `enabled` | `boolean` | `false` |
-| `level` | `string` | `"note"` |
-
-### Examples
-
-#### Correct code
-
-```php
-<?php
-
-if ($x) { /* ... */ }
-if (!$y) { /* ... */ }
-```
-
-#### Incorrect code
-
-```php
-<?php
-
-if ($x === true) { /* ... */ }
-if ($y != false) { /* ... */ }
-```
-
-
 ## <a id="no-empty-catch-clause"></a>`no-empty-catch-clause`
 
 Warns when a `catch` clause is empty.
@@ -501,131 +395,6 @@ test('example test', function () {
 it('does something', function () {
     expect(1)->toBe(1);
 })->only();
-```
-
-
-## <a id="parameter-type"></a>`parameter-type`
-
-Detects parameters that are missing a type hint.
-
-
-### Requirements
-
-- **PHP version:** >= `7.0.0`
-
-### Configuration
-
-| Option | Type | Default |
-| :--- | :--- | :--- |
-| `enabled` | `boolean` | `false` |
-| `level` | `string` | `"warning"` |
-| `ignore-closure` | `boolean` | `false` |
-| `ignore-arrow-function` | `boolean` | `false` |
-
-### Examples
-
-#### Correct code
-
-```php
-<?php
-
-function foo(string $bar): void
-{
-    // ...
-}
-```
-
-#### Incorrect code
-
-```php
-<?php
-
-function foo($bar): void
-{
-    // ...
-}
-```
-
-
-## <a id="property-type"></a>`property-type`
-
-Detects class-like properties that are missing a type hint.
-
-
-### Requirements
-
-- **PHP version:** >= `7.4.0`
-
-### Configuration
-
-| Option | Type | Default |
-| :--- | :--- | :--- |
-| `enabled` | `boolean` | `false` |
-| `level` | `string` | `"warning"` |
-
-### Examples
-
-#### Correct code
-
-```php
-<?php
-
-class Foo
-{
-    public int $bar;
-}
-```
-
-#### Incorrect code
-
-```php
-<?php
-
-class Foo
-{
-    public $bar;
-}
-```
-
-
-## <a id="return-type"></a>`return-type`
-
-Detects functions, methods, closures, and arrow functions that are missing a return type hint.
-
-
-### Requirements
-
-- **PHP version:** >= `7.0.0`
-
-### Configuration
-
-| Option | Type | Default |
-| :--- | :--- | :--- |
-| `enabled` | `boolean` | `false` |
-| `level` | `string` | `"warning"` |
-| `ignore-closure` | `boolean` | `false` |
-| `ignore-arrow-function` | `boolean` | `false` |
-
-### Examples
-
-#### Correct code
-
-```php
-<?php
-
-function foo(): int {
-    return 42;
-}
-```
-
-#### Incorrect code
-
-```php
-<?php
-
-function foo() {
-    return 42;
-}
 ```
 
 

@@ -17,7 +17,6 @@ use crate::rule::CombineConsecutiveIssetsConfig;
 use crate::rule::Config;
 use crate::rule::ConstantConditionConfig;
 use crate::rule::ConstantNameConfig;
-use crate::rule::ConstantTypeConfig;
 use crate::rule::CyclomaticComplexityConfig;
 use crate::rule::DisallowedFunctionsConfig;
 use crate::rule::EnumNameConfig;
@@ -46,7 +45,6 @@ use crate::rule::NoAliasFunctionConfig;
 use crate::rule::NoAssignInArgumentConfig;
 use crate::rule::NoAssignInConditionConfig;
 use crate::rule::NoBooleanFlagParameterConfig;
-use crate::rule::NoBooleanLiteralComparisonConfig;
 use crate::rule::NoClosingTagConfig;
 use crate::rule::NoDbSchemaChangeConfig;
 use crate::rule::NoDebugSymbolsConfig;
@@ -103,7 +101,6 @@ use crate::rule::NoUnsafeFinallyConfig;
 use crate::rule::NoVariableVariableConfig;
 use crate::rule::NoVoidReferenceReturnConfig;
 use crate::rule::OptionalParamOrderConfig;
-use crate::rule::ParameterTypeConfig;
 use crate::rule::PreferAnonymousMigrationConfig;
 use crate::rule::PreferArrowFunctionConfig;
 use crate::rule::PreferEarlyContinueConfig;
@@ -113,7 +110,6 @@ use crate::rule::PreferStaticClosureConfig;
 use crate::rule::PreferViewArrayConfig;
 use crate::rule::PreferWhileLoopConfig;
 use crate::rule::PropertyNameConfig;
-use crate::rule::PropertyTypeConfig;
 use crate::rule::PslArrayFunctionsConfig;
 use crate::rule::PslDataStructuresConfig;
 use crate::rule::PslDatetimeConfig;
@@ -126,7 +122,6 @@ use crate::rule::PslStringFunctionsConfig;
 use crate::rule::ReadableLiteralConfig;
 use crate::rule::RequireNamespaceConfig;
 use crate::rule::RequirePregQuoteDelimiterConfig;
-use crate::rule::ReturnTypeConfig;
 use crate::rule::SensitiveParameterConfig;
 use crate::rule::SingleClassPerFileConfig;
 use crate::rule::StrContainsConfig;
@@ -187,7 +182,6 @@ pub struct RulesSettings {
     pub class_name: RuleSettings<ClassNameConfig>,
     pub combine_consecutive_issets: RuleSettings<CombineConsecutiveIssetsConfig>,
     pub constant_name: RuleSettings<ConstantNameConfig>,
-    pub constant_type: RuleSettings<ConstantTypeConfig>,
     pub cyclomatic_complexity: RuleSettings<CyclomaticComplexityConfig>,
     pub disallowed_functions: RuleSettings<DisallowedFunctionsConfig>,
     pub enum_name: RuleSettings<EnumNameConfig>,
@@ -248,7 +242,6 @@ pub struct RulesSettings {
     pub no_empty_catch_clause: RuleSettings<NoEmptyCatchClauseConfig>,
     pub no_else_clause: RuleSettings<NoElseClauseConfig>,
     pub no_closing_tag: RuleSettings<NoClosingTagConfig>,
-    pub no_boolean_literal_comparison: RuleSettings<NoBooleanLiteralComparisonConfig>,
     pub no_boolean_flag_parameter: RuleSettings<NoBooleanFlagParameterConfig>,
     pub no_assign_in_argument: RuleSettings<NoAssignInArgumentConfig>,
     pub no_assign_in_condition: RuleSettings<NoAssignInConditionConfig>,
@@ -280,7 +273,6 @@ pub struct RulesSettings {
     pub psl_regex_functions: RuleSettings<PslRegexFunctionsConfig>,
     pub psl_sleep_functions: RuleSettings<PslSleepFunctionsConfig>,
     pub psl_string_functions: RuleSettings<PslStringFunctionsConfig>,
-    pub return_type: RuleSettings<ReturnTypeConfig>,
     pub str_contains: RuleSettings<StrContainsConfig>,
     pub str_starts_with: RuleSettings<StrStartsWithConfig>,
     pub strict_behavior: RuleSettings<StrictBehaviorConfig>,
@@ -299,9 +291,7 @@ pub struct RulesSettings {
     pub no_literal_password: RuleSettings<NoLiteralPasswordConfig>,
     pub tainted_data_to_sink: RuleSettings<TaintedDataToSinkConfig>,
     pub sensitive_parameter: RuleSettings<SensitiveParameterConfig>,
-    pub parameter_type: RuleSettings<ParameterTypeConfig>,
     pub property_name: RuleSettings<PropertyNameConfig>,
-    pub property_type: RuleSettings<PropertyTypeConfig>,
     pub no_unsafe_finally: RuleSettings<NoUnsafeFinallyConfig>,
     pub strict_assertions: RuleSettings<StrictAssertionsConfig>,
     pub use_specific_assertions: RuleSettings<UseSpecificAssertionsConfig>,
