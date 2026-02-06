@@ -120,6 +120,11 @@ const analyzerOptions = [
     description: 'Disable warnings for comparisons to true/false literals',
   },
   {
+    key: 'enforceClassFinality',
+    label: 'Enforce class finality',
+    description: 'Report classes that are not marked final but have no subclasses',
+  },
+  {
     key: 'checkMissingTypeHints',
     label: 'Check missing type hints',
     description: 'Report missing type hints on parameters, properties, and returns',

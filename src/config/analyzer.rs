@@ -203,6 +203,14 @@ pub struct AnalyzerConfiguration {
     /// Defaults to `false`.
     pub check_use_statements: bool,
 
+    /// Enforce that concrete classes are declared `final`.
+    ///
+    /// When enabled, the analyzer reports a warning for any class that is not
+    /// `final`, `abstract`, or annotated with `@api`, provided the class has no children.
+    ///
+    /// Defaults to `false`.
+    pub enforce_class_finality: bool,
+
     /// **Deprecated**: Use `check-missing-override` and `find-unused-parameters` instead.
     ///
     /// When set to `true`, enables both `check-missing-override` and `find-unused-parameters`.
@@ -333,6 +341,7 @@ impl AnalyzerConfiguration {
             find_unused_parameters,
             strict_list_index_checks: self.strict_list_index_checks,
             no_boolean_literal_comparison: self.no_boolean_literal_comparison,
+            enforce_class_finality: self.enforce_class_finality,
             check_missing_type_hints: self.check_missing_type_hints,
             check_closure_missing_type_hints: self.check_closure_missing_type_hints,
             check_arrow_function_missing_type_hints: self.check_arrow_function_missing_type_hints,
@@ -378,6 +387,7 @@ impl Default for AnalyzerConfiguration {
             find_unused_parameters: defaults.find_unused_parameters,
             strict_list_index_checks: defaults.strict_list_index_checks,
             no_boolean_literal_comparison: defaults.no_boolean_literal_comparison,
+            enforce_class_finality: defaults.enforce_class_finality,
             check_missing_type_hints: defaults.check_missing_type_hints,
             check_closure_missing_type_hints: defaults.check_closure_missing_type_hints,
             check_arrow_function_missing_type_hints: defaults.check_arrow_function_missing_type_hints,
