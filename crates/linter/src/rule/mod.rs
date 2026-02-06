@@ -85,7 +85,7 @@ macro_rules! define_rules {
         )*}
 
         impl AnyRule {
-            pub fn get_all_for(settings: &Settings, only: Option<&[String]>, include_disabled: bool) -> Vec<Self> {
+            pub fn get_all_for(settings: &Settings, only: Option<&[String]>, include_disabled: bool) -> Vec<(Self, Vec<String>)> {
                 let mut rules = Vec::new();
 
                 $(
@@ -94,7 +94,7 @@ macro_rules! define_rules {
                     // If `--only` is used, check if this rule's code is in the list.
                     if let Some(only_codes) = &only {
                         if only_codes.iter().any(|c| c == meta.code) {
-                            rules.push(AnyRule::$variant($rule::build(&settings.rules.$module)));
+                            rules.push((AnyRule::$variant($rule::build(&settings.rules.$module)), settings.rules.$module.exclude.clone()));
                         }
                     } else {
                         let is_enabled = include_disabled || (
@@ -103,7 +103,7 @@ macro_rules! define_rules {
                         );
 
                         if is_enabled {
-                            rules.push(AnyRule::$variant($rule::build(&settings.rules.$module)));
+                            rules.push((AnyRule::$variant($rule::build(&settings.rules.$module)), settings.rules.$module.exclude.clone()));
                         }
                     }
                 )*

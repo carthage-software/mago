@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::sync::Arc;
 
 use bumpalo::Bump;
@@ -82,16 +83,41 @@ impl<'arena> Linter<'arena> {
             collector.set_active_codes(only_codes);
         }
 
+        // Compute which rules are excluded for this file
+        let file_name = source_file.name.as_ref();
+        let excluded_rules: HashSet<usize> = self
+            .registry
+            .rules()
+            .iter()
+            .enumerate()
+            .filter(|(idx, _)| {
+                let excludes = self.registry.excludes_for(*idx);
+                !excludes.is_empty() && is_file_excluded(file_name, excludes)
+            })
+            .map(|(idx, _)| idx)
+            .collect();
+
         let mut context =
             LintContext::new(self.php_version, self.arena, &self.registry, source_file, resolved_names, collector);
 
-        walk(Node::Program(program), &mut context);
+        walk(Node::Program(program), &mut context, &excluded_rules);
 
         context.collector.finish()
     }
 }
 
-fn walk<'arena>(node: Node<'_, 'arena>, ctx: &mut LintContext<'_, 'arena>) {
+fn is_file_excluded(file_name: &str, patterns: &[String]) -> bool {
+    patterns.iter().any(|pattern| {
+        if pattern.ends_with('/') {
+            file_name.starts_with(pattern.as_str())
+        } else {
+            let dir_prefix = format!("{pattern}/");
+            file_name.starts_with(&dir_prefix) || file_name == pattern
+        }
+    })
+}
+
+fn walk<'arena>(node: Node<'_, 'arena>, ctx: &mut LintContext<'_, 'arena>, excluded_rules: &HashSet<usize>) {
     let mut in_scope = false;
     if let Some(scope) = Scope::for_node(ctx, node) {
         ctx.scope.push(scope);
@@ -102,13 +128,17 @@ fn walk<'arena>(node: Node<'_, 'arena>, ctx: &mut LintContext<'_, 'arena>) {
     let rules_to_run = ctx.registry.for_kind(node.kind());
 
     for &rule_index in rules_to_run {
+        if excluded_rules.contains(&rule_index) {
+            continue;
+        }
+
         let rule = ctx.registry.rule(rule_index);
 
         rule.check(ctx, node);
     }
 
     for child in node.children() {
-        walk(child, ctx);
+        walk(child, ctx, excluded_rules);
     }
 
     if in_scope {

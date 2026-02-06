@@ -163,6 +163,9 @@ pub struct Settings {
 pub struct RuleSettings<C: Config> {
     pub enabled: bool,
 
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub exclude: Vec<String>,
+
     #[serde(flatten)]
     pub config: C,
 }
@@ -332,6 +335,6 @@ impl Default for Settings {
 
 impl<C: Config> Default for RuleSettings<C> {
     fn default() -> Self {
-        Self { enabled: C::default_enabled(), config: C::default() }
+        Self { enabled: C::default_enabled(), exclude: Vec::new(), config: C::default() }
     }
 }
