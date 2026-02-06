@@ -55,6 +55,13 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ needs.crate_metadata.outputs.msrv }}
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: msrv-${{ needs.crate_metadata.outputs.msrv }}
+          cache-on-failure: true
+
       - name: Run tests
         run: cargo test --workspace --locked --all-targets
 
@@ -220,12 +227,27 @@ jobs:
           toolchain: ${{ needs.crate_metadata.outputs.msrv }}
           targets: ${{ matrix.job.target }}
 
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.job.target }}
+          cache-on-failure: true
+
+      - name: Cache cargo-pgo
+        if: matrix.job.pgo
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/cargo-pgo
+          key: cargo-pgo-${{ runner.os }}
+
       - name: install PGO tools
         if: matrix.job.pgo
         shell: bash
         run: |
           rustup component add llvm-tools-preview
-          cargo install cargo-pgo
+          if ! command -v cargo-pgo &>/dev/null; then
+            cargo install cargo-pgo
+          fi
 
       - name: install cross
         if: startsWith(matrix.job.os, 'ubuntu')
@@ -273,6 +295,13 @@ jobs:
           php-version: "8.3"
           tools: composer
 
+      - name: Cache composer dependencies for PGO corpus
+        if: matrix.job.pgo
+        uses: actions/cache@v4
+        with:
+          path: corpus/vendor
+          key: composer-corpus-${{ hashFiles('corpus/composer.lock') }}
+
       - name: setup PHP corpus for PGO profiling
         if: matrix.job.pgo
         shell: bash
@@ -319,10 +348,19 @@ jobs:
         shell: bash
         run: $BUILD_CMD test --workspace --locked --target=${{ matrix.job.target }}
 
+      - name: Cache wasm-pack
+        if: matrix.job.wasm && !startsWith(github.ref, 'refs/pull/')
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/wasm-pack
+          key: wasm-pack-0.13.1-${{ runner.os }}
+
       - name: Install wasm-pack and build WASM
         if: matrix.job.wasm && !startsWith(github.ref, 'refs/pull/')
         run: |
-          cargo install wasm-pack --version 0.13.1 --locked
+          if ! command -v wasm-pack &>/dev/null; then
+            cargo install wasm-pack --version 0.13.1 --locked
+          fi
           cd crates/wasm
           wasm-pack build -d pkg --release
           cd ../..
