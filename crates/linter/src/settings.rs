@@ -127,6 +127,7 @@ use crate::rule::RequireNamespaceConfig;
 use crate::rule::RequirePregQuoteDelimiterConfig;
 use crate::rule::ReturnTypeConfig;
 use crate::rule::SensitiveParameterConfig;
+use crate::rule::SingleClassPerFileConfig;
 use crate::rule::StrContainsConfig;
 use crate::rule::StrStartsWithConfig;
 use crate::rule::StrictAssertionsConfig;
@@ -307,6 +308,7 @@ pub struct RulesSettings {
     pub use_compound_assignment: RuleSettings<UseCompoundAssignmentConfig>,
     pub require_preg_quote_delimiter: RuleSettings<RequirePregQuoteDelimiterConfig>,
     pub require_namespace: RuleSettings<RequireNamespaceConfig>,
+    pub single_class_per_file: RuleSettings<SingleClassPerFileConfig>,
     pub readable_literal: RuleSettings<ReadableLiteralConfig>,
     pub yoda_conditions: RuleSettings<YodaConditionsConfig>,
     pub use_wp_functions: RuleSettings<UseWpFunctionsConfig>,

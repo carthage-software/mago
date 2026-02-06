@@ -34,6 +34,7 @@ This document details the rules available in the `BestPractices` category.
 | Psl Sleep Functions | [`psl-sleep-functions`](#psl-sleep-functions) |
 | Psl String Functions | [`psl-string-functions`](#psl-string-functions) |
 | Require Namespace | [`require-namespace`](#require-namespace) |
+| Single Class Per File | [`single-class-per-file`](#single-class-per-file) |
 | Use Compound Assignment | [`use-compound-assignment`](#use-compound-assignment) |
 | Use WordPress API Functions | [`use-wp-functions`](#use-wp-functions) |
 | Yoda Conditions | [`yoda-conditions`](#yoda-conditions) |
@@ -1107,6 +1108,50 @@ class Foo {}
 <?php
 
 class Foo {}
+```
+
+
+## <a id="single-class-per-file"></a>`single-class-per-file`
+
+Ensures that each file contains at most one class-like definition (class, interface, enum, or trait).
+
+
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `true` |
+| `level` | `string` | `"warning"` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+
+namespace App;
+
+class Foo
+{
+}
+```
+
+#### Incorrect code
+
+```php
+<?php
+
+namespace App;
+
+class Foo
+{
+}
+
+class Bar
+{
+}
 ```
 
 

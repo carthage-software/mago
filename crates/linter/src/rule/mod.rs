@@ -312,6 +312,7 @@ define_rules! {
     UseCompoundAssignment(use_compound_assignment @ UseCompoundAssignmentRule),
     RequirePregQuoteDelimiter(require_preg_quote_delimiter @ RequirePregQuoteDelimiterRule),
     RequireNamespace(require_namespace @ RequireNamespaceRule),
+    SingleClassPerFile(single_class_per_file @ SingleClassPerFileRule),
     YodaConditions(yoda_conditions @ YodaConditionsRule),
     UseWpFunctions(use_wp_functions @ UseWpFunctionsRule),
     NoDirectDbQuery(no_direct_db_query @ NoDirectDbQueryRule),
