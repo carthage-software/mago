@@ -135,8 +135,6 @@ pub(super) fn print_array_like<'arena>(
     if elements.is_empty() {
         if let Some(dangling_comments) = f.print_dangling_comments(array_like.span(), true) {
             parts.push(dangling_comments);
-        } else {
-            parts.push(Document::Line(Line::soft()));
         }
 
         parts.push(get_right_delimiter(f, &array_like));
