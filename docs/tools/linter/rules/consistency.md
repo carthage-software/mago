@@ -17,6 +17,7 @@ This document details the rules available in the `Consistency` category.
 | Class Name | [`class-name`](#class-name) |
 | Constant Name | [`constant-name`](#constant-name) |
 | Enum Name | [`enum-name`](#enum-name) |
+| File Name | [`file-name`](#file-name) |
 | Function Name | [`function-name`](#function-name) |
 | Interface Name | [`interface-name`](#interface-name) |
 | Lowercase Keyword | [`lowercase-keyword`](#lowercase-keyword) |
@@ -378,6 +379,53 @@ enum MyEnum {}
 enum my_enum {}
 enum myEnum {}
 enum MY_ENUM {}
+```
+
+
+## <a id="file-name"></a>`file-name`
+
+Ensures that a file containing a single class-like definition is named after that definition.
+
+For example, a file containing `class Foo` must be named `Foo.php`.
+Optionally, this rule can also check functions: a file containing a single function `foo`
+must be named `foo.php`.
+
+
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `true` |
+| `level` | `string` | `"warning"` |
+| `check-functions` | `boolean` | `false` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+// File: test.php
+
+namespace App;
+
+class test
+{
+}
+```
+
+#### Incorrect code
+
+```php
+<?php
+// File: test.php
+
+namespace App;
+
+class Foo
+{
+}
 ```
 
 

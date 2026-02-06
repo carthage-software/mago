@@ -264,6 +264,7 @@ define_rules! {
     InstanceofStringable(instanceof_stringable @ InstanceofStringableRule),
     InterfaceName(interface_name @ InterfaceNameRule),
     InvalidOpenTag(invalid_open_tag @ InvalidOpenTagRule),
+    FileName(file_name @ FileNameRule),
     FunctionName(function_name @ FunctionNameRule),
     ExplicitOctal(explicit_octal @ ExplicitOctalRule),
     ReadableLiteral(readable_literal @ ReadableLiteralRule),

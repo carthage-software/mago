@@ -25,6 +25,7 @@ use crate::rule::ExcessiveNestingConfig;
 use crate::rule::ExcessiveParameterListConfig;
 use crate::rule::ExplicitNullableParamConfig;
 use crate::rule::ExplicitOctalConfig;
+use crate::rule::FileNameConfig;
 use crate::rule::FinalControllerConfig;
 use crate::rule::FunctionNameConfig;
 use crate::rule::HalsteadConfig;
@@ -260,6 +261,7 @@ pub struct RulesSettings {
     pub instanceof_stringable: RuleSettings<InstanceofStringableConfig>,
     pub interface_name: RuleSettings<InterfaceNameConfig>,
     pub invalid_open_tag: RuleSettings<InvalidOpenTagConfig>,
+    pub file_name: RuleSettings<FileNameConfig>,
     pub function_name: RuleSettings<FunctionNameConfig>,
     pub explicit_nullable_param: RuleSettings<ExplicitNullableParamConfig>,
     pub explicit_octal: RuleSettings<ExplicitOctalConfig>,
