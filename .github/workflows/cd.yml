@@ -12,6 +12,8 @@ env:
 permissions:
   contents: write
   discussions: write
+  id-token: write
+  attestations: write
 
 jobs:
   crate_metadata:
@@ -86,6 +88,16 @@ jobs:
           cd -
           echo "ZIP_NAME=${ZIP_NAME}" >> $GITHUB_OUTPUT
           echo "ZIP_PATH=${STAGING}/${ZIP_NAME}" >> $GITHUB_OUTPUT
+
+      - name: Generate artifact attestation (source tar.gz)
+        uses: actions/attest-build-provenance@v3
+        with:
+          subject-path: ${{ steps.source_package.outputs.TAR_PATH }}
+
+      - name: Generate artifact attestation (source zip)
+        uses: actions/attest-build-provenance@v3
+        with:
+          subject-path: ${{ steps.source_package.outputs.ZIP_PATH }}
 
       - name: "Artifact upload: source tar.gz"
         uses: actions/upload-artifact@v4
@@ -371,6 +383,17 @@ jobs:
           popd >/dev/null
 
           echo "WASM_PKG_PATH=${WASM_STAGING}/${WASM_PKG_NAME}" >> $GITHUB_OUTPUT
+
+      - name: Generate artifact attestation (binary)
+        uses: actions/attest-build-provenance@v3
+        with:
+          subject-path: ${{ steps.package.outputs.PKG_PATH }}
+
+      - name: Generate artifact attestation (WASM)
+        if: matrix.job.wasm && !startsWith(github.ref, 'refs/pull/')
+        uses: actions/attest-build-provenance@v3
+        with:
+          subject-path: ${{ steps.wasm_package.outputs.WASM_PKG_PATH }}
 
       - name: "Artifact upload: tarball"
         uses: actions/upload-artifact@v4
