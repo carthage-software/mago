@@ -146,6 +146,20 @@ fn count_significant_digits(raw: &str) -> usize {
         }
     }
 
+    let raw_lower = raw.to_lowercase();
+    if raw.contains('.') || raw_lower.contains('e') {
+        let exp_pos = raw.find(['e', 'E']);
+        let mantissa = if let Some(pos) = exp_pos { &raw[..pos] } else { raw };
+
+        if let Some(dot_pos) = mantissa.find('.') {
+            let integer_digits = mantissa[..dot_pos].chars().filter(|c| c.is_ascii_digit()).count();
+            let fractional_digits = mantissa[dot_pos + 1..].chars().filter(|c| c.is_ascii_digit()).count();
+            return integer_digits.max(fractional_digits);
+        }
+
+        return mantissa.chars().filter(|c| c.is_ascii_digit()).count();
+    }
+
     raw.chars().filter(|c| c.is_ascii_digit()).count()
 }
 
@@ -253,4 +267,208 @@ fn group_digits_from_left(digits: &str, group_size: usize) -> String {
     }
 
     result
+}
+
+#[cfg(test)]
+mod tests {
+    use indoc::indoc;
+
+    use super::ReadableLiteralRule;
+    use crate::test_lint_failure;
+    use crate::test_lint_success;
+
+    test_lint_success! {
+        name = small_integer,
+        rule = ReadableLiteralRule,
+        code = indoc! {r"
+            <?php
+
+            $a = 1234;
+        "}
+    }
+
+    test_lint_success! {
+        name = small_float,
+        rule = ReadableLiteralRule,
+        code = indoc! {r"
+            <?php
+
+            $a = 123.45;
+        "}
+    }
+
+    test_lint_success! {
+        name = float_with_few_digits_each_side,
+        rule = ReadableLiteralRule,
+        code = indoc! {r"
+            <?php
+
+            $a = 1.23;
+            $b = 99.99;
+            $c = 100.0;
+        "}
+    }
+
+    test_lint_success! {
+        name = already_separated_integer,
+        rule = ReadableLiteralRule,
+        code = indoc! {r"
+            <?php
+
+            $a = 1_000_000;
+        "}
+    }
+
+    test_lint_success! {
+        name = already_separated_hex,
+        rule = ReadableLiteralRule,
+        code = indoc! {r"
+            <?php
+
+            $a = 0xCAFE_F00D;
+        "}
+    }
+
+    test_lint_success! {
+        name = already_separated_binary,
+        rule = ReadableLiteralRule,
+        code = indoc! {r"
+            <?php
+
+            $a = 0b0101_1111;
+        "}
+    }
+
+    test_lint_success! {
+        name = small_hex,
+        rule = ReadableLiteralRule,
+        code = indoc! {r"
+            <?php
+
+            $a = 0xFF;
+        "}
+    }
+
+    test_lint_success! {
+        name = small_binary,
+        rule = ReadableLiteralRule,
+        code = indoc! {r"
+            <?php
+
+            $a = 0b1010;
+        "}
+    }
+
+    test_lint_success! {
+        name = small_octal,
+        rule = ReadableLiteralRule,
+        code = indoc! {r"
+            <?php
+
+            $a = 0o777;
+        "}
+    }
+
+    test_lint_success! {
+        name = float_with_exponent_small,
+        rule = ReadableLiteralRule,
+        code = indoc! {r"
+            <?php
+
+            $a = 1.5e10;
+        "}
+    }
+
+    test_lint_failure! {
+        name = large_integer,
+        rule = ReadableLiteralRule,
+        code = indoc! {r"
+            <?php
+
+            $a = 1000000;
+        "}
+    }
+
+    test_lint_failure! {
+        name = five_digit_integer,
+        rule = ReadableLiteralRule,
+        code = indoc! {r"
+            <?php
+
+            $a = 10000;
+        "}
+    }
+
+    test_lint_failure! {
+        name = large_hex,
+        rule = ReadableLiteralRule,
+        code = indoc! {r"
+            <?php
+
+            $a = 0xCAFEF00D;
+        "}
+    }
+
+    test_lint_failure! {
+        name = large_binary,
+        rule = ReadableLiteralRule,
+        code = indoc! {r"
+            <?php
+
+            $a = 0b01011111;
+        "}
+    }
+
+    test_lint_failure! {
+        name = large_octal,
+        rule = ReadableLiteralRule,
+        code = indoc! {r"
+            <?php
+
+            $a = 0o12345;
+        "}
+    }
+
+    test_lint_failure! {
+        name = float_with_large_integer_part,
+        rule = ReadableLiteralRule,
+        code = indoc! {r"
+            <?php
+
+            $a = 12345.67;
+        "}
+    }
+
+    test_lint_failure! {
+        name = float_with_large_fractional_part,
+        rule = ReadableLiteralRule,
+        code = indoc! {r"
+            <?php
+
+            $a = 1.23456;
+        "}
+    }
+
+    test_lint_failure! {
+        name = multiple_large_literals,
+        rule = ReadableLiteralRule,
+        count = 3,
+        code = indoc! {r"
+            <?php
+
+            $a = 100000;
+            $b = 200000;
+            $c = 300000;
+        "}
+    }
+
+    test_lint_failure! {
+        name = legacy_octal,
+        rule = ReadableLiteralRule,
+        code = indoc! {r"
+            <?php
+
+            $a = 012345;
+        "}
+    }
 }
