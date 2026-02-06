@@ -350,7 +350,7 @@ final class AnalyzerCodeModuleGenerator
 
     private function generateEnum(): string
     {
-        if (count($this->allCodes) > 65535) {
+        if (count($this->allCodes) > 65_535) {
             throw new \RuntimeException('Too many issue codes; cannot be represented by a u16.');
         }
 

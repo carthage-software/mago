@@ -14,114 +14,78 @@ class Issue171
         $this->assertEquals($output, str($input)->stripEnd($strip)->toString());
     }
 
-    function y($x)
-    {
-    }
+    function y($x) {}
 
     // #[X]
-    function y($x)
-    {
-    }
+    function y($x) {}
 
     // #[X]
     // #[X]
-    function y($x)
-    {
-    }
+    function y($x) {}
 
     #[X]
     // #[X]
-    function y($x)
-    {
-    }
+    function y($x) {}
 
     #[X]
     #[X]
     // #[X]
     // #[X]
-    function y($x)
-    {
-    }
+    function y($x) {}
 
     #[X]
     #[X]
     #[X]
     #[X]
-    function y($x)
-    {
-    }
+    function y($x) {}
 
-    function y()
-    {
-    }
+    function y() {}
 
     // #[X]
-    function y()
-    {
-    }
+    function y() {}
 
     // #[X]
     // #[X]
-    function y()
-    {
-    }
+    function y() {}
 
     #[X]
     // #[X]
-    function y()
-    {
-    }
+    function y() {}
 
     #[X]
     #[X]
     // #[X]
     // #[X]
-    function y()
-    {
-    }
+    function y() {}
 
     #[X]
     #[X]
     #[X]
     #[X]
-    function y()
-    {
-    }
+    function y() {}
 }
 
-function y()
-{
-}
+function y() {}
 
 // #[X]
-function y()
-{
-}
+function y() {}
 
 // #[X]
 // #[X]
-function y()
-{
-}
+function y() {}
 
 #[X]
 // #[X]
-function y()
-{
-}
+function y() {}
 
 #[X]
 #[X]
 // #[X]
 // #[X]
-function y()
-{
-}
+function y() {}
 
 #[X]
 #[X]
 #[X]
 #[X]
-function y()
-{
-}
+function y() {}

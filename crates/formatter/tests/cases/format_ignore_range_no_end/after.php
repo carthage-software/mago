@@ -1,8 +1,6 @@
 <?php
 
-function formatted()
-{
-}
+function formatted() {}
 
 // @mago-format-ignore-start
 function   unformatted(   ) { }

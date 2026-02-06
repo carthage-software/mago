@@ -127,8 +127,8 @@ public function bar(
 | :--- | :--- | :--- | :--- |
 | `inline-empty-control-braces` | `boolean` | `false` | Place empty control structure bodies on the same line. |
 | `inline-empty-closure-braces` | `boolean` | `true` | Place empty closure bodies on the same line. |
-| `inline-empty-function-braces` | `boolean` | `false` | Place empty function bodies on the same line. |
-| `inline-empty-method-braces` | `boolean` | `false` | Place empty method bodies on the same line. |
+| `inline-empty-function-braces` | `boolean` | `true` | Place empty function bodies on the same line. |
+| `inline-empty-method-braces` | `boolean` | `true` | Place empty method bodies on the same line. |
 | `inline-empty-constructor-braces` | `boolean` | `true` | Place empty constructor bodies on the same line. |
 | `inline-empty-classlike-braces` | `boolean` | `true` | Place empty class-like bodies on the same line. |
 | `inline-empty-anonymous-class-braces` | `boolean` | `true` | Place empty anonymous class bodies on the same line. |

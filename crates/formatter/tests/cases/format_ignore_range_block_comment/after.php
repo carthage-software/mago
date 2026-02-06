@@ -4,6 +4,4 @@
 function   foo() {}
 /* @mago-formatter-ignore-end */
 
-function bar()
-{
-}
+function bar() {}

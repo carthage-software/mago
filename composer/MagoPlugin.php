@@ -29,23 +29,17 @@ final class MagoPlugin implements PluginInterface, EventSubscriberInterface, Cap
     /**
      * @inheritDoc
      */
-    public function activate(Composer $composer, IOInterface $io): void
-    {
-    }
+    public function activate(Composer $composer, IOInterface $io): void {}
 
     /**
      * @inheritDoc
      */
-    public function deactivate(Composer $composer, IOInterface $io): void
-    {
-    }
+    public function deactivate(Composer $composer, IOInterface $io): void {}
 
     /**
      * @inheritDoc
      */
-    public function uninstall(Composer $composer, IOInterface $io): void
-    {
-    }
+    public function uninstall(Composer $composer, IOInterface $io): void {}
 
     /**
      * @return array<class-string, class-string>

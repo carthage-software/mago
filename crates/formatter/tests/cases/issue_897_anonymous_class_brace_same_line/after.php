@@ -3,9 +3,7 @@
 declare(strict_types=1);
 
 $singleLine = new class($a, $b) {
-    public function foo(): void
-    {
-    }
+    public function foo(): void {}
 };
 
 $multiLineArgs = new class(
@@ -13,7 +11,5 @@ $multiLineArgs = new class(
     $anotherVeryLongArgumentNameForTesting,
     $yetAnotherExtremelyLongArgumentName,
 ) {
-    public function foo(): void
-    {
-    }
+    public function foo(): void {}
 };

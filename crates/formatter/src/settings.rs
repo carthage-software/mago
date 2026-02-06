@@ -269,8 +269,8 @@ generate_formatter_settings! {
     /// function foo() {}
     /// ```
     ///
-    /// Default: false
-    inline_empty_function_braces: bool => "default_false",
+    /// Default: true
+    inline_empty_function_braces: bool => "default_true",
 
     /// Place empty method bodies on the same line.
     ///
@@ -292,8 +292,8 @@ generate_formatter_settings! {
     /// }
     /// ```
     ///
-    /// Default: false
-    inline_empty_method_braces: bool => "default_false",
+    /// Default: true
+    inline_empty_method_braces: bool => "default_true",
 
     /// Place empty constructor bodies on the same line.
     ///
