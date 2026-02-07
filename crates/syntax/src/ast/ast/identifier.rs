@@ -9,7 +9,6 @@ use mago_span::Span;
 /// An identifier can be a local, qualified, or fully qualified identifier.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
-#[repr(u8)]
 pub enum Identifier<'arena> {
     Local(LocalIdentifier<'arena>),
     Qualified(QualifiedIdentifier<'arena>),

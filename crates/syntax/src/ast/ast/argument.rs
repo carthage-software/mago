@@ -35,7 +35,6 @@ pub struct PartialArgumentList<'arena> {
 /// Represents an argument.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
-#[repr(u8)]
 pub enum Argument<'arena> {
     Positional(PositionalArgument<'arena>),
     Named(NamedArgument<'arena>),
@@ -44,7 +43,6 @@ pub enum Argument<'arena> {
 /// Represents an argument or placeholder in a partial function application.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
-#[repr(u8)]
 pub enum PartialArgument<'arena> {
     Positional(PositionalArgument<'arena>),
     Named(NamedArgument<'arena>),

@@ -20,7 +20,6 @@ use crate::ast::sequence::TokenSeparatedSequence;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
-#[repr(u8)]
 pub enum Property<'arena> {
     Plain(PlainProperty<'arena>),
     Hooked(HookedProperty<'arena>),
@@ -81,7 +80,6 @@ pub struct HookedProperty<'arena> {
 /// Represents a property item in a class-like property declaration in PHP.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
-#[repr(u8)]
 pub enum PropertyItem<'arena> {
     Abstract(PropertyAbstractItem<'arena>),
     Concrete(PropertyConcreteItem<'arena>),
@@ -174,7 +172,6 @@ pub struct PropertyHook<'arena> {
 /// Represents the body of a property hook in a class-like property declaration in PHP.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
-#[repr(u8)]
 pub enum PropertyHookBody<'arena> {
     Abstract(PropertyHookAbstractBody),
     Concrete(PropertyHookConcreteBody<'arena>),
@@ -189,7 +186,6 @@ pub struct PropertyHookAbstractBody {
 /// Represents a concrete body of a property hook in a class-like property declaration in PHP.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
-#[repr(u8)]
 pub enum PropertyHookConcreteBody<'arena> {
     Block(Block<'arena>),
     Expression(PropertyHookConcreteExpressionBody<'arena>),

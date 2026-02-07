@@ -54,7 +54,6 @@ pub struct ExpressionStatement<'arena> {
 /// Represents a PHP statement.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
-#[repr(u8)]
 #[non_exhaustive]
 pub enum Statement<'arena> {
     OpeningTag(OpeningTag<'arena>),

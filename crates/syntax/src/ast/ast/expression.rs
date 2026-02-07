@@ -56,7 +56,6 @@ pub struct Parenthesized<'arena> {
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
-#[repr(u8)]
 #[non_exhaustive]
 pub enum Expression<'arena> {
     Binary(Binary<'arena>),

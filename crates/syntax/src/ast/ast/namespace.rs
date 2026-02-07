@@ -33,7 +33,6 @@ pub struct Namespace<'arena> {
 /// Represents the body of a PHP `namespace` declaration.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
-#[repr(u8)]
 pub enum NamespaceBody<'arena> {
     Implicit(NamespaceImplicitBody<'arena>),
     BraceDelimited(Block<'arena>),

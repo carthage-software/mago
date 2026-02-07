@@ -21,7 +21,6 @@ pub struct Use<'arena> {
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
-#[repr(u8)]
 pub enum UseItems<'arena> {
     Sequence(UseItemSequence<'arena>),
     TypedSequence(TypedUseItemSequence<'arena>),
@@ -31,7 +30,6 @@ pub enum UseItems<'arena> {
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
-#[repr(u8)]
 pub enum UseType<'arena> {
     Function(Keyword<'arena>),
     Const(Keyword<'arena>),

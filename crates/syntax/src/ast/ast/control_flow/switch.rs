@@ -23,7 +23,6 @@ pub struct Switch<'arena> {
 /// Represents the body of a switch statement.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
-#[repr(u8)]
 pub enum SwitchBody<'arena> {
     BraceDelimited(SwitchBraceDelimitedBody<'arena>),
     ColonDelimited(SwitchColonDelimitedBody<'arena>),
@@ -51,7 +50,6 @@ pub struct SwitchColonDelimitedBody<'arena> {
 /// Represents a single case within a switch statement.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
-#[repr(u8)]
 pub enum SwitchCase<'arena> {
     Expression(SwitchExpressionCase<'arena>),
     Default(SwitchDefaultCase<'arena>),
@@ -81,7 +79,6 @@ pub struct SwitchDefaultCase<'arena> {
 /// Represents the separator between a case and its statements.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
-#[repr(u8)]
 pub enum SwitchCaseSeparator {
     Colon(Span),
     SemiColon(Span),

@@ -19,7 +19,6 @@ pub struct Static<'arena> {
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
-#[repr(u8)]
 pub enum StaticItem<'arena> {
     Abstract(StaticAbstractItem<'arena>),
     Concrete(StaticConcreteItem<'arena>),

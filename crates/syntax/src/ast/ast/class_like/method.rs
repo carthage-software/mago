@@ -39,7 +39,6 @@ pub struct Method<'arena> {
 /// Represents the body of a method statement in PHP.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
-#[repr(u8)]
 pub enum MethodBody<'arena> {
     Abstract(MethodAbstractBody),
     Concrete(Block<'arena>),

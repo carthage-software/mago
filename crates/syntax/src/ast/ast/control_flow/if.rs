@@ -37,7 +37,6 @@ pub struct If<'arena> {
 /// This can be either a statement body or a colon-delimited body.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
-#[repr(u8)]
 pub enum IfBody<'arena> {
     Statement(IfStatementBody<'arena>),
     ColonDelimited(IfColonDelimitedBody<'arena>),

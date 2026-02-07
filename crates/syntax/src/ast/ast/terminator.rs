@@ -12,7 +12,6 @@ use crate::ast::ast::tag::OpeningTag;
 /// A PHP statement can be terminated with a semicolon `;` or a closing tag `?>`.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
-#[repr(u8)]
 pub enum Terminator<'arena> {
     /// A semicolon.
     Semicolon(Span),

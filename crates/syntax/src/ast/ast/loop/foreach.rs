@@ -35,7 +35,6 @@ pub struct Foreach<'arena> {
 /// Represents the target of a foreach statement.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
-#[repr(u8)]
 pub enum ForeachTarget<'arena> {
     Value(ForeachValueTarget<'arena>),
     KeyValue(ForeachKeyValueTarget<'arena>),
@@ -78,7 +77,6 @@ pub struct ForeachKeyValueTarget<'arena> {
 /// Represents the body of a foreach statement.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
-#[repr(u8)]
 pub enum ForeachBody<'arena> {
     /// The body is a statement.
     Statement(&'arena Statement<'arena>),

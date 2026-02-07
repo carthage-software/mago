@@ -23,7 +23,6 @@ pub struct Match<'arena> {
 /// Represents a single arm within a match expression.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
-#[repr(u8)]
 pub enum MatchArm<'arena> {
     Expression(MatchExpressionArm<'arena>),
     Default(MatchDefaultArm<'arena>),

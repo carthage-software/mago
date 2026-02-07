@@ -42,7 +42,6 @@ use crate::context::Context;
 use crate::context::block::BlockContext;
 
 #[derive(Debug, Clone, Copy)]
-#[repr(u8)]
 pub enum ArrayTarget<'ast, 'arena> {
     Access(&'ast ArrayAccess<'arena>),
     Append(&'ast ArrayAppend<'arena>),

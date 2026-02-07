@@ -21,7 +21,6 @@ pub struct EnumCase<'arena> {
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
-#[repr(u8)]
 pub enum EnumCaseItem<'arena> {
     Unit(EnumCaseUnitItem<'arena>),
     Backed(EnumCaseBackedItem<'arena>),

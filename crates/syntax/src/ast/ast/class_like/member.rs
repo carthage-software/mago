@@ -16,7 +16,6 @@ use crate::ast::ast::variable::Variable;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
-#[repr(u8)]
 pub enum ClassLikeMember<'arena> {
     TraitUse(TraitUse<'arena>),
     Constant(ClassLikeConstant<'arena>),
@@ -27,7 +26,6 @@ pub enum ClassLikeMember<'arena> {
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
-#[repr(u8)]
 pub enum ClassLikeMemberSelector<'arena> {
     Identifier(LocalIdentifier<'arena>),
     Variable(Variable<'arena>),
@@ -37,7 +35,6 @@ pub enum ClassLikeMemberSelector<'arena> {
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
-#[repr(u8)]
 pub enum ClassLikeConstantSelector<'arena> {
     Identifier(LocalIdentifier<'arena>),
     Expression(ClassLikeMemberExpressionSelector<'arena>),

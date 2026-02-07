@@ -9,7 +9,6 @@ use crate::ast::sequence::Sequence;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
-#[repr(u8)]
 pub enum CompositeString<'arena> {
     ShellExecute(ShellExecuteString<'arena>),
     Interpolated(InterpolatedString<'arena>),
@@ -39,7 +38,6 @@ pub enum DocumentKind {
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
-#[repr(u8)]
 pub enum DocumentIndentation {
     None,
     Whitespace(usize),
@@ -59,7 +57,6 @@ pub struct DocumentString<'arena> {
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
-#[repr(u8)]
 pub enum StringPart<'arena> {
     Literal(LiteralStringPart<'arena>),
     Expression(&'arena Expression<'arena>),

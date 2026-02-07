@@ -25,7 +25,6 @@ pub mod string;
 /// This includes general types (int, float, string, bool), literal types,
 /// union types (num, array-key), and the top type (scalar).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Eq, Hash, PartialOrd, Ord)]
-#[repr(u8)]
 pub enum TScalar {
     /// Represents the top type `scalar`, encompassing all other scalar variants.
     Generic,

@@ -12,7 +12,6 @@ use crate::token::Precedence;
 /// Represents a PHP binary operator.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
-#[repr(u8)]
 pub enum BinaryOperator<'arena> {
     Addition(Span),              // `+`
     Subtraction(Span),           // `-`

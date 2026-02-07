@@ -21,7 +21,6 @@ pub struct TraitUse<'arena> {
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
-#[repr(u8)]
 pub enum TraitUseSpecification<'arena> {
     Abstract(TraitUseAbstractSpecification<'arena>),
     Concrete(TraitUseConcreteSpecification<'arena>),
@@ -39,7 +38,6 @@ pub struct TraitUseConcreteSpecification<'arena> {
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
-#[repr(u8)]
 pub enum TraitUseAdaptation<'arena> {
     Precedence(TraitUsePrecedenceAdaptation<'arena>),
     Alias(TraitUseAliasAdaptation<'arena>),
@@ -64,7 +62,6 @@ pub struct TraitUseAliasAdaptation<'arena> {
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
-#[repr(u8)]
 pub enum TraitUseMethodReference<'arena> {
     Identifier(LocalIdentifier<'arena>),
     Absolute(TraitUseAbsoluteMethodReference<'arena>),

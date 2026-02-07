@@ -16,7 +16,6 @@ use crate::ast::sequence::Sequence;
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
-#[repr(u8)]
 pub enum Modifier<'arena> {
     Static(Keyword<'arena>),
     Final(Keyword<'arena>),

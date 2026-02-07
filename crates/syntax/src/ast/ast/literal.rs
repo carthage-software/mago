@@ -9,7 +9,6 @@ use crate::ast::ast::keyword::Keyword;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
-#[repr(u8)]
 pub enum Literal<'arena> {
     String(LiteralString<'arena>),
     Integer(LiteralInteger<'arena>),

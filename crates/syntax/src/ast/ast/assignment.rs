@@ -9,7 +9,6 @@ use crate::ast::ast::expression::Expression;
 /// Represents a PHP assignment operator.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
-#[repr(u8)]
 pub enum AssignmentOperator {
     Assign(Span),
     Addition(Span),
