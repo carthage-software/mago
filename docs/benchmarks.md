@@ -85,9 +85,9 @@ This benchmark measures the time it takes to perform a full static analysis.
 <BenchmarkChart
   title="Speed"
   :data="[
-    { label: 'Mago', value: 2.13, highlight: true },
-    { label: 'Psalm', value: 21.15 },
-    { label: 'PHPStan', value: 79.63 }
+    { label: 'Mago', value: 1.84, highlight: true },
+    { label: 'Psalm', value: 21.06 },
+    { label: 'PHPStan', value: 81.61 }
   ]"
   unit="seconds"
 />
@@ -100,9 +100,9 @@ This benchmark measures the time it takes to perform a full static analysis.
 <BenchmarkChart
   title="Peak Memory (RSS)"
   :data="[
-    { label: 'Mago', value: 1058, highlight: true },
-    { label: 'Psalm', value: 3693 },
-    { label: 'PHPStan', value: 882 }
+    { label: 'Mago', value: 1040, highlight: true },
+    { label: 'Psalm', value: 3716 },
+    { label: 'PHPStan', value: 878 }
   ]"
   unit="mb"
 />
@@ -116,7 +116,7 @@ This benchmark measures the time it takes to perform a full static analysis.
 - **Hardware:** MacBook Pro (Apple M1 Pro, 32GB RAM), idle system
 - **Codebase:** `wordpress-develop@5b01d24d8c5f2cfa4b96349967a9759e52888d03`
 - **PHP:** 8.5.0 (Zend Engine v4.5.0, Zend OPcache v8.5.0)
-- **Mago:** 1.4.0
+- **Mago:** 1.6.0
 - **Psalm:** 7.0.0-beta14
 - **PHPStan:** 2.1.38
 - **PHP-CS-Fixer:** 3.93.1

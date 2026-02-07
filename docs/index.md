@@ -50,10 +50,10 @@ curl --proto '=https' --tlsv1.2 -sSf https://carthage.software/mago.sh | bash
     <div class="speed-card">
       <div class="speed-label">Static Analysis</div>
       <div class="speed-stats">
-        <div class="speed-mago"><strong>Mago:</strong> 2.13s</div>
-        <div class="speed-others">PHPStan: 79.6s · Psalm: 21.2s</div>
+        <div class="speed-mago"><strong>Mago:</strong> 1.84s</div>
+        <div class="speed-others">PHPStan: 81.6s · Psalm: 21.1s</div>
       </div>
-      <div class="speed-badge">37x faster</div>
+      <div class="speed-badge">44x faster</div>
     </div>
     <div class="speed-card">
       <div class="speed-label">Linting</div>
