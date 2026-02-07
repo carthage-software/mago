@@ -166,7 +166,11 @@ impl<'a> DatabaseLoader<'a> {
         glob_excludes: &GlobSet,
         path_excludes: &HashSet<&Cow<'a, Path>>,
     ) -> Result<Vec<FileWithSpecificity>, DatabaseError> {
-        let mut paths_to_process: Vec<(std::path::PathBuf, String, usize)> = Vec::new();
+        // Tuple: (path, pattern, specificity, is_symlink)
+        // We track symlink status to avoid unnecessary canonicalize() calls.
+        // Since the workspace is already canonicalized, non-symlink children
+        // are already canonical and don't need resolution.
+        let mut paths_to_process: Vec<(std::path::PathBuf, String, usize, bool)> = Vec::new();
 
         for root in roots {
             // Check if this is a glob pattern (contains glob metacharacters)
@@ -187,8 +191,14 @@ impl<'a> DatabaseLoader<'a> {
                         for entry in entries {
                             match entry {
                                 Ok(path) => {
+                                    // Check if this path is a symlink
+                                    let is_symlink = path
+                                        .symlink_metadata()
+                                        .map(|m| m.file_type().is_symlink())
+                                        .unwrap_or(false);
+
                                     if path.is_file() {
-                                        paths_to_process.push((path, root.to_string(), specificity));
+                                        paths_to_process.push((path, root.to_string(), specificity, is_symlink));
                                     }
                                 }
                                 Err(e) => {
@@ -211,7 +221,10 @@ impl<'a> DatabaseLoader<'a> {
 
                 for entry in WalkDir::new(&dir_path).into_iter().filter_map(Result::ok) {
                     if entry.file_type().is_file() {
-                        paths_to_process.push((entry.into_path(), root.to_string(), specificity));
+                        // WalkDir follows symlinks by default, but we can check if the
+                        // entry itself is a symlink to determine if canonicalization is needed
+                        let is_symlink = entry.path_is_symlink();
+                        paths_to_process.push((entry.into_path(), root.to_string(), specificity, is_symlink));
                     }
                 }
             }
@@ -219,15 +232,28 @@ impl<'a> DatabaseLoader<'a> {
 
         let files: Vec<FileWithSpecificity> = paths_to_process
             .into_par_iter()
-            .filter_map(|(path, _pattern, specificity)| {
+            .filter_map(|(path, _pattern, specificity, is_symlink)| {
                 if glob_excludes.is_match(&path) {
                     return None;
                 }
 
-                if let Ok(canonical_path) = path.canonicalize()
-                    && path_excludes.iter().any(|excluded| canonical_path.starts_with(excluded))
-                {
-                    return None;
+                // Check path exclusions. Only canonicalize symlinks - non-symlink paths
+                // under a canonical workspace are already canonical.
+                if !path_excludes.is_empty() {
+                    let check_path = if is_symlink {
+                        // Symlinks need canonicalization to resolve their real location
+                        match path.canonicalize() {
+                            Ok(p) => p,
+                            Err(_) => path.clone(),
+                        }
+                    } else {
+                        // Non-symlink paths are already canonical
+                        path.clone()
+                    };
+
+                    if path_excludes.iter().any(|excluded| check_path.starts_with(excluded)) {
+                        return None;
+                    }
                 }
 
                 if let Some(ext) = path.extension() {
