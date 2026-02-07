@@ -1339,6 +1339,8 @@ function strtok(string $string, null|string $token = null): string|false
 }
 
 /**
+ * @return ($string is non-empty-string ? non-empty-uppercase-string : '')
+ * 
  * @pure
  */
 function strtoupper(string $string): string
@@ -1346,7 +1348,7 @@ function strtoupper(string $string): string
 }
 
 /**
- * @return lowercase-string
+ * @return ($string is non-empty-string ? non-empty-lowercase-string : '')
  *
  * @pure
  */

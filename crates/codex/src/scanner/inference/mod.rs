@@ -9,6 +9,7 @@ use mago_atom::atom;
 use mago_atom::concat_atom;
 
 use crate::metadata::constant::ConstantMetadata;
+use crate::ttype::atomic::scalar::string::TStringCasing;
 use mago_names::ResolvedNames;
 use mago_names::scope::NamespaceScope;
 use mago_span::HasPosition;
@@ -129,7 +130,13 @@ pub fn infer_with_constants<'arena>(
                                 str_is_numeric(value),
                                 true, // truthy
                                 true, // not empty
-                                value.chars().all(char::is_lowercase),
+                                if value.chars().all(char::is_lowercase) {
+                                    TStringCasing::Lowercase
+                                } else if value.chars().all(char::is_uppercase) {
+                                    TStringCasing::Uppercase
+                                } else {
+                                    TStringCasing::Unspecified
+                                },
                             ))))
                         }
                     }
@@ -228,12 +235,16 @@ pub fn infer_with_constants<'arena>(
             let is_non_empty = lhs_string.is_non_empty() || rhs_string.is_non_empty();
             let is_truthy = lhs_string.is_truthy() || rhs_string.is_truthy();
             let is_literal_origin = lhs_string.is_literal_origin() && rhs_string.is_literal_origin();
-            let is_lowercase = lhs_string.is_lowercase() && rhs_string.is_lowercase();
+            let casing = match (lhs_string.casing, rhs_string.casing) {
+                (TStringCasing::Lowercase, TStringCasing::Lowercase) => TStringCasing::Lowercase,
+                (TStringCasing::Uppercase, TStringCasing::Uppercase) => TStringCasing::Uppercase,
+                _ => TStringCasing::Unspecified,
+            };
 
             let final_string_type = if is_literal_origin {
-                TString::unspecified_literal_with_props(false, is_truthy, is_non_empty, is_lowercase)
+                TString::unspecified_literal_with_props(false, is_truthy, is_non_empty, casing)
             } else {
-                TString::general_with_props(false, is_truthy, is_non_empty, is_lowercase)
+                TString::general_with_props(false, is_truthy, is_non_empty, casing)
             };
 
             Some(wrap_atomic(TAtomic::Scalar(TScalar::String(final_string_type))))
@@ -420,14 +431,14 @@ fn infer_constant<'ctx, 'arena>(
                 is_numeric: false,
                 is_truthy: true,
                 is_non_empty: true,
-                is_lowercase: true,
+                casing: TStringCasing::Lowercase,
             })),
             TAtomic::Scalar(TScalar::String(TString {
                 literal: Some(TStringLiteral::Value(atom("\\"))),
                 is_numeric: false,
                 is_truthy: true,
                 is_non_empty: true,
-                is_lowercase: true,
+                casing: TStringCasing::Lowercase,
             })),
         ]
     });

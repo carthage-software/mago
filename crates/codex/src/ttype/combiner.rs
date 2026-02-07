@@ -37,6 +37,7 @@ use crate::ttype::atomic::scalar::TScalar;
 use crate::ttype::atomic::scalar::float::TFloat;
 use crate::ttype::atomic::scalar::int::TInteger;
 use crate::ttype::atomic::scalar::string::TString;
+use crate::ttype::atomic::scalar::string::TStringCasing;
 use crate::ttype::atomic::scalar::string::TStringLiteral;
 use crate::ttype::combination::CombinationFlags;
 use crate::ttype::combination::TypeCombination;
@@ -998,7 +999,8 @@ fn scrape_type_properties(
                     let is_incompatible = (existing_string_type.is_numeric && !str_is_numeric(lit_value))
                         || (existing_string_type.is_truthy && (lit_value.is_empty() || lit_value == "0"))
                         || (existing_string_type.is_non_empty && lit_value.is_empty())
-                        || (existing_string_type.is_lowercase && lit_value.chars().any(char::is_uppercase));
+                        || (existing_string_type.is_lowercase() && lit_value.chars().any(char::is_uppercase))
+                        || (existing_string_type.is_uppercase() && lit_value.chars().any(char::is_lowercase));
 
                     if is_incompatible {
                         // Check threshold before adding literal string
@@ -1033,7 +1035,7 @@ fn scrape_type_properties(
             if string_scalar.is_truthy
                 || string_scalar.is_non_empty
                 || string_scalar.is_numeric
-                || string_scalar.is_lowercase
+                || !string_scalar.casing.is_unspecified()
             {
                 for value in &combination.literal_strings {
                     if value.is_empty() {
@@ -1052,7 +1054,11 @@ fn scrape_type_properties(
                         string_scalar.is_numeric = string_scalar.is_numeric && str_is_numeric(value);
                     }
 
-                    string_scalar.is_lowercase = string_scalar.is_lowercase && value.chars().all(|c| !c.is_uppercase());
+                    string_scalar.casing = match string_scalar.casing {
+                        TStringCasing::Lowercase if value.chars().all(|c| c.is_lowercase()) => TStringCasing::Lowercase,
+                        TStringCasing::Uppercase if value.chars().all(|c| c.is_uppercase()) => TStringCasing::Uppercase,
+                        _ => TStringCasing::Unspecified,
+                    };
                 }
             }
 
@@ -1210,7 +1216,11 @@ fn combine_string_scalars(s1: &TString, s2: TString) -> TString {
         is_numeric: s1.is_numeric && s2.is_numeric,
         is_truthy: s1.is_truthy && s2.is_truthy,
         is_non_empty: s1.is_non_empty && s2.is_non_empty,
-        is_lowercase: s1.is_lowercase && s2.is_lowercase,
+        casing: match (s1.casing, s2.casing) {
+            (TStringCasing::Lowercase, TStringCasing::Lowercase) => TStringCasing::Lowercase,
+            (TStringCasing::Uppercase, TStringCasing::Uppercase) => TStringCasing::Uppercase,
+            _ => TStringCasing::Unspecified,
+        },
     }
 }
 

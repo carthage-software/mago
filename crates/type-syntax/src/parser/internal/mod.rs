@@ -252,6 +252,12 @@ fn parse_primary_type<'input>(stream: &mut TypeTokenStream<'input>) -> Result<Ty
         TypeTokenKind::LowercaseString => {
             Type::LowercaseString(Keyword::from_token(stream.consume()?, stream.file_id()))
         }
+        TypeTokenKind::NonEmptyUppercaseString => {
+            Type::NonEmptyUppercaseString(Keyword::from_token(stream.consume()?, stream.file_id()))
+        }
+        TypeTokenKind::UppercaseString => {
+            Type::UppercaseString(Keyword::from_token(stream.consume()?, stream.file_id()))
+        }
         TypeTokenKind::TruthyString => Type::TruthyString(Keyword::from_token(stream.consume()?, stream.file_id())),
         TypeTokenKind::NonFalsyString => Type::NonFalsyString(Keyword::from_token(stream.consume()?, stream.file_id())),
         TypeTokenKind::Object => parse_object_type(stream)?,

@@ -73,6 +73,7 @@ use crate::ttype::get_never;
 use crate::ttype::get_non_empty_lowercase_string;
 use crate::ttype::get_non_empty_string;
 use crate::ttype::get_non_empty_unspecified_literal_string;
+use crate::ttype::get_non_empty_uppercase_string;
 use crate::ttype::get_non_negative_int;
 use crate::ttype::get_null;
 use crate::ttype::get_nullable_float;
@@ -93,6 +94,7 @@ use crate::ttype::get_truthy_string;
 use crate::ttype::get_unspecified_literal_float;
 use crate::ttype::get_unspecified_literal_int;
 use crate::ttype::get_unspecified_literal_string;
+use crate::ttype::get_uppercase_string;
 use crate::ttype::get_void;
 use crate::ttype::resolution::TypeResolutionContext;
 use crate::ttype::template::GenericTemplate;
@@ -203,6 +205,30 @@ pub fn get_union_from_type_ast(
             TUnion::from_vec(combined_types)
         }
         Type::Intersection(intersection) => {
+            if matches!(intersection.left.as_ref(), Type::NonEmptyString(_)) {
+                match intersection.right.as_ref() {
+                    Type::String(_) => return Ok(get_non_empty_string()),
+                    Type::NonEmptyString(_) => return Ok(get_non_empty_string()),
+                    Type::LowercaseString(_) => return Ok(get_non_empty_lowercase_string()),
+                    Type::NonEmptyLowercaseString(_) => return Ok(get_non_empty_lowercase_string()),
+                    Type::UppercaseString(_) => return Ok(get_non_empty_uppercase_string()),
+                    Type::NonEmptyUppercaseString(_) => return Ok(get_non_empty_uppercase_string()),
+                    _ => {}
+                }
+            }
+
+            if matches!(intersection.right.as_ref(), Type::NonEmptyString(_)) {
+                match intersection.left.as_ref() {
+                    Type::String(_) => return Ok(get_non_empty_string()),
+                    Type::NonEmptyString(_) => return Ok(get_non_empty_string()),
+                    Type::LowercaseString(_) => return Ok(get_non_empty_lowercase_string()),
+                    Type::NonEmptyLowercaseString(_) => return Ok(get_non_empty_lowercase_string()),
+                    Type::UppercaseString(_) => return Ok(get_non_empty_uppercase_string()),
+                    Type::NonEmptyUppercaseString(_) => return Ok(get_non_empty_uppercase_string()),
+                    _ => {}
+                }
+            }
+
             let left = get_union_from_type_ast(&intersection.left, scope, type_context, classname)?;
             let right = get_union_from_type_ast(&intersection.right, scope, type_context, classname)?;
 
@@ -436,6 +462,8 @@ pub fn get_union_from_type_ast(
         Type::NonEmptyUnspecifiedLiteralString(_) => get_non_empty_unspecified_literal_string(),
         Type::NonEmptyLowercaseString(_) => get_non_empty_lowercase_string(),
         Type::LowercaseString(_) => get_lowercase_string(),
+        Type::NonEmptyUppercaseString(_) => get_non_empty_uppercase_string(),
+        Type::UppercaseString(_) => get_uppercase_string(),
         Type::UnspecifiedLiteralInt(_) => get_unspecified_literal_int(),
         Type::UnspecifiedLiteralFloat(_) => get_unspecified_literal_float(),
         Type::LiteralFloat(lit) => get_literal_float(*lit.value),

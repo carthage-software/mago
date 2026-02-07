@@ -8,9 +8,15 @@ use mago_atom::concat_atom;
 use crate::ttype::TType;
 use crate::utils::str_is_numeric;
 
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, Eq, PartialOrd, Ord, Hash)]
+pub enum TStringCasing {
+    Unspecified,
+    Lowercase,
+    Uppercase,
+}
+
 /// Represents the state of a string known to originate from a literal.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Eq, PartialOrd, Ord, Hash)]
-#[repr(u8)]
 pub enum TStringLiteral {
     /// The string originates from a literal, but its specific value isn't tracked here.
     Unspecified,
@@ -29,8 +35,8 @@ pub struct TString {
     pub is_truthy: bool,
     /// Is this string *guaranteed* (by analysis or literal value) to be non-empty?
     pub is_non_empty: bool,
-    /// Is this string guaranteed to be lowercase (e.g., from a literal like "hello")?
-    pub is_lowercase: bool,
+    /// What is the casing of this string? This is tracked separately from literal value to allow for non-literal strings that are known to be lowercase or uppercase.
+    pub casing: TStringCasing,
 }
 
 impl TStringLiteral {
@@ -95,60 +101,79 @@ impl TString {
         is_numeric: bool,
         is_truthy: bool,
         mut is_non_empty: bool,
-        is_lowercase: bool,
+        casing: TStringCasing,
     ) -> Self {
         is_non_empty |= is_numeric || is_truthy;
 
-        Self { literal, is_numeric, is_truthy, is_non_empty, is_lowercase }
+        Self { literal, is_numeric, is_truthy, is_non_empty, casing }
     }
 
     /// Creates an instance representing the general `string` type (not known literal, no guaranteed props).
     #[inline]
     #[must_use]
     pub const fn general() -> Self {
-        Self::new(None, false, false, false, false)
+        Self::new(None, false, false, false, TStringCasing::Unspecified)
     }
 
     /// Creates a non-empty string instance with no additional properties.
     #[inline]
     #[must_use]
     pub const fn non_empty() -> Self {
-        Self::new(None, false, false, true, false)
+        Self::new(None, false, false, true, TStringCasing::Unspecified)
     }
 
     /// Creates a numeric string instance.
     #[inline]
     #[must_use]
     pub const fn numeric() -> Self {
-        Self::new(None, true, false, true, false)
+        Self::new(None, true, false, true, TStringCasing::Unspecified)
     }
 
     /// Creates a lowercase string instance.
     #[inline]
     #[must_use]
     pub const fn lowercase() -> Self {
-        Self::new(None, false, false, false, true)
+        Self::new(None, false, false, false, TStringCasing::Lowercase)
     }
 
     /// Creates a non-empty lowercase string instance.
     #[inline]
     #[must_use]
     pub const fn non_empty_lowercase() -> Self {
-        Self::new(None, false, false, true, true)
+        Self::new(None, false, false, true, TStringCasing::Lowercase)
+    }
+
+    /// Creates a uppercase string instance.
+    #[inline]
+    #[must_use]
+    pub const fn uppercase() -> Self {
+        Self::new(None, false, false, false, TStringCasing::Uppercase)
+    }
+
+    /// Creates a non-empty uppercase string instance.
+    #[inline]
+    #[must_use]
+    pub const fn non_empty_uppercase() -> Self {
+        Self::new(None, false, false, true, TStringCasing::Uppercase)
     }
 
     /// Creates a truthy string instance.
     #[inline]
     #[must_use]
     pub const fn truthy() -> Self {
-        Self::new(None, false, true, true, false)
+        Self::new(None, false, true, true, TStringCasing::Unspecified)
     }
 
     /// Creates a general string instance with explicitly set guaranteed properties (from analysis).
     #[inline]
     #[must_use]
-    pub const fn general_with_props(is_numeric: bool, is_truthy: bool, is_non_empty: bool, is_lowercase: bool) -> Self {
-        Self::new(None, is_numeric, is_truthy, is_non_empty, is_lowercase)
+    pub const fn general_with_props(
+        is_numeric: bool,
+        is_truthy: bool,
+        is_non_empty: bool,
+        casing: TStringCasing,
+    ) -> Self {
+        Self::new(None, is_numeric, is_truthy, is_non_empty, casing)
     }
 
     /// Creates an instance representing an unspecified literal string (origin known, value unknown).
@@ -156,7 +181,7 @@ impl TString {
     #[inline]
     #[must_use]
     pub const fn unspecified_literal(non_empty: bool) -> Self {
-        Self::new(Some(TStringLiteral::Unspecified), false, false, non_empty, false)
+        Self::new(Some(TStringLiteral::Unspecified), false, false, non_empty, TStringCasing::Unspecified)
     }
 
     /// Creates an unspecified literal string instance with explicitly set guaranteed properties (from analysis).
@@ -166,9 +191,9 @@ impl TString {
         is_numeric: bool,
         is_truthy: bool,
         is_non_empty: bool,
-        is_lowercase: bool,
+        casing: TStringCasing,
     ) -> Self {
-        Self::new(Some(TStringLiteral::Unspecified), is_numeric, is_truthy, is_non_empty, is_lowercase)
+        Self::new(Some(TStringLiteral::Unspecified), is_numeric, is_truthy, is_non_empty, casing)
     }
 
     /// Creates an instance representing a known literal string type (e.g., `"hello"`).
@@ -179,9 +204,15 @@ impl TString {
         let is_numeric = str_is_numeric(&value);
         let is_non_empty = is_numeric || !value.is_empty();
         let is_truthy = is_non_empty && value.as_str() != "0";
-        let is_lowercase = value.chars().all(|c| !c.is_uppercase());
+        let casing = if value.chars().all(|c| c.is_lowercase()) {
+            TStringCasing::Lowercase
+        } else if value.chars().all(|c| c.is_uppercase()) {
+            TStringCasing::Uppercase
+        } else {
+            TStringCasing::Unspecified
+        };
 
-        Self::new(Some(TStringLiteral::Value(value)), is_numeric, is_truthy, is_non_empty, is_lowercase)
+        Self::new(Some(TStringLiteral::Value(value)), is_numeric, is_truthy, is_non_empty, casing)
     }
 
     /// Checks if this represents a general `string` (origin not known to be literal).
@@ -267,11 +298,28 @@ impl TString {
         self.is_non_empty
     }
 
+    /// Checks if the string is guaranteed to be empty.
+    #[inline]
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        match self.literal {
+            Some(TStringLiteral::Value(s)) => s.is_empty(),
+            _ => false,
+        }
+    }
+
     /// Checks if the string is guaranteed to be lowercase (e.g., from a literal like "hello").
     #[inline]
     #[must_use]
     pub const fn is_lowercase(&self) -> bool {
-        self.is_lowercase
+        matches!(self.casing, TStringCasing::Lowercase)
+    }
+
+    /// Checks if the string is guaranteed to be uppercase (e.g., from a literal like "HELLO").
+    #[inline]
+    #[must_use]
+    pub const fn is_uppercase(&self) -> bool {
+        matches!(self.casing, TStringCasing::Uppercase)
     }
 
     /// Checks if the string is guaranteed to be boring (no interesting properties).
@@ -280,7 +328,12 @@ impl TString {
     pub const fn is_boring(&self) -> bool {
         match &self.literal {
             Some(_) => false,
-            _ => !self.is_numeric && !self.is_truthy && !self.is_non_empty && !self.is_lowercase,
+            _ => {
+                !self.is_numeric
+                    && !self.is_truthy
+                    && !self.is_non_empty
+                    && matches!(self.casing, TStringCasing::Unspecified)
+            }
         }
     }
 
@@ -312,7 +365,7 @@ impl TString {
             is_numeric: true,
             is_truthy: self.is_truthy,
             is_non_empty: true, // Numeric strings are always non-empty
-            is_lowercase: self.is_lowercase,
+            casing: self.casing,
         }
     }
 }
@@ -337,38 +390,54 @@ impl TType for TString {
                 if self.is_truthy {
                     if self.is_numeric {
                         "truthy-numeric-literal-string"
-                    } else if self.is_lowercase {
-                        "truthy-lowercase-literal-string"
                     } else {
-                        "truthy-literal-string"
+                        match self.casing {
+                            TStringCasing::Lowercase => "truthy-lowercase-literal-string",
+                            TStringCasing::Uppercase => "truthy-uppercase-literal-string",
+                            TStringCasing::Unspecified => "truthy-literal-string",
+                        }
                     }
                 } else if self.is_numeric {
                     "numeric-literal-string"
                 } else if self.is_non_empty {
-                    if self.is_lowercase { "lowercase-non-empty-literal-string" } else { "non-empty-literal-string" }
-                } else if self.is_lowercase {
-                    "lowercase-literal-string"
+                    match self.casing {
+                        TStringCasing::Lowercase => "lowercase-non-empty-literal-string",
+                        TStringCasing::Uppercase => "uppercase-non-empty-literal-string",
+                        TStringCasing::Unspecified => "non-empty-literal-string",
+                    }
                 } else {
-                    "literal-string"
+                    match self.casing {
+                        TStringCasing::Lowercase => "lowercase-literal-string",
+                        TStringCasing::Uppercase => "uppercase-literal-string",
+                        TStringCasing::Unspecified => "literal-string",
+                    }
                 }
             }
             None => {
                 if self.is_truthy {
                     if self.is_numeric {
                         "truthy-numeric-string"
-                    } else if self.is_lowercase {
-                        "truthy-lowercase-string"
                     } else {
-                        "truthy-string"
+                        match self.casing {
+                            TStringCasing::Lowercase => "truthy-lowercase-string",
+                            TStringCasing::Uppercase => "truthy-uppercase-string",
+                            TStringCasing::Unspecified => "truthy-string",
+                        }
                     }
                 } else if self.is_numeric {
                     "numeric-string"
                 } else if self.is_non_empty {
-                    if self.is_lowercase { "lowercase-non-empty-string" } else { "non-empty-string" }
-                } else if self.is_lowercase {
-                    "lowercase-string"
+                    match self.casing {
+                        TStringCasing::Lowercase => "lowercase-non-empty-string",
+                        TStringCasing::Uppercase => "uppercase-non-empty-string",
+                        TStringCasing::Unspecified => "non-empty-string",
+                    }
                 } else {
-                    "string"
+                    match self.casing {
+                        TStringCasing::Lowercase => "lowercase-string",
+                        TStringCasing::Uppercase => "uppercase-string",
+                        TStringCasing::Unspecified => "string",
+                    }
                 }
             }
         };
@@ -378,6 +447,22 @@ impl TType for TString {
 
     fn get_pretty_id_with_indent(&self, _indent: usize) -> Atom {
         self.get_id()
+    }
+}
+
+impl TStringCasing {
+    /// Checks if the casing is unspecified.
+    #[inline]
+    #[must_use]
+    pub const fn is_unspecified(&self) -> bool {
+        matches!(self, TStringCasing::Unspecified)
+    }
+}
+
+impl Default for TStringCasing {
+    /// Defaults to `Unspecified`.
+    fn default() -> Self {
+        TStringCasing::Unspecified
     }
 }
 

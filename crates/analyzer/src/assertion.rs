@@ -13,6 +13,7 @@ use mago_codex::ttype::atomic::object::named::TNamedObject;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::int::TInteger;
 use mago_codex::ttype::atomic::scalar::string::TString;
+use mago_codex::ttype::atomic::scalar::string::TStringCasing;
 use mago_codex::ttype::get_array_value_parameter;
 use mago_codex::ttype::get_iterable_value_parameter;
 use mago_span::HasSpan;
@@ -301,13 +302,28 @@ fn scrape_special_function_call_assertions(
             "ctype_digit" => Some((
                 0,
                 vec![Assertion::IsType(TAtomic::Scalar(TScalar::String(TString::general_with_props(
-                    true, false, false, false,
+                    true,
+                    false,
+                    false,
+                    TStringCasing::Unspecified,
                 ))))],
             )),
             "ctype_lower" => Some((
                 0,
                 vec![Assertion::IsType(TAtomic::Scalar(TScalar::String(TString::general_with_props(
-                    false, false, true, true,
+                    false,
+                    false,
+                    true,
+                    TStringCasing::Lowercase,
+                ))))],
+            )),
+            "ctype_upper" => Some((
+                0,
+                vec![Assertion::IsType(TAtomic::Scalar(TScalar::String(TString::general_with_props(
+                    false,
+                    false,
+                    true,
+                    TStringCasing::Uppercase,
                 ))))],
             )),
             "count" => Some((0, vec![Assertion::HasAtLeastCount(1)])),

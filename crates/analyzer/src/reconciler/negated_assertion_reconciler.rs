@@ -313,7 +313,7 @@ fn handle_literal_negated_equality(
                                 existing_string.is_numeric,
                                 existing_string.is_truthy,
                                 true,
-                                existing_string.is_lowercase,
+                                existing_string.casing,
                             ))));
                         } else {
                             acceptable_types.push(existing_atomic_type);

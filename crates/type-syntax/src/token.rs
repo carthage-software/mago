@@ -48,8 +48,10 @@ pub enum TypeTokenKind {
     NonEmptyArray,
     NonEmptyString,
     NonEmptyLowercaseString,
+    NonEmptyUppercaseString,
     NonFalsyString,
     LowercaseString,
+    UppercaseString,
     TruthyString,
     Iterable,
     Null,
@@ -202,6 +204,8 @@ impl TypeTokenKind {
                 | Self::NonEmptyString
                 | Self::NonEmptyLowercaseString
                 | Self::LowercaseString
+                | Self::NonEmptyUppercaseString
+                | Self::UppercaseString
                 | Self::TruthyString
                 | Self::NonFalsyString
                 | Self::Iterable

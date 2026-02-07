@@ -24,6 +24,8 @@ use crate::ttype::atomic::scalar::string::TStringLiteral;
 use crate::ttype::get_arraykey;
 use crate::ttype::get_mixed;
 
+use super::atomic::scalar::string::TStringCasing;
+
 /// A static `TAtomic` representing the integer literal `1`.
 pub const ONE_INT_ATOMIC: &TAtomic = &TAtomic::Scalar(TScalar::literal_int(1));
 /// A static `TAtomic` representing the integer literal `0`.
@@ -43,28 +45,38 @@ pub const NON_NEGATIVE_INT_ATOMIC: &TAtomic = &TAtomic::Scalar(TScalar::Integer(
 /// A static `TAtomic` representing a `literal-int` where the value is unknown.
 pub const UNSPECIFIED_LITERAL_INT_ATOMIC: &TAtomic = &TAtomic::Scalar(TScalar::Integer(TInteger::UnspecifiedLiteral));
 /// A static `TAtomic` for the general `string` type.
-pub const STRING_ATOMIC: &TAtomic = &TAtomic::Scalar(TScalar::String(TString::new(None, false, false, false, false)));
+pub const STRING_ATOMIC: &TAtomic =
+    &TAtomic::Scalar(TScalar::String(TString::new(None, false, false, false, TStringCasing::Unspecified)));
 /// A static `TAtomic` for a `lowercase-string`.
 pub const LOWERCASE_STRING_ATOMIC: &TAtomic =
-    &TAtomic::Scalar(TScalar::String(TString::new(None, false, false, false, true)));
+    &TAtomic::Scalar(TScalar::String(TString::new(None, false, false, false, TStringCasing::Lowercase)));
+/// A static `TAtomic` for a `uppercase-string`.
+pub const UPPERCASE_STRING_ATOMIC: &TAtomic =
+    &TAtomic::Scalar(TScalar::String(TString::new(None, false, false, false, TStringCasing::Uppercase)));
 /// A static `TAtomic` for a `non-empty-string`.
 pub const NON_EMPTY_STRING_ATOMIC: &TAtomic =
-    &TAtomic::Scalar(TScalar::String(TString::new(None, false, false, true, false)));
+    &TAtomic::Scalar(TScalar::String(TString::new(None, false, false, true, TStringCasing::Unspecified)));
 /// A static `TAtomic` for a `non-empty-lowercase-string`.
 pub const NON_EMPTY_LOWERCASE_STRING_ATOMIC: &TAtomic =
-    &TAtomic::Scalar(TScalar::String(TString::new(None, false, false, true, true)));
+    &TAtomic::Scalar(TScalar::String(TString::new(None, false, false, true, TStringCasing::Lowercase)));
+/// A static `TAtomic` for a `non-empty-uppercase-string`.
+pub const NON_EMPTY_UPPERCASE_STRING_ATOMIC: &TAtomic =
+    &TAtomic::Scalar(TScalar::String(TString::new(None, false, false, true, TStringCasing::Uppercase)));
 /// A static `TAtomic` for a `truthy-string`.
 pub const TRUTHY_STRING_ATOMIC: &TAtomic =
-    &TAtomic::Scalar(TScalar::String(TString::new(None, false, true, false, false)));
+    &TAtomic::Scalar(TScalar::String(TString::new(None, false, true, false, TStringCasing::Unspecified)));
 /// A static `TAtomic` for a `truthy-lowercase-string`.
 pub const TRUTHY_LOWERCASE_STRING_ATOMIC: &TAtomic =
-    &TAtomic::Scalar(TScalar::String(TString::new(None, false, true, false, true)));
+    &TAtomic::Scalar(TScalar::String(TString::new(None, false, true, false, TStringCasing::Lowercase)));
+/// A static `TAtomic` for a `truthy-uppercase-string`.
+pub const TRUTHY_UPPERCASE_STRING_ATOMIC: &TAtomic =
+    &TAtomic::Scalar(TScalar::String(TString::new(None, false, true, false, TStringCasing::Uppercase)));
 /// A static `TAtomic` for a `numeric-string`.
 pub const NUMERIC_STRING_ATOMIC: &TAtomic =
-    &TAtomic::Scalar(TScalar::String(TString::new(None, true, false, false, false)));
+    &TAtomic::Scalar(TScalar::String(TString::new(None, true, false, false, TStringCasing::Unspecified)));
 /// A static `TAtomic` for a `numeric-string` that is also `truthy`.
 pub const NUMERIC_TRUTHY_STRING_ATOMIC: &TAtomic =
-    &TAtomic::Scalar(TScalar::String(TString::new(None, true, true, false, false)));
+    &TAtomic::Scalar(TScalar::String(TString::new(None, true, true, false, TStringCasing::Unspecified)));
 /// A static `TAtomic` representing the `class-string` type.
 pub const CLASS_STRING_ATOMIC: &TAtomic = &TAtomic::Scalar(TScalar::class_string());
 /// A static `TAtomic` representing the `interface-string` type.
@@ -120,7 +132,7 @@ pub static EMPTY_STRING_ATOMIC: LazyLock<TAtomic> = LazyLock::new(|| {
         is_numeric: false,
         is_truthy: false,
         is_non_empty: false,
-        is_lowercase: false,
+        casing: TStringCasing::Unspecified,
     }))
 });
 /// A static `TAtomic` representing a `literal-string` where the value is unknown.

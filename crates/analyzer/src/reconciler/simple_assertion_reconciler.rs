@@ -23,6 +23,7 @@ use mago_codex::ttype::atomic::scalar::bool::TBool;
 use mago_codex::ttype::atomic::scalar::float::TFloat;
 use mago_codex::ttype::atomic::scalar::int::TInteger;
 use mago_codex::ttype::atomic::scalar::string::TString;
+use mago_codex::ttype::atomic::scalar::string::TStringCasing;
 use mago_codex::ttype::comparator::ComparisonResult;
 use mago_codex::ttype::comparator::atomic_comparator;
 use mago_codex::ttype::comparator::union_comparator;
@@ -215,7 +216,7 @@ pub(crate) fn reconcile(
                     str.is_non_empty,
                     str.is_truthy,
                     str.is_numeric,
-                    str.is_lowercase,
+                    str.casing,
                 ));
             }
             TAtomic::Scalar(TScalar::Bool(bool)) => {
@@ -988,7 +989,7 @@ fn intersect_string(
     is_non_empty: bool,
     is_truthy: bool,
     is_numeric: bool,
-    is_lowercase: bool,
+    casing: TStringCasing,
 ) -> TUnion {
     let mut acceptable_types = Vec::new();
     let mut did_remove_type = false;
@@ -1001,7 +1002,11 @@ fn intersect_string(
                         is_numeric || existing_string.is_numeric,
                         is_truthy || existing_string.is_truthy,
                         is_non_empty || existing_string.is_non_empty,
-                        is_lowercase || existing_string.is_lowercase,
+                        match (casing, existing_string.casing) {
+                            (TStringCasing::Lowercase, TStringCasing::Lowercase) => TStringCasing::Lowercase,
+                            (TStringCasing::Uppercase, TStringCasing::Uppercase) => TStringCasing::Uppercase,
+                            _ => TStringCasing::Unspecified,
+                        },
                     )
                     .get_single_owned(),
                 );
@@ -1010,14 +1015,14 @@ fn intersect_string(
                 acceptable_types.push(atomic.clone());
             }
             TAtomic::Mixed(_) | TAtomic::Scalar(TScalar::Generic | TScalar::ArrayKey) => {
-                return get_string_with_props(is_numeric, is_truthy, is_non_empty, is_lowercase);
+                return get_string_with_props(is_numeric, is_truthy, is_non_empty, casing);
             }
             TAtomic::GenericParameter(generic_parameter) => {
                 did_remove_type = true;
 
                 if let Some(atomic) = map_generic_constraint_or_else(
                     generic_parameter,
-                    || get_string_with_props(is_numeric, is_truthy, is_non_empty, is_lowercase),
+                    || get_string_with_props(is_numeric, is_truthy, is_non_empty, casing),
                     |constraint| {
                         intersect_string(
                             context,
@@ -1030,7 +1035,7 @@ fn intersect_string(
                             is_non_empty,
                             is_truthy,
                             is_numeric,
-                            is_lowercase,
+                            casing,
                         )
                     },
                 ) {
@@ -1048,7 +1053,7 @@ fn intersect_string(
                 if atomic_comparator::is_contained_by(
                     context.codebase,
                     atomic,
-                    get_string_with_props(is_numeric, is_truthy, is_non_empty, is_lowercase).get_single(),
+                    get_string_with_props(is_numeric, is_truthy, is_non_empty, casing).get_single(),
                     false,
                     &mut ComparisonResult::new(),
                 ) {

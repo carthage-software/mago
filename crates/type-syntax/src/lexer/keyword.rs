@@ -254,6 +254,7 @@ fn lookup_len16(bytes: &[u8]) -> Option<TypeTokenKind> {
     match bytes[0] | 0x20 {
         b'i' if eq(bytes, b"interface-string") => Some(TypeTokenKind::InterfaceString),
         b'l' if eq(bytes, b"lowercase-string") => Some(TypeTokenKind::LowercaseString),
+        b'u' if eq(bytes, b"uppercase-string") => Some(TypeTokenKind::UppercaseString),
         b'n' => {
             if eq(bytes, b"non-empty-string") {
                 Some(TypeTokenKind::NonEmptyString)
@@ -302,5 +303,11 @@ fn lookup_len24(bytes: &[u8]) -> Option<TypeTokenKind> {
 
 #[inline]
 fn lookup_len26(bytes: &[u8]) -> Option<TypeTokenKind> {
-    if eq(bytes, b"non-empty-lowercase-string") { Some(TypeTokenKind::NonEmptyLowercaseString) } else { None }
+    if eq(bytes, b"non-empty-lowercase-string") {
+        Some(TypeTokenKind::NonEmptyLowercaseString)
+    } else if eq(bytes, b"non-empty-uppercase-string") {
+        Some(TypeTokenKind::NonEmptyUppercaseString)
+    } else {
+        None
+    }
 }

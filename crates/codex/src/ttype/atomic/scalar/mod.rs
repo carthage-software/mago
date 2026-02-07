@@ -12,6 +12,7 @@ use crate::ttype::atomic::scalar::class_like_string::TClassLikeString;
 use crate::ttype::atomic::scalar::float::TFloat;
 use crate::ttype::atomic::scalar::int::TInteger;
 use crate::ttype::atomic::scalar::string::TString;
+use crate::ttype::atomic::scalar::string::TStringCasing;
 
 pub mod bool;
 pub mod class_like_string;
@@ -119,7 +120,7 @@ impl TScalar {
     #[inline]
     #[must_use]
     pub const fn numeric_string() -> Self {
-        TScalar::String(TString::general_with_props(true, false, false, false))
+        TScalar::String(TString::general_with_props(true, false, false, TStringCasing::Unspecified))
     }
 
     /// Creates the general `string` type.

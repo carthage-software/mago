@@ -26,6 +26,8 @@ function mb_convert_case(string $string, int $mode, null|string $encoding = null
 }
 
 /**
+ * @return ($string is non-empty-string ? non-empty-uppercase-string : '')
+ * 
  * @pure
  */
 function mb_strtoupper(string $string, null|string $encoding = null): string
@@ -33,7 +35,7 @@ function mb_strtoupper(string $string, null|string $encoding = null): string
 }
 
 /**
- * @return lowercase-string
+ * @return ($string is non-empty-string ? non-empty-lowercase-string : '')
  *
  * @pure
  */

@@ -3,6 +3,7 @@
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::string::TString;
+use mago_codex::ttype::atomic::scalar::string::TStringCasing;
 use mago_codex::ttype::union::TUnion;
 
 use crate::plugin::context::InvocationInfo;
@@ -72,7 +73,7 @@ impl FunctionReturnTypeProvider for StrProvider {
                         false,
                         false,
                         false,
-                        haystack_type.is_lowercase,
+                        haystack_type.casing,
                     ))),
                 ]))
             }
@@ -106,14 +107,14 @@ impl FunctionReturnTypeProvider for StrProvider {
                         false,
                         false,
                         false,
-                        string_type.is_lowercase,
+                        string_type.casing,
                     ))))
                 } else {
                     TUnion::from_atomic(TAtomic::Scalar(TScalar::String(TString::general_with_props(
                         false,
                         false,
                         false,
-                        string_type.is_lowercase,
+                        string_type.casing,
                     ))))
                 })
             }
@@ -129,14 +130,22 @@ impl FunctionReturnTypeProvider for StrProvider {
                         false,
                         string_type.is_truthy || replacement_type.is_truthy,
                         string_type.is_non_empty || replacement_type.is_non_empty,
-                        string_type.is_lowercase && replacement_type.is_lowercase,
+                        match (string_type.casing, replacement_type.casing) {
+                            (TStringCasing::Lowercase, TStringCasing::Lowercase) => TStringCasing::Lowercase,
+                            (TStringCasing::Uppercase, TStringCasing::Uppercase) => TStringCasing::Uppercase,
+                            _ => TStringCasing::Unspecified,
+                        },
                     ))))
                 } else {
                     TUnion::from_atomic(TAtomic::Scalar(TScalar::String(TString::general_with_props(
                         false,
                         string_type.is_truthy || replacement_type.is_truthy,
                         string_type.is_non_empty || replacement_type.is_non_empty,
-                        string_type.is_lowercase && replacement_type.is_lowercase,
+                        match (string_type.casing, replacement_type.casing) {
+                            (TStringCasing::Lowercase, TStringCasing::Lowercase) => TStringCasing::Lowercase,
+                            (TStringCasing::Uppercase, TStringCasing::Uppercase) => TStringCasing::Uppercase,
+                            _ => TStringCasing::Unspecified,
+                        },
                     ))))
                 })
             }
@@ -150,14 +159,14 @@ impl FunctionReturnTypeProvider for StrProvider {
                             string_type.is_numeric,
                             string_type.is_truthy,
                             string_type.is_non_empty,
-                            true,
+                            TStringCasing::Lowercase,
                         ))))
                     }
                     None => TUnion::from_atomic(TAtomic::Scalar(TScalar::String(TString::general_with_props(
                         string_type.is_numeric,
                         string_type.is_truthy,
                         string_type.is_non_empty,
-                        true,
+                        TStringCasing::Lowercase,
                     )))),
                 })
             }
@@ -171,14 +180,14 @@ impl FunctionReturnTypeProvider for StrProvider {
                             string_type.is_numeric,
                             string_type.is_truthy,
                             string_type.is_non_empty,
-                            false,
+                            TStringCasing::Uppercase,
                         ))))
                     }
                     None => TUnion::from_atomic(TAtomic::Scalar(TScalar::String(TString::general_with_props(
                         string_type.is_numeric,
                         string_type.is_truthy,
                         string_type.is_non_empty,
-                        false,
+                        TStringCasing::Uppercase,
                     )))),
                 })
             }

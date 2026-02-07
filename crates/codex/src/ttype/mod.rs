@@ -20,6 +20,7 @@ use crate::ttype::atomic::scalar::class_like_string::TClassLikeString;
 use crate::ttype::atomic::scalar::class_like_string::TClassLikeStringKind;
 use crate::ttype::atomic::scalar::int::TInteger;
 use crate::ttype::atomic::scalar::string::TString;
+use crate::ttype::atomic::scalar::string::TStringCasing;
 use crate::ttype::atomic::scalar::string::TStringLiteral;
 use crate::ttype::comparator::ComparisonResult;
 use crate::ttype::comparator::union_comparator;
@@ -50,6 +51,7 @@ use crate::ttype::shared::NEVER_ATOMIC;
 use crate::ttype::shared::NON_EMPTY_LOWERCASE_STRING_ATOMIC;
 use crate::ttype::shared::NON_EMPTY_STRING_ATOMIC;
 use crate::ttype::shared::NON_EMPTY_UNSPECIFIED_LITERAL_STRING_ATOMIC;
+use crate::ttype::shared::NON_EMPTY_UPPERCASE_STRING_ATOMIC;
 use crate::ttype::shared::NON_NEGATIVE_INT_ATOMIC;
 use crate::ttype::shared::NON_POSITIVE_INT_ATOMIC;
 use crate::ttype::shared::NULL_ATOMIC;
@@ -75,9 +77,11 @@ use crate::ttype::shared::TRUE_ATOMIC;
 use crate::ttype::shared::TRUTHY_LOWERCASE_STRING_ATOMIC;
 use crate::ttype::shared::TRUTHY_MIXED_ATOMIC;
 use crate::ttype::shared::TRUTHY_STRING_ATOMIC;
+use crate::ttype::shared::TRUTHY_UPPERCASE_STRING_ATOMIC;
 use crate::ttype::shared::UNSPECIFIED_LITERAL_FLOAT_ATOMIC;
 use crate::ttype::shared::UNSPECIFIED_LITERAL_INT_ATOMIC;
 use crate::ttype::shared::UNSPECIFIED_LITERAL_STRING_ATOMIC;
+use crate::ttype::shared::UPPERCASE_STRING_ATOMIC;
 use crate::ttype::shared::VOID_ATOMIC;
 use crate::ttype::shared::ZERO_INT_ATOMIC;
 use crate::ttype::template::TemplateResult;
@@ -467,19 +471,22 @@ pub fn get_string() -> TUnion {
 /// This function maps all possible boolean property combinations to a canonical,
 /// static `TAtomic` instance, avoiding heap allocations for common string types.
 #[must_use]
-pub fn get_string_with_props(is_numeric: bool, is_truthy: bool, is_non_empty: bool, is_lowercase: bool) -> TUnion {
-    let atomic_ref = match (is_numeric, is_truthy, is_non_empty, is_lowercase) {
+pub fn get_string_with_props(is_numeric: bool, is_truthy: bool, is_non_empty: bool, casing: TStringCasing) -> TUnion {
+    let atomic_ref = match (is_numeric, is_truthy, is_non_empty, casing) {
         // is_numeric = true
         (true, true, _, _) => NUMERIC_TRUTHY_STRING_ATOMIC,
         (true, false, _, _) => NUMERIC_STRING_ATOMIC,
         // is_numeric = false, is_truthy = true
-        (false, true, _, false) => TRUTHY_STRING_ATOMIC,
-        (false, true, _, true) => TRUTHY_LOWERCASE_STRING_ATOMIC,
+        (false, true, _, TStringCasing::Unspecified) => TRUTHY_STRING_ATOMIC,
+        (false, true, _, TStringCasing::Uppercase) => TRUTHY_UPPERCASE_STRING_ATOMIC,
+        (false, true, _, TStringCasing::Lowercase) => TRUTHY_LOWERCASE_STRING_ATOMIC,
         // is_numeric = false, is_truthy = false
-        (false, false, false, false) => STRING_ATOMIC,
-        (false, false, false, true) => LOWERCASE_STRING_ATOMIC,
-        (false, false, true, false) => NON_EMPTY_STRING_ATOMIC,
-        (false, false, true, true) => NON_EMPTY_LOWERCASE_STRING_ATOMIC,
+        (false, false, false, TStringCasing::Unspecified) => STRING_ATOMIC,
+        (false, false, false, TStringCasing::Uppercase) => UPPERCASE_STRING_ATOMIC,
+        (false, false, false, TStringCasing::Lowercase) => LOWERCASE_STRING_ATOMIC,
+        (false, false, true, TStringCasing::Unspecified) => NON_EMPTY_STRING_ATOMIC,
+        (false, false, true, TStringCasing::Uppercase) => NON_EMPTY_UPPERCASE_STRING_ATOMIC,
+        (false, false, true, TStringCasing::Lowercase) => NON_EMPTY_LOWERCASE_STRING_ATOMIC,
     };
 
     TUnion::from_single(Cow::Borrowed(atomic_ref))
@@ -690,6 +697,18 @@ pub fn get_lowercase_string() -> TUnion {
 #[must_use]
 pub fn get_non_empty_lowercase_string() -> TUnion {
     TUnion::from_single(Cow::Borrowed(NON_EMPTY_LOWERCASE_STRING_ATOMIC))
+}
+
+#[inline]
+#[must_use]
+pub fn get_uppercase_string() -> TUnion {
+    TUnion::from_single(Cow::Borrowed(UPPERCASE_STRING_ATOMIC))
+}
+
+#[inline]
+#[must_use]
+pub fn get_non_empty_uppercase_string() -> TUnion {
+    TUnion::from_single(Cow::Borrowed(NON_EMPTY_UPPERCASE_STRING_ATOMIC))
 }
 
 #[inline]
@@ -1120,7 +1139,11 @@ fn intersect_atomic_types(
             is_numeric: s1.is_numeric || s2.is_numeric,
             is_truthy: s1.is_truthy || s2.is_truthy,
             is_non_empty: s1.is_non_empty || s2.is_non_empty,
-            is_lowercase: s1.is_lowercase || s2.is_lowercase,
+            casing: match (s1.casing, s2.casing) {
+                (TStringCasing::Lowercase, TStringCasing::Lowercase) => TStringCasing::Lowercase,
+                (TStringCasing::Uppercase, TStringCasing::Uppercase) => TStringCasing::Uppercase,
+                _ => TStringCasing::Unspecified,
+            },
             literal: if s1.is_literal_origin() && s2.is_literal_origin() {
                 Some(TStringLiteral::Unspecified)
             } else {
