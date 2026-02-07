@@ -317,6 +317,7 @@ final class AnalyzerCodeModuleGenerator
         'invalid-array-access-assignment-value',
         'non-existent-use-import',
         'class-must-be-final',
+        'missing-api-or-internal',
     ];
 
     /**

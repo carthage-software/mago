@@ -380,6 +380,27 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Class<'arena> {
             );
         }
 
+        if context.settings.require_api_or_internal
+            && class_like_metadata.flags.is_abstract()
+            && !class_like_metadata.flags.is_public_api()
+            && !class_like_metadata.flags.is_internal()
+        {
+            context.collector.report_with_code(
+                IssueCode::MissingApiOrInternal,
+                Issue::warning(format!(
+                    "Abstract class `{}` is missing an `@api` or `@internal` annotation.",
+                    class_like_metadata.original_name,
+                ))
+                .with_annotation(
+                    Annotation::primary(self.name.span)
+                        .with_message("This abstract class does not declare its extensibility intent."),
+                )
+                .with_help(
+                    "Add `@api` to indicate the class is part of the public API and may be extended by consumers, or `@internal` to indicate it is for internal use only.",
+                ),
+            );
+        }
+
         if context.settings.check_missing_override {
             override_attribute::check_override_attribute(class_like_metadata, self.members.as_slice(), context);
         }
@@ -463,6 +484,26 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Interface<'arena> {
             self.members.as_slice(),
         )?;
 
+        if context.settings.require_api_or_internal
+            && !class_like_metadata.flags.is_public_api()
+            && !class_like_metadata.flags.is_internal()
+        {
+            context.collector.report_with_code(
+                IssueCode::MissingApiOrInternal,
+                Issue::warning(format!(
+                    "Interface `{}` is missing an `@api` or `@internal` annotation.",
+                    class_like_metadata.original_name,
+                ))
+                .with_annotation(
+                    Annotation::primary(self.name.span)
+                        .with_message("This interface does not declare its extensibility intent."),
+                )
+                .with_help(
+                    "Add `@api` to indicate the interface is part of the public API and may be implemented by consumers, or `@internal` to indicate it is for internal use only.",
+                ),
+            );
+        }
+
         if context.settings.check_missing_override {
             override_attribute::check_override_attribute(class_like_metadata, self.members.as_slice(), context);
         }
@@ -526,6 +567,26 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Trait<'arena> {
             class_like_metadata,
             self.members.as_slice(),
         )?;
+
+        if context.settings.require_api_or_internal
+            && !class_like_metadata.flags.is_public_api()
+            && !class_like_metadata.flags.is_internal()
+        {
+            context.collector.report_with_code(
+                IssueCode::MissingApiOrInternal,
+                Issue::warning(format!(
+                    "Trait `{}` is missing an `@api` or `@internal` annotation.",
+                    class_like_metadata.original_name,
+                ))
+                .with_annotation(
+                    Annotation::primary(self.name.span)
+                        .with_message("This trait does not declare its extensibility intent."),
+                )
+                .with_help(
+                    "Add `@api` to indicate the trait is part of the public API and may be used by consumers, or `@internal` to indicate it is for internal use only.",
+                ),
+            );
+        }
 
         if context.settings.check_missing_override {
             override_attribute::check_override_attribute(class_like_metadata, self.members.as_slice(), context);

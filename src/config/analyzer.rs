@@ -211,6 +211,14 @@ pub struct AnalyzerConfiguration {
     /// Defaults to `false`.
     pub enforce_class_finality: bool,
 
+    /// Require `@api` or `@internal` annotations on abstract classes, interfaces, and traits.
+    ///
+    /// When enabled, the analyzer reports a warning for any abstract class, interface,
+    /// or trait that is not annotated with either `@api` or `@internal`.
+    ///
+    /// Defaults to `false`.
+    pub require_api_or_internal: bool,
+
     /// **Deprecated**: Use `check-missing-override` and `find-unused-parameters` instead.
     ///
     /// When set to `true`, enables both `check-missing-override` and `find-unused-parameters`.
@@ -342,6 +350,7 @@ impl AnalyzerConfiguration {
             strict_list_index_checks: self.strict_list_index_checks,
             no_boolean_literal_comparison: self.no_boolean_literal_comparison,
             enforce_class_finality: self.enforce_class_finality,
+            require_api_or_internal: self.require_api_or_internal,
             check_missing_type_hints: self.check_missing_type_hints,
             check_closure_missing_type_hints: self.check_closure_missing_type_hints,
             check_arrow_function_missing_type_hints: self.check_arrow_function_missing_type_hints,
@@ -388,6 +397,7 @@ impl Default for AnalyzerConfiguration {
             strict_list_index_checks: defaults.strict_list_index_checks,
             no_boolean_literal_comparison: defaults.no_boolean_literal_comparison,
             enforce_class_finality: defaults.enforce_class_finality,
+            require_api_or_internal: defaults.require_api_or_internal,
             check_missing_type_hints: defaults.check_missing_type_hints,
             check_closure_missing_type_hints: defaults.check_closure_missing_type_hints,
             check_arrow_function_missing_type_hints: defaults.check_arrow_function_missing_type_hints,

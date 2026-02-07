@@ -95,6 +95,14 @@ pub struct Settings {
     /// Defaults to `false`.
     pub enforce_class_finality: bool,
 
+    /// Require `@api` or `@internal` annotations on abstract classes, interfaces, and traits.
+    ///
+    /// When enabled, the analyzer reports a warning for any abstract class, interface,
+    /// or trait that is not annotated with either `@api` or `@internal`.
+    ///
+    /// Defaults to `false`.
+    pub require_api_or_internal: bool,
+
     /// Check for missing type hints on parameters, properties, and return types.
     ///
     /// When enabled, the analyzer will report warnings for function parameters, class properties,
@@ -284,6 +292,7 @@ impl Settings {
             strict_list_index_checks: false,
             no_boolean_literal_comparison: false,
             enforce_class_finality: false,
+            require_api_or_internal: false,
             check_missing_type_hints: false,
             check_closure_missing_type_hints: false,
             check_arrow_function_missing_type_hints: false,

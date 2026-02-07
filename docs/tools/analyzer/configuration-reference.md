@@ -107,6 +107,7 @@ These flags control specific, powerful analysis capabilities.
 | `check-property-initialization`       | `false` | When `true`, checks that typed properties are initialized in constructors or class initializers.      |
 | `check-use-statements`                | `false` | When `true`, reports use statements that import non-existent classes, functions, or constants.        |
 | `enforce-class-finality`              | `false` | When `true`, reports classes that are not `final`, `abstract`, or annotated with `@api` and have no children. |
+| `require-api-or-internal`             | `false` | When `true`, requires abstract classes, interfaces, and traits to have `@api` or `@internal` annotations. |
 
 ## Property initialization
 
@@ -295,6 +296,7 @@ check-missing-type-hints = true
 check-closure-missing-type-hints = true
 check-arrow-function-missing-type-hints = true
 enforce-class-finality = true
+require-api-or-internal = true
 
 # Enable strict checks
 strict-list-index-checks = true
@@ -356,6 +358,7 @@ function process(object $obj): mixed
 | `find-unused-parameters` | `true` | Reports unused function/method parameters. |
 | `no-boolean-literal-comparison` | `true` | Disallows comparisons like `$a === true` or `$b == false`. |
 | `enforce-class-finality` | `true` | Reports classes not declared `final`, `abstract`, or annotated with `@api`. |
+| `require-api-or-internal` | `true` | Requires abstract classes, interfaces, and traits to have `@api` or `@internal`. |
 
 #### Exception handling
 
@@ -374,6 +377,7 @@ check-missing-type-hints = false
 strict-list-index-checks = false
 no-boolean-literal-comparison = false
 enforce-class-finality = false
+require-api-or-internal = false
 
 # Enable lenient behaviors
 allow-possibly-undefined-array-keys = true

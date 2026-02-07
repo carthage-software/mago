@@ -390,6 +390,11 @@ test_case!(class_must_be_final, {
     s.enforce_class_finality = true;
     s
 });
+test_case!(missing_api_or_internal, {
+    let mut s = crate::framework::default_test_settings();
+    s.require_api_or_internal = true;
+    s
+});
 
 // Github Issues
 test_case!(issue_659);
