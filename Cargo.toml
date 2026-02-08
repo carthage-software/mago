@@ -87,7 +87,6 @@ blake3 = "1.8.1"
 memchr = "2.7.4"
 dialoguer = "0.12.0"
 unicode-width = { version = "0.2.0", default-features = false }
-derivative = "2.2.0"
 itertools = "0.14.0"
 indexmap = { version = "2.8.0", features = ["serde"] }
 rand = "0.9.0"

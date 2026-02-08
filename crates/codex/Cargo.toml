@@ -25,7 +25,6 @@ mago-fingerprint = { workspace = true }
 foldhash = { workspace = true }
 serde = { workspace = true }
 tracing = { workspace = true }
-derivative = { workspace = true }
 strum = { workspace = true }
 indexmap = { workspace = true }
 ordered-float = { workspace = true }

@@ -3,7 +3,6 @@ use std::hash::Hash;
 use std::hash::Hasher;
 use std::sync::Arc;
 
-use derivative::Derivative;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -38,7 +37,7 @@ use crate::ttype::get_arraykey;
 use crate::ttype::get_int;
 use crate::ttype::get_mixed;
 
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, Derivative, PartialOrd, Ord)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialOrd, Ord)]
 pub struct TUnion {
     pub types: Cow<'static, [TAtomic]>,
     pub flags: UnionFlags,
