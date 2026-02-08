@@ -76,7 +76,7 @@ serde-wasm-bindgen = "0.6"
 diffy = "0.4.0"
 termcolor = "1.4.1"
 indoc = "2"
-self_update = { version = "0.42.0", default-features = false, features = ["rustls", "archive-tar", "archive-zip", "compression-flate2"] }
+self_update = { git = "https://github.com/jaemk/self_update", rev = "9ec008b", default-features = false, features = ["ureq", "rustls", "archive-tar", "archive-zip", "compression-flate2"] }
 tempfile = "3.15.0"
 colored = "3.0.0"
 blake3 = "1.8.1"
