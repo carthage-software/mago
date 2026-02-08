@@ -5544,7 +5544,7 @@ function metaphone(string $string, int $max_phonemes = 0): string
  * @template O
  *
  * @param object|array<K, V> $array
- * @param (callable(V, T): O) $callback
+ * @param (callable(V, K, T): O) $callback
  * @param T|null $arg
  *
  * @param-out ($array is object ? object : (

@@ -14,6 +14,17 @@ function multiply_by(array $integers, int|float $by): array
 }
 
 /**
+ * @param array<string, int> $integers
+ * @return array<string, string>
+ */
+function multiply_assoc_by(array $integers, int|float $by): array
+{
+    array_walk($integers, fn(int $value, string $key, int|float $x): string => 'The value of ' . $key . ' is: ' . ($value * $x), $by);
+
+    return $integers;
+}
+
+/**
  * @param non-empty-list<int> $integers
  * @return non-empty-list<int>
  */
