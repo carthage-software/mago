@@ -1,7 +1,6 @@
 use std::path::PathBuf;
 use std::sync::LazyLock;
 
-use num_cpus::get as get_logical_cpus;
 use tracing::error;
 
 use mago_php_version::PHPVersion;
@@ -64,7 +63,15 @@ pub const MINIMUM_PHP_VERSION: PHPVersion = PHPVersion::PHP80;
 pub const MAXIMUM_PHP_VERSION: PHPVersion = PHPVersion::NEXT;
 
 /// The number of logical CPUs on the system.
-pub static LOGICAL_CPUS: LazyLock<usize> = LazyLock::new(get_logical_cpus);
+pub static LOGICAL_CPUS: LazyLock<usize> = LazyLock::new(|| {
+    std::thread::available_parallelism().map(|n| n.get()).unwrap_or_else(|e| {
+        error!("Failed to get the number of logical CPUs: {}", e);
+        error!("Falling back to 1 logical CPU. This might result in slower performance.");
+        error!("Need help? Open an issue at {}.", ISSUE_URL);
+
+        1
+    })
+});
 
 /// The current working directory.
 pub static CURRENT_DIR: LazyLock<PathBuf> = LazyLock::new(|| {
