@@ -1,3 +1,5 @@
+use mago_atom::Atom;
+
 use crate::metadata::CodebaseMetadata;
 use crate::ttype::atomic::TAtomic;
 use crate::ttype::atomic::object::TObject;
@@ -5,6 +7,7 @@ use crate::ttype::comparator::ComparisonResult;
 use crate::ttype::comparator::union_comparator;
 use crate::ttype::get_specialized_template_type;
 use crate::ttype::template::variance::Variance;
+use crate::ttype::union::TUnion;
 
 pub(crate) fn is_contained_by(
     codebase: &CodebaseMetadata,
@@ -17,24 +20,27 @@ pub(crate) fn is_contained_by(
         return false;
     };
 
-    let TAtomic::Object(TObject::Named(input_object)) = input_type_part else {
-        return false;
+    let (input_name, input_type_parameters): (Atom, Option<&[TUnion]>) = match input_type_part {
+        TAtomic::Object(TObject::Named(obj)) => (obj.name, obj.get_type_parameters()),
+        TAtomic::Object(TObject::Enum(e)) => (e.name, None),
+        _ => return false,
     };
 
     let Some(container_metadata) = codebase.get_class_like(&container_object.name) else {
         return false;
     };
 
-    let Some(input_metadata) = codebase.get_class_like(&input_object.name) else {
+    let Some(input_metadata) = codebase.get_class_like(&input_name) else {
         return false;
     };
 
-    if !codebase.is_instance_of(&input_object.name, &container_object.name) {
+    if !codebase.is_instance_of(&input_name, &container_object.name) {
         return false;
     }
 
-    let container_type_parameters = container_object.get_type_parameters().unwrap_or_default();
-    let input_type_parameters = input_object.get_type_parameters();
+    let Some(container_type_parameters) = container_object.get_type_parameters() else {
+        return true;
+    };
 
     let mut all_parameters_match = true;
     for (parameter_offset, container_type_parameter) in container_type_parameters.iter().enumerate() {
