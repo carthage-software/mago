@@ -57,7 +57,6 @@ foldhash = "0.2"
 serde_json = { version = "1.0.138" }
 serde = { version = "1.0", features = ["derive"] }
 strum = { version = "0.27", features = ["derive"] }
-strum_macros = { version = "0.27" }
 ordered-float = { version = "5.0", default-features = false, features = ["serde"] }
 pretty_assertions = { version = "1.4.1" }
 codespan-reporting = { version = "0.13.1", features = ["serde", "serialization"] }
@@ -134,7 +133,6 @@ clap_complete = { workspace = true }
 termtree = { workspace = true }
 serde_json = { workspace = true }
 strum = { workspace = true }
-strum_macros = { workspace = true }
 self_update = { workspace = true }
 tracing = { workspace = true }
 config = { workspace = true }
