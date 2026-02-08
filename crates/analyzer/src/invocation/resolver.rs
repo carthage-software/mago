@@ -1,13 +1,12 @@
 use std::borrow::Cow;
 
-use either::Either;
-
 use mago_atom::AtomMap;
 use mago_atom::empty_atom;
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::misc::GenericParent;
 use mago_codex::ttype::add_union_type;
 use mago_codex::ttype::atomic::TAtomic;
+use mago_codex::ttype::atomic::mixed::TMixed;
 use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::combiner::CombinerOptions;
 use mago_codex::ttype::comparator::ComparisonResult;
@@ -15,7 +14,6 @@ use mago_codex::ttype::comparator::union_comparator;
 use mago_codex::ttype::expander;
 use mago_codex::ttype::expander::StaticClassType;
 use mago_codex::ttype::expander::TypeExpansionOptions;
-use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::get_never;
 use mago_codex::ttype::template::TemplateBound;
 use mago_codex::ttype::template::TemplateResult;
@@ -109,14 +107,8 @@ fn resolve_union<'ctx, 'arena>(
     let mut resulting_union = union_to_resolve;
     let mut resulting_atomics = Vec::with_capacity(resulting_union.types.len());
     for atomic_to_resolve in resulting_union.types.into_owned() {
-        let return_atomic = resolve_atomic(context, invocation, template_result, parameters, atomic_to_resolve);
-
-        match return_atomic {
-            Either::Left(atomic) => resulting_atomics.push(atomic),
-            Either::Right(union) => {
-                resulting_atomics.extend(union.types.into_owned());
-            }
-        }
+        let return_atomics = resolve_atomic(context, invocation, template_result, parameters, atomic_to_resolve);
+        resulting_atomics.extend(return_atomics);
     }
 
     resulting_union.types = Cow::Owned(resulting_atomics);
@@ -199,22 +191,25 @@ fn resolve_atomic<'ctx, 'arena>(
     template_result: &TemplateResult,
     parameters: &AtomMap<TUnion>,
     atomic_to_resolve: TAtomic,
-) -> Either<TAtomic, TUnion> {
+) -> Vec<TAtomic> {
     if let TAtomic::Variable(variable) = atomic_to_resolve {
         if variable.eq_ignore_ascii_case("$this")
             && let Some(method_context) = invocation.target.get_method_context()
             && let StaticClassType::Object(this_type) = &method_context.class_type
         {
-            return Either::Left(TAtomic::Object(this_type.clone()));
+            return vec![TAtomic::Object(this_type.clone())];
         }
 
-        return parameters.get(&variable).map_or(Either::Right(get_mixed()), |argument_type| {
-            Either::Right(inferred_type_replacer::replace(argument_type, template_result, context.codebase))
-        });
+        return parameters
+            .get(&variable)
+            .map(|argument_type| {
+                inferred_type_replacer::replace(argument_type, template_result, context.codebase).types.into_owned()
+            })
+            .unwrap_or_else(|| vec![TAtomic::Mixed(TMixed::new())]);
     }
 
     let TAtomic::Conditional(conditional) = atomic_to_resolve else {
-        return Either::Left(atomic_to_resolve);
+        return vec![atomic_to_resolve];
     };
 
     let subject = resolve_union(context, invocation, template_result, parameters, (*conditional.subject).clone());
@@ -252,13 +247,13 @@ fn resolve_atomic<'ctx, 'arena>(
             || !union_comparator::can_expression_types_be_identical(context.codebase, &subject, &target, false, false);
 
         if are_disjoint {
-            return if negated { Either::Right(then_type) } else { Either::Right(otherwise_type) };
+            return if negated { then_type.types.into_owned() } else { otherwise_type.types.into_owned() };
         }
 
         if subject_is_contained {
-            return if negated { Either::Right(otherwise_type) } else { Either::Right(then_type) };
+            return if negated { otherwise_type.types.into_owned() } else { then_type.types.into_owned() };
         }
     }
 
-    Either::Right(add_union_type(then_type, &otherwise_type, context.codebase, CombinerOptions::default()))
+    add_union_type(then_type, &otherwise_type, context.codebase, CombinerOptions::default()).types.into_owned()
 }

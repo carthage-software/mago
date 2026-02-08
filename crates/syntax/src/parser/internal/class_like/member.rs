@@ -1,16 +1,12 @@
-use either::Either;
-
 use mago_database::file::HasFileId;
 use mago_span::Span;
 
 use crate::T;
 use crate::ast::ast::AttributeList;
-use crate::ast::ast::ClassLikeConstantSelector;
 use crate::ast::ast::ClassLikeMember;
 use crate::ast::ast::ClassLikeMemberExpressionSelector;
 use crate::ast::ast::ClassLikeMemberSelector;
 use crate::ast::ast::Modifier;
-use crate::ast::ast::Variable;
 use crate::ast::sequence::Sequence;
 use crate::error::ParseError;
 use crate::parser::Parser;
@@ -113,38 +109,6 @@ impl<'input, 'arena> Parser<'input, 'arena> {
                 let err = self.stream.unexpected(Some(token), T!["$variable", "${", "$", "{", Identifier]);
                 self.errors.push(err);
                 ClassLikeMemberSelector::Missing(span)
-            }
-        })
-    }
-
-    pub(crate) fn parse_classlike_constant_selector_or_variable(
-        &mut self,
-    ) -> Result<Either<ClassLikeConstantSelector<'arena>, Variable<'arena>>, ParseError> {
-        let token = match self.stream.lookahead(0)? {
-            Some(token) => token,
-            None => {
-                let pos = self.stream.current_position();
-                let span = Span::new(self.stream.file_id(), pos, pos);
-                return Ok(Either::Left(ClassLikeConstantSelector::Missing(span)));
-            }
-        };
-
-        Ok(match token.kind {
-            T!["$"] | T!["${"] | T!["$variable"] => Either::Right(self.parse_variable()?),
-            T!["{"] => Either::Left(ClassLikeConstantSelector::Expression(ClassLikeMemberExpressionSelector {
-                left_brace: self.stream.eat_span(T!["{"])?,
-                expression: self.parse_expression()?,
-                right_brace: self.stream.eat_span(T!["}"])?,
-            })),
-            kind if kind.is_identifier_maybe_reserved() => {
-                Either::Left(ClassLikeConstantSelector::Identifier(self.parse_local_identifier()?))
-            }
-            _ => {
-                let pos = self.stream.current_position();
-                let span = Span::new(self.stream.file_id(), pos, pos);
-                let err = self.stream.unexpected(Some(token), T!["$variable", "${", "$", "{", Identifier]);
-                self.errors.push(err);
-                Either::Left(ClassLikeConstantSelector::Missing(span))
             }
         })
     }

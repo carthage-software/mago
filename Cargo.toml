@@ -60,7 +60,6 @@ strum = { version = "0.27", features = ["derive"] }
 strum_macros = { version = "0.27" }
 ordered-float = { version = "5.0", default-features = false, features = ["serde"] }
 pretty_assertions = { version = "1.4.1" }
-either = { version = "1.13.0" }
 codespan-reporting = { version = "0.13.1", features = ["serde", "serialization"] }
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 config = { version = "0.15.4", features = ["toml", "yaml", "json"] }

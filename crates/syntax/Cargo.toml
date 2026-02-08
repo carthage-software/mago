@@ -20,7 +20,6 @@ mago-database = { workspace = true }
 mago-php-version = { workspace = true }
 serde = { workspace = true }
 strum = { workspace = true }
-either = { workspace = true }
 paste = { workspace = true }
 ordered-float = { workspace = true, features = ["serde", "rand"] }
 bumpalo = { workspace = true }

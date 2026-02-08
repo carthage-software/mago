@@ -1,4 +1,3 @@
-use either::Either;
 use mago_database::file::HasFileId;
 use mago_span::HasSpan;
 use mago_span::Span;
@@ -7,7 +6,6 @@ use crate::T;
 use crate::ast::ast::Access;
 use crate::ast::ast::ArrayAccess;
 use crate::ast::ast::ArrayAppend;
-use crate::ast::ast::ArrowFunction;
 use crate::ast::ast::Assignment;
 use crate::ast::ast::AssignmentOperator;
 use crate::ast::ast::Binary;
@@ -16,7 +14,6 @@ use crate::ast::ast::Call;
 use crate::ast::ast::ClassConstantAccess;
 use crate::ast::ast::ClassLikeConstantSelector;
 use crate::ast::ast::ClassLikeMemberSelector;
-use crate::ast::ast::Closure;
 use crate::ast::ast::Conditional;
 use crate::ast::ast::ConstantAccess;
 use crate::ast::ast::Expression;
@@ -153,10 +150,7 @@ impl<'input, 'arena> Parser<'input, 'arena> {
         }
 
         if matches!(token.kind, T!["#["]) {
-            return Ok(self.arena.alloc(match self.parse_arrow_function_or_closure()? {
-                Either::Left(arrow_function) => Expression::ArrowFunction(arrow_function),
-                Either::Right(closure) => Expression::Closure(closure),
-            }));
+            return self.parse_arrow_function_or_closure();
         }
 
         if matches!(token.kind, T!["clone"]) {
@@ -167,10 +161,7 @@ impl<'input, 'arena> Parser<'input, 'arena> {
             && (matches!((token.kind, next), (T!["function" | "fn"], _))
                 || matches!((token.kind, next), (T!["static"], Some(T!["function" | "fn"]))))
         {
-            return Ok(self.arena.alloc(match self.parse_arrow_function_or_closure()? {
-                Either::Left(arrow_function) => Expression::ArrowFunction(arrow_function),
-                Either::Right(closure) => Expression::Closure(closure),
-            }));
+            return self.parse_arrow_function_or_closure();
         }
 
         Ok(self.arena.alloc(match (token.kind, next) {
@@ -268,9 +259,7 @@ impl<'input, 'arena> Parser<'input, 'arena> {
         }))
     }
 
-    fn parse_arrow_function_or_closure(
-        &mut self,
-    ) -> Result<Either<ArrowFunction<'arena>, Closure<'arena>>, ParseError> {
+    fn parse_arrow_function_or_closure(&mut self) -> Result<&'arena Expression<'arena>, ParseError> {
         let attributes = self.parse_attribute_list_sequence()?;
 
         let next = self.stream.lookahead(0)?.ok_or_else(|| self.stream.unexpected(None, &[]))?;
@@ -278,10 +267,10 @@ impl<'input, 'arena> Parser<'input, 'arena> {
 
         Ok(match (next.kind, after.map(|t| t.kind)) {
             (T!["function"], _) | (T!["static"], Some(T!["function"])) => {
-                Either::Right(self.parse_closure_with_attributes(attributes)?)
+                self.arena.alloc(Expression::Closure(self.parse_closure_with_attributes(attributes)?))
             }
             (T!["fn"], _) | (T!["static"], Some(T!["fn"])) => {
-                Either::Left(self.parse_arrow_function_with_attributes(attributes)?)
+                self.arena.alloc(Expression::ArrowFunction(self.parse_arrow_function_with_attributes(attributes)?))
             }
             _ => return Err(self.stream.unexpected(Some(next), &[T!["function"], T!["fn"], T!["static"]])),
         })
@@ -330,19 +319,10 @@ impl<'input, 'arena> Parser<'input, 'arena> {
             }
             T!["::"] => {
                 let double_colon = self.stream.consume_span()?;
-                let selector_or_variable = self.parse_classlike_constant_selector_or_variable()?;
+                let selector = self.parse_classlike_member_selector()?;
                 let current = self.stream.lookahead(0)?.ok_or_else(|| self.stream.unexpected(None, &[]))?;
 
                 if Precedence::CallDim > precedence && matches!(current.kind, T!["("]) {
-                    let method = match selector_or_variable {
-                        Either::Left(selector) => match selector {
-                            ClassLikeConstantSelector::Identifier(i) => ClassLikeMemberSelector::Identifier(i),
-                            ClassLikeConstantSelector::Expression(c) => ClassLikeMemberSelector::Expression(c),
-                            ClassLikeConstantSelector::Missing(span) => ClassLikeMemberSelector::Missing(span),
-                        },
-                        Either::Right(variable) => ClassLikeMemberSelector::Variable(variable),
-                    };
-
                     let partial_args = self.parse_partial_argument_list()?;
 
                     if partial_args.has_placeholders() {
@@ -350,7 +330,7 @@ impl<'input, 'arena> Parser<'input, 'arena> {
                             StaticMethodPartialApplication {
                                 class: lhs,
                                 double_colon,
-                                method,
+                                method: selector,
                                 argument_list: partial_args,
                             },
                         ))
@@ -358,22 +338,40 @@ impl<'input, 'arena> Parser<'input, 'arena> {
                         Expression::Call(Call::StaticMethod(StaticMethodCall {
                             class: lhs,
                             double_colon,
-                            method,
+                            method: selector,
                             argument_list: partial_args.into_argument_list(self.arena),
                         }))
                     }
                 } else {
-                    match selector_or_variable {
-                        Either::Left(selector) => Expression::Access(Access::ClassConstant(ClassConstantAccess {
-                            class: lhs,
-                            double_colon,
-                            constant: selector,
-                        })),
-                        Either::Right(variable) => Expression::Access(Access::StaticProperty(StaticPropertyAccess {
-                            class: lhs,
-                            double_colon,
-                            property: variable,
-                        })),
+                    match selector {
+                        ClassLikeMemberSelector::Identifier(local_identifier) => {
+                            Expression::Access(Access::ClassConstant(ClassConstantAccess {
+                                class: lhs,
+                                double_colon,
+                                constant: ClassLikeConstantSelector::Identifier(local_identifier),
+                            }))
+                        }
+                        ClassLikeMemberSelector::Expression(class_like_member_expression_selector) => {
+                            Expression::Access(Access::ClassConstant(ClassConstantAccess {
+                                class: lhs,
+                                double_colon,
+                                constant: ClassLikeConstantSelector::Expression(class_like_member_expression_selector),
+                            }))
+                        }
+                        ClassLikeMemberSelector::Missing(span) => {
+                            Expression::Access(Access::ClassConstant(ClassConstantAccess {
+                                class: lhs,
+                                double_colon,
+                                constant: ClassLikeConstantSelector::Missing(span),
+                            }))
+                        }
+                        ClassLikeMemberSelector::Variable(variable) => {
+                            Expression::Access(Access::StaticProperty(StaticPropertyAccess {
+                                class: lhs,
+                                double_colon,
+                                property: variable,
+                            }))
+                        }
                     }
                 }
             }
