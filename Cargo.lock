@@ -1678,7 +1678,6 @@ dependencies = [
  "mago-syntax",
  "mago-text-edit",
  "regex",
- "strsim",
  "tracing",
 ]
 

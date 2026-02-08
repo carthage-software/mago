@@ -240,6 +240,69 @@ fn read_variable<'ctx>(
 }
 
 fn find_similar_variable_names(context: &BlockContext<'_>, target: &str) -> Vec<String> {
+    fn levenshtein_distance(s1: &str, s2: &str) -> usize {
+        const MAX_LEN: usize = 128;
+
+        if s1 == s2 {
+            return 0;
+        }
+
+        if s1.is_empty() {
+            return s2.chars().count();
+        }
+
+        if s2.is_empty() {
+            return s1.chars().count();
+        }
+
+        let mut s2_buf = ['\0'; MAX_LEN];
+        let mut s2_len = 0;
+
+        for c in s2.chars() {
+            if s2_len >= MAX_LEN {
+                return usize::MAX;
+            }
+
+            s2_buf[s2_len] = c;
+            s2_len += 1;
+        }
+
+        let mut row = [0usize; MAX_LEN + 1];
+        for (i, c) in row.iter_mut().enumerate().take(s2_len + 1) {
+            *c = i;
+        }
+
+        for (i, c1) in s1.chars().enumerate() {
+            let mut prev_sub = row[0];
+            row[0] = i + 1;
+
+            let mut row_min = row[0];
+            for j in 0..s2_len {
+                let c2 = s2_buf[j];
+                let prev_val = row[j + 1];
+
+                let substitution = prev_sub + if c1 == c2 { 0 } else { 1 };
+                let deletion = prev_val + 1;
+                let insertion = row[j] + 1;
+
+                let dist = substitution.min(deletion).min(insertion);
+
+                prev_sub = prev_val;
+                row[j + 1] = dist;
+
+                if dist < row_min {
+                    row_min = dist;
+                }
+            }
+
+            if row_min > 3 {
+                return usize::MAX;
+            }
+        }
+
+        row[s2_len]
+    }
+
     let mut suggestions: Vec<(usize, &str)> = Vec::new();
 
     for local in context.locals.keys() {
@@ -248,7 +311,7 @@ fn find_similar_variable_names(context: &BlockContext<'_>, target: &str) -> Vec<
             continue;
         }
 
-        let distance = strsim::levenshtein(target, local_str);
+        let distance = levenshtein_distance(target, local_str);
 
         if distance > 0 && distance <= 3 {
             suggestions.push((distance, local_str));
