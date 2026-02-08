@@ -12,6 +12,7 @@ use mago_span::HasSpan;
 use mago_syntax::ast::Argument;
 use mago_syntax::ast::Call;
 use mago_syntax::ast::ClassLikeMemberSelector;
+use mago_syntax::ast::Closure;
 use mago_syntax::ast::Expression;
 use mago_syntax::ast::FunctionCall;
 use mago_syntax::ast::FunctionLikeParameterList;
@@ -155,6 +156,10 @@ impl LintRule for PreferFirstClassCallableRule {
                 return;
             }
 
+            if is_callee_reference_captured(call, closure) {
+                return;
+            }
+
             let issue = Issue::new(
                 self.cfg.level(),
                 "Use first-class callable syntax `...` instead of a closure.",
@@ -235,6 +240,18 @@ pub(super) fn is_convertible_to_first_class_callable<'ast, 'arena>(call: &'ast C
     )
 }
 
+fn is_callee_reference_captured<'ast, 'arena>(call: &'ast Call<'arena>, closure: &'ast Closure<'arena>) -> bool {
+    let callee_var_name = match call {
+        Call::Function(FunctionCall { function: Expression::Variable(Variable::Direct(var)), .. }) => var.name,
+        Call::Method(MethodCall { object: Expression::Variable(Variable::Direct(var)), .. }) => var.name,
+        _ => return false,
+    };
+
+    closure.use_clause.as_ref().is_some_and(|use_clause| {
+        use_clause.variables.iter().any(|v| v.ampersand.is_some() && v.variable.name == callee_var_name)
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use indoc::indoc;
@@ -304,6 +321,30 @@ mod tests {
         "#}
     }
 
+    test_lint_success! {
+        name = closure_with_reference_captured_callee,
+        rule = PreferFirstClassCallableRule,
+        code = indoc! {r#"
+            <?php
+
+            $callable = "strlen";
+
+            run(function($x) use (&$callable) { return $callable($x); });
+        "#}
+    }
+
+    test_lint_success! {
+        name = closure_with_reference_captured_method_object,
+        rule = PreferFirstClassCallableRule,
+        code = indoc! {r#"
+            <?php
+
+            $obj = new SomeClass();
+
+            run(function($x) use (&$obj) { return $obj->method($x); });
+        "#}
+    }
+
     test_lint_failure! {
         name = simple_function_call,
         rule = PreferFirstClassCallableRule,
@@ -331,6 +372,18 @@ mod tests {
             <?php
 
             run(fn($x) => SomeClass::method($x));
+        "#}
+    }
+
+    test_lint_failure! {
+        name = closure_with_reference_capture_on_non_callee,
+        rule = PreferFirstClassCallableRule,
+        code = indoc! {r#"
+            <?php
+
+            $unused = null;
+
+            run(function($x) use (&$unused) { return strlen($x); });
         "#}
     }
 }
