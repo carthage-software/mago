@@ -14,47 +14,65 @@ use crate::ttype::atomic::derived::TDerived;
 use crate::ttype::atomic::scalar::int::TInteger;
 use crate::ttype::union::TUnion;
 
-bitflags::bitflags! {
-    /// Compact bitflags for boolean state in TypeCombination.
-    /// This reduces struct size and enables single-cycle multi-flag checks.
-    #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-    pub struct CombinationFlags: u32 {
-        const HAS_OBJECT_TOP_TYPE           = 1 << 0;
-        const LIST_ARRAY_SOMETIMES_FILLED   = 1 << 1;
-        const LIST_ARRAY_ALWAYS_FILLED      = 1 << 2;
-        const KEYED_ARRAY_SOMETIMES_FILLED  = 1 << 3;
-        const KEYED_ARRAY_ALWAYS_FILLED     = 1 << 4;
-        const HAS_EMPTY_ARRAY               = 1 << 5;
-        const HAS_KEYED_ARRAY               = 1 << 6;
-        const GENERIC_MIXED                 = 1 << 7;
-        const HAS_MIXED                     = 1 << 8;
-        const RESOURCE                      = 1 << 9;
-        const OPEN_RESOURCE                 = 1 << 10;
-        const CLOSED_RESOURCE               = 1 << 11;
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[repr(transparent)]
+pub struct CombinationFlags(u32);
 
-        // Tristate encoding: 2 bits each (None=neither set, Some(false)=SET only, Some(true)=SET+VALUE)
-        const FALSY_MIXED_SET               = 1 << 12;
-        const FALSY_MIXED_VALUE             = 1 << 13;
-        const TRUTHY_MIXED_SET              = 1 << 14;
-        const TRUTHY_MIXED_VALUE            = 1 << 15;
-        const NONNULL_MIXED_SET             = 1 << 16;
-        const NONNULL_MIXED_VALUE           = 1 << 17;
-        const MIXED_FROM_LOOP_ISSET_SET     = 1 << 18;
-        const MIXED_FROM_LOOP_ISSET_VALUE   = 1 << 19;
-    }
+impl CombinationFlags {
+    pub const HAS_OBJECT_TOP_TYPE: CombinationFlags = CombinationFlags(1 << 0);
+    pub const LIST_ARRAY_SOMETIMES_FILLED: CombinationFlags = CombinationFlags(1 << 1);
+    pub const LIST_ARRAY_ALWAYS_FILLED: CombinationFlags = CombinationFlags(1 << 2);
+    pub const KEYED_ARRAY_SOMETIMES_FILLED: CombinationFlags = CombinationFlags(1 << 3);
+    pub const KEYED_ARRAY_ALWAYS_FILLED: CombinationFlags = CombinationFlags(1 << 4);
+    pub const HAS_EMPTY_ARRAY: CombinationFlags = CombinationFlags(1 << 5);
+    pub const HAS_KEYED_ARRAY: CombinationFlags = CombinationFlags(1 << 6);
+    pub const GENERIC_MIXED: CombinationFlags = CombinationFlags(1 << 7);
+    pub const HAS_MIXED: CombinationFlags = CombinationFlags(1 << 8);
+    pub const RESOURCE: CombinationFlags = CombinationFlags(1 << 9);
+    pub const OPEN_RESOURCE: CombinationFlags = CombinationFlags(1 << 10);
+    pub const CLOSED_RESOURCE: CombinationFlags = CombinationFlags(1 << 11);
+    // Tristate encoding: 2 bits each (None=neither set, Some(false)=SET only, Some(true)=SET+VALUE)
+    const FALSY_MIXED_SET: CombinationFlags = CombinationFlags(1 << 12);
+    const FALSY_MIXED_VALUE: CombinationFlags = CombinationFlags(1 << 13);
+    const TRUTHY_MIXED_SET: CombinationFlags = CombinationFlags(1 << 14);
+    const TRUTHY_MIXED_VALUE: CombinationFlags = CombinationFlags(1 << 15);
+    const NONNULL_MIXED_SET: CombinationFlags = CombinationFlags(1 << 16);
+    const NONNULL_MIXED_VALUE: CombinationFlags = CombinationFlags(1 << 17);
+    const MIXED_FROM_LOOP_ISSET_SET: CombinationFlags = CombinationFlags(1 << 18);
+    const MIXED_FROM_LOOP_ISSET_VALUE: CombinationFlags = CombinationFlags(1 << 19);
 }
 
 impl CombinationFlags {
+    #[inline]
+    pub const fn insert(&mut self, other: CombinationFlags) {
+        self.0 |= other.0;
+    }
+
+    #[inline]
+    pub const fn remove(&mut self, other: CombinationFlags) {
+        self.0 &= !other.0;
+    }
+
+    #[inline]
+    pub const fn contains(self, other: CombinationFlags) -> bool {
+        (self.0 & other.0) == other.0
+    }
+
+    #[inline]
+    pub const fn intersects(self, other: CombinationFlags) -> bool {
+        (self.0 & other.0) != 0
+    }
+
     /// Get a tristate value (Option<bool>) from two bits.
     #[inline]
     #[must_use]
-    pub fn get_tristate(self, set_bit: Self, value_bit: Self) -> Option<bool> {
+    pub fn get_tristate(self, set_bit: CombinationFlags, value_bit: CombinationFlags) -> Option<bool> {
         if self.contains(set_bit) { Some(self.contains(value_bit)) } else { None }
     }
 
     /// Set a tristate value (Option<bool>) using two bits.
     #[inline]
-    pub fn set_tristate(&mut self, set_bit: Self, value_bit: Self, value: Option<bool>) {
+    pub fn set_tristate(&mut self, set_bit: CombinationFlags, value_bit: CombinationFlags, value: Option<bool>) {
         match value {
             None => {
                 self.remove(set_bit);
@@ -189,5 +207,41 @@ impl TypeCombination {
         }
 
         false
+    }
+}
+
+impl std::ops::BitOr for CombinationFlags {
+    type Output = Self;
+
+    #[inline]
+    fn bitor(self, rhs: Self) -> Self::Output {
+        CombinationFlags(self.0 | rhs.0)
+    }
+}
+
+impl std::ops::BitAnd for CombinationFlags {
+    type Output = Self;
+
+    #[inline]
+    fn bitand(self, rhs: Self) -> Self::Output {
+        CombinationFlags(self.0 & rhs.0)
+    }
+}
+
+impl std::ops::BitXor for CombinationFlags {
+    type Output = Self;
+
+    #[inline]
+    fn bitxor(self, rhs: Self) -> Self::Output {
+        CombinationFlags(self.0 ^ rhs.0)
+    }
+}
+
+impl std::ops::Not for CombinationFlags {
+    type Output = Self;
+
+    #[inline]
+    fn not(self) -> Self::Output {
+        CombinationFlags(!self.0)
     }
 }

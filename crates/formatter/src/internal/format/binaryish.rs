@@ -268,8 +268,8 @@ fn print_binaryish_expression_parts<'arena>(
     let right = unwrap_parenthesized(right);
     let is_original_right_parenthesized = !std::ptr::eq(original_right, right);
     let should_break = f
-        .has_comment(operator.span(), CommentFlags::Trailing | CommentFlags::Leading | CommentFlags::Line)
-        || f.has_comment(left.span(), CommentFlags::Trailing | CommentFlags::Line)
+        .has_comment(operator.span(), CommentFlags::TRAILING | CommentFlags::LEADING | CommentFlags::LINE)
+        || f.has_comment(left.span(), CommentFlags::TRAILING | CommentFlags::LINE)
         || f.has_leading_own_line_comment(right.span())
         || (is_original_right_parenthesized && has_leading_comment_in_leftmost(f, original_right));
 
@@ -325,7 +325,7 @@ fn print_binaryish_expression_parts<'arena>(
     let has_leading_comment_on_right = f.has_leading_own_line_comment(right.span())
         || (is_original_right_parenthesized && has_leading_comment_in_leftmost(f, original_right));
     let line_before_operator = f.settings.line_before_binary_operator && !has_leading_comment_on_right;
-    let operator_has_leading_comments = f.has_comment(operator.span(), CommentFlags::Leading);
+    let operator_has_leading_comments = f.has_comment(operator.span(), CommentFlags::LEADING);
 
     let leftmost_leading_comments =
         if is_original_right_parenthesized && has_leading_comment_in_leftmost(f, original_right) {

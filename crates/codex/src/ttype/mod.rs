@@ -96,6 +96,7 @@ pub mod combiner;
 pub mod comparator;
 pub mod error;
 pub mod expander;
+pub mod flags;
 pub mod resolution;
 pub mod shared;
 pub mod template;

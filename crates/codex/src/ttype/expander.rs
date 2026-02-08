@@ -786,13 +786,13 @@ mod tests {
     use crate::ttype::atomic::scalar::TScalar;
     use crate::ttype::atomic::scalar::class_like_string::TClassLikeString;
     use crate::ttype::atomic::scalar::class_like_string::TClassLikeStringKind;
+    use crate::ttype::flags::UnionFlags;
     use crate::ttype::get_int;
     use crate::ttype::get_mixed;
     use crate::ttype::get_never;
     use crate::ttype::get_null;
     use crate::ttype::get_string;
     use crate::ttype::get_void;
-    use crate::ttype::union::UnionFlags;
 
     fn create_test_codebase(code: &'static str) -> CodebaseMetadata {
         let file = File::ephemeral(Cow::Borrowed("code.php"), Cow::Borrowed(code));

@@ -29,7 +29,6 @@ derivative = { workspace = true }
 strum = { workspace = true }
 indexmap = { workspace = true }
 ordered-float = { workspace = true }
-bitflags = { workspace = true }
 bumpalo = { workspace = true }
 itertools = { workspace = true }
 

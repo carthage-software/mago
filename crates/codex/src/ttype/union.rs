@@ -3,7 +3,6 @@ use std::hash::Hash;
 use std::hash::Hasher;
 use std::sync::Arc;
 
-use bitflags::bitflags;
 use derivative::Derivative;
 use serde::Deserialize;
 use serde::Serialize;
@@ -34,39 +33,10 @@ use crate::ttype::atomic::scalar::class_like_string::TClassLikeString;
 use crate::ttype::atomic::scalar::int::TInteger;
 use crate::ttype::atomic::scalar::string::TString;
 use crate::ttype::atomic::scalar::string::TStringLiteral;
+use crate::ttype::flags::UnionFlags;
 use crate::ttype::get_arraykey;
 use crate::ttype::get_int;
 use crate::ttype::get_mixed;
-
-bitflags! {
-    /// Flags representing various properties of a type union.
-    ///
-    /// This replaces 9 individual boolean fields with a compact 16-bit representation,
-    /// reducing memory usage from 9 bytes to 2 bytes per TUnion instance.
-    #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
-    pub struct UnionFlags: u16 {
-        /// Indicates the union had a template type at some point.
-        const HAD_TEMPLATE = 1 << 0;
-        /// Indicates the value is passed by reference.
-        const BY_REFERENCE = 1 << 1;
-        /// Indicates no references exist to this type.
-        const REFERENCE_FREE = 1 << 2;
-        /// Indicates the type may be undefined due to a try block.
-        const POSSIBLY_UNDEFINED_FROM_TRY = 1 << 3;
-        /// Indicates the type may be undefined.
-        const POSSIBLY_UNDEFINED = 1 << 4;
-        /// Indicates nullable issues should be ignored for this type.
-        const IGNORE_NULLABLE_ISSUES = 1 << 5;
-        /// Indicates falsable issues should be ignored for this type.
-        const IGNORE_FALSABLE_ISSUES = 1 << 6;
-        /// Indicates the type came from a template default value.
-        const FROM_TEMPLATE_DEFAULT = 1 << 7;
-        /// Indicates the type has been populated with codebase information.
-        const POPULATED = 1 << 8;
-        /// Indicates the null in this union came from nullsafe short-circuit.
-        const NULLSAFE_NULL = 1 << 9;
-    }
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, Derivative, PartialOrd, Ord)]
 pub struct TUnion {

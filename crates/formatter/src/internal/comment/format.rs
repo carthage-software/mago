@@ -102,7 +102,7 @@ impl<'arena> FormatterState<'_, 'arena> {
     }
 
     pub(crate) fn has_leading_own_line_comment(&self, range: Span) -> bool {
-        self.has_comment_with_filter(range, CommentFlags::Leading, |comment| {
+        self.has_comment_with_filter(range, CommentFlags::LEADING, |comment| {
             self.has_newline(comment.end, /* backwards */ false)
         })
     }
@@ -121,15 +121,15 @@ impl<'arena> FormatterState<'_, 'arena> {
             }
 
             if comment.end <= range.start_offset() {
-                if flags.contains(CommentFlags::Leading) && comment.matches_flags(flags) {
+                if flags.contains(CommentFlags::LEADING) && comment.matches_flags(flags) {
                     return true;
                 }
             } else if range.end_offset() < comment.start && self.is_insignificant(range.end_offset(), comment.start) {
-                if flags.contains(CommentFlags::Trailing) && comment.matches_flags(flags) {
+                if flags.contains(CommentFlags::TRAILING) && comment.matches_flags(flags) {
                     return true;
                 }
             } else if comment.end <= range.end_offset() {
-                if flags.contains(CommentFlags::Dangling) && comment.matches_flags(flags) {
+                if flags.contains(CommentFlags::DANGLING) && comment.matches_flags(flags) {
                     return true;
                 }
             } else {

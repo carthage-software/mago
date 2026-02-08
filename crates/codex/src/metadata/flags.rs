@@ -1,47 +1,94 @@
 use serde::Deserialize;
 use serde::Serialize;
 
-bitflags::bitflags! {
-    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-    #[non_exhaustive]
-    pub struct MetadataFlags: u64 {
-        const ABSTRACT                  = 1 << 0;
-        const FINAL                     = 1 << 1;
-        const READONLY                  = 1 << 3;
-        const DEPRECATED                = 1 << 4;
-        const ENUM_INTERFACE            = 1 << 5;
-        const POPULATED                 = 1 << 6;
-        const INTERNAL                  = 1 << 7;
-        const CONSISTENT_CONSTRUCTOR    = 1 << 11;
-        const CONSISTENT_TEMPLATES      = 1 << 12;
-        const UNCHECKED                 = 1 << 13;
-        const USER_DEFINED              = 1 << 14;
-        const BUILTIN                   = 1 << 15;
-        const HAS_YIELD                 = 1 << 16;
-        const MUST_USE                  = 1 << 17;
-        const HAS_THROW                 = 1 << 18;
-        const PURE                      = 1 << 19;
-        const IGNORE_NULLABLE_RETURN    = 1 << 20;
-        const IGNORE_FALSABLE_RETURN    = 1 << 21;
-        const INHERITS_DOCS             = 1 << 22;
-        const NO_NAMED_ARGUMENTS        = 1 << 23;
-        const BACKED_ENUM_CASE          = 1 << 24;
-        const UNIT_ENUM_CASE            = 1 << 25;
-        const BY_REFERENCE              = 1 << 26;
-        const VARIADIC                  = 1 << 27;
-        const PROMOTED_PROPERTY         = 1 << 28;
-        const HAS_DEFAULT               = 1 << 29;
-        const VIRTUAL_PROPERTY          = 1 << 30;
-        const ASYMMETRIC_PROPERTY       = 1 << 31;
-        const STATIC                    = 1 << 32;
-        const WRITEONLY                 = 1 << 33;
-        const MAGIC_PROPERTY            = 1 << 34;
-        const MAGIC_METHOD              = 1 << 35;
-        const API                       = 1 << 36;
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct MetadataFlags(u64);
+
+impl MetadataFlags {
+    pub const ABSTRACT: MetadataFlags = MetadataFlags(1 << 0);
+    pub const FINAL: MetadataFlags = MetadataFlags(1 << 1);
+    pub const READONLY: MetadataFlags = MetadataFlags(1 << 3);
+    pub const DEPRECATED: MetadataFlags = MetadataFlags(1 << 4);
+    pub const ENUM_INTERFACE: MetadataFlags = MetadataFlags(1 << 5);
+    pub const POPULATED: MetadataFlags = MetadataFlags(1 << 6);
+    pub const INTERNAL: MetadataFlags = MetadataFlags(1 << 7);
+    pub const CONSISTENT_CONSTRUCTOR: MetadataFlags = MetadataFlags(1 << 11);
+    pub const CONSISTENT_TEMPLATES: MetadataFlags = MetadataFlags(1 << 12);
+    pub const UNCHECKED: MetadataFlags = MetadataFlags(1 << 13);
+    pub const USER_DEFINED: MetadataFlags = MetadataFlags(1 << 14);
+    pub const BUILTIN: MetadataFlags = MetadataFlags(1 << 15);
+    pub const HAS_YIELD: MetadataFlags = MetadataFlags(1 << 16);
+    pub const MUST_USE: MetadataFlags = MetadataFlags(1 << 17);
+    pub const HAS_THROW: MetadataFlags = MetadataFlags(1 << 18);
+    pub const PURE: MetadataFlags = MetadataFlags(1 << 19);
+    pub const IGNORE_NULLABLE_RETURN: MetadataFlags = MetadataFlags(1 << 20);
+    pub const IGNORE_FALSABLE_RETURN: MetadataFlags = MetadataFlags(1 << 21);
+    pub const INHERITS_DOCS: MetadataFlags = MetadataFlags(1 << 22);
+    pub const NO_NAMED_ARGUMENTS: MetadataFlags = MetadataFlags(1 << 23);
+    pub const BACKED_ENUM_CASE: MetadataFlags = MetadataFlags(1 << 24);
+    pub const UNIT_ENUM_CASE: MetadataFlags = MetadataFlags(1 << 25);
+    pub const BY_REFERENCE: MetadataFlags = MetadataFlags(1 << 26);
+    pub const VARIADIC: MetadataFlags = MetadataFlags(1 << 27);
+    pub const PROMOTED_PROPERTY: MetadataFlags = MetadataFlags(1 << 28);
+    pub const HAS_DEFAULT: MetadataFlags = MetadataFlags(1 << 29);
+    pub const VIRTUAL_PROPERTY: MetadataFlags = MetadataFlags(1 << 30);
+    pub const ASYMMETRIC_PROPERTY: MetadataFlags = MetadataFlags(1 << 31);
+    pub const STATIC: MetadataFlags = MetadataFlags(1 << 32);
+    pub const WRITEONLY: MetadataFlags = MetadataFlags(1 << 33);
+    pub const MAGIC_PROPERTY: MetadataFlags = MetadataFlags(1 << 34);
+    pub const MAGIC_METHOD: MetadataFlags = MetadataFlags(1 << 35);
+    pub const API: MetadataFlags = MetadataFlags(1 << 36);
+}
+
+impl MetadataFlags {
+    #[inline]
+    #[must_use]
+    pub const fn empty() -> Self {
+        MetadataFlags(0)
+    }
+
+    #[inline]
+    pub const fn insert(&mut self, other: MetadataFlags) {
+        self.0 |= other.0;
+    }
+
+    #[inline]
+    pub const fn set(&mut self, other: MetadataFlags, value: bool) {
+        if value {
+            self.insert(other);
+        } else {
+            self.0 &= !other.0;
+        }
+    }
+
+    #[inline]
+    pub const fn contains(self, other: MetadataFlags) -> bool {
+        (self.0 & other.0) == other.0
+    }
+
+    #[inline]
+    pub const fn remove(&mut self, other: MetadataFlags) {
+        self.0 &= !other.0;
+    }
+
+    #[inline]
+    pub const fn intersects(self, other: MetadataFlags) -> bool {
+        (self.0 & other.0) != 0
+    }
+
+    #[inline]
+    #[must_use]
+    pub const fn union(&self, other: MetadataFlags) -> MetadataFlags {
+        MetadataFlags(self.0 | other.0)
+    }
+
+    #[inline]
+    #[must_use]
+    pub const fn intersection(&self, other: MetadataFlags) -> MetadataFlags {
+        MetadataFlags(self.0 & other.0)
     }
 }
 
-// example: helper methods for extra readability
 impl MetadataFlags {
     #[inline]
     #[must_use]
@@ -239,5 +286,62 @@ impl MetadataFlags {
     #[must_use]
     pub const fn is_public_api(self) -> bool {
         self.contains(Self::API)
+    }
+}
+
+impl std::ops::BitOr for MetadataFlags {
+    type Output = Self;
+
+    #[inline]
+    fn bitor(self, rhs: Self) -> Self::Output {
+        MetadataFlags(self.0 | rhs.0)
+    }
+}
+
+impl std::ops::BitAnd for MetadataFlags {
+    type Output = Self;
+
+    #[inline]
+    fn bitand(self, rhs: Self) -> Self::Output {
+        MetadataFlags(self.0 & rhs.0)
+    }
+}
+
+impl std::ops::BitXor for MetadataFlags {
+    type Output = Self;
+
+    #[inline]
+    fn bitxor(self, rhs: Self) -> Self::Output {
+        MetadataFlags(self.0 ^ rhs.0)
+    }
+}
+
+impl std::ops::Not for MetadataFlags {
+    type Output = Self;
+
+    #[inline]
+    fn not(self) -> Self::Output {
+        MetadataFlags(!self.0)
+    }
+}
+
+impl std::ops::BitOrAssign for MetadataFlags {
+    #[inline]
+    fn bitor_assign(&mut self, rhs: Self) {
+        self.0 |= rhs.0;
+    }
+}
+
+impl std::ops::BitAndAssign for MetadataFlags {
+    #[inline]
+    fn bitand_assign(&mut self, rhs: Self) {
+        self.0 &= rhs.0;
+    }
+}
+
+impl std::ops::BitXorAssign for MetadataFlags {
+    #[inline]
+    fn bitxor_assign(&mut self, rhs: Self) {
+        self.0 ^= rhs.0;
     }
 }

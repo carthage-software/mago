@@ -1702,7 +1702,6 @@ dependencies = [
 name = "mago-codex"
 version = "1.6.0"
 dependencies = [
- "bitflags 2.10.0",
  "bumpalo",
  "criterion",
  "derivative",
@@ -1793,7 +1792,6 @@ dependencies = [
 name = "mago-formatter"
 version = "1.6.0"
 dependencies = [
- "bitflags 2.10.0",
  "bumpalo",
  "foldhash 0.2.0",
  "indoc",

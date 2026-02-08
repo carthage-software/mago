@@ -103,7 +103,7 @@ pub(super) fn print_argument_list<'arena>(
     if !force_break {
         let args = argument_list.arguments.as_slice();
         for (i, arg) in args.iter().enumerate() {
-            if i < args.len() - 1 && f.has_comment(arg.span(), CommentFlags::Trailing | CommentFlags::Line) {
+            if i < args.len() - 1 && f.has_comment(arg.span(), CommentFlags::TRAILING | CommentFlags::LINE) {
                 force_break = true;
                 break;
             }
@@ -381,8 +381,8 @@ fn print_right_parenthesis<'arena>(
 
 #[inline]
 fn argument_has_surrounding_comments(f: &FormatterState, argument: &Argument) -> bool {
-    f.has_comment(argument.span(), CommentFlags::Leading | CommentFlags::Trailing)
-        || f.has_comment(argument.span(), CommentFlags::Leading | CommentFlags::Trailing)
+    f.has_comment(argument.span(), CommentFlags::LEADING | CommentFlags::TRAILING)
+        || f.has_comment(argument.span(), CommentFlags::LEADING | CommentFlags::TRAILING)
 }
 
 pub(super) fn print_partial_argument_list<'arena>(
@@ -621,8 +621,8 @@ pub fn should_expand_first_arg<'arena>(
     let first_argument = &arguments[0];
     let second_argument = &arguments[1];
 
-    if f.has_comment(first_argument.span(), CommentFlags::Leading | CommentFlags::Trailing)
-        || f.has_comment(second_argument.span(), CommentFlags::Leading | CommentFlags::Trailing)
+    if f.has_comment(first_argument.span(), CommentFlags::LEADING | CommentFlags::TRAILING)
+        || f.has_comment(second_argument.span(), CommentFlags::LEADING | CommentFlags::TRAILING)
     {
         return false;
     }
@@ -639,7 +639,7 @@ pub fn should_expand_last_arg<'arena>(
     nested_args: bool,
 ) -> bool {
     let Some(last_argument) = argument_list.arguments.last() else { return false };
-    if f.has_comment(last_argument.span(), CommentFlags::Leading | CommentFlags::Trailing) {
+    if f.has_comment(last_argument.span(), CommentFlags::LEADING | CommentFlags::TRAILING) {
         return false;
     }
 
@@ -651,7 +651,7 @@ pub fn should_expand_last_arg<'arena>(
     };
 
     let penultimate_argument_comments =
-        penultimate_argument.is_some_and(|a| f.has_comment(a.span(), CommentFlags::Leading | CommentFlags::Trailing));
+        penultimate_argument.is_some_and(|a| f.has_comment(a.span(), CommentFlags::LEADING | CommentFlags::TRAILING));
 
     could_expand_value(f, last_argument_value, nested_args)
         // If the last two arguments are of the same type,

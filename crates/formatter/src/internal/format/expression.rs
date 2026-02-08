@@ -208,7 +208,7 @@ impl<'arena> Format<'arena> for Binary<'arena> {
 impl<'arena> Format<'arena> for Pipe<'arena> {
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
         wrap!(f, self, Pipe, {
-            let has_trailing_comments = f.has_comment(self.span(), CommentFlags::Trailing);
+            let has_trailing_comments = f.has_comment(self.span(), CommentFlags::TRAILING);
             let mut should_break = has_trailing_comments;
 
             let mut callables: Vec<&'arena Expression<'arena>> = vec![in f.arena];
@@ -231,7 +231,7 @@ impl<'arena> Format<'arena> for Pipe<'arena> {
                 contents.push(Document::Line(Line::default()));
                 contents.push(Document::String("|> "));
 
-                let callable_has_trailing_comments = f.has_comment(callable.span(), CommentFlags::Trailing);
+                let callable_has_trailing_comments = f.has_comment(callable.span(), CommentFlags::TRAILING);
                 contents.push(callable.format(f));
                 if callable_has_trailing_comments {
                     should_break = true;
@@ -914,7 +914,7 @@ impl<'arena> Format<'arena> for MatchExpressionArm<'arena> {
                 .conditions
                 .iter()
                 .take(len.saturating_sub(1))
-                .any(|condition| f.has_comment(condition.span(), CommentFlags::Trailing | CommentFlags::Line));
+                .any(|condition| f.has_comment(condition.span(), CommentFlags::TRAILING | CommentFlags::LINE));
 
             let mut contents = vec![in f.arena];
             for (i, condition) in self.conditions.iter().enumerate() {

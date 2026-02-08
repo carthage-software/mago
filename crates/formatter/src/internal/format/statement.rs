@@ -359,7 +359,7 @@ fn should_add_new_line_or_space_after_stmt<'arena>(
                 return (true, false);
             }
 
-            should_add_space = !f.has_comment(stmt.span(), CommentFlags::Trailing);
+            should_add_space = !f.has_comment(stmt.span(), CommentFlags::TRAILING);
 
             false
         }
@@ -367,7 +367,7 @@ fn should_add_new_line_or_space_after_stmt<'arena>(
             if f.has_newline(stmt.end_position().offset(), false) {
                 true
             } else if let Some(Statement::ClosingTag(_)) = stmts.get(i + 1) {
-                should_add_space = !f.has_comment(stmt.span(), CommentFlags::Trailing);
+                should_add_space = !f.has_comment(stmt.span(), CommentFlags::TRAILING);
 
                 false
             } else {
@@ -391,7 +391,7 @@ fn should_add_new_line_after_use<'arena>(
     } else if f.has_newline(last_use.span().end_position().offset, false) {
         true
     } else if let Some(Statement::ClosingTag(_)) = stmts.get(i) {
-        should_add_space = !f.has_comment(last_use.span(), CommentFlags::Trailing);
+        should_add_space = !f.has_comment(last_use.span(), CommentFlags::TRAILING);
 
         false
     } else {

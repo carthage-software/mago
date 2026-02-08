@@ -96,7 +96,7 @@ pub(super) fn should_hug_expression<'arena>(
     }
 
     // if the expression has leading or trailing comments, we can't hug it
-    if f.has_comment(expression.span(), CommentFlags::Leading | CommentFlags::Trailing) {
+    if f.has_comment(expression.span(), CommentFlags::LEADING | CommentFlags::TRAILING) {
         return false;
     }
 
@@ -612,7 +612,7 @@ pub(super) fn print_condition<'arena>(
 
     let condition = if is_expandable_expression(condition, true)
         && !has_breaking_concat
-        && !f.has_comment(condition.span(), CommentFlags::Leading | CommentFlags::Trailing)
+        && !f.has_comment(condition.span(), CommentFlags::LEADING | CommentFlags::TRAILING)
     {
         Document::Group(Group::new(vec![
             in f.arena;
