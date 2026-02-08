@@ -98,6 +98,12 @@ pub fn merge_metadata_from_required_class_like(
 
     metadata.require_extends.extend(parent_metadata.all_parent_classes.iter().copied());
     metadata.require_implements.extend(parent_metadata.all_parent_interfaces.iter().copied());
+
+    for (parent_constant_name, parent_constant_metadata) in &parent_metadata.constants {
+        if !metadata.constants.contains_key(parent_constant_name) {
+            metadata.constants.insert(*parent_constant_name, parent_constant_metadata.clone());
+        }
+    }
 }
 
 /// Merges class-like data inherited from a used trait.
