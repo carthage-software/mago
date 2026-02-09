@@ -175,6 +175,7 @@ pub fn post_invocation_process<'ctx, 'arena>(
         &metadata.if_true_assertions,
         template_result,
         parameters,
+        true,
     );
 
     for (variable, assertions) in resolved_if_true_assertions {
@@ -190,6 +191,7 @@ pub fn post_invocation_process<'ctx, 'arena>(
         &metadata.if_false_assertions,
         template_result,
         parameters,
+        true,
     );
 
     for (variable, assertions) in resolved_if_false_assertions {
@@ -241,6 +243,7 @@ fn apply_assertion_to_call_context<'ctx, 'arena>(
         assertions,
         template_result,
         parameters,
+        false,
     );
 
     if type_assertions.is_empty() {
@@ -410,6 +413,7 @@ fn resolve_invocation_assertion<'ctx, 'arena>(
     assertions: &BTreeMap<Atom, Conjunction<Assertion>>,
     template_result: &TemplateResult,
     parameters: &AtomMap<TUnion>,
+    report_redundancy: bool,
 ) -> IndexMap<Atom, AssertionSet> {
     let mut type_assertions: IndexMap<Atom, AssertionSet> = IndexMap::new();
     if assertions.is_empty() {
@@ -578,20 +582,22 @@ fn resolve_invocation_assertion<'ctx, 'arena>(
                         .join("|");
 
                     if all_negated || always_redundant {
-                        context.collector.report_with_code(
-                            IssueCode::RedundantTypeComparison,
-                            Issue::warning(format!(
-                                "Redundant type assertion: `{assertion_variable}` of type `{asserted_type_id}` is always not `{expected_type_id}`."
-                            ))
-                            .with_annotation(
-                                Annotation::primary(invocation.span)
+                        if report_redundancy {
+                            context.collector.report_with_code(
+                                IssueCode::RedundantTypeComparison,
+                                Issue::warning(format!(
+                                    "Redundant type assertion: `{assertion_variable}` of type `{asserted_type_id}` is always not `{expected_type_id}`."
+                                ))
+                                .with_annotation(
+                                    Annotation::primary(invocation.span)
                                     .with_message(format!("Argument `{assertion_variable}` has type `{asserted_type_id}`")),
-                            )
-                            .with_note(format!(
-                                "The assertion expects `{assertion_variable}` to not be `{expected_type_id}`, which is always true."
-                            ))
-                            .with_help("Consider removing this assertion as it has no effect."),
-                        );
+                                )
+                                .with_note(format!(
+                                    "The assertion expects `{assertion_variable}` to not be `{expected_type_id}`, which is always true."
+                                ))
+                                .with_help("Consider removing this assertion as it has no effect."),
+                            );
+                        }
                     } else {
                         context.collector.report_with_code(
                             IssueCode::ImpossibleTypeComparison,
@@ -943,6 +949,7 @@ fn apply_plugin_assertions<'ctx, 'arena>(
         &assertions.if_true,
         template_result,
         parameters,
+        true,
     );
 
     for (variable, assertion_set) in resolved_if_true_assertions {
@@ -958,6 +965,7 @@ fn apply_plugin_assertions<'ctx, 'arena>(
         &assertions.if_false,
         template_result,
         parameters,
+        true,
     );
 
     for (variable, assertion_set) in resolved_if_false_assertions {

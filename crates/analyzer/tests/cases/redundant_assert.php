@@ -36,5 +36,5 @@ function process_value(null|int $value): int
 function other(): void
 {
     $instance = create_some_instance();
-    assert_not_null($instance); // @mago-expect analysis:redundant-type-comparison
+    assert_not_null($instance);
 }
