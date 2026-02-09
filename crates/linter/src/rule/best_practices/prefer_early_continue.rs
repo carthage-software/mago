@@ -149,6 +149,20 @@ impl LintRule for PreferEarlyContinueRule {
             return;
         }
 
+        // Skip if the body is an early exit statement (continue, break, return, throw).
+        // These are already simple single-statement bodies with no nesting to reduce,
+        // and transforming them doesn't improve readability.
+        let is_early_exit = match &if_stmt.body {
+            IfBody::Statement(body) => is_early_exit_statement(body.statement),
+            IfBody::ColonDelimited(body) => {
+                body.statements.len() == 1 && is_early_exit_statement(&body.statements.nodes[0])
+            }
+        };
+
+        if is_early_exit {
+            return;
+        }
+
         let issue = Issue::new(self.cfg.level(), "Consider using early continue pattern to reduce nesting.")
             .with_code(self.meta.code)
             .with_annotation(
@@ -218,6 +232,12 @@ impl LintRule for PreferEarlyContinueRule {
                             let range_to_delete = last_stmt_end..block.right_brace.end_offset();
                             edits.push(TextEdit::delete(range_to_delete));
                         }
+                    } else {
+                        // Non-block statement: `if ($x) statement;`
+                        // Transform to: `if (!$x) { continue; }\n\nstatement;`
+                        let stmt_start = body.statement.start_offset();
+                        let range_to_replace = if_stmt.right_parenthesis.end_offset()..stmt_start;
+                        edits.push(TextEdit::replace(range_to_replace, " { continue; }\n\n"));
                     }
                 }
                 IfBody::ColonDelimited(body) => {
@@ -263,5 +283,16 @@ fn statement_len(stmt: &Statement) -> usize {
         Statement::Noop(_) => 0,
         Statement::Block(Block { statements, .. }) => statements.len(),
         _ => 1,
+    }
+}
+
+/// Checks if a statement is an "early exit" pattern that doesn't benefit from
+/// the early continue transformation (continue, break, return, throw).
+fn is_early_exit_statement(stmt: &Statement) -> bool {
+    match stmt {
+        Statement::Continue(_) | Statement::Break(_) | Statement::Return(_) => true,
+        Statement::Expression(expr) => matches!(expr.expression, Expression::Throw(_)),
+        Statement::Block(block) => block.statements.len() == 1 && is_early_exit_statement(&block.statements.nodes[0]),
+        _ => false,
     }
 }
