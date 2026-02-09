@@ -1,3 +1,4 @@
+use mago_atom::ascii_lowercase_atom;
 use mago_atom::atom;
 use mago_codex::ttype::get_empty_string;
 use mago_codex::ttype::get_false;
@@ -20,9 +21,23 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Literal<'arena> {
     fn analyze<'ctx>(
         &'ast self,
         _context: &mut Context<'ctx, 'arena>,
-        _block_context: &mut BlockContext<'ctx>,
+        block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
+        if let Literal::String(literal_string) = self
+            && let Some(value) = literal_string.value
+            && let Some((class_part, method_part)) = value.split_once("::")
+            && !class_part.is_empty()
+            && !method_part.is_empty()
+            && !method_part.contains("::")
+        {
+            artifacts.symbol_references.add_reference_to_class_member(
+                &block_context.scope,
+                (ascii_lowercase_atom(class_part), ascii_lowercase_atom(method_part)),
+                false,
+            );
+        }
+
         artifacts.set_expression_type(
             &self,
             match self {

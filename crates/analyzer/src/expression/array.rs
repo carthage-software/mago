@@ -6,6 +6,7 @@ use std::sync::Arc;
 use foldhash::HashSet;
 
 use mago_atom::AtomSet;
+use mago_atom::ascii_lowercase_atom;
 use mago_atom::atom;
 use mago_atom::empty_atom;
 use mago_codex::ttype::TType;
@@ -15,6 +16,7 @@ use mago_codex::ttype::atomic::array::key::ArrayKey;
 use mago_codex::ttype::atomic::array::keyed::TKeyedArray;
 use mago_codex::ttype::atomic::array::list::TList;
 use mago_codex::ttype::atomic::mixed::TMixed;
+use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::string::TString;
 use mago_codex::ttype::combine_union_types;
@@ -344,6 +346,50 @@ fn analyze_array_elements<'ctx, 'arena>(
                     array_creation_info.item_key_atomic_types.extend(key_type.types.into_owned());
                     array_creation_info.item_value_atomic_types.push(TAtomic::Mixed(TMixed::new()));
                 }
+            }
+        }
+    }
+
+    if array_creation_info.is_list
+        && array_creation_info.property_types.len() == 2
+        && let (Some((_, first_type)), Some((_, second_type))) = (
+            array_creation_info.property_types.get(&ArrayKey::Integer(0)),
+            array_creation_info.property_types.get(&ArrayKey::Integer(1)),
+        )
+    {
+        let class_names: Vec<_> = first_type
+            .types
+            .iter()
+            .filter_map(|atomic| {
+                if let Some(class_name) = atomic.get_class_string_value() {
+                    Some(class_name)
+                } else if let Some(literal_str) = atomic.get_literal_string_value() {
+                    Some(atom(literal_str))
+                } else if let TAtomic::Object(obj) = atomic {
+                    match obj {
+                        TObject::Named(named) => Some(named.name),
+                        TObject::Enum(r#enum) => Some(r#enum.name),
+                        _ => None,
+                    }
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        let method_names: Vec<_> = second_type
+            .types
+            .iter()
+            .filter_map(|atomic| atomic.get_literal_string_value().map(ascii_lowercase_atom))
+            .collect();
+
+        for class_name in &class_names {
+            for method_name in &method_names {
+                artifacts.symbol_references.add_reference_to_class_member(
+                    &block_context.scope,
+                    (ascii_lowercase_atom(class_name), *method_name),
+                    false,
+                );
             }
         }
     }
