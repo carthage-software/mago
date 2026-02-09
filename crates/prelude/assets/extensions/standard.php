@@ -5040,7 +5040,7 @@ function array_uintersect(array $array, ...$rest): array
  *
  * @param array<K, V> $array
  *
- * @param-out array<K, V> $array
+ * @param-out ($array is non-empty-array|non-empty-list ? non-empty-array<K, V> : array<K, V>) $array
  */
 function ksort(array &$array, int $flags = SORT_REGULAR): true
 {
@@ -5052,7 +5052,7 @@ function ksort(array &$array, int $flags = SORT_REGULAR): true
  *
  * @param array<K, V> $array
  *
- * @param-out array<K, V> $array
+ * @param-out ($array is non-empty-array|non-empty-list ? non-empty-array<K, V> : array<K, V>) $array
  */
 function krsort(array &$array, int $flags = SORT_REGULAR): true
 {
@@ -5064,7 +5064,7 @@ function krsort(array &$array, int $flags = SORT_REGULAR): true
  *
  * @param array<K, V> $array
  *
- * @param-out array<K, V> $array
+ * @param-out ($array is non-empty-array|non-empty-list ? non-empty-array<K, V> : array<K, V>) $array
  */
 function natsort(array &$array): true
 {
@@ -5076,7 +5076,7 @@ function natsort(array &$array): true
  *
  * @param array<K, V> $array
  *
- * @param-out array<K, V> $array
+ * @param-out ($array is non-empty-array|non-empty-list ? non-empty-array<K, V> : array<K, V>) $array
  */
 function natcasesort(array &$array): true
 {
@@ -5088,7 +5088,7 @@ function natcasesort(array &$array): true
  *
  * @param array<K, V> $array
  *
- * @param-out array<K, V> $array
+ * @param-out ($array is non-empty-array|non-empty-list ? non-empty-array<K, V> : array<K, V>) $array
  */
 function asort(array &$array, int $flags = SORT_REGULAR): true
 {
@@ -5100,7 +5100,7 @@ function asort(array &$array, int $flags = SORT_REGULAR): true
  *
  * @param array<K, V> $array
  *
- * @param-out array<K, V> $array
+ * @param-out ($array is non-empty-array|non-empty-list ? non-empty-array<K, V> : array<K, V>) $array
  */
 function arsort(array &$array, int $flags = SORT_REGULAR): true
 {
@@ -5111,7 +5111,7 @@ function arsort(array &$array, int $flags = SORT_REGULAR): true
  *
  * @param array<T> $array
  *
- * @param-out list<T> $array
+ * @param-out ($array is non-empty-array|non-empty-list ? non-empty-list<T> : list<T>) $array
  */
 function sort(array &$array, int $flags = SORT_REGULAR): true
 {
@@ -5122,7 +5122,7 @@ function sort(array &$array, int $flags = SORT_REGULAR): true
  *
  * @param array<T> $array
  *
- * @param-out list<T> $array
+ * @param-out ($array is non-empty-array|non-empty-list ? non-empty-list<T> : list<T>) $array
  */
 function rsort(array &$array, int $flags = SORT_REGULAR): true
 {
@@ -5134,7 +5134,7 @@ function rsort(array &$array, int $flags = SORT_REGULAR): true
  * @param array<T> $array
  * @param (callable(T, T): int) $callback
  *
- * @param-out list<T> $array
+ * @param-out ($array is non-empty-array|non-empty-list ? non-empty-list<T> : list<T>) $array
  */
 function usort(array &$array, callable $callback): true
 {
@@ -5147,7 +5147,7 @@ function usort(array &$array, callable $callback): true
  * @param array<K, V> $array
  * @param (callable(V, V): int) $callback
  *
- * @param-out array<K, V> $array
+ * @param-out ($array is non-empty-array|non-empty-list ? non-empty-array<K, V> : array<K, V>) $array
  */
 function uasort(array &$array, callable $callback): true
 {
@@ -5160,7 +5160,7 @@ function uasort(array &$array, callable $callback): true
  * @param array<K, V> $array
  * @param (callable(K, K): int) $callback
  *
- * @param-out array<K, V> $array
+ * @param-out ($array is non-empty-array|non-empty-list ? non-empty-array<K, V> : array<K, V>) $array
  */
 function uksort(array &$array, callable $callback): true
 {
@@ -5171,7 +5171,7 @@ function uksort(array &$array, callable $callback): true
  *
  * @param array<T> $array
  *
- * @param-out list<T> $array
+ * @param-out ($array is non-empty-array|non-empty-list ? non-empty-list<T> : list<T>) $array
  */
 function shuffle(array &$array): true
 {
