@@ -75,6 +75,7 @@ use crate::rule::NoRedundantBlockConfig;
 use crate::rule::NoRedundantContinueConfig;
 use crate::rule::NoRedundantFileConfig;
 use crate::rule::NoRedundantFinalConfig;
+use crate::rule::NoRedundantIssetConfig;
 use crate::rule::NoRedundantLabelConfig;
 use crate::rule::NoRedundantLiteralReturnConfig;
 use crate::rule::NoRedundantMathConfig;
@@ -209,6 +210,7 @@ pub struct RulesSettings {
     pub no_redundant_string_concat: RuleSettings<NoRedundantStringConcatConfig>,
     pub no_redundant_parentheses: RuleSettings<NoRedundantParenthesesConfig>,
     pub no_redundant_method_override: RuleSettings<NoRedundantMethodOverrideConfig>,
+    pub no_redundant_isset: RuleSettings<NoRedundantIssetConfig>,
     pub no_redundant_nullsafe: RuleSettings<NoRedundantNullsafeConfig>,
     pub no_redundant_math: RuleSettings<NoRedundantMathConfig>,
     pub no_redundant_label: RuleSettings<NoRedundantLabelConfig>,

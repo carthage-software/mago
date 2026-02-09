@@ -218,6 +218,7 @@ define_rules! {
     NoRedundantStringConcat(no_redundant_string_concat @ NoRedundantStringConcatRule),
     NoRedundantParentheses(no_redundant_parentheses @ NoRedundantParenthesesRule),
     NoRedundantMethodOverride(no_redundant_method_override @ NoRedundantMethodOverrideRule),
+    NoRedundantIsset(no_redundant_isset @ NoRedundantIssetRule),
     NoRedundantNullsafe(no_redundant_nullsafe @ NoRedundantNullsafeRule),
     NoRedundantMath(no_redundant_math @ NoRedundantMathRule),
     NoRedundantLabel(no_redundant_label @ NoRedundantLabelRule),
