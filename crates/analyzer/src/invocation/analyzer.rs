@@ -10,6 +10,7 @@ use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::atomic::TAtomic;
+use mago_codex::ttype::atomic::callable::TCallable;
 use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::class_like_string::TClassLikeString;
@@ -212,6 +213,13 @@ pub fn analyze_invocation<'ctx, 'arena>(
             } else {
                 Some(base_parameter_type)
             }
+        } else {
+            None
+        };
+
+        let parameter_type = if let Some(mut pt) = parameter_type {
+            filter_array_filter_callback_type(&invocation.target, &mut pt, &analyzed_argument_types);
+            Some(pt)
         } else {
             None
         };
@@ -1154,4 +1162,74 @@ fn extract_class_name_from_atomic(atomic: &TAtomic) -> Option<Atom> {
         TAtomic::Object(TObject::Enum(enum_obj)) => Some(enum_obj.name),
         _ => None,
     }
+}
+
+/// Filters the callable parameter type for `array_filter` based on the `mode` argument.
+/// For `array_filter`, narrows the callback parameter type to only the callable signature
+/// matching the `mode` argument, so closure parameters get the correct inferred type.
+///
+/// mode 0 (default) → `callable(V): bool`, mode 1 → `callable(V, K): bool`, mode 2 → `callable(K): bool`
+fn filter_array_filter_callback_type(
+    target: &InvocationTarget<'_>,
+    parameter_type: &mut TUnion,
+    analyzed_argument_types: &HashMap<usize, (TUnion, mago_span::Span)>,
+) {
+    let is_array_filter = target.get_function_like_identifier().is_some_and(
+        |id| matches!(id, FunctionLikeIdentifier::Function(name) if name.eq_ignore_ascii_case("array_filter")),
+    );
+
+    if !is_array_filter {
+        return;
+    }
+
+    let mode = analyzed_argument_types
+        .get(&2)
+        .and_then(|(mode_type, _)| mode_type.get_single_literal_int_value())
+        .unwrap_or(0);
+
+    let expected_params: usize = if mode == 1 { 2 } else { 1 };
+
+    let value_type_id = if expected_params == 1 {
+        parameter_type.types.as_ref().iter().find_map(|atomic| {
+            if let TAtomic::Callable(TCallable::Signature(sig)) = atomic
+                && sig.parameters.len() == 2
+            {
+                sig.parameters.first().and_then(|p| p.get_type_signature()).map(|t| t.get_id())
+            } else {
+                None
+            }
+        })
+    } else {
+        None
+    };
+
+    let mut kept_one = false;
+    parameter_type.types.to_mut().retain(|atomic| {
+        let TAtomic::Callable(TCallable::Signature(sig)) = atomic else {
+            return true;
+        };
+
+        if sig.parameters.len() != expected_params {
+            return false;
+        }
+
+        if expected_params == 2 {
+            return if kept_one {
+                false
+            } else {
+                kept_one = true;
+                true
+            };
+        }
+
+        let is_value = sig.parameters.first().and_then(|p| p.get_type_signature()).map(|t| t.get_id()) == value_type_id;
+
+        let want_value = mode != 2;
+        if is_value == want_value && !kept_one {
+            kept_one = true;
+            true
+        } else {
+            false
+        }
+    });
 }
