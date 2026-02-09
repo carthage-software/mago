@@ -5633,6 +5633,22 @@ function array_unshift(array &$array, mixed ...$values): int
 }
 
 /**
+ * @template K of array-key
+ * @template V
+ *
+ * @param list<V>|array<K, V> $array
+ * @param int $offset
+ * @param null|int $length
+ * @param array<K, V>|list<V> $replacement
+ *
+ * @param-out (
+ *    $array is list<V> ? (
+ *      $replacement is non-empty-array<K, V> ? non-empty-list<V> : list<V>
+ *    ) : (
+ *      $replacement is non-empty-array<K, V> ? non-empty-array<K, V> : array<K, V>  
+ *    )
+ * ) $array
+ *
  * @pure
  */
 function array_splice(array &$array, int $offset, null|int $length = null, mixed $replacement = []): array
