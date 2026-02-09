@@ -62,7 +62,9 @@ mod constant;
 mod docblock;
 mod enum_case;
 mod function_like;
-mod inference;
+
+pub mod inference;
+
 mod parameter;
 mod property;
 mod ttype;

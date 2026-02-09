@@ -1,4 +1,5 @@
 use mago_atom::atom;
+use mago_codex::scanner::inference::get_platform_constant_type;
 use mago_codex::ttype::expander;
 use mago_codex::ttype::expander::TypeExpansionOptions;
 use mago_codex::ttype::get_mixed;
@@ -66,12 +67,16 @@ impl<'arena> Analyzable<'_, 'arena> for ConstantAccess<'arena> {
             );
         }
 
-        let mut constant_type = match &constant_metadata.type_metadata {
-            Some(t) => t.type_union.clone(),
-            None => match &constant_metadata.inferred_type {
-                Some(t) => t.clone(),
-                _ => get_mixed(),
-            },
+        let mut constant_type = if let Some(t) = get_platform_constant_type(name) {
+            t
+        } else {
+            match &constant_metadata.type_metadata {
+                Some(t) => t.type_union.clone(),
+                None => match &constant_metadata.inferred_type {
+                    Some(t) => t.clone(),
+                    _ => get_mixed(),
+                },
+            }
         };
 
         expander::expand_union(context.codebase, &mut constant_type, &TypeExpansionOptions::default());

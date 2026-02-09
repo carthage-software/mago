@@ -71,8 +71,105 @@ use crate::ttype::union::TUnion;
 use crate::ttype::wrap_atomic;
 use crate::utils::str_is_numeric;
 
+/// Returns the platform-aware type for a predefined constant, if known.
+///
+/// These constants have values that vary across platforms (e.g. 32-bit vs 64-bit),
+/// so their types should be ranges or unions rather than host-specific literals.
 #[inline]
-pub fn infer<'arena>(
+pub fn get_platform_constant_type(name: &str) -> Option<TUnion> {
+    static DIR_SEPARATOR_SLICE: LazyLock<[TAtomic; 2]> = LazyLock::new(|| {
+        [
+            TAtomic::Scalar(TScalar::String(TString {
+                literal: Some(TStringLiteral::Value(atom("/"))),
+                is_numeric: false,
+                is_truthy: true,
+                is_non_empty: true,
+                casing: TStringCasing::Lowercase,
+            })),
+            TAtomic::Scalar(TScalar::String(TString {
+                literal: Some(TStringLiteral::Value(atom("\\"))),
+                is_numeric: false,
+                is_truthy: true,
+                is_non_empty: true,
+                casing: TStringCasing::Lowercase,
+            })),
+        ]
+    });
+
+    const PHP_INT_MAX_SLICE: &[TAtomic] = &[
+        TAtomic::Scalar(TScalar::Integer(TInteger::Literal(9_223_372_036_854_775_807))),
+        TAtomic::Scalar(TScalar::Integer(TInteger::Literal(2_147_483_647))),
+    ];
+
+    const PHP_INT_MIN_SLICE: &[TAtomic] = &[
+        TAtomic::Scalar(TScalar::Integer(TInteger::Literal(-9_223_372_036_854_775_808))),
+        TAtomic::Scalar(TScalar::Integer(TInteger::Literal(-2_147_483_648))),
+    ];
+
+    const PHP_MAJOR_VERSION_ATOMIC: &TAtomic = &TAtomic::Scalar(TScalar::Integer(TInteger::Range(8, 9)));
+    const PHP_ZTS_ATOMIC: &TAtomic = &TAtomic::Scalar(TScalar::Integer(TInteger::Range(0, 1)));
+    const PHP_DEBUG_ATOMIC: &TAtomic = &TAtomic::Scalar(TScalar::Integer(TInteger::Range(0, 1)));
+    const PHP_INT_SIZE_ATOMIC: &TAtomic = &TAtomic::Scalar(TScalar::Integer(TInteger::Range(4, 8)));
+    const PHP_WINDOWS_VERSION_MAJOR_ATOMIC: &TAtomic = &TAtomic::Scalar(TScalar::Integer(TInteger::Range(4, 6)));
+    const PHP_WINDOWS_VERSION_MINOR_SLICE: &[TAtomic] = &[
+        TAtomic::Scalar(TScalar::Integer(TInteger::Literal(0))),
+        TAtomic::Scalar(TScalar::Integer(TInteger::Literal(1))),
+        TAtomic::Scalar(TScalar::Integer(TInteger::Literal(2))),
+        TAtomic::Scalar(TScalar::Integer(TInteger::Literal(10))),
+        TAtomic::Scalar(TScalar::Integer(TInteger::Literal(90))),
+    ];
+
+    let name = name.strip_prefix('\\').unwrap_or(name);
+
+    match name {
+        "PHP_MAXPATHLEN"
+        | "PHP_WINDOWS_VERSION_BUILD"
+        | "LIBXML_VERSION"
+        | "OPENSSL_VERSION_NUMBER"
+        | "PHP_FLOAT_DIG" => Some(get_int()),
+        "PHP_EXTRA_VERSION" => Some(get_string()),
+        "PHP_BUILD_DATE"
+        | "PEAR_EXTENSION_DIR"
+        | "PEAR_INSTALL_DIR"
+        | "PHP_BINARY"
+        | "PHP_BINDIR"
+        | "PHP_CONFIG_FILE_PATH"
+        | "PHP_CONFIG_FILE_SCAN_DIR"
+        | "PHP_DATADIR"
+        | "PHP_EXTENSION_DIR"
+        | "PHP_LIBDIR"
+        | "PHP_LOCALSTATEDIR"
+        | "PHP_MANDIR"
+        | "PHP_OS"
+        | "PHP_OS_FAMILY"
+        | "PHP_PREFIX"
+        | "PHP_EOL"
+        | "PATH_SEPARATOR"
+        | "PHP_VERSION"
+        | "PHP_SAPI"
+        | "PHP_SYSCONFDIR"
+        | "ICONV_IMPL"
+        | "LIBXML_DOTTED_VERSION"
+        | "PCRE_VERSION" => Some(get_non_empty_string()),
+        "STDIN" | "STDOUT" | "STDERR" => Some(get_open_resource()),
+        "NAN" | "PHP_FLOAT_EPSILON" | "INF" => Some(get_float()),
+        "PHP_VERSION_ID" => Some(get_positive_int()),
+        "PHP_RELEASE_VERSION" | "PHP_MINOR_VERSION" => Some(get_non_negative_int()),
+        "PHP_MAJOR_VERSION" => Some(TUnion::from_single(Cow::Borrowed(PHP_MAJOR_VERSION_ATOMIC))),
+        "PHP_ZTS" => Some(TUnion::from_single(Cow::Borrowed(PHP_ZTS_ATOMIC))),
+        "PHP_DEBUG" => Some(TUnion::from_single(Cow::Borrowed(PHP_DEBUG_ATOMIC))),
+        "PHP_INT_SIZE" => Some(TUnion::from_single(Cow::Borrowed(PHP_INT_SIZE_ATOMIC))),
+        "PHP_WINDOWS_VERSION_MAJOR" => Some(TUnion::from_single(Cow::Borrowed(PHP_WINDOWS_VERSION_MAJOR_ATOMIC))),
+        "DIRECTORY_SEPARATOR" => Some(TUnion::new(Cow::Borrowed(DIR_SEPARATOR_SLICE.as_slice()))),
+        "PHP_INT_MAX" => Some(TUnion::new(Cow::Borrowed(PHP_INT_MAX_SLICE))),
+        "PHP_INT_MIN" => Some(TUnion::new(Cow::Borrowed(PHP_INT_MIN_SLICE))),
+        "PHP_WINDOWS_VERSION_MINOR" => Some(TUnion::new(Cow::Borrowed(PHP_WINDOWS_VERSION_MINOR_SLICE))),
+        _ => None,
+    }
+}
+
+#[inline]
+pub(crate) fn infer<'arena>(
     context: &Context<'_, 'arena>,
     scope: &NamespaceScope,
     expression: &'arena Expression<'arena>,
@@ -81,7 +178,7 @@ pub fn infer<'arena>(
 }
 
 #[inline]
-pub fn infer_with_constants<'arena>(
+pub(crate) fn infer_with_constants<'arena>(
     context: &Context<'_, 'arena>,
     scope: &NamespaceScope,
     expression: &'arena Expression<'arena>,
@@ -449,48 +546,6 @@ fn infer_constant<'ctx, 'arena>(
     constant: &'ctx Identifier<'arena>,
     constants_map: Option<&AtomMap<ConstantMetadata>>,
 ) -> Option<TUnion> {
-    static DIR_SEPARATOR_SLICE: LazyLock<[TAtomic; 2]> = LazyLock::new(|| {
-        [
-            TAtomic::Scalar(TScalar::String(TString {
-                literal: Some(TStringLiteral::Value(atom("/"))),
-                is_numeric: false,
-                is_truthy: true,
-                is_non_empty: true,
-                casing: TStringCasing::Lowercase,
-            })),
-            TAtomic::Scalar(TScalar::String(TString {
-                literal: Some(TStringLiteral::Value(atom("\\"))),
-                is_numeric: false,
-                is_truthy: true,
-                is_non_empty: true,
-                casing: TStringCasing::Lowercase,
-            })),
-        ]
-    });
-
-    const PHP_INT_MAX_SLICE: &[TAtomic] = &[
-        TAtomic::Scalar(TScalar::Integer(TInteger::Literal(9_223_372_036_854_775_807))),
-        TAtomic::Scalar(TScalar::Integer(TInteger::Literal(2_147_483_647))),
-    ];
-
-    const PHP_INT_MIN_SLICE: &[TAtomic] = &[
-        TAtomic::Scalar(TScalar::Integer(TInteger::Literal(-9_223_372_036_854_775_808))),
-        TAtomic::Scalar(TScalar::Integer(TInteger::Literal(-2_147_483_648))),
-    ];
-
-    const PHP_MAJOR_VERSION_ATOMIC: &TAtomic = &TAtomic::Scalar(TScalar::Integer(TInteger::Range(8, 9)));
-    const PHP_ZTS_ATOMIC: &TAtomic = &TAtomic::Scalar(TScalar::Integer(TInteger::Range(0, 1)));
-    const PHP_DEBUG_ATOMIC: &TAtomic = &TAtomic::Scalar(TScalar::Integer(TInteger::Range(0, 1)));
-    const PHP_INT_SIZE_ATOMIC: &TAtomic = &TAtomic::Scalar(TScalar::Integer(TInteger::Range(4, 8)));
-    const PHP_WINDOWS_VERSION_MAJOR_ATOMIC: &TAtomic = &TAtomic::Scalar(TScalar::Integer(TInteger::Range(4, 6)));
-    const PHP_WINDOWS_VERSION_MINOR_SLICE: &[TAtomic] = &[
-        TAtomic::Scalar(TScalar::Integer(TInteger::Literal(0))),
-        TAtomic::Scalar(TScalar::Integer(TInteger::Literal(1))),
-        TAtomic::Scalar(TScalar::Integer(TInteger::Literal(2))),
-        TAtomic::Scalar(TScalar::Integer(TInteger::Literal(10))),
-        TAtomic::Scalar(TScalar::Integer(TInteger::Literal(90))),
-    ];
-
     let (short_name, fqn) = if names.is_imported(constant) {
         (names.get(constant), names.get(constant))
     } else if let Some(stripped) = constant.value().strip_prefix('\\') {
@@ -498,6 +553,10 @@ fn infer_constant<'ctx, 'arena>(
     } else {
         (constant.value(), names.get(constant))
     };
+
+    if let Some(t) = get_platform_constant_type(short_name) {
+        return Some(t);
+    }
 
     if let Some(constants) = constants_map {
         let normalized_name = ascii_lowercase_constant_name_atom(fqn);
@@ -509,51 +568,7 @@ fn infer_constant<'ctx, 'arena>(
         }
     }
 
-    Some(match short_name {
-        "PHP_MAXPATHLEN"
-        | "PHP_WINDOWS_VERSION_BUILD"
-        | "LIBXML_VERSION"
-        | "OPENSSL_VERSION_NUMBER"
-        | "PHP_FLOAT_DIG" => get_int(),
-        "PHP_EXTRA_VERSION" => get_string(),
-        "PHP_BUILD_DATE"
-        | "PEAR_EXTENSION_DIR"
-        | "PEAR_INSTALL_DIR"
-        | "PHP_BINARY"
-        | "PHP_BINDIR"
-        | "PHP_CONFIG_FILE_PATH"
-        | "PHP_CONFIG_FILE_SCAN_DIR"
-        | "PHP_DATADIR"
-        | "PHP_EXTENSION_DIR"
-        | "PHP_LIBDIR"
-        | "PHP_LOCALSTATEDIR"
-        | "PHP_MANDIR"
-        | "PHP_OS"
-        | "PHP_OS_FAMILY"
-        | "PHP_PREFIX"
-        | "PHP_EOL"
-        | "PATH_SEPARATOR"
-        | "PHP_VERSION"
-        | "PHP_SAPI"
-        | "PHP_SYSCONFDIR"
-        | "ICONV_IMPL"
-        | "LIBXML_DOTTED_VERSION"
-        | "PCRE_VERSION" => get_non_empty_string(),
-        "STDIN" | "STDOUT" | "STDERR" => get_open_resource(),
-        "NAN" | "PHP_FLOAT_EPSILON" | "INF" => get_float(),
-        "PHP_VERSION_ID" => get_positive_int(),
-        "PHP_RELEASE_VERSION" | "PHP_MINOR_VERSION" => get_non_negative_int(),
-        "PHP_MAJOR_VERSION" => TUnion::from_single(Cow::Borrowed(PHP_MAJOR_VERSION_ATOMIC)),
-        "PHP_ZTS" => TUnion::from_single(Cow::Borrowed(PHP_ZTS_ATOMIC)),
-        "PHP_DEBUG" => TUnion::from_single(Cow::Borrowed(PHP_DEBUG_ATOMIC)),
-        "PHP_INT_SIZE" => TUnion::from_single(Cow::Borrowed(PHP_INT_SIZE_ATOMIC)),
-        "PHP_WINDOWS_VERSION_MAJOR" => TUnion::from_single(Cow::Borrowed(PHP_WINDOWS_VERSION_MAJOR_ATOMIC)),
-        "DIRECTORY_SEPARATOR" => TUnion::new(Cow::Borrowed(DIR_SEPARATOR_SLICE.as_slice())),
-        "PHP_INT_MAX" => TUnion::new(Cow::Borrowed(PHP_INT_MAX_SLICE)),
-        "PHP_INT_MIN" => TUnion::new(Cow::Borrowed(PHP_INT_MIN_SLICE)),
-        "PHP_WINDOWS_VERSION_MINOR" => TUnion::new(Cow::Borrowed(PHP_WINDOWS_VERSION_MINOR_SLICE)),
-        _ => return None,
-    })
+    None
 }
 
 #[inline]
