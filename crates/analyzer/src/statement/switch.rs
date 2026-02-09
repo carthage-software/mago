@@ -790,7 +790,17 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
             true,
         );
 
-        let effective_action = Self::get_last_action(&actions_set);
+        let effective_action = if actions_set.contains(ControlAction::None)
+            && matches!(self.last_case_exit_type, ControlAction::Return)
+            && !actions_set.contains(ControlAction::LeaveSwitch)
+            && !actions_set.contains(ControlAction::Break)
+            && !actions_set.contains(ControlAction::BreakImmediateLoop)
+            && !actions_set.contains(ControlAction::Continue)
+        {
+            Some(ControlAction::Return)
+        } else {
+            Self::get_last_action(&actions_set)
+        };
 
         if let Some(action) = effective_action {
             self.last_case_exit_type = action;
