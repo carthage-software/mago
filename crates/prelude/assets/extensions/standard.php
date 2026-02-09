@@ -5633,20 +5633,43 @@ function array_unshift(array &$array, mixed ...$values): int
 }
 
 /**
- * @template K of array-key
- * @template V
+ * @template InputKey of array-key
+ * @template InputValue
+ * @template ReplacementKey
+ * @template ReplacementValue
+ * @template ReplacementScalar
  *
- * @param list<V>|array<K, V> $array
+ * @param list<InputValue>|array<InputKey, InputValue> $array
  * @param int $offset
  * @param null|int $length
- * @param array<K, V>|list<V> $replacement
+ * @param array<ReplacementKey, ReplacementValue>|ReplacementScalar $replacement
  *
  * @param-out (
- *    $array is list<V> ? (
- *      $replacement is non-empty-array<K, V> ? non-empty-list<V> : list<V>
- *    ) : (
- *      $replacement is non-empty-array<K, V> ? non-empty-array<K, V> : array<K, V>  
- *    )
+ *   $replacement is array<ReplacementKey, ReplacementValue> ? (
+ *     $array is list<InputValue> ? (
+ *       $replacement is list<ReplacementValue> ? (
+ *         $replacement is non-empty-list<ReplacementValue> ? non-empty-list<InputValue|ReplacementValue> : list<InputValue|ReplacementValue> 
+ *       ) : (
+ *         $replacement is non-empty-array<ReplacementKey, ReplacementValue> ? (
+ *           non-empty-array<InputKey|ReplacementKey, InputValue|ReplacementValue>
+ *         ) : (
+ *           array<InputKey|ReplacementKey, InputValue|ReplacementValue>
+ *         )
+ *       )
+ *     ) : (
+ *       $replacement is non-empty-array<ReplacementKey, ReplacementValue> ? (
+ *         non-empty-array<InputKey|ReplacementKey, InputValue|ReplacementValue>
+ *       ) : (
+ *         array<InputKey|ReplacementKey, InputValue|ReplacementValue>
+ *       )
+ *     )
+ *   ) : (
+ *     $replacement is list<never>|array{} ? (
+ *       $array is list<InputValue> ? list<InputValue> : array<InputKey, InputValue>
+ *     ) : (
+ *       $array is list<InputValue> ? non-empty-list<InputValue|ReplacementScalar> : non-empty-array<InputKey|int, InputValue|ReplacementScalar>
+ *     )
+ *   )
  * ) $array
  *
  * @pure
