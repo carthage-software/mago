@@ -169,7 +169,7 @@ pub fn get_platform_constant_type(name: &str) -> Option<TUnion> {
 }
 
 #[inline]
-pub(crate) fn infer<'arena>(
+pub(super) fn infer<'arena>(
     context: &Context<'_, 'arena>,
     scope: &NamespaceScope,
     expression: &'arena Expression<'arena>,
@@ -178,7 +178,7 @@ pub(crate) fn infer<'arena>(
 }
 
 #[inline]
-pub(crate) fn infer_with_constants<'arena>(
+pub(super) fn infer_with_constants<'arena>(
     context: &Context<'_, 'arena>,
     scope: &NamespaceScope,
     expression: &'arena Expression<'arena>,
