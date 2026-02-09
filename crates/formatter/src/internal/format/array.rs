@@ -157,6 +157,9 @@ pub(super) fn print_array_like<'arena>(
     let use_table_style = f.settings.array_table_style_alignment && is_table_style(f, &array_like);
     let column_widths = if use_table_style { calculate_column_widths(f, &array_like) } else { None };
 
+    let outer_alignment = f.alignment_context();
+    f.set_alignment_context(None);
+
     parts.push(Document::Indent({
         let len = elements.len();
         let mut indent_parts = vec![in f.arena;];
@@ -211,6 +214,8 @@ pub(super) fn print_array_like<'arena>(
 
         indent_parts
     }));
+
+    f.set_alignment_context(outer_alignment);
 
     if f.settings.trailing_comma {
         parts.push(Document::IfBreak(IfBreak::then(f.arena, Document::String(","))));
