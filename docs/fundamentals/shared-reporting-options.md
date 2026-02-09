@@ -75,3 +75,4 @@ For a complete guide, see the [Baseline documentation](/fundamentals/baseline.md
 | `--generate-baseline` | Generate a new baseline file, capturing all current issues.                                     |
 | `--baseline <PATH>`   | Specify the path to a baseline file to use for ignoring issues.                                 |
 | `--backup-baseline`   | Create a backup of the old baseline file (e.g., `baseline.toml.bkp`) when generating a new one. |
+| `--ignore-baseline`   | Ignore any configured or specified baseline, reporting all issues.                               |
