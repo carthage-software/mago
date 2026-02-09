@@ -603,6 +603,7 @@ test_case!(issue_1057);
 test_case!(issue_1064);
 test_case!(issue_1061);
 test_case!(issue_1070);
+test_case!(issue_1071);
 test_case!(issue_1072);
 test_case!(issue_1074);
 

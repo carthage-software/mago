@@ -7,9 +7,6 @@ use mago_atom::AtomMap;
 use mago_atom::ascii_lowercase_constant_name_atom;
 use mago_atom::atom;
 use mago_atom::concat_atom;
-
-use crate::metadata::constant::ConstantMetadata;
-use crate::ttype::atomic::scalar::string::TStringCasing;
 use mago_names::ResolvedNames;
 use mago_names::scope::NamespaceScope;
 use mago_span::HasPosition;
@@ -33,6 +30,7 @@ use mago_syntax::ast::UnaryPrefixOperator;
 
 use crate::flags::attribute::AttributeFlags;
 use crate::identifier::function_like::FunctionLikeIdentifier;
+use crate::metadata::constant::ConstantMetadata;
 use crate::scanner::Context;
 use crate::ttype::atomic::TAtomic;
 use crate::ttype::atomic::array::TArray;
@@ -46,7 +44,9 @@ use crate::ttype::atomic::scalar::class_like_string::TClassLikeString;
 use crate::ttype::atomic::scalar::float::TFloat;
 use crate::ttype::atomic::scalar::int::TInteger;
 use crate::ttype::atomic::scalar::string::TString;
+use crate::ttype::atomic::scalar::string::TStringCasing;
 use crate::ttype::atomic::scalar::string::TStringLiteral;
+use crate::ttype::get_arraykey;
 use crate::ttype::get_bool;
 use crate::ttype::get_empty_string;
 use crate::ttype::get_false;
@@ -55,6 +55,7 @@ use crate::ttype::get_int;
 use crate::ttype::get_int_or_float;
 use crate::ttype::get_literal_int;
 use crate::ttype::get_literal_string;
+use crate::ttype::get_mixed;
 use crate::ttype::get_mixed_keyed_array;
 use crate::ttype::get_never;
 use crate::ttype::get_non_empty_string;
@@ -364,7 +365,10 @@ pub fn infer_with_constants<'arena>(
                     return None;
                 };
 
-                entries.insert(i, (false, infer_with_constants(context, scope, element.value, constants)?));
+                let value_type =
+                    infer_with_constants(context, scope, element.value, constants).unwrap_or_else(get_mixed);
+
+                entries.insert(i, (false, value_type));
             }
 
             Some(wrap_atomic(TAtomic::Array(TArray::List(TList {
@@ -378,14 +382,23 @@ pub fn infer_with_constants<'arena>(
             if is_keyed_array_expression(expression) =>
         {
             let mut known_items = BTreeMap::new();
+            let mut unknown_key_values = Vec::new();
             for element in elements {
                 let ArrayElement::KeyValue(element) = element else {
                     return None;
                 };
 
-                let key_type = infer_with_constants(context, scope, element.key, constants)
-                    .and_then(|v| v.get_single_array_key())?;
-                known_items.insert(key_type, (false, infer_with_constants(context, scope, element.value, constants)?));
+                let value_type =
+                    infer_with_constants(context, scope, element.value, constants).unwrap_or_else(get_mixed);
+
+                let Some(key_type) =
+                    infer_with_constants(context, scope, element.key, constants).and_then(|v| v.get_single_array_key())
+                else {
+                    unknown_key_values.push(value_type);
+                    continue;
+                };
+
+                known_items.insert(key_type, (false, value_type));
 
                 if known_items.len() > 100 {
                     return None;
@@ -394,7 +407,19 @@ pub fn infer_with_constants<'arena>(
 
             let mut keyed_array = TKeyedArray::new();
             keyed_array.non_empty = !known_items.is_empty();
-            keyed_array.known_items = Some(known_items);
+            if !known_items.is_empty() {
+                keyed_array.known_items = Some(known_items);
+            }
+
+            if !unknown_key_values.is_empty() {
+                let mut value_parameter_types = vec![];
+                for value_type in unknown_key_values {
+                    value_parameter_types.extend(value_type.types.into_owned());
+                }
+
+                keyed_array.parameters =
+                    Some((Arc::new(get_arraykey()), Arc::new(TUnion::from_vec(value_parameter_types))))
+            }
 
             Some(TUnion::from_single(Cow::Owned(TAtomic::Array(TArray::Keyed(keyed_array)))))
         }
