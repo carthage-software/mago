@@ -395,6 +395,7 @@ test_case!(missing_api_or_internal, {
     s.require_api_or_internal = true;
     s
 });
+test_case!(spread_list);
 
 // Github Issues
 test_case!(issue_659);

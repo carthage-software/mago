@@ -521,13 +521,9 @@ fn handle_variadic_array_element<'arena>(
                     }
                 }
                 TArray::List(list_data) => {
-                    // Process known elements
                     if let Some(known_elements) = &list_data.known_elements {
-                        // Original logic iterated values(), not keys. Let's adjust to match the old intent if needed.
-                        // Assuming the goal IS to add elements sequentially based on the values in the spread list:
-                        for (definite, value_type) in known_elements.values() {
-                            // Key _idx ignored if appending
-                            if !*definite {
+                        for (possibly_undefined, value_type) in known_elements.values() {
+                            if *possibly_undefined {
                                 continue;
                             }
 
