@@ -3,6 +3,9 @@ use std::rc::Rc;
 use mago_atom::Atom;
 use mago_atom::concat_atom;
 use mago_codex::ttype::add_optional_union_type;
+use mago_codex::ttype::expander::StaticClassType;
+use mago_codex::ttype::expander::TypeExpansionOptions;
+use mago_codex::ttype::expander::expand_union;
 use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::get_never;
 use mago_codex::ttype::get_null;
@@ -154,6 +157,20 @@ fn analyze_property_access<'ctx, 'ast, 'arena>(
     {
         resulting_type.set_nullsafe_null(true);
     }
+
+    expand_union(
+        context.codebase,
+        &mut resulting_type,
+        &TypeExpansionOptions {
+            self_class: block_context.scope.get_class_like_name(),
+            static_class_type: if let Some(calling_class) = block_context.scope.get_class_like_name() {
+                StaticClassType::Name(calling_class)
+            } else {
+                StaticClassType::None
+            },
+            ..Default::default()
+        },
+    );
 
     let resulting_type = Rc::new(resulting_type);
     if let Some(property_access_id) = property_access_id {
