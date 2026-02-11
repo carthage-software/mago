@@ -12,11 +12,13 @@ use mago_codex::populator::populate_codebase;
 use mago_codex::reference::SymbolReferences;
 use mago_codex::scanner::scan_program;
 use mago_codex::signature_builder;
+
 use mago_database::DatabaseReader;
 use mago_database::ReadDatabase;
 use mago_database::file::File;
 use mago_database::file::FileId;
 use mago_database::file::FileType;
+
 use mago_names::resolver::NameResolver;
 use mago_syntax::parser::parse_file_with_settings;
 use mago_syntax::settings::ParserSettings;
@@ -51,7 +53,7 @@ pub trait Reducer<T, R>: Debug {
         codebase: CodebaseMetadata,
         symbol_references: SymbolReferences,
         results: Vec<T>,
-    ) -> Result<(R, CodebaseMetadata, SymbolReferences), OrchestratorError>;
+    ) -> Result<R, OrchestratorError>;
 }
 
 /// A trait that defines the final "reduce" step for a stateless parallel computation.
@@ -59,9 +61,6 @@ pub trait StatelessReducer<I, R>: Debug {
     /// Aggregates intermediate results from the parallel "map" phase into a final result.
     fn reduce(&self, results: Vec<I>) -> Result<R, OrchestratorError>;
 }
-
-/// A callback type invoked after the scanning phase completes.
-pub type PostScanCallback = Box<dyn FnOnce(&mut CodebaseMetadata, &SymbolReferences) + Send>;
 
 /// An orchestrator for a multi-phase, data-parallel computation pipeline.
 ///
@@ -81,7 +80,6 @@ pub struct ParallelPipeline<T, I, R> {
     parser_settings: ParserSettings,
     reducer: Box<dyn Reducer<I, R> + Send + Sync>,
     should_use_progress_bar: bool,
-    after_scanning: Option<PostScanCallback>,
 }
 
 impl<T, I, R> std::fmt::Debug for ParallelPipeline<T, I, R>
@@ -98,7 +96,6 @@ where
             .field("parser_settings", &self.parser_settings)
             .field("reducer", &"<reducer>")
             .field("should_use_progress_bar", &self.should_use_progress_bar)
-            .field("after_scanning", &self.after_scanning.is_some())
             .finish()
     }
 }
@@ -142,21 +139,7 @@ where
             parser_settings,
             reducer,
             should_use_progress_bar,
-            after_scanning: None,
         }
-    }
-
-    /// Sets a callback to be invoked after the scanning phase completes.
-    ///
-    /// This callback receives mutable access to the codebase metadata and immutable
-    /// access to symbol references. It's useful for operations like incremental analysis
-    /// that need to mark safe symbols before the analysis phase begins.
-    pub fn with_after_scanning(
-        mut self,
-        callback: impl FnOnce(&mut CodebaseMetadata, &SymbolReferences) + Send + 'static,
-    ) -> Self {
-        self.after_scanning = Some(Box::new(callback));
-        self
     }
 
     /// Executes the full pipeline with a given map function.
@@ -173,7 +156,7 @@ where
     /// - `result`: The aggregated result from the reducer
     /// - `codebase`: The final codebase metadata after all processing
     /// - `symbol_references`: The final symbol references
-    pub fn run<F>(self, map_function: F) -> Result<(R, CodebaseMetadata, SymbolReferences), OrchestratorError>
+    pub fn run<F>(self, map_function: F) -> Result<R, OrchestratorError>
     where
         F: Fn(T, &Bump, Arc<File>, Arc<CodebaseMetadata>) -> Result<I, OrchestratorError> + Send + Sync + 'static,
     {
@@ -181,9 +164,7 @@ where
         if source_files.is_empty() {
             tracing::info!("No source files found for analysis.");
 
-            let (result, codebase, symbol_references) =
-                self.reducer.reduce(self.codebase, self.symbol_references, Vec::new())?;
-            return Ok((result, codebase, symbol_references));
+            return self.reducer.reduce(self.codebase, self.symbol_references, Vec::new());
         }
 
         let compiling_bar = if self.should_use_progress_bar {
@@ -230,11 +211,6 @@ where
         let mut symbol_references = self.symbol_references;
         populate_codebase(&mut merged_codex, &mut symbol_references, AtomSet::default(), HashSet::default());
 
-        // Invoke after_scanning callback if provided (for incremental analysis)
-        if let Some(callback) = self.after_scanning {
-            callback(&mut merged_codex, &symbol_references);
-        }
-
         if let Some(compiling_bar) = compiling_bar {
             remove_progress_bar(&compiling_bar);
         }
@@ -249,9 +225,7 @@ where
         if host_files.is_empty() {
             tracing::warn!("No host files found for analysis after compilation.");
 
-            let (result, codebase, symbol_references) =
-                self.reducer.reduce(merged_codex, symbol_references, Vec::new())?;
-            return Ok((result, codebase, symbol_references));
+            return self.reducer.reduce(merged_codex, symbol_references, Vec::new());
         }
 
         let final_codebase = Arc::new(merged_codex);
@@ -284,8 +258,7 @@ where
 
         let final_codebase = Arc::unwrap_or_clone(final_codebase);
 
-        let (result, codebase, symbol_references) = self.reducer.reduce(final_codebase, symbol_references, results)?;
-        Ok((result, codebase, symbol_references))
+        self.reducer.reduce(final_codebase, symbol_references, results)
     }
 }
 

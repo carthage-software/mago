@@ -54,6 +54,7 @@ use crate::service::analysis::AnalysisService;
 use crate::service::format::FileFormatStatus;
 use crate::service::format::FormatService;
 use crate::service::guard::GuardService;
+use crate::service::incremental_analysis::IncrementalAnalysisService;
 use crate::service::lint::LintService;
 
 pub use config::OrchestratorConfiguration;
@@ -61,7 +62,6 @@ pub use error::OrchestratorError;
 
 pub mod config;
 pub mod error;
-pub mod incremental;
 pub mod progress;
 pub mod service;
 
@@ -270,12 +270,13 @@ impl<'a> Orchestrator<'a> {
     /// The analysis service performs deep static analysis on PHP code, including type checking,
     /// control flow analysis, and detection of logical errors and type mismatches.
     ///
+    /// For incremental/watch mode analysis, use [`get_incremental_analysis_service`](Self::get_incremental_analysis_service) instead.
+    ///
     /// # Arguments
     ///
     /// * `database` - A read-only database handle containing the PHP files to analyze
     /// * `codebase` - Metadata about the codebase structure and symbols
     /// * `symbol_references` - Information about symbol usage and references across the codebase
-    /// * `incremental` - Optional incremental analysis manager for marking safe symbols
     ///
     /// # Returns
     ///
@@ -285,9 +286,8 @@ impl<'a> Orchestrator<'a> {
         database: ReadDatabase,
         codebase: CodebaseMetadata,
         symbol_references: SymbolReferences,
-        incremental: Option<incremental::IncrementalAnalysis>,
     ) -> AnalysisService {
-        let mut service = AnalysisService::new(
+        AnalysisService::new(
             database,
             codebase,
             symbol_references,
@@ -295,13 +295,38 @@ impl<'a> Orchestrator<'a> {
             self.config.parser_settings,
             self.config.use_progress_bars,
             self.get_analyzer_plugin_registry(),
-        );
+        )
+    }
 
-        if let Some(incremental) = incremental {
-            service = service.with_incremental(incremental);
-        }
-
-        service
+    /// Creates an incremental analysis service for watch mode or LSP integration.
+    ///
+    /// The service manages its own incremental state internally and provides a clean API
+    /// for running full and incremental analysis without being coupled to CLI output
+    /// or file watchers.
+    ///
+    /// # Arguments
+    ///
+    /// * `database` - A read-only database handle containing the PHP files to analyze
+    /// * `codebase` - Base codebase metadata (prelude only, no user symbols)
+    /// * `symbol_references` - Base symbol references (prelude only)
+    ///
+    /// # Returns
+    ///
+    /// An [`IncrementalAnalysisService`] ready for analysis.
+    pub fn get_incremental_analysis_service(
+        &self,
+        database: ReadDatabase,
+        codebase: CodebaseMetadata,
+        symbol_references: SymbolReferences,
+    ) -> IncrementalAnalysisService {
+        IncrementalAnalysisService::new(
+            database,
+            codebase,
+            symbol_references,
+            self.config.analyzer_settings.clone(),
+            self.config.parser_settings,
+            self.get_analyzer_plugin_registry(),
+        )
     }
 
     /// Creates a code formatting service with the current configuration.

@@ -48,7 +48,6 @@ use mago_database::file::FileType;
 use mago_database::watcher::DatabaseWatcher;
 use mago_database::watcher::WatchOptions;
 use mago_orchestrator::Orchestrator;
-use mago_orchestrator::incremental::IncrementalAnalysis;
 use mago_prelude::Prelude;
 
 use crate::commands::args::baseline_reporting::BaselineReportingArgs;
@@ -188,13 +187,7 @@ impl AnalyzeCommand {
             return Ok(ExitCode::SUCCESS);
         }
 
-        let mut service = orchestrator.get_analysis_service(
-            database.read_only(),
-            metadata,
-            symbol_references,
-            self.create_incremental_analysis(),
-        );
-
+        let service = orchestrator.get_analysis_service(database.read_only(), metadata, symbol_references);
         let analysis_result = service.run()?;
 
         let mut issues = analysis_result.issues;
@@ -210,25 +203,11 @@ impl AnalyzeCommand {
         processor.process_issues(&orchestrator, &mut database, issues)
     }
 
-    /// Creates incremental analysis manager based on flags.
-    ///
-    /// Returns `Some(IncrementalAnalysis)` if incremental analysis should be used,
-    /// `None` otherwise.
-    fn create_incremental_analysis(&self) -> Option<IncrementalAnalysis> {
-        if !self.watch {
-            return None;
-        }
-
-        Some(IncrementalAnalysis::new())
-    }
-
     /// Runs in watch mode, continuously monitoring for file changes and re-analyzing.
-    ///
-    /// This method sets up a file watcher on the workspace directory and runs
-    /// full analysis whenever PHP files are modified, created, or deleted.
     ///
     /// # Arguments
     ///
+    /// * `orchestrator` - The orchestrator for creating services
     /// * `configuration` - The loaded configuration
     /// * `color_choice` - Whether to use colored output
     /// * `prelude_database` - The prelude database with builtin symbols
@@ -261,14 +240,10 @@ impl AnalyzeCommand {
 
         tracing::info!("Watching {} for changes...", configuration.source.workspace.display());
         tracing::info!("Running initial analysis...");
-        let mut service = orchestrator.get_analysis_service(
-            watcher.read_only_database(),
-            metadata,
-            symbol_references,
-            self.create_incremental_analysis(),
-        );
 
-        let analysis_result = service.run()?;
+        let mut service =
+            orchestrator.get_incremental_analysis_service(watcher.read_only_database(), metadata, symbol_references);
+        let analysis_result = service.analyze()?;
 
         let mut issues = analysis_result.issues;
         let read_db = watcher.read_only_database();
@@ -292,9 +267,9 @@ impl AnalyzeCommand {
 
             tracing::info!("Detected {} file change(s), re-analyzing...", changed_file_ids.len());
 
-            service.update_database(watcher.database().read_only());
+            service.update_database(watcher.read_only_database());
 
-            let analysis_result = service.run_incremental()?;
+            let analysis_result = service.analyze_incremental(Some(&changed_file_ids))?;
 
             let mut issues = analysis_result.issues;
             let read_db = watcher.read_only_database();
