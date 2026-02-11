@@ -240,6 +240,7 @@ test_case!(match_idempotency);
 test_case!(heredoc_indentation);
 test_case!(heredoc_indentation_disabled);
 test_case!(drupal_preset);
+test_case!(redundant_grouping_parens);
 
 // A special test case for regressions in the Psl codebase
 test_case!(psl_regressions);
