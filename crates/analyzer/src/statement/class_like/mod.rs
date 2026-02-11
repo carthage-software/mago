@@ -932,12 +932,12 @@ pub(crate) fn analyze_class_like<'ctx, 'ast, 'arena>(
     for member in members {
         match member {
             ClassLikeMember::Constant(class_like_constant) => {
-                if context.settings.diff {
-                    if let Some(item) = class_like_constant.items.first() {
-                        let constant_name = atom(item.name.value);
-                        if context.codebase.safe_symbol_members.contains(&(class_like_metadata.name, constant_name)) {
-                            continue;
-                        }
+                if context.settings.diff
+                    && let Some(item) = class_like_constant.items.first()
+                {
+                    let constant_name = atom(item.name.value);
+                    if context.codebase.safe_symbol_members.contains(&(class_like_metadata.name, constant_name)) {
+                        continue;
                     }
                 }
 
@@ -952,10 +952,10 @@ pub(crate) fn analyze_class_like<'ctx, 'ast, 'arena>(
                         Property::Hooked(hooked) => Some(atom(hooked.item.variable().name)),
                     };
 
-                    if let Some(var_name) = first_var_name {
-                        if context.codebase.safe_symbol_members.contains(&(class_like_metadata.name, var_name)) {
-                            continue;
-                        }
+                    if let Some(var_name) = first_var_name
+                        && context.codebase.safe_symbol_members.contains(&(class_like_metadata.name, var_name))
+                    {
+                        continue;
                     }
                 }
 

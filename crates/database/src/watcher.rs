@@ -32,6 +32,9 @@ use crate::file::FileId;
 use crate::file::FileType;
 
 const DEFAULT_POLL_INTERVAL_MS: u64 = 1000;
+const WAIT_INTERNAL_MS: u64 = 100;
+const WAIT_DEBOUNCE_MS: u64 = 300;
+const STABILITY_CHECK_MS: u64 = 10;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 struct ChangedFile {
@@ -109,20 +112,10 @@ impl<'a> DatabaseWatcher<'a> {
         let extensions: HashSet<String> = config.extensions.iter().map(std::string::ToString::to_string).collect();
         let workspace = config.workspace.as_ref().to_path_buf();
 
-        let mut watcher = RecommendedWatcher::new(
-            move |res: Result<Event, notify::Error>| {
-                if let Ok(event) = res
-                    && let Some(changed) =
-                        Self::handle_event(event, &workspace, &glob_excludes, &path_excludes, &extensions)
-                {
-                    let _ = tx.send(changed);
-                }
-            },
-            Config::default()
-                .with_poll_interval(options.poll_interval.unwrap_or(Duration::from_millis(DEFAULT_POLL_INTERVAL_MS))),
-        )
-        .map_err(DatabaseError::WatcherInit)?;
-
+        // Build the set of explicitly configured watch paths so that events from
+        // these directories are never filtered out by the default glob exclusions
+        // (e.g., a project that explicitly includes `vendor/revolt` should still
+        // receive change events for files under that directory).
         let mut unique_watch_paths = HashSet::new();
 
         for path in &config.paths {
@@ -138,6 +131,28 @@ impl<'a> DatabaseWatcher<'a> {
 
             unique_watch_paths.insert(absolute_path);
         }
+
+        let explicit_watch_paths: Vec<PathBuf> = unique_watch_paths.iter().cloned().collect();
+
+        let mut watcher = RecommendedWatcher::new(
+            move |res: Result<Event, notify::Error>| {
+                if let Ok(event) = res
+                    && let Some(changed) = Self::handle_event(
+                        event,
+                        &workspace,
+                        &glob_excludes,
+                        &path_excludes,
+                        &extensions,
+                        &explicit_watch_paths,
+                    )
+                {
+                    let _ = tx.send(changed);
+                }
+            },
+            Config::default()
+                .with_poll_interval(options.poll_interval.unwrap_or(Duration::from_millis(DEFAULT_POLL_INTERVAL_MS))),
+        )
+        .map_err(DatabaseError::WatcherInit)?;
 
         let mut watched_paths = Vec::new();
         for path in unique_watch_paths {
@@ -205,6 +220,7 @@ impl<'a> DatabaseWatcher<'a> {
         glob_excludes: &GlobSet,
         path_excludes: &HashSet<PathBuf>,
         extensions: &HashSet<String>,
+        explicit_watch_paths: &[PathBuf],
     ) -> Option<Vec<ChangedFile>> {
         tracing::debug!("Watcher received event: kind={:?}, paths={:?}", event.kind, event.paths);
 
@@ -228,29 +244,33 @@ impl<'a> DatabaseWatcher<'a> {
                 continue;
             }
 
-            // Check glob pattern exclusions
-            if glob_excludes.is_match(&path) {
-                tracing::debug!("Skipping path excluded by pattern: {}", path.display());
-                continue;
-            }
-
-            // Check exact path exclusions
-            if path_excludes.contains(&path) {
-                tracing::debug!("Skipping excluded path: {}", path.display());
-                continue;
-            }
-
-            // Check if any parent directory is in path_excludes
-            let mut should_skip = false;
-            for ancestor in path.ancestors().skip(1) {
-                if path_excludes.contains(ancestor) {
-                    tracing::debug!("Skipping path under excluded directory: {}", path.display());
-                    should_skip = true;
-                    break;
+            let is_explicitly_watched = explicit_watch_paths.iter().any(|wp| path.starts_with(wp));
+            if !is_explicitly_watched {
+                // Check glob pattern exclusions
+                if glob_excludes.is_match(&path) {
+                    tracing::debug!("Skipping path excluded by pattern: {}", path.display());
+                    continue;
                 }
-            }
-            if should_skip {
-                continue;
+
+                // Check exact path exclusions
+                if path_excludes.contains(&path) {
+                    tracing::debug!("Skipping excluded path: {}", path.display());
+                    continue;
+                }
+
+                // Check if any parent directory is in path_excludes
+                let mut should_skip = false;
+                for ancestor in path.ancestors().skip(1) {
+                    if path_excludes.contains(ancestor) {
+                        tracing::debug!("Skipping path under excluded directory: {}", path.display());
+                        should_skip = true;
+                        break;
+                    }
+                }
+
+                if should_skip {
+                    continue;
+                }
             }
 
             // Normalize to forward slashes for cross-platform determinism
@@ -281,12 +301,18 @@ impl<'a> DatabaseWatcher<'a> {
         let config = &self.database.configuration;
         let workspace = config.workspace.as_ref().to_path_buf();
 
-        match receiver.recv_timeout(Duration::from_millis(100)) {
+        match receiver.recv_timeout(Duration::from_millis(WAIT_INTERNAL_MS)) {
             Ok(changed_files) => {
-                std::thread::sleep(Duration::from_millis(250));
                 let mut all_changed = changed_files;
-                while let Ok(more) = receiver.try_recv() {
-                    all_changed.extend(more);
+                loop {
+                    match receiver.recv_timeout(Duration::from_millis(WAIT_DEBOUNCE_MS)) {
+                        Ok(more) => all_changed.extend(more),
+                        Err(RecvTimeoutError::Timeout) => break,
+                        Err(RecvTimeoutError::Disconnected) => {
+                            self.stop();
+                            return Err(DatabaseError::WatcherNotActive);
+                        }
+                    }
                 }
 
                 let mut latest_changes: HashMap<FileId, ChangedFile> = HashMap::new();
@@ -299,39 +325,37 @@ impl<'a> DatabaseWatcher<'a> {
                 for changed_file in &all_changed {
                     changed_ids.push(changed_file.id);
 
-                    match self.database.get(&changed_file.id) {
-                        Ok(file) => {
-                            if changed_file.path.exists() {
-                                match std::fs::read_to_string(&changed_file.path) {
-                                    Ok(contents) => {
-                                        self.database.update(changed_file.id, Cow::Owned(contents));
-                                        tracing::trace!("Updated file in database: {}", file.name);
-                                    }
-                                    Err(e) => {
-                                        tracing::error!("Failed to read file {}: {}", changed_file.path.display(), e);
-                                    }
+                    let Ok(file) = self.database.get(&changed_file.id) else {
+                        if changed_file.path.exists() {
+                            match File::read(&workspace, &changed_file.path, FileType::Host) {
+                                Ok(file) => {
+                                    self.database.add(file);
+                                    tracing::debug!("Added new file to database: {}", changed_file.path.display());
                                 }
-                            } else {
-                                self.database.delete(changed_file.id);
-                                tracing::trace!("Deleted file from database: {}", file.name);
+                                Err(e) => {
+                                    tracing::error!("Failed to load new file {}: {}", changed_file.path.display(), e);
+                                }
                             }
                         }
-                        Err(_) => {
-                            if changed_file.path.exists() {
-                                match File::read(&workspace, &changed_file.path, FileType::Host) {
-                                    Ok(file) => {
-                                        self.database.add(file);
-                                        tracing::debug!("Added new file to database: {}", changed_file.path.display());
-                                    }
-                                    Err(e) => {
-                                        tracing::error!(
-                                            "Failed to load new file {}: {}",
-                                            changed_file.path.display(),
-                                            e
-                                        );
-                                    }
-                                }
+
+                        continue;
+                    };
+
+                    if !changed_file.path.exists() {
+                        self.database.delete(changed_file.id);
+                        tracing::trace!("Deleted file from database: {}", file.name);
+                    }
+
+                    match Self::read_stable_contents(&changed_file.path) {
+                        Ok(contents) => {
+                            if self.database.update(changed_file.id, Cow::Owned(contents)) {
+                                tracing::trace!("Updated file in database: {}", file.name);
+                            } else {
+                                tracing::warn!("Failed to update file in database (ID not found): {}", file.name);
                             }
+                        }
+                        Err(e) => {
+                            tracing::error!("Failed to read file {}: {}", changed_file.path.display(), e);
                         }
                     }
                 }
@@ -344,6 +368,28 @@ impl<'a> DatabaseWatcher<'a> {
                 Err(DatabaseError::WatcherNotActive)
             }
         }
+    }
+
+    /// Reads file contents with a stability check to handle partial writes.
+    ///
+    /// Some IDEs and formatters write files in multiple steps (save, then format).
+    /// This method reads the file, waits briefly, and re-reads to ensure the content
+    /// has stabilized before returning.
+    fn read_stable_contents(path: &Path) -> std::io::Result<String> {
+        let contents = std::fs::read_to_string(path)?;
+
+        std::thread::sleep(Duration::from_millis(STABILITY_CHECK_MS));
+
+        if path.exists()
+            && let Ok(reread) = std::fs::read_to_string(path)
+            && reread != contents
+        {
+            tracing::debug!("File content changed during stability check: {}", path.display());
+
+            return Ok(reread);
+        }
+
+        Ok(contents)
     }
 
     /// Returns a reference to the database.
