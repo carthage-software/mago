@@ -573,6 +573,10 @@ fn infer_constant<'ctx, 'arena>(
         (constant.value(), names.get(constant))
     };
 
+    if let Some(t) = get_literal_constant_type(short_name) {
+        return Some(t);
+    }
+
     if let Some(t) = get_platform_constant_type(short_name) {
         return Some(t);
     }
