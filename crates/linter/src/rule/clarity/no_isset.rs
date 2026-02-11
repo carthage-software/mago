@@ -7,6 +7,7 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_reporting::Level;
 use mago_span::HasSpan;
+use mago_syntax::ast::Expression;
 use mago_syntax::ast::Node;
 use mago_syntax::ast::NodeKind;
 
@@ -28,11 +29,12 @@ pub struct NoIssetRule {
 #[serde(default, rename_all = "kebab-case", deny_unknown_fields)]
 pub struct NoIssetConfig {
     pub level: Level,
+    pub allow_array_checks: bool,
 }
 
 impl Default for NoIssetConfig {
     fn default() -> Self {
-        Self { level: Level::Warning }
+        Self { level: Level::Warning, allow_array_checks: false }
     }
 }
 
@@ -95,6 +97,11 @@ impl LintRule for NoIssetRule {
         let Node::IssetConstruct(construct) = node else {
             return;
         };
+
+        if self.cfg.allow_array_checks && construct.values.iter().all(|expr| matches!(expr, Expression::ArrayAccess(_)))
+        {
+            return;
+        }
 
         ctx.collector.report(
             Issue::new(self.cfg.level(), "Use of the `isset` construct.")
