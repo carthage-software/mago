@@ -1464,10 +1464,25 @@ fn get_comparison_literal_operand(
 }
 
 fn get_expression_integer_value(artifacts: &AnalysisArtifacts, expression: &Expression) -> Option<TInteger> {
-    artifacts
+    if let Some(int) = artifacts
         .get_expression_type(expression)
         .and_then(mago_codex::ttype::union::TUnion::get_single_int)
         .filter(|integer| !integer.is_unspecified())
+    {
+        return Some(int);
+    }
+
+    match expression {
+        Expression::Literal(Literal::Integer(lit)) => lit.value.map(|v| TInteger::Literal(v as i64)),
+        Expression::UnaryPrefix(UnaryPrefix { operator: UnaryPrefixOperator::Negation(_), operand, .. }) => {
+            if let Expression::Literal(Literal::Integer(lit)) = operand {
+                lit.value.map(|v| TInteger::Literal(-(v as i64)))
+            } else {
+                None
+            }
+        }
+        _ => None,
+    }
 }
 
 fn get_expression_array_key(artifacts: &AnalysisArtifacts, expression: &Expression) -> Option<ArrayKey> {
