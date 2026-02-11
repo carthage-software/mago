@@ -228,13 +228,16 @@ interface OuterIterator extends Iterator
 /**
  * @template K
  * @template-covariant V
+ * @template I of Traversable<K, V>
  *
  * @implements OuterIterator<K, V>
+ *
+ * @mixin I
  */
 class IteratorIterator implements OuterIterator
 {
     /**
-     * @param Traversable<K, V> $iterator
+     * @param I $iterator
      * @param class-string|null $class
      */
     public function __construct(Traversable $iterator, ?string $class = null) {}
@@ -262,6 +265,8 @@ class IteratorIterator implements OuterIterator
     public function current(): mixed {}
 
     public function next(): void {}
+
+    public function __call(string $name, array $argv): mixed {}
 }
 
 /**
