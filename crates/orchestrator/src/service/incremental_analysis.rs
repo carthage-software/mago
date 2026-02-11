@@ -466,39 +466,47 @@ impl IncrementalAnalysisService {
 
             let files_to_skip: HashSet<FileId> = unchanged_file_ids.iter().copied().collect();
             let mut symbol_references = std::mem::take(&mut self.symbol_references);
-            {
-                let mut changed_symbols: HashSet<(mago_atom::Atom, mago_atom::Atom)> = HashSet::default();
-                let mut changed_file_names: Vec<mago_atom::Atom> = Vec::new();
 
-                for (file_id, metadata) in &new_file_scans {
-                    for &key in metadata.function_likes.keys() {
-                        changed_symbols.insert(key);
-                    }
+            let mut changed_symbols: HashSet<(mago_atom::Atom, mago_atom::Atom)> = HashSet::default();
+            let mut changed_file_names: Vec<mago_atom::Atom> = Vec::new();
 
-                    for &name in metadata.class_likes.keys() {
-                        changed_symbols.insert((name, mago_atom::empty_atom()));
-                    }
+            for (file_id, metadata) in &new_file_scans {
+                for &key in metadata.function_likes.keys() {
+                    changed_symbols.insert(key);
+                }
 
-                    for &name in metadata.constants.keys() {
-                        changed_symbols.insert((name, mago_atom::empty_atom()));
-                    }
+                for &name in metadata.class_likes.keys() {
+                    changed_symbols.insert((name, mago_atom::empty_atom()));
+                }
 
-                    if let Some(sig) = metadata.file_signatures.values().next() {
-                        for node in &sig.ast_nodes {
-                            for child in &node.children {
-                                changed_symbols.insert((node.name, child.name));
-                            }
+                for &name in metadata.constants.keys() {
+                    changed_symbols.insert((name, mago_atom::empty_atom()));
+                }
+
+                if let Some(sig) = metadata.file_signatures.values().next() {
+                    for node in &sig.ast_nodes {
+                        for child in &node.children {
+                            changed_symbols.insert((node.name, child.name));
                         }
-                    }
-
-                    // Collect file names for file-level reference cleanup
-                    if let Ok(file) = self.database.get(file_id) {
-                        changed_file_names.push(mago_atom::atom(&file.name));
                     }
                 }
 
-                symbol_references.remove_body_references_for_symbols(&changed_symbols, &changed_file_names);
+                // Collect file names for file-level reference cleanup
+                if let Ok(file) = self.database.get(file_id) {
+                    changed_file_names.push(mago_atom::atom(&file.name));
+                }
             }
+
+            symbol_references.remove_body_references_for_symbols(&changed_symbols, &changed_file_names);
+
+            let safe_symbols: AtomSet = merged_codebase.class_likes.keys().copied().collect();
+            populate_codebase_targeted(
+                &mut merged_codebase,
+                &mut symbol_references,
+                safe_symbols,
+                HashSet::default(),
+                changed_symbols,
+            );
 
             let (mut analysis_result, mut per_file_issues) =
                 self.run_analyzer_selective(&merged_codebase, symbol_references, &self.settings, files_to_skip)?;
