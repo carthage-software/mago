@@ -228,6 +228,24 @@ impl Symbols {
             self.all.entry(entry).or_insert(kind);
         }
     }
+
+    /// Extends the current `Symbols` map from a reference without consuming the source.
+    #[inline]
+    pub fn extend_ref(&mut self, other: &Symbols) {
+        self.namespaces.extend(other.namespaces.iter().copied());
+
+        for (entry, kind) in &other.all {
+            self.all.entry(*entry).or_insert(*kind);
+        }
+    }
+
+    /// Removes a symbol by its FQCN.
+    ///
+    /// Note: does not remove namespaces (they may be shared by other symbols).
+    #[inline]
+    pub fn remove(&mut self, name: &Atom) {
+        self.all.remove(name);
+    }
 }
 
 /// Provides a default, empty `Symbols` map.

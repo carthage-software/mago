@@ -49,6 +49,23 @@ pub mod property;
 pub mod property_hook;
 pub mod ttype;
 
+/// Lightweight set of keys extracted from a per-file [`CodebaseMetadata`].
+///
+/// Used by the incremental engine to efficiently remove a file's contributions from the
+/// merged codebase without keeping a full `CodebaseMetadata` clone per file.
+/// Created via [`CodebaseMetadata::extract_keys()`].
+#[derive(Debug, Clone)]
+pub struct CodebaseEntryKeys {
+    /// Class-like FQCN atoms (also used for symbol removal).
+    pub class_like_names: Vec<Atom>,
+    /// Function-like `(scope, name)` tuples.
+    pub function_like_keys: Vec<(Atom, Atom)>,
+    /// Constant FQN atoms.
+    pub constant_names: Vec<Atom>,
+    /// File IDs that had signatures in this metadata.
+    pub file_ids: Vec<FileId>,
+}
+
 /// Holds all analyzed information about the symbols, structures, and relationships within a codebase.
 ///
 /// This acts as the central repository for metadata gathered during static analysis,
@@ -928,9 +945,143 @@ impl CodebaseMetadata {
             self.direct_classlike_descendants.entry(k).or_default().extend(v);
         }
 
+        self.file_signatures.extend(other.file_signatures);
         self.safe_symbols.extend(other.safe_symbols);
         self.safe_symbol_members.extend(other.safe_symbol_members);
         self.infer_types_from_usage |= other.infer_types_from_usage;
+    }
+
+    /// Extends this codebase with another by reference, cloning only individual entries.
+    ///
+    /// This is more efficient than `extend(other.clone())` because it avoids allocating
+    /// a full clone of the source metadata's outer HashMap/AtomMap structures. Only
+    /// individual entries that need insertion are cloned.
+    pub fn extend_ref(&mut self, other: &CodebaseMetadata) {
+        for (k, v) in &other.class_likes {
+            match self.class_likes.entry(*k) {
+                Entry::Occupied(mut entry) => {
+                    if should_replace_metadata(entry.get().flags, entry.get().span, v.flags, v.span) {
+                        entry.insert(v.clone());
+                    }
+                }
+                Entry::Vacant(entry) => {
+                    entry.insert(v.clone());
+                }
+            }
+        }
+
+        for (k, v) in &other.function_likes {
+            match self.function_likes.entry(*k) {
+                Entry::Occupied(mut entry) => {
+                    if should_replace_metadata(entry.get().flags, entry.get().span, v.flags, v.span) {
+                        entry.insert(v.clone());
+                    }
+                }
+                Entry::Vacant(entry) => {
+                    entry.insert(v.clone());
+                }
+            }
+        }
+
+        for (k, v) in &other.constants {
+            match self.constants.entry(*k) {
+                Entry::Occupied(mut entry) => {
+                    if should_replace_metadata(entry.get().flags, entry.get().span, v.flags, v.span) {
+                        entry.insert(v.clone());
+                    }
+                }
+                Entry::Vacant(entry) => {
+                    entry.insert(v.clone());
+                }
+            }
+        }
+
+        self.symbols.extend_ref(&other.symbols);
+
+        for (k, v) in &other.all_class_like_descendants {
+            self.all_class_like_descendants.entry(*k).or_default().extend(v.iter().copied());
+        }
+
+        for (k, v) in &other.direct_classlike_descendants {
+            self.direct_classlike_descendants.entry(*k).or_default().extend(v.iter().copied());
+        }
+
+        for (k, v) in &other.file_signatures {
+            self.file_signatures.insert(*k, v.clone());
+        }
+        self.safe_symbols.extend(other.safe_symbols.iter().copied());
+        self.safe_symbol_members.extend(other.safe_symbol_members.iter().cloned());
+        self.infer_types_from_usage |= other.infer_types_from_usage;
+    }
+
+    /// Removes all entries that were contributed by the given per-file scan metadata.
+    ///
+    /// This is the inverse of [`extend_ref()`]: it removes class_likes, function_likes,
+    /// constants, symbols, and file_signatures whose keys match those in `file_metadata`.
+    ///
+    /// Used by the incremental engine to patch the codebase in-place when files change,
+    /// avoiding a full rebuild from base + all files.
+    ///
+    /// Note: This does NOT remove descendant map entries — those are rebuilt from scratch
+    /// by `populate_codebase()` on every run.
+    pub fn remove_entries_of(&mut self, file_metadata: &CodebaseMetadata) {
+        for k in file_metadata.class_likes.keys() {
+            self.class_likes.remove(k);
+        }
+
+        for k in file_metadata.function_likes.keys() {
+            self.function_likes.remove(k);
+        }
+
+        for k in file_metadata.constants.keys() {
+            self.constants.remove(k);
+        }
+
+        // Remove symbols that were contributed by this file.
+        // We can only remove class-like symbols (not namespaces, since they may be shared).
+        for k in file_metadata.class_likes.keys() {
+            self.symbols.remove(k);
+        }
+
+        for (k, _) in &file_metadata.file_signatures {
+            self.file_signatures.remove(k);
+        }
+    }
+
+    /// Extracts the set of keys from this metadata for use with [`remove_entries_by_keys()`].
+    ///
+    /// This is much cheaper than keeping a full `CodebaseMetadata` clone — it only stores
+    /// the keys needed to undo an `extend_ref()` operation.
+    pub fn extract_keys(&self) -> CodebaseEntryKeys {
+        CodebaseEntryKeys {
+            class_like_names: self.class_likes.keys().copied().collect(),
+            function_like_keys: self.function_likes.keys().copied().collect(),
+            constant_names: self.constants.keys().copied().collect(),
+            file_ids: self.file_signatures.keys().copied().collect(),
+        }
+    }
+
+    /// Removes entries whose keys match the given [`CodebaseEntryKeys`].
+    ///
+    /// This is the lightweight equivalent of [`remove_entries_of()`] — it performs the
+    /// same removals but from a compact key set instead of a full `CodebaseMetadata` reference.
+    pub fn remove_entries_by_keys(&mut self, keys: &CodebaseEntryKeys) {
+        for k in &keys.class_like_names {
+            self.class_likes.remove(k);
+            self.symbols.remove(k);
+        }
+
+        for k in &keys.function_like_keys {
+            self.function_likes.remove(k);
+        }
+
+        for k in &keys.constant_names {
+            self.constants.remove(k);
+        }
+
+        for k in &keys.file_ids {
+            self.file_signatures.remove(k);
+        }
     }
 
     /// Takes all issues from the codebase metadata.
