@@ -766,6 +766,10 @@ impl CodebaseMetadata {
 
         if let Some(overridden_map) = class_like.overridden_method_ids.get(method_name) {
             for (parent_class_name, parent_method_id) in overridden_map {
+                if class_like.name.eq_ignore_ascii_case(&parent_class_name) {
+                    continue; // Skip self-recursion if the method overrides itself
+                }
+
                 let Some(parent_class) = self.class_likes.get(parent_class_name) else {
                     continue;
                 };
