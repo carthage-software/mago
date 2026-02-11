@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 
 use mago_atom::Atom;
+use mago_atom::AtomSet;
 use mago_span::Span;
 
 use crate::assertion::Assertion;
@@ -190,49 +191,101 @@ fn should_inherit_docblock_type(
 ///
 /// Template parameters (e.g., `T`) are substituted with concrete types
 /// (e.g., `string` when class implements `Interface<string>`).
-pub fn inherit_method_docblocks(codebase: &mut CodebaseMetadata) {
+///
+/// When `safe_symbols` is non-empty, classes where both the child and parent
+/// are safe are skipped — their docblock inheritance is unchanged from the
+/// previous run.
+///
+/// When `dirty_classes` is provided, only those classes (and their descendants)
+/// are considered — O(dirty + descendants) instead of O(all classes).
+pub fn inherit_method_docblocks(
+    codebase: &mut CodebaseMetadata,
+    safe_symbols: &mago_atom::AtomSet,
+    dirty_classes: Option<&AtomSet>,
+) {
     let mut inheritance_work: Vec<(Atom, Atom, Atom, Atom)> = Vec::new();
 
-    for (class_name, class_metadata) in &codebase.class_likes {
-        for (method_name, method_ids) in &class_metadata.overridden_method_ids {
-            let mut parent_method_id = None;
-
-            if let Some(parent_class) = &class_metadata.direct_parent_class
-                && method_ids.contains_key(parent_class)
-            {
-                parent_method_id = Some((*parent_class, *method_name));
+    // When dirty_classes is provided, expand to include descendants,
+    // then use targeted lookups instead of iterating all class_likes.
+    if let Some(dirty) = dirty_classes {
+        let mut targets = dirty.clone();
+        for class_name in dirty {
+            if let Some(descendants) = codebase.all_class_like_descendants.get(class_name) {
+                targets.extend(descendants.iter().copied());
             }
+        }
 
-            if parent_method_id.is_none() {
-                for interface in &class_metadata.all_parent_interfaces {
-                    if method_ids.contains_key(interface) {
-                        parent_method_id = Some((*interface, *method_name));
-                        break;
-                    }
-                }
+        for class_name in &targets {
+            if !safe_symbols.is_empty() && safe_symbols.contains(class_name) {
+                continue;
             }
-
-            if parent_method_id.is_none() {
-                for trait_name in &class_metadata.used_traits {
-                    if method_ids.contains_key(trait_name) {
-                        parent_method_id = Some((*trait_name, *method_name));
-                        break;
-                    }
-                }
+            if let Some(class_metadata) = codebase.class_likes.get(class_name) {
+                collect_inheritance_work(*class_name, class_metadata, &mut inheritance_work);
             }
-
-            if parent_method_id.is_none()
-                && let Some((declaring_class, method_id)) = method_ids.first()
-            {
-                parent_method_id = Some((*declaring_class, *method_id.get_method_name()));
+        }
+    } else {
+        for (class_name, class_metadata) in &codebase.class_likes {
+            if !safe_symbols.is_empty() && safe_symbols.contains(class_name) {
+                continue;
             }
-
-            if let Some((parent_class, parent_method)) = parent_method_id {
-                inheritance_work.push((*class_name, *method_name, parent_class, parent_method));
-            }
+            collect_inheritance_work(*class_name, class_metadata, &mut inheritance_work);
         }
     }
 
+    inheritance_work.sort_by_key(|(class_name, _, _, _)| {
+        codebase.class_likes.get(class_name).map_or(0, |m| m.all_parent_classes.len() + m.all_parent_interfaces.len())
+    });
+
+    apply_inheritance_work(codebase, inheritance_work);
+}
+
+/// Collects inheritance work items for a single class.
+fn collect_inheritance_work(
+    class_name: Atom,
+    class_metadata: &crate::metadata::class_like::ClassLikeMetadata,
+    inheritance_work: &mut Vec<(Atom, Atom, Atom, Atom)>,
+) {
+    for (method_name, method_ids) in &class_metadata.overridden_method_ids {
+        let mut parent_method_id = None;
+
+        if let Some(parent_class) = &class_metadata.direct_parent_class
+            && method_ids.contains_key(parent_class)
+        {
+            parent_method_id = Some((*parent_class, *method_name));
+        }
+
+        if parent_method_id.is_none() {
+            for interface in &class_metadata.all_parent_interfaces {
+                if method_ids.contains_key(interface) {
+                    parent_method_id = Some((*interface, *method_name));
+                    break;
+                }
+            }
+        }
+
+        if parent_method_id.is_none() {
+            for trait_name in &class_metadata.used_traits {
+                if method_ids.contains_key(trait_name) {
+                    parent_method_id = Some((*trait_name, *method_name));
+                    break;
+                }
+            }
+        }
+
+        if parent_method_id.is_none()
+            && let Some((declaring_class, method_id)) = method_ids.first()
+        {
+            parent_method_id = Some((*declaring_class, *method_id.get_method_name()));
+        }
+
+        if let Some((parent_class, parent_method)) = parent_method_id {
+            inheritance_work.push((class_name, *method_name, parent_class, parent_method));
+        }
+    }
+}
+
+/// Sorts and applies docblock inheritance work items.
+fn apply_inheritance_work(codebase: &mut CodebaseMetadata, mut inheritance_work: Vec<(Atom, Atom, Atom, Atom)>) {
     inheritance_work.sort_by_key(|(class_name, _, _, _)| {
         codebase.class_likes.get(class_name).map_or(0, |m| m.all_parent_classes.len() + m.all_parent_interfaces.len())
     });
@@ -406,10 +459,6 @@ pub fn inherit_method_docblocks(codebase: &mut CodebaseMetadata) {
         };
 
         if should_inherit_return && let Some((type_union, span, from_docblock)) = substituted_return_type {
-            // Narrow the inherited docblock type based on child's native return type.
-            // If child's native type is non-nullable, remove null from the inherited type.
-            // Example: Parent has `@return T|null` with `:?object`, child has `:object`
-            //          After template substitution: `stdClass|null` -> narrowed to `stdClass`
             let narrowed_type = if let Some(child_native_return) = &child_method.return_type_declaration_metadata
                 && !child_native_return.type_union.accepts_null()
                 && type_union.has_null()
