@@ -77,7 +77,10 @@ impl Fingerprintable for Function<'_> {
         self.name.fingerprint_with_hasher(hasher, resolved_names, options);
         self.parameter_list.fingerprint_with_hasher(hasher, resolved_names, options);
         self.return_type_hint.fingerprint_with_hasher(hasher, resolved_names, options);
-        self.body.fingerprint_with_hasher(hasher, resolved_names, options);
+
+        if !options.signature_only {
+            self.body.fingerprint_with_hasher(hasher, resolved_names, options);
+        }
     }
 }
 

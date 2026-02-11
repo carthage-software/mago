@@ -101,11 +101,16 @@ where
 pub struct FingerprintOptions<'a> {
     pub include_use_statements: bool,
     pub important_comment_patterns: &'a [&'a str],
+    pub signature_only: bool,
 }
 
 impl Default for FingerprintOptions<'_> {
     fn default() -> Self {
-        Self { include_use_statements: false, important_comment_patterns: DEFAULT_IMPORTANT_COMMENT_PATTERNS }
+        Self {
+            include_use_statements: false,
+            important_comment_patterns: DEFAULT_IMPORTANT_COMMENT_PATTERNS,
+            signature_only: false,
+        }
     }
 }
 
@@ -117,7 +122,7 @@ impl<'a> FingerprintOptions<'a> {
 
     #[must_use]
     pub fn strict() -> Self {
-        Self { include_use_statements: true, important_comment_patterns: &[] }
+        Self { include_use_statements: true, important_comment_patterns: &[], signature_only: false }
     }
 
     #[must_use]
