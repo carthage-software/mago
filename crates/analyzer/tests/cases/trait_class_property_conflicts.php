@@ -24,7 +24,6 @@ trait T2
 class C2
 {
     // @mago-expect analysis:incompatible-property-visibility
-    // @mago-expect analysis:unused-property
     private $prop;
     use T2;
 }

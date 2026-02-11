@@ -90,6 +90,15 @@ pub fn check_unused_members_with_transitivity<'ctx, 'arena>(
             continue;
         }
 
+        if class_like_metadata
+            .used_traits
+            .iter()
+            .any(|trait_name| context.codebase.property_exists(trait_name, property_name))
+        {
+            // trait property override, could be used in the trait itself.
+            continue;
+        }
+
         if let Some(property_span) = property.name_span.or(property.span) {
             checkable_members.push(CheckableMember {
                 symbol_id: (class_name, *property_name),
