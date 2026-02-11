@@ -303,10 +303,7 @@ impl<'arena> FormatterState<'_, 'arena> {
             }
             Some(Node::Assignment(_)) => Precedence::Assignment,
             _ => {
-                if matches!(
-                    self.nth_parent_kind(2),
-                    Some(Node::PropertyAccess(_) | Node::NullSafePropertyAccess(_))
-                ) {
+                if matches!(self.nth_parent_kind(2), Some(Node::PropertyAccess(_) | Node::NullSafePropertyAccess(_))) {
                     return true;
                 }
 
