@@ -209,7 +209,7 @@ impl LintRule for InlineVariableReturnRule {
 /// or has a reference capture of the given variable name.
 fn involves_references(expr: &Expression<'_>, var_name: &str) -> bool {
     if let Expression::Parenthesized(parenthesized) = expr {
-        return involves_references(&parenthesized.expression, var_name);
+        return involves_references(parenthesized.expression, var_name);
     }
 
     if let Expression::UnaryPrefix(UnaryPrefix { operator: UnaryPrefixOperator::Reference(_), .. }) = expr {
