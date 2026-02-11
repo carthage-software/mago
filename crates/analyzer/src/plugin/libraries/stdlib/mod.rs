@@ -3,6 +3,7 @@
 pub mod array;
 pub mod closure;
 pub mod r#enum;
+pub mod filter;
 pub mod json;
 pub mod math;
 pub mod random;
@@ -42,6 +43,8 @@ impl Plugin for StdlibPlugin {
         registry.register_function_provider(array::ArrayMergeProvider);
         registry.register_function_provider(array::CompactProvider);
         registry.register_function_provider(url::ParseUrlProvider);
+        registry.register_function_provider(filter::FilterVarProvider);
+        registry.register_function_provider(filter::FilterInputProvider);
         registry.register_function_provider(math::MinProvider);
         registry.register_function_provider(math::MaxProvider);
 
