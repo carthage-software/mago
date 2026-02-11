@@ -558,7 +558,7 @@ pub(super) fn collect_member_access_chain<'arena>(
     } else {
         member_access.reverse();
 
-        Some(MemberAccessChain { base: current_expr, accesses: member_access })
+        Some(MemberAccessChain { base: unwrap_parenthesized(current_expr), accesses: member_access })
     }
 }
 
@@ -566,11 +566,32 @@ pub(super) fn print_member_access_chain<'arena>(
     member_access_chain: &MemberAccessChain<'arena>,
     f: &mut FormatterState<'_, 'arena>,
 ) -> Document<'arena> {
-    let base_document = member_access_chain.base.format(f);
-    let mut parts = if base_needs_parens(f, member_access_chain.base) {
-        vec![in f.arena; Document::String("("), base_document, Document::String(")")]
+    let base_adds_parens = if let Some(first) = member_access_chain.accesses.first() {
+        match first {
+            MemberAccess::PropertyAccess(pa) => {
+                f.enter_node(Node::PropertyAccess(pa));
+                true
+            }
+            MemberAccess::NullSafePropertyAccess(pa) => {
+                f.enter_node(Node::NullSafePropertyAccess(pa));
+                true
+            }
+            _ => false,
+        }
     } else {
+        false
+    };
+
+    let base_document = member_access_chain.base.format(f);
+
+    if base_adds_parens {
+        f.leave_node();
+    }
+
+    let mut parts = if base_adds_parens || !base_needs_parens(f, member_access_chain.base) {
         vec![in f.arena; base_document]
+    } else {
+        vec![in f.arena; Document::String("("), base_document, Document::String(")")]
     };
 
     let mut accesses_iter = member_access_chain.accesses.iter().enumerate().peekable();
