@@ -1393,10 +1393,26 @@ impl PartialEq for TUnion {
             return false;
         }
 
+        // Check self ⊆ other
         for i in 0..len {
             let mut has_match = false;
             for j in 0..len {
                 if self.types[i] == other.types[j] {
+                    has_match = true;
+                    break;
+                }
+            }
+
+            if !has_match {
+                return false;
+            }
+        }
+
+        // Check other ⊆ self (needed when duplicates exist in either side)
+        for i in 0..len {
+            let mut has_match = false;
+            for j in 0..len {
+                if other.types[i] == self.types[j] {
                     has_match = true;
                     break;
                 }
