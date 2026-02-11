@@ -52,7 +52,6 @@ use mago_prelude::Prelude;
 
 use crate::commands::args::baseline_reporting::BaselineReportingArgs;
 use crate::config::Configuration;
-use crate::consts::ISSUE_URL;
 use crate::consts::PRELUDE_BYTES;
 use crate::error::Error;
 use crate::utils::create_orchestrator;
