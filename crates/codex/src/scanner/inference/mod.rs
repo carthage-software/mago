@@ -71,6 +71,25 @@ use crate::ttype::union::TUnion;
 use crate::ttype::wrap_atomic;
 use crate::utils::str_is_numeric;
 
+/// Returns the type for a predefined literal constant, if known.
+///
+/// These constants (`true`, `false`, `null`) are parsed as `Literal` nodes when bare,
+/// but become `ConstantAccess` nodes when accessed via FQN (e.g. `\true`).
+#[inline]
+pub fn get_literal_constant_type(name: &str) -> Option<TUnion> {
+    let name = name.strip_prefix('\\').unwrap_or(name);
+
+    if name.eq_ignore_ascii_case("true") {
+        Some(get_true())
+    } else if name.eq_ignore_ascii_case("false") {
+        Some(get_false())
+    } else if name.eq_ignore_ascii_case("null") {
+        Some(get_null())
+    } else {
+        None
+    }
+}
+
 /// Returns the platform-aware type for a predefined constant, if known.
 ///
 /// These constants have values that vary across platforms (e.g. 32-bit vs 64-bit),
@@ -553,6 +572,10 @@ fn infer_constant<'ctx, 'arena>(
     } else {
         (constant.value(), names.get(constant))
     };
+
+    if let Some(t) = get_literal_constant_type(short_name) {
+        return Some(t);
+    }
 
     if let Some(t) = get_platform_constant_type(short_name) {
         return Some(t);

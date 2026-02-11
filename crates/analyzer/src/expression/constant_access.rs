@@ -1,4 +1,5 @@
 use mago_atom::atom;
+use mago_codex::scanner::inference::get_literal_constant_type;
 use mago_codex::scanner::inference::get_platform_constant_type;
 use mago_codex::ttype::expander;
 use mago_codex::ttype::expander::TypeExpansionOptions;
@@ -29,6 +30,11 @@ impl<'arena> Analyzable<'_, 'arena> for ConstantAccess<'arena> {
             context.codebase.get_constant(name).or_else(|| context.codebase.get_constant(unqualified_name));
 
         let Some(constant_metadata) = constant_metadata else {
+            if let Some(literal_type) = get_literal_constant_type(name) {
+                artifacts.set_expression_type(self, literal_type);
+                return Ok(());
+            }
+
             let is_known = block_context.known_constants.contains(&atom(name));
 
             if is_known {
