@@ -405,7 +405,31 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Class<'arena> {
             override_attribute::check_override_attribute(class_like_metadata, self.members.as_slice(), context);
         }
 
-        if context.settings.find_unused_definitions {
+        let should_check_unused = 'check_unused: {
+            if !context.settings.find_unused_definitions {
+                break 'check_unused false;
+            }
+
+            if !context.settings.diff {
+                break 'check_unused true;
+            }
+
+            if context.codebase.safe_symbols.contains(&class_like_metadata.name) {
+                break 'check_unused false;
+            }
+
+            if class_like_metadata
+                .methods
+                .iter()
+                .any(|m| context.codebase.safe_symbol_members.contains(&(class_like_metadata.name, *m)))
+            {
+                break 'check_unused false;
+            }
+
+            true
+        };
+
+        if should_check_unused {
             let unused_members = unused_members::check_unused_members_with_transitivity(
                 class_like_metadata.name,
                 self.span(),
@@ -908,11 +932,33 @@ pub(crate) fn analyze_class_like<'ctx, 'ast, 'arena>(
     for member in members {
         match member {
             ClassLikeMember::Constant(class_like_constant) => {
+                if context.settings.diff {
+                    if let Some(item) = class_like_constant.items.first() {
+                        let constant_name = atom(item.name.value);
+                        if context.codebase.safe_symbol_members.contains(&(class_like_metadata.name, constant_name)) {
+                            continue;
+                        }
+                    }
+                }
+
                 missing_type_hints::check_constant_type_hint(context, class_like_constant);
 
                 class_like_constant.analyze(context, &mut block_context, artifacts)?;
             }
             ClassLikeMember::Property(property) => {
+                if context.settings.diff {
+                    let first_var_name = match property {
+                        Property::Plain(plain) => plain.items.first().map(|item| atom(item.variable().name)),
+                        Property::Hooked(hooked) => Some(atom(hooked.item.variable().name)),
+                    };
+
+                    if let Some(var_name) = first_var_name {
+                        if context.codebase.safe_symbol_members.contains(&(class_like_metadata.name, var_name)) {
+                            continue;
+                        }
+                    }
+                }
+
                 missing_type_hints::check_property_type_hint(context, class_like_metadata, property);
 
                 let property_names: Vec<Atom> = match property {
@@ -939,6 +985,13 @@ pub(crate) fn analyze_class_like<'ctx, 'ast, 'arena>(
                 property.analyze(context, &mut block_context, artifacts)?;
             }
             ClassLikeMember::EnumCase(enum_case) => {
+                if context.settings.diff {
+                    let case_name = atom(enum_case.item.name().value);
+                    if context.codebase.safe_symbol_members.contains(&(class_like_metadata.name, case_name)) {
+                        continue;
+                    }
+                }
+
                 enum_case.analyze(context, &mut block_context, artifacts)?;
             }
             ClassLikeMember::Method(method) => {
