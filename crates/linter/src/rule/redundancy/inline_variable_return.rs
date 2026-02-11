@@ -1,4 +1,6 @@
 use indoc::indoc;
+use mago_syntax::ast::UnaryPrefix;
+use mago_syntax::ast::UnaryPrefixOperator;
 use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
@@ -171,7 +173,7 @@ impl LintRule for InlineVariableReturnRule {
                 continue;
             }
 
-            if has_reference_capture(assignment.rhs, assigned_var.name) {
+            if involves_references(assignment.rhs, assigned_var.name) {
                 continue;
             }
 
@@ -203,8 +205,17 @@ impl LintRule for InlineVariableReturnRule {
     }
 }
 
-/// Check if the expression has a reference capture of the given variable name.
-fn has_reference_capture(expr: &Expression<'_>, var_name: &str) -> bool {
+/// Check if the expression is by reference,
+/// or has a reference capture of the given variable name.
+fn involves_references(expr: &Expression<'_>, var_name: &str) -> bool {
+    if let Expression::Parenthesized(parenthesized) = expr {
+        return involves_references(&parenthesized.expression, var_name);
+    }
+
+    if let Expression::UnaryPrefix(UnaryPrefix { operator: UnaryPrefixOperator::Reference(_), .. }) = expr {
+        return true;
+    }
+
     struct RefCaptureChecker<'a> {
         var_name: &'a str,
         found: bool,
@@ -212,9 +223,11 @@ fn has_reference_capture(expr: &Expression<'_>, var_name: &str) -> bool {
 
     impl<'arena> MutWalker<'_, 'arena, ()> for RefCaptureChecker<'_> {
         fn walk_closure(&mut self, closure: &'_ Closure<'arena>, _: &mut ()) {
-            if let Some(use_clause) = &closure.use_clause
-                && use_clause.variables.iter().any(|v| v.ampersand.is_some() && v.variable.name == self.var_name)
-            {
+            let Some(use_clause) = &closure.use_clause else {
+                return;
+            };
+
+            if use_clause.variables.iter().any(|v| v.ampersand.is_some() && v.variable.name == self.var_name) {
                 self.found = true;
             }
         }
@@ -360,6 +373,18 @@ mod tests {
             function getValue() {
                 $result = (function() use (&$result) { return $result; });
                 return $result;
+            }
+        "}
+    }
+
+    test_lint_success! {
+        name = valid_by_ref,
+        rule = InlineVariableReturnRule,
+        code = indoc! {r"
+            <?php
+
+            function &get_gategory_by_path(string $path): ?array {
+                return &find_node();
             }
         "}
     }
