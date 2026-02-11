@@ -53,16 +53,21 @@ struct SignatureBuilder<'file, 'arena> {
     file: &'file File,
     resolved_names: &'arena ResolvedNames<'arena>,
     fingerprint_options: FingerprintOptions<'static>,
+    sig_only_options: FingerprintOptions<'static>,
     class_stack: Vec<DefSignatureNode>,
     ast_nodes: Vec<DefSignatureNode>,
 }
 
 impl<'file, 'arena> SignatureBuilder<'file, 'arena> {
     fn new(file: &'file File, resolved_names: &'arena ResolvedNames<'arena>) -> Self {
+        let fingerprint_options = FingerprintOptions::default();
+        let sig_only_options = FingerprintOptions { signature_only: true, ..fingerprint_options };
+
         Self {
             file,
             resolved_names,
-            fingerprint_options: FingerprintOptions::default(),
+            fingerprint_options,
+            sig_only_options,
             class_stack: Vec::new(),
             ast_nodes: Vec::new(),
         }
@@ -76,6 +81,7 @@ impl<'file, 'arena> SignatureBuilder<'file, 'arena> {
         is_property: bool,
         span: mago_span::Span,
         hash: u64,
+        signature_hash: u64,
     ) -> DefSignatureNode {
         let start_line = self.file.line_number(span.start.offset);
         let end_line = self.file.line_number(span.end.offset);
@@ -98,6 +104,7 @@ impl<'file, 'arena> SignatureBuilder<'file, 'arena> {
             start_column,
             end_column,
             hash,
+            signature_hash,
         )
     }
 }
@@ -107,8 +114,9 @@ impl<'ast, 'arena> MutWalker<'ast, 'arena, ()> for SignatureBuilder<'_, 'arena> 
         let span = class.span();
         let name = self.resolved_names.get(&class.name);
         let hash = class.fingerprint(self.resolved_names, &self.fingerprint_options);
+        let signature_hash = class.fingerprint(self.resolved_names, &self.sig_only_options);
 
-        let node = self.create_node(name, false, false, false, span, hash);
+        let node = self.create_node(name, false, false, false, span, hash, signature_hash);
         self.class_stack.push(node);
     }
 
@@ -122,8 +130,9 @@ impl<'ast, 'arena> MutWalker<'ast, 'arena, ()> for SignatureBuilder<'_, 'arena> 
         let span = interface.span();
         let name = self.resolved_names.get(&interface.name);
         let hash = interface.fingerprint(self.resolved_names, &self.fingerprint_options);
+        let signature_hash = interface.fingerprint(self.resolved_names, &self.sig_only_options);
 
-        let node = self.create_node(name, false, false, false, span, hash);
+        let node = self.create_node(name, false, false, false, span, hash, signature_hash);
         self.class_stack.push(node);
     }
 
@@ -137,8 +146,9 @@ impl<'ast, 'arena> MutWalker<'ast, 'arena, ()> for SignatureBuilder<'_, 'arena> 
         let span = r#trait.span();
         let name = self.resolved_names.get(&r#trait.name);
         let hash = r#trait.fingerprint(self.resolved_names, &self.fingerprint_options);
+        let signature_hash = r#trait.fingerprint(self.resolved_names, &self.sig_only_options);
 
-        let node = self.create_node(name, false, false, false, span, hash);
+        let node = self.create_node(name, false, false, false, span, hash, signature_hash);
         self.class_stack.push(node);
     }
 
@@ -152,8 +162,9 @@ impl<'ast, 'arena> MutWalker<'ast, 'arena, ()> for SignatureBuilder<'_, 'arena> 
         let span = r#enum.span();
         let name = self.resolved_names.get(&r#enum.name);
         let hash = r#enum.fingerprint(self.resolved_names, &self.fingerprint_options);
+        let signature_hash = r#enum.fingerprint(self.resolved_names, &self.sig_only_options);
 
-        let node = self.create_node(name, false, false, false, span, hash);
+        let node = self.create_node(name, false, false, false, span, hash, signature_hash);
         self.class_stack.push(node);
     }
 
@@ -167,18 +178,21 @@ impl<'ast, 'arena> MutWalker<'ast, 'arena, ()> for SignatureBuilder<'_, 'arena> 
         let span = function.span();
         let name = self.resolved_names.get(&function.name);
         let hash = function.fingerprint(self.resolved_names, &self.fingerprint_options);
+        let signature_hash = function.fingerprint(self.resolved_names, &self.sig_only_options);
 
-        let node = self.create_node(name, true, false, false, span, hash);
+        let node = self.create_node(name, true, false, false, span, hash, signature_hash);
         self.ast_nodes.push(node);
     }
 
     fn walk_in_constant(&mut self, constant: &'ast Constant<'arena>, _context: &mut ()) {
         let span = constant.span();
         let hash = constant.fingerprint(self.resolved_names, &self.fingerprint_options);
+        // Constants don't have bodies — signature_hash == hash
+        let signature_hash = hash;
 
         for item in &constant.items {
             let name = item.name.value;
-            let node = self.create_node(name, false, true, false, span, hash);
+            let node = self.create_node(name, false, true, false, span, hash, signature_hash);
             self.ast_nodes.push(node);
         }
     }
@@ -187,8 +201,9 @@ impl<'ast, 'arena> MutWalker<'ast, 'arena, ()> for SignatureBuilder<'_, 'arena> 
         let span = method.span();
         let name = method.name.value;
         let hash = method.fingerprint(self.resolved_names, &self.fingerprint_options);
+        let signature_hash = method.fingerprint(self.resolved_names, &self.sig_only_options);
 
-        let node = self.create_node(name, true, false, false, span, hash);
+        let node = self.create_node(name, true, false, false, span, hash, signature_hash);
 
         // Add method to the current class if we're inside one
         if let Some(class_node) = self.class_stack.last_mut() {
@@ -199,6 +214,8 @@ impl<'ast, 'arena> MutWalker<'ast, 'arena, ()> for SignatureBuilder<'_, 'arena> 
     fn walk_in_property(&mut self, property: &'ast Property<'arena>, _context: &mut ()) {
         let span = property.span();
         let hash = property.fingerprint(self.resolved_names, &self.fingerprint_options);
+        // Properties don't have traditional "bodies" — signature_hash == hash
+        let signature_hash = hash;
 
         // Extract the first property variable name
         let name = match property {
@@ -214,7 +231,7 @@ impl<'ast, 'arena> MutWalker<'ast, 'arena, ()> for SignatureBuilder<'_, 'arena> 
 
         if let Some(var) = name {
             let var_name = var.name;
-            let node = self.create_node(var_name, false, false, true, span, hash);
+            let node = self.create_node(var_name, false, false, true, span, hash, signature_hash);
 
             // Add property to the current class if we're inside one
             if let Some(class_node) = self.class_stack.last_mut() {
@@ -226,11 +243,13 @@ impl<'ast, 'arena> MutWalker<'ast, 'arena, ()> for SignatureBuilder<'_, 'arena> 
     fn walk_in_class_like_constant(&mut self, constant: &'ast ClassLikeConstant<'arena>, _context: &mut ()) {
         let span = constant.span();
         let hash = constant.fingerprint(self.resolved_names, &self.fingerprint_options);
+        // Class constants don't have bodies — signature_hash == hash
+        let signature_hash = hash;
 
         // Add the first constant item to the current class
         if let Some(item) = constant.items.first() {
             let name = item.name.value;
-            let node = self.create_node(name, false, true, false, span, hash);
+            let node = self.create_node(name, false, true, false, span, hash, signature_hash);
 
             if let Some(class_node) = self.class_stack.last_mut() {
                 class_node.children.push(node);
@@ -241,6 +260,8 @@ impl<'ast, 'arena> MutWalker<'ast, 'arena, ()> for SignatureBuilder<'_, 'arena> 
     fn walk_in_enum_case(&mut self, case: &'ast EnumCase<'arena>, _context: &mut ()) {
         let span = case.span();
         let hash = case.fingerprint(self.resolved_names, &self.fingerprint_options);
+        // Enum cases don't have bodies — signature_hash == hash
+        let signature_hash = hash;
 
         // Extract enum case name
         let name = match &case.item {
@@ -248,7 +269,7 @@ impl<'ast, 'arena> MutWalker<'ast, 'arena, ()> for SignatureBuilder<'_, 'arena> 
             EnumCaseItem::Backed(backed) => backed.name.value,
         };
 
-        let node = self.create_node(name, false, true, false, span, hash);
+        let node = self.create_node(name, false, true, false, span, hash, signature_hash);
 
         // Add enum case to the current enum if we're inside one
         if let Some(enum_node) = self.class_stack.last_mut() {

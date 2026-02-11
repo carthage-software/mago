@@ -35,19 +35,11 @@ pub fn compute_file_diff(
     old_signature: Option<&FileSignature>,
     new_signature: Option<&FileSignature>,
 ) -> CodebaseDiff {
-    let Some(new_signature) = new_signature else {
-        return CodebaseDiff::new();
-    };
-
-    match old_signature {
-        None => {
-            // New file - all symbols are changed
-            mark_all_as_changed(new_signature)
-        }
-        Some(old_sig) => {
-            // Existing file - use Myers diff
-            myers_diff(file_id, old_sig, new_signature)
-        }
+    match (old_signature, new_signature) {
+        (None, None) => CodebaseDiff::new(),
+        (Some(old_sig), None) => mark_all_as_changed(old_sig),
+        (None, Some(new_sig)) => mark_all_as_changed(new_sig),
+        (Some(old_sig), Some(new_sig)) => myers_diff(file_id, old_sig, new_sig),
     }
 }
 
@@ -74,15 +66,10 @@ fn mark_all_as_changed(signature: &FileSignature) -> CodebaseDiff {
 /// 1. Top-level diff: compares classes, functions, and constants
 /// 2. Member-level diff: compares methods, properties, and class constants within each class
 ///
-/// For each symbol, it checks both structural changes (add/remove/keep) and content changes
-/// (hash comparison) to determine if re-analysis is needed.
-///
-/// # Implementation
-///
-/// Adapted from Hakana's implementation, but uses a single fingerprint hash per symbol
-/// instead of separate signature/body hashes. Any hash change triggers re-analysis.
-///
-/// See: <https://github.com/slackhq/hakana/blob/35890f99ded7897e4203a896fd1636bda300bad6/src/orchestrator/ast_differ.rs#L10-L13>
+/// Uses `signature_hash` (which excludes function/method bodies) for the keep/changed
+/// decision. This means body-only changes to a function or method do NOT mark it as
+/// "changed" in the diff, so they don't trigger cascade invalidation of dependents.
+/// The changed file itself is still re-analyzed because its content hash changed.
 ///
 /// # Arguments
 ///
@@ -93,8 +80,8 @@ fn mark_all_as_changed(signature: &FileSignature) -> CodebaseDiff {
 /// # Returns
 ///
 /// A `CodebaseDiff` with:
-/// - `keep`: Unchanged symbols
-/// - `changed`: Added, removed, or modified symbols
+/// - `keep`: Symbols whose signatures are unchanged
+/// - `changed`: Added, removed, or signature-modified symbols
 /// - `diff_map`: Position changes for issue mapping
 /// - `deletion_ranges_map`: Deleted code ranges for issue filtering
 fn myers_diff(file_id: FileId, old_signature: &FileSignature, new_signature: &FileSignature) -> CodebaseDiff {
@@ -114,7 +101,7 @@ fn myers_diff(file_id: FileId, old_signature: &FileSignature, new_signature: &Fi
     for diff_elem in diff {
         match diff_elem {
             AstDiffElem::Keep(a, b) => {
-                let mut has_child_change = false;
+                let mut has_child_sig_change = false;
 
                 let Ok((class_trace, class_x, class_y)) = calculate_trace(&a.children, &b.children) else {
                     changed.insert((a.name, empty_atom()));
@@ -134,11 +121,12 @@ fn myers_diff(file_id: FileId, old_signature: &FileSignature, new_signature: &Fi
                 for class_diff_elem in class_diff {
                     match class_diff_elem {
                         AstDiffElem::Keep(a_child, b_child) => {
-                            // Check if the child's hash changed
-                            if a_child.hash == b_child.hash {
+                            // Use signature_hash for cascade decision: body-only changes
+                            // don't cascade to dependents, only signature changes do.
+                            if a_child.signature_hash == b_child.signature_hash {
                                 keep.insert((a.name, a_child.name));
                             } else {
-                                has_child_change = true;
+                                has_child_sig_change = true;
                                 changed.insert((a.name, a_child.name));
                             }
 
@@ -154,19 +142,18 @@ fn myers_diff(file_id: FileId, old_signature: &FileSignature, new_signature: &Fi
                             }
                         }
                         AstDiffElem::Remove(child_node) => {
-                            has_child_change = true;
+                            has_child_sig_change = true;
                             changed.insert((a.name, child_node.name));
                             deletion_ranges.push((child_node.start_offset as usize, child_node.end_offset as usize));
                         }
                         AstDiffElem::Add(child_node) => {
-                            has_child_change = true;
+                            has_child_sig_change = true;
                             changed.insert((a.name, child_node.name));
                         }
                     }
                 }
 
-                // Check if parent's hash changed or if any child changed
-                if has_child_change || a.hash != b.hash {
+                if has_child_sig_change || a.signature_hash != b.signature_hash {
                     changed.insert((a.name, empty_atom()));
                 } else {
                     keep.insert((a.name, empty_atom()));

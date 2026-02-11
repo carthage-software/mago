@@ -8,9 +8,6 @@ use mago_atom::Atom;
 /// This structure forms a hierarchical tree where top-level symbols (classes, functions)
 /// can have children (methods, properties within classes).
 ///
-/// Unlike Hakana which separates `signature_hash` and `body_hash`, we use a single `hash`
-/// field that covers everything. This is more conservative but simpler, and aligns with
-/// the requirements for taint analysis where any change requires re-analysis.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DefSignatureNode {
     /// The name of the symbol (e.g., "Foo" for class Foo, "bar" for method bar)
@@ -46,6 +43,12 @@ pub struct DefSignatureNode {
     /// Position-insensitive fingerprint hash covering the entire definition.
     /// Any change to signature, body, modifiers, or attributes will change this hash.
     pub hash: u64,
+
+    /// Signature-only fingerprint hash, excluding function/method bodies.
+    /// Used by the differ to determine cascade invalidation: if only the body changed
+    /// (signature_hash unchanged), dependents are not invalidated — only the changed
+    /// file itself is re-analyzed.
+    pub signature_hash: u64,
 }
 
 impl DefSignatureNode {
@@ -64,6 +67,7 @@ impl DefSignatureNode {
         start_column: u16,
         end_column: u16,
         hash: u64,
+        signature_hash: u64,
     ) -> Self {
         Self {
             name,
@@ -77,6 +81,7 @@ impl DefSignatureNode {
             end_column,
             children: Vec::new(),
             hash,
+            signature_hash,
         }
     }
 
