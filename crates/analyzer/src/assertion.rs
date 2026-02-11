@@ -1051,19 +1051,32 @@ fn scrape_lesser_than_assertions(
 
     // Generate assertions for the left variable based on the right variable's type.
     // For an expression `$a < $b`, this asserts `$a` is less than the upper bound of `$b`.
+    // Range bounds are only used when the right operand is a trackable variable;
+    // for non-variable expressions (e.g. function calls), using a bound produces
+    // incorrect narrowing when the assertion is negated for the else branch.
     if let (Some(left_var_id), Some(right_int)) = (left_id, &right_integer) {
+        let use_range_bounds = right_id.is_some();
+
         let assertion_result = if matches!(operator, BinaryOperator::LessThanOrEqual(_)) {
             match *right_int {
                 TInteger::Literal(count) => Some((Assertion::IsLessThanOrEqual(count), count)),
-                TInteger::To(upper_bound) => Some((Assertion::IsLessThanOrEqual(upper_bound), upper_bound)),
-                TInteger::Range(_, upper_bound) => Some((Assertion::IsLessThanOrEqual(upper_bound), upper_bound)),
+                TInteger::To(upper_bound) if use_range_bounds => {
+                    Some((Assertion::IsLessThanOrEqual(upper_bound), upper_bound))
+                }
+                TInteger::Range(_, upper_bound) if use_range_bounds => {
+                    Some((Assertion::IsLessThanOrEqual(upper_bound), upper_bound))
+                }
                 _ => None,
             }
         } else {
             match *right_int {
                 TInteger::Literal(count) => Some((Assertion::IsLessThan(count), count)),
-                TInteger::To(upper_bound) => Some((Assertion::IsLessThan(upper_bound), upper_bound)),
-                TInteger::Range(_, upper_bound) => Some((Assertion::IsLessThan(upper_bound), upper_bound)),
+                TInteger::To(upper_bound) if use_range_bounds => {
+                    Some((Assertion::IsLessThan(upper_bound), upper_bound))
+                }
+                TInteger::Range(_, upper_bound) if use_range_bounds => {
+                    Some((Assertion::IsLessThan(upper_bound), upper_bound))
+                }
                 _ => None,
             }
         };
@@ -1089,19 +1102,30 @@ fn scrape_lesser_than_assertions(
 
     // Generate assertions for the right variable based on the left variable's type.
     // For an expression `$a < $b`, this asserts `$b` is greater than the lower bound of `$a`.
+    // Same restriction: range bounds only used when the left operand is a trackable variable.
     if let (Some(right_var_id), Some(left_int)) = (right_id, &left_integer) {
+        let use_range_bounds = left_id.is_some();
+
         let assertion_result = if matches!(operator, BinaryOperator::LessThanOrEqual(_)) {
             match *left_int {
                 TInteger::Literal(count) => Some((Assertion::IsGreaterThanOrEqual(count), count)),
-                TInteger::From(lower_bound) => Some((Assertion::IsGreaterThanOrEqual(lower_bound), lower_bound)),
-                TInteger::Range(lower_bound, _) => Some((Assertion::IsGreaterThanOrEqual(lower_bound), lower_bound)),
+                TInteger::From(lower_bound) if use_range_bounds => {
+                    Some((Assertion::IsGreaterThanOrEqual(lower_bound), lower_bound))
+                }
+                TInteger::Range(lower_bound, _) if use_range_bounds => {
+                    Some((Assertion::IsGreaterThanOrEqual(lower_bound), lower_bound))
+                }
                 _ => None,
             }
         } else {
             match *left_int {
                 TInteger::Literal(count) => Some((Assertion::IsGreaterThan(count), count)),
-                TInteger::From(lower_bound) => Some((Assertion::IsGreaterThan(lower_bound), lower_bound)),
-                TInteger::Range(lower_bound, _) => Some((Assertion::IsGreaterThan(lower_bound), lower_bound)),
+                TInteger::From(lower_bound) if use_range_bounds => {
+                    Some((Assertion::IsGreaterThan(lower_bound), lower_bound))
+                }
+                TInteger::Range(lower_bound, _) if use_range_bounds => {
+                    Some((Assertion::IsGreaterThan(lower_bound), lower_bound))
+                }
                 _ => None,
             }
         };
@@ -1194,6 +1218,9 @@ fn scrape_greater_than_assertions(
 
     // Generate assertions for the left variable based on the right variable's type.
     // For an expression `$a > $b`, this asserts `$a` is greater than the lower bound of `$b`.
+    // Range bounds are only used when the right operand is a trackable variable;
+    // for non-variable expressions (e.g. function calls), using a bound produces
+    // incorrect narrowing when the assertion is negated for the else branch.
     if let Some(right_int) = &right_integer
         && let Some(left_var_id) = get_expression_id(
             left,
@@ -1202,18 +1229,34 @@ fn scrape_greater_than_assertions(
             Some(assertion_context.codebase),
         )
     {
+        let use_range_bounds = get_expression_id(
+            right,
+            assertion_context.this_class_name,
+            assertion_context.resolved_names,
+            Some(assertion_context.codebase),
+        )
+        .is_some();
+
         let assertion_result = if matches!(operator, BinaryOperator::GreaterThanOrEqual(_)) {
             match *right_int {
                 TInteger::Literal(count) => Some((Assertion::IsGreaterThanOrEqual(count), count)),
-                TInteger::From(lower_bound) => Some((Assertion::IsGreaterThanOrEqual(lower_bound), lower_bound)),
-                TInteger::Range(lower_bound, _) => Some((Assertion::IsGreaterThanOrEqual(lower_bound), lower_bound)),
+                TInteger::From(lower_bound) if use_range_bounds => {
+                    Some((Assertion::IsGreaterThanOrEqual(lower_bound), lower_bound))
+                }
+                TInteger::Range(lower_bound, _) if use_range_bounds => {
+                    Some((Assertion::IsGreaterThanOrEqual(lower_bound), lower_bound))
+                }
                 _ => None,
             }
         } else {
             match *right_int {
                 TInteger::Literal(count) => Some((Assertion::IsGreaterThan(count), count)),
-                TInteger::From(lower_bound) => Some((Assertion::IsGreaterThan(lower_bound), lower_bound)),
-                TInteger::Range(lower_bound, _) => Some((Assertion::IsGreaterThan(lower_bound), lower_bound)),
+                TInteger::From(lower_bound) if use_range_bounds => {
+                    Some((Assertion::IsGreaterThan(lower_bound), lower_bound))
+                }
+                TInteger::Range(lower_bound, _) if use_range_bounds => {
+                    Some((Assertion::IsGreaterThan(lower_bound), lower_bound))
+                }
                 _ => None,
             }
         };
@@ -1247,18 +1290,34 @@ fn scrape_greater_than_assertions(
             Some(assertion_context.codebase),
         )
     {
+        let use_range_bounds = get_expression_id(
+            left,
+            assertion_context.this_class_name,
+            assertion_context.resolved_names,
+            Some(assertion_context.codebase),
+        )
+        .is_some();
+
         let assertion_result = if matches!(operator, BinaryOperator::GreaterThanOrEqual(_)) {
             match *left_int {
                 TInteger::Literal(count) => Some((Assertion::IsLessThanOrEqual(count), count)),
-                TInteger::To(upper_bound) => Some((Assertion::IsLessThanOrEqual(upper_bound), upper_bound)),
-                TInteger::Range(_, upper_bound) => Some((Assertion::IsLessThanOrEqual(upper_bound), upper_bound)),
+                TInteger::To(upper_bound) if use_range_bounds => {
+                    Some((Assertion::IsLessThanOrEqual(upper_bound), upper_bound))
+                }
+                TInteger::Range(_, upper_bound) if use_range_bounds => {
+                    Some((Assertion::IsLessThanOrEqual(upper_bound), upper_bound))
+                }
                 _ => None,
             }
         } else {
             match *left_int {
                 TInteger::Literal(count) => Some((Assertion::IsLessThan(count), count)),
-                TInteger::To(upper_bound) => Some((Assertion::IsLessThan(upper_bound), upper_bound)),
-                TInteger::Range(_, upper_bound) => Some((Assertion::IsLessThan(upper_bound), upper_bound)),
+                TInteger::To(upper_bound) if use_range_bounds => {
+                    Some((Assertion::IsLessThan(upper_bound), upper_bound))
+                }
+                TInteger::Range(_, upper_bound) if use_range_bounds => {
+                    Some((Assertion::IsLessThan(upper_bound), upper_bound))
+                }
                 _ => None,
             }
         };
