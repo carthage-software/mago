@@ -13,6 +13,7 @@ use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::comparator::ComparisonResult;
 use mago_codex::ttype::comparator::union_comparator;
 use mago_codex::ttype::expander::StaticClassType;
+use mago_codex::ttype::get_specialized_template_type;
 use mago_codex::ttype::template::GenericTemplate;
 use mago_codex::ttype::template::TemplateBound;
 use mago_codex::ttype::template::TemplateResult;
@@ -62,13 +63,47 @@ pub fn populate_template_result_from_invocation<'ctx, 'arena>(
         return;
     };
 
-    if method_metadata.is_static {
-        return;
-    }
-
     let Some(method_context) = method_context else {
         return;
     };
+
+    if method_metadata.is_static {
+        let Some(identifier) = method_context.declaring_method_id else {
+            return;
+        };
+
+        let Some(declaring_class_metadata) = context.codebase.get_class_like(identifier.get_class_name()) else {
+            return;
+        };
+
+        for (template_name, template_details) in &declaring_class_metadata.template_types {
+            if !template_result.template_types.contains_key(template_name) {
+                template_result.template_types.entry(*template_name).or_default().push(template_details.clone());
+            }
+        }
+
+        if declaring_class_metadata.name != method_context.class_like_metadata.name {
+            for (template_name, _) in &declaring_class_metadata.template_types {
+                let template_type = get_specialized_template_type(
+                    context.codebase,
+                    template_name,
+                    &declaring_class_metadata.name,
+                    method_context.class_like_metadata,
+                    None,
+                );
+
+                if let Some(template_type) = template_type {
+                    template_result.add_lower_bound(
+                        *template_name,
+                        GenericParent::ClassLike(declaring_class_metadata.name),
+                        template_type,
+                    );
+                }
+            }
+        }
+
+        return;
+    }
 
     let StaticClassType::Object(TObject::Named(instance_type)) = &method_context.class_type else {
         return;
