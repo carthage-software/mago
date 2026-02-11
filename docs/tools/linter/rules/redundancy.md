@@ -20,6 +20,7 @@ This document details the rules available in the `Redundancy` category.
 | No Redundant Continue | [`no-redundant-continue`](#no-redundant-continue) |
 | No Redundant File | [`no-redundant-file`](#no-redundant-file) |
 | No Redundant Final | [`no-redundant-final`](#no-redundant-final) |
+| No Redundant Isset | [`no-redundant-isset`](#no-redundant-isset) |
 | No Redundant Label | [`no-redundant-label`](#no-redundant-label) |
 | No Redundant Literal Return | [`no-redundant-literal-return`](#no-redundant-literal-return) |
 | No Redundant Math | [`no-redundant-math`](#no-redundant-math) |
@@ -465,6 +466,46 @@ final class Foo {
     final public function bar(): void {
         // ...
     }
+}
+```
+
+
+## <a id="no-redundant-isset"></a>`no-redundant-isset`
+
+Detects redundant arguments in `isset()` calls where a nested access already implies the parent checks.
+
+For example, `isset($d, $d['first'], $d['first']['second'])` can be simplified to
+`isset($d['first']['second'])` because checking a nested array access or property access
+implicitly verifies that all parent levels exist.
+
+
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `true` |
+| `level` | `string` | `"help"` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+
+if (isset($d['first']['second'])) {
+    echo 'all present';
+}
+```
+
+#### Incorrect code
+
+```php
+<?php
+
+if (isset($d, $d['first'], $d['first']['second'])) {
+    echo 'all present';
 }
 ```
 

@@ -259,6 +259,7 @@ coalescing operator (`??`) is often clearer and more maintainable.
 | :--- | :--- | :--- |
 | `enabled` | `boolean` | `true` |
 | `level` | `string` | `"warning"` |
+| `allow-array-checks` | `boolean` | `false` |
 
 ### Examples
 
