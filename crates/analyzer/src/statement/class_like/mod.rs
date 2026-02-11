@@ -1790,10 +1790,13 @@ fn check_abstract_method_signatures<'ctx>(
             let substituted_overridden_method =
                 get_substituted_method(overridden_method, class_like_metadata, *declaring_class_name, context.codebase);
 
+            let substituted_appearing_method =
+                get_substituted_method(appearing_method, class_like_metadata, atom(method_fqcn_str), context.codebase);
+
             let issues = method_signature::validate_method_signature_compatibility(
                 context.codebase,
                 class_like_metadata.name,
-                appearing_method,
+                &substituted_appearing_method,
                 &substituted_overridden_method,
             );
 
@@ -2349,10 +2352,17 @@ fn check_interface_method_signatures<'ctx>(
             context.codebase,
         );
 
+        let substituted_class_method = get_substituted_method(
+            class_method,
+            class_like_metadata,
+            *class_method_id.get_class_name(),
+            context.codebase,
+        );
+
         let issues = method_signature::validate_method_signature_compatibility(
             context.codebase,
             class_like_metadata.name,
-            class_method,
+            &substituted_class_method,
             &substituted_interface_method,
         );
 

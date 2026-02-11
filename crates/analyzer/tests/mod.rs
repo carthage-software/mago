@@ -399,6 +399,7 @@ test_case!(missing_api_or_internal, {
     s
 });
 test_case!(spread_list);
+test_case!(abstract_method_inheritance);
 
 // Github Issues
 test_case!(issue_659);
