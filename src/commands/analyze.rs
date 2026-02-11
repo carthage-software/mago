@@ -227,9 +227,6 @@ impl AnalyzeCommand {
         metadata: CodebaseMetadata,
         symbol_references: SymbolReferences,
     ) -> Result<ExitCode, Error> {
-        tracing::warn!("Watch mode is an experimental feature and may be unstable.");
-        tracing::warn!("If you encounter issues, please report them at {}", ISSUE_URL);
-
         tracing::info!("Starting watch mode. Press Ctrl+C to stop.");
 
         let database = orchestrator.load_database(&configuration.source.workspace, true, Some(prelude_database))?;
