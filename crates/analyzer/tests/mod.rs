@@ -615,11 +615,12 @@ test_case!(issue_1071);
 test_case!(issue_1072);
 test_case!(issue_1074);
 test_case!(issue_1031);
+test_case!(issue_1081);
 test_case!(issue_1083);
 test_case!(issue_1084);
-test_case!(issue_1081);
-test_case!(issue_1096);
+test_case!(issue_1086);
 test_case!(issue_1087);
+test_case!(issue_1096);
 
 #[test]
 fn test_all_test_cases_are_ran() {

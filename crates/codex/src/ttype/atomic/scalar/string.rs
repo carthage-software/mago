@@ -204,9 +204,11 @@ impl TString {
         let is_numeric = str_is_numeric(&value);
         let is_non_empty = is_numeric || !value.is_empty();
         let is_truthy = is_non_empty && value.as_str() != "0";
-        let casing = if value.chars().all(|c| c.is_lowercase()) {
+        let has_lowercase = value.chars().any(|c| c.is_lowercase());
+        let has_uppercase = value.chars().any(|c| c.is_uppercase());
+        let casing = if has_lowercase && !has_uppercase {
             TStringCasing::Lowercase
-        } else if value.chars().all(|c| c.is_uppercase()) {
+        } else if has_uppercase && !has_lowercase {
             TStringCasing::Uppercase
         } else {
             TStringCasing::Unspecified
@@ -311,15 +313,35 @@ impl TString {
     /// Checks if the string is guaranteed to be lowercase (e.g., from a literal like "hello").
     #[inline]
     #[must_use]
-    pub const fn is_lowercase(&self) -> bool {
-        matches!(self.casing, TStringCasing::Lowercase)
+    pub fn is_lowercase(&self) -> bool {
+        match self.casing {
+            TStringCasing::Lowercase => true,
+            TStringCasing::Uppercase => false,
+            TStringCasing::Unspecified => {
+                if let Some(TStringLiteral::Value(s)) = &self.literal {
+                    s.chars().all(|c| !c.is_uppercase())
+                } else {
+                    false
+                }
+            }
+        }
     }
 
     /// Checks if the string is guaranteed to be uppercase (e.g., from a literal like "HELLO").
     #[inline]
     #[must_use]
-    pub const fn is_uppercase(&self) -> bool {
-        matches!(self.casing, TStringCasing::Uppercase)
+    pub fn is_uppercase(&self) -> bool {
+        match self.casing {
+            TStringCasing::Uppercase => true,
+            TStringCasing::Lowercase => false,
+            TStringCasing::Unspecified => {
+                if let Some(TStringLiteral::Value(s)) = &self.literal {
+                    s.chars().all(|c| !c.is_lowercase())
+                } else {
+                    false
+                }
+            }
+        }
     }
 
     /// Checks if the string is guaranteed to be boring (no interesting properties).
