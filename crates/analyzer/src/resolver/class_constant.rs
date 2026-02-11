@@ -234,12 +234,21 @@ fn find_constant_in_class<'ctx>(
 
     // Check for a defined constant
     if let Some(constant_metadata) = metadata.constants.get(&const_name) {
-        let mut const_type = constant_metadata
-            .inferred_type
-            .clone()
-            .map(wrap_atomic)
-            .or_else(|| constant_metadata.type_metadata.clone().map(|s| s.type_union))
-            .unwrap_or_else(get_mixed);
+        // Prefer the docblock type (@var) when it exists, as it reflects the user's
+        // intended type. When type_metadata was merely copied from the type declaration
+        // (they are equal), fall back to the more specific inferred type.
+        let mut const_type = if let Some(type_metadata) = &constant_metadata.type_metadata
+            && type_metadata.from_docblock
+        {
+            type_metadata.type_union.clone()
+        } else {
+            constant_metadata
+                .inferred_type
+                .clone()
+                .map(wrap_atomic)
+                .or_else(|| constant_metadata.type_metadata.clone().map(|s| s.type_union))
+                .unwrap_or_else(get_mixed)
+        };
 
         expander::expand_union(
             context.codebase,
