@@ -1,7 +1,7 @@
 <?php
 
-$value = ($items[$index] ?? Fallback::X)->value;
+$value = ($items ?? Fallback::X)->value;
 
-$value = ($items[$index] ?? Fallback::X)->value;
+$value = ($items ?? Fallback::X)->value;
 
-$value = ($items[$index] ?? Fallback::X)->value;
+$value = ($items ?? Fallback::X)->value;
