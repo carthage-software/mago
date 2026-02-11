@@ -17,40 +17,24 @@ class CURLFile
 
     public string $postname;
 
-    public function __construct(string $filename, string|null $mime_type = null, string|null $posted_filename = null) {}
+    public function __construct(string $filename, ?string $mime_type = null, ?string $posted_filename = null) {}
 
-    public function getFilename(): string
-    {
-    }
+    public function getFilename(): string {}
 
-    public function getMimeType(): string
-    {
-    }
+    public function getMimeType(): string {}
 
-    public function getPostFilename(): string
-    {
-    }
+    public function getPostFilename(): string {}
 
-    public function setMimeType(string $mime_type): void
-    {
-    }
+    public function setMimeType(string $mime_type): void {}
 
-    public function setPostFilename(string $posted_filename): void
-    {
-    }
+    public function setPostFilename(string $posted_filename): void {}
 
-    public function __wakeup()
-    {
-    }
+    public function __wakeup() {}
 }
 
-function curl_init(null|string $url = null): CurlHandle|false
-{
-}
+function curl_init(?string $url = null): CurlHandle|false {}
 
-function curl_copy_handle(CurlHandle $handle): CurlHandle|false
-{
-}
+function curl_copy_handle(CurlHandle $handle): CurlHandle|false {}
 
 #[ArrayShape([
     'version_number' => 'string',
@@ -63,118 +47,63 @@ function curl_copy_handle(CurlHandle $handle): CurlHandle|false
     'features' => 'int',
     'protocols' => 'array',
 ])]
-function curl_version(): array|false
-{
-}
+function curl_version(): array|false {}
 
-function curl_setopt(CurlHandle $handle, int $option, mixed $value): bool
-{
-}
+function curl_setopt(CurlHandle $handle, int $option, mixed $value): bool {}
 
-function curl_setopt_array(CurlHandle $handle, array $options): bool
-{
-}
+function curl_setopt_array(CurlHandle $handle, array $options): bool {}
 
-function curl_share_close(CurlShareHandle $share_handle): void
-{
-}
+function curl_share_close(CurlShareHandle $share_handle): void {}
 
-function curl_share_init(): CurlShareHandle
-{
-}
+function curl_share_init(): CurlShareHandle {}
 
-function curl_share_setopt(CurlShareHandle $share_handle, int $option, mixed $value): bool
-{
-}
+function curl_share_setopt(CurlShareHandle $share_handle, int $option, mixed $value): bool {}
 
-function curl_strerror(int $error_code): null|string
-{
-}
+function curl_strerror(int $error_code): ?string {}
 
-function curl_unescape(CurlHandle $handle, string $string): string|false
-{
-}
+function curl_unescape(CurlHandle $handle, string $string): string|false {}
 
-function curl_exec(CurlHandle $handle): string|bool
-{
-}
+function curl_exec(CurlHandle $handle): string|bool {}
 
-function curl_getinfo(CurlHandle $handle, null|int $option = null): mixed
-{
-}
+function curl_getinfo(CurlHandle $handle, ?int $option = null): mixed {}
 
-function curl_error(CurlHandle $handle): string
-{
-}
+function curl_error(CurlHandle $handle): string {}
 
-function curl_errno(CurlHandle $handle): int
-{
-}
+function curl_errno(CurlHandle $handle): int {}
 
-function curl_escape(CurlHandle $handle, string $string): string|false
-{
-}
+function curl_escape(CurlHandle $handle, string $string): string|false {}
 
-function curl_file_create(
-    string $filename,
-    null|string $mime_type = null,
-    null|string $posted_filename = null,
-): CURLFile {
-}
+function curl_file_create(string $filename, ?string $mime_type = null, ?string $posted_filename = null): CURLFile {}
 
-function curl_close(CurlHandle $handle): void
-{
-}
+function curl_close(CurlHandle $handle): void {}
 
-function curl_multi_init(): CurlMultiHandle
-{
-}
+function curl_multi_init(): CurlMultiHandle {}
 
 /**
  * @return list<CurlHandle>
  */
-function curl_multi_get_handles(CurlMultiHandle $multi_handle): array
-{
-}
+function curl_multi_get_handles(CurlMultiHandle $multi_handle): array {}
 
-function curl_multi_add_handle(CurlMultiHandle $multi_handle, CurlHandle $handle): int
-{
-}
+function curl_multi_add_handle(CurlMultiHandle $multi_handle, CurlHandle $handle): int {}
 
-function curl_multi_remove_handle(CurlMultiHandle $multi_handle, CurlHandle $handle): int
-{
-}
+function curl_multi_remove_handle(CurlMultiHandle $multi_handle, CurlHandle $handle): int {}
 
-function curl_multi_select(CurlMultiHandle $multi_handle, float $timeout = 1.0): int
-{
-}
+function curl_multi_select(CurlMultiHandle $multi_handle, float $timeout = 1.0): int {}
 
-function curl_multi_setopt(CurlMultiHandle $multi_handle, int $option, mixed $value): bool
-{
-}
+function curl_multi_setopt(CurlMultiHandle $multi_handle, int $option, mixed $value): bool {}
 
-function curl_multi_strerror(int $error_code): null|string
-{
-}
+function curl_multi_strerror(int $error_code): ?string {}
 
-function curl_pause(CurlHandle $handle, int $flags): int
-{
-}
+function curl_pause(CurlHandle $handle, int $flags): int {}
 
-function curl_reset(CurlHandle $handle): void
-{
-}
+function curl_reset(CurlHandle $handle): void {}
 
 /**
  * @param-out int $still_running
  */
-function curl_multi_exec(CurlMultiHandle $multi_handle, &$still_running = 0): int
-{
-}
+function curl_multi_exec(CurlMultiHandle $multi_handle, &$still_running = 0): int {}
 
-function curl_multi_getcontent(CurlHandle $handle): null|string
-{
-}
+function curl_multi_getcontent(CurlHandle $handle): ?string {}
 
 /**
  * @return array{
@@ -183,29 +112,17 @@ function curl_multi_getcontent(CurlHandle $handle): null|string
  *   handle: resource
  * }
  */
-function curl_multi_info_read(CurlMultiHandle $multi_handle, &$queued_messages): array|false
-{
-}
+function curl_multi_info_read(CurlMultiHandle $multi_handle, &$queued_messages): array|false {}
 
-function curl_multi_close(CurlMultiHandle $multi_handle): void
-{
-}
+function curl_multi_close(CurlMultiHandle $multi_handle): void {}
 
-function curl_multi_errno(CurlMultiHandle $multi_handle): int
-{
-}
+function curl_multi_errno(CurlMultiHandle $multi_handle): int {}
 
-function curl_share_errno(CurlShareHandle $share_handle): int
-{
-}
+function curl_share_errno(CurlShareHandle $share_handle): int {}
 
-function curl_share_strerror(int $error_code): null|string
-{
-}
+function curl_share_strerror(int $error_code): ?string {}
 
-function curl_upkeep(CurlHandle $handle): bool
-{
-}
+function curl_upkeep(CurlHandle $handle): bool {}
 
 final class CurlHandle
 {

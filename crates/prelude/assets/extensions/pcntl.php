@@ -259,143 +259,85 @@ namespace {
 
     const P_PIDFD = 3;
 
-    function pcntl_fork(): int
-    {
-    }
+    function pcntl_fork(): int {}
 
     /**
      * @param-out array $resource_usage
      */
-    function pcntl_waitpid(int $process_id, &$status, int $flags = 0, &$resource_usage = []): int
-    {
-    }
+    function pcntl_waitpid(int $process_id, &$status, int $flags = 0, &$resource_usage = []): int {}
 
     /**
      * @param-out int $status
      * @param-out array $resource_usage
      */
-    function pcntl_wait(&$status, int $flags = 0, &$resource_usage = []): int
-    {
-    }
+    function pcntl_wait(&$status, int $flags = 0, &$resource_usage = []): int {}
 
     /**
      * @param callable|int $handler
      */
-    function pcntl_signal(int $signal, $handler, bool $restart_syscalls = true): bool
-    {
-    }
+    function pcntl_signal(int $signal, $handler, bool $restart_syscalls = true): bool {}
 
-    function pcntl_signal_dispatch(): bool
-    {
-    }
+    function pcntl_signal_dispatch(): bool {}
 
-    function pcntl_wifexited(int $status): bool
-    {
-    }
+    function pcntl_wifexited(int $status): bool {}
 
-    function pcntl_wifstopped(int $status): bool
-    {
-    }
+    function pcntl_wifstopped(int $status): bool {}
 
-    function pcntl_wifsignaled(int $status): bool
-    {
-    }
+    function pcntl_wifsignaled(int $status): bool {}
 
-    function pcntl_wexitstatus(int $status): int|false
-    {
-    }
+    function pcntl_wexitstatus(int $status): int|false {}
 
-    function pcntl_wifcontinued(int $status): bool
-    {
-    }
+    function pcntl_wifcontinued(int $status): bool {}
 
-    function pcntl_wtermsig(int $status): int|false
-    {
-    }
+    function pcntl_wtermsig(int $status): int|false {}
 
-    function pcntl_wstopsig(int $status): int|false
-    {
-    }
+    function pcntl_wstopsig(int $status): int|false {}
 
-    function pcntl_exec(string $path, array $args = [], array $env_vars = []): bool
-    {
-    }
+    function pcntl_exec(string $path, array $args = [], array $env_vars = []): bool {}
 
-    function pcntl_alarm(int $seconds): int
-    {
-    }
+    function pcntl_alarm(int $seconds): int {}
 
-    function pcntl_get_last_error(): int
-    {
-    }
+    function pcntl_get_last_error(): int {}
 
-    function pcntl_errno(): int
-    {
-    }
+    function pcntl_errno(): int {}
 
-    function pcntl_strerror(int $error_code): string
-    {
-    }
+    function pcntl_strerror(int $error_code): string {}
 
-    function pcntl_getpriority(null|int $process_id, int $mode = PRIO_PROCESS): int|false
-    {
-    }
+    function pcntl_getpriority(?int $process_id, int $mode = PRIO_PROCESS): int|false {}
 
-    function pcntl_setpriority(int $priority, null|int $process_id, int $mode = PRIO_PROCESS): bool
-    {
-    }
+    function pcntl_setpriority(int $priority, ?int $process_id, int $mode = PRIO_PROCESS): bool {}
 
     /**
      * @param-out array $old_signals
      */
-    function pcntl_sigprocmask(int $mode, array $signals, &$old_signals): bool
-    {
-    }
+    function pcntl_sigprocmask(int $mode, array $signals, &$old_signals): bool {}
 
     /**
      * @param-out array $info
      */
-    function pcntl_sigwaitinfo(array $signals, &$info = []): int|false
-    {
-    }
+    function pcntl_sigwaitinfo(array $signals, &$info = []): int|false {}
 
     /**
      * @param-out array $info
      */
-    function pcntl_sigtimedwait(array $signals, &$info = [], int $seconds = 0, int $nanoseconds = 0): int|false
-    {
-    }
+    function pcntl_sigtimedwait(array $signals, &$info = [], int $seconds = 0, int $nanoseconds = 0): int|false {}
 
-    function pcntl_async_signals(null|bool $enable = null): bool
-    {
-    }
+    function pcntl_async_signals(?bool $enable = null): bool {}
 
     /**
      * @return bool|resource
      */
-    function pcntl_signal_get_handler(int $signal)
-    {
-    }
+    function pcntl_signal_get_handler(int $signal) {}
 
-    function pcntl_unshare(int $flags): bool
-    {
-    }
+    function pcntl_unshare(int $flags): bool {}
 
-    function pcntl_waitid(int $idtype = P_ALL, null|int $id = null, &$info = [], int $flags = WEXITED): bool
-    {
-    }
+    function pcntl_waitid(int $idtype = P_ALL, ?int $id = null, &$info = [], int $flags = WEXITED): bool {}
 
-    function pcntl_getcpuaffinity(null|int $process_id = null): array|false
-    {
-    }
+    function pcntl_getcpuaffinity(?int $process_id = null): array|false {}
 
-    function pcntl_setcpuaffinity(null|int $process_id = null, array $cpu_ids = []): bool
-    {
-    }
+    function pcntl_setcpuaffinity(?int $process_id = null, array $cpu_ids = []): bool {}
 
-    function pcntl_getcpu(): int
-    {
-    }
+    function pcntl_getcpu(): int {}
 }
 
 namespace Pcntl {

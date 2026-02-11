@@ -4,496 +4,272 @@ class SWFShape
 {
     public function __construct() {}
 
-    public function setLine()
-    {
-    }
+    public function setLine() {}
 
-    public function addFill()
-    {
-    }
+    public function addFill() {}
 
-    public function setLeftFill()
-    {
-    }
+    public function setLeftFill() {}
 
-    public function setRightFill()
-    {
-    }
+    public function setRightFill() {}
 
-    public function movePenTo()
-    {
-    }
+    public function movePenTo() {}
 
-    public function movePen()
-    {
-    }
+    public function movePen() {}
 
-    public function drawLineTo()
-    {
-    }
+    public function drawLineTo() {}
 
-    public function drawLine()
-    {
-    }
+    public function drawLine() {}
 
-    public function drawCurveTo()
-    {
-    }
+    public function drawCurveTo() {}
 
-    public function drawCurve()
-    {
-    }
+    public function drawCurve() {}
 
-    public function drawGlyph()
-    {
-    }
+    public function drawGlyph() {}
 
-    public function drawCircle()
-    {
-    }
+    public function drawCircle() {}
 
-    public function drawArc()
-    {
-    }
+    public function drawArc() {}
 
-    public function drawCubic()
-    {
-    }
+    public function drawCubic() {}
 
-    public function drawCubicTo()
-    {
-    }
+    public function drawCubicTo() {}
 }
 
 class SWFFill
 {
     public function __construct() {}
 
-    public function moveTo()
-    {
-    }
+    public function moveTo() {}
 
-    public function scaleTo()
-    {
-    }
+    public function scaleTo() {}
 
-    public function rotateTo()
-    {
-    }
+    public function rotateTo() {}
 
-    public function skewXTo()
-    {
-    }
+    public function skewXTo() {}
 
-    public function skewYTo()
-    {
-    }
+    public function skewYTo() {}
 }
 
 class SWFGradient
 {
     public function __construct() {}
 
-    public function addEntry()
-    {
-    }
+    public function addEntry() {}
 }
 
 class SWFBitmap
 {
     public function __construct() {}
 
-    public function getWidth()
-    {
-    }
+    public function getWidth() {}
 
-    public function getHeight()
-    {
-    }
+    public function getHeight() {}
 }
 
 class SWFText
 {
     public function __construct() {}
 
-    public function setFont()
-    {
-    }
+    public function setFont() {}
 
-    public function setHeight()
-    {
-    }
+    public function setHeight() {}
 
-    public function setSpacing()
-    {
-    }
+    public function setSpacing() {}
 
-    public function setColor()
-    {
-    }
+    public function setColor() {}
 
-    public function moveTo()
-    {
-    }
+    public function moveTo() {}
 
-    public function addString()
-    {
-    }
+    public function addString() {}
 
-    public function addUTF8String()
-    {
-    }
+    public function addUTF8String() {}
 
-    public function getWidth()
-    {
-    }
+    public function getWidth() {}
 
-    public function getUTF8Width()
-    {
-    }
+    public function getUTF8Width() {}
 
-    public function getAscent()
-    {
-    }
+    public function getAscent() {}
 
-    public function getDescent()
-    {
-    }
+    public function getDescent() {}
 
-    public function getLeading()
-    {
-    }
+    public function getLeading() {}
 }
 
 class SWFTextField
 {
     public function __construct() {}
 
-    public function setFont()
-    {
-    }
+    public function setFont() {}
 
-    public function setBounds()
-    {
-    }
+    public function setBounds() {}
 
-    public function align()
-    {
-    }
+    public function align() {}
 
-    public function setHeight()
-    {
-    }
+    public function setHeight() {}
 
-    public function setLeftMargin()
-    {
-    }
+    public function setLeftMargin() {}
 
-    public function setRightMargin()
-    {
-    }
+    public function setRightMargin() {}
 
-    public function setMargins()
-    {
-    }
+    public function setMargins() {}
 
-    public function setIndentation()
-    {
-    }
+    public function setIndentation() {}
 
-    public function setLineSpacing()
-    {
-    }
+    public function setLineSpacing() {}
 
-    public function setColor()
-    {
-    }
+    public function setColor() {}
 
-    public function setName()
-    {
-    }
+    public function setName() {}
 
-    public function addString()
-    {
-    }
+    public function addString() {}
 
-    public function setPadding()
-    {
-    }
+    public function setPadding() {}
 
-    public function addChars()
-    {
-    }
+    public function addChars() {}
 }
 
 class SWFFont
 {
     public function __construct() {}
 
-    public function getWidth()
-    {
-    }
+    public function getWidth() {}
 
-    public function getUTF8Width()
-    {
-    }
+    public function getUTF8Width() {}
 
-    public function getAscent()
-    {
-    }
+    public function getAscent() {}
 
-    public function getDescent()
-    {
-    }
+    public function getDescent() {}
 
-    public function getLeading()
-    {
-    }
+    public function getLeading() {}
 
-    public function getShape()
-    {
-    }
+    public function getShape() {}
 }
 
 class SWFDisplayItem
 {
-    public function moveTo()
-    {
-    }
+    public function moveTo() {}
 
-    public function move()
-    {
-    }
+    public function move() {}
 
-    public function scaleTo()
-    {
-    }
+    public function scaleTo() {}
 
-    public function scale()
-    {
-    }
+    public function scale() {}
 
-    public function rotateTo()
-    {
-    }
+    public function rotateTo() {}
 
-    public function rotate()
-    {
-    }
+    public function rotate() {}
 
-    public function skewXTo()
-    {
-    }
+    public function skewXTo() {}
 
-    public function skewX()
-    {
-    }
+    public function skewX() {}
 
-    public function skewYTo()
-    {
-    }
+    public function skewYTo() {}
 
-    public function skewY()
-    {
-    }
+    public function skewY() {}
 
-    public function setMatrix()
-    {
-    }
+    public function setMatrix() {}
 
-    public function setDepth()
-    {
-    }
+    public function setDepth() {}
 
-    public function setRatio()
-    {
-    }
+    public function setRatio() {}
 
-    public function addColor()
-    {
-    }
+    public function addColor() {}
 
-    public function multColor()
-    {
-    }
+    public function multColor() {}
 
-    public function setName()
-    {
-    }
+    public function setName() {}
 
-    public function addAction()
-    {
-    }
+    public function addAction() {}
 
-    public function remove()
-    {
-    }
+    public function remove() {}
 
-    public function setMaskLevel()
-    {
-    }
+    public function setMaskLevel() {}
 
-    public function endMask()
-    {
-    }
+    public function endMask() {}
 
-    public function getX()
-    {
-    }
+    public function getX() {}
 
-    public function getY()
-    {
-    }
+    public function getY() {}
 
-    public function getXScale()
-    {
-    }
+    public function getXScale() {}
 
-    public function getYScale()
-    {
-    }
+    public function getYScale() {}
 
-    public function getXSkew()
-    {
-    }
+    public function getXSkew() {}
 
-    public function getYSkew()
-    {
-    }
+    public function getYSkew() {}
 
-    public function getRot()
-    {
-    }
+    public function getRot() {}
 }
 
 class SWFMovie
 {
     public function __construct() {}
 
-    public function nextFrame()
-    {
-    }
+    public function nextFrame() {}
 
-    public function labelFrame()
-    {
-    }
+    public function labelFrame() {}
 
-    public function add()
-    {
-    }
+    public function add() {}
 
-    public function remove()
-    {
-    }
+    public function remove() {}
 
-    public function output()
-    {
-    }
+    public function output() {}
 
-    public function save()
-    {
-    }
+    public function save() {}
 
-    public function saveToFile()
-    {
-    }
+    public function saveToFile() {}
 
-    public function setBackground()
-    {
-    }
+    public function setBackground() {}
 
-    public function setRate()
-    {
-    }
+    public function setRate() {}
 
-    public function setDimension()
-    {
-    }
+    public function setDimension() {}
 
-    public function setFrames()
-    {
-    }
+    public function setFrames() {}
 
-    public function streamMP3()
-    {
-    }
+    public function streamMP3() {}
 
-    public function addExport()
-    {
-    }
+    public function addExport() {}
 
-    public function writeExports()
-    {
-    }
+    public function writeExports() {}
 
-    public function startSound()
-    {
-    }
+    public function startSound() {}
 
-    public function stopSound()
-    {
-    }
+    public function stopSound() {}
 
-    public function importChar()
-    {
-    }
+    public function importChar() {}
 
-    public function importFont()
-    {
-    }
+    public function importFont() {}
 
-    public function addFont()
-    {
-    }
+    public function addFont() {}
 
-    public function protect()
-    {
-    }
+    public function protect() {}
 
-    public function namedAnchor()
-    {
-    }
+    public function namedAnchor() {}
 }
 
 class SWFButton
 {
     public function __construct() {}
 
-    public function setHit()
-    {
-    }
+    public function setHit() {}
 
-    public function setOver()
-    {
-    }
+    public function setOver() {}
 
-    public function setUp()
-    {
-    }
+    public function setUp() {}
 
-    public function setDown()
-    {
-    }
+    public function setDown() {}
 
-    public function setAction()
-    {
-    }
+    public function setAction() {}
 
-    public function addShape()
-    {
-    }
+    public function addShape() {}
 
-    public function setMenu()
-    {
-    }
+    public function setMenu() {}
 
-    public function addAction()
-    {
-    }
+    public function addAction() {}
 
-    public function addSound()
-    {
-    }
+    public function addSound() {}
 }
 
 class SWFAction
@@ -505,46 +281,28 @@ class SWFMorph
 {
     public function __construct() {}
 
-    public function getShape1()
-    {
-    }
+    public function getShape1() {}
 
-    public function getShape2()
-    {
-    }
+    public function getShape2() {}
 }
 
 class SWFSprite
 {
     public function __construct() {}
 
-    public function add()
-    {
-    }
+    public function add() {}
 
-    public function remove()
-    {
-    }
+    public function remove() {}
 
-    public function nextFrame()
-    {
-    }
+    public function nextFrame() {}
 
-    public function labelFrame()
-    {
-    }
+    public function labelFrame() {}
 
-    public function setFrames()
-    {
-    }
+    public function setFrames() {}
 
-    public function startSound()
-    {
-    }
+    public function startSound() {}
 
-    public function stopSound()
-    {
-    }
+    public function stopSound() {}
 }
 
 class SWFSound
@@ -554,70 +312,42 @@ class SWFSound
 
 class SWFFontChar
 {
-    public function addChars()
-    {
-    }
+    public function addChars() {}
 
-    public function addUTF8Chars()
-    {
-    }
+    public function addUTF8Chars() {}
 }
 
 class SWFSoundInstance
 {
-    public function noMultiple()
-    {
-    }
+    public function noMultiple() {}
 
-    public function loopInPoint()
-    {
-    }
+    public function loopInPoint() {}
 
-    public function loopOutPoint()
-    {
-    }
+    public function loopOutPoint() {}
 
-    public function loopCount()
-    {
-    }
+    public function loopCount() {}
 }
 
 class SWFVideoStream
 {
     public function __construct() {}
 
-    public function setdimension()
-    {
-    }
+    public function setdimension() {}
 
-    public function getnumframes()
-    {
-    }
+    public function getnumframes() {}
 }
 
-function ming_setcubicthreshold(int $threshold): void
-{
-}
+function ming_setcubicthreshold(int $threshold): void {}
 
-function ming_setscale(float $scale): void
-{
-}
+function ming_setscale(float $scale): void {}
 
-function ming_useswfversion(int $version): void
-{
-}
+function ming_useswfversion(int $version): void {}
 
-function ming_keypress(string $char): int
-{
-}
+function ming_keypress(string $char): int {}
 
-function ming_useconstants(int $use): void
-{
-}
+function ming_useconstants(int $use): void {}
 
-function ming_setswfcompression(int $level): void
-{
-}
+function ming_setswfcompression(int $level): void {}
 
 const MING_NEW = 1;
 

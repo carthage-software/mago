@@ -50,9 +50,7 @@ class Yar_Server
     /**
      * @return bool
      */
-    public function handle()
-    {
-    }
+    public function handle() {}
 }
 
 class Yar_Client
@@ -66,18 +64,14 @@ class Yar_Client
      * @param string $method
      * @param array $parameters
      */
-    public function __call($method, $parameters)
-    {
-    }
+    public function __call($method, $parameters) {}
 
     /**
      * @param string $url
      */
     final public function __construct($url, $async = null) {}
 
-    public function call($method, $parameters)
-    {
-    }
+    public function call($method, $parameters) {}
 
     /**
      * @param int $type
@@ -85,13 +79,9 @@ class Yar_Client
      *
      * @return static|false
      */
-    public function setOpt($type, $value)
-    {
-    }
+    public function setOpt($type, $value) {}
 
-    public function getOpt($type)
-    {
-    }
+    public function getOpt($type) {}
 }
 
 class Yar_Concurrent_Client
@@ -118,8 +108,7 @@ class Yar_Concurrent_Client
         callable $callback = null,
         callable $error_callback,
         array $options,
-    ) {
-    }
+    ) {}
 
     /**
      * @param callable $callback
@@ -127,16 +116,12 @@ class Yar_Concurrent_Client
      *
      * @return bool
      */
-    public static function loop($callback = null, $error_callback = null)
-    {
-    }
+    public static function loop($callback = null, $error_callback = null) {}
 
     /**
      * @return bool
      */
-    public static function reset()
-    {
-    }
+    public static function reset() {}
 }
 
 class Yar_Server_Exception extends Exception
@@ -146,9 +131,7 @@ class Yar_Server_Exception extends Exception
     /**
      * @return string
      */
-    public function getType()
-    {
-    }
+    public function getType() {}
 }
 
 class Yar_Client_Exception extends Exception
@@ -156,35 +139,19 @@ class Yar_Client_Exception extends Exception
     /**
      * @return string
      */
-    public function getType()
-    {
-    }
+    public function getType() {}
 }
 
-class Yar_Server_Request_Exception extends Yar_Server_Exception
-{
-}
+class Yar_Server_Request_Exception extends Yar_Server_Exception {}
 
-class Yar_Server_Protocol_Exception extends Yar_Server_Exception
-{
-}
+class Yar_Server_Protocol_Exception extends Yar_Server_Exception {}
 
-class Yar_Server_Packager_Exception extends Yar_Server_Exception
-{
-}
+class Yar_Server_Packager_Exception extends Yar_Server_Exception {}
 
-class Yar_Server_Output_Exception extends Yar_Server_Exception
-{
-}
+class Yar_Server_Output_Exception extends Yar_Server_Exception {}
 
-class Yar_Client_Transport_Exception extends Yar_Client_Exception
-{
-}
+class Yar_Client_Transport_Exception extends Yar_Client_Exception {}
 
-class Yar_Client_Packager_Exception extends Yar_Client_Exception
-{
-}
+class Yar_Client_Packager_Exception extends Yar_Client_Exception {}
 
-class Yar_Client_Protocol_Exception extends Yar_Client_Exception
-{
-}
+class Yar_Client_Protocol_Exception extends Yar_Client_Exception {}

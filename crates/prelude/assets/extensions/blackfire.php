@@ -5,23 +5,17 @@ final class BlackfireProbe
     /**
      * @return BlackfireProbe
      */
-    public static function getMainInstance()
-    {
-    }
+    public static function getMainInstance() {}
 
     /**
      * @return bool
      */
-    public static function isEnabled()
-    {
-    }
+    public static function isEnabled() {}
 
     /**
      * @param string $markerName
      */
-    public static function addMarker($markerName = '')
-    {
-    }
+    public static function addMarker($markerName = '') {}
 
     /**
      * @param string $query
@@ -34,84 +28,60 @@ final class BlackfireProbe
     /**
      * @return bool
      */
-    public function isVerified()
-    {
-    }
+    public function isVerified() {}
 
     /**
      * @param string $configuration
      */
-    public function setConfiguration($configuration)
-    {
-    }
+    public function setConfiguration($configuration) {}
 
     /**
      * @return string
      */
-    public function getResponseLine()
-    {
-    }
+    public function getResponseLine() {}
 
     /**
      * @return bool
      */
-    public function enable()
-    {
-    }
+    public function enable() {}
 
     /**
      * @return bool
      */
-    public function discard()
-    {
-    }
+    public function discard() {}
 
     /**
      * @return bool
      */
-    public function disable()
-    {
-    }
+    public function disable() {}
 
     /**
      * @return bool
      */
-    public function close()
-    {
-    }
+    public function close() {}
 
     /**
      * @return string|null
      */
-    public function createSubProfileQuery()
-    {
-    }
+    public function createSubProfileQuery() {}
 
     /**
      * @return void
      */
-    public static function setTransactionName(string $transactionName)
-    {
-    }
+    public static function setTransactionName(string $transactionName) {}
 
     /**
      * @return void
      */
-    public static function ignoreTransaction()
-    {
-    }
+    public static function ignoreTransaction() {}
 
     /**
      * @return void
      */
-    public static function startTransaction()
-    {
-    }
+    public static function startTransaction() {}
 
     /**
      * @return void
      */
-    public static function stopTransaction()
-    {
-    }
+    public static function stopTransaction() {}
 }

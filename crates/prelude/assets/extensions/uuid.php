@@ -33,18 +33,14 @@ const UUID_TYPE_INVALID = -42;
  *
  * @return string
  */
-function uuid_create($uuid_type = UUID_TYPE_DEFAULT)
-{
-}
+function uuid_create($uuid_type = UUID_TYPE_DEFAULT) {}
 
 /**
  * @param string $uuid
  *
  * @return bool
  */
-function uuid_is_valid($uuid)
-{
-}
+function uuid_is_valid($uuid) {}
 
 /**
  * @param string $uuid1
@@ -52,18 +48,14 @@ function uuid_is_valid($uuid)
  *
  * @return int
  */
-function uuid_compare($uuid1, $uuid2)
-{
-}
+function uuid_compare($uuid1, $uuid2) {}
 
 /**
  * @param string $uuid
  *
  * @return bool
  */
-function uuid_is_null($uuid)
-{
-}
+function uuid_is_null($uuid) {}
 
 /**
  * @param string $uuid_ns
@@ -71,9 +63,7 @@ function uuid_is_null($uuid)
  *
  * @return string
  */
-function uuid_generate_md5($uuid_ns, $name)
-{
-}
+function uuid_generate_md5($uuid_ns, $name) {}
 
 /**
  * @param string $uuid_ns
@@ -81,54 +71,40 @@ function uuid_generate_md5($uuid_ns, $name)
  *
  * @return string
  */
-function uuid_generate_sha1($uuid_ns, $name)
-{
-}
+function uuid_generate_sha1($uuid_ns, $name) {}
 
 /**
  * @param string $uuid
  * @return int
  */
-function uuid_type($uuid)
-{
-}
+function uuid_type($uuid) {}
 
 /**
  * @param string $uuid
  * @return int
  */
-function uuid_variant($uuid)
-{
-}
+function uuid_variant($uuid) {}
 
 /**
  * @param string $uuid
  * @return false|int
  */
-function uuid_time($uuid)
-{
-}
+function uuid_time($uuid) {}
 
 /**
  * @param string $uuid
  * @return false|string
  */
-function uuid_mac($uuid)
-{
-}
+function uuid_mac($uuid) {}
 
 /**
  * @param string $uuid
  * @return false|string
  */
-function uuid_parse($uuid)
-{
-}
+function uuid_parse($uuid) {}
 
 /**
  * @param string $uuid
  * @return false|string
  */
-function uuid_unparse($uuid)
-{
-}
+function uuid_unparse($uuid) {}

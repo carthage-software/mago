@@ -10,95 +10,73 @@ class ZendAPI_Queue
      *
      * @return bool
      */
-    public function login($password, $application_id = null)
-    {
-    }
+    public function login($password, $application_id = null) {}
 
     /**
      * @param ZendAPI_Job $job
      *
      * @return int
      */
-    public function addJob($job)
-    {
-    }
+    public function addJob($job) {}
 
     /**
      * @param int $job_id
      *
      * @return ZendAPI_Job
      */
-    public function getJob($job_id)
-    {
-    }
+    public function getJob($job_id) {}
 
     /**
      * @param ZendAPI_Job $job
      *
      * @return int
      */
-    public function updateJob($job)
-    {
-    }
+    public function updateJob($job) {}
 
     /**
      * @param int|list<int> $job_id
      *
      * @return bool
      */
-    public function removeJob($job_id)
-    {
-    }
+    public function removeJob($job_id) {}
 
     /**
      * @param int|list<int> $job_id
      *
      * @return bool
      */
-    public function suspendJob($job_id)
-    {
-    }
+    public function suspendJob($job_id) {}
 
     /**
      * @param int|list<int> $job_id
      *
      * @return bool
      */
-    public function resumeJob($job_id)
-    {
-    }
+    public function resumeJob($job_id) {}
 
     /**
      * @param Job $job
      *
      * @return bool
      */
-    public function requeueJob($job)
-    {
-    }
+    public function requeueJob($job) {}
 
     /**
      * @return array
      */
-    public function getStatistics()
-    {
-    }
+    public function getStatistics() {}
 
     /**
      * @param string $path
      *
      * @return bool
      */
-    public function isScriptExists($path)
-    {
-    }
+    public function isScriptExists($path) {}
 
     /**
      * @return bool
      */
-    public function isSuspend()
-    {
-    }
+    public function isSuspend() {}
 
     /**
      * @param array $filter_options
@@ -107,32 +85,24 @@ class ZendAPI_Queue
      *
      * @return array
      */
-    public function getJobsInQueue($filter_options = null, $max_jobs = -1, $with_globals_and_output = false)
-    {
-    }
+    public function getJobsInQueue($filter_options = null, $max_jobs = -1, $with_globals_and_output = false) {}
 
     /**
      * @param array $filter_options
      *
      * @return int
      */
-    public function getNumOfJobsInQueue($filter_options = null)
-    {
-    }
+    public function getNumOfJobsInQueue($filter_options = null) {}
 
     /**
      * @return array
      */
-    public function getAllhosts()
-    {
-    }
+    public function getAllhosts() {}
 
     /**
      * @return array
      */
-    public function getAllApplicationIDs()
-    {
-    }
+    public function getAllApplicationIDs() {}
 
     /**
      * @param int $status
@@ -144,37 +114,27 @@ class ZendAPI_Queue
      *
      * @return array
      */
-    public function getHistoricJobs($status, $start_time, $end_time, $index, $count, &$total)
-    {
-    }
+    public function getHistoricJobs($status, $start_time, $end_time, $index, $count, &$total) {}
 
     /**
      * @return bool
      */
-    public function suspendQueue()
-    {
-    }
+    public function suspendQueue() {}
 
     /**
      * @return bool
      */
-    public function resumeQueue()
-    {
-    }
+    public function resumeQueue() {}
 
     /**
      * @return string
      */
-    public function getLastError()
-    {
-    }
+    public function getLastError() {}
 
     /**
      * @return bool
      */
-    public function setMaxHistoryTime()
-    {
-    }
+    public function setMaxHistoryTime() {}
 }
 
 class ZendAPI_Job
@@ -260,115 +220,63 @@ class ZendAPI_Job
      *
      * @return int|false
      */
-    public function addJobToQueue($jobqueue_url, $password)
-    {
-    }
+    public function addJobToQueue($jobqueue_url, $password) {}
 
     /**
      * @param int $priority
      */
-    public function setJobPriority($priority)
-    {
-    }
+    public function setJobPriority($priority) {}
 
-    public function setJobName($name)
-    {
-    }
+    public function setJobName($name) {}
 
-    public function setScript($script)
-    {
-    }
+    public function setScript($script) {}
 
-    public function setApplicationID($app_id)
-    {
-    }
+    public function setApplicationID($app_id) {}
 
-    public function setUserVariables($vars)
-    {
-    }
+    public function setUserVariables($vars) {}
 
-    public function setGlobalVariables($vars)
-    {
-    }
+    public function setGlobalVariables($vars) {}
 
-    public function setJobDependency($job_id)
-    {
-    }
+    public function setJobDependency($job_id) {}
 
-    public function setScheduledTime($timestamp)
-    {
-    }
+    public function setScheduledTime($timestamp) {}
 
-    public function setRecurrenceData($interval, $end_time = null)
-    {
-    }
+    public function setRecurrenceData($interval, $end_time = null) {}
 
-    public function setPreserved($preserved)
-    {
-    }
+    public function setPreserved($preserved) {}
 
     /**
      * @return array
      */
-    public function getProperties()
-    {
-    }
+    public function getProperties() {}
 
-    public function getOutput()
-    {
-    }
+    public function getOutput() {}
 
-    public function getID()
-    {
-    }
+    public function getID() {}
 
-    public function getHost()
-    {
-    }
+    public function getHost() {}
 
-    public function getScript()
-    {
-    }
+    public function getScript() {}
 
-    public function getJobPriority()
-    {
-    }
+    public function getJobPriority() {}
 
-    public function getJobName()
-    {
-    }
+    public function getJobName() {}
 
-    public function getApplicationID()
-    {
-    }
+    public function getApplicationID() {}
 
-    public function getUserVariables()
-    {
-    }
+    public function getUserVariables() {}
 
-    public function getGlobalVariables()
-    {
-    }
+    public function getGlobalVariables() {}
 
-    public function getJobDependency()
-    {
-    }
+    public function getJobDependency() {}
 
-    public function getScheduledTime()
-    {
-    }
+    public function getScheduledTime() {}
 
-    public function getInterval()
-    {
-    }
+    public function getInterval() {}
 
-    public function getEndTime()
-    {
-    }
+    public function getEndTime() {}
 
-    public function getPreserved()
-    {
-    }
+    public function getPreserved() {}
 
     /**
      * Get the current status of the job
@@ -379,9 +287,7 @@ class ZendAPI_Job
      *
      * @return int|false
      */
-    public function getJobStatus()
-    {
-    }
+    public function getJobStatus() {}
 
     /**
      * Get how much seconds there are until the next time the job will run.
@@ -389,9 +295,7 @@ class ZendAPI_Job
      *
      * @return int
      */
-    public function getTimeToNextRepeat()
-    {
-    }
+    public function getTimeToNextRepeat() {}
 
     /**
      * For recurring job get the status of the last execution. For simple job,
@@ -399,23 +303,17 @@ class ZendAPI_Job
      * jobs that haven't been executed yet will return STATUS_WAITING
      * @return int
      */
-    public function getLastPerformedStatus()
-    {
-    }
+    public function getLastPerformedStatus() {}
 }
 
-class java
-{
-}
+class java {}
 
 class JavaException
 {
     /**
      * @return object
      */
-    public function getCause()
-    {
-    }
+    public function getCause() {}
 }
 
 /**
@@ -423,23 +321,17 @@ class JavaException
  *
  * @return void
  */
-function accelerator_set_status($status)
-{
-}
+function accelerator_set_status($status) {}
 
 /**
  * @return void
  */
-function output_cache_disable()
-{
-}
+function output_cache_disable() {}
 
 /**
  * @return void
  */
-function output_cache_disable_compression()
-{
-}
+function output_cache_disable_compression() {}
 
 /**
  * @param string $key
@@ -448,9 +340,7 @@ function output_cache_disable_compression()
  *
  * @return string
  */
-function output_cache_fetch($key, $function, $lifetime)
-{
-}
+function output_cache_fetch($key, $function, $lifetime) {}
 
 /**
  * @param string $key
@@ -459,53 +349,41 @@ function output_cache_fetch($key, $function, $lifetime)
  *
  * @return mixed
  */
-function output_cache_output($key, $function, $lifetime)
-{
-}
+function output_cache_output($key, $function, $lifetime) {}
 
 /**
  * @param string $filename
  *
  * @return bool
  */
-function output_cache_remove($filename)
-{
-}
+function output_cache_remove($filename) {}
 
 /**
  * @param string $url
  *
  * @return bool
  */
-function output_cache_remove_url($url)
-{
-}
+function output_cache_remove_url($url) {}
 
 /**
  * @param string $key
  *
  * @return bool
  */
-function output_cache_remove_key($key)
-{
-}
+function output_cache_remove_key($key) {}
 
 /**
  * @param string $key
  *
  * @return bool
  */
-function output_cache_put($key, $data)
-{
-}
+function output_cache_put($key, $data) {}
 
 /**
  * @param string $key
  * @param int $lifetime
  */
-function output_cache_get($key, $lifetime)
-{
-}
+function output_cache_get($key, $lifetime) {}
 
 /**
  * @param string $key
@@ -513,16 +391,12 @@ function output_cache_get($key, $lifetime)
  *
  * @return bool
  */
-function output_cache_exists($key, $lifetime)
-{
-}
+function output_cache_exists($key, $lifetime) {}
 
 /**
  * @return void
  */
-function output_cache_stop()
-{
-}
+function output_cache_stop() {}
 
 /**
  * @param int $errno
@@ -532,18 +406,14 @@ function output_cache_stop()
  *
  * @return void
  */
-function monitor_pass_error($errno, $errstr, $errfile, $errline)
-{
-}
+function monitor_pass_error($errno, $errstr, $errfile, $errline) {}
 
 /**
  * @param string $hint
  *
  * @return void
  */
-function monitor_set_aggregation_hint($hint)
-{
-}
+function monitor_set_aggregation_hint($hint) {}
 
 /**
  * @param string $class
@@ -552,9 +422,7 @@ function monitor_set_aggregation_hint($hint)
  *
  * @return void
  */
-function monitor_custom_event($class, $text, $severe = null, $user_data = null)
-{
-}
+function monitor_custom_event($class, $text, $severe = null, $user_data = null) {}
 
 /**
  * @param int $error_code
@@ -563,16 +431,12 @@ function monitor_custom_event($class, $text, $severe = null, $user_data = null)
  *
  * @return void
  */
-function monitor_httperror_event($error_code, $url, $severe = null)
-{
-}
+function monitor_httperror_event($error_code, $url, $severe = null) {}
 
 /**
  * @return array
  */
-function monitor_license_info()
-{
-}
+function monitor_license_info() {}
 
 /**
  * @param string $event_handler_func
@@ -581,18 +445,14 @@ function monitor_license_info()
  *
  * @return bool
  */
-function register_event_handler($event_handler_func, $handler_register_name, $event_type_mask)
-{
-}
+function register_event_handler($event_handler_func, $handler_register_name, $event_type_mask) {}
 
 /**
  * @param string $handler_name
  *
  * @return bool
  */
-function unregister_event_handler($handler_name)
-{
-}
+function unregister_event_handler($handler_name) {}
 
 /**
  * @param string $filename
@@ -601,9 +461,7 @@ function unregister_event_handler($handler_name)
  *
  * @return null|false
  */
-function zend_send_file($filename, $mime_type, $custom_headers)
-{
-}
+function zend_send_file($filename, $mime_type, $custom_headers) {}
 
 /**
  * @param string $buffer
@@ -612,119 +470,89 @@ function zend_send_file($filename, $mime_type, $custom_headers)
  *
  * @return null|false
  */
-function zend_send_buffer($buffer, $mime_type, $custom_headers)
-{
-}
+function zend_send_buffer($buffer, $mime_type, $custom_headers) {}
 
 /**
  * @param string $error_string
  */
-function set_job_failed($error_string)
-{
-}
+function set_job_failed($error_string) {}
 
 /**
  * @return array{license_ok: bool, expires: string|int}
  */
-function jobqueue_license_info()
-{
-}
+function jobqueue_license_info() {}
 
 /**
  * @param string $class
  *
  * @return object
  */
-function java($class)
-{
-}
+function java($class) {}
 
 /**
  * @return object|false
  */
-function java_last_exception_get()
-{
-}
+function java_last_exception_get() {}
 
 /**
  * @return void
  */
-function java_last_exception_clear()
-{
-}
+function java_last_exception_clear() {}
 
 /**
  * @param bool $ignore
  *
  * @return void
  */
-function java_set_ignore_case($ignore)
-{
-}
+function java_set_ignore_case($ignore) {}
 
 /**
  * @param string $encoding
  *
  * @return array
  */
-function java_set_encoding($encoding)
-{
-}
+function java_set_encoding($encoding) {}
 
 /**
  * @param bool $throw
  *
  * @return void
  */
-function java_throw_exceptions($throw)
-{
-}
+function java_throw_exceptions($throw) {}
 
 /**
  * @param string $new_jarpath
  *
  * @return array
  */
-function java_reload($new_jarpath)
-{
-}
+function java_reload($new_jarpath) {}
 
 /**
  * @param string $new_classpath
  *
  * @return array
  */
-function java_require($new_classpath)
-{
-}
+function java_require($new_classpath) {}
 
 /**
  * @return bool
  */
-function zend_loader_enabled()
-{
-}
+function zend_loader_enabled() {}
 
 /**
  * @return bool
  */
-function zend_loader_file_encoded()
-{
-}
+function zend_loader_file_encoded() {}
 
 /**
  * @return array
  */
-function zend_loader_file_licensed()
-{
-}
+function zend_loader_file_licensed() {}
 
 /**
  * @return string
  */
-function zend_loader_current_file()
-{
-}
+function zend_loader_current_file() {}
 
 /**
  * @param string $license_file
@@ -732,57 +560,43 @@ function zend_loader_current_file()
  *
  * @return bool
  */
-function zend_loader_install_license($license_file, $override)
-{
-}
+function zend_loader_install_license($license_file, $override) {}
 
 /**
  * @param string $function_name
  *
  * @return string
  */
-function zend_obfuscate_function_name($function_name)
-{
-}
+function zend_obfuscate_function_name($function_name) {}
 
 /**
  * @param string $class_name
  *
  * @return string
  */
-function zend_obfuscate_class_name($class_name)
-{
-}
+function zend_obfuscate_class_name($class_name) {}
 
 /**
  * @return int
  */
-function zend_current_obfuscation_level()
-{
-}
+function zend_current_obfuscation_level() {}
 
 /**
  * @return void
  */
-function zend_runtime_obfuscate()
-{
-}
+function zend_runtime_obfuscate() {}
 
 /**
  * @param bool $all_ids
  *
  * @return array
  */
-function zend_get_id($all_ids = false)
-{
-}
+function zend_get_id($all_ids = false) {}
 
 /**
  * @return string
  */
-function zend_optimizer_version()
-{
-}
+function zend_optimizer_version() {}
 
 const JOB_QUEUE_STATUS_SUCCESS = 1;
 

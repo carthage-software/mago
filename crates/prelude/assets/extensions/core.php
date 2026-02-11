@@ -3,21 +3,13 @@
 #[AllowDynamicProperties]
 class stdClass
 {
-    public function __set(string $name, mixed $value): void
-    {
-    }
+    public function __set(string $name, mixed $value): void {}
 
-    public function __get(string $name): mixed
-    {
-    }
+    public function __get(string $name): mixed {}
 
-    public function __isset(string $name): bool
-    {
-    }
+    public function __isset(string $name): bool {}
 
-    public function __unset(string $name): void
-    {
-    }
+    public function __unset(string $name): void {}
 }
 
 /**
@@ -26,9 +18,7 @@ class stdClass
  *
  * @inheritors IteratorAggregate|Generator|Iterator|PDOStatement|DS\Collection|DOMNodeList|DatePeriod
  */
-interface Traversable
-{
-}
+interface Traversable {}
 
 /**
  * @template K
@@ -143,7 +133,7 @@ interface Throwable extends Stringable
 
     public function getTraceAsString(): string;
 
-    public function getPrevious(): Throwable|null;
+    public function getPrevious(): ?Throwable;
 
     /**
      * @return string
@@ -164,70 +154,50 @@ class Exception implements Throwable
     /**
      * @pure
      */
-    public function __construct(string $message = '', int $code = 0, null|Throwable $previous = null) {}
+    public function __construct(string $message = '', int $code = 0, ?Throwable $previous = null) {}
 
     /**
      * @mutation-free
      */
-    final public function getMessage(): string
-    {
-    }
+    final public function getMessage(): string {}
 
     /**
      * @return int|string
      *
      * @mutation-free
      */
-    final public function getCode()
-    {
-    }
+    final public function getCode() {}
 
     /**
      * @mutation-free
      */
-    final public function getFile(): string
-    {
-    }
+    final public function getFile(): string {}
 
     /**
      * @mutation-free
      */
-    final public function getLine(): int
-    {
-    }
+    final public function getLine(): int {}
 
     /**
      * @mutation-free
      */
-    final public function getTrace(): array
-    {
-    }
+    final public function getTrace(): array {}
 
     /**
      * @mutation-free
      */
-    final public function getPrevious(): null|Throwable
-    {
-    }
+    final public function getPrevious(): ?Throwable {}
 
     /**
      * @mutation-free
      */
-    final public function getTraceAsString(): string
-    {
-    }
+    final public function getTraceAsString(): string {}
 
-    public function __toString(): string
-    {
-    }
+    public function __toString(): string {}
 
-    private function __clone(): void
-    {
-    }
+    private function __clone(): void {}
 
-    public function __wakeup(): void
-    {
-    }
+    public function __wakeup(): void {}
 }
 
 class Error implements Throwable
@@ -247,109 +217,71 @@ class Error implements Throwable
      *
      * @pure
      */
-    public function __construct(string $message = '', int $code = 0, null|Throwable $previous = null) {}
+    public function __construct(string $message = '', int $code = 0, ?Throwable $previous = null) {}
 
     /**
      * @return string
      *
      * @mutation-free
      */
-    final public function getMessage(): string
-    {
-    }
+    final public function getMessage(): string {}
 
     /**
      * @return int
      *
      * @mutation-free
      */
-    final public function getCode()
-    {
-    }
+    final public function getCode() {}
 
     /**
      * @mutation-free
      */
-    final public function getFile(): string
-    {
-    }
+    final public function getFile(): string {}
 
     /**
      * @mutation-free
      */
-    final public function getLine(): int
-    {
-    }
+    final public function getLine(): int {}
 
     /**
      * @mutation-free
      */
-    final public function getTrace(): array
-    {
-    }
+    final public function getTrace(): array {}
 
     /**
      * @mutation-free
      */
-    final public function getTraceAsString(): string
-    {
-    }
+    final public function getTraceAsString(): string {}
 
     /**
      * @mutation-free
      */
-    final public function getPrevious(): null|Throwable
-    {
-    }
+    final public function getPrevious(): ?Throwable {}
 
-    public function __toString(): string
-    {
-    }
+    public function __toString(): string {}
 
-    private function __clone(): void
-    {
-    }
+    private function __clone(): void {}
 
-    public function __wakeup(): void
-    {
-    }
+    public function __wakeup(): void {}
 }
 
-class ValueError extends Error
-{
-}
+class ValueError extends Error {}
 
-class TypeError extends Error
-{
-}
+class TypeError extends Error {}
 
-class ParseError extends CompileError
-{
-}
+class ParseError extends CompileError {}
 
-class ArgumentCountError extends TypeError
-{
-}
+class ArgumentCountError extends TypeError {}
 
-class ArithmeticError extends Error
-{
-}
+class ArithmeticError extends Error {}
 
-class CompileError extends Error
-{
-}
+class CompileError extends Error {}
 
-class DivisionByZeroError extends ArithmeticError
-{
-}
+class DivisionByZeroError extends ArithmeticError {}
 
-class UnhandledMatchError extends Error
-{
-}
+class UnhandledMatchError extends Error {}
 
-class RequestParseBodyException extends Exception
-{
-}
+class RequestParseBodyException extends Exception {}
 
 class ErrorException extends Exception
 {
@@ -362,17 +294,15 @@ class ErrorException extends Exception
         string $message = '',
         int $code = 0,
         int $severity = 1,
-        null|string $filename = null,
-        null|int $line = null,
-        null|Throwable $previous = null,
+        ?string $filename = null,
+        ?int $line = null,
+        ?Throwable $previous = null,
     ) {}
 
     /**
      * @mutation-free
      */
-    final public function getSeverity(): int
-    {
-    }
+    final public function getSeverity(): int {}
 }
 
 final class Closure
@@ -382,9 +312,7 @@ final class Closure
     /**
      * @no-named-arguments
      */
-    public function __invoke(...$_)
-    {
-    }
+    public function __invoke(...$_) {}
 
     /**
      * @param object|null $newThis
@@ -395,9 +323,7 @@ final class Closure
      * @pure
      * @no-named-arguments
      */
-    public function bindTo(null|object $newThis, object|string|null $newScope = 'static'): null|Closure
-    {
-    }
+    public function bindTo(?object $newThis, object|string|null $newScope = 'static'): ?Closure {}
 
     /**
      * @param Closure $closure
@@ -410,31 +336,24 @@ final class Closure
      */
     public static function bind(
         Closure $closure,
-        null|object $newThis,
+        ?object $newThis,
         object|string|null $newScope = 'static',
-    ): null|Closure {
-    }
+    ): ?Closure {}
 
     /**
      * @param object $newThis
      */
-    public function call(object $newThis, mixed ...$args): mixed
-    {
-    }
+    public function call(object $newThis, mixed ...$args): mixed {}
 
     /**
      * @pure
      */
-    public static function fromCallable(callable $callback): Closure
-    {
-    }
+    public static function fromCallable(callable $callback): Closure {}
 
     /**
      * @pure
      */
-    public static function getCurrent(): Closure
-    {
-    }
+    public static function getCurrent(): Closure {}
 }
 
 interface Countable
@@ -458,18 +377,14 @@ final class WeakReference
      *
      * @pure
      */
-    public static function create(object $object): WeakReference
-    {
-    }
+    public static function create(object $object): WeakReference {}
 
     /**
      * @return T|null
      *
      * @pure
      */
-    public function get(): null|object
-    {
-    }
+    public function get(): ?object {}
 }
 
 /**
@@ -487,9 +402,7 @@ final class WeakMap implements ArrayAccess, Countable, IteratorAggregate
      * @pure
      * @no-named-arguments
      */
-    public function offsetExists($object): bool
-    {
-    }
+    public function offsetExists($object): bool {}
 
     /**
      * @param K $object
@@ -499,9 +412,7 @@ final class WeakMap implements ArrayAccess, Countable, IteratorAggregate
      * @pure
      * @no-named-arguments
      */
-    public function offsetGet($object): mixed
-    {
-    }
+    public function offsetGet($object): mixed {}
 
     /**
      * @param K $object
@@ -509,36 +420,28 @@ final class WeakMap implements ArrayAccess, Countable, IteratorAggregate
      *
      * @no-named-arguments
      */
-    public function offsetSet($object, mixed $value): void
-    {
-    }
+    public function offsetSet($object, mixed $value): void {}
 
     /**
      * @param K $object
      *
      * @no-named-arguments
      */
-    public function offsetUnset($object): void
-    {
-    }
+    public function offsetUnset($object): void {}
 
     /**
      * @return Iterator<K, V>
      *
      * @pure
      */
-    public function getIterator(): Iterator
-    {
-    }
+    public function getIterator(): Iterator {}
 
     /**
      * @return int<0,max>
      *
      * @pure
      */
-    public function count(): int
-    {
-    }
+    public function count(): int {}
 }
 
 interface Stringable
@@ -567,25 +470,15 @@ final class InternalIterator implements Iterator
 {
     private function __construct() {}
 
-    public function current(): mixed
-    {
-    }
+    public function current(): mixed {}
 
-    public function next(): void
-    {
-    }
+    public function next(): void {}
 
-    public function key(): mixed
-    {
-    }
+    public function key(): mixed {}
 
-    public function valid(): bool
-    {
-    }
+    public function valid(): bool {}
 
-    public function rewind(): void
-    {
-    }
+    public function rewind(): void {}
 }
 
 /**
@@ -621,7 +514,7 @@ interface BackedEnum extends UnitEnum
     /**
      * @pure
      */
-    public static function tryFrom(int|string $value): null|static;
+    public static function tryFrom(int|string $value): ?static;
 }
 
 /**
@@ -641,7 +534,7 @@ interface __INTERNAL_DO_NOT_USE__IntBackedEnum extends BackedEnum
     /**
      * @pure
      */
-    public static function tryFrom(int $value): null|static;
+    public static function tryFrom(int $value): ?static;
 }
 
 /**
@@ -661,7 +554,7 @@ interface __INTERNAL_DO_NOT_USE__StringBackedEnum extends BackedEnum
     /**
      * @pure
      */
-    public static function tryFrom(string $value): null|static;
+    public static function tryFrom(string $value): ?static;
 }
 
 /**
@@ -682,9 +575,7 @@ final class Fiber
      * @throws FiberError
      * @throws Throwable
      */
-    public function start(mixed ...$args): mixed
-    {
-    }
+    public function start(mixed ...$args): mixed {}
 
     /**
      * @param TResume $value
@@ -694,9 +585,7 @@ final class Fiber
      * @throws FiberError
      * @throws Throwable
      */
-    public function resume(mixed $value = null): mixed
-    {
-    }
+    public function resume(mixed $value = null): mixed {}
 
     /**
      * @return TSuspend|null
@@ -704,38 +593,24 @@ final class Fiber
      * @throws FiberError
      * @throws Throwable
      */
-    public function throw(Throwable $exception): mixed
-    {
-    }
+    public function throw(Throwable $exception): mixed {}
 
-    public function isStarted(): bool
-    {
-    }
+    public function isStarted(): bool {}
 
-    public function isSuspended(): bool
-    {
-    }
+    public function isSuspended(): bool {}
 
-    public function isRunning(): bool
-    {
-    }
+    public function isRunning(): bool {}
 
-    public function isTerminated(): bool
-    {
-    }
+    public function isTerminated(): bool {}
 
     /**
      * @return TReturn
      *
      * @throws FiberError
      */
-    public function getReturn(): mixed
-    {
-    }
+    public function getReturn(): mixed {}
 
-    public static function getCurrent(): null|Fiber
-    {
-    }
+    public static function getCurrent(): ?Fiber {}
 
     /**
      * @param TSuspend $value
@@ -745,9 +620,7 @@ final class Fiber
      * @throws FiberError
      * @throws Throwable
      */
-    public static function suspend(mixed $value = null): mixed
-    {
-    }
+    public static function suspend(mixed $value = null): mixed {}
 }
 
 final class FiberError extends Error
@@ -779,13 +652,9 @@ final class SensitiveParameterValue
 
     public function __construct(mixed $value) {}
 
-    public function getValue(): mixed
-    {
-    }
+    public function getValue(): mixed {}
 
-    public function __debugInfo(): array
-    {
-    }
+    public function __debugInfo(): array {}
 }
 
 #[Attribute(Attribute::TARGET_METHOD | Attribute::TARGET_PROPERTY)]
@@ -798,59 +667,53 @@ final class Override
  * @strict-properties
  */
 #[Attribute(
-    Attribute::TARGET_METHOD | Attribute::TARGET_FUNCTION | Attribute::TARGET_CLASS_CONSTANT | Attribute::TARGET_CONSTANT | Attribute::TARGET_CLASS
+    Attribute::TARGET_METHOD
+    | Attribute::TARGET_FUNCTION
+    | Attribute::TARGET_CLASS_CONSTANT
+    | Attribute::TARGET_CONSTANT
+    | Attribute::TARGET_CLASS,
 )]
 final class Deprecated
 {
-    public readonly null|string $message;
-    public readonly null|string $since;
+    public readonly ?string $message;
+    public readonly ?string $since;
 
-    public function __construct(null|string $message = null, null|string $since = null) {}
+    public function __construct(?string $message = null, ?string $since = null) {}
 }
 
 #[Attribute(Attribute::TARGET_METHOD | Attribute::TARGET_FUNCTION)]
 final class NoDiscard
 {
-    public readonly null|string $message;
+    public readonly ?string $message;
 
-    public function __construct(null|string $message = null) {}
+    public function __construct(?string $message = null) {}
 }
 
 #[Attribute(Attribute::TARGET_ALL)]
-final class DelayedTargetValidation
-{
-}
+final class DelayedTargetValidation {}
 
 /**
  * @return non-empty-string
  *
  * @pure
  */
-function zend_version(): string
-{
-}
+function zend_version(): string {}
 
 /**
  * @pure
  */
-function func_num_args(): int
-{
-}
+function func_num_args(): int {}
 
 /**
  * @pure
  */
-function func_get_arg(int $position): mixed
-{
-}
+function func_get_arg(int $position): mixed {}
 
 /**
  * @pure
  * @no-named-arguments
  */
-function func_get_args(): array
-{
-}
+function func_get_args(): array {}
 
 /**
  * @return int<0, max>
@@ -858,124 +721,92 @@ function func_get_args(): array
  * @pure
  * @no-named-arguments
  */
-function strlen(string $string): int
-{
-}
+function strlen(string $string): int {}
 
 /**
  * @pure
  * @no-named-arguments
  */
-function strcmp(string $string1, string $string2): int
-{
-}
+function strcmp(string $string1, string $string2): int {}
 
 /**
  * @pure
  * @no-named-arguments
  */
-function strncmp(string $string1, string $string2, int $length): int
-{
-}
+function strncmp(string $string1, string $string2, int $length): int {}
 
 /**
  * @pure
  * @no-named-arguments
  */
-function strcasecmp(string $string1, string $string2): int
-{
-}
+function strcasecmp(string $string1, string $string2): int {}
 
 /**
  * @pure
  * @no-named-arguments
  */
-function strncasecmp(string $string1, string $string2, int $length): int
-{
-}
+function strncasecmp(string $string1, string $string2, int $length): int {}
 
 /**
  * @pure
  * @no-named-arguments
  */
-function str_starts_with(string $haystack, string $needle): bool
-{
-}
+function str_starts_with(string $haystack, string $needle): bool {}
 
 /**
  * @pure
  * @no-named-arguments
  */
-function str_ends_with(string $haystack, string $needle): bool
-{
-}
+function str_ends_with(string $haystack, string $needle): bool {}
 
 /**
  * @pure
  * @no-named-arguments
  */
-function str_contains(string $haystack, string $needle): bool
-{
-}
+function str_contains(string $haystack, string $needle): bool {}
 
 /**
  * @pure
  * @no-named-arguments
  */
-function str_decrement(string $string): string
-{
-}
+function str_decrement(string $string): string {}
 
 /**
  * @pure
  * @no-named-arguments
  */
-function str_increment(string $string): string
-{
-}
+function str_increment(string $string): string {}
 
 /**
  * @no-named-arguments
  */
-function error_reporting(null|int $error_level = null): int
-{
-}
+function error_reporting(?int $error_level = null): int {}
 
-function define(string $constant_name, mixed $value, bool $case_insensitive = false): bool
-{
-}
+function define(string $constant_name, mixed $value, bool $case_insensitive = false): bool {}
 
 /**
  * @pure
  * @no-named-arguments
  */
-function defined(string $constant_name): bool
-{
-}
+function defined(string $constant_name): bool {}
 
 /**
  * @pure
  * @no-named-arguments
  */
-function get_class(object $object): string
-{
-}
+function get_class(object $object): string {}
 
 /**
  * @pure
  * @no-named-arguments
  */
-function get_called_class(): string
-{
-}
+function get_called_class(): string {}
 
 /**
  * @pure
  * @no-named-arguments
  */
-function get_parent_class(object|string $object_or_class): string|false
-{
-}
+function get_parent_class(object|string $object_or_class): string|false {}
 
 /**
  * @param object|class-string $object_or_class
@@ -983,9 +814,7 @@ function get_parent_class(object|string $object_or_class): string|false
  * @pure
  * @no-named-arguments
  */
-function method_exists(object|string $object_or_class, string $method): bool
-{
-}
+function method_exists(object|string $object_or_class, string $method): bool {}
 
 /**
  * @param object|class-string $object_or_class
@@ -993,9 +822,7 @@ function method_exists(object|string $object_or_class, string $method): bool
  * @pure
  * @no-named-arguments
  */
-function property_exists(object|string $object_or_class, string $property): bool
-{
-}
+function property_exists(object|string $object_or_class, string $property): bool {}
 
 /**
  * @param string $trait
@@ -1005,9 +832,7 @@ function property_exists(object|string $object_or_class, string $property): bool
  * @pure
  * @no-named-arguments
  */
-function trait_exists(string $trait, bool $autoload = true): bool
-{
-}
+function trait_exists(string $trait, bool $autoload = true): bool {}
 
 /**
  * @param string $class
@@ -1017,9 +842,7 @@ function trait_exists(string $trait, bool $autoload = true): bool
  * @pure
  * @no-named-arguments
  */
-function class_exists(string $class, bool $autoload = true): bool
-{
-}
+function class_exists(string $class, bool $autoload = true): bool {}
 
 /**
  * @param string $interface
@@ -1029,9 +852,7 @@ function class_exists(string $class, bool $autoload = true): bool
  * @pure
  * @no-named-arguments
  */
-function interface_exists(string $interface, bool $autoload = true): bool
-{
-}
+function interface_exists(string $interface, bool $autoload = true): bool {}
 
 /**
  * @param string $function
@@ -1041,9 +862,7 @@ function interface_exists(string $interface, bool $autoload = true): bool
  * @pure
  * @no-named-arguments
  */
-function function_exists(string $function): bool
-{
-}
+function function_exists(string $function): bool {}
 
 /**
  * @param string $enum
@@ -1053,9 +872,7 @@ function function_exists(string $function): bool
  * @pure
  * @no-named-arguments
  */
-function enum_exists(string $enum, bool $autoload = true): bool
-{
-}
+function enum_exists(string $enum, bool $autoload = true): bool {}
 
 /**
  * @param class-string $class
@@ -1064,27 +881,21 @@ function enum_exists(string $enum, bool $autoload = true): bool
  * @pure
  * @no-named-arguments
  */
-function class_alias(string $class, string $alias, bool $autoload = true): bool
-{
-}
+function class_alias(string $class, string $alias, bool $autoload = true): bool {}
 
 /**
  * @return list<non-empty-string>
  *
  * @pure
  */
-function get_included_files(): array
-{
-}
+function get_included_files(): array {}
 
 /**
  * @return list<non-empty-string>
  *
  * @pure
  */
-function get_required_files(): array
-{
-}
+function get_required_files(): array {}
 
 /**
  * @param object|class-string $object_or_class
@@ -1092,9 +903,7 @@ function get_required_files(): array
  *
  * @pure
  */
-function is_subclass_of(mixed $object_or_class, string $class, bool $allow_string = true): bool
-{
-}
+function is_subclass_of(mixed $object_or_class, string $class, bool $allow_string = true): bool {}
 
 /**
  * @param object|class-string $object_or_class
@@ -1102,27 +911,21 @@ function is_subclass_of(mixed $object_or_class, string $class, bool $allow_strin
  *
  * @pure
  */
-function is_a(mixed $object_or_class, string $class, bool $allow_string = false): bool
-{
-}
+function is_a(mixed $object_or_class, string $class, bool $allow_string = false): bool {}
 
 /**
  * @param class-string $class
  *
  * @pure
  */
-function get_class_vars(string $class): array
-{
-}
+function get_class_vars(string $class): array {}
 
 /**
  * @param object $object
  *
  * @pure
  */
-function get_object_vars(object $object): array
-{
-}
+function get_object_vars(object $object): array {}
 
 /**
  * @param object|class-string $object_or_class
@@ -1130,96 +933,68 @@ function get_object_vars(object $object): array
  *
  * @pure
  */
-function get_class_methods(object|string $object_or_class): array
-{
-}
+function get_class_methods(object|string $object_or_class): array {}
 
-function trigger_error(string $message, int $error_level = E_USER_NOTICE)
-{
-}
+function trigger_error(string $message, int $error_level = E_USER_NOTICE) {}
 
-function user_error(string $message, int $error_level = E_USER_NOTICE)
-{
-}
+function user_error(string $message, int $error_level = E_USER_NOTICE) {}
 
 /**
  * @return callable|null
  */
-function set_error_handler(null|callable $callback, int $error_levels = E_ALL)
-{
-}
+function set_error_handler(?callable $callback, int $error_levels = E_ALL) {}
 
 /**
  * @return callable|null
  */
-function get_error_handler(): null|callable
-{
-}
+function get_error_handler(): ?callable {}
 
-function restore_error_handler(): true
-{
-}
+function restore_error_handler(): true {}
 
 /**
  * @return callable|null
  */
-function set_exception_handler(null|callable $callback)
-{
-}
+function set_exception_handler(?callable $callback) {}
 
 /**
  * @return callable|null
  */
-function get_exception_handler(): null|callable
-{
-}
+function get_exception_handler(): ?callable {}
 
-function restore_exception_handler(): true
-{
-}
+function restore_exception_handler(): true {}
 
 /**
  * @return list<class-string>
  *
  * @pure
  */
-function get_declared_classes(): array
-{
-}
+function get_declared_classes(): array {}
 
 /**
  * @return list<interface-string>
  *
  * @pure
  */
-function get_declared_interfaces(): array
-{
-}
+function get_declared_interfaces(): array {}
 
 /**
  * @return list<trait-string>
  *
  * @pure
  */
-function get_declared_traits(): array
-{
-}
+function get_declared_traits(): array {}
 
 /**
  * @return array{internal: list<non-empty-string>, user: list<non-empty-string>}
  *
  * @pure
  */
-function get_defined_functions(bool $exclude_disabled = true): array
-{
-}
+function get_defined_functions(bool $exclude_disabled = true): array {}
 
 /**
  * @pure
  */
-function get_defined_vars(): array
-{
-}
+function get_defined_vars(): array {}
 
 /**
  * @param resource $resource
@@ -1228,95 +1003,67 @@ function get_defined_vars(): array
  *
  * @pure
  */
-function get_resource_type($resource): string
-{
-}
+function get_resource_type($resource): string {}
 
 /**
  * @return non-empty-list<non-empty-string>
  *
  * @pure
  */
-function get_loaded_extensions(bool $zend_extensions = false): array
-{
-}
+function get_loaded_extensions(bool $zend_extensions = false): array {}
 
 /**
  * @param non-empty-string $extension
  *
  * @pure
  */
-function extension_loaded(string $extension): bool
-{
-}
+function extension_loaded(string $extension): bool {}
 
 /**
  * @return list<non-empty-string>|false
  *
  * @pure
  */
-function get_extension_funcs(string $extension): array|false
-{
-}
+function get_extension_funcs(string $extension): array|false {}
 
 /**
  * @pure
  */
-function get_defined_constants(bool $categorize = false): array
-{
-}
+function get_defined_constants(bool $categorize = false): array {}
 
 /**
  * @pure
  */
-function debug_backtrace(int $options = DEBUG_BACKTRACE_PROVIDE_OBJECT, int $limit = 0): array
-{
-}
+function debug_backtrace(int $options = DEBUG_BACKTRACE_PROVIDE_OBJECT, int $limit = 0): array {}
 
-function debug_print_backtrace(int $options = 0, int $limit = 0): void
-{
-}
+function debug_print_backtrace(int $options = 0, int $limit = 0): void {}
 
-function gc_collect_cycles(): int
-{
-}
+function gc_collect_cycles(): int {}
 
 /**
  * @pure
  */
-function gc_enabled(): bool
-{
-}
+function gc_enabled(): bool {}
 
-function gc_enable(): void
-{
-}
+function gc_enable(): void {}
 
-function gc_disable(): void
-{
-}
+function gc_disable(): void {}
 
 /**
  * @return array{runs: int, collected: int, threshold: int, roots: int}
  *
  * @pure
  */
-function gc_status(): array
-{
-}
+function gc_status(): array {}
 
-function gc_mem_caches(): int
-{
-}
+function gc_mem_caches(): int {}
 
 /**
  * @return list<resource>
  *
  * @pure
  */
-function get_resources(null|string $type): array
-{
-}
+function get_resources(?string $type): array {}
 
 /**
  * @template T of object
@@ -1326,17 +1073,11 @@ function get_resources(null|string $type): array
  *
  * @return T
  */
-function clone(object $object, array $withProperties = []): object
-{
-}
+function clone(object $object, array $withProperties = []): object {}
 
-function exit(string|int $status = 0): never
-{
-}
+function exit(string|int $status = 0): never {}
 
-function die(string|int $status = 0): never
-{
-}
+function die(string|int $status = 0): never {}
 
 /**
  * @deprecated

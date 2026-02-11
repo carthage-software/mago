@@ -11,190 +11,136 @@ class ffmpeg_movie
     /**
      * @return int
      */
-    public function getDuration()
-    {
-    }
+    public function getDuration() {}
 
     /**
      * @return int
      */
-    public function getFrameCount()
-    {
-    }
+    public function getFrameCount() {}
 
     /**
      * @return int
      */
-    public function getFrameRate()
-    {
-    }
+    public function getFrameRate() {}
 
     /**
      * @return string
      */
-    public function getFilename()
-    {
-    }
+    public function getFilename() {}
 
     /**
      * @return string
      */
-    public function getComment()
-    {
-    }
+    public function getComment() {}
 
     /**
      * @return string
      */
-    public function getTitle()
-    {
-    }
+    public function getTitle() {}
 
     /**
      * @return string
      */
-    public function getAuthor()
-    {
-    }
+    public function getAuthor() {}
 
     /**
      * @return string
      */
-    public function getArtist()
-    {
-    }
+    public function getArtist() {}
 
     /**
      * @return string
      */
-    public function getCopyright()
-    {
-    }
+    public function getCopyright() {}
 
     /**
      * @return string
      */
-    public function getGenre()
-    {
-    }
+    public function getGenre() {}
 
     /**
      * @return string|int
      */
-    public function getTrackNumber()
-    {
-    }
+    public function getTrackNumber() {}
 
     /**
      * @return string|int
      */
-    public function getYear()
-    {
-    }
+    public function getYear() {}
 
     /**
      * @return int
      */
-    public function getFrameHeight()
-    {
-    }
+    public function getFrameHeight() {}
 
     /**
      * @return int
      */
-    public function getFrameWidth()
-    {
-    }
+    public function getFrameWidth() {}
 
-    public function getPixelFormat()
-    {
-    }
+    public function getPixelFormat() {}
 
     /**
      * @return int
      */
-    public function getBitRate()
-    {
-    }
+    public function getBitRate() {}
 
     /**
      * @return int
      */
-    public function getVideoBitRate()
-    {
-    }
+    public function getVideoBitRate() {}
 
     /**
      * @return int
      */
-    public function getAudioBitRate()
-    {
-    }
+    public function getAudioBitRate() {}
 
     /**
      * @return int
      */
-    public function getAudioSampleRate()
-    {
-    }
+    public function getAudioSampleRate() {}
 
     /**
      * @return int
      */
-    public function getFrameNumber()
-    {
-    }
+    public function getFrameNumber() {}
 
     /**
      * @return string
      */
-    public function getVideoCodec()
-    {
-    }
+    public function getVideoCodec() {}
 
     /**
      * @return string
      */
-    public function getAudioCodec()
-    {
-    }
+    public function getAudioCodec() {}
 
     /**
      * @return int
      */
-    public function getAudioChannels()
-    {
-    }
+    public function getAudioChannels() {}
 
     /**
      * @return bool
      */
-    public function hasAudio()
-    {
-    }
+    public function hasAudio() {}
 
     /**
      * @return bool
      */
-    public function hasVideo()
-    {
-    }
+    public function hasVideo() {}
 
     /**
      * @param int $framenumber
      *
      * @return ffmpeg_frame
      */
-    public function getFrame($framenumber)
-    {
-    }
+    public function getFrame($framenumber) {}
 
     /**
      * @return ffmpeg_frame
      */
-    public function getNextKeyFrame()
-    {
-    }
+    public function getNextKeyFrame() {}
 }
 
 class ffmpeg_frame
@@ -207,30 +153,22 @@ class ffmpeg_frame
     /**
      * @return int
      */
-    public function getWidth()
-    {
-    }
+    public function getWidth() {}
 
     /**
      * @return int
      */
-    public function getHeight()
-    {
-    }
+    public function getHeight() {}
 
     /**
      * @return int
      */
-    public function getPTS()
-    {
-    }
+    public function getPTS() {}
 
     /**
      * @return int
      */
-    public function getPresentationTimestamp()
-    {
-    }
+    public function getPresentationTimestamp() {}
 
     /**
      * @param int $width
@@ -240,9 +178,7 @@ class ffmpeg_frame
      * @param int $crop_left
      * @param int $crop_right
      */
-    public function resize($width, $height, $crop_top = 0, $crop_bottom = 0, $crop_left = 0, $crop_right = 0)
-    {
-    }
+    public function resize($width, $height, $crop_top = 0, $crop_bottom = 0, $crop_left = 0, $crop_right = 0) {}
 
     /**
      * @param int $crop_top
@@ -250,16 +186,12 @@ class ffmpeg_frame
      * @param int $crop_left
      * @param int $crop_right
      */
-    public function crop($crop_top, $crop_bottom = 0, $crop_left = 0, $crop_right = 0)
-    {
-    }
+    public function crop($crop_top, $crop_bottom = 0, $crop_left = 0, $crop_right = 0) {}
 
     /**
      * @return resource
      */
-    public function toGDImage()
-    {
-    }
+    public function toGDImage() {}
 }
 
 class ffmpeg_animated_gif
@@ -273,7 +205,5 @@ class ffmpeg_animated_gif
      */
     public function __construct($output_file_path, $width, $height, $frame_rate, $loop_count = 0) {}
 
-    public function addFrame(ffmpeg_frame $frame_to_add)
-    {
-    }
+    public function addFrame(ffmpeg_frame $frame_to_add) {}
 }

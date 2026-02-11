@@ -11,53 +11,29 @@ namespace {
 
     const LIBZSTD_VERSION_STRING = '1.4.5';
 
-    function zstd_compress(string $data, int $level = 3): string|false
-    {
-    }
+    function zstd_compress(string $data, int $level = 3): string|false {}
 
-    function zstd_uncompress(string $data): string|false
-    {
-    }
+    function zstd_uncompress(string $data): string|false {}
 
-    function zstd_compress_dict(string $data, string $dict): string|false
-    {
-    }
+    function zstd_compress_dict(string $data, string $dict): string|false {}
 
-    function zstd_compress_usingcdict(string $data, string $dict): string|false
-    {
-    }
+    function zstd_compress_usingcdict(string $data, string $dict): string|false {}
 
-    function zstd_uncompress_dict(string $data, string $dict): string|false
-    {
-    }
+    function zstd_uncompress_dict(string $data, string $dict): string|false {}
 
-    function zstd_decompress_dict(string $data, string $dict): string|false
-    {
-    }
+    function zstd_decompress_dict(string $data, string $dict): string|false {}
 
-    function zstd_uncompress_usingcdict(string $data, string $dict): string|false
-    {
-    }
+    function zstd_uncompress_usingcdict(string $data, string $dict): string|false {}
 
-    function zstd_decompress_usingcdict(string $data, string $dict): string|false
-    {
-    }
+    function zstd_decompress_usingcdict(string $data, string $dict): string|false {}
 }
 
 namespace Zstd {
-    function compress(string $data, int $level = 3): string|false
-    {
-    }
+    function compress(string $data, int $level = 3): string|false {}
 
-    function uncompress(string $data): string|false
-    {
-    }
+    function uncompress(string $data): string|false {}
 
-    function compress_dict(string $data, string $dict): string|false
-    {
-    }
+    function compress_dict(string $data, string $dict): string|false {}
 
-    function uncompress_dict(string $data, string $dict): string|false
-    {
-    }
+    function uncompress_dict(string $data, string $dict): string|false {}
 }

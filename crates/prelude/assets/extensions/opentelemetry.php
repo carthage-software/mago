@@ -4,6 +4,4 @@ namespace OpenTelemetry\Instrumentation;
 
 use Closure;
 
-function hook(string|null $class, string $function, null|Closure $pre = null, null|Closure $post = null): bool
-{
-}
+function hook(?string $class, string $function, ?Closure $pre = null, ?Closure $post = null): bool {}

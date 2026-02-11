@@ -22,40 +22,32 @@ namespace {
         string $additional_data,
         string $nonce,
         #[SensitiveParameter] string $key,
-    ): string|false {
-    }
+    ): string|false {}
 
     function sodium_crypto_aead_aegis128l_encrypt(
         #[SensitiveParameter] string $message,
         string $additional_data,
         string $nonce,
         #[SensitiveParameter] string $key,
-    ): string {
-    }
+    ): string {}
 
-    function sodium_crypto_aead_aegis128l_keygen(): string
-    {
-    }
+    function sodium_crypto_aead_aegis128l_keygen(): string {}
 
     function sodium_crypto_aead_aegis256_decrypt(
         string $ciphertext,
         string $additional_data,
         string $nonce,
         #[SensitiveParameter] string $key,
-    ): string|false {
-    }
+    ): string|false {}
 
     function sodium_crypto_aead_aegis256_encrypt(
         #[SensitiveParameter] string $message,
         string $additional_data,
         string $nonce,
         #[SensitiveParameter] string $key,
-    ): string {
-    }
+    ): string {}
 
-    function sodium_crypto_aead_aegis256_keygen(): string
-    {
-    }
+    function sodium_crypto_aead_aegis256_keygen(): string {}
 }
 
 namespace Sodium {
@@ -163,105 +155,60 @@ namespace Sodium {
 
     const CRYPTO_PWHASH_MEMLIMIT_SENSITIVE = 536870912;
 
-    function crypto_aead_aes256gcm_is_available(): bool
-    {
-    }
+    function crypto_aead_aes256gcm_is_available(): bool {}
 
-    function crypto_aead_aes256gcm_decrypt(string $msg, string $nonce, string $key, string $ad = ''): string
-    {
-    }
+    function crypto_aead_aes256gcm_decrypt(string $msg, string $nonce, string $key, string $ad = ''): string {}
 
-    function crypto_aead_aes256gcm_encrypt(string $msg, string $nonce, string $key, string $ad = ''): string
-    {
-    }
+    function crypto_aead_aes256gcm_encrypt(string $msg, string $nonce, string $key, string $ad = ''): string {}
 
-    function crypto_aead_chacha20poly1305_decrypt(string $msg, string $nonce, string $key, string $ad = ''): string
-    {
-    }
+    function crypto_aead_chacha20poly1305_decrypt(string $msg, string $nonce, string $key, string $ad = ''): string {}
 
-    function crypto_aead_chacha20poly1305_encrypt(string $msg, string $nonce, string $key, string $ad = ''): string
-    {
-    }
+    function crypto_aead_chacha20poly1305_encrypt(string $msg, string $nonce, string $key, string $ad = ''): string {}
 
-    function crypto_auth(string $msg, string $key): string
-    {
-    }
+    function crypto_auth(string $msg, string $key): string {}
 
-    function crypto_auth_verify(string $mac, string $msg, string $key): bool
-    {
-    }
+    function crypto_auth_verify(string $mac, string $msg, string $key): bool {}
 
-    function crypto_box(string $msg, string $nonce, string $keypair): string
-    {
-    }
+    function crypto_box(string $msg, string $nonce, string $keypair): string {}
 
-    function crypto_box_keypair(): string
-    {
-    }
+    function crypto_box_keypair(): string {}
 
-    function crypto_box_seed_keypair(string $seed): string
-    {
-    }
+    function crypto_box_seed_keypair(string $seed): string {}
 
-    function crypto_box_keypair_from_secretkey_and_publickey(string $secretkey, string $publickey): string
-    {
-    }
+    function crypto_box_keypair_from_secretkey_and_publickey(string $secretkey, string $publickey): string {}
 
-    function crypto_box_open(string $msg, string $nonce, string $keypair): string
-    {
-    }
+    function crypto_box_open(string $msg, string $nonce, string $keypair): string {}
 
-    function crypto_box_publickey(string $keypair): string
-    {
-    }
+    function crypto_box_publickey(string $keypair): string {}
 
-    function crypto_box_publickey_from_secretkey(string $secretkey): string
-    {
-    }
+    function crypto_box_publickey_from_secretkey(string $secretkey): string {}
 
-    function crypto_box_seal(string $message, string $publickey): string
-    {
-    }
+    function crypto_box_seal(string $message, string $publickey): string {}
 
-    function crypto_box_seal_open(string $encrypted, string $keypair): string
-    {
-    }
+    function crypto_box_seal_open(string $encrypted, string $keypair): string {}
 
-    function crypto_box_secretkey(string $keypair): string
-    {
-    }
+    function crypto_box_secretkey(string $keypair): string {}
 
-    function crypto_kx(string $secretkey, string $publickey, string $client_publickey, string $server_publickey): string
-    {
-    }
+    function crypto_kx(
+        string $secretkey,
+        string $publickey,
+        string $client_publickey,
+        string $server_publickey,
+    ): string {}
 
-    function crypto_generichash(string $input, string $key = '', int $length = 32): string
-    {
-    }
+    function crypto_generichash(string $input, string $key = '', int $length = 32): string {}
 
-    function crypto_generichash_init(string $key = '', int $length = 32): string
-    {
-    }
+    function crypto_generichash_init(string $key = '', int $length = 32): string {}
 
-    function crypto_generichash_update(string &$hashState, string $append): bool
-    {
-    }
+    function crypto_generichash_update(string &$hashState, string $append): bool {}
 
-    function crypto_generichash_final(string $state, int $length = 32): string
-    {
-    }
+    function crypto_generichash_final(string $state, int $length = 32): string {}
 
-    function crypto_pwhash(int $out_len, string $passwd, string $salt, int $opslimit, int $memlimit): string
-    {
-    }
+    function crypto_pwhash(int $out_len, string $passwd, string $salt, int $opslimit, int $memlimit): string {}
 
-    function crypto_pwhash_str(string $passwd, int $opslimit, int $memlimit): string
-    {
-    }
+    function crypto_pwhash_str(string $passwd, int $opslimit, int $memlimit): string {}
 
-    function crypto_pwhash_str_verify(string $hash, string $passwd): bool
-    {
-    }
+    function crypto_pwhash_str_verify(string $hash, string $passwd): bool {}
 
     function crypto_pwhash_scryptsalsa208sha256(
         int $out_len,
@@ -269,142 +216,73 @@ namespace Sodium {
         string $salt,
         int $opslimit,
         int $memlimit,
-    ): string {
-    }
+    ): string {}
 
-    function crypto_pwhash_scryptsalsa208sha256_str(string $passwd, int $opslimit, int $memlimit): string
-    {
-    }
+    function crypto_pwhash_scryptsalsa208sha256_str(string $passwd, int $opslimit, int $memlimit): string {}
 
-    function crypto_pwhash_scryptsalsa208sha256_str_verify(string $hash, string $passwd): bool
-    {
-    }
+    function crypto_pwhash_scryptsalsa208sha256_str_verify(string $hash, string $passwd): bool {}
 
-    function crypto_scalarmult(string $ecdhA, string $ecdhB): string
-    {
-    }
+    function crypto_scalarmult(string $ecdhA, string $ecdhB): string {}
 
-    function crypto_secretbox(string $plaintext, string $nonce, string $key): string
-    {
-    }
+    function crypto_secretbox(string $plaintext, string $nonce, string $key): string {}
 
-    function crypto_secretbox_open(string $ciphertext, string $nonce, string $key): string
-    {
-    }
+    function crypto_secretbox_open(string $ciphertext, string $nonce, string $key): string {}
 
-    function crypto_shorthash(string $message, string $key): string
-    {
-    }
+    function crypto_shorthash(string $message, string $key): string {}
 
-    function crypto_sign(string $message, string $secretkey): string
-    {
-    }
+    function crypto_sign(string $message, string $secretkey): string {}
 
-    function crypto_sign_detached(string $message, string $secretkey): string
-    {
-    }
+    function crypto_sign_detached(string $message, string $secretkey): string {}
 
-    function crypto_sign_ed25519_pk_to_curve25519(string $sign_pk): string
-    {
-    }
+    function crypto_sign_ed25519_pk_to_curve25519(string $sign_pk): string {}
 
-    function crypto_sign_ed25519_sk_to_curve25519(string $sign_sk): string
-    {
-    }
+    function crypto_sign_ed25519_sk_to_curve25519(string $sign_sk): string {}
 
-    function crypto_sign_keypair(): string
-    {
-    }
+    function crypto_sign_keypair(): string {}
 
-    function crypto_sign_keypair_from_secretkey_and_publickey(string $secretkey, string $publickey): string
-    {
-    }
+    function crypto_sign_keypair_from_secretkey_and_publickey(string $secretkey, string $publickey): string {}
 
-    function crypto_sign_open(string $signed_message, string $publickey): string
-    {
-    }
+    function crypto_sign_open(string $signed_message, string $publickey): string {}
 
-    function crypto_sign_publickey(string $keypair): string
-    {
-    }
+    function crypto_sign_publickey(string $keypair): string {}
 
-    function crypto_sign_secretkey(string $keypair): string
-    {
-    }
+    function crypto_sign_secretkey(string $keypair): string {}
 
-    function crypto_sign_publickey_from_secretkey(string $secretkey): string
-    {
-    }
+    function crypto_sign_publickey_from_secretkey(string $secretkey): string {}
 
-    function crypto_sign_seed_keypair(string $seed): string
-    {
-    }
+    function crypto_sign_seed_keypair(string $seed): string {}
 
-    function crypto_sign_verify_detached(string $signature, string $msg, string $publickey): bool
-    {
-    }
+    function crypto_sign_verify_detached(string $signature, string $msg, string $publickey): bool {}
 
-    function crypto_stream(int $length, string $nonce, string $key): string
-    {
-    }
+    function crypto_stream(int $length, string $nonce, string $key): string {}
 
-    function crypto_stream_xor(string $plaintext, string $nonce, string $key): string
-    {
-    }
+    function crypto_stream_xor(string $plaintext, string $nonce, string $key): string {}
 
-    function randombytes_buf(int $length): string
-    {
-    }
+    function randombytes_buf(int $length): string {}
 
-    function randombytes_random16(): int
-    {
-    }
+    function randombytes_random16(): int {}
 
-    function randombytes_uniform(int $upperBoundNonInclusive): int
-    {
-    }
+    function randombytes_uniform(int $upperBoundNonInclusive): int {}
 
-    function bin2hex(string $binary): string
-    {
-    }
+    function bin2hex(string $binary): string {}
 
-    function compare(string $left, string $right): int
-    {
-    }
+    function compare(string $left, string $right): int {}
 
-    function hex2bin(string $hex): string
-    {
-    }
+    function hex2bin(string $hex): string {}
 
-    function increment(string &$nonce)
-    {
-    }
+    function increment(string &$nonce) {}
 
-    function add(string &$left, string $right)
-    {
-    }
+    function add(string &$left, string $right) {}
 
-    function library_version_major(): int
-    {
-    }
+    function library_version_major(): int {}
 
-    function library_version_minor(): int
-    {
-    }
+    function library_version_minor(): int {}
 
-    function memcmp(string $left, string $right): int
-    {
-    }
+    function memcmp(string $left, string $right): int {}
 
-    function memzero(string &$target)
-    {
-    }
+    function memzero(string &$target) {}
 
-    function version_string(): string
-    {
-    }
+    function version_string(): string {}
 
-    function crypto_scalarmult_base(string $sk): string
-    {
-    }
+    function crypto_scalarmult_base(string $sk): string {}
 }

@@ -202,394 +202,208 @@ abstract class UV
     public const EFTYPE = -4028;
 }
 
-abstract class UVStream extends UV
-{
-}
+abstract class UVStream extends UV {}
 
-class UVTcp extends UVStream
-{
-}
+class UVTcp extends UVStream {}
 
-class UVUdp extends UV
-{
-}
+class UVUdp extends UV {}
 
-class UVPipe extends UVStream
-{
-}
+class UVPipe extends UVStream {}
 
-class UVIdle extends UV
-{
-}
+class UVIdle extends UV {}
 
-class UVTimer extends UV
-{
-}
+class UVTimer extends UV {}
 
-class UVAsync extends UV
-{
-}
+class UVAsync extends UV {}
 
-class UVAddrinfo extends UV
-{
-}
+class UVAddrinfo extends UV {}
 
-class UVProcess extends UV
-{
-}
+class UVProcess extends UV {}
 
-class UVPrepare extends UV
-{
-}
+class UVPrepare extends UV {}
 
-class UVCheck extends UV
-{
-}
+class UVCheck extends UV {}
 
-class UVWork extends UV
-{
-}
+class UVWork extends UV {}
 
-class UVFs extends UV
-{
-}
+class UVFs extends UV {}
 
-class UVFsEvent extends UV
-{
-}
+class UVFsEvent extends UV {}
 
-class UVTty extends UVStream
-{
-}
+class UVTty extends UVStream {}
 
-class UVFsPoll extends UV
-{
-}
+class UVFsPoll extends UV {}
 
-class UVPoll extends UV
-{
-}
+class UVPoll extends UV {}
 
-class UVSignal extends UV
-{
-}
+class UVSignal extends UV {}
 
-class UVLoop
-{
-}
+class UVLoop {}
 
-abstract class UVSockAddr
-{
-}
+abstract class UVSockAddr {}
 
-class UVSockAddrIPv4 extends UVSockAddr
-{
-}
+class UVSockAddrIPv4 extends UVSockAddr {}
 
-class UVSockAddrIPv6 extends UVSockAddr
-{
-}
+class UVSockAddrIPv6 extends UVSockAddr {}
 
-class UVLock
-{
-}
+class UVLock {}
 
-class UVStdio
-{
-}
+class UVStdio {}
 
-function uv_unref(UV $uv_t): void
-{
-}
+function uv_unref(UV $uv_t): void {}
 
-function uv_last_error(null|UVLoop $uv_loop = null): int
-{
-}
+function uv_last_error(?UVLoop $uv_loop = null): int {}
 
-function uv_err_name(int $error_code): string
-{
-}
+function uv_err_name(int $error_code): string {}
 
-function uv_strerror(int $error_code): string
-{
-}
+function uv_strerror(int $error_code): string {}
 
-function uv_update_time(UVLoop $uv_loop): void
-{
-}
+function uv_update_time(UVLoop $uv_loop): void {}
 
-function uv_ref(UV $uv_handle): void
-{
-}
+function uv_ref(UV $uv_handle): void {}
 
-function uv_run(null|UVLoop $uv_loop = null, int $run_mode = UV::RUN_DEFAULT): void
-{
-}
+function uv_run(?UVLoop $uv_loop = null, int $run_mode = UV::RUN_DEFAULT): void {}
 
-function uv_run_once(UVLoop|null $uv_loop = null): void
-{
-}
+function uv_run_once(?UVLoop $uv_loop = null): void {}
 
-function uv_loop_delete(UVLoop $uv_loop): void
-{
-}
+function uv_loop_delete(UVLoop $uv_loop): void {}
 
-function uv_now(): int
-{
-}
+function uv_now(): int {}
 
-function uv_tcp_bind(UVTcp $uv_tcp, UVSockAddr $uv_sockaddr): void
-{
-}
+function uv_tcp_bind(UVTcp $uv_tcp, UVSockAddr $uv_sockaddr): void {}
 
-function uv_tcp_bind6(UVTcp $uv_tcp, UVSockAddr $uv_sockaddr): void
-{
-}
+function uv_tcp_bind6(UVTcp $uv_tcp, UVSockAddr $uv_sockaddr): void {}
 
-function uv_write(UVStream $handle, string $data, callable $callback): void
-{
-}
+function uv_write(UVStream $handle, string $data, callable $callback): void {}
 
-function uv_write2(UVStream $handle, string $data, UVTcp|UvPipe $send, callable $callback): void
-{
-}
+function uv_write2(UVStream $handle, string $data, UVTcp|UvPipe $send, callable $callback): void {}
 
-function uv_tcp_nodelay(UVTcp $handle, bool $enable)
-{
-}
+function uv_tcp_nodelay(UVTcp $handle, bool $enable) {}
 
-function uv_accept(UVTcp|UVPipe $server, UVTcp|UVPipe $client): void
-{
-}
+function uv_accept(UVTcp|UVPipe $server, UVTcp|UVPipe $client): void {}
 
-function uv_shutdown(UVStream $handle, callable $callback): void
-{
-}
+function uv_shutdown(UVStream $handle, callable $callback): void {}
 
-function uv_close(UV $handle, null|callable $callback = null): void
-{
-}
+function uv_close(UV $handle, ?callable $callback = null): void {}
 
-function uv_read_start(UVStream $handle, callable $callback)
-{
-}
+function uv_read_start(UVStream $handle, callable $callback) {}
 
-function uv_read_stop(UVStream $handle): void
-{
-}
+function uv_read_stop(UVStream $handle): void {}
 
-function uv_ip4_addr(string $ipv4_addr, int $port): UVSockAddrIPv4
-{
-}
+function uv_ip4_addr(string $ipv4_addr, int $port): UVSockAddrIPv4 {}
 
-function uv_ip6_addr(string $ipv6_addr, int $port): UVSockAddrIPv6
-{
-}
+function uv_ip6_addr(string $ipv6_addr, int $port): UVSockAddrIPv6 {}
 
-function uv_listen(UVTcp|UVPipe $handle, int $backlog, callable $callback): void
-{
-}
+function uv_listen(UVTcp|UVPipe $handle, int $backlog, callable $callback): void {}
 
-function uv_tcp_connect(UVTcp $handle, UVSockAddr $ipv4_addr, callable $callback): void
-{
-}
+function uv_tcp_connect(UVTcp $handle, UVSockAddr $ipv4_addr, callable $callback): void {}
 
-function uv_tcp_connect6(UVTcp $handle, UVSockAddrIPv6 $ipv6_addr, callable $callback): void
-{
-}
+function uv_tcp_connect6(UVTcp $handle, UVSockAddrIPv6 $ipv6_addr, callable $callback): void {}
 
-function uv_timer_init(UVLoop $loop = null): UVTimer
-{
-}
+function uv_timer_init(UVLoop $loop = null): UVTimer {}
 
-function uv_timer_start(UVTimer $timer, int $timeout, int $repeat, callable $callback): void
-{
-}
+function uv_timer_start(UVTimer $timer, int $timeout, int $repeat, callable $callback): void {}
 
-function uv_timer_stop(UVTimer $timer): int
-{
-}
+function uv_timer_stop(UVTimer $timer): int {}
 
-function uv_timer_again(UVTimer $timer): void
-{
-}
+function uv_timer_again(UVTimer $timer): void {}
 
-function uv_timer_set_repeat(UVTimer $timer, int $repeat): void
-{
-}
+function uv_timer_set_repeat(UVTimer $timer, int $repeat): void {}
 
-function uv_timer_get_repeat(UVTimer $timer): int
-{
-}
+function uv_timer_get_repeat(UVTimer $timer): int {}
 
-function uv_idle_init(null|UVLoop $loop = null): UVIdle
-{
-}
+function uv_idle_init(?UVLoop $loop = null): UVIdle {}
 
-function uv_idle_start(UVIdle $idle, callable $callback): void
-{
-}
+function uv_idle_start(UVIdle $idle, callable $callback): void {}
 
 /**
  * @param UVIdle $idle
  */
-function uv_idle_stop($idle): void
-{
-}
+function uv_idle_stop($idle): void {}
 
 /**
  * @param UVLoop $loop
  */
-function uv_getaddrinfo(UVLoop $loop, callable $callback, string $node, string $service, array $hints): void
-{
-}
+function uv_getaddrinfo(UVLoop $loop, callable $callback, string $node, string $service, array $hints): void {}
 
 /**
  * @param UVLoop|null $loop
  *
  * @return UVTcp
  */
-function uv_tcp_init($loop = null)
-{
-}
+function uv_tcp_init($loop = null) {}
 
-function uv_default_loop(): UVLoop
-{
-}
+function uv_default_loop(): UVLoop {}
 
-function uv_loop_new(): UVLoop
-{
-}
+function uv_loop_new(): UVLoop {}
 
-function uv_udp_init(UVLoop|null $loop = null): UVUdp
-{
-}
+function uv_udp_init(?UVLoop $loop = null): UVUdp {}
 
-function uv_udp_bind(UVUdp $resource, UVSockAddr $address, int $flags): void
-{
-}
+function uv_udp_bind(UVUdp $resource, UVSockAddr $address, int $flags): void {}
 
-function uv_udp_bind6(UVUdp $resource, UVSockAddr $address, int $flags): void
-{
-}
+function uv_udp_bind6(UVUdp $resource, UVSockAddr $address, int $flags): void {}
 
-function uv_udp_recv_start(UVUdp $handle, callable $callback): void
-{
-}
+function uv_udp_recv_start(UVUdp $handle, callable $callback): void {}
 
-function uv_udp_recv_stop(UVUdp $handle): void
-{
-}
+function uv_udp_recv_stop(UVUdp $handle): void {}
 
-function uv_udp_set_membership(UVUdp $handle, string $multicast_addr, string $interface_addr, int $membership): int
-{
-}
+function uv_udp_set_membership(UVUdp $handle, string $multicast_addr, string $interface_addr, int $membership): int {}
 
-function uv_udp_set_multicast_loop(UVUdp $handle, int $enabled): void
-{
-}
+function uv_udp_set_multicast_loop(UVUdp $handle, int $enabled): void {}
 
-function uv_udp_set_multicast_ttl(UVUdp $handle, int $ttl): void
-{
-}
+function uv_udp_set_multicast_ttl(UVUdp $handle, int $ttl): void {}
 
-function uv_udp_set_broadcast(UVUdp $handle, bool $enabled): void
-{
-}
+function uv_udp_set_broadcast(UVUdp $handle, bool $enabled): void {}
 
-function uv_udp_send(UVUdp $handle, string $data, UVSockAddr $uv_addr, callable $callback): void
-{
-}
+function uv_udp_send(UVUdp $handle, string $data, UVSockAddr $uv_addr, callable $callback): void {}
 
-function uv_udp_send6(UVUdp $handle, string $data, UVSockAddrIPv6 $uv_addr6, callable $callback): void
-{
-}
+function uv_udp_send6(UVUdp $handle, string $data, UVSockAddrIPv6 $uv_addr6, callable $callback): void {}
 
-function uv_is_active(UV $handle): bool
-{
-}
+function uv_is_active(UV $handle): bool {}
 
-function uv_is_closing(UV $handle): bool
-{
-}
+function uv_is_closing(UV $handle): bool {}
 
-function uv_is_readable(UVStream $handle): bool
-{
-}
+function uv_is_readable(UVStream $handle): bool {}
 
-function uv_is_writable(UVStream $handle): bool
-{
-}
+function uv_is_writable(UVStream $handle): bool {}
 
-function uv_walk(UVLoop $loop, callable $closure, array $opaque = null): bool
-{
-}
+function uv_walk(UVLoop $loop, callable $closure, array $opaque = null): bool {}
 
 /**
  * @param resource $uv
  */
-function uv_guess_handle($uv): int
-{
-}
+function uv_guess_handle($uv): int {}
 
-function uv_pipe_init(UVLoop $loop, int $ipc): UVPipe
-{
-}
+function uv_pipe_init(UVLoop $loop, int $ipc): UVPipe {}
 
-function uv_pipe_open(UVPipe $handle, int $pipe): void
-{
-}
+function uv_pipe_open(UVPipe $handle, int $pipe): void {}
 
-function uv_pipe_bind(UVPipe $handle, string $name): int
-{
-}
+function uv_pipe_bind(UVPipe $handle, string $name): int {}
 
-function uv_pipe_connect(UVPipe $handle, string $path, callable $callback): void
-{
-}
+function uv_pipe_connect(UVPipe $handle, string $path, callable $callback): void {}
 
-function uv_pipe_pending_instances(UVPipe $handle, $count): void
-{
-}
+function uv_pipe_pending_instances(UVPipe $handle, $count): void {}
 
-function uv_loadavg(): array
-{
-}
+function uv_loadavg(): array {}
 
-function uv_uptime(): float
-{
-}
+function uv_uptime(): float {}
 
-function uv_get_free_memory(): int
-{
-}
+function uv_get_free_memory(): int {}
 
-function uv_get_total_memory(): int
-{
-}
+function uv_get_total_memory(): int {}
 
-function uv_hrtime(): int
-{
-}
+function uv_hrtime(): int {}
 
-function uv_exepath(): string
-{
-}
+function uv_exepath(): string {}
 
-function uv_cpu_info(): array
-{
-}
+function uv_cpu_info(): array {}
 
-function uv_interface_addresses(): array
-{
-}
+function uv_interface_addresses(): array {}
 
 /**
  * @param UV|resource|int|null $fd
  */
-function uv_stdio_new($fd, int $flags): UVStdio
-{
-}
+function uv_stdio_new($fd, int $flags): UVStdio {}
 
 function uv_spawn(
     UVLoop $loop,
@@ -598,331 +412,190 @@ function uv_spawn(
     array $stdio,
     string $cwd,
     array $env = [],
-    null|callable $callback = null,
-    null|int $flags = null,
-    null|array $options = null,
-): UVProcess|int {
-}
+    ?callable $callback = null,
+    ?int $flags = null,
+    ?array $options = null,
+): UVProcess|int {}
 
-function uv_process_kill(UVProcess $handle, int $signal): void
-{
-}
+function uv_process_kill(UVProcess $handle, int $signal): void {}
 
-function uv_kill(int $pid, int $signal)
-{
-}
+function uv_kill(int $pid, int $signal) {}
 
-function uv_chdir(string $directory): bool
-{
-}
+function uv_chdir(string $directory): bool {}
 
-function uv_rwlock_init(): UVLock
-{
-}
+function uv_rwlock_init(): UVLock {}
 
-function uv_rwlock_rdlock(UVLock $handle)
-{
-}
+function uv_rwlock_rdlock(UVLock $handle) {}
 
-function uv_rwlock_tryrdlock(UVLock $handle): bool
-{
-}
+function uv_rwlock_tryrdlock(UVLock $handle): bool {}
 
-function uv_rwlock_rdunlock(UVLock $handle): void
-{
-}
+function uv_rwlock_rdunlock(UVLock $handle): void {}
 
-function uv_rwlock_wrlock(UVLock $handle): void
-{
-}
+function uv_rwlock_wrlock(UVLock $handle): void {}
 
-function uv_rwlock_trywrlock(UVLock $handle)
-{
-}
+function uv_rwlock_trywrlock(UVLock $handle) {}
 
-function uv_rwlock_wrunlock(UVLock $handle)
-{
-}
+function uv_rwlock_wrunlock(UVLock $handle) {}
 
-function uv_mutex_init(): UVLock
-{
-}
+function uv_mutex_init(): UVLock {}
 
-function uv_mutex_lock(UVLock $lock): void
-{
-}
+function uv_mutex_lock(UVLock $lock): void {}
 
-function uv_mutex_trylock(UVLock $lock): bool
-{
-}
+function uv_mutex_trylock(UVLock $lock): bool {}
 
-function uv_sem_init(int $value): UVLock
-{
-}
+function uv_sem_init(int $value): UVLock {}
 
-function uv_sem_post(UVLock $sem): void
-{
-}
+function uv_sem_post(UVLock $sem): void {}
 
-function uv_sem_wait(UVLock $sem): void
-{
-}
+function uv_sem_wait(UVLock $sem): void {}
 
-function uv_sem_trywait(UVLock $sem): void
-{
-}
+function uv_sem_trywait(UVLock $sem): void {}
 
-function uv_prepare_init(UVLoop $loop): UVPrepare
-{
-}
+function uv_prepare_init(UVLoop $loop): UVPrepare {}
 
-function uv_prepare_start(UVPrepare $handle, callable $callback): void
-{
-}
+function uv_prepare_start(UVPrepare $handle, callable $callback): void {}
 
-function uv_prepare_stop(UVPrepare $handle): void
-{
-}
+function uv_prepare_stop(UVPrepare $handle): void {}
 
-function uv_check_init(UVLoop $loop): UVCheck
-{
-}
+function uv_check_init(UVLoop $loop): UVCheck {}
 
-function uv_check_start(UVCheck $handle, callable $callback): void
-{
-}
+function uv_check_start(UVCheck $handle, callable $callback): void {}
 
-function uv_check_stop(UVCheck $handle): void
-{
-}
+function uv_check_stop(UVCheck $handle): void {}
 
-function uv_async_init(UVLoop $loop, callable $callback): UVAsync
-{
-}
+function uv_async_init(UVLoop $loop, callable $callback): UVAsync {}
 
-function uv_async_send(UVAsync $handle): void
-{
-}
+function uv_async_send(UVAsync $handle): void {}
 
-function uv_queue_work(UVLoop $loop, callable $callback, callable $after_callback): void
-{
-}
+function uv_queue_work(UVLoop $loop, callable $callback, callable $after_callback): void {}
 
 /**
  * @return resource
  */
-function uv_fs_open(UVLoop $loop, string $path, int $flag, int $mode, callable $callback)
-{
-}
+function uv_fs_open(UVLoop $loop, string $path, int $flag, int $mode, callable $callback) {}
 
 /**
  * @param resource $fd
  */
-function uv_fs_read(UVLoop $loop, $fd, int $offset, int $length, callable $callback): void
-{
-}
+function uv_fs_read(UVLoop $loop, $fd, int $offset, int $length, callable $callback): void {}
 
 /**
  * @param resource $fd
  */
-function uv_fs_close(UVLoop $loop, $fd, callable $callback): void
-{
-}
+function uv_fs_close(UVLoop $loop, $fd, callable $callback): void {}
 
 /**
  * @param resource $fd
  */
-function uv_fs_write(UVLoop $loop, $fd, string $buffer, int $offset, callable $callback): void
-{
-}
+function uv_fs_write(UVLoop $loop, $fd, string $buffer, int $offset, callable $callback): void {}
 
 /**
  * @param resource $fd
  */
-function uv_fs_fsync(UVLoop $loop, $fd, callable $callback): void
-{
-}
+function uv_fs_fsync(UVLoop $loop, $fd, callable $callback): void {}
 
 /**
  * @param resource $fd
  */
-function uv_fs_fdatasync(UVLoop $loop, $fd, callable $callback): void
-{
-}
+function uv_fs_fdatasync(UVLoop $loop, $fd, callable $callback): void {}
 
 /**
  * @param resource $fd
  */
-function uv_fs_ftruncate(UVLoop $loop, $fd, int $offset, callable $callback): void
-{
-}
+function uv_fs_ftruncate(UVLoop $loop, $fd, int $offset, callable $callback): void {}
 
-function uv_fs_mkdir(UVLoop $loop, string $path, int $mode, callable $callback): void
-{
-}
+function uv_fs_mkdir(UVLoop $loop, string $path, int $mode, callable $callback): void {}
 
-function uv_fs_rmdir(UVLoop $loop, string $path, callable $callback): void
-{
-}
+function uv_fs_rmdir(UVLoop $loop, string $path, callable $callback): void {}
 
-function uv_fs_unlink(UVLoop $loop, string $path, callable $callback): void
-{
-}
+function uv_fs_unlink(UVLoop $loop, string $path, callable $callback): void {}
 
-function uv_fs_rename(UVLoop $loop, string $from, string $to, callable $callback): void
-{
-}
+function uv_fs_rename(UVLoop $loop, string $from, string $to, callable $callback): void {}
 
-function uv_fs_utime(UVLoop $loop, string $path, int $utime, int $atime, callable $callback): void
-{
-}
+function uv_fs_utime(UVLoop $loop, string $path, int $utime, int $atime, callable $callback): void {}
 
 /**
  * @param resource $fd
  */
-function uv_fs_futime(UVLoop $loop, $fd, int $utime, int $atime, callable $callback): void
-{
-}
+function uv_fs_futime(UVLoop $loop, $fd, int $utime, int $atime, callable $callback): void {}
 
-function uv_fs_chmod(UVLoop $loop, string $path, int $mode, callable $callback): void
-{
-}
+function uv_fs_chmod(UVLoop $loop, string $path, int $mode, callable $callback): void {}
 
 /**
  * @param resource $fd
  */
-function uv_fs_fchmod(UVLoop $loop, $fd, int $mode, callable $callback): void
-{
-}
+function uv_fs_fchmod(UVLoop $loop, $fd, int $mode, callable $callback): void {}
 
-function uv_fs_chown(UVLoop $loop, string $path, int $uid, int $gid, callable $callback): void
-{
-}
+function uv_fs_chown(UVLoop $loop, string $path, int $uid, int $gid, callable $callback): void {}
 
 /**
  * @param resource $fd
  */
-function uv_fs_fchown(UVLoop $loop, $fd, int $uid, int $gid, callable $callback): void
-{
-}
+function uv_fs_fchown(UVLoop $loop, $fd, int $uid, int $gid, callable $callback): void {}
 
-function uv_fs_link(UVLoop $loop, string $from, string $to, callable $callback): void
-{
-}
+function uv_fs_link(UVLoop $loop, string $from, string $to, callable $callback): void {}
 
-function uv_fs_symlink(UVLoop $loop, string $from, string $to, int $flags, callable $callback): void
-{
-}
+function uv_fs_symlink(UVLoop $loop, string $from, string $to, int $flags, callable $callback): void {}
 
-function uv_fs_readlink(UVLoop $loop, string $path, callable $callback): void
-{
-}
+function uv_fs_readlink(UVLoop $loop, string $path, callable $callback): void {}
 
-function uv_fs_stat(UVLoop $loop, string $path, callable $callback): void
-{
-}
+function uv_fs_stat(UVLoop $loop, string $path, callable $callback): void {}
 
-function uv_fs_lstat(UVLoop $loop, string $path, callable $callback): void
-{
-}
+function uv_fs_lstat(UVLoop $loop, string $path, callable $callback): void {}
 
 /**
  * @param resource $fd
  */
-function uv_fs_fstat(UVLoop $loop, $fd, callable $callback): void
-{
-}
+function uv_fs_fstat(UVLoop $loop, $fd, callable $callback): void {}
 
-function uv_fs_readdir(UVLoop $loop, string $path, int $flags, callable $callback): void
-{
-}
+function uv_fs_readdir(UVLoop $loop, string $path, int $flags, callable $callback): void {}
 
 /**
  * @param resource $in_fd
  * @param resource $out_fd
  */
-function uv_fs_sendfile(UVLoop $loop, $in_fd, $out_fd, int $offset, int $length, callable $callback)
-{
-}
+function uv_fs_sendfile(UVLoop $loop, $in_fd, $out_fd, int $offset, int $length, callable $callback) {}
 
-function uv_fs_event_init(UVLoop $loop, string $path, callable $callback, int $flags = 0): UVFsEvent
-{
-}
+function uv_fs_event_init(UVLoop $loop, string $path, callable $callback, int $flags = 0): UVFsEvent {}
 
 /**
  * @param resource $fd
  */
-function uv_tty_init(UVLoop $loop, $fd, int $readable): UVTty
-{
-}
+function uv_tty_init(UVLoop $loop, $fd, int $readable): UVTty {}
 
-function uv_tty_get_winsize(UVTty $tty, int &$width, int &$height): int
-{
-}
+function uv_tty_get_winsize(UVTty $tty, int &$width, int &$height): int {}
 
-function uv_tty_set_mode(UVTty $tty, int $mode): int
-{
-}
+function uv_tty_set_mode(UVTty $tty, int $mode): int {}
 
-function uv_tty_reset_mode(): void
-{
-}
+function uv_tty_reset_mode(): void {}
 
-function uv_tcp_getsockname(UVTcp $uv_sockaddr): string
-{
-}
+function uv_tcp_getsockname(UVTcp $uv_sockaddr): string {}
 
-function uv_tcp_getpeername(UVTcp $uv_sockaddr): string
-{
-}
+function uv_tcp_getpeername(UVTcp $uv_sockaddr): string {}
 
-function uv_udp_getsockname(UVUdp $uv_sockaddr): string
-{
-}
+function uv_udp_getsockname(UVUdp $uv_sockaddr): string {}
 
-function uv_resident_set_memory(): int
-{
-}
+function uv_resident_set_memory(): int {}
 
-function uv_ip4_name(UVSockAddr $address): string
-{
-}
+function uv_ip4_name(UVSockAddr $address): string {}
 
-function uv_ip6_name(UVSockAddr $address): string
-{
-}
+function uv_ip6_name(UVSockAddr $address): string {}
 
 /**
  * @param resource $fd
  */
-function uv_poll_init(UVLoop $uv_loop, $fd): UVPoll
-{
-}
+function uv_poll_init(UVLoop $uv_loop, $fd): UVPoll {}
 
-function uv_poll_start(UVPoll $handle, int $events, callable $callback): void
-{
-}
+function uv_poll_start(UVPoll $handle, int $events, callable $callback): void {}
 
-function uv_poll_stop(UVPoll $poll): void
-{
-}
+function uv_poll_stop(UVPoll $poll): void {}
 
-function uv_fs_poll_init(null|UVLoop $uv_loop = null): UVFsPoll
-{
-}
+function uv_fs_poll_init(?UVLoop $uv_loop = null): UVFsPoll {}
 
-function uv_fs_poll_start(UVFsPoll $handle, callable $callback, string $path, int $interval): UV
-{
-}
+function uv_fs_poll_start(UVFsPoll $handle, callable $callback, string $path, int $interval): UV {}
 
-function uv_fs_poll_stop(UVFsPoll $poll): void
-{
-}
+function uv_fs_poll_stop(UVFsPoll $poll): void {}
 
-function uv_stop(UVLoop $uv_loop): void
-{
-}
+function uv_stop(UVLoop $uv_loop): void {}
 
-function uv_signal_stop(UVSignal $sig_handle): int
-{
-}
+function uv_signal_stop(UVSignal $sig_handle): int {}

@@ -16,156 +16,98 @@ class LevelDB
      *
      * @return string|false
      */
-    public function get($key, array $read_options = [])
-    {
-    }
+    public function get($key, array $read_options = []) {}
 
     /**
      * @param string $key
      * @param string $value
      */
-    public function set($key, $value, array $write_options = [])
-    {
-    }
+    public function set($key, $value, array $write_options = []) {}
 
     /**
      * @param string $key
      * @param string $value
      */
-    public function put($key, $value, array $write_options = [])
-    {
-    }
+    public function put($key, $value, array $write_options = []) {}
 
     /**
      * @param string $key
      *
      * @return bool
      */
-    public function delete($key, array $write_options = [])
-    {
-    }
+    public function delete($key, array $write_options = []) {}
 
-    public function write(LevelDBWriteBatch $batch, array $write_options = [])
-    {
-    }
+    public function write(LevelDBWriteBatch $batch, array $write_options = []) {}
 
     /**
      * @param string $name
      */
-    public function getProperty($name)
-    {
-    }
+    public function getProperty($name) {}
 
-    public function getApproximateSizes($start, $limit)
-    {
-    }
+    public function getApproximateSizes($start, $limit) {}
 
-    public function compactRange($start, $limit)
-    {
-    }
+    public function compactRange($start, $limit) {}
 
-    public function close()
-    {
-    }
+    public function close() {}
 
     /**
      * @return LevelDBIterator
      */
-    public function getIterator(array $options = [])
-    {
-    }
+    public function getIterator(array $options = []) {}
 
     /**
      * @return LevelDBSnapshot
      */
-    public function getSnapshot()
-    {
-    }
+    public function getSnapshot() {}
 
-    public static function destroy($name, array $options = [])
-    {
-    }
+    public static function destroy($name, array $options = []) {}
 
-    public static function repair($name, array $options = [])
-    {
-    }
+    public static function repair($name, array $options = []) {}
 }
 
 class LevelDBIterator implements Iterator
 {
     public function __construct(LevelDB $db, array $read_options = []) {}
 
-    public function valid()
-    {
-    }
+    public function valid() {}
 
-    public function rewind()
-    {
-    }
+    public function rewind() {}
 
-    public function last()
-    {
-    }
+    public function last() {}
 
-    public function seek($key)
-    {
-    }
+    public function seek($key) {}
 
-    public function next()
-    {
-    }
+    public function next() {}
 
-    public function prev()
-    {
-    }
+    public function prev() {}
 
-    public function key()
-    {
-    }
+    public function key() {}
 
-    public function current()
-    {
-    }
+    public function current() {}
 
-    public function getError()
-    {
-    }
+    public function getError() {}
 
-    public function destroy()
-    {
-    }
+    public function destroy() {}
 }
 
 class LevelDBWriteBatch
 {
     public function __construct() {}
 
-    public function set($key, $value, array $write_options = [])
-    {
-    }
+    public function set($key, $value, array $write_options = []) {}
 
-    public function put($key, $value, array $write_options = [])
-    {
-    }
+    public function put($key, $value, array $write_options = []) {}
 
-    public function delete($key, array $write_options = [])
-    {
-    }
+    public function delete($key, array $write_options = []) {}
 
-    public function clear()
-    {
-    }
+    public function clear() {}
 }
 
 class LevelDBSnapshot
 {
     public function __construct(LevelDB $db) {}
 
-    public function release()
-    {
-    }
+    public function release() {}
 }
 
-class LevelDBException extends Exception
-{
-}
+class LevelDBException extends Exception {}

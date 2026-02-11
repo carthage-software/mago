@@ -7,34 +7,26 @@
  *
  * @return int
  */
-function inotify_add_watch($inotify_instance, $pathname, $mask)
-{
-}
+function inotify_add_watch($inotify_instance, $pathname, $mask) {}
 
 /**
  * @return resource|false
  */
-function inotify_init()
-{
-}
+function inotify_init() {}
 
 /**
  * @param resource $inotify_instance
  *
  * @return int
  */
-function inotify_queue_len($inotify_instance)
-{
-}
+function inotify_queue_len($inotify_instance) {}
 
 /**
  * @param resource $inotify_instance
  *
  * @return array|false
  */
-function inotify_read($inotify_instance)
-{
-}
+function inotify_read($inotify_instance) {}
 
 /**
  * @param resource $inotify_instance
@@ -42,9 +34,7 @@ function inotify_read($inotify_instance)
  *
  * @return bool
  */
-function inotify_rm_watch($inotify_instance, $mask)
-{
-}
+function inotify_rm_watch($inotify_instance, $mask) {}
 
 const IN_ACCESS = 1;
 

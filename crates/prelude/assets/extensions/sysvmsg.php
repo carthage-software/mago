@@ -1,8 +1,6 @@
 <?php
 
-function msg_get_queue(int $key, int $permissions = 0666): SysvMessageQueue|false
-{
-}
+function msg_get_queue(int $key, int $permissions = 0666): SysvMessageQueue|false {}
 
 function msg_send(
     SysvMessageQueue $queue,
@@ -11,8 +9,7 @@ function msg_send(
     bool $serialize = true,
     bool $blocking = true,
     int &$error_code = null,
-): bool {
-}
+): bool {}
 
 function msg_receive(
     SysvMessageQueue $queue,
@@ -23,12 +20,9 @@ function msg_receive(
     bool $unserialize = true,
     int $flags = 0,
     int &$error_code = null,
-): bool {
-}
+): bool {}
 
-function msg_remove_queue(SysvMessageQueue $queue): bool
-{
-}
+function msg_remove_queue(SysvMessageQueue $queue): bool {}
 
 /**
  * @return false|array{
@@ -44,17 +38,11 @@ function msg_remove_queue(SysvMessageQueue $queue): bool
  *  'msg_lrpid': int
  * }
  */
-function msg_stat_queue(SysvMessageQueue $queue): array|false
-{
-}
+function msg_stat_queue(SysvMessageQueue $queue): array|false {}
 
-function msg_set_queue(SysvMessageQueue $queue, array $data): bool
-{
-}
+function msg_set_queue(SysvMessageQueue $queue, array $data): bool {}
 
-function msg_queue_exists(int $key): bool
-{
-}
+function msg_queue_exists(int $key): bool {}
 
 const MSG_IPC_NOWAIT = 1;
 

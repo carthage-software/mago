@@ -2,65 +2,47 @@
 
 class finfo
 {
-    public function __construct(int $flags = 0, null|string $magic_database = null) {}
+    public function __construct(int $flags = 0, ?string $magic_database = null) {}
 
-    public function set_flags(int $flags): bool
-    {
-    }
+    public function set_flags(int $flags): bool {}
 
     /**
      * @param null|resource $context
      *
      * @pure
      */
-    public function file(string $filename, int $flags = FILEINFO_NONE, mixed $context = null): string|false
-    {
-    }
+    public function file(string $filename, int $flags = FILEINFO_NONE, mixed $context = null): string|false {}
 
     /**
      * @param null|resource $context
      *
      * @pure
      */
-    public function buffer(string $string, int $flags = FILEINFO_NONE, mixed $context = null): string|false
-    {
-    }
+    public function buffer(string $string, int $flags = FILEINFO_NONE, mixed $context = null): string|false {}
 }
 
-function finfo_open(int $flags = 0, null|string $magic_database = null): finfo|false
-{
-}
+function finfo_open(int $flags = 0, ?string $magic_database = null): finfo|false {}
 
-function finfo_close(finfo $finfo): bool
-{
-}
+function finfo_close(finfo $finfo): bool {}
 
-function finfo_set_flags(finfo $finfo, int $flags): bool
-{
-}
+function finfo_set_flags(finfo $finfo, int $flags): bool {}
 
 /**
  * @param finfo $finfo
  * @param null|resource $context
  */
-function finfo_file(finfo $finfo, string $filename, int $flags = 0, mixed $context = null): string|false
-{
-}
+function finfo_file(finfo $finfo, string $filename, int $flags = 0, mixed $context = null): string|false {}
 
 /**
  * @param finfo $finfo
  * @param null|resource $context
  */
-function finfo_buffer(finfo $finfo, string $string, int $flags = FILEINFO_NONE, mixed $context = null): string|false
-{
-}
+function finfo_buffer(finfo $finfo, string $string, int $flags = FILEINFO_NONE, mixed $context = null): string|false {}
 
 /**
  * @param resource|object|string $filename
  */
-function mime_content_type($filename): string|false
-{
-}
+function mime_content_type($filename): string|false {}
 
 const FILEINFO_NONE = 0;
 

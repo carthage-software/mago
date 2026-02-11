@@ -3,13 +3,9 @@
 /**
  * @deprecated
  */
-function openssl_pkey_free(OpenSSLAsymmetricKey $key): void
-{
-}
+function openssl_pkey_free(OpenSSLAsymmetricKey $key): void {}
 
-function openssl_pkey_new(null|array $options): OpenSSLAsymmetricKey|false
-{
-}
+function openssl_pkey_new(?array $options): OpenSSLAsymmetricKey|false {}
 
 /**
  * @param-out string $output
@@ -17,27 +13,23 @@ function openssl_pkey_new(null|array $options): OpenSSLAsymmetricKey|false
 function openssl_pkey_export(
     OpenSSLAsymmetricKey|OpenSSLCertificate|array|string $key,
     &$output,
-    null|string $passphrase = null,
-    null|array $options = null,
-): bool {
-}
+    ?string $passphrase = null,
+    ?array $options = null,
+): bool {}
 
 function openssl_pkey_export_to_file(
     OpenSSLAsymmetricKey|OpenSSLCertificate|array|string $key,
     string $output_filename,
-    null|string $passphrase = null,
-    null|array $options = null,
-): bool {
-}
+    ?string $passphrase = null,
+    ?array $options = null,
+): bool {}
 
 function openssl_pkey_get_private(
     OpenSSLAsymmetricKey|OpenSSLCertificate|array|string $private_key,
-    null|string $passphrase = null,
-): OpenSSLAsymmetricKey|false {
-}
+    ?string $passphrase = null,
+): OpenSSLAsymmetricKey|false {}
 
-function openssl_pkey_get_public(OpenSSLAsymmetricKey|OpenSSLCertificate|array|string $public_key): OpenSSLAsymmetricKey|false {
-}
+function openssl_pkey_get_public(OpenSSLAsymmetricKey|OpenSSLCertificate|array|string $public_key): OpenSSLAsymmetricKey|false {}
 
 /**
  * @return array{
@@ -50,59 +42,40 @@ function openssl_pkey_get_public(OpenSSLAsymmetricKey|OpenSSLCertificate|array|s
  *  'type': int,
  * }|false
  */
-function openssl_pkey_get_details(OpenSSLAsymmetricKey $key): array|false
-{
-}
+function openssl_pkey_get_details(OpenSSLAsymmetricKey $key): array|false {}
 
 /**
  * @deprecated
  */
-function openssl_free_key(OpenSSLAsymmetricKey $key): void
-{
-}
+function openssl_free_key(OpenSSLAsymmetricKey $key): void {}
 
 function openssl_get_privatekey(
     OpenSSLAsymmetricKey|OpenSSLCertificate|array|string $private_key,
-    null|string $passphrase = null,
-): OpenSSLAsymmetricKey|false {
-}
+    ?string $passphrase = null,
+): OpenSSLAsymmetricKey|false {}
 
-function openssl_get_publickey(OpenSSLAsymmetricKey|OpenSSLCertificate|array|string $public_key): OpenSSLAsymmetricKey|false {
-}
+function openssl_get_publickey(OpenSSLAsymmetricKey|OpenSSLCertificate|array|string $public_key): OpenSSLAsymmetricKey|false {}
 
-function openssl_spki_new(OpenSSLAsymmetricKey $private_key, string $challenge, int $digest_algo = 2): string|false
-{
-}
+function openssl_spki_new(OpenSSLAsymmetricKey $private_key, string $challenge, int $digest_algo = 2): string|false {}
 
-function openssl_spki_verify(string $spki): bool
-{
-}
+function openssl_spki_verify(string $spki): bool {}
 
-function openssl_spki_export_challenge(string $spki): string|false
-{
-}
+function openssl_spki_export_challenge(string $spki): string|false {}
 
-function openssl_spki_export(string $spki): string|false
-{
-}
+function openssl_spki_export(string $spki): string|false {}
 
-function openssl_x509_read(OpenSSLCertificate|false $certificate): OpenSSLCertificate|false
-{
-}
+function openssl_x509_read(OpenSSLCertificate|false $certificate): OpenSSLCertificate|false {}
 
 function openssl_x509_fingerprint(
     OpenSSLCertificate|false $certificate,
     string $digest_algo = 'sha1',
     bool $binary = false,
-): string|false {
-}
+): string|false {}
 
 /**
  * @deprecated
  */
-function openssl_x509_free(OpenSSLCertificate $certificate): void
-{
-}
+function openssl_x509_free(OpenSSLCertificate $certificate): void {}
 
 /**
  * @return array{
@@ -125,43 +98,35 @@ function openssl_x509_free(OpenSSLCertificate $certificate): void
  *   'extensions': array,
  * }|false
  */
-function openssl_x509_parse(OpenSSLCertificate|false $certificate, bool $short_names = true): array|false
-{
-}
+function openssl_x509_parse(OpenSSLCertificate|false $certificate, bool $short_names = true): array|false {}
 
 function openssl_x509_checkpurpose(
     OpenSSLCertificate|false $certificate,
     int $purpose,
     array $ca_info = [],
-    null|string $untrusted_certificates_file = null,
-): int|bool {
-}
+    ?string $untrusted_certificates_file = null,
+): int|bool {}
 
 function openssl_x509_check_private_key(
     OpenSSLCertificate|false $certificate,
     OpenSSLAsymmetricKey|OpenSSLCertificate|array|string $private_key,
-): bool {
-}
+): bool {}
 
 /**
  * @param-out string $output
  */
-function openssl_x509_export(OpenSSLCertificate|false $certificate, &$output, bool $no_text = true): bool
-{
-}
+function openssl_x509_export(OpenSSLCertificate|false $certificate, &$output, bool $no_text = true): bool {}
 
 function openssl_x509_export_to_file(
     OpenSSLCertificate|false $certificate,
     string $output_filename,
     bool $no_text = true,
-): bool {
-}
+): bool {}
 
 function openssl_x509_verify(
     OpenSSLCertificate|false $certificate,
     OpenSSLAsymmetricKey|OpenSSLCertificate|array|string $public_key,
-): int {
-}
+): int {}
 
 /**
  * @param-out string $output
@@ -172,8 +137,7 @@ function openssl_pkcs12_export(
     OpenSSLAsymmetricKey|OpenSSLCertificate|array|string $private_key,
     string $passphrase,
     array $options = [],
-): bool {
-}
+): bool {}
 
 function openssl_pkcs12_export_to_file(
     OpenSSLCertificate|false $certificate,
@@ -181,15 +145,12 @@ function openssl_pkcs12_export_to_file(
     OpenSSLAsymmetricKey|OpenSSLCertificate|array|string $private_key,
     string $passphrase,
     array $options = [],
-): bool {
-}
+): bool {}
 
 /**
  * @param-out array $certificates
  */
-function openssl_pkcs12_read(string $pkcs12, &$certificates, string $passphrase): bool
-{
-}
+function openssl_pkcs12_read(string $pkcs12, &$certificates, string $passphrase): bool {}
 
 /**
  * @return OpenSSLCertificateSigningRequest|resource|false the CSR.
@@ -197,49 +158,39 @@ function openssl_pkcs12_read(string $pkcs12, &$certificates, string $passphrase)
 function openssl_csr_new(
     array $distinguished_names,
     OpenSSLAsymmetricKey $private_key,
-    null|array $options = null,
-    null|array $extra_attributes = null,
-): OpenSSLCertificateSigningRequest|bool {
-}
+    ?array $options = null,
+    ?array $extra_attributes = null,
+): OpenSSLCertificateSigningRequest|bool {}
 
 /**
  * @param-out string $output
  */
-function openssl_csr_export(OpenSSLCertificateSigningRequest|string $csr, &$output, bool $no_text = true): bool
-{
-}
+function openssl_csr_export(OpenSSLCertificateSigningRequest|string $csr, &$output, bool $no_text = true): bool {}
 
 function openssl_csr_export_to_file(
     OpenSSLCertificateSigningRequest|string $csr,
     string $output_filename,
     bool $no_text = true,
-): bool {
-}
+): bool {}
 
 function openssl_csr_sign(
     OpenSSLCertificateSigningRequest|string $csr,
     OpenSSLCertificate|string|null $ca_certificate,
     OpenSSLAsymmetricKey|OpenSSLCertificate|array|string $private_key,
     int $days,
-    null|array $options,
+    ?array $options,
     int $serial = 0,
-    null|string $serial_hex = null,
-): OpenSSLCertificate|false {
-}
+    ?string $serial_hex = null,
+): OpenSSLCertificate|false {}
 
-function openssl_csr_get_subject(OpenSSLCertificateSigningRequest|string $csr, bool $short_names = true): array|false
-{
-}
+function openssl_csr_get_subject(OpenSSLCertificateSigningRequest|string $csr, bool $short_names = true): array|false {}
 
 function openssl_csr_get_public_key(
     OpenSSLCertificateSigningRequest|string $csr,
     bool $short_names = true,
-): OpenSSLAsymmetricKey|false {
-}
+): OpenSSLAsymmetricKey|false {}
 
-function openssl_digest(string $data, string $digest_algo, bool $binary = false): string|false
-{
-}
+function openssl_digest(string $data, string $digest_algo, bool $binary = false): string|false {}
 
 /**
  * @param-out string $tag
@@ -255,8 +206,7 @@ function openssl_encrypt(
     &$tag = null,
     string $aad = '',
     int $tag_length = 16,
-): string|false {
-}
+): string|false {}
 
 function openssl_decrypt(
     string $data,
@@ -264,18 +214,13 @@ function openssl_decrypt(
     string $passphrase,
     int $options = 0,
     string $iv = '',
-    string|null $tag = null,
+    ?string $tag = null,
     string $aad = '',
-): string|false {
-}
+): string|false {}
 
-function openssl_cipher_iv_length(string $cipher_algo): int|false
-{
-}
+function openssl_cipher_iv_length(string $cipher_algo): int|false {}
 
-function openssl_cipher_key_length(string $cipher_algo): int|false
-{
-}
+function openssl_cipher_key_length(string $cipher_algo): int|false {}
 
 /**
  * @param-out string $signature
@@ -285,16 +230,14 @@ function openssl_sign(
     &$signature,
     OpenSSLAsymmetricKey|OpenSSLCertificate|array|string $private_key,
     string|int $algorithm = OPENSSL_ALGO_SHA1,
-): bool {
-}
+): bool {}
 
 function openssl_verify(
     string $data,
     string $signature,
     OpenSSLAsymmetricKey|OpenSSLCertificate|array|string $public_key,
     string|int $algorithm = OPENSSL_ALGO_SHA1,
-): int|false {
-}
+): int|false {}
 
 /**
  * @param-out string $sealed_data
@@ -308,8 +251,7 @@ function openssl_seal(
     array $public_key,
     string $cipher_algo,
     &$iv = null,
-): int|false {
-}
+): int|false {}
 
 /**
  * @param-out string $output
@@ -320,9 +262,8 @@ function openssl_open(
     string $encrypted_key,
     OpenSSLAsymmetricKey|OpenSSLCertificate|array|string $private_key,
     string $cipher_algo,
-    null|string $iv = null,
-): bool {
-}
+    ?string $iv = null,
+): bool {}
 
 function openssl_pbkdf2(
     string $password,
@@ -330,19 +271,17 @@ function openssl_pbkdf2(
     int $key_length,
     int $iterations,
     string $digest_algo = 'sha1',
-): string|false {
-}
+): string|false {}
 
 function openssl_pkcs7_verify(
     string $input_filename,
     int $flags,
-    null|string $signers_certificates_filename,
+    ?string $signers_certificates_filename,
     array $ca_info = [],
-    null|string $untrusted_certificates_filename = null,
-    null|string $content = null,
-    null|string $output_filename = null,
-): int|bool {
-}
+    ?string $untrusted_certificates_filename = null,
+    ?string $content = null,
+    ?string $output_filename = null,
+): int|bool {}
 
 /**
  * @param OpenSSLCertificate|string|resource $certificate
@@ -352,29 +291,26 @@ function openssl_pkcs7_decrypt(
     string $output_filename,
     $certificate,
     OpenSSLAsymmetricKey|OpenSSLCertificate|array|string|null $private_key = null,
-): bool {
-}
+): bool {}
 
 function openssl_pkcs7_sign(
     string $input_filename,
     string $output_filename,
     OpenSSLCertificate|false $certificate,
     OpenSSLAsymmetricKey|OpenSSLCertificate|array|string $private_key,
-    null|array $headers,
+    ?array $headers,
     int $flags = PKCS7_DETACHED,
-    null|string $untrusted_certificates_filename = null,
-): bool {
-}
+    ?string $untrusted_certificates_filename = null,
+): bool {}
 
 function openssl_pkcs7_encrypt(
     string $input_filename,
     string $output_filename,
     OpenSSLCertificate|array|string $certificate,
-    null|array $headers,
+    ?array $headers,
     int $flags = 0,
     int $cipher_algo = OPENSSL_CIPHER_AES_128_CBC,
-): bool {
-}
+): bool {}
 
 /**
  * @param-out string $encrypted_data
@@ -384,8 +320,7 @@ function openssl_private_encrypt(
     &$encrypted_data,
     OpenSSLAsymmetricKey|OpenSSLCertificate|array|string $private_key,
     int $padding = OPENSSL_PKCS1_PADDING,
-): bool {
-}
+): bool {}
 
 /**
  * @param-out string $decrypted_data
@@ -395,8 +330,7 @@ function openssl_private_decrypt(
     &$decrypted_data,
     OpenSSLAsymmetricKey|OpenSSLCertificate|array|string $private_key,
     int $padding = OPENSSL_PKCS1_PADDING,
-): bool {
-}
+): bool {}
 
 /**
  * @param-out string $encrypted_data
@@ -406,8 +340,7 @@ function openssl_public_encrypt(
     &$encrypted_data,
     OpenSSLAsymmetricKey|OpenSSLCertificate|array|string $public_key,
     int $padding = OPENSSL_PKCS1_PADDING,
-): bool {
-}
+): bool {}
 
 /**
  * @param-out string $decrypted_data
@@ -417,40 +350,28 @@ function openssl_public_decrypt(
     &$decrypted_data,
     OpenSSLAsymmetricKey|OpenSSLCertificate|array|string $public_key,
     int $padding = OPENSSL_PKCS1_PADDING,
-): bool {
-}
+): bool {}
 
-function openssl_get_md_methods(bool $aliases = false): array
-{
-}
+function openssl_get_md_methods(bool $aliases = false): array {}
 
-function openssl_get_cipher_methods(bool $aliases = false): array
-{
-}
+function openssl_get_cipher_methods(bool $aliases = false): array {}
 
-function openssl_dh_compute_key(string $public_key, OpenSSLAsymmetricKey $private_key): string|false
-{
-}
+function openssl_dh_compute_key(string $public_key, OpenSSLAsymmetricKey $private_key): string|false {}
 
 function openssl_pkey_derive(
     OpenSSLAsymmetricKey|OpenSSLCertificate|array|string $public_key,
     OpenSSLAsymmetricKey|OpenSSLCertificate|array|string $private_key,
     int $key_length = 0,
-): string|false {
-}
+): string|false {}
 
 /**
  * @param positive-int $length
  *
  * @param-out bool $strong_result
  */
-function openssl_random_pseudo_bytes(int $length, null|bool &$strong_result = null): string
-{
-}
+function openssl_random_pseudo_bytes(int $length, ?bool &$strong_result = null): string {}
 
-function openssl_error_string(): string|false
-{
-}
+function openssl_error_string(): string|false {}
 
 /**
  * @return array{
@@ -464,33 +385,26 @@ function openssl_error_string(): string|false
  *   'ini_capath': string,
  * }
  */
-function openssl_get_cert_locations(): array
-{
-}
+function openssl_get_cert_locations(): array {}
 
-function openssl_get_curve_names(): array|false
-{
-}
+function openssl_get_curve_names(): array|false {}
 
 /**
  * @param-out array $certificates
  */
-function openssl_pkcs7_read(string $data, &$certificates): bool
-{
-}
+function openssl_pkcs7_read(string $data, &$certificates): bool {}
 
 function openssl_cms_verify(
     string $input_filename,
     int $flags = 0,
-    null|string $certificates,
+    ?string $certificates,
     array $ca_info = [],
-    null|string $untrusted_certificates_filename = null,
-    null|string $content = null,
-    null|string $pk7 = null,
-    null|string $sigfile = null,
+    ?string $untrusted_certificates_filename = null,
+    ?string $content = null,
+    ?string $pk7 = null,
+    ?string $sigfile = null,
     int $encoding = OPENSSL_ENCODING_SMIME,
-): bool {
-}
+): bool {}
 
 /**
  * @param resource|string|array $certificate
@@ -499,24 +413,22 @@ function openssl_cms_encrypt(
     string $input_filename,
     string $output_filename,
     $certificate,
-    null|array $headers,
+    ?array $headers,
     int $flags = 0,
     int $encoding = OPENSSL_ENCODING_SMIME,
     int $cipher_algo = OPENSSL_CIPHER_AES_128_CBC,
-): bool {
-}
+): bool {}
 
 function openssl_cms_sign(
     string $input_filename,
     string $output_filename,
     OpenSSLCertificate|string $certificate,
     OpenSSLAsymmetricKey|OpenSSLCertificate|array|string $private_key,
-    null|array $headers,
+    ?array $headers,
     int $flags = 0,
     int $encoding = OPENSSL_ENCODING_SMIME,
-    null|string $untrusted_certificates_filename = null,
-): bool {
-}
+    ?string $untrusted_certificates_filename = null,
+): bool {}
 
 function openssl_cms_decrypt(
     string $input_filename,
@@ -524,15 +436,12 @@ function openssl_cms_decrypt(
     $certificate,
     $private_key = null,
     int $encoding = OPENSSL_ENCODING_SMIME,
-): bool {
-}
+): bool {}
 
 /**
  * @param-out array $certificates
  */
-function openssl_cms_read(string $input_filename, &$certificates): bool
-{
-}
+function openssl_cms_read(string $input_filename, &$certificates): bool {}
 
 const OPENSSL_VERSION_TEXT = 'OpenSSL 1.0.0e 6 Sep 2011';
 
@@ -669,13 +578,13 @@ const OPENSSL_ENCODING_PEM = 2;
 const OPENSSL_CMS_OLDMIMETYPE = 1024;
 
 const OPENSSL_DEFAULT_STREAM_CIPHERS =
-    'ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES128-GCM-SHA256:' .
-    'ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES256-GCM-SHA384:DHE-RSA-AES128-GCM-SHA256:' .
-    'DHE-DSS-AES128-GCM-SHA256:kEDH+AESGCM:ECDHE-RSA-AES128-SHA256:ECDHE-ECDSA-AES128-SHA256:' .
-    'ECDHE-RSA-AES128-SHA:ECDHE-ECDSA-AES128-SHA:ECDHE-RSA-AES256-SHA384:ECDHE-ECDSA-AES256-SHA384:' .
-    'ECDHE-RSA-AES256-SHA:ECDHE-ECDSA-AES256-SHA:DHE-RSA-AES128-SHA256:DHE-RSA-AES128-SHA:' .
-    'DHE-DSS-AES128-SHA256:DHE-RSA-AES256-SHA256:DHE-DSS-AES256-SHA:DHE-RSA-AES256-SHA:AES128-GCM-SHA256:' .
-    'AES256-GCM-SHA384:AES128:AES256:HIGH:!SSLv2:!aNULL:!eNULL:!EXPORT:!DES:!MD5:!RC4:!ADH';
+    'ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES128-GCM-SHA256:'
+    . 'ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES256-GCM-SHA384:DHE-RSA-AES128-GCM-SHA256:'
+    . 'DHE-DSS-AES128-GCM-SHA256:kEDH+AESGCM:ECDHE-RSA-AES128-SHA256:ECDHE-ECDSA-AES128-SHA256:'
+    . 'ECDHE-RSA-AES128-SHA:ECDHE-ECDSA-AES128-SHA:ECDHE-RSA-AES256-SHA384:ECDHE-ECDSA-AES256-SHA384:'
+    . 'ECDHE-RSA-AES256-SHA:ECDHE-ECDSA-AES256-SHA:DHE-RSA-AES128-SHA256:DHE-RSA-AES128-SHA:'
+    . 'DHE-DSS-AES128-SHA256:DHE-RSA-AES256-SHA256:DHE-DSS-AES256-SHA:DHE-RSA-AES256-SHA:AES128-GCM-SHA256:'
+    . 'AES256-GCM-SHA384:AES128:AES256:HIGH:!SSLv2:!aNULL:!eNULL:!EXPORT:!DES:!MD5:!RC4:!ADH';
 
 final class OpenSSLCertificate
 {

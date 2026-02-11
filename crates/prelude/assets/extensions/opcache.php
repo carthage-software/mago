@@ -1,16 +1,10 @@
 <?php
 
-function opcache_compile_file(string $filename): bool
-{
-}
+function opcache_compile_file(string $filename): bool {}
 
-function opcache_invalidate(string $filename, bool $force = false): bool
-{
-}
+function opcache_invalidate(string $filename, bool $force = false): bool {}
 
-function opcache_reset(): bool
-{
-}
+function opcache_reset(): bool {}
 
 /**
  * @return false|array{
@@ -60,9 +54,7 @@ function opcache_reset(): bool
  *    preload_statistics?: array<string, mixed>,
  * }
  */
-function opcache_get_status(bool $include_scripts = true): array|false
-{
-}
+function opcache_get_status(bool $include_scripts = true): array|false {}
 
 /**
  * @return false|array{
@@ -125,14 +117,8 @@ function opcache_get_status(bool $include_scripts = true): array|false
  *    blacklist: array<string, mixed>,
  * }
  */
-function opcache_get_configuration(): array|false
-{
-}
+function opcache_get_configuration(): array|false {}
 
-function opcache_is_script_cached(string $filename): bool
-{
-}
+function opcache_is_script_cached(string $filename): bool {}
 
-function opcache_jit_blacklist(Closure $closure): void
-{
-}
+function opcache_jit_blacklist(Closure $closure): void {}

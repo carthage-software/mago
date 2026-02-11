@@ -60,9 +60,7 @@ const SQLITE3_OPEN_CREATE = UNKNOWN;
  */
 const SQLITE3_DETERMINISTIC = UNKNOWN;
 
-class SQLite3Exception extends \Exception
-{
-}
+class SQLite3Exception extends \Exception {}
 
 class SQLite3
 {
@@ -114,87 +112,52 @@ class SQLite3
         string $filename,
         int $flags = SQLITE3_OPEN_READWRITE | SQLITE3_OPEN_CREATE,
         string $encryptionKey = '',
-    ): void {
-    }
+    ): void {}
 
-    public function close(): bool
-    {
-    }
+    public function close(): bool {}
 
-    public static function version(): array
-    {
-    }
+    public static function version(): array {}
 
-    public function lastInsertRowID(): int
-    {
-    }
+    public function lastInsertRowID(): int {}
 
-    public function lastErrorCode(): int
-    {
-    }
+    public function lastErrorCode(): int {}
 
-    public function lastExtendedErrorCode(): int
-    {
-    }
+    public function lastExtendedErrorCode(): int {}
 
-    public function lastErrorMsg(): string
-    {
-    }
+    public function lastErrorMsg(): string {}
 
-    public function changes(): int
-    {
-    }
+    public function changes(): int {}
 
-    public function busyTimeout(int $milliseconds): bool
-    {
-    }
+    public function busyTimeout(int $milliseconds): bool {}
 
-    public function loadExtension(string $name): bool
-    {
-    }
+    public function loadExtension(string $name): bool {}
 
     public function backup(
         SQLite3 $destination,
         string $sourceDatabase = 'main',
         string $destinationDatabase = 'main',
-    ): bool {
-    }
+    ): bool {}
 
-    public static function escapeString(string $string): string
-    {
-    }
+    public static function escapeString(string $string): string {}
 
-    public function prepare(string $query): SQLite3Stmt|false
-    {
-    }
+    public function prepare(string $query): SQLite3Stmt|false {}
 
-    public function exec(string $query): bool
-    {
-    }
+    public function exec(string $query): bool {}
 
-    public function query(string $query): SQLite3Result|false
-    {
-    }
+    public function query(string $query): SQLite3Result|false {}
 
-    public function querySingle(string $query, bool $entireRow = false): mixed
-    {
-    }
+    public function querySingle(string $query, bool $entireRow = false): mixed {}
 
-    public function createFunction(string $name, callable $callback, int $argCount = -1, int $flags = 0): bool
-    {
-    }
+    public function createFunction(string $name, callable $callback, int $argCount = -1, int $flags = 0): bool {}
 
     public function createAggregate(
         string $name,
         callable $stepCallback,
         callable $finalCallback,
         int $argCount = -1,
-    ): bool {
-    }
+    ): bool {}
 
-    public function createCollation(string $name, callable $callback): bool
-    {
-    }
+    public function createCollation(string $name, callable $callback): bool {}
 
     /** @return resource|false */
     public function openBlob(
@@ -203,108 +166,63 @@ class SQLite3
         int $rowid,
         string $database = 'main',
         int $flags = SQLITE3_OPEN_READONLY,
-    ) {
-    }
+    ) {}
 
-    public function enableExceptions(bool $enable = false): bool
-    {
-    }
+    public function enableExceptions(bool $enable = false): bool {}
 
-    public function enableExtendedResultCodes(bool $enable = true): bool
-    {
-    }
+    public function enableExtendedResultCodes(bool $enable = true): bool {}
 
-    public function setAuthorizer(null|callable $callback): bool
-    {
-    }
+    public function setAuthorizer(?callable $callback): bool {}
 }
 
 class SQLite3Stmt
 {
     private function __construct(SQLite3 $sqlite3, string $query) {}
 
-    public function bindParam(string|int $param, mixed &$var, int $type = SQLITE3_TEXT): bool
-    {
-    }
+    public function bindParam(string|int $param, mixed &$var, int $type = SQLITE3_TEXT): bool {}
 
-    public function bindValue(string|int $param, mixed $value, int $type = SQLITE3_TEXT): bool
-    {
-    }
+    public function bindValue(string|int $param, mixed $value, int $type = SQLITE3_TEXT): bool {}
 
-    public function clear(): bool
-    {
-    }
+    public function clear(): bool {}
 
-    public function close(): true
-    {
-    }
+    public function close(): true {}
 
-    public function execute(): SQLite3Result|false
-    {
-    }
+    public function execute(): SQLite3Result|false {}
 
-    public function getSQL(bool $expand = false): string|false
-    {
-    }
+    public function getSQL(bool $expand = false): string|false {}
 
-    public function paramCount(): int
-    {
-    }
+    public function paramCount(): int {}
 
-    public function readOnly(): bool
-    {
-    }
+    public function readOnly(): bool {}
 
-    public function reset(): bool
-    {
-    }
+    public function reset(): bool {}
 
-    public function busy(): bool
-    {
-    }
+    public function busy(): bool {}
 
     public const int EXPLAIN_MODE_PREPARED = 0;
     public const int EXPLAIN_MODE_EXPLAIN = 1;
     public const int EXPLAIN_MODE_EXPLAIN_QUERY_PLAN = 2;
 
-    public function explain(): int
-    {
-    }
+    public function explain(): int {}
 
-    public function setExplain(int $mode): bool
-    {
-    }
+    public function setExplain(int $mode): bool {}
 }
 
 class SQLite3Result
 {
     private function __construct() {}
 
-    public function numColumns(): int
-    {
-    }
+    public function numColumns(): int {}
 
-    public function columnName(int $column): string|false
-    {
-    }
+    public function columnName(int $column): string|false {}
 
-    public function columnType(int $column): int|false
-    {
-    }
+    public function columnType(int $column): int|false {}
 
-    public function fetchArray(int $mode = SQLITE3_BOTH): array|false
-    {
-    }
+    public function fetchArray(int $mode = SQLITE3_BOTH): array|false {}
 
-    public function fetchAll(int $mode = SQLITE3_BOTH): array|false
-    {
-    }
+    public function fetchAll(int $mode = SQLITE3_BOTH): array|false {}
 
-    public function reset(): bool
-    {
-    }
+    public function reset(): bool {}
 
-    public function finalize(): true
-    {
-    }
+    public function finalize(): true {}
 }

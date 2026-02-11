@@ -27,60 +27,34 @@ class SVM
 
     public function __construct() {}
 
-    public function crossvalidate(array $problem, int $number_of_folds): float
-    {
-    }
+    public function crossvalidate(array $problem, int $number_of_folds): float {}
 
-    public function getOptions(): array
-    {
-    }
+    public function getOptions(): array {}
 
-    public function setOptions(array $params): bool
-    {
-    }
+    public function setOptions(array $params): bool {}
 
-    public function train(array $problem, array $weights = null): SVMModel
-    {
-    }
+    public function train(array $problem, array $weights = null): SVMModel {}
 }
 
 class SVMModel
 {
-    public function checkProbabilityModel(): bool
-    {
-    }
+    public function checkProbabilityModel(): bool {}
 
     public function __construct(string $filename = '') {}
 
-    public function getLabels(): array
-    {
-    }
+    public function getLabels(): array {}
 
-    public function getNrClass(): int
-    {
-    }
+    public function getNrClass(): int {}
 
-    public function getSvmType(): int
-    {
-    }
+    public function getSvmType(): int {}
 
-    public function getSvrProbability(): float
-    {
-    }
+    public function getSvrProbability(): float {}
 
-    public function load(string $filename): bool
-    {
-    }
+    public function load(string $filename): bool {}
 
-    public function predict_probability(array $data): float
-    {
-    }
+    public function predict_probability(array $data): float {}
 
-    public function predict(array $data): float
-    {
-    }
+    public function predict(array $data): float {}
 
-    public function save(string $filename): bool
-    {
-    }
+    public function save(string $filename): bool {}
 }

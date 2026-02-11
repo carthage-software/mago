@@ -11,59 +11,43 @@ class LuaSandbox
      *
      * @return array|bool
      */
-    public function callFunction($name, array $arguments)
-    {
-    }
+    public function callFunction($name, array $arguments) {}
 
-    public function disableProfiler()
-    {
-    }
+    public function disableProfiler() {}
 
     /**
      * @param float $period
      *
      * @return bool
      */
-    public function enableProfiler($period = 0.02)
-    {
-    }
+    public function enableProfiler($period = 0.02) {}
 
     /**
      * @return float
      */
-    public function getCPUUsage()
-    {
-    }
+    public function getCPUUsage() {}
 
     /**
      * @return int
      */
-    public function getMemoryUsage()
-    {
-    }
+    public function getMemoryUsage() {}
 
     /**
      * @return int
      */
-    public function getPeakMemoryUsage()
-    {
-    }
+    public function getPeakMemoryUsage() {}
 
     /**
      * @param int $units
      *
      * @return array
      */
-    public function getProfilerFunctionReport($units = LuaSandbox::SECONDS)
-    {
-    }
+    public function getProfilerFunctionReport($units = LuaSandbox::SECONDS) {}
 
     /**
      * @return array
      */
-    public static function getVersionInfo()
-    {
-    }
+    public static function getVersionInfo() {}
 
     /**
      * @param string $code
@@ -71,9 +55,7 @@ class LuaSandbox
      *
      * @return LuaSandboxFunction
      */
-    public function loadBinary($code, $chunkName = '')
-    {
-    }
+    public function loadBinary($code, $chunkName = '') {}
 
     /**
      * @param string $code
@@ -81,53 +63,39 @@ class LuaSandbox
      *
      * @return LuaSandboxFunction
      */
-    public function loadString($code, $chunkName = '')
-    {
-    }
+    public function loadString($code, $chunkName = '') {}
 
     /**
      * @return bool
      */
-    public function pauseUsageTimer()
-    {
-    }
+    public function pauseUsageTimer() {}
 
     /**
      * @param string $libname
      * @param array $functions
      */
-    public function registerLibrary($libname, $functions)
-    {
-    }
+    public function registerLibrary($libname, $functions) {}
 
     /**
      * @param bool|float $limit
      */
-    public function setCPULimit($limit)
-    {
-    }
+    public function setCPULimit($limit) {}
 
     /**
      * @param int $limit
      *
      * @throws LuaSandboxMemoryError
      */
-    public function setMemoryLimit($limit)
-    {
-    }
+    public function setMemoryLimit($limit) {}
 
-    public function unpauseUsageTimer()
-    {
-    }
+    public function unpauseUsageTimer() {}
 
     /**
      * @param callable $function
      *
      * @return LuaSandboxFunction
      */
-    public function wrapPhpFunction($function)
-    {
-    }
+    public function wrapPhpFunction($function) {}
 }
 
 class LuaSandboxFunction
@@ -135,16 +103,12 @@ class LuaSandboxFunction
     /**
      * @return array|bool
      */
-    public function call(string ...$args)
-    {
-    }
+    public function call(string ...$args) {}
 
     /**
      * @return string
      */
-    public function dump()
-    {
-    }
+    public function dump() {}
 }
 
 class LuaSandboxError extends Exception
@@ -155,26 +119,14 @@ class LuaSandboxError extends Exception
     public const ERR = 5;
 }
 
-class LuaSandboxRuntimeError extends LuaSandboxError
-{
-}
+class LuaSandboxRuntimeError extends LuaSandboxError {}
 
-class LuaSandboxFatalError extends LuaSandboxError
-{
-}
+class LuaSandboxFatalError extends LuaSandboxError {}
 
-class LuaSandboxErrorError extends LuaSandboxFatalError
-{
-}
+class LuaSandboxErrorError extends LuaSandboxFatalError {}
 
-class LuaSandboxMemoryError extends LuaSandboxFatalError
-{
-}
+class LuaSandboxMemoryError extends LuaSandboxFatalError {}
 
-class LuaSandboxSyntaxError extends LuaSandboxFatalError
-{
-}
+class LuaSandboxSyntaxError extends LuaSandboxFatalError {}
 
-class LuaSandboxTimeoutError extends LuaSandboxFatalError
-{
-}
+class LuaSandboxTimeoutError extends LuaSandboxFatalError {}

@@ -5,13 +5,9 @@ namespace Parle;
 use Exception;
 use Throwable;
 
-class ParserException extends Exception implements Throwable
-{
-}
+class ParserException extends Exception implements Throwable {}
 
-class LexerException extends Exception implements Throwable
-{
-}
+class LexerException extends Exception implements Throwable {}
 
 class Token
 {
@@ -98,44 +94,26 @@ class Lexer
      */
     public $cursor = 0;
 
-    public function advance(): void
-    {
-    }
+    public function advance(): void {}
 
-    public function build(): void
-    {
-    }
+    public function build(): void {}
 
     /**
      * @param (callable(): void) $callback
      */
-    public function callout(int $id, callable $callback): void
-    {
-    }
+    public function callout(int $id, callable $callback): void {}
 
-    public function consume(string $data): void
-    {
-    }
+    public function consume(string $data): void {}
 
-    public function dump(): void
-    {
-    }
+    public function dump(): void {}
 
-    public function getToken(): Token
-    {
-    }
+    public function getToken(): Token {}
 
-    public function insertMacro(string $name, string $regex): void
-    {
-    }
+    public function insertMacro(string $name, string $regex): void {}
 
-    public function push(string $regex, int $id): void
-    {
-    }
+    public function push(string $regex, int $id): void {}
 
-    public function reset(int $pos): void
-    {
-    }
+    public function reset(int $pos): void {}
 }
 
 class Parser
@@ -163,69 +141,37 @@ class Parser
      */
     public $reduceId = 0;
 
-    public function advance(): void
-    {
-    }
+    public function advance(): void {}
 
-    public function build(): void
-    {
-    }
+    public function build(): void {}
 
-    public function consume(string $data, Lexer $lexer): void
-    {
-    }
+    public function consume(string $data, Lexer $lexer): void {}
 
-    public function dump(): void
-    {
-    }
+    public function dump(): void {}
 
-    public function errorInfo(): ErrorInfo
-    {
-    }
+    public function errorInfo(): ErrorInfo {}
 
-    public function left(string $token): void
-    {
-    }
+    public function left(string $token): void {}
 
-    public function nonassoc(string $token): void
-    {
-    }
+    public function nonassoc(string $token): void {}
 
-    public function precedence(string $token): void
-    {
-    }
+    public function precedence(string $token): void {}
 
-    public function push(string $name, string $rule): int
-    {
-    }
+    public function push(string $name, string $rule): int {}
 
-    public function reset(int $tokenId): void
-    {
-    }
+    public function reset(int $tokenId): void {}
 
-    public function right(string $token): void
-    {
-    }
+    public function right(string $token): void {}
 
-    public function sigil(int $idx): string
-    {
-    }
+    public function sigil(int $idx): string {}
 
-    public function token(string $token): void
-    {
-    }
+    public function token(string $token): void {}
 
-    public function tokenId(string $token): int
-    {
-    }
+    public function tokenId(string $token): int {}
 
-    public function trace(): string
-    {
-    }
+    public function trace(): string {}
 
-    public function validate(string $data, Lexer $lexer): bool
-    {
-    }
+    public function validate(string $data, Lexer $lexer): bool {}
 }
 
 /**
@@ -254,18 +200,14 @@ class Stack
      */
     public $top;
 
-    public function pop(): void
-    {
-    }
+    public function pop(): void {}
 
     /**
      * @param TValue $item
      *
      * @return void
      */
-    public function push($item)
-    {
-    }
+    public function push($item) {}
 }
 
 class RLexer
@@ -307,52 +249,30 @@ class RLexer
      */
     public $cursor = 0;
 
-    public function advance(): void
-    {
-    }
+    public function advance(): void {}
 
-    public function build(): void
-    {
-    }
+    public function build(): void {}
 
     /**
      * @param (callable(): void) $callback
      */
-    public function callout(int $id, callable $callback): void
-    {
-    }
+    public function callout(int $id, callable $callback): void {}
 
-    public function consume(string $data): void
-    {
-    }
+    public function consume(string $data): void {}
 
-    public function dump(): void
-    {
-    }
+    public function dump(): void {}
 
-    public function getToken(): Token
-    {
-    }
+    public function getToken(): Token {}
 
-    public function push(string $regex, int $id): void
-    {
-    }
+    public function push(string $regex, int $id): void {}
 
-    public function push(string $state, string $regex, int $id, string $newState): void
-    {
-    }
+    public function push(string $state, string $regex, int $id, string $newState): void {}
 
-    public function push(string $state, string $regex, string $newState): void
-    {
-    }
+    public function push(string $state, string $regex, string $newState): void {}
 
-    public function pushState(string $state): int
-    {
-    }
+    public function pushState(string $state): int {}
 
-    public function reset(int $pos): void
-    {
-    }
+    public function reset(int $pos): void {}
 }
 
 class RParser
@@ -380,67 +300,35 @@ class RParser
      */
     public $reduceId = 0;
 
-    public function advance(): void
-    {
-    }
+    public function advance(): void {}
 
-    public function build(): void
-    {
-    }
+    public function build(): void {}
 
-    public function consume(string $data, Lexer $lexer): void
-    {
-    }
+    public function consume(string $data, Lexer $lexer): void {}
 
-    public function dump(): void
-    {
-    }
+    public function dump(): void {}
 
-    public function errorInfo(): ErrorInfo
-    {
-    }
+    public function errorInfo(): ErrorInfo {}
 
-    public function left(string $token): void
-    {
-    }
+    public function left(string $token): void {}
 
-    public function nonassoc(string $token): void
-    {
-    }
+    public function nonassoc(string $token): void {}
 
-    public function precedence(string $token): void
-    {
-    }
+    public function precedence(string $token): void {}
 
-    public function push(string $name, string $rule): int
-    {
-    }
+    public function push(string $name, string $rule): int {}
 
-    public function reset(int $tokenId): void
-    {
-    }
+    public function reset(int $tokenId): void {}
 
-    public function right(string $token): void
-    {
-    }
+    public function right(string $token): void {}
 
-    public function sigil(int $idx): string
-    {
-    }
+    public function sigil(int $idx): string {}
 
-    public function token(string $token): void
-    {
-    }
+    public function token(string $token): void {}
 
-    public function tokenId(string $token): int
-    {
-    }
+    public function tokenId(string $token): int {}
 
-    public function trace(): string
-    {
-    }
+    public function trace(): string {}
 
-    public function validate(string $data, RLexer $lexer): bool
-    {
-    }
+    public function validate(string $data, RLexer $lexer): bool {}
 }

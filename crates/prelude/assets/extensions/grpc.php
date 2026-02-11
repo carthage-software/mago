@@ -108,18 +108,14 @@ class Server
      * @param int $tag_new
      * @param int $tag_cancel
      */
-    public function requestCall($tag_new, $tag_cancel)
-    {
-    }
+    public function requestCall($tag_new, $tag_cancel) {}
 
     /**
      * @param string $addr
      *
      * @return bool
      */
-    public function addHttp2Port($addr)
-    {
-    }
+    public function addHttp2Port($addr) {}
 
     /**
      * @param string             $addr
@@ -127,13 +123,9 @@ class Server
      *
      * @return bool
      */
-    public function addSecureHttp2Port($addr, $creds_obj)
-    {
-    }
+    public function addSecureHttp2Port($addr, $creds_obj) {}
 
-    public function start()
-    {
-    }
+    public function start() {}
 }
 
 class ServerCredentials
@@ -146,9 +138,7 @@ class ServerCredentials
      * @return object
      * @throws InvalidArgumentException
      */
-    public static function createSsl($pem_root_certs, $pem_private_key, $pem_cert_chain)
-    {
-    }
+    public static function createSsl($pem_root_certs, $pem_private_key, $pem_cert_chain) {}
 }
 
 class Channel
@@ -164,9 +154,7 @@ class Channel
     /**
      * @return string
      */
-    public function getTarget()
-    {
-    }
+    public function getTarget() {}
 
     /**
      * @param bool $try_to_connect
@@ -174,9 +162,7 @@ class Channel
      * @return int
      * @throws InvalidArgumentException
      */
-    public function getConnectivityState($try_to_connect = false)
-    {
-    }
+    public function getConnectivityState($try_to_connect = false) {}
 
     /**
      * @param int     $last_state
@@ -185,13 +171,9 @@ class Channel
      * @return bool
      * @throws InvalidArgumentException
      */
-    public function watchConnectivityState($last_state, Timeval $deadline_obj)
-    {
-    }
+    public function watchConnectivityState($last_state, Timeval $deadline_obj) {}
 
-    public function close()
-    {
-    }
+    public function close() {}
 }
 
 class ChannelCredentials
@@ -201,16 +183,12 @@ class ChannelCredentials
      *
      * @throws InvalidArgumentException
      */
-    public static function setDefaultRootsPem($pem_roots)
-    {
-    }
+    public static function setDefaultRootsPem($pem_roots) {}
 
     /**
      * @return ChannelCredentials
      */
-    public static function createDefault()
-    {
-    }
+    public static function createDefault() {}
 
     /**
      * @param string|null $pem_root_certs
@@ -224,8 +202,7 @@ class ChannelCredentials
         string $pem_root_certs = null,
         string $pem_private_key = null,
         string $pem_cert_chain = null,
-    ) {
-    }
+    ) {}
 
     /**
      * @param ChannelCredentials $cred1
@@ -234,16 +211,12 @@ class ChannelCredentials
      * @return ChannelCredentials
      * @throws InvalidArgumentException
      */
-    public static function createComposite(ChannelCredentials $cred1, CallCredentials $cred2)
-    {
-    }
+    public static function createComposite(ChannelCredentials $cred1, CallCredentials $cred2) {}
 
     /**
      * @return null
      */
-    public static function createInsecure()
-    {
-    }
+    public static function createInsecure() {}
 }
 
 class Call
@@ -263,28 +236,20 @@ class Call
      * @throws InvalidArgumentException
      * @throws \LogicException
      */
-    public function startBatch(array $batch)
-    {
-    }
+    public function startBatch(array $batch) {}
 
     /**
      * @return int
      * @throws InvalidArgumentException
      */
-    public function setCredentials(CallCredentials $creds_obj)
-    {
-    }
+    public function setCredentials(CallCredentials $creds_obj) {}
 
     /**
      * @return string
      */
-    public function getPeer()
-    {
-    }
+    public function getPeer() {}
 
-    public function cancel()
-    {
-    }
+    public function cancel() {}
 }
 
 class CallCredentials
@@ -293,17 +258,13 @@ class CallCredentials
      * @return CallCredentials
      * @throws InvalidArgumentException
      */
-    public static function createComposite(CallCredentials $cred1, CallCredentials $cred2)
-    {
-    }
+    public static function createComposite(CallCredentials $cred1, CallCredentials $cred2) {}
 
     /**
      * @return CallCredentials
      * @throws InvalidArgumentException
      */
-    public static function createFromPlugin(\Closure $callback)
-    {
-    }
+    public static function createFromPlugin(\Closure $callback) {}
 }
 
 class Timeval
@@ -317,63 +278,45 @@ class Timeval
      * @return Timeval
      * @throws InvalidArgumentException
      */
-    public function add(Timeval $other)
-    {
-    }
+    public function add(Timeval $other) {}
 
     /**
      * @return int
      * @throws InvalidArgumentException
      */
-    public static function compare(Timeval $a, Timeval $b)
-    {
-    }
+    public static function compare(Timeval $a, Timeval $b) {}
 
     /**
      * @return Timeval
      */
-    public static function infFuture()
-    {
-    }
+    public static function infFuture() {}
 
     /**
      * @return Timeval
      */
-    public static function infPast()
-    {
-    }
+    public static function infPast() {}
 
     /**
      * @return Timeval
      */
-    public static function now()
-    {
-    }
+    public static function now() {}
 
     /**
      * @return bool
      * @throws InvalidArgumentException
      */
-    public static function similar(Timeval $a, Timeval $b, Timeval $threshold)
-    {
-    }
+    public static function similar(Timeval $a, Timeval $b, Timeval $threshold) {}
 
-    public function sleepUntil()
-    {
-    }
+    public function sleepUntil() {}
 
     /**
      * @return Timeval
      * @throws InvalidArgumentException
      */
-    public function subtract(Timeval $other)
-    {
-    }
+    public function subtract(Timeval $other) {}
 
     /**
      * @return Timeval
      */
-    public static function zero()
-    {
-    }
+    public static function zero() {}
 }

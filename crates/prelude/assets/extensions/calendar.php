@@ -105,68 +105,38 @@ const CAL_JEWISH_ADD_ALAFIM = UNKNOWN;
  */
 const CAL_JEWISH_ADD_GERESHAYIM = UNKNOWN;
 
-function jdtogregorian(int $julian_day): string
-{
-}
+function jdtogregorian(int $julian_day): string {}
 
-function gregoriantojd(int $month, int $day, int $year): int
-{
-}
+function gregoriantojd(int $month, int $day, int $year): int {}
 
-function jdtojulian(int $julian_day): string
-{
-}
+function jdtojulian(int $julian_day): string {}
 
-function juliantojd(int $month, int $day, int $year): int
-{
-}
+function juliantojd(int $month, int $day, int $year): int {}
 
-function jdtojewish(int $julian_day, bool $hebrew = false, int $flags = 0): string
-{
-}
+function jdtojewish(int $julian_day, bool $hebrew = false, int $flags = 0): string {}
 
-function jewishtojd(int $month, int $day, int $year): int
-{
-}
+function jewishtojd(int $month, int $day, int $year): int {}
 
-function jdtofrench(int $julian_day): string
-{
-}
+function jdtofrench(int $julian_day): string {}
 
-function frenchtojd(int $month, int $day, int $year): int
-{
-}
+function frenchtojd(int $month, int $day, int $year): int {}
 
-function jddayofweek(int $julian_day, int $mode = CAL_DOW_DAYNO): string|int
-{
-}
+function jddayofweek(int $julian_day, int $mode = CAL_DOW_DAYNO): string|int {}
 
-function jdmonthname(int $julian_day, int $mode): string
-{
-}
+function jdmonthname(int $julian_day, int $mode): string {}
 
-function easter_date(null|int $year, int $mode = CAL_EASTER_DEFAULT): int
-{
-}
+function easter_date(?int $year, int $mode = CAL_EASTER_DEFAULT): int {}
 
 /**
  * @param positive-int|null $year
  */
-function easter_days(null|int $year, int $mode = CAL_EASTER_DEFAULT): int
-{
-}
+function easter_days(?int $year, int $mode = CAL_EASTER_DEFAULT): int {}
 
-function unixtojd(null|int $timestamp = null): int|false
-{
-}
+function unixtojd(?int $timestamp = null): int|false {}
 
-function jdtounix(int $julian_day): int
-{
-}
+function jdtounix(int $julian_day): int {}
 
-function cal_to_jd(int $calendar, int $month, int $day, int $year): int
-{
-}
+function cal_to_jd(int $calendar, int $month, int $day, int $year): int {}
 
 /**
  * @return array{
@@ -181,13 +151,9 @@ function cal_to_jd(int $calendar, int $month, int $day, int $year): int
  *     monthname: string
  * }
  */
-function cal_from_jd(int $julian_day, int $calendar): array
-{
-}
+function cal_from_jd(int $julian_day, int $calendar): array {}
 
-function cal_days_in_month(int $calendar, int $month, int $year): int
-{
-}
+function cal_days_in_month(int $calendar, int $month, int $year): int {}
 
 /**
  * @return array{
@@ -198,6 +164,4 @@ function cal_days_in_month(int $calendar, int $month, int $year): int
  *     calsymbol: string
  * }
  */
-function cal_info(int $calendar = -1): array
-{
-}
+function cal_info(int $calendar = -1): array {}

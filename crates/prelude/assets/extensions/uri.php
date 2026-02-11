@@ -1,17 +1,11 @@
 <?php
 
 namespace Uri {
-    class UriException extends \Exception
-    {
-    }
+    class UriException extends \Exception {}
 
-    class UriError extends \Error
-    {
-    }
+    class UriError extends \Error {}
 
-    class InvalidUriException extends UriException
-    {
-    }
+    class InvalidUriException extends UriException {}
 
     enum UriComparisonMode
     {
@@ -23,137 +17,74 @@ namespace Uri {
 namespace Uri\Rfc3986 {
     final readonly class Uri
     {
-        public static function parse(string $uri, null|Uri $baseUrl = null): null|static
-        {
-        }
+        public static function parse(string $uri, ?Uri $baseUrl = null): ?static {}
 
-        public function __construct(string $uri, null|Uri $baseUrl = null) {}
+        public function __construct(string $uri, ?Uri $baseUrl = null) {}
 
-        public function getScheme(): null|string
-        {
-        }
+        public function getScheme(): ?string {}
 
-        public function getRawScheme(): null|string
-        {
-        }
+        public function getRawScheme(): ?string {}
 
-        public function withScheme(null|string $scheme): static
-        {
-        }
+        public function withScheme(?string $scheme): static {}
 
-        public function getUserInfo(): null|string
-        {
-        }
+        public function getUserInfo(): ?string {}
 
-        public function getRawUserInfo(): null|string
-        {
-        }
+        public function getRawUserInfo(): ?string {}
 
-        public function withUserInfo(null|string $userinfo): static
-        {
-        }
+        public function withUserInfo(?string $userinfo): static {}
 
-        public function getUsername(): null|string
-        {
-        }
+        public function getUsername(): ?string {}
 
-        public function getRawUsername(): null|string
-        {
-        }
+        public function getRawUsername(): ?string {}
 
-        public function getPassword(): null|string
-        {
-        }
+        public function getPassword(): ?string {}
 
-        public function getRawPassword(): null|string
-        {
-        }
+        public function getRawPassword(): ?string {}
 
-        public function getHost(): null|string
-        {
-        }
+        public function getHost(): ?string {}
 
-        public function getRawHost(): null|string
-        {
-        }
+        public function getRawHost(): ?string {}
 
-        public function withHost(null|string $host): static
-        {
-        }
+        public function withHost(?string $host): static {}
 
-        public function getPort(): null|int
-        {
-        }
+        public function getPort(): ?int {}
 
-        public function withPort(null|int $port): static
-        {
-        }
+        public function withPort(?int $port): static {}
 
-        public function getPath(): string
-        {
-        }
+        public function getPath(): string {}
 
-        public function getRawPath(): string
-        {
-        }
+        public function getRawPath(): string {}
 
-        public function withPath(string $path): static
-        {
-        }
+        public function withPath(string $path): static {}
 
-        public function getQuery(): null|string
-        {
-        }
+        public function getQuery(): ?string {}
 
-        public function getRawQuery(): null|string
-        {
-        }
+        public function getRawQuery(): ?string {}
 
-        public function withQuery(null|string $query): static
-        {
-        }
+        public function withQuery(?string $query): static {}
 
-        public function getFragment(): null|string
-        {
-        }
+        public function getFragment(): ?string {}
 
-        public function getRawFragment(): null|string
-        {
-        }
+        public function getRawFragment(): ?string {}
 
-        public function withFragment(null|string $fragment): static
-        {
-        }
+        public function withFragment(?string $fragment): static {}
 
         public function equals(
             Uri $uri,
             \Uri\UriComparisonMode $comparisonMode = \Uri\UriComparisonMode::ExcludeFragment,
-        ): bool {
-        }
+        ): bool {}
 
-        public function toString(): string
-        {
-        }
+        public function toString(): string {}
 
-        public function toRawString(): string
-        {
-        }
+        public function toRawString(): string {}
 
-        public function resolve(string $uri): static
-        {
-        }
+        public function resolve(string $uri): static {}
 
-        public function __serialize(): array
-        {
-        }
+        public function __serialize(): array {}
 
-        public function __unserialize(array $data): void
-        {
-        }
+        public function __unserialize(array $data): void {}
 
-        public function __debugInfo(): array
-        {
-        }
+        public function __debugInfo(): array {}
     }
 }
 
@@ -166,7 +97,7 @@ namespace Uri\WhatWg {
             string $message = '',
             array $errors = [],
             int $code = 0,
-            null|\Throwable $previous = null,
+            ?\Throwable $previous = null,
         ) {}
     }
 
@@ -217,114 +148,65 @@ namespace Uri\WhatWg {
         /**
          * @param-out array<int, UrlValidationError> $errors
          */
-        public static function parse(string $uri, null|Url $baseUrl = null, &$errors = null): null|static
-        {
-        }
+        public static function parse(string $uri, ?Url $baseUrl = null, &$errors = null): ?static {}
 
         /**
          * @param-out array<int, UrlValidationError> $softErrors
          */
-        public function __construct(string $uri, null|Url $baseUrl = null, &$softErrors = null) {}
+        public function __construct(string $uri, ?Url $baseUrl = null, &$softErrors = null) {}
 
-        public function getScheme(): string
-        {
-        }
+        public function getScheme(): string {}
 
-        public function withScheme(string $scheme): static
-        {
-        }
+        public function withScheme(string $scheme): static {}
 
-        public function getUsername(): null|string
-        {
-        }
+        public function getUsername(): ?string {}
 
-        public function withUsername(null|string $username): static
-        {
-        }
+        public function withUsername(?string $username): static {}
 
-        public function getPassword(): null|string
-        {
-        }
+        public function getPassword(): ?string {}
 
-        public function withPassword(null|string $password): static
-        {
-        }
+        public function withPassword(?string $password): static {}
 
-        public function getAsciiHost(): null|string
-        {
-        }
+        public function getAsciiHost(): ?string {}
 
-        public function getUnicodeHost(): null|string
-        {
-        }
+        public function getUnicodeHost(): ?string {}
 
-        public function withHost(null|string $host): static
-        {
-        }
+        public function withHost(?string $host): static {}
 
-        public function getPort(): null|int
-        {
-        }
+        public function getPort(): ?int {}
 
-        public function withPort(null|int $port): static
-        {
-        }
+        public function withPort(?int $port): static {}
 
-        public function getPath(): string
-        {
-        }
+        public function getPath(): string {}
 
-        public function withPath(string $path): static
-        {
-        }
+        public function withPath(string $path): static {}
 
-        public function getQuery(): null|string
-        {
-        }
+        public function getQuery(): ?string {}
 
-        public function withQuery(null|string $query): static
-        {
-        }
+        public function withQuery(?string $query): static {}
 
-        public function getFragment(): null|string
-        {
-        }
+        public function getFragment(): ?string {}
 
-        public function withFragment(null|string $fragment): static
-        {
-        }
+        public function withFragment(?string $fragment): static {}
 
         public function equals(
             Url $url,
             \Uri\UriComparisonMode $comparisonMode = \Uri\UriComparisonMode::ExcludeFragment,
-        ): bool {
-        }
+        ): bool {}
 
-        public function toAsciiString(): string
-        {
-        }
+        public function toAsciiString(): string {}
 
-        public function toUnicodeString(): string
-        {
-        }
+        public function toUnicodeString(): string {}
 
         /**
          * @param-out array<int, UrlValidationError> $softErrors
          */
-        public function resolve(string $uri, &$softErrors = null): static
-        {
-        }
+        public function resolve(string $uri, &$softErrors = null): static {}
 
-        public function __serialize(): array
-        {
-        }
+        public function __serialize(): array {}
 
-        public function __unserialize(array $data): void
-        {
-        }
+        public function __unserialize(array $data): void {}
 
-        public function __debugInfo(): array
-        {
-        }
+        public function __debugInfo(): array {}
     }
 }

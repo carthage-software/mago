@@ -542,22 +542,12 @@ const RPMTAG_VERSION = 1001;
 
 const RPMTAG_XPM = 1013;
 
-function rpmvercmp(string $evr1, string $evr2): int
-{
-}
+function rpmvercmp(string $evr1, string $evr2): int {}
 
-function rpminfo(string $path, bool $full = false, null|string &$error = null): null|array
-{
-}
+function rpminfo(string $path, bool $full = false, ?string &$error = null): ?array {}
 
-function rpmdbinfo(string $nevr, bool $full = false): null|array
-{
-}
+function rpmdbinfo(string $nevr, bool $full = false): ?array {}
 
-function rpmdbsearch(string $pattern, int $rpmtag = RPMTAG_NAME, int $rpmmire = -1, bool $full = false): null|array
-{
-}
+function rpmdbsearch(string $pattern, int $rpmtag = RPMTAG_NAME, int $rpmmire = -1, bool $full = false): ?array {}
 
-function rpmaddtag(int $tag): bool
-{
-}
+function rpmaddtag(int $tag): bool {}

@@ -23,40 +23,29 @@ namespace {
         string $data,
         int $quality = BROTLI_COMPRESS_LEVEL_DEFAULT,
         int $mode = BROTLI_GENERIC,
-    ): string|false {
-    }
+    ): string|false {}
 
-    function brotli_uncompress(string $data, int $length = 0): string|false
-    {
-    }
+    function brotli_uncompress(string $data, int $length = 0): string|false {}
 
     /**
      * @return resource|false
      */
-    function brotli_compress_init(int $quality = BROTLI_COMPRESS_LEVEL_DEFAULT, int $mode = BROTLI_GENERIC)
-    {
-    }
+    function brotli_compress_init(int $quality = BROTLI_COMPRESS_LEVEL_DEFAULT, int $mode = BROTLI_GENERIC) {}
 
     /**
      * @param resource $context
      */
-    function brotli_compress_add($context, string $data, int $mode = BROTLI_FLUSH): string|false
-    {
-    }
+    function brotli_compress_add($context, string $data, int $mode = BROTLI_FLUSH): string|false {}
 
     /**
      * @return resource|false
      */
-    function brotli_uncompress_init()
-    {
-    }
+    function brotli_uncompress_init() {}
 
     /**
      * @param resource $context
      */
-    function brotli_uncompress_add($context, string $data, int $mode = BROTLI_FLUSH): string|false
-    {
-    }
+    function brotli_uncompress_add($context, string $data, int $mode = BROTLI_FLUSH): string|false {}
 }
 
 namespace Brotli {
@@ -64,38 +53,27 @@ namespace Brotli {
         string $data,
         int $quality = BROTLI_COMPRESS_LEVEL_DEFAULT,
         int $mode = BROTLI_GENERIC,
-    ): string|false {
-    }
+    ): string|false {}
 
-    function uncompress(string $data, int $length = 0): string|false
-    {
-    }
+    function uncompress(string $data, int $length = 0): string|false {}
 
     /**
      * @return resource|false
      */
-    function compress_init(int $quality = BROTLI_COMPRESS_LEVEL_DEFAULT, int $mode = BROTLI_GENERIC)
-    {
-    }
+    function compress_init(int $quality = BROTLI_COMPRESS_LEVEL_DEFAULT, int $mode = BROTLI_GENERIC) {}
 
     /**
      * @param resource $context
      */
-    function compress_add($context, string $data, int $mode = BROTLI_FLUSH): string|false
-    {
-    }
+    function compress_add($context, string $data, int $mode = BROTLI_FLUSH): string|false {}
 
     /**
      * @return resource|false
      */
-    function uncompress_init()
-    {
-    }
+    function uncompress_init() {}
 
     /**
      * @param resource $context
      */
-    function uncompress_add($context, string $data, int $mode = BROTLI_FLUSH): string|false
-    {
-    }
+    function uncompress_add($context, string $data, int $mode = BROTLI_FLUSH): string|false {}
 }

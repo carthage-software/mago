@@ -20,33 +20,25 @@ class Cipher
      * @param string $prefix
      * @return string
      */
-    public static function getAlgorithms($aliases = false, $prefix = null)
-    {
-    }
+    public static function getAlgorithms($aliases = false, $prefix = null) {}
 
     /**
      * @param string $algorithm
      * @return bool
      */
-    public static function hasAlgorithm($algorithm)
-    {
-    }
+    public static function hasAlgorithm($algorithm) {}
 
     /**
      * @param int $mode
      * @return bool
      */
-    public static function hasMode($mode)
-    {
-    }
+    public static function hasMode($mode) {}
 
     /**
      * @param string $name
      * @param array $arguments
      */
-    public static function __callStatic($name, $arguments)
-    {
-    }
+    public static function __callStatic($name, $arguments) {}
 
     /**
      * @param string $algorithm
@@ -58,33 +50,25 @@ class Cipher
     /**
      * @return string
      */
-    public function getAlgorithmName()
-    {
-    }
+    public function getAlgorithmName() {}
 
     /**
      * @param string $key
      * @param string $iv
      * @return bool
      */
-    public function encryptInit($key, $iv = null)
-    {
-    }
+    public function encryptInit($key, $iv = null) {}
 
     /**
      * @param string $data
      * @return string
      */
-    public function encryptUpdate($data)
-    {
-    }
+    public function encryptUpdate($data) {}
 
     /**
      * @return string
      */
-    public function encryptFinish()
-    {
-    }
+    public function encryptFinish() {}
 
     /**
      * @param string $data
@@ -92,33 +76,25 @@ class Cipher
      * @param string $iv
      * @return string
      */
-    public function encrypt($data, $key, $iv = null)
-    {
-    }
+    public function encrypt($data, $key, $iv = null) {}
 
     /**
      * @param string $key
      * @param string $iv
      * @return null
      */
-    public function decryptInit($key, $iv = null)
-    {
-    }
+    public function decryptInit($key, $iv = null) {}
 
     /**
      * @param string $data
      * @return string
      */
-    public function decryptUpdate($data)
-    {
-    }
+    public function decryptUpdate($data) {}
 
     /**
      * @return string
      */
-    public function decryptFinish()
-    {
-    }
+    public function decryptFinish() {}
 
     /**
      * @param string $data
@@ -126,69 +102,51 @@ class Cipher
      * @param string $iv
      * @return string
      */
-    public function decrypt($data, $key, $iv = null)
-    {
-    }
+    public function decrypt($data, $key, $iv = null) {}
 
     /**
      * @return int
      */
-    public function getBlockSize()
-    {
-    }
+    public function getBlockSize() {}
 
     /**
      * @return int
      */
-    public function getKeyLength()
-    {
-    }
+    public function getKeyLength() {}
 
     /**
      * @return int
      */
-    public function getIVLength()
-    {
-    }
+    public function getIVLength() {}
 
     /**
      * @return int
      */
-    public function getMode()
-    {
-    }
+    public function getMode() {}
 
     /**
      * @return string
      */
-    public function getTag()
-    {
-    }
+    public function getTag() {}
 
     /**
      * Sets authentication tag
      * @param string $tag
      * @return bool
      */
-    public function setTag($tag)
-    {
-    }
+    public function setTag($tag) {}
 
     /**
      * @param int $tag_length
      * @return bool
      */
-    public function setTagLength($tag_length)
-    {
-    }
+    public function setTagLength($tag_length) {}
 
     /**
      * @param string $aad
      * @return bool
      */
-    public function setAAD($aad)
-    {
-    }
+    public function setAAD($aad) {}
 }
 
 class CipherException extends Exception
@@ -261,25 +219,19 @@ class Hash
      * @param string $prefix
      * @return string
      */
-    public static function getAlgorithms($aliases = false, $prefix = null)
-    {
-    }
+    public static function getAlgorithms($aliases = false, $prefix = null) {}
 
     /**
      * @param string $algorithm
      * @return bool
      */
-    public static function hasAlgorithm($algorithm)
-    {
-    }
+    public static function hasAlgorithm($algorithm) {}
 
     /**
      * @param string $name
      * @param array $arguments
      */
-    public static function __callStatic($name, $arguments)
-    {
-    }
+    public static function __callStatic($name, $arguments) {}
 
     /**
      * @param string $algorithm
@@ -289,45 +241,33 @@ class Hash
     /**
      * @return string
      */
-    public function getAlgorithmName()
-    {
-    }
+    public function getAlgorithmName() {}
 
     /**
      * @param string $data
      * @return null
      */
-    public function update($data)
-    {
-    }
+    public function update($data) {}
 
     /**
      * @return string
      */
-    public function digest()
-    {
-    }
+    public function digest() {}
 
     /**
      * @return string
      */
-    public function hexdigest()
-    {
-    }
+    public function hexdigest() {}
 
     /**
      * @return int
      */
-    public function getBlockSize()
-    {
-    }
+    public function getBlockSize() {}
 
     /**
      * @return int
      */
-    public function getSize()
-    {
-    }
+    public function getSize() {}
 }
 
 class HashException extends Exception
@@ -363,13 +303,9 @@ class MACException extends HashException
     public const KEY_LENGTH_INVALID = 2;
 }
 
-class HMAC extends MAC
-{
-}
+class HMAC extends MAC {}
 
-class CMAC extends MAC
-{
-}
+class CMAC extends MAC {}
 
 abstract class KDF
 {
@@ -382,32 +318,24 @@ abstract class KDF
     /**
      * @return int
      */
-    public function getLength()
-    {
-    }
+    public function getLength() {}
 
     /**
      * @param int $length
      * @return bool
      */
-    public function setLength($length)
-    {
-    }
+    public function setLength($length) {}
 
     /**
      * @return string
      */
-    public function getSalt()
-    {
-    }
+    public function getSalt() {}
 
     /**
      * @param string $salt
      * @return bool
      */
-    public function setSalt($salt)
-    {
-    }
+    public function setSalt($salt) {}
 }
 
 class KDFException
@@ -437,39 +365,29 @@ class PBKDF2 extends KDF
      * @param string $password
      * @return string
      */
-    public function derive($password)
-    {
-    }
+    public function derive($password) {}
 
     /**
      * @return int
      */
-    public function getIterations()
-    {
-    }
+    public function getIterations() {}
 
     /**
      * @param int $iterations
      * @return bool
      */
-    public function setIterations($iterations)
-    {
-    }
+    public function setIterations($iterations) {}
 
     /**
      * @return string
      */
-    public function getHashAlgorithm()
-    {
-    }
+    public function getHashAlgorithm() {}
 
     /**
      * @param string $hashAlgorithm
      * @return bool
      */
-    public function setHashAlgorithm($hashAlgorithm)
-    {
-    }
+    public function setHashAlgorithm($hashAlgorithm) {}
 }
 
 class PBKDF2Exception extends KDFException
@@ -485,41 +403,29 @@ class Base64
      * @param string $data
      * @return string
      */
-    public function encode($data)
-    {
-    }
+    public function encode($data) {}
 
     /**
      * @param string $data
      * @return string
      */
-    public function decode($data)
-    {
-    }
+    public function decode($data) {}
 
     public function __construct() {}
 
     /**
      * @param string $data
      */
-    public function encodeUpdate($data)
-    {
-    }
+    public function encodeUpdate($data) {}
 
-    public function encodeFinish()
-    {
-    }
+    public function encodeFinish() {}
 
     /**
      * @param string $data
      */
-    public function decodeUpdate($data)
-    {
-    }
+    public function decodeUpdate($data) {}
 
-    public function decodeFinish()
-    {
-    }
+    public function decodeFinish() {}
 }
 
 class Base64Exception extends Exception
@@ -545,42 +451,32 @@ class Rand
      * @param bool &$returned_strong_result
      * @return string
      */
-    public static function generate($num, $must_be_strong = true, &$returned_strong_result = true)
-    {
-    }
+    public static function generate($num, $must_be_strong = true, &$returned_strong_result = true) {}
 
     /**
      * @param string $buf
      * @param float $entropy
      * @return null
      */
-    public static function seed($buf, $entropy = null)
-    {
-    }
+    public static function seed($buf, $entropy = null) {}
 
     /**
      * @return null
      */
-    public static function cleanup()
-    {
-    }
+    public static function cleanup() {}
 
     /**
      * @param string $filename
      * @param int $max_bytes
      * @return int
      */
-    public static function loadFile($filename, $max_bytes = -1)
-    {
-    }
+    public static function loadFile($filename, $max_bytes = -1) {}
 
     /**
      * @param string $filename
      * @return int
      */
-    public static function writeFile($filename)
-    {
-    }
+    public static function writeFile($filename) {}
 }
 
 class RandException extends Exception

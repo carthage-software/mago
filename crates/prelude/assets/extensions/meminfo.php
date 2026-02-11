@@ -3,6 +3,4 @@
 /**
  * @param resource $stream
  */
-function meminfo_dump($stream): void
-{
-}
+function meminfo_dump($stream): void {}

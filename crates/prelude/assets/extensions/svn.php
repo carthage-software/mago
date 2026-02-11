@@ -17,173 +17,89 @@ class Svn
     public const PREV = -4;
     public const UNSPECIFIED = -5;
 
-    public static function checkout()
-    {
-    }
+    public static function checkout() {}
 
-    public static function cat()
-    {
-    }
+    public static function cat() {}
 
-    public static function ls()
-    {
-    }
+    public static function ls() {}
 
-    public static function log()
-    {
-    }
+    public static function log() {}
 
-    public static function auth_set_parameter()
-    {
-    }
+    public static function auth_set_parameter() {}
 
-    public static function auth_get_parameter()
-    {
-    }
+    public static function auth_get_parameter() {}
 
-    public static function client_version()
-    {
-    }
+    public static function client_version() {}
 
-    public static function config_ensure()
-    {
-    }
+    public static function config_ensure() {}
 
-    public static function diff()
-    {
-    }
+    public static function diff() {}
 
-    public static function cleanup()
-    {
-    }
+    public static function cleanup() {}
 
-    public static function revert()
-    {
-    }
+    public static function revert() {}
 
-    public static function resolved()
-    {
-    }
+    public static function resolved() {}
 
-    public static function commit()
-    {
-    }
+    public static function commit() {}
 
-    public static function lock()
-    {
-    }
+    public static function lock() {}
 
-    public static function unlock()
-    {
-    }
+    public static function unlock() {}
 
-    public static function add()
-    {
-    }
+    public static function add() {}
 
-    public static function status()
-    {
-    }
+    public static function status() {}
 
-    public static function update()
-    {
-    }
+    public static function update() {}
 
-    public static function update2()
-    {
-    }
+    public static function update2() {}
 
-    public static function import()
-    {
-    }
+    public static function import() {}
 
-    public static function info()
-    {
-    }
+    public static function info() {}
 
-    public static function export()
-    {
-    }
+    public static function export() {}
 
-    public static function copy()
-    {
-    }
+    public static function copy() {}
 
-    public static function switch()
-    {
-    }
+    public static function switch() {}
 
-    public static function blame()
-    {
-    }
+    public static function blame() {}
 
-    public static function delete()
-    {
-    }
+    public static function delete() {}
 
-    public static function mkdir()
-    {
-    }
+    public static function mkdir() {}
 
-    public static function move()
-    {
-    }
+    public static function move() {}
 
-    public static function proplist()
-    {
-    }
+    public static function proplist() {}
 
-    public static function propget()
-    {
-    }
+    public static function propget() {}
 
-    public static function propset()
-    {
-    }
+    public static function propset() {}
 
-    public static function prop_delete()
-    {
-    }
+    public static function prop_delete() {}
 
-    public static function revprop_get()
-    {
-    }
+    public static function revprop_get() {}
 
-    public static function revprop_set()
-    {
-    }
+    public static function revprop_set() {}
 
-    public static function revprop_delete()
-    {
-    }
+    public static function revprop_delete() {}
 
-    public static function repos_create()
-    {
-    }
+    public static function repos_create() {}
 
-    public static function repos_recover()
-    {
-    }
+    public static function repos_recover() {}
 
-    public static function repos_hotcopy()
-    {
-    }
+    public static function repos_hotcopy() {}
 
-    public static function repos_open()
-    {
-    }
+    public static function repos_open() {}
 
-    public static function repos_fs()
-    {
-    }
+    public static function repos_fs() {}
 
-    public static function repos_fs_begin_txn_for_commit()
-    {
-    }
+    public static function repos_fs_begin_txn_for_commit() {}
 
-    public static function repos_fs_commit_txn()
-    {
-    }
+    public static function repos_fs_commit_txn() {}
 }
 
 class SvnWc
@@ -228,9 +144,7 @@ class SvnNode
  *
  * @return bool
  */
-function svn_checkout($repos, $targetpath, $revision = SVN_REVISION_HEAD, $flags = 0)
-{
-}
+function svn_checkout($repos, $targetpath, $revision = SVN_REVISION_HEAD, $flags = 0) {}
 
 /**
  * @param string $repos_url
@@ -238,9 +152,7 @@ function svn_checkout($repos, $targetpath, $revision = SVN_REVISION_HEAD, $flags
  *
  * @return string
  */
-function svn_cat($repos_url, $revision_no = SVN_REVISION_HEAD)
-{
-}
+function svn_cat($repos_url, $revision_no = SVN_REVISION_HEAD) {}
 
 /**
  * @param string $repos_url
@@ -250,9 +162,7 @@ function svn_cat($repos_url, $revision_no = SVN_REVISION_HEAD)
  *
  * @return array
  */
-function svn_ls($repos_url, $revision_no = SVN_REVISION_HEAD, $recurse = false, $peg = false)
-{
-}
+function svn_ls($repos_url, $revision_no = SVN_REVISION_HEAD, $recurse = false, $peg = false) {}
 
 /**
  * @param string $repos_url
@@ -269,8 +179,7 @@ function svn_log(
     $end_revision = null,
     $limit = 0,
     $flags = SVN_DISCOVER_CHANGED_PATHS | SVN_STOP_ON_COPY,
-) {
-}
+) {}
 
 /**
  * @param string $key
@@ -278,29 +187,21 @@ function svn_log(
  *
  * @return void
  */
-function svn_auth_set_parameter($key, $value)
-{
-}
+function svn_auth_set_parameter($key, $value) {}
 
 /**
  * @param string $key
  *
  * @return string|null
  */
-function svn_auth_get_parameter($key)
-{
-}
+function svn_auth_get_parameter($key) {}
 
 /**
  * @return string
  */
-function svn_client_version()
-{
-}
+function svn_client_version() {}
 
-function svn_config_ensure()
-{
-}
+function svn_config_ensure() {}
 
 /**
  * @param string $path1
@@ -310,18 +211,14 @@ function svn_config_ensure()
  *
  * @return array
  */
-function svn_diff($path1, $rev1, $path2, $rev2)
-{
-}
+function svn_diff($path1, $rev1, $path2, $rev2) {}
 
 /**
  * @param string $workingdir
  *
  * @return bool
  */
-function svn_cleanup($workingdir)
-{
-}
+function svn_cleanup($workingdir) {}
 
 /**
  * @param string $path
@@ -329,13 +226,9 @@ function svn_cleanup($workingdir)
  *
  * @return bool
  */
-function svn_revert($path, $recursive = false)
-{
-}
+function svn_revert($path, $recursive = false) {}
 
-function svn_resolved()
-{
-}
+function svn_resolved() {}
 
 /**
  * @param string $log
@@ -344,17 +237,11 @@ function svn_resolved()
  *
  * @return array
  */
-function svn_commit($log, array $targets, $recursive = true)
-{
-}
+function svn_commit($log, array $targets, $recursive = true) {}
 
-function svn_lock()
-{
-}
+function svn_lock() {}
 
-function svn_unlock()
-{
-}
+function svn_unlock() {}
 
 /**
  * @param string $path
@@ -363,9 +250,7 @@ function svn_unlock()
  *
  * @return bool
  */
-function svn_add($path, $recursive = true, $force = false)
-{
-}
+function svn_add($path, $recursive = true, $force = false) {}
 
 /**
  * @param string $path
@@ -373,9 +258,7 @@ function svn_add($path, $recursive = true, $force = false)
  *
  * @return array
  */
-function svn_status($path, $flags = 0)
-{
-}
+function svn_status($path, $flags = 0) {}
 
 /**
  * @param string $path
@@ -384,9 +267,7 @@ function svn_status($path, $flags = 0)
  *
  * @return int|false
  */
-function svn_update($path, $revno = SVN_REVISION_HEAD, $recurse = true)
-{
-}
+function svn_update($path, $revno = SVN_REVISION_HEAD, $recurse = true) {}
 
 /**
  * @param string $path
@@ -395,13 +276,9 @@ function svn_update($path, $revno = SVN_REVISION_HEAD, $recurse = true)
  *
  * @return bool
  */
-function svn_import($path, $url, $nonrecursive)
-{
-}
+function svn_import($path, $url, $nonrecursive) {}
 
-function svn_info()
-{
-}
+function svn_info() {}
 
 /**
  * @param string $frompath
@@ -411,17 +288,11 @@ function svn_info()
  *
  * @return bool
  */
-function svn_export($frompath, $topath, $working_copy = true, $revision_no = -1)
-{
-}
+function svn_export($frompath, $topath, $working_copy = true, $revision_no = -1) {}
 
-function svn_copy()
-{
-}
+function svn_copy() {}
 
-function svn_switch()
-{
-}
+function svn_switch() {}
 
 /**
  * @param string $repository_url
@@ -429,9 +300,7 @@ function svn_switch()
  *
  * @return array
  */
-function svn_blame($repository_url, $revision_no = SVN_REVISION_HEAD)
-{
-}
+function svn_blame($repository_url, $revision_no = SVN_REVISION_HEAD) {}
 
 /**
  * @param string $path
@@ -439,9 +308,7 @@ function svn_blame($repository_url, $revision_no = SVN_REVISION_HEAD)
  *
  * @return bool
  */
-function svn_delete($path, $force = false)
-{
-}
+function svn_delete($path, $force = false) {}
 
 /**
  * @param string $path
@@ -449,27 +316,21 @@ function svn_delete($path, $force = false)
  *
  * @return bool
  */
-function svn_mkdir($path, $log_message = null)
-{
-}
+function svn_mkdir($path, $log_message = null) {}
 
 /**
  * @param string $src_path
  * @param string $dst_path
  * @param bool $force
  */
-function svn_move($src_path, $dst_path, $force = false)
-{
-}
+function svn_move($src_path, $dst_path, $force = false) {}
 
 /**
  * @param string $path
  * @param bool $recurse
  * @param int $revision
  */
-function svn_proplist($path, $recurse = false, $revision)
-{
-}
+function svn_proplist($path, $recurse = false, $revision) {}
 
 /**
  * @param string $path
@@ -477,9 +338,7 @@ function svn_proplist($path, $recurse = false, $revision)
  * @param bool $recurse
  * @param int $revision
  */
-function svn_propget($path, $property_name, $recurse = false, $revision)
-{
-}
+function svn_propget($path, $property_name, $recurse = false, $revision) {}
 
 /**
  * @param string $path
@@ -488,18 +347,14 @@ function svn_propget($path, $property_name, $recurse = false, $revision)
  *
  * @return resource
  */
-function svn_repos_create($path, null|array $config = null, null|array $fsconfig = null)
-{
-}
+function svn_repos_create($path, ?array $config = null, ?array $fsconfig = null) {}
 
 /**
  * @param string $path
  *
  * @return bool
  */
-function svn_repos_recover($path)
-{
-}
+function svn_repos_recover($path) {}
 
 /**
  * @param string $repospath
@@ -508,27 +363,21 @@ function svn_repos_recover($path)
  *
  * @return bool
  */
-function svn_repos_hotcopy($repospath, $destpath, $cleanlogs)
-{
-}
+function svn_repos_hotcopy($repospath, $destpath, $cleanlogs) {}
 
 /**
  * @param string $path
  *
  * @return resource
  */
-function svn_repos_open($path)
-{
-}
+function svn_repos_open($path) {}
 
 /**
  * @param resource $repos
  *
  * @return resource
  */
-function svn_repos_fs($repos)
-{
-}
+function svn_repos_fs($repos) {}
 
 /**
  * @param resource $repos
@@ -538,18 +387,14 @@ function svn_repos_fs($repos)
  *
  * @return resource
  */
-function svn_repos_fs_begin_txn_for_commit($repos, $rev, $author, $log_msg)
-{
-}
+function svn_repos_fs_begin_txn_for_commit($repos, $rev, $author, $log_msg) {}
 
 /**
  * @param resource $txn
  *
  * @return int
  */
-function svn_repos_fs_commit_txn($txn)
-{
-}
+function svn_repos_fs_commit_txn($txn) {}
 
 /**
  * @param resource $fs
@@ -557,9 +402,7 @@ function svn_repos_fs_commit_txn($txn)
  *
  * @return resource
  */
-function svn_fs_revision_root($fs, $revnum)
-{
-}
+function svn_fs_revision_root($fs, $revnum) {}
 
 /**
  * @param resource $fsroot
@@ -567,9 +410,7 @@ function svn_fs_revision_root($fs, $revnum)
  *
  * @return int
  */
-function svn_fs_check_path($fsroot, $path)
-{
-}
+function svn_fs_check_path($fsroot, $path) {}
 
 /**
  * @param resource $fs
@@ -578,9 +419,7 @@ function svn_fs_check_path($fsroot, $path)
  *
  * @return string
  */
-function svn_fs_revision_prop($fs, $revnum, $propname)
-{
-}
+function svn_fs_revision_prop($fs, $revnum, $propname) {}
 
 /**
  * @param resource $fsroot
@@ -588,9 +427,7 @@ function svn_fs_revision_prop($fs, $revnum, $propname)
  *
  * @return array
  */
-function svn_fs_dir_entries($fsroot, $path)
-{
-}
+function svn_fs_dir_entries($fsroot, $path) {}
 
 /**
  * @param resource $fsroot
@@ -598,18 +435,14 @@ function svn_fs_dir_entries($fsroot, $path)
  *
  * @return int
  */
-function svn_fs_node_created_rev($fsroot, $path)
-{
-}
+function svn_fs_node_created_rev($fsroot, $path) {}
 
 /**
  * @param resource $fs
  *
  * @return int
  */
-function svn_fs_youngest_rev($fs)
-{
-}
+function svn_fs_youngest_rev($fs) {}
 
 /**
  * @param resource $fsroot
@@ -617,9 +450,7 @@ function svn_fs_youngest_rev($fs)
  *
  * @return resource
  */
-function svn_fs_file_contents($fsroot, $path)
-{
-}
+function svn_fs_file_contents($fsroot, $path) {}
 
 /**
  * @param resource $fsroot
@@ -627,18 +458,14 @@ function svn_fs_file_contents($fsroot, $path)
  *
  * @return int
  */
-function svn_fs_file_length($fsroot, $path)
-{
-}
+function svn_fs_file_length($fsroot, $path) {}
 
 /**
  * @param resource $txn
  *
  * @return resource
  */
-function svn_fs_txn_root($txn)
-{
-}
+function svn_fs_txn_root($txn) {}
 
 /**
  * @param resource $root
@@ -646,9 +473,7 @@ function svn_fs_txn_root($txn)
  *
  * @return bool
  */
-function svn_fs_make_file($root, $path)
-{
-}
+function svn_fs_make_file($root, $path) {}
 
 /**
  * @param resource $root
@@ -656,9 +481,7 @@ function svn_fs_make_file($root, $path)
  *
  * @return bool
  */
-function svn_fs_make_dir($root, $path)
-{
-}
+function svn_fs_make_dir($root, $path) {}
 
 /**
  * @param resource $root
@@ -666,9 +489,7 @@ function svn_fs_make_dir($root, $path)
  *
  * @return resource
  */
-function svn_fs_apply_text($root, $path)
-{
-}
+function svn_fs_apply_text($root, $path) {}
 
 /**
  * @param resource $from_root
@@ -678,9 +499,7 @@ function svn_fs_apply_text($root, $path)
  *
  * @return bool
  */
-function svn_fs_copy($from_root, $from_path, $to_root, $to_path)
-{
-}
+function svn_fs_copy($from_root, $from_path, $to_root, $to_path) {}
 
 /**
  * @param resource $root
@@ -688,9 +507,7 @@ function svn_fs_copy($from_root, $from_path, $to_root, $to_path)
  *
  * @return bool
  */
-function svn_fs_delete($root, $path)
-{
-}
+function svn_fs_delete($root, $path) {}
 
 /**
  * @param resource $repos
@@ -698,9 +515,7 @@ function svn_fs_delete($root, $path)
  *
  * @return resource
  */
-function svn_fs_begin_txn2($repos, $rev)
-{
-}
+function svn_fs_begin_txn2($repos, $rev) {}
 
 /**
  * @param resource $root
@@ -708,9 +523,7 @@ function svn_fs_begin_txn2($repos, $rev)
  *
  * @return bool
  */
-function svn_fs_is_dir($root, $path)
-{
-}
+function svn_fs_is_dir($root, $path) {}
 
 /**
  * @param resource $root
@@ -718,9 +531,7 @@ function svn_fs_is_dir($root, $path)
  *
  * @return bool
  */
-function svn_fs_is_file($root, $path)
-{
-}
+function svn_fs_is_file($root, $path) {}
 
 /**
  * @param resource $fsroot
@@ -729,9 +540,7 @@ function svn_fs_is_file($root, $path)
  *
  * @return string
  */
-function svn_fs_node_prop($fsroot, $path, $propname)
-{
-}
+function svn_fs_node_prop($fsroot, $path, $propname) {}
 
 /**
  * @param resource $root
@@ -741,9 +550,7 @@ function svn_fs_node_prop($fsroot, $path, $propname)
  *
  * @return bool
  */
-function svn_fs_change_node_prop($root, $path, $name, $value)
-{
-}
+function svn_fs_change_node_prop($root, $path, $name, $value) {}
 
 /**
  * @param resource $root1
@@ -753,9 +560,7 @@ function svn_fs_change_node_prop($root, $path, $name, $value)
  *
  * @return bool
  */
-function svn_fs_contents_changed($root1, $path1, $root2, $path2)
-{
-}
+function svn_fs_contents_changed($root1, $path1, $root2, $path2) {}
 
 /**
  * @param resource $root1
@@ -765,17 +570,13 @@ function svn_fs_contents_changed($root1, $path1, $root2, $path2)
  *
  * @return bool
  */
-function svn_fs_props_changed($root1, $path1, $root2, $path2)
-{
-}
+function svn_fs_props_changed($root1, $path1, $root2, $path2) {}
 
 /**
  * @param resource $txn
  * @return bool
  */
-function svn_fs_abort_txn($txn)
-{
-}
+function svn_fs_abort_txn($txn) {}
 
 const SVN_AUTH_PARAM_DEFAULT_USERNAME = 'svn:auth:username';
 

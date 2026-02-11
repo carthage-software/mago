@@ -13,9 +13,7 @@ namespace Mago;
  *
  * @return void This function does not return a value.
  */
-function inspect(mixed ...$value): void
-{
-}
+function inspect(mixed ...$value): void {}
 
 /**
  * Confirms that the given value is of the specified type statically.
@@ -28,6 +26,4 @@ function inspect(mixed ...$value): void
  *
  * @return void This function does not return a value.
  */
-function confirm(mixed $value, string $type): void
-{
-}
+function confirm(mixed $value, string $type): void {}

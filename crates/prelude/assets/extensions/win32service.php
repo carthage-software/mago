@@ -124,42 +124,22 @@ const WIN32_NORMAL_PRIORITY_CLASS = 0x00000020;
 
 const WIN32_REALTIME_PRIORITY_CLASS = 0x00000100;
 
-function win32_continue_service(string $serviceName, string $machine = ''): int|false
-{
-}
+function win32_continue_service(string $serviceName, string $machine = ''): int|false {}
 
-function win32_create_service(string $details, string $machine = ''): int|false
-{
-}
+function win32_create_service(string $details, string $machine = ''): int|false {}
 
-function win32_delete_service(string $serviceName, string $machine = ''): int|false
-{
-}
+function win32_delete_service(string $serviceName, string $machine = ''): int|false {}
 
-function win32_get_last_control_message(): int
-{
-}
+function win32_get_last_control_message(): int {}
 
-function win32_pause_service(string $serviceName, string $machine = ''): int|false
-{
-}
+function win32_pause_service(string $serviceName, string $machine = ''): int|false {}
 
-function win32_query_service_status(string $serviceName, string $machine = ''): array|false
-{
-}
+function win32_query_service_status(string $serviceName, string $machine = ''): array|false {}
 
-function win32_set_service_status(int $status, int $checkpoint = 0): bool|int
-{
-}
+function win32_set_service_status(int $status, int $checkpoint = 0): bool|int {}
 
-function win32_start_service_ctrl_dispatcher(string $name): bool|int
-{
-}
+function win32_start_service_ctrl_dispatcher(string $name): bool|int {}
 
-function win32_start_service(string $serviceName, string $machine = ''): int|false
-{
-}
+function win32_start_service(string $serviceName, string $machine = ''): int|false {}
 
-function win32_stop_service(string $serviceName, string $machine = ''): int|false
-{
-}
+function win32_stop_service(string $serviceName, string $machine = ''): int|false {}

@@ -4,44 +4,32 @@ namespace pcov {
     /**
      * @return void
      */
-    function start()
-    {
-    }
+    function start() {}
 
     /**
      * @return void
      */
-    function stop()
-    {
-    }
+    function stop() {}
 
     /**
      * @return array
      */
-    function collect(int $type = all, array $filter = [])
-    {
-    }
+    function collect(int $type = all, array $filter = []) {}
 
     /**
      * @return void
      */
-    function clear(bool $files = false)
-    {
-    }
+    function clear(bool $files = false) {}
 
     /**
      * @return array
      */
-    function waiting()
-    {
-    }
+    function waiting() {}
 
     /**
      * @return int
      */
-    function memory()
-    {
-    }
+    function memory() {}
 
     const all = 0;
 

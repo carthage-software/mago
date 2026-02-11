@@ -821,9 +821,7 @@ const PASSWORD_ARGON2_PROVIDER = 'standard';
  * @no-named-arguments
  * @pure
  */
-function password_get_info(string $hash): array
-{
-}
+function password_get_info(string $hash): array {}
 
 /**
  * @param array{'salt'?: int, 'cost'?: int, 'memory_cost'?: int, 'time_cost'?: int, 'threads'?: int, ...} $options
@@ -833,9 +831,7 @@ function password_get_info(string $hash): array
  * @no-named-arguments
  * @pure
  */
-function password_hash(string $password, string|int|null $algo, array $options = []): string
-{
-}
+function password_hash(string $password, string|int|null $algo, array $options = []): string {}
 
 /**
  * @param array{'salt'?:int, 'cost'?: int, 'memory_cost'?: int, 'time_cost'?: int, 'threads'?: int, ...} $options
@@ -843,17 +839,13 @@ function password_hash(string $password, string|int|null $algo, array $options =
  * @no-named-arguments
  * @pure
  */
-function password_needs_rehash(string $hash, string|int|null $algo, array $options = []): bool
-{
-}
+function password_needs_rehash(string $hash, string|int|null $algo, array $options = []): bool {}
 
 /**
  * @no-named-arguments
  * @pure
  */
-function password_verify(string $password, string $hash): bool
-{
-}
+function password_verify(string $password, string $hash): bool {}
 
 /**
  * @return list<non-empty-string>
@@ -861,75 +853,47 @@ function password_verify(string $password, string $hash): bool
  * @no-named-arguments
  * @pure
  */
-function password_algos(): array
-{
-}
+function password_algos(): array {}
 
-function dl(string $extension_filename): bool
-{
-}
+function dl(string $extension_filename): bool {}
 
-function cli_set_process_title(string $title): bool
-{
-}
+function cli_set_process_title(string $title): bool {}
 
 /**
  * @pure
  */
-function cli_get_process_title(): null|string
-{
-}
+function cli_get_process_title(): ?string {}
 
 /**
  * @deprecated
  * @pure
  */
-function utf8_encode(string $string): string
-{
-}
+function utf8_encode(string $string): string {}
 
 /**
  * @pure
  * @deprecated
  */
-function utf8_decode(string $string): string
-{
-}
+function utf8_decode(string $string): string {}
 
-function error_clear_last(): void
-{
-}
+function error_clear_last(): void {}
 
-function sapi_windows_cp_get(string $kind = ''): int
-{
-}
+function sapi_windows_cp_get(string $kind = ''): int {}
 
-function sapi_windows_cp_set(int $codepage): bool
-{
-}
+function sapi_windows_cp_set(int $codepage): bool {}
 
-function sapi_windows_cp_conv(int|string $in_codepage, int|string $out_codepage, string $subject): null|string
-{
-}
+function sapi_windows_cp_conv(int|string $in_codepage, int|string $out_codepage, string $subject): ?string {}
 
-function sapi_windows_cp_is_utf8(): bool
-{
-}
+function sapi_windows_cp_is_utf8(): bool {}
 
 /**
  * @param resource $stream
  */
-function sapi_windows_vt100_support($stream, null|bool $enable = null): bool
-{
-}
+function sapi_windows_vt100_support($stream, ?bool $enable = null): bool {}
 
-function sapi_windows_set_ctrl_handler(null|callable $handler, bool $add = true): bool
-{
-}
+function sapi_windows_set_ctrl_handler(?callable $handler, bool $add = true): bool {}
 
-function sapi_windows_generate_ctrl_event(int $event, int $pid = 0): bool
-{
-}
+function sapi_windows_generate_ctrl_event(int $event, int $pid = 0): bool {}
 
 /**
  * @template TKey
@@ -946,44 +910,32 @@ class Generator implements Traversable
      *
      * @psalm-ignore-nullable-return
      */
-    public function current()
-    {
-    }
+    public function current() {}
 
     /**
      * @return void
      */
-    public function next()
-    {
-    }
+    public function next() {}
 
     /**
      * @return TKey
      */
-    public function key()
-    {
-    }
+    public function key() {}
 
     /**
      * @return bool
      */
-    public function valid()
-    {
-    }
+    public function valid() {}
 
     /**
      * @return void
      */
-    public function rewind()
-    {
-    }
+    public function rewind() {}
 
     /**
      * @return TReturn
      */
-    public function getReturn()
-    {
-    }
+    public function getReturn() {}
 
     /**
      * @param TSend $value
@@ -992,27 +944,19 @@ class Generator implements Traversable
      *
      * @psalm-ignore-nullable-return
      */
-    public function send($value)
-    {
-    }
+    public function send($value) {}
 
     /**
      * @return ?TValue
      *
      * @psalm-ignore-nullable-return
      */
-    public function throw(Throwable $exception)
-    {
-    }
+    public function throw(Throwable $exception) {}
 }
 
-function hex2bin(string $string): string|false
-{
-}
+function hex2bin(string $string): string|false {}
 
-function http_response_code(int $response_code = 0): int|bool
-{
-}
+function http_response_code(int $response_code = 0): int|bool {}
 
 final class __PHP_Incomplete_Class
 {
@@ -1033,17 +977,11 @@ class php_user_filter
      * @param resource $out
      * @param int &$consumed
      */
-    public function filter($in, $out, &$consumed, bool $closing): int
-    {
-    }
+    public function filter($in, $out, &$consumed, bool $closing): int {}
 
-    public function onCreate(): bool
-    {
-    }
+    public function onCreate(): bool {}
 
-    public function onClose(): void
-    {
-    }
+    public function onClose(): void {}
 }
 
 final class StreamBucket
@@ -1063,17 +1001,11 @@ class Directory
      */
     public readonly mixed $handle;
 
-    public function close(): void
-    {
-    }
+    public function close(): void {}
 
-    public function rewind(): void
-    {
-    }
+    public function rewind(): void {}
 
-    public function read(): string|false
-    {
-    }
+    public function read(): string|false {}
 }
 
 /**
@@ -1081,30 +1013,22 @@ class Directory
  *
  * @pure
  */
-function constant(string $name): mixed
-{
-}
+function constant(string $name): mixed {}
 
 /**
  * @pure
  */
-function bin2hex(string $string): string
-{
-}
+function bin2hex(string $string): string {}
 
 /**
  * @param int<0, max> $seconds
  */
-function sleep(int $seconds): int
-{
-}
+function sleep(int $seconds): int {}
 
 /**
  * @param int<0, max> $microseconds
  */
-function usleep(int $microseconds): void
-{
-}
+function usleep(int $microseconds): void {}
 
 /**
  * @param positive-int $seconds
@@ -1112,31 +1036,21 @@ function usleep(int $microseconds): void
  *
  * @return bool|array{seconds: int, nanoseconds: int}
  */
-function time_nanosleep(int $seconds, int $nanoseconds): array|bool
-{
-}
+function time_nanosleep(int $seconds, int $nanoseconds): array|bool {}
 
-function time_sleep_until(float $timestamp): bool
-{
-}
+function time_sleep_until(float $timestamp): bool {}
 
 /**
  * @return false|array{tm_sec: int, tm_min: int, tm_hour: int, tm_mday: int, tm_mon: int, tm_year: int, tm_wday: int, tm_yday: int, unparsed: string}
  */
-function strptime(string $timestamp, string $format): array|false
-{
-}
+function strptime(string $timestamp, string $format): array|false {}
 
-function flush(): void
-{
-}
+function flush(): void {}
 
 /**
  * @pure
  */
-function wordwrap(string $string, int $width = 75, string $break = "\n", bool $cut_long_words = false): string
-{
-}
+function wordwrap(string $string, int $width = 75, string $break = "\n", bool $cut_long_words = false): string {}
 
 /**
  * @pure
@@ -1144,10 +1058,9 @@ function wordwrap(string $string, int $width = 75, string $break = "\n", bool $c
 function htmlspecialchars(
     string $string,
     int $flags = ENT_QUOTES | ENT_SUBSTITUTE,
-    null|string $encoding = null,
+    ?string $encoding = null,
     bool $double_encode = true,
-): string {
-}
+): string {}
 
 /**
  * @pure
@@ -1155,10 +1068,9 @@ function htmlspecialchars(
 function htmlentities(
     string $string,
     int $flags = ENT_QUOTES | ENT_SUBSTITUTE,
-    null|string $encoding = null,
+    ?string $encoding = null,
     bool $double_encode = true,
-): string {
-}
+): string {}
 
 /**
  * @pure
@@ -1166,16 +1078,13 @@ function htmlentities(
 function html_entity_decode(
     string $string,
     int $flags = ENT_QUOTES | ENT_SUBSTITUTE,
-    null|string $encoding = null,
-): string {
-}
+    ?string $encoding = null,
+): string {}
 
 /**
  * @pure
  */
-function htmlspecialchars_decode(string $string, int $flags = ENT_QUOTES | ENT_SUBSTITUTE): string
-{
-}
+function htmlspecialchars_decode(string $string, int $flags = ENT_QUOTES | ENT_SUBSTITUTE): string {}
 
 /**
  * @pure
@@ -1184,298 +1093,217 @@ function get_html_translation_table(
     int $table = 0,
     int $flags = ENT_QUOTES | ENT_SUBSTITUTE,
     string $encoding = 'UTF-8',
-): array {
-}
+): array {}
 
 /**
  * @pure
  */
-function sha1(string $string, bool $binary = false): string
-{
-}
+function sha1(string $string, bool $binary = false): string {}
 
-function sha1_file(string $filename, bool $binary = false): string|false
-{
-}
+function sha1_file(string $filename, bool $binary = false): string|false {}
 
 /**
  * @pure
  */
-function md5(string $string, bool $binary = false): string
-{
-}
+function md5(string $string, bool $binary = false): string {}
 
-function md5_file(string $filename, bool $binary = false): string|false
-{
-}
+function md5_file(string $filename, bool $binary = false): string|false {}
 
 /**
  * @pure
  */
-function crc32(string $string): int
-{
-}
+function crc32(string $string): int {}
 
 /**
  * @pure
  */
-function iptcparse(string $iptc_block): array|false
-{
-}
+function iptcparse(string $iptc_block): array|false {}
 
-function iptcembed(string $iptc_data, string $filename, int $spool = 0): string|bool
-{
-}
+function iptcembed(string $iptc_data, string $filename, int $spool = 0): string|bool {}
 
 /**
  * @param-out array $image_info
  *
  * @return false|array{0: int, 1: int, 2: int, 3: string, bits: int, channels: int, mime: string}
  */
-function getimagesize(string $filename, null|array &$image_info = null): array|false
-{
-}
+function getimagesize(string $filename, ?array &$image_info = null): array|false {}
 
 /**
  * @pure
  */
-function image_type_to_mime_type(int $image_type): string
-{
-}
+function image_type_to_mime_type(int $image_type): string {}
 
 /**
  * @pure
  */
-function image_type_to_extension(int $image_type, bool $include_dot = true): string|false
-{
-}
+function image_type_to_extension(int $image_type, bool $include_dot = true): string|false {}
 
-function phpinfo(int $flags = INFO_ALL): bool
-{
-}
+function phpinfo(int $flags = INFO_ALL): bool {}
 
 /**
  * @pure
  */
-function phpversion(null|string $extension): string|false
-{
-}
+function phpversion(?string $extension): string|false {}
 
-function phpcredits(int $flags = CREDITS_ALL): bool
-{
-}
+function phpcredits(int $flags = CREDITS_ALL): bool {}
 
 /**
  * @return 'cli'|'phpdbg'|'embed'|'apache'|'apache2handler'|'cgi-fcgi'|'cli-server'|'fpm-fcgi'|'litespeed'|false
  * @pure
  */
-function php_sapi_name(): string|false
-{
-}
+function php_sapi_name(): string|false {}
 
 /**
  * @pure
  */
-function php_uname(string $mode = 'a'): string
-{
-}
+function php_uname(string $mode = 'a'): string {}
 
 /**
  * @pure
  */
-function php_ini_scanned_files(): string|false
-{
-}
+function php_ini_scanned_files(): string|false {}
 
 /**
  * @pure
  */
-function php_ini_loaded_file(): string|false
-{
-}
+function php_ini_loaded_file(): string|false {}
 
 /**
  * @pure
  */
-function strnatcmp(string $string1, string $string2): int
-{
-}
+function strnatcmp(string $string1, string $string2): int {}
 
 /**
  * @pure
  */
-function strnatcasecmp(string $string1, string $string2): int
-{
-}
+function strnatcasecmp(string $string1, string $string2): int {}
 
 /**
  * @return int<0,max>
  *
  * @pure
  */
-function substr_count(string $haystack, string $needle, int $offset = 0, null|int $length = null): int
-{
-}
+function substr_count(string $haystack, string $needle, int $offset = 0, ?int $length = null): int {}
 
 /**
  * @pure
  */
-function strspn(string $string, string $characters, int $offset = 0, null|int $length = null): int
-{
-}
+function strspn(string $string, string $characters, int $offset = 0, ?int $length = null): int {}
 
 /**
  * @pure
  */
-function strcspn(string $string, string $characters, int $offset = 0, null|int $length = null): int
-{
-}
+function strcspn(string $string, string $characters, int $offset = 0, ?int $length = null): int {}
 
 /**
  * @pure
  */
-function strtok(string $string, null|string $token = null): string|false
-{
-}
+function strtok(string $string, ?string $token = null): string|false {}
 
 /**
  * @return ($string is non-empty-string ? non-empty-uppercase-string : '')
- * 
+ *
  * @pure
  */
-function strtoupper(string $string): string
-{
-}
+function strtoupper(string $string): string {}
 
 /**
  * @return ($string is non-empty-string ? non-empty-lowercase-string : '')
  *
  * @pure
  */
-function strtolower(string $string): string
-{
-}
+function strtolower(string $string): string {}
 
 /**
  * @return non-negative-int|false
  *
  * @pure
  */
-function strpos(string $haystack, string $needle, int $offset = 0): int|false
-{
-}
+function strpos(string $haystack, string $needle, int $offset = 0): int|false {}
 
 /**
  * @return int<0, max>|false
  *
  * @pure
  */
-function stripos(string $haystack, string $needle, int $offset = 0): int|false
-{
-}
+function stripos(string $haystack, string $needle, int $offset = 0): int|false {}
 
 /**
  * @return int<0, max>|false
  *
  * @pure
  */
-function strrpos(string $haystack, string $needle, int $offset = 0): int|false
-{
-}
+function strrpos(string $haystack, string $needle, int $offset = 0): int|false {}
 
 /**
  * @return int<0, max>|false
  *
  * @pure
  */
-function strripos(string $haystack, string $needle, int $offset = 0): int|false
-{
-}
+function strripos(string $haystack, string $needle, int $offset = 0): int|false {}
 
 /**
  * @return ($string is non-empty-string ? non-empty-string : string)
  *
  * @pure
  */
-function strrev(string $string): string
-{
-}
+function strrev(string $string): string {}
 
 /**
  * @pure
  */
-function hebrev(string $string, int $max_chars_per_line = 0): string
-{
-}
+function hebrev(string $string, int $max_chars_per_line = 0): string {}
 
 /**
  * @pure
  */
-function nl2br(string $string, bool $use_xhtml = true): string
-{
-}
+function nl2br(string $string, bool $use_xhtml = true): string {}
 
 /**
  * @pure
  *
  * @return ($path is non-empty-string ? non-empty-string : string)
  */
-function basename(string $path, string $suffix = ''): string
-{
-}
+function basename(string $path, string $suffix = ''): string {}
 
 /**
  * @pure
  *
  * @return ($path is non-empty-string ? non-empty-string : string)
  */
-function dirname(string $path, int $levels = 1): string
-{
-}
+function dirname(string $path, int $levels = 1): string {}
 
 /**
  * @param 1|2|4|8|15 $flags
  *
  * @return ($flags is 15 ? array{dirname?: string, basename: string, extension?: string, filename: string} : string)
  */
-function pathinfo(string $path, int $flags = PATHINFO_ALL): array|string
-{
-}
+function pathinfo(string $path, int $flags = PATHINFO_ALL): array|string {}
 
 /**
  * @pure
  */
-function stripslashes(string $string): string
-{
-}
+function stripslashes(string $string): string {}
 
 /**
  * @pure
  */
-function stripcslashes(string $string): string
-{
-}
+function stripcslashes(string $string): string {}
 
 /**
  * @pure
  */
-function strstr(string $haystack, string $needle, bool $before_needle = false): string|false
-{
-}
+function strstr(string $haystack, string $needle, bool $before_needle = false): string|false {}
 
 /**
  * @pure
  */
-function stristr(string $haystack, string $needle, bool $before_needle = false): string|false
-{
-}
+function stristr(string $haystack, string $needle, bool $before_needle = false): string|false {}
 
 /**
  * @pure
  */
-function strrchr(string $haystack, string $needle, bool $before_needle = false): string|false
-{
-}
+function strrchr(string $haystack, string $needle, bool $before_needle = false): string|false {}
 
 /**
  * @template T as string
@@ -1486,9 +1314,7 @@ function strrchr(string $haystack, string $needle, bool $before_needle = false):
  *
  * @pure
  */
-function str_shuffle(string $string): string
-{
-}
+function str_shuffle(string $string): string {}
 
 /**
  * @template T as 0|1|2
@@ -1505,9 +1331,7 @@ function str_shuffle(string $string): string
  *
  * @pure
  */
-function str_word_count(string $string, int $format = 0, null|string $characters = null): array|int
-{
-}
+function str_word_count(string $string, int $format = 0, ?string $characters = null): array|int {}
 
 /**
  * @param int<1, max> $length
@@ -1516,16 +1340,12 @@ function str_word_count(string $string, int $format = 0, null|string $characters
  *
  * @pure
  */
-function str_split(string $string, int $length = 1): array
-{
-}
+function str_split(string $string, int $length = 1): array {}
 
 /**
  * @pure
  */
-function strpbrk(string $string, string $characters): string|false
-{
-}
+function strpbrk(string $string, string $characters): string|false {}
 
 /**
  * @pure
@@ -1534,24 +1354,19 @@ function substr_compare(
     string $haystack,
     string $needle,
     int $offset,
-    null|int $length = null,
+    ?int $length = null,
     bool $case_insensitive = false,
-): int {
-}
+): int {}
 
 /**
  * @pure
  */
-function strcoll(string $string1, string $string2): int
-{
-}
+function strcoll(string $string1, string $string2): int {}
 
 /**
  * @pure
  */
-function substr(string $string, int $offset, null|int $length = null): string
-{
-}
+function substr(string $string, int $offset, ?int $length = null): string {}
 
 /**
  * @template K as array-key
@@ -1570,66 +1385,49 @@ function substr_replace(
     array|string $replace,
     array|int $offset,
     array|int|null $length = null,
-): array|string {
-}
+): array|string {}
 
 /**
  * @pure
  */
-function quotemeta(string $string): string
-{
-}
+function quotemeta(string $string): string {}
 
 /**
  * @pure
  */
-function ucfirst(string $string): string
-{
-}
+function ucfirst(string $string): string {}
 
 /**
  * @pure
  */
-function lcfirst(string $string): string
-{
-}
+function lcfirst(string $string): string {}
 
 /**
  * @pure
  */
-function ucwords(string $string, string $separators = " \t\r\n\f\v"): string
-{
-}
+function ucwords(string $string, string $separators = " \t\r\n\f\v"): string {}
 
 /**
  * @param string|array<string, string> $from
  *
  * @pure
  */
-function strtr(string $string, string|array $from, string $to = ''): string
-{
-}
+function strtr(string $string, string|array $from, string $to = ''): string {}
 
 /**
  * @pure
  */
-function addslashes(string $string): string
-{
-}
+function addslashes(string $string): string {}
 
 /**
  * @pure
  */
-function addcslashes(string $string, string $characters): string
-{
-}
+function addcslashes(string $string, string $characters): string {}
 
 /**
  * @pure
  */
-function rtrim(string $string, string $characters = " \n\r\t\v\0"): string
-{
-}
+function rtrim(string $string, string $characters = " \n\r\t\v\0"): string {}
 
 /**
  * @param string|array<string> $search
@@ -1646,9 +1444,8 @@ function str_replace(
     array|string $search,
     array|string $replace,
     array|string $subject,
-    null|int &$count = null,
-): array|string {
-}
+    ?int &$count = null,
+): array|string {}
 
 /**
  * @param string|array<string> $search
@@ -1665,69 +1462,52 @@ function str_ireplace(
     array|string $search,
     array|string $replace,
     array|string $subject,
-    null|int &$count = null,
-): array|string {
-}
+    ?int &$count = null,
+): array|string {}
 
 /**
  * @pure
  */
-function str_repeat(string $string, int $times): string
-{
-}
+function str_repeat(string $string, int $times): string {}
 
 /**
  * @pure
  */
-function count_chars(string $string, int $mode = 0): array|string
-{
-}
+function count_chars(string $string, int $mode = 0): array|string {}
 
 /**
  * @pure
  */
-function chunk_split(string $string, int $length = 76, string $separator = "\r\n"): string
-{
-}
+function chunk_split(string $string, int $length = 76, string $separator = "\r\n"): string {}
 
 /**
  * @pure
  */
-function trim(string $string, string $characters = " \n\r\t\v\0"): string
-{
-}
+function trim(string $string, string $characters = " \n\r\t\v\0"): string {}
 
 /**
  * @pure
  */
-function ltrim(string $string, string $characters = " \n\r\t\v\0"): string
-{
-}
+function ltrim(string $string, string $characters = " \n\r\t\v\0"): string {}
 
 /**
  * @param array<string>|string|null $allowed_tags
  *
  * @pure
  */
-function strip_tags(string $string, string|array|null $allowed_tags = null): string
-{
-}
+function strip_tags(string $string, string|array|null $allowed_tags = null): string {}
 
 /**
  * @pure
  */
-function similar_text(string $string1, string $string2, &$percent = null): int
-{
-}
+function similar_text(string $string1, string $string2, &$percent = null): int {}
 
 /**
  * @return non-empty-list<string>
  *
  * @pure
  */
-function explode(string $separator, string $string, int $limit = PHP_INT_MAX): array
-{
-}
+function explode(string $separator, string $string, int $limit = PHP_INT_MAX): array {}
 
 /**
  * @param array<string>|string $separator
@@ -1735,9 +1515,7 @@ function explode(string $separator, string $string, int $limit = PHP_INT_MAX): a
  *
  * @pure
  */
-function implode(array|string $separator = '', null|array $array = null): string
-{
-}
+function implode(array|string $separator = '', ?array $array = null): string {}
 
 /**
  * @param array<string>|string $separator
@@ -1745,17 +1523,13 @@ function implode(array|string $separator = '', null|array $array = null): string
  *
  * @pure
  */
-function join(array|string $separator = '', null|array $array = null): string
-{
-}
+function join(array|string $separator = '', ?array $array = null): string {}
 
 /**
  * @param string|array<string>|int $locales
  * @param string|array<string> ...$rest
  */
-function setlocale(int $category, string|int|array $locales, string|array ...$rest): string|false
-{
-}
+function setlocale(int $category, string|int|array $locales, string|array ...$rest): string|false {}
 
 /**
  * @return array{
@@ -1781,9 +1555,7 @@ function setlocale(int $category, string|int|array $locales, string|array ...$re
  *
  * @pure
  */
-function localeconv(): array
-{
-}
+function localeconv(): array {}
 
 /**
  * @template K
@@ -1796,9 +1568,7 @@ function localeconv(): array
  *
  * @since 8.4
  */
-function array_find(array $array, callable $callback): mixed
-{
-}
+function array_find(array $array, callable $callback): mixed {}
 
 /**
  * @template K
@@ -1811,9 +1581,7 @@ function array_find(array $array, callable $callback): mixed
  *
  * @since 8.4
  */
-function array_find_key(array $array, callable $callback): mixed
-{
-}
+function array_find_key(array $array, callable $callback): mixed {}
 
 /**
  * @template K
@@ -1824,9 +1592,7 @@ function array_find_key(array $array, callable $callback): mixed
  *
  * @since 8.4
  */
-function array_any(array $array, callable $callback): bool
-{
-}
+function array_any(array $array, callable $callback): bool {}
 
 /**
  * @template K
@@ -1837,38 +1603,28 @@ function array_any(array $array, callable $callback): bool
  *
  * @since 8.4
  */
-function array_all(array $array, callable $callback): bool
-{
-}
+function array_all(array $array, callable $callback): bool {}
 
 /**
  * @return null|list<non-empty-string>
  *
  * @since 8.4
  */
-function http_get_last_response_headers(): null|array
-{
-}
+function http_get_last_response_headers(): ?array {}
 
 /**
  * @since 8.4
  */
-function http_clear_last_response_headers(): void
-{
-}
+function http_clear_last_response_headers(): void {}
 
 /**
  * @since 8.4
  * @param array|null $options
  * @return array<int, array>
  */
-function request_parse_body(null|array $options = null): array
-{
-}
+function request_parse_body(?array $options = null): array {}
 
-function fpow(float $num, float $exponent): float
-{
-}
+function fpow(float $num, float $exponent): float {}
 
 enum RoundingMode implements UnitEnum
 {
@@ -1885,16 +1641,12 @@ enum RoundingMode implements UnitEnum
 /**
  * @pure
  */
-function nl_langinfo(int $item): string|false
-{
-}
+function nl_langinfo(int $item): string|false {}
 
 /**
  * @pure
  */
-function soundex(string $string): string
-{
-}
+function soundex(string $string): string {}
 
 function levenshtein(
     string $string1,
@@ -1902,15 +1654,12 @@ function levenshtein(
     int $insertion_cost = 1,
     int $replacement_cost = 1,
     int $deletion_cost = 1,
-): int {
-}
+): int {}
 
 /**
  * @pure
  */
-function chr(int $codepoint): string
-{
-}
+function chr(int $codepoint): string {}
 
 /**
  * @param string $character
@@ -1918,82 +1667,62 @@ function chr(int $codepoint): string
  *
  * @pure
  */
-function ord(string $character): int
-{
-}
+function ord(string $character): int {}
 
 /**
  * @param-out array<string, string> $result
  *
  * @return void
  */
-function parse_str(string $string, &$result): void
-{
-}
+function parse_str(string $string, &$result): void {}
 
 /**
  * @pure
  */
-function str_getcsv(string $string, string $separator = ',', string $enclosure = '"', string $escape = "\\"): array
-{
-}
+function str_getcsv(string $string, string $separator = ',', string $enclosure = '"', string $escape = "\\"): array {}
 
 /**
  * @pure
  */
-function str_pad(string $string, int $length, string $pad_string = ' ', int $pad_type = STR_PAD_RIGHT): string
-{
-}
+function str_pad(string $string, int $length, string $pad_string = ' ', int $pad_type = STR_PAD_RIGHT): string {}
 
 /**
  * @pure
  */
-function chop(string $string, string $characters = " \n\r\t\v\0"): string
-{
-}
+function chop(string $string, string $characters = " \n\r\t\v\0"): string {}
 
 /**
  * @pure
  */
-function strchr(string $haystack, string $needle, bool $before_needle = false): string|false
-{
-}
+function strchr(string $haystack, string $needle, bool $before_needle = false): string|false {}
 
 /**
  * @param string|int|float|bool|null|Stringable ...$values
  *
  * @pure
  */
-function sprintf(string $format, mixed ...$values): string
-{
-}
+function sprintf(string $format, mixed ...$values): string {}
 
 /**
  * @param string|int|float|bool|null|Stringable ...$values
  *
  * @return int<0, max>
  */
-function printf(string $format, mixed ...$values): int
-{
-}
+function printf(string $format, mixed ...$values): int {}
 
 /**
  * @param array<string|int|float|bool|null|Stringable> $values
  *
  * @pure
  */
-function vprintf(string $format, array $values): int
-{
-}
+function vprintf(string $format, array $values): int {}
 
 /**
  * @param array<string|int|float|bool|null|Stringable> $values
  *
  * @pure
  */
-function vsprintf(string $format, array $values): string
-{
-}
+function vsprintf(string $format, array $values): string {}
 
 /**
  * @param resource $stream
@@ -2001,9 +1730,7 @@ function vsprintf(string $format, array $values): string
  *
  * @pure
  */
-function fprintf($stream, string $format, mixed ...$values): int
-{
-}
+function fprintf($stream, string $format, mixed ...$values): int {}
 
 /**
  * @param resource $stream
@@ -2011,55 +1738,39 @@ function fprintf($stream, string $format, mixed ...$values): int
  *
  * @pure
  */
-function vfprintf($stream, string $format, array $values): int
-{
-}
+function vfprintf($stream, string $format, array $values): int {}
 
-function sscanf(string $string, string $format, mixed &...$vars): array|int|null
-{
-}
+function sscanf(string $string, string $format, mixed &...$vars): array|int|null {}
 
 /**
  * @param resource $stream
  */
-function fscanf($stream, string $format, mixed &...$vars): array|int|false|null
-{
-}
+function fscanf($stream, string $format, mixed &...$vars): array|int|false|null {}
 
 /**
  * @pure
  */
-function parse_url(string $url, int $component = -1): array|string|int|false|null
-{
-}
+function parse_url(string $url, int $component = -1): array|string|int|false|null {}
 
 /**
  * @pure
  */
-function urlencode(string $string): string
-{
-}
+function urlencode(string $string): string {}
 
 /**
  * @pure
  */
-function urldecode(string $string): string
-{
-}
+function urldecode(string $string): string {}
 
 /**
  * @pure
  */
-function rawurlencode(string $string): string
-{
-}
+function rawurlencode(string $string): string {}
 
 /**
  * @pure
  */
-function rawurldecode(string $string): string
-{
-}
+function rawurldecode(string $string): string {}
 
 /**
  * @pure
@@ -2067,73 +1778,50 @@ function rawurldecode(string $string): string
 function http_build_query(
     object|array $data,
     string $numeric_prefix = '',
-    null|string $arg_separator = null,
+    ?string $arg_separator = null,
     int $encoding_type = PHP_QUERY_RFC1738,
-): string {
-}
+): string {}
 
-function readlink(string $path): string|false
-{
-}
+function readlink(string $path): string|false {}
 
-function linkinfo(string $path): int|false
-{
-}
+function linkinfo(string $path): int|false {}
 
-function symlink(string $target, string $link): bool
-{
-}
+function symlink(string $target, string $link): bool {}
 
-function link(string $target, string $link): bool
-{
-}
+function link(string $target, string $link): bool {}
 
 /**
  * @param null|resource $context
  */
-function unlink(string $filename, mixed $context = null): bool
-{
-}
+function unlink(string $filename, mixed $context = null): bool {}
 
 /**
  * @param-out list<string> $output
  * @param-out int $result_code
  */
-function exec(string $command, array|null &$output = null, int|int &$result_code = null): string|false
-{
-}
+function exec(string $command, ?array &$output = null, int|int &$result_code = null): string|false {}
 
 /**
  * @param-out int $result_code
  */
-function system(string $command, null|int &$result_code = null): string|false
-{
-}
+function system(string $command, ?int &$result_code = null): string|false {}
 
 /**
  * @pure
  */
-function escapeshellcmd(string $command): string
-{
-}
+function escapeshellcmd(string $command): string {}
 
 /**
  * @pure
  */
-function escapeshellarg(string $arg): string
-{
-}
+function escapeshellarg(string $arg): string {}
 
 /**
  * @param-out int $result_code
  */
-function passthru(string $command, &$result_code = null): null|false
-{
-}
+function passthru(string $command, &$result_code = null): ?false {}
 
-function shell_exec(string $command): string|false|null
-{
-}
+function shell_exec(string $command): string|false|null {}
 
 /**
  * @param array<string>|string $command
@@ -2163,26 +1851,21 @@ function shell_exec(string $command): string|false|null
 function proc_open(
     array|string $command,
     array $descriptor_spec,
-    null|array &$pipes,
-    null|string $cwd = null,
-    null|array $env_vars = null,
-    null|array $options = null,
-) {
-}
+    ?array &$pipes,
+    ?string $cwd = null,
+    ?array $env_vars = null,
+    ?array $options = null,
+) {}
 
 /**
  * @param resource $process
  */
-function proc_close($process): int
-{
-}
+function proc_close($process): int {}
 
 /**
  * @param resource $process
  */
-function proc_terminate($process, int $signal = 15): bool
-{
-}
+function proc_terminate($process, int $signal = 15): bool {}
 
 /**
  * @param resource $process
@@ -2198,254 +1881,180 @@ function proc_terminate($process, int $signal = 15): bool
  *  'stopsig': int,
  * }
  */
-function proc_get_status($process): array
-{
-}
+function proc_get_status($process): array {}
 
-function proc_nice(int $priority): bool
-{
-}
+function proc_nice(int $priority): bool {}
 
-function getservbyname(string $service, string $protocol): int|false
-{
-}
+function getservbyname(string $service, string $protocol): int|false {}
 
 /**
  * @pure
  */
-function getservbyport(int $port, string $protocol): string|false
-{
-}
+function getservbyport(int $port, string $protocol): string|false {}
 
 /**
  * @pure
  */
-function getprotobyname(string $protocol): int|false
-{
-}
+function getprotobyname(string $protocol): int|false {}
 
 /**
  * @pure
  */
-function getprotobynumber(int $protocol): string|false
-{
-}
+function getprotobynumber(int $protocol): string|false {}
 
 /**
  * @pure
  */
-function getmyuid(): int|false
-{
-}
+function getmyuid(): int|false {}
 
 /**
  * @pure
  */
-function getmygid(): int|false
-{
-}
+function getmygid(): int|false {}
 
 /**
  * @pure
  */
-function getmypid(): int|false
-{
-}
+function getmypid(): int|false {}
 
 /**
  * @pure
  */
-function getmyinode(): int|false
-{
-}
+function getmyinode(): int|false {}
 
-function getlastmod(): int|false
-{
-}
+function getlastmod(): int|false {}
 
 /**
  * @pure
  */
-function base64_decode(string $string, bool $strict = false): string|false
-{
-}
+function base64_decode(string $string, bool $strict = false): string|false {}
 
 /**
  * @pure
  */
-function base64_encode(string $string): string
-{
-}
+function base64_encode(string $string): string {}
 
 /**
  * @pure
  */
-function convert_uuencode(string $string): string
-{
-}
+function convert_uuencode(string $string): string {}
 
 /**
  * @pure
  */
-function convert_uudecode(string $string): string|false
-{
-}
+function convert_uudecode(string $string): string|false {}
 
 /**
  * @return ($num is int ? int : float)
  *
  * @pure
  */
-function abs(int|float $num): int|float
-{
-}
+function abs(int|float $num): int|float {}
 
 /**
  * @pure
  */
-function ceil(int|float $num): float
-{
-}
+function ceil(int|float $num): float {}
 
 /**
  * @pure
  */
-function floor(int|float $num): float
-{
-}
+function floor(int|float $num): float {}
 
 /**
  * @pure
  */
-function round(int|float $num, int $precision = 0, RoundingMode|int $mode = 0): float
-{
-}
+function round(int|float $num, int $precision = 0, RoundingMode|int $mode = 0): float {}
 
 /**
  * @pure
  */
-function sin(float $num): float
-{
-}
+function sin(float $num): float {}
 
 /**
  * @pure
  */
-function cos(float $num): float
-{
-}
+function cos(float $num): float {}
 
 /**
  * @pure
  */
-function tan(float $num): float
-{
-}
+function tan(float $num): float {}
 
 /**
  * @pure
  */
-function asin(float $num): float
-{
-}
+function asin(float $num): float {}
 
 /**
  * @pure
  */
-function acos(float $num): float
-{
-}
+function acos(float $num): float {}
 
 /**
  * @pure
  */
-function atan(float $num): float
-{
-}
+function atan(float $num): float {}
 
 /**
  * @pure
  */
-function atanh(float $num): float
-{
-}
+function atanh(float $num): float {}
 
 /**
  * @pure
  */
-function atan2(float $y, float $x): float
-{
-}
+function atan2(float $y, float $x): float {}
 
 /**
  * @pure
  */
-function sinh(float $num): float
-{
-}
+function sinh(float $num): float {}
 
 /**
  * @pure
  */
-function cosh(float $num): float
-{
-}
+function cosh(float $num): float {}
 
 /**
  * @pure
  */
-function tanh(float $num): float
-{
-}
+function tanh(float $num): float {}
 
 /**
  * @pure
  */
-function asinh(float $num): float
-{
-}
+function asinh(float $num): float {}
 
 /**
  * @pure
  */
-function acosh(float $num): float
-{
-}
+function acosh(float $num): float {}
 
 /**
  * @pure
  */
-function expm1(float $num): float
-{
-}
+function expm1(float $num): float {}
 
 /**
  * @pure
  */
-function log1p(float $num): float
-{
-}
+function log1p(float $num): float {}
 
 /**
  * @pure
  */
-function pi(): float
-{
-}
+function pi(): float {}
 
 /**
  * @pure
  */
-function is_finite(float $num): bool
-{
-}
+function is_finite(float $num): bool {}
 
 /**
  * @pure
  */
-function is_nan(float $num): bool
-{
-}
+function is_nan(float $num): bool {}
 
 /**
  * @pure
@@ -2453,121 +2062,87 @@ function is_nan(float $num): bool
  * @throws DivisionByZeroError
  * @throws ArithmeticError
  */
-function intdiv(int $num1, int $num2): int
-{
-}
+function intdiv(int $num1, int $num2): int {}
 
 /**
  * @pure
  */
-function is_infinite(float $num): bool
-{
-}
+function is_infinite(float $num): bool {}
 
 /**
  * @pure
  */
-function pow(mixed $num, mixed $exponent): object|int|float
-{
-}
+function pow(mixed $num, mixed $exponent): object|int|float {}
 
 /**
  * @pure
  */
-function exp(float $num): float
-{
-}
+function exp(float $num): float {}
 
 /**
  * @pure
  */
-function log(float $num, float $base = M_E): float
-{
-}
+function log(float $num, float $base = M_E): float {}
 
 /**
  * @pure
  */
-function log10(float $num): float
-{
-}
+function log10(float $num): float {}
 
 /**
  * @pure
  */
-function sqrt(float $num): float
-{
-}
+function sqrt(float $num): float {}
 
 /**
  * @pure
  */
-function hypot(float $x, float $y): float
-{
-}
+function hypot(float $x, float $y): float {}
 
 /**
  * @pure
  */
-function deg2rad(float $num): float
-{
-}
+function deg2rad(float $num): float {}
 
 /**
  * @pure
  */
-function rad2deg(float $num): float
-{
-}
+function rad2deg(float $num): float {}
 
 /**
  * @pure
  */
-function bindec(string $binary_string): int|float
-{
-}
+function bindec(string $binary_string): int|float {}
 
 /**
  * @pure
  */
-function hexdec(string $hex_string): int|float
-{
-}
+function hexdec(string $hex_string): int|float {}
 
 /**
  * @pure
  */
-function octdec(string $octal_string): int|float
-{
-}
+function octdec(string $octal_string): int|float {}
 
 /**
  * @pure
  */
-function decbin(int $num): string
-{
-}
+function decbin(int $num): string {}
 
 /**
  * @pure
  */
-function decoct(int $num): string
-{
-}
+function decoct(int $num): string {}
 
 /**
  * @pure
  */
-function dechex(int $num): string
-{
-}
+function dechex(int $num): string {}
 
 /**
  * @pure
  */
-function base_convert(string $num, int $from_base, int $to_base): string
-{
-}
+function base_convert(string $num, int $from_base, int $to_base): string {}
 
 /**
  * @pure
@@ -2575,63 +2150,46 @@ function base_convert(string $num, int $from_base, int $to_base): string
 function number_format(
     float $num,
     int $decimals = 0,
-    null|string $decimal_separator = '.',
-    null|string $thousands_separator = ',',
-): string {
-}
+    ?string $decimal_separator = '.',
+    ?string $thousands_separator = ',',
+): string {}
 
 /**
  * @pure
  */
-function fmod(float $num1, float $num2): float
-{
-}
+function fmod(float $num1, float $num2): float {}
 
 /**
  * @pure
  */
-function fdiv(float $num1, float $num2): float
-{
-}
+function fdiv(float $num1, float $num2): float {}
 
 /**
  * @pure
  */
-function inet_ntop(string $ip): string|false
-{
-}
+function inet_ntop(string $ip): string|false {}
 
 /**
  * @pure
  */
-function inet_pton(string $ip): string|false
-{
-}
+function inet_pton(string $ip): string|false {}
 
 /**
  * @pure
  */
-function ip2long(string $ip): int|false
-{
-}
+function ip2long(string $ip): int|false {}
 
 /**
  * @pure
  */
-function long2ip(int $ip): string
-{
-}
+function long2ip(int $ip): string {}
 
 /**
  * @return ($name is null ? array<string, string> : string|false)
  */
-function getenv(null|string $name = null, bool $local_only = false): array|string|false
-{
-}
+function getenv(?string $name = null, bool $local_only = false): array|string|false {}
 
-function putenv(string $assignment): bool
-{
-}
+function putenv(string $assignment): bool {}
 
 /**
  * @param string $short_options
@@ -2639,135 +2197,96 @@ function putenv(string $assignment): bool
  *
  * @return array<string, string>|false
  */
-function getopt(string $short_options, array $long_options = [], null|int &$rest_index = null): array|false
-{
-}
+function getopt(string $short_options, array $long_options = [], ?int &$rest_index = null): array|false {}
 
-function sys_getloadavg(): array|false
-{
-}
+function sys_getloadavg(): array|false {}
 
 /**
  * @return ($as_float is true ? float : ($as_float is false ? string : string|float))
  */
-function microtime(bool $as_float = false): string|float
-{
-}
+function microtime(bool $as_float = false): string|float {}
 
 /**
  * @return ($as_float is true ? float : (
  *   $ast_float is false ? array{sec: int, usec: int, minuteswest: int, dsttime: int} : array{sec: int, usec: int, minuteswest: int, dsttime: int}|float
  * ))
  */
-function gettimeofday(bool $as_float = false): array|float
-{
-}
+function gettimeofday(bool $as_float = false): array|float {}
 
 /**
  * @return array<string, scalar>|false
  */
-function getrusage(int $mode = 0): array|false
-{
-}
+function getrusage(int $mode = 0): array|false {}
 
 /**
  * @return non-empty-string
  */
-function uniqid(string $prefix = '', bool $more_entropy = false): string
-{
-}
+function uniqid(string $prefix = '', bool $more_entropy = false): string {}
 
 /**
  * @pure
  */
-function quoted_printable_decode(string $string): string
-{
-}
+function quoted_printable_decode(string $string): string {}
 
 /**
  * @pure
  */
-function quoted_printable_encode(string $string): string
-{
-}
+function quoted_printable_encode(string $string): string {}
 
-function get_current_user(): string
-{
-}
+function get_current_user(): string {}
 
-function set_time_limit(int $seconds): bool
-{
-}
+function set_time_limit(int $seconds): bool {}
 
 /**
  * @pure
  */
-function get_cfg_var(string $option): array|string|false
-{
-}
+function get_cfg_var(string $option): array|string|false {}
 
 /**
  * @deprecated
  */
-function get_magic_quotes_runtime(): int
-{
-}
+function get_magic_quotes_runtime(): int {}
 
 function error_log(
     string $message,
     int $message_type = 0,
-    null|string $destination = null,
-    null|string $additional_headers = null,
-): bool {
-}
+    ?string $destination = null,
+    ?string $additional_headers = null,
+): bool {}
 
 /**
  * @pure
  */
-function boolval(mixed $value): bool
-{
-}
+function boolval(mixed $value): bool {}
 
 /**
  * @pure
  */
-function intval(mixed $value, int $base = 10): int
-{
-}
+function intval(mixed $value, int $base = 10): int {}
 
 /**
  * @pure
  */
-function floatval(mixed $value): float
-{
-}
+function floatval(mixed $value): float {}
 
 /**
  * @pure
  */
-function doubleval(mixed $value): float
-{
-}
+function doubleval(mixed $value): float {}
 
-function strval(mixed $value): string
-{
-}
+function strval(mixed $value): string {}
 
 /**
  * @return 'boolean'|'integer'|'double'|'string'|'array'|'object'|'resource'|'NULL'|'unknown type'|'resource (closed)'
  *
  * @pure
  */
-function gettype(mixed $value): string
-{
-}
+function gettype(mixed $value): string {}
 
 /**
  * @param 'bool'|'boolean'|'int'|'integer'|'float'|'double'|'string'|'array'|'object'|'null' $type
  */
-function settype(mixed &$var, string $type): bool
-{
-}
+function settype(mixed &$var, string $type): bool {}
 
 /**
  * @assert-if-true null $value
@@ -2776,9 +2295,7 @@ function settype(mixed &$var, string $type): bool
  *
  * @pure
  */
-function is_null(mixed $value): bool
-{
-}
+function is_null(mixed $value): bool {}
 
 /**
  * @assert-if-true open-resource $value
@@ -2787,9 +2304,7 @@ function is_null(mixed $value): bool
  *
  * @pure
  */
-function is_resource(mixed $value): bool
-{
-}
+function is_resource(mixed $value): bool {}
 
 /**
  * @assert-if-true bool $value
@@ -2798,9 +2313,7 @@ function is_resource(mixed $value): bool
  *
  * @pure
  */
-function is_bool(mixed $value): bool
-{
-}
+function is_bool(mixed $value): bool {}
 
 /**
  * @assert-if-true int $value
@@ -2809,9 +2322,7 @@ function is_bool(mixed $value): bool
  *
  * @pure
  */
-function is_long(mixed $value): bool
-{
-}
+function is_long(mixed $value): bool {}
 
 /**
  * @assert-if-true float $value
@@ -2820,9 +2331,7 @@ function is_long(mixed $value): bool
  *
  * @pure
  */
-function is_float(mixed $value): bool
-{
-}
+function is_float(mixed $value): bool {}
 
 /**
  * @assert-if-true int $value
@@ -2831,9 +2340,7 @@ function is_float(mixed $value): bool
  *
  * @pure
  */
-function is_int(mixed $value): bool
-{
-}
+function is_int(mixed $value): bool {}
 
 /**
  * @assert-if-true int $value
@@ -2842,9 +2349,7 @@ function is_int(mixed $value): bool
  *
  * @pure
  */
-function is_integer(mixed $value): bool
-{
-}
+function is_integer(mixed $value): bool {}
 
 /**
  * @assert-if-true float $value
@@ -2853,9 +2358,7 @@ function is_integer(mixed $value): bool
  *
  * @pure
  */
-function is_double(mixed $value): bool
-{
-}
+function is_double(mixed $value): bool {}
 
 /**
  * @assert-if-true float $value
@@ -2865,9 +2368,7 @@ function is_double(mixed $value): bool
  * @pure
  * @deprecated
  */
-function is_real(mixed $var): bool
-{
-}
+function is_real(mixed $var): bool {}
 
 /**
  * @assert-if-true numeric $value
@@ -2876,9 +2377,7 @@ function is_real(mixed $var): bool
  *
  * @pure
  */
-function is_numeric(mixed $value): bool
-{
-}
+function is_numeric(mixed $value): bool {}
 
 /**
  * @assert-if-true string $value
@@ -2887,9 +2386,7 @@ function is_numeric(mixed $value): bool
  *
  * @pure
  */
-function is_string(mixed $value): bool
-{
-}
+function is_string(mixed $value): bool {}
 
 /**
  * @assert-if-true array<array-key, mixed> $value
@@ -2898,9 +2395,7 @@ function is_string(mixed $value): bool
  *
  * @pure
  */
-function is_array(mixed $value): bool
-{
-}
+function is_array(mixed $value): bool {}
 
 /**
  * @template V
@@ -2913,9 +2408,7 @@ function is_array(mixed $value): bool
  *
  * @pure
  */
-function array_is_list(array $array): bool
-{
-}
+function array_is_list(array $array): bool {}
 
 /**
  * @assert-if-true iterable $value
@@ -2924,9 +2417,7 @@ function array_is_list(array $array): bool
  *
  * @pure
  */
-function is_iterable(mixed $value): bool
-{
-}
+function is_iterable(mixed $value): bool {}
 
 /**
  * @assert-if-true object $value
@@ -2935,9 +2426,7 @@ function is_iterable(mixed $value): bool
  *
  * @pure
  */
-function is_object(mixed $value): bool
-{
-}
+function is_object(mixed $value): bool {}
 
 /**
  * @assert-if-true scalar $value
@@ -2946,9 +2435,7 @@ function is_object(mixed $value): bool
  *
  * @pure
  */
-function is_scalar(mixed $value): bool
-{
-}
+function is_scalar(mixed $value): bool {}
 
 /**
  * @param mixed $value
@@ -2960,92 +2447,66 @@ function is_scalar(mixed $value): bool
  *
  * @pure
  */
-function is_callable(mixed $value, bool $syntax_only = false, &$callable_name = null): bool
-{
-}
+function is_callable(mixed $value, bool $syntax_only = false, &$callable_name = null): bool {}
 
 /**
  * @pure
  */
-function is_countable(mixed $value): bool
-{
-}
+function is_countable(mixed $value): bool {}
 
 /**
  * @param resource $handle
  *
  * @return int<-1, max>
  */
-function pclose($handle): int
-{
-}
+function pclose($handle): int {}
 
 /**
  * @return open-resource|false
  */
-function popen(string $command, string $mode)
-{
-}
+function popen(string $command, string $mode) {}
 
 /**
  * @param null|resource $context
  */
-function readfile(string $filename, bool $use_include_path = false, $context = null): int|false
-{
-}
+function readfile(string $filename, bool $use_include_path = false, $context = null): int|false {}
 
 /**
  * @param resource $stream
  */
-function rewind($stream): bool
-{
-}
+function rewind($stream): bool {}
 
 /**
  * @param null|resource $context
  */
-function rmdir(string $directory, $context = null): bool
-{
-}
+function rmdir(string $directory, $context = null): bool {}
 
-function umask(null|int $mask = null): int
-{
-}
+function umask(?int $mask = null): int {}
 
 /**
  * @param resource $stream
  */
-function fclose($stream): bool
-{
-}
+function fclose($stream): bool {}
 
 /**
  * @param resource $stream
  */
-function feof($stream): bool
-{
-}
+function feof($stream): bool {}
 
 /**
  * @param resource $stream
  */
-function fgetc($stream): string|false
-{
-}
+function fgetc($stream): string|false {}
 
 /**
  * @param resource $stream
  */
-function fgets($stream, null|int $length = null): string|false
-{
-}
+function fgets($stream, ?int $length = null): string|false {}
 
 /**
  * @param resource $stream
  */
-function fread($stream, int $length): string|false
-{
-}
+function fread($stream, int $length): string|false {}
 
 /**
  * @param resource|null $context
@@ -3054,23 +2515,17 @@ function fread($stream, int $length): string|false
  *
  * @ignore-falsable-return
  */
-function fopen(string $filename, string $mode, bool $use_include_path = false, $context = null)
-{
-}
+function fopen(string $filename, string $mode, bool $use_include_path = false, $context = null) {}
 
 /**
  * @param resource $stream
  */
-function fpassthru($stream): int
-{
-}
+function fpassthru($stream): int {}
 
 /**
  * @param resource $stream
  */
-function ftruncate($stream, int $size): bool
-{
-}
+function ftruncate($stream, int $size): bool {}
 
 /**
  * @param resource $stream
@@ -3091,105 +2546,77 @@ function ftruncate($stream, int $size): bool
  *   'blocks': int<0, max>,
  * }
  */
-function fstat($stream): array|false
-{
-}
+function fstat($stream): array|false {}
 
 /**
  * @param resource $stream
  */
-function fseek($stream, int $offset, int $whence = SEEK_SET): int
-{
-}
+function fseek($stream, int $offset, int $whence = SEEK_SET): int {}
 
 /**
  * @param resource $stream
  *
  * @return int<0, max>|false
  */
-function ftell($stream): int|false
-{
-}
+function ftell($stream): int|false {}
 
 /**
  * @param resource $stream
  */
-function fflush($stream): bool
-{
-}
+function fflush($stream): bool {}
 
 /**
  * @param resource $stream
  */
-function fsync($stream): bool
-{
-}
+function fsync($stream): bool {}
 
 /**
  * @param resource $stream
  */
-function fdatasync($stream): bool
-{
-}
+function fdatasync($stream): bool {}
 
 /**
  * @param resource $stream
  *
  * @return int<0, max>|false
  */
-function fwrite($stream, string $data, null|int $length = null): int|false
-{
-}
+function fwrite($stream, string $data, ?int $length = null): int|false {}
 
 /**
  * @param resource $stream
  *
  * @return int<0, max>|false
  */
-function fputs($stream, string $data, null|int $length = null): int|false
-{
-}
+function fputs($stream, string $data, ?int $length = null): int|false {}
 
 /**
  * @param null|resource $context
  */
-function mkdir(string $directory, int $permissions = 0777, bool $recursive = false, $context = null): bool
-{
-}
+function mkdir(string $directory, int $permissions = 0777, bool $recursive = false, $context = null): bool {}
 
 /**
  * @param null|resource $context
  */
-function rename(string $from, string $to, $context = null): bool
-{
-}
+function rename(string $from, string $to, $context = null): bool {}
 
 /**
  * @param null|resource $context
  */
-function copy(string $from, string $to, $context = null): bool
-{
-}
+function copy(string $from, string $to, $context = null): bool {}
 
-function tempnam(string $directory, string $prefix): string|false
-{
-}
+function tempnam(string $directory, string $prefix): string|false {}
 
 /**
  * @return resource|false
  */
-function tmpfile()
-{
-}
+function tmpfile() {}
 
 /**
  * @param null|resource $context
  *
  * @return array<int, string>|false
  */
-function file(string $filename, int $flags = 0, $context = null): array|false
-{
-}
+function file(string $filename, int $flags = 0, $context = null): array|false {}
 
 /**
  * @param null|resource $context
@@ -3199,27 +2626,22 @@ function file_get_contents(
     bool $use_include_path = false,
     $context = null,
     int $offset = 0,
-    null|int $length = null,
-): string|false {
-}
+    ?int $length = null,
+): string|false {}
 
 /**
  * @param null|resource $context
  *
  * @return int<0, max>|false
  */
-function file_put_contents(string $filename, mixed $data, int $flags = 0, $context = null): int|false
-{
-}
+function file_put_contents(string $filename, mixed $data, int $flags = 0, $context = null): int|false {}
 
 /**
  * @return array{type: int, message: string, file: string, line: int}|null
  *
  * @pure
  */
-function error_get_last(): null|array
-{
-}
+function error_get_last(): ?array {}
 
 /**
  * @template I
@@ -3230,9 +2652,7 @@ function error_get_last(): null|array
  *
  * @return R
  */
-function call_user_func(callable|string $callback, mixed ...$args): mixed
-{
-}
+function call_user_func(callable|string $callback, mixed ...$args): mixed {}
 
 /**
  * @template I
@@ -3243,9 +2663,7 @@ function call_user_func(callable|string $callback, mixed ...$args): mixed
  *
  * @return R
  */
-function call_user_func_array(callable|string $callback, array $args): mixed
-{
-}
+function call_user_func_array(callable|string $callback, array $args): mixed {}
 
 /**
  * @template I
@@ -3256,9 +2674,7 @@ function call_user_func_array(callable|string $callback, array $args): mixed
  *
  * @return R
  */
-function forward_static_call(callable|string $callback, mixed ...$args): mixed
-{
-}
+function forward_static_call(callable|string $callback, mixed ...$args): mixed {}
 
 /**
  * @template I
@@ -3269,54 +2685,34 @@ function forward_static_call(callable|string $callback, mixed ...$args): mixed
  *
  * @return R
  */
-function forward_static_call_array(callable|string $callback, array $args): mixed
-{
-}
+function forward_static_call_array(callable|string $callback, array $args): mixed {}
 
 /**
  * @return non-empty-string
  */
-function serialize(mixed $value): string
-{
-}
+function serialize(mixed $value): string {}
 
-function unserialize(string $data, array $options = []): mixed
-{
-}
+function unserialize(string $data, array $options = []): mixed {}
 
-function var_dump(mixed $value, mixed ...$values): void
-{
-}
+function var_dump(mixed $value, mixed ...$values): void {}
 
 /**
  * @return ($return is true ? non-empty-string : null)
  */
-function var_export(mixed $value, bool $return = false): null|string
-{
-}
+function var_export(mixed $value, bool $return = false): ?string {}
 
-function debug_zval_dump(mixed $value, mixed ...$values): void
-{
-}
+function debug_zval_dump(mixed $value, mixed ...$values): void {}
 
 /**
  * @return ($return is true ? non-empty-string : bool)
  */
-function print_r(mixed $value, bool $return = false): string|bool
-{
-}
+function print_r(mixed $value, bool $return = false): string|bool {}
 
-function memory_get_usage(bool $real_usage = false): int
-{
-}
+function memory_get_usage(bool $real_usage = false): int {}
 
-function memory_get_peak_usage(bool $real_usage = false): int
-{
-}
+function memory_get_peak_usage(bool $real_usage = false): int {}
 
-function memory_reset_peak_usage(): void
-{
-}
+function memory_reset_peak_usage(): void {}
 
 /**
  * @template I
@@ -3326,9 +2722,7 @@ function memory_reset_peak_usage(): void
  *
  * @return bool|null
  */
-function register_shutdown_function(callable $callback, mixed ...$args): void
-{
-}
+function register_shutdown_function(callable $callback, mixed ...$args): void {}
 
 /**
  * @template I
@@ -3336,82 +2730,52 @@ function register_shutdown_function(callable $callback, mixed ...$args): void
  * @param (callable(I...)) $callback
  * @param I ...$args
  */
-function register_tick_function(callable $callback, mixed ...$args): bool
-{
-}
+function register_tick_function(callable $callback, mixed ...$args): bool {}
 
-function unregister_tick_function(callable $callback): void
-{
-}
+function unregister_tick_function(callable $callback): void {}
 
 /**
  * @return ($return is true ? string|false : bool)
  */
-function highlight_file(string $filename, bool $return = false): string|bool
-{
-}
+function highlight_file(string $filename, bool $return = false): string|bool {}
 
 /**
  * @return ($return is true ? string|false : bool)
  */
-function show_source(string $filename, bool $return = false): string|bool
-{
-}
+function show_source(string $filename, bool $return = false): string|bool {}
 
 /**
  * @return ($return is true ? string|false : bool)
  */
-function highlight_string(string $string, bool $return = false): string|bool
-{
-}
+function highlight_string(string $string, bool $return = false): string|bool {}
 
 /**
  * @return ($as_number is true ? int|float|false : list{int, int}|false)
  *
  * @mutation-free
  */
-function hrtime(bool $as_number = false): array|int|float|false
-{
-}
+function hrtime(bool $as_number = false): array|int|float|false {}
 
-function php_strip_whitespace(string $filename): string
-{
-}
+function php_strip_whitespace(string $filename): string {}
 
-function ini_get(string $option): string|false
-{
-}
+function ini_get(string $option): string|false {}
 
 /**
  * @return array{'global_value': string, 'local_value': string, 'access': int}|false
  */
-function ini_get_all(null|string $extension, bool $details = true): array|false
-{
-}
+function ini_get_all(?string $extension, bool $details = true): array|false {}
 
-function ini_set(string $option, string|int|float|bool|null $value): string|false
-{
-}
+function ini_set(string $option, string|int|float|bool|null $value): string|false {}
 
-function ini_alter(string $option, string|int|float|bool|null $value): string|false
-{
-}
+function ini_alter(string $option, string|int|float|bool|null $value): string|false {}
 
-function ini_restore(string $option): void
-{
-}
+function ini_restore(string $option): void {}
 
-function ini_parse_quantity(string $shorthand): int
-{
-}
+function ini_parse_quantity(string $shorthand): int {}
 
-function get_include_path(): string|false
-{
-}
+function get_include_path(): string|false {}
 
-function set_include_path(string $include_path): string|false
-{
-}
+function set_include_path(string $include_path): string|false {}
 
 function setcookie(
     string $name,
@@ -3421,8 +2785,7 @@ function setcookie(
     string $domain = '',
     bool $secure = false,
     bool $httponly = false,
-): bool {
-}
+): bool {}
 
 /**
  * @param string $value
@@ -3440,89 +2803,62 @@ function setrawcookie(
     $domain = '',
     $secure = false,
     $httponly = false,
-): bool {
-}
+): bool {}
 
 /**
  * @param string $value
  */
-function setrawcookie(string $name, $value = '', array $options = []): bool
-{
-}
+function setrawcookie(string $name, $value = '', array $options = []): bool {}
 
-function header(string $header, bool $replace = true, int $response_code = 0): void
-{
-}
+function header(string $header, bool $replace = true, int $response_code = 0): void {}
 
-function header_remove(null|string $name = null): void
-{
-}
+function header_remove(?string $name = null): void {}
 
 /**
  * @param-out string $filename
  * @param-out int $line
  */
-function headers_sent(&$filename = null, &$line = null): bool
-{
-}
+function headers_sent(&$filename = null, &$line = null): bool {}
 
 /**
  * @return list<string>
  */
-function headers_list(): array
-{
-}
+function headers_list(): array {}
 
 /**
  * @return array<string, string>|false
  */
-function apache_request_headers(): false|array
-{
-}
+function apache_request_headers(): false|array {}
 
 /**
  * @return array<string, string>|false
  */
-function getallheaders(): false|array
-{
-}
+function getallheaders(): false|array {}
 
 /**
  * @return 0|1
  */
-function connection_aborted(): int
-{
-}
+function connection_aborted(): int {}
 
-function connection_status(): int
-{
-}
+function connection_status(): int {}
 
-function ignore_user_abort(null|bool $enable = null): int
-{
-}
+function ignore_user_abort(?bool $enable = null): int {}
 
 function parse_ini_file(
     string $filename,
     bool $process_sections = false,
     int $scanner_mode = INI_SCANNER_NORMAL,
-): array|false {
-}
+): array|false {}
 
 function parse_ini_string(
     string $ini_string,
     bool $process_sections = false,
     int $scanner_mode = INI_SCANNER_NORMAL,
-): array|false {
-}
+): array|false {}
 
-function is_uploaded_file(string $filename): bool
-{
-}
+function is_uploaded_file(string $filename): bool {}
 
-function move_uploaded_file(string $from, string $to): bool
-{
-}
+function move_uploaded_file(string $from, string $to): bool {}
 
 /**
  * @return false|array{
@@ -3533,55 +2869,37 @@ function move_uploaded_file(string $from, string $to): bool
  *   'up': bool,
  * }
  */
-function net_get_interfaces(): array|false
-{
-}
+function net_get_interfaces(): array|false {}
 
-function gethostbyaddr(string $ip): string|false
-{
-}
+function gethostbyaddr(string $ip): string|false {}
 
-function gethostbyname(string $hostname): string
-{
-}
+function gethostbyname(string $hostname): string {}
 
 /**
  * @return list<non-empty-string>|false
  */
-function gethostbynamel(string $hostname): array|false
-{
-}
+function gethostbynamel(string $hostname): array|false {}
 
 /**
  * @return non-empty-string|false
  */
-function gethostname(): string|false
-{
-}
+function gethostname(): string|false {}
 
-function dns_check_record(string $hostname, string $type = 'MX'): bool
-{
-}
+function dns_check_record(string $hostname, string $type = 'MX'): bool {}
 
-function checkdnsrr(string $hostname, string $type = 'MX'): bool
-{
-}
+function checkdnsrr(string $hostname, string $type = 'MX'): bool {}
 
 /**
  * @param-out list<non-empty-string> $hosts
  * @param-out array $weights
  */
-function dns_get_mx(string $hostname, &$hosts, &$weights = null): bool
-{
-}
+function dns_get_mx(string $hostname, &$hosts, &$weights = null): bool {}
 
 /**
  * @param-out list<non-empty-string> $hosts
  * @param-out array $weights
  */
-function getmxrr(string $hostname, &$hosts, &$weights = null): bool
-{
-}
+function getmxrr(string $hostname, &$hosts, &$weights = null): bool {}
 
 /**
  * @param-out array $authoritative_name_servers
@@ -3593,8 +2911,7 @@ function dns_get_record(
     &$authoritative_name_servers = null,
     &$additional_records = null,
     bool $raw = false,
-): array|false {
-}
+): array|false {}
 
 /**
  * @template R of null|array<array-key, resource>
@@ -3611,104 +2928,73 @@ function dns_get_record(
  *
  * @return false|int<0, max>
  */
-function stream_select(
-    null|array &$read,
-    null|array &$write,
-    null|array &$except,
-    null|int $seconds,
-    null|int $microseconds,
-): int|false {
-}
+function stream_select(?array &$read, ?array &$write, ?array &$except, ?int $seconds, ?int $microseconds): int|false {}
 
 /**
  * @return resource
  */
-function stream_context_create(null|array $options = null, null|array $params = null): mixed
-{
-}
+function stream_context_create(?array $options = null, ?array $params = null): mixed {}
 
 /**
  * @param resource $context
  */
-function stream_context_set_params($context, array $params): bool
-{
-}
+function stream_context_set_params($context, array $params): bool {}
 
 /**
  * @param resource $context
  *
  * @return array{notification: string, options: array}
  */
-function stream_context_get_params($context): array
-{
-}
+function stream_context_get_params($context): array {}
 
 /**
  * @param resource $context
  */
-function stream_context_set_option($context, string $wrapper_or_options, string $option_name, mixed $value): bool
-{
-}
+function stream_context_set_option($context, string $wrapper_or_options, string $option_name, mixed $value): bool {}
 
 /**
  * @param resource $stream_or_context
  */
-function stream_context_set_option($stream_or_context, array $options): bool
-{
-}
+function stream_context_set_option($stream_or_context, array $options): bool {}
 
 /**
  * @param resource $context
  */
-function stream_context_set_options($context, array $options): bool
-{
-}
+function stream_context_set_options($context, array $options): bool {}
 
 /**
  * @param resource $stream_or_context
  */
-function stream_context_get_options($stream_or_context): array
-{
-}
+function stream_context_get_options($stream_or_context): array {}
 
 /**
  * @return resource
  */
-function stream_context_get_default(null|array $options)
-{
-}
+function stream_context_get_default(?array $options) {}
 
 /**
  * @return resource
  */
-function stream_context_set_default(array $options)
-{
-}
+function stream_context_set_default(array $options) {}
 
 /**
  * @param resource $stream
  *
  * @return resource
  */
-function stream_filter_prepend($stream, string $filter_name, int $mode = 0, mixed $params = null)
-{
-}
+function stream_filter_prepend($stream, string $filter_name, int $mode = 0, mixed $params = null) {}
 
 /**
  * @param resource $stream
  *
  * @return resource|false
  */
-function stream_filter_append($stream, string $filter_name, int $mode = 0, mixed $params = null)
-{
-}
+function stream_filter_append($stream, string $filter_name, int $mode = 0, mixed $params = null) {}
 
 /**
  * @param resource $stream_filter
  */
-function stream_filter_remove($stream_filter): bool
-{
-}
+function stream_filter_remove($stream_filter): bool {}
 
 /**
  * @param null|resource $context
@@ -3722,11 +3008,10 @@ function stream_socket_client(
     string $address,
     &$error_code = null,
     &$error_message = null,
-    null|float $timeout = null,
+    ?float $timeout = null,
     int $flags = STREAM_CLIENT_CONNECT,
     $context = null,
-) {
-}
+) {}
 
 /**
  * @param null|resource $context
@@ -3742,8 +3027,7 @@ function stream_socket_server(
     &$error_message = null,
     int $flags = STREAM_SERVER_BIND | STREAM_SERVER_LISTEN,
     $context = null,
-) {
-}
+) {}
 
 /**
  * @param resource $socket
@@ -3752,32 +3036,24 @@ function stream_socket_server(
  *
  * @return resource|false
  */
-function stream_socket_accept($socket, null|float $timeout = null, &$peer_name = null)
-{
-}
+function stream_socket_accept($socket, ?float $timeout = null, &$peer_name = null) {}
 
 /**
  * @param resource $socket
  */
-function stream_socket_get_name($socket, bool $remote): string|false
-{
-}
+function stream_socket_get_name($socket, bool $remote): string|false {}
 
 /**
  * @param resource $socket
  *
  * @param-out string $address
  */
-function stream_socket_recvfrom($socket, int $length, int $flags = 0, &$address): string|false
-{
-}
+function stream_socket_recvfrom($socket, int $length, int $flags = 0, &$address): string|false {}
 
 /**
  * @param resource $socket
  */
-function stream_socket_sendto($socket, string $data, int $flags = 0, string $address = ''): int|false
-{
-}
+function stream_socket_sendto($socket, string $data, int $flags = 0, string $address = ''): int|false {}
 
 /**
  * @param resource $stream
@@ -3786,58 +3062,46 @@ function stream_socket_sendto($socket, string $data, int $flags = 0, string $add
 function stream_socket_enable_crypto(
     $stream,
     bool $enable,
-    null|int $crypto_method = null,
+    ?int $crypto_method = null,
     $session_stream = null,
-): int|bool {
-}
+): int|bool {}
 
 /**
  * @param resource $stream
  */
-function stream_socket_shutdown($stream, int $mode): bool
-{
-}
+function stream_socket_shutdown($stream, int $mode): bool {}
 
 /**
  * @return list{resource, resource}|false
  */
-function stream_socket_pair(int $domain, int $type, int $protocol): array|false
-{
-}
+function stream_socket_pair(int $domain, int $type, int $protocol): array|false {}
 
 /**
  * @param resource $from
  * @param resource $to
  */
-function stream_copy_to_stream($from, $to, null|int $length, int $offset = 0): int|false
-{
-}
+function stream_copy_to_stream($from, $to, ?int $length, int $offset = 0): int|false {}
 
 /**
  * @param resource $stream
  */
-function stream_get_contents($stream, null|int $length = null, int $offset = -1): string|false
-{
-}
+function stream_get_contents($stream, ?int $length = null, int $offset = -1): string|false {}
 
 /**
  * @param resource $stream
  */
-function stream_supports_lock($stream): bool
-{
-}
+function stream_supports_lock($stream): bool {}
 
 /**
  * @param resource $stream
  */
 function fgetcsv(
     $stream,
-    null|int $length = null,
+    ?int $length = null,
     string $separator = ',',
     string $enclosure = '"',
     string $escape = '\\',
-): array|false {
-}
+): array|false {}
 
 /**
  * @param resource $stream
@@ -3849,8 +3113,7 @@ function fputcsv(
     string $enclosure = '"',
     string $escape = "\\",
     string $eol = PHP_EOL,
-): int|false {
-}
+): int|false {}
 
 /**
  * @param resource $stream
@@ -3858,51 +3121,37 @@ function fputcsv(
  *
  * @return bool
  */
-function flock($stream, int $operation, &$would_block = null): bool
-{
-}
+function flock($stream, int $operation, &$would_block = null): bool {}
 
 /**
  * @return array<string, string>|false
  */
-function get_meta_tags(string $filename, bool $use_include_path = false): array|false
-{
-}
+function get_meta_tags(string $filename, bool $use_include_path = false): array|false {}
 
 /**
  * @param resource $stream
  */
-function stream_set_write_buffer($stream, int $size): int
-{
-}
+function stream_set_write_buffer($stream, int $size): int {}
 
 /**
  * @param resource $stream
  */
-function stream_set_read_buffer($stream, int $size): int
-{
-}
+function stream_set_read_buffer($stream, int $size): int {}
 
 /**
  * @param resource $stream
  */
-function set_file_buffer($stream, int $size): int
-{
-}
+function set_file_buffer($stream, int $size): int {}
 
 /**
  * @param resource $stream
  */
-function stream_set_blocking($stream, bool $enable): bool
-{
-}
+function stream_set_blocking($stream, bool $enable): bool {}
 
 /**
  * @param resource $stream
  */
-function socket_set_blocking($stream, bool $enable): bool
-{
-}
+function socket_set_blocking($stream, bool $enable): bool {}
 
 /**
  * @param resource $stream
@@ -3922,93 +3171,61 @@ function socket_set_blocking($stream, bool $enable): bool
  *   mediatype: string,
  * }
  */
-function stream_get_meta_data($stream): array
-{
-}
+function stream_get_meta_data($stream): array {}
 
 /**
  * @param resource $stream
  */
-function stream_get_line($stream, int $length, string $ending = ''): string|false
-{
-}
+function stream_get_line($stream, int $length, string $ending = ''): string|false {}
 
-function stream_wrapper_register(string $protocol, string $class, int $flags = 0): bool
-{
-}
+function stream_wrapper_register(string $protocol, string $class, int $flags = 0): bool {}
 
-function stream_register_wrapper(string $protocol, string $class, int $flags = 0): bool
-{
-}
+function stream_register_wrapper(string $protocol, string $class, int $flags = 0): bool {}
 
-function stream_resolve_include_path(string $filename): string|false
-{
-}
+function stream_resolve_include_path(string $filename): string|false {}
 
-function stream_wrapper_unregister(string $protocol): bool
-{
-}
+function stream_wrapper_unregister(string $protocol): bool {}
 
-function stream_wrapper_restore(string $protocol): bool
-{
-}
+function stream_wrapper_restore(string $protocol): bool {}
 
 /**
  * @return list<string>
  */
-function stream_get_wrappers(): array
-{
-}
+function stream_get_wrappers(): array {}
 
 /**
  * @return list<string>
  */
-function stream_get_transports(): array
-{
-}
+function stream_get_transports(): array {}
 
 /**
  * @param string|resource $stream
  */
-function stream_is_local($stream): bool
-{
-}
+function stream_is_local($stream): bool {}
 
 /**
  * @param null|resource $context
  */
-function get_headers(string $url, bool $associative = false, $context = null): array|false
-{
-}
+function get_headers(string $url, bool $associative = false, $context = null): array|false {}
 
 /**
  * @param resource $stream
  */
-function stream_set_timeout($stream, int $seconds, int $microseconds = 0): bool
-{
-}
+function stream_set_timeout($stream, int $seconds, int $microseconds = 0): bool {}
 
 /**
  * @param resource $stream
  */
-function socket_set_timeout($stream, int $seconds, int $microseconds = 0): bool
-{
-}
+function socket_set_timeout($stream, int $seconds, int $microseconds = 0): bool {}
 
 /**
  * @param resource $stream
  */
-function socket_get_status($stream): array
-{
-}
+function socket_get_status($stream): array {}
 
-function realpath(string $path): string|false
-{
-}
+function realpath(string $path): string|false {}
 
-function fnmatch(string $pattern, string $filename, int $flags = 0): bool
-{
-}
+function fnmatch(string $pattern, string $filename, int $flags = 0): bool {}
 
 /**
  * @param string $hostname <p>
@@ -4026,9 +3243,8 @@ function fsockopen(
     int $port = -1,
     &$error_code = null,
     &$error_message = null,
-    null|float $timeout = null,
-) {
-}
+    ?float $timeout = null,
+) {}
 
 /**
  * @param string $hostname
@@ -4045,16 +3261,13 @@ function pfsockopen(
     int $port = -1,
     &$error_code = null,
     &$error_message = null,
-    null|float $timeout = null,
-) {
-}
+    ?float $timeout = null,
+) {}
 
 /**
  * @pure
  */
-function pack(string $format, mixed ...$values): string
-{
-}
+function pack(string $format, mixed ...$values): string {}
 
 /**
  * @return ($format is 'a'|'A'|'h'|'H' ? array{1: string}|false : (
@@ -4079,192 +3292,130 @@ function pack(string $format, mixed ...$values): string
  *
  * @pure
  */
-function unpack(string $format, string $string, int $offset = 0): array|false
-{
-}
+function unpack(string $format, string $string, int $offset = 0): array|false {}
 
-function get_browser(null|string $user_agent, bool $return_array = false): object|array|false
-{
-}
+function get_browser(?string $user_agent, bool $return_array = false): object|array|false {}
 
 /**
  * @pure
  */
-function crypt(string $string, string $salt): string
-{
-}
+function crypt(string $string, string $salt): string {}
 
 /**
  * @param null|resource $context
  *
  * @return resource|false
  */
-function opendir(string $directory, $context = null)
-{
-}
+function opendir(string $directory, $context = null) {}
 
 /**
  * @param null|resource $dir_handle
  */
-function closedir($dir_handle = null): void
-{
-}
+function closedir($dir_handle = null): void {}
 
-function chdir(string $directory): bool
-{
-}
+function chdir(string $directory): bool {}
 
-function chroot(string $directory): bool
-{
-}
+function chroot(string $directory): bool {}
 
 /**
  * @return non-empty-string|false
  */
-function getcwd(): string|false
-{
-}
+function getcwd(): string|false {}
 
 /**
  * @param resource $dir_handle
  */
-function rewinddir($dir_handle): void
-{
-}
+function rewinddir($dir_handle): void {}
 
 /**
  * @param resource $dir_handle
  *
  * @return non-empty-string|false
  */
-function readdir($dir_handle): string|false
-{
-}
+function readdir($dir_handle): string|false {}
 
 /**
  * @param resource $context
  */
-function dir(string $directory, $context): Directory|false
-{
-}
+function dir(string $directory, $context): Directory|false {}
 
 /**
  * @param resource $context
  */
-function getdir(string $directory, $context = null): Directory|false
-{
-}
+function getdir(string $directory, $context = null): Directory|false {}
 
 /**
  * @param resource|null $context
  *
  * @return list<non-empty-string>|false
  */
-function scandir(string $directory, int $sorting_order = 0, $context = null): array|false
-{
-}
+function scandir(string $directory, int $sorting_order = 0, $context = null): array|false {}
 
 /**
  * @return list<non-empty-string>|false
  */
-function glob(string $pattern, int $flags = 0): array|false
-{
-}
+function glob(string $pattern, int $flags = 0): array|false {}
 
 /**
  * @return int<1750595956, max>|false
  */
-function fileatime(string $filename): int|false
-{
-}
+function fileatime(string $filename): int|false {}
 
 /**
  * @return int<1750595956, max>|false
  */
-function filectime(string $filename): int|false
-{
-}
+function filectime(string $filename): int|false {}
 
 /**
  * @return int<0, max>|false
  */
-function filegroup(string $filename): int|false
-{
-}
+function filegroup(string $filename): int|false {}
 
 /**
  * @return int<0, max>|false
  */
-function fileinode(string $filename): int|false
-{
-}
+function fileinode(string $filename): int|false {}
 
 /**
  * @return int<1750595956, max>|false
  */
-function filemtime(string $filename): int|false
-{
-}
+function filemtime(string $filename): int|false {}
 
 /**
  * @return int<0, max>|false
  */
-function fileowner(string $filename): int|false
-{
-}
+function fileowner(string $filename): int|false {}
 
 /**
  * @return int<0, max>|false
  */
-function fileperms(string $filename): int|false
-{
-}
+function fileperms(string $filename): int|false {}
 
 /**
  * @return int<0, max>|false
  */
-function filesize(string $filename): int|false
-{
-}
+function filesize(string $filename): int|false {}
 
 /**
  * @return 'fifo'|'char'|'dir'|'block'|'link'|'file'|'socket'|'unknown'|false
  */
-function filetype(string $filename): string|false
-{
-}
+function filetype(string $filename): string|false {}
 
-function file_exists(string $filename): bool
-{
-}
+function file_exists(string $filename): bool {}
 
-function is_writable(string $filename): bool
-{
-}
+function is_writable(string $filename): bool {}
 
-function is_writeable(string $filename): bool
-{
-}
+function is_writeable(string $filename): bool {}
 
-function is_readable(string $filename): bool
-{
-}
+function is_readable(string $filename): bool {}
 
-function is_executable(string $filename): bool
-{
-}
+function is_executable(string $filename): bool {}
 
-function is_file(string $filename): bool
-{
-}
+function is_file(string $filename): bool {}
 
-function is_dir(string $filename): bool
-{
-}
+function is_dir(string $filename): bool {}
 
-function is_link(string $filename): bool
-{
-}
+function is_link(string $filename): bool {}
 
 /**
  * @return array{
@@ -4283,9 +3434,7 @@ function is_link(string $filename): bool
  *   'blocks': int,
  * }|false
  */
-function stat(string $filename): array|false
-{
-}
+function stat(string $filename): array|false {}
 
 /**
  * @return array{
@@ -4304,49 +3453,27 @@ function stat(string $filename): array|false
  *   'blocks': int,
  * }|false
  */
-function lstat(string $filename): array|false
-{
-}
+function lstat(string $filename): array|false {}
 
-function chown(string $filename, string|int $user): bool
-{
-}
+function chown(string $filename, string|int $user): bool {}
 
-function chgrp(string $filename, string|int $group): bool
-{
-}
+function chgrp(string $filename, string|int $group): bool {}
 
-function lchown(string $filename, string|int $user): bool
-{
-}
+function lchown(string $filename, string|int $user): bool {}
 
-function lchgrp(string $filename, string|int $group): bool
-{
-}
+function lchgrp(string $filename, string|int $group): bool {}
 
-function chmod(string $filename, int $permissions): bool
-{
-}
+function chmod(string $filename, int $permissions): bool {}
 
-function touch(string $filename, null|int $mtime = null, null|int $atime = null): bool
-{
-}
+function touch(string $filename, ?int $mtime = null, ?int $atime = null): bool {}
 
-function clearstatcache(bool $clear_realpath_cache = false, string $filename = ''): void
-{
-}
+function clearstatcache(bool $clear_realpath_cache = false, string $filename = ''): void {}
 
-function disk_total_space(string $directory): float|false
-{
-}
+function disk_total_space(string $directory): float|false {}
 
-function disk_free_space(string $directory): float|false
-{
-}
+function disk_free_space(string $directory): float|false {}
 
-function diskfreespace(string $directory): float|false
-{
-}
+function diskfreespace(string $directory): float|false {}
 
 /**
  * @param string|array<string, string> $additional_headers
@@ -4357,12 +3484,9 @@ function mail(
     string $message,
     array|string $additional_headers = [],
     string $additional_params = '',
-): bool {
-}
+): bool {}
 
-function openlog(string $prefix, int $flags, int $facility): bool
-{
-}
+function openlog(string $prefix, int $flags, int $facility): bool {}
 
 const ARRAY_FILTER_USE_BOTH = 1;
 
@@ -4379,9 +3503,7 @@ const ARRAY_FILTER_USE_KEY = 2;
  * @no-named-arguments
  * @pure
  */
-function array_merge_recursive(array ...$arrays)
-{
-}
+function array_merge_recursive(array ...$arrays) {}
 
 /**
  * @param array<array-key, mixed> $array
@@ -4392,9 +3514,7 @@ function array_merge_recursive(array ...$arrays)
  * @no-named-arguments
  * @pure
  */
-function array_replace(array $array, array ...$replacements): array
-{
-}
+function array_replace(array $array, array ...$replacements): array {}
 
 /**
  * @param array<array-key, mixed> $array
@@ -4405,9 +3525,7 @@ function array_replace(array $array, array ...$replacements): array
  * @no-named-arguments
  * @pure
  */
-function array_replace_recursive(array $array, array ...$replacements): array
-{
-}
+function array_replace_recursive(array $array, array ...$replacements): array {}
 
 /**
  * @template K as array-key
@@ -4422,9 +3540,7 @@ function array_replace_recursive(array $array, array ...$replacements): array
  * @no-named-arguments
  * @pure
  */
-function array_keys(array $array, mixed $filter_value = null, bool $strict = false): array
-{
-}
+function array_keys(array $array, mixed $filter_value = null, bool $strict = false): array {}
 
 /**
  * @template K as array-key
@@ -4437,9 +3553,7 @@ function array_keys(array $array, mixed $filter_value = null, bool $strict = fal
  * @no-named-arguments
  * @pure
  */
-function array_values(array $array): array
-{
-}
+function array_values(array $array): array {}
 
 /**
  * @template K as array-key
@@ -4452,9 +3566,7 @@ function array_values(array $array): array
  * @no-named-arguments
  * @pure
  */
-function array_count_values(array $array): array
-{
-}
+function array_count_values(array $array): array {}
 
 /**
  * @template K as array-key
@@ -4469,9 +3581,7 @@ function array_count_values(array $array): array
  * @no-named-arguments
  * @pure
  */
-function array_column(array $array, string|int|null $column_key, string|int|null $index_key = null): array
-{
-}
+function array_column(array $array, string|int|null $column_key, string|int|null $index_key = null): array {}
 
 /**
  * @template K as array-key
@@ -4485,9 +3595,7 @@ function array_column(array $array, string|int|null $column_key, string|int|null
  * @no-named-arguments
  * @pure
  */
-function array_reverse(array $array, bool $preserve_keys = false): array
-{
-}
+function array_reverse(array $array, bool $preserve_keys = false): array {}
 
 /**
  * @template K as array-key
@@ -4500,9 +3608,7 @@ function array_reverse(array $array, bool $preserve_keys = false): array
  *
  * @return I
  */
-function array_reduce(array $array, callable $callback, mixed $initial = null): mixed
-{
-}
+function array_reduce(array $array, callable $callback, mixed $initial = null): mixed {}
 
 /**
  * @template K as array-key
@@ -4516,9 +3622,7 @@ function array_reduce(array $array, callable $callback, mixed $initial = null): 
  *
  * @pure
  */
-function array_pad(array $array, int $length, mixed $value): array
-{
-}
+function array_pad(array $array, int $length, mixed $value): array {}
 
 /**
  * @template K as array-key
@@ -4530,9 +3634,7 @@ function array_pad(array $array, int $length, mixed $value): array
  *
  * @pure
  */
-function array_flip(array $array): array
-{
-}
+function array_flip(array $array): array {}
 
 /**
  *
@@ -4545,9 +3647,7 @@ function array_flip(array $array): array
  *
  * @pure
  */
-function array_change_key_case(array $array, int $case = CASE_LOWER): array
-{
-}
+function array_change_key_case(array $array, int $case = CASE_LOWER): array {}
 
 /**
  * @template K as array-key
@@ -4559,9 +3659,7 @@ function array_change_key_case(array $array, int $case = CASE_LOWER): array
  *
  * @pure
  */
-function array_rand(array $array, int $num = 1): array|string|int
-{
-}
+function array_rand(array $array, int $num = 1): array|string|int {}
 
 /**
  * @template K as array-key
@@ -4574,9 +3672,7 @@ function array_rand(array $array, int $num = 1): array|string|int
  *
  * @pure
  */
-function array_unique(array $array, int $flags = SORT_STRING): array
-{
-}
+function array_unique(array $array, int $flags = SORT_STRING): array {}
 
 /**
  * @template K as array-key
@@ -4588,66 +3684,7 @@ function array_unique(array $array, int $flags = SORT_STRING): array
  * @return array<K, V>
  * @pure
  */
-function array_intersect(array $array, array ...$arrays): array
-{
-}
-
-/**
- * @template K as array-key
- * @template V
- *
- * @param array<K, V> $array
- * @param array ...$arrays
- *
- * @return array<K, V>
- *
- * @pure
- */
-function array_intersect_key(array $array, array ...$arrays): array
-{
-}
-
-/**
- * @template K as array-key
- * @template V
- *
- * @param array<K, V> $array
- * @param array ...$arrays
- *
- * @return array<K, V>
- * @pure
- */
-function array_intersect_assoc(array $array, array ...$arrays): array
-{
-}
-
-/**
- * @template K as array-key
- * @template V
- *
- * @param array<K, V> $array
- * @param array ...$arrays
- *
- * @return array<K, V>
- * @pure
- */
-function array_diff(array $array, array ...$arrays): array
-{
-}
-
-/**
- * @template K as array-key
- * @template V
- *
- * @param array<K, V> $array
- * @param array ...$arrays
- *
- * @return array<K, V>
- * @pure
- */
-function array_diff_key(array $array, array ...$arrays): array
-{
-}
+function array_intersect(array $array, array ...$arrays): array {}
 
 /**
  * @template K as array-key
@@ -4660,9 +3697,56 @@ function array_diff_key(array $array, array ...$arrays): array
  *
  * @pure
  */
-function array_diff_assoc(array $array, array ...$arrays): array
-{
-}
+function array_intersect_key(array $array, array ...$arrays): array {}
+
+/**
+ * @template K as array-key
+ * @template V
+ *
+ * @param array<K, V> $array
+ * @param array ...$arrays
+ *
+ * @return array<K, V>
+ * @pure
+ */
+function array_intersect_assoc(array $array, array ...$arrays): array {}
+
+/**
+ * @template K as array-key
+ * @template V
+ *
+ * @param array<K, V> $array
+ * @param array ...$arrays
+ *
+ * @return array<K, V>
+ * @pure
+ */
+function array_diff(array $array, array ...$arrays): array {}
+
+/**
+ * @template K as array-key
+ * @template V
+ *
+ * @param array<K, V> $array
+ * @param array ...$arrays
+ *
+ * @return array<K, V>
+ * @pure
+ */
+function array_diff_key(array $array, array ...$arrays): array {}
+
+/**
+ * @template K as array-key
+ * @template V
+ *
+ * @param array<K, V> $array
+ * @param array ...$arrays
+ *
+ * @return array<K, V>
+ *
+ * @pure
+ */
+function array_diff_assoc(array $array, array ...$arrays): array {}
 
 /**
  * @param array<int|float> $array
@@ -4671,18 +3755,14 @@ function array_diff_assoc(array $array, array ...$arrays): array
  *
  * @pure
  */
-function array_sum(array $array): int|float
-{
-}
+function array_sum(array $array): int|float {}
 
 /**
  * @param array<int|float> $array
  *
  * @pure
  */
-function array_product(array $array): int|float
-{
-}
+function array_product(array $array): int|float {}
 
 /**
  * @template K as array-key
@@ -4693,9 +3773,7 @@ function array_product(array $array): int|float
  *
  * @return array<K, V>
  */
-function array_filter(array $array, null|callable $callback = null, int $mode = 0): array
-{
-}
+function array_filter(array $array, ?callable $callback = null, int $mode = 0): array {}
 
 /**
  * @template K as array-key
@@ -4711,9 +3789,7 @@ function array_filter(array $array, null|callable $callback = null, int $mode = 
  *     ? ($array is non-empty-list<V> ? non-empty-list<U> : list<U>)
  *     : ($array is non-empty-array<K, V> ? non-empty-array<K, U> : array<K, U>))
  */
-function array_map(null|callable $callback, array $array, array ...$arrays): array
-{
-}
+function array_map(?callable $callback, array $array, array ...$arrays): array {}
 
 /**
  * @template K as array-key
@@ -4725,9 +3801,7 @@ function array_map(null|callable $callback, array $array, array ...$arrays): arr
  *
  * @pure
  */
-function array_chunk(array $array, int $length, bool $preserve_keys = false): array
-{
-}
+function array_chunk(array $array, int $length, bool $preserve_keys = false): array {}
 
 /**
  * @template K as array-key
@@ -4740,16 +3814,12 @@ function array_chunk(array $array, int $length, bool $preserve_keys = false): ar
  *
  * @pure
  */
-function array_combine(array $keys, array $values): array
-{
-}
+function array_combine(array $keys, array $values): array {}
 
 /**
  * @pure
  */
-function array_key_exists(string|int|float|bool|null $key, array $array): bool
-{
-}
+function array_key_exists(string|int|float|bool|null $key, array $array): bool {}
 
 /**
  * @template K as array-key
@@ -4760,9 +3830,7 @@ function array_key_exists(string|int|float|bool|null $key, array $array): bool
  *
  * @pure
  */
-function array_key_first(array $array): string|int|null
-{
-}
+function array_key_first(array $array): string|int|null {}
 
 /**
  * @template V
@@ -4773,9 +3841,7 @@ function array_key_first(array $array): string|int|null
  *
  * @pure
  */
-function array_first(array $array): mixed
-{
-}
+function array_first(array $array): mixed {}
 
 /**
  * @template K as array-key
@@ -4786,9 +3852,7 @@ function array_first(array $array): mixed
  *
  * @pure
  */
-function array_key_last(array $array): string|int|null
-{
-}
+function array_key_last(array $array): string|int|null {}
 
 /**
  * @template V
@@ -4799,25 +3863,19 @@ function array_key_last(array $array): string|int|null
  *
  * @pure
  */
-function array_last(array $array): mixed
-{
-}
+function array_last(array $array): mixed {}
 
 /**
  * @pure
  */
-function pos(object|array $array): mixed
-{
-}
+function pos(object|array $array): mixed {}
 
 /**
  * @return ($value is non-empty-array|non-empty-list ? int<1, max> : int<0, max>)
  *
  * @pure
  */
-function sizeof(Countable|array $value, int $mode = COUNT_NORMAL): int
-{
-}
+function sizeof(Countable|array $value, int $mode = COUNT_NORMAL): int {}
 
 /**
  * @template K as array-key
@@ -4826,27 +3884,19 @@ function sizeof(Countable|array $value, int $mode = COUNT_NORMAL): int
  * @param K $key
  * @param array<K, V> $array
  */
-function key_exists($key, array $array): bool
-{
-}
+function key_exists($key, array $array): bool {}
 
 /**
  * @assert truthy $assertion
  */
-function assert(mixed $assertion, Throwable|string|null $description = null): bool
-{
-}
+function assert(mixed $assertion, Throwable|string|null $description = null): bool {}
 
-class AssertionError extends Error
-{
-}
+class AssertionError extends Error {}
 
 /**
  * @deprecated
  */
-function assert_options(int $option, mixed $value): mixed
-{
-}
+function assert_options(int $option, mixed $value): mixed {}
 
 /**
  * @param null|'<'|'lt'|'<='|'le'|'>'|'gt'|'>='|'ge'|'=='|'='|'eq'|'!='|'<>'|'ne' $operator
@@ -4855,184 +3905,128 @@ function assert_options(int $option, mixed $value): mixed
  *
  * @pure
  */
-function version_compare(string $version1, string $version2, null|string $operator = null): int|bool
-{
-}
+function version_compare(string $version1, string $version2, ?string $operator = null): int|bool {}
 
-function ftok(string $filename, string $project_id): int
-{
-}
+function ftok(string $filename, string $project_id): int {}
 
 /**
  * @pure
  */
-function str_rot13(string $string): string
-{
-}
+function str_rot13(string $string): string {}
 
 /**
  * @return list<string>
  */
-function stream_get_filters(): array
-{
-}
+function stream_get_filters(): array {}
 
 /**
  * @param resource $stream
  */
-function stream_isatty($stream): bool
-{
-}
+function stream_isatty($stream): bool {}
 
 /**
  * @param class-string $class
  */
-function stream_filter_register(string $filter_name, string $class): bool
-{
-}
+function stream_filter_register(string $filter_name, string $class): bool {}
 
 /**
  * @param resource $brigade
  */
-function stream_bucket_make_writeable($brigade): StreamBucket|null
-{
-}
+function stream_bucket_make_writeable($brigade): ?StreamBucket {}
 
 /**
  * @param resource $brigade
  */
-function stream_bucket_prepend($brigade, StreamBucket $bucket): void
-{
-}
+function stream_bucket_prepend($brigade, StreamBucket $bucket): void {}
 
 /**
  * @param resource $brigade
  */
-function stream_bucket_append($brigade, StreamBucket $bucket): void
-{
-}
+function stream_bucket_append($brigade, StreamBucket $bucket): void {}
 
 /**
  * @param resource $stream
  */
-function stream_bucket_new($stream, string $buffer): StreamBucket
-{
-}
+function stream_bucket_new($stream, string $buffer): StreamBucket {}
 
-function output_add_rewrite_var(string $name, string $value): bool
-{
-}
+function output_add_rewrite_var(string $name, string $value): bool {}
 
-function output_reset_rewrite_vars(): bool
-{
-}
+function output_reset_rewrite_vars(): bool {}
 
 /**
  * @return non-empty-string
  */
-function sys_get_temp_dir(): string
-{
-}
+function sys_get_temp_dir(): string {}
 
-function realpath_cache_get(): array
-{
-}
+function realpath_cache_get(): array {}
 
-function realpath_cache_size(): int
-{
-}
+function realpath_cache_size(): int {}
 
-function get_mangled_object_vars(object $object): array
-{
-}
+function get_mangled_object_vars(object $object): array {}
 
 /**
  * @return non-empty-string
  *
  * @pure
  */
-function get_debug_type(mixed $value): string
-{
-}
+function get_debug_type(mixed $value): string {}
 
 /**
  * @param resource $resource
  *
  * @pure
  */
-function get_resource_id($resource): int
-{
-}
+function get_resource_id($resource): int {}
 
 /**
  * @no-named-arguments
  */
-function array_diff_ukey(array $array, ...$rest): array
-{
-}
+function array_diff_ukey(array $array, ...$rest): array {}
 
 /**
  * @no-named-arguments
  */
-function array_udiff(array $array, ...$rest): array
-{
-}
+function array_udiff(array $array, ...$rest): array {}
 
 /**
  * @no-named-arguments
  */
-function array_udiff_assoc(array $array, ...$rest): array
-{
-}
+function array_udiff_assoc(array $array, ...$rest): array {}
 
 /**
  * @no-named-arguments
  */
-function array_diff_uassoc(array $array, ...$rest): array
-{
-}
+function array_diff_uassoc(array $array, ...$rest): array {}
 
 /**
  * @no-named-arguments
  */
-function array_udiff_uassoc(array $array, ...$rest): array
-{
-}
+function array_udiff_uassoc(array $array, ...$rest): array {}
 
 /**
  * @no-named-arguments
  */
-function array_uintersect_assoc(array $array, ...$rest): array
-{
-}
+function array_uintersect_assoc(array $array, ...$rest): array {}
 
 /**
  * @no-named-arguments
  */
-function array_intersect_uassoc(array $array, ...$rest): array
-{
-}
+function array_intersect_uassoc(array $array, ...$rest): array {}
 
 /**
  * @no-named-arguments
  */
-function array_uintersect_uassoc(array $array, ...$rest): array
-{
-}
+function array_uintersect_uassoc(array $array, ...$rest): array {}
 
 /**
  * @no-named-arguments
  */
-function array_intersect_ukey(array $array, ...$rest): array
-{
-}
+function array_intersect_ukey(array $array, ...$rest): array {}
 
 /**
  * @no-named-arguments
  */
-function array_uintersect(array $array, ...$rest): array
-{
-}
+function array_uintersect(array $array, ...$rest): array {}
 
 /**
  * @template K as array-key
@@ -5042,9 +4036,7 @@ function array_uintersect(array $array, ...$rest): array
  *
  * @param-out ($array is non-empty-array|non-empty-list ? non-empty-array<K, V> : array<K, V>) $array
  */
-function ksort(array &$array, int $flags = SORT_REGULAR): true
-{
-}
+function ksort(array &$array, int $flags = SORT_REGULAR): true {}
 
 /**
  * @template K as array-key
@@ -5054,9 +4046,7 @@ function ksort(array &$array, int $flags = SORT_REGULAR): true
  *
  * @param-out ($array is non-empty-array|non-empty-list ? non-empty-array<K, V> : array<K, V>) $array
  */
-function krsort(array &$array, int $flags = SORT_REGULAR): true
-{
-}
+function krsort(array &$array, int $flags = SORT_REGULAR): true {}
 
 /**
  * @template K as array-key
@@ -5066,9 +4056,7 @@ function krsort(array &$array, int $flags = SORT_REGULAR): true
  *
  * @param-out ($array is non-empty-array|non-empty-list ? non-empty-array<K, V> : array<K, V>) $array
  */
-function natsort(array &$array): true
-{
-}
+function natsort(array &$array): true {}
 
 /**
  * @template K as array-key
@@ -5078,9 +4066,7 @@ function natsort(array &$array): true
  *
  * @param-out ($array is non-empty-array|non-empty-list ? non-empty-array<K, V> : array<K, V>) $array
  */
-function natcasesort(array &$array): true
-{
-}
+function natcasesort(array &$array): true {}
 
 /**
  * @template K as array-key
@@ -5090,9 +4076,7 @@ function natcasesort(array &$array): true
  *
  * @param-out ($array is non-empty-array|non-empty-list ? non-empty-array<K, V> : array<K, V>) $array
  */
-function asort(array &$array, int $flags = SORT_REGULAR): true
-{
-}
+function asort(array &$array, int $flags = SORT_REGULAR): true {}
 
 /**
  * @template K as array-key
@@ -5102,9 +4086,7 @@ function asort(array &$array, int $flags = SORT_REGULAR): true
  *
  * @param-out ($array is non-empty-array|non-empty-list ? non-empty-array<K, V> : array<K, V>) $array
  */
-function arsort(array &$array, int $flags = SORT_REGULAR): true
-{
-}
+function arsort(array &$array, int $flags = SORT_REGULAR): true {}
 
 /**
  * @template T
@@ -5113,9 +4095,7 @@ function arsort(array &$array, int $flags = SORT_REGULAR): true
  *
  * @param-out ($array is non-empty-array|non-empty-list ? non-empty-list<T> : list<T>) $array
  */
-function sort(array &$array, int $flags = SORT_REGULAR): true
-{
-}
+function sort(array &$array, int $flags = SORT_REGULAR): true {}
 
 /**
  * @template T
@@ -5124,9 +4104,7 @@ function sort(array &$array, int $flags = SORT_REGULAR): true
  *
  * @param-out ($array is non-empty-array|non-empty-list ? non-empty-list<T> : list<T>) $array
  */
-function rsort(array &$array, int $flags = SORT_REGULAR): true
-{
-}
+function rsort(array &$array, int $flags = SORT_REGULAR): true {}
 
 /**
  * @template T
@@ -5136,9 +4114,7 @@ function rsort(array &$array, int $flags = SORT_REGULAR): true
  *
  * @param-out ($array is non-empty-array|non-empty-list ? non-empty-list<T> : list<T>) $array
  */
-function usort(array &$array, callable $callback): true
-{
-}
+function usort(array &$array, callable $callback): true {}
 
 /**
  * @template K
@@ -5149,9 +4125,7 @@ function usort(array &$array, callable $callback): true
  *
  * @param-out ($array is non-empty-array|non-empty-list ? non-empty-array<K, V> : array<K, V>) $array
  */
-function uasort(array &$array, callable $callback): true
-{
-}
+function uasort(array &$array, callable $callback): true {}
 
 /**
  * @template K as array-key
@@ -5162,9 +4136,7 @@ function uasort(array &$array, callable $callback): true
  *
  * @param-out ($array is non-empty-array|non-empty-list ? non-empty-array<K, V> : array<K, V>) $array
  */
-function uksort(array &$array, callable $callback): true
-{
-}
+function uksort(array &$array, callable $callback): true {}
 
 /**
  * @template T
@@ -5173,18 +4145,14 @@ function uksort(array &$array, callable $callback): true
  *
  * @param-out ($array is non-empty-array|non-empty-list ? non-empty-list<T> : list<T>) $array
  */
-function shuffle(array &$array): true
-{
-}
+function shuffle(array &$array): true {}
 
 /**
  * @return ($value is non-empty-array|non-empty-list ? int<1, max> : int<0, max>)
  *
  * @pure
  */
-function count(Countable|array $value, int $mode = COUNT_NORMAL): int
-{
-}
+function count(Countable|array $value, int $mode = COUNT_NORMAL): int {}
 
 /**
  * @template T
@@ -5194,9 +4162,7 @@ function count(Countable|array $value, int $mode = COUNT_NORMAL): int
  *
  * @return ($array is non-empty-array|non-empty-list ? T : false)
  */
-function end(object|array &$array): mixed
-{
-}
+function end(object|array &$array): mixed {}
 
 /**
  * @template T
@@ -5206,9 +4172,7 @@ function end(object|array &$array): mixed
  *
  * @return T|false
  */
-function prev(object|array &$array): mixed
-{
-}
+function prev(object|array &$array): mixed {}
 
 /**
  * @template K
@@ -5219,9 +4183,7 @@ function prev(object|array &$array): mixed
  *
  * @return V|false
  */
-function next(object|array &$array): mixed
-{
-}
+function next(object|array &$array): mixed {}
 
 /**
  * @template K
@@ -5232,9 +4194,7 @@ function next(object|array &$array): mixed
  *
  * @return V|false
  */
-function reset(object|array &$array): mixed
-{
-}
+function reset(object|array &$array): mixed {}
 
 /**
  * @template V
@@ -5245,9 +4205,7 @@ function reset(object|array &$array): mixed
  *
  * @pure
  */
-function current(object|array $array): mixed
-{
-}
+function current(object|array $array): mixed {}
 
 /**
  * @template K of array-key
@@ -5258,9 +4216,7 @@ function current(object|array $array): mixed
  *
  * @pure
  */
-function key(object|array $array): string|int|null
-{
-}
+function key(object|array $array): string|int|null {}
 
 /**
  * @template T
@@ -5272,9 +4228,7 @@ function key(object|array $array): string|int|null
  *
  * @pure
  */
-function min(mixed $value, mixed ...$values): mixed
-{
-}
+function min(mixed $value, mixed ...$values): mixed {}
 
 /**
  * @template T
@@ -5286,9 +4240,7 @@ function min(mixed $value, mixed ...$values): mixed
  *
  * @pure
  */
-function max(mixed $value, mixed ...$values): mixed
-{
-}
+function max(mixed $value, mixed ...$values): mixed {}
 
 /**
  * @template V
@@ -5298,9 +4250,7 @@ function max(mixed $value, mixed ...$values): mixed
  *
  * @pure
  */
-function in_array(mixed $needle, array $haystack, bool $strict = false): bool
-{
-}
+function in_array(mixed $needle, array $haystack, bool $strict = false): bool {}
 
 /**
  * @template K of array-key
@@ -5313,9 +4263,7 @@ function in_array(mixed $needle, array $haystack, bool $strict = false): bool
  *
  * @pure
  */
-function array_search(mixed $needle, array $haystack, bool $strict = false): string|int|false
-{
-}
+function array_search(mixed $needle, array $haystack, bool $strict = false): string|int|false {}
 
 /**
  * @template T
@@ -5330,9 +4278,7 @@ function array_search(mixed $needle, array $haystack, bool $strict = false): str
  *
  * @pure
  */
-function array_fill(int $start_index, int $count, mixed $value): array
-{
-}
+function array_fill(int $start_index, int $count, mixed $value): array {}
 
 /**
  * @template K of array-key
@@ -5345,9 +4291,7 @@ function array_fill(int $start_index, int $count, mixed $value): array
  *
  * @pure
  */
-function array_fill_keys(array $keys, mixed $value): array
-{
-}
+function array_fill_keys(array $keys, mixed $value): array {}
 
 /**
  * @template K of array-key
@@ -5362,9 +4306,7 @@ function array_fill_keys(array $keys, mixed $value): array
  *
  * @pure
  */
-function array_push(array &$array, mixed ...$values): int
-{
-}
+function array_push(array &$array, mixed ...$values): int {}
 
 /**
  * @template K of array-key
@@ -5376,9 +4318,7 @@ function array_push(array &$array, mixed ...$values): int
  *
  * @return ($array is non-empty-array|non-empty-list ? V : V|null)
  */
-function array_pop(array &$array): mixed
-{
-}
+function array_pop(array &$array): mixed {}
 
 /**
  * @template K of array-key
@@ -5391,9 +4331,7 @@ function array_pop(array &$array): mixed
  *
  * @pure
  */
-function array_shift(array &$array): mixed
-{
-}
+function array_shift(array &$array): mixed {}
 
 /**
  * @template K of array-key
@@ -5405,9 +4343,7 @@ function array_shift(array &$array): mixed
  *
  * @pure
  */
-function array_slice(array $array, int $offset, null|int $length = null, bool $preserve_keys = false): array
-{
-}
+function array_slice(array $array, int $offset, ?int $length = null, bool $preserve_keys = false): array {}
 
 /**
  * @template K as array-key
@@ -5419,48 +4355,28 @@ function array_slice(array $array, int $offset, null|int $length = null, bool $p
  *
  * @pure
  */
-function array_merge(array ...$arrays): array
-{
-}
+function array_merge(array ...$arrays): array {}
 
 /**
  * @param (callable(string, null|int): string)|null $callback
  */
-function ob_start(callable|null $callback = null, int $chunk_size = 0, int $flags = PHP_OUTPUT_HANDLER_STDFLAGS): bool
-{
-}
+function ob_start(?callable $callback = null, int $chunk_size = 0, int $flags = PHP_OUTPUT_HANDLER_STDFLAGS): bool {}
 
-function ob_flush(): bool
-{
-}
+function ob_flush(): bool {}
 
-function ob_clean(): bool
-{
-}
+function ob_clean(): bool {}
 
-function ob_end_flush(): bool
-{
-}
+function ob_end_flush(): bool {}
 
-function ob_end_clean(): bool
-{
-}
+function ob_end_clean(): bool {}
 
-function ob_get_flush(): string|false
-{
-}
+function ob_get_flush(): string|false {}
 
-function ob_get_clean(): string|false
-{
-}
+function ob_get_clean(): string|false {}
 
-function ob_get_length(): int|false
-{
-}
+function ob_get_length(): int|false {}
 
-function ob_get_level(): int
-{
-}
+function ob_get_level(): int {}
 
 /**
  * @return array{
@@ -5474,39 +4390,25 @@ function ob_get_level(): int
  *   buffer_used: int
  * }
  */
-function ob_get_status(bool $full_status = false): array
-{
-}
+function ob_get_status(bool $full_status = false): array {}
 
-function ob_get_contents(): string|false
-{
-}
+function ob_get_contents(): string|false {}
 
-function ob_implicit_flush(bool $enable = true): void
-{
-}
+function ob_implicit_flush(bool $enable = true): void {}
 
 /**
  * @return list<non-empty-string>
  */
-function ob_list_handlers(): array
-{
-}
+function ob_list_handlers(): array {}
 
-function syslog(int $priority, string $message): true
-{
-}
+function syslog(int $priority, string $message): true {}
 
-function closelog(): true
-{
-}
+function closelog(): true {}
 
 /**
  * @param (callable(): void) $callback
  */
-function header_register_callback(callable $callback): bool
-{
-}
+function header_register_callback(callable $callback): bool {}
 
 /**
  * @return false|array{
@@ -5519,23 +4421,17 @@ function header_register_callback(callable $callback): bool
  *  mime: string
  * }
  */
-function getimagesizefromstring(string $string, null|array &$image_info = null): array|false
-{
-}
+function getimagesizefromstring(string $string, ?array &$image_info = null): array|false {}
 
 /**
  * @param resource $stream
  */
-function stream_set_chunk_size($stream, int $size): int
-{
-}
+function stream_set_chunk_size($stream, int $size): int {}
 
 /**
  * @pure
  */
-function metaphone(string $string, int $max_phonemes = 0): string
-{
-}
+function metaphone(string $string, int $max_phonemes = 0): string {}
 
 /**
  * @template K
@@ -5549,28 +4445,22 @@ function metaphone(string $string, int $max_phonemes = 0): string
  *
  * @param-out ($array is object ? object : (
  *    $array is list<V> ? (
- *      $array is non-empty-list<V> ? non-empty-list<O> : list<O> 
+ *      $array is non-empty-list<V> ? non-empty-list<O> : list<O>
  *    ) : (
  *      $array is non-empty-array<K, V> ? non-empty-array<K, O> : array<K, O>
  *    )
  * )) $array
  */
-function array_walk(object|array &$array, callable $callback, mixed $arg = null): true
-{
-}
+function array_walk(object|array &$array, callable $callback, mixed $arg = null): true {}
 
-function array_walk_recursive(object|array &$array, callable $callback, mixed $arg = null): true
-{
-}
+function array_walk_recursive(object|array &$array, callable $callback, mixed $arg = null): true {}
 
 /**
  * @param array<string, mixed> $array
  *
  * @return int<0, max>
  */
-function extract(array &$array, int $flags = EXTR_OVERWRITE, string $prefix = ''): int
-{
-}
+function extract(array &$array, int $flags = EXTR_OVERWRITE, string $prefix = ''): int {}
 
 /**
  * @param string|array<string> $var_name
@@ -5580,9 +4470,7 @@ function extract(array &$array, int $flags = EXTR_OVERWRITE, string $prefix = ''
  *
  * @pure
  */
-function compact($var_name, ...$var_names): array
-{
-}
+function compact($var_name, ...$var_names): array {}
 
 /**
  * @param positive-int|float $step
@@ -5603,16 +4491,12 @@ function compact($var_name, ...$var_names): array
  *
  * @pure
  */
-function range(string|int|float $start, string|int|float $end, int|float $step = 1): array
-{
-}
+function range(string|int|float $start, string|int|float $end, int|float $step = 1): array {}
 
 /**
  * @pure
  */
-function array_multisort(&$array, $sort_order = SORT_ASC, $sort_flags = SORT_REGULAR, &...$rest): bool
-{
-}
+function array_multisort(&$array, $sort_order = SORT_ASC, $sort_flags = SORT_REGULAR, &...$rest): bool {}
 
 /**
  * @template K of array-key
@@ -5628,9 +4512,7 @@ function array_multisort(&$array, $sort_order = SORT_ASC, $sort_flags = SORT_REG
  *
  * @pure
  */
-function array_unshift(array &$array, mixed ...$values): int
-{
-}
+function array_unshift(array &$array, mixed ...$values): int {}
 
 /**
  * @template InputKey of array-key
@@ -5648,7 +4530,7 @@ function array_unshift(array &$array, mixed ...$values): int
  *   $replacement is array<ReplacementKey, ReplacementValue> ? (
  *     $array is list<InputValue> ? (
  *       $replacement is list<ReplacementValue> ? (
- *         $replacement is non-empty-list<ReplacementValue> ? non-empty-list<InputValue|ReplacementValue> : list<InputValue|ReplacementValue> 
+ *         $replacement is non-empty-list<ReplacementValue> ? non-empty-list<InputValue|ReplacementValue> : list<InputValue|ReplacementValue>
  *       ) : (
  *         $replacement is non-empty-array<ReplacementKey, ReplacementValue> ? (
  *           non-empty-array<InputKey|ReplacementKey, InputValue|ReplacementValue>
@@ -5674,6 +4556,4 @@ function array_unshift(array &$array, mixed ...$values): int
  *
  * @pure
  */
-function array_splice(array &$array, int $offset, null|int $length = null, mixed $replacement = []): array
-{
-}
+function array_splice(array &$array, int $offset, ?int $length = null, mixed $replacement = []): array {}

@@ -15,31 +15,21 @@ class PhpToken implements Stringable
     /**
      * @return string|null
      */
-    public function getTokenName(): null|string
-    {
-    }
+    public function getTokenName(): ?string {}
 
     /**
      * @return list<PhpToken>
      */
-    public static function tokenize(string $code, int $flags = 0): array
-    {
-    }
+    public static function tokenize(string $code, int $flags = 0): array {}
 
     /**
      * @param int|string|array $kind
      */
-    public function is($kind): bool
-    {
-    }
+    public function is($kind): bool {}
 
-    public function isIgnorable(): bool
-    {
-    }
+    public function isIgnorable(): bool {}
 
-    public function __toString(): string
-    {
-    }
+    public function __toString(): string {}
 }
 
 /**
@@ -47,16 +37,12 @@ class PhpToken implements Stringable
  *
  * @pure
  */
-function token_get_all(string $code, int $flags = 0): array
-{
-}
+function token_get_all(string $code, int $flags = 0): array {}
 
 /**
  * @return non-empty-string
  */
-function token_name(int $id): string
-{
-}
+function token_name(int $id): string {}
 
 const TOKEN_PARSE = 1;
 

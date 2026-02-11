@@ -15,13 +15,9 @@ const EXP_FULLBUFFER = -5;
 /**
  * @return resource|false
  */
-function expect_popen(string $command)
-{
-}
+function expect_popen(string $command) {}
 
 /**
  * @param resource $expect
  */
-function expect_expectl($expect, array $cases, array &$match = []): int
-{
-}
+function expect_expectl($expect, array $cases, array &$match = []): int {}

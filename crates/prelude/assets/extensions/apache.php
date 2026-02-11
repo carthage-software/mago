@@ -3,27 +3,21 @@
 /**
  * @return bool
  */
-function apache_child_terminate()
-{
-}
+function apache_child_terminate() {}
 
 /**
  * @return array
  *
  * @pure
  */
-function apache_get_modules()
-{
-}
+function apache_get_modules() {}
 
 /**
  * @return string|false
  *
  * @pure
  */
-function apache_get_version()
-{
-}
+function apache_get_version() {}
 
 /**
  * @param string $variable
@@ -33,18 +27,14 @@ function apache_get_version()
  *
  * @pure
  */
-function apache_getenv($variable, $walk_to_top = false)
-{
-}
+function apache_getenv($variable, $walk_to_top = false) {}
 
 /**
  * @param string $filename
  *
  * @return object
  */
-function apache_lookup_uri($filename)
-{
-}
+function apache_lookup_uri($filename) {}
 
 /**
  * @param string $note_name
@@ -52,23 +42,17 @@ function apache_lookup_uri($filename)
  *
  * @return string|false
  */
-function apache_note($note_name, $note_value = '')
-{
-}
+function apache_note($note_name, $note_value = '') {}
 
 /**
  * @return bool
  */
-function apache_reset_timeout()
-{
-}
+function apache_reset_timeout() {}
 
 /**
  * @return array|false
  */
-function apache_response_headers()
-{
-}
+function apache_response_headers() {}
 
 /**
  * @param string $variable
@@ -77,14 +61,10 @@ function apache_response_headers()
  *
  * @return bool
  */
-function apache_setenv($variable, $value, $walk_to_top = false)
-{
-}
+function apache_setenv($variable, $value, $walk_to_top = false) {}
 
 /**
  * @param string $filename
  * @return bool
  */
-function virtual($filename)
-{
-}
+function virtual($filename) {}

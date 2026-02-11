@@ -6,74 +6,54 @@
  *
  * @return bool
  */
-function zend_shm_cache_store($key, $value, $ttl = 0)
-{
-}
+function zend_shm_cache_store($key, $value, $ttl = 0) {}
 
 /**
  * @param string $key
  */
-function zend_shm_cache_fetch($key)
-{
-}
+function zend_shm_cache_fetch($key) {}
 
 /**
  * @param string $key
  */
-function zend_shm_cache_delete($key)
-{
-}
+function zend_shm_cache_delete($key) {}
 
 /**
  * @param string $namespace
  *
  * @return bool
  */
-function zend_shm_cache_clear($namespace = '')
-{
-}
+function zend_shm_cache_clear($namespace = '') {}
 
 /**
  * @return array|false
  */
-function zend_shm_cache_info()
-{
-}
+function zend_shm_cache_info() {}
 
 /**
  * @param string $key
  * @param int $ttl
  */
-function zend_disk_cache_store($key, $value, $ttl = 0)
-{
-}
+function zend_disk_cache_store($key, $value, $ttl = 0) {}
 
 /**
  * @param string $key
  */
-function zend_disk_cache_fetch($key)
-{
-}
+function zend_disk_cache_fetch($key) {}
 
 /**
  * @param string $key
  */
-function zend_disk_cache_delete($key)
-{
-}
+function zend_disk_cache_delete($key) {}
 
 /**
  * @param string $namespace
  *
  * @return bool
  */
-function zend_disk_cache_clear($namespace = '')
-{
-}
+function zend_disk_cache_clear($namespace = '') {}
 
 /**
  * @return array|false
  */
-function zend_disk_cache_info()
-{
-}
+function zend_disk_cache_info() {}

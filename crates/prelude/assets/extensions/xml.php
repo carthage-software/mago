@@ -1,126 +1,81 @@
 <?php
 
-final class XMLParser
-{
-}
+final class XMLParser {}
 
 /**
  * @pure
  */
-function xml_parser_create(null|string $encoding): XMLParser
-{
-}
+function xml_parser_create(?string $encoding): XMLParser {}
 
 /**
  * @pure
  */
-function xml_parser_create_ns(null|string $encoding, string $separator = ':'): XMLParser
-{
-}
+function xml_parser_create_ns(?string $encoding, string $separator = ':'): XMLParser {}
 
 /**
  * @deprecated
  */
-function xml_set_object(XMLParser $parser, object $object): bool
-{
-}
+function xml_set_object(XMLParser $parser, object $object): bool {}
 
 function xml_set_element_handler(
     XMLParser $parser,
     callable|string|null $start_handler,
     callable|string|null $end_handler,
-): bool {
-}
+): bool {}
 
-function xml_set_character_data_handler(XMLParser $parser, callable|string|null $handler): bool
-{
-}
+function xml_set_character_data_handler(XMLParser $parser, callable|string|null $handler): bool {}
 
-function xml_set_processing_instruction_handler(XMLParser $parser, callable|string|null $handler): bool
-{
-}
+function xml_set_processing_instruction_handler(XMLParser $parser, callable|string|null $handler): bool {}
 
-function xml_set_default_handler(XMLParser $parser, callable|string|null $handler): bool
-{
-}
+function xml_set_default_handler(XMLParser $parser, callable|string|null $handler): bool {}
 
-function xml_set_unparsed_entity_decl_handler(XMLParser $parser, callable|string|null $handler): bool
-{
-}
+function xml_set_unparsed_entity_decl_handler(XMLParser $parser, callable|string|null $handler): bool {}
 
-function xml_set_notation_decl_handler(XMLParser $parser, callable|string|null $handler): bool
-{
-}
+function xml_set_notation_decl_handler(XMLParser $parser, callable|string|null $handler): bool {}
 
-function xml_set_external_entity_ref_handler(XMLParser $parser, callable|string|null $handler): bool
-{
-}
+function xml_set_external_entity_ref_handler(XMLParser $parser, callable|string|null $handler): bool {}
 
-function xml_set_start_namespace_decl_handler(XMLParser $parser, callable|string|null $handler): bool
-{
-}
+function xml_set_start_namespace_decl_handler(XMLParser $parser, callable|string|null $handler): bool {}
 
-function xml_set_end_namespace_decl_handler(XMLParser $parser, callable|string|null $handler): bool
-{
-}
+function xml_set_end_namespace_decl_handler(XMLParser $parser, callable|string|null $handler): bool {}
 
-function xml_parse(XMLParser $parser, string $data, bool $is_final = false): int
-{
-}
+function xml_parse(XMLParser $parser, string $data, bool $is_final = false): int {}
 
-function xml_parse_into_struct(XMLParser $parser, string $data, array &$values, array &$index): int
-{
-}
+function xml_parse_into_struct(XMLParser $parser, string $data, array &$values, array &$index): int {}
 
 /**
  * @pure
  */
-function xml_get_error_code(XMLParser $parser): int
-{
-}
+function xml_get_error_code(XMLParser $parser): int {}
 
 /**
  * @pure
  */
-function xml_error_string(int $error_code): null|string
-{
-}
+function xml_error_string(int $error_code): ?string {}
 
 /**
  * @pure
  */
-function xml_get_current_line_number(XMLParser $parser): int
-{
-}
+function xml_get_current_line_number(XMLParser $parser): int {}
 
 /**
  * @pure
  */
-function xml_get_current_column_number(XMLParser $parser): int
-{
-}
+function xml_get_current_column_number(XMLParser $parser): int {}
 
 /**
  * @pure
  */
-function xml_get_current_byte_index(XMLParser $parser): int
-{
-}
+function xml_get_current_byte_index(XMLParser $parser): int {}
 
-function xml_parser_free(XMLParser $parser): bool
-{
-}
+function xml_parser_free(XMLParser $parser): bool {}
 
-function xml_parser_set_option(XMLParser $parser, int $option, mixed $value): bool
-{
-}
+function xml_parser_set_option(XMLParser $parser, int $option, mixed $value): bool {}
 
 /**
  * @pure
  */
-function xml_parser_get_option(XMLParser $parser, int $option): string|int|bool
-{
-}
+function xml_parser_get_option(XMLParser $parser, int $option): string|int|bool {}
 
 const XML_ERROR_NONE = 0;
 

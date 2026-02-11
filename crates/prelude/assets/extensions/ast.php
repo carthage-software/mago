@@ -55,42 +55,30 @@ namespace ast {
          * @param list<Node>|null $children
          */
         public function __construct(
-            null|int $kind = null,
-            null|int $flags = null,
-            null|array $children = null,
-            null|int $lineno = null,
+            ?int $kind = null,
+            ?int $flags = null,
+            ?array $children = null,
+            ?int $lineno = null,
         ) {}
     }
 
-    function get_kind_name(int $kind): string
-    {
-    }
+    function get_kind_name(int $kind): string {}
 
     /**
      * @return list<Metadata>
      */
-    function get_metadata(): array
-    {
-    }
+    function get_metadata(): array {}
 
     /**
      * @return list<int>
      */
-    function get_supported_versions(bool $exclude_deprecated = false): array
-    {
-    }
+    function get_supported_versions(bool $exclude_deprecated = false): array {}
 
-    function kind_uses_flags(int $kind): bool
-    {
-    }
+    function kind_uses_flags(int $kind): bool {}
 
-    function parse_code(string $code, int $version, string $filename = 'string code'): Node
-    {
-    }
+    function parse_code(string $code, int $version, string $filename = 'string code'): Node {}
 
-    function parse_file(string $filename, int $version): Node
-    {
-    }
+    function parse_file(string $filename, int $version): Node {}
 
     const AST_ARG_LIST = 128;
 

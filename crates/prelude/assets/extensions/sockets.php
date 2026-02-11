@@ -493,17 +493,11 @@ final class AddressInfo
 /**
  * @return AddressInfo[]|false
  */
-function socket_addrinfo_lookup(string $host, null|string $service, array $hints = []): array|false
-{
-}
+function socket_addrinfo_lookup(string $host, ?string $service, array $hints = []): array|false {}
 
-function socket_addrinfo_connect(AddressInfo $address): Socket|false
-{
-}
+function socket_addrinfo_connect(AddressInfo $address): Socket|false {}
 
-function socket_addrinfo_bind(AddressInfo $address): Socket|false
-{
-}
+function socket_addrinfo_bind(AddressInfo $address): Socket|false {}
 
 /**
  * @return array{
@@ -520,9 +514,7 @@ function socket_addrinfo_bind(AddressInfo $address): Socket|false
  *   },
  * }
  */
-function socket_addrinfo_explain(AddressInfo $address): array
-{
-}
+function socket_addrinfo_explain(AddressInfo $address): array {}
 
 /**
  * @param-out array<array-key, resource> $read
@@ -530,123 +522,80 @@ function socket_addrinfo_explain(AddressInfo $address): array
  * @param-out array<array-key, resource> $except
  */
 function socket_select(
-    null|array &$read,
-    null|array &$write,
-    null|array &$except,
-    null|int $seconds,
+    ?array &$read,
+    ?array &$write,
+    ?array &$except,
+    ?int $seconds,
     int $microseconds = 0,
-): int|false {
-}
+): int|false {}
 
-function socket_create(int $domain, int $type, int $protocol): Socket|false
-{
-}
+function socket_create(int $domain, int $type, int $protocol): Socket|false {}
 
 /**
  * @param Socket $socket
  * @return resource|Socket|false
  */
-function socket_export_stream(Socket $socket)
-{
-}
+function socket_export_stream(Socket $socket) {}
 
-function socket_create_listen(int $port, int $backlog = 128): Socket|false
-{
-}
+function socket_create_listen(int $port, int $backlog = 128): Socket|false {}
 
 /**
  * @param-out array{Socket, Socket} $pair
  */
-function socket_create_pair(int $domain, int $type, int $protocol, &$pair): bool
-{
-}
+function socket_create_pair(int $domain, int $type, int $protocol, &$pair): bool {}
 
-function socket_accept(Socket $socket): Socket|false
-{
-}
+function socket_accept(Socket $socket): Socket|false {}
 
-function socket_set_nonblock(Socket $socket): bool
-{
-}
+function socket_set_nonblock(Socket $socket): bool {}
 
-function socket_set_block(Socket $socket): bool
-{
-}
+function socket_set_block(Socket $socket): bool {}
 
-function socket_listen(Socket $socket, int $backlog = 0): bool
-{
-}
+function socket_listen(Socket $socket, int $backlog = 0): bool {}
 
-function socket_close(Socket $socket): void
-{
-}
+function socket_close(Socket $socket): void {}
 
-function socket_write(Socket $socket, string $data, null|int $length = null): int|false
-{
-}
+function socket_write(Socket $socket, string $data, ?int $length = null): int|false {}
 
-function socket_read(Socket $socket, int $length, int $mode = PHP_BINARY_READ): string|false
-{
-}
+function socket_read(Socket $socket, int $length, int $mode = PHP_BINARY_READ): string|false {}
 
 /**
  * @param-out string $address
  * @param-out int $port
  */
-function socket_getsockname(Socket $socket, &$address, &$port = null): bool
-{
-}
+function socket_getsockname(Socket $socket, &$address, &$port = null): bool {}
 
 /**
  * @param-out string $address
  * @param-out int $port
  */
-function socket_getpeername(Socket $socket, &$address, &$port = null): bool
-{
-}
+function socket_getpeername(Socket $socket, &$address, &$port = null): bool {}
 
-function socket_connect(Socket $socket, string $address, null|int $port = null): bool
-{
-}
+function socket_connect(Socket $socket, string $address, ?int $port = null): bool {}
 
-function socket_strerror(int $error_code): string
-{
-}
+function socket_strerror(int $error_code): string {}
 
-function socket_bind(Socket $socket, string $address, int $port = 0): bool
-{
-}
+function socket_bind(Socket $socket, string $address, int $port = 0): bool {}
 
 /**
  * @param-out string $data
  */
-function socket_recv(Socket $socket, &$data, int $length, int $flags): int|false
-{
-}
+function socket_recv(Socket $socket, &$data, int $length, int $flags): int|false {}
 
-function socket_send(Socket $socket, string $data, int $length, int $flags): int|false
-{
-}
+function socket_send(Socket $socket, string $data, int $length, int $flags): int|false {}
 
-function socket_sendmsg(Socket $socket, array $message, int $flags = 0): int|false
-{
-}
+function socket_sendmsg(Socket $socket, array $message, int $flags = 0): int|false {}
 
 /**
  * @param-out string $data
  * @param-out string $address
  * @param-out int $port
  */
-function socket_recvfrom(Socket $socket, &$data, int $length, int $flags, &$address, &$port = null): int|false
-{
-}
+function socket_recvfrom(Socket $socket, &$data, int $length, int $flags, &$address, &$port = null): int|false {}
 
 /**
  * @param-out array $message
  */
-function socket_recvmsg(Socket $socket, array &$message, int $flags = 0): int|false
-{
-}
+function socket_recvmsg(Socket $socket, array &$message, int $flags = 0): int|false {}
 
 function socket_sendto(
     Socket $socket,
@@ -654,61 +603,34 @@ function socket_sendto(
     int $length,
     int $flags,
     string $address,
-    null|int $port = null,
-): int|false {
-}
+    ?int $port = null,
+): int|false {}
 
-function socket_get_option(Socket $socket, int $level, int $option): array|int|false
-{
-}
+function socket_get_option(Socket $socket, int $level, int $option): array|int|false {}
 
-function socket_set_option(Socket $socket, int $level, int $option, $value): bool
-{
-}
+function socket_set_option(Socket $socket, int $level, int $option, $value): bool {}
 
-function socket_shutdown(Socket $socket, int $mode = 2): bool
-{
-}
+function socket_shutdown(Socket $socket, int $mode = 2): bool {}
 
-function socket_last_error(null|Socket $socket = null): int
-{
-}
+function socket_last_error(?Socket $socket = null): int {}
 
-function socket_clear_error(null|Socket $socket = null): void
-{
-}
+function socket_clear_error(?Socket $socket = null): void {}
 
 /**
  * @param resource|Socket $stream
  */
-function socket_import_stream($stream): Socket|false
-{
-}
+function socket_import_stream($stream): Socket|false {}
 
-function socket_cmsg_space(int $level, int $type, int $num = 0): null|int
-{
-}
+function socket_cmsg_space(int $level, int $type, int $num = 0): ?int {}
 
-function socket_getopt(Socket $socket, int $level, int $option): array|int|false
-{
-}
+function socket_getopt(Socket $socket, int $level, int $option): array|int|false {}
 
-function socket_setopt(Socket $socket, int $level, int $option, $value): bool
-{
-}
+function socket_setopt(Socket $socket, int $level, int $option, $value): bool {}
 
-function socket_wsaprotocol_info_export(Socket $socket, int $target_pid): string|false
-{
-}
+function socket_wsaprotocol_info_export(Socket $socket, int $target_pid): string|false {}
 
-function socket_wsaprotocol_info_import(string $info_id): Socket|false
-{
-}
+function socket_wsaprotocol_info_import(string $info_id): Socket|false {}
 
-function socket_wsaprotocol_info_release(string $info_id): bool
-{
-}
+function socket_wsaprotocol_info_release(string $info_id): bool {}
 
-function socket_atmark(Socket $socket): bool
-{
-}
+function socket_atmark(Socket $socket): bool {}

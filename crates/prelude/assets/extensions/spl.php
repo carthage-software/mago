@@ -1,56 +1,30 @@
 <?php
 
-class LogicException extends Exception
-{
-}
+class LogicException extends Exception {}
 
-class BadFunctionCallException extends LogicException
-{
-}
+class BadFunctionCallException extends LogicException {}
 
-class BadMethodCallException extends BadFunctionCallException
-{
-}
+class BadMethodCallException extends BadFunctionCallException {}
 
-class DomainException extends LogicException
-{
-}
+class DomainException extends LogicException {}
 
-class InvalidArgumentException extends LogicException
-{
-}
+class InvalidArgumentException extends LogicException {}
 
-class LengthException extends LogicException
-{
-}
+class LengthException extends LogicException {}
 
-class OutOfRangeException extends LogicException
-{
-}
+class OutOfRangeException extends LogicException {}
 
-class RuntimeException extends Exception
-{
-}
+class RuntimeException extends Exception {}
 
-class OutOfBoundsException extends RuntimeException
-{
-}
+class OutOfBoundsException extends RuntimeException {}
 
-class OverflowException extends RuntimeException
-{
-}
+class OverflowException extends RuntimeException {}
 
-class RangeException extends RuntimeException
-{
-}
+class RangeException extends RuntimeException {}
 
-class UnderflowException extends RuntimeException
-{
-}
+class UnderflowException extends RuntimeException {}
 
-class UnexpectedValueException extends RuntimeException
-{
-}
+class UnexpectedValueException extends RuntimeException {}
 
 /**
  * @template-implements Iterator<never, never>
@@ -60,37 +34,27 @@ class EmptyIterator implements Iterator
     /**
      * @return never
      */
-    public function current()
-    {
-    }
+    public function current() {}
 
     /**
      * @return never
      */
-    public function key()
-    {
-    }
+    public function key() {}
 
     /**
      * @return void
      */
-    public function next()
-    {
-    }
+    public function next() {}
 
     /**
      * @return void
      */
-    public function rewind()
-    {
-    }
+    public function rewind() {}
 
     /**
      * @return false
      */
-    public function valid()
-    {
-    }
+    public function valid() {}
 }
 
 /**
@@ -114,17 +78,13 @@ class CallbackFilterIterator extends FilterIterator implements OuterIterator
      * @return V|null
      * @ignore-nullable-return
      */
-    public function current()
-    {
-    }
+    public function current() {}
 
     /**
      * @return K|null
      * @ignore-nullable-return
      */
-    public function key()
-    {
-    }
+    public function key() {}
 }
 
 /**
@@ -146,30 +106,22 @@ class RecursiveCallbackFilterIterator extends CallbackFilterIterator implements 
     /**
      * @return RecursiveCallbackFilterIterator<K, V, TIterator>
      */
-    public function getChildren()
-    {
-    }
+    public function getChildren() {}
 
     /**
      * @return bool
      */
-    public function hasChildren()
-    {
-    }
+    public function hasChildren() {}
 
     /**
      * @return V|null
      */
-    public function current()
-    {
-    }
+    public function current() {}
 
     /**
      * @return K|null
      */
-    public function key()
-    {
-    }
+    public function key() {}
 }
 
 /**
@@ -209,88 +161,54 @@ class RecursiveIteratorIterator implements OuterIterator
      */
     public function __construct(Traversable $iterator, int $mode = self::LEAVES_ONLY, int $flags = 0) {}
 
-    public function rewind(): void
-    {
-    }
+    public function rewind(): void {}
 
-    public function valid(): bool
-    {
-    }
+    public function valid(): bool {}
 
     /**
      * @return null|K
      */
-    public function key(): mixed
-    {
-    }
+    public function key(): mixed {}
 
     /**
      * @return null|V
      */
-    public function current(): mixed
-    {
-    }
+    public function current(): mixed {}
 
-    public function next(): void
-    {
-    }
+    public function next(): void {}
 
-    public function getDepth(): int
-    {
-    }
+    public function getDepth(): int {}
 
     /**
      * @return RecursiveIterator<K, V>|null
      */
-    public function getSubIterator(null|int $level): null|RecursiveIterator
-    {
-    }
+    public function getSubIterator(?int $level): ?RecursiveIterator {}
 
     /**
      * @return RecursiveIterator<K, V>
      */
-    public function getInnerIterator(): RecursiveIterator
-    {
-    }
+    public function getInnerIterator(): RecursiveIterator {}
 
-    public function beginIteration(): void
-    {
-    }
+    public function beginIteration(): void {}
 
-    public function endIteration(): void
-    {
-    }
+    public function endIteration(): void {}
 
-    public function callHasChildren(): bool
-    {
-    }
+    public function callHasChildren(): bool {}
 
     /**
      * @return RecursiveIterator<K, V>|null
      */
-    public function callGetChildren(): null|RecursiveIterator
-    {
-    }
+    public function callGetChildren(): ?RecursiveIterator {}
 
-    public function beginChildren(): void
-    {
-    }
+    public function beginChildren(): void {}
 
-    public function endChildren(): void
-    {
-    }
+    public function endChildren(): void {}
 
-    public function nextElement(): void
-    {
-    }
+    public function nextElement(): void {}
 
-    public function setMaxDepth(int $maxDepth = -1): void
-    {
-    }
+    public function setMaxDepth(int $maxDepth = -1): void {}
 
-    public function getMaxDepth(): int|false
-    {
-    }
+    public function getMaxDepth(): int|false {}
 }
 
 /**
@@ -319,43 +237,31 @@ class IteratorIterator implements OuterIterator
      * @param Traversable<K, V> $iterator
      * @param class-string|null $class
      */
-    public function __construct(Traversable $iterator, null|string $class = null) {}
+    public function __construct(Traversable $iterator, ?string $class = null) {}
 
     /**
      * @return Iterator<K, V>|null
      */
-    public function getInnerIterator(): null|Iterator
-    {
-    }
+    public function getInnerIterator(): ?Iterator {}
 
     /**
      * @return void
      */
-    public function rewind(): void
-    {
-    }
+    public function rewind(): void {}
 
-    public function valid(): bool
-    {
-    }
+    public function valid(): bool {}
 
     /**
      * @return null|K
      */
-    public function key(): mixed
-    {
-    }
+    public function key(): mixed {}
 
     /**
      * @return null|V
      */
-    public function current(): mixed
-    {
-    }
+    public function current(): mixed {}
 
-    public function next(): void
-    {
-    }
+    public function next(): void {}
 }
 
 /**
@@ -374,17 +280,13 @@ abstract class FilterIterator extends IteratorIterator
      * @return null|V
      * @ignore-nullable-return
      */
-    public function current()
-    {
-    }
+    public function current() {}
 
     /**
      * @return null|K
      * @ignore-nullable-return
      */
-    public function key()
-    {
-    }
+    public function key() {}
 }
 
 /**
@@ -405,32 +307,24 @@ abstract class RecursiveFilterIterator extends FilterIterator implements Recursi
     /**
      * @return TIterator
      */
-    public function getChildren()
-    {
-    }
+    public function getChildren() {}
 
     /**
      * @return bool
      */
-    public function hasChildren()
-    {
-    }
+    public function hasChildren() {}
 
     /**
      * @return V|null
      * @ignore-nullable-return
      */
-    public function current()
-    {
-    }
+    public function current() {}
 
     /**
      * @return K|null
      * @ignore-nullable-return
      */
-    public function key()
-    {
-    }
+    public function key() {}
 }
 
 /**
@@ -445,9 +339,7 @@ class ParentIterator extends RecursiveFilterIterator implements RecursiveIterato
     /**
      * @return bool
      */
-    public function accept()
-    {
-    }
+    public function accept() {}
 
     /**
      * @param TIterator $iterator
@@ -457,46 +349,34 @@ class ParentIterator extends RecursiveFilterIterator implements RecursiveIterato
     /**
      * @return ParentIterator<K,V>
      */
-    public function getChildren()
-    {
-    }
+    public function getChildren() {}
 
     /**
      * @return bool
      */
-    public function hasChildren()
-    {
-    }
+    public function hasChildren() {}
 
     /**
      * @return void
      */
-    public function next()
-    {
-    }
+    public function next() {}
 
     /**
      * @return void
      */
-    public function rewind()
-    {
-    }
+    public function rewind() {}
 
     /**
      * @return V|null
      * @ignore-nullable-return
      */
-    public function current()
-    {
-    }
+    public function current() {}
 
     /**
      * @return K|null
      * @ignore-nullable-return
      */
-    public function key()
-    {
-    }
+    public function key() {}
 }
 
 /**
@@ -529,17 +409,13 @@ class LimitIterator extends IteratorIterator implements OuterIterator
      * @return V|null
      * @ignore-nullable-return
      */
-    public function current()
-    {
-    }
+    public function current() {}
 
     /**
      * @return K|null
      * @ignore-nullable-return
      */
-    public function key()
-    {
-    }
+    public function key() {}
 }
 
 /**
@@ -569,32 +445,24 @@ class CachingIterator extends IteratorIterator implements OuterIterator, ArrayAc
     /**
      * @return bool
      */
-    public function hasNext()
-    {
-    }
+    public function hasNext() {}
 
     /**
      * @return V|null
      * @ignore-nullable-return
      */
-    public function current()
-    {
-    }
+    public function current() {}
 
     /**
      * @return K|null
      * @ignore-nullable-return
      */
-    public function key()
-    {
-    }
+    public function key() {}
 
     /**
      * @return array<array-key, V>
      */
-    public function getCache()
-    {
-    }
+    public function getCache() {}
 }
 
 /**
@@ -610,16 +478,12 @@ class RecursiveCachingIterator extends CachingIterator implements RecursiveItera
     /**
      * @return RecursiveCachingIterator<K,V, TIterator>
      */
-    public function getChildren()
-    {
-    }
+    public function getChildren() {}
 
     /**
      * @return bool
      */
-    public function hasChildren()
-    {
-    }
+    public function hasChildren() {}
 }
 
 /**
@@ -640,17 +504,13 @@ class NoRewindIterator extends IteratorIterator
      * @return V|null
      * @ignore-nullable-return
      */
-    public function current()
-    {
-    }
+    public function current() {}
 
     /**
      * @return K|null
      * @ignore-nullable-return
      */
-    public function key()
-    {
-    }
+    public function key() {}
 }
 
 /**
@@ -668,39 +528,29 @@ class AppendIterator extends IteratorIterator
      * @param TIterator $iterator
      * @return void
      */
-    public function append(Iterator $iterator)
-    {
-    }
+    public function append(Iterator $iterator) {}
 
     /**
      * @return ArrayIterator<K, V>
      */
-    public function getArrayIterator()
-    {
-    }
+    public function getArrayIterator() {}
 
     /**
      * @return int
      */
-    public function getIteratorIndex()
-    {
-    }
+    public function getIteratorIndex() {}
 
     /**
      * @return V|null
      * @ignore-nullable-return
      */
-    public function current()
-    {
-    }
+    public function current() {}
 
     /**
      * @return K|null
      * @ignore-nullable-return
      */
-    public function key()
-    {
-    }
+    public function key() {}
 }
 
 /**
@@ -721,17 +571,13 @@ class InfiniteIterator extends IteratorIterator
      * @return V|null
      * @ignore-nullable-return
      */
-    public function current()
-    {
-    }
+    public function current() {}
 
     /**
      * @return K|null
      * @ignore-nullable-return
      */
-    public function key()
-    {
-    }
+    public function key() {}
 }
 
 /**
@@ -768,17 +614,13 @@ class RegexIterator extends FilterIterator
      * @return null|V
      * @ignore-nullable-return
      */
-    public function current()
-    {
-    }
+    public function current() {}
 
     /**
      * @return null|K
      * @ignore-nullable-return
      */
-    public function key()
-    {
-    }
+    public function key() {}
 }
 
 /**
@@ -816,9 +658,7 @@ class RecursiveRegexIterator extends RegexIterator implements RecursiveIterator
     /**
      * @return RecursiveRegexIterator<K, V>
      */
-    public function getChildren()
-    {
-    }
+    public function getChildren() {}
 }
 
 /**
@@ -847,30 +687,22 @@ class RecursiveTreeIterator extends RecursiveIteratorIterator implements OuterIt
     /**
      * @return void
      */
-    public function beginChildren()
-    {
-    }
+    public function beginChildren() {}
 
     /**
      * @return RecursiveIterator
      */
-    public function beginIteration()
-    {
-    }
+    public function beginIteration() {}
 
     /**
      * @return RecursiveIterator
      */
-    public function callGetChildren()
-    {
-    }
+    public function callGetChildren() {}
 
     /**
      * @return bool
      */
-    public function callHasChildren()
-    {
-    }
+    public function callHasChildren() {}
 
     /**
      * @param RecursiveIterator<K, V>|IteratorAggregate<K, V> $it
@@ -889,61 +721,35 @@ class RecursiveTreeIterator extends RecursiveIteratorIterator implements OuterIt
      * @return null|V
      * @ignore-nullable-return
      */
-    public function current()
-    {
-    }
+    public function current() {}
 
-    public function endChildren(): void
-    {
-    }
+    public function endChildren(): void {}
 
-    public function endIteration(): void
-    {
-    }
+    public function endIteration(): void {}
 
-    public function getEntry(): string
-    {
-    }
+    public function getEntry(): string {}
 
-    public function getPostfix(): string
-    {
-    }
+    public function getPostfix(): string {}
 
-    public function getPrefix(): string
-    {
-    }
+    public function getPrefix(): string {}
 
     /**
      * @return null|K
      * @ignore-nullable-return
      */
-    public function key()
-    {
-    }
+    public function key() {}
 
-    public function next(): void
-    {
-    }
+    public function next(): void {}
 
-    public function nextElement(): void
-    {
-    }
+    public function nextElement(): void {}
 
-    public function rewind(): void
-    {
-    }
+    public function rewind(): void {}
 
-    public function setPostfix(string $postfix): void
-    {
-    }
+    public function setPostfix(string $postfix): void {}
 
-    public function setPrefixPart(int $part, string $value): void
-    {
-    }
+    public function setPrefixPart(int $part, string $value): void {}
 
-    public function valid(): bool
-    {
-    }
+    public function valid(): bool {}
 }
 
 /**
@@ -972,9 +778,7 @@ class ArrayObject implements IteratorAggregate, ArrayAccess, Serializable, Count
      *
      * @no-named-arguments
      */
-    public function offsetExists($offset)
-    {
-    }
+    public function offsetExists($offset) {}
 
     /**
      * @param K $offset
@@ -983,9 +787,7 @@ class ArrayObject implements IteratorAggregate, ArrayAccess, Serializable, Count
      *
      * @no-named-arguments
      */
-    public function offsetGet($offset)
-    {
-    }
+    public function offsetGet($offset) {}
 
     /**
      * @param K $offset
@@ -995,9 +797,7 @@ class ArrayObject implements IteratorAggregate, ArrayAccess, Serializable, Count
      *
      * @no-named-arguments
      */
-    public function offsetSet($offset, $value)
-    {
-    }
+    public function offsetSet($offset, $value) {}
 
     /**
      * @param K $offset
@@ -1006,142 +806,106 @@ class ArrayObject implements IteratorAggregate, ArrayAccess, Serializable, Count
      *
      * @no-named-arguments
      */
-    public function offsetUnset($offset)
-    {
-    }
+    public function offsetUnset($offset) {}
 
     /**
      * @param V $value
      *
      * @return void
      */
-    public function append($value)
-    {
-    }
+    public function append($value) {}
 
     /**
      * @return array<K, V>
      */
-    public function getArrayCopy()
-    {
-    }
+    public function getArrayCopy() {}
 
     /**
      * @return int
      */
-    public function count()
-    {
-    }
+    public function count() {}
 
     /**
      * @return int
      */
-    public function getFlags()
-    {
-    }
+    public function getFlags() {}
 
     /**
      * @param int $flags
      *
      * @return void
      */
-    public function setFlags($flags)
-    {
-    }
+    public function setFlags($flags) {}
 
     /**
      * @return void
      */
-    public function asort()
-    {
-    }
+    public function asort() {}
 
     /**
      * @return void
      */
-    public function ksort()
-    {
-    }
+    public function ksort() {}
 
     /**
      * @param (callable(V, V): int) $cmp_function
      *
      * @return void
      */
-    public function uasort($cmp_function)
-    {
-    }
+    public function uasort($cmp_function) {}
 
     /**
      * @param (callable(K, K):int) $cmp_function
      *
      * @return void
      */
-    public function uksort($cmp_function)
-    {
-    }
+    public function uksort($cmp_function) {}
 
     /**
      * @return void
      */
-    public function natsort()
-    {
-    }
+    public function natsort() {}
 
     /**
      * @return void
      */
-    public function natcasesort()
-    {
-    }
+    public function natcasesort() {}
 
     /**
      * @param string $serialized
      *
      * @return void
      */
-    public function unserialize($serialized)
-    {
-    }
+    public function unserialize($serialized) {}
 
     /**
      * @return string
      */
-    public function serialize()
-    {
-    }
+    public function serialize() {}
 
     /**
      * @return ArrayIterator<K, V>
      */
-    public function getIterator()
-    {
-    }
+    public function getIterator() {}
 
     /**
      * @param mixed $input
      *
      * @return array
      */
-    public function exchangeArray($input)
-    {
-    }
+    public function exchangeArray($input) {}
 
     /**
      * @param class-string<ArrayIterator<K,V>>|class-string<ArrayObject<K,V>> $iterator_class
      *
      * @return void
      */
-    public function setIteratorClass($iterator_class)
-    {
-    }
+    public function setIteratorClass($iterator_class) {}
 
     /**
      * @return class-string<ArrayIterator<K, V>>|class-string<ArrayObject<K, V>>
      */
-    public function getIteratorClass()
-    {
-    }
+    public function getIteratorClass() {}
 }
 
 /**
@@ -1167,9 +931,7 @@ class ArrayIterator implements SeekableIterator, ArrayAccess, Serializable, Coun
      *
      * @return bool
      */
-    public function offsetExists($offset)
-    {
-    }
+    public function offsetExists($offset) {}
 
     /**
      * @param K $offset
@@ -1178,9 +940,7 @@ class ArrayIterator implements SeekableIterator, ArrayAccess, Serializable, Coun
      *
      * @ignore-nullable-return
      */
-    public function offsetGet($offset)
-    {
-    }
+    public function offsetGet($offset) {}
 
     /**
      * @param K $offset
@@ -1189,167 +949,125 @@ class ArrayIterator implements SeekableIterator, ArrayAccess, Serializable, Coun
      *
      * @return void
      */
-    public function offsetSet($offset, $value)
-    {
-    }
+    public function offsetSet($offset, $value) {}
 
     /**
      * @param K $offset
      *
      * @return void
      */
-    public function offsetUnset($offset)
-    {
-    }
+    public function offsetUnset($offset) {}
 
     /**
      * @param V $value
      *
      * @return void
      */
-    public function append($value)
-    {
-    }
+    public function append($value) {}
 
     /**
      * @return array<K, V>
      */
-    public function getArrayCopy()
-    {
-    }
+    public function getArrayCopy() {}
 
     /**
      * @return int
      */
-    public function count()
-    {
-    }
+    public function count() {}
 
     /**
      * @return int
      */
-    public function getFlags()
-    {
-    }
+    public function getFlags() {}
 
     /**
      * @param int $flags
      *
      * @return void
      */
-    public function setFlags($flags)
-    {
-    }
+    public function setFlags($flags) {}
 
     /**
      * @return void
      */
-    public function asort()
-    {
-    }
+    public function asort() {}
 
     /**
      * @return void
      */
-    public function ksort()
-    {
-    }
+    public function ksort() {}
 
     /**
      * @param (callable(V,V): int) $cmp_function
      *
      * @return void
      */
-    public function uasort($cmp_function)
-    {
-    }
+    public function uasort($cmp_function) {}
 
     /**
      * @param (callable(K,K): int) $cmp_function
      *
      * @return void
      */
-    public function uksort($cmp_function)
-    {
-    }
+    public function uksort($cmp_function) {}
 
     /**
      * @return void
      */
-    public function natsort()
-    {
-    }
+    public function natsort() {}
 
     /**
      * @return void
      */
-    public function natcasesort()
-    {
-    }
+    public function natcasesort() {}
 
     /**
      * @param string $serialized
      *
      * @return void
      */
-    public function unserialize($serialized)
-    {
-    }
+    public function unserialize($serialized) {}
 
     /**
      * @return string
      */
-    public function serialize()
-    {
-    }
+    public function serialize() {}
 
     /**
      * @return void
      */
-    public function rewind()
-    {
-    }
+    public function rewind() {}
 
     /**
      * @return V|null
      *
      * @ignore-nullable-return
      */
-    public function current()
-    {
-    }
+    public function current() {}
 
     /**
      * @return K|null
      *
      * @ignore-nullable-return
      */
-    public function key()
-    {
-    }
+    public function key() {}
 
     /**
      * @return void
      */
-    public function next()
-    {
-    }
+    public function next() {}
 
     /**
      * @return bool
      */
-    public function valid()
-    {
-    }
+    public function valid() {}
 
     /**
      * @param int $offset
      *
      * @return void
      */
-    public function seek($offset)
-    {
-    }
+    public function seek($offset) {}
 }
 
 /**
@@ -1368,151 +1086,99 @@ class RecursiveArrayIterator extends ArrayIterator implements RecursiveIterator
     /**
      * @return ?RecursiveArrayIterator<K, V>
      */
-    public function getChildren()
-    {
-    }
+    public function getChildren() {}
 
     /**
      * @return bool
      */
-    public function hasChildren()
-    {
-    }
+    public function hasChildren() {}
 
     /**
      * @return V|null
      *
      * @ignore-nullable-return
      */
-    public function current()
-    {
-    }
+    public function current() {}
 
     /**
      * @return K|null
      *
      * @ignore-nullable-return
      */
-    public function key()
-    {
-    }
+    public function key() {}
 }
 
 class SplFileInfo implements Stringable
 {
     public function __construct(string $filename) {}
 
-    public function getPath(): string
-    {
-    }
+    public function getPath(): string {}
 
-    public function getFilename(): string
-    {
-    }
+    public function getFilename(): string {}
 
-    public function getExtension(): string
-    {
-    }
+    public function getExtension(): string {}
 
-    public function getBasename(string $suffix = ''): string
-    {
-    }
+    public function getBasename(string $suffix = ''): string {}
 
-    public function getPathname(): string
-    {
-    }
+    public function getPathname(): string {}
 
-    public function getPerms(): int|false
-    {
-    }
+    public function getPerms(): int|false {}
 
     /**
      * @throws RuntimeException
      */
-    public function getInode(): int|false
-    {
-    }
+    public function getInode(): int|false {}
 
     /**
      * @throws RuntimeException
      */
-    public function getSize(): int|false
-    {
-    }
+    public function getSize(): int|false {}
 
     /**
      * @throws RuntimeException
      */
-    public function getOwner(): int|false
-    {
-    }
+    public function getOwner(): int|false {}
 
     /**
      * @throws RuntimeException
      */
-    public function getGroup(): int|false
-    {
-    }
+    public function getGroup(): int|false {}
 
     /**
      * @throws RuntimeException
      */
-    public function getATime(): int|false
-    {
-    }
+    public function getATime(): int|false {}
 
-    public function getMTime(): int|false
-    {
-    }
+    public function getMTime(): int|false {}
 
     /**
      * @throws RuntimeException
      */
-    public function getCTime(): int|false
-    {
-    }
+    public function getCTime(): int|false {}
 
     /**
      * @throws RuntimeException
      */
-    public function getType(): string|false
-    {
-    }
+    public function getType(): string|false {}
 
-    public function isWritable(): bool
-    {
-    }
+    public function isWritable(): bool {}
 
-    public function isReadable(): bool
-    {
-    }
+    public function isReadable(): bool {}
 
-    public function isExecutable(): bool
-    {
-    }
+    public function isExecutable(): bool {}
 
-    public function isFile(): bool
-    {
-    }
+    public function isFile(): bool {}
 
-    public function isDir(): bool
-    {
-    }
+    public function isDir(): bool {}
 
-    public function isLink(): bool
-    {
-    }
+    public function isLink(): bool {}
 
     /**
      * @throws RuntimeException
      */
-    public function getLinkTarget(): string|false
-    {
-    }
+    public function getLinkTarget(): string|false {}
 
-    public function getRealPath(): string|false
-    {
-    }
+    public function getRealPath(): string|false {}
 
     /**
      * @template T of SplFileInfo
@@ -1521,9 +1187,7 @@ class SplFileInfo implements Stringable
      *
      * @return ($class is null ? SplFileInfo : T)
      */
-    public function getFileInfo(null|string $class = null): SplFileInfo
-    {
-    }
+    public function getFileInfo(?string $class = null): SplFileInfo {}
 
     /**
      * @template T of SplFileInfo
@@ -1532,55 +1196,39 @@ class SplFileInfo implements Stringable
      *
      * @return ($class is null ? null|SplFileInfo : null|T)
      */
-    public function getPathInfo(null|string $class = null): null|SplFileInfo
-    {
-    }
+    public function getPathInfo(?string $class = null): ?SplFileInfo {}
 
     /**
      * @param null|resource $context
      *
      * @throws RuntimeException
      */
-    public function openFile(string $mode = 'r', bool $useIncludePath = false, $context = null): SplFileObject
-    {
-    }
+    public function openFile(string $mode = 'r', bool $useIncludePath = false, $context = null): SplFileObject {}
 
     /**
      * @template T of SplFileInfo
      *
      * @param class-string<T> $class
      */
-    public function setFileClass(string $class = SplFileObject::class): void
-    {
-    }
+    public function setFileClass(string $class = SplFileObject::class): void {}
 
     /**
      * @template T of SplFileInfo
      *
      * @param class-string<T> $class
      */
-    public function setInfoClass(string $class = SplFileInfo::class): void
-    {
-    }
+    public function setInfoClass(string $class = SplFileInfo::class): void {}
 
     /**
      * @return string
      */
-    public function __toString(): string
-    {
-    }
+    public function __toString(): string {}
 
-    final public function _bad_state_ex(): void
-    {
-    }
+    final public function _bad_state_ex(): void {}
 
-    public function __wakeup()
-    {
-    }
+    public function __wakeup() {}
 
-    public function __debugInfo(): array
-    {
-    }
+    public function __debugInfo(): array {}
 }
 
 /**
@@ -1595,50 +1243,36 @@ class DirectoryIterator extends SplFileInfo implements SeekableIterator
      *
      * @ignore-nullable-return
      */
-    public function current()
-    {
-    }
+    public function current() {}
 
     /**
      * @return null|int
      *
      * @ignore-nullable-return
      */
-    public function key()
-    {
-    }
+    public function key() {}
 
     /**
      * @return void
      */
-    public function next()
-    {
-    }
+    public function next() {}
 
     /**
      * @return void
      */
-    public function rewind()
-    {
-    }
+    public function rewind() {}
 
     /**
      * @param int $offset
      */
-    public function seek($offset)
-    {
-    }
+    public function seek($offset) {}
 
     /**
      * @return bool
      */
-    public function valid()
-    {
-    }
+    public function valid() {}
 
-    public function isDot(): bool
-    {
-    }
+    public function isDot(): bool {}
 }
 
 /**
@@ -1668,34 +1302,26 @@ class FilesystemIterator extends DirectoryIterator implements Iterator
      *
      * @ignore-nullable-return
      */
-    public function current(): string|SplFileInfo|null
-    {
-    }
+    public function current(): string|SplFileInfo|null {}
 
     /**
      * @return string|null
      *
      * @ignore-nullable-return
      */
-    public function key()
-    {
-    }
+    public function key() {}
 
     /**
      * @return int
      */
-    public function getFlags()
-    {
-    }
+    public function getFlags() {}
 
     /**
      * @param int $flags
      *
      * @return void
      */
-    public function setFlags($flags)
-    {
-    }
+    public function setFlags($flags) {}
 }
 
 /**
@@ -1718,31 +1344,23 @@ class RecursiveDirectoryIterator extends FilesystemIterator implements Recursive
 
     public function __construct(string $path, int $flags = self::KEY_AS_PATHNAME | self::CURRENT_AS_FILEINFO) {}
 
-    public function getSubPath(): string
-    {
-    }
+    public function getSubPath(): string {}
 
-    public function getSubPathname(): string
-    {
-    }
+    public function getSubPathname(): string {}
 
     /**
      * @return RecursiveDirectoryIterator|string|SplFileInfo|null
      *
      * @ignore-nullable-return
      */
-    public function current()
-    {
-    }
+    public function current() {}
 
     /**
      * @return string|null
      *
      * @ignore-nullable-return
      */
-    public function key()
-    {
-    }
+    public function key() {}
 }
 
 /**
@@ -1753,9 +1371,7 @@ class GlobIterator extends FilesystemIterator implements Countable
     /**
      * @return int<0, max>
      */
-    public function count()
-    {
-    }
+    public function count() {}
 }
 
 class SplFileObject extends SplFileInfo implements RecursiveIterator, SeekableIterator
@@ -1776,35 +1392,23 @@ class SplFileObject extends SplFileInfo implements RecursiveIterator, SeekableIt
     /**
      * @throws RuntimeException
      */
-    public function rewind(): void
-    {
-    }
+    public function rewind(): void {}
 
-    public function eof(): bool
-    {
-    }
+    public function eof(): bool {}
 
-    public function valid(): bool
-    {
-    }
+    public function valid(): bool {}
 
     /**
      * @throws RuntimeException
      */
-    public function fgets(): string
-    {
-    }
+    public function fgets(): string {}
 
-    public function fread(int $length): string|false
-    {
-    }
+    public function fread(int $length): string|false {}
 
     /**
      * @return array|false|null
      */
-    public function fgetcsv(string $separator = ',', string $enclosure = "\"", string $escape = "\\")
-    {
-    }
+    public function fgetcsv(string $separator = ',', string $enclosure = "\"", string $escape = "\\") {}
 
     public function fputcsv(
         array $fields,
@@ -1812,119 +1416,70 @@ class SplFileObject extends SplFileInfo implements RecursiveIterator, SeekableIt
         string $enclosure = '"',
         string $escape = "\\",
         string $eol = PHP_EOL,
-    ): int|false {
-    }
+    ): int|false {}
 
-    public function setCsvControl(string $separator = ',', string $enclosure = "\"", string $escape = "\\"): void
-    {
-    }
+    public function setCsvControl(string $separator = ',', string $enclosure = "\"", string $escape = "\\"): void {}
 
-    public function getCsvControl(): array
-    {
-    }
+    public function getCsvControl(): array {}
 
-    public function flock(int $operation, int &$wouldBlock = null): bool
-    {
-    }
+    public function flock(int $operation, int &$wouldBlock = null): bool {}
 
-    public function fflush(): bool
-    {
-    }
+    public function fflush(): bool {}
 
-    public function ftell(): int|false
-    {
-    }
+    public function ftell(): int|false {}
 
-    public function fseek(int $offset, int $whence = SEEK_SET): int
-    {
-    }
+    public function fseek(int $offset, int $whence = SEEK_SET): int {}
 
-    public function fgetc(): string|false
-    {
-    }
+    public function fgetc(): string|false {}
 
-    public function fpassthru(): int
-    {
-    }
+    public function fpassthru(): int {}
 
-    public function fscanf(string $format, mixed &...$vars): array|int|null
-    {
-    }
+    public function fscanf(string $format, mixed &...$vars): array|int|null {}
 
-    public function fwrite(string $data, int $length = 0): int|false
-    {
-    }
+    public function fwrite(string $data, int $length = 0): int|false {}
 
-    public function fstat(): array
-    {
-    }
+    public function fstat(): array {}
 
-    public function ftruncate(int $size): bool
-    {
-    }
+    public function ftruncate(int $size): bool {}
 
-    public function current(): string|array|false
-    {
-    }
+    public function current(): string|array|false {}
 
-    public function key(): int
-    {
-    }
+    public function key(): int {}
 
-    public function next(): void
-    {
-    }
+    public function next(): void {}
 
-    public function setFlags(int $flags): void
-    {
-    }
+    public function setFlags(int $flags): void {}
 
-    public function getFlags(): int
-    {
-    }
+    public function getFlags(): int {}
 
     /**
      * @throws DomainException
      */
-    public function setMaxLineLen(int $maxLength): void
-    {
-    }
+    public function setMaxLineLen(int $maxLength): void {}
 
     /**
      * @return int<0, max>
      */
-    public function getMaxLineLen(): int
-    {
-    }
+    public function getMaxLineLen(): int {}
 
     /**
      * @return bool
      */
-    public function hasChildren()
-    {
-    }
+    public function hasChildren() {}
 
     /**
      * @return null|RecursiveIterator
      */
-    public function getChildren()
-    {
-    }
+    public function getChildren() {}
 
     /**
      * @throws LogicException
      */
-    public function seek(int $line): void
-    {
-    }
+    public function seek(int $line): void {}
 
-    public function getCurrentLine(): string
-    {
-    }
+    public function getCurrentLine(): string {}
 
-    public function __toString(): string
-    {
-    }
+    public function __toString(): string {}
 }
 
 class SplTempFileObject extends SplFileObject
@@ -1950,136 +1505,84 @@ class SplDoublyLinkedList implements Iterator, Countable, ArrayAccess, Serializa
     /**
      * @param V $value
      */
-    public function add(int $index, mixed $value): void
-    {
-    }
+    public function add(int $index, mixed $value): void {}
 
     /**
      * @return V
      */
-    public function pop(): mixed
-    {
-    }
+    public function pop(): mixed {}
 
     /**
      * @return V
      */
-    public function shift(): mixed
-    {
-    }
+    public function shift(): mixed {}
 
     /**
      * @param V $value
      */
-    public function push(mixed $value): void
-    {
-    }
+    public function push(mixed $value): void {}
 
     /**
      * @param V $value
      */
-    public function unshift(mixed $value): void
-    {
-    }
+    public function unshift(mixed $value): void {}
 
     /**
      * @return V
      */
-    public function top(): mixed
-    {
-    }
+    public function top(): mixed {}
 
     /**
      * @return V
      */
-    public function bottom(): mixed
-    {
-    }
+    public function bottom(): mixed {}
 
-    public function count(): int
-    {
-    }
+    public function count(): int {}
 
-    public function isEmpty(): bool
-    {
-    }
+    public function isEmpty(): bool {}
 
-    public function setIteratorMode(int $mode): int
-    {
-    }
+    public function setIteratorMode(int $mode): int {}
 
-    public function getIteratorMode(): int
-    {
-    }
+    public function getIteratorMode(): int {}
 
-    public function offsetExists($index): bool
-    {
-    }
+    public function offsetExists($index): bool {}
 
     /**
      * @return V
      */
-    public function offsetGet($index): mixed
-    {
-    }
+    public function offsetGet($index): mixed {}
 
     /**
      * @param V $value
      */
-    public function offsetSet($index, mixed $value): void
-    {
-    }
+    public function offsetSet($index, mixed $value): void {}
 
-    public function offsetUnset($index): void
-    {
-    }
+    public function offsetUnset($index): void {}
 
-    public function rewind(): void
-    {
-    }
+    public function rewind(): void {}
 
     /**
      * @return V
      */
-    public function current(): mixed
-    {
-    }
+    public function current(): mixed {}
 
-    public function key(): int
-    {
-    }
+    public function key(): int {}
 
-    public function next(): void
-    {
-    }
+    public function next(): void {}
 
-    public function prev(): void
-    {
-    }
+    public function prev(): void {}
 
-    public function valid(): bool
-    {
-    }
+    public function valid(): bool {}
 
-    public function unserialize(string $data): void
-    {
-    }
+    public function unserialize(string $data): void {}
 
-    public function serialize(): string
-    {
-    }
+    public function serialize(): string {}
 
-    public function __debugInfo(): array
-    {
-    }
+    public function __debugInfo(): array {}
 
-    public function __serialize(): array
-    {
-    }
+    public function __serialize(): array {}
 
-    public function __unserialize(array $data): void
-    {
-    }
+    public function __unserialize(array $data): void {}
 }
 
 /**
@@ -2090,25 +1593,19 @@ class SplQueue extends SplDoublyLinkedList
     /**
      * @param V $value
      */
-    public function enqueue(mixed $value): void
-    {
-    }
+    public function enqueue(mixed $value): void {}
 
     /**
      * @return V
      */
-    public function dequeue(): mixed
-    {
-    }
+    public function dequeue(): mixed {}
 
     /**
      * @param int $mode
      *
      * @return void
      */
-    public function setIteratorMode($mode)
-    {
-    }
+    public function setIteratorMode($mode) {}
 }
 
 /**
@@ -2122,9 +1619,7 @@ class SplStack extends SplDoublyLinkedList
      *
      * @return void
      */
-    public function setIteratorMode($mode)
-    {
-    }
+    public function setIteratorMode($mode) {}
 }
 
 /**
@@ -2136,58 +1631,36 @@ abstract class SplHeap implements Iterator, Countable
     /**
      * @return V
      */
-    public function extract(): mixed
-    {
-    }
+    public function extract(): mixed {}
 
     /**
      * @param V $value
      */
-    public function insert(mixed $value): bool
-    {
-    }
+    public function insert(mixed $value): bool {}
 
     /**
      * @return V
      */
-    public function top(): mixed
-    {
-    }
+    public function top(): mixed {}
 
-    public function count(): int
-    {
-    }
+    public function count(): int {}
 
-    public function isEmpty(): bool
-    {
-    }
+    public function isEmpty(): bool {}
 
-    public function rewind(): void
-    {
-    }
+    public function rewind(): void {}
 
     /**
      * @return V
      */
-    public function current(): mixed
-    {
-    }
+    public function current(): mixed {}
 
-    public function key(): int
-    {
-    }
+    public function key(): int {}
 
-    public function next(): void
-    {
-    }
+    public function next(): void {}
 
-    public function valid(): bool
-    {
-    }
+    public function valid(): bool {}
 
-    public function recoverFromCorruption(): bool
-    {
-    }
+    public function recoverFromCorruption(): bool {}
 
     /**
      * @param V $value1
@@ -2197,13 +1670,9 @@ abstract class SplHeap implements Iterator, Countable
      */
     abstract protected function compare($value1, $value2);
 
-    public function isCorrupted(): bool
-    {
-    }
+    public function isCorrupted(): bool {}
 
-    public function __debugInfo(): array
-    {
-    }
+    public function __debugInfo(): array {}
 }
 
 /**
@@ -2218,88 +1687,64 @@ class SplMinHeap extends SplHeap
      *
      * @return int
      */
-    protected function compare(mixed $value1, mixed $value2): int
-    {
-    }
+    protected function compare(mixed $value1, mixed $value2): int {}
 
     /**
      * @return V
      */
-    public function extract()
-    {
-    }
+    public function extract() {}
 
     /**
      * @param V $value
      *
      * @return true
      */
-    public function insert($value)
-    {
-    }
+    public function insert($value) {}
 
     /**
      * @return V
      */
-    public function top()
-    {
-    }
+    public function top() {}
 
     /**
      * @return int
      */
-    public function count()
-    {
-    }
+    public function count() {}
 
     /**
      * @return bool
      */
-    public function isEmpty()
-    {
-    }
+    public function isEmpty() {}
 
     /**
      * @return void
      */
-    public function rewind()
-    {
-    }
+    public function rewind() {}
 
     /**
      * @return V
      */
-    public function current()
-    {
-    }
+    public function current() {}
 
     /**
      * @return int
      */
-    public function key()
-    {
-    }
+    public function key() {}
 
     /**
      * @return void
      */
-    public function next()
-    {
-    }
+    public function next() {}
 
     /**
      * @return bool
      */
-    public function valid()
-    {
-    }
+    public function valid() {}
 
     /**
      * @return void
      */
-    public function recoverFromCorruption()
-    {
-    }
+    public function recoverFromCorruption() {}
 }
 
 /**
@@ -2314,9 +1759,7 @@ class SplMaxHeap extends SplHeap
      *
      * @return int
      */
-    protected function compare(mixed $value1, mixed $value2): int
-    {
-    }
+    protected function compare(mixed $value1, mixed $value2): int {}
 }
 
 /**
@@ -2335,91 +1778,59 @@ class SplPriorityQueue implements Iterator, Countable
      * @param TPriority $priority1
      * @param TPriority $priority2
      */
-    public function compare(mixed $priority1, mixed $priority2): int
-    {
-    }
+    public function compare(mixed $priority1, mixed $priority2): int {}
 
     /**
      * @param V $value
      * @param TPriority $priority
      */
-    public function insert(mixed $value, mixed $priority): true
-    {
-    }
+    public function insert(mixed $value, mixed $priority): true {}
 
-    public function setExtractFlags(int $flags): int
-    {
-    }
+    public function setExtractFlags(int $flags): int {}
 
     /**
      * @return V
      */
-    public function top(): mixed
-    {
-    }
+    public function top(): mixed {}
 
     /**
      * @return V
      */
-    public function extract(): mixed
-    {
-    }
+    public function extract(): mixed {}
 
-    public function count(): int
-    {
-    }
+    public function count(): int {}
 
-    public function isEmpty(): bool
-    {
-    }
+    public function isEmpty(): bool {}
 
-    public function rewind(): void
-    {
-    }
+    public function rewind(): void {}
 
     /**
      * @return V
      */
-    public function current(): mixed
-    {
-    }
+    public function current(): mixed {}
 
     /**
      * @return int
      */
-    public function key(): int
-    {
-    }
+    public function key(): int {}
 
     /**
      * @return void
      */
-    public function next(): void
-    {
-    }
+    public function next(): void {}
 
     /**
      * @return bool
      */
-    public function valid(): bool
-    {
-    }
+    public function valid(): bool {}
 
-    public function recoverFromCorruption(): true
-    {
-    }
+    public function recoverFromCorruption(): true {}
 
-    public function isCorrupted(): bool
-    {
-    }
+    public function isCorrupted(): bool {}
 
-    public function getExtractFlags(): int
-    {
-    }
+    public function getExtractFlags(): int {}
 
-    public function __debugInfo(): array
-    {
-    }
+    public function __debugInfo(): array {}
 }
 
 /**
@@ -2436,124 +1847,86 @@ class SplFixedArray implements Iterator, ArrayAccess, Countable, IteratorAggrega
     /**
      * @return int<0, max>
      */
-    public function count(): int
-    {
-    }
+    public function count(): int {}
 
     /**
      * @return list<V>
      */
-    public function toArray(): array
-    {
-    }
+    public function toArray(): array {}
 
-    public static function fromArray(array $array, bool $preserveKeys = true): SplFixedArray
-    {
-    }
+    public static function fromArray(array $array, bool $preserveKeys = true): SplFixedArray {}
 
     /**
      * @return int<0, max>
      */
-    public function getSize(): int
-    {
-    }
+    public function getSize(): int {}
 
     /**
      * @return bool
      */
-    public function setSize(int $size)
-    {
-    }
+    public function setSize(int $size) {}
 
     /**
      * @param int $index
      */
-    public function offsetExists($index): bool
-    {
-    }
+    public function offsetExists($index): bool {}
 
     /**
      * @param int $index
      *
      * @return V
      */
-    public function offsetGet($index): mixed
-    {
-    }
+    public function offsetGet($index): mixed {}
 
     /**
      * @param int $index
      * @param V $value
      */
-    public function offsetSet($index, mixed $value): void
-    {
-    }
+    public function offsetSet($index, mixed $value): void {}
 
     /**
      * @param int $index
      */
-    public function offsetUnset($index): void
-    {
-    }
+    public function offsetUnset($index): void {}
 
     /**
      * @return void
      */
-    public function rewind()
-    {
-    }
+    public function rewind() {}
 
     /**
      * @return v
      */
-    public function current()
-    {
-    }
+    public function current() {}
 
     /**
      * @return int
      */
-    public function key()
-    {
-    }
+    public function key() {}
 
     /**
      * @return void
      */
-    public function next()
-    {
-    }
+    public function next() {}
 
     /**
      * @return bool
      */
-    public function valid(): bool
-    {
-    }
+    public function valid(): bool {}
 
     #[Deprecated('The function is deprecated', since: '8.4')]
-    public function __wakeup(): void
-    {
-    }
+    public function __wakeup(): void {}
 
-    public function __serialize(): array
-    {
-    }
+    public function __serialize(): array {}
 
-    public function __unserialize(array $data): void
-    {
-    }
+    public function __unserialize(array $data): void {}
 
     /**
      * @return Iterator<int, V>
      */
-    public function getIterator(): Iterator
-    {
-    }
+    public function getIterator(): Iterator {}
 
-    public function jsonSerialize(): array
-    {
-    }
+    public function jsonSerialize(): array {}
 }
 
 interface SplObserver
@@ -2583,119 +1956,85 @@ class SplObjectStorage implements Countable, SeekableIterator, Serializable, Arr
      * @param O $object
      * @param V $info
      */
-    public function attach(object $object, mixed $info = null): void
-    {
-    }
+    public function attach(object $object, mixed $info = null): void {}
 
     /**
      * @param O $object
      *
      * @return void
      */
-    public function detach(object $object): void
-    {
-    }
+    public function detach(object $object): void {}
 
     /**
      * @param O $object
      */
-    public function contains(object $object): bool
-    {
-    }
+    public function contains(object $object): bool {}
 
     /**
      * @param SplObjectStorage<O, V> $storage
      */
-    public function addAll(SplObjectStorage $storage): int
-    {
-    }
+    public function addAll(SplObjectStorage $storage): int {}
 
     /**
      * @param SplObjectStorage<O, V> $storage
      */
-    public function removeAll(SplObjectStorage $storage): int
-    {
-    }
+    public function removeAll(SplObjectStorage $storage): int {}
 
     /**
      * @param SplObjectStorage<O, V> $storage
      */
-    public function removeAllExcept(SplObjectStorage $storage): int
-    {
-    }
+    public function removeAllExcept(SplObjectStorage $storage): int {}
 
     /**
      * @return V
      */
-    public function getInfo(): mixed
-    {
-    }
+    public function getInfo(): mixed {}
 
     /**
      * @param V $info
      */
-    public function setInfo(mixed $info): void
-    {
-    }
+    public function setInfo(mixed $info): void {}
 
     /**
      * @param int $mode
      *
      * @return int
      */
-    public function count(int $mode = COUNT_NORMAL): int
-    {
-    }
+    public function count(int $mode = COUNT_NORMAL): int {}
 
     /**
      * @return void
      */
-    public function rewind(): void
-    {
-    }
+    public function rewind(): void {}
 
     /**
      * @return bool
      */
-    public function valid(): bool
-    {
-    }
+    public function valid(): bool {}
 
     /**
      * @return int
      */
-    public function key(): int
-    {
-    }
+    public function key(): int {}
 
     /**
      * @return O
      */
-    public function current(): object
-    {
-    }
+    public function current(): object {}
 
     /**
      * @return void
      */
-    public function next(): void
-    {
-    }
+    public function next(): void {}
 
-    public function unserialize(string $data): void
-    {
-    }
+    public function unserialize(string $data): void {}
 
-    public function serialize(): string
-    {
-    }
+    public function serialize(): string {}
 
     /**
      * @param O $object
      */
-    public function offsetExists($object): bool
-    {
-    }
+    public function offsetExists($object): bool {}
 
     /**
      * @param O $object
@@ -2703,48 +2042,32 @@ class SplObjectStorage implements Countable, SeekableIterator, Serializable, Arr
      *
      * @return void
      */
-    public function offsetSet(mixed $object, mixed $info = null): void
-    {
-    }
+    public function offsetSet(mixed $object, mixed $info = null): void {}
 
     /**
      * @param O $object
      */
-    public function offsetUnset($object): void
-    {
-    }
+    public function offsetUnset($object): void {}
 
     /**
      * @param O $object
      *
      * @return V
      */
-    public function offsetGet($object): mixed
-    {
-    }
+    public function offsetGet($object): mixed {}
 
     /**
      * @param O $object
      */
-    public function getHash(object $object): string
-    {
-    }
+    public function getHash(object $object): string {}
 
-    public function __serialize(): array
-    {
-    }
+    public function __serialize(): array {}
 
-    public function __unserialize(array $data): void
-    {
-    }
+    public function __unserialize(array $data): void {}
 
-    public function __debugInfo(): array
-    {
-    }
+    public function __debugInfo(): array {}
 
-    public function seek(int $offset): void
-    {
-    }
+    public function seek(int $offset): void {}
 }
 
 class MultipleIterator implements Iterator
@@ -2756,120 +2079,78 @@ class MultipleIterator implements Iterator
 
     public function __construct(int $flags = MultipleIterator::MIT_NEED_ALL | MultipleIterator::MIT_KEYS_NUMERIC) {}
 
-    public function getFlags(): int
-    {
-    }
+    public function getFlags(): int {}
 
-    public function setFlags(int $flags): void
-    {
-    }
+    public function setFlags(int $flags): void {}
 
-    public function attachIterator(Iterator $iterator, int|string|null $info = null): void
-    {
-    }
+    public function attachIterator(Iterator $iterator, int|string|null $info = null): void {}
 
-    public function detachIterator(Iterator $iterator): void
-    {
-    }
+    public function detachIterator(Iterator $iterator): void {}
 
-    public function containsIterator(Iterator $iterator): bool
-    {
-    }
+    public function containsIterator(Iterator $iterator): bool {}
 
-    public function countIterators(): int
-    {
-    }
+    public function countIterators(): int {}
 
-    public function rewind(): void
-    {
-    }
+    public function rewind(): void {}
 
-    public function valid(): bool
-    {
-    }
+    public function valid(): bool {}
 
-    public function key(): array
-    {
-    }
+    public function key(): array {}
 
     /**
      * @throws RuntimeException
      * @throws InvalidArgumentException
      */
-    public function current(): array
-    {
-    }
+    public function current(): array {}
 
-    public function next(): void
-    {
-    }
+    public function next(): void {}
 
-    public function __debugInfo(): array
-    {
-    }
+    public function __debugInfo(): array {}
 }
 
 /**
  * @return list<class-string>
  */
-function spl_classes(): array
-{
-}
+function spl_classes(): array {}
 
 /**
  * @param class-string $class
  */
-function spl_autoload(string $class, null|string $file_extensions = null): void
-{
-}
+function spl_autoload(string $class, ?string $file_extensions = null): void {}
 
-function spl_autoload_extensions(null|string $file_extensions = null): string
-{
-}
+function spl_autoload_extensions(?string $file_extensions = null): string {}
 
 /**
  * @param null|(callable(class-string): void) $callback
  *
  * @throws TypeError
  */
-function spl_autoload_register(null|callable $callback, bool $throw = true, bool $prepend = false): bool
-{
-}
+function spl_autoload_register(?callable $callback, bool $throw = true, bool $prepend = false): bool {}
 
 /**
  * @param null|(callable(class-string): void) $callback
  */
-function spl_autoload_unregister(callable $callback): bool
-{
-}
+function spl_autoload_unregister(callable $callback): bool {}
 
 /**
  * @return list<(callable(class-string): void)>
  */
-function spl_autoload_functions(): array
-{
-}
+function spl_autoload_functions(): array {}
 
 /**
  * @param class-string $class
  */
-function spl_autoload_call(string $class): void
-{
-}
+function spl_autoload_call(string $class): void {}
 
 /**
  * @pure
  */
-function spl_object_hash(object $object): string
-{
-}
+function spl_object_hash(object $object): string {}
 
 /**
  * @pure
  */
-function spl_object_id(object $object): int
-{
-}
+function spl_object_id(object $object): int {}
 
 /**
  * @template K
@@ -2879,20 +2160,14 @@ function spl_object_id(object $object): int
  *
  * @return ($preserve_keys is true ? array<K, V> : list<V>)
  */
-function iterator_to_array(Traversable|array $iterator, bool $preserve_keys = true): array
-{
-}
+function iterator_to_array(Traversable|array $iterator, bool $preserve_keys = true): array {}
 
 /**
  * @return int<0, max>
  */
-function iterator_count(Traversable|array $iterator): int
-{
-}
+function iterator_count(Traversable|array $iterator): int {}
 
-function iterator_apply(Traversable $iterator, callable $callback, null|array $args = null): int
-{
-}
+function iterator_apply(Traversable $iterator, callable $callback, ?array $args = null): int {}
 
 /**
  * @param object|class-string $object_or_class
@@ -2901,9 +2176,7 @@ function iterator_apply(Traversable $iterator, callable $callback, null|array $a
  *
  * @pure
  */
-function class_parents($object_or_class, bool $autoload = true): array|false
-{
-}
+function class_parents($object_or_class, bool $autoload = true): array|false {}
 
 /**
  * @param object|class-string $object_or_class
@@ -2912,9 +2185,7 @@ function class_parents($object_or_class, bool $autoload = true): array|false
  *
  * @pure
  */
-function class_uses($object_or_class, bool $autoload = true): array|false
-{
-}
+function class_uses($object_or_class, bool $autoload = true): array|false {}
 
 /**
  * @param object|class-string $object_or_class
@@ -2923,6 +2194,4 @@ function class_uses($object_or_class, bool $autoload = true): array|false
  *
  * @pure
  */
-function class_implements($object_or_class, bool $autoload = true): array|false
-{
-}
+function class_implements($object_or_class, bool $autoload = true): array|false {}
