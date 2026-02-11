@@ -9,19 +9,14 @@ namespace {
     function ldap_exop_passwd(
         LDAP\Connection $ldap,
         string $user = '',
-        string $old_password = '',
-        string $new_password = '',
+        #[SensitiveParameter] string $old_password = '',
+        #[SensitiveParameter] string $new_password = '',
         &$controls = null,
-    ): string|bool {
-    }
+    ): string|bool {}
 
-    function ldap_exop_refresh(LDAP\Connection $ldap, string $dn, int $ttl): int|false
-    {
-    }
+    function ldap_exop_refresh(LDAP\Connection $ldap, string $dn, int $ttl): int|false {}
 
-    function ldap_exop_whoami(LDAP\Connection $ldap): string|false
-    {
-    }
+    function ldap_exop_whoami(LDAP\Connection $ldap): string|false {}
 
     /**
      * @param-out string $response_data
@@ -30,12 +25,11 @@ namespace {
     function ldap_exop(
         LDAP\Connection $ldap,
         string $request_oid,
-        null|string $request_data,
-        null|array $controls = null,
+        ?string $request_data,
+        ?array $controls = null,
         &$response_data,
         &$response_oid,
-    ): LDAP\Result|bool {
-    }
+    ): LDAP\Result|bool {}
 
     /**
      * @param-out string $response_data
@@ -46,61 +40,46 @@ namespace {
         LDAP\Result $result,
         &$response_data = null,
         &$response_oid = null,
-    ): bool {
-    }
+    ): bool {}
 
-    function ldap_8859_to_t61(string $value): string
-    {
-    }
+    function ldap_8859_to_t61(string $value): string {}
 
-    function ldap_t61_to_8859(string $value): string
-    {
-    }
+    function ldap_t61_to_8859(string $value): string {}
 
-    function ldap_connect(null|string $uri, int $port = 389): LDAP\Connection|false
-    {
-    }
+    function ldap_connect(?string $uri, int $port = 389): LDAP\Connection|false {}
 
-    function ldap_close(LDAP\Connection $ldap): bool
-    {
-    }
+    function ldap_close(LDAP\Connection $ldap): bool {}
 
-    function ldap_bind(LDAP\Connection $ldap, null|string $dn, null|string $password): bool
-    {
-    }
+    function ldap_bind(LDAP\Connection $ldap, ?string $dn, #[SensitiveParameter] ?string $password): bool {}
 
     function ldap_bind_ext(
         LDAP\Connection $ldap,
-        null|string $dn,
-        null|string $password,
-        null|array $controls = null,
-    ): LDAP\Result|false {
-    }
+        ?string $dn,
+        ?string $password,
+        ?array $controls = null,
+    ): LDAP\Result|false {}
 
     /**
-     * @param string $binddn
-     * @param string $password
-     * @param string $sasl_mech
-     * @param string $sasl_realm
-     * @param string $sasl_authc_id
-     * @param string $sasl_authz_id
-     * @param string $props
+     * @param null|string $dn
+     * @param null|string $password
+     * @param null|string $mech
+     * @param null|string $realm
+     * @param null|string $authc_id
+     * @param null|string $authz_id
+     * @param null|string $props
      */
     function ldap_sasl_bind(
         LDAP\Connection $ldap,
-        $binddn = null,
-        $password = null,
-        $sasl_mech = null,
-        $sasl_realm = null,
-        $sasl_authc_id = null,
-        $sasl_authz_id = null,
-        $props = null,
-    ): bool {
-    }
+        ?string $dn = null,
+        #[SensitiveParameter] ?string $password = null,
+        ?string $mech = null,
+        ?string $realm = null,
+        ?string $authc_id = null,
+        ?string $authz_id = null,
+        ?string $props = null,
+    ): bool {}
 
-    function ldap_unbind(LDAP\Connection $ldap): bool
-    {
-    }
+    function ldap_unbind(LDAP\Connection $ldap): bool {}
 
     function ldap_read(
         LDAP\Connection $ldap,
@@ -111,9 +90,8 @@ namespace {
         int $sizelimit = -1,
         int $timelimit = -1,
         int $deref = 0,
-        null|array $controls = null,
-    ): LDAP\Result|array|false {
-    }
+        ?array $controls = null,
+    ): LDAP\Result|array|false {}
 
     function ldap_list(
         LDAP\Connection $ldap,
@@ -124,9 +102,8 @@ namespace {
         int $sizelimit = -1,
         int $timelimit = -1,
         int $deref = 0,
-        null|array $controls = null,
-    ): LDAP\Result|array|false {
-    }
+        ?array $controls = null,
+    ): LDAP\Result|array|false {}
 
     function ldap_search(
         LDAP\Connection $ldap,
@@ -137,148 +114,96 @@ namespace {
         int $sizelimit = -1,
         int $timelimit = -1,
         int $deref = 0,
-        null|array $controls = null,
-    ): LDAP\Result|array|false {
-    }
+        ?array $controls = null,
+    ): LDAP\Result|array|false {}
 
-    function ldap_free_result(Result $result): bool
-    {
-    }
+    function ldap_free_result(Result $result): bool {}
 
-    function ldap_count_entries(LDAP\Connection $ldap, LDAP\Result $result): int
-    {
-    }
+    function ldap_count_entries(LDAP\Connection $ldap, LDAP\Result $result): int {}
 
-    function ldap_first_entry(LDAP\Connection $ldap, LDAP\Result $result): LDAP\ResultEntry|false
-    {
-    }
+    function ldap_first_entry(LDAP\Connection $ldap, LDAP\Result $result): LDAP\ResultEntry|false {}
 
-    function ldap_next_entry(LDAP\Connection $ldap, LDAP\ResultEntry $entry): LDAP\ResultEntry|false
-    {
-    }
+    function ldap_next_entry(LDAP\Connection $ldap, LDAP\ResultEntry $entry): LDAP\ResultEntry|false {}
 
-    function ldap_get_entries(LDAP\Connection $ldap, LDAP\Result $result): array|false
-    {
-    }
+    function ldap_get_entries(LDAP\Connection $ldap, LDAP\Result $result): array|false {}
 
-    function ldap_first_attribute(LDAP\Connection $ldap, LDAP\ResultEntry $entry): string|false
-    {
-    }
+    function ldap_first_attribute(LDAP\Connection $ldap, LDAP\ResultEntry $entry): string|false {}
 
-    function ldap_next_attribute(LDAP\Connection $ldap, LDAP\ResultEntry $entry): string|false
-    {
-    }
+    function ldap_next_attribute(LDAP\Connection $ldap, LDAP\ResultEntry $entry): string|false {}
 
-    function ldap_get_attributes(LDAP\Connection $ldap, LDAP\ResultEntry $entry): array
-    {
-    }
+    function ldap_get_attributes(LDAP\Connection $ldap, LDAP\ResultEntry $entry): array {}
 
-    function ldap_get_values(LDAP\Connection $ldap, LDAP\ResultEntry $entry, string $attribute): array|false
-    {
-    }
+    function ldap_get_values(LDAP\Connection $ldap, LDAP\ResultEntry $entry, string $attribute): array|false {}
 
-    function ldap_get_values_len(LDAP\Connection $ldap, LDAP\ResultEntry $entry, string $attribute): array|false
-    {
-    }
+    function ldap_get_values_len(LDAP\Connection $ldap, LDAP\ResultEntry $entry, string $attribute): array|false {}
 
     /**
      * @return string|false
      */
-    function ldap_get_dn(LDAP\Connection $ldap, LDAP\ResultEntry $entry): string|false
-    {
-    }
+    function ldap_get_dn(LDAP\Connection $ldap, LDAP\ResultEntry $entry): string|false {}
 
     /**
      * @return array{count: int}|false
      */
-    function ldap_explode_dn(string $dn, int $with_attrib): array|false
-    {
-    }
+    function ldap_explode_dn(string $dn, int $with_attrib): array|false {}
 
-    function ldap_dn2ufn(string $dn): string|false
-    {
-    }
+    function ldap_dn2ufn(string $dn): string|false {}
 
-    function ldap_add(LDAP\Connection $ldap, string $dn, array $entry, null|array $controls = null): bool
-    {
-    }
+    function ldap_add(LDAP\Connection $ldap, string $dn, array $entry, ?array $controls = null): bool {}
 
     function ldap_add_ext(
         LDAP\Connection $ldap,
         string $dn,
         array $entry,
-        null|array $controls = null,
-    ): LDAP\Result|false {
-    }
+        ?array $controls = null,
+    ): LDAP\Result|false {}
 
-    function ldap_delete(LDAP\Connection $ldap, string $dn, null|array $controls = null): bool
-    {
-    }
+    function ldap_delete(LDAP\Connection $ldap, string $dn, ?array $controls = null): bool {}
 
-    function ldap_delete_ext(LDAP\Connection $ldap, string $dn, null|array $controls = null): LDAP\Result|false
-    {
-    }
+    function ldap_delete_ext(LDAP\Connection $ldap, string $dn, ?array $controls = null): LDAP\Result|false {}
 
-    function ldap_modify(LDAP\Connection $ldap, string $dn, array $entry, null|array $controls = null): bool
-    {
-    }
+    function ldap_modify(LDAP\Connection $ldap, string $dn, array $entry, ?array $controls = null): bool {}
 
-    function ldap_mod_add(LDAP\Connection $ldap, string $dn, array $entry, null|array $controls = null): bool
-    {
-    }
+    function ldap_mod_add(LDAP\Connection $ldap, string $dn, array $entry, ?array $controls = null): bool {}
 
     function ldap_mod_add_ext(
         LDAP\Connection $ldap,
         string $dn,
         array $entry,
-        null|array $controls = null,
-    ): LDAP\Result|false {
-    }
+        ?array $controls = null,
+    ): LDAP\Result|false {}
 
-    function ldap_mod_replace(LDAP\Connection $ldap, string $dn, array $entry, null|array $controls = null): bool
-    {
-    }
+    function ldap_mod_replace(LDAP\Connection $ldap, string $dn, array $entry, ?array $controls = null): bool {}
 
     function ldap_mod_replace_ext(
         LDAP\Connection $ldap,
         string $dn,
         array $entry,
-        null|array $controls = null,
-    ): LDAP\Result|false {
-    }
+        ?array $controls = null,
+    ): LDAP\Result|false {}
 
-    function ldap_mod_del(LDAP\Connection $ldap, string $dn, array $entry, null|array $controls = null): bool
-    {
-    }
+    function ldap_mod_del(LDAP\Connection $ldap, string $dn, array $entry, ?array $controls = null): bool {}
 
     function ldap_mod_del_ext(
         LDAP\Connection $ldap,
         string $dn,
         array $entry,
-        null|array $controls = null,
-    ): LDAP\Result|false {
-    }
+        ?array $controls = null,
+    ): LDAP\Result|false {}
 
-    function ldap_errno(LDAP\Connection $ldap): int
-    {
-    }
+    function ldap_errno(LDAP\Connection $ldap): int {}
 
-    function ldap_err2str(int $errno): string
-    {
-    }
+    function ldap_err2str(int $errno): string {}
 
-    function ldap_error(LDAP\Connection $ldap): string
-    {
-    }
+    function ldap_error(LDAP\Connection $ldap): string {}
 
     function ldap_compare(
         LDAP\Connection $ldap,
         string $dn,
         string $attribute,
         string $value,
-        null|array $controls = null,
-    ): int|bool {
-    }
+        ?array $controls = null,
+    ): int|bool {}
 
     function ldap_rename(
         LDAP\Connection $ldap,
@@ -286,9 +211,8 @@ namespace {
         string $new_rdn,
         string $new_parent,
         bool $delete_old_rdn,
-        null|array $controls = null,
-    ): bool {
-    }
+        ?array $controls = null,
+    ): bool {}
 
     function ldap_rename_ext(
         LDAP\Connection $ldap,
@@ -296,32 +220,21 @@ namespace {
         string $new_rdn,
         string $new_parent,
         bool $delete_old_rdn,
-        null|array $controls = null,
-    ): LDAP\Result|false {
-    }
+        ?array $controls = null,
+    ): LDAP\Result|false {}
 
-    function ldap_get_option(LDAP\Connection $ldap, int $option, &$value = null): bool
-    {
-    }
+    function ldap_get_option(LDAP\Connection $ldap, int $option, &$value = null): bool {}
 
-    function ldap_set_option(LDAP\Connection|null $ldap, int $option, $value): bool
-    {
-    }
+    function ldap_set_option(?LDAP\Connection $ldap, int $option, $value): bool {}
 
-    function ldap_first_reference(LDAP\Connection $ldap, LDAP\Result $result): LDAP\ResultEntry|false
-    {
-    }
+    function ldap_first_reference(LDAP\Connection $ldap, LDAP\Result $result): LDAP\ResultEntry|false {}
 
-    function ldap_next_reference(LDAP\Connection $ldap, LDAP\ResultEntry $entry): LDAP\ResultEntry|false
-    {
-    }
+    function ldap_next_reference(LDAP\Connection $ldap, LDAP\ResultEntry $entry): LDAP\ResultEntry|false {}
 
     /**
      * @param-out array $referrals
      */
-    function ldap_parse_reference(LDAP\Connection $ldap, LDAP\ResultEntry $entry, &$referrals): bool
-    {
-    }
+    function ldap_parse_reference(LDAP\Connection $ldap, LDAP\ResultEntry $entry, &$referrals): bool {}
 
     /**
      * @param-out int &$error_code
@@ -338,42 +251,31 @@ namespace {
         &$error_message,
         &$referrals,
         &$controls = null,
-    ): bool {
-    }
+    ): bool {}
 
-    function ldap_start_tls(LDAP\Connection $ldap): bool
-    {
-    }
+    function ldap_start_tls(LDAP\Connection $ldap): bool {}
 
-    function ldap_set_rebind_proc(LDAP\Connection $ldap, null|callable $callback): bool
-    {
-    }
+    function ldap_set_rebind_proc(LDAP\Connection $ldap, ?callable $callback): bool {}
 
-    function ldap_escape(string $value, string $ignore = '', int $flags = 0): string
-    {
-    }
+    function ldap_escape(string $value, string $ignore = '', int $flags = 0): string {}
 
     function ldap_modify_batch(
         LDAP\Connection $ldap,
         string $dn,
         array $modifications_info,
-        null|array $controls = null,
-    ): bool {
-    }
+        ?array $controls = null,
+    ): bool {}
 
-    function ldap_count_references(LDAP\Connection $ldap, LDAP\Result $result): int
-    {
-    }
+    function ldap_count_references(LDAP\Connection $ldap, LDAP\Result $result): int {}
 
     function ldap_exop_sync(
         LDAP\Connection $ldap,
         string $request_oid,
-        null|string $request_data = null,
-        null|array $controls = null,
+        ?string $request_data = null,
+        ?array $controls = null,
         &$response_data = null,
         &$response_oid = null,
-    ): Result|bool {
-    }
+    ): Result|bool {}
 
     const LDAP_ESCAPE_FILTER = 1;
 
@@ -569,15 +471,9 @@ namespace {
 }
 
 namespace LDAP {
-    final class Connection
-    {
-    }
+    final class Connection {}
 
-    final class Result
-    {
-    }
+    final class Result {}
 
-    final class ResultEntry
-    {
-    }
+    final class ResultEntry {}
 }
