@@ -519,6 +519,10 @@ impl IssueCollection {
         self.issues.extend(issues);
     }
 
+    pub fn reserve(&mut self, additional: usize) {
+        self.issues.reserve(additional);
+    }
+
     pub fn shrink_to_fit(&mut self) {
         self.issues.shrink_to_fit();
     }
