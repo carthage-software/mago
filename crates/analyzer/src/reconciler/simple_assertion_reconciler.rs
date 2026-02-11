@@ -997,6 +997,13 @@ fn intersect_string(
     for atomic in existing_var_type.types.as_ref() {
         match atomic {
             TAtomic::Scalar(TScalar::String(existing_string)) => {
+                if (is_numeric && !existing_string.is_numeric)
+                    || (is_truthy && !existing_string.is_truthy)
+                    || (is_non_empty && !existing_string.is_non_empty)
+                {
+                    did_remove_type = true;
+                }
+
                 acceptable_types.push(
                     get_string_with_props(
                         is_numeric || existing_string.is_numeric,
@@ -1540,7 +1547,7 @@ fn reconcile_exactly_countable(
     for atomic in existing_var_types {
         if let TAtomic::Array(TArray::List(TList { non_empty, known_count, element_type, known_elements })) = atomic {
             let min_under_count = if let Some(known_count) = known_count { *known_count < count } else { false };
-            if !non_empty || min_under_count {
+            if !non_empty || min_under_count || known_count.is_none() {
                 existing_var_type.remove_type(atomic);
                 if !element_type.is_never() {
                     existing_var_type.types.to_mut().push(TAtomic::Array(TArray::List(TList {
