@@ -4339,7 +4339,7 @@ function array_shift(array &$array): mixed {}
  *
  * @param array<K, V> $array
  *
- * @return ($preserve_keys is true ? array<K, V> : list<V>) $array
+ * @return ($array is list<V> ? ($preserve_keys is true ? array<int, V> : list<V>) : array<K, V>) $array
  *
  * @pure
  */
