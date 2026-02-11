@@ -347,6 +347,8 @@ impl TAtomic {
 
                 return false;
             }
+            // bottom type: subtype of all types
+            TAtomic::Never => return true,
             _ => return false,
         };
 
