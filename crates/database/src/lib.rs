@@ -197,21 +197,34 @@ impl<'a> Database<'a> {
         id
     }
 
-    /// Updates a file's content in-place using its stable `FileId`.
+    /// Updates a file's content using its stable `FileId`.
     ///
     /// This recalculates derived data like file size, line endings, and `FileRevision`.
+    /// If another `ReadDatabase` snapshot holds a reference to the file (preventing in-place
+    /// mutation), a new `Arc<File>` is created with the updated contents.
+    ///
     /// Returns `true` if a file with the given ID was found and updated.
     pub fn update(&mut self, id: FileId, new_contents: Cow<'static, str>) -> bool {
-        if let Some(name) = self.id_to_name.get(&id)
-            && let Some(file) = self.files.get_mut(name)
-            && let Some(file) = Arc::get_mut(file)
-        {
+        let Some(name) = self.id_to_name.get(&id) else {
+            return false;
+        };
+
+        let Some(arc) = self.files.get_mut(name) else {
+            return false;
+        };
+
+        if let Some(file) = Arc::get_mut(arc) {
             file.contents = new_contents;
             file.size = file.contents.len() as u32;
             file.lines = line_starts(file.contents.as_ref());
-            return true;
+        } else {
+            // other Arc clones exist (e.g., from a ReadDatabase snapshot).
+            // Create a new File with updated contents and replace the Arc.
+            let old = &**arc;
+            *arc = Arc::new(File::new(old.name.clone(), old.file_type, old.path.clone(), new_contents));
         }
-        false
+
+        true
     }
 
     /// Deletes a file from the database using its stable `FileId`.
