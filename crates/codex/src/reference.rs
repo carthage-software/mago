@@ -117,6 +117,22 @@ impl SymbolReferences {
         self.symbol_references_to_symbols_in_signature.values().map(std::collections::HashSet::len).sum()
     }
 
+    /// Returns the total number of map entries (keys) across all reference maps.
+    /// Useful for memory auditing — this count should remain stable across cycles
+    /// in a long-running process.
+    #[inline]
+    #[must_use]
+    pub fn total_map_entries(&self) -> usize {
+        self.symbol_references_to_symbols.len()
+            + self.symbol_references_to_symbols_in_signature.len()
+            + self.symbol_references_to_overridden_members.len()
+            + self.functionlike_references_to_functionlike_returns.len()
+            + self.file_references_to_symbols.len()
+            + self.file_references_to_symbols_in_signature.len()
+            + self.property_write_references.len()
+            + self.property_read_references.len()
+    }
+
     /// Counts how many symbols reference the given symbol.
     ///
     /// # Arguments
@@ -673,13 +689,16 @@ impl SymbolReferences {
         let mut invalid_signatures = HashSet::default();
         let mut partially_invalid_symbols = AtomSet::default();
 
-        for sig_ref_key in self.symbol_references_to_symbols_in_signature.keys() {
-            // Represent the containing symbol (ignore member part for diff check)
-            let containing_symbol = (sig_ref_key.0, empty_atom());
-
+        let mut sig_reverse_index: HashMap<SymbolIdentifier, Vec<SymbolIdentifier>> = HashMap::default();
+        for (referencing_item, referenced_items) in &self.symbol_references_to_symbols_in_signature {
+            let containing_symbol = (referencing_item.0, empty_atom());
             if codebase_diff.contains_changed_entry(&containing_symbol) {
-                invalid_signatures.insert(*sig_ref_key);
-                partially_invalid_symbols.insert(sig_ref_key.0);
+                invalid_signatures.insert(*referencing_item);
+                partially_invalid_symbols.insert(referencing_item.0);
+            }
+
+            for referenced in referenced_items {
+                sig_reverse_index.entry(*referenced).or_default().push(*referencing_item);
             }
         }
 
@@ -703,52 +722,42 @@ impl SymbolReferences {
             invalid_signatures.insert(invalidated_item);
             processed_symbols.insert(invalidated_item);
             if !invalidated_item.1.is_empty() {
-                // If it's a member...
+                // If it's a member, also mark its containing symbol for processing.
                 partially_invalid_symbols.insert(invalidated_item.0);
+                let containing_symbol = (invalidated_item.0, empty_atom());
+                if !processed_symbols.contains(&containing_symbol) {
+                    symbols_to_process.push(containing_symbol);
+                }
             }
 
             // Find all items that reference this now-invalid item *in their signature*
-            for (referencing_item, referenced_items) in &self.symbol_references_to_symbols_in_signature {
-                if referenced_items.contains(&invalidated_item) {
-                    // If referencing item not already processed, add it to the processing queue
+            if let Some(referencing_items) = sig_reverse_index.get(&invalidated_item) {
+                for referencing_item in referencing_items {
                     if !processed_symbols.contains(referencing_item) {
                         symbols_to_process.push(*referencing_item);
                     }
 
-                    // Mark the referencing item itself as invalid (signature)
                     invalid_signatures.insert(*referencing_item);
                     if !referencing_item.1.is_empty() {
-                        // If it's a member...
                         partially_invalid_symbols.insert(referencing_item.0);
                     }
                 }
             }
-
-            // Simple check against limit within loop might be slightly faster
-            if expense_counter > EXPENSE_LIMIT {
-                return None;
-            }
         }
 
-        // An item's body is invalid if it references (anywhere, body or sig) an item with an invalid signature,
-        // OR if its own signature was kept but its body might have changed (keep_signature diff).
+        // An item's body is invalid if it references (anywhere, body or sig) an item with an invalid signature.
+        // Check both body and signature reference maps in a single pass where possible.
         let mut invalid_bodies = HashSet::default();
 
-        // Check references from body map
         for (referencing_item, referenced_items) in &self.symbol_references_to_symbols {
-            // Does this item reference *any* item with an invalid signature?
             if referenced_items.iter().any(|r| invalid_signatures.contains(r)) {
                 invalid_bodies.insert(*referencing_item);
                 if !referencing_item.1.is_empty() {
-                    // If it's a member...
                     partially_invalid_symbols.insert(referencing_item.0);
                 }
             }
         }
 
-        // Check references from signature map (redundant with propagation? Maybe not entirely)
-        // If item A's signature references item B (invalid signature), A's signature becomes invalid (handled above).
-        // But A's *body* might also be considered invalid due to the signature dependency.
         for (referencing_item, referenced_items) in &self.symbol_references_to_symbols_in_signature {
             if referenced_items.iter().any(|r| invalid_signatures.contains(r)) {
                 invalid_bodies.insert(*referencing_item);
@@ -758,15 +767,117 @@ impl SymbolReferences {
             }
         }
 
-        // Note: With single-hash fingerprinting, we don't distinguish between signature and body changes.
-        // Any change to a symbol (signature or body) marks it as 'changed' in the diff.
-
-        // Combine results: invalid_symbols includes items whose definition changed or depend on changed signatures,
-        // PLUS items whose bodies reference invalid signatures.
-        // partially_invalid_symbols includes symbols containing members from either invalid_signatures or invalid_bodies.
         let mut all_invalid_symbols = invalid_signatures;
         all_invalid_symbols.extend(invalid_bodies);
         Some((all_invalid_symbols, partially_invalid_symbols))
+    }
+
+    /// Extracts references originating from safe (skipped) symbols and merges them into this instance.
+    ///
+    /// When incremental analysis runs with `diff = true`, the analyzer skips safe symbols,
+    /// which means their body references are not collected. This method copies those missing
+    /// references from the previous run's reference graph.
+    ///
+    /// Only references from symbols that are in `safe_symbols` or `safe_symbol_members`
+    /// (and not already present in this instance) are copied.
+    ///
+    /// # Arguments
+    ///
+    /// * `previous` - The previous run's complete symbol references
+    /// * `safe_symbols` - Set of safe top-level symbol names
+    /// * `safe_symbol_members` - Set of safe (symbol, member) pairs
+    #[inline]
+    pub fn restore_references_for_safe_symbols(
+        &mut self,
+        previous: &SymbolReferences,
+        safe_symbols: &AtomSet,
+        safe_symbol_members: &HashSet<SymbolIdentifier>,
+    ) {
+        let is_safe = |key: &SymbolIdentifier| -> bool {
+            if key.1.is_empty() { safe_symbols.contains(&key.0) } else { safe_symbol_members.contains(key) }
+        };
+
+        // Restore body references for safe symbols
+        for (key, refs) in &previous.symbol_references_to_symbols {
+            if is_safe(key) && !self.symbol_references_to_symbols.contains_key(key) {
+                self.symbol_references_to_symbols.insert(*key, refs.clone());
+            }
+        }
+
+        // Restore overridden member references for safe symbols
+        for (key, refs) in &previous.symbol_references_to_overridden_members {
+            if is_safe(key) && !self.symbol_references_to_overridden_members.contains_key(key) {
+                self.symbol_references_to_overridden_members.insert(*key, refs.clone());
+            }
+        }
+
+        // Restore function-like return references for safe symbols
+        for (key, refs) in &previous.functionlike_references_to_functionlike_returns {
+            let sym_key = match key {
+                FunctionLikeIdentifier::Function(name) => (*name, mago_atom::empty_atom()),
+                FunctionLikeIdentifier::Method(class, method) => (*class, *method),
+                _ => continue,
+            };
+
+            if is_safe(&sym_key) && !self.functionlike_references_to_functionlike_returns.contains_key(key) {
+                self.functionlike_references_to_functionlike_returns.insert(*key, refs.clone());
+            }
+        }
+
+        // Restore property write references for safe symbols
+        for (key, refs) in &previous.property_write_references {
+            if is_safe(key) && !self.property_write_references.contains_key(key) {
+                self.property_write_references.insert(*key, refs.clone());
+            }
+        }
+
+        // Restore property read references for safe symbols
+        for (key, refs) in &previous.property_read_references {
+            if is_safe(key) && !self.property_read_references.contains_key(key) {
+                self.property_read_references.insert(*key, refs.clone());
+            }
+        }
+    }
+
+    /// Removes **body** references originating from the given symbols/members.
+    ///
+    /// Used by the body-only fast path: when only function/method bodies changed (no signature
+    /// changes), we remove old body references and let the analyzer rebuild them fresh.
+    /// Signature references are kept because signatures didn't change.
+    ///
+    /// Also removes function-like return references and property read/write references from
+    /// the given symbols, as those originate from body code.
+    ///
+    /// File-level references keyed by the given file names are also removed.
+    #[inline]
+    pub fn remove_body_references_for_symbols(
+        &mut self,
+        symbols_and_members: &HashSet<SymbolIdentifier>,
+        file_names: &[Atom],
+    ) {
+        // Remove body (not signature) references
+        for key in symbols_and_members {
+            self.symbol_references_to_symbols.remove(key);
+            self.symbol_references_to_overridden_members.remove(key);
+            self.property_write_references.remove(key);
+            self.property_read_references.remove(key);
+        }
+
+        // Remove function-like return references for matching keys
+        self.functionlike_references_to_functionlike_returns.retain(|key, _| {
+            let sym_key = match key {
+                FunctionLikeIdentifier::Function(name) => (*name, mago_atom::empty_atom()),
+                FunctionLikeIdentifier::Method(class, method) => (*class, *method),
+                _ => return true,
+            };
+
+            !symbols_and_members.contains(&sym_key)
+        });
+
+        // Remove file-level body references (signature refs kept)
+        for name in file_names {
+            self.file_references_to_symbols.remove(name);
+        }
     }
 
     /// Removes all references *originating from* symbols/members that are marked as invalid.
@@ -787,6 +898,64 @@ impl SymbolReferences {
             .retain(|referencing_item, _| !invalid_symbols_and_members.contains(referencing_item));
         self.property_read_references
             .retain(|referencing_item, _| !invalid_symbols_and_members.contains(referencing_item));
+    }
+
+    /// Retains only references originating from safe (unchanged) symbols, removing all others.
+    ///
+    /// This is the inverse of [`remove_references_from_invalid_symbols`]: instead of
+    /// specifying what to remove, you specify what to keep. References from non-safe symbols
+    /// will be rebuilt by `populate_codebase` and the analyzer.
+    ///
+    /// This method also retains all builtin/prelude references (those where the key symbol
+    /// is not user-defined, i.e., is in the base references).
+    #[inline]
+    pub fn retain_safe_symbol_references(
+        &mut self,
+        safe_symbols: &AtomSet,
+        safe_symbol_members: &HashSet<SymbolIdentifier>,
+    ) {
+        let is_safe = |key: &SymbolIdentifier| -> bool {
+            if key.1.is_empty() { safe_symbols.contains(&key.0) } else { safe_symbol_members.contains(key) }
+        };
+
+        self.symbol_references_to_symbols.retain(|k, _| is_safe(k));
+        self.symbol_references_to_symbols_in_signature.retain(|k, _| is_safe(k));
+        self.symbol_references_to_overridden_members.retain(|k, _| is_safe(k));
+        self.property_write_references.retain(|k, _| is_safe(k));
+        self.property_read_references.retain(|k, _| is_safe(k));
+
+        self.functionlike_references_to_functionlike_returns.retain(|key, _| {
+            let sym_key = match key {
+                FunctionLikeIdentifier::Function(name) => (*name, mago_atom::empty_atom()),
+                FunctionLikeIdentifier::Method(class, method) => (*class, *method),
+                _ => return true, // Keep closures and other non-symbol function-likes
+            };
+
+            is_safe(&sym_key)
+        });
+    }
+
+    /// Removes references for dirty (non-safe) symbols — O(dirty) instead of O(all).
+    ///
+    /// This is the inverse of [`retain_safe_symbol_references`]: instead of iterating all
+    /// entries and keeping safe ones, it directly removes entries for the given dirty set.
+    /// Much faster when the dirty set is small relative to the total number of references.
+    pub fn remove_dirty_symbol_references(&mut self, dirty_symbols: &HashSet<SymbolIdentifier>) {
+        for key in dirty_symbols {
+            self.symbol_references_to_symbols.remove(key);
+            self.symbol_references_to_symbols_in_signature.remove(key);
+            self.symbol_references_to_overridden_members.remove(key);
+            self.property_write_references.remove(key);
+            self.property_read_references.remove(key);
+
+            let fl_key = if key.1.is_empty() {
+                FunctionLikeIdentifier::Function(key.0)
+            } else {
+                FunctionLikeIdentifier::Method(key.0, key.1)
+            };
+
+            self.functionlike_references_to_functionlike_returns.remove(&fl_key);
+        }
     }
 
     /// Returns a reference to the map tracking references within symbol/member bodies.
@@ -833,5 +1002,133 @@ impl SymbolReferences {
     #[must_use]
     pub fn get_file_references_to_symbols_in_signature(&self) -> &HashMap<Atom, HashSet<SymbolIdentifier>> {
         &self.file_references_to_symbols_in_signature
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use mago_atom::atom;
+    use mago_atom::empty_atom;
+
+    fn make_refs_with_body(entries: Vec<(SymbolIdentifier, Vec<SymbolIdentifier>)>) -> SymbolReferences {
+        let mut refs = SymbolReferences::new();
+        for (key, values) in entries {
+            let set: HashSet<SymbolIdentifier> = values.into_iter().collect();
+            refs.symbol_references_to_symbols.insert(key, set);
+        }
+        refs
+    }
+
+    #[test]
+    fn test_restore_references_for_safe_symbols_restores_missing_body_refs() {
+        let class_a = atom("class_a");
+        let class_b = atom("class_b");
+        let method_foo = atom("foo");
+        let method_bar = atom("bar");
+
+        let previous = make_refs_with_body(vec![
+            ((class_a, method_foo), vec![(class_b, empty_atom())]),
+            ((class_b, method_bar), vec![(class_a, empty_atom())]),
+        ]);
+
+        let mut current = make_refs_with_body(vec![((class_b, method_bar), vec![(class_a, empty_atom())])]);
+
+        let safe_symbols = AtomSet::default();
+        let mut safe_members = HashSet::default();
+        safe_members.insert((class_a, method_foo));
+
+        current.restore_references_for_safe_symbols(&previous, &safe_symbols, &safe_members);
+
+        assert!(current.symbol_references_to_symbols.contains_key(&(class_a, method_foo)));
+        let restored = &current.symbol_references_to_symbols[&(class_a, method_foo)];
+        assert!(restored.contains(&(class_b, empty_atom())));
+
+        assert!(current.symbol_references_to_symbols.contains_key(&(class_b, method_bar)));
+    }
+
+    #[test]
+    fn test_restore_references_does_not_overwrite_existing() {
+        let class_a = atom("class_a");
+        let class_b = atom("class_b");
+        let class_c = atom("class_c");
+        let method_foo = atom("foo");
+
+        let previous = make_refs_with_body(vec![((class_a, method_foo), vec![(class_b, empty_atom())])]);
+
+        let mut current = make_refs_with_body(vec![((class_a, method_foo), vec![(class_c, empty_atom())])]);
+
+        let safe_symbols = AtomSet::default();
+        let mut safe_members = HashSet::default();
+        safe_members.insert((class_a, method_foo));
+
+        current.restore_references_for_safe_symbols(&previous, &safe_symbols, &safe_members);
+
+        let refs = &current.symbol_references_to_symbols[&(class_a, method_foo)];
+        assert!(refs.contains(&(class_c, empty_atom())));
+        assert!(!refs.contains(&(class_b, empty_atom())));
+    }
+
+    #[test]
+    fn test_restore_references_for_safe_top_level_symbols() {
+        let func_a = atom("func_a");
+        let class_b = atom("class_b");
+
+        let previous = make_refs_with_body(vec![((func_a, empty_atom()), vec![(class_b, empty_atom())])]);
+
+        let mut current = SymbolReferences::new();
+
+        let mut safe_symbols = AtomSet::default();
+        safe_symbols.insert(func_a);
+        let safe_members = HashSet::default();
+
+        current.restore_references_for_safe_symbols(&previous, &safe_symbols, &safe_members);
+
+        assert!(current.symbol_references_to_symbols.contains_key(&(func_a, empty_atom())));
+        let restored = &current.symbol_references_to_symbols[&(func_a, empty_atom())];
+        assert!(restored.contains(&(class_b, empty_atom())));
+    }
+
+    #[test]
+    fn test_restore_skips_non_safe_symbols() {
+        let func_a = atom("func_a");
+        let class_b = atom("class_b");
+        let previous = make_refs_with_body(vec![((func_a, empty_atom()), vec![(class_b, empty_atom())])]);
+
+        let mut current = SymbolReferences::new();
+
+        let safe_symbols = AtomSet::default();
+        let safe_members = HashSet::default();
+
+        current.restore_references_for_safe_symbols(&previous, &safe_symbols, &safe_members);
+
+        assert!(!current.symbol_references_to_symbols.contains_key(&(func_a, empty_atom())));
+    }
+
+    #[test]
+    fn test_get_invalid_symbols_basic_cascade() {
+        let class_a = atom("class_a");
+        let class_b = atom("class_b");
+        let method_foo = atom("foo");
+
+        let mut refs = SymbolReferences::new();
+        refs.symbol_references_to_symbols_in_signature.insert((class_b, method_foo), {
+            let mut set = HashSet::default();
+            set.insert((class_a, empty_atom()));
+            set
+        });
+
+        let mut diff = crate::diff::CodebaseDiff::new();
+        let mut changed = HashSet::default();
+        changed.insert((class_a, empty_atom()));
+        diff = diff.with_changed(changed);
+
+        let result = refs.get_invalid_symbols(&diff);
+        assert!(result.is_some());
+        let (invalid, partially_invalid) = result.unwrap();
+
+        assert!(invalid.contains(&(class_a, empty_atom())));
+        assert!(invalid.contains(&(class_b, method_foo)));
+        assert!(partially_invalid.contains(&class_b));
     }
 }

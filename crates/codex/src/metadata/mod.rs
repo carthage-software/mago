@@ -1043,7 +1043,7 @@ impl CodebaseMetadata {
             self.symbols.remove(k);
         }
 
-        for (k, _) in &file_metadata.file_signatures {
+        for k in file_metadata.file_signatures.keys() {
             self.file_signatures.remove(k);
         }
     }
