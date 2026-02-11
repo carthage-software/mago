@@ -5,6 +5,8 @@ use serde::Serialize;
 
 use mago_database::file::FileId;
 
+use crate::differ::compute_file_diff;
+use crate::metadata::CodebaseMetadata;
 use crate::symbol::SymbolIdentifier;
 
 /// Represents a text diff hunk with position and offset information.
@@ -55,6 +57,32 @@ impl CodebaseDiff {
     #[must_use]
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Computes the `CodebaseDiff` between two `CodebaseMetadata` instances.
+    ///
+    /// This method compares the metadata of the old and new codebases to determine which symbols have changed,
+    /// which can be kept unchanged, and what text diffs exist for source files.
+    ///
+    /// It aggregates this information into a `CodebaseDiff` instance that can be used for incremental analysis.
+    pub fn between(old_metadata: &CodebaseMetadata, new_metadata: &CodebaseMetadata) -> Self {
+        let mut aggregate_diff = CodebaseDiff::new();
+
+        let mut all_file_ids = old_metadata.get_all_file_ids();
+        all_file_ids.extend(new_metadata.get_all_file_ids());
+        all_file_ids.sort();
+        all_file_ids.dedup();
+
+        for file_id in all_file_ids {
+            let old_sig = old_metadata.get_file_signature(&file_id);
+            let new_sig = new_metadata.get_file_signature(&file_id);
+
+            let file_diff = compute_file_diff(file_id, old_sig, new_sig);
+
+            aggregate_diff.extend(file_diff);
+        }
+
+        aggregate_diff
     }
 
     /// Merges changes from another `CodebaseDiff` into this one.

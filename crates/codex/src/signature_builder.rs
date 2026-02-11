@@ -73,6 +73,7 @@ impl<'file, 'arena> SignatureBuilder<'file, 'arena> {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn create_node(
         &self,
         name: &str,

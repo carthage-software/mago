@@ -20,6 +20,7 @@ use mago_reporting::IssueCollection;
 use mago_span::Position;
 use mago_span::Span;
 
+use crate::diff::CodebaseDiff;
 use crate::identifier::method::MethodIdentifier;
 use crate::metadata::class_like::ClassLikeMetadata;
 use crate::metadata::class_like_constant::ClassLikeConstantMetadata;
@@ -29,6 +30,7 @@ use crate::metadata::flags::MetadataFlags;
 use crate::metadata::function_like::FunctionLikeMetadata;
 use crate::metadata::property::PropertyMetadata;
 use crate::metadata::ttype::TypeMetadata;
+use crate::reference::SymbolReferences;
 use crate::signature::FileSignature;
 use crate::symbol::SymbolKind;
 use crate::symbol::Symbols;
@@ -889,6 +891,44 @@ impl CodebaseMetadata {
     #[inline]
     pub fn remove_file_signature(&mut self, file_id: &FileId) -> Option<FileSignature> {
         self.file_signatures.remove(file_id)
+    }
+
+    /// Marks safe symbols based on diff and invalidation cascade.
+    ///
+    /// After this function runs, `self.safe_symbols` and `self.safe_symbol_members`
+    /// will contain all symbols that can be safely skipped during analysis.
+    ///
+    /// # Arguments
+    ///
+    /// * `diff` - The computed diff between old and new code
+    /// * `references` - Symbol reference graph from previous run
+    ///
+    /// # Returns
+    ///
+    /// `true` if safe symbols were successfully marked, or `false` if the cascade was too large to compute.
+    pub fn mark_safe_symbols(&mut self, diff: &CodebaseDiff, references: &SymbolReferences) -> bool {
+        // Get invalid symbols with propagation through reference graph
+        let Some((invalid_symbols, partially_invalid)) = references.get_invalid_symbols(diff) else {
+            // Propagation too expensive (>5000 steps)
+            return false;
+        };
+
+        // Mark all symbols in 'keep' set as safe (unless invalidated by cascade)
+        for keep_symbol in diff.get_keep() {
+            if !invalid_symbols.contains(keep_symbol) {
+                if keep_symbol.1.is_empty() {
+                    // Top-level symbol (class, function, constant)
+                    if !partially_invalid.contains(&keep_symbol.0) {
+                        self.safe_symbols.insert(keep_symbol.0);
+                    }
+                } else {
+                    // Member (method, property, class constant)
+                    self.safe_symbol_members.insert(*keep_symbol);
+                }
+            }
+        }
+
+        true
     }
 
     /// Merges information from another `CodebaseMetadata` into this one.
