@@ -80,32 +80,20 @@ impl TUnion {
                  in type construction - unions must contain at least one type. \
                  Consider using TAtomic::Never for empty/impossible types."
             );
+        }
 
-            if types.len() > 1
-                && types.iter().any(|atomic| {
-                    atomic.is_never() || atomic.map_generic_parameter_constraint(TUnion::is_never).unwrap_or(false)
-                })
-            {
-                panic!(
-                    "TUnion::from_vec() received a mix of 'never' and other types. \
-                     This indicates a logic error - 'never' should be filtered out before \
-                     creating unions since (A | never) = A. Types received: {types:#?}"
-                )
-            }
-        } else {
-            // If we have more than one type, 'never' is redundant and can be removed,
-            // as the union `A|never` is simply `A`.
-            if types.len() > 1 {
-                types.retain(|atomic| {
-                    !atomic.is_never() && !atomic.map_generic_parameter_constraint(TUnion::is_never).unwrap_or(false)
-                });
-            }
+        // If we have more than one type, 'never' is redundant and can be removed,
+        // as the union `A|never` is simply `A`.
+        if types.len() > 1 {
+            types.retain(|atomic| {
+                !atomic.is_never() && !atomic.map_generic_parameter_constraint(TUnion::is_never).unwrap_or(false)
+            });
+        }
 
-            // If the vector was originally empty, or contained only 'never' types
-            // which were removed, ensure the final union is `never`.
-            if types.is_empty() {
-                types.push(TAtomic::Never);
-            }
+        // If the vector was originally empty, or contained only 'never' types
+        // which were removed, ensure the final union is `never`.
+        if types.is_empty() {
+            types.push(TAtomic::Never);
         }
 
         Self::new(Cow::Owned(types))
