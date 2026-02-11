@@ -1721,7 +1721,7 @@ function similar_text(string $string1, string $string2, &$percent = null): int
 }
 
 /**
- * @return list<non-empty-string>
+ * @return non-empty-list<string>
  *
  * @pure
  */
