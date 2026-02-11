@@ -44,6 +44,7 @@ test_case!(array_unique_non_empty);
 test_case!(assert_concrete_to_template_type);
 test_case!(assert_generic_array_key_is_array_key);
 test_case!(bare_identifier_in_array_access);
+test_case!(bin2hex);
 test_case!(break_narrowing);
 test_case!(by_reference_invalidation);
 test_case!(callable_template_inference);

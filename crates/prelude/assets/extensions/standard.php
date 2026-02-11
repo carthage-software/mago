@@ -1017,6 +1017,8 @@ function constant(string $name): mixed {}
 
 /**
  * @pure
+ * 
+ * @return ($string is non-empty-string ? non-empty-string : '')
  */
 function bin2hex(string $string): string {}
 
