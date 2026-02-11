@@ -538,11 +538,13 @@ fn scan_class_like<'arena>(
         }
 
         for type_alias in &docblock.type_aliases {
+            type_context = type_context.with_type_alias(atom(&type_alias.name));
+        }
+
+        for type_alias in &docblock.type_aliases {
             let alias_name = atom(&type_alias.name);
             match get_type_metadata_from_type_string(&type_alias.type_string, Some(name), &type_context, scope) {
                 Ok(type_metadata) => {
-                    type_context = type_context.with_type_alias(alias_name);
-
                     class_like_metadata.type_aliases.insert(alias_name, type_metadata);
                 }
                 Err(typing_error) => {
