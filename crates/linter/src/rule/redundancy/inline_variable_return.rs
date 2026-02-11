@@ -383,7 +383,7 @@ mod tests {
         code = indoc! {r"
             <?php
 
-            function &get_gategory_by_path(string $path): ?array {
+            function &get_category_by_path(string $path): ?array {
                 return &find_node();
             }
         "}
