@@ -15,6 +15,7 @@ use mago_atom::AtomSet;
 use mago_atom::atom;
 use mago_atom::concat_atom;
 use mago_codex::assertion::Assertion;
+use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::ttype::add_optional_union_type;
 use mago_codex::ttype::add_union_type;
 use mago_codex::ttype::atomic::TAtomic;
@@ -36,6 +37,7 @@ use mago_codex::ttype::get_mixed_maybe_from_loop;
 use mago_codex::ttype::get_never;
 use mago_codex::ttype::get_null;
 use mago_codex::ttype::get_string;
+use mago_codex::ttype::intersect_union_types;
 use mago_codex::ttype::union::TUnion;
 use mago_codex::ttype::wrap_atomic;
 use mago_reporting::Annotation;
@@ -194,7 +196,7 @@ pub fn reconcile_keyed_types<'ctx>(
             // Even when the type doesn't exist and result is never, we still need to
             // update parent array types for negated isset/key_exists to remove the key
             if key_str.ends_with(']') && (has_inverted_isset || has_inverted_key_exists) {
-                adjust_array_type_remove_key(key_parts.clone(), block_context, changed_var_ids);
+                adjust_array_type_remove_key(key_parts.clone(), block_context, changed_var_ids, context.codebase);
             }
 
             continue;
@@ -207,9 +209,11 @@ pub fn reconcile_keyed_types<'ctx>(
             changed_var_ids.insert(*key);
 
             if key_str.ends_with(']') && !has_inverted_isset && !has_inverted_key_exists && !has_empty && !is_equality {
-                adjust_array_type(key_parts.clone(), block_context, changed_var_ids, &result_type);
+                adjust_array_type(key_parts.clone(), block_context, changed_var_ids, &result_type, context.codebase);
             } else if key_str.ends_with(']') && (has_inverted_isset || has_inverted_key_exists) {
-                adjust_array_type_remove_key(key_parts.clone(), block_context, changed_var_ids);
+                adjust_array_type_remove_key(key_parts.clone(), block_context, changed_var_ids, context.codebase);
+            } else if key_str.contains("->") && !is_equality {
+                adjust_object_property_type(key_parts.clone(), block_context, changed_var_ids, &result_type, context);
             }
 
             if key_str != "$this" {
@@ -292,6 +296,7 @@ fn adjust_array_type(
     context: &mut BlockContext<'_>,
     changed_var_ids: &mut AtomSet,
     result_type: &TUnion,
+    codebase: &CodebaseMetadata,
 ) {
     key_parts.pop();
     let Some(array_key) = key_parts.pop() else {
@@ -321,19 +326,34 @@ fn adjust_array_type(
         return;
     };
 
-    for base_atomic_type in existing_type.types.to_mut() {
-        match base_atomic_type {
+    let atomic_types = std::mem::take(existing_type.types.to_mut());
+    let mut compatible_types = Vec::with_capacity(atomic_types.len());
+
+    for mut base_atomic_type in atomic_types {
+        match &mut base_atomic_type {
             TAtomic::Array(TArray::Keyed(TKeyedArray { known_items, .. })) => {
                 let dictkey = if has_string_offset {
                     ArrayKey::String(atom(&arraykey_offset))
                 } else if let Ok(arraykey_value) = arraykey_offset.parse::<i64>() {
                     ArrayKey::Integer(arraykey_value)
                 } else {
+                    compatible_types.push(base_atomic_type);
                     continue;
                 };
 
                 if let Some(known_items) = known_items {
-                    known_items.insert(dictkey, (false, result_type.clone()));
+                    if let Some((_, existing_item_type)) = known_items.get(&dictkey) {
+                        match intersect_union_types(result_type, existing_item_type, codebase) {
+                            Some(intersected) if !intersected.is_never() => {
+                                known_items.insert(dictkey, (false, intersected));
+                            }
+                            _ => {
+                                continue;
+                            }
+                        }
+                    } else {
+                        known_items.insert(dictkey, (false, result_type.clone()));
+                    }
                 } else {
                     *known_items = Some(BTreeMap::from([(dictkey, (false, result_type.clone()))]));
                 }
@@ -341,7 +361,18 @@ fn adjust_array_type(
             TAtomic::Array(TArray::List(TList { known_elements, .. })) => {
                 if let Ok(arraykey_offset) = arraykey_offset.parse::<usize>() {
                     if let Some(known_elements) = known_elements {
-                        known_elements.insert(arraykey_offset, (false, result_type.clone()));
+                        if let Some((_, existing_item_type)) = known_elements.get(&arraykey_offset) {
+                            match intersect_union_types(result_type, existing_item_type, codebase) {
+                                Some(intersected) if !intersected.is_never() => {
+                                    known_elements.insert(arraykey_offset, (false, intersected));
+                                }
+                                _ => {
+                                    continue;
+                                }
+                            }
+                        } else {
+                            known_elements.insert(arraykey_offset, (false, result_type.clone()));
+                        }
                     } else {
                         *known_elements = Some(BTreeMap::from([(arraykey_offset, (false, result_type.clone()))]));
                     }
@@ -353,16 +384,18 @@ fn adjust_array_type(
                 } else if let Ok(arraykey_value) = arraykey_offset.parse::<i64>() {
                     ArrayKey::Integer(arraykey_value)
                 } else {
+                    compatible_types.push(base_atomic_type);
                     continue;
                 };
 
-                *base_atomic_type = TAtomic::Array(TArray::Keyed(TKeyedArray {
+                base_atomic_type = TAtomic::Array(TArray::Keyed(TKeyedArray {
                     known_items: Some(BTreeMap::from([(key, (false, result_type.clone()))])),
                     parameters: Some((Arc::new(get_arraykey()), Arc::new(get_mixed()))),
                     non_empty: true,
                 }));
             }
             _ => {
+                compatible_types.push(base_atomic_type);
                 continue;
             }
         }
@@ -372,8 +405,20 @@ fn adjust_array_type(
         if let Some(last_part) = key_parts.last()
             && last_part == "]"
         {
-            adjust_array_type(key_parts.clone(), context, changed_var_ids, &wrap_atomic(base_atomic_type.clone()));
+            adjust_array_type(
+                key_parts.clone(),
+                context,
+                changed_var_ids,
+                &wrap_atomic(base_atomic_type.clone()),
+                codebase,
+            );
         }
+
+        compatible_types.push(base_atomic_type);
+    }
+
+    if !compatible_types.is_empty() {
+        *existing_type.types.to_mut() = compatible_types;
     }
 
     context.locals.insert(base_key_atom, Rc::new(existing_type));
@@ -383,6 +428,7 @@ fn adjust_array_type_remove_key(
     mut key_parts: Vec<String>,
     context: &mut BlockContext<'_>,
     changed_var_ids: &mut AtomSet,
+    codebase: &CodebaseMetadata,
 ) {
     key_parts.pop();
     let Some(array_key) = key_parts.pop() else {
@@ -445,11 +491,90 @@ fn adjust_array_type_remove_key(
         if let Some(last_part) = key_parts.last()
             && last_part == "]"
         {
-            adjust_array_type(key_parts.clone(), context, changed_var_ids, &wrap_atomic(base_atomic_type.clone()));
+            adjust_array_type(
+                key_parts.clone(),
+                context,
+                changed_var_ids,
+                &wrap_atomic(base_atomic_type.clone()),
+                codebase,
+            );
         }
     }
 
     context.locals.insert(base_key_atom, Rc::new(existing_type));
+}
+
+/// Filters a union of object types based on a narrowed property type.
+///
+/// When `$input->myProp` is narrowed (e.g., via `is_string()`), this function
+/// checks each object variant to see if its declared property type is compatible
+/// with the narrowed type, and removes incompatible variants.
+fn adjust_object_property_type(
+    mut key_parts: Vec<String>,
+    block_context: &mut BlockContext<'_>,
+    changed_var_ids: &mut AtomSet,
+    result_type: &TUnion,
+    context: &Context<'_, '_>,
+) {
+    let Some(property_name) = key_parts.pop() else {
+        return;
+    };
+
+    let Some(divider) = key_parts.pop() else {
+        return;
+    };
+
+    if divider != "->" {
+        return;
+    }
+
+    let base_key = key_parts.join("");
+    let base_key_atom = atom(&base_key);
+
+    let mut existing_type = if let Some(existing_type) = block_context.locals.get(&base_key_atom) {
+        (**existing_type).clone()
+    } else {
+        return;
+    };
+
+    let atomic_types = std::mem::take(existing_type.types.to_mut());
+    let original_len = atomic_types.len();
+    let mut compatible_types = Vec::with_capacity(original_len);
+
+    for base_atomic_type in atomic_types {
+        let should_check = match &base_atomic_type {
+            TAtomic::Object(TObject::Named(named)) => {
+                let fq_class_name = named.get_name_ref();
+                if fq_class_name.eq_ignore_ascii_case("stdClass")
+                    || !context.codebase.class_or_interface_exists(fq_class_name)
+                {
+                    None
+                } else {
+                    get_property_type(context, *named.get_name_ref(), &property_name)
+                }
+            }
+            _ => None,
+        };
+
+        if let Some(declared_property_type) = should_check {
+            match intersect_union_types(result_type, &declared_property_type, context.codebase) {
+                Some(intersected) if !intersected.is_never() => {
+                    compatible_types.push(base_atomic_type);
+                }
+                _ => {
+                    continue;
+                }
+            }
+        } else {
+            compatible_types.push(base_atomic_type);
+        }
+    }
+
+    if !compatible_types.is_empty() && compatible_types.len() < original_len {
+        *existing_type.types.to_mut() = compatible_types;
+        block_context.locals.insert(base_key_atom, Rc::new(existing_type));
+        changed_var_ids.insert(base_key_atom);
+    }
 }
 
 fn refine_array_key(key_type: &TUnion) -> TUnion {

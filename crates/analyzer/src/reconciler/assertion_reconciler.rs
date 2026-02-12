@@ -31,6 +31,7 @@ use mago_codex::ttype::expander::TypeExpansionOptions;
 use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::get_mixed_maybe_from_loop;
 use mago_codex::ttype::get_never;
+use mago_codex::ttype::intersect_union_types;
 use mago_codex::ttype::union::TUnion;
 use mago_codex::ttype::wrap_atomic;
 use mago_span::Span;
@@ -158,15 +159,28 @@ pub(crate) fn refine_atomic_with_union(
 
             let mut new_known_items = existing_known_items.clone();
             let mut has_non_optional = false;
+            let mut variant_compatible = true;
             for (key, (new_is_optional, new_item_type)) in known_items {
                 if let Some((is_optional, existing_item_type)) = new_known_items.get_mut(key) {
-                    *is_optional = *new_is_optional;
-                    *existing_item_type = new_item_type.clone();
+                    match intersect_union_types(new_item_type, existing_item_type, context.codebase) {
+                        Some(intersected) if !intersected.is_never() => {
+                            *is_optional = *new_is_optional;
+                            *existing_item_type = intersected;
+                        }
+                        _ => {
+                            variant_compatible = false;
+                            break;
+                        }
+                    }
 
                     if !*new_is_optional {
                         has_non_optional = true;
                     }
                 }
+            }
+
+            if !variant_compatible {
+                continue;
             }
 
             acceptable_atomic_types.push(TAtomic::Array(TArray::Keyed(TKeyedArray {
@@ -204,15 +218,28 @@ pub(crate) fn refine_atomic_with_union(
 
             let mut new_known_elements = existing_known_elements.clone();
             let mut has_non_optional = false;
+            let mut variant_compatible = true;
             for (key, (new_is_optional, new_item_type)) in known_elements {
                 if let Some((is_optional, existing_item_type)) = new_known_elements.get_mut(key) {
-                    *is_optional = *new_is_optional;
-                    *existing_item_type = new_item_type.clone();
+                    match intersect_union_types(new_item_type, existing_item_type, context.codebase) {
+                        Some(intersected) if !intersected.is_never() => {
+                            *is_optional = *new_is_optional;
+                            *existing_item_type = intersected;
+                        }
+                        _ => {
+                            variant_compatible = false;
+                            break;
+                        }
+                    }
 
                     if !*new_is_optional {
                         has_non_optional = true;
                     }
                 }
+            }
+
+            if !variant_compatible {
+                continue;
             }
 
             acceptable_atomic_types.push(TAtomic::Array(TArray::List(TList {
