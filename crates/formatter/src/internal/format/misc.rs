@@ -209,7 +209,6 @@ pub fn is_breaking_expression<'arena>(
             | Expression::LegacyArray(_)
             | Expression::List(_)
             | Expression::Closure(_)
-            | Expression::PartialApplication(_)
             | Expression::AnonymousClass(_)
             | Expression::Match(_)
     )

@@ -7,6 +7,7 @@
 use std::borrow::Cow;
 
 use bumpalo::Bump;
+
 use mago_database::file::File;
 use mago_php_version::PHPVersion;
 use mago_syntax::ast::Program;

@@ -109,6 +109,7 @@ use crate::internal::format::assignment::print_assignment_with_alignment;
 use crate::internal::format::binaryish;
 use crate::internal::format::binaryish::BinaryishOperator;
 use crate::internal::format::call_arguments::print_argument_list;
+use crate::internal::format::call_arguments::print_partial_argument_list;
 use crate::internal::format::call_node::CallLikeNode;
 use crate::internal::format::call_node::print_call_like_node;
 use crate::internal::format::class_like::print_class_like_body;
@@ -626,10 +627,7 @@ impl<'arena> Format<'arena> for NamedArgument<'arena> {
 
 impl<'arena> Format<'arena> for PartialArgumentList<'arena> {
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
-        wrap!(f, self, PartialArgumentList, {
-            use crate::internal::format::call_arguments::print_partial_argument_list;
-            print_partial_argument_list(f, self, false, false)
-        })
+        wrap!(f, self, PartialArgumentList, { print_partial_argument_list(f, self) })
     }
 }
 

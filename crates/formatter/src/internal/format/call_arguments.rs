@@ -388,9 +388,11 @@ fn argument_has_surrounding_comments(f: &FormatterState, argument: &Argument) ->
 pub(super) fn print_partial_argument_list<'arena>(
     f: &mut FormatterState<'_, 'arena>,
     argument_list: &'arena PartialArgumentList<'arena>,
-    _for_attribute: bool,
-    _can_expand_first_or_last: bool,
 ) -> Document<'arena> {
+    if argument_list.is_first_class_callable() {
+        return Document::String("(...)");
+    }
+
     let left_parenthesis = Document::String("(");
     let mut contents = vec![in f.arena; left_parenthesis];
 
