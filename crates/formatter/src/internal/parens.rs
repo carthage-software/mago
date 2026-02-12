@@ -74,6 +74,12 @@ impl<'arena> FormatterState<'_, 'arena> {
             return false;
         }
 
+        if matches!(node, Node::Binary(_) | Node::Conditional(_))
+            && matches!(self.parent_node(), Node::PropertyAccess(_) | Node::NullSafePropertyAccess(_))
+        {
+            return true;
+        }
+
         self.called_or_accessed_node_needs_parens(node)
             || self.conditional_needs_parens(node)
             || self.binary_node_needs_parens(node)
@@ -297,6 +303,10 @@ impl<'arena> FormatterState<'_, 'arena> {
             }
             Some(Node::Assignment(_)) => Precedence::Assignment,
             _ => {
+                if matches!(self.nth_parent_kind(2), Some(Node::PropertyAccess(_) | Node::NullSafePropertyAccess(_))) {
+                    return true;
+                }
+
                 let grand_parent_node = self.nth_parent_kind(3);
 
                 if let Some(Node::Access(_)) = grand_parent_node {
@@ -417,6 +427,12 @@ impl<'arena> FormatterState<'_, 'arena> {
         }
 
         if let Some(Node::Access(access)) = self.grandparent_node() {
+            if matches!(self.parent_node(), Node::PropertyAccess(_) | Node::NullSafePropertyAccess(_))
+                && matches!(expression, Expression::Binary(_) | Expression::Conditional(_))
+            {
+                return false;
+            }
+
             let offset = match access {
                 Access::Property(property_access) => property_access.arrow.start_offset(),
                 Access::NullSafeProperty(null_safe_property_access) => {
