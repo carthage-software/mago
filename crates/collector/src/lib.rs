@@ -360,6 +360,7 @@ impl<'ctx, 'arena> Collector<'ctx, 'arena> {
                                 Annotation::primary(pragma.span)
                                     .with_message("This ignore pragma does not match any reported issue."),
                             )
+                            .with_annotation(Annotation::secondary(pragma.code_span).with_message("...for this code"))
                             .with_annotation(
                                 Annotation::secondary(pragma.trivia_span).with_message("...within this comment."),
                             ),
@@ -378,6 +379,7 @@ impl<'ctx, 'arena> Collector<'ctx, 'arena> {
                             .with_annotation(
                                 Annotation::primary(pragma.span).with_message("This expect pragma was not fulfilled."),
                             )
+                            .with_annotation(Annotation::secondary(pragma.code_span).with_message("...for this code"))
                             .with_annotation(
                                 Annotation::secondary(pragma.trivia_span).with_message("...within this comment."),
                             ),
