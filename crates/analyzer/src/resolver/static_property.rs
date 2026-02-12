@@ -150,6 +150,48 @@ fn find_static_property_in_class<'ctx, 'ast, 'arena>(
     };
 
     let Some(property_metadata) = declaring_class_metadata.properties.get(&property_name) else {
+        for required_class in
+            declaring_class_metadata.require_extends.iter().chain(declaring_class_metadata.require_implements.iter())
+        {
+            let Some(required_metadata) = context.codebase.get_class_like(required_class) else {
+                continue;
+            };
+            let required_declaring_id = context
+                .codebase
+                .get_declaring_property_class(required_class, &property_name)
+                .unwrap_or(*required_class);
+            let required_declaring_metadata =
+                context.codebase.get_class_like(&required_declaring_id).unwrap_or(required_metadata);
+
+            if let Some(prop_meta) = required_declaring_metadata.properties.get(&property_name) {
+                if !prop_meta.flags.is_static() {
+                    continue;
+                }
+
+                let mut property_type =
+                    prop_meta.type_metadata.as_ref().map_or_else(get_mixed, |metadata| metadata.type_union.clone());
+
+                expander::expand_union(
+                    context.codebase,
+                    &mut property_type,
+                    &TypeExpansionOptions {
+                        self_class: Some(required_declaring_id),
+                        static_class_type: StaticClassType::Name(class_id),
+                        parent_class: required_declaring_metadata.direct_parent_class,
+                        ..Default::default()
+                    },
+                );
+
+                return Some(ResolvedProperty {
+                    property_span: prop_meta.name_span.or(prop_meta.span),
+                    property_name,
+                    declaring_class_id: Some(required_declaring_id),
+                    property_type,
+                    is_magic: false,
+                });
+            }
+        }
+
         result.has_invalid_path = true;
         report_non_existent_property(
             context,

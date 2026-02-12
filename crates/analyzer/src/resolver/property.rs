@@ -457,7 +457,37 @@ fn find_property_in_class<'ctx, 'ast, 'arena>(
     };
 
     let Some(property_metadata) = declaring_class_metadata.properties.get(&prop_name) else {
-        // Property not found on class. Check mixins.
+        for required_class in
+            declaring_class_metadata.require_extends.iter().chain(declaring_class_metadata.require_implements.iter())
+        {
+            let Some(required_metadata) = context.codebase.get_class_like(required_class) else {
+                continue;
+            };
+
+            let required_declaring_class_id =
+                context.codebase.get_declaring_property_class(required_class, &prop_name).unwrap_or(*required_class);
+            let required_declaring_metadata =
+                context.codebase.get_class_like(&required_declaring_class_id).unwrap_or(required_metadata);
+
+            if let Some(prop_meta) = required_declaring_metadata.properties.get(&prop_name) {
+                let property_type = prop_meta
+                    .type_metadata
+                    .as_ref()
+                    .or(prop_meta.type_declaration_metadata.as_ref())
+                    .map(|type_metadata| type_metadata.type_union.clone())
+                    .unwrap_or_else(get_mixed);
+
+                return Some(ResolvedProperty {
+                    property_span: prop_meta.name_span.or(prop_meta.span),
+                    property_name: prop_name,
+                    declaring_class_id: Some(required_declaring_class_id),
+                    property_type,
+                    is_magic: false,
+                });
+            }
+        }
+
+        // Check mixins.
         if !declaring_class_metadata.mixins.is_empty() {
             // Try to find property in mixin types
             if let Some(resolved) = find_property_in_mixins(

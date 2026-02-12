@@ -456,6 +456,23 @@ pub fn get_method_ids_from_object<'ctx, 'ast, 'arena, 'object>(
         }
 
         ids.push((class_metadata, method_id, outer_object.clone(), *name, None));
+    } else if !class_metadata.require_extends.is_empty() || !class_metadata.require_implements.is_empty() {
+        for required_class in class_metadata.require_extends.iter().chain(class_metadata.require_implements.iter()) {
+            let Some(required_metadata) = context.codebase.get_class_like(required_class) else {
+                continue;
+            };
+
+            let mut required_method_id =
+                MethodIdentifier::new(atom(&required_metadata.original_name), atom(&method_name));
+            if !context.codebase.method_identifier_exists(&required_method_id) {
+                required_method_id = context.codebase.get_declaring_method_identifier(&required_method_id);
+            }
+
+            if context.codebase.get_method_by_id(&required_method_id).is_some() {
+                ids.push((required_metadata, required_method_id, outer_object.clone(), *required_class, None));
+                break;
+            }
+        }
     } else if !class_metadata.mixins.is_empty() {
         // Search mixins for the method. If has_magic_call is false, we track that
         // the method was found in a mixin without the required magic method.

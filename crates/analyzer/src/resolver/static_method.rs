@@ -348,7 +348,27 @@ fn resolve_method_from_metadata<'ctx, 'arena>(
 ) -> Option<ResolvedMethod> {
     let method_id = MethodIdentifier::new(atom(&defining_class_metadata.original_name), atom(&method_name));
     let declaring_method_id = context.codebase.get_declaring_method_identifier(&method_id);
-    let function_like = context.codebase.get_method_by_id(&declaring_method_id)?;
+    let (declaring_method_id, function_like) = match context.codebase.get_method_by_id(&declaring_method_id) {
+        Some(fl) => (declaring_method_id, fl),
+        None => {
+            let mut found = None;
+            for required_class in
+                defining_class_metadata.require_extends.iter().chain(defining_class_metadata.require_implements.iter())
+            {
+                let Some(required_metadata) = context.codebase.get_class_like(required_class) else {
+                    continue;
+                };
+                let req_method_id = MethodIdentifier::new(atom(&required_metadata.original_name), atom(&method_name));
+                let req_declaring_id = context.codebase.get_declaring_method_identifier(&req_method_id);
+                if let Some(fl) = context.codebase.get_method_by_id(&req_declaring_id) {
+                    found = Some((req_declaring_id, fl));
+                    break;
+                }
+            }
+
+            found?
+        }
+    };
 
     if let Some(result) = result
         && !check_method_visibility(

@@ -273,6 +273,50 @@ fn find_constant_in_class<'ctx>(
         return Some(ResolvedConstant { const_type });
     }
 
+    for required_class in metadata.require_extends.iter().chain(metadata.require_implements.iter()) {
+        let Some(required_metadata) = context.codebase.get_class_like(required_class) else {
+            continue;
+        };
+
+        if let Some(constant_metadata) = required_metadata.constants.get(&const_name) {
+            let mut const_type = if let Some(type_metadata) = &constant_metadata.type_metadata
+                && type_metadata.from_docblock
+            {
+                type_metadata.type_union.clone()
+            } else {
+                constant_metadata
+                    .inferred_type
+                    .clone()
+                    .map(wrap_atomic)
+                    .or_else(|| constant_metadata.type_metadata.clone().map(|s| s.type_union))
+                    .unwrap_or_else(get_mixed)
+            };
+
+            expander::expand_union(
+                context.codebase,
+                &mut const_type,
+                &TypeExpansionOptions {
+                    self_class: Some(required_metadata.name),
+                    static_class_type: StaticClassType::Name(required_metadata.name),
+                    parent_class: required_metadata.direct_parent_class,
+                    function_is_final: required_metadata.flags.is_final(),
+                    ..Default::default()
+                },
+            );
+
+            return Some(ResolvedConstant { const_type });
+        }
+
+        if required_metadata.kind.is_enum() && required_metadata.enum_cases.contains_key(&const_name) {
+            let const_type = TUnion::from_atomic(TAtomic::Object(TObject::Enum(TEnum::new_case(
+                required_metadata.original_name,
+                const_name,
+            ))));
+
+            return Some(ResolvedConstant { const_type });
+        }
+    }
+
     // Not found, report error.
     report_non_existent_constant(context, metadata, const_name, class_span, const_span);
     None
