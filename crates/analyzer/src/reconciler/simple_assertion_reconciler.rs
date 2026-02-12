@@ -1619,10 +1619,12 @@ fn reconcile_at_least_countable(
             if !non_empty || min_under_count {
                 existing_var_type.remove_type(atomic);
                 if !element_type.is_never() {
+                    let new_known_count = if known_count.is_some() { Some(count) } else { *known_count };
+
                     existing_var_type.types.to_mut().push(TAtomic::Array(TArray::List(TList {
                         element_type: element_type.clone(),
                         known_elements: known_elements.clone(),
-                        known_count: Some(count),
+                        known_count: new_known_count,
                         non_empty: true,
                     })));
                 }
