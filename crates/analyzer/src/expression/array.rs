@@ -105,6 +105,7 @@ struct ArrayCreationInfo {
     int_offset: i64,
     is_list: bool,
     can_be_empty: bool,
+    known_int_offset: bool,
 }
 
 fn analyze_array_elements<'ctx, 'arena>(
@@ -130,6 +131,7 @@ fn analyze_array_elements<'ctx, 'arena>(
         int_offset: -1,
         is_list: true,
         can_be_empty: true,
+        known_int_offset: true,
     };
 
     for element in elements {
@@ -227,14 +229,18 @@ fn analyze_array_elements<'ctx, 'arena>(
                     break;
                 }
 
-                array_creation_info.int_offset += 1;
+                if array_creation_info.known_int_offset {
+                    array_creation_info.int_offset += 1;
 
-                (
-                    Some(ArrayKey::Integer(array_creation_info.int_offset)),
-                    get_literal_int(array_creation_info.int_offset),
-                    true,
-                    value_array_element.value,
-                )
+                    (
+                        Some(ArrayKey::Integer(array_creation_info.int_offset)),
+                        get_literal_int(array_creation_info.int_offset),
+                        true,
+                        value_array_element.value,
+                    )
+                } else {
+                    (None, get_int(), true, value_array_element.value)
+                }
             }
             ArrayElement::Variadic(variadic_array_element) => {
                 let was_inside_general_use = block_context.flags.inside_general_use();
@@ -417,7 +423,11 @@ fn analyze_array_elements<'ctx, 'arena>(
     let array_type = if !array_creation_info.property_types.is_empty() {
         if array_creation_info.is_list {
             TUnion::from_vec(vec![TAtomic::Array(TArray::List(TList {
-                known_count: Some(array_creation_info.property_types.len()),
+                known_count: if array_creation_info.known_int_offset {
+                    Some(array_creation_info.property_types.len())
+                } else {
+                    None
+                },
                 known_elements: Some(
                     array_creation_info
                         .property_types
@@ -567,6 +577,11 @@ fn handle_variadic_array_element<'arena>(
                     }
                 }
                 TArray::List(list_data) => {
+                    let has_unknown_count = list_data.known_count.is_none();
+                    if has_unknown_count {
+                        array_creation_info.known_int_offset = false;
+                    }
+
                     if let Some(known_elements) = &list_data.known_elements {
                         for (possibly_undefined, value_type) in known_elements.values() {
                             if *possibly_undefined {
