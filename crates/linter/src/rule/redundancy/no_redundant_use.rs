@@ -373,11 +373,11 @@ mod utils {
     ) -> bool {
         let alias = get_alias(decl.item);
 
-        if docblocks.iter().any(|doc| doc.contains(alias.as_str())) {
+        if docblocks.iter().any(|doc| contains_word(doc, alias.as_str())) {
             return true;
         }
 
-        if inline_contents.iter().any(|content| content.contains(alias.as_str())) {
+        if inline_contents.iter().any(|content| contains_word(content, alias.as_str())) {
             return true;
         }
 
@@ -388,6 +388,29 @@ mod utils {
         if decl.import_type == ImportType::ClassOrNamespace {
             let prefix = concat_atom!(decl.fqn, "\\");
             if used_fqns.iter().any(|used| starts_with_ignore_case(used.as_str(), prefix.as_str())) {
+                return true;
+            }
+        }
+
+        false
+    }
+
+    /// Checks if `haystack` contains `needle` as a whole word (not as a substring of a larger identifier).
+    ///
+    /// A match is considered a whole word if the characters immediately before and after the match
+    /// are not ASCII alphanumeric or underscore (i.e., not PHP identifier characters).
+    fn contains_word(haystack: &str, needle: &str) -> bool {
+        let needle_len = needle.len();
+        let haystack_bytes = haystack.as_bytes();
+
+        for (pos, _) in haystack.match_indices(needle) {
+            let before_ok =
+                pos == 0 || !haystack_bytes[pos - 1].is_ascii_alphanumeric() && haystack_bytes[pos - 1] != b'_';
+            let after_pos = pos + needle_len;
+            let after_ok = after_pos >= haystack_bytes.len()
+                || !haystack_bytes[after_pos].is_ascii_alphanumeric() && haystack_bytes[after_pos] != b'_';
+
+            if before_ok && after_ok {
                 return true;
             }
         }
@@ -893,6 +916,52 @@ mod tests {
             use Foo as Foo;
 
             $_ = new Foo();
+        "}
+    }
+
+    test_lint_failure! {
+        name = import_not_used_despite_substring_in_docblock,
+        rule = NoRedundantUseRule,
+        code = indoc! {r"
+            <?php
+
+            namespace App\Commands;
+
+            use Config;
+
+            class TestCommand
+            {
+                public function handle(): void
+                {
+                    /**
+                     * @var Collection<int, ConfigUsage> $usages
+                     */
+                    $usages = new Collection();
+                }
+            }
+        "}
+    }
+
+    test_lint_success! {
+        name = import_used_in_docblock_as_whole_word,
+        rule = NoRedundantUseRule,
+        code = indoc! {r"
+            <?php
+
+            namespace App\Commands;
+
+            use Config;
+
+            class TestCommand
+            {
+                public function handle(): void
+                {
+                    /**
+                     * @var Config $config
+                     */
+                    $config = null;
+                }
+            }
         "}
     }
 }
