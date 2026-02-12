@@ -173,6 +173,7 @@ pub fn reconcile_keyed_types<'ctx>(
                     inside_loop,
                     Some(span),
                     can_report_issues
+                        && new_type_part_parts.len() == 1
                         && referenced_var_ids.contains(key)
                         && active_new_types.get(key).is_some_and(|active_new_type| active_new_type.contains(&i)),
                     negated,

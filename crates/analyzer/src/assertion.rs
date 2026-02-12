@@ -349,6 +349,45 @@ fn scrape_special_function_call_assertions(
 
                 Some((0, vec![Assertion::IsType(TAtomic::Object(TObject::new_has_property(atom(property_name))))]))
             }
+            "is_a" | "is_subclass_of" => {
+                let class_name_type = function_call
+                    .argument_list
+                    .arguments
+                    .get(1)
+                    .map(mago_syntax::ast::Argument::value)
+                    .and_then(|expr| artifacts.get_expression_type(expr))?;
+
+                let is_subclass_of_call = name == "is_subclass_of";
+                let allow_string = function_call
+                    .argument_list
+                    .arguments
+                    .get(2)
+                    .and_then(|argument| artifacts.get_expression_type(argument.value()))
+                    .map_or(is_subclass_of_call, |t| !t.is_false());
+
+                let mut assertions = vec![];
+                for atomic in class_name_type.types.as_ref() {
+                    let Some(resolved) = get_class_name_from_atomic(assertion_context.codebase, atomic) else {
+                        continue;
+                    };
+
+                    let object_type = resolved.get_object_type(assertion_context.codebase);
+
+                    if allow_string {
+                        assertions.push(Assertion::IsType(TAtomic::Scalar(TScalar::class_string_of_type(
+                            object_type.clone(),
+                        ))));
+                    }
+
+                    assertions.push(Assertion::IsType(object_type));
+                }
+
+                if assertions.is_empty() {
+                    return None;
+                }
+
+                Some((0, assertions))
+            }
             "in_array" => {
                 let should_strict_check = function_call
                     .argument_list
