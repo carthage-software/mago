@@ -111,7 +111,7 @@ impl HasSpan for InterpolatedString<'_> {
 
 impl HasSpan for DocumentString<'_> {
     fn span(&self) -> Span {
-        self.open
+        self.open.join(self.close)
     }
 }
 
