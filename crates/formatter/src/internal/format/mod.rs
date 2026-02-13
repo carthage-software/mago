@@ -1370,15 +1370,22 @@ impl<'arena> Format<'arena> for Hint<'arena> {
                             Hint::Nullable(_) | Hint::Union(_) | Hint::Intersection(_) | Hint::Parenthesized(_)
                         ));
 
-                    if force_long_syntax || !f.settings.null_type_hint.is_question() {
+                    if !force_long_syntax && f.settings.null_type_hint.is_question() {
+                        Document::Array(vec![in f.arena; Document::String("?"), nullable_hint.hint.format(f)])
+                    } else if f.settings.null_type_hint.is_null_pipe_last() {
+                        Document::Array(vec![
+                            in f.arena;
+                            nullable_hint.hint.format(f),
+                            Document::String("|"),
+                            Document::String("null"),
+                        ])
+                    } else {
                         Document::Array(vec![
                             in f.arena;
                             Document::String("null"),
                             Document::String("|"),
                             nullable_hint.hint.format(f),
                         ])
-                    } else {
-                        Document::Array(vec![in f.arena; Document::String("?"), nullable_hint.hint.format(f)])
                     }
                 }
                 Hint::Union(union_hint) => {
@@ -1407,6 +1414,16 @@ impl<'arena> Format<'arena> for Hint<'arena> {
                             Document::String("?"),
                             non_null_hint.format(f),
                         ])
+                    } else if f.settings.null_type_hint.is_null_pipe_last()
+                        // Only reorder at top-level unions; nested unions are handled by the top-level's tree traversal.
+                        && !matches!(f.parent_node(), Node::Hint(Hint::Union(_)))
+                        && union_needs_null_reorder(self)
+                    {
+                        let mut docs = Vec::new_in(f.arena);
+                        format_union_non_null_leaves(f, self, &mut docs);
+                        docs.push(Document::String("|"));
+                        docs.push(Document::String("null"));
+                        Document::Array(docs)
                     } else {
                         Document::Array(vec![
                             in f.arena;
@@ -1943,6 +1960,43 @@ impl<'arena> Format<'arena> for HaltCompiler<'arena> {
                 self.terminator.format(f),
             ]))
         })
+    }
+}
+
+/// Returns `true` if the union tree contains `null` that is not already the rightmost leaf.
+fn union_needs_null_reorder(hint: &Hint<'_>) -> bool {
+    fn contains_null(hint: &Hint<'_>) -> bool {
+        match hint {
+            Hint::Null(_) => true,
+            Hint::Union(u) => contains_null(u.left) || contains_null(u.right),
+            _ => false,
+        }
+    }
+
+    match hint {
+        Hint::Union(u) => contains_null(u.left) || union_needs_null_reorder(u.right),
+        _ => false,
+    }
+}
+
+/// Formats all non-null leaves of a union tree directly into `docs`, skipping `null`.
+fn format_union_non_null_leaves<'arena>(
+    f: &mut FormatterState<'_, 'arena>,
+    hint: &'arena Hint<'arena>,
+    docs: &mut Vec<'arena, Document<'arena>>,
+) {
+    match hint {
+        Hint::Union(u) => {
+            format_union_non_null_leaves(f, u.left, docs);
+            format_union_non_null_leaves(f, u.right, docs);
+        }
+        Hint::Null(_) => {}
+        leaf => {
+            if !docs.is_empty() {
+                docs.push(Document::String("|"));
+            }
+            docs.push(leaf.format(f));
+        }
     }
 }
 
