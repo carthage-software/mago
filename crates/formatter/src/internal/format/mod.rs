@@ -1968,13 +1968,13 @@ fn union_needs_null_reorder(hint: &Hint<'_>) -> bool {
     fn contains_null(hint: &Hint<'_>) -> bool {
         match hint {
             Hint::Null(_) => true,
-            Hint::Union(u) => contains_null(&u.left) || contains_null(&u.right),
+            Hint::Union(u) => contains_null(u.left) || contains_null(u.right),
             _ => false,
         }
     }
 
     match hint {
-        Hint::Union(u) => contains_null(&u.left) || union_needs_null_reorder(&u.right),
+        Hint::Union(u) => contains_null(u.left) || union_needs_null_reorder(u.right),
         _ => false,
     }
 }
@@ -1987,8 +1987,8 @@ fn format_union_non_null_leaves<'arena>(
 ) {
     match hint {
         Hint::Union(u) => {
-            format_union_non_null_leaves(f, &u.left, docs);
-            format_union_non_null_leaves(f, &u.right, docs);
+            format_union_non_null_leaves(f, u.left, docs);
+            format_union_non_null_leaves(f, u.right, docs);
         }
         Hint::Null(_) => {}
         leaf => {
