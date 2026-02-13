@@ -104,9 +104,33 @@ pub(super) fn should_hug_expression<'arena>(
         return true;
     }
 
-    if let Expression::Call(_) | Expression::Access(_) = expression {
-        // Don't hug calls/accesses if they are part of a member access chain
+    if let Expression::Access(_) = expression {
         return collect_member_access_chain(f.arena, expression).is_none_or(|chain| !chain.is_eligible_for_chaining(f));
+    }
+
+    if let Expression::Call(call) = expression {
+        if collect_member_access_chain(f.arena, expression).is_some_and(|chain| chain.is_eligible_for_chaining(f)) {
+            return false;
+        }
+
+        let argument_list = call.get_argument_list();
+
+        if argument_list.arguments.is_empty() {
+            return false;
+        }
+
+        if argument_list.arguments.len() >= 2 {
+            return true;
+        }
+
+        // A call with a single zero-arg call argument (e.g. `foo(bar())`) has no
+        // internal line breaks, so hugging it would prevent the enclosing argument
+        // list from ever breaking regardless of print width.
+        let arg_value = argument_list.arguments.as_slice()[0].value();
+        return !matches!(
+            arg_value,
+            Expression::Call(inner_call) if inner_call.get_argument_list().arguments.is_empty()
+        );
     }
 
     if let Expression::ArrowFunction(arrow_function) = expression {
