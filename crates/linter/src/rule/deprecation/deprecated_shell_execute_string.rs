@@ -91,7 +91,7 @@ impl LintRule for DeprecatedShellExecuteStringRule {
             return;
         };
 
-        let issue = Issue::new(self.cfg.level(), format!("Usage of deprecated shell execute string detected."))
+        let issue = Issue::new(self.cfg.level(), "Usage of deprecated shell execute string detected.")
             .with_code(self.meta.code)
             .with_annotation(
                 Annotation::primary(shell_execute_string.span())

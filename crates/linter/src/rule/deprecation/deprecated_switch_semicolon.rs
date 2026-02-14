@@ -112,7 +112,7 @@ impl LintRule for DeprecatedSwitchSemicolonRule {
             return;
         };
 
-        let issue = Issue::new(self.cfg.level(), format!("Usage of semicolon as a switch case separator is deprecated."))
+        let issue = Issue::new(self.cfg.level(), "Usage of semicolon as a switch case separator is deprecated.")
             .with_code(self.meta.code)
             .with_annotation(
                 Annotation::primary(semicolon.span())
