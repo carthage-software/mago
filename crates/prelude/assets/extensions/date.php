@@ -43,6 +43,7 @@ const DATE_RFC1123 = 'D, d M Y H:i:s O';
 /**
  * @var string
  */
+#[Deprecated(since: '8.5', message: 'as this format ignores the associated timezone and always uses GMT')]
 const DATE_RFC7231 = "D, d M Y H:i:s \\G\\M\\T";
 
 /**
@@ -302,6 +303,7 @@ interface DateTimeInterface
 
     public const string RFC1123 = DATE_RFC1123;
 
+    #[Deprecated(since: '8.5', message: 'as this format ignores the associated timezone and always uses GMT')]
     public const string RFC7231 = DATE_RFC7231;
 
     public const string RFC2822 = DATE_RFC2822;
