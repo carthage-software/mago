@@ -81,6 +81,7 @@ pub struct Lexer<'input> {
     settings: LexerSettings,
     mode: LexerMode<'input>,
     interpolating: bool,
+    brace_interpolating: bool,
     /// Buffer for tokens during string interpolation.
     buffer: VecDeque<Token<'input>>,
 }
@@ -106,6 +107,7 @@ impl<'input> Lexer<'input> {
             settings,
             mode: LexerMode::Inline,
             interpolating: false,
+            brace_interpolating: false,
             buffer: VecDeque::with_capacity(Self::BUFFER_INITIAL_CAPACITY),
         }
     }
@@ -126,6 +128,7 @@ impl<'input> Lexer<'input> {
             settings,
             mode: LexerMode::Script,
             interpolating: false,
+            brace_interpolating: false,
             buffer: VecDeque::with_capacity(Self::BUFFER_INITIAL_CAPACITY),
         }
     }
@@ -628,8 +631,9 @@ impl<'input> Lexer<'input> {
                             [b'{', b'$', ..] | [b'$', b'{', ..] if !last_was_slash => {
                                 let until_offset = read_until_end_of_brace_interpolation(&self.input, length + 2);
 
-                                self.mode =
-                                    LexerMode::DoubleQuoteString(Interpolation::Until(start.offset + until_offset));
+                                self.mode = LexerMode::DoubleQuoteString(Interpolation::BraceUntil(
+                                    start.offset + until_offset,
+                                ));
 
                                 break;
                             }
@@ -668,7 +672,10 @@ impl<'input> Lexer<'input> {
                     Some(Ok(self.token(token_kind, buffer, start, end)))
                 }
                 Interpolation::Until(offset) => {
-                    self.interpolation(*offset, LexerMode::DoubleQuoteString(Interpolation::None))
+                    self.interpolation(*offset, LexerMode::DoubleQuoteString(Interpolation::None), false)
+                }
+                Interpolation::BraceUntil(offset) => {
+                    self.interpolation(*offset, LexerMode::DoubleQuoteString(Interpolation::None), true)
                 }
             },
             LexerMode::ShellExecuteString(interpolation) => match &interpolation {
@@ -691,8 +698,9 @@ impl<'input> Lexer<'input> {
                             [b'{', b'$', ..] | [b'$', b'{', ..] if !last_was_slash => {
                                 let until_offset = read_until_end_of_brace_interpolation(&self.input, length + 2);
 
-                                self.mode =
-                                    LexerMode::ShellExecuteString(Interpolation::Until(start.offset + until_offset));
+                                self.mode = LexerMode::ShellExecuteString(Interpolation::BraceUntil(
+                                    start.offset + until_offset,
+                                ));
 
                                 break;
                             }
@@ -730,7 +738,10 @@ impl<'input> Lexer<'input> {
                     Some(Ok(self.token(token_kind, buffer, start, end)))
                 }
                 Interpolation::Until(offset) => {
-                    self.interpolation(*offset, LexerMode::ShellExecuteString(Interpolation::None))
+                    self.interpolation(*offset, LexerMode::ShellExecuteString(Interpolation::None), false)
+                }
+                Interpolation::BraceUntil(offset) => {
+                    self.interpolation(*offset, LexerMode::ShellExecuteString(Interpolation::None), true)
                 }
             },
             LexerMode::DocumentString(kind, label, interpolation) => match &kind {
@@ -775,7 +786,7 @@ impl<'input> Lexer<'input> {
                                     self.mode = LexerMode::DocumentString(
                                         kind,
                                         label,
-                                        Interpolation::Until(start.offset + until_offset),
+                                        Interpolation::BraceUntil(start.offset + until_offset),
                                     );
 
                                     break;
@@ -820,7 +831,10 @@ impl<'input> Lexer<'input> {
                         Some(Ok(self.token(token_kind, buffer, start, end)))
                     }
                     Interpolation::Until(offset) => {
-                        self.interpolation(*offset, LexerMode::DocumentString(kind, label, Interpolation::None))
+                        self.interpolation(*offset, LexerMode::DocumentString(kind, label, Interpolation::None), false)
+                    }
+                    Interpolation::BraceUntil(offset) => {
+                        self.interpolation(*offset, LexerMode::DocumentString(kind, label, Interpolation::None), true)
                     }
                 },
                 DocumentKind::Nowdoc => {
@@ -1000,7 +1014,7 @@ impl<'input> Lexer<'input> {
                 [b'a'..=b'z' | b'A'..=b'Z' | b'0'..=b'9' | b'_' | 0x80..=0xFF] if !last_was_slash => {
                     length += 1;
                 }
-                [b'\\'] if !self.interpolating => {
+                [b'\\'] if !self.interpolating || self.brace_interpolating => {
                     if last_was_slash {
                         length -= 1;
                         slashes -= 1;
@@ -1044,11 +1058,15 @@ impl<'input> Lexer<'input> {
         &mut self,
         end_offset: u32,
         post_interpolation_mode: LexerMode<'input>,
+        brace: bool,
     ) -> Option<Result<Token<'input>, SyntaxError>> {
         self.mode = LexerMode::Script;
 
         let was_interpolating = self.interpolating;
         self.interpolating = true;
+        let was_brace_interpolating = self.brace_interpolating;
+        // For brace interpolation ({$...}), allow qualified identifiers with backslashes.
+        self.brace_interpolating = brace;
 
         loop {
             let subsequent_token = self.advance()?.ok()?;
@@ -1066,6 +1084,7 @@ impl<'input> Lexer<'input> {
 
         self.mode = post_interpolation_mode;
         self.interpolating = was_interpolating;
+        self.brace_interpolating = was_brace_interpolating;
 
         self.advance()
     }

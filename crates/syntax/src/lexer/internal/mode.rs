@@ -19,6 +19,7 @@ pub enum HaltStage {
 pub enum Interpolation {
     None,
     Until(u32),
+    BraceUntil(u32),
 }
 
 /// Represents the different modes the lexer can be in while tokenizing PHP code.
