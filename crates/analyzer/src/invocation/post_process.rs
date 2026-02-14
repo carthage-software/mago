@@ -64,7 +64,7 @@ pub fn post_invocation_process<'ctx, 'arena>(
     apply_assertions: bool,
 ) -> Result<(), AnalysisError> {
     update_by_reference_argument_types(context, block_context, artifacts, invoication, template_result, parameters)?;
-    clear_object_argument_property_narrowings(context, block_context, invoication);
+    clear_object_property_narrowings(context, block_context, invoication);
 
     let Some(identifier) = invoication.target.get_function_like_identifier() else {
         return Ok(());
@@ -345,21 +345,23 @@ fn update_by_reference_argument_types<'ctx, 'arena>(
     Ok(())
 }
 
-/// Clears narrowed property types for object arguments passed to an invocation.
+/// Clears narrowed property types after an invocation.
 ///
-/// When an object is passed to a method or function, its properties could be modified.
-/// This function removes any narrowed property types for object arguments to prevent
-/// false positives from the analyzer assuming properties remain unchanged after the call.
-fn clear_object_argument_property_narrowings<'ctx, 'arena>(
+/// When an object is passed to a method or function, its properties could be modified,
+/// and objects reachable through that argument could also be affected. We conservatively
+/// remove all narrowed property types for all local object variables when any argument
+/// is an object type. We also clear any clauses that reference property accesses to prevent
+/// stale narrowing from influencing subsequent assertion resolution.
+fn clear_object_property_narrowings<'ctx, 'arena>(
     context: &Context<'ctx, 'arena>,
     block_context: &mut BlockContext<'ctx>,
     invocation: &Invocation<'ctx, '_, 'arena>,
 ) {
     let arguments = invocation.arguments_source.get_arguments();
 
-    for argument in arguments {
+    let has_object_argument = arguments.iter().any(|argument| {
         let Some(expression) = argument.value() else {
-            continue;
+            return false;
         };
 
         let Some(argument_id) = get_expression_id(
@@ -368,37 +370,34 @@ fn clear_object_argument_property_narrowings<'ctx, 'arena>(
             context.resolved_names,
             Some(context.codebase),
         ) else {
-            continue;
+            return false;
         };
 
-        let Some(existing_type) = block_context.locals.get(&argument_id).cloned() else {
-            continue;
-        };
+        block_context.locals.get(&argument_id).is_some_and(|t| t.has_object_type())
+    });
 
-        if !existing_type.has_object_type() {
-            continue;
-        }
-
-        let keys_to_remove: Vec<_> = block_context
-            .locals
-            .keys()
-            .filter(|var_id| {
-                if *var_id == &argument_id {
-                    return false;
-                }
-                if !var_id.starts_with(argument_id.as_str()) {
-                    return false;
-                }
-                let after_root = &var_id.as_str()[argument_id.len()..];
-                after_root.starts_with("->") || after_root.starts_with('[')
-            })
-            .copied()
-            .collect();
-
-        for key in keys_to_remove {
-            block_context.locals.remove(&key);
-        }
+    if !has_object_argument {
+        return;
     }
+
+    let keys_to_remove: Vec<_> =
+        block_context.locals.keys().filter(|var_id| is_property_or_index_key(var_id)).copied().collect();
+
+    for key in &keys_to_remove {
+        block_context.locals.remove(key);
+    }
+
+    // Also remove clauses that reference property accesses so stale narrowings
+    // don't influence subsequent assertion resolution.
+    block_context.clauses.retain(|clause| clause.wedge || !clause.possibilities.keys().any(is_property_or_index_key));
+    block_context
+        .reconciled_expression_clauses
+        .retain(|clause| clause.wedge || !clause.possibilities.keys().any(is_property_or_index_key));
+}
+
+fn is_property_or_index_key(var_id: &Atom) -> bool {
+    let s = var_id.as_str();
+    s.contains("->") || (s.starts_with('$') && s.contains('['))
 }
 
 fn resolve_invocation_assertion<'ctx, 'arena>(

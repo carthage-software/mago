@@ -403,6 +403,7 @@ test_case!(or_never);
 test_case!(abstract_method_inheritance);
 test_case!(variadic_array_type);
 test_case!(parse_str);
+test_case!(assertion_after_side_effect);
 
 // Github Issues
 test_case!(issue_659);
