@@ -1190,6 +1190,12 @@ mod parser {
     smoke_test!(keyword_private_in_string_array_access, "<?php echo \"$arr[private]\";");
     smoke_test!(keyword_protected_in_string_array_access, "<?php echo \"$arr[protected]\";");
 
+    // Namespaced class constants in braced string interpolation
+    smoke_test!(namespaced_constant_in_braced_string_interpolation, r#"<?php echo "{$arr[A\B::VALUE]}";"#);
+    smoke_test!(fully_qualified_constant_in_braced_string_interpolation, r#"<?php echo "{$arr[\Foo\Bar::VALUE]}";"#);
+    smoke_test!(deeply_qualified_constant_in_braced_string_interpolation, r#"<?php echo "{$arr[A\B\C\D::VALUE]}";"#);
+    smoke_test!(namespaced_static_method_in_braced_string_interpolation, r#"<?php echo "{$arr[A\B::method()]}";"#);
+
     smoke_test!(fcc_function, "<?php foo(...);");
     smoke_test!(fcc_method, "<?php $obj->method(...);");
     smoke_test!(fcc_static_method, "<?php Foo::method(...);");

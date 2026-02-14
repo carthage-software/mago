@@ -1035,6 +1035,56 @@ fn test_braced_string_interpolation() -> Result<(), SyntaxError> {
 }
 
 #[test]
+fn test_namespaced_constant_in_braced_string_interpolation() -> Result<(), SyntaxError> {
+    let code = r#"<?= "{$arr[A\B::VALUE]}";"#;
+    let expected = &[
+        TokenKind::EchoTag,
+        TokenKind::Whitespace,
+        TokenKind::DoubleQuote,
+        TokenKind::StringPart,
+        TokenKind::LeftBrace,
+        TokenKind::Variable,
+        TokenKind::LeftBracket,
+        TokenKind::QualifiedIdentifier,
+        TokenKind::ColonColon,
+        TokenKind::Identifier,
+        TokenKind::RightBracket,
+        TokenKind::RightBrace,
+        TokenKind::DoubleQuote,
+        TokenKind::Semicolon,
+    ];
+
+    test_lexer(code.as_bytes(), expected).map_err(|err| {
+        panic!("unexpected error: {err}");
+    })
+}
+
+#[test]
+fn test_fully_qualified_constant_in_braced_string_interpolation() -> Result<(), SyntaxError> {
+    let code = r#"<?= "{$arr[\Foo\Bar::VALUE]}";"#;
+    let expected = &[
+        TokenKind::EchoTag,
+        TokenKind::Whitespace,
+        TokenKind::DoubleQuote,
+        TokenKind::StringPart,
+        TokenKind::LeftBrace,
+        TokenKind::Variable,
+        TokenKind::LeftBracket,
+        TokenKind::FullyQualifiedIdentifier,
+        TokenKind::ColonColon,
+        TokenKind::Identifier,
+        TokenKind::RightBracket,
+        TokenKind::RightBrace,
+        TokenKind::DoubleQuote,
+        TokenKind::Semicolon,
+    ];
+
+    test_lexer(code.as_bytes(), expected).map_err(|err| {
+        panic!("unexpected error: {err}");
+    })
+}
+
+#[test]
 fn test_use_fully_qualified() -> Result<(), SyntaxError> {
     let code = r"<?php use \Foo\{Bar,Baz};";
     let expected = &[

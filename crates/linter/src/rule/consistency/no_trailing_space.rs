@@ -93,10 +93,10 @@ impl LintRule for NoTrailingSpaceRule {
             }
 
             let comment_span = trivia.span();
-            let lines = trivia.value.lines().collect::<Vec<_>>();
+            let value = trivia.value;
 
-            let mut offset = 0;
-            for line in &lines {
+            for line in value.lines() {
+                let offset = (line.as_ptr() as usize) - (value.as_ptr() as usize);
                 let trimmed = line.trim_end();
                 let trimmed_length = trimmed.len();
                 let trailing_whitespace_length = line.len() - trimmed_length;
@@ -124,8 +124,6 @@ impl LintRule for NoTrailingSpaceRule {
                         edits.push(TextEdit::delete(whitespace_span));
                     });
                 }
-
-                offset += line.len() + 1;
             }
         }
     }

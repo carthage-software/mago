@@ -123,6 +123,12 @@ pub(super) fn resolve_targets<'ctx, 'arena>(
     let mut encountered_invalid_targets = false;
     let mut targets = vec![];
     for atomic in expression_type.types.as_ref() {
+        if (atomic.is_null() && expression_type.ignore_nullable_issues())
+            || (atomic.is_false() && expression_type.ignore_falsable_issues())
+        {
+            continue;
+        }
+
         if let Some(callable) = cast_atomic_to_callable(atomic, context.codebase, Some(template_result)) {
             match callable.as_ref() {
                 TCallable::Signature(callable_signature) => {

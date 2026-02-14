@@ -401,7 +401,7 @@ test_case!(missing_api_or_internal, {
 test_case!(spread_list);
 test_case!(or_never);
 test_case!(abstract_method_inheritance);
-test_case!(parse_str);
+test_case!(variadic_array_type);
 
 // Github Issues
 test_case!(issue_659);
@@ -640,6 +640,10 @@ test_case!(issue_1119);
 test_case!(issue_1108);
 test_case!(issue_1102);
 test_case!(issue_1093);
+test_case!(issue_1126);
+test_case!(issue_1127);
+test_case!(issue_1130);
+test_case!(issue_1131);
 
 #[test]
 fn test_all_test_cases_are_ran() {

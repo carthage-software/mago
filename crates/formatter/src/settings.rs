@@ -604,16 +604,29 @@ generate_formatter_settings! {
     ///
     /// With `Question`:
     /// ```php
-    /// function foo(?string $bar) {
-    ///     return $bar;
-    /// }
+    /// function foo(
+    ///     ?string $a,
+    ///     null|int|string $b,
+    ///     int|null|string $c,
+    /// ) {}
     /// ```
     ///
     /// With `NullPipe`:
     /// ```php
-    /// function foo(null|string $bar) {
-    ///     return $bar;
-    /// }
+    /// function foo(
+    ///     null|string $a,
+    ///     null|int|string $b,
+    ///     int|null|string $c,
+    /// ) {}
+    /// ```
+    ///
+    /// With `NullPipeLast`:
+    /// ```php
+    /// function foo(
+    ///     string|null $a,
+    ///     int|string|null $b,
+    ///     int|string|null $c,
+    /// ) {}
     /// ```
     ///
     /// Default: `Question`
@@ -1069,12 +1082,19 @@ impl FromStr for EndOfLine {
 pub enum NullTypeHint {
     #[serde(alias = "null_pipe", alias = "pipe", alias = "long", alias = "|")]
     NullPipe,
+    #[serde(alias = "null_pipe_last", alias = "pipe_last", alias = "long_last")]
+    NullPipeLast,
     #[default]
     #[serde(alias = "question", alias = "short", alias = "?")]
     Question,
 }
 
 impl NullTypeHint {
+    #[must_use]
+    pub fn is_null_pipe_last(&self) -> bool {
+        *self == Self::NullPipeLast
+    }
+
     #[must_use]
     pub fn is_question(&self) -> bool {
         *self == Self::Question

@@ -773,6 +773,17 @@ impl TUnion {
     }
 
     #[must_use]
+    pub fn can_be_null(&self) -> bool {
+        self.types.iter().any(|t| match t {
+            TAtomic::Null => true,
+            TAtomic::Void => true,
+            TAtomic::Mixed(mixed) if !mixed.is_non_null() => true,
+            TAtomic::GenericParameter(param) => param.constraint.can_be_null(),
+            _ => false,
+        })
+    }
+
+    #[must_use]
     pub fn is_void(&self) -> bool {
         self.types.iter().all(|t| matches!(t, TAtomic::Void)) && !self.types.is_empty()
     }

@@ -230,8 +230,7 @@ pub fn merge_type_preserving_nullability(
     docblock_type: TypeMetadata,
     real_type: Option<&TypeMetadata>,
 ) -> TypeMetadata {
-    // Don't merge nullability if docblock has expandable types
-    if docblock_type.type_union.is_expandable() {
+    if docblock_type.type_union.types.iter().any(|t| t.is_conditional()) {
         return docblock_type;
     }
 

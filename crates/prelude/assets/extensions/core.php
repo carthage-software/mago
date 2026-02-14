@@ -320,6 +320,8 @@ final class Closure
      *
      * @return Closure|null
      *
+     * @psalm-ignore-nullable-return
+     *
      * @pure
      * @no-named-arguments
      */
@@ -331,6 +333,8 @@ final class Closure
      * @param object|class-string|null $newScope
      *
      * @return Closure|null
+     *
+     * @psalm-ignore-nullable-return
      *
      * @pure
      */

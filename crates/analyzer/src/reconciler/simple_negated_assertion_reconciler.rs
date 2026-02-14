@@ -151,6 +151,17 @@ pub(crate) fn reconcile(
                     assertion.has_equality(),
                 ));
             }
+            TAtomic::Scalar(TScalar::Numeric) => {
+                return Some(subtract_numeric(
+                    context,
+                    assertion,
+                    existing_var_type,
+                    key,
+                    negated,
+                    span,
+                    assertion.has_equality(),
+                ));
+            }
             TAtomic::Array(TArray::List(_)) => {
                 return Some(subtract_list_array(
                     context,
@@ -565,6 +576,101 @@ fn subtract_string(
             } else {
                 acceptable_types.push(TAtomic::Scalar(TScalar::int()));
                 acceptable_types.push(TAtomic::Scalar(TScalar::float()));
+            }
+        } else {
+            acceptable_types.push(atomic);
+        }
+    }
+
+    get_acceptable_type(
+        context,
+        acceptable_types,
+        did_remove_type,
+        key,
+        span,
+        existing_var_type,
+        assertion,
+        negated,
+        true,
+        new_var_type,
+    )
+}
+
+fn subtract_numeric(
+    context: &mut Context<'_, '_>,
+    assertion: &Assertion,
+    existing_var_type: &TUnion,
+    key: Option<&str>,
+    negated: bool,
+    span: Option<&Span>,
+    is_equality: bool,
+) -> TUnion {
+    if existing_var_type.is_mixed() {
+        return existing_var_type.clone();
+    }
+
+    let mut did_remove_type = false;
+    let mut new_var_type = existing_var_type.clone();
+    let mut acceptable_types = vec![];
+
+    for atomic in new_var_type.types.to_mut().drain(..) {
+        if let TAtomic::GenericParameter(generic_parameter) = &atomic {
+            did_remove_type = true;
+
+            if !is_equality && !generic_parameter.constraint.is_mixed() {
+                if let Some(atomic) = map_generic_constraint(generic_parameter, |constraint| {
+                    subtract_numeric(context, assertion, constraint, None, false, None, is_equality)
+                }) {
+                    acceptable_types.push(atomic);
+                }
+            } else {
+                acceptable_types.push(atomic);
+            }
+        } else if let TAtomic::Scalar(TScalar::ArrayKey) = atomic {
+            did_remove_type = true;
+
+            if is_equality {
+                acceptable_types.push(atomic);
+            } else {
+                acceptable_types.push(TAtomic::Scalar(TScalar::string()));
+            }
+        } else if let TAtomic::Scalar(TScalar::Generic) = atomic {
+            did_remove_type = true;
+
+            if is_equality {
+                acceptable_types.push(atomic);
+            } else {
+                acceptable_types.push(TAtomic::Scalar(TScalar::string()));
+                acceptable_types.push(TAtomic::Scalar(TScalar::bool()));
+            }
+        } else if let TAtomic::Scalar(TScalar::Numeric) = atomic {
+            did_remove_type = true;
+
+            if is_equality {
+                acceptable_types.push(atomic);
+            }
+        } else if let TAtomic::Scalar(TScalar::Integer(_)) = atomic {
+            did_remove_type = true;
+
+            if is_equality {
+                acceptable_types.push(atomic);
+            }
+        } else if let TAtomic::Scalar(TScalar::Float(_)) = atomic {
+            did_remove_type = true;
+
+            if is_equality {
+                acceptable_types.push(atomic);
+            }
+        } else if let TAtomic::Scalar(TScalar::String(existing_string)) = &atomic {
+            if existing_string.is_numeric {
+                did_remove_type = true;
+
+                if is_equality {
+                    acceptable_types.push(atomic);
+                }
+            } else {
+                did_remove_type = true;
+                acceptable_types.push(atomic);
             }
         } else {
             acceptable_types.push(atomic);

@@ -150,7 +150,7 @@ public function bar(
 | `sort-class-methods` | `boolean` | `false` | Sort class methods by visibility and type (constructor first, then static methods, then instance methods by visibility, destructor last). |
 | `separate-use-types` | `boolean` | `true` | Insert a blank line between different types of `use` statements. |
 | `expand-use-groups` | `boolean` | `true` | Expand grouped `use` statements into individual statements. |
-| `null-type-hint` | `enum("null_pipe", "question")` | `"question"` | How to format null type hints (`null\|T` vs `?T`). |
+| `null-type-hint` | `enum("null_pipe", "null_pipe_last", "question")` | `"question"` | How to format null type hints. `"null_pipe"` converts `?T` to `null\|T` but preserves existing union order. `"null_pipe_last"` converts `?T` to `T\|null` and reorders unions to place `null` last. `"question"` converts `null\|T`/`T\|null` to `?T`. |
 | `parentheses-around-new-in-member-access` | `boolean` | `false` | Add parentheses around `new` in member access (`(new Foo)->bar()`). |
 | `parentheses-in-new-expression` | `boolean` | `true` | Add parentheses to `new` expressions without arguments (`new Foo()`). |
 | `parentheses-in-exit-and-die` | `boolean` | `true` | Add parentheses to `exit` and `die` constructs. |
