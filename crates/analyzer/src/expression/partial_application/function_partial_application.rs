@@ -197,6 +197,14 @@ fn resolve_function_callable_types<'ctx, 'arena, 'artifacts>(
         let as_callable = cast_atomic_to_callable(atomic, context.codebase, None);
 
         let Some(callable) = as_callable else {
+            if atomic.is_null() && expression_type.ignore_nullable_issues() {
+                continue;
+            }
+
+            if atomic.is_false() && expression_type.ignore_falsable_issues() {
+                continue;
+            }
+
             let type_name = atomic.get_id();
 
             context.collector.report_with_code(
