@@ -1672,7 +1672,7 @@ function chr(int $codepoint): string {}
 function ord(string $character): int {}
 
 /**
- * @param-out array<string, string> $result
+ * @param-out array<string, string|array<array-key, string>> $result
  *
  * @return void
  */

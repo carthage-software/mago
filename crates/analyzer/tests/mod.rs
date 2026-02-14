@@ -401,6 +401,7 @@ test_case!(missing_api_or_internal, {
 test_case!(spread_list);
 test_case!(or_never);
 test_case!(abstract_method_inheritance);
+test_case!(parse_str);
 
 // Github Issues
 test_case!(issue_659);
