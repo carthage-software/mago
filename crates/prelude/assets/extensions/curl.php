@@ -53,6 +53,7 @@ function curl_setopt(CurlHandle $handle, int $option, mixed $value): bool {}
 
 function curl_setopt_array(CurlHandle $handle, array $options): bool {}
 
+#[Deprecated(since: '8.5', message: 'as it has no effect since PHP 8.0')]
 function curl_share_close(CurlShareHandle $share_handle): void {}
 
 function curl_share_init(): CurlShareHandle {}
@@ -75,6 +76,7 @@ function curl_escape(CurlHandle $handle, string $string): string|false {}
 
 function curl_file_create(string $filename, ?string $mime_type = null, ?string $posted_filename = null): CURLFile {}
 
+#[Deprecated(since: '8.5', message: 'as it has no effect since PHP 8.0')]
 function curl_close(CurlHandle $handle): void {}
 
 function curl_multi_init(): CurlMultiHandle {}

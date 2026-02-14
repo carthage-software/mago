@@ -1017,7 +1017,7 @@ function constant(string $name): mixed {}
 
 /**
  * @pure
- * 
+ *
  * @return ($string is non-empty-string ? non-empty-string : '')
  */
 function bin2hex(string $string): string {}
@@ -3218,6 +3218,7 @@ function stream_set_timeout($stream, int $seconds, int $microseconds = 0): bool 
 /**
  * @param resource $stream
  */
+#[Deprecated(since: '8.5', message: 'use stream_set_timeout() instead')]
 function socket_set_timeout($stream, int $seconds, int $microseconds = 0): bool {}
 
 /**

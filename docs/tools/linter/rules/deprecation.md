@@ -9,10 +9,154 @@ This document details the rules available in the `Deprecation` category.
 
 | Rule | Code |
 | :--- | :---------- |
+| Deprecated Cast | [`deprecated-cast`](#deprecated-cast) |
+| Deprecated Shell Execute String | [`deprecated-shell-execute-string`](#deprecated-shell-execute-string) |
+| Deprecated Switch Semicolon | [`deprecated-switch-semicolon`](#deprecated-switch-semicolon) |
 | Explicit Nullable Param | [`explicit-nullable-param`](#explicit-nullable-param) |
 | No Underscore Class | [`no-underscore-class`](#no-underscore-class) |
 | No Void Reference Return | [`no-void-reference-return`](#no-void-reference-return) |
 | Optional Parameter Before Required | [`optional-param-order`](#optional-param-order) |
+
+
+## <a id="deprecated-cast"></a>`deprecated-cast`
+
+Detect the usage of deprecated type casts in PHP code.
+
+In PHP 8.5, the following type casts have been deprecated:
+
+- `(integer)`: The integer cast has been deprecated in favor of `(int)`.
+- `(boolean)`: The boolean cast has been deprecated in favor of `(bool)`.
+- `(double)`: The double cast has been deprecated in favor of `(float)`.
+- `(binary)`: The binary cast has been deprecated in favor of `(string)`.
+
+
+### Requirements
+
+- **PHP version:** >= `8.5.0`
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `true` |
+| `level` | `string` | `"error"` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+
+(int) $value;
+```
+
+#### Incorrect code
+
+```php
+<?php
+
+(integer) $value;
+```
+
+
+## <a id="deprecated-shell-execute-string"></a>`deprecated-shell-execute-string`
+
+Detect the usage of deprecated shell execute strings in PHP code.
+
+In PHP 8.5, the shell execute string syntax (enclosed in backticks, e.g., `` `ls -l` ``) has been deprecated.
+
+This rule identifies instances of shell execute strings and provides guidance on how to replace them with safer alternatives,
+such as using the `shell_exec()` function or other appropriate methods for executing shell commands.
+
+
+### Requirements
+
+- **PHP version:** >= `8.5.0`
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `true` |
+| `level` | `string` | `"error"` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+
+shell_exec('ls -l');
+```
+
+#### Incorrect code
+
+```php
+<?php
+
+`ls -l`;
+```
+
+
+## <a id="deprecated-switch-semicolon"></a>`deprecated-switch-semicolon`
+
+Detect the usage of semicolon as a switch case separator.
+
+In PHP 8.5, the use of a semicolon (`;`) as a case separator in switch statements has been deprecated.
+
+Instead, the colon (`:`) should be used to separate case statements.
+
+
+### Requirements
+
+- **PHP version:** >= `8.5.0`
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `true` |
+| `level` | `string` | `"error"` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+
+switch ($value) {
+    case 1:
+        // code for case 1
+        break;
+    case 2:
+        // code for case 2
+        break;
+    default:
+        // default case
+        break;
+}
+```
+
+#### Incorrect code
+
+```php
+<?php
+
+switch ($value) {
+    case 1;
+        // code for case 1
+        break;
+    case 2;
+        // code for case 2
+        break;
+    default;
+        // default case
+        break;
+}
+```
 
 
 ## <a id="explicit-nullable-param"></a>`explicit-nullable-param`

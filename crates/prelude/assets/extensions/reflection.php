@@ -504,10 +504,9 @@ class ReflectionProperty implements Reflector
     public function getDocComment(): string|false {}
 
     /**
-     * @deprecated
-     *
      * @pure
      */
+    #[Deprecated(since: '8.5', message: 'as it has no effect')]
     public function setAccessible(bool $accessible): void {}
 
     /**
@@ -1058,10 +1057,9 @@ class ReflectionMethod extends ReflectionFunctionAbstract
     public function getPrototype(): ReflectionMethod {}
 
     /**
-     * @deprecated
-     *
      * @pure
      */
+    #[Deprecated(since: '8.5', message: 'as it has no effect')]
     public function setAccessible(bool $accessible): void {}
 
     public function hasPrototype(): bool {}
