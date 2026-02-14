@@ -15,8 +15,6 @@ use mago_codex::misc::GenericParent;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::TypeRef;
 use mago_codex::ttype::atomic::TAtomic;
-use mago_codex::ttype::atomic::array::TArray;
-use mago_codex::ttype::atomic::array::list::TList;
 use mago_codex::ttype::atomic::callable::TCallable;
 use mago_codex::ttype::atomic::generic::TGenericParameter;
 use mago_codex::ttype::atomic::object::TObject;
@@ -30,6 +28,9 @@ use mago_codex::ttype::comparator::union_comparator;
 use mago_codex::ttype::expander;
 use mago_codex::ttype::expander::StaticClassType;
 use mago_codex::ttype::expander::TypeExpansionOptions;
+use mago_codex::ttype::get_arraykey;
+use mago_codex::ttype::get_keyed_array;
+use mago_codex::ttype::get_list;
 use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::union::TUnion;
 use mago_codex::ttype::wrap_atomic;
@@ -386,7 +387,11 @@ fn add_parameter_types_to_context<'ctx, 'arena>(
         }
 
         let final_parameter_type = if parameter_metadata.flags.is_variadic() {
-            wrap_atomic(TAtomic::Array(TArray::List(TList::new(Arc::new(final_parameter_type)))))
+            if function_like_metadata.flags.forbids_named_arguments() {
+                get_list(final_parameter_type)
+            } else {
+                get_keyed_array(get_arraykey(), final_parameter_type)
+            }
         } else {
             final_parameter_type
         };
