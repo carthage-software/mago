@@ -75,7 +75,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ArrayAccess<'arena> {
                 false,
                 extended_var_id,
                 None,
-                container_type.is_nullable() && expression_is_nullsafe(self.array),
+                container_type.can_be_null() && expression_is_nullsafe(self.array),
             );
 
             if let Some(keyed_array_var_id) = &keyed_array_var_id {
