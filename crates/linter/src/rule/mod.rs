@@ -209,6 +209,7 @@ define_rules! {
     NoSprintfConcat(no_sprintf_concat @ NoSprintfConcatRule),
     OptionalParamOrder(optional_param_order @ OptionalParamOrderRule),
     DeprecatedCast(deprecated_cast @ DeprecatedCastRule),
+    DeprecatedShellExecuteString(deprecated_shell_execute_string @ DeprecatedShellExecuteStringRule),
     PreferInterface(prefer_interface @ PreferInterfaceRule),
     PreferAnonymousMigration(prefer_anonymous_migration @ PreferAnonymousMigrationRule),
     PreferFirstClassCallable(prefer_first_class_callable @ PreferFirstClassCallableRule),

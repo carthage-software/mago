@@ -19,6 +19,7 @@ use crate::rule::ConstantConditionConfig;
 use crate::rule::ConstantNameConfig;
 use crate::rule::CyclomaticComplexityConfig;
 use crate::rule::DeprecatedCastConfig;
+use crate::rule::DeprecatedShellExecuteStringConfig;
 use crate::rule::DisallowedFunctionsConfig;
 use crate::rule::EnumNameConfig;
 use crate::rule::ExcessiveNestingConfig;
@@ -203,6 +204,7 @@ pub struct RulesSettings {
     pub no_sprintf_concat: RuleSettings<NoSprintfConcatConfig>,
     pub optional_param_order: RuleSettings<OptionalParamOrderConfig>,
     pub deprecated_cast: RuleSettings<DeprecatedCastConfig>,
+    pub deprecated_shell_execute_string: RuleSettings<DeprecatedShellExecuteStringConfig>,
     pub prefer_anonymous_migration: RuleSettings<PreferAnonymousMigrationConfig>,
     pub prefer_first_class_callable: RuleSettings<PreferFirstClassCallableConfig>,
     pub no_void_reference_return: RuleSettings<NoVoidReferenceReturnConfig>,

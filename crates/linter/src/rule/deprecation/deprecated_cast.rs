@@ -110,7 +110,8 @@ impl LintRule for DeprecatedCastRule {
                 Annotation::primary(operator.span()).with_message(format!("Deprecated cast `{operator}` used here.")),
             )
             .with_note(format!("The `{operator}` cast has been deprecated since PHP 8.5."))
-            .with_help(format!("Replace `{operator}` with `{replacement}` to resolve this issue."));
+            .with_help(format!("Replace `{operator}` with `{replacement}` to resolve this issue."))
+            .with_link("https://wiki.php.net/rfc/deprecations_php_8_5");
 
         ctx.collector.propose(issue, |edits| {
             edits.push(TextEdit::replace(operator.span(), replacement));

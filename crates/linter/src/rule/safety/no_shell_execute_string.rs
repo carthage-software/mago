@@ -64,7 +64,6 @@ impl LintRule for NoShellExecuteStringRule {
                 $output = `ls -l`;
             "},
             category: Category::Safety,
-
             requirements: RuleRequirements::None,
         };
 
