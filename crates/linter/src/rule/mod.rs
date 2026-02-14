@@ -210,6 +210,7 @@ define_rules! {
     OptionalParamOrder(optional_param_order @ OptionalParamOrderRule),
     DeprecatedCast(deprecated_cast @ DeprecatedCastRule),
     DeprecatedShellExecuteString(deprecated_shell_execute_string @ DeprecatedShellExecuteStringRule),
+    DeprecatedSwitchSemicolon(deprecated_switch_semicolon @ DeprecatedSwitchSemicolonRule),
     PreferInterface(prefer_interface @ PreferInterfaceRule),
     PreferAnonymousMigration(prefer_anonymous_migration @ PreferAnonymousMigrationRule),
     PreferFirstClassCallable(prefer_first_class_callable @ PreferFirstClassCallableRule),
