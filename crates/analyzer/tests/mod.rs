@@ -348,6 +348,7 @@ test_case!(enum_empty_check);
 test_case!(optional_chain_method);
 test_case!(compound_condition);
 test_case!(instanceof_assertion);
+test_case!(instanceof_unresolved_class);
 test_case!(type_narrowing_external);
 test_case!(post_narrowing_check);
 test_case!(data_transformer_type);
