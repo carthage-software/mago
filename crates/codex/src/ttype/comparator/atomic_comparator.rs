@@ -14,6 +14,7 @@ use crate::ttype::atomic::mixed::TMixed;
 use crate::ttype::atomic::object::TObject;
 use crate::ttype::atomic::object::r#enum::TEnum;
 use crate::ttype::atomic::object::named::TNamedObject;
+use crate::ttype::atomic::reference::TReference;
 use crate::ttype::atomic::scalar::TScalar;
 use crate::ttype::comparator::ComparisonResult;
 use crate::ttype::comparator::array_comparator;
@@ -744,9 +745,21 @@ pub(crate) fn can_be_identical<'a>(
 
     if let (TAtomic::Object(first_object), TAtomic::Object(second_object)) = (first_part, second_part)
         && let (Some(first_name), Some(second_name)) = (first_object.get_name(), second_object.get_name())
-        && let (Some(c1), Some(c2)) = (codebase.get_class_like(first_name), codebase.get_class_like(second_name))
-        && (c1.kind.is_interface() || c2.kind.is_interface())
     {
+        return match (codebase.get_class_like(first_name), codebase.get_class_like(second_name)) {
+            (Some(c1), Some(c2)) => c1.kind.is_interface() || c2.kind.is_interface(),
+            _ => true,
+        };
+    }
+
+    if matches!(
+        (first_part, second_part),
+        (TAtomic::Object(_), TAtomic::Reference(TReference::Symbol { .. }))
+            | (
+                TAtomic::Reference(TReference::Symbol { .. }),
+                TAtomic::Object(_) | TAtomic::Reference(TReference::Symbol { .. })
+            )
+    ) {
         return true;
     }
 
