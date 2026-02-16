@@ -45,6 +45,16 @@ namespace Psl\Type {
 
     /**
      * @template T
+     * @param TypeInterface<T> $inner_type
+     * @return TypeInterface<T|null>
+     */
+    function nullable(TypeInterface $inner_type): TypeInterface
+    {
+        return nullable($inner_type);
+    }
+
+    /**
+     * @template T
      * @param class-string<T> $class_name
      * @return TypeInterface<T>
      */
@@ -105,6 +115,14 @@ namespace {
         return $value;
     }
 
+    /**
+     * @var array{z: array{a: int}, w: array{h: int, ...}} $shape
+     */
+    function take_given_shape(array $shape): void
+    {
+        take_given_shape($shape);
+    }
+
     $array_type = Psl\Type\shape([
         'name' => Psl\Type\string(),
         'age' => Psl\Type\int(),
@@ -160,4 +178,37 @@ namespace {
 
     i_take_flexible_array($flexible);
     i_take_string($flexible['required_field']);
+
+    /**
+     * array{z: array{a: int}, w: array{h: int, ...}}
+     */
+    $shape = Psl\Type\shape([
+        'z' => Psl\Type\shape(['a' => Psl\Type\int()]),
+        'w' => Psl\Type\shape(['h' => Psl\Type\int()], allow_unknown_fields: true),
+    ]);
+
+    take_given_shape($shape->assert(get_mixed()));
+
+    /** @return Psl\Type\TypeInterface<array{'a': string, 'b': int}> */
+    function twoKeys(): \Psl\Type\TypeInterface
+    {
+        return Psl\Type\shape(['a' => Psl\Type\string(), 'b' => Psl\Type\int()]);
+    }
+
+    $shape = Psl\Type\shape([
+        'x' => Psl\Type\string(),
+        'y' => Psl\Type\nullable(Psl\Type\string()),
+        'z' => twoKeys(),
+        'w' => Psl\Type\shape(['h' => Psl\Type\string()], allow_unknown_fields: true),
+    ]);
+
+    /**
+     * @param array{'x': string, 'y': string|null, 'z': array{'a': string, 'b': int}, 'w': array{h: string, ...}} $value
+     */
+    function i_take_that_shape(array $value): void
+    {
+        i_take_that_shape($value);
+    }
+
+    i_take_that_shape($shape->assert(get_mixed()));
 }

@@ -598,7 +598,9 @@ fn scrape_type_properties(
             return;
         }
 
-        for array in std::iter::once(array).chain(combination.sealed_arrays.drain(..)) {
+        let mut sealed_arrays = vec![];
+        std::mem::swap(&mut sealed_arrays, &mut combination.sealed_arrays);
+        for array in std::iter::once(array).chain(sealed_arrays) {
             match array {
                 TArray::List(TList { element_type, known_elements, non_empty, known_count }) => {
                     if non_empty {
@@ -683,7 +685,36 @@ fn scrape_type_properties(
                     };
                 }
                 TArray::Keyed(TKeyedArray { parameters, known_items, non_empty, .. }) => {
-                    let had_previous_keyed_array = combination.flags.contains(CombinationFlags::HAS_KEYED_ARRAY);
+                    let mut had_previous_keyed_array = combination.flags.contains(CombinationFlags::HAS_KEYED_ARRAY);
+
+                    if had_previous_keyed_array {
+                        let incoming_is_sealed = parameters.is_none();
+                        let existing_is_sealed = combination.keyed_array_parameters.is_none();
+
+                        if incoming_is_sealed && !existing_is_sealed && known_items.is_some() {
+                            combination.sealed_arrays.push(TArray::Keyed(TKeyedArray {
+                                known_items,
+                                parameters,
+                                non_empty,
+                            }));
+
+                            continue;
+                        }
+
+                        if !incoming_is_sealed && existing_is_sealed && !combination.keyed_array_entries.is_empty() {
+                            let frozen = TArray::Keyed(TKeyedArray {
+                                known_items: Some(std::mem::take(&mut combination.keyed_array_entries)),
+                                parameters: None,
+                                non_empty: combination.flags.contains(CombinationFlags::KEYED_ARRAY_SOMETIMES_FILLED),
+                            });
+                            combination.sealed_arrays.push(frozen);
+                            combination.flags.remove(CombinationFlags::HAS_KEYED_ARRAY);
+                            combination.flags.remove(CombinationFlags::KEYED_ARRAY_SOMETIMES_FILLED);
+                            combination.flags.insert(CombinationFlags::KEYED_ARRAY_ALWAYS_FILLED);
+                            had_previous_keyed_array = false;
+                        }
+                    }
+
                     combination.flags.insert(CombinationFlags::HAS_KEYED_ARRAY);
 
                     if non_empty {
