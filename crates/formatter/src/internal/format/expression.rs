@@ -249,7 +249,19 @@ impl<'arena> Format<'arena> for Pipe<'arena> {
 impl<'arena> Format<'arena> for UnaryPrefix<'arena> {
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
         wrap!(f, self, UnaryPrefix, {
-            Document::Group(Group::new(vec![in f.arena; self.operator.format(f), self.operand.format(f)]))
+            let operator = self.operator.format(f);
+            let operand_trailing_comments = if let Expression::Parenthesized(p) = self.operand {
+                f.print_trailing_comments_between_nodes(p.left_parenthesis, p.expression.span())
+            } else {
+                None
+            };
+
+            match operand_trailing_comments {
+                Some(operand_trailing_comments) => Document::Group(Group::new(
+                    vec![in f.arena; operator, operand_trailing_comments, self.operand.format(f)],
+                )),
+                None => Document::Group(Group::new(vec![in f.arena; operator, self.operand.format(f)])),
+            }
         })
     }
 }
