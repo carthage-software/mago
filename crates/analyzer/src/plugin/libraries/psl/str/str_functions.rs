@@ -8,6 +8,7 @@ use mago_codex::ttype::union::TUnion;
 
 use crate::plugin::context::InvocationInfo;
 use crate::plugin::context::ProviderContext;
+use crate::plugin::libraries::stdlib::string::resolve_sprintf;
 use crate::plugin::provider::Provider;
 use crate::plugin::provider::ProviderMeta;
 use crate::plugin::provider::function::FunctionReturnTypeProvider;
@@ -191,6 +192,7 @@ impl FunctionReturnTypeProvider for StrProvider {
                     )))),
                 })
             }
+            "psl\\str\\format" => resolve_sprintf(context, invocation),
             _ => None,
         }
     }
