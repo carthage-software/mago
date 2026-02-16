@@ -349,6 +349,7 @@ test_case!(issue_978);
 test_case!(issue_1082);
 test_case!(issue_1091);
 test_case!(issue_993_print_width_with_indentation);
+test_case!(issue_1077);
 
 #[test]
 fn test_all_test_cases_are_ran() {

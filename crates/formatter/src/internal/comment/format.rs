@@ -563,6 +563,15 @@ impl<'arena> FormatterState<'_, 'arena> {
 
                 // SAFETY: We are constructing the string from valid UTF-8 parts.
                 unsafe { std::str::from_utf8_unchecked(buf.into_bump_slice()) }
+            } else if content.starts_with("/**") && !content.starts_with("/** ") && content.len() > 5 {
+                let inner = &content[3..content.len() - 2];
+                let mut buf = Vec::with_capacity_in(content.len() + 1, self.arena);
+                buf.extend_from_slice(b"/** ");
+                buf.extend_from_slice(inner.trim().as_bytes());
+                buf.extend_from_slice(b" */");
+
+                // SAFETY: We are constructing the string from valid UTF-8 parts.
+                unsafe { std::str::from_utf8_unchecked(buf.into_bump_slice()) }
             } else {
                 content
             };
