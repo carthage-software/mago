@@ -253,7 +253,7 @@ pub fn handle_return_value<'ctx>(
 
     if function_like_metadata.flags.has_yield() {
         if let Some((return_type, is_from_generator)) = get_generator_return_type(context, &expected_return_type) {
-            if !is_from_generator {
+            if !is_from_generator && function_like_metadata.return_type_metadata.is_some() {
                 let inferred_return_type_str = inferred_return_type.get_id();
                 let expected_return_type_str = expected_return_type.get_id();
 
@@ -290,7 +290,9 @@ pub fn handle_return_value<'ctx>(
         } else {
             // ignore this, it will be handled by the `yield` analyzer
         }
-    } else if return_value.is_some() {
+    }
+
+    if return_value.is_some() {
         artifacts.inferred_return_types.push(inferred_return_type.clone());
     }
 

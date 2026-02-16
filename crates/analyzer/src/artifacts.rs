@@ -31,6 +31,8 @@ pub struct AnalysisArtifacts {
     pub if_false_assertions: HashMap<(u32, u32), AtomMap<AssertionSet>>,
     pub true_branch_only_assertions: HashMap<(u32, u32), AtomMap<AssertionSet>>,
     pub inferred_return_types: Vec<Rc<TUnion>>,
+    pub inferred_yield_key_types: Vec<TUnion>,
+    pub inferred_yield_value_types: Vec<TUnion>,
     pub symbol_references: SymbolReferences,
     pub loop_scope: Option<LoopScope>,
     pub case_scopes: Vec<CaseScope>,
@@ -48,6 +50,8 @@ impl AnalysisArtifacts {
         Self {
             expression_types: HashMap::default(),
             inferred_return_types: Vec::new(),
+            inferred_yield_key_types: Vec::new(),
+            inferred_yield_value_types: Vec::new(),
             if_true_assertions: HashMap::default(),
             if_false_assertions: HashMap::default(),
             true_branch_only_assertions: HashMap::default(),
