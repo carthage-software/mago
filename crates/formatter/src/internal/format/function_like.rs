@@ -304,6 +304,7 @@ impl<'arena> FunctionLikeParts<'arena> {
             None
         };
 
+        let (signature, signature_id) = self.format_signature(f, settings.space_before_params);
         let dangling_comments = match (&self.body, parameter_list_will_break) {
             (_, Some(false)) => None,
             (FunctionLikeBody::Block(block), _) => {
@@ -313,7 +314,6 @@ impl<'arena> FunctionLikeParts<'arena> {
             (FunctionLikeBody::Abstract(_), _) => None,
         };
 
-        let (signature, signature_id) = self.format_signature(f, settings.space_before_params);
         let body = self.format_body(f, settings, signature_id, parameter_list_will_break, dangling_comments);
 
         Document::Group(Group::new(vec![

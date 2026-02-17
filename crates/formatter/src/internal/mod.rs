@@ -198,6 +198,7 @@ impl<'ctx, 'arena> FormatterState<'ctx, 'arena> {
         self.all_comments
     }
 
+
     fn next_id(&mut self) -> GroupIdentifier {
         self.id_builder.next_id()
     }
