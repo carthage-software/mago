@@ -122,6 +122,7 @@ pub struct FormatterState<'ctx, 'arena> {
     is_in_inlined_binary_chain: bool,
     halted_compilation: bool,
     alignment_context: Option<AssignmentAlignment>,
+    member_access_chain_group_id: Option<GroupIdentifier>,
 }
 
 impl<'ctx, 'arena> FormatterState<'ctx, 'arena> {
@@ -165,6 +166,7 @@ impl<'ctx, 'arena> FormatterState<'ctx, 'arena> {
             halted_compilation: false,
             in_script_terminating_statement: false,
             alignment_context: None,
+            member_access_chain_group_id: None,
         }
     }
 
@@ -198,6 +200,17 @@ impl<'ctx, 'arena> FormatterState<'ctx, 'arena> {
         self.all_comments
     }
 
+    /// Take the member access chain group ID, resetting it to None.
+    #[inline]
+    pub(crate) fn take_member_access_chain_group_id(&mut self) -> Option<GroupIdentifier> {
+        self.member_access_chain_group_id.take()
+    }
+
+    /// Set the member access chain group ID.
+    #[inline]
+    pub(crate) fn set_member_access_chain_group_id(&mut self, id: GroupIdentifier) {
+        self.member_access_chain_group_id = Some(id);
+    }
 
     fn next_id(&mut self) -> GroupIdentifier {
         self.id_builder.next_id()

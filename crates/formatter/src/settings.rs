@@ -388,6 +388,26 @@ generate_formatter_settings! {
     /// Default: `true`
     first_method_chain_on_new_line: bool => "default_true",
 
+    /// When a method chain breaks across multiple lines, place the semicolon on its own line.
+    ///
+    /// When enabled:
+    /// ```php
+    /// $object->method1()
+    ///     ->method2()
+    ///     ->method3()
+    /// ;
+    /// ```
+    ///
+    /// When disabled:
+    /// ```php
+    /// $object->method1()
+    ///     ->method2()
+    ///     ->method3();
+    /// ```
+    ///
+    /// Default: `false`
+    method_chain_semicolon_on_next_line: bool => "default_false",
+
     /// Whether to preserve line breaks in method chains, even if they could fit on a single line.
     ///
     /// Default: false

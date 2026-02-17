@@ -134,6 +134,7 @@ public function bar(
 | `inline-empty-anonymous-class-braces` | `boolean` | `true` | Place empty anonymous class bodies on the same line. |
 | `method-chain-breaking-style`| `enum("same-line", "next-line")` | `"next-line"` | How to break method chains. |
 | `first-method-chain-on-new-line` | `boolean` | `true` | When method chaining breaks across lines, place the first method call on a new line. Only applies to object method calls (`->`, `?->`), not static methods (`::`) or property access ([PER-CS 4.7](https://www.php-fig.org/per/coding-style/#47-method-and-function-calls) compliant). |
+| `method-chain-semicolon-on-next-line` | `boolean` | `false` | When a method chain breaks across multiple lines, place the semicolon on its own line. |
 | `preserve-breaking-member-access-chain` | `boolean` | `false` | Preserve existing line breaks in method chains. |
 | `preserve-breaking-argument-list` | `boolean` | `false` | Preserve existing line breaks in argument lists. |
 | `preserve-breaking-array-like` | `boolean` | `true` | Preserve existing line breaks in array-like structures. |

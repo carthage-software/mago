@@ -679,6 +679,10 @@ pub(super) fn print_member_access_chain<'arena>(
         parts.push(Document::BreakParent);
     }
 
+    if matches!(f.parent_node(), Node::ExpressionStatement(_)) {
+        f.set_member_access_chain_group_id(group_id);
+    }
+
     // Wrap everything in a group to manage line breaking
     Document::Group(Group::new(parts).with_id(group_id))
 }

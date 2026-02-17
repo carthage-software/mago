@@ -1032,7 +1032,27 @@ impl<'arena> Format<'arena> for Terminator<'arena> {
 impl<'arena> Format<'arena> for ExpressionStatement<'arena> {
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
         wrap!(f, self, ExpressionStatement, {
-            Document::Array(vec![in f.arena; self.expression.format(f), self.terminator.format(f)])
+            let expression = self.expression.format(f);
+            let terminator = self.terminator.format(f);
+
+            if let Some(chain_group_id) = f.take_member_access_chain_group_id()
+                && f.settings.method_chain_semicolon_on_next_line
+            {
+                return Document::Array(vec![
+                    in f.arena;
+                    expression,
+                    Document::IfBreak(
+                        IfBreak::new(
+                            f.arena,
+                            Document::Array(vec![in f.arena; Document::Line(Line::hard()), Document::String(";")]),
+                            terminator,
+                        )
+                        .with_id(chain_group_id),
+                    ),
+                ]);
+            }
+
+            Document::Array(vec![in f.arena; expression, terminator])
         })
     }
 }
