@@ -405,6 +405,12 @@ test_case!(abstract_method_inheritance);
 test_case!(variadic_array_type);
 test_case!(parse_str);
 test_case!(assertion_after_side_effect);
+test_case!(undefined_string_key_in_union);
+test_case!(possibly_undefined_string_key_in_union, {
+    let mut s = crate::framework::default_test_settings();
+    s.allow_possibly_undefined_array_keys = true;
+    s
+});
 
 // Github Issues
 test_case!(issue_659);
