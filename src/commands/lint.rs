@@ -36,6 +36,7 @@ use colored::Colorize;
 use mago_database::DatabaseReader;
 use mago_linter::registry::RuleRegistry;
 use mago_linter::rule::AnyRule;
+use mago_linter::rule_meta::RuleEntry;
 use mago_orchestrator::service::lint::LintMode;
 use mago_reporting::Level;
 
@@ -340,8 +341,9 @@ pub fn list_rules(rules: &[AnyRule], json: bool) -> Result<ExitCode, Error> {
     }
 
     if json {
-        let metas: Vec<_> = rules.iter().map(|r| r.meta()).collect();
-        println!("{}", serde_json::to_string_pretty(&metas)?);
+        let entries: Vec<_> = rules.iter().map(|r| RuleEntry { meta: r.meta(), level: r.default_level() }).collect();
+
+        println!("{}", serde_json::to_string_pretty(&entries)?);
 
         return Ok(ExitCode::SUCCESS);
     }
