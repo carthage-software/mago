@@ -1192,6 +1192,8 @@ class ReflectionClass implements Reflector
     public function getReflectionConstant(string $name): ReflectionClassConstant|false {}
 
     /**
+     * @return list<ReflectionClassConstant>
+     *
      * @pure
      */
     public function getReflectionConstants(?int $filter = null): array {}
@@ -1324,8 +1326,6 @@ class ReflectionClass implements Reflector
     public function isSubclassOf(ReflectionClass|string $class): bool {}
 
     /**
-     * @return array
-     *
      * @pure
      */
     public function getStaticProperties(): array {}
