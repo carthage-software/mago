@@ -40,6 +40,7 @@ use std::time::Duration;
 use clap::ColorChoice;
 use clap::Parser;
 
+use mago_analyzer::code::IssueCode;
 use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::reference::SymbolReferences;
 use mago_database::Database;
@@ -113,6 +114,13 @@ pub struct AnalyzeCommand {
     #[arg(long, default_value_t = false)]
     pub watch: bool,
 
+    /// List all available analyzer issue codes in JSON format.
+    ///
+    /// Outputs a JSON array of all issue code strings that the analyzer
+    /// can report. Useful for tooling integration and documentation.
+    #[arg(long, conflicts_with_all = ["path", "no_stubs", "watch", "reporting_target", "reporting_format"])]
+    pub list_codes: bool,
+
     /// Arguments related to reporting issues with baseline support.
     #[clap(flatten)]
     pub baseline_reporting: BaselineReportingArgs,
@@ -152,6 +160,14 @@ impl AnalyzeCommand {
     /// Only host files are analyzed for issues; external files only contribute to
     /// the symbol table and type graph.
     pub fn execute(self, configuration: Configuration, color_choice: ColorChoice) -> Result<ExitCode, Error> {
+        if self.list_codes {
+            let codes: Vec<_> = IssueCode::all().iter().map(|c| c.as_str()).collect();
+
+            println!("{}", serde_json::to_string_pretty(&codes)?);
+
+            return Ok(ExitCode::SUCCESS);
+        }
+
         // 1. Establish the base prelude data.
         let Prelude { database, metadata, symbol_references } = if self.no_stubs {
             Prelude::default()

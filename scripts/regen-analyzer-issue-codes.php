@@ -391,6 +391,14 @@ final class AnalyzerCodeModuleGenerator
         $impl .= "        *self as u16\n";
         $impl .= "    }\n\n";
 
+        // all() method
+        $impl .= "    pub fn all() -> &'static [IssueCode] {\n";
+        $impl .= "        &[\n";
+        foreach ($this->allCodes as $code => $_) {
+            $impl .= "            Self::{$code},\n";
+        }
+        $impl .= "        ]\n    }\n\n";
+
         return $impl . "}\n\n";
     }
 
