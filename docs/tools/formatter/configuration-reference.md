@@ -161,7 +161,6 @@ public function bar(
 | `space-before-hook-parameter-list-parenthesis` | `boolean` | `false` | Add a space before hook parameters. |
 | `inline-abstract-property-hooks` | `boolean` | `true` | Keep abstract property hooks (e.g., `get;`, `set;`) on a single line ([PER-CS 4.10](https://www.php-fig.org/per/coding-style/#410-interface-and-abstract-properties) compliant). |
 | `space-before-closure-use-clause-parenthesis` | `boolean` | `true` | Add a space before closure `use` parentheses. |
-| `space-after-colon-in-enum-backing-type` | `boolean` | `true` | Add a space after the colon in enum backing types. |
 | `space-after-cast-unary-prefix-operators` | `boolean` | `true` | Add a space after cast operators like `(int)`. |
 | `space-after-reference-unary-prefix-operator` | `boolean` | `false` | Add a space after the reference operator (`&`). |
 | `space-after-error-control-unary-prefix-operator` | `boolean` | `false` | Add a space after the error control operator (`@`). |
