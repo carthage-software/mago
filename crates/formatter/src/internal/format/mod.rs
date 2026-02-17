@@ -1274,23 +1274,36 @@ impl<'arena> Format<'arena> for Echo<'arena> {
 impl<'arena> Format<'arena> for EchoTag<'arena> {
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
         wrap!(f, self, EchoTag, {
-            let values_group_id = f.next_id();
-            let values_group = Document::Group(
-                Group::new(Document::join(f.arena, self.values.iter().map(|v| v.format(f)), Separator::CommaLine))
-                    .with_id(values_group_id),
-            );
-
-            Document::Group(Group::new(vec![
-                in f.arena;
-                Document::String("<?="),
-                Document::IndentIfBreak(IndentIfBreak::new(values_group_id, vec![
+            if self.values.len() == 1
+                && let Some(expression) = self.values.first()
+            {
+                // Single expression: inline as `<?= expr ?>`
+                Document::Group(Group::new(vec![
                     in f.arena;
-                    Document::Line(Line::default()),
-                    values_group
-                ])),
-                Document::Line(Line::soft()),
-                self.terminator.format(f),
-            ]))
+                    Document::String("<?="),
+                    Document::space(),
+                    expression.format(f),
+                    self.terminator.format(f),
+                ]))
+            } else {
+                let values_group_id = f.next_id();
+                let values_group = Document::Group(
+                    Group::new(Document::join(f.arena, self.values.iter().map(|v| v.format(f)), Separator::CommaLine))
+                        .with_id(values_group_id),
+                );
+
+                Document::Group(Group::new(vec![
+                    in f.arena;
+                    Document::String("<?="),
+                    Document::IndentIfBreak(IndentIfBreak::new(values_group_id, vec![
+                        in f.arena;
+                        Document::Line(Line::default()),
+                        values_group
+                    ])),
+                    Document::Line(Line::soft()),
+                    self.terminator.format(f),
+                ]))
+            }
         })
     }
 }

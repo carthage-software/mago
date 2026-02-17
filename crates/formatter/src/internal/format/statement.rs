@@ -159,35 +159,49 @@ fn print_statement_slice<'ctx, 'arena>(
 
         f.set_alignment_context(None);
 
-        if let Statement::OpeningTag(tag) = stmt {
-            let offset = tag.span().start.offset;
+        let tag_offset = match stmt {
+            Statement::OpeningTag(tag) => Some(tag.span().start.offset),
+            Statement::EchoTag(tag) => Some(tag.tag.start.offset),
+            _ => None,
+        };
+
+        if let Some(offset) = tag_offset {
             let line = f.file.line_number(offset);
 
             if let Some(line_start_offset) = f.file.get_line_start_offset(line) {
                 let c = &f.source_text[line_start_offset as usize..offset as usize];
                 let ws = c.chars().take_while(|c| c.is_whitespace()).collect::<String>();
                 if !ws.is_empty() {
-                    let mut j = i + 1;
-                    let mut stmts_to_format = vec![in f.arena];
-                    while j < stmts.len() {
-                        let next_stmt = stmts[j];
-                        stmts_to_format.push(next_stmt);
-                        if next_stmt.terminates_scripting() {
-                            break;
+                    if matches!(stmt, Statement::OpeningTag(_)) {
+                        let mut j = i + 1;
+                        let mut stmts_to_format = vec![in f.arena];
+                        while j < stmts.len() {
+                            let next_stmt = stmts[j];
+                            stmts_to_format.push(next_stmt);
+                            if next_stmt.terminates_scripting() {
+                                break;
+                            }
+
+                            j += 1;
                         }
 
-                        j += 1;
+                        parts.push(Document::Group(Group::new(vec![in f.arena; Document::Align(Align {
+                            alignment: f.as_str(&ws),
+                            contents: {
+                                formatted_statement.extend(print_statement_slice(f, stmts_to_format.as_slice()));
+                                formatted_statement
+                            },
+                        })])));
+
+                        i = j + 1;
+                    } else {
+                        parts.push(Document::Group(Group::new(vec![in f.arena; Document::Align(Align {
+                            alignment: f.as_str(&ws),
+                            contents: formatted_statement,
+                        })])));
+
+                        i += 1;
                     }
-
-                    parts.push(Document::Group(Group::new(vec![in f.arena; Document::Align(Align {
-                        alignment: f.as_str(&ws),
-                        contents: {
-                            formatted_statement.extend(print_statement_slice(f, stmts_to_format.as_slice()));
-                            formatted_statement
-                        },
-                    })])));
-
-                    i = j + 1;
 
                     continue;
                 }
