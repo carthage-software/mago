@@ -37,7 +37,27 @@ pub(super) fn print_function_like_parameters<'arena>(
 
     let should_hug_the_parameters = !should_break && should_hug_the_only_parameter(f, parameter_list);
 
-    let mut parts = vec![in f.arena; Document::String("(")];
+    let mut force_break = should_break;
+    let left_parenthesis = {
+        let mut contents = vec![in f.arena; Document::String("(")];
+
+        if let Some(trailing_comment) = f.print_trailing_comments(parameter_list.left_parenthesis) {
+            contents.push(trailing_comment);
+            force_break = true;
+        }
+
+        if let Some(parameter) = parameter_list.parameters.first()
+            && let Some(trailing_comments) =
+                f.print_dangling_comments_between_nodes(parameter_list.left_parenthesis, parameter.span())
+        {
+            contents.push(trailing_comments);
+            force_break = true;
+        }
+
+        Document::Array(contents)
+    };
+
+    let mut parts = vec![in f.arena; left_parenthesis];
 
     let mut printed = vec![in f.arena; ];
     let len = parameter_list.parameters.len();
@@ -85,7 +105,7 @@ pub(super) fn print_function_like_parameters<'arena>(
 
     f.parameter_state.force_break = previous_break;
 
-    Document::Group(Group::new(parts).with_break(should_break))
+    Document::Group(Group::new(parts).with_break(force_break))
 }
 
 pub(super) fn should_break_parameters<'arena>(
