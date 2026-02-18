@@ -408,6 +408,11 @@ class DateTimeImmutable implements DateTimeInterface
 
     public static function __set_state(array $array): DateTimeImmutable {}
 
+    /**
+     * @psalm-mutation-free
+     *
+     * @return static|false
+     */
     public static function createFromFormat(
         string $format,
         string $datetime,
@@ -421,48 +426,125 @@ class DateTimeImmutable implements DateTimeInterface
      */
     public static function getLastErrors(): array|false {}
 
+    /**
+     * @psalm-mutation-free
+     *
+     * @param string $format
+     *
+     * @return ($format is non-empty-string ? non-empty-string : string)
+     */
     public function format(string $format): string {}
 
+    /**
+     * @psalm-mutation-free
+     *
+     * @psalm-ignore-falsable-return
+     */
     public function getTimezone(): DateTimeZone|false {}
 
+    /**
+     * @psalm-mutation-free
+     */
     public function getOffset(): int {}
 
+    /**
+     * @psalm-mutation-free
+     */
     public function getTimestamp(): int {}
 
     public function getMicrosecond(): int {}
 
+    /**
+     * @psalm-mutation-free
+     *
+     * @param bool $absolute
+     *
+     * @return DateInterval
+     */
     public function diff(DateTimeInterface $targetObject, bool $absolute = false): DateInterval {}
 
+    /**
+     * @psalm-mutation-free
+     *
+     * @return static
+     */
     #[NoDiscard(message: 'as DateTimeImmutable::modify() does not modify the object itself')]
     public function modify(string $modifier): DateTimeImmutable {}
 
+    /**
+     * @psalm-mutation-free
+     *
+     * @return static
+     */
     #[NoDiscard(message: 'as DateTimeImmutable::add() does not modify the object itself')]
     public function add(DateInterval $interval): DateTimeImmutable {}
 
+    /**
+     * @psalm-mutation-free
+     *
+     * @return static
+     */
     #[NoDiscard(message: 'as DateTimeImmutable::sub() does not modify the object itself')]
     public function sub(DateInterval $interval): DateTimeImmutable {}
 
+    /**
+     * @psalm-mutation-free
+     *
+     * @return static
+     */
     #[NoDiscard(message: 'as DateTimeImmutable::setTimezone() does not modify the object itself')]
     public function setTimezone(DateTimeZone $timezone): DateTimeImmutable {}
 
+    /**
+     * @psalm-mutation-free
+     *
+     * @return static
+     */
     #[NoDiscard(message: 'as DateTimeImmutable::setTime() does not modify the object itself')]
     public function setTime(int $hour, int $minute, int $second = 0, int $microsecond = 0): DateTimeImmutable {}
 
+    /**
+     * @psalm-mutation-free
+     *
+     * @return static
+     */
     #[NoDiscard(message: 'as DateTimeImmutable::setDate() does not modify the object itself')]
     public function setDate(int $year, int $month, int $day): DateTimeImmutable {}
 
+    /**
+     * @psalm-mutation-free
+     *
+     * @return static
+     */
     #[NoDiscard(message: 'as DateTimeImmutable::setISODate() does not modify the object itself')]
     public function setISODate(int $year, int $week, int $dayOfWeek = 1): DateTimeImmutable {}
 
+    /**
+     * @psalm-mutation-free
+     *
+     * @return static
+     */
     #[NoDiscard(message: 'as DateTimeImmutable::setTimestamp() does not modify the object itself')]
     public function setTimestamp(int $timestamp): DateTimeImmutable {}
 
+    /**
+     * @psalm-mutation-free
+     *
+     * @return static
+     */
     #[NoDiscard(message: 'as DateTimeImmutable::setMicrosecond() does not modify the object itself')]
     public function setMicrosecond(int $microsecond): static {}
 
+    /**
+     * @psalm-mutation-free
+     *
+     * @return static
+     */
     public static function createFromMutable(DateTime $object): static {}
 
     /**
+     * @psalm-mutation-free
+     *
      * @return static
      */
     public static function createFromInterface(DateTimeInterface $object): DateTimeImmutable {}
@@ -485,10 +567,16 @@ class DateTimeZone
     public const int ALL_WITH_BC = UNKNOWN;
     public const int PER_COUNTRY = UNKNOWN;
 
+    /**
+     * @psalm-external-mutation-free
+     */
     public function __construct(string $timezone) {}
 
     public function getName(): string {}
 
+    /**
+     * @psalm-mutation-free
+     */
     public function getOffset(DateTimeInterface $datetime): int {}
 
     /**
