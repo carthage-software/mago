@@ -14,7 +14,6 @@ use mago_atom::Atom;
 use mago_atom::AtomMap;
 use mago_atom::AtomSet;
 use mago_codex::assertion::Assertion;
-
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::atomic::TAtomic;
@@ -357,6 +356,13 @@ fn clear_object_property_narrowings<'ctx, 'arena>(
     block_context: &mut BlockContext<'ctx>,
     invocation: &Invocation<'ctx, '_, 'arena>,
 ) {
+    if let Some(metadata) = invocation.target.get_function_like_metadata()
+        && (metadata.flags.is_pure() || metadata.flags.is_mutation_free() || metadata.flags.is_external_mutation_free())
+    {
+        // Mutation free functions are guaranteed not to have side effects, so we can skip clearing property narrowings.
+        return;
+    }
+
     let arguments = invocation.arguments_source.get_arguments();
 
     let has_object_argument = arguments.iter().any(|argument| {
