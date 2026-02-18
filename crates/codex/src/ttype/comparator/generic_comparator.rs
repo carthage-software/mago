@@ -48,7 +48,7 @@ pub(crate) fn is_contained_by(
             continue;
         };
 
-        let Some(specialized_template_type) = get_specialized_template_type(
+        let Some(mut specialized_template_type) = get_specialized_template_type(
             codebase,
             template_name,
             &container_metadata.name,
@@ -57,6 +57,12 @@ pub(crate) fn is_contained_by(
         ) else {
             return false;
         };
+
+        // When the input has no explicit type parameters, the specialized type
+        // comes from template defaults, not explicit annotations.
+        if input_type_parameters.is_none() {
+            specialized_template_type.set_from_template_default(true);
+        }
 
         let mut parameter_comparison_result = ComparisonResult::new();
 
@@ -85,7 +91,9 @@ pub(crate) fn is_contained_by(
 
             update_failed_result_from_nested(atomic_comparison_result, &parameter_comparison_result);
 
-            all_parameters_match = false;
+            if !parameter_comparison_result.type_coerced_from_as_mixed.unwrap_or(false) {
+                all_parameters_match = false;
+            }
         }
     }
 

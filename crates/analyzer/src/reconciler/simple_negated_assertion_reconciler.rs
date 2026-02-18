@@ -346,12 +346,23 @@ fn subtract_object(
                     && permitted_inheritors.contains(&lowercase_subtracting_name)
                 {
                     // This is a sealed BASE class/interface and we're subtracting one of its permitted inheritors
-                    // Expand to all OTHER permitted inheritors
+                    // Expand to all OTHER permitted inheritors, transferring parent's type params
+                    let parent_type_params = existing_named.get_type_parameters();
                     acceptable_types.extend(
                         permitted_inheritors
                             .iter()
                             .filter(|inheritor| !inheritor.eq_ignore_ascii_case(&lowercase_subtracting_name))
-                            .map(|inheritor| TNamedObject::new(*inheritor))
+                            .map(|inheritor| {
+                                let child = TNamedObject::new(
+                                    context.codebase.get_class_like(inheritor).map_or(*inheritor, |m| m.original_name),
+                                );
+
+                                if let Some(type_params) = parent_type_params {
+                                    child.with_type_parameters(Some(type_params.to_vec()))
+                                } else {
+                                    child
+                                }
+                            })
                             .map(TObject::Named)
                             .map(TAtomic::Object),
                     );

@@ -662,6 +662,16 @@ fn intersect_contained_atomic_with_another(
         }
     }
 
+    if generic_coercion
+        && named_object.get_type_parameters().is_none()
+        && let TAtomic::Object(TObject::Named(super_named_object)) = super_atomic
+        && let Some(super_type_parameters) = super_named_object.get_type_parameters()
+    {
+        return Some(TAtomic::Object(TObject::Named(
+            TNamedObject::new(named_object.name).with_type_parameters(Some(super_type_parameters.to_vec())),
+        )));
+    }
+
     let mut first_type_atomic = super_atomic.clone();
     if let TAtomic::GenericParameter(TGenericParameter { constraint: first_type_constraint, .. }) =
         &mut first_type_atomic
