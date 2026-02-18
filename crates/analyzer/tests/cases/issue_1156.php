@@ -20,6 +20,9 @@ abstract class Option
  */
 final class None extends Option
 {
+    /**
+     * @throws Exception
+     */
     public function unwrap(): never
     {
         throw new Exception('this is none!');
