@@ -174,6 +174,7 @@ pub(crate) fn get_array_target_type_given_index<'ctx>(
     let mut value_type = None;
     let mut expected_index_types = vec![];
     let mut has_union_key_mismatch = false; // Track if we're in a union where key exists in some but not all variants
+    let mut reported_undefined_key = false;
     while let Some(atomic_var_type) = array_atomic_types.pop() {
         if let TAtomic::GenericParameter(parameter) = atomic_var_type {
             array_atomic_types.extend(parameter.constraint.types.as_ref());
@@ -217,6 +218,7 @@ pub(crate) fn get_array_target_type_given_index<'ctx>(
                     &mut expected_index_types,
                     array_like_type,
                     &mut has_key_in_other_variant,
+                    &mut reported_undefined_key,
                 );
 
                 new_type.set_possibly_undefined(possibly_undefined, None);
@@ -634,7 +636,8 @@ pub(crate) fn handle_array_access_on_keyed_array<'ctx>(
     has_matching_array_key: &mut bool,
     expected_index_types: &mut Vec<TUnion>,
     array_like_type: &TUnion,
-    key_in_other_variant: &mut bool, // NEW: Track if key exists in other union variants but not this one
+    key_in_other_variant: &mut bool,
+    reported_undefined_key: &mut bool,
 ) -> TUnion {
     let TAtomic::Array(TArray::Keyed(keyed_array)) = keyed_array else {
         return get_never();
@@ -756,27 +759,31 @@ pub(crate) fn handle_array_access_on_keyed_array<'ctx>(
                     *has_possibly_undefined = true;
                     *key_in_other_variant = true;
                 } else {
-                    // Key doesn't exist in any variant - report error
-                    context.collector.report_with_code(
-                        IssueCode::UndefinedStringArrayIndex,
-                        Issue::error(format!(
-                            "Undefined array key {} accessed on `{}`.",
-                            array_key,
-                            keyed_array.get_id()
-                        ))
-                        .with_annotation(
-                            Annotation::primary(span)
-                                .with_message(format!("Key {array_key} does not exist."))
-                        )
-                        .with_note(
-                            "Attempting to access a non-existent string key will raise a warning/notice at runtime."
-                        )
-                        .with_help(
-                            format!(
-                                "Ensure the key {array_key} exists before accessing it, or use `isset()` or the null coalesce operator (`??`) to handle potential missing keys."
+                    // Key doesn't exist in any variant - report error (only once for union types)
+                    if !*reported_undefined_key {
+                        *reported_undefined_key = true;
+
+                        context.collector.report_with_code(
+                            IssueCode::UndefinedStringArrayIndex,
+                            Issue::error(format!(
+                                "Undefined array key {} accessed on `{}`.",
+                                array_key,
+                                keyed_array.get_id()
+                            ))
+                            .with_annotation(
+                                Annotation::primary(span)
+                                    .with_message(format!("Key {array_key} does not exist."))
                             )
-                        ),
-                    );
+                            .with_note(
+                                "Attempting to access a non-existent string key will raise a warning/notice at runtime."
+                            )
+                            .with_help(
+                                format!(
+                                    "Ensure the key {array_key} exists before accessing it, or use `isset()` or the null coalesce operator (`??`) to handle potential missing keys."
+                                )
+                            ),
+                        );
+                    }
                 }
 
                 if has_value_parameter { get_mixed() } else { get_null() }
