@@ -732,11 +732,15 @@ pub(crate) fn handle_array_access_on_keyed_array<'ctx>(
                 let key_exists_in_other_variant = if array_like_type.types.len() > 1 {
                     array_like_type.types.iter().any(|atomic_type| {
                         if let TAtomic::Array(TArray::Keyed(other_keyed)) = atomic_type {
-                            if let Some(other_known_items) = other_keyed.get_known_items() {
+                            // Array with generic parameters might have any key
+                            if context.settings.allow_possibly_undefined_array_keys
+                                && other_keyed.get_generic_parameters().is_some()
+                            {
+                                true
+                            } else if let Some(other_known_items) = other_keyed.get_known_items() {
                                 other_known_items.contains_key(&array_key)
                             } else {
-                                // Array with generic parameters might have any key
-                                other_keyed.get_generic_parameters().is_some()
+                                false
                             }
                         } else {
                             false
@@ -790,11 +794,13 @@ pub(crate) fn handle_array_access_on_keyed_array<'ctx>(
                     // This is a union type - check if any other atomic type has this key
                     !array_like_type.types.iter().any(|atomic_type| {
                         if let TAtomic::Array(TArray::Keyed(other_keyed)) = atomic_type {
-                            if let Some(other_known_items) = other_keyed.get_known_items() {
+                            // Array with generic parameters might have any key
+                            if other_keyed.get_generic_parameters().is_some() {
+                                true
+                            } else if let Some(other_known_items) = other_keyed.get_known_items() {
                                 other_known_items.contains_key(&array_key)
                             } else {
-                                // Array with generic parameters might have any key
-                                other_keyed.get_generic_parameters().is_some()
+                                false
                             }
                         } else {
                             false
