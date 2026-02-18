@@ -8,6 +8,7 @@ use mago_codex::ttype::get_bool;
 use mago_codex::ttype::get_false;
 use mago_codex::ttype::get_true;
 use mago_codex::ttype::union::TUnion;
+use mago_span::HasSpan;
 use mago_syntax::ast::Binary;
 use mago_syntax::ast::BinaryOperator;
 use mago_syntax::ast::Expression;
@@ -17,6 +18,7 @@ use crate::artifacts::AnalysisArtifacts;
 use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
+use crate::resolver::class_name::report_non_existent_class_like;
 
 pub mod utils;
 
@@ -85,6 +87,13 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Binary<'arena> {
                     Expression::Identifier(_) | Expression::Self_(_) | Expression::Static(_) | Expression::Parent(_)
                 ) {
                     self.rhs.analyze(context, block_context, artifacts)?;
+                }
+
+                if let Expression::Identifier(identifier) = self.rhs {
+                    let class_name = context.resolved_names.get(identifier);
+                    if !context.codebase.class_like_exists(class_name) {
+                        report_non_existent_class_like(context, identifier.span(), atom(class_name));
+                    }
                 }
 
                 artifacts.set_expression_type(self, compute_instanceof_type(self, context, artifacts));

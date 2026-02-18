@@ -1,19 +1,13 @@
 <?php
 
 // @mago-expect analysis:non-existent-class-like
-function test(Bar $_x): void
-{
-}
+function test(Bar $_x): void {}
 
 // @mago-expect analysis:non-existent-class-like,missing-return-statement
-function test2(): Baz
-{
-}
+function test2(): Baz {}
 
 // @mago-expect analysis:non-existent-class-like,missing-return-statement
-function test3(): stdClass&Baz
-{
-}
+function test3(): stdClass&Baz {}
 
 // @mago-expect analysis:non-existent-class-like
 function test4(): string|(stdClass&Baz)
@@ -33,9 +27,7 @@ class OtherSample
     /**
      * @param Undefined $_x
      */
-    public function test3($_x): void
-    {
-    }
+    public function test3($_x): void {}
 }
 
 function valid(string $_x, int $_y): stdClass
@@ -50,14 +42,24 @@ class Valid
 }
 
 // @mago-expect analysis:non-existent-class-like
-function test5(?Unknown $_x): void
-{
-}
+function test5(?Unknown $_x): void {}
 
 class WithMethod
 {
     // @mago-expect analysis:non-existent-class-like,missing-return-statement
-    public function method(Invalid $_p): Missing
-    {
+    public function method(Invalid $_p): Missing {}
+}
+
+// @mago-expect analysis:non-existent-class-like
+/** @var null|NonExistingClass */
+$x = null;
+
+function test_instanceof(mixed $x): void
+{
+    // @mago-expect analysis:non-existent-class-like
+    if ($x instanceof NonExistingClass) {
+    }
+
+    if ($x instanceof stdClass) {
     }
 }

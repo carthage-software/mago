@@ -779,6 +779,7 @@ mod tests {
         "},
         issues = [
             IssueCode::NonExistentClassLike,
+            IssueCode::NonExistentClassLike,
             IssueCode::UnusedStatement,
         ]
     }

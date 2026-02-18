@@ -2,6 +2,9 @@ use std::rc::Rc;
 
 use mago_atom::Atom;
 use mago_codex::ttype::TType;
+use mago_codex::ttype::TypeRef;
+use mago_codex::ttype::atomic::TAtomic;
+use mago_codex::ttype::atomic::reference::TReference;
 use mago_codex::ttype::builder::get_type_from_string;
 use mago_codex::ttype::comparator::ComparisonResult;
 use mago_codex::ttype::comparator::union_comparator::can_expression_types_be_identical;
@@ -57,6 +60,25 @@ pub fn populate_docblock_variables_excluding<'ctx>(
     exclude_variable: Option<Atom>,
 ) {
     for (name, variable_type, variable_type_span) in get_docblock_variables(context, block_context, artifacts, true) {
+        // Check for undefined type references in ALL @var types, regardless of variable name.
+        for type_ref in variable_type.get_all_child_nodes() {
+            let TypeRef::Atomic(TAtomic::Reference(TReference::Symbol { name: ref_name, .. })) = type_ref else {
+                continue;
+            };
+
+            context.collector.report_with_code(
+                IssueCode::NonExistentClassLike,
+                Issue::error(format!("Cannot find class, interface, enum, or type alias `{ref_name}`."))
+                    .with_annotation(
+                        Annotation::primary(variable_type_span)
+                            .with_message(format!("`{ref_name}` is not defined in the current codebase")),
+                    )
+                    .with_note("This error occurs when a type is referenced but not found in any analyzed source files or stubs.")
+                    .with_note("If this type comes from an optional dependency or extension, you can safely suppress this issue using `@mago-ignore` or `@mago-expect`.")
+                    .with_help("Verify the type name is spelled correctly, the file containing it is included in analysis, and any required `use` statements are present."),
+            );
+        }
+
         let Some(variable_name) = name else {
             continue;
         };
