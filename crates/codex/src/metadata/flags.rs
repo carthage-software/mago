@@ -38,6 +38,8 @@ impl MetadataFlags {
     pub const MAGIC_PROPERTY: MetadataFlags = MetadataFlags(1 << 34);
     pub const MAGIC_METHOD: MetadataFlags = MetadataFlags(1 << 35);
     pub const API: MetadataFlags = MetadataFlags(1 << 36);
+    pub const MUTATION_FREE: MetadataFlags = MetadataFlags(1 << 37);
+    pub const EXTERNAL_MUTATION_FREE: MetadataFlags = MetadataFlags(1 << 38);
 }
 
 impl MetadataFlags {
@@ -286,6 +288,18 @@ impl MetadataFlags {
     #[must_use]
     pub const fn is_public_api(self) -> bool {
         self.contains(Self::API)
+    }
+
+    #[inline]
+    #[must_use]
+    pub const fn is_mutation_free(self) -> bool {
+        self.contains(Self::MUTATION_FREE)
+    }
+
+    #[inline]
+    #[must_use]
+    pub const fn is_external_mutation_free(self) -> bool {
+        self.contains(Self::EXTERNAL_MUTATION_FREE)
     }
 }
 

@@ -2,8 +2,6 @@ use mago_atom::Atom;
 use mago_atom::AtomMap;
 use mago_atom::ascii_lowercase_atom;
 use mago_atom::atom;
-
-use crate::metadata::constant::ConstantMetadata;
 use mago_docblock::tag::TypeString;
 use mago_names::scope::NamespaceScope;
 use mago_reporting::Annotation;
@@ -20,6 +18,7 @@ use mago_syntax::utils;
 use crate::assertion::Assertion;
 use crate::issue::ScanningIssueKind;
 use crate::metadata::class_like::ClassLikeMetadata;
+use crate::metadata::constant::ConstantMetadata;
 use crate::metadata::flags::MetadataFlags;
 use crate::metadata::function_like::FunctionLikeKind;
 use crate::metadata::function_like::FunctionLikeMetadata;
@@ -327,6 +326,13 @@ fn scan_function_like_docblock(
 
     if docblock.is_pure {
         metadata.flags |= MetadataFlags::PURE;
+    }
+
+    if docblock.is_mutation_free {
+        metadata.flags |= MetadataFlags::MUTATION_FREE;
+        metadata.flags |= MetadataFlags::EXTERNAL_MUTATION_FREE;
+    } else if docblock.is_external_mutation_free {
+        metadata.flags |= MetadataFlags::EXTERNAL_MUTATION_FREE;
     }
 
     if docblock.ignore_falsable_return {

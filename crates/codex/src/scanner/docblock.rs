@@ -69,6 +69,8 @@ pub struct FunctionLikeDocblockComment {
     pub is_deprecated: bool,
     pub is_internal: bool,
     pub is_pure: bool,
+    pub is_external_mutation_free: bool,
+    pub is_mutation_free: bool,
     pub ignore_nullable_return: bool,
     pub ignore_falsable_return: bool,
     pub inherits_docs: bool,
@@ -338,6 +340,8 @@ impl FunctionLikeDocblockComment {
         let mut is_deprecated = false;
         let mut is_internal = false;
         let mut is_pure = false;
+        let mut is_external_mutation_free = false;
+        let mut is_mutation_free = false;
         let mut ignore_nullable_return = false;
         let mut ignore_falsable_return = false;
         let mut inherits_docs = false;
@@ -472,6 +476,13 @@ impl FunctionLikeDocblockComment {
                 TagKind::InheritDoc => {
                     inherits_docs = true;
                 }
+                TagKind::MutationFree | TagKind::PsalmMutationFree => {
+                    is_mutation_free = true;
+                    is_external_mutation_free = true;
+                }
+                TagKind::ExternalMutationFree | TagKind::PsalmExternalMutationFree => {
+                    is_external_mutation_free = true;
+                }
                 _ => {
                     // Ignore other tags
                 }
@@ -483,6 +494,8 @@ impl FunctionLikeDocblockComment {
             is_deprecated,
             is_internal,
             is_pure,
+            is_external_mutation_free,
+            is_mutation_free,
             ignore_nullable_return,
             ignore_falsable_return,
             inherits_docs,
