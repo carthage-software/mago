@@ -61,3 +61,21 @@ function format_any(string|int|float|bool $element): string
         return $element ? 'true' : 'false';
     }
 }
+
+function narrow_int_or_float_to_float(int|float $value): float
+{
+    if (is_float($value)) {
+        return $value;
+    } else {
+        return 0.0;
+    }
+}
+
+function narrow_int_or_float_to_int(int|float $value): int
+{
+    if (is_float($value)) {
+        return 0;
+    } else {
+        return $value;
+    }
+}

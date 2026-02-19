@@ -486,7 +486,7 @@ fn resolve_invocation_assertion<'ctx, 'arena>(
                                 &resolved_assertion_type,
                                 false,
                                 false,
-                                false,
+                                true,
                                 &mut comparison_result,
                             );
 
