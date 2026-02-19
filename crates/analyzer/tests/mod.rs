@@ -411,6 +411,7 @@ test_case!(possibly_undefined_string_key_in_union, {
     s.allow_possibly_undefined_array_keys = true;
     s
 });
+test_case!(only_ascii_is_caseless);
 
 // Github Issues
 test_case!(issue_659);
