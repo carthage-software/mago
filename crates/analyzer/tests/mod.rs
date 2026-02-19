@@ -412,6 +412,7 @@ test_case!(possibly_undefined_string_key_in_union, {
     s
 });
 test_case!(only_ascii_is_caseless);
+test_case!(allow_unknown_array_key_in_assignment);
 
 // Github Issues
 test_case!(issue_659);

@@ -760,7 +760,7 @@ pub(crate) fn handle_array_access_on_keyed_array<'ctx>(
                     *key_in_other_variant = true;
                 } else {
                     // Key doesn't exist in any variant - report error (only once for union types)
-                    if !*reported_undefined_key {
+                    if !in_assignment && !*reported_undefined_key {
                         *reported_undefined_key = true;
 
                         context.collector.report_with_code(
