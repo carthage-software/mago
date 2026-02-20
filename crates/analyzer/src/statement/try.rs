@@ -504,18 +504,18 @@ fn get_caught_classes<'arena>(context: &mut Context<'_, 'arena>, hint: &Hint<'ar
             context.collector.report_with_code(
                 IssueCode::CatchTypeNotThrowable,
                 Issue::error(format!(
-                    "The type `{lowercase_caught_type}` caught in a catch block must implement the `Throwable` interface.",
+                    "The type `{caught_type}` caught in a catch block must implement the `Throwable` interface.",
                 ))
                 .with_annotation(
                     Annotation::primary(caught_span)
-                        .with_message(format!("`{lowercase_caught_type}` is not an instance of `Throwable`")),
+                        .with_message(format!("`{caught_type}` is not an instance of `Throwable`")),
                 )
                 .with_annotation(
                     Annotation::secondary(class_like_metadata.name_span.unwrap_or(class_like_metadata.span))
-                        .with_message(format!("`{lowercase_caught_type}` defined here does not implement `Throwable`")),
+                        .with_message(format!("`{caught_type}` defined here does not implement `Throwable`")),
                 )
                 .with_note("In PHP, only objects that implement the `Throwable` interface (this includes `Exception` and `Error` classes and their children) can be caught in a `catch` block.")
-                .with_help(format!("Ensure that `{lowercase_caught_type}` implements the `Throwable` interface, or catch a more general exception type like `Exception` or `Throwable` itself.")),
+                .with_help(format!("Ensure that `{caught_type}` implements the `Throwable` interface, or catch a more general exception type like `Exception` or `Throwable` itself.")),
             );
 
             continue;
