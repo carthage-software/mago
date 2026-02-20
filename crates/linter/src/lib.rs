@@ -8,6 +8,7 @@ use mago_names::ResolvedNames;
 use mago_php_version::PHPVersion;
 use mago_reporting::IssueCollection;
 use mago_syntax::ast::Node;
+use mago_syntax::ast::NodeKind;
 use mago_syntax::ast::Program;
 
 use crate::context::LintContext;
@@ -117,12 +118,28 @@ fn is_file_excluded(file_name: &str, patterns: &[String]) -> bool {
     })
 }
 
+fn is_constant_expression_context(kind: NodeKind) -> bool {
+    matches!(
+        kind,
+        NodeKind::Attribute
+            | NodeKind::FunctionLikeParameter
+            | NodeKind::PropertyConcreteItem
+            | NodeKind::ClassLikeConstantItem
+            | NodeKind::ConstantItem
+    )
+}
+
 fn walk<'arena>(node: Node<'_, 'arena>, ctx: &mut LintContext<'_, 'arena>, excluded_rules: &HashSet<usize>) {
     let mut in_scope = false;
     if let Some(scope) = Scope::for_node(ctx, node) {
         ctx.scope.push(scope);
 
         in_scope = true;
+    }
+
+    let in_constant_expression = is_constant_expression_context(node.kind());
+    if in_constant_expression {
+        ctx.constant_expression_depth += 1;
     }
 
     let rules_to_run = ctx.registry.for_kind(node.kind());
@@ -139,6 +156,10 @@ fn walk<'arena>(node: Node<'_, 'arena>, ctx: &mut LintContext<'_, 'arena>, exclu
 
     for child in node.children() {
         walk(child, ctx, excluded_rules);
+    }
+
+    if in_constant_expression {
+        ctx.constant_expression_depth -= 1;
     }
 
     if in_scope {

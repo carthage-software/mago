@@ -98,6 +98,10 @@ impl LintRule for PreferArrowFunctionRule {
             return;
         };
 
+        if ctx.is_in_constant_expression() {
+            return;
+        }
+
         if let Some(use_clause) = closure.use_clause.as_ref()
             && use_clause.variables.iter().any(|variable| variable.ampersand.is_some())
         {
@@ -150,5 +154,127 @@ impl LintRule for PreferArrowFunctionRule {
             edits.push(TextEdit::replace(to_replace_with_arrow, "=>").with_safety(Safety::PotentiallyUnsafe));
             edits.push(TextEdit::delete(to_remove).with_safety(Safety::PotentiallyUnsafe));
         });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use indoc::indoc;
+
+    use super::PreferArrowFunctionRule;
+    use crate::test_lint_failure;
+    use crate::test_lint_success;
+
+    test_lint_failure! {
+        name = simple_closure_with_return,
+        rule = PreferArrowFunctionRule,
+        code = indoc! {r#"
+            <?php
+
+            $a = function($x) {
+                return $x + 1;
+            };
+        "#}
+    }
+
+    test_lint_failure! {
+        name = closure_with_use_clause,
+        rule = PreferArrowFunctionRule,
+        code = indoc! {r#"
+            <?php
+
+            $y = 5;
+            $a = function($x) use ($y) {
+                return $x + $y;
+            };
+        "#}
+    }
+
+    test_lint_success! {
+        name = closure_in_attribute_argument,
+        rule = PreferArrowFunctionRule,
+        code = indoc! {r#"
+            <?php
+
+            #[Route('/', middleware: function(): Middleware {
+                return new Auth();
+            })]
+            function index(): Response {
+                return new Response();
+            }
+        "#}
+    }
+
+    test_lint_success! {
+        name = closure_in_parameter_default,
+        rule = PreferArrowFunctionRule,
+        code = indoc! {r#"
+            <?php
+
+            function foo($callback = function($x) { return $x + 1; }) {
+                return $callback(5);
+            }
+        "#}
+    }
+
+    test_lint_success! {
+        name = closure_in_property_default,
+        rule = PreferArrowFunctionRule,
+        code = indoc! {r#"
+            <?php
+
+            class Foo {
+                public $callback = function($x) { return $x + 1; };
+            }
+        "#}
+
+    }
+
+    test_lint_success! {
+        name = closure_in_class_constant,
+        rule = PreferArrowFunctionRule,
+        code = indoc! {r#"
+            <?php
+
+            class Foo {
+                const CALLBACK = function($x) { return $x + 1; };
+            }
+        "#}
+    }
+
+    test_lint_success! {
+        name = closure_in_top_level_constant,
+        rule = PreferArrowFunctionRule,
+        code = indoc! {r#"
+            <?php
+
+            const CALLBACK = function($x) { return $x + 1; };
+        "#}
+    }
+
+    test_lint_success! {
+        name = closure_with_reference_capture,
+        rule = PreferArrowFunctionRule,
+        code = indoc! {r#"
+            <?php
+
+            $y = 5;
+            $a = function($x) use (&$y) {
+                return $x + $y;
+            };
+        "#}
+    }
+
+    test_lint_success! {
+        name = closure_with_multiple_statements,
+        rule = PreferArrowFunctionRule,
+        code = indoc! {r#"
+            <?php
+
+            $a = function($x) {
+                $y = $x + 1;
+                return $y;
+            };
+        "#}
     }
 }
