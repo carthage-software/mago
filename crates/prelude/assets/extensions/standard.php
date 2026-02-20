@@ -3338,12 +3338,12 @@ function rewinddir($dir_handle): void {}
 function readdir($dir_handle): string|false {}
 
 /**
- * @param resource $context
+ * @param null|resource $context
  */
-function dir(string $directory, $context): Directory|false {}
+function dir(string $directory, $context = null): Directory|false {}
 
 /**
- * @param resource $context
+ * @param null|resource $context
  */
 function getdir(string $directory, $context = null): Directory|false {}
 
