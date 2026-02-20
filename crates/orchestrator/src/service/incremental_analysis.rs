@@ -508,6 +508,11 @@ impl IncrementalAnalysisService {
                 changed_symbols,
             );
 
+            // Clear safe_symbols before analysis — they were needed for populate_codebase_targeted
+            // but must not leak into the analyzer (see non-body-only path for explanation).
+            merged_codebase.safe_symbols.clear();
+            merged_codebase.safe_symbol_members.clear();
+
             let (mut analysis_result, mut per_file_issues) =
                 self.run_analyzer_selective(&merged_codebase, symbol_references, &self.settings, files_to_skip)?;
 
