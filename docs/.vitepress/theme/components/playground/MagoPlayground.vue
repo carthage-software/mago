@@ -3,6 +3,7 @@ import { onMounted, onUnmounted, watch, ref } from 'vue';
 import { useMagoWasm } from '../../composables/useMagoWasm.js';
 import { createPlaygroundState } from '../../composables/usePlaygroundState.js';
 import { useUrlState } from '../../composables/useUrlState.js';
+import { useMagoTasks } from '../../composables/useMagoTasks.js';
 import PlaygroundToolbar from './PlaygroundToolbar.vue';
 import PlaygroundSettings from './PlaygroundSettings.vue';
 import PlaygroundEditor from './PlaygroundEditor.vue';
@@ -11,7 +12,8 @@ import PlaygroundOutput from './PlaygroundOutput.vue';
 const store = createPlaygroundState();
 const { state } = store;
 
-const { isLoading: wasmLoading, isReady: wasmReady, analyze, format, loadWasm, getRules } = useMagoWasm();
+const { isLoading: wasmLoading, isReady: wasmReady, loadWasm, getRules } = useMagoWasm();
+const { analyze, format } = useMagoTasks();
 const { shareError, shareSuccess, isSharing, shareUrl, generateShareUrl, loadFromUrl, copyToClipboard, clearShareUrl, shouldClearShareUrl } = useUrlState();
 
 const hasRunOnce = ref(false);
@@ -24,6 +26,12 @@ onMounted(async () => {
   const urlState = await loadFromUrl();
   if (urlState) {
     store.restoreState(urlState);
+  }
+
+  const params = new URLSearchParams(window.location.search);
+  const tabParam = params.get('tab');
+  if (tabParam === 'issues' || tabParam === 'formatter') {
+    store.setActiveTab(tabParam);
   }
 
   try {
@@ -51,6 +59,7 @@ watch(wasmReady, async (ready) => {
       console.error('Failed to load linter rules:', e);
     }
     runAnalysis();
+    updateFormattedPreview();
   }
 });
 
@@ -89,12 +98,12 @@ watch(
 );
 
 async function runAnalysis() {
-  if (!wasmReady.value) return;
+  if (!wasmReady.value || state.activeTab !== 'issues') return;
 
   store.setLoading(true);
   try {
     const results = await analyze(state.code, state.settings);
-    store.setResults(results);
+    store.setAnalyzerResults(results);
   } catch (e) {
     console.error('Analysis failed:', e);
     store.setResults({
@@ -107,13 +116,23 @@ async function runAnalysis() {
   }
 }
 
+async function updateFormattedPreview() {
+  if (!wasmReady.value || state.activeTab !== 'formatter') return;
+  try {
+    const res = await format(state.code, state.settings.phpVersion);
+    store.setFormatterResults(res);
+  } catch (e) {
+    store.setFormatterResults({ code: state.code || '', timeMs: null, error: e?.message || 'Format failed' });
+  }
+}
+
 async function handleFormat() {
   if (!wasmReady.value || state.isLoading) return;
 
   store.setLoading(true);
   try {
     const formatted = await format(state.code, state.settings.phpVersion);
-    store.setCode(formatted);
+    store.setCode(formatted.code);
   } catch (e) {
     console.error('Format failed:', e);
   } finally {
@@ -161,6 +180,31 @@ function handleCloseSettings() {
 function handleTabChange(tab) {
   store.setActiveTab(tab);
 }
+
+watch(
+  () => state.activeTab,
+  (tab) => {
+    const params = new URLSearchParams(window.location.search);
+    params.set('tab', tab);
+    const query = `?${params.toString()}`;
+    const url = `${window.location.pathname}${query}${window.location.hash || ''}`;
+    window.history.replaceState(null, '', url);
+
+    if (tab === 'formatter') {
+      return updateFormattedPreview();
+    } else if (tab === 'issues') {
+      return runAnalysis();
+    }
+  }
+);
+
+watch(
+  () => [state.code, state.settings.phpVersion],
+  () => {
+    updateFormattedPreview();
+  },
+  { deep: true }
+);
 
 function handleHighlightLine(range) {
   highlightedRange.value = range;
@@ -237,10 +281,13 @@ onUnmounted(() => {
       />
       <PlaygroundOutput
         class="panel-output"
-        :results="state.results"
+        :analyzer-results="state.analyzerResults"
+        :formatter-results="state.formatterResults"
         :active-tab="state.activeTab"
         :is-loading="state.isLoading"
-        @update:active-tab="handleTabChange"
+        :code="state.code"
+        :php-version="state.settings.phpVersion"
+        @update-active-tab="handleTabChange"
         @highlight-line="handleHighlightLine"
       />
     </div>
