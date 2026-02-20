@@ -220,6 +220,7 @@ pub fn statement_has_yield(statement: &Statement) -> bool {
             }
         },
         Statement::Expression(expression) => expression_has_yield(expression.expression),
+        Statement::Return(r#return) => r#return.value.is_some_and(|v| expression_has_yield(v)),
         _ => false,
     }
 }

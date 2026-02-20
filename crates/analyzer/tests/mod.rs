@@ -62,6 +62,7 @@ test_case!(docblock_type_parsing_verification);
 test_case!(docblock_var_on_non_assignment);
 test_case!(empty_switch);
 test_case!(empty_construct);
+test_case!(generator_return_yield);
 test_case!(generic_shape_coercion);
 test_case!(int_or_float);
 test_case!(literal_float);
