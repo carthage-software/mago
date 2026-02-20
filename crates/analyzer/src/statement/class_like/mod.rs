@@ -1659,7 +1659,7 @@ fn check_template_parameters<'ctx>(
 /// Example: `StringBox` extends Box and inherits `Box::setValue` without overriding it.
 #[inline]
 fn should_skip_same_method(appearing_fqcn: &str, overridden_fqcn: &str) -> bool {
-    ascii_lowercase_atom(appearing_fqcn) == ascii_lowercase_atom(overridden_fqcn)
+    appearing_fqcn.eq_ignore_ascii_case(overridden_fqcn)
 }
 
 /// Checks if this is a trait-to-trait abstract method conflict that should be handled

@@ -274,7 +274,7 @@ fn analyze_class_instantiation<'ctx, 'arena>(
 
     let mut type_parameters = None;
 
-    let constructor_id = MethodIdentifier::new(atom(&metadata.original_name), atom("__construct"));
+    let constructor_id = MethodIdentifier::new(metadata.original_name, atom("__construct"));
     let constructor_declraing_id = context.codebase.get_declaring_method_identifier(&constructor_id);
 
     artifacts.symbol_references.add_reference_for_method_call(&block_context.scope, &constructor_id);

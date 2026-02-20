@@ -5,7 +5,6 @@ use std::rc::Rc;
 use mago_atom::Atom;
 use mago_atom::AtomMap;
 use mago_atom::AtomSet;
-use mago_atom::ascii_lowercase_atom;
 use mago_atom::atom;
 
 use mago_codex::ttype;
@@ -446,11 +445,9 @@ fn get_caught_classes<'arena>(context: &mut Context<'_, 'arena>, hint: &Hint<'ar
     let throwable = atom("Throwable");
     let mut caught_classes = AtomSet::with_capacity_and_hasher(caught_identifiers.len(), Default::default());
     for (caught_type, caught_span) in caught_identifiers {
-        let lowercase_caught_type = ascii_lowercase_atom(&caught_type);
-
-        if lowercase_caught_type == "throwable"
-            || lowercase_caught_type == "exception"
-            || lowercase_caught_type == "error"
+        if caught_type.eq_ignore_ascii_case("throwable")
+            || caught_type.eq_ignore_ascii_case("exception")
+            || caught_type.eq_ignore_ascii_case("error")
         {
             caught_classes.insert(caught_type);
             continue;

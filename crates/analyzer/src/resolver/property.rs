@@ -292,7 +292,7 @@ pub fn resolve_instance_properties<'ctx, 'ast, 'arena>(
         };
 
         let magic_method_name = if for_assignment { "__set" } else { "__get" };
-        let mut magic_method_identifier = MethodIdentifier::new(atom(&classname), atom(magic_method_name));
+        let mut magic_method_identifier = MethodIdentifier::new(classname, atom(magic_method_name));
         magic_method_identifier = context.codebase.get_declaring_method_identifier(&magic_method_identifier);
         let magic_method = context.codebase.get_method_by_id(&magic_method_identifier);
 

@@ -379,7 +379,7 @@ pub fn get_method_ids_from_object<'ctx, 'ast, 'arena, 'object>(
         return ids;
     };
 
-    let mut method_id = MethodIdentifier::new(atom(&class_metadata.original_name), atom(&method_name));
+    let mut method_id = MethodIdentifier::new(class_metadata.original_name, method_name);
     if !context.codebase.method_identifier_exists(&method_id) {
         method_id = context.codebase.get_declaring_method_identifier(&method_id);
     }
@@ -462,8 +462,7 @@ pub fn get_method_ids_from_object<'ctx, 'ast, 'arena, 'object>(
                 continue;
             };
 
-            let mut required_method_id =
-                MethodIdentifier::new(atom(&required_metadata.original_name), atom(&method_name));
+            let mut required_method_id = MethodIdentifier::new(required_metadata.original_name, method_name);
             if !context.codebase.method_identifier_exists(&required_method_id) {
                 required_method_id = context.codebase.get_declaring_method_identifier(&required_method_id);
             }
@@ -483,7 +482,7 @@ pub fn get_method_ids_from_object<'ctx, 'ast, 'arena, 'object>(
                 continue;
             };
 
-            let mut mixin_method_id = MethodIdentifier::new(atom(&mixin_metadata.original_name), atom(&method_name));
+            let mut mixin_method_id = MethodIdentifier::new(mixin_metadata.original_name, method_name);
             if !context.codebase.method_identifier_exists(&mixin_method_id) {
                 mixin_method_id = context.codebase.get_declaring_method_identifier(&mixin_method_id);
             }
