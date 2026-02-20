@@ -147,6 +147,8 @@ impl Reporter {
 
         // Dispatch to the appropriate formatter
         dispatch_format(self.config.format, &mut *writer, &issues, &self.database, &formatter_config)?;
+        // When writing to pipes, some formatters do not flush the last line of json
+        writer.flush()?;
 
         Ok(ReportStatus {
             baseline_dead_issues: baseline_has_dead_issues,
