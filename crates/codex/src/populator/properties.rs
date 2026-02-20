@@ -30,7 +30,11 @@ pub fn inherit_properties_from_parent(metadata: &mut ClassLikeMetadata, parent_m
 
     for (property_name, declaring_classlike) in &parent_metadata.declaring_property_ids {
         if metadata.declaring_property_ids.contains_key(property_name) {
-            continue;
+            if !parent_is_trait && metadata.properties.get(property_name).is_some_and(|p| p.flags.is_magic_property()) {
+                metadata.properties.remove(property_name);
+            } else {
+                continue;
+            }
         }
 
         if !parent_is_trait
