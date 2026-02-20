@@ -513,6 +513,8 @@ Refactor by extracting the flag logic into its own class or method.
 | :--- | :--- | :--- |
 | `enabled` | `boolean` | `true` |
 | `level` | `string` | `"help"` |
+| `exclude-setters` | `boolean` | `false` |
+| `exclude-constructors` | `boolean` | `true` |
 
 ### Examples
 
