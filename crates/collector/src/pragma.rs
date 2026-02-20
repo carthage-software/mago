@@ -128,7 +128,51 @@ fn parse_pragmas_in_trivia<'arena>(
         let content = content_with_leading_space.trim_start();
 
         let Some((category, rest)) = content.split_once(':') else {
-            continue; // Malformed pragma, no category or code.
+            // Handle `@mago-ignore all` / `@mago-expect all` without a category prefix.
+            let mut parts = content.splitn(2, char::is_whitespace);
+            let code_part = parts.next().unwrap_or("");
+            if code_part != "all" {
+                continue;
+            }
+
+            let description = parts.next().unwrap_or("").trim();
+
+            let Some(&default_category) = categories.first() else {
+                continue;
+            };
+
+            let code = "all";
+            let code_offset_in_line = content.as_ptr() as usize - line.as_ptr() as usize;
+            let code_start_offset = absolute_line_start + code_offset_in_line as u32;
+            let code_span = Span::new(file.id, code_start_offset, code_start_offset + code.len() as u32);
+
+            let pragma_end_offset = pragma_start_offset + prefix.len() as u32 + content_with_leading_space.len() as u32;
+            let span = Span::new(file.id, pragma_start_offset, pragma_end_offset);
+
+            let start_line = file.line_number(trivia.span.start.offset);
+            let end_line = file.line_number(trivia.span.end.offset);
+            let line_start_offset = file.get_line_start_offset(start_line).unwrap_or(0);
+            let line_end_offset = file.get_line_end_offset(end_line).unwrap_or(file.contents.len() as u32);
+            let prefix_text = &file.contents[line_start_offset as usize..trivia.span.start.offset as usize];
+            let postfix_text = &file.contents[trivia.span.end.offset as usize..line_end_offset as usize];
+            let own_line = prefix_text.trim().is_empty() && postfix_text.trim().is_empty();
+
+            pragmas.push(Pragma {
+                kind,
+                span,
+                trivia_span: trivia.span,
+                code_span,
+                start_line,
+                end_line,
+                own_line,
+                category: default_category,
+                code,
+                description,
+                scope_span: None,
+                used: false,
+            });
+
+            continue;
         };
 
         if category.contains(char::is_whitespace) {

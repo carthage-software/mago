@@ -368,6 +368,7 @@ impl<'ctx, 'arena> Collector<'ctx, 'arena> {
                 }
                 PragmaKind::Expect => {
                     if let Some(ref active_codes) = self.active_codes
+                        && pragma.code != "all"
                         && !active_codes.contains(&pragma.code)
                     {
                         continue;
@@ -441,13 +442,13 @@ impl<'ctx, 'arena> Collector<'ctx, 'arena> {
             }
 
             let resolved_pragma_code = self.aliases.get(pragma.code).copied().unwrap_or(pragma.code);
-            if resolved_pragma_code != issue_code {
+            if resolved_pragma_code != "all" && resolved_pragma_code != issue_code {
                 continue;
             }
 
             let is_applicable = if let Some(scope_span) = pragma.scope_span {
                 scope_span.contains(&issue_span) || issue_span.contains(&scope_span)
-            } else if pragma.used {
+            } else if pragma.used && resolved_pragma_code != "all" {
                 false
             } else if pragma.trivia_span.contains(&issue_span) || issue_span.contains(&pragma.trivia_span) {
                 // The issue is inside the same comment as the pragma!

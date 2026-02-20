@@ -2,7 +2,7 @@
 
 While it's best to fix all issues that Mago reports, there are cases where you might need to suppress them in your source code. Mago provides two pragmas for this, each with a specific purpose: `@mago-expect` and `@mago-ignore`.
 
-Both pragmas require you to specify the exact issue you intend to suppress, using the format `[category]:[code]`. You can also suppress multiple issues at once by providing a comma-separated list of codes: `[category]:[code1,code2,code3]`.
+Both pragmas require you to specify the issue(s) you intend to suppress, using the format `[category]:[code]`. You can also suppress multiple issues at once by providing a comma-separated list of codes: `[category]:[code1,code2,code3]`.
 
 ## Categories
 
@@ -78,6 +78,50 @@ function foo(): string {
 }
 ```
 
+## Suppressing All Issues (`all`)
+
+You can use the special `all` code to suppress all issues at once, rather than listing individual codes. This is useful when working with legacy code that triggers many diagnostics.
+
+### Suppressing All Issues in a Category
+
+Use `[category]:all` to suppress every issue within a specific category:
+
+```php
+// @mago-ignore lint:all
+$result = $value ?: ($x == true ? 'yes' : 'no');
+
+// @mago-expect analysis:all
+function legacy_code(): string {
+    if (rand(0, 1)) {
+        return 'foo';
+    }
+}
+```
+
+### Suppressing All Issues Across All Categories
+
+Use `all` without a category prefix to suppress every issue across all categories:
+
+```php
+// @mago-ignore all
+$result = eval($value) ?: 'default';
+```
+
+When placed before a block, it suppresses all issues for the entire block:
+
+```php
+/**
+ * @mago-ignore all
+ */
+function legacy_code(): string {
+    // All linter, analyzer, and guard issues are suppressed here
+}
+```
+
+::: warning
+Using `all` is a blunt instrument. Prefer suppressing specific codes when possible so you don't accidentally hide new, unrelated issues.
+:::
+
 ## Choosing Between `@mago-expect` and `@mago-ignore`
 
 - Use `@mago-expect` when you want to be explicitly notified with a warning if the code changes and the issue no longer exists. This is best for most cases, as it prevents suppressions from becoming outdated.
@@ -104,5 +148,15 @@ function complexFunction(): string {
     }
 
     // No return statement here
+}
+
+// Suppress all lint issues on one line
+// @mago-ignore lint:all
+$result = $value ?: ($x == true ? 'yes' : 'no');
+
+// Suppress all issues across all categories for a legacy function
+// @mago-ignore all
+function legacyFunction(): string {
+    // Everything is suppressed here
 }
 ```
