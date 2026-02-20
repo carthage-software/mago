@@ -300,7 +300,7 @@ const PINT_PRESET: FormatSettings = FormatSettings {
     inline_empty_anonymous_class_braces: true,
     method_chain_breaking_style: MethodChainBreakingStyle::NextLine,
     first_method_chain_on_new_line: false,
-    method_chain_semicolon_on_next_line: true,
+    method_chain_semicolon_on_next_line: false,
     preserve_breaking_member_access_chain: true,
     preserve_breaking_argument_list: true,
     preserve_breaking_array_like: true,
