@@ -44,11 +44,12 @@ pub struct PreferFirstClassCallableRule {
 #[serde(default, rename_all = "kebab-case", deny_unknown_fields)]
 pub struct PreferFirstClassCallableConfig {
     pub level: Level,
+    pub check_functions: bool,
 }
 
 impl Default for PreferFirstClassCallableConfig {
     fn default() -> Self {
-        Self { level: Level::Warning }
+        Self { level: Level::Warning, check_functions: false }
     }
 }
 
@@ -71,18 +72,22 @@ impl LintRule for PreferFirstClassCallableRule {
                 This rule identifies closures and arrow functions that do nothing but forward their arguments to another function or method.
                 In such cases, the more concise and modern first-class callable syntax, introduced in PHP 8.1, can be used instead.
                 This improves readability by reducing boilerplate code.
+
+                By default, this rule only checks method and static method calls. Optionally, function calls can also
+                be checked by enabling `check-functions`, but this may produce false positives with internal PHP
+                functions that enforce strict argument counts.
             "},
             good_example: indoc! {r"
                 <?php
 
                 $names = ['Alice', 'Bob', 'Charlie'];
-                $uppercased_names = array_map(strtoupper(...), $names);
+                $uppercased_names = array_map($formatter->format(...), $names);
             "},
             bad_example: indoc! {r"
                 <?php
 
                 $names = ['Alice', 'Bob', 'Charlie'];
-                $uppercased_names = array_map(fn($name) => strtoupper($name), $names);
+                $uppercased_names = array_map(fn($name) => $formatter->format($name), $names);
             "},
             category: Category::BestPractices,
             requirements: RuleRequirements::PHPVersion(PHPVersionRange::from(PHPVersion::PHP81)),
@@ -105,6 +110,10 @@ impl LintRule for PreferFirstClassCallableRule {
             let Expression::Call(call) = arrow_function.expression else {
                 return;
             };
+
+            if !self.cfg.check_functions && matches!(call, Call::Function(_)) {
+                return;
+            }
 
             if !is_call_forwarding(&arrow_function.parameter_list, call) {
                 return;
@@ -147,6 +156,10 @@ impl LintRule for PreferFirstClassCallableRule {
             let Expression::Call(call) = value else {
                 return;
             };
+
+            if !self.cfg.check_functions && matches!(call, Call::Function(_)) {
+                return;
+            }
 
             if !is_call_forwarding(&closure.parameter_list, call) {
                 return;
@@ -345,13 +358,25 @@ mod tests {
         "#}
     }
 
-    test_lint_failure! {
+    test_lint_success! {
         name = simple_function_call,
         rule = PreferFirstClassCallableRule,
         code = indoc! {r#"
             <?php
 
             run(fn($x) => strlen($x));
+        "#}
+    }
+
+    test_lint_success! {
+        name = closure_with_function_call,
+        rule = PreferFirstClassCallableRule,
+        code = indoc! {r#"
+            <?php
+
+            $unused = null;
+
+            run(function($x) use (&$unused) { return strlen($x); });
         "#}
     }
 
@@ -376,14 +401,54 @@ mod tests {
     }
 
     test_lint_failure! {
-        name = closure_with_reference_capture_on_non_callee,
+        name = closure_method_call_with_non_callee_reference_capture,
         rule = PreferFirstClassCallableRule,
         code = indoc! {r#"
             <?php
 
             $unused = null;
+            $obj = new SomeClass();
 
-            run(function($x) use (&$unused) { return strlen($x); });
+            run(function($x) use (&$unused, $obj) { return $obj->method($x); });
+        "#}
+    }
+
+    test_lint_failure! {
+        name = function_call_detected_when_check_functions_enabled,
+        rule = PreferFirstClassCallableRule,
+        settings = |s: &mut crate::settings::Settings| {
+            s.rules.prefer_first_class_callable.config.check_functions = true;
+        },
+        code = indoc! {r#"
+            <?php
+
+            run(fn($x) => strlen($x));
+        "#}
+    }
+
+    test_lint_failure! {
+        name = closure_function_call_detected_when_check_functions_enabled,
+        rule = PreferFirstClassCallableRule,
+        settings = |s: &mut crate::settings::Settings| {
+            s.rules.prefer_first_class_callable.config.check_functions = true;
+        },
+        code = indoc! {r#"
+            <?php
+
+            run(function($x) { return strlen($x); });
+        "#}
+    }
+
+    test_lint_failure! {
+        name = variable_function_call_detected_when_check_functions_enabled,
+        rule = PreferFirstClassCallableRule,
+        settings = |s: &mut crate::settings::Settings| {
+            s.rules.prefer_first_class_callable.config.check_functions = true;
+        },
+        code = indoc! {r#"
+            <?php
+
+            run(fn($x) => $callback($x));
         "#}
     }
 }
