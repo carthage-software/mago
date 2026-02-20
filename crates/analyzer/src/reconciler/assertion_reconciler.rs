@@ -368,13 +368,13 @@ pub(crate) fn intersect_atomic_with_atomic(
             return None;
         }
         (TAtomic::Object(TObject::Named(first_object)), TAtomic::Object(TObject::Named(second_object))) => {
-            let first_object_name = first_object.get_name_ref();
-            let second_object_name = second_object.get_name_ref();
+            let first_object_name = first_object.get_name();
+            let second_object_name = second_object.get_name();
 
-            if (context.codebase.interface_exists(first_object_name)
-                && context.codebase.is_inheritable(second_object_name))
-                || (context.codebase.interface_exists(second_object_name)
-                    && context.codebase.is_inheritable(first_object_name))
+            if (context.codebase.interface_exists(&first_object_name)
+                && context.codebase.is_inheritable(&second_object_name))
+                || (context.codebase.interface_exists(&second_object_name)
+                    && context.codebase.is_inheritable(&first_object_name))
             {
                 let mut first_type = first_type.clone();
                 first_type.add_intersection_type(second_type.clone());

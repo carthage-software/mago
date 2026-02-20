@@ -39,7 +39,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for DoWhile<'arena> {
         let mut mixed_variable_ids = vec![];
         for (variable_id, variable_type) in &loop_scope.parent_context_variables {
             if variable_type.is_mixed() {
-                mixed_variable_ids.push(variable_id);
+                mixed_variable_ids.push(*variable_id);
             }
         }
 

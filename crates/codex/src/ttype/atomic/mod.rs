@@ -224,7 +224,7 @@ impl TAtomic {
                 break 'parameters None;
             };
 
-            let object_name = named_object.get_name_ref();
+            let object_name = named_object.get_name();
             if !object_name.eq_ignore_ascii_case("Generator") {
                 break 'parameters None;
             }
@@ -353,11 +353,11 @@ impl TAtomic {
         };
 
         if let Some(object_name) = object.get_name() {
-            if *object_name == interface {
+            if object_name == interface {
                 return true;
             }
 
-            if codebase.is_instance_of(object_name, interface) {
+            if codebase.is_instance_of(&object_name, interface) {
                 return true;
             }
         }
@@ -1156,7 +1156,7 @@ pub fn populate_atomic_type(
 
             if !named_object.is_intersection()
                 && !named_object.has_type_parameters()
-                && codebase_symbols.contains_enum(&name)
+                && codebase_symbols.contains_enum(name)
             {
                 *unpopulated_atomic = TAtomic::Object(TObject::new_enum(name));
             } else {
@@ -1243,7 +1243,7 @@ pub fn populate_atomic_type(
                     }
                 }
 
-                if let Some(symbol_kind) = codebase_symbols.get_kind(&ascii_lowercase_atom(name)) {
+                if let Some(symbol_kind) = codebase_symbols.get_kind(ascii_lowercase_atom(name)) {
                     if symbol_kind == SymbolKind::Enum {
                         *unpopulated_atomic = TAtomic::Object(TObject::new_enum(*name));
                     } else {

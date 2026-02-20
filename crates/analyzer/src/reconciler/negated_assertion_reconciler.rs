@@ -155,19 +155,19 @@ fn subtract_complex_type(
                 TAtomic::Object(TObject::Named(existing_named_object)),
                 TAtomic::Object(TObject::Named(assertion_named_object)),
             ) => {
-                let existing_classlike_name = existing_named_object.get_name_ref();
-                let assertion_classlike_name = assertion_named_object.get_name_ref();
+                let existing_classlike_name = existing_named_object.get_name();
+                let assertion_classlike_name = assertion_named_object.get_name();
 
-                if let Some(class_like_metadata) = context.codebase.get_class_like(existing_classlike_name) {
+                if let Some(class_like_metadata) = context.codebase.get_class_like(&existing_classlike_name) {
                     // handle __Sealed classes, negating where possible
                     if let Some(child_classlikes) = class_like_metadata.child_class_likes.as_ref()
-                        && child_classlikes.contains(assertion_classlike_name)
+                        && child_classlikes.contains(&assertion_classlike_name)
                     {
                         handle_negated_class(
                             context,
                             child_classlikes,
                             &existing_atomic,
-                            *assertion_classlike_name,
+                            assertion_classlike_name,
                             &mut acceptable_types,
                         );
 
@@ -177,8 +177,8 @@ fn subtract_complex_type(
                     }
                 }
 
-                if (context.codebase.interface_exists(assertion_classlike_name)
-                    || context.codebase.interface_exists(existing_classlike_name))
+                if (context.codebase.interface_exists(&assertion_classlike_name)
+                    || context.codebase.interface_exists(&existing_classlike_name))
                     && assertion_classlike_name != existing_classlike_name
                 {
                     *can_be_disjunct = true;

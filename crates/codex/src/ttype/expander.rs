@@ -310,7 +310,7 @@ fn expand_member_reference(
     };
 
     for (constant_name, constant) in &class_like.constants {
-        if !member_selector.matches(constant_name) {
+        if !member_selector.matches(*constant_name) {
             continue;
         }
 
@@ -332,7 +332,7 @@ fn expand_member_reference(
     }
 
     for enum_case_name in class_like.enum_cases.keys() {
-        if !member_selector.matches(enum_case_name) {
+        if !member_selector.matches(*enum_case_name) {
             continue;
         }
         new_return_type_parts.push(TAtomic::Object(TObject::new_enum_case(class_like.original_name, *enum_case_name)));
@@ -455,7 +455,7 @@ fn is_static_type_compatible(named: &TNamedObject, static_obj: &TNamedObject, co
             .iter()
             .flatten()
             .filter_map(|t| if let TAtomic::Object(obj) = t { obj.get_name() } else { None })
-            .any(|name| codebase.is_instance_of(name, &named.name))
+            .any(|name| codebase.is_instance_of(&name, &named.name))
 }
 
 /// Returns true if we should use the static object's type parameters instead of the current ones.
@@ -830,9 +830,8 @@ mod tests {
     }
 
     fn options_with_static_object(object: TObject) -> TypeExpansionOptions {
-        let name = object.get_name().copied();
         TypeExpansionOptions {
-            self_class: name,
+            self_class: object.get_name(),
             static_class_type: StaticClassType::Object(object),
             ..Default::default()
         }

@@ -54,7 +54,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Foreach<'arena> {
         );
 
         let (always_enters_loop, mut key_type, mut value_type) =
-            r#loop::analyze_iterator(context, block_context, artifacts, iterator, iterator_variable_id.as_ref(), self)?;
+            r#loop::analyze_iterator(context, block_context, artifacts, iterator, iterator_variable_id, self)?;
 
         if key_type.is_never() {
             key_type = get_mixed();

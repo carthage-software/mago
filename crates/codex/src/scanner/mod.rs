@@ -137,7 +137,7 @@ impl Scanner {
 
         for template_constraint_list in self.template_constraints.iter().rev() {
             for (name, constraint) in template_constraint_list {
-                if !context.has_template_definition(name) {
+                if !context.has_template_definition(*name) {
                     context = context.with_template_definition(*name, vec![constraint.clone()]);
                 }
             }

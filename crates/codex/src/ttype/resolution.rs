@@ -119,8 +119,8 @@ impl TypeResolutionContext {
     ///
     /// `Some` containing a reference to the vector of constraints if the template is defined, `None` otherwise.
     #[must_use]
-    pub fn get_template_definition(&self, name: &Atom) -> Option<&Vec<GenericTemplate>> {
-        self.template_definitions.get(name)
+    pub fn get_template_definition(&self, name: Atom) -> Option<&Vec<GenericTemplate>> {
+        self.template_definitions.get(&name)
     }
 
     /// Checks if a specific template parameter is defined in this context.
@@ -133,8 +133,8 @@ impl TypeResolutionContext {
     ///
     /// `true` if the template parameter is defined, `false` otherwise.
     #[must_use]
-    pub fn has_template_definition(&self, name: &Atom) -> bool {
-        self.template_definitions.contains_key(name)
+    pub fn has_template_definition(&self, name: Atom) -> bool {
+        self.template_definitions.contains_key(&name)
     }
 
     /// Adds type aliases from a class to this context.
@@ -165,8 +165,8 @@ impl TypeResolutionContext {
     ///
     /// * `name`: The name of the type alias to check.
     #[must_use]
-    pub fn has_type_alias(&self, name: &Atom) -> bool {
-        self.type_aliases.contains(name)
+    pub fn has_type_alias(&self, name: Atom) -> bool {
+        self.type_aliases.contains(&name)
     }
 
     /// Adds an imported type alias to this context.
@@ -192,8 +192,8 @@ impl TypeResolutionContext {
     ///
     /// `Some` containing a reference to (`source_class`, `original_name`) if found, `None` otherwise.
     #[must_use]
-    pub fn get_imported_type_alias(&self, name: &Atom) -> Option<&(Atom, Atom)> {
-        self.imported_type_aliases.get(name)
+    pub fn get_imported_type_alias(&self, name: Atom) -> Option<&(Atom, Atom)> {
+        self.imported_type_aliases.get(&name)
     }
 
     /// Checks if a specific imported type alias is defined in this context.
@@ -202,8 +202,8 @@ impl TypeResolutionContext {
     ///
     /// * `name`: The local name of the imported alias to check.
     #[must_use]
-    pub fn has_imported_type_alias(&self, name: &Atom) -> bool {
-        self.imported_type_aliases.contains_key(name)
+    pub fn has_imported_type_alias(&self, name: Atom) -> bool {
+        self.imported_type_aliases.contains_key(&name)
     }
 
     /// Looks up the concrete type that a specific template parameter resolves to in this context.
@@ -216,8 +216,8 @@ impl TypeResolutionContext {
     ///
     /// `Some` containing a reference to the resolved `TUnion` type if found, `None` otherwise.
     #[must_use]
-    pub fn get_resolved_template_type(&self, name: &Atom) -> Option<&TUnion> {
-        self.resolved_template_types.get(name)
+    pub fn get_resolved_template_type(&self, name: Atom) -> Option<&TUnion> {
+        self.resolved_template_types.get(&name)
     }
 
     /// Checks if this context contains any template definitions or resolved template types.
@@ -230,8 +230,8 @@ impl TypeResolutionContext {
     /// Checks if a specific template parameter has a concrete resolved type in this context.
     #[inline]
     #[must_use]
-    pub fn is_template_resolved(&self, name: &Atom) -> bool {
-        self.resolved_template_types.contains_key(name)
+    pub fn is_template_resolved(&self, name: Atom) -> bool {
+        self.resolved_template_types.contains_key(&name)
     }
 
     /// Merges another `TypeResolutionContext` into this one, combining their template definitions

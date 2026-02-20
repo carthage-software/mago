@@ -193,7 +193,7 @@ pub fn resolve_instance_properties<'ctx, 'ast, 'arena>(
             TObject::HasProperty(has_property) => {
                 let all_properties_match = property_names.iter().all(|prop_name| {
                     let prop_name_without_dollar = atom(prop_name.trim_start_matches('$'));
-                    has_property.has_property(&prop_name_without_dollar)
+                    has_property.has_property(prop_name_without_dollar)
                         || type_has_property_assertion(
                             has_property.intersection_types.as_deref(),
                             prop_name_without_dollar,
@@ -1090,7 +1090,7 @@ fn type_has_property_assertion(intersection_types: Option<&[TAtomic]>, property_
     intersection_types.is_some_and(|types| {
         types.iter().any(|atomic| match atomic {
             TAtomic::Object(TObject::HasProperty(has_property)) => {
-                has_property.has_property(&property_name)
+                has_property.has_property(property_name)
                     || type_has_property_assertion(has_property.intersection_types.as_deref(), property_name)
             }
             TAtomic::Object(TObject::HasMethod(has_method)) => {
@@ -1134,7 +1134,7 @@ fn find_property_in_mixins(
                         && let Some(type_params) = named_object.get_type_parameters()
                         && let GenericParent::ClassLike(defining_class) = defining_entity
                         && named_object.name.eq_ignore_ascii_case(defining_class)
-                        && let Some(index) = class_metadata.get_template_index_for_name(parameter_name)
+                        && let Some(index) = class_metadata.get_template_index_for_name(*parameter_name)
                         && let Some(concrete_type) = type_params.get(index)
                     {
                         for atomic in concrete_type.types.as_ref() {

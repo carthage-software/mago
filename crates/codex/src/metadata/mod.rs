@@ -120,7 +120,7 @@ impl CodebaseMetadata {
     #[must_use]
     pub fn class_exists(&self, name: &str) -> bool {
         let lowercase_name = ascii_lowercase_atom(name);
-        matches!(self.symbols.get_kind(&lowercase_name), Some(SymbolKind::Class))
+        matches!(self.symbols.get_kind(lowercase_name), Some(SymbolKind::Class))
     }
 
     /// Checks if an interface exists in the codebase (case-insensitive).
@@ -128,7 +128,7 @@ impl CodebaseMetadata {
     #[must_use]
     pub fn interface_exists(&self, name: &str) -> bool {
         let lowercase_name = ascii_lowercase_atom(name);
-        matches!(self.symbols.get_kind(&lowercase_name), Some(SymbolKind::Interface))
+        matches!(self.symbols.get_kind(lowercase_name), Some(SymbolKind::Interface))
     }
 
     /// Checks if a trait exists in the codebase (case-insensitive).
@@ -136,7 +136,7 @@ impl CodebaseMetadata {
     #[must_use]
     pub fn trait_exists(&self, name: &str) -> bool {
         let lowercase_name = ascii_lowercase_atom(name);
-        matches!(self.symbols.get_kind(&lowercase_name), Some(SymbolKind::Trait))
+        matches!(self.symbols.get_kind(lowercase_name), Some(SymbolKind::Trait))
     }
 
     /// Checks if an enum exists in the codebase (case-insensitive).
@@ -144,7 +144,7 @@ impl CodebaseMetadata {
     #[must_use]
     pub fn enum_exists(&self, name: &str) -> bool {
         let lowercase_name = ascii_lowercase_atom(name);
-        matches!(self.symbols.get_kind(&lowercase_name), Some(SymbolKind::Enum))
+        matches!(self.symbols.get_kind(lowercase_name), Some(SymbolKind::Enum))
     }
 
     /// Checks if a class-like (class, interface, trait, or enum) exists (case-insensitive).
@@ -152,7 +152,7 @@ impl CodebaseMetadata {
     #[must_use]
     pub fn class_like_exists(&self, name: &str) -> bool {
         let lowercase_name = ascii_lowercase_atom(name);
-        self.symbols.contains(&lowercase_name)
+        self.symbols.contains(lowercase_name)
     }
 
     /// Checks if a namespace exists (case-insensitive).
@@ -160,7 +160,7 @@ impl CodebaseMetadata {
     #[must_use]
     pub fn namespace_exists(&self, name: &str) -> bool {
         let lowercase_name = ascii_lowercase_atom(name);
-        self.symbols.contains_namespace(&lowercase_name)
+        self.symbols.contains_namespace(lowercase_name)
     }
 
     /// Checks if a class or trait exists in the codebase (case-insensitive).
@@ -168,7 +168,7 @@ impl CodebaseMetadata {
     #[must_use]
     pub fn class_or_trait_exists(&self, name: &str) -> bool {
         let lowercase_name = ascii_lowercase_atom(name);
-        matches!(self.symbols.get_kind(&lowercase_name), Some(SymbolKind::Class | SymbolKind::Trait))
+        matches!(self.symbols.get_kind(lowercase_name), Some(SymbolKind::Class | SymbolKind::Trait))
     }
 
     /// Checks if a class or interface exists in the codebase (case-insensitive).
@@ -176,15 +176,15 @@ impl CodebaseMetadata {
     #[must_use]
     pub fn class_or_interface_exists(&self, name: &str) -> bool {
         let lowercase_name = ascii_lowercase_atom(name);
-        matches!(self.symbols.get_kind(&lowercase_name), Some(SymbolKind::Class | SymbolKind::Interface))
+        matches!(self.symbols.get_kind(lowercase_name), Some(SymbolKind::Class | SymbolKind::Interface))
     }
 
     /// Checks if a method identifier exists in the codebase.
     #[inline]
     #[must_use]
     pub fn method_identifier_exists(&self, method_id: &MethodIdentifier) -> bool {
-        let lowercase_class = ascii_lowercase_atom(method_id.get_class_name());
-        let lowercase_method = ascii_lowercase_atom(method_id.get_method_name());
+        let lowercase_class = ascii_lowercase_atom(&method_id.get_class_name());
+        let lowercase_method = ascii_lowercase_atom(&method_id.get_method_name());
         let identifier = (lowercase_class, lowercase_method);
         self.function_likes.contains_key(&identifier)
     }
@@ -251,7 +251,7 @@ impl CodebaseMetadata {
         self.class_likes
             .get(&lowercase_class)
             .and_then(|meta| meta.declaring_method_ids.get(&lowercase_method))
-            .is_some_and(|method_id| method_id.get_class_name() == &lowercase_class)
+            .is_some_and(|method_id| method_id.get_class_name() == lowercase_class)
     }
 
     /// Checks if a property is declared directly in a class (not inherited).
@@ -269,7 +269,7 @@ impl CodebaseMetadata {
     #[must_use]
     pub fn get_class(&self, name: &str) -> Option<&ClassLikeMetadata> {
         let lowercase_name = ascii_lowercase_atom(name);
-        if self.symbols.contains_class(&lowercase_name) { self.class_likes.get(&lowercase_name) } else { None }
+        if self.symbols.contains_class(lowercase_name) { self.class_likes.get(&lowercase_name) } else { None }
     }
 
     /// Retrieves metadata for an interface (case-insensitive).
@@ -277,7 +277,7 @@ impl CodebaseMetadata {
     #[must_use]
     pub fn get_interface(&self, name: &str) -> Option<&ClassLikeMetadata> {
         let lowercase_name = ascii_lowercase_atom(name);
-        if self.symbols.contains_interface(&lowercase_name) { self.class_likes.get(&lowercase_name) } else { None }
+        if self.symbols.contains_interface(lowercase_name) { self.class_likes.get(&lowercase_name) } else { None }
     }
 
     /// Retrieves metadata for a trait (case-insensitive).
@@ -285,7 +285,7 @@ impl CodebaseMetadata {
     #[must_use]
     pub fn get_trait(&self, name: &str) -> Option<&ClassLikeMetadata> {
         let lowercase_name = ascii_lowercase_atom(name);
-        if self.symbols.contains_trait(&lowercase_name) { self.class_likes.get(&lowercase_name) } else { None }
+        if self.symbols.contains_trait(lowercase_name) { self.class_likes.get(&lowercase_name) } else { None }
     }
 
     /// Retrieves metadata for an enum (case-insensitive).
@@ -293,7 +293,7 @@ impl CodebaseMetadata {
     #[must_use]
     pub fn get_enum(&self, name: &str) -> Option<&ClassLikeMetadata> {
         let lowercase_name = ascii_lowercase_atom(name);
-        if self.symbols.contains_enum(&lowercase_name) { self.class_likes.get(&lowercase_name) } else { None }
+        if self.symbols.contains_enum(lowercase_name) { self.class_likes.get(&lowercase_name) } else { None }
     }
 
     /// Retrieves metadata for any class-like structure (case-insensitive).
@@ -337,8 +337,8 @@ impl CodebaseMetadata {
     #[inline]
     #[must_use]
     pub fn get_method_by_id(&self, method_id: &MethodIdentifier) -> Option<&FunctionLikeMetadata> {
-        let lowercase_class = ascii_lowercase_atom(method_id.get_class_name());
-        let lowercase_method = ascii_lowercase_atom(method_id.get_method_name());
+        let lowercase_class = ascii_lowercase_atom(&method_id.get_class_name());
+        let lowercase_method = ascii_lowercase_atom(&method_id.get_method_name());
         let identifier = (lowercase_class, lowercase_method);
         self.function_likes.get(&identifier)
     }
@@ -350,7 +350,7 @@ impl CodebaseMetadata {
     pub fn get_declaring_method(&self, class: &str, method: &str) -> Option<&FunctionLikeMetadata> {
         let method_id = MethodIdentifier::new(atom(class), atom(method));
         let declaring_method_id = self.get_declaring_method_identifier(&method_id);
-        self.get_method(declaring_method_id.get_class_name(), declaring_method_id.get_method_name())
+        self.get_method(&declaring_method_id.get_class_name(), &declaring_method_id.get_method_name())
     }
 
     /// Retrieves metadata for any function-like construct (function, method, or closure).
@@ -568,7 +568,7 @@ impl CodebaseMetadata {
     #[must_use]
     pub fn is_inheritable(&self, name: &str) -> bool {
         let lowercase_name = ascii_lowercase_atom(name);
-        match self.symbols.get_kind(&lowercase_name) {
+        match self.symbols.get_kind(lowercase_name) {
             Some(SymbolKind::Class) => self.class_likes.get(&lowercase_name).is_some_and(|meta| !meta.flags.is_final()),
             Some(SymbolKind::Enum) => false,
             Some(SymbolKind::Interface | SymbolKind::Trait) | None => true,
@@ -623,7 +623,7 @@ impl CodebaseMetadata {
             .get(&lowercase_class)?
             .declaring_method_ids
             .get(&lowercase_method)
-            .map(|method_id| *method_id.get_class_name())
+            .map(|method_id| method_id.get_class_name())
     }
 
     /// Gets the class where a method appears (could be the declaring class or child class).
@@ -636,14 +636,14 @@ impl CodebaseMetadata {
             .get(&lowercase_class)?
             .appearing_method_ids
             .get(&lowercase_method)
-            .map(|method_id| *method_id.get_class_name())
+            .map(|method_id| method_id.get_class_name())
     }
 
     /// Gets the declaring method identifier for a method.
     #[must_use]
     pub fn get_declaring_method_identifier(&self, method_id: &MethodIdentifier) -> MethodIdentifier {
-        let lowercase_class = ascii_lowercase_atom(method_id.get_class_name());
-        let lowercase_method = ascii_lowercase_atom(method_id.get_method_name());
+        let lowercase_class = ascii_lowercase_atom(&method_id.get_class_name());
+        let lowercase_method = ascii_lowercase_atom(&method_id.get_method_name());
 
         let Some(class_meta) = self.class_likes.get(&lowercase_class) else {
             return *method_id;
@@ -774,7 +774,7 @@ impl CodebaseMetadata {
                     continue;
                 };
 
-                let parent_method_key = (*parent_method_id.get_class_name(), *parent_method_id.get_method_name());
+                let parent_method_key = (parent_method_id.get_class_name(), parent_method_id.get_method_name());
                 if let Some(parent_method) = self.function_likes.get(&parent_method_key) {
                     let thrown = self.get_function_like_thrown_types(Some(parent_class), parent_method);
                     if !thrown.is_empty() {
@@ -1084,7 +1084,7 @@ impl CodebaseMetadata {
         // Remove symbols that were contributed by this file.
         // We can only remove class-like symbols (not namespaces, since they may be shared).
         for k in file_metadata.class_likes.keys() {
-            self.symbols.remove(k);
+            self.symbols.remove(*k);
         }
 
         for k in file_metadata.file_signatures.keys() {
@@ -1112,7 +1112,7 @@ impl CodebaseMetadata {
     pub fn remove_entries_by_keys(&mut self, keys: &CodebaseEntryKeys) {
         for k in &keys.class_like_names {
             self.class_likes.remove(k);
-            self.symbols.remove(k);
+            self.symbols.remove(*k);
         }
 
         for k in &keys.function_like_keys {

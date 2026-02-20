@@ -296,8 +296,8 @@ fn analyze_class_instantiation<'ctx, 'arena>(
         let constructor_call = Invocation {
             target: InvocationTarget::FunctionLike {
                 identifier: FunctionLikeIdentifier::Method(
-                    *constructor_declraing_id.get_class_name(),
-                    *constructor_declraing_id.get_method_name(),
+                    constructor_declraing_id.get_class_name(),
+                    constructor_declraing_id.get_method_name(),
                 ),
                 metadata: constructor,
                 inferred_return_type: None,
@@ -340,8 +340,8 @@ fn analyze_class_instantiation<'ctx, 'arena>(
         if !check_method_visibility(
             context,
             block_context,
-            constructor_declraing_id.get_class_name(),
-            constructor_declraing_id.get_method_name(),
+            &constructor_declraing_id.get_class_name(),
+            &constructor_declraing_id.get_method_name(),
             instantiation_span,
             None,
         ) {
@@ -351,7 +351,7 @@ fn analyze_class_instantiation<'ctx, 'arena>(
         let mut resolved_template_types = vec![];
         for (template_name, base_type) in &metadata.template_types {
             let template_type = if let Some(lower_bounds) =
-                template_result.get_lower_bounds_for_class_like(template_name, &metadata.name)
+                template_result.get_lower_bounds_for_class_like(*template_name, metadata.name)
             {
                 get_most_specific_type_from_bounds(lower_bounds, context.codebase)
             } else if !metadata.template_extended_parameters.is_empty() && !template_result.lower_bounds.is_empty() {
@@ -463,7 +463,7 @@ fn analyze_class_instantiation<'ctx, 'arena>(
         for descendant_class in descendants {
             artifacts.symbol_references.add_reference_to_overridden_class_member(
                 &block_context.scope,
-                (descendant_class, *constructor_id.get_method_name()),
+                (descendant_class, constructor_id.get_method_name()),
             );
         }
     }
@@ -508,8 +508,8 @@ pub fn analyze_anonymous_class_constructor<'ctx, 'arena>(
         let constructor_call = Invocation {
             target: InvocationTarget::FunctionLike {
                 identifier: FunctionLikeIdentifier::Method(
-                    *constructor_declaring_id.get_class_name(),
-                    *constructor_declaring_id.get_method_name(),
+                    constructor_declaring_id.get_class_name(),
+                    constructor_declaring_id.get_method_name(),
                 ),
                 metadata: constructor,
                 inferred_return_type: None,

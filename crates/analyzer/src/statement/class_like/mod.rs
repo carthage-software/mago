@@ -265,7 +265,7 @@ fn check_unused_template_parameters<'ctx>(
 
         for method_id in class_like_metadata.declaring_method_ids.values() {
             let Some(function_like) =
-                context.codebase.get_method(method_id.get_class_name(), method_id.get_method_name())
+                context.codebase.get_method(&method_id.get_class_name(), &method_id.get_method_name())
             else {
                 continue;
             };
@@ -754,13 +754,13 @@ pub(crate) fn analyze_class_like<'ctx, 'ast, 'arena>(
                 }
             }
 
-            let Some(declaring_class_like_metadata) = context.codebase.get_class_like(method_id.get_class_name())
+            let Some(declaring_class_like_metadata) = context.codebase.get_class_like(&method_id.get_class_name())
             else {
                 continue;
             };
 
             let Some(function_like) =
-                context.codebase.get_method(method_id.get_class_name(), method_id.get_method_name())
+                context.codebase.get_method(&method_id.get_class_name(), &method_id.get_method_name())
             else {
                 continue;
             };
@@ -1585,7 +1585,7 @@ fn check_template_parameters<'ctx>(
                                 .with_help(format!("Change this to a template parameter defined on `{class_name}`.")),
                         );
                     } else if let Some(child_template_name) = extended_as_template
-                        && let Some(child_template) = class_like_metadata.get_template_type(&child_template_name)
+                        && let Some(child_template) = class_like_metadata.get_template_type(child_template_name)
                         && let child_template_type = &child_template.constraint
                         && child_template_type.get_id() != template_type.get_id()
                     {
@@ -1718,13 +1718,13 @@ fn check_abstract_method_signatures<'ctx>(
             continue;
         };
 
-        let declaring_fqcn_str = declaring_method_id.get_class_name().as_ref();
+        let declaring_fqcn_str = declaring_method_id.get_class_name().as_str();
         let declaring_method_opt = context.codebase.get_method(declaring_fqcn_str, method_name_str);
 
         let (method_fqcn_str, appearing_method) = if let Some(method) = declaring_method_opt {
             (declaring_fqcn_str, method)
         } else if let Some(appearing_method_id) = class_like_metadata.appearing_method_ids.get(method_name_atom) {
-            let appearing_fqcn_str = appearing_method_id.get_class_name().as_ref();
+            let appearing_fqcn_str = appearing_method_id.get_class_name().as_str();
             let Some(method) = context.codebase.get_method(appearing_fqcn_str, method_name_str) else {
                 continue;
             };
@@ -1780,7 +1780,7 @@ fn check_abstract_method_signatures<'ctx>(
             }
 
             let substituted_overridden_method =
-                get_substituted_method(overridden_method, class_like_metadata, *declaring_class_name, context.codebase);
+                get_substituted_method(overridden_method, class_like_metadata, declaring_class_name, context.codebase);
 
             let substituted_appearing_method =
                 get_substituted_method(appearing_method, class_like_metadata, atom(method_fqcn_str), context.codebase);
@@ -2318,7 +2318,7 @@ fn check_interface_method_signatures<'ctx>(
 
     for (method_name_atom, interface_method_id) in &interface_metadata.declaring_method_ids {
         let method_name_str = method_name_atom.as_ref();
-        let interface_fqcn_str = interface_method_id.get_class_name().as_ref();
+        let interface_fqcn_str = interface_method_id.get_class_name().as_str();
 
         let Some(interface_method) = context.codebase.get_declaring_method(interface_fqcn_str, method_name_str) else {
             continue;
@@ -2328,7 +2328,7 @@ fn check_interface_method_signatures<'ctx>(
             continue;
         };
 
-        let class_fqcn_str = class_method_id.get_class_name().as_ref();
+        let class_fqcn_str = class_method_id.get_class_name().as_str();
         let Some(class_method) = context.codebase.get_declaring_method(class_fqcn_str, method_name_str) else {
             continue;
         };
@@ -2340,14 +2340,14 @@ fn check_interface_method_signatures<'ctx>(
         let substituted_interface_method = get_substituted_method(
             interface_method,
             class_like_metadata,
-            *interface_method_id.get_class_name(),
+            interface_method_id.get_class_name(),
             context.codebase,
         );
 
         let substituted_class_method = get_substituted_method(
             class_method,
             class_like_metadata,
-            *class_method_id.get_class_name(),
+            class_method_id.get_class_name(),
             context.codebase,
         );
 

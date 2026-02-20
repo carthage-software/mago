@@ -81,8 +81,8 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for StaticMethodCall<'arena> {
 
             invocation_targets.push(InvocationTarget::FunctionLike {
                 identifier: FunctionLikeIdentifier::Method(
-                    *resolved_method.method_identifier.get_class_name(),
-                    *resolved_method.method_identifier.get_method_name(),
+                    resolved_method.method_identifier.get_class_name(),
+                    resolved_method.method_identifier.get_method_name(),
                 ),
                 metadata: method_metadata,
                 inferred_return_type: None,

@@ -559,7 +559,7 @@ fn handle_binary_and_operation(
 
 pub fn remove_clauses_with_mixed_variables(
     clauses: Vec<Clause>,
-    mut mixed_var_ids: Vec<&Atom>,
+    mut mixed_var_ids: Vec<Atom>,
     cond_object_id: Span,
 ) -> Vec<Clause> {
     clauses
@@ -576,7 +576,7 @@ pub fn remove_clauses_with_mixed_variables(
             mixed_var_ids = new_mixed_var_ids;
             for key in keys {
                 for mixed_var_id in &mixed_var_ids {
-                    if var_has_root(key, **mixed_var_id) {
+                    if var_has_root(key, *mixed_var_id) {
                         return Clause::new(IndexMap::new(), cond_object_id, cond_object_id, Some(true), None, None);
                     }
                 }

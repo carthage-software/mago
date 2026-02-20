@@ -141,14 +141,14 @@ fn resolve_union<'ctx, 'arena>(
         if let Some(declaring_method_id) = &method_context.declaring_method_id {
             let declaring_class_name = declaring_method_id.get_class_name();
             if *declaring_class_name != method_context.class_like_metadata.name
-                && let Some(declaring_class_meta) = context.codebase.get_class_like(declaring_class_name)
+                && let Some(declaring_class_meta) = context.codebase.get_class_like(&declaring_class_name)
                 && declaring_class_meta.kind.is_trait()
             {
                 let mut new_atomics = Vec::with_capacity(resulting_union.types.len());
                 for atomic in resulting_union.types.as_ref() {
                     match atomic {
                         TAtomic::Object(TObject::Named(named_object))
-                            if named_object.name.eq_ignore_ascii_case(declaring_class_name) =>
+                            if named_object.name.eq_ignore_ascii_case(&declaring_class_name) =>
                         {
                             let mut new_object = named_object.clone();
                             new_object.name = method_context.class_like_metadata.name;

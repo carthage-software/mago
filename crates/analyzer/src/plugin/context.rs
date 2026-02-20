@@ -181,8 +181,8 @@ impl<'a, 'b, 'c> ProviderContext<'a, 'b, 'c> {
     }
 
     #[inline]
-    pub fn get_class_like(&self, name: &Atom) -> Option<&ClassLikeMetadata> {
-        self.codebase.get_class_like(name)
+    pub fn get_class_like(&self, name: Atom) -> Option<&ClassLikeMetadata> {
+        self.codebase.get_class_like(&name)
     }
 
     #[inline]
@@ -274,8 +274,8 @@ impl<'ctx, 'a> HookContext<'ctx, 'a> {
 
     /// Get metadata for a class-like by name.
     #[inline]
-    pub fn get_class_like(&self, name: &Atom) -> Option<&ClassLikeMetadata> {
-        self.codebase.get_class_like(name)
+    pub fn get_class_like(&self, name: Atom) -> Option<&ClassLikeMetadata> {
+        self.codebase.get_class_like(&name)
     }
 
     /// Get the current class name if inside a class.

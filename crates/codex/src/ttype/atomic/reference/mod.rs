@@ -25,10 +25,10 @@ impl TReferenceMemberSelector {
     /// Returns true if this selector matches the given member name.
     #[inline]
     #[must_use]
-    pub fn matches(&self, name: &Atom) -> bool {
+    pub fn matches(&self, name: Atom) -> bool {
         match self {
             Self::Wildcard => true,
-            Self::Identifier(n) => n == name,
+            Self::Identifier(n) => *n == name,
             Self::StartsWith(prefix) => name.starts_with(prefix.as_str()),
             Self::EndsWith(suffix) => name.ends_with(suffix.as_str()),
         }
@@ -102,9 +102,11 @@ impl TReference {
     #[inline]
     #[allow(clippy::type_complexity)]
     #[must_use]
-    pub const fn get_symbol_data(&self) -> Option<(&Atom, &Option<Vec<TUnion>>, &Option<Vec<TAtomic>>)> {
+    pub const fn get_symbol_data(&self) -> Option<(Atom, &Option<Vec<TUnion>>, &Option<Vec<TAtomic>>)> {
         match self {
-            TReference::Symbol { name, parameters, intersection_types } => Some((name, parameters, intersection_types)),
+            TReference::Symbol { name, parameters, intersection_types } => {
+                Some((*name, parameters, intersection_types))
+            }
             _ => None,
         }
     }
@@ -112,10 +114,10 @@ impl TReference {
     /// Returns the class-like name and member name if this is a Member reference.
     #[inline]
     #[must_use]
-    pub const fn get_member_data(&self) -> Option<(&Atom, &TReferenceMemberSelector)> {
+    pub const fn get_member_data(&self) -> Option<(Atom, &TReferenceMemberSelector)> {
         match self {
             TReference::Member { class_like_name: classlike_name, member_selector } => {
-                Some((classlike_name, member_selector))
+                Some((*classlike_name, member_selector))
             }
             _ => None,
         }

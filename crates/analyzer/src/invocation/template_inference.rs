@@ -631,8 +631,8 @@ fn infer_templates_from_input_and_container_types(
 
                             if let Some(inferred_bound) = get_specialized_template_type(
                                 context.codebase,
-                                template_name,
-                                &container_meta.name,
+                                *template_name,
+                                container_meta.name,
                                 input_meta,
                                 input_obj.get_type_parameters(),
                             ) {
@@ -920,8 +920,8 @@ pub fn infer_templates_for_method_call<'ctx>(
         for (template_name, _) in &declaring_class_like_metadata.template_types {
             let template_type = get_specialized_template_type(
                 context.codebase,
-                template_name,
-                &declaring_class_like_metadata.name,
+                *template_name,
+                declaring_class_like_metadata.name,
                 method_target_context.class_like_metadata,
                 object_type.get_type_parameters(),
             );
@@ -939,8 +939,8 @@ pub fn infer_templates_for_method_call<'ctx>(
     for (template_name, where_constraint) in &method_metadata.where_constraints {
         let Some(actual_type) = get_specialized_template_type(
             context.codebase,
-            template_name,
-            &declaring_class_like_metadata.name,
+            *template_name,
+            declaring_class_like_metadata.name,
             method_target_context.class_like_metadata,
             object_type.get_type_parameters(),
         ) else {

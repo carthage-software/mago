@@ -373,7 +373,7 @@ fn replace_atomic(
                     object @ TAtomic::Object(TObject::Named(TNamedObject { type_parameters: Some(_), .. })),
                 ) = &input_type
                 {
-                    Some(get_mapped_generic_type_parameters(codebase, object, &object_name, object_rempped_parameters))
+                    Some(get_mapped_generic_type_parameters(codebase, object, object_name, object_rempped_parameters))
                 } else {
                     None
                 };
@@ -960,9 +960,9 @@ fn handle_template_param_class_standin(
 }
 
 #[must_use]
-pub fn get_actual_type_from_literal(name: &Atom, codebase: &CodebaseMetadata) -> Vec<TAtomic> {
-    if codebase.class_like_exists(name) {
-        vec![TAtomic::Object(TObject::Named(TNamedObject::new(*name)))]
+pub fn get_actual_type_from_literal(name: Atom, codebase: &CodebaseMetadata) -> Vec<TAtomic> {
+    if codebase.class_like_exists(&name) {
+        vec![TAtomic::Object(TObject::Named(TNamedObject::new(name)))]
     } else {
         vec![]
     }
@@ -1042,7 +1042,7 @@ fn find_matching_atomic_types_for_template(
                     continue;
                 };
 
-                if input_type_parameters.is_some() && class_metadata.has_template_extended_parameter(&base_name) {
+                if input_type_parameters.is_some() && class_metadata.has_template_extended_parameter(base_name) {
                     matching_atomic_types.push(atomic_input_type.clone());
                     continue;
                 }
@@ -1121,7 +1121,7 @@ fn find_matching_atomic_types_for_template(
 pub fn get_mapped_generic_type_parameters(
     codebase: &CodebaseMetadata,
     input_type_part: &TAtomic,
-    container_name: &Atom,
+    container_name: Atom,
     container_remapped_parameters: bool,
 ) -> Vec<(Option<usize>, TUnion)> {
     let mut input_type_parameters = match input_type_part {
@@ -1148,7 +1148,7 @@ pub fn get_mapped_generic_type_parameters(
         return vec![];
     };
 
-    if input_name == *container_name {
+    if input_name == container_name {
         return input_type_parameters;
     }
 
@@ -1173,7 +1173,7 @@ pub fn get_mapped_generic_type_parameters(
         }
     }
 
-    if let Some(parameters) = input_class_metadata.template_extended_parameters.get(container_name) {
+    if let Some(parameters) = input_class_metadata.template_extended_parameters.get(&container_name) {
         let mut new_input_parameters = Vec::new();
 
         for (_, extended_input_parameter) in parameters {
@@ -1190,7 +1190,7 @@ pub fn get_mapped_generic_type_parameters(
 
                 if let Some(TAtomic::GenericParameter(parameter)) = extended_input_parameter_types.first()
                     && let Some((old_parameters_offset, GenericTemplate { defining_entity, .. })) =
-                        input_class_metadata.get_template_type_with_index(&parameter.parameter_name)
+                        input_class_metadata.get_template_type_with_index(parameter.parameter_name)
                     && parameter.defining_entity == *defining_entity
                 {
                     let candidate_parameter_type_inner =

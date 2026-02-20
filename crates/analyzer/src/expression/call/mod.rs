@@ -326,9 +326,9 @@ fn get_function_like_target_inner<'ctx>(
                         let declaring_class_id = declaring_method_id.get_class_name();
                         context
                             .codebase
-                            .get_function_like(&FunctionLikeIdentifier::Method(*declaring_class_id, method_name))
+                            .get_function_like(&FunctionLikeIdentifier::Method(declaring_class_id, method_name))
                             .inspect(|_| {
-                                identifier = FunctionLikeIdentifier::Method(*declaring_class_id, method_name);
+                                identifier = FunctionLikeIdentifier::Method(declaring_class_id, method_name);
                             })
                     } else {
                         None

@@ -411,7 +411,7 @@ impl SymbolReferences {
     pub fn add_reference_for_method_call(&mut self, scope: &ScopeContext<'_>, method: &MethodIdentifier) {
         self.add_reference_to_class_member(
             scope,
-            (ascii_lowercase_atom(method.get_class_name()), *method.get_method_name()),
+            (ascii_lowercase_atom(&method.get_class_name()), method.get_method_name()),
             false,
         );
     }

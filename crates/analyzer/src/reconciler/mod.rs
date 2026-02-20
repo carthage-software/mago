@@ -544,13 +544,13 @@ fn adjust_object_property_type(
     for base_atomic_type in atomic_types {
         let should_check = match &base_atomic_type {
             TAtomic::Object(TObject::Named(named)) => {
-                let fq_class_name = named.get_name_ref();
+                let fq_class_name = named.get_name();
                 if fq_class_name.eq_ignore_ascii_case("stdClass")
-                    || !context.codebase.class_or_interface_exists(fq_class_name)
+                    || !context.codebase.class_or_interface_exists(&fq_class_name)
                 {
                     None
                 } else {
-                    get_property_type(context, *named.get_name_ref(), &property_name)
+                    get_property_type(context, named.get_name(), &property_name)
                 }
             }
             _ => None,
@@ -1111,14 +1111,14 @@ fn get_value_for_key(
                     {
                         class_property_type = get_mixed();
                     } else if let TAtomic::Object(TObject::Named(named_object)) = existing_key_type_part {
-                        let fq_class_name = named_object.get_name_ref();
+                        let fq_class_name = named_object.get_name();
 
                         if fq_class_name.eq_ignore_ascii_case("stdClass")
-                            || !context.codebase.class_or_interface_exists(fq_class_name)
+                            || !context.codebase.class_or_interface_exists(&fq_class_name)
                         {
                             class_property_type = get_mixed();
                         } else {
-                            class_property_type = get_property_type(context, *fq_class_name, &property_name)?;
+                            class_property_type = get_property_type(context, fq_class_name, &property_name)?;
                         }
                     } else {
                         class_property_type = get_mixed();

@@ -181,7 +181,7 @@ pub fn is_contained_by(
     if let TAtomic::Object(TObject::Enum(enum_container)) = container_type_part {
         return match input_type_part {
             TAtomic::Object(TObject::Enum(enum_input)) => {
-                if !codebase.is_instance_of(enum_input.get_name_ref(), enum_container.get_name_ref()) {
+                if !codebase.is_instance_of(&enum_input.get_name(), &enum_container.get_name()) {
                     return false;
                 }
 
@@ -195,7 +195,7 @@ pub fn is_contained_by(
                 true
             }
             TAtomic::Object(TObject::Named(named_object)) if enum_container.case.is_none() => {
-                if !codebase.is_instance_of(named_object.get_name_ref(), enum_container.get_name_ref()) {
+                if !codebase.is_instance_of(&named_object.get_name(), &enum_container.get_name()) {
                     return false;
                 }
 
@@ -746,7 +746,7 @@ pub(crate) fn can_be_identical<'a>(
     if let (TAtomic::Object(first_object), TAtomic::Object(second_object)) = (first_part, second_part)
         && let (Some(first_name), Some(second_name)) = (first_object.get_name(), second_object.get_name())
     {
-        return match (codebase.get_class_like(first_name), codebase.get_class_like(second_name)) {
+        return match (codebase.get_class_like(&first_name), codebase.get_class_like(&second_name)) {
             (Some(c1), Some(c2)) => c1.kind.is_interface() || c2.kind.is_interface(),
             _ => true,
         };

@@ -280,7 +280,7 @@ fn collect_inheritance_work(
         if parent_method_id.is_none()
             && let Some((declaring_class, method_id)) = method_ids.first()
         {
-            parent_method_id = Some((*declaring_class, *method_id.get_method_name()));
+            parent_method_id = Some((*declaring_class, method_id.get_method_name()));
         }
 
         if let Some((parent_class, parent_method)) = parent_method_id {

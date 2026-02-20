@@ -838,7 +838,7 @@ fn scrape_type_properties(
     }
 
     if let TAtomic::Object(TObject::Named(named_object)) = &atomic {
-        if let Some(object_static) = combination.object_static.get(named_object.get_name_ref()) {
+        if let Some(object_static) = combination.object_static.get(&named_object.get_name()) {
             if *object_static && !named_object.is_this() {
                 combination.object_static.insert(named_object.get_name(), false);
             }
@@ -890,7 +890,7 @@ fn scrape_type_properties(
             return;
         }
 
-        let Some(symbol_type) = codebase.symbols.get_kind(&fq_class_name) else {
+        let Some(symbol_type) = codebase.symbols.get_kind(fq_class_name) else {
             combination.value_types.insert(atomic.get_id(), atomic);
             return;
         };
@@ -934,7 +934,7 @@ fn scrape_type_properties(
                     continue;
                 }
 
-                let Some(existing_symbol_kind) = codebase.symbols.get_kind(existing_object.get_name_ref()) else {
+                let Some(existing_symbol_kind) = codebase.symbols.get_kind(existing_object.get_name()) else {
                     continue;
                 };
 

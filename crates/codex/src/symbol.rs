@@ -121,8 +121,8 @@ impl Symbols {
     /// `Some(SymbolKind)` if the symbol exists in the map, `None` otherwise.
     #[inline]
     #[must_use]
-    pub fn get_kind(&self, name: &Atom) -> Option<SymbolKind> {
-        self.all.get(name).copied() // Use copied() since SymbolKind is Copy
+    pub fn get_kind(&self, name: Atom) -> Option<SymbolKind> {
+        self.all.get(&name).copied() // Use copied() since SymbolKind is Copy
     }
 
     /// Checks if a symbol with the given name is known.
@@ -136,8 +136,8 @@ impl Symbols {
     /// `true` if the symbol exists in the map, `false` otherwise.
     #[inline]
     #[must_use]
-    pub fn contains(&self, name: &Atom) -> bool {
-        self.all.contains_key(name)
+    pub fn contains(&self, name: Atom) -> bool {
+        self.all.contains_key(&name)
     }
 
     /// Check if any symbol within the table is part of the given namespace.
@@ -149,8 +149,8 @@ impl Symbols {
     /// # Returns
     ///
     /// `true` if the namespace is present, `false` otherwise.
-    pub fn contains_namespace(&self, namespace: &Atom) -> bool {
-        self.namespaces.contains(namespace)
+    pub fn contains_namespace(&self, namespace: Atom) -> bool {
+        self.namespaces.contains(&namespace)
     }
 
     /// Checks if a symbol with the given name is a `Class`.
@@ -164,7 +164,7 @@ impl Symbols {
     /// `true` if the symbol is a `Class`, `false` otherwise.
     #[inline]
     #[must_use]
-    pub fn contains_class(&self, name: &Atom) -> bool {
+    pub fn contains_class(&self, name: Atom) -> bool {
         matches!(self.get_kind(name), Some(SymbolKind::Class))
     }
 
@@ -179,7 +179,7 @@ impl Symbols {
     /// `true` if the symbol is an `Interface`, `false` otherwise.
     #[inline]
     #[must_use]
-    pub fn contains_interface(&self, name: &Atom) -> bool {
+    pub fn contains_interface(&self, name: Atom) -> bool {
         matches!(self.get_kind(name), Some(SymbolKind::Interface))
     }
 
@@ -194,7 +194,7 @@ impl Symbols {
     /// `true` if the symbol is a `Trait`, `false` otherwise.
     #[inline]
     #[must_use]
-    pub fn contains_trait(&self, name: &Atom) -> bool {
+    pub fn contains_trait(&self, name: Atom) -> bool {
         matches!(self.get_kind(name), Some(SymbolKind::Trait))
     }
 
@@ -209,7 +209,7 @@ impl Symbols {
     /// `true` if the symbol is an `Enum`, `false` otherwise.
     #[inline]
     #[must_use]
-    pub fn contains_enum(&self, name: &Atom) -> bool {
+    pub fn contains_enum(&self, name: Atom) -> bool {
         matches!(self.get_kind(name), Some(SymbolKind::Enum))
     }
 
@@ -243,8 +243,8 @@ impl Symbols {
     ///
     /// Note: does not remove namespaces (they may be shared by other symbols).
     #[inline]
-    pub fn remove(&mut self, name: &Atom) {
-        self.all.remove(name);
+    pub fn remove(&mut self, name: Atom) {
+        self.all.remove(&name);
     }
 }
 

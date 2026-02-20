@@ -176,7 +176,7 @@ fn resolve_method_from_classname<'ctx, 'arena>(
                 && !is_relative
                 && !current_class_metadata.is_some_and(|current_class_metadata| {
                     current_class_metadata.name == defining_class_metadata.name
-                        || current_class_metadata.has_parent(&defining_class_metadata.name)
+                        || current_class_metadata.has_parent(defining_class_metadata.name)
                 })
             {
                 report_non_static_access(context, &method.method_identifier, method_span);
@@ -374,8 +374,8 @@ fn resolve_method_from_metadata<'ctx, 'arena>(
         && !check_method_visibility(
             context,
             block_context,
-            method_id.get_class_name(),
-            method_id.get_method_name(),
+            &method_id.get_class_name(),
+            &method_id.get_method_name(),
             access_span,
             Some(selector.span()),
         )
@@ -390,7 +390,7 @@ fn resolve_method_from_metadata<'ctx, 'arena>(
             context,
             class_span,
             selector.span(),
-            *method_id.get_class_name(),
+            method_id.get_class_name(),
             method_name,
             is_static,
         );
@@ -487,11 +487,11 @@ fn get_metadata_object<'ctx>(
                 class_like_metadata
                     .template_types
                     .iter()
-                    .map(|(parameter_name, template)| {
+                    .map(|(&parameter_name, template)| {
                         if let Some(parameter) = get_specialized_template_type(
                             context.codebase,
                             parameter_name,
-                            &class_like_metadata.name,
+                            class_like_metadata.name,
                             current_class_metadata,
                             None,
                         ) {
@@ -501,7 +501,7 @@ fn get_metadata_object<'ctx>(
                             let constraint = &template.constraint;
 
                             wrap_atomic(TAtomic::GenericParameter(TGenericParameter {
-                                parameter_name: *parameter_name,
+                                parameter_name,
                                 constraint: Arc::new(constraint.clone()),
                                 defining_entity: *defining_entity,
                                 intersection_types: None,
@@ -725,8 +725,8 @@ fn find_static_method_in_single_mixin<'ctx, 'arena>(
     if !check_method_visibility(
         context,
         block_context,
-        method_id.get_class_name(),
-        method_id.get_method_name(),
+        &method_id.get_class_name(),
+        &method_id.get_method_name(),
         access_span,
         Some(selector.span()),
     ) {

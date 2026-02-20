@@ -185,8 +185,8 @@ pub fn analyze_implicit_method_call<'ctx, 'arena>(
     if !check_method_visibility(
         context,
         block_context,
-        method_identifier.get_class_name(),
-        method_identifier.get_method_name(),
+        &method_identifier.get_class_name(),
+        &method_identifier.get_method_name(),
         span,
         None,
     ) {
@@ -204,8 +204,8 @@ pub fn analyze_implicit_method_call<'ctx, 'arena>(
     let invocation = Invocation::new(
         InvocationTarget::FunctionLike {
             identifier: FunctionLikeIdentifier::Method(
-                *method_identifier.get_class_name(),
-                *method_identifier.get_method_name(),
+                method_identifier.get_class_name(),
+                method_identifier.get_method_name(),
             ),
             metadata: method_metadata,
             inferred_return_type: None,
@@ -283,8 +283,8 @@ fn analyze_method_call<'ctx, 'ast, 'arena>(
 
         invocation_targets.push(InvocationTarget::FunctionLike {
             identifier: FunctionLikeIdentifier::Method(
-                *resolved_method.method_identifier.get_class_name(),
-                *resolved_method.method_identifier.get_method_name(),
+                resolved_method.method_identifier.get_class_name(),
+                resolved_method.method_identifier.get_method_name(),
             ),
             metadata: method_metadata,
             inferred_return_type: None,

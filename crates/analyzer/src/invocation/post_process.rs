@@ -387,7 +387,7 @@ fn clear_object_property_narrowings<'ctx, 'arena>(
     }
 
     let keys_to_remove: Vec<_> =
-        block_context.locals.keys().filter(|var_id| is_property_or_index_key(var_id)).copied().collect();
+        block_context.locals.keys().copied().filter(|var_id| is_property_or_index_key(*var_id)).collect();
 
     for key in &keys_to_remove {
         block_context.locals.remove(key);
@@ -395,13 +395,15 @@ fn clear_object_property_narrowings<'ctx, 'arena>(
 
     // Also remove clauses that reference property accesses so stale narrowings
     // don't influence subsequent assertion resolution.
-    block_context.clauses.retain(|clause| clause.wedge || !clause.possibilities.keys().any(is_property_or_index_key));
+    block_context
+        .clauses
+        .retain(|clause| clause.wedge || !clause.possibilities.keys().copied().any(is_property_or_index_key));
     block_context
         .reconciled_expression_clauses
-        .retain(|clause| clause.wedge || !clause.possibilities.keys().any(is_property_or_index_key));
+        .retain(|clause| clause.wedge || !clause.possibilities.keys().copied().any(is_property_or_index_key));
 }
 
-fn is_property_or_index_key(var_id: &Atom) -> bool {
+fn is_property_or_index_key(var_id: Atom) -> bool {
     let s = var_id.as_str();
     s.contains("->") || (s.starts_with('$') && s.contains('['))
 }

@@ -72,7 +72,7 @@ pub fn populate_template_result_from_invocation<'ctx, 'arena>(
             return;
         };
 
-        let Some(declaring_class_metadata) = context.codebase.get_class_like(identifier.get_class_name()) else {
+        let Some(declaring_class_metadata) = context.codebase.get_class_like(&identifier.get_class_name()) else {
             return;
         };
 
@@ -86,8 +86,8 @@ pub fn populate_template_result_from_invocation<'ctx, 'arena>(
             for (template_name, _) in &declaring_class_metadata.template_types {
                 let template_type = get_specialized_template_type(
                     context.codebase,
-                    template_name,
-                    &declaring_class_metadata.name,
+                    *template_name,
+                    declaring_class_metadata.name,
                     method_context.class_like_metadata,
                     None,
                 );
@@ -139,7 +139,7 @@ pub fn populate_template_result_from_invocation<'ctx, 'arena>(
         return;
     };
 
-    let Some(metadata) = context.codebase.get_class_like(identifier.get_class_name()) else {
+    let Some(metadata) = context.codebase.get_class_like(&identifier.get_class_name()) else {
         return;
     };
 
