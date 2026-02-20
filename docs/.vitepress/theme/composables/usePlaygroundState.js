@@ -51,7 +51,7 @@ export function createPlaygroundState(initialCode = DEFAULT_CODE) {
         plugins: [],
       },
       linter: {
-        disabledRules: [],
+        disabledRules: ["file-name"],
       },
     },
     results: null,
