@@ -508,8 +508,8 @@ impl IncrementalAnalysisService {
                 changed_symbols,
             );
 
-            // Clear safe_symbols before analysis — they were needed for populate_codebase_targeted
-            // but must not leak into the analyzer (see non-body-only path for explanation).
+            // Clearing safe_symbols in just_body edits before calling the analyzer makes sure
+            // existing errors aren't cleared.
             merged_codebase.safe_symbols.clear();
             merged_codebase.safe_symbol_members.clear();
 
