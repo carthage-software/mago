@@ -76,6 +76,20 @@ fn populate_codebase_inner(
                 class_likes_to_repopulate.insert(*class_name);
             }
         }
+
+        // Also repopulate user-defined classes that were invalidated by the
+        // cascade (not in safe_symbols) but are not directly in dirty_symbols.
+        // This handles e.g. a child class whose parent's method was removed:
+        // the child is invalidated (not safe) but its file didn't change,
+        // so it's not in dirty_symbols.
+        for (class_name, metadata) in &codebase.class_likes {
+            if metadata.flags.is_user_defined()
+                && !safe_symbols.contains(class_name)
+                && !class_likes_to_repopulate.contains(class_name)
+            {
+                class_likes_to_repopulate.insert(*class_name);
+            }
+        }
     } else {
         for (name, metadata) in &codebase.class_likes {
             if !metadata.flags.is_populated() || (metadata.flags.is_user_defined() && !safe_symbols.contains(name)) {
@@ -91,6 +105,9 @@ fn populate_codebase_inner(
             classlike_info.appearing_property_ids.clear();
             classlike_info.declaring_method_ids.clear();
             classlike_info.appearing_method_ids.clear();
+            classlike_info.overridden_method_ids.clear();
+            classlike_info.overridden_property_ids.clear();
+            classlike_info.invalid_dependencies.clear();
         }
     }
 
@@ -130,6 +147,46 @@ fn populate_codebase_inner(
                     force_repopulation,
                 );
             }
+        }
+
+        // Also repopulate non-dirty function_likes that are not safe but need repopulation.
+        // This handles e.g. a child method when the parent class was re-added:
+        // the child method isn't dirty (file didn't change) but it's not safe
+        // (parent class changed), so it needs type signature repopulation.
+        for (name, function_like_metadata) in &mut codebase.function_likes {
+            if dirty.contains(name) {
+                continue;
+            }
+
+            let is_closure_or_arrow =
+                function_like_metadata.get_kind().is_closure() || function_like_metadata.get_kind().is_arrow_function();
+
+            let is_safe = if is_closure_or_arrow {
+                true
+            } else if name.1.is_empty() {
+                safe_symbols.contains(&name.0)
+            } else {
+                safe_symbol_members.contains(name) || safe_symbols.contains(&name.0)
+            };
+
+            let force_repopulation = function_like_metadata.flags.is_user_defined() && !is_safe;
+            if function_like_metadata.flags.is_populated() && !force_repopulation {
+                continue;
+            }
+
+            let reference_source = if name.1.is_empty() || function_like_metadata.get_kind().is_closure() {
+                ReferenceSource::Symbol(true, name.0)
+            } else {
+                ReferenceSource::ClassLikeMember(true, name.0, name.1)
+            };
+
+            signatures::populate_function_like_metadata(
+                function_like_metadata,
+                &codebase.symbols,
+                &reference_source,
+                symbol_references,
+                force_repopulation,
+            );
         }
     } else {
         for (name, function_like_metadata) in &mut codebase.function_likes {

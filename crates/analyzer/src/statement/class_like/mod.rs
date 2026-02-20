@@ -418,14 +418,6 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Class<'arena> {
                 break 'check_unused false;
             }
 
-            if class_like_metadata
-                .methods
-                .iter()
-                .any(|m| context.codebase.safe_symbol_members.contains(&(class_like_metadata.name, *m)))
-            {
-                break 'check_unused false;
-            }
-
             true
         };
 
