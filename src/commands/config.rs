@@ -178,9 +178,9 @@ impl ConfigCommand {
                 }
                 ConfigSection::Formatter => {
                     if self.default {
-                        serde_json::to_string_pretty(&FormatterConfiguration::default())?
+                        serde_json::to_string_pretty(&FormatterConfiguration::default().to_value())?
                     } else {
-                        serde_json::to_string_pretty(&configuration.formatter)?
+                        serde_json::to_string_pretty(&configuration.formatter.to_value())?
                     }
                 }
                 ConfigSection::Analyzer => {

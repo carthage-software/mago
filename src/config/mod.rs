@@ -454,7 +454,7 @@ impl Configuration {
             "source": self.source,
             "linter": self.linter.to_filtered_value(self.php_version),
             "parser": self.parser,
-            "formatter": self.formatter,
+            "formatter": self.formatter.to_value(),
             "analyzer": self.analyzer,
             "guard": self.guard,
         })

@@ -1,4 +1,9 @@
+use std::borrow::Cow;
+
 use schemars::JsonSchema;
+use schemars::Schema;
+use schemars::SchemaGenerator;
+use schemars::json_schema;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -6,9 +11,8 @@ use mago_formatter::presets::FormatterPreset;
 use mago_formatter::settings::*;
 
 /// Configuration options for formatting source code.
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case", from = "RawFormatterConfiguration", deny_unknown_fields)]
-#[schemars(!from)]
 pub struct FormatterConfiguration {
     /// A list of patterns to exclude from formatting.
     ///
@@ -23,6 +27,42 @@ pub struct FormatterConfiguration {
     pub settings: FormatSettings,
 }
 
+impl JsonSchema for FormatterConfiguration {
+    fn schema_name() -> Cow<'static, str> {
+        "FormatterConfiguration".into()
+    }
+
+    fn json_schema(generator: &mut SchemaGenerator) -> Schema {
+        // Start with FormatSettings schema (all the individual settings flattened)
+        let mut schema = FormatSettings::json_schema(generator);
+
+        // Add `excludes` and `preset` properties to the flat schema
+        if let Some(obj) = schema.as_object_mut() {
+            if let Some(props) = obj.get_mut("properties").and_then(|p| p.as_object_mut()) {
+                props.insert(
+                    "excludes".to_string(),
+                    json_schema!({
+                        "description": "A list of patterns to exclude from formatting.\n\nDefaults to `[]`.",
+                        "type": "array",
+                        "items": { "type": "string" }
+                    })
+                    .to_value(),
+                );
+
+                props.insert("preset".to_string(), generator.subschema_for::<Option<FormatterPreset>>().to_value());
+            }
+
+            obj.insert("title".to_string(), serde_json::json!("FormatterConfiguration"));
+            obj.insert(
+                "description".to_string(),
+                serde_json::json!("Configuration options for formatting source code."),
+            );
+        }
+
+        schema
+    }
+}
+
 /// Intermediate struct used for deserialization before merging with presets.
 #[derive(Deserialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
@@ -33,6 +73,23 @@ struct RawFormatterConfiguration {
     preset: Option<FormatterPreset>,
     #[serde(flatten)]
     settings: RawFormatSettings,
+}
+
+impl FormatterConfiguration {
+    /// Returns a JSON value that includes the resolved `settings` field.
+    ///
+    /// Since `settings` is marked `#[serde(skip_serializing)]` (it's computed
+    /// from preset + overrides during deserialization), direct serialization
+    /// omits it. This method explicitly includes it for display purposes.
+    #[must_use]
+    pub fn to_value(&self) -> serde_json::Value {
+        let mut value = serde_json::to_value(self.settings).unwrap_or_default();
+        if let serde_json::Value::Object(ref mut map) = value {
+            map.insert("excludes".to_string(), serde_json::to_value(&self.excludes).unwrap_or_default());
+        }
+
+        value
+    }
 }
 
 impl From<RawFormatterConfiguration> for FormatterConfiguration {
