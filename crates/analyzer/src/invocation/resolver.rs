@@ -230,7 +230,7 @@ fn resolve_atomic<'ctx, 'arena>(
             &target,
             false,
             false,
-            false,
+            true,
             &mut comparison_result,
         );
 

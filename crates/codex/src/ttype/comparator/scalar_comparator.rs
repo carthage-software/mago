@@ -29,7 +29,7 @@ pub fn is_contained_by(
         (TAtomic::Scalar(TScalar::Integer(ci)), TAtomic::Scalar(TScalar::Integer(ii))) if ci.contains(*ii) => {
             return true;
         }
-        (TAtomic::Scalar(TScalar::Float(TFloat::Float)), TAtomic::Scalar(TScalar::Float(_) | TScalar::Integer(_))) => {
+        (TAtomic::Scalar(TScalar::Float(TFloat::Float)), TAtomic::Scalar(TScalar::Integer(_))) if !inside_assertion => {
             return true;
         }
         (TAtomic::Scalar(TScalar::Float(container_float)), TAtomic::Scalar(TScalar::Float(input_float)))
