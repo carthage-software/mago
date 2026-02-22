@@ -87,10 +87,10 @@ For comprehensive static analyzer benchmarks across multiple projects, versions,
 <BenchmarkChart
   title="Speed"
   :data="[
-    { label: 'Mago', value: 2.11, highlight: true },
-    { label: 'Psalm', value: 11.37 },
-    { label: 'Phan', value: 60.65 },
-    { label: 'PHPStan', value: 61.85 }
+    { label: 'Mago', value: 2.17, highlight: true },
+    { label: 'Psalm', value: 11.34 },
+    { label: 'Phan', value: 62.61 },
+    { label: 'PHPStan', value: 79.88 }
   ]"
   unit="seconds"
 />
@@ -103,10 +103,10 @@ For comprehensive static analyzer benchmarks across multiple projects, versions,
 <BenchmarkChart
   title="Peak Memory (RSS)"
   :data="[
-    { label: 'Mago', value: 1017, highlight: true },
-    { label: 'Psalm', value: 3958 },
-    { label: 'PHPStan', value: 7119 },
-    { label: 'Phan', value: 14295 }
+    { label: 'Mago', value: 1058, highlight: true },
+    { label: 'Psalm', value: 3921 },
+    { label: 'PHPStan', value: 7370 },
+    { label: 'Phan', value: 12823 }
   ]"
   unit="mb"
 />
