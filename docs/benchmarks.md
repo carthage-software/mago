@@ -80,14 +80,17 @@ This benchmark measures the time it takes to lint an entire codebase.
 
 ## Analyzer
 
-This benchmark measures the time it takes to perform a full static analysis.
+This benchmark measures the time it takes to perform a full static analysis (uncached) on the `wordpress-develop` codebase.
+
+For comprehensive static analyzer benchmarks across multiple projects, versions, and categories, see the [**Static Analyzer Benchmarks Dashboard**](https://carthage-software.github.io/static-analyzers-benchmarks/) ([source](https://github.com/carthage-software/static-analyzers-benchmarks)).
 
 <BenchmarkChart
   title="Speed"
   :data="[
-    { label: 'Mago', value: 1.84, highlight: true },
-    { label: 'Psalm', value: 21.06 },
-    { label: 'PHPStan', value: 81.61 }
+    { label: 'Mago', value: 2.11, highlight: true },
+    { label: 'Psalm', value: 11.37 },
+    { label: 'Phan', value: 60.65 },
+    { label: 'PHPStan', value: 61.85 }
   ]"
   unit="seconds"
 />
@@ -100,9 +103,10 @@ This benchmark measures the time it takes to perform a full static analysis.
 <BenchmarkChart
   title="Peak Memory (RSS)"
   :data="[
-    { label: 'Mago', value: 1040, highlight: true },
-    { label: 'Psalm', value: 3716 },
-    { label: 'PHPStan', value: 878 }
+    { label: 'Mago', value: 1017, highlight: true },
+    { label: 'Psalm', value: 3958 },
+    { label: 'PHPStan', value: 7119 },
+    { label: 'Phan', value: 14295 }
   ]"
   unit="mb"
 />
@@ -116,9 +120,10 @@ This benchmark measures the time it takes to perform a full static analysis.
 - **Hardware:** MacBook Pro (Apple M1 Pro, 32GB RAM), idle system
 - **Codebase:** `wordpress-develop@5b01d24d8c5f2cfa4b96349967a9759e52888d03`
 - **PHP:** 8.5.0 (Zend Engine v4.5.0, Zend OPcache v8.5.0)
-- **Mago:** 1.6.0
-- **Psalm:** 7.0.0-beta14
-- **PHPStan:** 2.1.38
+- **Mago:** 1.9.1
+- **Psalm:** 6.15.1
+- **PHPStan:** 2.1.39
+- **Phan:** 6.0.1
 - **PHP-CS-Fixer:** 3.93.1
 - **Pint:** 1.27.0
 - **Pretty PHP:** 0.4.95
