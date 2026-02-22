@@ -2,6 +2,7 @@ use bumpalo::Bump;
 use bumpalo::collections::CollectIn;
 use bumpalo::collections::Vec;
 use foldhash::HashMap;
+use foldhash::HashSet;
 
 use mago_database::file::File;
 use mago_reporting::Annotation;
@@ -10,6 +11,7 @@ use mago_reporting::IssueCollection;
 use mago_span::Span;
 use mago_syntax::ast::Program;
 use mago_text_edit::TextEdit;
+use mago_text_edit::TextRange;
 
 use crate::pragma::Pragma;
 use crate::pragma::PragmaKind;
@@ -335,10 +337,12 @@ impl<'ctx, 'arena> Collector<'ctx, 'arena> {
     ///
     /// - Unfulfilled `@mago-expect` pragmas.
     /// - Unused pragmas of any kind.
+    ///
+    /// Each issue includes a suggested `TextEdit` fix to remove the unused pragma text.
     #[inline]
     #[must_use]
     pub fn finish(mut self) -> IssueCollection {
-        let mut issues = self.issues;
+        let mut issues = std::mem::take(&mut self.issues);
 
         if self.skip_unfulfilled_expect {
             self.pragmas.clear();
@@ -346,50 +350,152 @@ impl<'ctx, 'arena> Collector<'ctx, 'arena> {
             return issues;
         }
 
-        for pragma in self.pragmas.drain(..) {
-            if pragma.used {
-                continue;
+        let mut directive_has_used: HashMap<Span, bool> = HashMap::default();
+        let mut trivia_has_used: HashMap<Span, bool> = HashMap::default();
+        for pragma in self.pragmas.iter() {
+            let effectively_used = pragma.used || self.is_pragma_skipped(pragma);
+
+            let entry = directive_has_used.entry(pragma.span).or_insert(false);
+            if effectively_used {
+                *entry = true;
             }
 
-            match pragma.kind {
-                PragmaKind::Ignore => {
-                    issues.push(
-                        Issue::note("This pragma was not used and may be removed.")
-                            .with_code("unused-pragma")
-                            .with_annotation(
-                                Annotation::primary(pragma.span)
-                                    .with_message("This ignore pragma does not match any reported issue."),
-                            )
-                            .with_annotation(Annotation::secondary(pragma.code_span).with_message("...for this code"))
-                            .with_annotation(
-                                Annotation::secondary(pragma.trivia_span).with_message("...within this comment."),
-                            ),
-                    );
-                }
-                PragmaKind::Expect => {
-                    if let Some(ref active_codes) = self.active_codes
-                        && pragma.code != "all"
-                        && !active_codes.contains(&pragma.code)
-                    {
-                        continue;
-                    }
-
-                    issues.push(
-                        Issue::warning("This pragma was not used and may be removed.")
-                            .with_code("unfulfilled-expect")
-                            .with_annotation(
-                                Annotation::primary(pragma.span).with_message("This expect pragma was not fulfilled."),
-                            )
-                            .with_annotation(Annotation::secondary(pragma.code_span).with_message("...for this code"))
-                            .with_annotation(
-                                Annotation::secondary(pragma.trivia_span).with_message("...within this comment."),
-                            ),
-                    );
-                }
+            let entry = trivia_has_used.entry(pragma.trivia_span).or_insert(false);
+            if effectively_used {
+                *entry = true;
             }
         }
 
+        let mut handled_directives: HashSet<Span> = HashSet::default();
+        let mut handled_trivias: HashSet<Span> = HashSet::default();
+
+        let pragmas = std::mem::replace(&mut self.pragmas, Vec::new_in(self.arena));
+        for pragma in pragmas {
+            if pragma.used || self.is_pragma_skipped(&pragma) {
+                continue;
+            }
+
+            let has_used_sibling_codes = directive_has_used.get(&pragma.span).copied().unwrap_or(false);
+            let has_used_sibling_pragmas = trivia_has_used.get(&pragma.trivia_span).copied().unwrap_or(false);
+
+            let edit = if has_used_sibling_codes {
+                Some(self.compute_code_deletion(&pragma))
+            } else if !has_used_sibling_pragmas && !handled_trivias.contains(&pragma.trivia_span) {
+                handled_trivias.insert(pragma.trivia_span);
+                handled_directives.insert(pragma.span);
+                Some(self.compute_comment_deletion(&pragma))
+            } else if !handled_directives.contains(&pragma.span) && !handled_trivias.contains(&pragma.trivia_span) {
+                handled_directives.insert(pragma.span);
+                Some(self.compute_directive_deletion(&pragma))
+            } else {
+                None
+            };
+
+            let mut issue = match pragma.kind {
+                PragmaKind::Ignore => Issue::note("This pragma was not used and may be removed.")
+                    .with_code("unused-pragma")
+                    .with_annotation(
+                        Annotation::primary(pragma.span)
+                            .with_message("This ignore pragma does not match any reported issue."),
+                    )
+                    .with_annotation(Annotation::secondary(pragma.code_span).with_message("...for this code"))
+                    .with_annotation(Annotation::secondary(pragma.trivia_span).with_message("...within this comment.")),
+                PragmaKind::Expect => Issue::warning("This pragma was not used and may be removed.")
+                    .with_code("unfulfilled-expect")
+                    .with_annotation(
+                        Annotation::primary(pragma.span).with_message("This expect pragma was not fulfilled."),
+                    )
+                    .with_annotation(Annotation::secondary(pragma.code_span).with_message("...for this code"))
+                    .with_annotation(Annotation::secondary(pragma.trivia_span).with_message("...within this comment.")),
+            };
+
+            if let Some(edit) = edit {
+                issue = issue.with_edit(self.file.id, edit);
+            }
+
+            issues.push(issue);
+        }
+
         issues
+    }
+
+    /// Returns `true` if this pragma should be skipped (not reported) due to inactive codes.
+    fn is_pragma_skipped(&self, pragma: &Pragma<'arena>) -> bool {
+        pragma.kind == PragmaKind::Expect
+            && pragma.code != "all"
+            && self.active_codes.as_ref().is_some_and(|codes| !codes.contains(&pragma.code))
+    }
+
+    /// Computes a `TextEdit` to delete a single code from a comma-separated list
+    /// within a pragma directive (e.g., remove `bar` from `@mago-expect lint:foo,bar,baz`).
+    fn compute_code_deletion(&self, pragma: &Pragma<'arena>) -> TextEdit {
+        let contents = self.file.contents.as_bytes();
+        let code_start = pragma.code_span.start.offset as usize;
+        let code_end = pragma.code_span.end.offset as usize;
+
+        let mut scan = code_start;
+        while scan > 0 {
+            scan -= 1;
+            match contents[scan] {
+                b',' => {
+                    return TextEdit::delete(TextRange::new(scan as u32, code_end as u32));
+                }
+                b' ' | b'\t' => continue,
+                _ => break,
+            }
+        }
+
+        // No leading comma found → this is the first code. Try trailing comma.
+        let mut scan = code_end;
+        while scan < contents.len() {
+            match contents[scan] {
+                b',' => {
+                    scan += 1;
+                    while scan < contents.len() && matches!(contents[scan], b' ' | b'\t') {
+                        scan += 1;
+                    }
+
+                    return TextEdit::delete(TextRange::new(code_start as u32, scan as u32));
+                }
+                b' ' | b'\t' => {
+                    scan += 1;
+                }
+                _ => break,
+            }
+        }
+
+        TextEdit::delete(TextRange::new(code_start as u32, code_end as u32))
+    }
+
+    /// Computes a `TextEdit` to delete an entire comment (trivia) and its surrounding whitespace.
+    ///
+    /// For own-line comments, this deletes the entire line(s). For inline comments, this deletes
+    /// the trivia and any preceding horizontal whitespace.
+    fn compute_comment_deletion(&self, pragma: &Pragma<'arena>) -> TextEdit {
+        if pragma.own_line {
+            let line_start =
+                self.file.get_line_start_offset(pragma.start_line).unwrap_or(pragma.trivia_span.start.offset);
+            let delete_end =
+                self.file.get_line_start_offset(pragma.end_line + 1).unwrap_or(pragma.trivia_span.end.offset);
+
+            TextEdit::delete(TextRange::new(line_start, delete_end))
+        } else {
+            let mut start = pragma.trivia_span.start.offset as usize;
+            while start > 0 && matches!(self.file.contents.as_bytes()[start - 1], b' ' | b'\t') {
+                start -= 1;
+            }
+
+            TextEdit::delete(TextRange::new(start as u32, pragma.trivia_span.end.offset))
+        }
+    }
+
+    /// Computes a `TextEdit` to delete a single pragma directive line from within a multi-line comment.
+    fn compute_directive_deletion(&self, pragma: &Pragma<'arena>) -> TextEdit {
+        let pragma_line = self.file.line_number(pragma.span.start.offset);
+        let line_start = self.file.get_line_start_offset(pragma_line).unwrap_or(pragma.span.start.offset);
+        let delete_end = self.file.get_line_start_offset(pragma_line + 1).unwrap_or(pragma.span.end.offset);
+
+        TextEdit::delete(TextRange::new(line_start, delete_end))
     }
 
     /// Checks if an issue is suppressed by an `@mago-ignore` pragma.
