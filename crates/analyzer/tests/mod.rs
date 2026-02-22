@@ -661,6 +661,7 @@ test_case!(issue_1073);
 test_case!(issue_1150);
 test_case!(issue_1156);
 test_case!(issue_1157);
+test_case!(issue_1165);
 test_case!(issue_1169);
 test_case!(issue_1184);
 test_case!(issue_1184_methods);

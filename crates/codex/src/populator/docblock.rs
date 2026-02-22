@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 
 use mago_atom::Atom;
+use mago_atom::AtomMap;
 use mago_atom::AtomSet;
 use mago_span::Span;
 
@@ -220,7 +221,7 @@ pub fn inherit_method_docblocks(
                 continue;
             }
             if let Some(class_metadata) = codebase.class_likes.get(class_name) {
-                collect_inheritance_work(*class_name, class_metadata, &mut inheritance_work);
+                collect_inheritance_work(*class_name, class_metadata, &codebase.class_likes, &mut inheritance_work);
             }
         }
     } else {
@@ -228,7 +229,7 @@ pub fn inherit_method_docblocks(
             if !safe_symbols.is_empty() && safe_symbols.contains(class_name) {
                 continue;
             }
-            collect_inheritance_work(*class_name, class_metadata, &mut inheritance_work);
+            collect_inheritance_work(*class_name, class_metadata, &codebase.class_likes, &mut inheritance_work);
         }
     }
 
@@ -243,15 +244,19 @@ pub fn inherit_method_docblocks(
 fn collect_inheritance_work(
     class_name: Atom,
     class_metadata: &crate::metadata::class_like::ClassLikeMetadata,
+    class_likes: &AtomMap<crate::metadata::class_like::ClassLikeMetadata>,
     inheritance_work: &mut Vec<(Atom, Atom, Atom, Atom)>,
 ) {
     for (method_name, method_ids) in &class_metadata.overridden_method_ids {
         let mut parent_method_id = None;
 
-        if let Some(parent_class) = &class_metadata.direct_parent_class
-            && method_ids.contains_key(parent_class)
-        {
-            parent_method_id = Some((*parent_class, *method_name));
+        let mut current_class = class_metadata.direct_parent_class;
+        while let Some(parent_name) = current_class {
+            if method_ids.contains_key(&parent_name) {
+                parent_method_id = Some((parent_name, *method_name));
+                break;
+            }
+            current_class = class_likes.get(&parent_name).and_then(|m| m.direct_parent_class);
         }
 
         if parent_method_id.is_none() {
