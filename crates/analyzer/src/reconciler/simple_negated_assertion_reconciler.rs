@@ -331,16 +331,16 @@ fn subtract_object(
             } else if let TAtomic::Object(TObject::Named(existing_named)) = &atomic
                 && let Some(TAtomic::Object(TObject::Named(subtracting_named))) = type_to_subtract
             {
-                let lowercase_subtracting_name = ascii_lowercase_atom(subtracting_named.get_name_ref());
+                let lowercase_subtracting_name = ascii_lowercase_atom(&subtracting_named.get_name());
 
                 // If the class names match (case-insensitive), this type is being subtracted - don't add it
-                if existing_named.get_name_ref().eq_ignore_ascii_case(&lowercase_subtracting_name) {
+                if existing_named.get_name().eq_ignore_ascii_case(&lowercase_subtracting_name) {
                     // Type is removed, don't add to acceptable_types
-                } else if let Some(existing_metadata) = context.codebase.get_class_like(existing_named.get_name_ref())
+                } else if let Some(existing_metadata) = context.codebase.get_class_like(&existing_named.get_name())
                     // Check if the existing type has permitted inheritors
                     && let Some(permitted_inheritors) = &existing_metadata.permitted_inheritors
                     // Check if the subtracting type is an inheritor of the existing type
-                    && context.codebase.is_instance_of(&lowercase_subtracting_name, existing_named.get_name_ref())
+                    && context.codebase.is_instance_of(&lowercase_subtracting_name, &existing_named.get_name())
                     // If the type we're subtracting is one of the permitted inheritors
                     // PHP class names are case-insensitive, so we need to compare case-insensitively
                     && permitted_inheritors.contains(&lowercase_subtracting_name)

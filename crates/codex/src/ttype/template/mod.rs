@@ -117,25 +117,25 @@ impl TemplateResult {
     }
 
     #[must_use]
-    pub fn has_lower_bound(&self, parameter_name: &Atom, generic_parent: &GenericParent) -> bool {
+    pub fn has_lower_bound(&self, parameter_name: Atom, generic_parent: &GenericParent) -> bool {
         self.lower_bounds
-            .get(parameter_name)
+            .get(&parameter_name)
             .and_then(|bounds| bounds.get(generic_parent))
             .is_some_and(|bounds| !bounds.is_empty())
     }
 
     #[must_use]
-    pub fn has_lower_bound_for_class_like(&self, parameter_name: &Atom, classlike_name: &Atom) -> bool {
+    pub fn has_lower_bound_for_class_like(&self, parameter_name: Atom, classlike_name: &Atom) -> bool {
         self.has_lower_bound(parameter_name, &GenericParent::ClassLike(*classlike_name))
     }
 
     #[must_use]
     pub fn get_lower_bounds_for_class_like(
         &self,
-        parameter_name: &Atom,
-        classlike_name: &Atom,
+        parameter_name: Atom,
+        classlike_name: Atom,
     ) -> Option<&Vec<TemplateBound>> {
-        self.lower_bounds.get(parameter_name).and_then(|bounds| bounds.get(&GenericParent::ClassLike(*classlike_name)))
+        self.lower_bounds.get(&parameter_name).and_then(|bounds| bounds.get(&GenericParent::ClassLike(classlike_name)))
     }
 }
 

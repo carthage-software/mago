@@ -176,7 +176,7 @@ pub fn populate_class_like_metadata_iterative(
                         )),
                 );
             }
-        } else if !codebase.symbols.contains(&source_class_name) {
+        } else if !codebase.symbols.contains(source_class_name) {
             metadata.issues.push(
                 Issue::error(format!("Class `{source_class_name}` not found for type import"))
                     .with_code("unknown-class-in-import-type")

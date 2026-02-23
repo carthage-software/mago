@@ -794,7 +794,7 @@ pub fn get_mixed_closure() -> TUnion {
 #[must_use]
 pub fn get_named_object(name: Atom, type_resolution_context: Option<&TypeResolutionContext>) -> TUnion {
     if let Some(type_resolution_context) = type_resolution_context
-        && let Some(defining_entities) = type_resolution_context.get_template_definition(&name)
+        && let Some(defining_entities) = type_resolution_context.get_template_definition(name)
     {
         let first = &defining_entities[0];
         return wrap_atomic(TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::Generic {
@@ -1217,17 +1217,17 @@ pub fn get_iterable_parameters(atomic: &TAtomic, codebase: &CodebaseMetadata) ->
                 let iterator = atom("iterator");
                 let iterator_aggregate = atom("iteratoraggregate");
 
-                let class_metadata = codebase.get_class_like(name)?;
+                let class_metadata = codebase.get_class_like(&name)?;
                 if !codebase.is_instance_of(&class_metadata.name, &traversable) {
                     break 'parameters None;
                 }
 
-                let is_iterator_interface = name == &iterator || name == &traversable || name == &iterator_aggregate;
+                let is_iterator_interface = name == iterator || name == traversable || name == iterator_aggregate;
                 if !is_iterator_interface
                     && codebase.is_instance_of(&class_metadata.name, &iterator)
                     && let (Some(key_type), Some(value_type)) = (
-                        get_iterator_method_return_type(codebase, *name, "key"),
-                        get_iterator_method_return_type(codebase, *name, "current"),
+                        get_iterator_method_return_type(codebase, name, "key"),
+                        get_iterator_method_return_type(codebase, name, "current"),
                     )
                 {
                     let contains_generic_param = |t: &TUnion| t.types.iter().any(atomic::TAtomic::is_generic_parameter);
@@ -1247,8 +1247,8 @@ pub fn get_iterable_parameters(atomic: &TAtomic, codebase: &CodebaseMetadata) ->
 
                 let key_type = get_specialized_template_type(
                     codebase,
-                    &key_template,
-                    &traversable,
+                    key_template,
+                    traversable,
                     class_metadata,
                     object.get_type_parameters(),
                 )
@@ -1256,8 +1256,8 @@ pub fn get_iterable_parameters(atomic: &TAtomic, codebase: &CodebaseMetadata) ->
 
                 let value_type = get_specialized_template_type(
                     codebase,
-                    &value_template,
-                    &traversable,
+                    value_template,
+                    traversable,
                     class_metadata,
                     object.get_type_parameters(),
                 )
@@ -1354,7 +1354,7 @@ pub fn get_iterable_value_parameter(atomic: &TAtomic, codebase: &CodebaseMetadat
             let name = object.get_name()?;
             let traversable = atom("traversable");
 
-            let class_metadata = codebase.get_class_like(name)?;
+            let class_metadata = codebase.get_class_like(&name)?;
             if !codebase.is_instance_of(&class_metadata.name, &traversable) {
                 return None;
             }
@@ -1364,8 +1364,8 @@ pub fn get_iterable_value_parameter(atomic: &TAtomic, codebase: &CodebaseMetadat
 
             get_specialized_template_type(
                 codebase,
-                &value_template,
-                &traversable,
+                value_template,
+                traversable,
                 class_metadata,
                 object.get_type_parameters(),
             )
@@ -1431,12 +1431,12 @@ pub fn get_array_value_parameter(array_type: &TArray, codebase: &CodebaseMetadat
 #[must_use]
 pub fn get_specialized_template_type(
     codebase: &CodebaseMetadata,
-    template_name: &Atom,
-    template_defining_class_id: &Atom,
+    template_name: Atom,
+    template_defining_class_id: Atom,
     instantiated_class_metadata: &ClassLikeMetadata,
     instantiated_type_parameters: Option<&[TUnion]>,
 ) -> Option<TUnion> {
-    let defining_class_metadata = codebase.get_class_like(template_defining_class_id)?;
+    let defining_class_metadata = codebase.get_class_like(&template_defining_class_id)?;
 
     if defining_class_metadata.name == instantiated_class_metadata.name {
         let index = instantiated_class_metadata.get_template_index_for_name(template_name)?;
@@ -1459,7 +1459,7 @@ pub fn get_specialized_template_type(
 
     let template = defining_class_metadata.get_template_type(template_name)?;
     let template_union = wrap_atomic(TAtomic::GenericParameter(TGenericParameter {
-        parameter_name: *template_name,
+        parameter_name: template_name,
         defining_entity: template.defining_entity,
         constraint: Arc::new(template.constraint.clone()),
         intersection_types: None,

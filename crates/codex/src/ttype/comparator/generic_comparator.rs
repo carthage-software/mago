@@ -50,8 +50,8 @@ pub(crate) fn is_contained_by(
 
         let Some(mut specialized_template_type) = get_specialized_template_type(
             codebase,
-            template_name,
-            &container_metadata.name,
+            *template_name,
+            container_metadata.name,
             input_metadata,
             input_type_parameters,
         ) else {

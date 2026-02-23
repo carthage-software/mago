@@ -298,7 +298,7 @@ impl TClassLikeString {
                 ))
             }
             TClassLikeString::Literal { value } => {
-                if codebase.symbols.contains_enum(&ascii_lowercase_atom(value)) {
+                if codebase.symbols.contains_enum(ascii_lowercase_atom(value)) {
                     TAtomic::Object(TObject::Enum(TEnum::new(*value)))
                 } else {
                     TAtomic::Object(TObject::Named(TNamedObject::new(*value)))

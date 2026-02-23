@@ -983,8 +983,8 @@ pub(crate) fn handle_array_access_on_named_object(
 
             let key_type = get_specialized_template_type(
                 context.codebase,
-                &key_template_name,
-                &array_access,
+                key_template_name,
+                array_access,
                 metadata,
                 named_object.get_type_parameters(),
             )
@@ -992,8 +992,8 @@ pub(crate) fn handle_array_access_on_named_object(
 
             let value_type = get_specialized_template_type(
                 context.codebase,
-                &value_template_name,
-                &array_access,
+                value_template_name,
+                array_access,
                 metadata,
                 named_object.get_type_parameters(),
             )

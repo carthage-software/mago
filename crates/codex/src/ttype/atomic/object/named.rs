@@ -58,13 +58,6 @@ impl TNamedObject {
         self.name
     }
 
-    /// Returns the `Atom` for the primary class/interface name.
-    #[inline]
-    #[must_use]
-    pub const fn get_name_ref(&self) -> &Atom {
-        &self.name
-    }
-
     /// Checks if this object has concrete generic type parameters.
     #[inline]
     #[must_use]

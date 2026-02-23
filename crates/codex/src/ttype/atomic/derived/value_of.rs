@@ -73,7 +73,7 @@ impl TValueOf {
                         continue;
                     };
 
-                    let Some(class_like_metadata) = codebase.get_class_like(name) else {
+                    let Some(class_like_metadata) = codebase.get_class_like(&name) else {
                         continue;
                     };
 

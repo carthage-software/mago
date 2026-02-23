@@ -138,7 +138,7 @@ pub fn saturate_clauses<'a>(
             if is_clause_a_simple {
                 // This is unit propagation: (A) & (!A | B) => (B)
                 // `clause_a` is the unit clause (A).
-                let (clause_var, var_possibilities) = clause_a.possibilities.iter().next().unwrap();
+                let (&clause_var, var_possibilities) = clause_a.possibilities.iter().next().unwrap();
                 let only_type = var_possibilities.values().next().unwrap();
                 let negated_clause_type = only_type.get_negation();
                 let negated_hash = negated_clause_type.to_hash();
@@ -154,7 +154,7 @@ pub fn saturate_clauses<'a>(
                     }
 
                     // Check if clause_b contains the negated literal
-                    let Some(matching_clause_possibilities) = clause_b.possibilities.get(clause_var) else {
+                    let Some(matching_clause_possibilities) = clause_b.possibilities.get(&clause_var) else {
                         continue;
                     };
 
@@ -172,7 +172,7 @@ pub fn saturate_clauses<'a>(
                             added_clauses.push(updated_clause);
                         }
                     } else {
-                        let updated_clause = clause_b.add_possibility(*clause_var, clause_var_possibilities);
+                        let updated_clause = clause_b.add_possibility(clause_var, clause_var_possibilities);
                         added_clauses.push(updated_clause);
                     }
                 }
@@ -196,8 +196,8 @@ pub fn saturate_clauses<'a>(
 
                     let mut opposing_key = None;
                     let mut mismatch = false;
-                    for (key, a_possibilities) in &clause_a.possibilities {
-                        if let Some(b_possibilities) = clause_b.possibilities.get(key) {
+                    for (&key, a_possibilities) in &clause_a.possibilities {
+                        if let Some(b_possibilities) = clause_b.possibilities.get(&key) {
                             if index_keys_match(a_possibilities, b_possibilities) {
                                 continue;
                             }
@@ -313,17 +313,21 @@ pub fn saturate_clauses<'a>(
                     compared_clauses.insert((clause_a.hash, clause_b.hash));
 
                     // Find common keys between the two clauses
-                    let common_keys: Vec<_> =
-                        clause_a.possibilities.keys().filter(|k| clause_b.possibilities.contains_key(*k)).collect();
+                    let common_keys: Vec<_> = clause_a
+                        .possibilities
+                        .keys()
+                        .copied()
+                        .filter(|k| clause_b.possibilities.contains_key(k))
+                        .collect();
 
                     if common_keys.is_empty() {
                         continue;
                     }
 
-                    let mut common_negated_keys: HashSet<&Atom> = HashSet::default();
-                    for common_key in &common_keys {
-                        let clause_a_possibilities = &clause_a.possibilities[*common_key];
-                        let clause_b_possibilities = &clause_b.possibilities[*common_key];
+                    let mut common_negated_keys: HashSet<Atom> = HashSet::default();
+                    for common_key in common_keys {
+                        let clause_a_possibilities = &clause_a.possibilities[&common_key];
+                        let clause_b_possibilities = &clause_b.possibilities[&common_key];
 
                         if clause_a_possibilities.len() == 1
                             && clause_b_possibilities.len() == 1
@@ -331,7 +335,7 @@ pub fn saturate_clauses<'a>(
                                 clause_b_possibilities.values().next().is_some_and(|b| a.is_negation_of(b))
                             })
                         {
-                            common_negated_keys.insert(*common_key);
+                            common_negated_keys.insert(common_key);
                         }
                     }
 

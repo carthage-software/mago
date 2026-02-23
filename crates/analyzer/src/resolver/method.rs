@@ -182,14 +182,14 @@ pub fn resolve_method_targets<'ctx, 'ast, 'arena>(
                 &mut result,
             );
 
-            for method_name in &method_names {
+            for &method_name in &method_names {
                 let resolved_methods = resolve_method_from_object(
                     context,
                     block_context,
                     object,
                     selector,
                     obj_type,
-                    *method_name,
+                    method_name,
                     access_span,
                     !resolved_magic_call_method.is_empty(),
                     &mut result,
@@ -206,16 +206,16 @@ pub fn resolve_method_targets<'ctx, 'ast, 'arena>(
                                     context,
                                     object.span(),
                                     selector.span(),
-                                    *classname,
-                                    *method_name,
+                                    classname,
+                                    method_name,
                                 );
                             } else {
                                 report_non_documented_method(
                                     context,
                                     object.span(),
                                     selector.span(),
-                                    *classname,
-                                    *method_name,
+                                    classname,
+                                    method_name,
                                 );
                             }
 
@@ -236,8 +236,8 @@ pub fn resolve_method_targets<'ctx, 'ast, 'arena>(
                                     context,
                                     object.span(),
                                     selector.span(),
-                                    *classname,
-                                    *method_name,
+                                    classname,
+                                    method_name,
                                     mixin_info.mixin_class_name,
                                 );
                                 result.has_invalid_target = true;
@@ -247,8 +247,8 @@ pub fn resolve_method_targets<'ctx, 'ast, 'arena>(
                                     context,
                                     object.span(),
                                     selector.span(),
-                                    *classname,
-                                    *method_name,
+                                    classname,
+                                    method_name,
                                     mixin_info.mixin_class_name,
                                 );
                             }
@@ -307,7 +307,7 @@ pub fn resolve_method_from_object<'ctx, 'ast, 'arena>(
 
     for (metadata, declaring_method_id, object, classname, mixin_without_magic_method) in method_ids {
         let declaring_class_metadata =
-            context.codebase.get_class_like(declaring_method_id.get_class_name()).unwrap_or(metadata);
+            context.codebase.get_class_like(&declaring_method_id.get_class_name()).unwrap_or(metadata);
 
         let class_template_parameters = super::class_template_type_collector::collect(
             context.codebase,
@@ -373,13 +373,13 @@ pub fn get_method_ids_from_object<'ctx, 'ast, 'arena, 'object>(
         return ids;
     };
 
-    let Some(class_metadata) = context.codebase.get_class_like(name) else {
+    let Some(class_metadata) = context.codebase.get_class_like(&name) else {
         result.has_invalid_target = true;
-        report_non_existent_class_like(context, object.span(), *name);
+        report_non_existent_class_like(context, object.span(), name);
         return ids;
     };
 
-    let mut method_id = MethodIdentifier::new(atom(&class_metadata.original_name), atom(&method_name));
+    let mut method_id = MethodIdentifier::new(class_metadata.original_name, method_name);
     if !context.codebase.method_identifier_exists(&method_id) {
         method_id = context.codebase.get_declaring_method_identifier(&method_id);
     }
@@ -455,15 +455,14 @@ pub fn get_method_ids_from_object<'ctx, 'ast, 'arena, 'object>(
             }
         }
 
-        ids.push((class_metadata, method_id, outer_object.clone(), *name, None));
+        ids.push((class_metadata, method_id, outer_object.clone(), name, None));
     } else if !class_metadata.require_extends.is_empty() || !class_metadata.require_implements.is_empty() {
         for required_class in class_metadata.require_extends.iter().chain(class_metadata.require_implements.iter()) {
             let Some(required_metadata) = context.codebase.get_class_like(required_class) else {
                 continue;
             };
 
-            let mut required_method_id =
-                MethodIdentifier::new(atom(&required_metadata.original_name), atom(&method_name));
+            let mut required_method_id = MethodIdentifier::new(required_metadata.original_name, method_name);
             if !context.codebase.method_identifier_exists(&required_method_id) {
                 required_method_id = context.codebase.get_declaring_method_identifier(&required_method_id);
             }
@@ -483,7 +482,7 @@ pub fn get_method_ids_from_object<'ctx, 'ast, 'arena, 'object>(
                 continue;
             };
 
-            let mut mixin_method_id = MethodIdentifier::new(atom(&mixin_metadata.original_name), atom(&method_name));
+            let mut mixin_method_id = MethodIdentifier::new(mixin_metadata.original_name, method_name);
             if !context.codebase.method_identifier_exists(&mixin_method_id) {
                 mixin_method_id = context.codebase.get_declaring_method_identifier(&mixin_method_id);
             }
@@ -584,11 +583,11 @@ fn check_where_method_constraints(
         return true;
     }
 
-    for (template_name, constraint) in &method_metadata.where_constraints {
+    for (&template_name, constraint) in &method_metadata.where_constraints {
         let actual_template_type = get_specialized_template_type(
             context.codebase,
             template_name,
-            &defining_class_id,
+            defining_class_id,
             class_like_metadata,
             object_type.get_type_parameters(),
         )
@@ -912,7 +911,7 @@ fn collect_mixin_types<'object>(
                         && let Some(type_params) = named_object.get_type_parameters()
                         && let GenericParent::ClassLike(defining_class) = defining_entity
                         && named_object.name.eq_ignore_ascii_case(defining_class)
-                        && let Some(index) = class_metadata.get_template_index_for_name(parameter_name)
+                        && let Some(index) = class_metadata.get_template_index_for_name(*parameter_name)
                         && let Some(concrete_type) = type_params.get(index)
                     {
                         for atomic in concrete_type.types.as_ref() {

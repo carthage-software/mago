@@ -260,8 +260,8 @@ fn populate_codebase_inner(
             }
         }
 
-        for const_name in &dirty_const_names {
-            if let Some(constant) = codebase.constants.get_mut(const_name) {
+        for const_name in dirty_const_names {
+            if let Some(constant) = codebase.constants.get_mut(&const_name) {
                 let force_repopulation = constant.flags.is_user_defined();
                 if constant.flags.is_populated() && !force_repopulation {
                     continue;
@@ -277,7 +277,7 @@ fn populate_codebase_inner(
                 continue;
             }
 
-            populate_constant(name, constant, &codebase.symbols, symbol_references, force_repopulation);
+            populate_constant(*name, constant, &codebase.symbols, symbol_references, force_repopulation);
         }
     }
 
@@ -341,21 +341,21 @@ fn populate_codebase_inner(
 
 /// Populates a single constant's type metadata.
 fn populate_constant(
-    name: &Atom,
+    name: Atom,
     constant: &mut ConstantMetadata,
     symbols: &Symbols,
     symbol_references: &mut SymbolReferences,
     force_repopulation: bool,
 ) {
     for attribute_metadata in &constant.attributes {
-        symbol_references.add_symbol_reference_to_symbol(*name, attribute_metadata.name, true);
+        symbol_references.add_symbol_reference_to_symbol(name, attribute_metadata.name, true);
     }
 
     if let Some(type_metadata) = &mut constant.type_metadata {
         populate_union_type(
             &mut type_metadata.type_union,
             symbols,
-            Some(&ReferenceSource::Symbol(true, *name)),
+            Some(&ReferenceSource::Symbol(true, name)),
             symbol_references,
             force_repopulation,
         );
@@ -365,7 +365,7 @@ fn populate_constant(
         populate_union_type(
             inferred_type,
             symbols,
-            Some(&ReferenceSource::Symbol(true, *name)),
+            Some(&ReferenceSource::Symbol(true, name)),
             symbol_references,
             force_repopulation,
         );

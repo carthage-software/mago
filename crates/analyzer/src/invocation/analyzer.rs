@@ -475,7 +475,7 @@ pub fn analyze_invocation<'ctx, 'arena>(
 
     if let Some(template_types) = invocation.target.get_template_types() {
         for (template_name, template) in template_types {
-            if template_result.has_lower_bound(template_name, &template.defining_entity) {
+            if template_result.has_lower_bound(*template_name, &template.defining_entity) {
                 continue;
             }
 

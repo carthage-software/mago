@@ -8,7 +8,7 @@ pub fn inherit_properties_from_parent(metadata: &mut ClassLikeMetadata, parent_m
     let parent_is_trait = parent_metadata.kind.is_trait();
 
     for (property_name, appearing_classlike) in &parent_metadata.appearing_property_ids {
-        if metadata.has_appearing_property(property_name) {
+        if metadata.has_appearing_property(*property_name) {
             continue;
         }
 

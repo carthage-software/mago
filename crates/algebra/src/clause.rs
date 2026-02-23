@@ -60,10 +60,10 @@ impl Clause {
     }
 
     #[must_use]
-    pub fn remove_possibilities(&self, var_id: &Atom) -> Option<Clause> {
+    pub fn remove_possibilities(&self, var_id: Atom) -> Option<Clause> {
         let mut possibilities = self.possibilities.clone();
 
-        possibilities.shift_remove(var_id);
+        possibilities.shift_remove(&var_id);
 
         if possibilities.is_empty() {
             return None;

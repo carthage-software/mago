@@ -1593,7 +1593,7 @@ pub fn cast_type_to_string<'ctx>(
 
                 if let Some(to_string_metadata) = context
                     .codebase
-                    .get_method(declaring_method_id.get_class_name(), declaring_method_id.get_method_name())
+                    .get_method(&declaring_method_id.get_class_name(), &declaring_method_id.get_method_name())
                 {
                     let result = analyze_implicit_method_call(
                         context,
@@ -1734,7 +1734,7 @@ fn find_to_string_in_intersections<'ctx>(
 
                 let Some(method) = context
                     .codebase
-                    .get_method(intersection_method_id.get_class_name(), intersection_method_id.get_method_name())
+                    .get_method(&intersection_method_id.get_class_name(), &intersection_method_id.get_method_name())
                 else {
                     continue;
                 };

@@ -175,15 +175,15 @@ impl ClassLikeMetadata {
     /// Returns type parameters for a specific generic parameter name.
     #[inline]
     #[must_use]
-    pub fn get_template_type(&self, name: &Atom) -> Option<&GenericTemplate> {
-        self.template_types.get(name)
+    pub fn get_template_type(&self, name: Atom) -> Option<&GenericTemplate> {
+        self.template_types.get(&name)
     }
 
     /// Returns type parameters for a specific generic parameter name with its index.
     #[inline]
     #[must_use]
-    pub fn get_template_type_with_index(&self, name: &Atom) -> Option<(usize, &GenericTemplate)> {
-        self.template_types.get_full(name).map(|(index, _, types)| (index, types))
+    pub fn get_template_type_with_index(&self, name: Atom) -> Option<(usize, &GenericTemplate)> {
+        self.template_types.get_full(&name).map(|(index, _, types)| (index, types))
     }
 
     #[must_use]
@@ -197,29 +197,29 @@ impl ClassLikeMetadata {
     }
 
     #[must_use]
-    pub fn get_template_index_for_name(&self, name: &Atom) -> Option<usize> {
-        self.template_types.get_index_of(name)
+    pub fn get_template_index_for_name(&self, name: Atom) -> Option<usize> {
+        self.template_types.get_index_of(&name)
     }
 
     /// Checks if a specific parent is either a parent class or interface.
     #[inline]
     #[must_use]
-    pub fn has_parent(&self, parent: &Atom) -> bool {
-        self.all_parent_classes.contains(parent) || self.all_parent_interfaces.contains(parent)
+    pub fn has_parent(&self, parent: Atom) -> bool {
+        self.all_parent_classes.contains(&parent) || self.all_parent_interfaces.contains(&parent)
     }
 
     /// Checks if a specific parent has template extended parameters.
     #[inline]
     #[must_use]
-    pub fn has_template_extended_parameter(&self, parent: &Atom) -> bool {
-        self.template_extended_parameters.contains_key(parent)
+    pub fn has_template_extended_parameter(&self, parent: Atom) -> bool {
+        self.template_extended_parameters.contains_key(&parent)
     }
 
     /// Checks if a specific method appears in this class-like.
     #[inline]
     #[must_use]
-    pub fn has_appearing_method(&self, method: &Atom) -> bool {
-        self.appearing_method_ids.contains_key(method)
+    pub fn has_appearing_method(&self, method: Atom) -> bool {
+        self.appearing_method_ids.contains_key(&method)
     }
 
     /// Returns a vector of property names.
@@ -232,15 +232,15 @@ impl ClassLikeMetadata {
     /// Checks if a specific property appears in this class-like.
     #[inline]
     #[must_use]
-    pub fn has_appearing_property(&self, name: &Atom) -> bool {
-        self.appearing_property_ids.contains_key(name)
+    pub fn has_appearing_property(&self, name: Atom) -> bool {
+        self.appearing_property_ids.contains_key(&name)
     }
 
     /// Checks if a specific property is declared in this class-like.
     #[inline]
     #[must_use]
-    pub fn has_declaring_property(&self, name: &Atom) -> bool {
-        self.declaring_property_ids.contains_key(name)
+    pub fn has_declaring_property(&self, name: Atom) -> bool {
+        self.declaring_property_ids.contains_key(&name)
     }
 
     /// Takes ownership of the issues found for this class-like structure.
@@ -367,7 +367,7 @@ impl ClassLikeMetadata {
         self.overridden_method_ids
             .entry(method)
             .or_default()
-            .insert(*parent_method_id.get_class_name(), parent_method_id)
+            .insert(parent_method_id.get_class_name(), parent_method_id)
     }
 
     /// Adds or updates a property's metadata. Returns the previous metadata if the property existed.

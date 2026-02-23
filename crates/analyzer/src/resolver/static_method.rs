@@ -176,7 +176,7 @@ fn resolve_method_from_classname<'ctx, 'arena>(
                 && !is_relative
                 && !current_class_metadata.is_some_and(|current_class_metadata| {
                     current_class_metadata.name == defining_class_metadata.name
-                        || current_class_metadata.has_parent(&defining_class_metadata.name)
+                        || current_class_metadata.has_parent(defining_class_metadata.name)
                 })
             {
                 report_non_static_access(context, &method.method_identifier, method_span);
@@ -346,7 +346,7 @@ fn resolve_method_from_metadata<'ctx, 'arena>(
     class_span: Span,
     has_magic_static_call: bool,
 ) -> Option<ResolvedMethod> {
-    let method_id = MethodIdentifier::new(atom(&defining_class_metadata.original_name), atom(&method_name));
+    let method_id = MethodIdentifier::new(defining_class_metadata.original_name, method_name);
     let declaring_method_id = context.codebase.get_declaring_method_identifier(&method_id);
     let (declaring_method_id, function_like) = match context.codebase.get_method_by_id(&declaring_method_id) {
         Some(fl) => (declaring_method_id, fl),
@@ -358,7 +358,7 @@ fn resolve_method_from_metadata<'ctx, 'arena>(
                 let Some(required_metadata) = context.codebase.get_class_like(required_class) else {
                     continue;
                 };
-                let req_method_id = MethodIdentifier::new(atom(&required_metadata.original_name), atom(&method_name));
+                let req_method_id = MethodIdentifier::new(required_metadata.original_name, method_name);
                 let req_declaring_id = context.codebase.get_declaring_method_identifier(&req_method_id);
                 if let Some(fl) = context.codebase.get_method_by_id(&req_declaring_id) {
                     found = Some((req_declaring_id, fl));
@@ -374,8 +374,8 @@ fn resolve_method_from_metadata<'ctx, 'arena>(
         && !check_method_visibility(
             context,
             block_context,
-            method_id.get_class_name(),
-            method_id.get_method_name(),
+            &method_id.get_class_name(),
+            &method_id.get_method_name(),
             access_span,
             Some(selector.span()),
         )
@@ -390,7 +390,7 @@ fn resolve_method_from_metadata<'ctx, 'arena>(
             context,
             class_span,
             selector.span(),
-            *method_id.get_class_name(),
+            method_id.get_class_name(),
             method_name,
             is_static,
         );
@@ -487,11 +487,11 @@ fn get_metadata_object<'ctx>(
                 class_like_metadata
                     .template_types
                     .iter()
-                    .map(|(parameter_name, template)| {
+                    .map(|(&parameter_name, template)| {
                         if let Some(parameter) = get_specialized_template_type(
                             context.codebase,
                             parameter_name,
-                            &class_like_metadata.name,
+                            class_like_metadata.name,
                             current_class_metadata,
                             None,
                         ) {
@@ -501,7 +501,7 @@ fn get_metadata_object<'ctx>(
                             let constraint = &template.constraint;
 
                             wrap_atomic(TAtomic::GenericParameter(TGenericParameter {
-                                parameter_name: *parameter_name,
+                                parameter_name,
                                 constraint: Arc::new(constraint.clone()),
                                 defining_entity: *defining_entity,
                                 intersection_types: None,
@@ -710,7 +710,7 @@ fn find_static_method_in_single_mixin<'ctx, 'arena>(
 ) -> Option<ResolvedMethod> {
     let mixin_metadata = context.codebase.get_class_like(&mixin_class_name)?;
 
-    let method_id = MethodIdentifier::new(atom(&mixin_metadata.original_name), atom(&method_name));
+    let method_id = MethodIdentifier::new(mixin_metadata.original_name, method_name);
     let declaring_method_id = context.codebase.get_declaring_method_identifier(&method_id);
     let function_like = context.codebase.get_method_by_id(&declaring_method_id)?;
 
@@ -725,8 +725,8 @@ fn find_static_method_in_single_mixin<'ctx, 'arena>(
     if !check_method_visibility(
         context,
         block_context,
-        method_id.get_class_name(),
-        method_id.get_method_name(),
+        &method_id.get_class_name(),
+        &method_id.get_method_name(),
         access_span,
         Some(selector.span()),
     ) {

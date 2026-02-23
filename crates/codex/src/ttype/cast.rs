@@ -59,7 +59,7 @@ pub fn cast_atomic_to_callable<'a>(
     if let TAtomic::Object(TObject::Named(named_object)) = atomic {
         let method_identifier = MethodIdentifier::new(named_object.get_name(), atom("__invoke"));
         let method_identifier = codebase.get_declaring_method_identifier(&method_identifier);
-        if codebase.method_exists(method_identifier.get_class_name(), method_identifier.get_method_name()) {
+        if codebase.method_exists(&method_identifier.get_class_name(), &method_identifier.get_method_name()) {
             populate_template_result(
                 template_result.as_deref_mut(),
                 codebase,
@@ -159,7 +159,7 @@ fn try_object_method(
     let method_identifier = MethodIdentifier::new(object_name, method_name);
     let method_identifier = codebase.get_declaring_method_identifier(&method_identifier);
 
-    if codebase.method_exists(method_identifier.get_class_name(), method_identifier.get_method_name()) {
+    if codebase.method_exists(&method_identifier.get_class_name(), &method_identifier.get_method_name()) {
         populate_template_result(template_result, codebase, object_name, type_parameters);
         return Some(Cow::Owned(TCallable::Alias(method_identifier.into())));
     }

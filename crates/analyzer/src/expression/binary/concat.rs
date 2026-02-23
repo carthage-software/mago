@@ -236,7 +236,7 @@ fn analyze_string_concat_operand<'arena>(
                     continue;
                 };
 
-                if context.codebase.method_exists(class_like_name, "__toString") {
+                if context.codebase.method_exists(&class_like_name, "__toString") {
                     current_atomic_is_valid = true;
 
                     context.collector.report_with_code(

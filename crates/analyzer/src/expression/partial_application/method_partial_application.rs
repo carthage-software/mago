@@ -38,7 +38,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for MethodPartialApplication<'arena>
         let mut identifiers = vec![];
         for resolved_method in &method_resolution.resolved_methods {
             let class_name = ascii_lowercase_atom(resolved_method.method_identifier.get_class_name().as_ref());
-            let method_name = *resolved_method.method_identifier.get_method_name();
+            let method_name = resolved_method.method_identifier.get_method_name();
             artifacts.symbol_references.add_reference_to_class_member(
                 &block_context.scope,
                 (class_name, method_name),
@@ -46,8 +46,8 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for MethodPartialApplication<'arena>
             );
 
             identifiers.push(FunctionLikeIdentifier::Method(
-                *resolved_method.method_identifier.get_class_name(),
-                *resolved_method.method_identifier.get_method_name(),
+                resolved_method.method_identifier.get_class_name(),
+                resolved_method.method_identifier.get_method_name(),
             ));
         }
 
@@ -63,8 +63,8 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for MethodPartialApplication<'arena>
             let mut closure_types = Vec::new();
             for resolved_method in method_resolution.resolved_methods {
                 let identifier = FunctionLikeIdentifier::Method(
-                    *resolved_method.method_identifier.get_class_name(),
-                    *resolved_method.method_identifier.get_method_name(),
+                    resolved_method.method_identifier.get_class_name(),
+                    resolved_method.method_identifier.get_method_name(),
                 );
 
                 let Some(signature) = get_signature_of_function_like_identifier(&identifier, context.codebase) else {

@@ -954,7 +954,7 @@ fn analyze_iterator<'ctx, 'ast, 'arena>(
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     iterator: &'ast Expression<'arena>,
-    iterator_variable_id: Option<&Atom>,
+    iterator_variable_id: Option<Atom>,
     foreach: &'ast Foreach<'arena>,
 ) -> Result<(bool, TUnion, TUnion), AnalysisError> {
     let was_inside_general_use = block_context.flags.inside_general_use();
@@ -964,7 +964,7 @@ fn analyze_iterator<'ctx, 'ast, 'arena>(
 
     let iterator_type = if let Some(it_type) = artifacts.get_rc_expression_type(iterator).cloned() {
         it_type
-    } else if let Some(var_type) = iterator_variable_id.and_then(|v| block_context.locals.get(v).cloned()) {
+    } else if let Some(var_type) = iterator_variable_id.and_then(|v| block_context.locals.get(&v).cloned()) {
         var_type
     } else {
         context.collector.report_with_code(
@@ -1124,7 +1124,7 @@ fn analyze_iterator<'ctx, 'ast, 'arena>(
                         let enum_name = enum_instance.get_name();
                         let enum_backing_type = context
                             .codebase
-                            .get_enum(enum_instance.get_name_ref())
+                            .get_enum(&enum_instance.get_name())
                             .and_then(|class_like| class_like.enum_type.as_ref());
 
                         context.collector.report_with_code(

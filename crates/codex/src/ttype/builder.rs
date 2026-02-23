@@ -420,11 +420,11 @@ pub fn get_union_from_type_ast(
         Type::Reference(reference_type) => {
             let reference_name_atom = atom(reference_type.identifier.value);
 
-            if let Some((source_class, original_name)) = type_context.get_imported_type_alias(&reference_name_atom) {
+            if let Some((source_class, original_name)) = type_context.get_imported_type_alias(reference_name_atom) {
                 return Ok(wrap_atomic(TAtomic::Alias(TAlias::new(*source_class, *original_name))));
             }
 
-            if type_context.has_type_alias(&reference_name_atom)
+            if type_context.has_type_alias(reference_name_atom)
                 && let Some(class_name) = classname
             {
                 return Ok(wrap_atomic(TAtomic::Alias(TAlias::new(class_name, reference_name_atom))));
@@ -834,7 +834,7 @@ fn get_reference_from_ast<'i>(
         classname.unwrap_or_else(|| atom("static"))
     } else {
         let reference_name_atom = atom(reference_name);
-        if let Some(defining_entities) = type_context.get_template_definition(&reference_name_atom)
+        if let Some(defining_entities) = type_context.get_template_definition(reference_name_atom)
             && generics.is_none()
         {
             return Ok(get_template_atomic(defining_entities, reference_name_atom));

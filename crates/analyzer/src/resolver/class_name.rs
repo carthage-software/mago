@@ -184,7 +184,7 @@ impl ResolvedClassname {
             Some(fqcn) => {
                 let lowercase_fqcn = ascii_lowercase_atom(&fqcn);
 
-                if codebase.symbols.contains_enum(&lowercase_fqcn) {
+                if codebase.symbols.contains_enum(lowercase_fqcn) {
                     TObject::Enum(TEnum::new(fqcn))
                 } else {
                     TObject::Named(TNamedObject::new(fqcn))
