@@ -20,6 +20,7 @@ use crate::statement::function_like::FunctionLikeBody;
 use crate::statement::function_like::analyze_function_like;
 use crate::statement::function_like::check_unused_function_template_parameters;
 use crate::statement::function_like::unused_parameter;
+use crate::utils::missing_type_hints;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for Method<'arena> {
     fn analyze<'ctx>(
@@ -119,7 +120,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Method<'arena> {
 
         // Check for missing type hints
         for parameter in &self.parameter_list.parameters {
-            crate::utils::missing_type_hints::check_parameter_type_hint(
+            missing_type_hints::check_parameter_type_hint(
                 context,
                 Some(class_like_metadata),
                 method_metadata,
@@ -127,13 +128,24 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Method<'arena> {
             );
         }
 
-        crate::utils::missing_type_hints::check_return_type_hint(
+        missing_type_hints::check_return_type_hint(
             context,
             Some(class_like_metadata),
             method_metadata,
             self.name.value,
             self.return_type_hint.as_ref(),
             self.span(),
+        );
+
+        for (i, parameter) in self.parameter_list.parameters.iter().enumerate() {
+            missing_type_hints::check_imprecise_parameter_type_hint(context, method_metadata, parameter, i);
+        }
+
+        missing_type_hints::check_imprecise_return_type_hint(
+            context,
+            method_metadata,
+            self.name.value,
+            self.return_type_hint.as_ref(),
         );
 
         Ok(())

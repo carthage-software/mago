@@ -666,6 +666,11 @@ test_case!(issue_1169);
 test_case!(issue_1184);
 test_case!(issue_1184_methods);
 test_case!(issue_1190);
+test_case!(issue_1191, {
+    let mut s = crate::framework::default_test_settings();
+    s.check_missing_type_hints = true;
+    s
+});
 
 #[test]
 fn test_all_test_cases_are_ran() {

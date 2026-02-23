@@ -953,6 +953,15 @@ pub(crate) fn analyze_class_like<'ctx, 'ast, 'arena>(
 
                 missing_type_hints::check_property_type_hint(context, class_like_metadata, property);
 
+                // Check for imprecise type hints (bare `array` or `iterable`)
+                let first_property_name = match property {
+                    Property::Plain(plain) => plain.items.first().map(|item| atom(item.variable().name)),
+                    Property::Hooked(hooked) => Some(atom(hooked.item.variable().name)),
+                };
+
+                let prop_meta = first_property_name.and_then(|name| class_like_metadata.properties.get(&name));
+                missing_type_hints::check_imprecise_property_type_hint(context, property, prop_meta);
+
                 let property_names: Vec<Atom> = match property {
                     Property::Plain(plain) => plain.items.iter().map(|item| atom(item.variable().name)).collect(),
                     Property::Hooked(hooked) => {

@@ -29,6 +29,7 @@ use crate::statement::function_like::FunctionLikeBody;
 use crate::statement::function_like::analyze_function_like;
 use crate::statement::function_like::unused_parameter;
 use crate::utils::expression::variable::get_variables_referenced_in_expression;
+use crate::utils::missing_type_hints;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for ArrowFunction<'arena> {
     fn analyze<'ctx>(
@@ -91,7 +92,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ArrowFunction<'arena> {
 
         // Check for missing type hints
         for parameter in &self.parameter_list.parameters {
-            crate::utils::missing_type_hints::check_parameter_type_hint(
+            missing_type_hints::check_parameter_type_hint(
                 context,
                 block_context.scope.get_class_like(),
                 function_metadata,
@@ -99,13 +100,25 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ArrowFunction<'arena> {
             );
         }
 
-        crate::utils::missing_type_hints::check_return_type_hint(
+        missing_type_hints::check_return_type_hint(
             context,
             block_context.scope.get_class_like(),
             function_metadata,
             "arrow function",
             self.return_type_hint.as_ref(),
             self.span(),
+        );
+
+        // Check for imprecise type hints (bare `array` or `iterable`)
+        for (i, parameter) in self.parameter_list.parameters.iter().enumerate() {
+            missing_type_hints::check_imprecise_parameter_type_hint(context, function_metadata, parameter, i);
+        }
+
+        missing_type_hints::check_imprecise_return_type_hint(
+            context,
+            function_metadata,
+            "arrow function",
+            self.return_type_hint.as_ref(),
         );
 
         let inferred_parameter_types = artifacts.inferred_parameter_types.take();

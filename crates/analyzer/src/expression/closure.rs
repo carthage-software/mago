@@ -170,6 +170,23 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Closure<'arena> {
             self.span(),
         );
 
+        // Check for imprecise type hints (bare `array` or `iterable`)
+        for (i, parameter) in self.parameter_list.parameters.iter().enumerate() {
+            crate::utils::missing_type_hints::check_imprecise_parameter_type_hint(
+                context,
+                function_metadata,
+                parameter,
+                i,
+            );
+        }
+
+        crate::utils::missing_type_hints::check_imprecise_return_type_hint(
+            context,
+            function_metadata,
+            "closure",
+            self.return_type_hint.as_ref(),
+        );
+
         let inferred_parameter_types = artifacts.inferred_parameter_types.take();
         let inner_artifacts = analyze_function_like(
             context,
