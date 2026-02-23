@@ -87,10 +87,10 @@ For comprehensive static analyzer benchmarks across multiple projects, versions,
 <BenchmarkChart
   title="Speed"
   :data="[
-    { label: 'Mago', value: 2.17, highlight: true },
-    { label: 'Psalm', value: 11.34 },
-    { label: 'Phan', value: 62.61 },
-    { label: 'PHPStan', value: 79.88 }
+    { label: 'Mago', value: 2.24, highlight: true },
+    { label: 'Psalm', value: 11.31 },
+    { label: 'Phan', value: 62.36 },
+    { label: 'PHPStan', value: 80.18 }
   ]"
   unit="seconds"
 />
@@ -103,10 +103,10 @@ For comprehensive static analyzer benchmarks across multiple projects, versions,
 <BenchmarkChart
   title="Peak Memory (RSS)"
   :data="[
-    { label: 'Mago', value: 1058, highlight: true },
-    { label: 'Psalm', value: 3921 },
-    { label: 'PHPStan', value: 7370 },
-    { label: 'Phan', value: 12823 }
+    { label: 'Mago', value: 1082, highlight: true },
+    { label: 'Psalm', value: 3865 },
+    { label: 'PHPStan', value: 7171 },
+    { label: 'Phan', value: 13187 }
   ]"
   unit="mb"
 />
@@ -120,7 +120,7 @@ For comprehensive static analyzer benchmarks across multiple projects, versions,
 - **Hardware:** MacBook Pro (Apple M1 Pro, 32GB RAM), idle system
 - **Codebase:** `wordpress-develop@5b01d24d8c5f2cfa4b96349967a9759e52888d03`
 - **PHP:** 8.5.0 (Zend Engine v4.5.0, Zend OPcache v8.5.0)
-- **Mago:** 1.9.1
+- **Mago:** 1.10.0
 - **Psalm:** 6.15.1
 - **PHPStan:** 2.1.39
 - **Phan:** 6.0.1
