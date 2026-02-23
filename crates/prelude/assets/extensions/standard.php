@@ -1714,8 +1714,6 @@ function printf(string $format, mixed ...$values): int {}
 
 /**
  * @param array<string|int|float|bool|null|Stringable> $values
- *
- * @pure
  */
 function vprintf(string $format, array $values): int {}
 
@@ -1729,16 +1727,12 @@ function vsprintf(string $format, array $values): string {}
 /**
  * @param resource $stream
  * @param string|int|float|bool|null|Stringable ...$values
- *
- * @pure
  */
 function fprintf($stream, string $format, mixed ...$values): int {}
 
 /**
  * @param resource $stream
  * @param array<string|int|float|bool|null|Stringable> $values
- *
- * @pure
  */
 function vfprintf($stream, string $format, array $values): int {}
 
