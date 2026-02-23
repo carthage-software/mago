@@ -430,7 +430,10 @@ impl<'arena> FormatterState<'_, 'arena> {
             if matches!(self.parent_node(), Node::PropertyAccess(_) | Node::NullSafePropertyAccess(_))
                 && matches!(expression, Expression::Binary(_) | Expression::Conditional(_))
             {
-                return false;
+                // Binary expressions are handled by `binary_node_needs_parens` which
+                // already checks for PropertyAccess context. Only Conditional/elvis
+                // needs parens added here since no equivalent check exists for it.
+                return matches!(expression, Expression::Conditional(_));
             }
 
             let offset = match access {
