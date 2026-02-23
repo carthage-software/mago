@@ -15,6 +15,7 @@ use crate::ttype::TType;
 use crate::ttype::atomic::TAtomic;
 use crate::ttype::atomic::alias::TAlias;
 use crate::ttype::atomic::array::TArray;
+use crate::ttype::atomic::array::key::ArrayKey;
 use crate::ttype::atomic::callable::TCallable;
 use crate::ttype::atomic::callable::TCallableSignature;
 use crate::ttype::atomic::callable::parameter::TCallableParameter;
@@ -32,6 +33,9 @@ use crate::ttype::atomic::reference::TReference;
 use crate::ttype::atomic::reference::TReferenceMemberSelector;
 use crate::ttype::atomic::scalar::TScalar;
 use crate::ttype::atomic::scalar::class_like_string::TClassLikeString;
+use crate::ttype::atomic::scalar::int::TInteger;
+use crate::ttype::atomic::scalar::string::TString;
+use crate::ttype::atomic::scalar::string::TStringLiteral;
 use crate::ttype::combiner;
 use crate::ttype::union::TUnion;
 
@@ -196,8 +200,20 @@ pub(crate) fn expand_atomic(
                 }
 
                 if let Some(known_items) = &mut keyed_data.known_items {
-                    for (_, item_type) in known_items.values_mut() {
-                        expand_union(codebase, item_type, options);
+                    // Check if any keys need resolution
+                    let needs_key_resolution = known_items.keys().any(|k| k.is_class_like_constant());
+
+                    if needs_key_resolution {
+                        let old_items = std::mem::take(known_items);
+                        for (key, (is_optional, mut value_type)) in old_items {
+                            expand_union(codebase, &mut value_type, options);
+                            let resolved_key = resolve_array_key(key, codebase, options);
+                            known_items.insert(resolved_key, (is_optional, value_type));
+                        }
+                    } else {
+                        for (_, item_type) in known_items.values_mut() {
+                            expand_union(codebase, item_type, options);
+                        }
                     }
                 }
             }
@@ -294,6 +310,71 @@ pub(crate) fn expand_atomic(
         }
         _ => {}
     }
+}
+
+/// Resolves a `ClassLikeConstant` array key to its concrete `Integer` or `String` value.
+///
+/// Looks up the class constant or enum case in the codebase metadata and returns:
+/// - `ArrayKey::Integer(value)` if the constant resolves to a literal integer
+/// - `ArrayKey::String(value)` if the constant resolves to a literal string
+/// - The original key unchanged if it cannot be resolved
+fn resolve_array_key(key: ArrayKey, codebase: &CodebaseMetadata, options: &TypeExpansionOptions) -> ArrayKey {
+    let ArrayKey::ClassLikeConstant { class_like_name, constant_name } = key else {
+        return key;
+    };
+
+    // Resolve self/static/this to the actual class name
+    let resolved_class_name = {
+        let name_lc = ascii_lowercase_atom(&class_like_name);
+        match name_lc.as_str() {
+            "self" => options.self_class.unwrap_or(class_like_name),
+            "static" | "$this" => {
+                if let StaticClassType::Name(name) = &options.static_class_type {
+                    *name
+                } else {
+                    options.self_class.unwrap_or(class_like_name)
+                }
+            }
+            _ => class_like_name,
+        }
+    };
+
+    let Some(class_like) = codebase.get_class_like(&resolved_class_name) else {
+        return ArrayKey::ClassLikeConstant { class_like_name, constant_name };
+    };
+
+    // Try class constants first
+    if let Some(constant) = class_like.constants.get(&constant_name)
+        && let Some(inferred) = &constant.inferred_type
+    {
+        match inferred {
+            TAtomic::Scalar(TScalar::Integer(TInteger::Literal(i))) => {
+                return ArrayKey::Integer(*i);
+            }
+            TAtomic::Scalar(TScalar::String(TString { literal: Some(TStringLiteral::Value(s)), .. })) => {
+                return ArrayKey::String(*s);
+            }
+            _ => {}
+        }
+    }
+
+    // Try enum cases
+    if let Some(enum_case) = class_like.enum_cases.get(&constant_name)
+        && let Some(value_type) = &enum_case.value_type
+    {
+        match value_type {
+            TAtomic::Scalar(TScalar::Integer(TInteger::Literal(i))) => {
+                return ArrayKey::Integer(*i);
+            }
+            TAtomic::Scalar(TScalar::String(TString { literal: Some(TStringLiteral::Value(s)), .. })) => {
+                return ArrayKey::String(*s);
+            }
+            _ => {}
+        }
+    }
+
+    // Cannot resolve - keep as-is
+    ArrayKey::ClassLikeConstant { class_like_name, constant_name }
 }
 
 #[cold]

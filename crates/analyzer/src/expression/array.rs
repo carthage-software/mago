@@ -557,6 +557,11 @@ fn handle_variadic_array_element<'arena>(
                                         .push(TAtomic::Scalar(TScalar::String(TString::known_literal(*string_key))));
                                     ArrayKey::String(*string_key)
                                 }
+                                ArrayKey::ClassLikeConstant { .. } => {
+                                    // unresolved class-like constant key; treat as opaque
+                                    array_creation_info.is_list = false;
+                                    *key
+                                }
                             };
 
                             array_creation_info.array_keys.insert(new_offset_key);

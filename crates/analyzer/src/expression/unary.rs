@@ -13,7 +13,6 @@ use mago_codex::identifier::method::MethodIdentifier;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::array::TArray;
-use mago_codex::ttype::atomic::array::key::ArrayKey;
 use mago_codex::ttype::atomic::array::keyed::TKeyedArray;
 use mago_codex::ttype::atomic::array::list::TList;
 use mago_codex::ttype::atomic::callable::TCallableSignature;
@@ -1389,10 +1388,7 @@ fn cast_type_to_object<'arena>(
                 let mut known_properties = BTreeMap::new();
                 if let Some(known_items) = &keyed_array.known_items {
                     for (key, item) in known_items {
-                        let property_name = match key {
-                            ArrayKey::Integer(value) => i64_atom(*value),
-                            ArrayKey::String(value) => *value,
-                        };
+                        let property_name = key.to_atom();
 
                         known_properties.insert(property_name, item.clone());
                     }

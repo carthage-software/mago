@@ -5,6 +5,7 @@ use mago_syntax_core::utils::parse_literal_integer;
 
 use crate::ast::ArrayType;
 use crate::ast::AssociativeArrayType;
+use crate::ast::Identifier;
 use crate::ast::Keyword;
 use crate::ast::ListType;
 use crate::ast::NonEmptyArrayType;
@@ -240,6 +241,23 @@ pub fn parse_shape_field_key<'input>(stream: &mut TypeTokenStream<'input>) -> Re
     if stream.is_at(TypeTokenKind::LiteralFloat)? {
         let token = stream.consume()?;
         return Ok(ShapeKey::String { value: token.value, span: token.span_for(stream.file_id()) });
+    }
+
+    // Check for class-like constant key pattern: ClassName::CONSTANT_NAME
+    if (stream.is_at(TypeTokenKind::Identifier)?
+        || stream.is_at(TypeTokenKind::QualifiedIdentifier)?
+        || stream.is_at(TypeTokenKind::FullyQualifiedIdentifier)?)
+        && stream.lookahead(1)?.is_some_and(|t| t.kind == TypeTokenKind::ColonColon)
+        && stream.lookahead(2)?.is_some_and(|t| t.kind == TypeTokenKind::Identifier)
+    {
+        let class_token = stream.consume()?;
+        let class_name = Identifier::from_token(class_token, stream.file_id());
+        let double_colon = stream.eat(TypeTokenKind::ColonColon)?.span_for(stream.file_id());
+        let constant_token = stream.eat(TypeTokenKind::Identifier)?;
+        let constant_name = Identifier::from_token(constant_token, stream.file_id());
+        let span = class_name.span.join(constant_name.span);
+
+        return Ok(ShapeKey::ClassLikeConstant { class_name, double_colon, constant_name, span });
     }
 
     let mut key_parts = Vec::new();

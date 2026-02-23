@@ -980,6 +980,9 @@ fn validate_keyed_array_elements<'ctx, 'arena>(
                     continue;
                 }
             }
+            ArrayKey::ClassLikeConstant { .. } => {
+                continue;
+            }
         };
 
         if let Some(parameter_ref) =

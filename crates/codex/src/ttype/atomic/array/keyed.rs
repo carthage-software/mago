@@ -170,7 +170,13 @@ impl TType for TKeyedArray {
 
     fn is_expandable(&self) -> bool {
         if let Some(known_items) = &self.known_items
-            && known_items.iter().any(|(_, (_, item_type))| item_type.is_expandable())
+            && known_items.iter().any(|(key, (_, item_type))| {
+                if let ArrayKey::ClassLikeConstant { .. } = key {
+                    return true;
+                }
+
+                item_type.is_expandable()
+            })
         {
             return true;
         }

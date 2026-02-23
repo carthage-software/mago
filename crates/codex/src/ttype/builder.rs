@@ -5,6 +5,7 @@ use std::sync::Arc;
 use mago_atom::Atom;
 use mago_atom::ascii_lowercase_atom;
 use mago_atom::atom;
+use mago_atom::concat_atom;
 use mago_atom::i64_atom;
 use mago_names::kind::NameKind;
 use mago_names::scope::NamespaceScope;
@@ -621,6 +622,9 @@ fn get_object_from_ast(
         let key = match field_key.key {
             ShapeKey::String { value, .. } => atom(value),
             ShapeKey::Integer { value, .. } => i64_atom(value),
+            ShapeKey::ClassLikeConstant { ref class_name, ref constant_name, .. } => {
+                concat_atom!(class_name.value, "::", constant_name.value)
+            }
         };
 
         let property_type = get_union_from_type_ast(&property.value, scope, type_context, classname)?;
@@ -662,6 +666,20 @@ fn get_shape_from_ast(
                     let array_key = match field_key.key {
                         ShapeKey::String { value, .. } => ArrayKey::String(atom(value)),
                         ShapeKey::Integer { value, .. } => ArrayKey::Integer(value),
+                        ShapeKey::ClassLikeConstant { ref class_name, ref constant_name, .. } => {
+                            let class_like_name = if class_name.value.eq_ignore_ascii_case("self")
+                                || class_name.value.eq_ignore_ascii_case("static")
+                                || class_name.value.eq("this")
+                                || class_name.value.eq("$this")
+                            {
+                                classname.unwrap_or_else(|| atom(class_name.value))
+                            } else {
+                                let (resolved, _) = scope.resolve(NameKind::Default, class_name.value);
+                                atom(&resolved)
+                            };
+
+                            ArrayKey::ClassLikeConstant { class_like_name, constant_name: atom(constant_name.value) }
+                        }
                     };
 
                     if let ArrayKey::Integer(offset) = array_key {
@@ -738,6 +756,20 @@ fn get_shape_from_ast(
                     let array_key = match field_key.key {
                         ShapeKey::String { value, .. } => ArrayKey::String(atom(value)),
                         ShapeKey::Integer { value, .. } => ArrayKey::Integer(value),
+                        ShapeKey::ClassLikeConstant { ref class_name, ref constant_name, .. } => {
+                            let class_like_name = if class_name.value.eq_ignore_ascii_case("self")
+                                || class_name.value.eq_ignore_ascii_case("static")
+                                || class_name.value.eq("this")
+                                || class_name.value.eq("$this")
+                            {
+                                classname.unwrap_or_else(|| atom(class_name.value))
+                            } else {
+                                let (resolved, _) = scope.resolve(NameKind::Default, class_name.value);
+                                atom(&resolved)
+                            };
+
+                            ArrayKey::ClassLikeConstant { class_like_name, constant_name: atom(constant_name.value) }
+                        }
                     };
 
                     if let ArrayKey::Integer(offset) = array_key

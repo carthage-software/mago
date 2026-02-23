@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 
 use mago_atom::Atom;
+use mago_atom::concat_atom;
 use mago_atom::i64_atom;
 use serde::Deserialize;
 use serde::Serialize;
@@ -9,8 +10,10 @@ use crate::ttype::atomic::TAtomic;
 use crate::ttype::atomic::scalar::TScalar;
 use crate::ttype::atomic::scalar::int::TInteger;
 use crate::ttype::atomic::scalar::string::TString;
+use crate::ttype::get_arraykey;
 use crate::ttype::get_int;
 use crate::ttype::get_string;
+use crate::ttype::shared::ARRAYKEY_ATOMIC;
 use crate::ttype::shared::INT_ATOMIC;
 use crate::ttype::shared::STRING_ATOMIC;
 use crate::ttype::union::TUnion;
@@ -26,6 +29,12 @@ pub enum ArrayKey {
     Integer(i64),
     /// A string array key.
     String(Atom),
+    /// A class-like constant or enum case key, not yet resolved to its concrete value.
+    ///
+    /// This is used when a docblock specifies `array{Foo::BAR: string}` where
+    /// `Foo::BAR` is a class constant or enum case. The key will be resolved
+    /// to its concrete `Integer` or `String` value during type expansion.
+    ClassLikeConstant { class_like_name: Atom, constant_name: Atom },
 }
 
 impl ArrayKey {
@@ -35,7 +44,7 @@ impl ArrayKey {
     pub const fn get_integer(&self) -> Option<i64> {
         match self {
             ArrayKey::Integer(i) => Some(*i),
-            ArrayKey::String(_) => None,
+            _ => None,
         }
     }
 
@@ -46,8 +55,8 @@ impl ArrayKey {
     #[must_use]
     pub fn get_string(&self) -> Option<&str> {
         match self {
-            ArrayKey::Integer(_) => None,
             ArrayKey::String(s) => Some(s),
+            _ => None,
         }
     }
 
@@ -65,6 +74,13 @@ impl ArrayKey {
         matches!(self, ArrayKey::String(_))
     }
 
+    /// Checks if this array key is an unresolved class-like constant.
+    #[inline]
+    #[must_use]
+    pub const fn is_class_like_constant(&self) -> bool {
+        matches!(self, ArrayKey::ClassLikeConstant { .. })
+    }
+
     /// Converts the array key into an `Atom` representing the key *value*.
     /// Preserves the literal value (e.g., `10`, `"abc"`).
     #[inline]
@@ -73,19 +89,21 @@ impl ArrayKey {
         match self {
             ArrayKey::Integer(i) => i64_atom(*i),
             ArrayKey::String(s) => *s,
+            ArrayKey::ClassLikeConstant { class_like_name, constant_name } => {
+                concat_atom!(class_like_name, "::", constant_name)
+            }
         }
     }
 
     /// Converts the array key into a specific literal atomic type representing the key *value*.
     /// Preserves the literal value (e.g., `10`, `"abc"`).
-    ///
-    /// Note: Clones the string for `ArrayKey::String`.
     #[inline]
     #[must_use]
     pub fn to_atomic(&self) -> TAtomic {
         match &self {
             ArrayKey::Integer(i) => TAtomic::Scalar(TScalar::Integer(TInteger::literal(*i))),
             ArrayKey::String(s) => TAtomic::Scalar(TScalar::String(TString::known_literal(*s))),
+            ArrayKey::ClassLikeConstant { .. } => TAtomic::Scalar(TScalar::ArrayKey),
         }
     }
 
@@ -104,6 +122,7 @@ impl ArrayKey {
         match self {
             ArrayKey::Integer(_) => INT_ATOMIC,
             ArrayKey::String(_) => STRING_ATOMIC,
+            ArrayKey::ClassLikeConstant { .. } => ARRAYKEY_ATOMIC,
         }
     }
 
@@ -114,6 +133,7 @@ impl ArrayKey {
         match self {
             ArrayKey::Integer(_) => get_int(),
             ArrayKey::String(_) => get_string(),
+            ArrayKey::ClassLikeConstant { .. } => get_arraykey(),
         }
     }
 }
@@ -129,6 +149,9 @@ impl std::fmt::Display for ArrayKey {
         match self {
             ArrayKey::Integer(i) => write!(f, "{i}"),
             ArrayKey::String(k) => write!(f, "'{k}'"),
+            ArrayKey::ClassLikeConstant { class_like_name, constant_name } => {
+                write!(f, "{class_like_name}::{constant_name}")
+            }
         }
     }
 }

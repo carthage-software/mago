@@ -290,6 +290,9 @@ fn update_atomic_given_key(
                                 non_empty: true,
                             });
                         }
+                        ArrayKey::ClassLikeConstant { .. } => {
+                            // Unresolved class-like constant key; skip
+                        }
                     },
                     TArray::Keyed(keyed_array) => {
                         *has_matching_item = true;

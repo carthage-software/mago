@@ -665,6 +665,7 @@ test_case!(issue_1165);
 test_case!(issue_1169);
 test_case!(issue_1184);
 test_case!(issue_1184_methods);
+test_case!(issue_1190);
 
 #[test]
 fn test_all_test_cases_are_ran() {
