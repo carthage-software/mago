@@ -882,7 +882,6 @@ function enum_exists(string $enum, bool $autoload = true): bool {}
  * @param class-string $class
  * @param non-empty-string $alias
  *
- * @pure
  * @no-named-arguments
  */
 function class_alias(string $class, string $alias, bool $autoload = true): bool {}
