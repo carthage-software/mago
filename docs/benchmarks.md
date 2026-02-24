@@ -2,11 +2,109 @@
 title: Benchmarks
 ---
 
+<script setup>
+import { ref, computed, onMounted } from 'vue'
+
+const DATA_URL = 'https://carthage-software.github.io/php-toolchain-benchmarks/latest.json'
+const PROJECT_LABELS = { wordpress: 'WordPress', psl: 'PSL', magento: 'Magento' }
+
+const raw = ref(null)
+const loading = ref(true)
+const error = ref(null)
+const selectedProject = ref('wordpress')
+
+onMounted(async () => {
+  try {
+    const res = await fetch(DATA_URL)
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    raw.value = await res.json()
+  } catch (e) {
+    error.value = 'Failed to load benchmark data. Please try refreshing the page.'
+  } finally {
+    loading.value = false
+  }
+})
+
+function parseVersion(v) {
+  return v.split('.').map(Number)
+}
+
+function compareVersions(a, b) {
+  const pa = parseVersion(a)
+  const pb = parseVersion(b)
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    if ((pa[i] || 0) !== (pb[i] || 0)) return (pa[i] || 0) - (pb[i] || 0)
+  }
+  return 0
+}
+
+function getLatestVersions(toolsObj) {
+  const groups = {}
+  for (const [name, measurements] of Object.entries(toolsObj)) {
+    const match = name.match(/^(.+?)\s+([\d.]+)$/)
+    if (!match) continue
+    const [, baseName, version] = match
+    if (!groups[baseName] || compareVersions(version, groups[baseName].version) > 0) {
+      groups[baseName] = { version, fullName: name, measurements }
+    }
+  }
+  return groups
+}
+
+function getStats(measurements) {
+  const valid = measurements.filter(m => !m.timed_out)
+  if (!valid.length) return null
+  return {
+    time: valid.reduce((s, m) => s + m.mean, 0) / valid.length,
+    memory: Math.max(...valid.map(m => m.memory_mb || 0)),
+  }
+}
+
+function cleanLabel(baseName, category) {
+  if (category === 'Formatter') return baseName.replace('Mago Fmt', 'Mago')
+  if (category === 'Linter') return baseName.replace('Mago Lint', 'Mago')
+  return baseName
+}
+
+function chartData(category, metric) {
+  if (!raw.value) return []
+  const project = raw.value.projects[selectedProject.value]
+  if (!project || !project[category]) return []
+
+  const latest = getLatestVersions(project[category])
+  const entries = []
+  for (const [baseName, { measurements }] of Object.entries(latest)) {
+    const stats = getStats(measurements)
+    if (!stats) continue
+    const isMago = baseName.startsWith('Mago')
+    entries.push({
+      label: cleanLabel(baseName, category),
+      value: metric === 'time' ? Math.round(stats.time * 1000) / 1000 : Math.round(stats.memory),
+      highlight: isMago,
+      isMago,
+    })
+  }
+
+  const mago = entries.filter(e => e.isMago)
+  const rest = entries.filter(e => !e.isMago).sort((a, b) => a.value - b.value)
+  return [...mago, ...rest]
+}
+
+const formatterSpeed = computed(() => chartData('Formatter', 'time'))
+const formatterMemory = computed(() => chartData('Formatter', 'memory'))
+const linterSpeed = computed(() => chartData('Linter', 'time'))
+const linterMemory = computed(() => chartData('Linter', 'memory'))
+const analyzerSpeed = computed(() => chartData('Cold', 'time'))
+const analyzerMemory = computed(() => chartData('Cold', 'memory'))
+const projects = computed(() => raw.value ? Object.keys(raw.value.projects) : [])
+const aggregationDate = computed(() => raw.value ? raw.value['aggregation-date'] : '')
+</script>
+
 # Benchmarks
 
 Performance is a core feature of **Mago**. Every component, from the parser to the analyzer, is designed to be as fast as possible.
 
-We regularly benchmark Mago against other popular tools in the PHP ecosystem to ensure it remains the fastest toolchain available. The benchmarks below were run against the full `wordpress-develop` codebase.
+We regularly benchmark Mago against other popular tools in the PHP ecosystem to ensure it remains the fastest toolchain available. The data below is fetched live from the [**PHP Toolchain Benchmarks**](https://carthage-software.github.io/php-toolchain-benchmarks/?project=psl&kind=Analyzers) dashboard ([source](https://github.com/carthage-software/php-toolchain-benchmarks)).
 
 ## Our performance promise
 
@@ -14,119 +112,45 @@ At its core, Mago is built on a simple philosophy: **it must be the fastest.**
 
 This is not just a goal; it's a guarantee. If any tool listed in our benchmarks ever outperforms Mago in a like-for-like comparison, we consider it a high-priority bug that needs to be fixed. Speed is a feature, and we promise to always deliver it.
 
+<div v-if="loading" class="benchmark-status">Loading benchmark data...</div>
+<div v-else-if="error" class="benchmark-status benchmark-error">{{ error }}</div>
+<template v-else>
+
+<div class="project-selector">
+  <button
+    v-for="p in projects"
+    :key="p"
+    :class="['project-btn', { active: p === selectedProject }]"
+    @click="selectedProject = p"
+  >{{ PROJECT_LABELS[p] || p }}</button>
+  <span class="benchmark-date">Updated: {{ aggregationDate }}</span>
+</div>
+
 ## Formatter
 
 This benchmark measures the time it takes to check the formatting of an entire codebase.
 
-<BenchmarkChart
-  title="Speed"
-  :data="[
-    { label: 'Mago', value: 0.365, highlight: true },
-    { label: 'Pretty PHP', value: 31.44 }
-  ]"
-  unit="seconds"
-/>
+<BenchmarkChart title="Speed" :data="formatterSpeed" unit="seconds" />
 
-<div class="memory-toggle">
-<details>
-<summary>Show Memory Usage</summary>
-<div class="memory-content">
-
-<BenchmarkChart
-  title="Peak Memory (RSS)"
-  :data="[
-    { label: 'Mago', value: 632, highlight: true },
-    { label: 'Pretty PHP', value: 155 }
-  ]"
-  unit="mb"
-/>
-
-</div>
-</details>
-</div>
+<BenchmarkChart title="Peak Memory (RSS)" :data="formatterMemory" unit="mb" />
 
 ## Linter
 
 This benchmark measures the time it takes to lint an entire codebase.
 
-<BenchmarkChart
-  title="Speed"
-  :data="[
-    { label: 'Mago', value: 0.547, highlight: true },
-    { label: 'Pint', value: 31.08 },
-    { label: 'PHP-CS-Fixer', value: 49.64 }
-  ]"
-  unit="seconds"
-/>
+<BenchmarkChart title="Speed" :data="linterSpeed" unit="seconds" />
 
-<div class="memory-toggle">
-<details>
-<summary>Show Memory Usage</summary>
-<div class="memory-content">
-
-<BenchmarkChart
-  title="Peak Memory (RSS)"
-  :data="[
-    { label: 'Mago', value: 460, highlight: true },
-    { label: 'Pint', value: 81 },
-    { label: 'PHP-CS-Fixer', value: 123 }
-  ]"
-  unit="mb"
-/>
-
-</div>
-</details>
-</div>
+<BenchmarkChart title="Peak Memory (RSS)" :data="linterMemory" unit="mb" />
 
 ## Analyzer
 
-This benchmark measures the time it takes to perform a full static analysis (uncached) on the `wordpress-develop` codebase.
+This benchmark measures the time it takes to perform a full static analysis (uncached).
 
-For comprehensive static analyzer benchmarks across multiple projects, versions, and categories, see the [**Static Analyzer Benchmarks Dashboard**](https://carthage-software.github.io/static-analyzers-benchmarks/) ([source](https://github.com/carthage-software/static-analyzers-benchmarks)).
+<BenchmarkChart title="Speed" :data="analyzerSpeed" unit="seconds" />
 
-<BenchmarkChart
-  title="Speed"
-  :data="[
-    { label: 'Mago', value: 2.24, highlight: true },
-    { label: 'Psalm', value: 11.31 },
-    { label: 'Phan', value: 62.36 },
-    { label: 'PHPStan', value: 80.18 }
-  ]"
-  unit="seconds"
-/>
+<BenchmarkChart title="Peak Memory (RSS)" :data="analyzerMemory" unit="mb" />
 
-<div class="memory-toggle">
-<details>
-<summary>Show Memory Usage</summary>
-<div class="memory-content">
-
-<BenchmarkChart
-  title="Peak Memory (RSS)"
-  :data="[
-    { label: 'Mago', value: 1082, highlight: true },
-    { label: 'Psalm', value: 3865 },
-    { label: 'PHPStan', value: 7171 },
-    { label: 'Phan', value: 13187 }
-  ]"
-  unit="mb"
-/>
-
-</div>
-</details>
-</div>
-
-## Environment
-
-- **Hardware:** MacBook Pro (Apple M1 Pro, 32GB RAM), idle system
-- **Codebase:** `wordpress-develop@5b01d24d8c5f2cfa4b96349967a9759e52888d03`
-- **PHP:** 8.5.0 (Zend Engine v4.5.0, Zend OPcache v8.5.0)
-- **Mago:** 1.10.0
-- **Psalm:** 6.15.1
-- **PHPStan:** 2.1.39
-- **Phan:** 6.0.1
-- **PHP-CS-Fixer:** 3.93.1
-- **Pint:** 1.27.0
-- **Pretty PHP:** 0.4.95
+</template>
 
 ## A note on memory usage
 
@@ -139,53 +163,51 @@ To achieve its blazing-fast speeds, Mago uses per-thread arena allocators. Inste
 We believe that in modern development environments, saving a developer several seconds, or even minutes, is a worthwhile trade for a temporary increase in RAM usage.
 
 <style>
-.memory-toggle {
-  margin-top: 1.5rem;
-}
-
-.memory-toggle details {
-  border: 1px solid var(--vp-c-divider);
-  border-radius: 8px;
-  background: var(--vp-c-bg-soft);
-}
-
-.memory-toggle summary {
-  padding: 0 1rem;
-  cursor: pointer;
-  font-weight: 500;
-  font-size: 0.9rem;
+.benchmark-status {
+  padding: 2rem;
+  text-align: center;
   color: var(--vp-c-text-2);
+  font-size: 0.95rem;
+}
+
+.benchmark-error {
+  color: var(--vp-c-danger-1);
+}
+
+.project-selector {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  list-style: none;
+  margin: 1.5rem 0;
+  flex-wrap: wrap;
 }
 
-.memory-toggle summary::-webkit-details-marker {
-  display: none;
+.project-btn {
+  padding: 0.4rem 1rem;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 20px;
+  background: var(--vp-c-bg-soft);
+  color: var(--vp-c-text-2);
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 500;
+  transition: all 0.2s;
 }
 
-.memory-toggle summary::before {
-  content: "▶";
-  font-size: 0.7rem;
-  transition: transform 0.2s;
+.project-btn:hover {
+  border-color: var(--vp-c-brand-1);
+  color: var(--vp-c-brand-1);
 }
 
-.memory-toggle details[open] summary::before {
-  transform: rotate(90deg);
+.project-btn.active {
+  background: var(--vp-c-brand-1);
+  border-color: var(--vp-c-brand-1);
+  color: #fff;
 }
 
-.memory-toggle summary:hover {
-  color: var(--vp-c-text-1);
-  background: var(--vp-c-bg-mute);
-  border-radius: 8px 8px 0 0;
-}
-
-.memory-toggle details:not([open]) summary:hover {
-  border-radius: 8px;
-}
-
-.memory-toggle .memory-content {
-  border-top: 1px solid var(--vp-c-divider);
+.benchmark-date {
+  margin-left: auto;
+  font-size: 0.8rem;
+  color: var(--vp-c-text-3);
 }
 </style>
