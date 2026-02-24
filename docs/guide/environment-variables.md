@@ -39,6 +39,24 @@ Mago follows the XDG Base Directory Specification. You can use this environment 
 
 - **Example**: `XDG_CONFIG_HOME=/path/to/config mago lint`
 
+## Reserved `MAGO_` prefix
+
+The `MAGO_` prefix is reserved for Mago configuration. Mago reads **all** environment variables starting with `MAGO_` and attempts to map them to configuration fields. If any `MAGO_`-prefixed environment variable does not correspond to a valid configuration field, Mago will fail with an "unknown field" error.
+
+For example, setting `MAGO_LINT=1` or `MAGO_MY_CUSTOM_VAR=foo` in your environment will cause an error like:
+
+```
+ERROR Failed to build the configuration: unknown field `lint`, expected one of ...
+```
+
+If you encounter unexpected configuration errors, check your environment for any `MAGO_`-prefixed variables that are not listed below:
+
+```bash
+env | grep ^MAGO_
+```
+
+Remove or rename any variables that are not recognized by Mago.
+
 ## Overriding Configuration
 
 The following environment variables can be used to override settings from the `mago.toml` file.
