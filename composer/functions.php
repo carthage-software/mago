@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Mago;
 
-if (!\function_exists('Mago\inspect')) {
+use function function_exists;
+
+if (!function_exists('Mago\inspect')) {
     /**
      * @mago-ignore analysis:unused-parameter
      *
@@ -19,7 +21,7 @@ if (!\function_exists('Mago\inspect')) {
     function inspect(mixed ...$value): void {}
 }
 
-if (!\function_exists('Mago\confirm')) {
+if (!function_exists('Mago\confirm')) {
     /**
      * @mago-ignore analysis:unused-parameter
      *

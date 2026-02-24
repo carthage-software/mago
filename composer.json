@@ -17,7 +17,8 @@
   ],
   "autoload": {
     "files": [
-      "composer/functions.php"
+      "composer/functions.php",
+      "composer/internal.php"
     ]
   },
   "suggest": {

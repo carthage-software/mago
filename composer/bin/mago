@@ -3,9 +3,20 @@
 
 declare(strict_types=1);
 
-(function () {
+namespace Mago\Internal;
+
+use Composer;
+use RuntimeException;
+
+use function array_shift;
+use function class_exists;
+use function fwrite;
+
+use const STDERR;
+
+(function (): never {
     // Ensure autoloader is loaded (Composer bin proxy loads it, but handle direct execution too)
-    if (!class_exists(\Composer\InstalledVersions::class, false)) {
+    if (!class_exists(Composer\InstalledVersions::class, false)) {
         $loaded = false;
         foreach ([__DIR__ . '/../../../../autoload.php', __DIR__ . '/../../vendor/autoload.php'] as $file) {
             if (file_exists($file)) {
@@ -21,214 +32,26 @@ declare(strict_types=1);
         }
     }
 
-    // Determine version
-    $version = \Composer\InstalledVersions::getPrettyVersion('carthage-software/mago');
-    if ($version === null) {
-        fwrite(STDERR, "Error: Could not determine mago package version.\n");
+    try {
+        $version = namespace\get_version();
+        $architecture = namespace\detect_architecture();
+        $platform = namespace\detect_platform($architecture);
+        $triple = namespace\build_target_triple(
+            $architecture,
+            $platform['vendor'],
+            $platform['os'],
+            $platform['suffix'],
+        );
+
+        $extension = namespace\get_archive_extension($platform['os'], $platform['suffix']);
+        $executable = namespace\ensure_binary($version, $triple, $platform['extension'], $extension, __DIR__);
+
+        $args = $_SERVER['argv'];
+        array_shift($args);
+
+        namespace\execute($executable, $args);
+    } catch (RuntimeException $e) {
+        fwrite(STDERR, "Error: {$e->getMessage()}\n");
         exit(1);
     }
-
-    // Detect architecture
-    $archName = strtolower(php_uname('m'));
-    $arch = match ($archName) {
-        'x86_64', 'amd64' => 'x86_64',
-        'arm64', 'aarch64' => 'aarch64',
-        'armv7l' => 'armv7',
-        'i386', 'i486', 'i586', 'i686' => 'i686',
-        'ppc' => 'powerpc',
-        'ppc64' => 'powerpc64',
-        'ppc64le' => 'powerpc64le',
-        's390x' => 's390x',
-        default => null,
-    };
-
-    if ($arch === null) {
-        fwrite(STDERR, "Error: Unsupported architecture: {$archName}. Please open an issue on GitHub.\n");
-        exit(1);
-    }
-
-    // Detect OS and build target triple
-    $os = strtolower(php_uname('s'));
-    $vendor = 'unknown';
-    $osSuffix = '';
-    $executableExtension = '';
-
-    switch ($os) {
-        case 'windows nt':
-            $os = 'windows';
-            $vendor = 'pc';
-            $osSuffix = 'msvc';
-            $executableExtension = '.exe';
-            break;
-        case 'darwin':
-            $vendor = 'apple';
-            break;
-        case 'linux':
-            $lddPath = trim((string) shell_exec('command -v ldd 2>/dev/null'));
-            if ($lddPath !== '') {
-                $lddVersion = (string) shell_exec('ldd --version 2>&1');
-                if (str_contains($lddVersion, 'musl')) {
-                    switch ($arch) {
-                        case 'x86_64':
-                        case 'aarch64':
-                        case 'i686':
-                            $osSuffix = 'musl';
-                            break;
-                        case 'armv7':
-                            $osSuffix = str_contains((string) file_get_contents('/proc/cpuinfo'), 'hard')
-                                ? 'musleabihf'
-                                : 'musleabi';
-                            break;
-                        default:
-                            fwrite(STDERR, "Error: Unsupported architecture for musl: {$archName}\n");
-                            exit(1);
-                    }
-                } else {
-                    switch ($arch) {
-                        case 'x86_64':
-                        case 'aarch64':
-                        case 'i686':
-                        case 'powerpc':
-                        case 'powerpc64':
-                        case 'powerpc64le':
-                        case 's390x':
-                            $osSuffix = 'gnu';
-                            break;
-                        case 'armv7':
-                            $osSuffix = str_contains((string) file_get_contents('/proc/cpuinfo'), 'hard')
-                                ? 'gnueabihf'
-                                : 'gnueabi';
-                            break;
-                        default:
-                            fwrite(STDERR, "Error: Unsupported architecture for glibc: {$archName}\n");
-                            exit(1);
-                    }
-                }
-            } else {
-                $osSuffix = 'musl';
-            }
-            break;
-        case 'freebsd':
-            break;
-        default:
-            fwrite(STDERR, "Error: Unsupported operating system: {$os}. Please open an issue on GitHub.\n");
-            exit(1);
-    }
-
-    $triple = $osSuffix !== '' ? "{$arch}-{$vendor}-{$os}-{$osSuffix}" : "{$arch}-{$vendor}-{$os}";
-    $storageDir = "mago-{$version}-{$triple}";
-    $executable = "mago{$executableExtension}";
-
-    $binDir = __DIR__;
-    $releaseDir = "{$binDir}/{$version}";
-    $executablePath = "{$releaseDir}/{$storageDir}/{$executable}";
-
-    // Download binary if it doesn't exist
-    if (!file_exists($executablePath)) {
-        $archiveFile = "{$releaseDir}/{$storageDir}.tar.gz";
-        $url = "https://github.com/carthage-software/mago/releases/download/{$version}/{$storageDir}.tar.gz";
-
-        if (!is_dir($releaseDir)) {
-            mkdir($releaseDir, 0755, true);
-        }
-
-        fprintf(STDERR, "Downloading mago %s for %s...\n", $version, $triple);
-
-        if (extension_loaded('curl')) {
-            $ch = curl_init($url);
-            $fh = fopen($archiveFile, 'w');
-            curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-            curl_setopt($ch, CURLOPT_FILE, $fh);
-            curl_setopt($ch, CURLOPT_NOPROGRESS, false);
-            curl_setopt($ch, CURLOPT_PROGRESSFUNCTION, function (mixed $resource, int $dlSize, int $dlNow) {
-                if ($dlSize > 0) {
-                    $pct = (int) ($dlNow / $dlSize * 100);
-                    $dlMb = number_format($dlNow / 1048576, 1);
-                    $totalMb = number_format($dlSize / 1048576, 1);
-                    fprintf(STDERR, "\r  %s / %s MB (%d%%)", $dlMb, $totalMb, $pct);
-                }
-                return 0;
-            });
-
-            $success = curl_exec($ch);
-            $statusCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            $error = curl_error($ch);
-            curl_close($ch);
-            fclose($fh);
-
-            if (!$success || $statusCode >= 400) {
-                unlink($archiveFile);
-                fprintf(STDERR, "\nError: Failed to download mago binary (HTTP %d): %s\nURL: %s\n", $statusCode, $error, $url);
-                exit(1);
-            }
-
-            fprintf(STDERR, "\n");
-        } elseif (ini_get('allow_url_fopen')) {
-            $contents = file_get_contents($url);
-            if ($contents === false) {
-                fprintf(STDERR, "Error: Failed to download mago binary.\nURL: %s\n", $url);
-                exit(1);
-            }
-
-            file_put_contents($archiveFile, $contents);
-        } else {
-            fwrite(STDERR, "Error: Unable to download mago binary. Either install the PHP curl extension or set allow_url_fopen=1 in php.ini.\n");
-            exit(1);
-        }
-
-        fprintf(STDERR, "Downloaded.\n");
-
-        // Extract archive
-        $phar = new \PharData($archiveFile);
-        $phar->extractTo($releaseDir);
-
-        // Clean up archive
-        unlink($archiveFile);
-
-        if (!file_exists($executablePath)) {
-            fwrite(STDERR, "Error: Expected binary not found after extraction at {$executablePath}\n");
-            exit(1);
-        }
-
-        // Ensure binary is executable on Unix
-        if ($os !== 'windows') {
-            chmod($executablePath, 0755);
-        }
-    }
-
-    $args = $_SERVER['argv'];
-    array_shift($args);
-
-    $command = escapeshellcmd($executablePath);
-    if ($args) {
-        $command .= ' ' . implode(' ', array_map(escapeshellarg(...), $args));
-    }
-
-    // Run command
-    $pipes = [];
-    $process = @proc_open(
-        $command,
-        // Map process to current io
-        $descriptorspec = array(
-            0 => array('file', 'php://stdin', 'r'),
-            1 => array('file', 'php://stdout', 'w'),
-            2 => array('file', 'php://stderr', 'w'),
-        ),
-        $pipes
-    );
-
-    if (!is_resource($process)) {
-        echo('Unable to start mago process');
-        exit(1);
-    }
-
-    // Loop on process until it exits normally.
-    do {
-        $status = proc_get_status($process);
-    } while ($status['running']);
-
-    $exitCode = $status['exitcode'] ?? -1;
-    proc_close($process);
-
-    exit($exitCode);
 })();
