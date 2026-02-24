@@ -44,6 +44,7 @@ use crate::commands::args::baseline_reporting::BaselineReportingArgs;
 use crate::config::Configuration;
 use crate::error::Error;
 use crate::utils::create_orchestrator;
+use crate::utils::git;
 
 /// Command for linting PHP source code.
 ///
@@ -157,6 +158,15 @@ pub struct LintCommand {
     #[arg(short, long, conflicts_with = "semantics", num_args = 1.., value_delimiter = ',')]
     pub only: Vec<String>,
 
+    /// Only lint files that are staged in git.
+    ///
+    /// This flag is designed for git pre-commit hooks. It will find all PHP files
+    /// currently staged for commit and lint only those files.
+    ///
+    /// Fails if not in a git repository.
+    #[arg(long, conflicts_with_all = ["path", "list_rules", "explain"])]
+    pub staged: bool,
+
     #[clap(flatten)]
     pub baseline_reporting: BaselineReportingArgs,
 }
@@ -193,7 +203,15 @@ impl LintCommand {
     pub fn execute(self, configuration: Configuration, color_choice: ColorChoice) -> Result<ExitCode, Error> {
         let mut orchestrator = create_orchestrator(&configuration, color_choice, self.pedantic, true, false);
         orchestrator.add_exclude_patterns(configuration.linter.excludes.iter());
-        if !self.path.is_empty() {
+        if self.staged {
+            let staged_paths = git::get_staged_file_paths(&configuration.source.workspace)?;
+            if staged_paths.is_empty() {
+                tracing::info!("No staged files to lint.");
+                return Ok(ExitCode::SUCCESS);
+            }
+
+            orchestrator.set_source_paths(staged_paths.iter().map(|p| p.to_string_lossy().to_string()));
+        } else if !self.path.is_empty() {
             orchestrator.set_source_paths(self.path.iter().map(|p| p.to_string_lossy().to_string()));
         }
 
@@ -233,7 +251,13 @@ impl LintCommand {
         let baseline_variant = configuration.linter.baseline_variant;
         let processor = self.baseline_reporting.get_processor(color_choice, baseline, baseline_variant);
 
-        processor.process_issues(&orchestrator, &mut database, issues)
+        let (exit_code, changed_file_ids) = processor.process_issues(&orchestrator, &mut database, issues)?;
+
+        if self.staged && !changed_file_ids.is_empty() {
+            git::stage_files(&configuration.source.workspace, &database, changed_file_ids)?;
+        }
+
+        Ok(exit_code)
     }
 }
 

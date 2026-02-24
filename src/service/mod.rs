@@ -302,11 +302,12 @@ impl IssueProcessor {
         issues: IssueCollection,
         baseline: Option<Baseline>,
         fail_on_out_of_sync_baseline: bool,
-    ) -> Result<ExitCode, Error> {
+    ) -> Result<(ExitCode, Vec<FileId>), Error> {
         if self.fix {
             self.handle_fix_mode(orchestrator, database, issues, baseline)
         } else {
             self.handle_report_mode(database, issues, baseline, fail_on_out_of_sync_baseline)
+                .map(|code| (code, Vec::new()))
         }
     }
 
@@ -323,12 +324,12 @@ impl IssueProcessor {
         database: &mut Database<'_>,
         issues: IssueCollection,
         baseline: Option<Baseline>,
-    ) -> Result<ExitCode, Error> {
+    ) -> Result<(ExitCode, Vec<FileId>), Error> {
         let issues =
             if let Some(baseline) = baseline { baseline.filter_issues(issues, &database.read_only()) } else { issues };
 
         let dry_run = self.dry_run;
-        let (applied_fixes, skipped_unsafe, skipped_potentially_unsafe, bugs) =
+        let (applied_fixes, skipped_unsafe, skipped_potentially_unsafe, bugs, changed_file_ids) =
             self.apply_fixes(orchestrator, database, issues)?;
 
         if skipped_unsafe > 0 {
@@ -360,10 +361,10 @@ impl IssueProcessor {
         if bugs > 0 {
             tracing::error!("Encountered {bugs} bugs while applying fixes. Please report them at {}", ISSUE_URL);
 
-            return Ok(ExitCode::FAILURE);
+            return Ok((ExitCode::FAILURE, changed_file_ids));
         }
 
-        Ok(if success { ExitCode::SUCCESS } else { ExitCode::FAILURE })
+        Ok((if success { ExitCode::SUCCESS } else { ExitCode::FAILURE }, changed_file_ids))
     }
 
     /// Reports issues to the configured output target when `--fix` is not enabled.
@@ -474,7 +475,7 @@ impl IssueProcessor {
         orchestrator: &Orchestrator<'_>,
         database: &mut Database<'_>,
         issues: IssueCollection,
-    ) -> Result<(usize, usize, usize, usize), Error> {
+    ) -> Result<(usize, usize, usize, usize, Vec<FileId>), Error> {
         let read_database = Arc::new(database.read_only());
         let change_log = ChangeLog::new();
 
@@ -490,7 +491,7 @@ impl IssueProcessor {
         // Collect edit batches by file (each batch = all edits from one issue)
         let batches_by_file = issues.to_edit_batches();
         if batches_by_file.is_empty() {
-            return Ok((0, 0, 0, 0));
+            return Ok((0, 0, 0, 0, Vec::new()));
         }
 
         let format_after_fix = self.format_after_fix;
@@ -575,9 +576,13 @@ impl IssueProcessor {
             })
             .collect::<Result<Vec<(bool, usize, usize, usize)>, Error>>()?;
 
-        if !dry_run {
+        let changed_file_ids = if !dry_run {
+            let ids = change_log.changed_file_ids()?;
             database.commit(change_log, true)?;
-        }
+            ids
+        } else {
+            Vec::new()
+        };
 
         let mut applied_fix_count = 0;
         let mut total_skipped_unsafe = 0;
@@ -593,7 +598,7 @@ impl IssueProcessor {
             total_bugs += bugs;
         }
 
-        Ok((applied_fix_count, total_skipped_unsafe, total_skipped_potentially_unsafe, total_bugs))
+        Ok((applied_fix_count, total_skipped_unsafe, total_skipped_potentially_unsafe, total_bugs, changed_file_ids))
     }
 }
 
@@ -633,7 +638,7 @@ impl BaselineIssueProcessor {
         orchestrator: &Orchestrator<'_>,
         database: &mut Database<'_>,
         issues: IssueCollection,
-    ) -> Result<ExitCode, Error> {
+    ) -> Result<(ExitCode, Vec<FileId>), Error> {
         // Extract baseline_path before consuming self
         let baseline = if let Some(baseline_path_cow) = self.baseline_path.as_ref() {
             let baseline_path = baseline_path_cow.as_ref();
@@ -641,20 +646,20 @@ impl BaselineIssueProcessor {
                 let read_database = database.read_only();
                 self.generate_baseline(baseline_path, &read_database, issues)?;
 
-                return Ok(ExitCode::SUCCESS);
+                return Ok((ExitCode::SUCCESS, Vec::new()));
             }
 
             if self.verify_baseline {
                 let read_database = database.read_only();
                 let success = self.verify_baseline(baseline_path, &read_database, issues)?;
 
-                return Ok(if success { ExitCode::SUCCESS } else { ExitCode::FAILURE });
+                return Ok((if success { ExitCode::SUCCESS } else { ExitCode::FAILURE }, Vec::new()));
             }
 
             self.get_baseline(Some(baseline_path))
         } else {
             if !self.validate_baseline_parameters() {
-                return Ok(ExitCode::FAILURE);
+                return Ok((ExitCode::FAILURE, Vec::new()));
             }
 
             None

@@ -206,6 +206,8 @@ impl GuardCommand {
         let baseline_variant = configuration.guard.baseline_variant;
         let processor = self.baseline_reporting.get_processor(color_choice, baseline, baseline_variant);
 
-        processor.process_issues(&orchestrator, &mut database, result.issues)
+        let (exit_code, _) = processor.process_issues(&orchestrator, &mut database, result.issues)?;
+
+        Ok(exit_code)
     }
 }

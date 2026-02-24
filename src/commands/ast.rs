@@ -185,13 +185,15 @@ impl AstCommand {
                     let mut database = Database::single(file, config);
                     let orchestrator = create_orchestrator(&configuration, color_choice, false, true, false);
 
-                    return self.reporting.get_processor(color_choice).process_issues(
+                    let (exit_code, _) = self.reporting.get_processor(color_choice).process_issues(
                         &orchestrator,
                         &mut database,
                         IssueCollection::from([issue]),
                         None,
                         false,
-                    );
+                    )?;
+
+                    return Ok(exit_code);
                 }
                 None => break,
             }

@@ -30,6 +30,9 @@ Optional. A list of specific files or directories to analyze. If you provide pat
 | Flag, Alias(es) | Description                                                                          |
 | :-------------- | :----------------------------------------------------------------------------------- |
 | `--no-stubs`    | Analyze the project without loading the built-in PHP stubs for the standard library. |
+| `--staged`      | Only analyze files that are staged in git. Designed for pre-commit hooks. Fails if not in a git repository. |
+| `--watch`       | Enable watch mode for continuous analysis. Re-runs analysis when files change. (Experimental) |
+| `--list-codes`  | List all available analyzer issue codes in JSON format.                               |
 | `--help`, `-h`  | Print the help summary for the command.                                              |
 
 ### Shared Reporting and Fixing Options

@@ -16,6 +16,27 @@ use mago_database::file::FileId;
 
 use crate::error::Error;
 
+/// Get staged file paths relative to the workspace.
+///
+/// This function is used by `--staged` flags in lint and analyze commands
+/// to filter analysis to only staged files.
+///
+/// # Arguments
+///
+/// * `workspace` - The git repository root directory
+///
+/// # Returns
+///
+/// A vector of staged file paths (relative to workspace), or an error if
+/// not in a git repository.
+pub fn get_staged_file_paths(workspace: &Path) -> Result<Vec<PathBuf>, Error> {
+    if !is_git_repository(workspace) {
+        return Err(Error::NotAGitRepository);
+    }
+
+    get_staged_files(workspace)
+}
+
 /// Get staged files that are clean (no unstaged changes) as file IDs.
 ///
 /// This function combines multiple git operations and database lookups into

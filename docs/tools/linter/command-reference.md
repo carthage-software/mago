@@ -31,6 +31,7 @@ Optional. A list of specific files or directories to lint. If you provide paths 
 | `--only <RULE_CODE>`, `-o` | Run only a specific, comma-separated list of rules, overriding the configuration file.                                                                                                 |
 | `--pedantic`               | Enable all linter rules for the most exhaustive analysis possible. This overrides your configuration, ignores PHP version constraints, and enables rules that are disabled by default. |
 | `--semantics`, `-s`        | Perform only the parsing and basic semantic checks without running any lint rules.                                                                                                     |
+| `--staged`                 | Only lint files that are staged in git. Designed for pre-commit hooks. Fails if not in a git repository.                                                                               |
 | `--help`, `-h`             | Print the help summary for the command.                                                                                                                                                |
 
 ### Shared Reporting and Fixing Options

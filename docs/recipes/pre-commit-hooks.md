@@ -25,15 +25,15 @@ This approach automatically formats your staged PHP files and includes the forma
 ```bash
 #!/bin/sh
 
-# Run linter on the entire project
-mago lint
+# Lint only staged files
+mago lint --staged
 if [ $? -ne 0 ]; then
     echo "Linting failed. Please fix the issues before committing."
     exit 1
 fi
 
-# Run static analysis on the entire project
-mago analyze
+# Analyze only staged files
+mago analyze --staged
 if [ $? -ne 0 ]; then
     echo "Static analysis failed. Please fix the issues before committing."
     exit 1
@@ -49,32 +49,70 @@ fi
 exit 0
 ```
 
-The `--staged` flag:
+The `--staged` flag on all three commands:
 
 - Finds all files currently staged for commit
-- Formats only those files
-- Automatically re-stages them so the formatted version is committed
+- Only processes those files instead of the entire project
+- For `fmt --staged`, automatically re-stages formatted files
+- For `lint --staged` and `analyze --staged`, when combined with `--fix`, automatically re-stages fixed files
 
 :::warning
-The `--staged` flag will fail if a staged file also has unstaged changes. This prevents accidentally including unintended changes in your commit. Either stage all changes or stash the unstaged ones before committing.
+The `fmt --staged` flag will fail if a staged file also has unstaged changes. This prevents accidentally including unintended changes in your commit. Either stage all changes or stash the unstaged ones before committing.
 :::
 
-### Option 2: Block commits if not formatted
+### Option 2: Auto-fix and auto-format staged files
+
+This approach automatically fixes linting issues in staged files, then formats them. Fixed and formatted files are re-staged automatically.
+
+```bash
+#!/bin/sh
+
+# Fix linting issues in staged files and re-stage them
+mago lint --fix --staged
+if [ $? -ne 0 ]; then
+    echo "Linting failed. Please fix the remaining issues before committing."
+    exit 1
+fi
+
+# Analyze only staged files
+mago analyze --staged
+if [ $? -ne 0 ]; then
+    echo "Static analysis failed. Please fix the issues before committing."
+    exit 1
+fi
+
+# Format staged files and re-stage them
+mago fmt --staged
+if [ $? -ne 0 ]; then
+    echo "Formatting failed. Please check the error above."
+    exit 1
+fi
+
+exit 0
+```
+
+You can also use `--fix --unsafe` or `--fix --potentially-unsafe` to apply more aggressive fixes:
+
+```bash
+mago lint --fix --potentially-unsafe --staged
+```
+
+### Option 3: Block commits if not formatted
 
 This approach blocks the commit if any staged files aren't properly formatted, requiring developers to format their code before committing.
 
 ```bash
 #!/bin/sh
 
-# Run linter on the entire project
-mago lint
+# Lint only staged files
+mago lint --staged
 if [ $? -ne 0 ]; then
     echo "Linting failed. Please fix the issues before committing."
     exit 1
 fi
 
-# Run static analysis on the entire project
-mago analyze
+# Analyze only staged files
+mago analyze --staged
 if [ $? -ne 0 ]; then
     echo "Static analysis failed. Please fix the issues before committing."
     exit 1
@@ -98,8 +136,8 @@ If your project uses [Husky](https://typicode.github.io/husky/) for git hooks, a
 #!/bin/sh
 . "$(dirname "$0")/_/husky.sh"
 
-mago lint
-mago analyze
+mago lint --staged
+mago analyze --staged
 mago fmt --staged  # or: mago fmt --check
 ```
 
@@ -113,10 +151,10 @@ If your project uses [CaptainHook](https://docs.captainhook.info/), add the foll
     "enabled": true,
     "actions": [
       {
-        "action": "mago lint"
+        "action": "mago lint --staged"
       },
       {
-        "action": "mago analyze"
+        "action": "mago analyze --staged"
       },
       {
         "action": "mago fmt --staged"
@@ -134,10 +172,10 @@ Or if you prefer the check-only approach:
     "enabled": true,
     "actions": [
       {
-        "action": "mago lint"
+        "action": "mago lint --staged"
       },
       {
-        "action": "mago analyze"
+        "action": "mago analyze --staged"
       },
       {
         "action": "mago fmt --check"

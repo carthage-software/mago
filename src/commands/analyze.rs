@@ -56,6 +56,7 @@ use crate::config::Configuration;
 use crate::consts::PRELUDE_BYTES;
 use crate::error::Error;
 use crate::utils::create_orchestrator;
+use crate::utils::git;
 
 /// Command for performing static type analysis on PHP code.
 ///
@@ -121,6 +122,15 @@ pub struct AnalyzeCommand {
     #[arg(long, conflicts_with_all = ["path", "no_stubs", "watch", "reporting_target", "reporting_format"])]
     pub list_codes: bool,
 
+    /// Only analyze files that are staged in git.
+    ///
+    /// This flag is designed for git pre-commit hooks. It will find all PHP files
+    /// currently staged for commit and analyze only those files.
+    ///
+    /// Fails if not in a git repository.
+    #[arg(long, conflicts_with_all = ["path", "list_codes", "watch"])]
+    pub staged: bool,
+
     /// Arguments related to reporting issues with baseline support.
     #[clap(flatten)]
     pub baseline_reporting: BaselineReportingArgs,
@@ -178,7 +188,15 @@ impl AnalyzeCommand {
         let mut orchestrator = create_orchestrator(&configuration, color_choice, false, !self.watch, self.watch);
         orchestrator.add_exclude_patterns(configuration.analyzer.excludes.iter());
 
-        if !self.path.is_empty() {
+        if self.staged {
+            let staged_paths = git::get_staged_file_paths(&configuration.source.workspace)?;
+            if staged_paths.is_empty() {
+                tracing::info!("No staged files to analyze.");
+                return Ok(ExitCode::SUCCESS);
+            }
+
+            orchestrator.set_source_paths(staged_paths.iter().map(|p| p.to_string_lossy().to_string()));
+        } else if !self.path.is_empty() {
             orchestrator.set_source_paths(self.path.iter().map(|p| p.to_string_lossy().to_string()));
         }
 
@@ -215,7 +233,9 @@ impl AnalyzeCommand {
         let baseline_variant = configuration.analyzer.baseline_variant;
         let processor = self.baseline_reporting.get_processor(color_choice, baseline, baseline_variant);
 
-        processor.process_issues(&orchestrator, &mut database, issues)
+        let (exit_code, _) = processor.process_issues(&orchestrator, &mut database, issues)?;
+
+        Ok(exit_code)
     }
 
     /// Runs in watch mode, continuously monitoring for file changes and re-analyzing.
@@ -267,7 +287,9 @@ impl AnalyzeCommand {
 
         let processor = self.baseline_reporting.get_processor(color_choice, baseline, baseline_variant);
 
-        watcher.with_database_mut(|database| processor.process_issues(&orchestrator, database, issues))?;
+        watcher.with_database_mut(|database| {
+            processor.process_issues(&orchestrator, database, issues).map(|(code, _)| code)
+        })?;
 
         tracing::info!("Initial analysis complete. Watching for changes...");
 
@@ -289,7 +311,9 @@ impl AnalyzeCommand {
                 read_db.get_ref(&file_id).ok().map(|f| f.name.to_string())
             });
 
-            watcher.with_database_mut(|database| processor.process_issues(&orchestrator, database, issues))?;
+            watcher.with_database_mut(|database| {
+                processor.process_issues(&orchestrator, database, issues).map(|(code, _)| code)
+            })?;
 
             tracing::info!("Analysis complete. Watching for changes...");
         }
