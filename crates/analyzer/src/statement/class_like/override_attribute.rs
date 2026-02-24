@@ -68,7 +68,7 @@ pub fn check_override_attribute<'ctx, 'arena>(
         let lowercase_name = ascii_lowercase_atom(method.name.value);
         let Some(parent_class_names) = metadata.overridden_method_ids.get(&lowercase_name) else {
             if let Some(attribute) = override_attribute {
-                let issue = Issue::error(format!("Invalid `#[Override]` attribute on `{class_name}::{name}`."))
+                let mut issue = Issue::error(format!("Invalid `#[Override]` attribute on `{class_name}::{name}`."))
                     .with_code(IssueCode::InvalidOverrideAttribute)
                     .with_annotation(
                         Annotation::primary(attribute.span())
@@ -76,6 +76,12 @@ pub fn check_override_attribute<'ctx, 'arena>(
                     )
                     .with_note("The attribute should only be used when explicitly overriding a parent method.")
                     .with_help(format!("Remove the `#[Override]` attribute from `{name}` or verify inheritance."));
+
+                if metadata.kind.is_trait() {
+                    issue = issue.with_note(
+                        "If this method is intended to override an interface method, add a `@require-implements` annotation to the trait."
+                    );
+                }
 
                 context.collector.propose(issue, |edits| {
                     let attribute_list = &method.attribute_lists.as_slice()[attribute_list_index];
