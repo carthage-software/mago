@@ -452,11 +452,6 @@ fn should_break_after_operator<'arena>(
 
             return false;
         }
-        Expression::AnonymousClass(anonymous_class) => {
-            if !anonymous_class.attribute_lists.is_empty() {
-                return true;
-            }
-        }
         Expression::Closure(closure) => {
             if !closure.attribute_lists.is_empty() {
                 return true;

@@ -1553,19 +1553,6 @@ impl<'arena> Format<'arena> for StaticMethodPartialApplication<'arena> {
 impl<'arena> Format<'arena> for AnonymousClass<'arena> {
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
         wrap!(f, self, AnonymousClass, {
-            let initialization = {
-                let mut contents = vec![in f.arena; self.new.format(f)];
-                if let Some(attributes) = misc::print_attribute_list_sequence(f, &self.attribute_lists) {
-                    contents.push(Document::Line(Line::default()));
-                    contents.push(attributes);
-                    contents.push(Document::Line(Line::hard()));
-                } else {
-                    contents.push(Document::space());
-                }
-
-                Document::Group(Group::new(contents))
-            };
-
             let mut signature = print_modifiers(f, &self.modifiers);
             if !signature.is_empty() {
                 signature.push(Document::space());
@@ -1589,12 +1576,30 @@ impl<'arena> Format<'arena> for AnonymousClass<'arena> {
             let signature_id = f.next_id();
             let signature = Document::Group(Group::new(signature).with_id(signature_id));
 
-            Document::Group(Group::new(vec![
-                in f.arena;
-                initialization,
-                signature,
-                print_class_like_body(f, &self.left_brace, &self.members, &self.right_brace, Some(signature_id)),
-            ]))
+            let body = print_class_like_body(f, &self.left_brace, &self.members, &self.right_brace, Some(signature_id));
+
+            if let Some(attributes) = misc::print_attribute_list_sequence(f, &self.attribute_lists) {
+                Document::Group(
+                    Group::new(vec![
+                        in f.arena;
+                        self.new.format(f),
+                        Document::Line(Line::default()),
+                        attributes,
+                        Document::Line(Line::default()),
+                        signature,
+                        body,
+                    ])
+                    .with_break(true),
+                )
+            } else {
+                Document::Group(Group::new(vec![
+                    in f.arena;
+                    self.new.format(f),
+                    Document::space(),
+                    signature,
+                    body,
+                ]))
+            }
         })
     }
 }
