@@ -671,6 +671,7 @@ test_case!(issue_1191, {
     s.check_missing_type_hints = true;
     s
 });
+test_case!(issue_1202);
 
 #[test]
 fn test_all_test_cases_are_ran() {

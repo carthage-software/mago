@@ -1017,7 +1017,8 @@ fn get_class_string_type_from_ast(
             for constraint in constraint_union.types.into_owned() {
                 match constraint {
                     TAtomic::Object(TObject::Named(_) | TObject::Enum(_))
-                    | TAtomic::Reference(TReference::Symbol { .. }) => class_strings
+                    | TAtomic::Reference(TReference::Symbol { .. })
+                    | TAtomic::Alias(_) => class_strings
                         .push(TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::of_type(kind, constraint)))),
                     TAtomic::GenericParameter(TGenericParameter {
                         parameter_name,
