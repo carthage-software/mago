@@ -1822,9 +1822,9 @@ function shell_exec(string $command): string|false|null {}
 /**
  * @param array<string>|string $command
  * @param array{
- *   0?: resource|array{0: 'pipe', 1: 'r'|'w'}|array{0: 'file', 1: non-empty-string},
- *   1?: resource|array{0: 'pipe', 1: 'r'|'w'}|array{0: 'file', 1: non-empty-string},
- *   2?: resource|array{0: 'pipe', 1: 'r'|'w'}|array{0: 'file', 1: non-empty-string},
+ *   0?: resource|array{0: 'pipe', 1: 'r'|'w'}|array{0: 'file', 1: non-empty-string, 2?: 'r'|'w'},
+ *   1?: resource|array{0: 'pipe', 1: 'r'|'w'}|array{0: 'file', 1: non-empty-string, 2?: 'r'|'w'},
+ *   2?: resource|array{0: 'pipe', 1: 'r'|'w'}|array{0: 'file', 1: non-empty-string, 2?: 'r'|'w'},
  * } $descriptor_spec
  * @param non-empty-string|null $cwd
  * @param null|array<string, string> $env_vars
