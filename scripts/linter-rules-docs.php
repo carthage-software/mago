@@ -413,7 +413,14 @@ function generate_overview_page(string $docs_dir, array $rules_by_category, arra
  */
 function create_category_markdown_content(string $category_name, array $rules, array $linter_config): string
 {
-    usort($rules, fn(array $a, array $b): int => $a['code'] <=> $b['code']);
+    usort(
+        $rules,
+        /**
+         * @param array{code: string, ...} $a
+         * @param array{code: string, ...} $b
+         */
+        fn(array $a, array $b): int => $a['code'] <=> $b['code'],
+    );
 
     $content = <<<MD
         ---
