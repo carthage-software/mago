@@ -26,22 +26,35 @@
 //! by ignoring pre-existing issues while catching new ones. See [`BaselineReportingArgs`]
 //! for baseline options.
 
+use std::borrow::Cow;
+use std::io::Read;
 use std::path::PathBuf;
 use std::process::ExitCode;
 
+use bumpalo::Bump;
 use clap::ColorChoice;
 use clap::Parser;
 use colored::Colorize;
 
 use mago_database::DatabaseReader;
+use mago_database::ReadDatabase;
+use mago_database::error::DatabaseError;
+use mago_database::file::File;
 use mago_linter::registry::RuleRegistry;
 use mago_linter::rule::AnyRule;
 use mago_linter::rule_meta::RuleEntry;
+use mago_orchestrator::Orchestrator;
+use mago_orchestrator::service::format::FileFormatStatus;
 use mago_orchestrator::service::lint::LintMode;
 use mago_reporting::Level;
+use mago_syntax::parser::parse_file_content_with_settings;
+use mago_text_edit::ApplyResult;
+use mago_text_edit::Safety;
+use mago_text_edit::TextEditor;
 
 use crate::commands::args::baseline_reporting::BaselineReportingArgs;
 use crate::config::Configuration;
+use crate::consts::ISSUE_URL;
 use crate::error::Error;
 use crate::utils::create_orchestrator;
 
@@ -157,6 +170,29 @@ pub struct LintCommand {
     #[arg(short, long, conflicts_with = "semantics", num_args = 1.., value_delimiter = ',')]
     pub only: Vec<String>,
 
+    /// Read input from STDIN, apply fixes, and write to STDOUT.
+    ///
+    /// This flag allows you to pipe PHP code directly into the linter for fixing.
+    ///
+    /// When using this option, the linter reads from standard input,
+    /// applies fixes according to the configuration, and outputs the
+    /// fixed code to standard output. This is useful for integrating
+    /// with editors and other tools without modifying files.
+    ///
+    /// Requires --fix to be enabled.
+    #[arg(
+        long,
+        short = 'i',
+        requires = "fix",
+        conflicts_with_all = [
+            "path", "semantics", "pedantic", "explain", "list_rules",
+            "json", "dry_run", "fixable_only", "sort",
+            "baseline", "generate_baseline", "verify_baseline",
+            "reporting_target", "reporting_format",
+        ]
+    )]
+    pub stdin_input: bool,
+
     #[clap(flatten)]
     pub baseline_reporting: BaselineReportingArgs,
 }
@@ -193,6 +229,11 @@ impl LintCommand {
     pub fn execute(self, configuration: Configuration, color_choice: ColorChoice) -> Result<ExitCode, Error> {
         let mut orchestrator = create_orchestrator(&configuration, color_choice, self.pedantic, true, false);
         orchestrator.add_exclude_patterns(configuration.linter.excludes.iter());
+
+        if self.stdin_input {
+            return self.execute_stdin(&orchestrator);
+        }
+
         if !self.path.is_empty() {
             orchestrator.set_source_paths(self.path.iter().map(|p| p.to_string_lossy().to_string()));
         }
@@ -234,6 +275,98 @@ impl LintCommand {
         let processor = self.baseline_reporting.get_processor(color_choice, baseline, baseline_variant);
 
         processor.process_issues(&orchestrator, &mut database, issues)
+    }
+
+    /// Creates an ephemeral file from standard input.
+    fn create_file_from_stdin() -> Result<File, Error> {
+        let mut content = String::new();
+        std::io::stdin().read_to_string(&mut content).map_err(|e| Error::Database(DatabaseError::IOError(e)))?;
+
+        Ok(File::ephemeral(Cow::Borrowed("<stdin>"), Cow::Owned(content)))
+    }
+
+    /// Executes the linter in stdin mode.
+    ///
+    /// Reads PHP code from stdin, lints it, applies fixes, and writes the
+    /// result to stdout. This mode bypasses the database, baseline, and
+    /// parallel pipeline entirely for single-file synchronous processing.
+    fn execute_stdin(&self, orchestrator: &Orchestrator<'_>) -> Result<ExitCode, Error> {
+        let file = Self::create_file_from_stdin()?;
+        let service = orchestrator.get_lint_service(ReadDatabase::empty());
+        let issues = service.lint_file(
+            &file,
+            LintMode::Full,
+            if self.only.is_empty() { None } else { Some(self.only.as_slice()) },
+        );
+
+        let batches_by_file = issues.to_edit_batches();
+        let Some(batches) = batches_by_file.into_iter().find(|(fid, _)| *fid == file.id).map(|(_, b)| b) else {
+            print!("{}", file.contents);
+            return Ok(ExitCode::SUCCESS);
+        };
+
+        let safety_threshold = if self.baseline_reporting.reporting.r#unsafe {
+            Safety::Unsafe
+        } else if self.baseline_reporting.reporting.potentially_unsafe {
+            Safety::PotentiallyUnsafe
+        } else {
+            Safety::Safe
+        };
+
+        let arena = Bump::new();
+        let file_id = file.id;
+        let parser_settings = orchestrator.config.parser_settings;
+        let mut editor = TextEditor::with_safety(&file.contents, safety_threshold);
+        let checker =
+            |code: &str| !parse_file_content_with_settings(&arena, file_id, code, parser_settings).has_errors();
+
+        let mut bugs = 0usize;
+        for (rule_code, edits) in batches {
+            let rule_code = rule_code.as_deref().unwrap_or("unknown");
+            match editor.apply_batch(edits, Some(checker)) {
+                ApplyResult::Applied => {}
+                ApplyResult::Unsafe | ApplyResult::PotentiallyUnsafe => {}
+                ApplyResult::OutOfBounds => {
+                    tracing::warn!("Edit out of bounds for `<stdin>` (issue: `{rule_code}`). This is a bug in Mago.");
+                    tracing::error!("Please report this issue at {}", ISSUE_URL);
+                    bugs += 1;
+                }
+                ApplyResult::Overlap => {
+                    tracing::warn!("Overlapping edit for `<stdin>` (issue: `{rule_code}`), skipping.");
+                }
+                ApplyResult::Rejected => {
+                    tracing::error!(
+                        "Edit for `<stdin>` (issue: `{rule_code}`) was rejected because it would produce invalid PHP syntax."
+                    );
+                    tracing::error!("This is a bug in Mago. Please report this issue at {}", ISSUE_URL);
+                    bugs += 1;
+                }
+            }
+        }
+
+        if bugs > 0 {
+            return Ok(ExitCode::FAILURE);
+        }
+
+        let fixed_content = editor.finish();
+
+        let final_content = if self.baseline_reporting.reporting.format_after_fix {
+            let ephemeral = File::ephemeral(Cow::Borrowed("<stdin>"), Cow::Owned(fixed_content));
+            match orchestrator.format_file(&ephemeral)? {
+                FileFormatStatus::Unchanged => ephemeral.contents.into_owned(),
+                FileFormatStatus::Changed(new_content) => new_content,
+                FileFormatStatus::FailedToParse(parse_error) => {
+                    tracing::warn!("Failed to format after applying fixes: {}", parse_error);
+                    ephemeral.contents.into_owned()
+                }
+            }
+        } else {
+            fixed_content
+        };
+
+        print!("{final_content}");
+
+        Ok(ExitCode::SUCCESS)
     }
 }
 
