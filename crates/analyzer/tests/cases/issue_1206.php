@@ -5,10 +5,10 @@
  * @param Literal $literal
  * @return Literal
  */
-function parse_literal(null|bool|int|float|string $literal, mixed $unknow): null|bool|int|float|string
+function parse_literal(null|bool|int|float|string $literal, mixed $unknown): null|bool|int|float|string
 {
-    assert($literal === $unknow);
-    return $unknow;
+    assert($literal === $unknown);
+    return $unknown;
 }
 
 /**
@@ -16,10 +16,10 @@ function parse_literal(null|bool|int|float|string $literal, mixed $unknow): null
  * @param Literal $literal
  * @return Literal
  */
-function parse_literal2(null|bool|int|float|string $literal, mixed $unknow): null|bool|int|float|string
+function parse_literal2(null|bool|int|float|string $literal, mixed $unknown): null|bool|int|float|string
 {
-    if ($literal === $unknow) {
-        return $unknow;
+    if ($literal === $unknown) {
+        return $unknown;
     }
 
     exit(0);
@@ -30,11 +30,11 @@ function parse_literal2(null|bool|int|float|string $literal, mixed $unknow): nul
  * @param Literal $literal
  * @return Literal
  */
-function parse_literal3(null|bool|int|float|string $literal, mixed $unknow): null|bool|int|float|string
+function parse_literal3(null|bool|int|float|string $literal, mixed $unknown): null|bool|int|float|string
 {
-    if ($literal !== $unknow) {
+    if ($literal !== $unknown) {
         exit(0);
     }
 
-    return $unknow;
+    return $unknown;
 }
