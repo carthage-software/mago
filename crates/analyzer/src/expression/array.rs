@@ -564,7 +564,6 @@ fn handle_variadic_array_element<'arena>(
                                 }
                             };
 
-                            array_creation_info.array_keys.insert(new_offset_key);
                             array_creation_info.property_types.insert(new_offset_key, (false, value_type.clone()));
                         }
                     }
