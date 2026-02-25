@@ -101,6 +101,15 @@ pub struct ReportingArgs {
     #[arg(long, short = 'd', requires = "fix", alias = "diff")]
     pub dry_run: bool,
 
+    /// Exit with a non-zero status code if there are remaining issues after fixing.
+    ///
+    /// When used with --fix, the command will exit with code 1 if there are any
+    /// issues that could not be automatically fixed and require manual attention.
+    /// This is useful in CI/CD pipelines to ensure all issues are addressed.
+    /// Requires --fix to be enabled.
+    #[arg(long, requires = "fix")]
+    pub fail_on_remaining: bool,
+
     /// Specify where to send the output.
     ///
     /// Choose stdout for normal output or stderr for error streams.
@@ -199,6 +208,7 @@ impl ReportingArgs {
             potentially_unsafe: self.potentially_unsafe,
             format_after_fix: self.format_after_fix,
             dry_run: self.dry_run,
+            fail_on_remaining: self.fail_on_remaining,
             reporting_target: self.reporting_target.clone(),
             reporting_format: self.reporting_format,
             minimum_fail_level: self.minimum_fail_level,

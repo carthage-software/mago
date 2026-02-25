@@ -64,11 +64,14 @@ The `fmt --staged` flag will fail if a staged file also has unstaged changes. Th
 
 This approach automatically fixes linting issues in staged files, then formats them. Fixed and formatted files are re-staged automatically.
 
+The `--fail-on-remaining` flag ensures the commit is blocked if any issues could not be auto-fixed and still require manual attention. Without it, `--fix` exits successfully even when unfixed issues remain.
+
 ```bash
 #!/bin/sh
 
 # Fix linting issues in staged files and re-stage them
-mago lint --fix --staged
+# --fail-on-remaining blocks the commit if any issues remain unfixed
+mago lint --fix --fail-on-remaining --staged
 if [ $? -ne 0 ]; then
     echo "Linting failed. Please fix the remaining issues before committing."
     exit 1
@@ -94,7 +97,7 @@ exit 0
 You can also use `--fix --unsafe` or `--fix --potentially-unsafe` to apply more aggressive fixes:
 
 ```bash
-mago lint --fix --potentially-unsafe --staged
+mago lint --fix --potentially-unsafe --fail-on-remaining --staged
 ```
 
 ### Option 3: Block commits if not formatted

@@ -158,6 +158,13 @@ pub struct IssueProcessor {
     /// Useful for reviewing fixes before applying them. Only applies in fix mode.
     pub dry_run: bool,
 
+    /// Exit with failure if there are remaining unfixed issues after applying fixes.
+    ///
+    /// When `true`, the command exits with a non-zero status code if any issues
+    /// could not be automatically fixed and require manual attention.
+    /// Only applies in fix mode.
+    pub fail_on_remaining: bool,
+
     /// Output target for issue reports (stdout or stderr).
     ///
     /// Determines where the reporter sends its output. Only applies in report mode.
@@ -328,6 +335,8 @@ impl IssueProcessor {
         let issues =
             if let Some(baseline) = baseline { baseline.filter_issues(issues, &database.read_only()) } else { issues };
 
+        let unfixable_count = (&issues).into_iter().filter(|i| i.edits.is_empty()).count();
+
         let dry_run = self.dry_run;
         let (applied_fixes, skipped_unsafe, skipped_potentially_unsafe, bugs, changed_file_ids) =
             self.apply_fixes(orchestrator, database, issues)?;
@@ -362,6 +371,26 @@ impl IssueProcessor {
             tracing::error!("Encountered {bugs} bugs while applying fixes. Please report them at {}", ISSUE_URL);
 
             return Ok((ExitCode::FAILURE, changed_file_ids));
+        }
+
+        if success && self.fail_on_remaining {
+            let skipped_safety = skipped_unsafe + skipped_potentially_unsafe;
+            let remaining = unfixable_count + skipped_safety;
+            if remaining > 0 {
+                if unfixable_count > 0 {
+                    tracing::warn!(
+                        "{unfixable_count} issues require manual attention and cannot be fixed automatically."
+                    );
+                }
+
+                if skipped_safety > 0 {
+                    tracing::warn!(
+                        "{skipped_safety} issues were skipped due to safety level. Use `--potentially-unsafe` or `--unsafe` to apply them.",
+                    );
+                }
+
+                return Ok((ExitCode::FAILURE, changed_file_ids));
+            }
         }
 
         Ok((if success { ExitCode::SUCCESS } else { ExitCode::FAILURE }, changed_file_ids))
