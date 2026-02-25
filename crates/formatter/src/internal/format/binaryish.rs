@@ -436,6 +436,10 @@ fn should_flatten<'arena>(operator: &BinaryishOperator<'arena>, parent_op: &Bina
         return false;
     }
 
+    if self_precedence.is_non_associative() {
+        return false;
+    }
+
     operator.is_same_as(parent_op)
 }
 
