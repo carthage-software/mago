@@ -672,6 +672,7 @@ test_case!(issue_1191, {
     s
 });
 test_case!(issue_1202);
+test_case!(issue_1206);
 test_case!(issue_1207);
 
 #[test]

@@ -1630,7 +1630,6 @@ pub fn has_typed_value_comparison(
     }
 
     if let Some(left_type) = artifacts.get_expression_type(&left.span())
-        && left_var_id.is_none()
         && left_type.is_single()
         && !left_type.is_mixed()
     {
