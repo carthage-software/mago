@@ -195,6 +195,10 @@ impl AnalyzeCommand {
                 return Ok(ExitCode::SUCCESS);
             }
 
+            if self.baseline_reporting.reporting.fix {
+                git::ensure_staged_files_are_clean(&configuration.source.workspace, &staged_paths)?;
+            }
+
             orchestrator.set_source_paths(staged_paths.iter().map(|p| p.to_string_lossy().to_string()));
         } else if !self.path.is_empty() {
             orchestrator.set_source_paths(self.path.iter().map(|p| p.to_string_lossy().to_string()));
@@ -233,7 +237,11 @@ impl AnalyzeCommand {
         let baseline_variant = configuration.analyzer.baseline_variant;
         let processor = self.baseline_reporting.get_processor(color_choice, baseline, baseline_variant);
 
-        let (exit_code, _) = processor.process_issues(&orchestrator, &mut database, issues)?;
+        let (exit_code, changed_file_ids) = processor.process_issues(&orchestrator, &mut database, issues)?;
+
+        if self.staged && !changed_file_ids.is_empty() {
+            git::stage_files(&configuration.source.workspace, &database, changed_file_ids)?;
+        }
 
         Ok(exit_code)
     }

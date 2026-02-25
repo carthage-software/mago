@@ -210,6 +210,10 @@ impl LintCommand {
                 return Ok(ExitCode::SUCCESS);
             }
 
+            if self.baseline_reporting.reporting.fix {
+                git::ensure_staged_files_are_clean(&configuration.source.workspace, &staged_paths)?;
+            }
+
             orchestrator.set_source_paths(staged_paths.iter().map(|p| p.to_string_lossy().to_string()));
         } else if !self.path.is_empty() {
             orchestrator.set_source_paths(self.path.iter().map(|p| p.to_string_lossy().to_string()));

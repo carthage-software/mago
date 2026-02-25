@@ -94,6 +94,33 @@ pub fn get_staged_clean_files(workspace: &Path, database: &Database) -> Result<V
     Ok(file_ids)
 }
 
+/// Verify that none of the given staged files have unstaged changes.
+///
+/// This check prevents data loss when applying fixes to staged files:
+/// if a file has both staged and unstaged changes, modifying it on disk
+/// and re-staging would include the previously-unstaged changes in the commit.
+///
+/// # Arguments
+///
+/// * `workspace` - The git repository root directory
+/// * `staged_files` - The list of staged file paths to check
+///
+/// # Returns
+///
+/// `Ok(())` if all staged files are clean, or `Err(Error::StagedFileHasUnstagedChanges)`
+/// if any staged file also has unstaged modifications.
+pub fn ensure_staged_files_are_clean(workspace: &Path, staged_files: &[PathBuf]) -> Result<(), Error> {
+    let files_with_unstaged = get_files_with_unstaged_changes(workspace)?;
+
+    for staged_file in staged_files {
+        if files_with_unstaged.contains(staged_file) {
+            return Err(Error::StagedFileHasUnstagedChanges(staged_file.display().to_string()));
+        }
+    }
+
+    Ok(())
+}
+
 /// Stage multiple files at once by their file IDs.
 ///
 /// This function looks up file paths from the database and runs
