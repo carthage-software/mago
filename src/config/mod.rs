@@ -302,8 +302,13 @@ impl Configuration {
             builder = builder.add_source(File::from(file).required(true));
         } else {
             let formats = [FileFormat::Toml, FileFormat::Yaml, FileFormat::Json];
-            // Check workspace first, then XDG, then home (workspace has highest precedence)
-            let fallback_roots = [std::env::var_os("XDG_CONFIG_HOME").map(PathBuf::from), home_dir()];
+            // Check workspace first, then XDG, then ~/.config, then ~ (workspace has highest precedence)
+            let fallback_roots = [
+                std::env::var_os("XDG_CONFIG_HOME").map(PathBuf::from),
+                home_dir().map(|h| h.join(".config")),
+                home_dir(),
+            ];
+
             if let Some((config_file, format)) = Self::find_config_files(&workspace_dir, &fallback_roots, &formats) {
                 tracing::debug!("Sourcing configuration from {}.", config_file.display());
                 builder = builder.add_source(File::from(config_file).format(format).required(false));

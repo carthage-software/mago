@@ -35,7 +35,13 @@ See [force-color.org](https://force-color.org/) for more information.
 
 ### `XDG_CONFIG_HOME`
 
-Mago follows the XDG Base Directory Specification. You can use this environment variable to change the directory where Mago looks for its global configuration file. If unset, it defaults to `$HOME/.config`.
+Mago follows the [XDG Base Directory Specification](https://specifications.freedesktop.org/basedir-spec/latest/). When no configuration file is found in the workspace, Mago searches for a global configuration file in the following order:
+
+1. `$XDG_CONFIG_HOME/mago.toml` — if `XDG_CONFIG_HOME` is set
+2. `$HOME/.config/mago.toml` — the default XDG config directory
+3. `$HOME/mago.toml` — the user's home directory
+
+Set this variable to change the first lookup directory:
 
 - **Example**: `XDG_CONFIG_HOME=/path/to/config mago lint`
 

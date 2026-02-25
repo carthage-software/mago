@@ -25,7 +25,7 @@ These options can be used with the main `mago` command and any of its subcommand
 | Flag, Alias(es)                   | Description                                                                                                     |
 | :-------------------------------- | :-------------------------------------------------------------------------------------------------------------- |
 | `--workspace <PATH>`              | Sets the path to the workspace directory, which is the root of your project. Defaults to the current directory. |
-| `--config <PATH>`                 | Specifies the path to the configuration file. If not provided, Mago searches for `mago.toml` in the workspace.  |
+| `--config <PATH>`                 | Specifies the path to the configuration file. If not provided, Mago searches for `mago.toml` in the workspace, `$XDG_CONFIG_HOME`, `~/.config`, and `~`. See [Configuration File Discovery](/guide/configuration#configuration-file-discovery). |
 | `--php-version <VERSION>`         | Overrides the PHP version (e.g., `8.2`) specified in the configuration file.                                    |
 | `--threads <NUMBER>`              | Overrides the number of threads Mago will use. Defaults to the number of available logical CPUs.                |
 | `--allow-unsupported-php-version` | Allows Mago to run against a PHP version that is not officially supported. Use with caution.                    |

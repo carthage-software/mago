@@ -4,9 +4,20 @@ title: Configuration Reference
 
 # Configuration
 
-Mago is configured using a `mago.toml` file in the root of your project. You can generate a default configuration file using the `mago init` command.
+Mago is configured using a `mago.toml` file. You can generate a default configuration file using the `mago init` command.
 
 This page details the global configuration options and the `[source]` section. For tool-specific options, see the links at the bottom of this page.
+
+## Configuration File Discovery
+
+When no `--config` flag is provided, Mago searches for a configuration file (`mago.toml`, `mago.yaml`, or `mago.json`) in the following locations, in order:
+
+1. **Workspace directory** — the current working directory (or the path given by `--workspace`)
+2. **`$XDG_CONFIG_HOME`** — if the environment variable is set (e.g., `$XDG_CONFIG_HOME/mago.toml`)
+3. **`$HOME/.config`** — the default XDG config directory (e.g., `~/.config/mago.toml`)
+4. **`$HOME`** — the user's home directory (e.g., `~/mago.toml`)
+
+The first file found wins. This allows you to have a global configuration in `~/.config/mago.toml` that applies when no project-level configuration exists.
 
 ## Global Options
 
