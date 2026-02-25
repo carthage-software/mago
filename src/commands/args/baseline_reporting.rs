@@ -110,6 +110,7 @@ impl BaselineReportingArgs {
         color_choice: ColorChoice,
         baseline: Option<&Path>,
         baseline_variant: BaselineVariant,
+        editor_url: Option<String>,
     ) -> BaselineIssueProcessor {
         BaselineIssueProcessor {
             baseline_path: if self.ignore_baseline {
@@ -125,7 +126,7 @@ impl BaselineReportingArgs {
             verify_baseline: self.verify_baseline,
             fail_on_out_of_sync_baseline: self.fail_on_out_of_sync_baseline,
             baseline_variant,
-            issue_processor: self.reporting.get_processor(color_choice),
+            issue_processor: self.reporting.get_processor(color_choice, editor_url),
         }
     }
 }

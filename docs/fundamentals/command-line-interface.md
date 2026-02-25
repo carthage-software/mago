@@ -33,6 +33,15 @@ These options can be used with the main `mago` command and any of its subcommand
 | `-h`, `--help`                    | Print help information.                                                                                         |
 | `-V`, `--version`                 | Print version information.                                                                                      |
 
+## Environment Variables
+
+In addition to the `MAGO_*` prefix for [configuration options](/guide/configuration), Mago recognizes these environment variables:
+
+| Variable          | Description                                                                                                     |
+| :---------------- | :-------------------------------------------------------------------------------------------------------------- |
+| `MAGO_LOG`        | Set the log filter for tracing output (e.g., `debug`, `info`, `warn`).                                         |
+| `MAGO_EDITOR_URL` | Editor URL template for clickable file paths in terminal output. See [Editor Integration](/guide/configuration#editor-integration). |
+
 ## Subcommands
 
 Mago is organized into several tools and utility commands, each accessed via a subcommand.

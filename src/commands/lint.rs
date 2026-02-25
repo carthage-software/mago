@@ -200,7 +200,8 @@ impl LintCommand {
     /// - **Explain Mode** (`--explain`): Displays detailed rule documentation and exits
     /// - **List Mode** (`--list-rules`): Shows all enabled rules and exits
     /// - **Empty Database**: Logs a message and exits successfully if no files found
-    pub fn execute(self, configuration: Configuration, color_choice: ColorChoice) -> Result<ExitCode, Error> {
+    pub fn execute(self, mut configuration: Configuration, color_choice: ColorChoice) -> Result<ExitCode, Error> {
+        let editor_url = configuration.editor_url.take();
         let mut orchestrator = create_orchestrator(&configuration, color_choice, self.pedantic, true, false);
         orchestrator.add_exclude_patterns(configuration.linter.excludes.iter());
         if self.staged {
@@ -253,7 +254,7 @@ impl LintCommand {
 
         let baseline = configuration.linter.baseline.as_deref();
         let baseline_variant = configuration.linter.baseline_variant;
-        let processor = self.baseline_reporting.get_processor(color_choice, baseline, baseline_variant);
+        let processor = self.baseline_reporting.get_processor(color_choice, baseline, baseline_variant, editor_url);
 
         let (exit_code, changed_file_ids) = processor.process_issues(&orchestrator, &mut database, issues)?;
 

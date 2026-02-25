@@ -1,3 +1,4 @@
+use std::io::IsTerminal;
 use std::io::Write;
 
 use mago_database::DatabaseReader;
@@ -9,6 +10,7 @@ use crate::Level;
 use crate::error::ReportingError;
 use crate::formatter::Formatter;
 use crate::formatter::FormatterConfig;
+use crate::formatter::utils::osc8_hyperlink;
 
 /// Formatter that outputs issues in Emacs compilation mode format.
 pub(crate) struct EmacsFormatter;
@@ -24,14 +26,24 @@ impl Formatter for EmacsFormatter {
         // Apply filters
         let issues = apply_filters(issues, config);
 
+        let use_colors = config.color_choice.should_use_colors(std::io::stdout().is_terminal());
+        let editor_url = if use_colors { config.editor_url.as_deref() } else { None };
+
         for issue in issues.iter() {
-            let (file_path, line, column) = match issue.annotations.iter().find(|annotation| annotation.is_primary()) {
+            let (file_display, line, column) = match issue.annotations.iter().find(|annotation| annotation.is_primary())
+            {
                 Some(annotation) => {
                     let file = database.get(&annotation.span.file_id())?;
                     let line = file.line_number(annotation.span.start.offset) + 1;
                     let column = file.column_number(annotation.span.start.offset) + 1;
 
-                    (file.name.to_string(), line, column)
+                    let display = if let (Some(template), Some(path)) = (editor_url, file.path.as_ref()) {
+                        osc8_hyperlink(template, &path.display().to_string(), line, column, &file.name)
+                    } else {
+                        file.name.to_string()
+                    };
+
+                    (display, line, column)
                 }
                 None => ("<unknown>".to_string(), 0, 0),
             };
@@ -50,7 +62,7 @@ impl Formatter for EmacsFormatter {
 
             let issue_type = issue.code.as_deref().unwrap_or("other");
 
-            writeln!(writer, "{file_path}:{line}:{column}:{severity} - {issue_type}: {message}")?;
+            writeln!(writer, "{file_display}:{line}:{column}:{severity} - {issue_type}: {message}")?;
         }
 
         Ok(())

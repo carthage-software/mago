@@ -174,6 +174,7 @@ impl GuardCommand {
             configuration.guard.settings.mode = mode;
         }
 
+        let editor_url = configuration.editor_url.take();
         let mut orchestrator = create_orchestrator(&configuration, color_choice, false, true, false);
         orchestrator.add_exclude_patterns(configuration.guard.excludes.iter());
         if !self.path.is_empty() {
@@ -204,7 +205,7 @@ impl GuardCommand {
 
         let baseline = configuration.guard.baseline.as_deref();
         let baseline_variant = configuration.guard.baseline_variant;
-        let processor = self.baseline_reporting.get_processor(color_choice, baseline, baseline_variant);
+        let processor = self.baseline_reporting.get_processor(color_choice, baseline, baseline_variant, editor_url);
 
         let (exit_code, _) = processor.process_issues(&orchestrator, &mut database, result.issues)?;
 

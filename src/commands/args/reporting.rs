@@ -199,7 +199,7 @@ impl ReportingArgs {
     ///
     /// An [`IssueProcessor`] configured with all the reporting and fixing options
     /// from this argument set.
-    pub fn get_processor(&self, color_choice: ColorChoice) -> IssueProcessor {
+    pub fn get_processor(&self, color_choice: ColorChoice, editor_url: Option<String>) -> IssueProcessor {
         IssueProcessor {
             fixable_only: self.fixable_only,
             sort: self.sort,
@@ -215,6 +215,7 @@ impl ReportingArgs {
             minimum_report_level: self.minimum_report_level,
             retain_code: self.retain_code.clone(),
             color_choice,
+            editor_url,
         }
     }
 }

@@ -16,6 +16,7 @@ These options are set at the root of your `mago.toml` file.
 php-version = "8.2"
 threads = 8
 stack-size = 8388608 # 8 MB
+editor-url = "phpstorm://open?file=%file%&line=%line%&column=%column%"
 ```
 
 | Option                          | Type      | Default        | Description                                                                                           |
@@ -24,6 +25,7 @@ stack-size = 8388608 # 8 MB
 | `allow-unsupported-php-version` | `boolean` | `false`        | Allow Mago to run on unsupported PHP versions. Not recommended.                                       |
 | `threads`                       | `integer` | (logical CPUs) | The number of threads to use for parallel tasks.                                                      |
 | `stack-size`                    | `integer` | (see below)    | The stack size in bytes for each thread. Defaults to 2MB, with a minimum of 2MB and a maximum of 8MB. |
+| `editor-url`                    | `string`  | (none)         | Editor URL template for clickable file paths in terminal output. See [Editor Integration](#editor-integration) below. |
 
 ## `[source]` Section
 
@@ -179,6 +181,61 @@ You might want to disable short open tags if:
 :::warning
 When `enable-short-tags` is `false`, sequences like `<?xml version="1.0"?>` will be treated as inline text rather than causing parse errors. However, any code using `<?` as a PHP open tag will no longer be recognized as PHP code.
 :::
+
+## Editor Integration
+
+Mago can make file paths in diagnostic output clickable using [OSC 8 terminal hyperlinks](https://gist.github.com/egmontkob/eb114294efbcd5adb1944c9f3cb5feda). When configured, clicking a file path in the terminal opens the file directly in your editor at the correct line and column.
+
+This works in terminals that support OSC 8 hyperlinks, including iTerm2, Wezterm, Kitty, Windows Terminal, Ghostty, and others.
+
+### Configuration
+
+Set the `editor-url` option in your `mago.toml` with a URL template for your editor:
+
+```toml
+editor-url = "phpstorm://open?file=%file%&line=%line%&column=%column%"
+```
+
+Or use the `MAGO_EDITOR_URL` environment variable:
+
+```sh
+export MAGO_EDITOR_URL="vscode://file/%file%:%line%:%column%"
+```
+
+### Supported Placeholders
+
+| Placeholder  | Description                          |
+| :----------- | :----------------------------------- |
+| `%file%`     | Absolute path to the file            |
+| `%line%`     | Line number (1-based)                |
+| `%column%`   | Column number (1-based)              |
+
+### Editor URL Templates
+
+| Editor               | Template                                                          |
+| :------------------- | :---------------------------------------------------------------- |
+| VS Code              | `vscode://file/%file%:%line%:%column%`                            |
+| VS Code Insiders     | `vscode-insiders://file/%file%:%line%:%column%`                   |
+| Cursor               | `cursor://file/%file%:%line%:%column%`                            |
+| Windsurf             | `windsurf://file/%file%:%line%:%column%`                          |
+| PhpStorm / IntelliJ  | `phpstorm://open?file=%file%&line=%line%&column=%column%`         |
+| Zed                  | `zed://file/%file%:%line%:%column%`                               |
+| Sublime Text         | `subl://open?url=file://%file%&line=%line%&column=%column%`       |
+| Emacs                | `emacs://open?url=file://%file%&line=%line%&column=%column%`      |
+| Atom                 | `atom://core/open/file?filename=%file%&line=%line%&column=%column%` |
+
+:::tip
+Hyperlinks are only rendered when output is sent to a terminal with colors enabled. They are automatically disabled when output is piped or when `--colors=never` is used, so they won't interfere with scripts or CI pipelines.
+:::
+
+### Supported Formats
+
+Clickable file paths are supported in the following reporting formats:
+
+- `rich` (default), `medium`, `short` — file paths in diagnostic headers
+- `emacs` — file paths at the start of each line
+
+Machine-readable formats (`json`, `github`, `gitlab`, `checkstyle`, `sarif`) are not affected.
 
 ## Tool-Specific Configuration
 

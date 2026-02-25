@@ -53,6 +53,12 @@ pub struct ReporterConfig {
     ///
     /// Issues below this level will be completely ignored and not displayed.
     pub minimum_report_level: Option<Level>,
+
+    /// Optional editor URL template for OSC 8 terminal hyperlinks on file paths.
+    ///
+    /// Supported placeholders: `%file%` (absolute path), `%line%`, `%column%`.
+    /// Example: `"phpstorm://open?file=%file%&line=%line%"`
+    pub editor_url: Option<String>,
 }
 
 /// Status information returned after reporting issues.
@@ -143,6 +149,7 @@ impl Reporter {
             sort: self.config.sort,
             minimum_level: self.config.minimum_report_level,
             filter_fixable: self.config.filter_fixable,
+            editor_url: self.config.editor_url.clone(),
         };
 
         // Dispatch to the appropriate formatter
@@ -224,6 +231,7 @@ impl Reporter {
             sort: self.config.sort,
             minimum_level: self.config.minimum_report_level,
             filter_fixable: self.config.filter_fixable,
+            editor_url: self.config.editor_url.clone(),
         };
 
         // Dispatch to the appropriate formatter

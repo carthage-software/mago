@@ -131,7 +131,7 @@ pub struct AstCommand {
 
 impl AstCommand {
     /// Executes the AST inspection command.
-    pub fn execute(self, configuration: Configuration, color_choice: ColorChoice) -> Result<ExitCode, Error> {
+    pub fn execute(self, mut configuration: Configuration, color_choice: ColorChoice) -> Result<ExitCode, Error> {
         let arena = Bump::new();
         let file = File::read(&configuration.source.workspace, &self.file, FileType::Host)?;
 
@@ -144,9 +144,10 @@ impl AstCommand {
             let issues = IssueCollection::from(program.errors.iter().map(Issue::from).collect::<Vec<_>>());
             let config = DatabaseConfiguration::new(Path::new("/"), vec![], vec![], vec![], vec![]).into_static();
             let mut database = Database::single(file, config);
+            let editor_url = configuration.editor_url.take();
             let orchestrator = create_orchestrator(&configuration, color_choice, false, true, false);
 
-            self.reporting.get_processor(color_choice).process_issues(
+            self.reporting.get_processor(color_choice, editor_url).process_issues(
                 &orchestrator,
                 &mut database,
                 issues,
@@ -169,7 +170,7 @@ impl AstCommand {
     /// Prints the list of tokens from a file, either as a table or as JSON.
     fn print_tokens(
         self,
-        configuration: Configuration,
+        mut configuration: Configuration,
         color_choice: ColorChoice,
         file: File,
     ) -> Result<ExitCode, Error> {
@@ -183,9 +184,10 @@ impl AstCommand {
                     let config =
                         DatabaseConfiguration::new(Path::new("/"), vec![], vec![], vec![], vec![]).into_static();
                     let mut database = Database::single(file, config);
+                    let editor_url = configuration.editor_url.take();
                     let orchestrator = create_orchestrator(&configuration, color_choice, false, true, false);
 
-                    let (exit_code, _) = self.reporting.get_processor(color_choice).process_issues(
+                    let (exit_code, _) = self.reporting.get_processor(color_choice, editor_url).process_issues(
                         &orchestrator,
                         &mut database,
                         IssueCollection::from([issue]),

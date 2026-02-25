@@ -211,6 +211,20 @@ pub struct Configuration {
     #[schemars(skip)]
     #[allow(dead_code)]
     log: Value,
+
+    /// Editor URL template for OSC 8 terminal hyperlinks on file paths in diagnostics.
+    ///
+    /// When set, file paths in diagnostic output become clickable links in terminals
+    /// that support OSC 8 hyperlinks (e.g., iTerm2, Wezterm, Kitty, Windows Terminal).
+    ///
+    /// Supported placeholders:
+    /// - `%file%` — absolute file path
+    /// - `%line%` — line number
+    /// - `%column%` — column number
+    ///
+    /// Can be set via `MAGO_EDITOR_URL` environment variable or `editor-url` in `mago.toml`.
+    #[serde(default)]
+    pub editor_url: Option<String>,
 }
 
 impl Configuration {
@@ -335,7 +349,7 @@ impl Configuration {
     /// Searches for configuration files in a project directory, falling back to global config locations.
     ///
     /// This function attempts to load at most one configuration file per supported config type.
-    /// It first searches the given `root_dir` (typically the workspace/project directory).  
+    /// It first searches the given `root_dir` (typically the workspace/project directory).
     /// If any configuration file is found there, those results are returned immediately and no
     /// fallback locations are checked.
     ///
@@ -435,6 +449,7 @@ impl Configuration {
             analyzer: AnalyzerConfiguration::default(),
             guard: GuardConfiguration::default(),
             log: Value::new(None, ValueKind::Nil),
+            editor_url: None,
         }
     }
 }

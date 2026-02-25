@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+use std::cell::Cell;
 use std::cmp::Ordering;
 use std::io::IsTerminal;
 use std::io::Write;
@@ -26,6 +28,7 @@ use crate::Level;
 use crate::error::ReportingError;
 use crate::formatter::Formatter;
 use crate::formatter::FormatterConfig;
+use crate::formatter::utils::osc8_hyperlink;
 
 /// Formatter that outputs issues in rich diagnostic format with full context.
 pub(crate) struct RichFormatter;
@@ -64,7 +67,8 @@ pub(super) fn codespan_format_with_config(
     // Create a buffer for codespan (it requires WriteColor)
     let mut buffer = if use_colors { Buffer::ansi() } else { Buffer::no_color() };
 
-    let files = DatabaseFiles(database);
+    let editor_url = if use_colors { config.editor_url.as_deref() } else { None };
+    let files = DatabaseFiles { database, editor_url, line_hint: Cell::new(None), column_hint: Cell::new(None) };
 
     let highest_level = issues.get_highest_level();
     let mut errors = 0;
@@ -91,6 +95,21 @@ pub(super) fn codespan_format_with_config(
 
         if !issue.edits.is_empty() {
             suggestions += 1;
+        }
+
+        // Set line/column hints from the primary annotation for OSC 8 hyperlinks
+        if editor_url.is_some() {
+            if let Some(annotation) = issue.annotations.iter().find(|a| a.is_primary()) {
+                if let Ok(file) = database.get_ref(&annotation.span.file_id) {
+                    let line = file.line_number(annotation.span.start.offset) + 1;
+                    let column = file.column_number(annotation.span.start.offset) + 1;
+                    files.line_hint.set(Some(line));
+                    files.column_hint.set(Some(column));
+                }
+            } else {
+                files.line_hint.set(None);
+                files.column_hint.set(None);
+            }
         }
 
         let diagnostic: Diagnostic<FileId> = issue.into();
@@ -154,23 +173,39 @@ fn apply_filters(issues: &IssueCollection, config: &FormatterConfig) -> IssueCol
     filtered
 }
 
-struct DatabaseFiles<'a>(&'a ReadDatabase);
+struct DatabaseFiles<'a> {
+    database: &'a ReadDatabase,
+    editor_url: Option<&'a str>,
+    line_hint: Cell<Option<u32>>,
+    column_hint: Cell<Option<u32>>,
+}
 
 impl<'a> Files<'a> for DatabaseFiles<'_> {
     type FileId = FileId;
-    type Name = &'a str;
+    type Name = Cow<'a, str>;
     type Source = &'a str;
 
-    fn name(&'a self, file_id: FileId) -> Result<&'a str, Error> {
-        self.0.get_ref(&file_id).map(|source| source.name.as_ref()).map_err(|_| Error::FileMissing)
+    fn name(&'a self, file_id: FileId) -> Result<Cow<'a, str>, Error> {
+        let file = self.database.get_ref(&file_id).map_err(|_| Error::FileMissing)?;
+        let name = file.name.as_ref();
+
+        if let (Some(template), Some(path)) = (self.editor_url, file.path.as_ref()) {
+            let abs_path = path.display().to_string();
+            let line = self.line_hint.get().unwrap_or(1);
+            let column = self.column_hint.get().unwrap_or(1);
+
+            Ok(Cow::Owned(osc8_hyperlink(template, &abs_path, line, column, name)))
+        } else {
+            Ok(Cow::Borrowed(name))
+        }
     }
 
     fn source(&'a self, file_id: FileId) -> Result<&'a str, Error> {
-        self.0.get_ref(&file_id).map(|source| source.contents.as_ref()).map_err(|_| Error::FileMissing)
+        self.database.get_ref(&file_id).map(|source| source.contents.as_ref()).map_err(|_| Error::FileMissing)
     }
 
     fn line_index(&self, file_id: FileId, byte_index: usize) -> Result<usize, Error> {
-        let file = self.0.get_ref(&file_id).map_err(|_| Error::FileMissing)?;
+        let file = self.database.get_ref(&file_id).map_err(|_| Error::FileMissing)?;
 
         Ok(file.line_number(
             byte_index.try_into().map_err(|_| Error::IndexTooLarge { given: byte_index, max: u32::MAX as usize })?,
@@ -178,7 +213,7 @@ impl<'a> Files<'a> for DatabaseFiles<'_> {
     }
 
     fn line_range(&self, file_id: FileId, line_index: usize) -> Result<Range<usize>, Error> {
-        let file = self.0.get(&file_id).map_err(|_| Error::FileMissing)?;
+        let file = self.database.get(&file_id).map_err(|_| Error::FileMissing)?;
 
         codespan_line_range(&file.lines, file.size, line_index)
     }

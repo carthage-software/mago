@@ -235,7 +235,12 @@ impl AnalyzeCommand {
 
         let baseline = configuration.analyzer.baseline.as_deref();
         let baseline_variant = configuration.analyzer.baseline_variant;
-        let processor = self.baseline_reporting.get_processor(color_choice, baseline, baseline_variant);
+        let processor = self.baseline_reporting.get_processor(
+            color_choice,
+            baseline,
+            baseline_variant,
+            configuration.editor_url.clone(),
+        );
 
         let (exit_code, changed_file_ids) = processor.process_issues(&orchestrator, &mut database, issues)?;
 
@@ -293,7 +298,12 @@ impl AnalyzeCommand {
         let baseline = configuration.analyzer.baseline.as_deref();
         let baseline_variant = configuration.analyzer.baseline_variant;
 
-        let processor = self.baseline_reporting.get_processor(color_choice, baseline, baseline_variant);
+        let processor = self.baseline_reporting.get_processor(
+            color_choice,
+            baseline,
+            baseline_variant,
+            configuration.editor_url.clone(),
+        );
 
         watcher.with_database_mut(|database| {
             processor.process_issues(&orchestrator, database, issues).map(|(code, _)| code)

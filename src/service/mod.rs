@@ -199,6 +199,12 @@ pub struct IssueProcessor {
     /// Controls whether colored output is used in diffs (fix mode) and reports
     /// (report mode).
     pub color_choice: ColorChoice,
+
+    /// Editor URL template for OSC 8 terminal hyperlinks on file paths.
+    ///
+    /// When set, file paths in diagnostic output become clickable links in
+    /// terminals that support OSC 8 hyperlinks.
+    pub editor_url: Option<String>,
 }
 
 /// Baseline-aware issue processor for incremental issue adoption.
@@ -449,6 +455,7 @@ impl IssueProcessor {
             filter_fixable: self.fixable_only,
             sort: self.sort,
             minimum_report_level: self.minimum_report_level,
+            editor_url: self.editor_url.clone(),
         };
 
         let reporter = Reporter::new(read_database, reporter_configuration);
