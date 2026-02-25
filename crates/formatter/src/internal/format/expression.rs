@@ -1579,18 +1579,18 @@ impl<'arena> Format<'arena> for AnonymousClass<'arena> {
             let body = print_class_like_body(f, &self.left_brace, &self.members, &self.right_brace, Some(signature_id));
 
             if let Some(attributes) = misc::print_attribute_list_sequence(f, &self.attribute_lists) {
-                Document::Group(
-                    Group::new(vec![
+                Document::Group(Group::new(vec![
+                    in f.arena;
+                    self.new.format(f),
+                    Document::Indent(vec![
                         in f.arena;
-                        self.new.format(f),
-                        Document::Line(Line::default()),
+                        Document::Line(Line::hard()),
                         attributes,
-                        Document::Line(Line::default()),
+                        Document::Line(Line::hard()),
                         signature,
                         body,
-                    ])
-                    .with_break(true),
-                )
+                    ]),
+                ]))
             } else {
                 Document::Group(Group::new(vec![
                     in f.arena;
