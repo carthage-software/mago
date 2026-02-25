@@ -20,7 +20,7 @@ stack-size = 8388608 # 8 MB
 
 | Option                          | Type      | Default        | Description                                                                                           |
 | :------------------------------ | :-------- | :------------- | :---------------------------------------------------------------------------------------------------- |
-| `php-version`                   | `string`  | `"8.1"`        | The version of PHP to use for parsing and analysis.                                                   |
+| `php-version`                   | `string`  | Latest stable  | The version of PHP to use for parsing and analysis. Defaults to the latest stable PHP version supported by your Mago release. Use `mago init` to auto-detect from `composer.json`. |
 | `allow-unsupported-php-version` | `boolean` | `false`        | Allow Mago to run on unsupported PHP versions. Not recommended.                                       |
 | `threads`                       | `integer` | (logical CPUs) | The number of threads to use for parallel tasks.                                                      |
 | `stack-size`                    | `integer` | (see below)    | The stack size in bytes for each thread. Defaults to 2MB, with a minimum of 2MB and a maximum of 8MB. |
