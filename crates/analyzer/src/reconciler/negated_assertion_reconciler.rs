@@ -127,6 +127,21 @@ fn subtract_complex_type(
             continue;
         }
 
+        if matches!(assertion_type, TAtomic::GenericParameter(_)) {
+            if atomic_comparator::is_contained_by(
+                context.codebase,
+                assertion_type,
+                &existing_atomic,
+                true,
+                &mut ComparisonResult::new(),
+            ) {
+                *can_be_disjunct = true;
+            }
+
+            acceptable_types.push(existing_atomic);
+            continue;
+        }
+
         if atomic_comparator::is_contained_by(
             context.codebase,
             &existing_atomic,
