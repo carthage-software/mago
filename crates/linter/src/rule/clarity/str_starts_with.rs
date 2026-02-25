@@ -143,13 +143,13 @@ impl LintRule for StrStartsWithRule {
         .with_note("Using `str_starts_with` makes the code easier to understand and more expressive.");
 
         ctx.collector.propose(issue, |edits| {
-            if !equal {
-                edits.push(TextEdit::insert(binary.span().start_offset(), "!"));
-            }
-
             let function_span = call.function.span();
 
-            edits.push(TextEdit::replace(function_span, STR_STARTS_WITH));
+            if equal {
+                edits.push(TextEdit::replace(function_span, STR_STARTS_WITH));
+            } else {
+                edits.push(TextEdit::replace(function_span, format!("!{STR_STARTS_WITH}")));
+            }
 
             if left {
                 // delete the `=== 0` part

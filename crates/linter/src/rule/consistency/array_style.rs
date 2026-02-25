@@ -105,9 +105,12 @@ impl LintRule for ArrayStyleRule {
                     .with_help("Use the short array style `[..]` instead.");
 
                 ctx.collector.propose(issue, |edits| {
-                    edits.push(TextEdit::delete(arr.array.span));
-                    edits.push(TextEdit::replace(arr.left_parenthesis, "["));
-                    edits.push(TextEdit::replace(arr.right_parenthesis, "]"));
+                    if arr.left_parenthesis.end == arr.right_parenthesis.start {
+                        edits.push(TextEdit::replace(arr.array.span.join(arr.right_parenthesis), "[]"));
+                    } else {
+                        edits.push(TextEdit::replace(arr.array.span.join(arr.left_parenthesis), "["));
+                        edits.push(TextEdit::replace(arr.right_parenthesis, "]"));
+                    }
                 });
             }
             Node::Array(arr) if ArrayStyleOption::Long == self.cfg.style => {

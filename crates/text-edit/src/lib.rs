@@ -47,15 +47,20 @@ impl TextRange {
 
     /// Checks if this range overlaps with another.
     ///
-    /// We consider touching ranges as overlapping (e.g. `0..5` and `5..10` overlap at 5).
-    /// This strictness is required to prevent ambiguity in insertion order (e.g. which
-    /// insertion happens first at offset 5?).
+    /// Two non-empty ranges overlap only when they share byte positions.
+    /// Adjacent ranges (e.g. `0..5` and `5..10`) do NOT overlap since they
+    /// replace different bytes and the result is unambiguous.
     ///
-    /// Zero-length ranges (insertions) at the boundary of another range are also
-    /// considered overlapping (e.g. insert at 5 overlaps with `5..10`).
+    /// Zero-length ranges (insertions) use inclusive boundary checks because
+    /// the ordering of an insertion relative to an adjacent edit is ambiguous
+    /// (e.g. should `insert(5)` go before or after `replace(5..10)`?).
     #[inline(always)]
     pub fn overlaps(&self, other: &TextRange) -> bool {
-        self.start <= other.end && other.start <= self.end
+        if self.is_empty() || other.is_empty() {
+            self.start <= other.end && other.start <= self.end
+        } else {
+            self.start < other.end && other.start < self.end
+        }
     }
 
     /// Checks if this range contains a specific offset.
@@ -619,11 +624,11 @@ mod tests {
     }
 
     #[test]
-    fn test_touching_ranges_overlap() {
+    fn test_touching_non_empty_ranges_do_not_overlap() {
         let range1 = TextRange::new(0, 5);
         let range2 = TextRange::new(5, 10);
-        assert!(range1.overlaps(&range2));
-        assert!(range2.overlaps(&range1));
+        assert!(!range1.overlaps(&range2));
+        assert!(!range2.overlaps(&range1));
     }
 
     #[test]
