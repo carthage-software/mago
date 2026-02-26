@@ -225,9 +225,7 @@ impl<'a> DatabaseLoader<'a> {
                     return None;
                 }
 
-                let Some(ext) = path.extension() else {
-                    return None;
-                };
+                let ext = path.extension()?;
                 if !extensions.contains(ext) {
                     return None;
                 }
