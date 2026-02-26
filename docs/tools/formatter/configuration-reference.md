@@ -141,6 +141,7 @@ public function bar(
 | `preserve-breaking-parameter-list` | `boolean` | `false` | Preserve existing line breaks in parameter lists. |
 | `preserve-breaking-attribute-list` | `boolean` | `false` | Preserve existing line breaks in attribute lists. |
 | `preserve-breaking-conditional-expression` | `boolean` | `false` | Preserve existing line breaks in ternary expressions. |
+| `preserve-breaking-condition-statement` | `boolean` | `false` | Preserve existing line breaks in control structure conditions (`if`, `elseif`, `while`, `do-while`, `switch`, `match`). When enabled, each boolean operator is placed on its own line. |
 | `break-promoted-properties-list` | `boolean` | `true` | Always break parameter lists with promoted properties. |
 | `line-before-binary-operator` | `boolean` | `true` | Place the binary operator on the next line when breaking. |
 | `always-break-named-arguments-list` | `boolean` | `false` | Always break named argument lists into multiple lines. |
