@@ -1374,6 +1374,10 @@ impl TType for TUnion {
 
 impl PartialEq for TUnion {
     fn eq(&self, other: &TUnion) -> bool {
+        if std::ptr::eq(self, other) {
+            return true;
+        }
+
         const SEMANTIC_FLAGS: UnionFlags = UnionFlags::HAD_TEMPLATE
             .union(UnionFlags::BY_REFERENCE)
             .union(UnionFlags::REFERENCE_FREE)
@@ -1390,6 +1394,12 @@ impl PartialEq for TUnion {
         let len = self.types.len();
         if len != other.types.len() {
             return false;
+        }
+
+        // Fast path: unions are commonly constructed in stable type order.
+        // When order already matches, this keeps comparison linear.
+        if self.types == other.types {
+            return true;
         }
 
         // Check self ⊆ other
