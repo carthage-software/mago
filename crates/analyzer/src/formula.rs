@@ -1,5 +1,6 @@
 use indexmap::IndexMap;
 
+use itertools::Itertools;
 use mago_algebra::AlgebraThresholds;
 use mago_algebra::assertion_set::AssertionSet;
 use mago_algebra::clause::Clause;
@@ -7,7 +8,6 @@ use mago_algebra::disjoin_clauses;
 use mago_algebra::negate_formula;
 use mago_atom::Atom;
 use mago_atom::AtomMap;
-use mago_atom::AtomSet;
 use mago_codex::assertion::Assertion;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::scalar::TScalar;
@@ -565,21 +565,10 @@ pub fn remove_clauses_with_mixed_variables(
     clauses
         .into_iter()
         .map(|c| {
-            let keys: AtomSet = c.possibilities.keys().copied().collect();
-            let mut new_mixed_var_ids = vec![];
-            for i in &mixed_var_ids {
-                if !keys.contains(i) {
-                    new_mixed_var_ids.push(*i);
-                }
-            }
+            mixed_var_ids.retain(|id| !c.possibilities.contains_key(id));
 
-            mixed_var_ids = new_mixed_var_ids;
-            for key in keys {
-                for mixed_var_id in &mixed_var_ids {
-                    if var_has_root(key, *mixed_var_id) {
-                        return Clause::new(IndexMap::new(), cond_object_id, cond_object_id, Some(true), None, None);
-                    }
-                }
+            if c.possibilities.keys().cartesian_product(&mixed_var_ids).any(|(key, id)| var_has_root(*key, *id)) {
+                return Clause::new(IndexMap::new(), cond_object_id, cond_object_id, Some(true), None, None);
             }
 
             c
