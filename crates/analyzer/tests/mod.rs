@@ -675,6 +675,11 @@ test_case!(issue_1202);
 test_case!(issue_1206);
 test_case!(issue_1207);
 test_case!(issue_1215);
+test_case!(issue_1223, {
+    let mut s = crate::framework::default_test_settings();
+    s.check_missing_type_hints = true;
+    s
+});
 
 #[test]
 fn test_all_test_cases_are_ran() {

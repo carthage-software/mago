@@ -31,8 +31,6 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Method<'arena> {
     ) -> Result<(), AnalysisError> {
         analyze_attributes(context, block_context, artifacts, self.attribute_lists.as_slice(), AttributeTarget::Method);
 
-        let MethodBody::Concrete(concrete_body) = &self.body else { return Ok(()) };
-
         let Some(class_like_metadata) = block_context.scope.get_class_like() else {
             tracing::error!("Attempted to analyze method `{}` without class-like context.", self.name.value);
 
@@ -64,39 +62,54 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Method<'arena> {
             return Ok(());
         }
 
-        let mut scope = ScopeContext::new();
-        scope.set_class_like(Some(class_like_metadata));
-        scope.set_function_like(Some(method_metadata));
-        scope.set_static(self.is_static());
+        if let MethodBody::Concrete(concrete_body) = &self.body {
+            let mut scope = ScopeContext::new();
+            scope.set_class_like(Some(class_like_metadata));
+            scope.set_function_like(Some(method_metadata));
+            scope.set_static(self.is_static());
 
-        let mut method_block_context = BlockContext::new(scope, context.settings.register_super_globals);
+            let mut method_block_context = BlockContext::new(scope, context.settings.register_super_globals);
 
-        method_block_context.flags.set_collect_initializations(true);
+            method_block_context.flags.set_collect_initializations(true);
 
-        analyze_function_like(
-            context,
-            artifacts,
-            &mut method_block_context,
-            method_metadata,
-            &self.parameter_list,
-            FunctionLikeBody::Statements(concrete_body.statements.as_slice(), concrete_body.span()),
-            None,
-        )?;
+            analyze_function_like(
+                context,
+                artifacts,
+                &mut method_block_context,
+                method_metadata,
+                &self.parameter_list,
+                FunctionLikeBody::Statements(concrete_body.statements.as_slice(), concrete_body.span()),
+                None,
+            )?;
 
-        let method_key = (class_like_metadata.name, lowercase_method_name);
+            let method_key = (class_like_metadata.name, lowercase_method_name);
 
-        artifacts
-            .method_initialized_properties
-            .insert(method_key, method_block_context.definitely_initialized_properties.clone());
+            artifacts
+                .method_initialized_properties
+                .insert(method_key, method_block_context.definitely_initialized_properties.clone());
 
-        artifacts.method_calls_this_methods.insert(method_key, method_block_context.definitely_called_methods.clone());
+            artifacts
+                .method_calls_this_methods
+                .insert(method_key, method_block_context.definitely_called_methods.clone());
 
-        if method_block_context.flags.calls_parent_constructor() {
-            artifacts.method_calls_parent_constructor.insert(method_key, true);
-        }
+            if method_block_context.flags.calls_parent_constructor() {
+                artifacts.method_calls_parent_constructor.insert(method_key, true);
+            }
 
-        if let Some(parent_initializer_name) = method_block_context.calls_parent_initializer {
-            artifacts.method_calls_parent_initializer.insert(method_key, parent_initializer_name);
+            if let Some(parent_initializer_name) = method_block_context.calls_parent_initializer {
+                artifacts.method_calls_parent_initializer.insert(method_key, parent_initializer_name);
+            }
+
+            if context.settings.find_unused_parameters
+                && !context.codebase.method_is_overriding(&class_like_metadata.name, &method_name)
+            {
+                unused_parameter::check_unused_params(
+                    method_metadata,
+                    self.parameter_list.parameters.as_slice(),
+                    FunctionLikeBody::Statements(concrete_body.statements.as_slice(), concrete_body.span()),
+                    context,
+                );
+            }
         }
 
         check_unused_function_template_parameters(
@@ -107,25 +120,16 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Method<'arena> {
             concat_atom!(&class_like_metadata.original_name, "::", &method_name),
         );
 
-        if context.settings.find_unused_parameters
-            && !context.codebase.method_is_overriding(&class_like_metadata.name, &method_name)
-        {
-            unused_parameter::check_unused_params(
-                method_metadata,
-                self.parameter_list.parameters.as_slice(),
-                FunctionLikeBody::Statements(concrete_body.statements.as_slice(), concrete_body.span()),
-                context,
-            );
-        }
-
         // Check for missing type hints
-        for parameter in &self.parameter_list.parameters {
+        for (i, parameter) in self.parameter_list.parameters.iter().enumerate() {
             missing_type_hints::check_parameter_type_hint(
                 context,
                 Some(class_like_metadata),
                 method_metadata,
                 parameter,
             );
+
+            missing_type_hints::check_imprecise_parameter_type_hint(context, method_metadata, parameter, i);
         }
 
         missing_type_hints::check_return_type_hint(
@@ -136,10 +140,6 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Method<'arena> {
             self.return_type_hint.as_ref(),
             self.span(),
         );
-
-        for (i, parameter) in self.parameter_list.parameters.iter().enumerate() {
-            missing_type_hints::check_imprecise_parameter_type_hint(context, method_metadata, parameter, i);
-        }
 
         missing_type_hints::check_imprecise_return_type_hint(
             context,
