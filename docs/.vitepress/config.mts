@@ -1,11 +1,20 @@
 import { defineConfig } from "vitepress";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 
 const hostname = "https://mago.carthage.software";
+
+// Read version from root Cargo.toml for WASM cache-busting
+const cargoToml = readFileSync(resolve(__dirname, "../../Cargo.toml"), "utf-8");
+const magoVersion = cargoToml.match(/^version\s*=\s*"(.+)"/m)?.[1] ?? "dev";
 
 export default defineConfig({
   srcDir: ".",
   vite: {
     assetsInclude: ["**/*.wasm"],
+    define: {
+      __MAGO_VERSION__: JSON.stringify(magoVersion),
+    },
     build: {
       target: "esnext",
       cssMinify: true,

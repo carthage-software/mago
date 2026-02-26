@@ -18,9 +18,11 @@ export function useMagoWasm() {
 
     loadPromise = (async () => {
       try {
+        const version = typeof __MAGO_VERSION__ !== 'undefined' ? __MAGO_VERSION__ : '';
+        const cacheBust = version ? `?v=${version}` : '';
         const importFn = new Function('path', 'return import(path)');
-        const wasm = await importFn('/wasm/mago_wasm.js');
-        await wasm.default('/wasm/mago_wasm_bg.wasm');
+        const wasm = await importFn(`/wasm/mago_wasm.js${cacheBust}`);
+        await wasm.default(`/wasm/mago_wasm_bg.wasm${cacheBust}`);
 
         wasmModule = {
           run: wasm.run,
