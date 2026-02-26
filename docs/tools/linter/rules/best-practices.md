@@ -15,6 +15,7 @@ This document details the rules available in the `BestPractices` category.
 | Middleware In Routes | [`middleware-in-routes`](#middleware-in-routes) |
 | No Direct Database Queries | [`no-direct-db-query`](#no-direct-db-query) |
 | No ini_set | [`no-ini-set`](#no-ini-set) |
+| No Inline | [`no-inline`](#no-inline) |
 | No Sprintf Concat | [`no-sprintf-concat`](#no-sprintf-concat) |
 | Prefer Anonymous Migration | [`prefer-anonymous-migration`](#prefer-anonymous-migration) |
 | Prefer Arrow Function | [`prefer-arrow-function`](#prefer-arrow-function) |
@@ -306,6 +307,52 @@ ini_set( 'memory_limit', '256M' );
 ```
 
 
+## <a id="no-inline"></a>`no-inline`
+
+Disallows inline content (text outside of PHP tags) in source files.
+
+Most modern PHP applications are source-code only and do not use PHP as a templating
+language. Inline content before `<?php`, after `?>`, or between PHP tags is typically
+unintentional and can cause issues such as unexpected output or "headers already sent"
+errors.
+
+This rule is disabled by default and is intended for codebases that do not use PHP
+templates.
+
+
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `false` |
+| `level` | `string` | `"error"` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+
+namespace App;
+
+echo "Hello, world!";
+```
+
+#### Incorrect code
+
+```php
+Hello
+<?php
+
+echo "Hello, world!";
+
+?>
+Goodbye
+```
+
+
 ## <a id="no-sprintf-concat"></a>`no-sprintf-concat`
 
 Disallows string concatenation with the result of an `sprintf` call.
@@ -510,6 +557,10 @@ This rule identifies closures and arrow functions that do nothing but forward th
 In such cases, the more concise and modern first-class callable syntax, introduced in PHP 8.1, can be used instead.
 This improves readability by reducing boilerplate code.
 
+By default, this rule only checks method and static method calls. Optionally, function calls can also
+be checked by enabling `check-functions`, but this may produce false positives with internal PHP
+functions that enforce strict argument counts.
+
 
 ### Requirements
 
@@ -521,6 +572,7 @@ This improves readability by reducing boilerplate code.
 | :--- | :--- | :--- |
 | `enabled` | `boolean` | `true` |
 | `level` | `string` | `"warning"` |
+| `check-functions` | `boolean` | `false` |
 
 ### Examples
 
@@ -530,7 +582,7 @@ This improves readability by reducing boilerplate code.
 <?php
 
 $names = ['Alice', 'Bob', 'Charlie'];
-$uppercased_names = array_map(strtoupper(...), $names);
+$uppercased_names = array_map($formatter->format(...), $names);
 ```
 
 #### Incorrect code
@@ -539,7 +591,7 @@ $uppercased_names = array_map(strtoupper(...), $names);
 <?php
 
 $names = ['Alice', 'Bob', 'Charlie'];
-$uppercased_names = array_map(fn($name) => strtoupper($name), $names);
+$uppercased_names = array_map(fn($name) => $formatter->format($name), $names);
 ```
 
 

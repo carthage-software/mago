@@ -65,6 +65,7 @@ use crate::rule::NoGotoConfig;
 use crate::rule::NoHashCommentConfig;
 use crate::rule::NoHashEmojiConfig;
 use crate::rule::NoIniSetConfig;
+use crate::rule::NoInlineConfig;
 use crate::rule::NoInsecureComparisonConfig;
 use crate::rule::NoIssetConfig;
 use crate::rule::NoLiteralPasswordConfig;
@@ -295,6 +296,7 @@ pub struct RulesSettings {
     pub variable_name: RuleSettings<VariableNameConfig>,
     pub constant_condition: RuleSettings<ConstantConditionConfig>,
     pub no_ini_set: RuleSettings<NoIniSetConfig>,
+    pub no_inline: RuleSettings<NoInlineConfig>,
     pub no_insecure_comparison: RuleSettings<NoInsecureComparisonConfig>,
     pub no_literal_password: RuleSettings<NoLiteralPasswordConfig>,
     pub tainted_data_to_sink: RuleSettings<TaintedDataToSinkConfig>,

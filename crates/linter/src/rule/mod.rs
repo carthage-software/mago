@@ -299,6 +299,7 @@ define_rules! {
     VariableName(variable_name @ VariableNameRule),
     ConstantCondition(constant_condition @ ConstantConditionRule),
     NoIniSet(no_ini_set @ NoIniSetRule),
+    NoInline(no_inline @ NoInlineRule),
     NoInsecureComparison(no_insecure_comparison @ NoInsecureComparisonRule),
     NoLiteralPassword(no_literal_password @ NoLiteralPasswordRule),
     TaintedDataToSink(tainted_data_to_sink @ TaintedDataToSinkRule),
