@@ -230,6 +230,32 @@ fn get_target_asset_from_release(release: &Release) -> Result<&ReleaseAsset, Err
         .iter()
         .find(|asset| asset.name.contains(TARGET) && asset.name.ends_with(ARCHIVE_EXTENSION))
         .ok_or_else(|| {
-            Error::SelfUpdate(SelfUpdateError::Release("No asset found for the current platform.".to_string()))
+            let binary_asset_count =
+                release.assets.iter().filter(|a| SUPPORTED_TARGETS.iter().any(|t| a.name.contains(t))).count();
+
+            let message = if !SUPPORTED_TARGETS.contains(&TARGET) {
+                format!(
+                    "No pre-built binary is available for your platform `{TARGET}`. \
+                     You can compile Mago from source by cloning the repository and running `cargo install --path .`.",
+                )
+            } else if binary_asset_count == 0 {
+                format!(
+                    "No binaries are available for release `{}` yet. \
+                     The release was just published and binaries are still being built by CI. \
+                     This typically takes 30-40 minutes. Please try again shortly.",
+                    release.version,
+                )
+            } else {
+                format!(
+                    "The binary for your platform `{TARGET}` is not available in release `{}` yet. \
+                     The release has {}/{} platform builds ready. \
+                     The remaining builds are likely still in progress - please try again in a few minutes.",
+                    release.version,
+                    binary_asset_count,
+                    SUPPORTED_TARGETS.len(),
+                )
+            };
+
+            Error::SelfUpdate(SelfUpdateError::Release(message))
         })
 }

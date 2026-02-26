@@ -5,6 +5,27 @@ use tracing::error;
 
 use mago_php_version::PHPVersion;
 
+/// Targets for which official pre-built binaries are provided.
+///
+/// This list must match the build matrix in `.github/workflows/cd.yml`.
+pub const SUPPORTED_TARGETS: &[&str] = &[
+    "x86_64-pc-windows-msvc",
+    "aarch64-apple-darwin",
+    "x86_64-apple-darwin",
+    "aarch64-unknown-linux-gnu",
+    "aarch64-unknown-linux-musl",
+    "x86_64-unknown-linux-gnu",
+    "x86_64-unknown-linux-musl",
+    "x86_64-pc-windows-gnu",
+    "x86_64-unknown-freebsd",
+    "arm-unknown-linux-gnueabi",
+    "arm-unknown-linux-gnueabihf",
+    "arm-unknown-linux-musleabi",
+    "arm-unknown-linux-musleabihf",
+    "armv7-unknown-linux-gnueabihf",
+    "armv7-unknown-linux-musleabihf",
+];
+
 /// The current version of mago.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
