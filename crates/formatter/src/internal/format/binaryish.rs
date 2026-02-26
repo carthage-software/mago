@@ -311,10 +311,12 @@ fn print_binaryish_expression_parts<'arena>(
     let line_before_operator = f.settings.line_before_binary_operator && !has_leading_comment_on_right;
     let operator_has_leading_comments = f.has_comment(operator.span(), CommentFlags::LEADING);
 
+    let force_break = f.must_break_condition && line_before_operator;
+
     let mut right_document = vec![in f.arena];
 
-    right_document.push(if operator_has_leading_comments || (line_before_operator && !should_inline_this_level) {
-        Document::Line(if has_space_around { Line::default() } else { Line::soft() })
+    right_document.push(if force_break || operator_has_leading_comments || (line_before_operator && !should_inline_this_level) {
+        Document::Line(if force_break { Line::hard() } else if has_space_around { Line::default() } else { Line::soft() })
     } else {
         Document::String(if has_space_around { " " } else { "" })
     });
