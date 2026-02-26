@@ -624,11 +624,7 @@ pub(super) fn print_condition<'arena>(
     f.in_condition = true;
 
     let must_break = f.settings.preserve_breaking_condition_statement
-        && has_new_line_in_range(
-            f.source_text,
-            left_parenthesis.end.offset,
-            condition.span().start.offset,
-        );
+        && has_new_line_in_range(f.source_text, left_parenthesis.end.offset, condition.span().start.offset);
 
     f.must_break_condition = must_break;
 

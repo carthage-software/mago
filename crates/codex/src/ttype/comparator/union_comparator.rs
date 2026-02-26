@@ -40,15 +40,11 @@ pub fn is_contained_by(
 
     'outer: while let Some(input_type_part) = input_atomic_types.pop_front() {
         match input_type_part {
-            TAtomic::Null => {
-                if ignore_null {
-                    continue;
-                }
+            TAtomic::Null if ignore_null => {
+                continue;
             }
-            TAtomic::Scalar(TScalar::Bool(bool)) if bool.is_false() => {
-                if ignore_false {
-                    continue;
-                }
+            TAtomic::Scalar(TScalar::Bool(bool)) if bool.is_false() && ignore_false => {
+                continue;
             }
             TAtomic::Variable(name) => {
                 if container_type.is_single()
@@ -64,11 +60,11 @@ pub fn is_contained_by(
 
                 continue;
             }
-            TAtomic::GenericParameter(TGenericParameter { intersection_types: None, constraint, .. }) => {
-                if !container_has_template {
-                    input_atomic_types.extend(constraint.types.iter());
-                    continue;
-                }
+            TAtomic::GenericParameter(TGenericParameter { intersection_types: None, constraint, .. })
+                if !container_has_template =>
+            {
+                input_atomic_types.extend(constraint.types.iter());
+                continue;
             }
             _ => (),
         }
