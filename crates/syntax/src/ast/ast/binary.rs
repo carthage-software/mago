@@ -319,6 +319,22 @@ impl HasSpan for BinaryOperator<'_> {
 
 impl HasSpan for Binary<'_> {
     fn span(&self) -> Span {
-        self.lhs.span().join(self.rhs.span())
+        fn left_edge_span(mut expression: &Expression<'_>) -> Span {
+            while let Expression::Binary(binary) = expression {
+                expression = binary.lhs;
+            }
+
+            expression.span()
+        }
+
+        fn right_edge_span(mut expression: &Expression<'_>) -> Span {
+            while let Expression::Binary(binary) = expression {
+                expression = binary.rhs;
+            }
+
+            expression.span()
+        }
+
+        left_edge_span(self.lhs).join(right_edge_span(self.rhs))
     }
 }
