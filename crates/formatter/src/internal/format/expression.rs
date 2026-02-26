@@ -114,6 +114,7 @@ use crate::internal::format::call_node::CallLikeNode;
 use crate::internal::format::call_node::print_call_like_node;
 use crate::internal::format::class_like::print_class_like_body;
 use crate::internal::format::format_token;
+use crate::internal::format::format_token_with_only_leading_comments;
 use crate::internal::format::member_access::collect_member_access_chain;
 use crate::internal::format::member_access::print_member_access_chain;
 use crate::internal::format::misc;
@@ -1075,7 +1076,7 @@ impl<'arena> Format<'arena> for Conditional<'arena> {
                             Document::Indent(vec![
                                 in f.arena;
                                 Document::Line(if must_break { Line::hard() } else { Line::default() }),
-                                format_token(f, self.question_mark, "? "),
+                                format_token_with_only_leading_comments(f, self.question_mark, "? "),
                                 Document::Group(Group::new(vec![in f.arena; then.format(f)]).with_id(then_id)),
                                 {
                                     if inline_colon {
@@ -1096,7 +1097,7 @@ impl<'arena> Format<'arena> for Conditional<'arena> {
                                         Document::Line(if must_break { Line::hard() } else { Line::default() })
                                     }
                                 },
-                                format_token(f, self.colon, ": "),
+                                format_token_with_only_leading_comments(f, self.colon, ": "),
                                 self.r#else.format(f),
                             ]),
                         ])

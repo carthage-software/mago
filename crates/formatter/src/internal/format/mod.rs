@@ -2039,3 +2039,13 @@ fn format_token<'arena>(f: &mut FormatterState<'_, 'arena>, span: Span, token_va
 
     f.print_comments(leading, Document::String(token_value), trailing)
 }
+
+fn format_token_with_only_leading_comments<'arena>(
+    f: &mut FormatterState<'_, 'arena>,
+    span: Span,
+    token_value: &'arena str,
+) -> Document<'arena> {
+    let leading = f.print_leading_comments(span);
+
+    f.print_comments(leading, Document::String(token_value), None)
+}
