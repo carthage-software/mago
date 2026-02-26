@@ -76,7 +76,12 @@ serde-wasm-bindgen = "0.6"
 diffy = "0.4.0"
 termcolor = "1.4.1"
 indoc = "2"
-self_update = { git = "https://github.com/jaemk/self_update", rev = "9ec008b", default-features = false, features = ["ureq", "rustls", "archive-tar", "archive-zip", "compression-flate2"] }
+ureq = { version = "3", features = ["rustls", "json"] }
+self-replace = "1"
+semver = "1"
+tar = "0.4"
+flate2 = "1"
+zip = { version = "6", default-features = false, features = ["deflate"] }
 tempfile = "3.15.0"
 colored = "3.0.0"
 blake3 = "1.8.1"
@@ -130,7 +135,12 @@ clap_complete = { workspace = true }
 termtree = { workspace = true }
 serde_json = { workspace = true }
 strum = { workspace = true }
-self_update = { workspace = true }
+ureq = { workspace = true }
+self-replace = { workspace = true }
+semver = { workspace = true }
+tar = { workspace = true }
+flate2 = { workspace = true }
+zip = { workspace = true }
 tracing = { workspace = true }
 config = { workspace = true }
 toml = { workspace = true }

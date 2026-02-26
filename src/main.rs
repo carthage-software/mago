@@ -62,6 +62,7 @@ mod consts;
 mod error;
 mod macros;
 mod service;
+mod updater;
 mod utils;
 
 #[cfg(all(

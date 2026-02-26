@@ -126,8 +126,8 @@ pub enum Error {
     ///
     /// This error occurs during the `mago self-update` command when the update process
     /// fails due to network issues, missing release assets, permission errors when
-    /// replacing the binary, or checksum verification failures.
-    SelfUpdate(self_update::errors::Error),
+    /// replacing the binary, or version comparison failures.
+    SelfUpdate(crate::updater::error::UpdateError),
 
     /// The configured PHP version is too old and not supported.
     ///
@@ -380,10 +380,10 @@ impl From<serde_json::Error> for Error {
 
 /// Converts self-update errors into CLI errors.
 ///
-/// This enables the `?` operator to automatically convert self-update crate errors
+/// This enables the `?` operator to automatically convert [`UpdateError`](crate::updater::error::UpdateError)
 /// into [`Error`] when propagating errors from the `mago self-update` command.
-impl From<self_update::errors::Error> for Error {
-    fn from(error: self_update::errors::Error) -> Self {
+impl From<crate::updater::error::UpdateError> for Error {
+    fn from(error: crate::updater::error::UpdateError) -> Self {
         Self::SelfUpdate(error)
     }
 }
