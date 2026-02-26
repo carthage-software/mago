@@ -225,6 +225,7 @@ export default defineConfig({
         text: "🧩 Recipes",
         collapsed: true,
         items: [
+          { text: "Docker", link: "/recipes/docker" },
           { text: "GitHub Actions", link: "/recipes/github-actions" },
           { text: "Zed", link: "/recipes/zed" },
           { text: "Helix", link: "/recipes/helix" },

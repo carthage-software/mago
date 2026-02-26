@@ -46,6 +46,18 @@ You can always download a pre-compiled binary directly from our GitHub Releases 
 3.  Unzip the archive.
 4.  Place the `mago.exe` (or `mago`) executable in a directory that is part of your system's `PATH` environment variable.
 
+## Docker
+
+The official container image provides a zero-install way to run Mago in any environment. The image is built from `scratch` and weighs only ~26 MB.
+
+```sh
+docker run --rm -v $(pwd):/app -w /app ghcr.io/carthage-software/mago lint
+```
+
+Available tags include `latest`, exact versions (e.g., `1.13.0`), minor versions (`1.13`), and major versions (`1`). Both `linux/amd64` and `linux/arm64` are supported.
+
+See the [Docker recipe](/recipes/docker) for detailed usage, CI/CD examples, and limitations.
+
 ## Package managers
 
 These methods are convenient but may be managed by the community or experience slight publishing delays. If you use Homebrew or Cargo, it is **crucial to run [`mago self-update`](/guide/upgrading)** immediately after installation.
