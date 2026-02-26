@@ -141,6 +141,8 @@ test_case!(preserve_breaking_attribute_list);
 test_case!(preserve_breaking_attribute_list_disabled);
 test_case!(preserve_breaking_conditional_expression);
 test_case!(preserve_breaking_conditional_expression_disabled);
+test_case!(preserve_breaking_condition_statement);
+test_case!(preserve_breaking_condition_statement_disabled);
 test_case!(preserve_breaking_parameter_list_promoted_properties);
 test_case!(hooks_always_break);
 test_case!(inline_abstract_property_hooks);
