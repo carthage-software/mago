@@ -166,7 +166,7 @@ impl<'a> DatabaseLoader<'a> {
         glob_excludes: &GlobSet,
         path_excludes: &HashSet<&Cow<'a, Path>>,
     ) -> Result<Vec<FileWithSpecificity>, DatabaseError> {
-        let mut paths_to_process: Vec<(std::path::PathBuf, String, usize)> = Vec::new();
+        let mut paths_to_process: Vec<(std::path::PathBuf, usize)> = Vec::new();
 
         for root in roots {
             // Check if this is a glob pattern (contains glob metacharacters)
@@ -188,7 +188,7 @@ impl<'a> DatabaseLoader<'a> {
                             match entry {
                                 Ok(path) => {
                                     if path.is_file() {
-                                        paths_to_process.push((path, root.to_string(), specificity));
+                                        paths_to_process.push((path, specificity));
                                     }
                                 }
                                 Err(e) => {
@@ -211,30 +211,31 @@ impl<'a> DatabaseLoader<'a> {
 
                 for entry in WalkDir::new(&dir_path).into_iter().filter_map(Result::ok) {
                     if entry.file_type().is_file() {
-                        paths_to_process.push((entry.into_path(), root.to_string(), specificity));
+                        paths_to_process.push((entry.into_path(), specificity));
                     }
                 }
             }
         }
 
+        let has_path_excludes = !path_excludes.is_empty();
         let files: Vec<FileWithSpecificity> = paths_to_process
             .into_par_iter()
-            .filter_map(|(path, _pattern, specificity)| {
+            .filter_map(|(path, specificity)| {
                 if glob_excludes.is_match(&path) {
                     return None;
                 }
 
-                if let Ok(canonical_path) = path.canonicalize()
-                    && path_excludes.iter().any(|excluded| canonical_path.starts_with(excluded))
-                {
+                let Some(ext) = path.extension() else {
+                    return None;
+                };
+                if !extensions.contains(ext) {
                     return None;
                 }
 
-                if let Some(ext) = path.extension() {
-                    if !extensions.contains(ext) {
-                        return None;
-                    }
-                } else {
+                if has_path_excludes
+                    && let Ok(canonical_path) = path.canonicalize()
+                    && path_excludes.iter().any(|excluded| canonical_path.starts_with(excluded))
+                {
                     return None;
                 }
 
