@@ -620,7 +620,17 @@ pub(super) fn print_condition<'arena>(
     right_parenthesis: Span,
 ) -> Document<'arena> {
     let was_in_condition = f.in_condition;
+    let was_must_break_condition = f.must_break_condition;
     f.in_condition = true;
+
+    let must_break = f.settings.preserve_breaking_condition_statement
+        && has_new_line_in_range(
+            f.source_text,
+            left_parenthesis.end.offset,
+            condition.span().start.offset,
+        );
+
+    f.must_break_condition = must_break;
 
     let has_breaking_concat = match condition {
         Expression::Call(call) => {
@@ -636,6 +646,7 @@ pub(super) fn print_condition<'arena>(
     let condition = if is_expandable_expression(condition, true)
         && !has_breaking_concat
         && !f.has_comment(condition.span(), CommentFlags::LEADING | CommentFlags::TRAILING)
+        && !must_break
     {
         Document::Group(Group::new(vec![
             in f.arena;
@@ -654,17 +665,19 @@ pub(super) fn print_condition<'arena>(
                 format_token(f, left_parenthesis, "("),
                 Document::IndentIfBreak(IndentIfBreak::new(group_id, vec![
                     in f.arena;
-                    Document::Line(Line::soft()),
+                    Document::Line(if must_break { Line::hard() } else { Line::soft() }),
                     condition.format(f),
                 ])),
-                Document::Line(Line::soft()),
+                Document::Line(if must_break { Line::hard() } else { Line::soft() }),
                 format_token(f, right_parenthesis, ")"),
             ])
-            .with_id(group_id),
+            .with_id(group_id)
+            .with_break(must_break),
         )
     };
 
     f.in_condition = was_in_condition;
+    f.must_break_condition = was_must_break_condition;
 
     condition
 }
