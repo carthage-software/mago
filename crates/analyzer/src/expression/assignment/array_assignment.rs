@@ -359,6 +359,14 @@ fn update_array_assignment_child_type<'ctx>(
                         })));
                     }
                     TArray::Keyed(keyed_array) => {
+                        if keyed_array.get_known_items().is_none()
+                            && keyed_array.get_generic_parameters().is_none()
+                            && root_type.types.len() > 1
+                            && root_type.types.iter().any(|t| matches!(t, TAtomic::Array(TArray::List(_))))
+                        {
+                            continue;
+                        }
+
                         collection_types.push(TAtomic::Array(TArray::Keyed(TKeyedArray {
                             parameters: Some((Arc::new((*key_type).clone()), Arc::new(value_type.clone()))),
                             known_items: keyed_array.get_known_items().map(|known_items| {
