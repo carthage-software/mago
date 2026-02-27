@@ -692,6 +692,7 @@ test_case!(issue_1230_simple, {
     s.strict_list_index_checks = true;
     s
 });
+test_case!(issue_1242_reference_count_sync);
 test_case!(issue_1226);
 
 #[test]
