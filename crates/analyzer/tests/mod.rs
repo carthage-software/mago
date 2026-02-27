@@ -692,6 +692,7 @@ test_case!(issue_1230_simple, {
     s.strict_list_index_checks = true;
     s
 });
+test_case!(issue_1226);
 
 #[test]
 fn test_all_test_cases_are_ran() {
