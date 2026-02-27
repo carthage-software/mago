@@ -334,10 +334,19 @@ impl<'arena> FormatterState<'_, 'arena> {
                 )
             );
 
-            if is_include_like && let Some(Node::Binary(parent_bin)) = self.nth_parent_kind(2) {
-                let is_lhs = node.end_position() < parent_bin.operator.start_position();
-                if is_lhs {
-                    return true;
+            if is_include_like {
+                if let Some(Node::Binary(parent_bin)) = self.nth_parent_kind(2) {
+                    let is_lhs = node.end_position() < parent_bin.operator.start_position();
+                    if is_lhs {
+                        return true;
+                    }
+                }
+
+                if let Some(Node::Conditional(parent_cond)) = self.nth_parent_kind(2) {
+                    let is_condition = node.end_position() < parent_cond.question_mark.start_position();
+                    if is_condition {
+                        return true;
+                    }
                 }
             }
         }
