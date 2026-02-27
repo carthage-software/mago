@@ -58,9 +58,7 @@ pub(crate) fn read_file(workspace: &Path, path: &Path, file_type: FileType) -> R
 
         match file_type {
             FileType::Host => tracing::warn!("{}", warning_message),
-            // Vendored/builtin file load order is parallelized; keep these diagnostics at debug
-            // to avoid nondeterministic INFO output ordering between identical runs.
-            FileType::Vendored | FileType::Builtin => tracing::debug!("{}", warning_message),
+            FileType::Vendored | FileType::Builtin => tracing::info!("{}", warning_message),
         }
 
         String::from_utf8_lossy(&bytes).into_owned()
