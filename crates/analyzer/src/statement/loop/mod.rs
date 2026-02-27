@@ -17,6 +17,7 @@ use mago_codex::ttype;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::add_optional_union_type;
 use mago_codex::ttype::atomic::TAtomic;
+use mago_codex::ttype::atomic::array::TArray;
 use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::bool::TBool;
@@ -430,12 +431,12 @@ fn analyze<'ctx, 'ast, 'arena>(
                         // widen the foreach context type with the initial context type
                         continue_context.locals.insert(
                             variable_id,
-                            Rc::new(combine_union_types(
+                            Rc::new(simplify_generic_subset_arrays(combine_union_types(
                                 &continue_context_type,
                                 parent_context_type,
                                 context.codebase,
                                 CombinerOptions::default(),
-                            )),
+                            ))),
                         );
 
                         pre_loop_context.remove_variable_from_conflicting_clauses(context, variable_id, None);
@@ -449,15 +450,16 @@ fn analyze<'ctx, 'ast, 'arena>(
                         }
 
                         // widen the foreach context type with the initial context type
-                        continue_context.locals.insert(
-                            variable_id,
-                            Rc::new(combine_union_types(
-                                &continue_context_type,
-                                loop_context_type,
-                                codebase,
-                                CombinerOptions::default(),
-                            )),
+                        let combined = combine_union_types(
+                            &continue_context_type,
+                            loop_context_type,
+                            codebase,
+                            CombinerOptions::default(),
                         );
+
+                        let combined = simplify_generic_subset_arrays(combined);
+
+                        continue_context.locals.insert(variable_id, Rc::new(combined));
 
                         // if there's a change, invalidate related clauses
                         pre_loop_context.remove_variable_from_conflicting_clauses(context, variable_id, None);
@@ -1233,6 +1235,67 @@ fn analyze_iterator<'ctx, 'ast, 'arena>(
     }
 
     Ok((has_at_least_one_entry, key_type.unwrap_or_else(get_mixed), value_type.unwrap_or_else(get_mixed)))
+}
+
+/// Removes generic keyed arrays from a union when their value parameter shape is a
+/// strict subset of a list element shape in the same union.
+///
+/// These generic keyed arrays arise from assignments on empty arrays inside conditional
+/// branches (e.g., `$arr[$key]['values'][] = ...` on `array{}`). They produce imprecise
+/// value types that incorrectly mark shape keys as possibly-undefined when combined
+/// with more precise list element types.
+fn simplify_generic_subset_arrays(union: TUnion) -> TUnion {
+    if union.types.len() <= 1 {
+        return union;
+    }
+
+    // Collect known_items from list element shapes in this union
+    let list_element_items: Vec<_> = union
+        .types
+        .iter()
+        .filter_map(|atomic| {
+            if let TAtomic::Array(TArray::List(list)) = atomic
+                && list.element_type.types.len() == 1
+                && let Some(TAtomic::Array(TArray::Keyed(keyed_element))) = list.element_type.types.first()
+            {
+                return keyed_element.get_known_items();
+            }
+
+            None
+        })
+        .collect();
+
+    if list_element_items.is_empty() {
+        return union;
+    }
+
+    let original_len = union.types.len();
+    let types: Vec<TAtomic> = union
+        .types
+        .iter()
+        .filter(|atomic| {
+            if let TAtomic::Array(TArray::Keyed(keyed)) = atomic
+                && keyed.get_known_items().is_none()
+                && let Some(params) = keyed.get_generic_parameters()
+                && params.1.types.len() == 1
+                && let Some(TAtomic::Array(TArray::Keyed(value_shape))) = params.1.types.first()
+                && let Some(param_items) = value_shape.get_known_items()
+            {
+                return !list_element_items.iter().any(|list_items| {
+                    param_items.keys().all(|k| list_items.contains_key(k)) && param_items.len() < list_items.len()
+                });
+            }
+
+            true
+        })
+        .cloned()
+        .collect();
+
+    if types.len() == original_len {
+        return union;
+    }
+
+    TUnion::from_vec(types)
 }
 
 /// Scrapes all direct variable names from an expression and indicates if a reference operator (`&`)

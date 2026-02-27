@@ -680,6 +680,18 @@ test_case!(issue_1223, {
     s.check_missing_type_hints = true;
     s
 });
+test_case!(issue_1230, {
+    let mut s = crate::framework::default_test_settings();
+    s.allow_possibly_undefined_array_keys = false;
+    s.strict_list_index_checks = true;
+    s
+});
+test_case!(issue_1230_simple, {
+    let mut s = crate::framework::default_test_settings();
+    s.allow_possibly_undefined_array_keys = false;
+    s.strict_list_index_checks = true;
+    s
+});
 
 #[test]
 fn test_all_test_cases_are_ran() {
