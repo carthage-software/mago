@@ -1,3 +1,4 @@
+use foldhash::HashSet;
 use foldhash::fast::RandomState;
 use indexmap::IndexMap;
 use itertools::Itertools;
@@ -727,8 +728,10 @@ pub(crate) fn analyze_class_like<'ctx, 'ast, 'arena>(
 
     let name = &class_like_metadata.original_name;
 
+    let mut checked_signatures: HashSet<(Atom, Atom)> = HashSet::default();
+
     check_class_like_extends(context, class_like_metadata, extends_ast);
-    check_class_like_implements(context, class_like_metadata, implements_ast);
+    check_class_like_implements(context, class_like_metadata, implements_ast, &mut checked_signatures);
 
     for member in members {
         if let ClassLikeMember::TraitUse(used_trait) = member {
@@ -876,7 +879,7 @@ pub(crate) fn analyze_class_like<'ctx, 'ast, 'arena>(
     }
 
     if !class_like_metadata.kind.is_trait() {
-        check_abstract_method_signatures(context, class_like_metadata);
+        check_abstract_method_signatures(context, class_like_metadata, &mut checked_signatures);
         check_trait_method_conflicts(context, class_like_metadata, members);
     }
 
@@ -1189,6 +1192,7 @@ fn check_class_like_implements<'ctx, 'arena>(
     context: &mut Context<'ctx, 'arena>,
     class_like_metadata: &'ctx ClassLikeMetadata,
     implements_ast: Option<&Implements<'arena>>,
+    checked_signatures: &mut HashSet<(Atom, Atom)>,
 ) {
     // This check only applies to classes and enums, which can use `implements`.
     if !class_like_metadata.kind.is_class() && !class_like_metadata.kind.is_enum() {
@@ -1270,7 +1274,7 @@ fn check_class_like_implements<'ctx, 'arena>(
                 InheritanceKind::Implements(implemented_type.span()),
             );
 
-            check_interface_method_signatures(context, class_like_metadata, implemented_metadata);
+            check_interface_method_signatures(context, class_like_metadata, implemented_metadata, checked_signatures);
         } else {
             let implemented_name = implemented_type.value();
 
@@ -1719,6 +1723,7 @@ fn should_skip_enum_builtin_interface(class_like_metadata: &ClassLikeMetadata, i
 fn check_abstract_method_signatures<'ctx>(
     context: &mut Context<'ctx, '_>,
     class_like_metadata: &'ctx ClassLikeMetadata,
+    checked_signatures: &mut HashSet<(Atom, Atom)>,
 ) {
     for (method_name_atom, overridden_method_ids) in &class_like_metadata.overridden_method_ids {
         let method_name_str = method_name_atom.as_ref();
@@ -1753,6 +1758,10 @@ fn check_abstract_method_signatures<'ctx>(
                 continue;
             }
 
+            if !checked_signatures.insert((declaring_class_name, *method_name_atom)) {
+                continue;
+            }
+
             let Some(overridden_method) =
                 context.codebase.get_declaring_method(declaring_class_name_str, method_name_str)
             else {
@@ -1762,13 +1771,6 @@ fn check_abstract_method_signatures<'ctx>(
             let Some(overridden_class) = context.codebase.get_class_like(declaring_class_name_str) else {
                 continue;
             };
-
-            if !class_like_metadata.kind.is_interface()
-                && overridden_class.kind.is_interface()
-                && class_like_metadata.direct_parent_interfaces.contains(&overridden_class.name)
-            {
-                continue;
-            }
 
             let Some(appearing_class) = context.codebase.get_class_like(method_fqcn_str) else {
                 continue;
@@ -2319,6 +2321,7 @@ fn check_interface_method_signatures<'ctx>(
     context: &mut Context<'ctx, '_>,
     class_like_metadata: &'ctx ClassLikeMetadata,
     interface_metadata: &'ctx ClassLikeMetadata,
+    checked_signatures: &mut HashSet<(Atom, Atom)>,
 ) {
     let interface_fqcn_str: &str = interface_metadata.name.as_ref();
     if should_skip_enum_builtin_interface(class_like_metadata, interface_fqcn_str) {
@@ -2343,6 +2346,10 @@ fn check_interface_method_signatures<'ctx>(
         };
 
         if should_skip_same_method(class_fqcn_str, interface_fqcn_str) {
+            continue;
+        }
+
+        if !checked_signatures.insert((interface_method_id.get_class_name(), *method_name_atom)) {
             continue;
         }
 
@@ -3330,5 +3337,53 @@ fn check_readonly_class_trait_properties<'ctx, 'arena>(
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::code::IssueCode;
+    use crate::test_analysis;
+
+    test_analysis! {
+        name = direct_interface_incompatible_parameter_name,
+        code = r#"<?php
+            interface Sizer {
+                public function getSize(string $document): int;
+            }
+            class SizerImpl implements Sizer {
+                public function getSize(string $file): int { return 100; }
+            }
+        "#,
+        issues = [IssueCode::IncompatibleParameterName],
+    }
+
+    test_analysis! {
+        name = diamond_inheritance_incompatible_parameter_name,
+        code = r#"<?php
+            interface Logger {
+                public function log(string $message): void;
+            }
+            interface FileLogger extends Logger {}
+            interface DatabaseLogger extends Logger {}
+            class CompositeLogger implements FileLogger, DatabaseLogger {
+                public function log(string $entry): void {}
+            }
+        "#,
+        issues = [IssueCode::IncompatibleParameterName],
+    }
+
+    test_analysis! {
+        name = indirect_interface_incompatible_parameter_name,
+        code = r#"<?php
+            interface Serializer {
+                public function serialize(mixed $data): string;
+            }
+            interface JsonSerializer extends Serializer {}
+            class DefaultJsonSerializer implements JsonSerializer {
+                public function serialize(mixed $payload): string { return ''; }
+            }
+        "#,
+        issues = [IssueCode::IncompatibleParameterName],
     }
 }

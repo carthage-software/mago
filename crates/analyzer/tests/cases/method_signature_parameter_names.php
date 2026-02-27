@@ -76,3 +76,35 @@ class StringValidator extends BaseValidator
         return is_string($input);
     }
 }
+
+// Test 6: Parameter name change with diamond inheritance (WARNING)
+interface Logger
+{
+    public function log(string $message): void;
+}
+
+interface FileLogger extends Logger {}
+interface DatabaseLogger extends Logger {}
+
+class CompositeLogger implements FileLogger, DatabaseLogger
+{
+    // @mago-expect analysis:incompatible-parameter-name
+    public function log(string $entry): void {}
+}
+
+// Test 7: Parameter name change with indirect interface (WARNING)
+interface Serializer
+{
+    public function serialize(mixed $data): string;
+}
+
+interface JsonSerializer extends Serializer {}
+
+class DefaultJsonSerializer implements JsonSerializer
+{
+    // @mago-expect analysis:incompatible-parameter-name
+    public function serialize(mixed $payload): string
+    {
+        return '';
+    }
+}
