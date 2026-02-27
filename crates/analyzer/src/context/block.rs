@@ -488,8 +488,8 @@ impl<'ctx> BlockContext<'ctx> {
 
     pub fn remove_possible_reference(&mut self, remove_var_id: &str) {
         let remove_var_atom = atom(remove_var_id);
-        if let Some(reference_count) = self.referenced_counts.get(&remove_var_atom)
-            && *reference_count > 0
+        if let Some(reference_count) = self.referenced_counts.get(&remove_var_atom).copied()
+            && reference_count > 0
         {
             // If a referenced variable goes out of scope, we need to update the references.
             // All of the references to this variable are still references to the same value,
@@ -505,14 +505,21 @@ impl<'ctx> BlockContext<'ctx> {
                 self.references_in_scope.remove(reference);
             }
 
-            debug_assert!(
-                !references.is_empty(),
-                "No references found for variable {remove_var_id}, even though it has a reference count of {reference_count}"
-            );
+            if references.is_empty() {
+                tracing::debug!(
+                    "Reference count map was stale for variable {} (count={}, no references in scope).",
+                    remove_var_id,
+                    reference_count
+                );
+                self.referenced_counts.remove(&remove_var_atom);
+            } else {
+                // `remove_var_atom` is being removed from scope entirely.
+                self.referenced_counts.remove(&remove_var_atom);
 
-            if !references.is_empty() {
                 let first_reference = references.remove(0);
-                if !references.is_empty() {
+                if references.is_empty() {
+                    self.referenced_counts.remove(&first_reference);
+                } else {
                     self.referenced_counts.insert(first_reference, references.len() as u32);
                     for reference in references {
                         self.references_in_scope.insert(reference, first_reference);
@@ -699,5 +706,23 @@ fn should_keep_clause(clause: &Rc<Clause>, remove_var_id: Atom, new_type: Option
         false
     } else {
         true
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use mago_atom::atom;
+    use mago_codex::context::ScopeContext;
+
+    use super::BlockContext;
+
+    #[test]
+    fn remove_possible_reference_tolerates_stale_reference_count() {
+        let mut block_context = BlockContext::new(ScopeContext::new(), false);
+        block_context.referenced_counts.insert(atom("$stale"), 1);
+
+        block_context.remove_possible_reference("$stale");
+
+        assert!(!block_context.referenced_counts.contains_key(&atom("$stale")));
     }
 }
