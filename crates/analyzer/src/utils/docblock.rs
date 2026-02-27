@@ -10,7 +10,10 @@ use mago_codex::ttype::comparator::ComparisonResult;
 use mago_codex::ttype::comparator::union_comparator::can_expression_types_be_identical;
 use mago_codex::ttype::comparator::union_comparator::is_contained_by;
 use mago_codex::ttype::expander;
+use mago_codex::metadata::CodebaseMetadata;
+use mago_codex::ttype::atomic::array::TArray;
 use mago_codex::ttype::expander::TypeExpansionOptions;
+use mago_codex::ttype::get_array_value_parameter;
 use mago_codex::ttype::union::TUnion;
 use mago_codex::ttype::union::populate_union_type;
 use mago_docblock::document::Element;
@@ -367,6 +370,49 @@ pub fn insert_variable_from_docblock<'ctx>(
     block_context.locals.insert(variable_name, Rc::new(variable_type));
 }
 
+/// Returns true when the docblock array narrows the element type compared to the inferred array.
+/// E.g. @var list<int> with list<string|int> - we're asserting int when we have string|int.
+/// Shape-only narrowing (e.g. list{string, string} vs non-empty-list<string>) returns false.
+fn narrows_element_type(codebase: &CodebaseMetadata, inferred: &TUnion, docblock: &TUnion) -> bool {
+    let inferred_arrays: Vec<&TArray> = inferred
+        .types
+        .iter()
+        .filter_map(|a| match a {
+            TAtomic::Array(arr) => Some(arr),
+            _ => None,
+        })
+        .collect();
+    let docblock_arrays: Vec<&TArray> = docblock
+        .types
+        .iter()
+        .filter_map(|a| match a {
+            TAtomic::Array(arr) => Some(arr),
+            _ => None,
+        })
+        .collect();
+
+    if inferred_arrays.is_empty() || docblock_arrays.is_empty() {
+        return false;
+    }
+
+    // Invalid narrowing: inferred element type is not assignable to docblock element type.
+    inferred_arrays.iter().any(|inferred_arr| {
+        let inferred_elem = get_array_value_parameter(inferred_arr, codebase);
+        docblock_arrays.iter().any(|docblock_arr| {
+            let docblock_elem = get_array_value_parameter(docblock_arr, codebase);
+            !is_contained_by(
+                codebase,
+                &inferred_elem,
+                &docblock_elem,
+                false,
+                false,
+                false,
+                &mut ComparisonResult::default(),
+            )
+        })
+    })
+}
+
 pub fn check_docblock_type_incompatibility(
     context: &mut Context<'_, '_>,
     value_expression_variable_id: Option<&str>,
@@ -412,11 +458,14 @@ pub fn check_docblock_type_incompatibility(
     // When is_super is true but is_sub is false, we're "narrowing" - asserting a type
     // that's incompatible with what we're assigning (e.g. @var list<int> with list<string|int>).
     // This hides bugs like passing wrong types to functions. Report it.
-    // Only apply to array types where element types affect runtime behavior (e.g. list<string|int>
-    // with @var list<int> hides passing strings to functions expecting ints). Generic object and
-    // scalar narrowing (e.g. @var Suspension<string>, @var int with null|int|float) is often
-    // intentional type assertions.
-    let invalid_narrowing = is_super && !is_sub && inferred_type.is_array();
+    // Only report when we're narrowing the ELEMENT TYPE (e.g. list<int> vs list<string|int>).
+    // Shape-only narrowing (e.g. list{string, string} vs non-empty-list<string>) is allowed -
+    // the element types match, so it's a valid assertion about the array shape.
+    let invalid_narrowing = is_super
+        && !is_sub
+        && inferred_type.is_array()
+        && docblock_type.is_array()
+        && narrows_element_type(context.codebase, inferred_type, docblock_type);
 
     if is_impossible || invalid_narrowing {
         let docblock_type_str = docblock_type.get_id();
