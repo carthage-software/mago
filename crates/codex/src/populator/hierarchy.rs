@@ -1,5 +1,3 @@
-use itertools::Itertools;
-
 use mago_atom::Atom;
 use mago_atom::AtomSet;
 use mago_reporting::Annotation;
@@ -25,6 +23,16 @@ use super::merge::merge_interface_metadata_from_parent_interface;
 use super::merge::merge_metadata_from_parent_class_like;
 use super::merge::merge_metadata_from_required_class_like;
 use super::merge::merge_metadata_from_trait;
+
+#[inline]
+fn sorted_atoms(iter: impl Iterator<Item = Atom>) -> Vec<Atom> {
+    let mut values: Vec<_> = iter.collect();
+    if values.len() > 1 {
+        values.sort_unstable();
+    }
+
+    values
+}
 
 /// Detects circular references in a type definition by walking its dependencies.
 ///
@@ -120,7 +128,7 @@ pub fn populate_class_like_metadata_iterative(
         metadata.declaring_method_ids.insert(*method_name, method_id);
     }
 
-    for trait_name in metadata.used_traits.iter().copied().sorted().collect::<Vec<_>>() {
+    for trait_name in sorted_atoms(metadata.used_traits.iter().copied()) {
         merge_metadata_from_trait(&mut metadata, codebase, trait_name, symbol_references);
     }
 
@@ -128,7 +136,7 @@ pub fn populate_class_like_metadata_iterative(
         merge_metadata_from_parent_class_like(&mut metadata, codebase, parent_classname, symbol_references);
     }
 
-    let direct_parent_interfaces = metadata.direct_parent_interfaces.iter().copied().sorted().collect::<Vec<_>>();
+    let direct_parent_interfaces = sorted_atoms(metadata.direct_parent_interfaces.iter().copied());
     for direct_parent_interface in direct_parent_interfaces {
         merge_interface_metadata_from_parent_interface(
             &mut metadata,
@@ -138,11 +146,11 @@ pub fn populate_class_like_metadata_iterative(
         );
     }
 
-    for required_class in metadata.require_extends.iter().copied().sorted().collect::<Vec<_>>() {
+    for required_class in sorted_atoms(metadata.require_extends.iter().copied()) {
         merge_metadata_from_required_class_like(&mut metadata, codebase, required_class, symbol_references);
     }
 
-    for required_interface in metadata.require_implements.iter().copied().sorted().collect::<Vec<_>>() {
+    for required_interface in sorted_atoms(metadata.require_implements.iter().copied()) {
         merge_interface_metadata_from_parent_interface(&mut metadata, codebase, required_interface, symbol_references);
     }
 
