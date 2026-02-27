@@ -648,16 +648,16 @@ impl IssueCollection {
         issues.sort_by(|a, b| match a.level.cmp(&b.level) {
             Ordering::Greater => Ordering::Greater,
             Ordering::Less => Ordering::Less,
-                Ordering::Equal => match a.code.as_deref().cmp(&b.code.as_deref()) {
-                    Ordering::Less => Ordering::Less,
-                    Ordering::Greater => Ordering::Greater,
-                    Ordering::Equal => {
-                        let a_span = a.primary_span();
-                        let b_span = b.primary_span();
+            Ordering::Equal => match a.code.as_deref().cmp(&b.code.as_deref()) {
+                Ordering::Less => Ordering::Less,
+                Ordering::Greater => Ordering::Greater,
+                Ordering::Equal => {
+                    let a_span = a.primary_span();
+                    let b_span = b.primary_span();
 
-                        match (a_span, b_span) {
-                            (Some(a_span), Some(b_span)) => a_span.cmp(&b_span),
-                            (Some(_), None) => Ordering::Less,
+                    match (a_span, b_span) {
+                        (Some(a_span), Some(b_span)) => a_span.cmp(&b_span),
+                        (Some(_), None) => Ordering::Less,
                         (None, Some(_)) => Ordering::Greater,
                         (None, None) => Ordering::Equal,
                     }
