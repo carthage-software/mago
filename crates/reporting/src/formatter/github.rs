@@ -33,7 +33,7 @@ impl Formatter for GithubFormatter {
                 Level::Error => "error",
             };
 
-            let properties = match issue.annotations.iter().find(|annotation| annotation.is_primary()) {
+            let properties = match issue.primary_annotation() {
                 Some(annotation) => {
                     let file = database.get(&annotation.span.file_id())?;
                     let start_line = file.line_number(annotation.span.start.offset) + 1;
