@@ -1071,6 +1071,30 @@ mod tests {
     }
 
     test_analysis! {
+        name = test_var_docblock_override_list_narrow,
+        code = indoc! {r"
+            <?php
+
+            /** @return list<string|int> */
+            function foo(): array {
+                return ['foo'];
+            }
+
+            /** @param list<int> $bar */
+            function bar(array $bar): int {
+                return 123;
+            }
+
+            /** @var list<int> $val */
+            $val = foo();
+            bar($val);
+        "},
+        issues = [
+            IssueCode::DocblockTypeMismatch,
+        ]
+    }
+
+    test_analysis! {
         name = test_var_docblock_overridei,
         code = indoc! {r"
             <?php

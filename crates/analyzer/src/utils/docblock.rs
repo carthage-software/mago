@@ -408,7 +408,17 @@ pub fn check_docblock_type_incompatibility(
         && !is_sub
         && !can_expression_types_be_identical(context.codebase, inferred_type, docblock_type, false, true);
 
-    if is_impossible {
+    // For assignments: the assigned value must be assignable to the @var type.
+    // When is_super is true but is_sub is false, we're "narrowing" - asserting a type
+    // that's incompatible with what we're assigning (e.g. @var list<int> with list<string|int>).
+    // This hides bugs like passing wrong types to functions. Report it.
+    // Only apply to array types where element types affect runtime behavior (e.g. list<string|int>
+    // with @var list<int> hides passing strings to functions expecting ints). Generic object and
+    // scalar narrowing (e.g. @var Suspension<string>, @var int with null|int|float) is often
+    // intentional type assertions.
+    let invalid_narrowing = is_super && !is_sub && inferred_type.is_array();
+
+    if is_impossible || invalid_narrowing {
         let docblock_type_str = docblock_type.get_id();
         let inferred_type_str = inferred_type.get_id();
 
@@ -435,9 +445,11 @@ pub fn check_docblock_type_incompatibility(
             issue = issue.with_annotation(
                 Annotation::secondary(value_expression_span)
                     .with_message(format!("The assignment to `{value_expression_variable_id}` here is invalid.")),
-            ) .with_note(
+            ).with_note(if invalid_narrowing {
+                "The assigned value has a broader type than the `@var` declares. Using `@var` to narrow the type incorrectly can hide bugs when the variable is passed to functions expecting the narrower type."
+            } else {
                 "The type of the assigned value and the `@var` docblock type have no overlap, making this assignment impossible."
-            )
+            })
             .with_help(format!(
                 "Change the assigned value to match `{docblock_type_str}`, or update the `@var` tag to a compatible type."
             ));
