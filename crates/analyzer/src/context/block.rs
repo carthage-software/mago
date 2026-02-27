@@ -514,10 +514,14 @@ impl<'ctx> BlockContext<'ctx> {
                 self.referenced_counts.remove(&remove_var_atom);
 
                 let first_reference = references.remove(0);
-                if references.is_empty() {
-                    self.referenced_counts.remove(&first_reference);
-                } else {
-                    self.referenced_counts.insert(first_reference, references.len() as u32);
+                if !references.is_empty() {
+                    let reassigned_references = references.len() as u32;
+                    if let Some(existing_count) = self.referenced_counts.get_mut(&first_reference) {
+                        *existing_count += reassigned_references;
+                    } else {
+                        self.referenced_counts.insert(first_reference, reassigned_references);
+                    }
+
                     for reference in references {
                         self.references_in_scope.insert(reference, first_reference);
                     }
@@ -703,5 +707,42 @@ fn should_keep_clause(clause: &Rc<Clause>, remove_var_id: Atom, new_type: Option
         false
     } else {
         true
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::rc::Rc;
+
+    use mago_atom::atom;
+    use mago_codex::context::ScopeContext;
+    use mago_codex::ttype::get_mixed;
+
+    use super::BlockContext;
+
+    #[test]
+    fn remove_possible_reference_preserves_promoted_reference_counts() {
+        let mut block_context = BlockContext::new(ScopeContext::new(), false);
+        for variable in ["$a", "$b", "$c"] {
+            let variable_atom = atom(variable);
+            block_context.locals.insert(variable_atom, Rc::new(get_mixed()));
+            block_context.variables_possibly_in_scope.insert(variable_atom);
+        }
+
+        // Model: $b =& $a; $c =& $b.
+        block_context.references_in_scope.insert(atom("$b"), atom("$a"));
+        block_context.references_in_scope.insert(atom("$c"), atom("$b"));
+        block_context.referenced_counts.insert(atom("$a"), 1);
+        block_context.referenced_counts.insert(atom("$b"), 1);
+
+        block_context.remove_possible_reference("$a");
+
+        // $b is promoted to root, but still has $c pointing to it.
+        assert_eq!(block_context.references_in_scope.get(&atom("$c")).copied(), Some(atom("$b")));
+        assert_eq!(block_context.referenced_counts.get(&atom("$b")).copied(), Some(1));
+
+        // Removing $b should re-root $c and clear dangling reference links.
+        block_context.remove_possible_reference("$b");
+        assert!(!block_context.references_in_scope.contains_key(&atom("$c")));
     }
 }
