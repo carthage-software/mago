@@ -560,13 +560,13 @@ function socket_read(Socket $socket, int $length, int $mode = PHP_BINARY_READ): 
 
 /**
  * @param-out string $address
- * @param-out int $port
+ * @param-out int<0, 65535> $port
  */
 function socket_getsockname(Socket $socket, &$address, &$port = null): bool {}
 
 /**
  * @param-out string $address
- * @param-out int $port
+ * @param-out int<0, 65535> $port
  */
 function socket_getpeername(Socket $socket, &$address, &$port = null): bool {}
 
@@ -588,7 +588,7 @@ function socket_sendmsg(Socket $socket, array $message, int $flags = 0): int|fal
 /**
  * @param-out string $data
  * @param-out string $address
- * @param-out int $port
+ * @param-out int<0, 65535> $port
  */
 function socket_recvfrom(Socket $socket, &$data, int $length, int $flags, &$address, &$port = null): int|false {}
 
