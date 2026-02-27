@@ -47,7 +47,7 @@ impl Formatter for AriadneFormatter {
                 Level::Error => Color::Red,
             };
 
-            let (file_path, range) = match issue.annotations.iter().find(|annotation| annotation.is_primary()) {
+            let (file_path, range) = match issue.primary_annotation() {
                 Some(annotation) => {
                     let file = database.get(&annotation.span.file_id())?;
 

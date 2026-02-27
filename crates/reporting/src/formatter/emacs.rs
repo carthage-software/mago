@@ -30,8 +30,7 @@ impl Formatter for EmacsFormatter {
         let editor_url = if use_colors { config.editor_url.as_deref() } else { None };
 
         for issue in issues.iter() {
-            let (file_display, line, column) = match issue.annotations.iter().find(|annotation| annotation.is_primary())
-            {
+            let (file_display, line, column) = match issue.primary_annotation() {
                 Some(annotation) => {
                     let file = database.get(&annotation.span.file_id())?;
                     let line = file.line_number(annotation.span.start.offset) + 1;

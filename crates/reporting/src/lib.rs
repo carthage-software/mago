@@ -426,6 +426,20 @@ impl Issue {
         self
     }
 
+    /// Returns the deterministic primary annotation for this issue.
+    ///
+    /// If multiple primary annotations exist, the one with the smallest span is returned.
+    #[must_use]
+    pub fn primary_annotation(&self) -> Option<&Annotation> {
+        self.annotations.iter().filter(|annotation| annotation.is_primary()).min_by_key(|annotation| annotation.span)
+    }
+
+    /// Returns the deterministic primary span for this issue.
+    #[must_use]
+    pub fn primary_span(&self) -> Option<Span> {
+        self.primary_annotation().map(|annotation| annotation.span)
+    }
+
     /// Add a note to this issue.
     ///
     /// # Examples
@@ -593,11 +607,7 @@ impl IssueCollection {
                 match entry {
                     IgnoreEntry::Code(ignored) if ignored == code => return false,
                     IgnoreEntry::Scoped { code: ignored, paths } if ignored == code => {
-                        let file_name = issue
-                            .annotations
-                            .iter()
-                            .find(|a| a.is_primary())
-                            .and_then(|a| resolve_file_name(a.span.file_id));
+                        let file_name = issue.primary_span().and_then(|span| resolve_file_name(span.file_id));
 
                         if let Some(name) = file_name
                             && is_path_match(&name, paths)
@@ -642,17 +652,8 @@ impl IssueCollection {
                 Ordering::Less => Ordering::Less,
                 Ordering::Greater => Ordering::Greater,
                 Ordering::Equal => {
-                    let a_span = a
-                        .annotations
-                        .iter()
-                        .find(|annotation| annotation.is_primary())
-                        .map(|annotation| annotation.span);
-
-                    let b_span = b
-                        .annotations
-                        .iter()
-                        .find(|annotation| annotation.is_primary())
-                        .map(|annotation| annotation.span);
+                    let a_span = a.primary_span();
+                    let b_span = b.primary_span();
 
                     match (a_span, b_span) {
                         (Some(a_span), Some(b_span)) => a_span.cmp(&b_span),
@@ -879,5 +880,18 @@ mod tests {
         assert_eq!(collection.get_level_count(Level::Warning), 1);
         assert_eq!(collection.get_level_count(Level::Help), 1);
         assert_eq!(collection.get_level_count(Level::Note), 1);
+    }
+
+    #[test]
+    pub fn test_primary_span_is_deterministic() {
+        let file = FileId::zero();
+        let span_later = Span::new(file, 20_u32.into(), 25_u32.into());
+        let span_earlier = Span::new(file, 5_u32.into(), 10_u32.into());
+
+        let issue = Issue::error("x")
+            .with_annotation(Annotation::primary(span_later))
+            .with_annotation(Annotation::primary(span_earlier));
+
+        assert_eq!(issue.primary_span(), Some(span_earlier));
     }
 }
