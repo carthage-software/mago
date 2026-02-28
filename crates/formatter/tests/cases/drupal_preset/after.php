@@ -212,26 +212,20 @@ $query = db_query("
 ]);
 
 // Array with multi line comments.
-$query = db_query(
-  "
+$query = db_query("
   SELECT * FROM {foobar} WHERE nid IN (1, 2, 3)
-  AND date BETWEEN '%s' AND '%s'",
-  /* comment
-   * in here */ [
-    ':from_date' => $from_date,
-    ':to_date' => $to_date,
-  ],
-);
-$query = db_query(
-  "
+  AND date BETWEEN '%s' AND '%s'", /* comment
+ * in here */ [
+  ':from_date' => $from_date,
+  ':to_date' => $to_date,
+]);
+$query = db_query("
   SELECT * FROM {foobar} WHERE nid IN (1, 2, 3)
-  AND date BETWEEN '%s' AND '%s'",
-  /* comment
-   * in here */ [
-    ':from_date' => $from_date,
-    ':to_date' => $to_date,
-  ],
-);
+  AND date BETWEEN '%s' AND '%s'", /* comment
+ * in here */ [
+  ':from_date' => $from_date,
+  ':to_date' => $to_date,
+]);
 
 // Array with multi-line constant string in it.
 $array = [

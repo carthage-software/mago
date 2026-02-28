@@ -186,7 +186,7 @@ impl<'arena> Printer<'arena> {
             unreachable!();
         };
 
-        let should_break = *group.should_break.borrow();
+        let should_break = *group.should_break.borrow() || group.preserve_source_break;
         let group_id = group.id;
 
         if mode.is_flat() && !should_remeasure {
@@ -493,6 +493,10 @@ impl<'arena> Printer<'arena> {
                     }
                 }
                 Document::Group(group) => {
+                    if group.preserve_source_break && mode.is_flat() {
+                        return false;
+                    }
+
                     let group_mode = if *group.should_break.borrow() { Mode::Break } else { mode };
                     if group.expanded_states.is_some() && group_mode.is_break() {
                         if let Some(expanded_states) = group.expanded_states.as_ref()

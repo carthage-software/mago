@@ -28,7 +28,14 @@ pub(super) fn print_function_like_parameters<'arena>(
         return Document::Array(contents);
     }
 
-    let should_break = should_break_parameters(f, parameter_list);
+    let mut force_break = force_break_parameters(f, parameter_list);
+    let preserve_break = f.settings.preserve_breaking_parameter_list
+        && misc::has_new_line_in_range(
+            f.source_text,
+            parameter_list.left_parenthesis.start.offset,
+            parameter_list.parameters.as_slice()[0].span().start.offset,
+        );
+    let should_break = force_break || preserve_break;
 
     let previous_break = f.parameter_state.force_break;
     if should_break {
@@ -37,7 +44,6 @@ pub(super) fn print_function_like_parameters<'arena>(
 
     let should_hug_the_parameters = !should_break && should_hug_the_only_parameter(f, parameter_list);
 
-    let mut force_break = should_break;
     let left_parenthesis = {
         let mut contents = vec![in f.arena; Document::String("(")];
 
@@ -105,30 +111,17 @@ pub(super) fn print_function_like_parameters<'arena>(
 
     f.parameter_state.force_break = previous_break;
 
-    Document::Group(Group::new(parts).with_break(force_break))
+    Document::Group(
+        Group::new(parts).with_break(force_break).with_preserve_source_break(!force_break && preserve_break),
+    )
 }
 
-pub(super) fn should_break_parameters<'arena>(
+pub(super) fn force_break_parameters<'arena>(
     f: &FormatterState<'_, 'arena>,
     parameter_list: &'arena FunctionLikeParameterList<'arena>,
 ) -> bool {
-    if f.settings.break_promoted_properties_list
+    f.settings.break_promoted_properties_list
         && parameter_list.parameters.iter().any(FunctionLikeParameter::is_promoted_property)
-    {
-        return true;
-    }
-
-    if f.settings.preserve_breaking_parameter_list
-        && misc::has_new_line_in_range(
-            f.source_text,
-            parameter_list.left_parenthesis.start.offset,
-            parameter_list.parameters.as_slice()[0].span().start.offset,
-        )
-    {
-        return true;
-    }
-
-    false
 }
 
 pub(super) fn should_hug_the_only_parameter<'arena>(

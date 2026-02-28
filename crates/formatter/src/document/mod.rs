@@ -78,6 +78,7 @@ pub struct Space {
 pub struct Group<'arena> {
     pub contents: Vec<'arena, Document<'arena>>,
     pub should_break: RefCell<bool>,
+    pub preserve_source_break: bool,
     pub expanded_states: Option<Vec<'arena, Document<'arena>>>,
     pub id: Option<GroupIdentifier>,
 }
@@ -151,7 +152,13 @@ impl Space {
 impl<'arena> Group<'arena> {
     #[must_use]
     pub fn new(contents: Vec<'arena, Document<'arena>>) -> Self {
-        Self { contents, should_break: RefCell::new(false), id: None, expanded_states: None }
+        Self {
+            contents,
+            should_break: RefCell::new(false),
+            preserve_source_break: false,
+            id: None,
+            expanded_states: None,
+        }
     }
 
     #[must_use]
@@ -159,11 +166,22 @@ impl<'arena> Group<'arena> {
         contents: Vec<'arena, Document<'arena>>,
         expanded_states: Vec<'arena, Document<'arena>>,
     ) -> Self {
-        Self { contents, should_break: RefCell::new(false), id: None, expanded_states: Some(expanded_states) }
+        Self {
+            contents,
+            should_break: RefCell::new(false),
+            preserve_source_break: false,
+            id: None,
+            expanded_states: Some(expanded_states),
+        }
     }
 
     pub fn with_break(mut self, yes: bool) -> Self {
         self.should_break = RefCell::new(yes);
+        self
+    }
+
+    pub fn with_preserve_source_break(mut self, yes: bool) -> Self {
+        self.preserve_source_break = yes;
         self
     }
 
@@ -337,6 +355,7 @@ pub fn clone_in_arena<'arena>(arena: &'arena Bump, document: &Document<'arena>) 
         Document::Group(g) => Document::Group(Group {
             contents: clone_vec_in_arena(arena, &g.contents),
             should_break: g.should_break.clone(),
+            preserve_source_break: g.preserve_source_break,
             expanded_states: g.expanded_states.as_ref().map(|v| clone_vec_in_arena(arena, v)),
             id: g.id,
         }),
@@ -406,10 +425,13 @@ pub(crate) fn print_document_to_string<'arena>(arena: &'arena Bump, document: &D
             buffer.push('}');
             buffer.push(')');
         }
-        Document::Group(Group { contents, should_break, expanded_states, id }) => {
+        Document::Group(Group { contents, should_break, preserve_source_break, expanded_states, id }) => {
             let mut options = vec![in arena];
             if *should_break.borrow() {
                 options.push("shouldBreak: true".to_string());
+            }
+            if *preserve_source_break {
+                options.push("preserveSourceBreak: true".to_string());
             }
 
             if let Some(id) = id {
