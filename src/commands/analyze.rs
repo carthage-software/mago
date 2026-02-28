@@ -59,6 +59,7 @@ use mago_orchestrator::Orchestrator;
 use mago_prelude::Prelude;
 
 use crate::commands::args::baseline_reporting::BaselineReportingArgs;
+use crate::commands::stdin_input;
 use crate::config::Configuration;
 use crate::consts::PRELUDE_BYTES;
 use crate::error::Error;
@@ -149,6 +150,13 @@ pub struct AnalyzeCommand {
     #[arg(long, conflicts_with_all = ["path", "list_codes", "watch"])]
     pub staged: bool,
 
+    /// Read the file content from stdin and use the given path for baseline and reporting.
+    ///
+    /// Intended for editor integrations: pipe unsaved buffer content and pass the real file path
+    /// so baseline entries and issue locations use the correct path.
+    #[arg(long, conflicts_with_all = ["list_codes", "watch", "staged"])]
+    pub stdin_input: bool,
+
     /// Arguments related to reporting issues with baseline support.
     #[clap(flatten)]
     pub baseline_reporting: BaselineReportingArgs,
@@ -211,7 +219,14 @@ impl AnalyzeCommand {
         let mut orchestrator = create_orchestrator(&configuration, color_choice, false, true, false);
         orchestrator.add_exclude_patterns(configuration.analyzer.excludes.iter());
 
-        if self.staged {
+        let stdin_override = stdin_input::resolve_stdin_override(
+            self.stdin_input,
+            &self.path,
+            &configuration.source.workspace,
+            &mut orchestrator,
+        )?;
+
+        if !self.stdin_input && self.staged {
             let staged_paths = git::get_staged_file_paths(&configuration.source.workspace)?;
             if staged_paths.is_empty() {
                 tracing::info!("No staged files to analyze.");
@@ -223,11 +238,12 @@ impl AnalyzeCommand {
             }
 
             orchestrator.set_source_paths(staged_paths.iter().map(|p| p.to_string_lossy().to_string()));
-        } else if !self.path.is_empty() {
-            orchestrator.set_source_paths(self.path.iter().map(|p| p.to_string_lossy().to_string()));
+        } else if !self.stdin_input && !self.path.is_empty() {
+            stdin_input::set_source_paths_from_paths(&mut orchestrator, &self.path);
         }
 
-        let mut database = orchestrator.load_database(&configuration.source.workspace, true, Some(database))?;
+        let mut database =
+            orchestrator.load_database(&configuration.source.workspace, true, Some(database), stdin_override)?;
 
         if !database.files().any(|f| f.file_type == FileType::Host) {
             tracing::warn!("No files found to analyze.");
@@ -335,7 +351,8 @@ impl AnalyzeCommand {
     ) -> Result<WatchOutcome, Error> {
         tracing::info!("Starting watch mode. Press Ctrl+C to stop.");
 
-        let database = orchestrator.load_database(&configuration.source.workspace, true, Some(prelude_database))?;
+        let database =
+            orchestrator.load_database(&configuration.source.workspace, true, Some(prelude_database), None)?;
 
         let mut watcher = DatabaseWatcher::new(database);
 

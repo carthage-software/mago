@@ -159,6 +159,9 @@ impl<'a> Orchestrator<'a> {
     ///   directly analyzed, linted, or formatted.
     /// * `prelude_database` - An optional pre-existing database to merge with. This is useful
     ///   for including standard library or framework stubs.
+    /// * `stdin_override` - When set, the file with the given logical name (workspace-relative path)
+    ///   uses the given content instead of being read from disk. Used for editor integrations
+    ///   (e.g. `--stdin-input`), so baseline and reporting use the real path.
     ///
     /// # Returns
     ///
@@ -169,6 +172,7 @@ impl<'a> Orchestrator<'a> {
         workspace: &'a Path,
         include_externals: bool,
         prelude_database: Option<Database<'static>>,
+        stdin_override: Option<(String, String)>,
     ) -> Result<Database<'a>, OrchestratorError>
     where
         'b: 'a,
@@ -214,6 +218,10 @@ impl<'a> Orchestrator<'a> {
 
         if let Some(prelude_db) = prelude_database {
             loader = loader.with_database(prelude_db);
+        }
+
+        if let Some((name, content)) = stdin_override {
+            loader = loader.with_stdin_override(name, content);
         }
 
         let result = loader.load().map_err(OrchestratorError::Database)?;
