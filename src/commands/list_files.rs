@@ -120,7 +120,7 @@ impl ListFilesCommand {
             }
         }
 
-        let database = orchestrator.load_database(&configuration.source.workspace, false, None)?;
+        let database = orchestrator.load_database(&configuration.source.workspace, false, None, None)?;
 
         for file in database.files() {
             print!("{}{}", file.name, if self.zero_terminate { '\0' } else { '\n' });

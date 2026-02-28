@@ -27,13 +27,24 @@ Optional. A list of specific files or directories to analyze. If you provide pat
 
 ## Options
 
-| Flag, Alias(es) | Description                                                                          |
-| :-------------- | :----------------------------------------------------------------------------------- |
-| `--no-stubs`    | Analyze the project without loading the built-in PHP stubs for the standard library. |
-| `--staged`      | Only analyze files that are staged in git. Designed for pre-commit hooks. Fails if not in a git repository. |
-| `--watch`       | Enable watch mode for continuous analysis. Re-runs analysis when files change. (Experimental) |
-| `--list-codes`  | List all available analyzer issue codes in JSON format.                               |
-| `--help`, `-h`  | Print the help summary for the command.                                              |
+| Flag, Alias(es) | Description                                                                                                                                                                   |
+|:----------------|:------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `--no-stubs`    | Analyze the project without loading the built-in PHP stubs for the standard library.                                                                                          |
+| `--staged`      | Only analyze files that are staged in git. Designed for pre-commit hooks. Fails if not in a git repository.                                                                   |
+| `--stdin-input` | Read file content from stdin and use the single path argument for baseline and reporting. Intended for editor integrations (e.g. unsaved buffers). Requires exactly one path. |
+| `--watch`       | Enable watch mode for continuous analysis. Re-runs analysis when files change. (Experimental)                                                                                 |
+| `--list-codes`  | List all available analyzer issue codes in JSON format.                                                                                                                       |
+| `--help`, `-h`  | Print the help summary for the command.                                                                                                                                       |
+
+### Reading from stdin (editor integration)
+
+When using an editor or IDE that can pipe unsaved buffer content, you can run the analyzer on that content while still using the real file path for baseline lookup and issue locations:
+
+```sh
+cat src/Example.php | mago analyze --stdin-input src/Example.php
+```
+
+You must pass **exactly one path**; it is used as the logical file name (workspace-relative) for baseline matching and diagnostics. The path is normalized (e.g. `./src/Example.php` is treated like `src/Example.php`). This mode conflicts with `--staged` and `--watch`.
 
 ### Shared Reporting and Fixing Options
 
