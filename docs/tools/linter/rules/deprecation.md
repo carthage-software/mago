@@ -13,6 +13,8 @@ This document details the rules available in the `Deprecation` category.
 | Deprecated Shell Execute String | [`deprecated-shell-execute-string`](#deprecated-shell-execute-string) |
 | Deprecated Switch Semicolon | [`deprecated-switch-semicolon`](#deprecated-switch-semicolon) |
 | Explicit Nullable Param | [`explicit-nullable-param`](#explicit-nullable-param) |
+| No Executable Regex Modifier | [`no-executable-regex-modifier`](#no-executable-regex-modifier) |
+| No Registry | [`no-registry`](#no-registry) |
 | No Underscore Class | [`no-underscore-class`](#no-underscore-class) |
 | No Void Reference Return | [`no-void-reference-return`](#no-void-reference-return) |
 | Optional Parameter Before Required | [`optional-param-order`](#optional-param-order) |
@@ -201,6 +203,98 @@ function foo(string $param = null) {}
 function bar(string $param = NULL) {}
 
 function baz(object $param = null) {}
+```
+
+
+## <a id="no-executable-regex-modifier"></a>`no-executable-regex-modifier`
+
+Flags the use of the `e` (executable) modifier in `preg_replace()` patterns.
+The `e` modifier causes the replacement string to be evaluated as PHP code,
+which is a security vulnerability. It was deprecated in PHP 5.5 and removed in PHP 7.0.
+Use `preg_replace_callback()` instead.
+
+
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `true` |
+| `level` | `string` | `"error"` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+
+$result = preg_replace_callback('/pattern/', function ($matches) {
+    return strtoupper($matches[0]);
+}, $subject);
+```
+
+#### Incorrect code
+
+```php
+<?php
+
+$result = preg_replace('/pattern/e', 'strtoupper("$1")', $subject);
+```
+
+
+## <a id="no-registry"></a>`no-registry`
+
+Flags usage of `Magento\Framework\Registry`, which is deprecated since Magento 2.3.
+The Registry singleton pattern is considered an anti-pattern. Use constructor dependency
+injection and proper state management instead.
+
+
+### Requirements
+
+- **Integration:** `Magento`
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `true` |
+| `level` | `string` | `"warning"` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+
+namespace Vendor\Module\Model;
+
+use Magento\Catalog\Api\ProductRepositoryInterface;
+
+class Example
+{
+    public function __construct(
+        private ProductRepositoryInterface $productRepository,
+    ) {}
+}
+```
+
+#### Incorrect code
+
+```php
+<?php
+
+namespace Vendor\Module\Model;
+
+use Magento\Framework\Registry;
+
+class Example
+{
+    public function __construct(
+        private Registry $registry,
+    ) {}
+}
 ```
 
 
