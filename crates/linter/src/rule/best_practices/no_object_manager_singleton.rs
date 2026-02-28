@@ -141,3 +141,87 @@ impl LintRule for NoObjectManagerSingletonRule {
         );
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_lint_failure;
+    use crate::test_lint_success;
+
+    test_lint_success! {
+        name = no_object_manager_usage,
+        rule = NoObjectManagerSingletonRule,
+        code = r#"
+            <?php
+
+            namespace Vendor\Module\Model;
+
+            use Magento\Catalog\Api\ProductRepositoryInterface;
+
+            class Example
+            {
+                public function __construct(
+                    private ProductRepositoryInterface $productRepository,
+                ) {}
+            }
+        "#
+    }
+
+    test_lint_success! {
+        name = other_static_method_call,
+        rule = NoObjectManagerSingletonRule,
+        code = r#"
+            <?php
+
+            namespace Vendor\Module\Model;
+
+            use Magento\Framework\App\ObjectManager;
+
+            class Example
+            {
+                public function doSomething(): void
+                {
+                    ObjectManager::someOtherMethod();
+                }
+            }
+        "#
+    }
+
+    test_lint_failure! {
+        name = get_instance_direct,
+        rule = NoObjectManagerSingletonRule,
+        code = r#"
+            <?php
+
+            namespace Vendor\Module\Model;
+
+            use Magento\Framework\App\ObjectManager;
+
+            class Example
+            {
+                public function doSomething(): void
+                {
+                    $objectManager = ObjectManager::getInstance();
+                }
+            }
+        "#
+    }
+
+    test_lint_failure! {
+        name = get_instance_fqn,
+        rule = NoObjectManagerSingletonRule,
+        code = r#"
+            <?php
+
+            namespace Vendor\Module\Model;
+
+            class Example
+            {
+                public function doSomething(): void
+                {
+                    $objectManager = \Magento\Framework\App\ObjectManager::getInstance();
+                }
+            }
+        "#
+    }
+}

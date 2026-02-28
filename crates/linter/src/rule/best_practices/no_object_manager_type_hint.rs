@@ -129,3 +129,65 @@ impl LintRule for NoObjectManagerTypeHintRule {
         );
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_lint_failure;
+    use crate::test_lint_success;
+
+    test_lint_success! {
+        name = specific_interface_type_hint,
+        rule = NoObjectManagerTypeHintRule,
+        code = r#"
+            <?php
+
+            namespace Vendor\Module\Model;
+
+            use Magento\Catalog\Api\ProductRepositoryInterface;
+
+            class Example
+            {
+                public function __construct(
+                    private ProductRepositoryInterface $productRepository,
+                ) {}
+            }
+        "#
+    }
+
+    test_lint_failure! {
+        name = object_manager_interface_type_hint,
+        rule = NoObjectManagerTypeHintRule,
+        code = r#"
+            <?php
+
+            namespace Vendor\Module\Model;
+
+            use Magento\Framework\ObjectManagerInterface;
+
+            class Example
+            {
+                public function __construct(
+                    private ObjectManagerInterface $objectManager,
+                ) {}
+            }
+        "#
+    }
+
+    test_lint_failure! {
+        name = object_manager_interface_fqn_type_hint,
+        rule = NoObjectManagerTypeHintRule,
+        code = r#"
+            <?php
+
+            namespace Vendor\Module\Model;
+
+            class Example
+            {
+                public function __construct(
+                    private \Magento\Framework\ObjectManagerInterface $objectManager,
+                ) {}
+            }
+        "#
+    }
+}

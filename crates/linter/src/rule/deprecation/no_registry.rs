@@ -127,3 +127,65 @@ impl LintRule for NoRegistryRule {
         );
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_lint_failure;
+    use crate::test_lint_success;
+
+    test_lint_success! {
+        name = no_registry_usage,
+        rule = NoRegistryRule,
+        code = r#"
+            <?php
+
+            namespace Vendor\Module\Model;
+
+            use Magento\Catalog\Api\ProductRepositoryInterface;
+
+            class Example
+            {
+                public function __construct(
+                    private ProductRepositoryInterface $productRepository,
+                ) {}
+            }
+        "#
+    }
+
+    test_lint_failure! {
+        name = registry_type_hint,
+        rule = NoRegistryRule,
+        code = r#"
+            <?php
+
+            namespace Vendor\Module\Model;
+
+            use Magento\Framework\Registry;
+
+            class Example
+            {
+                public function __construct(
+                    private Registry $registry,
+                ) {}
+            }
+        "#
+    }
+
+    test_lint_failure! {
+        name = registry_fqn_type_hint,
+        rule = NoRegistryRule,
+        code = r#"
+            <?php
+
+            namespace Vendor\Module\Model;
+
+            class Example
+            {
+                public function __construct(
+                    private \Magento\Framework\Registry $registry,
+                ) {}
+            }
+        "#
+    }
+}
