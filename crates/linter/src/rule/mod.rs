@@ -320,4 +320,7 @@ define_rules! {
     NoDbSchemaChange(no_db_schema_change @ NoDbSchemaChangeRule),
     NoUnescapedOutput(no_unescaped_output @ NoUnescapedOutputRule),
     NoRolesAsCapabilities(no_roles_as_capabilities @ NoRolesAsCapabilitiesRule),
+    NoObjectManagerSingleton(no_object_manager_singleton @ NoObjectManagerSingletonRule),
+    NoObjectManagerTypeHint(no_object_manager_type_hint @ NoObjectManagerTypeHintRule),
+    NoRegistry(no_registry @ NoRegistryRule),
 }
