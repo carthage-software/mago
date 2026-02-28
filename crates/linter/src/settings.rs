@@ -45,6 +45,7 @@ use crate::rule::LowercaseKeywordConfig;
 use crate::rule::LowercaseTypeHintConfig;
 use crate::rule::MiddlewareInRoutesConfig;
 use crate::rule::NoAliasFunctionConfig;
+use crate::rule::NoArrayMergeInLoopConfig;
 use crate::rule::NoAssignInArgumentConfig;
 use crate::rule::NoAssignInConditionConfig;
 use crate::rule::NoBooleanFlagParameterConfig;
@@ -52,6 +53,7 @@ use crate::rule::NoClosingTagConfig;
 use crate::rule::NoDbSchemaChangeConfig;
 use crate::rule::NoDebugSymbolsConfig;
 use crate::rule::NoDirectDbQueryConfig;
+use crate::rule::NoDirectExceptionThrowConfig;
 use crate::rule::NoElseClauseConfig;
 use crate::rule::NoEmptyCatchClauseConfig;
 use crate::rule::NoEmptyCommentConfig;
@@ -59,6 +61,7 @@ use crate::rule::NoEmptyConfig;
 use crate::rule::NoEmptyLoopConfig;
 use crate::rule::NoErrorControlOperatorConfig;
 use crate::rule::NoEvalConfig;
+use crate::rule::NoExecutableRegexModifierConfig;
 use crate::rule::NoFfiConfig;
 use crate::rule::NoGlobalConfig;
 use crate::rule::NoGotoConfig;
@@ -68,15 +71,18 @@ use crate::rule::NoIniSetConfig;
 use crate::rule::NoInlineConfig;
 use crate::rule::NoInsecureComparisonConfig;
 use crate::rule::NoIssetConfig;
+use crate::rule::NoLiteralNamespaceStringConfig;
 use crate::rule::NoLiteralPasswordConfig;
 use crate::rule::NoMultiAssignmentsConfig;
 use crate::rule::NoNestedTernaryConfig;
 use crate::rule::NoObjectManagerSingletonConfig;
 use crate::rule::NoObjectManagerTypeHintConfig;
 use crate::rule::NoNoopConfig;
+use crate::rule::NoProxyInterceptorInConstructorConfig;
 use crate::rule::NoOnlyConfig;
 use crate::rule::NoPhpTagTerminatorConfig;
 use crate::rule::NoProtectedInFinalConfig;
+use crate::rule::NoRawSqlQueryConfig;
 use crate::rule::NoRedundantBlockConfig;
 use crate::rule::NoRedundantContinueConfig;
 use crate::rule::NoRedundantFileConfig;
@@ -95,6 +101,8 @@ use crate::rule::NoRedundantWriteVisibilityConfig;
 use crate::rule::NoRedundantYieldFromConfig;
 use crate::rule::NoRegistryConfig;
 use crate::rule::NoRequestAllConfig;
+use crate::rule::NoTestNamespaceImportConfig;
+use crate::rule::NoThisInTemplateConfig;
 use crate::rule::NoRequestVariableConfig;
 use crate::rule::NoRolesAsCapabilitiesConfig;
 use crate::rule::NoSelfAssignmentConfig;
@@ -324,6 +332,14 @@ pub struct RulesSettings {
     pub no_object_manager_singleton: RuleSettings<NoObjectManagerSingletonConfig>,
     pub no_object_manager_type_hint: RuleSettings<NoObjectManagerTypeHintConfig>,
     pub no_registry: RuleSettings<NoRegistryConfig>,
+    pub no_proxy_interceptor_in_constructor: RuleSettings<NoProxyInterceptorInConstructorConfig>,
+    pub no_this_in_template: RuleSettings<NoThisInTemplateConfig>,
+    pub no_test_namespace_import: RuleSettings<NoTestNamespaceImportConfig>,
+    pub no_literal_namespace_string: RuleSettings<NoLiteralNamespaceStringConfig>,
+    pub no_array_merge_in_loop: RuleSettings<NoArrayMergeInLoopConfig>,
+    pub no_direct_exception_throw: RuleSettings<NoDirectExceptionThrowConfig>,
+    pub no_executable_regex_modifier: RuleSettings<NoExecutableRegexModifierConfig>,
+    pub no_raw_sql_query: RuleSettings<NoRawSqlQueryConfig>,
 }
 
 impl<C: Config> RuleSettings<C> {
