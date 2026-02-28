@@ -61,6 +61,51 @@ To get started with Mago and learn how to configure your project, please visit o
 - 📜 Formatting: Automatically format your code to adhere to best practices and style guides.
 - 🧠 Semantic Checks: Ensure code correctness with robust semantic analysis.
 - 🌳 AST Visualization: Explore your code’s structure with Abstract Syntax Tree (AST) parsing.
+- 🧩 Framework Integrations: Built-in support for popular PHP frameworks and libraries including Magento 2, Laravel, Symfony, PSL, and more.
+
+## Magento 2 Support
+
+Mago includes built-in support for Magento 2 projects with both analyzer plugins and linter rules.
+
+### Analyzer Plugin
+
+Enable the Magento analyzer plugin in your `mago.toml`:
+
+```toml
+[analyzer]
+plugins = ["magento"]
+```
+
+This enables the following type-aware checks:
+
+| Code | Description |
+|------|-------------|
+| `magento-use-service-contracts` | Flags direct `save()`, `load()`, `delete()` calls on `AbstractModel` subclasses |
+| `magento-collection-via-factory` | Flags `getCollection()` calls on `AbstractModel` subclasses |
+| `magento-use-resource-model-directly` | Flags `getResource()` / `_getResource()` calls on `AbstractModel` subclasses |
+| `magento-no-set-template-in-block` | Flags `setTemplate()` calls on `Template` block subclasses |
+| `magento-collection-mock-subclass` | Validates `getCollectionMock()` argument extends `Collection` |
+
+It also provides an ObjectManager return type provider, resolving `ObjectManagerInterface::get(Foo::class)` and `::create(Foo::class)` to their correct return types.
+
+### Linter Rules
+
+Enable the Magento integration in your `mago.toml`:
+
+```toml
+[linter]
+integrations = ["magento"]
+```
+
+This enables the following lint rules:
+
+| Code | Category | Description |
+|------|----------|-------------|
+| `no-object-manager-singleton` | Best Practices | Flags `ObjectManager::getInstance()` usage |
+| `no-object-manager-type-hint` | Best Practices | Flags `ObjectManagerInterface` type hints |
+| `no-registry` | Deprecation | Flags `Magento\Framework\Registry` usage |
+
+These rules are inspired by [phpstan-magento](https://github.com/bitExpert/phpstan-magento).
 
 ## Our Sponsors
 
@@ -89,7 +134,7 @@ Mago stands on the shoulders of giants. Our design and functionality are heavily
 
 ### Acknowledgements:
 
-We deeply respect the foundational work of tools like [PHP-CS-Fixer](https://github.com/PHP-CS-Fixer/PHP-CS-Fixer), [Psalm](https://github.com/vimeo/psalm), [PHPStan](https://github.com/phpstan/phpstan), and [PHP_CodeSniffer](https://github.com/PHPCSStandards/PHP_CodeSniffer). While Mago aims to offer a unified and faster alternative, these tools paved the way for modern PHP development.
+We deeply respect the foundational work of tools like [PHP-CS-Fixer](https://github.com/PHP-CS-Fixer/PHP-CS-Fixer), [Psalm](https://github.com/vimeo/psalm), [PHPStan](https://github.com/phpstan/phpstan), [PHP_CodeSniffer](https://github.com/PHPCSStandards/PHP_CodeSniffer), and [phpstan-magento](https://github.com/bitExpert/phpstan-magento). While Mago aims to offer a unified and faster alternative, these tools paved the way for modern PHP development.
 
 ## License
 
