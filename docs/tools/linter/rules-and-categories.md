@@ -34,6 +34,16 @@ title: Rules & categories
 - [`no-request-all`](./rules/safety#no-request-all)
 - [`middleware-in-routes`](./rules/best-practices#middleware-in-routes)
 
+### Magento
+
+- [`no-object-manager-singleton`](./rules/best-practices#no-object-manager-singleton)
+- [`no-object-manager-type-hint`](./rules/best-practices#no-object-manager-type-hint)
+- [`no-registry`](./rules/deprecation#no-registry)
+- [`no-proxy-interceptor-in-constructor`](./rules/best-practices#no-proxy-interceptor-in-constructor)
+- [`no-this-in-template`](./rules/best-practices#no-this-in-template)
+- [`no-test-namespace-import`](./rules/best-practices#no-test-namespace-import)
+- [`no-literal-namespace-string`](./rules/best-practices#no-literal-namespace-string)
+
 ### PHPUnit
 
 - [`assertion-style`](./rules/consistency#assertion-style)
