@@ -19,16 +19,24 @@ ignore = [
 
 # Use a baseline file to ignore existing issues
 baseline = "analyzer-baseline.toml"
+
+# Report only specific issue codes (optionally path-scoped)
+only = ["missing-return-type"]
+
+# In these paths, report only this code; other paths unchanged
+only-in = [{ code = "class-must-be-final", in = ["src/"] }]
 ```
 
 ## General options
 
-| Option             | Type       | Default   | Description                                                |
-| :----------------- | :--------- | :-------- | :--------------------------------------------------------- |
-| `excludes`         | `string[]` | `[]`      | A list of paths or glob patterns to exclude from analysis. |
-| `ignore`           | `(string \| object)[]` | `[]` | Issue codes to ignore, optionally scoped to specific paths. See [Path-scoped ignoring](#path-scoped-ignoring). |
-| `baseline`         | `string`   | `null`    | Path to a baseline file to ignore listed issues. When specified, the analyzer will use this file as the default baseline, eliminating the need to pass `--baseline` on every run. Command-line `--baseline` arguments will override this setting. |
-| `baseline-variant` | `string`   | `"loose"` | The baseline format variant to use when generating new baselines. Options: `"loose"` (count-based, resilient to line changes) or `"strict"` (exact line matching). See [Baseline Variants](/fundamentals/baseline#baseline-variants) for details. |
+| Option             | Type                   | Default   | Description                                                                                                                                                                                                                                       |
+|:-------------------|:-----------------------|:----------|:--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `excludes`         | `string[]`             | `[]`      | A list of paths or glob patterns to exclude from analysis.                                                                                                                                                                                        |
+| `ignore`           | `(string \| object)[]` | `[]`      | Issue codes to ignore, optionally scoped to specific paths. See [Path-scoped ignoring](#path-scoped-ignoring).                                                                                                                                    |
+| `only`             | `(string \| object)[]` | `[]`      | Issue codes to report; all others are filtered out. Same formats as `ignore`. See [Path-scoped only](#path-scoped-only).                                                                                                                          |
+| `only-in`          | `object[]`             | `[]`      | In the given paths, report only the specified code; other paths are unaffected. See [Only-in (scoped-only)](#only-in-scoped-only).                                                                                                                |
+| `baseline`         | `string`               | `null`    | Path to a baseline file to ignore listed issues. When specified, the analyzer will use this file as the default baseline, eliminating the need to pass `--baseline` on every run. Command-line `--baseline` arguments will override this setting. |
+| `baseline-variant` | `string`               | `"loose"` | The baseline format variant to use when generating new baselines. Options: `"loose"` (count-based, resilient to line changes) or `"strict"` (exact line matching). See [Baseline Variants](/fundamentals/baseline#baseline-variants) for details. |
 
 :::tip Tool-Specific Excludes
 The `excludes` option here is **additive** to the global `source.excludes` defined in the `[source]` section of your configuration. Files excluded globally will always be excluded from analysis, and this option allows you to exclude additional files from the analyzer specifically.
@@ -82,6 +90,45 @@ Path-scoped ignoring is different from `excludes`:
 - `excludes` removes files from analysis entirely — they won't be parsed for type information.
 - `ignore` with `in` still analyzes the files but suppresses specific issue codes in the output.
 :::
+
+### Path-scoped only
+
+The `only` option restricts which issue codes are reported. It uses the same three formats as `ignore`:
+
+**Plain string** — report only this code everywhere:
+```toml
+only = ["missing-return-type"]
+```
+
+**Object with single path** — report this code only in specific paths:
+```toml
+only = [
+  { code = "missing-return-type", in = "src/" },
+]
+```
+
+**Object with multiple paths** — report this code in several locations:
+```toml
+only = [
+  { code = "missing-return-type", in = ["src/", "app/"] },
+]
+```
+
+All three formats can be mixed. When `only` is non-empty, only issues matching an entry (and, for scoped entries, the file path) are reported; all others are filtered out. Paths are matched as prefixes against relative file paths from the project root, same as `ignore`.
+
+### Only-in (scoped-only)
+
+Use `only-in` when you want to **enable a specific check only in certain paths**, without restricting what is reported elsewhere. Each entry is `{ code = "...", in = "path/" }` or `in = ["a/", "b/"]`. Files that match an entry's path only report that code in that path; files that do not match any entry are unchanged (all codes reported).
+
+```toml
+[analyzer]
+# Only report class-must-be-final in this file; other files report all codes
+only-in = [
+  { code = "class-must-be-final", in = ["src/class-must-be-final.php"] },
+]
+```
+
+This is different from `only`: `only` is a global allowlist (only listed codes/paths are ever reported). `only-in` restricts only inside the listed paths; everywhere else, all issues are still reported.
 
 ## Feature flags
 

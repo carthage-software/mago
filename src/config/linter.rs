@@ -1,5 +1,7 @@
 use std::path::PathBuf;
 
+use mago_reporting::OnlyEntry;
+use mago_reporting::OnlyInEntry;
 use mago_reporting::baseline::BaselineVariant;
 use schemars::JsonSchema;
 use serde::Deserialize;
@@ -17,6 +19,21 @@ use mago_php_version::PHPVersion;
 pub struct LinterConfiguration {
     /// A list of patterns to exclude from linting.
     pub excludes: Vec<String>,
+
+    /// Run only specific rule codes, optionally scoped to paths.
+    ///
+    /// Same formats as analyzer/linter `ignore`: plain string (e.g. `"strict-types"`),
+    /// or `{ code = "strict-types", in = "src/" }` / `in = ["src/", "tests/"]`.
+    /// When non-empty, only these rules run and only matching issues are reported.
+    #[serde(default)]
+    pub only: Vec<OnlyEntry>,
+
+    /// In the given paths, run only the specified rule; other paths are not restricted.
+    ///
+    /// Each entry is `{ code = "...", in = "path/" }` or `in = ["a/", "b/"]`. Files outside any entry's paths
+    /// are unaffected.
+    #[serde(default, rename = "only-in")]
+    pub only_in: Vec<OnlyInEntry>,
 
     /// Integrations to enable during linting.
     pub integrations: Vec<Integration>,
@@ -51,6 +68,8 @@ impl LinterConfiguration {
 
         serde_json::json!({
             "excludes": self.excludes,
+            "only": self.only,
+            "only-in": self.only_in,
             "integrations": self.integrations,
             "rules": filtered_rules,
             "baseline": self.baseline,

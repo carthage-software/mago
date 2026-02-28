@@ -232,6 +232,12 @@ impl AnalyzeCommand {
         issues.filter_out_ignored(&configuration.analyzer.ignore, |file_id| {
             read_db.get_ref(&file_id).ok().map(|f| f.name.to_string())
         });
+        issues.filter_retain_only(&configuration.analyzer.only, |file_id| {
+            read_db.get_ref(&file_id).ok().map(|f| f.name.to_string())
+        });
+        issues.filter_retain_only_in(&configuration.analyzer.only_in, |file_id| {
+            read_db.get_ref(&file_id).ok().map(|f| f.name.to_string())
+        });
 
         let baseline = configuration.analyzer.baseline.as_deref();
         let baseline_variant = configuration.analyzer.baseline_variant;
@@ -295,6 +301,12 @@ impl AnalyzeCommand {
         issues.filter_out_ignored(&configuration.analyzer.ignore, |file_id| {
             read_db.get_ref(&file_id).ok().map(|f| f.name.to_string())
         });
+        issues.filter_retain_only(&configuration.analyzer.only, |file_id| {
+            read_db.get_ref(&file_id).ok().map(|f| f.name.to_string())
+        });
+        issues.filter_retain_only_in(&configuration.analyzer.only_in, |file_id| {
+            read_db.get_ref(&file_id).ok().map(|f| f.name.to_string())
+        });
         let baseline = configuration.analyzer.baseline.as_deref();
         let baseline_variant = configuration.analyzer.baseline_variant;
 
@@ -326,6 +338,12 @@ impl AnalyzeCommand {
             let mut issues = analysis_result.issues;
             let read_db = watcher.read_only_database();
             issues.filter_out_ignored(&configuration.analyzer.ignore, |file_id| {
+                read_db.get_ref(&file_id).ok().map(|f| f.name.to_string())
+            });
+            issues.filter_retain_only(&configuration.analyzer.only, |file_id| {
+                read_db.get_ref(&file_id).ok().map(|f| f.name.to_string())
+            });
+            issues.filter_retain_only_in(&configuration.analyzer.only_in, |file_id| {
                 read_db.get_ref(&file_id).ok().map(|f| f.name.to_string())
             });
 
