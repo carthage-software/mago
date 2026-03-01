@@ -6,6 +6,7 @@ use mago_span::HasSpan;
 use mago_span::Span;
 use mago_syntax::ast::Node;
 
+use crate::document::BreakMode;
 use crate::document::Document;
 use crate::document::Group;
 use crate::document::Line;
@@ -418,7 +419,7 @@ impl<'arena> FormatterState<'_, 'arena> {
                     Document::Indent(vec![in self.arena; Document::Line(Line::default()), document]),
                     Document::Line(Line::default()),
                 ])
-                .with_break(must_break),
+                .with_break_mode(if must_break { BreakMode::Force } else { BreakMode::Auto }),
             )
         } else {
             Document::Group(
@@ -427,7 +428,7 @@ impl<'arena> FormatterState<'_, 'arena> {
                     Document::Array(vec![in self.arena; Document::Line(Line::default()), document]),
                     Document::Line(Line::default()),
                 ])
-                .with_break(must_break),
+                .with_break_mode(if must_break { BreakMode::Force } else { BreakMode::Auto }),
             )
         })
     }

@@ -22,6 +22,7 @@ use mago_syntax::ast::Terminator;
 use mago_syntax::ast::Variable;
 use mago_syntax::ast::Yield;
 
+use crate::document::BreakMode;
 use crate::document::Document;
 use crate::document::Group;
 use crate::document::IndentIfBreak;
@@ -447,7 +448,7 @@ pub(super) fn print_colon_delimited_body<'arena>(
     parts.push(end_keyword.format(f));
     parts.push(terminator.format(f));
 
-    Document::Group(Group::new(parts).with_break(true))
+    Document::Group(Group::new(parts).with_break_mode(BreakMode::Force))
 }
 
 pub(super) fn print_modifiers<'arena>(

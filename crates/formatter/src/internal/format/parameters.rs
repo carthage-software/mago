@@ -4,6 +4,7 @@ use mago_span::HasSpan;
 use mago_syntax::ast::FunctionLikeParameter;
 use mago_syntax::ast::FunctionLikeParameterList;
 
+use crate::document::BreakMode;
 use crate::document::Document;
 use crate::document::Group;
 use crate::document::IfBreak;
@@ -111,9 +112,13 @@ pub(super) fn print_function_like_parameters<'arena>(
 
     f.parameter_state.force_break = previous_break;
 
-    Document::Group(
-        Group::new(parts).with_break(force_break).with_preserve_source_break(!force_break && preserve_break),
-    )
+    Document::Group(Group::new(parts).with_break_mode(if force_break {
+        BreakMode::Force
+    } else if preserve_break {
+        BreakMode::Preserve
+    } else {
+        BreakMode::Auto
+    }))
 }
 
 pub(super) fn force_break_parameters<'arena>(

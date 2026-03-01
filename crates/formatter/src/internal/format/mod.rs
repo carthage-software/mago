@@ -96,6 +96,7 @@ use mago_syntax::ast::UseItemSequence;
 use mago_syntax::ast::UseItems;
 use mago_syntax::ast::UseType;
 
+use crate::document::BreakMode;
 use crate::document::Document;
 use crate::document::Group;
 use crate::document::IfBreak;
@@ -327,7 +328,7 @@ impl<'arena> Format<'arena> for Declare<'arena> {
             contents.push(Document::String(")"));
             contents.push(self.body.format(f));
 
-            Document::Group(Group::new(contents).with_break(true))
+            Document::Group(Group::new(contents).with_break_mode(BreakMode::Force))
         })
     }
 }
@@ -1561,7 +1562,11 @@ impl<'arena> Format<'arena> for AttributeList<'arena> {
 
             contents.push(Document::String("]"));
 
-            Document::Group(Group::new(contents).with_preserve_source_break(preserve_break))
+            Document::Group(Group::new(contents).with_break_mode(if preserve_break {
+                BreakMode::Preserve
+            } else {
+                BreakMode::Auto
+            }))
         })
     }
 }

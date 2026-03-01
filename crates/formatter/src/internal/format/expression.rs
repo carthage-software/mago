@@ -92,6 +92,7 @@ use mago_syntax::ast::YieldPair;
 use mago_syntax::ast::YieldValue;
 
 use crate::document::Align;
+use crate::document::BreakMode;
 use crate::document::Document;
 use crate::document::Line;
 use crate::internal::FormatterState;
@@ -241,7 +242,8 @@ impl<'arena> Format<'arena> for Pipe<'arena> {
             }
 
             Document::Group(
-                Group::new(vec![in f.arena; formatted_input, Document::Indent(contents)]).with_break(should_break),
+                Group::new(vec![in f.arena; formatted_input, Document::Indent(contents)])
+                    .with_break_mode(if should_break { BreakMode::Force } else { BreakMode::Auto }),
             )
         })
     }
@@ -955,11 +957,11 @@ impl<'arena> Format<'arena> for MatchExpressionArm<'arena> {
             Document::Group(
                 Group::new(vec![
                     in f.arena;
-                    Document::Group(Group::new(contents).with_break(must_break)),
+                    Document::Group(Group::new(contents).with_break_mode(if must_break { BreakMode::Force } else { BreakMode::Auto })),
                     self.expression.format(f),
                 ])
                 .with_id(group_id)
-                .with_break(must_break),
+                .with_break_mode(if must_break { BreakMode::Force } else { BreakMode::Auto }),
             )
         })
     }
@@ -1036,7 +1038,11 @@ impl<'arena> Format<'arena> for Match<'arena> {
 
             contents.push(format_token(f, self.right_brace, "}"));
 
-            Document::Group(Group::new(contents).with_break(should_break))
+            Document::Group(Group::new(contents).with_break_mode(if should_break {
+                BreakMode::Force
+            } else {
+                BreakMode::Auto
+            }))
         })
     }
 }
@@ -1098,7 +1104,7 @@ impl<'arena> Format<'arena> for Conditional<'arena> {
                                 self.r#else.format(f),
                             ]),
                         ])
-                        .with_preserve_source_break(preserve_break)
+                        .with_break_mode(if preserve_break { BreakMode::Preserve } else { BreakMode::Auto })
                         .with_id(conditional_id),
                     )
                 }

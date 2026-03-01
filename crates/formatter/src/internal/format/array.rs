@@ -10,6 +10,7 @@ use mago_syntax::ast::Expression;
 use mago_syntax::ast::LegacyArray;
 use mago_syntax::ast::List;
 
+use crate::document::BreakMode;
 use crate::document::Document;
 use crate::document::Group;
 use crate::document::IfBreak;
@@ -232,9 +233,13 @@ pub(super) fn print_array_like<'arena>(
 
     let force_break = use_table_style || has_floating_comments;
 
-    Document::Group(
-        Group::new(parts).with_break(force_break).with_preserve_source_break(!force_break && preserve_break),
-    )
+    Document::Group(Group::new(parts).with_break_mode(if force_break {
+        BreakMode::Force
+    } else if preserve_break {
+        BreakMode::Preserve
+    } else {
+        BreakMode::Auto
+    }))
 }
 
 #[inline]
