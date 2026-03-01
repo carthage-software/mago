@@ -1185,7 +1185,12 @@ impl PluginRegistry {
     ///
     /// Returns a new `IssueCollection` with filtered issues.
     #[must_use]
-    pub fn filter_issues(&self, file: &File, issues: IssueCollection) -> IssueCollection {
+    pub fn filter_issues(
+        &self,
+        file: &File,
+        issues: IssueCollection,
+        codebase: &CodebaseMetadata,
+    ) -> IssueCollection {
         if self.issue_filter_hooks.is_empty() {
             return issues;
         }
@@ -1195,7 +1200,7 @@ impl PluginRegistry {
         for issue in issues {
             let mut keep = true;
             for hook in &self.issue_filter_hooks {
-                if let Ok(IssueFilterDecision::Remove) = hook.filter_issue(file, &issue) {
+                if let Ok(IssueFilterDecision::Remove) = hook.filter_issue(file, &issue, codebase) {
                     keep = false;
                     break;
                 }

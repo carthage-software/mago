@@ -7,11 +7,16 @@
 //! The functionality here is derived from PHPantom's Laravel
 //! virtual member providers (`src/virtual_members/laravel.rs`).
 
+pub mod issue_filter;
+pub mod property_init;
 pub mod utils;
 
 use crate::plugin::Plugin;
 use crate::plugin::PluginMeta;
 use crate::plugin::PluginRegistry;
+
+use issue_filter::LaravelIssueFilter;
+use property_init::LaravelPropertyInit;
 
 /// Plugin providing analysis support for the Laravel framework.
 pub struct LaravelPlugin;
@@ -29,8 +34,10 @@ impl Plugin for LaravelPlugin {
         &META
     }
 
-    fn register(&self, _registry: &mut PluginRegistry) {
-        // TODO: Register providers derived from PHPantom's
-        // LaravelModelProvider and LaravelFactoryProvider.
+    fn register(&self, registry: &mut PluginRegistry) {
+        // Phase 2: Mark Eloquent model/builder/factory properties as initialized
+        registry.register_property_initialization_provider(LaravelPropertyInit);
+        // Phase 1: Suppress false-positive diagnostics on Eloquent classes
+        registry.register_issue_filter_hook(LaravelIssueFilter::new());
     }
 }

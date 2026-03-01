@@ -157,6 +157,122 @@ pub const CASTABLE: &str = "Illuminate\\Contracts\\Database\\Eloquent\\Castable"
 /// type or return `void`.
 pub const DEFAULT_SCOPE_RETURN_TYPE: &str = "\\Illuminate\\Database\\Eloquent\\Builder<static>";
 
+/// The fully-qualified name of the `#[Scope]` attribute (Laravel 11+).
+pub const SCOPE_ATTRIBUTE: &str = "Illuminate\\Database\\Eloquent\\Attributes\\Scope";
+
+/// The fully-qualified name of the `#[CollectedBy]` attribute.
+pub const COLLECTED_BY_ATTRIBUTE: &str = "Illuminate\\Database\\Eloquent\\Attributes\\CollectedBy";
+
+/// The fully-qualified name of the `SoftDeletes` trait.
+pub const SOFT_DELETES_TRAIT: &str = "Illuminate\\Database\\Eloquent\\SoftDeletes";
+
+// ────────────────────────────────────────────────────────────────────────────────
+// Model / Builder / Factory initialized property lists
+// ────────────────────────────────────────────────────────────────────────────────
+
+/// Well-known Eloquent Model properties that are initialized at runtime
+/// (either with defaults in the base class or hydrated from the database).
+pub const MODEL_INITIALIZED_PROPERTIES: &[&str] = &[
+    "$connection",
+    "$table",
+    "$primaryKey",
+    "$keyType",
+    "$incrementing",
+    "$with",
+    "$withCount",
+    "$preventsLazyLoading",
+    "$perPage",
+    "$exists",
+    "$wasRecentlyCreated",
+    "$escapeWhenCastingToString",
+    "$attributes",
+    "$original",
+    "$changes",
+    "$casts",
+    "$classCastCache",
+    "$attributeCastCache",
+    "$dateFormat",
+    "$appends",
+    "$dispatchesEvents",
+    "$observables",
+    "$relations",
+    "$touches",
+    "$timestamps",
+    "$usesUniqueIds",
+    "$hidden",
+    "$visible",
+    "$fillable",
+    "$guarded",
+];
+
+/// Well-known Eloquent Builder properties that are initialized at runtime.
+pub const BUILDER_INITIALIZED_PROPERTIES: &[&str] = &[
+    "$model",
+    "$query",
+    "$eagerLoad",
+    "$localMacros",
+    "$scopes",
+    "$removedScopes",
+    "$passthru",
+];
+
+/// Well-known Factory properties that are initialized at runtime.
+pub const FACTORY_INITIALIZED_PROPERTIES: &[&str] = &[
+    "$model",
+    "$count",
+    "$states",
+    "$has",
+    "$for",
+    "$afterMaking",
+    "$afterCreating",
+    "$connection",
+    "$faker",
+];
+
+// ────────────────────────────────────────────────────────────────────────────────
+// Hierarchy helpers (lowercased parent checking)
+// ────────────────────────────────────────────────────────────────────────────────
+
+/// Lowercased FQN of the Eloquent Model base class (for `all_parent_classes` lookups).
+const ELOQUENT_MODEL_LOWER: &str = "illuminate\\database\\eloquent\\model";
+
+/// Lowercased FQN of the Eloquent Builder class.
+const ELOQUENT_BUILDER_LOWER: &str = "illuminate\\database\\eloquent\\builder";
+
+/// Lowercased FQN of the Eloquent Factory class.
+const ELOQUENT_FACTORY_LOWER: &str = "illuminate\\database\\eloquent\\factories\\factory";
+
+/// Checks if the given `all_parent_classes` set contains the Eloquent Model.
+///
+/// `all_parent_classes` in Mago stores lowercased FQNs.
+pub fn is_eloquent_model_parent(all_parent_classes: &impl Contains) -> bool {
+    all_parent_classes.contains_str(ELOQUENT_MODEL_LOWER)
+}
+
+/// Checks if the given `all_parent_classes` set contains the Eloquent Builder.
+pub fn is_eloquent_builder_parent(all_parent_classes: &impl Contains) -> bool {
+    all_parent_classes.contains_str(ELOQUENT_BUILDER_LOWER)
+}
+
+/// Checks if the given `all_parent_classes` set contains the Eloquent Factory.
+pub fn is_eloquent_factory_parent(all_parent_classes: &impl Contains) -> bool {
+    all_parent_classes.contains_str(ELOQUENT_FACTORY_LOWER)
+}
+
+/// Abstraction for checking string membership in a set.
+///
+/// Implemented for `AtomSet` so that the hierarchy helpers work with
+/// `ClassLikeMetadata.all_parent_classes`.
+pub trait Contains {
+    fn contains_str(&self, s: &str) -> bool;
+}
+
+impl Contains for mago_atom::AtomSet {
+    fn contains_str(&self, s: &str) -> bool {
+        self.contains(&mago_atom::atom(s))
+    }
+}
+
 // ────────────────────────────────────────────────────────────────────────────────
 // Relationship classification
 // ────────────────────────────────────────────────────────────────────────────────
@@ -219,6 +335,39 @@ pub fn classify_relationship(short_name: &str) -> Option<RelationshipKind> {
         return Some(RelationshipKind::Collection);
     }
     None
+}
+
+/// Classifies a relationship by its fully-qualified class name.
+///
+/// Extracts the short name from the FQN and delegates to [`classify_relationship`].
+///
+/// # Examples
+/// ```text
+/// "Illuminate\\Database\\Eloquent\\Relations\\HasMany" → Some(Collection)
+/// "\\Illuminate\\Database\\Eloquent\\Relations\\HasOne" → Some(Singular)
+/// ```
+pub fn classify_relationship_fqn(fqn: &str) -> Option<RelationshipKind> {
+    let short = extract_short_name(strip_leading_backslash(fqn));
+    classify_relationship(short)
+}
+
+/// All known relationship class short names.
+pub const RELATIONSHIP_CLASSES: &[&str] = &[
+    "HasOne",
+    "HasMany",
+    "BelongsTo",
+    "BelongsToMany",
+    "MorphOne",
+    "MorphMany",
+    "MorphTo",
+    "MorphToMany",
+    "HasManyThrough",
+    "HasOneThrough",
+];
+
+/// Checks if a short class name is a known Eloquent relationship class.
+pub fn is_relationship_class(short_name: &str) -> bool {
+    RELATIONSHIP_CLASSES.contains(&short_name)
 }
 
 // ────────────────────────────────────────────────────────────────────────────────
@@ -531,6 +680,8 @@ pub fn cast_type_to_php_type(cast_str: &str) -> Option<&'static str> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use mago_atom::AtomSet;
+    use mago_atom::atom;
 
     // ── String conversions ───────────────────────────────────────────
 
@@ -576,7 +727,98 @@ mod tests {
         assert_eq!(strip_leading_backslash("App\\Models\\User"), "App\\Models\\User");
     }
 
+    // ── Hierarchy helpers ────────────────────────────────────────────
+
+    #[test]
+    fn test_is_eloquent_model_parent() {
+        let mut set = AtomSet::default();
+        set.insert(atom("illuminate\\database\\eloquent\\model"));
+        assert!(is_eloquent_model_parent(&set));
+
+        let empty = AtomSet::default();
+        assert!(!is_eloquent_model_parent(&empty));
+    }
+
+    #[test]
+    fn test_is_eloquent_builder_parent() {
+        let mut set = AtomSet::default();
+        set.insert(atom("illuminate\\database\\eloquent\\builder"));
+        assert!(is_eloquent_builder_parent(&set));
+
+        let empty = AtomSet::default();
+        assert!(!is_eloquent_builder_parent(&empty));
+    }
+
+    #[test]
+    fn test_is_eloquent_factory_parent() {
+        let mut set = AtomSet::default();
+        set.insert(atom("illuminate\\database\\eloquent\\factories\\factory"));
+        assert!(is_eloquent_factory_parent(&set));
+
+        let empty = AtomSet::default();
+        assert!(!is_eloquent_factory_parent(&empty));
+    }
+
+    // ── Initialized property lists ───────────────────────────────────
+
+    #[test]
+    fn test_model_initialized_properties() {
+        assert!(MODEL_INITIALIZED_PROPERTIES.contains(&"$fillable"));
+        assert!(MODEL_INITIALIZED_PROPERTIES.contains(&"$guarded"));
+        assert!(MODEL_INITIALIZED_PROPERTIES.contains(&"$casts"));
+        assert!(MODEL_INITIALIZED_PROPERTIES.contains(&"$hidden"));
+        assert!(MODEL_INITIALIZED_PROPERTIES.contains(&"$table"));
+        assert!(MODEL_INITIALIZED_PROPERTIES.contains(&"$connection"));
+        assert!(MODEL_INITIALIZED_PROPERTIES.contains(&"$primaryKey"));
+        assert!(!MODEL_INITIALIZED_PROPERTIES.contains(&"$nonExistent"));
+    }
+
+    #[test]
+    fn test_builder_initialized_properties() {
+        assert!(BUILDER_INITIALIZED_PROPERTIES.contains(&"$model"));
+        assert!(BUILDER_INITIALIZED_PROPERTIES.contains(&"$query"));
+        assert!(BUILDER_INITIALIZED_PROPERTIES.contains(&"$eagerLoad"));
+        assert!(!BUILDER_INITIALIZED_PROPERTIES.contains(&"$nonExistent"));
+    }
+
+    #[test]
+    fn test_factory_initialized_properties() {
+        assert!(FACTORY_INITIALIZED_PROPERTIES.contains(&"$model"));
+        assert!(FACTORY_INITIALIZED_PROPERTIES.contains(&"$count"));
+        assert!(FACTORY_INITIALIZED_PROPERTIES.contains(&"$states"));
+        assert!(FACTORY_INITIALIZED_PROPERTIES.contains(&"$afterMaking"));
+        assert!(FACTORY_INITIALIZED_PROPERTIES.contains(&"$afterCreating"));
+        assert!(!FACTORY_INITIALIZED_PROPERTIES.contains(&"$nonExistent"));
+    }
+
     // ── Relationship classification ──────────────────────────────────
+
+    #[test]
+    fn test_classify_relationship_fqn() {
+        assert_eq!(
+            classify_relationship_fqn("Illuminate\\Database\\Eloquent\\Relations\\HasMany"),
+            Some(RelationshipKind::Collection),
+        );
+        assert_eq!(
+            classify_relationship_fqn("\\Illuminate\\Database\\Eloquent\\Relations\\HasOne"),
+            Some(RelationshipKind::Singular),
+        );
+        assert_eq!(
+            classify_relationship_fqn("\\Illuminate\\Database\\Eloquent\\Relations\\MorphTo"),
+            Some(RelationshipKind::MorphTo),
+        );
+        assert_eq!(classify_relationship_fqn("App\\Models\\User"), None);
+    }
+
+    #[test]
+    fn test_is_relationship_class() {
+        assert!(is_relationship_class("HasOne"));
+        assert!(is_relationship_class("HasMany"));
+        assert!(is_relationship_class("BelongsTo"));
+        assert!(is_relationship_class("MorphTo"));
+        assert!(!is_relationship_class("User"));
+        assert!(!is_relationship_class("Model"));
+    }
 
     #[test]
     fn test_classify_relationship() {
