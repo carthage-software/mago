@@ -7,6 +7,8 @@
 //! The functionality here is derived from PHPantom's Laravel
 //! virtual member providers (`src/virtual_members/laravel.rs`).
 
+pub mod utils;
+
 use crate::plugin::Plugin;
 use crate::plugin::PluginMeta;
 use crate::plugin::PluginRegistry;
@@ -28,10 +30,7 @@ impl Plugin for LaravelPlugin {
     }
 
     fn register(&self, _registry: &mut PluginRegistry) {
-        // TODO: Register providers and hooks for Laravel support:
-        // - Function return type providers for helpers (e.g. collect(), app(), config(), view())
-        // - Method return type providers for Eloquent query builder chains
-        // - Property initialization provider for Eloquent model properties
-        // - Issue filter hook to suppress false positives on model magic properties/methods
+        // TODO: Register providers derived from PHPantom's
+        // LaravelModelProvider and LaravelFactoryProvider.
     }
 }
