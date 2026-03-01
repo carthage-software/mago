@@ -66,6 +66,12 @@ const availablePlugins = [
     description: 'Type providers for psr/container package',
     defaultEnabled: false,
   },
+  {
+    id: 'laravel',
+    name: 'Laravel',
+    description: 'Type providers and analysis support for the Laravel framework',
+    defaultEnabled: false,
+  },
 ];
 
 const analyzerOptions = [
