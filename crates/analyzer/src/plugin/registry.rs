@@ -1185,12 +1185,7 @@ impl PluginRegistry {
     ///
     /// Returns a new `IssueCollection` with filtered issues.
     #[must_use]
-    pub fn filter_issues(
-        &self,
-        file: &File,
-        issues: IssueCollection,
-        codebase: &CodebaseMetadata,
-    ) -> IssueCollection {
+    pub fn filter_issues(&self, file: &File, issues: IssueCollection, codebase: &CodebaseMetadata) -> IssueCollection {
         if self.issue_filter_hooks.is_empty() {
             return issues;
         }

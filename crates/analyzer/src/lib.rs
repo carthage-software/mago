@@ -105,7 +105,8 @@ impl<'ctx, 'ast, 'arena> Analyzer<'ctx, 'ast, 'arena> {
         let mut artifacts = AnalysisArtifacts::new();
 
         if self.plugin_registry.has_program_hooks() {
-            let mut hook_context = HookContext::new(context.codebase, &mut block_context, &mut artifacts);
+            let mut hook_context =
+                HookContext::new(context.codebase, context.resolved_names, &mut block_context, &mut artifacts);
 
             if let HookAction::Skip =
                 self.plugin_registry.before_program(self.source_file, program, &mut hook_context)?
@@ -133,7 +134,8 @@ impl<'ctx, 'ast, 'arena> Analyzer<'ctx, 'ast, 'arena> {
 
         // Call after_program hooks
         if self.plugin_registry.has_program_hooks() {
-            let mut hook_context = HookContext::new(context.codebase, &mut block_context, &mut artifacts);
+            let mut hook_context =
+                HookContext::new(context.codebase, context.resolved_names, &mut block_context, &mut artifacts);
             self.plugin_registry.after_program(self.source_file, program, &mut hook_context)?;
             for reported in hook_context.take_issues() {
                 context.collector.report_with_code(reported.code, reported.issue);
@@ -144,8 +146,11 @@ impl<'ctx, 'ast, 'arena> Analyzer<'ctx, 'ast, 'arena> {
 
         // Filter issues through registered issue filter hooks
         if self.plugin_registry.has_issue_filter_hooks() {
-            analysis_result.issues =
-                self.plugin_registry.filter_issues(self.source_file, std::mem::take(&mut analysis_result.issues), self.codebase);
+            analysis_result.issues = self.plugin_registry.filter_issues(
+                self.source_file,
+                std::mem::take(&mut analysis_result.issues),
+                self.codebase,
+            );
         }
 
         #[cfg(not(target_arch = "wasm32"))]

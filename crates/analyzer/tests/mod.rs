@@ -693,6 +693,12 @@ test_case!(issue_1230_simple, {
     s
 });
 test_case!(issue_1226);
+test_case!(laravel_builder_forwarding);
+test_case!(laravel_cast_minimal);
+test_case!(laravel_factory);
+test_case!(laravel_model_properties);
+test_case!(laravel_property_initialization);
+test_case!(laravel_scopes);
 
 #[test]
 fn test_all_test_cases_are_ran() {

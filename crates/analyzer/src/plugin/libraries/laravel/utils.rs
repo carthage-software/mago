@@ -31,14 +31,11 @@ pub fn camel_to_snake(input: &str) -> String {
                 let prev = chars[i - 1];
                 // Insert underscore when: lowercase/digit → uppercase,
                 // or uppercase → uppercase followed by lowercase (acronym boundary).
-                if prev.is_lowercase() || prev.is_ascii_digit() {
+                if prev.is_lowercase()
+                    || prev.is_ascii_digit()
+                    || (prev.is_uppercase() && chars.get(i + 1).is_some_and(|next| next.is_lowercase()))
+                {
                     result.push('_');
-                } else if prev.is_uppercase() {
-                    if let Some(&next) = chars.get(i + 1) {
-                        if next.is_lowercase() {
-                            result.push('_');
-                        }
-                    }
                 }
             }
             for lc in ch.to_lowercase() {
@@ -206,28 +203,12 @@ pub const MODEL_INITIALIZED_PROPERTIES: &[&str] = &[
 ];
 
 /// Well-known Eloquent Builder properties that are initialized at runtime.
-pub const BUILDER_INITIALIZED_PROPERTIES: &[&str] = &[
-    "$model",
-    "$query",
-    "$eagerLoad",
-    "$localMacros",
-    "$scopes",
-    "$removedScopes",
-    "$passthru",
-];
+pub const BUILDER_INITIALIZED_PROPERTIES: &[&str] =
+    &["$model", "$query", "$eagerLoad", "$localMacros", "$scopes", "$removedScopes", "$passthru"];
 
 /// Well-known Factory properties that are initialized at runtime.
-pub const FACTORY_INITIALIZED_PROPERTIES: &[&str] = &[
-    "$model",
-    "$count",
-    "$states",
-    "$has",
-    "$for",
-    "$afterMaking",
-    "$afterCreating",
-    "$connection",
-    "$faker",
-];
+pub const FACTORY_INITIALIZED_PROPERTIES: &[&str] =
+    &["$model", "$count", "$states", "$has", "$for", "$afterMaking", "$afterCreating", "$connection", "$faker"];
 
 // ────────────────────────────────────────────────────────────────────────────────
 // Hierarchy helpers (lowercased parent checking)
@@ -897,18 +878,12 @@ mod tests {
 
     #[test]
     fn test_factory_to_model_fqn() {
-        assert_eq!(
-            factory_to_model_fqn("Database\\Factories\\UserFactory"),
-            Some("App\\Models\\User".to_string()),
-        );
+        assert_eq!(factory_to_model_fqn("Database\\Factories\\UserFactory"), Some("App\\Models\\User".to_string()),);
         assert_eq!(
             factory_to_model_fqn("Database\\Factories\\Admin\\SuperUserFactory"),
             Some("App\\Models\\Admin\\SuperUser".to_string()),
         );
-        assert_eq!(
-            factory_to_model_fqn("\\Database\\Factories\\UserFactory"),
-            Some("App\\Models\\User".to_string()),
-        );
+        assert_eq!(factory_to_model_fqn("\\Database\\Factories\\UserFactory"), Some("App\\Models\\User".to_string()),);
         // Not a factory name
         assert_eq!(factory_to_model_fqn("App\\Models\\User"), None);
         // Bare "Factory"
@@ -917,33 +892,15 @@ mod tests {
 
     #[test]
     fn test_model_to_factory_fqn() {
-        assert_eq!(
-            model_to_factory_fqn("App\\Models\\User"),
-            "Database\\Factories\\UserFactory",
-        );
-        assert_eq!(
-            model_to_factory_fqn("App\\Models\\Admin\\User"),
-            "Database\\Factories\\Admin\\UserFactory",
-        );
-        assert_eq!(
-            model_to_factory_fqn("\\App\\Models\\User"),
-            "Database\\Factories\\UserFactory",
-        );
+        assert_eq!(model_to_factory_fqn("App\\Models\\User"), "Database\\Factories\\UserFactory",);
+        assert_eq!(model_to_factory_fqn("App\\Models\\Admin\\User"), "Database\\Factories\\Admin\\UserFactory",);
+        assert_eq!(model_to_factory_fqn("\\App\\Models\\User"), "Database\\Factories\\UserFactory",);
         // Bare name
-        assert_eq!(
-            model_to_factory_fqn("User"),
-            "Database\\Factories\\UserFactory",
-        );
+        assert_eq!(model_to_factory_fqn("User"), "Database\\Factories\\UserFactory",);
         // Non-App namespace with Models segment
-        assert_eq!(
-            model_to_factory_fqn("MyApp\\Models\\Sub\\User"),
-            "Database\\Factories\\Sub\\UserFactory",
-        );
+        assert_eq!(model_to_factory_fqn("MyApp\\Models\\Sub\\User"), "Database\\Factories\\Sub\\UserFactory",);
         // Models-only namespace
-        assert_eq!(
-            model_to_factory_fqn("Models\\User"),
-            "Database\\Factories\\UserFactory",
-        );
+        assert_eq!(model_to_factory_fqn("Models\\User"), "Database\\Factories\\UserFactory",);
     }
 
     // ── Cast type mapping ────────────────────────────────────────────

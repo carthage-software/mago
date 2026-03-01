@@ -15,4 +15,5 @@ pub use psr_container::PsrContainerPlugin;
 pub use stdlib::StdlibPlugin;
 
 /// All available analyzer plugins.
-pub static ALL_PLUGINS: &[&dyn Plugin] = &[&StdlibPlugin, &PslPlugin, &FlowPhpPlugin, &PsrContainerPlugin, &LaravelPlugin];
+pub static ALL_PLUGINS: &[&dyn Plugin] =
+    &[&StdlibPlugin, &PslPlugin, &FlowPhpPlugin, &PsrContainerPlugin, &LaravelPlugin];

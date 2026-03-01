@@ -78,17 +78,17 @@ impl PropertyInitializationProvider for LaravelPropertyInit {
         }
 
         // Check Builder hierarchy
-        if is_eloquent_builder_parent(&class_metadata.all_parent_classes) {
-            if BUILDER_INITIALIZED_PROPERTIES.contains(&prop_name) {
-                return true;
-            }
+        if is_eloquent_builder_parent(&class_metadata.all_parent_classes)
+            && BUILDER_INITIALIZED_PROPERTIES.contains(&prop_name)
+        {
+            return true;
         }
 
         // Check Factory hierarchy
-        if is_eloquent_factory_parent(&class_metadata.all_parent_classes) {
-            if FACTORY_INITIALIZED_PROPERTIES.contains(&prop_name) {
-                return true;
-            }
+        if is_eloquent_factory_parent(&class_metadata.all_parent_classes)
+            && FACTORY_INITIALIZED_PROPERTIES.contains(&prop_name)
+        {
+            return true;
         }
 
         false

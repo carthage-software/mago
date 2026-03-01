@@ -36,19 +36,11 @@ const MODEL_SUPPRESSED_CODES: &[&str] = &[
 ];
 
 /// Issue codes to suppress on Eloquent Builder subclasses.
-const BUILDER_SUPPRESSED_CODES: &[&str] = &[
-    "non-existent-method",
-    "non-documented-method",
-    "possibly-non-existent-method",
-    "uninitialized-property",
-];
+const BUILDER_SUPPRESSED_CODES: &[&str] =
+    &["non-existent-method", "non-documented-method", "possibly-non-existent-method", "uninitialized-property"];
 
 /// Issue codes to suppress on Factory subclasses.
-const FACTORY_SUPPRESSED_CODES: &[&str] = &[
-    "uninitialized-property",
-    "non-existent-method",
-    "non-documented-method",
-];
+const FACTORY_SUPPRESSED_CODES: &[&str] = &["uninitialized-property", "non-existent-method", "non-documented-method"];
 
 static META: ProviderMeta = ProviderMeta::new(
     "laravel-issue-filter",
@@ -58,6 +50,7 @@ static META: ProviderMeta = ProviderMeta::new(
 
 /// Issue filter hook that suppresses false-positive diagnostics on
 /// Eloquent Model, Builder, and Factory subclasses.
+#[derive(Default)]
 pub struct LaravelIssueFilter;
 
 impl LaravelIssueFilter {
@@ -257,14 +250,8 @@ mod tests {
             extract_class_from_double_colon("Property `App\\Models\\User::$foo` is not accessible"),
             Some("App\\Models\\User"),
         );
-        assert_eq!(
-            extract_class_from_double_colon("Method `User::doSomething` not found"),
-            Some("User"),
-        );
-        assert_eq!(
-            extract_class_from_double_colon("No double colon here"),
-            None,
-        );
+        assert_eq!(extract_class_from_double_colon("Method `User::doSomething` not found"), Some("User"),);
+        assert_eq!(extract_class_from_double_colon("No double colon here"), None,);
     }
 
     #[test]
@@ -277,18 +264,9 @@ mod tests {
             extract_class_from_context("Method might not exist on type `App\\Models\\Post` at runtime."),
             Some("App\\Models\\Post"),
         );
-        assert_eq!(
-            extract_class_from_context("On an object of type `App\\Models\\User`"),
-            Some("App\\Models\\User"),
-        );
-        assert_eq!(
-            extract_class_from_context("In class `App\\Models\\User`"),
-            Some("App\\Models\\User"),
-        );
-        assert_eq!(
-            extract_class_from_context("no class name here"),
-            None,
-        );
+        assert_eq!(extract_class_from_context("On an object of type `App\\Models\\User`"), Some("App\\Models\\User"),);
+        assert_eq!(extract_class_from_context("In class `App\\Models\\User`"), Some("App\\Models\\User"),);
+        assert_eq!(extract_class_from_context("no class name here"), None,);
     }
 
     #[test]

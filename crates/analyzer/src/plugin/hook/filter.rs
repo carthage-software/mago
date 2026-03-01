@@ -32,10 +32,5 @@ pub trait IssueFilterHook: Provider {
     /// The issue contains the code as a string in `issue.code`.
     /// Return `IssueFilterDecision::Keep` to keep it,
     /// `IssueFilterDecision::Remove` to suppress it.
-    fn filter_issue(
-        &self,
-        file: &File,
-        issue: &Issue,
-        codebase: &CodebaseMetadata,
-    ) -> HookResult<IssueFilterDecision>;
+    fn filter_issue(&self, file: &File, issue: &Issue, codebase: &CodebaseMetadata) -> HookResult<IssueFilterDecision>;
 }
