@@ -518,11 +518,11 @@ fn resolve_static_type(
             named.name = static_obj.name;
             named.is_this = true;
         }
-        StaticClassType::Name(static_class) => {
-            if !check_compatibility || codebase.is_instance_of(static_class, &named.name) {
-                named.name = *static_class;
-                named.is_this = false;
-            }
+        StaticClassType::Name(static_class)
+            if (!check_compatibility || codebase.is_instance_of(static_class, &named.name)) =>
+        {
+            named.name = *static_class;
+            named.is_this = false;
         }
         _ => {}
     }

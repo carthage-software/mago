@@ -195,10 +195,8 @@ impl TPropertiesOf {
                         }
                     }
                 }
-                TAtomic::GenericParameter(parameter) => {
-                    if parameter.get_constraint().is_objecty() {
-                        needs_unsealed = true;
-                    }
+                TAtomic::GenericParameter(parameter) if parameter.get_constraint().is_objecty() => {
+                    needs_unsealed = true;
                 }
                 _ => {}
             }

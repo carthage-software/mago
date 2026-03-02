@@ -108,12 +108,11 @@ impl LintRule for NoUnescapedOutputRule {
                     }
                 }
             }
-            Node::PrintConstruct(print_construct) => {
+            Node::PrintConstruct(print_construct)
                 // Check the print construct expression
-                if needs_escaping_with_context(print_construct.value, Some(ctx)) {
+                if needs_escaping_with_context(print_construct.value, Some(ctx)) => {
                     self.report_unescaped_output(ctx, print_construct.value.span(), "print statement");
                 }
-            }
             Node::FunctionCall(function_call) => {
                 // Check printf function - only flag if it has exactly one argument (the format string)
                 if function_call.argument_list.arguments.len() == 1

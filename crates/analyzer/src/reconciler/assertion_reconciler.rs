@@ -1106,42 +1106,30 @@ fn handle_literal_equality_with_float(
             TAtomic::Scalar(TScalar::Float(TFloat::Float)) => {
                 acceptable_types.push(literal_asserted_type.clone());
             }
-            TAtomic::Scalar(TScalar::Float(TFloat::Literal(existing_float))) => {
-                if (existing_float.0 - assertion_float_val).abs() < f64::EPSILON {
-                    if existing_var_type.is_single()
-                        && let Some(k_str) = &key
-                        && let Some(s_ref) = span
-                    {
-                        trigger_issue_for_impossible(
-                            context,
-                            old_var_type_atom,
-                            k_str,
-                            assertion,
-                            true,
-                            negated,
-                            s_ref,
-                        );
-                    }
-                    acceptable_types.push(literal_asserted_type.clone());
-                } else {
-                    did_remove_type = true;
+            TAtomic::Scalar(TScalar::Float(TFloat::Literal(existing_float)))
+                if (existing_float.0 - assertion_float_val).abs() < f64::EPSILON =>
+            {
+                if existing_var_type.is_single()
+                    && let Some(k_str) = &key
+                    && let Some(s_ref) = span
+                {
+                    trigger_issue_for_impossible(context, old_var_type_atom, k_str, assertion, true, negated, s_ref);
                 }
+                acceptable_types.push(literal_asserted_type.clone());
             }
-            TAtomic::Scalar(TScalar::Integer(TInteger::Literal(existing_int))) if is_loose_equality => {
-                if (*existing_int as f64 - assertion_float_val).abs() < f64::EPSILON {
-                    acceptable_types.push(existing_var_atomic_type.clone());
-                } else {
-                    did_remove_type = true;
-                }
+            TAtomic::Scalar(TScalar::Integer(TInteger::Literal(existing_int)))
+                if is_loose_equality && (*existing_int as f64 - assertion_float_val).abs() < f64::EPSILON =>
+            {
+                acceptable_types.push(existing_var_atomic_type.clone());
             }
             TAtomic::Scalar(TScalar::String(TString {
                 literal: Some(TStringLiteral::Value(string_value)), ..
-            })) if is_loose_equality => {
-                if string_value.parse::<f64>().is_ok_and(|f_val| (f_val - assertion_float_val).abs() < f64::EPSILON) {
-                    acceptable_types.push(existing_var_atomic_type.clone());
-                } else {
-                    did_remove_type = true;
-                }
+            })) if is_loose_equality
+                && string_value
+                    .parse::<f64>()
+                    .is_ok_and(|f_val| (f_val - assertion_float_val).abs() < f64::EPSILON) =>
+            {
+                acceptable_types.push(existing_var_atomic_type.clone());
             }
             TAtomic::Scalar(TScalar::Bool(TBool { value: Some(b_val), .. })) if is_loose_equality => {
                 let bool_as_f64 = if *b_val { 1.0 } else { 0.0 };
@@ -1151,12 +1139,8 @@ fn handle_literal_equality_with_float(
                     did_remove_type = true;
                 }
             }
-            TAtomic::Null if is_loose_equality => {
-                if (0.0 - assertion_float_val).abs() < f64::EPSILON {
-                    acceptable_types.push(existing_var_atomic_type.clone());
-                } else {
-                    did_remove_type = true;
-                }
+            TAtomic::Null if is_loose_equality && (0.0 - assertion_float_val).abs() < f64::EPSILON => {
+                acceptable_types.push(existing_var_atomic_type.clone());
             }
             TAtomic::Scalar(TScalar::Integer(TInteger::Unspecified)) if is_loose_equality => {
                 acceptable_types.push(existing_var_atomic_type.clone());
@@ -1232,27 +1216,17 @@ fn handle_literal_equality_with_bool(
             TAtomic::Scalar(TScalar::Bool(TBool { value: None, .. })) => {
                 acceptable_types.push(literal_asserted_type.clone());
             }
-            TAtomic::Scalar(TScalar::Bool(TBool { value: Some(existing_bool_val), .. })) => {
-                if *existing_bool_val == assertion_bool_val {
-                    if existing_var_type.is_single()
-                        && let Some(k_str) = &key
-                        && let Some(s_ref) = span
-                    {
-                        trigger_issue_for_impossible(
-                            context,
-                            old_var_type_atom,
-                            k_str,
-                            assertion,
-                            true,
-                            negated,
-                            s_ref,
-                        );
-                    }
-
-                    acceptable_types.push(literal_asserted_type.clone());
-                } else {
-                    did_remove_type = true;
+            TAtomic::Scalar(TScalar::Bool(TBool { value: Some(existing_bool_val), .. }))
+                if *existing_bool_val == assertion_bool_val =>
+            {
+                if existing_var_type.is_single()
+                    && let Some(k_str) = &key
+                    && let Some(s_ref) = span
+                {
+                    trigger_issue_for_impossible(context, old_var_type_atom, k_str, assertion, true, negated, s_ref);
                 }
+
+                acceptable_types.push(literal_asserted_type.clone());
             }
             TAtomic::Scalar(TScalar::Integer(TInteger::Literal(existing_int))) if is_loose_equality => {
                 let int_as_bool = *existing_int != 0;
