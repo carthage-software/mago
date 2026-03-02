@@ -453,7 +453,11 @@ mod tests {
         create_test_file(&temp_dir, "src/excluded/skip.php", "<?php");
 
         let mut config = create_test_config(&temp_dir, vec!["./src/**/*.php"], vec![]);
-        let exclude_pattern = temp_dir.path().join("src/excluded/**").to_string_lossy().to_string();
+        let exclude_pattern = temp_dir
+            .path()
+            .join("src/excluded/**")
+            .to_string_lossy()
+            .replace('\\', "/");
         config.excludes = vec![Exclusion::Pattern(Cow::Owned(exclude_pattern))];
 
         let loader = DatabaseLoader::new(config);
