@@ -77,7 +77,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Function<'arena> {
 
         // Call plugin on_enter_function hooks
         if context.plugin_registry.has_function_decl_hooks() {
-            let mut hook_context = HookContext::new(context.codebase, block_context, artifacts);
+            let mut hook_context = HookContext::new(context.codebase, context.resolved_names, block_context, artifacts);
             context.plugin_registry.on_enter_function(self, function_metadata, &mut hook_context)?;
             for reported in hook_context.take_issues() {
                 context.collector.report_with_code(reported.code, reported.issue);
@@ -100,7 +100,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Function<'arena> {
 
         // Call plugin on_leave_function hooks
         if context.plugin_registry.has_function_decl_hooks() {
-            let mut hook_context = HookContext::new(context.codebase, block_context, artifacts);
+            let mut hook_context = HookContext::new(context.codebase, context.resolved_names, block_context, artifacts);
             context.plugin_registry.on_leave_function(self, function_metadata, &mut hook_context)?;
             for reported in hook_context.take_issues() {
                 context.collector.report_with_code(reported.code, reported.issue);
