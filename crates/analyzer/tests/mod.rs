@@ -693,14 +693,6 @@ test_case!(issue_1230_simple, {
     s
 });
 test_case!(issue_1226);
-<<<<<<< laravel
-test_case!(laravel_builder_forwarding);
-test_case!(laravel_cast_minimal);
-test_case!(laravel_factory);
-test_case!(laravel_model_properties);
-test_case!(laravel_property_initialization);
-test_case!(laravel_scopes);
-=======
 test_case!(issue_1259);
 test_case!(issue_1262);
 test_case!(issue_1264);
@@ -708,7 +700,12 @@ test_case!(issue_1265);
 test_case!(issue_1266);
 test_case!(issue_1266_inheritdoc_narrowing);
 test_case!(issue_1267);
->>>>>>> main
+test_case!(laravel_builder_forwarding);
+test_case!(laravel_cast_minimal);
+test_case!(laravel_factory);
+test_case!(laravel_model_properties);
+test_case!(laravel_property_initialization);
+test_case!(laravel_scopes);
 
 #[test]
 fn test_all_test_cases_are_ran() {
