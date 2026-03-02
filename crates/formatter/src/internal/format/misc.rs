@@ -139,6 +139,15 @@ pub(super) fn should_hug_expression<'arena>(
     }
 
     if let Expression::Binary(binary) = expression {
+        // Don't hug concatenation chains (3+ operands) as they can be long
+        // and should allow the argument list to properly expand with indentation.
+        if binary.operator.is_concatenation()
+            && (matches!(binary.lhs, Expression::Binary(b) if b.operator.is_concatenation())
+                || matches!(binary.rhs, Expression::Binary(b) if b.operator.is_concatenation()))
+        {
+            return false;
+        }
+
         let is_left_hand_side_simple = is_simple_expression(binary.lhs);
         let is_right_hand_side_simple = is_simple_expression(binary.rhs);
 
