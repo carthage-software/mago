@@ -511,9 +511,17 @@ impl<'ctx> BlockContext<'ctx> {
             );
 
             if !references.is_empty() {
+                self.referenced_counts.remove(&remove_var_atom);
+
                 let first_reference = references.remove(0);
                 if !references.is_empty() {
-                    self.referenced_counts.insert(first_reference, references.len() as u32);
+                    let reassigned_references = references.len() as u32;
+                    if let Some(existing_count) = self.referenced_counts.get_mut(&first_reference) {
+                        *existing_count += reassigned_references;
+                    } else {
+                        self.referenced_counts.insert(first_reference, reassigned_references);
+                    }
+
                     for reference in references {
                         self.references_in_scope.insert(reference, first_reference);
                     }
@@ -699,5 +707,96 @@ fn should_keep_clause(clause: &Rc<Clause>, remove_var_id: Atom, new_type: Option
         false
     } else {
         true
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::rc::Rc;
+
+    use mago_atom::atom;
+    use mago_codex::context::ScopeContext;
+    use mago_codex::ttype::get_mixed;
+
+    use super::BlockContext;
+
+    fn block_context_with_locals(vars: &[&str]) -> BlockContext<'static> {
+        let mut block_context = BlockContext::new(ScopeContext::new(), false);
+        for variable in vars {
+            let variable_atom = atom(*variable);
+            block_context.locals.insert(variable_atom, Rc::new(get_mixed()));
+            block_context.variables_possibly_in_scope.insert(variable_atom);
+        }
+
+        block_context
+    }
+
+    #[test]
+    fn remove_possible_reference_preserves_promoted_reference_counts() {
+        let mut block_context = block_context_with_locals(&["$a", "$b", "$c"]);
+
+        // Model: $b =& $a; $c =& $b.
+        block_context.references_in_scope.insert(atom("$b"), atom("$a"));
+        block_context.references_in_scope.insert(atom("$c"), atom("$b"));
+        block_context.referenced_counts.insert(atom("$a"), 1);
+        block_context.referenced_counts.insert(atom("$b"), 1);
+
+        block_context.remove_possible_reference("$a");
+
+        // $b is promoted to root, but still has $c pointing to it.
+        assert_eq!(block_context.references_in_scope.get(&atom("$c")).copied(), Some(atom("$b")));
+        assert_eq!(block_context.referenced_counts.get(&atom("$b")).copied(), Some(1));
+
+        // Removing $b should re-root $c and clear dangling reference links.
+        block_context.remove_possible_reference("$b");
+        assert!(!block_context.references_in_scope.contains_key(&atom("$c")));
+    }
+
+    #[test]
+    fn remove_possible_reference_adds_to_existing_promoted_count() {
+        let mut block_context = block_context_with_locals(&["$a", "$b", "$c", "$d"]);
+
+        // Model before removal:
+        // $b =& $a, $c =& $a, and $d =& $b.
+        block_context.references_in_scope.insert(atom("$b"), atom("$a"));
+        block_context.references_in_scope.insert(atom("$c"), atom("$a"));
+        block_context.references_in_scope.insert(atom("$d"), atom("$b"));
+        block_context.referenced_counts.insert(atom("$a"), 2);
+        block_context.referenced_counts.insert(atom("$b"), 1);
+
+        block_context.remove_possible_reference("$a");
+
+        // $b is promoted and keeps its prior 1, plus 1 reassigned reference from $c.
+        assert_eq!(block_context.referenced_counts.get(&atom("$b")).copied(), Some(2));
+        assert_eq!(block_context.references_in_scope.get(&atom("$c")).copied(), Some(atom("$b")));
+        assert_eq!(block_context.references_in_scope.get(&atom("$d")).copied(), Some(atom("$b")));
+    }
+
+    #[test]
+    fn remove_possible_reference_sets_promoted_count_when_missing() {
+        let mut block_context = block_context_with_locals(&["$a", "$b", "$c"]);
+
+        // Model before removal:
+        // $b =& $a, $c =& $a with no prior count entry for $b.
+        block_context.references_in_scope.insert(atom("$b"), atom("$a"));
+        block_context.references_in_scope.insert(atom("$c"), atom("$a"));
+        block_context.referenced_counts.insert(atom("$a"), 2);
+
+        block_context.remove_possible_reference("$a");
+
+        // $b becomes primary and should have count 1 (the reassigned $c).
+        assert_eq!(block_context.referenced_counts.get(&atom("$b")).copied(), Some(1));
+        assert_eq!(block_context.references_in_scope.get(&atom("$c")).copied(), Some(atom("$b")));
+    }
+
+    #[test]
+    #[cfg(debug_assertions)]
+    #[should_panic(expected = "No references found for variable")]
+    fn remove_possible_reference_panics_on_stale_counts_in_debug() {
+        let mut block_context = block_context_with_locals(&["$stale"]);
+        block_context.referenced_counts.insert(atom("$stale"), 1);
+
+        // No references_in_scope entry for $stale -> intentional debug panic.
+        block_context.remove_possible_reference("$stale");
     }
 }

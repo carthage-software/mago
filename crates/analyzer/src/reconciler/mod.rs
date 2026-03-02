@@ -218,13 +218,14 @@ pub fn reconcile_keyed_types<'ctx>(
 
             if key_str != "$this" {
                 let mut removable_keys: Vec<Atom> = Vec::new();
-                for new_key in block_context.locals.keys() {
-                    if new_key == key {
+                let local_keys = block_context.locals.keys().copied().collect::<Vec<_>>();
+                for new_key in local_keys {
+                    if new_key == *key {
                         continue;
                     }
 
-                    if is_real && !new_types.contains_key(new_key) && var_has_root(*new_key, *key) {
-                        if let Some(references_map) = reference_graph.get(new_key) {
+                    if is_real && !new_types.contains_key(&new_key) && var_has_root(new_key, *key) {
+                        if let Some(references_map) = reference_graph.get(&new_key) {
                             let references_to_fix = references_map.iter().copied().collect::<Vec<_>>();
 
                             match references_to_fix.len() {
@@ -232,12 +233,15 @@ pub fn reconcile_keyed_types<'ctx>(
                                 1 => {
                                     let reference_to_fix = references_to_fix[0];
                                     reference_graph.remove(&reference_to_fix);
-                                    block_context.references_in_scope.remove(&reference_to_fix);
+                                    if block_context.references_in_scope.contains_key(&reference_to_fix) {
+                                        block_context.decrement_reference_count(reference_to_fix.as_str());
+                                        block_context.references_in_scope.remove(&reference_to_fix);
+                                    }
                                 }
                                 _ => {
                                     for reference in &references_to_fix {
                                         if let Some(inner_set) = reference_graph.get_mut(reference) {
-                                            inner_set.remove(new_key);
+                                            inner_set.remove(&new_key);
                                         }
                                     }
 
@@ -245,10 +249,13 @@ pub fn reconcile_keyed_types<'ctx>(
                                         .get(&references_to_fix[0])
                                         .and_then(|inner_set| inner_set.iter().next().copied())
                                     {
-                                        block_context.references_in_scope.remove(&new_primary_reference);
+                                        if block_context.references_in_scope.contains_key(&new_primary_reference) {
+                                            block_context.decrement_reference_count(new_primary_reference.as_str());
+                                            block_context.references_in_scope.remove(&new_primary_reference);
+                                        }
 
                                         for referenced_value in block_context.references_in_scope.values_mut() {
-                                            if *referenced_value == *new_key {
+                                            if *referenced_value == new_key {
                                                 *referenced_value = new_primary_reference;
                                             }
                                         }
@@ -257,9 +264,12 @@ pub fn reconcile_keyed_types<'ctx>(
                             }
                         }
 
-                        reference_graph.remove(new_key);
-                        removable_keys.push(*new_key);
-                        block_context.references_in_scope.remove(new_key);
+                        reference_graph.remove(&new_key);
+                        removable_keys.push(new_key);
+                        if block_context.references_in_scope.contains_key(&new_key) {
+                            block_context.decrement_reference_count(new_key.as_str());
+                            block_context.references_in_scope.remove(&new_key);
+                        }
                     }
                 }
 

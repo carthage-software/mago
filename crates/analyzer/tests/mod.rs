@@ -692,6 +692,9 @@ test_case!(issue_1230_simple, {
     s.strict_list_index_checks = true;
     s
 });
+test_case!(issue_1242_reference_count_sync);
+test_case!(issue_1242_reconciler_reference_graph_single);
+test_case!(issue_1242_reconciler_reference_graph_snapshot);
 test_case!(issue_1226);
 
 #[test]
