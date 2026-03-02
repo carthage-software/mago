@@ -43,7 +43,7 @@ curl --proto '=https' --tlsv1.2 -sSf https://carthage.software/mago.sh | bash
 To install a specific version:
 
 ```sh
-curl --proto '=https' --tlsv1.2 -sSf https://carthage.software/mago.sh | bash -s -- --version=1.13.2
+curl --proto '=https' --tlsv1.2 -sSf https://carthage.software/mago.sh | bash -s -- --version=1.13.3
 ```
 
 For all other installation methods, including Homebrew, Composer, and Cargo, please refer to our official **[Installation Guide](https://mago.carthage.software/guide/installation)**.
