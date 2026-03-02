@@ -201,6 +201,7 @@ impl TypeCombination {
             return self.object_type_params.is_empty()
                 && self.enum_names.is_empty()
                 && self.literal_strings.is_empty()
+                && self.literal_floats.is_empty()
                 && self.class_string_types.is_empty()
                 && self.integers.is_empty()
                 && self.derived_types.is_empty();
