@@ -92,6 +92,7 @@ use mago_syntax::ast::YieldPair;
 use mago_syntax::ast::YieldValue;
 
 use crate::document::Align;
+use crate::document::BreakMode;
 use crate::document::Document;
 use crate::document::Line;
 use crate::internal::FormatterState;
@@ -241,7 +242,8 @@ impl<'arena> Format<'arena> for Pipe<'arena> {
             }
 
             Document::Group(
-                Group::new(vec![in f.arena; formatted_input, Document::Indent(contents)]).with_break(should_break),
+                Group::new(vec![in f.arena; formatted_input, Document::Indent(contents)])
+                    .with_break_mode(if should_break { BreakMode::Force } else { BreakMode::Auto }),
             )
         })
     }
@@ -955,11 +957,11 @@ impl<'arena> Format<'arena> for MatchExpressionArm<'arena> {
             Document::Group(
                 Group::new(vec![
                     in f.arena;
-                    Document::Group(Group::new(contents).with_break(must_break)),
+                    Document::Group(Group::new(contents).with_break_mode(if must_break { BreakMode::Force } else { BreakMode::Auto })),
                     self.expression.format(f),
                 ])
                 .with_id(group_id)
-                .with_break(must_break),
+                .with_break_mode(if must_break { BreakMode::Force } else { BreakMode::Auto }),
             )
         })
     }
@@ -1036,7 +1038,11 @@ impl<'arena> Format<'arena> for Match<'arena> {
 
             contents.push(format_token(f, self.right_brace, "}"));
 
-            Document::Group(Group::new(contents).with_break(should_break))
+            Document::Group(Group::new(contents).with_break_mode(if should_break {
+                BreakMode::Force
+            } else {
+                BreakMode::Auto
+            }))
         })
     }
 }
@@ -1044,7 +1050,7 @@ impl<'arena> Format<'arena> for Match<'arena> {
 impl<'arena> Format<'arena> for Conditional<'arena> {
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
         wrap!(f, self, Conditional, {
-            let must_break = f.settings.preserve_breaking_conditional_expression && {
+            let preserve_break = f.settings.preserve_breaking_conditional_expression && {
                 misc::has_new_line_in_range(f.source_text, self.condition.span().end.offset, self.colon.start.offset)
                     || self.then.as_ref().is_some_and(|t| {
                         misc::has_new_line_in_range(
@@ -1066,21 +1072,18 @@ impl<'arena> Format<'arena> for Conditional<'arena> {
                     let conditional_id = f.next_id();
                     let then_id = f.next_id();
 
-                    let break_group = must_break
-                        && matches!(unwrap_parenthesized(self.condition), Expression::Binary(Binary { lhs, rhs, .. }) if lhs.is_binary() || rhs.is_binary());
-
                     Document::Group(
                         Group::new(vec![
                             in f.arena;
                             self.condition.format(f),
                             Document::Indent(vec![
                                 in f.arena;
-                                Document::Line(if must_break { Line::hard() } else { Line::default() }),
+                                Document::Line(Line::default()),
                                 format_token_with_only_leading_comments(f, self.question_mark, "? "),
                                 Document::Group(Group::new(vec![in f.arena; then.format(f)]).with_id(then_id)),
                                 {
                                     if inline_colon {
-                                        if must_break {
+                                        if preserve_break {
                                             Document::space()
                                         } else {
                                             Document::IfBreak(
@@ -1094,14 +1097,14 @@ impl<'arena> Format<'arena> for Conditional<'arena> {
                                             )
                                         }
                                     } else {
-                                        Document::Line(if must_break { Line::hard() } else { Line::default() })
+                                        Document::Line(Line::default())
                                     }
                                 },
                                 format_token_with_only_leading_comments(f, self.colon, ": "),
                                 self.r#else.format(f),
                             ]),
                         ])
-                        .with_break(break_group)
+                        .with_break_mode(if preserve_break { BreakMode::Preserve } else { BreakMode::Auto })
                         .with_id(conditional_id),
                     )
                 }

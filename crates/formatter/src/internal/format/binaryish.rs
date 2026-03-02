@@ -14,6 +14,7 @@ use mago_syntax::ast::NodeKind;
 use mago_syntax::token::GetPrecedence;
 use mago_syntax::token::Precedence;
 
+use crate::document::BreakMode;
 use crate::document::Document;
 use crate::document::Group;
 use crate::document::IndentIfBreak;
@@ -372,7 +373,11 @@ fn print_binaryish_expression_parts<'arena>(
                 && right.node_kind() != NodeKind::Binary));
 
     if should_group {
-        parts.push(Document::Group(Group::new(right_document).with_break(should_break)));
+        parts.push(Document::Group(Group::new(right_document).with_break_mode(if should_break {
+            BreakMode::Force
+        } else {
+            BreakMode::Auto
+        })));
     } else {
         parts.extend(right_document);
     }

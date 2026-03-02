@@ -4,6 +4,7 @@ use bumpalo::vec;
 use foldhash::HashMap;
 
 use crate::document::Align;
+use crate::document::BreakMode;
 use crate::document::Document;
 use crate::document::Fill;
 use crate::document::IfBreak;
@@ -186,7 +187,7 @@ impl<'arena> Printer<'arena> {
             unreachable!();
         };
 
-        let should_break = *group.should_break.borrow();
+        let should_break = !matches!(*group.break_mode.borrow(), BreakMode::Auto);
         let group_id = group.id;
 
         if mode.is_flat() && !should_remeasure {
@@ -493,7 +494,12 @@ impl<'arena> Printer<'arena> {
                     }
                 }
                 Document::Group(group) => {
-                    let group_mode = if *group.should_break.borrow() { Mode::Break } else { mode };
+                    let group_break_mode = *group.break_mode.borrow();
+                    if group_break_mode == BreakMode::Preserve && mode.is_flat() {
+                        return false;
+                    }
+
+                    let group_mode = if group_break_mode == BreakMode::Force { Mode::Break } else { mode };
                     if group.expanded_states.is_some() && group_mode.is_break() {
                         if let Some(expanded_states) = group.expanded_states.as_ref()
                             && let Some(last_state) = expanded_states.last()
@@ -558,7 +564,7 @@ impl<'arena> Printer<'arena> {
         match doc {
             Document::BreakParent => true,
             Document::Group(group) => {
-                let mut should_break = *group.should_break.borrow();
+                let mut should_break = *group.break_mode.borrow() == BreakMode::Force;
 
                 if let Some(expanded_states) = &group.expanded_states {
                     should_break |= expanded_states.iter().rev().any(Self::propagate_breaks);
@@ -566,11 +572,12 @@ impl<'arena> Printer<'arena> {
 
                 should_break |= check_array(&group.contents);
 
-                if group.expanded_states.is_none() && should_break {
-                    group.should_break.replace(should_break);
+                if group.expanded_states.is_none() && should_break && *group.break_mode.borrow() != BreakMode::Preserve
+                {
+                    group.break_mode.replace(BreakMode::Force);
                 }
 
-                *group.should_break.borrow()
+                *group.break_mode.borrow() == BreakMode::Force
             }
             Document::IfBreak(d) => Self::propagate_breaks(d.break_contents),
             Document::Array(arr)
