@@ -22,6 +22,7 @@ use mago_syntax::ast::Terminator;
 use mago_syntax::ast::Variable;
 use mago_syntax::ast::Yield;
 
+use crate::document::BreakMode;
 use crate::document::Document;
 use crate::document::Group;
 use crate::document::IndentIfBreak;
@@ -138,6 +139,15 @@ pub(super) fn should_hug_expression<'arena>(
     }
 
     if let Expression::Binary(binary) = expression {
+        // Don't hug concatenation chains (3+ operands) as they can be long
+        // and should allow the argument list to properly expand with indentation.
+        if binary.operator.is_concatenation()
+            && (matches!(binary.lhs, Expression::Binary(b) if b.operator.is_concatenation())
+                || matches!(binary.rhs, Expression::Binary(b) if b.operator.is_concatenation()))
+        {
+            return false;
+        }
+
         let is_left_hand_side_simple = is_simple_expression(binary.lhs);
         let is_right_hand_side_simple = is_simple_expression(binary.rhs);
 
@@ -447,7 +457,7 @@ pub(super) fn print_colon_delimited_body<'arena>(
     parts.push(end_keyword.format(f));
     parts.push(terminator.format(f));
 
-    Document::Group(Group::new(parts).with_break(true))
+    Document::Group(Group::new(parts).with_break_mode(BreakMode::Force))
 }
 
 pub(super) fn print_modifiers<'arena>(

@@ -87,11 +87,12 @@ fn infer_templates_from_input_and_container_types(
         .iter()
         .any(|t| matches!(t, TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::Generic { .. }))));
 
+    let has_bare_generic_parameter = generic_container_parts.iter().any(|t| matches!(t, TAtomic::GenericParameter(_)));
     let residual_input_types = input_type
         .types
         .iter()
         .filter(|argument_atomic| {
-            !argument_atomic.is_empty_array()
+            (!argument_atomic.is_empty_array() || has_bare_generic_parameter)
                 && !concrete_container_parts.iter().any(|container_atomic| {
                     if has_generic_class_string
                         && matches!(argument_atomic, TAtomic::Scalar(TScalar::ClassLikeString(_)))

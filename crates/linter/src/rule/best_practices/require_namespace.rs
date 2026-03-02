@@ -101,35 +101,23 @@ impl LintRule for RequireNamespaceRule {
                     has_namespace = true;
                     break;
                 }
-                Statement::Class(class) => {
-                    if first_definition_span.is_none() {
-                        first_definition_span = Some(class.span());
-                    }
+                Statement::Class(class) if first_definition_span.is_none() => {
+                    first_definition_span = Some(class.span());
                 }
-                Statement::Interface(interface) => {
-                    if first_definition_span.is_none() {
-                        first_definition_span = Some(interface.span());
-                    }
+                Statement::Interface(interface) if first_definition_span.is_none() => {
+                    first_definition_span = Some(interface.span());
                 }
-                Statement::Enum(e) => {
-                    if first_definition_span.is_none() {
-                        first_definition_span = Some(e.span());
-                    }
+                Statement::Enum(e) if first_definition_span.is_none() => {
+                    first_definition_span = Some(e.span());
                 }
-                Statement::Trait(t) => {
-                    if first_definition_span.is_none() {
-                        first_definition_span = Some(t.span());
-                    }
+                Statement::Trait(t) if first_definition_span.is_none() => {
+                    first_definition_span = Some(t.span());
                 }
-                Statement::Function(f) => {
-                    if first_definition_span.is_none() {
-                        first_definition_span = Some(f.span());
-                    }
+                Statement::Function(f) if first_definition_span.is_none() => {
+                    first_definition_span = Some(f.span());
                 }
-                Statement::Constant(c) => {
-                    if first_definition_span.is_none() {
-                        first_definition_span = Some(c.span());
-                    }
+                Statement::Constant(c) if first_definition_span.is_none() => {
+                    first_definition_span = Some(c.span());
                 }
                 _ => {}
             }

@@ -29,7 +29,7 @@ use crate::internal::format::Format;
 use crate::internal::format::block::block_is_empty;
 use crate::internal::format::format_token;
 use crate::internal::format::misc::print_modifiers;
-use crate::internal::format::parameters::should_break_parameters;
+use crate::internal::format::parameters::force_break_parameters;
 use crate::internal::format::parameters::should_hug_the_only_parameter;
 use crate::settings::BraceStyle;
 use crate::wrap;
@@ -296,7 +296,7 @@ impl<'arena> FunctionLikeParts<'arena> {
 
         let parameter_list_will_break = if self.parameter_list.parameters.is_empty() {
             if f.has_inner_comment(self.parameter_list.span()) { None } else { Some(false) }
-        } else if should_break_parameters(f, self.parameter_list) {
+        } else if force_break_parameters(f, self.parameter_list) {
             Some(true)
         } else if should_hug_the_only_parameter(f, self.parameter_list) {
             Some(false)

@@ -22,6 +22,7 @@ use mago_syntax::ast::PartialApplication;
 use mago_syntax::ast::StringPart;
 
 use crate::document::Align;
+use crate::document::BreakMode;
 use crate::document::Document;
 use crate::document::IndentIfBreak;
 use crate::document::Separator;
@@ -138,7 +139,7 @@ pub fn will_break<'arena>(document: &'arena Document<'arena>) -> bool {
         Document::BreakParent => true,
         Document::Line(doc) => doc.hard,
         Document::Group(group) => {
-            if *group.should_break.borrow() {
+            if *group.break_mode.borrow() == BreakMode::Force {
                 return true;
             }
 

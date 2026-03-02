@@ -96,6 +96,7 @@ use mago_syntax::ast::UseItemSequence;
 use mago_syntax::ast::UseItems;
 use mago_syntax::ast::UseType;
 
+use crate::document::BreakMode;
 use crate::document::Document;
 use crate::document::Group;
 use crate::document::IfBreak;
@@ -327,7 +328,7 @@ impl<'arena> Format<'arena> for Declare<'arena> {
             contents.push(Document::String(")"));
             contents.push(self.body.format(f));
 
-            Document::Group(Group::new(contents).with_break(true))
+            Document::Group(Group::new(contents).with_break_mode(BreakMode::Force))
         })
     }
 }
@@ -1517,14 +1518,14 @@ impl<'arena> Format<'arena> for AttributeList<'arena> {
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
         wrap!(f, self, AttributeList, {
             let attributes_count = self.attributes.len();
-            let must_break = f.settings.preserve_breaking_attribute_list
+            let preserve_break = f.settings.preserve_breaking_attribute_list
                 && attributes_count >= 1
                 && misc::has_new_line_in_range(
                     f.source_text,
                     self.hash_left_bracket.end.offset,
                     self.attributes.as_slice()[0].span().start.offset,
                 );
-            let should_inline = !must_break && attributes_count == 1;
+            let should_inline = !preserve_break && attributes_count == 1;
 
             let mut contents = vec![in f.arena; Document::String("#[")];
             if let Some(trailing_comments) = f.print_trailing_comments(self.hash_left_bracket) {
@@ -1561,7 +1562,11 @@ impl<'arena> Format<'arena> for AttributeList<'arena> {
 
             contents.push(Document::String("]"));
 
-            Document::Group(Group::new(contents).with_break(must_break))
+            Document::Group(Group::new(contents).with_break_mode(if preserve_break {
+                BreakMode::Preserve
+            } else {
+                BreakMode::Auto
+            }))
         })
     }
 }

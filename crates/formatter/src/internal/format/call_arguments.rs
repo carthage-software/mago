@@ -11,6 +11,7 @@ use mago_syntax::ast::Expression;
 use mago_syntax::ast::PartialArgumentList;
 use mago_syntax::ast::UnaryPrefixOperator;
 
+use crate::document::BreakMode;
 use crate::document::Document;
 use crate::document::Group;
 use crate::document::IfBreak;
@@ -207,7 +208,7 @@ pub(super) fn print_argument_list<'arena>(
 
         parts.push(print_right_parenthesis(f, dangling_comments.as_ref(), &right_parenthesis, Some(true)));
 
-        Document::Group(Group::new(parts).with_break(true))
+        Document::Group(Group::new(parts).with_break_mode(BreakMode::Force))
     };
 
     if should_break_all {
@@ -271,7 +272,7 @@ pub(super) fn print_argument_list<'arena>(
                     vec![
                         in f.arena;
                         clone_in_arena(f.arena, &left_parenthesis),
-                        Document::Group(Group::new(vec![in f.arena; first_argument]).with_break(true)),
+                        Document::Group(Group::new(vec![in f.arena; first_argument]).with_break_mode(BreakMode::Force)),
                         Document::String(", "),
                         last_argument,
                         print_right_parenthesis(f, dangling_comments.as_ref(), &right_parenthesis, None),
@@ -297,7 +298,7 @@ pub(super) fn print_argument_list<'arena>(
                     Document::Array(vec![
                         in f.arena;
                         clone_in_arena(f.arena, &left_parenthesis),
-                        Document::Group(Group::new(vec![in f.arena; first_argument]).with_break(true)),
+                        Document::Group(Group::new(vec![in f.arena; first_argument]).with_break_mode(BreakMode::Force)),
                         Document::String(", "),
                         last_argument,
                         print_right_parenthesis(f, dangling_comments.as_ref(), &right_parenthesis, None),
@@ -328,7 +329,7 @@ pub(super) fn print_argument_list<'arena>(
                     in f.arena;
                     clone_in_arena(f.arena, &left_parenthesis),
                     Document::Array(first_arguments),
-                    Document::Group(Group::new(vec![in f.arena; last_argument]).with_break(true)),
+                    Document::Group(Group::new(vec![in f.arena; last_argument]).with_break_mode(BreakMode::Force)),
                     print_right_parenthesis(f, dangling_comments.as_ref(), &right_parenthesis, None),
                 ],
                 vec![
@@ -792,17 +793,13 @@ fn is_simple_call_argument<'arena>(node: &'arena Expression<'arena>, depth: usiz
         Expression::ArrayAccess(array_access) => {
             is_simple_call_argument(array_access.array, depth) && is_simple_call_argument(array_access.index, depth)
         }
-        Expression::Instantiation(instantiation) => {
-            if is_simple_call_argument(instantiation.class, depth) {
-                match &instantiation.argument_list {
-                    Some(argument_list) => {
-                        argument_list.arguments.len() <= depth
-                            && argument_list.arguments.iter().map(Argument::value).all(is_child_simple)
-                    }
-                    None => true,
+        Expression::Instantiation(instantiation) if is_simple_call_argument(instantiation.class, depth) => {
+            match &instantiation.argument_list {
+                Some(argument_list) => {
+                    argument_list.arguments.len() <= depth
+                        && argument_list.arguments.iter().map(Argument::value).all(is_child_simple)
                 }
-            } else {
-                false
+                None => true,
             }
         }
         _ => false,

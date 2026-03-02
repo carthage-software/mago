@@ -10,6 +10,7 @@ use mago_syntax::ast::Expression;
 use mago_syntax::ast::LegacyArray;
 use mago_syntax::ast::List;
 
+use crate::document::BreakMode;
 use crate::document::Document;
 use crate::document::Group;
 use crate::document::IfBreak;
@@ -142,11 +143,12 @@ pub(super) fn print_array_like<'arena>(
         return Document::Group(Group::new(parts));
     }
 
-    let must_break = (f.settings.preserve_breaking_array_like
-        && misc::has_new_line_in_range(f.source_text, array_like.start_offset(), elements[0].start_offset()))
-        || has_floating_comments(f, &array_like);
+    let preserve_break = f.settings.preserve_breaking_array_like
+        && misc::has_new_line_in_range(f.source_text, array_like.start_offset(), elements[0].start_offset());
+    let has_floating_comments = has_floating_comments(f, &array_like);
+    let should_break = preserve_break || has_floating_comments;
 
-    if !must_break && let Some(element) = inline_single_element(f, &array_like) {
+    if !should_break && let Some(element) = inline_single_element(f, &array_like) {
         parts.push(element);
         parts.push(get_right_delimiter(f, &array_like));
 
@@ -229,7 +231,15 @@ pub(super) fn print_array_like<'arena>(
 
     parts.push(get_right_delimiter(f, &array_like));
 
-    Document::Group(Group::new(parts).with_break(use_table_style || must_break))
+    let force_break = use_table_style || has_floating_comments;
+
+    Document::Group(Group::new(parts).with_break_mode(if force_break {
+        BreakMode::Force
+    } else if preserve_break {
+        BreakMode::Preserve
+    } else {
+        BreakMode::Auto
+    }))
 }
 
 #[inline]

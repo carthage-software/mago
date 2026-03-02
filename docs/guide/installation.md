@@ -28,13 +28,13 @@ wget -qO- https://carthage.software/mago.sh | bash
 To install a specific version of Mago, use the `--version=` flag:
 
 ```sh
-curl --proto '=https' --tlsv1.2 -sSf https://carthage.software/mago.sh | bash -s -- --version=1.13.2
+curl --proto '=https' --tlsv1.2 -sSf https://carthage.software/mago.sh | bash -s -- --version=1.13.3
 ```
 
 Or with `wget`:
 
 ```sh
-wget -qO- https://carthage.software/mago.sh | bash -s -- --version=1.13.2
+wget -qO- https://carthage.software/mago.sh | bash -s -- --version=1.13.3
 ```
 
 ## Manual download
@@ -54,7 +54,7 @@ The official container image provides a zero-install way to run Mago in any envi
 docker run --rm -v $(pwd):/app -w /app ghcr.io/carthage-software/mago lint
 ```
 
-Available tags include `latest`, exact versions (e.g., `1.13.2`), minor versions (`1.13`), and major versions (`1`). Both `linux/amd64` and `linux/arm64` are supported.
+Available tags include `latest`, exact versions (e.g., `1.13.3`), minor versions (`1.13`), and major versions (`1`). Both `linux/amd64` and `linux/arm64` are supported.
 
 See the [Docker recipe](/recipes/docker) for detailed usage, CI/CD examples, and limitations.
 
@@ -67,7 +67,7 @@ These methods are convenient but may be managed by the community or experience s
 To add Mago as a development dependency to your PHP project via Composer:
 
 ```sh
-composer require --dev "carthage-software/mago:^1.13.2"
+composer require --dev "carthage-software/mago:^1.13.3"
 ```
 
 ### Homebrew (macOS)

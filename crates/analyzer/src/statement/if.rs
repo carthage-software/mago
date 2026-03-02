@@ -765,11 +765,7 @@ fn analyze_else_if_clause<'ctx, 'ast, 'arena>(
             if let Some(negated_elseif_type_assertions) = if_scope.negated_types.swap_remove(&negated_variable_id) {
                 if_scope.negated_types.insert(
                     negated_variable_id,
-                    negated_variable_type_assertions
-                        .iter()
-                        .cloned()
-                        .chain(negated_elseif_type_assertions.into_iter())
-                        .collect(),
+                    negated_variable_type_assertions.iter().cloned().chain(negated_elseif_type_assertions).collect(),
                 );
             } else {
                 if_scope.negated_types.insert(negated_variable_id, negated_variable_type_assertions.clone());
