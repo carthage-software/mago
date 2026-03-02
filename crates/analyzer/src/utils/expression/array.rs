@@ -28,6 +28,7 @@ use mago_codex::ttype::get_non_negative_int;
 use mago_codex::ttype::get_null;
 use mago_codex::ttype::get_specialized_template_type;
 use mago_codex::ttype::get_string;
+use mago_codex::ttype::get_undefined_null;
 use mago_codex::ttype::union::TUnion;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
@@ -841,7 +842,7 @@ pub(crate) fn handle_array_access_on_keyed_array<'ctx>(
                     );
                 }
 
-                get_mixed()
+                get_undefined_null()
             };
 
             // since we're emitting a very specific error
