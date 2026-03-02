@@ -459,22 +459,45 @@ fn apply_inheritance_work(codebase: &mut CodebaseMetadata, mut inheritance_work:
             None
         };
 
-        let Some(child_method) = codebase.function_likes.get_mut(&child_method_id) else {
-            continue;
-        };
+        let narrowed_return = if should_inherit_return
+            && let Some((type_union, span, from_docblock)) = substituted_return_type
+        {
+            let child_native_return =
+                codebase.function_likes.get(&child_method_id).and_then(|m| m.return_type_declaration_metadata.as_ref());
 
-        if should_inherit_return && let Some((type_union, span, from_docblock)) = substituted_return_type {
-            let narrowed_type = if let Some(child_native_return) = &child_method.return_type_declaration_metadata
-                && !child_native_return.type_union.accepts_null()
-                && type_union.has_null()
-            {
-                type_union.to_non_nullable()
+            let narrowed_type = if let Some(child_native_return) = child_native_return {
+                let child_is_more_specific = union_comparator::is_contained_by(
+                    codebase,
+                    &child_native_return.type_union,
+                    &type_union,
+                    false,
+                    false,
+                    false,
+                    &mut ComparisonResult::new(),
+                );
+
+                if child_is_more_specific {
+                    child_native_return.type_union.clone()
+                } else if !child_native_return.type_union.accepts_null() && type_union.has_null() {
+                    type_union.to_non_nullable()
+                } else {
+                    type_union
+                }
             } else {
                 type_union
             };
 
-            child_method.return_type_metadata =
-                Some(TypeMetadata { type_union: narrowed_type, span, from_docblock, inferred: false });
+            Some(TypeMetadata { type_union: narrowed_type, span, from_docblock, inferred: false })
+        } else {
+            None
+        };
+
+        let Some(child_method) = codebase.function_likes.get_mut(&child_method_id) else {
+            continue;
+        };
+
+        if let Some(narrowed_return) = narrowed_return {
+            child_method.return_type_metadata = Some(narrowed_return);
         }
 
         for (i, substituted_param) in substituted_param_types.into_iter().enumerate() {
