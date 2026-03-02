@@ -173,18 +173,18 @@ pub(crate) fn reconcile(
                     assertion.has_equality(),
                 ));
             }
-            TAtomic::Array(TArray::Keyed(TKeyedArray { known_items: None, parameters: Some(parameters), .. })) => {
-                if parameters.0.is_placeholder() && parameters.1.is_placeholder() {
-                    return Some(subtract_keyed_array(
-                        context,
-                        assertion,
-                        existing_var_type,
-                        key,
-                        negated,
-                        span,
-                        assertion.has_equality(),
-                    ));
-                }
+            TAtomic::Array(TArray::Keyed(TKeyedArray { known_items: None, parameters: Some(parameters), .. }))
+                if parameters.0.is_placeholder() && parameters.1.is_placeholder() =>
+            {
+                return Some(subtract_keyed_array(
+                    context,
+                    assertion,
+                    existing_var_type,
+                    key,
+                    negated,
+                    span,
+                    assertion.has_equality(),
+                ));
             }
             TAtomic::Null => {
                 return Some(subtract_null(context, assertion, existing_var_type, key, negated, span));

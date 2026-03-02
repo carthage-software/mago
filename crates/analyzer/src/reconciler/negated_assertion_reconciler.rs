@@ -313,12 +313,8 @@ fn handle_literal_negated_equality(
                 }
 
                 match (existing_literal_string, assertion_literal_string) {
-                    (Some(existing_value), Some(assertion_value)) => {
-                        if existing_value == assertion_value {
-                            did_remove_type = true;
-                        } else {
-                            acceptable_types.push(existing_atomic_type);
-                        }
+                    (Some(existing_value), Some(assertion_value)) if existing_value == assertion_value => {
+                        did_remove_type = true;
                     }
                     (None, Some(assertion_value)) => {
                         did_remove_type = true;
@@ -364,12 +360,8 @@ fn handle_literal_negated_equality(
                 let assertion_value = assertion_type.get_literal_float_value();
 
                 match (existing_value, assertion_value) {
-                    (Some(existing_value), Some(assertion_value)) => {
-                        if existing_value == assertion_value {
-                            did_remove_type = true;
-                        } else {
-                            acceptable_types.push(existing_atomic_type);
-                        }
+                    (Some(existing_value), Some(assertion_value)) if existing_value == assertion_value => {
+                        did_remove_type = true;
                     }
                     (None, Some(_)) => {
                         did_remove_type = true;
@@ -394,12 +386,8 @@ fn handle_literal_negated_equality(
                 let assertion_value = assertion_type.get_class_string_value();
 
                 match (existing_classlike_string, assertion_value) {
-                    (Some(existing_value), Some(assertion_value)) => {
-                        if existing_value == assertion_value {
-                            did_remove_type = true;
-                        } else {
-                            acceptable_types.push(existing_atomic_type);
-                        }
+                    (Some(existing_value), Some(assertion_value)) if existing_value == assertion_value => {
+                        did_remove_type = true;
                     }
                     (None, Some(_)) => {
                         did_remove_type = true;

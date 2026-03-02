@@ -980,20 +980,14 @@ impl<'input> Lexer<'input> {
 
         if !ended_with_slash {
             match length {
-                6 => {
-                    if self.input.is_at(b"public(set)", true) {
-                        return (TokenKind::PublicSet, 11);
-                    }
+                6 if self.input.is_at(b"public(set)", true) => {
+                    return (TokenKind::PublicSet, 11);
                 }
-                7 => {
-                    if self.input.is_at(b"private(set)", true) {
-                        return (TokenKind::PrivateSet, 12);
-                    }
+                7 if self.input.is_at(b"private(set)", true) => {
+                    return (TokenKind::PrivateSet, 12);
                 }
-                9 => {
-                    if self.input.is_at(b"protected(set)", true) {
-                        return (TokenKind::ProtectedSet, 14);
-                    }
+                9 if self.input.is_at(b"protected(set)", true) => {
+                    return (TokenKind::ProtectedSet, 14);
                 }
                 _ => {}
             }

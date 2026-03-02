@@ -505,18 +505,19 @@ fn resolve_invocation_assertion<'ctx, 'arena>(
                     } else if let Some(asserted_type) = &asserted_type {
                         always_redundant = false;
                         match variable_assertion {
-                            Assertion::IsType(_) => {
+                            Assertion::IsType(_)
                                 if !can_expression_types_be_identical(
                                     context.codebase,
                                     asserted_type,
                                     &resolved_assertion_type,
                                     false,
                                     false,
-                                ) {
-                                    let asserted_type_id = asserted_type.get_id();
-                                    let expected_type_id = resolved_assertion_type.get_id();
+                                ) =>
+                            {
+                                let asserted_type_id = asserted_type.get_id();
+                                let expected_type_id = resolved_assertion_type.get_id();
 
-                                    context.collector.report_with_code(
+                                context.collector.report_with_code(
                                         IssueCode::ImpossibleTypeComparison,
                                         Issue::error(format!(
                                             "Impossible type assertion: `{assertion_variable}` of type `{asserted_type_id}` can never be `{expected_type_id}`."
@@ -530,7 +531,6 @@ fn resolve_invocation_assertion<'ctx, 'arena>(
                                         ))
                                         .with_help("Check that the correct variable is being passed, or update the assertion type."),
                                     );
-                                }
                             }
                             Assertion::IsIdentical(_) => {
                                 let intersection = if let Some(intersection) =

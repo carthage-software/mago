@@ -171,10 +171,8 @@ impl LintRule for BlockStatementRule {
                     report("while", r#while.r#while.span(), statement.span());
                 }
             }
-            Node::DoWhile(do_while) => {
-                if !matches!(do_while.statement, Statement::Block(_)) {
-                    report("do-while", do_while.r#do.span(), do_while.statement.span());
-                }
+            Node::DoWhile(do_while) if !matches!(do_while.statement, Statement::Block(_)) => {
+                report("do-while", do_while.r#do.span(), do_while.statement.span());
             }
             _ => {}
         }
