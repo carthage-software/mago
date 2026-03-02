@@ -462,6 +462,6 @@ mod tests {
         assert_eq!(db.len(), 1, "Only non-excluded file should be loaded");
 
         let file = db.files().next().unwrap();
-        assert_eq!(file.name, "src/keep.php");
+        assert!(Path::new(file.name.as_ref()).ends_with(Path::new("src").join("keep.php")));
     }
 }
