@@ -694,6 +694,7 @@ test_case!(issue_1230_simple, {
 });
 test_case!(issue_1226);
 test_case!(issue_1264);
+test_case!(issue_1267);
 
 #[test]
 fn test_all_test_cases_are_ran() {
