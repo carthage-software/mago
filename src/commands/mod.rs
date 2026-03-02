@@ -80,6 +80,7 @@ pub mod init;
 pub mod lint;
 pub mod list_files;
 pub mod self_update;
+pub mod stdin_input;
 
 /// ANSI color styling configuration for Mago's CLI output.
 ///
