@@ -123,6 +123,7 @@ pub fn analyze_invocation<'ctx, 'arena>(
     let method_call_context = invocation.target.get_method_context();
     let base_class_metadata = method_call_context.map(|ctx| ctx.class_like_metadata).or(calling_class_like_metadata);
     let calling_instance_type = calling_class_like.and_then(|(_, atomic)| atomic);
+    let method_class_type = method_call_context.map(|ctx| &ctx.class_type);
 
     for (argument_offset, argument) in &non_closure_arguments {
         let Some(argument_expression) = argument.value() else {
@@ -152,6 +153,7 @@ pub fn analyze_invocation<'ctx, 'arena>(
                 base_class_metadata,
                 calling_class_like_metadata,
                 calling_instance_type,
+                method_class_type,
             );
 
             if parameter_type.has_template_types() {
@@ -190,6 +192,7 @@ pub fn analyze_invocation<'ctx, 'arena>(
                 base_class_metadata,
                 calling_class_like_metadata,
                 calling_instance_type,
+                method_class_type,
             );
 
             if base_parameter_type.has_template_types() {
@@ -357,6 +360,7 @@ pub fn analyze_invocation<'ctx, 'arena>(
                 base_class_metadata,
                 calling_class_like_metadata,
                 calling_instance_type,
+                method_class_type,
             );
 
             let final_parameter_type =
@@ -454,6 +458,7 @@ pub fn analyze_invocation<'ctx, 'arena>(
                 base_class_metadata,
                 calling_class_like_metadata,
                 calling_instance_type,
+                method_class_type,
             );
 
             let default_type =
@@ -496,6 +501,7 @@ pub fn analyze_invocation<'ctx, 'arena>(
                     base_class_metadata,
                     calling_class_like_metadata,
                     calling_instance_type,
+                    method_class_type,
                 );
 
                 let final_variadic_parameter_type =
@@ -634,6 +640,7 @@ pub fn analyze_invocation<'ctx, 'arena>(
                             base_class_metadata,
                             calling_class_like_metadata,
                             calling_instance_type,
+                            method_class_type,
                             &invocation.target,
                             template_result,
                             current_parameter_position,
@@ -769,6 +776,7 @@ fn get_parameter_type<'ctx>(
     base_class_metadata: Option<&'ctx ClassLikeMetadata>,
     calling_class_like_metadata: Option<&'ctx ClassLikeMetadata>,
     calling_instance_type: Option<&TAtomic>,
+    method_class_type: Option<&StaticClassType>,
 ) -> TUnion {
     let Some(invocation_target_parameter) = invocation_target_parameter else {
         return get_mixed();
@@ -778,19 +786,27 @@ fn get_parameter_type<'ctx>(
 
     let mut resolved_parameter_type = parameter_type;
 
-    expander::expand_union(
-        context.codebase,
-        &mut resolved_parameter_type,
-        &TypeExpansionOptions {
-            self_class: base_class_metadata.map(|meta| meta.name),
-            static_class_type: calling_class_like_metadata.map_or(StaticClassType::None, |calling_meta| {
+    let static_class_type = method_class_type
+        .filter(|t| !matches!(t, StaticClassType::None))
+        .cloned()
+        .or_else(|| {
+            calling_class_like_metadata.map(|calling_meta| {
                 calling_instance_type
                     .and_then(|instance| match instance {
                         TAtomic::Object(obj) => Some(StaticClassType::Object(obj.clone())),
                         _ => None,
                     })
                     .unwrap_or(StaticClassType::Name(calling_meta.name))
-            }),
+            })
+        })
+        .unwrap_or(StaticClassType::None);
+
+    expander::expand_union(
+        context.codebase,
+        &mut resolved_parameter_type,
+        &TypeExpansionOptions {
+            self_class: base_class_metadata.map(|meta| meta.name),
+            static_class_type,
             parent_class: base_class_metadata.and_then(|meta| meta.direct_parent_class),
             function_is_final: calling_class_like_metadata.is_some_and(|meta| meta.flags.is_final()),
             ..Default::default()
@@ -809,6 +825,7 @@ fn validate_unpacked_argument_elements<'ctx, 'arena>(
     base_class_metadata: Option<&'ctx ClassLikeMetadata>,
     calling_class_like_metadata: Option<&'ctx ClassLikeMetadata>,
     calling_instance_type: Option<&TAtomic>,
+    method_class_type: Option<&StaticClassType>,
     invocation_target: &InvocationTarget<'_>,
     template_result: &TemplateResult,
     starting_parameter_position: usize,
@@ -839,6 +856,7 @@ fn validate_unpacked_argument_elements<'ctx, 'arena>(
                                 base_class_metadata,
                                 calling_class_like_metadata,
                                 calling_instance_type,
+                                method_class_type,
                             );
 
                             let final_parameter_type = if template_result.has_template_types() {
@@ -889,6 +907,7 @@ fn validate_unpacked_argument_elements<'ctx, 'arena>(
                                 base_class_metadata,
                                 calling_class_like_metadata,
                                 calling_instance_type,
+                                method_class_type,
                             );
 
                             let final_parameter_type = if template_result.has_template_types() {
@@ -935,6 +954,7 @@ fn validate_unpacked_argument_elements<'ctx, 'arena>(
                     base_class_metadata,
                     calling_class_like_metadata,
                     calling_instance_type,
+                    method_class_type,
                     invocation_target,
                     template_result,
                     target_kind_str,
@@ -953,6 +973,7 @@ fn validate_keyed_array_elements<'ctx, 'arena>(
     base_class_metadata: Option<&'ctx ClassLikeMetadata>,
     calling_class_like_metadata: Option<&'ctx ClassLikeMetadata>,
     calling_instance_type: Option<&TAtomic>,
+    method_class_type: Option<&StaticClassType>,
     invocation_target: &InvocationTarget<'_>,
     template_result: &TemplateResult,
     target_kind_str: &str,
@@ -994,6 +1015,7 @@ fn validate_keyed_array_elements<'ctx, 'arena>(
                 base_class_metadata,
                 calling_class_like_metadata,
                 calling_instance_type,
+                method_class_type,
             );
 
             let final_parameter_type =
