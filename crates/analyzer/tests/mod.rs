@@ -693,9 +693,10 @@ test_case!(issue_1230_simple, {
     s
 });
 test_case!(issue_1226);
+test_case!(issue_1259);
 test_case!(issue_1262);
-test_case!(issue_1265);
 test_case!(issue_1264);
+test_case!(issue_1265);
 test_case!(issue_1266);
 test_case!(issue_1266_inheritdoc_narrowing);
 test_case!(issue_1267);
