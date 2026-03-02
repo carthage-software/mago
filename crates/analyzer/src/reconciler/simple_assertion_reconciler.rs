@@ -140,18 +140,18 @@ pub(crate) fn reconcile(
                     span,
                 ));
             }
-            TAtomic::Iterable(TIterable { key_type, value_type, intersection_types: None }) => {
-                if (key_type.is_mixed() || key_type.is_array_key()) && value_type.is_mixed() {
-                    return Some(intersect_iterable(
-                        context,
-                        assertion,
-                        existing_var_type,
-                        key,
-                        negated,
-                        span,
-                        assertion.has_equality(),
-                    ));
-                }
+            TAtomic::Iterable(TIterable { key_type, value_type, intersection_types: None })
+                if (key_type.is_mixed() || key_type.is_array_key()) && value_type.is_mixed() =>
+            {
+                return Some(intersect_iterable(
+                    context,
+                    assertion,
+                    existing_var_type,
+                    key,
+                    negated,
+                    span,
+                    assertion.has_equality(),
+                ));
             }
             TAtomic::Array(TArray::List(TList { known_elements: None, non_empty, element_type, .. }))
                 if element_type.is_placeholder() || element_type.is_mixed() =>
@@ -167,20 +167,19 @@ pub(crate) fn reconcile(
                     *non_empty,
                 ));
             }
-            TAtomic::Array(TArray::Keyed(TKeyedArray { known_items: None, parameters: Some(parameters), .. })) => {
+            TAtomic::Array(TArray::Keyed(TKeyedArray { known_items: None, parameters: Some(parameters), .. }))
                 if (parameters.0.is_placeholder() || parameters.0.is_array_key())
-                    && (parameters.1.is_placeholder() || parameters.1.is_mixed())
-                {
-                    return Some(intersect_keyed_array(
-                        context,
-                        assertion,
-                        existing_var_type,
-                        key,
-                        negated,
-                        span,
-                        assertion.has_equality(),
-                    ));
-                }
+                    && (parameters.1.is_placeholder() || parameters.1.is_mixed()) =>
+            {
+                return Some(intersect_keyed_array(
+                    context,
+                    assertion,
+                    existing_var_type,
+                    key,
+                    negated,
+                    span,
+                    assertion.has_equality(),
+                ));
             }
             TAtomic::Scalar(TScalar::ArrayKey) => {
                 return Some(intersect_arraykey(
@@ -255,10 +254,10 @@ pub(crate) fn reconcile(
                     i,
                 ));
             }
-            TAtomic::Mixed(mixed) if mixed.is_vanilla() || mixed.is_isset_from_loop() => {
-                if existing_var_type.is_mixed() {
-                    return Some(existing_var_type.clone());
-                }
+            TAtomic::Mixed(mixed)
+                if (mixed.is_vanilla() || mixed.is_isset_from_loop()) && existing_var_type.is_mixed() =>
+            {
+                return Some(existing_var_type.clone());
             }
             _ => {}
         }

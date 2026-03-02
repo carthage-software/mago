@@ -452,15 +452,11 @@ fn should_break_after_operator<'arena>(
 
             return false;
         }
-        Expression::Closure(closure) => {
-            if !closure.attribute_lists.is_empty() {
-                return true;
-            }
+        Expression::Closure(closure) if !closure.attribute_lists.is_empty() => {
+            return true;
         }
-        Expression::ArrowFunction(arrow_func) => {
-            if !arrow_func.attribute_lists.is_empty() {
-                return true;
-            }
+        Expression::ArrowFunction(arrow_func) if !arrow_func.attribute_lists.is_empty() => {
+            return true;
         }
         _ => {}
     }

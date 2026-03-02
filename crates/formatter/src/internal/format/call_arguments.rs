@@ -793,17 +793,13 @@ fn is_simple_call_argument<'arena>(node: &'arena Expression<'arena>, depth: usiz
         Expression::ArrayAccess(array_access) => {
             is_simple_call_argument(array_access.array, depth) && is_simple_call_argument(array_access.index, depth)
         }
-        Expression::Instantiation(instantiation) => {
-            if is_simple_call_argument(instantiation.class, depth) {
-                match &instantiation.argument_list {
-                    Some(argument_list) => {
-                        argument_list.arguments.len() <= depth
-                            && argument_list.arguments.iter().map(Argument::value).all(is_child_simple)
-                    }
-                    None => true,
+        Expression::Instantiation(instantiation) if is_simple_call_argument(instantiation.class, depth) => {
+            match &instantiation.argument_list {
+                Some(argument_list) => {
+                    argument_list.arguments.len() <= depth
+                        && argument_list.arguments.iter().map(Argument::value).all(is_child_simple)
                 }
-            } else {
-                false
+                None => true,
             }
         }
         _ => false,
