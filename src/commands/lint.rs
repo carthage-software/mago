@@ -39,6 +39,7 @@ use mago_linter::rule::AnyRule;
 use mago_linter::rule_meta::RuleEntry;
 use mago_orchestrator::service::lint::LintMode;
 use mago_reporting::Level;
+use mago_reporting::only_entry_codes;
 
 use crate::commands::args::baseline_reporting::BaselineReportingArgs;
 use crate::config::Configuration;
@@ -223,9 +224,18 @@ impl LintCommand {
         let mut database = orchestrator.load_database(&configuration.source.workspace, false, None)?;
         let service = orchestrator.get_lint_service(database.read_only());
 
+        let effective_only: Option<Vec<String>> = if !self.only.is_empty() {
+            Some(self.only.clone())
+        } else if !configuration.linter.only.is_empty() {
+            Some(only_entry_codes(&configuration.linter.only))
+        } else {
+            None
+        };
+        let effective_only_slice = effective_only.as_deref();
+
         if let Some(explain_code) = self.explain {
             let registry = service.create_registry(
-                if self.only.is_empty() { None } else { Some(&self.only) },
+                effective_only_slice,
                 self.pedantic, // Enable all rules if pedantic is set
             );
 
@@ -234,7 +244,7 @@ impl LintCommand {
 
         if self.list_rules {
             let registry = service.create_registry(
-                if self.only.is_empty() { None } else { Some(&self.only) },
+                effective_only_slice,
                 self.pedantic, // Enable all rules if pedantic is set
             );
 
@@ -247,10 +257,21 @@ impl LintCommand {
             return Ok(ExitCode::SUCCESS);
         }
 
-        let issues = service.lint(
-            if self.semantics { LintMode::SemanticsOnly } else { LintMode::Full },
-            if self.only.is_empty() { None } else { Some(self.only.as_slice()) },
-        )?;
+        let mut issues = service
+            .lint(if self.semantics { LintMode::SemanticsOnly } else { LintMode::Full }, effective_only_slice)?;
+
+        if !configuration.linter.only.is_empty() {
+            let read_db = database.read_only();
+            issues.filter_retain_only(&configuration.linter.only, |file_id| {
+                read_db.get_ref(&file_id).ok().map(|f| f.name.to_string())
+            });
+        }
+        if !configuration.linter.only_in.is_empty() {
+            let read_db = database.read_only();
+            issues.filter_retain_only_in(&configuration.linter.only_in, |file_id| {
+                read_db.get_ref(&file_id).ok().map(|f| f.name.to_string())
+            });
+        }
 
         let baseline = configuration.linter.baseline.as_deref();
         let baseline_variant = configuration.linter.baseline_variant;

@@ -14,6 +14,8 @@ use mago_codex::ttype::combiner::DEFAULT_INTEGER_COMBINATION_THRESHOLD;
 use mago_codex::ttype::combiner::DEFAULT_STRING_COMBINATION_THRESHOLD;
 use mago_php_version::PHPVersion;
 use mago_reporting::IgnoreEntry;
+use mago_reporting::OnlyEntry;
+use mago_reporting::OnlyInEntry;
 use mago_reporting::baseline::BaselineVariant;
 use schemars::JsonSchema;
 use serde::Deserialize;
@@ -30,6 +32,19 @@ pub struct AnalyzerConfiguration {
 
     /// Ignore specific issues based on their code, optionally scoped to paths.
     pub ignore: Vec<IgnoreEntry>,
+
+    /// Report only specific issue codes, optionally scoped to paths.
+    ///
+    /// Same formats as `ignore`: plain string (everywhere), or `{ code = "...", in = "path/" }` / `in = ["a/", "b/"]`.
+    /// When non-empty, only matching issues are reported; all others are filtered out.
+    pub only: Vec<OnlyEntry>,
+
+    /// In the given paths, report only the specified code; other paths are not restricted.
+    ///
+    /// Each entry is `{ code = "...", in = "path/" }` or `in = ["a/", "b/"]`. Files outside any entry's paths
+    /// are unaffected. Use this to enable a check only in specific files or directories.
+    #[serde(rename = "only-in")]
+    pub only_in: Vec<OnlyInEntry>,
 
     /// Path to a baseline file to ignore listed issues.
     pub baseline: Option<PathBuf>,
@@ -382,6 +397,8 @@ impl Default for AnalyzerConfiguration {
             plugins: vec![],
             excludes: vec![],
             ignore: vec![],
+            only: vec![],
+            only_in: vec![],
             baseline: None,
             baseline_variant: BaselineVariant::default(),
             find_unused_expressions: defaults.find_unused_expressions,
