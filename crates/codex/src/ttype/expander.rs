@@ -517,9 +517,7 @@ fn resolve_static_type(
 
             named.name = static_obj.name;
             // For final classes, static === self, so is_this should be false
-            named.is_this = !codebase
-                .get_class_like(&static_obj.name)
-                .is_some_and(|meta| meta.flags.is_final());
+            named.is_this = !codebase.get_class_like(&static_obj.name).is_some_and(|meta| meta.flags.is_final());
         }
         StaticClassType::Name(static_class) => {
             if !check_compatibility || codebase.is_instance_of(static_class, &named.name) {
