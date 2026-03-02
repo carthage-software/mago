@@ -25,6 +25,7 @@
             pkgs.openssl
             pkgs.just
             pkgs.wasm-pack
+            pkgs.lld
             php
             composer
           ] ++ pkgs.lib.optionals isDarwin [

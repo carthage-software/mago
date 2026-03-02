@@ -54,10 +54,11 @@ export function createPlaygroundState(initialCode = DEFAULT_CODE) {
         disabledRules: ["file-name"],
       },
     },
-    results: null,
+    analyzerResults: null,
+    formatterResults: { code: "", timeMs: null, error: null },
     isLoading: false,
     wasmReady: false,
-    activeTab: "linter",
+    activeTab: "issues",
     settingsOpen: false,
     availableRules: [],
   });
@@ -97,8 +98,12 @@ export function createPlaygroundState(initialCode = DEFAULT_CODE) {
       state.availableRules = rules;
     },
 
-    setResults(results) {
-      state.results = results;
+    setAnalyzerResults(results) {
+      state.analyzerResults = results;
+    },
+
+    setFormatterResults(result) {
+      state.formatterResults = result;
     },
 
     setLoading(loading) {
