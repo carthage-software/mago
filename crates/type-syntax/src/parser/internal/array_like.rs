@@ -195,11 +195,7 @@ pub fn parse_array_like_type<'input>(stream: &mut TypeTokenStream<'input>) -> Re
 pub fn parse_shape_field_key<'input>(stream: &mut TypeTokenStream<'input>) -> Result<ShapeKey<'input>, ParseError> {
     if stream.is_at(TypeTokenKind::LiteralString)? {
         let token = stream.consume()?;
-        let value = if token.value.starts_with('"') || token.value.starts_with('\'') {
-            &token.value[1..token.value.len() - 1]
-        } else {
-            token.value
-        };
+        let value = &token.value[1..token.value.len() - 1];
 
         return Ok(ShapeKey::String { value, span: token.span_for(stream.file_id()) });
     }
