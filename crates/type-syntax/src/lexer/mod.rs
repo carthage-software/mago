@@ -181,12 +181,6 @@ impl<'input> TypeLexer<'input> {
 
         let is_float = matches!(self.input.peek(length, 3), float_separator!());
         if !is_float {
-            if kind == NumberKind::OctalOrFloat {
-                let has_invalid_octal_digit = (1..length).any(|i| matches!(self.input.peek(i, 1), [b'8' | b'9']));
-                if has_invalid_octal_digit {
-                    return (TypeTokenKind::LiteralString, length);
-                }
-            }
             return (TypeTokenKind::LiteralInteger, length);
         }
 
