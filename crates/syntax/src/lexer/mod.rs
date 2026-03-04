@@ -605,6 +605,21 @@ impl<'input> Lexer<'input> {
                         let is_float = matches!(self.input.peek(length, 3), float_separator!());
 
                         if !is_float {
+                            if kind == NumberKind::OctalOrFloat {
+                                if let Some(invalid_idx) =
+                                    (1..length).find(|&i| matches!(self.input.peek(i, 1), [b'8' | b'9']))
+                                {
+                                    let invalid_byte = self.input.peek(invalid_idx, 1)[0];
+                                    let start = self.input.current_position();
+                                    let invalid_position = Position { offset: start.offset + invalid_idx as u32 };
+                                    self.input.consume(length);
+                                    return Some(Err(SyntaxError::UnexpectedToken(
+                                        self.file_id(),
+                                        invalid_byte,
+                                        invalid_position,
+                                    )));
+                                }
+                            }
                             break 'number (TokenKind::LiteralInteger, length);
                         }
 
