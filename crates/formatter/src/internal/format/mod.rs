@@ -1721,11 +1721,18 @@ impl<'arena> Format<'arena> for FunctionLikeParameter<'arena> {
             let mut contents = vec![in f.arena];
             if let Some(attributes) = print_attribute_list_sequence(f, &self.attribute_lists) {
                 contents.push(attributes);
-                contents.push(Document::Line(if f.parameter_state.force_break {
-                    Line::hard()
-                } else {
-                    Line::default()
-                }));
+                contents.push(
+                    if f.settings.parameter_attribute_on_new_line
+                        && let Some(list_id) = f.parameter_state.list_group_id
+                    {
+                        Document::IfBreak(
+                            IfBreak::new(f.arena, Document::Line(Line::hard()), Document::Line(Line::default()))
+                                .with_id(list_id),
+                        )
+                    } else {
+                        Document::Line(Line::default())
+                    },
+                );
             }
 
             contents.extend(print_modifiers(f, &self.modifiers));
