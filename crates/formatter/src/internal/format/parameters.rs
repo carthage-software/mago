@@ -30,12 +30,7 @@ pub(super) fn print_function_like_parameters<'arena>(
     }
 
     let mut force_break = force_break_parameters(f, parameter_list);
-    let preserve_break = f.settings.preserve_breaking_parameter_list
-        && misc::has_new_line_in_range(
-            f.source_text,
-            parameter_list.left_parenthesis.start.offset,
-            parameter_list.parameters.as_slice()[0].span().start.offset,
-        );
+    let preserve_break = preserve_break_parameters(f, parameter_list);
     let should_break = force_break || preserve_break;
 
     let previous_break = f.parameter_state.force_break;
@@ -127,6 +122,19 @@ pub(super) fn force_break_parameters<'arena>(
 ) -> bool {
     f.settings.break_promoted_properties_list
         && parameter_list.parameters.iter().any(FunctionLikeParameter::is_promoted_property)
+}
+
+pub(super) fn preserve_break_parameters<'arena>(
+    f: &FormatterState<'_, 'arena>,
+    parameter_list: &'arena FunctionLikeParameterList<'arena>,
+) -> bool {
+    f.settings.preserve_breaking_parameter_list
+        && !parameter_list.parameters.is_empty()
+        && misc::has_new_line_in_range(
+            f.source_text,
+            parameter_list.left_parenthesis.start.offset,
+            parameter_list.parameters.as_slice()[0].span().start.offset,
+        )
 }
 
 pub(super) fn should_hug_the_only_parameter<'arena>(
