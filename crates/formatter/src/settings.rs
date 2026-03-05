@@ -478,7 +478,7 @@ generate_formatter_settings! {
     /// ) {}
     /// ```
     ///
-    /// Default: true ([PER-CS 12.2](https://www.php-fig.org/per/coding-style/#122-method-and-function-parameters) compliant)
+    /// Default: true ([PER-CS 12.2](https://www.php-fig.org/per/coding-style/#122-placement) compliant)
     parameter_attribute_on_new_line: bool => "default_true",
 
     /// Whether to add a line before binary operators or after when breaking.
