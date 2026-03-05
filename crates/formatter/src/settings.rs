@@ -460,6 +460,27 @@ generate_formatter_settings! {
     /// Default: true
     break_promoted_properties_list: bool => "default_true",
 
+    /// Whether to place parameter attributes on their own line when the parameter list breaks.
+    ///
+    /// When enabled, attributes are placed on a separate line
+    /// from the parameter when the parameter list spans multiple lines:
+    /// ```php
+    /// function foo(
+    ///     #[SensitiveParameter]
+    ///     string $password,
+    /// ) {}
+    /// ```
+    ///
+    /// When disabled, attributes stay on the same line as the parameter:
+    /// ```php
+    /// function foo(
+    ///     #[SensitiveParameter] string $password,
+    /// ) {}
+    /// ```
+    ///
+    /// Default: true ([PER-CS 12.2](https://www.php-fig.org/per/coding-style/#122-placement) compliant)
+    parameter_attribute_on_new_line: bool => "default_true",
+
     /// Whether to add a line before binary operators or after when breaking.
     ///
     /// When true:
