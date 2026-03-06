@@ -1793,17 +1793,25 @@ impl<'arena> Format<'arena> for Try<'arena> {
         wrap!(f, self, Try, {
             let mut parts = vec![in f.arena; self.r#try.format(f), Document::space(), self.block.format(f)];
 
+            let mut prev_block_span = self.block.span();
             for clause in &self.catch_clauses {
-                if f.settings.following_clause_on_newline {
+                if f.settings.following_clause_on_newline
+                    || f.is_followed_by_comment_on_next_line(prev_block_span)
+                    || f.has_same_line_trailing_comment(prev_block_span)
+                {
                     parts.push(Document::Line(Line::hard()));
                 } else {
                     parts.push(Document::space());
                 }
                 parts.push(clause.format(f));
+                prev_block_span = clause.block.span();
             }
 
             if let Some(clause) = &self.finally_clause {
-                if f.settings.following_clause_on_newline {
+                if f.settings.following_clause_on_newline
+                    || f.is_followed_by_comment_on_next_line(prev_block_span)
+                    || f.has_same_line_trailing_comment(prev_block_span)
+                {
                     parts.push(Document::Line(Line::hard()));
                 } else {
                     parts.push(Document::space());
