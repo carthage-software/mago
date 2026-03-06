@@ -578,6 +578,21 @@ generate_formatter_settings! {
     /// Default: true
     sort_uses: bool => "default_true",
 
+    /// How to order import types when sorting `use` statements.
+    ///
+    /// Default: `["class", "function", "const"]`
+    use_type_order: UseTypeOrder => "UseTypeOrder::default",
+
+    /// Which algorithm to use when sorting `use` statements.
+    ///
+    /// Default: `alpha`
+    sort_uses_algorithm: UseSortAlgorithm => "UseSortAlgorithm::default",
+
+    /// Whether `use` sorting should compare names case-sensitively.
+    ///
+    /// Default: false
+    sort_uses_case_sensitive: bool => "default_false",
+
     /// Whether to sort class methods by visibility and name.
     ///
     /// When enabled, methods in class-like structures are automatically reordered:
@@ -983,6 +998,13 @@ generate_formatter_settings! {
     /// Default: false
     empty_line_before_return: bool => "default_false",
 
+    /// Which statements should be preceded by a blank line.
+    ///
+    /// Compatible with PHP-CS-Fixer's `blank_line_before_statement` rule.
+    ///
+    /// Default: `[]`
+    blank_line_before_statement: BlankLineBeforeStatements => "BlankLineBeforeStatements::default",
+
     /// Whether to add an empty line before dangling comments.
     ///
     /// Default: true
@@ -1140,6 +1162,217 @@ impl NullTypeHint {
     pub fn is_question(&self) -> bool {
         *self == Self::Question
     }
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum BlankLineBeforeStatement {
+    Break,
+    Case,
+    Continue,
+    Declare,
+    Default,
+    #[serde(alias = "do-while", alias = "do_while", alias = "do")]
+    Do,
+    Foreach,
+    For,
+    Goto,
+    If,
+    Include,
+    #[serde(alias = "include-once")]
+    IncludeOnce,
+    Phpdoc,
+    Require,
+    #[serde(alias = "require-once")]
+    RequireOnce,
+    Return,
+    Switch,
+    Throw,
+    Try,
+    While,
+    Yield,
+    #[serde(alias = "yield-from")]
+    YieldFrom,
+}
+
+impl BlankLineBeforeStatement {
+    const fn bit(self) -> u32 {
+        match self {
+            Self::Break => 1 << 0,
+            Self::Case => 1 << 1,
+            Self::Continue => 1 << 2,
+            Self::Declare => 1 << 3,
+            Self::Default => 1 << 4,
+            Self::Do => 1 << 5,
+            Self::Foreach => 1 << 6,
+            Self::For => 1 << 7,
+            Self::Goto => 1 << 8,
+            Self::If => 1 << 9,
+            Self::Include => 1 << 10,
+            Self::IncludeOnce => 1 << 11,
+            Self::Phpdoc => 1 << 12,
+            Self::Require => 1 << 13,
+            Self::RequireOnce => 1 << 14,
+            Self::Return => 1 << 15,
+            Self::Switch => 1 << 16,
+            Self::Throw => 1 << 17,
+            Self::Try => 1 << 18,
+            Self::While => 1 << 19,
+            Self::Yield => 1 << 20,
+            Self::YieldFrom => 1 << 21,
+        }
+    }
+}
+
+const BLANK_LINE_BEFORE_STATEMENT_ORDER: [BlankLineBeforeStatement; 22] = [
+    BlankLineBeforeStatement::Break,
+    BlankLineBeforeStatement::Case,
+    BlankLineBeforeStatement::Continue,
+    BlankLineBeforeStatement::Declare,
+    BlankLineBeforeStatement::Default,
+    BlankLineBeforeStatement::Do,
+    BlankLineBeforeStatement::Foreach,
+    BlankLineBeforeStatement::For,
+    BlankLineBeforeStatement::Goto,
+    BlankLineBeforeStatement::If,
+    BlankLineBeforeStatement::Include,
+    BlankLineBeforeStatement::IncludeOnce,
+    BlankLineBeforeStatement::Phpdoc,
+    BlankLineBeforeStatement::Require,
+    BlankLineBeforeStatement::RequireOnce,
+    BlankLineBeforeStatement::Return,
+    BlankLineBeforeStatement::Switch,
+    BlankLineBeforeStatement::Throw,
+    BlankLineBeforeStatement::Try,
+    BlankLineBeforeStatement::While,
+    BlankLineBeforeStatement::Yield,
+    BlankLineBeforeStatement::YieldFrom,
+];
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, JsonSchema)]
+#[serde(try_from = "Vec<BlankLineBeforeStatement>", into = "Vec<BlankLineBeforeStatement>")]
+pub struct BlankLineBeforeStatements(u32);
+
+impl BlankLineBeforeStatements {
+    pub const NONE: Self = Self(0);
+    pub const RETURN_ONLY: Self = Self(BlankLineBeforeStatement::Return.bit());
+
+    #[must_use]
+    pub const fn contains(self, statement: BlankLineBeforeStatement) -> bool {
+        (self.0 & statement.bit()) != 0
+    }
+}
+
+impl Default for BlankLineBeforeStatements {
+    fn default() -> Self {
+        Self::NONE
+    }
+}
+
+impl TryFrom<Vec<BlankLineBeforeStatement>> for BlankLineBeforeStatements {
+    type Error = String;
+
+    fn try_from(value: Vec<BlankLineBeforeStatement>) -> Result<Self, Self::Error> {
+        let mut bits = 0;
+        for statement in value {
+            bits |= statement.bit();
+        }
+
+        Ok(Self(bits))
+    }
+}
+
+impl From<BlankLineBeforeStatements> for Vec<BlankLineBeforeStatement> {
+    fn from(value: BlankLineBeforeStatements) -> Self {
+        BLANK_LINE_BEFORE_STATEMENT_ORDER.into_iter().filter(|statement| value.contains(*statement)).collect()
+    }
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum UseImportType {
+    Class,
+    Function,
+    Const,
+}
+
+const USE_IMPORT_TYPE_ORDER: [UseImportType; 3] = [UseImportType::Class, UseImportType::Function, UseImportType::Const];
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, JsonSchema)]
+#[serde(try_from = "Vec<UseImportType>", into = "Vec<UseImportType>")]
+pub struct UseTypeOrder([UseImportType; 3]);
+
+impl UseTypeOrder {
+    pub const CLASS_FUNCTION_CONST: Self = Self([UseImportType::Class, UseImportType::Function, UseImportType::Const]);
+
+    #[must_use]
+    pub fn rank(self, import_type: UseImportType) -> usize {
+        let [first, second, _] = self.0;
+
+        if first == import_type {
+            0
+        } else if second == import_type {
+            1
+        } else {
+            2
+        }
+    }
+}
+
+impl Default for UseTypeOrder {
+    fn default() -> Self {
+        Self::CLASS_FUNCTION_CONST
+    }
+}
+
+impl TryFrom<Vec<UseImportType>> for UseTypeOrder {
+    type Error = String;
+
+    fn try_from(value: Vec<UseImportType>) -> Result<Self, Self::Error> {
+        let mut ordered = [UseImportType::Class, UseImportType::Function, UseImportType::Const];
+        let mut index = 0;
+
+        for import_type in value {
+            if ordered[..index].contains(&import_type) {
+                continue;
+            }
+
+            ordered[index] = import_type;
+            index += 1;
+            if index == ordered.len() {
+                return Ok(Self(ordered));
+            }
+        }
+
+        for import_type in USE_IMPORT_TYPE_ORDER {
+            if ordered[..index].contains(&import_type) {
+                continue;
+            }
+
+            ordered[index] = import_type;
+            index += 1;
+            if index == ordered.len() {
+                break;
+            }
+        }
+
+        Ok(Self(ordered))
+    }
+}
+
+impl From<UseTypeOrder> for Vec<UseImportType> {
+    fn from(value: UseTypeOrder) -> Self {
+        value.0.into_iter().collect()
+    }
+}
+
+#[derive(Default, Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum UseSortAlgorithm {
+    None,
+    Length,
+    #[default]
+    Alpha,
 }
 
 fn default_print_width() -> usize {
