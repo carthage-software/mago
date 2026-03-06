@@ -53,7 +53,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Statement<'arena> {
 
         // Call plugin before_statement hooks
         if context.plugin_registry.has_statement_hooks() {
-            let mut hook_context = HookContext::new(context.codebase, block_context, artifacts);
+            let mut hook_context = HookContext::new(context.codebase, context.resolved_names, block_context, artifacts);
             if let HookAction::Skip = context.plugin_registry.before_statement(self, &mut hook_context)? {
                 for reported in hook_context.take_issues() {
                     context.collector.report_with_code(reported.code, reported.issue);
@@ -202,7 +202,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Statement<'arena> {
 
         // Call plugin after_statement hooks
         if context.plugin_registry.has_statement_hooks() {
-            let mut hook_context = HookContext::new(context.codebase, block_context, artifacts);
+            let mut hook_context = HookContext::new(context.codebase, context.resolved_names, block_context, artifacts);
             context.plugin_registry.after_statement(self, &mut hook_context)?;
             for reported in hook_context.take_issues() {
                 context.collector.report_with_code(reported.code, reported.issue);

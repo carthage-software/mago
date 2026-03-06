@@ -14,12 +14,14 @@ use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::string::TString;
 use mago_codex::ttype::atomic::scalar::string::TStringLiteral;
 use mago_codex::ttype::union::TUnion;
+use mago_names::ResolvedNames;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_span::Span;
 use mago_syntax::ast::Argument;
 use mago_syntax::ast::ClassLikeMemberSelector;
 use mago_syntax::ast::Expression;
+use mago_syntax::ast::Identifier;
 use mago_syntax::ast::PartialApplication;
 use mago_syntax::ast::PartialArgument;
 
@@ -197,6 +199,7 @@ impl<'a, 'b, 'c> ProviderContext<'a, 'b, 'c> {
 /// to modify the analysis state (expression types, variable types, assertions).
 pub struct HookContext<'ctx, 'a> {
     pub(crate) codebase: &'ctx CodebaseMetadata,
+    pub(crate) resolved_names: &'ctx ResolvedNames<'ctx>,
     pub(crate) block_context: &'a mut BlockContext<'ctx>,
     pub(crate) artifacts: &'a mut AnalysisArtifacts,
     pub(crate) reported_issues: RefCell<Vec<ReportedIssue>>,
@@ -205,10 +208,11 @@ pub struct HookContext<'ctx, 'a> {
 impl<'ctx, 'a> HookContext<'ctx, 'a> {
     pub(crate) fn new(
         codebase: &'ctx CodebaseMetadata,
+        resolved_names: &'ctx ResolvedNames<'ctx>,
         block_context: &'a mut BlockContext<'ctx>,
         artifacts: &'a mut AnalysisArtifacts,
     ) -> Self {
-        Self { codebase, artifacts, block_context, reported_issues: RefCell::new(Vec::new()) }
+        Self { codebase, resolved_names, artifacts, block_context, reported_issues: RefCell::new(Vec::new()) }
     }
 
     /// Report an issue from a hook.
@@ -282,6 +286,15 @@ impl<'ctx, 'a> HookContext<'ctx, 'a> {
     #[inline]
     pub fn current_class_name(&self) -> Option<Atom> {
         self.block_context.scope.get_class_like_name()
+    }
+
+    /// Resolve an identifier to its fully-qualified name using the resolved names map.
+    ///
+    /// For example, resolves `User` to `App\Models\User` when there is a
+    /// `use App\Models\User;` statement in scope.
+    #[inline]
+    pub fn resolve_name<'arena>(&self, identifier: &Identifier<'arena>) -> &'ctx str {
+        self.resolved_names.get(identifier)
     }
 
     /// Set the type of an expression.
@@ -370,6 +383,21 @@ impl<'ctx, 'ast, 'arena> InvocationInfo<'ctx, 'ast, 'arena> {
     #[must_use]
     pub fn function_name(&self) -> String {
         self.invocation.target.guess_name()
+    }
+
+    /// Returns the class name of the object the method is being called on,
+    /// which may differ from the declaring class.
+    ///
+    /// For example, if `UserFactory` extends `Factory` and you call
+    /// `$factory->create()`, the declaring class is `Factory` but the
+    /// calling class is `UserFactory`.
+    ///
+    /// Returns `None` if this is not a method call or no method context
+    /// is available.
+    #[inline]
+    #[must_use]
+    pub fn calling_class_name(&self) -> Option<Atom> {
+        self.invocation.target.get_method_context().map(|ctx| ctx.class_like_metadata.original_name)
     }
 }
 
