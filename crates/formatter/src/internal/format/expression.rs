@@ -629,9 +629,18 @@ impl<'arena> Format<'arena> for PositionalArgument<'arena> {
 impl<'arena> Format<'arena> for NamedArgument<'arena> {
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
         wrap!(f, self, NamedArgument, {
+            let padding = if let Some(padding) = f.argument_state.named_argument_padding {
+                let mut spaces = bumpalo::collections::Vec::with_capacity_in(padding, f.arena);
+                spaces.resize(padding, b' ');
+                Document::String(unsafe { std::str::from_utf8_unchecked(spaces.into_bump_slice()) })
+            } else {
+                Document::empty()
+            };
+
             Document::Group(Group::new(vec![
                 in f.arena;
                 self.name.format(f),
+                padding,
                 Document::String(":"),
                 Document::space(),
                 self.value.format(f),

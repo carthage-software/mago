@@ -46,6 +46,21 @@ pub(super) fn has_new_line_in_range(text: &str, start: u32, end: u32) -> bool {
     text[start as usize..end as usize].contains('\n')
 }
 
+pub(crate) fn get_document_width(doc: &Document<'_>) -> usize {
+    match doc {
+        Document::String(s) => string_width(s),
+        Document::Array(docs) => docs.iter().map(get_document_width).sum(),
+        Document::Group(group) => group.contents.iter().map(get_document_width).sum(),
+        Document::Indent(docs) => docs.iter().map(get_document_width).sum(),
+        Document::Line(_) => 1,
+        Document::IfBreak(if_break) => {
+            get_document_width(if_break.break_contents).max(get_document_width(if_break.flat_content))
+        }
+        Document::IndentIfBreak(indent_if_break) => indent_if_break.contents.iter().map(get_document_width).sum(),
+        _ => 0,
+    }
+}
+
 /// Determines whether an expression can be "hugged" within brackets without line breaks.
 ///
 /// # Overview

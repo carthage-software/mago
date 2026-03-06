@@ -24,10 +24,10 @@ use crate::internal::format::alignment::has_blank_line_between;
 use crate::internal::format::alignment::has_comment_between;
 use crate::internal::format::assignment::AssignmentAlignment;
 use crate::internal::format::misc;
+use crate::internal::format::misc::get_document_width;
 use crate::internal::format::misc::is_expandable_expression;
 use crate::internal::format::misc::is_string_word_type;
 use crate::internal::utils::get_expression_width;
-use crate::internal::utils::string_width;
 
 #[derive(Debug, Clone, Copy)]
 pub enum ArrayLike<'arena> {
@@ -560,21 +560,6 @@ fn calculate_column_widths<'arena>(
     }
 
     Some(column_maximum_widths)
-}
-
-fn get_document_width(doc: &Document<'_>) -> usize {
-    match doc {
-        Document::String(s) => string_width(s),
-        Document::Array(docs) => docs.iter().map(get_document_width).sum(),
-        Document::Group(group) => group.contents.iter().map(get_document_width).sum(),
-        Document::Indent(docs) => docs.iter().map(get_document_width).sum(),
-        Document::Line(_) => 1,
-        Document::IfBreak(if_break) => {
-            get_document_width(if_break.break_contents).max(get_document_width(if_break.flat_content))
-        }
-        Document::IndentIfBreak(indent_if_break) => indent_if_break.contents.iter().map(get_document_width).sum(),
-        _ => 0,
-    }
 }
 
 /// Detect alignment runs in array elements for key-value pairs.
