@@ -23,8 +23,8 @@ static META: ProviderMeta = ProviderMeta::new(
 );
 
 static TARGETS: [MethodTarget; 2] = [
-    MethodTarget::any_class("get"),
-    MethodTarget::any_class("create"),
+    MethodTarget::exact("Magento\\Framework\\ObjectManagerInterface", "get"),
+    MethodTarget::exact("Magento\\Framework\\ObjectManagerInterface", "create"),
 ];
 
 #[derive(Default)]
