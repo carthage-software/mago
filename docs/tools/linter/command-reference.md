@@ -24,11 +24,11 @@ Optional. A list of specific files or directories to lint. If you provide paths 
 ## Options
 
 | Flag, Alias(es)            | Description                                                                                                                                                                            |
-| :------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+|:---------------------------|:---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `--list-rules`             | List all enabled linter rules and their descriptions.                                                                                                                                  |
 | `--json`                   | Used with `--list-rules` to output the rule information in a machine-readable JSON format.                                                                                             |
 | `--explain <RULE_CODE>`    | Provide detailed documentation for a specific linter rule (e.g., `no-redundant-nullsafe`).                                                                                             |
-| `--only <RULE_CODE>`, `-o` | Run only a specific, comma-separated list of rules, overriding the configuration file.                                                                                                 |
+| `--only <RULE_CODE>`, `-o` | Run only a specific, comma-separated list of rules. When omitted, the `only` list from `[linter]` in `mago.toml` is used (if set). Command-line `--only` overrides the config.         |
 | `--pedantic`               | Enable all linter rules for the most exhaustive analysis possible. This overrides your configuration, ignores PHP version constraints, and enables rules that are disabled by default. |
 | `--semantics`, `-s`        | Perform only the parsing and basic semantic checks without running any lint rules.                                                                                                     |
 | `--staged`                 | Only lint files that are staged in git. Designed for pre-commit hooks. Fails if not in a git repository.                                                                               |
