@@ -320,4 +320,5 @@ define_rules! {
     NoDbSchemaChange(no_db_schema_change @ NoDbSchemaChangeRule),
     NoUnescapedOutput(no_unescaped_output @ NoUnescapedOutputRule),
     NoRolesAsCapabilities(no_roles_as_capabilities @ NoRolesAsCapabilitiesRule),
+    LineLengthLimit(line_length_limit @ LineLengthLimitRule),
 }
