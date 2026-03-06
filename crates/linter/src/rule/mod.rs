@@ -315,6 +315,8 @@ define_rules! {
     RequireNamespace(require_namespace @ RequireNamespaceRule),
     SingleClassPerFile(single_class_per_file @ SingleClassPerFileRule),
     YodaConditions(yoda_conditions @ YodaConditionsRule),
+    LineLengthLimit(line_length_limit @ LineLengthLimitRule),
+    GlobalNamespaceImport(global_namespace_import @ GlobalNamespaceImportRule),
     UseWpFunctions(use_wp_functions @ UseWpFunctionsRule),
     NoDirectDbQuery(no_direct_db_query @ NoDirectDbQueryRule),
     NoDbSchemaChange(no_db_schema_change @ NoDbSchemaChangeRule),
