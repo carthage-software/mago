@@ -9,7 +9,6 @@ use mago_reporting::Issue;
 use mago_reporting::Level;
 use mago_span::HasSpan;
 use mago_syntax::ast::BinaryOperator;
-use mago_syntax::ast::Call;
 use mago_syntax::ast::Expression;
 use mago_syntax::ast::Node;
 use mago_syntax::ast::NodeKind;
@@ -223,7 +222,9 @@ fn flip_comparison_operator(op: &BinaryOperator) -> Option<&'static str> {
     }
 }
 
-/// Check if an expression is "constant-like" (literal, array, or function call)
+/// Check if an expression is "constant-like" (literal, named constant, magic constant, or array literal).
+/// Does NOT include function calls — `strlen($x)` is not constant-like for yoda purposes,
+/// matching PHP-CS-Fixer's behavior.
 const fn is_constant_like(expr: &Expression) -> bool {
     matches!(
         expr,
@@ -232,7 +233,6 @@ const fn is_constant_like(expr: &Expression) -> bool {
             | Expression::MagicConstant(_)
             | Expression::Array(_)
             | Expression::LegacyArray(_)
-            | Expression::Call(Call::Function(_))
     )
 }
 
