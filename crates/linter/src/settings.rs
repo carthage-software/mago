@@ -84,6 +84,7 @@ use crate::rule::NoLiteralPasswordConfig;
 use crate::rule::NoMultiAssignmentsConfig;
 use crate::rule::NoNestedTernaryConfig;
 use crate::rule::NoNoopConfig;
+use crate::rule::NoNullPropertyInitConfig;
 use crate::rule::NoOnlyConfig;
 use crate::rule::NoParameterShadowingConfig;
 use crate::rule::NoPhpTagTerminatorConfig;
@@ -357,6 +358,7 @@ pub struct RulesSettings {
     pub no_alternative_syntax: RuleSettings<NoAlternativeSyntaxConfig>,
     pub prefer_pre_increment: RuleSettings<PreferPreIncrementConfig>,
     pub switch_continue_to_break: RuleSettings<SwitchContinueToBreakConfig>,
+    pub no_null_property_init: RuleSettings<NoNullPropertyInitConfig>,
     pub use_wp_functions: RuleSettings<UseWpFunctionsConfig>,
     pub no_direct_db_query: RuleSettings<NoDirectDbQueryConfig>,
     pub no_db_schema_change: RuleSettings<NoDbSchemaChangeConfig>,

@@ -341,4 +341,5 @@ define_rules! {
     PreferPreIncrement(prefer_pre_increment @ PreferPreIncrementRule),
     SwitchContinueToBreak(switch_continue_to_break @ SwitchContinueToBreakRule),
     MissingDocs(missing_docs @ MissingDocsRule),
+    NoNullPropertyInit(no_null_property_init @ NoNullPropertyInitRule),
 }
