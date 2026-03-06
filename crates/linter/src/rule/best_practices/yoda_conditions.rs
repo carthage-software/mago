@@ -145,15 +145,16 @@ impl LintRule for YodaConditionsRule {
 
                 // If variable is on the left and constant is on the right, suggest Yoda condition
                 if left_is_variable && right_is_constant {
-                    let issue =
-                        Issue::new(self.cfg.level(), "Use Yoda condition style for safer comparisons")
-                            .with_code(self.meta.code)
-                            .with_annotation(
-                                Annotation::primary(binary.operator.span())
-                                    .with_message("Variable should be on the right side"),
-                            )
-                            .with_note("Yoda conditions help prevent accidental assignment bugs where `=` is used instead of `==`")
-                            .with_help("Move constant/literal to left: `5 === $count`");
+                    let issue = Issue::new(self.cfg.level(), "Use Yoda condition style for safer comparisons")
+                        .with_code(self.meta.code)
+                        .with_annotation(
+                            Annotation::primary(binary.operator.span())
+                                .with_message("Variable should be on the right side"),
+                        )
+                        .with_note(
+                            "Yoda conditions help prevent accidental assignment bugs where `=` is used instead of `==`",
+                        )
+                        .with_help("Move constant/literal to left: `5 === $count`");
 
                     let source_code = ctx.source_file.contents.as_ref();
                     ctx.collector.propose(issue, |edits| {
@@ -164,15 +165,14 @@ impl LintRule for YodaConditionsRule {
             YodaConditionsStyle::NonYoda => {
                 // Check both equality and comparison operators for NonYoda
                 if left_is_constant && right_is_variable {
-                    let issue =
-                        Issue::new(self.cfg.level(), "Use non-Yoda condition style for readability")
-                            .with_code(self.meta.code)
-                            .with_annotation(
-                                Annotation::primary(binary.operator.span())
-                                    .with_message("Variable should be on the left side"),
-                            )
-                            .with_note("Non-Yoda conditions read more naturally: `$count === 5`")
-                            .with_help("Move variable to left side of comparison");
+                    let issue = Issue::new(self.cfg.level(), "Use non-Yoda condition style for readability")
+                        .with_code(self.meta.code)
+                        .with_annotation(
+                            Annotation::primary(binary.operator.span())
+                                .with_message("Variable should be on the left side"),
+                        )
+                        .with_note("Non-Yoda conditions read more naturally: `$count === 5`")
+                        .with_help("Move variable to left side of comparison");
 
                     let source_code = ctx.source_file.contents.as_ref();
                     ctx.collector.propose(issue, |edits| {
