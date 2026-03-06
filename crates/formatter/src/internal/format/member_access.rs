@@ -267,8 +267,61 @@ impl<'arena> MemberAccessChain<'arena> {
     }
 
     #[inline]
+    fn is_first_link_already_broken(&self, f: &FormatterState) -> bool {
+        let Some(first_access) = self.accesses.first() else {
+            return false;
+        };
+
+        misc::has_new_line_in_range(
+            f.source_text,
+            self.base.span().end.offset,
+            first_access.get_operator_span().start.offset,
+        )
+    }
+
+    #[inline]
     fn is_first_link_object_method_call(&self) -> bool {
         matches!(self.accesses.first(), Some(MemberAccess::MethodCall(_) | MemberAccess::NullSafeMethodCall(_)))
+    }
+
+    fn exceeds_print_width(&self, f: &FormatterState) -> bool {
+        let Some(last_access) = self.accesses.last() else {
+            return false;
+        };
+
+        let end = match last_access.get_arguments_list() {
+            Some(args) => args.span().end.offset,
+            None => last_access.get_selector().span().end.offset,
+        };
+        let start = self.base.span().start.offset;
+
+        if misc::has_new_line_in_range(f.source_text, start, end) {
+            return false;
+        }
+
+        string_width(&f.source_text[start as usize..end as usize]) > f.settings.print_width
+    }
+
+    #[inline]
+    fn has_break_after_first_access(&self, f: &FormatterState) -> bool {
+        for (i, access) in self.accesses.iter().enumerate() {
+            if i == 0 {
+                continue;
+            }
+
+            let prev_access = &self.accesses[i - 1];
+            let prev_selector = prev_access.get_selector();
+            let prev_selector_end = match prev_access.get_arguments_list() {
+                Some(args) => args.span().end,
+                None => prev_selector.span().end,
+            };
+
+            if misc::has_new_line_in_range(f.source_text, prev_selector_end.offset, access.get_operator_span().start_offset()) {
+                return true;
+            }
+        }
+
+        false
     }
 
     #[inline]
@@ -661,7 +714,7 @@ pub(super) fn print_member_access_chain<'arena>(
         parts.push(Document::BreakParent);
     }
 
-    if matches!(f.parent_node(), Node::ExpressionStatement(_)) {
+    if matches!(f.parent_node(), Node::ExpressionStatement(_) | Node::Assignment(_) | Node::Return(_)) {
         f.set_member_access_chain_group_id(group_id);
     }
 
@@ -673,6 +726,27 @@ fn should_inline_first_access<'arena>(
     f: &FormatterState<'_, 'arena>,
     member_access_chain: &MemberAccessChain<'arena>,
 ) -> bool {
+    if f.settings.preserve_breaking_member_access_chain
+        && member_access_chain.is_first_link_object_method_call()
+        && member_access_chain.is_first_link_already_broken(f)
+    {
+        return false;
+    }
+
+    if f.settings.preserve_breaking_member_access_chain
+        && member_access_chain.is_first_link_object_method_call()
+        && member_access_chain.has_break_after_first_access(f)
+    {
+        return false;
+    }
+
+    if f.settings.preserve_breaking_member_access_chain
+        && member_access_chain.is_first_link_object_method_call()
+        && member_access_chain.exceeds_print_width(f)
+    {
+        return false;
+    }
+
     if f.settings.first_method_chain_on_new_line && member_access_chain.is_first_link_object_method_call() {
         return false;
     }
