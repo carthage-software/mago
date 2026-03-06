@@ -10,6 +10,7 @@ pub mod no_only;
 pub mod strict_assertions;
 pub mod strict_behavior;
 pub mod strict_types;
+pub mod switch_continue_to_break;
 pub mod use_specific_assertions;
 
 pub use assert_description::*;
@@ -24,4 +25,5 @@ pub use no_only::*;
 pub use strict_assertions::*;
 pub use strict_behavior::*;
 pub use strict_types::*;
+pub use switch_continue_to_break::*;
 pub use use_specific_assertions::*;
