@@ -8,6 +8,7 @@ use bumpalo::Bump;
 use mago_span::HasPosition;
 use mago_span::HasSpan;
 use mago_syntax::ast::Constant;
+use mago_syntax::ast::Construct;
 use mago_syntax::ast::Declare;
 use mago_syntax::ast::DeclareBody;
 use mago_syntax::ast::Echo;
@@ -24,6 +25,7 @@ use mago_syntax::ast::Use;
 use mago_syntax::ast::UseItem;
 use mago_syntax::ast::UseItems;
 use mago_syntax::ast::UseType;
+use mago_syntax::ast::Yield;
 
 use mago_syntax::ast::Expression;
 
@@ -40,6 +42,9 @@ use crate::internal::format::alignment::detect_statement_ref_alignment_runs;
 use crate::internal::format::alignment::get_statement_alignment;
 use crate::internal::format::assignment::AssignmentAlignment;
 use crate::internal::format::misc::has_new_line_in_range;
+use crate::settings::BlankLineBeforeStatement;
+use crate::settings::UseImportType;
+use crate::settings::UseSortAlgorithm;
 
 pub fn print_statement_sequence<'arena>(
     f: &mut FormatterState<'_, 'arena>,
@@ -306,8 +311,68 @@ const fn should_add_empty_line_after<'arena>(f: &FormatterState<'_, 'arena>, stm
 
 #[inline]
 fn should_add_empty_line_before<'arena>(f: &FormatterState<'_, 'arena>, stmt: &'arena Statement<'arena>) -> bool {
-    match stmt {
-        Statement::Return(_) => f.settings.empty_line_before_return,
+    let configured = match stmt {
+        Statement::Break(_) => f.settings.blank_line_before_statement.contains(BlankLineBeforeStatement::Break),
+        Statement::Continue(_) => f.settings.blank_line_before_statement.contains(BlankLineBeforeStatement::Continue),
+        Statement::Declare(_) => f.settings.blank_line_before_statement.contains(BlankLineBeforeStatement::Declare),
+        Statement::DoWhile(_) => f.settings.blank_line_before_statement.contains(BlankLineBeforeStatement::Do),
+        Statement::Foreach(_) => f.settings.blank_line_before_statement.contains(BlankLineBeforeStatement::Foreach),
+        Statement::For(_) => f.settings.blank_line_before_statement.contains(BlankLineBeforeStatement::For),
+        Statement::Goto(_) => f.settings.blank_line_before_statement.contains(BlankLineBeforeStatement::Goto),
+        Statement::If(_) => f.settings.blank_line_before_statement.contains(BlankLineBeforeStatement::If),
+        Statement::Return(_) => {
+            f.settings.empty_line_before_return
+                || f.settings.blank_line_before_statement.contains(BlankLineBeforeStatement::Return)
+        }
+        Statement::Switch(_) => f.settings.blank_line_before_statement.contains(BlankLineBeforeStatement::Switch),
+        Statement::Try(_) => f.settings.blank_line_before_statement.contains(BlankLineBeforeStatement::Try),
+        Statement::While(_) => f.settings.blank_line_before_statement.contains(BlankLineBeforeStatement::While),
+        Statement::Expression(expression) => should_add_empty_line_before_expression(f, &expression.expression),
+        _ => false,
+    };
+
+    configured
+        || (f.settings.blank_line_before_statement.contains(BlankLineBeforeStatement::Phpdoc)
+            && f.has_leading_docblock_comment(stmt.span()))
+}
+
+pub(super) fn should_add_empty_line_before_switch_case<'arena>(
+    f: &FormatterState<'_, 'arena>,
+    case: &'arena mago_syntax::ast::SwitchCase<'arena>,
+) -> bool {
+    match case {
+        mago_syntax::ast::SwitchCase::Expression(_) => {
+            f.settings.blank_line_before_statement.contains(BlankLineBeforeStatement::Case)
+        }
+        mago_syntax::ast::SwitchCase::Default(_) => {
+            f.settings.blank_line_before_statement.contains(BlankLineBeforeStatement::Default)
+        }
+    }
+}
+
+fn should_add_empty_line_before_expression<'arena>(
+    f: &FormatterState<'_, 'arena>,
+    expression: &'arena Expression<'arena>,
+) -> bool {
+    match expression {
+        Expression::Construct(construct) => match construct {
+            Construct::Include(_) => f.settings.blank_line_before_statement.contains(BlankLineBeforeStatement::Include),
+            Construct::IncludeOnce(_) => {
+                f.settings.blank_line_before_statement.contains(BlankLineBeforeStatement::IncludeOnce)
+            }
+            Construct::Require(_) => f.settings.blank_line_before_statement.contains(BlankLineBeforeStatement::Require),
+            Construct::RequireOnce(_) => {
+                f.settings.blank_line_before_statement.contains(BlankLineBeforeStatement::RequireOnce)
+            }
+            _ => false,
+        },
+        Expression::Throw(_) => f.settings.blank_line_before_statement.contains(BlankLineBeforeStatement::Throw),
+        Expression::Yield(r#yield) => match r#yield {
+            Yield::From(_) => f.settings.blank_line_before_statement.contains(BlankLineBeforeStatement::YieldFrom),
+            Yield::Pair(_) | Yield::Value(_) => {
+                f.settings.blank_line_before_statement.contains(BlankLineBeforeStatement::Yield)
+            }
+        },
         _ => false,
     }
 }
