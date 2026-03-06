@@ -111,6 +111,7 @@ use crate::rule::PreferArrowFunctionConfig;
 use crate::rule::PreferEarlyContinueConfig;
 use crate::rule::PreferFirstClassCallableConfig;
 use crate::rule::PreferInterfaceConfig;
+use crate::rule::PreferPreIncrementConfig;
 use crate::rule::PreferStaticClosureConfig;
 use crate::rule::PreferViewArrayConfig;
 use crate::rule::PreferWhileLoopConfig;
@@ -313,6 +314,7 @@ pub struct RulesSettings {
     pub single_class_per_file: RuleSettings<SingleClassPerFileConfig>,
     pub readable_literal: RuleSettings<ReadableLiteralConfig>,
     pub yoda_conditions: RuleSettings<YodaConditionsConfig>,
+    pub prefer_pre_increment: RuleSettings<PreferPreIncrementConfig>,
     pub use_wp_functions: RuleSettings<UseWpFunctionsConfig>,
     pub no_direct_db_query: RuleSettings<NoDirectDbQueryConfig>,
     pub no_db_schema_change: RuleSettings<NoDbSchemaChangeConfig>,
