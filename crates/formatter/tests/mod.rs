@@ -257,6 +257,7 @@ test_case!(drupal_preset);
 test_case!(symfony_preset);
 test_case!(redundant_grouping_parens);
 test_case!(null_type_hint_null_pipe_last);
+test_case!(phpdoc_reformat);
 
 // A special test case for regressions in the Psl codebase
 test_case!(psl_regressions);

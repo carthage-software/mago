@@ -579,6 +579,42 @@ impl<'arena> FormatterState<'_, 'arena> {
     fn print_comment(&self, comment: Comment) -> Document<'arena> {
         let content = &self.source_text[comment.start as usize..comment.end as usize];
 
+        // PHPDoc reformatting: parse and reconstruct multi-line docblocks
+        if comment.is_docblock && !comment.is_single_line && self.settings.phpdoc_reformat {
+            if self.get_ignore_region_for(comment.start).is_none() {
+                let span = mago_span::Span::new(
+                    self.file.id,
+                    mago_span::Position::new(comment.start),
+                    mago_span::Position::new(comment.end),
+                );
+
+                if let Some(reformatted) =
+                    super::docblock::reformat_docblock(self.arena, &self.settings, content, span)
+                {
+                    if reformatted.is_empty() {
+                        // Empty docblock — signal removal by returning empty string.
+                        // The caller will still emit it; this is the best we can do
+                        // without restructuring the comment pipeline.
+                        return Document::String("/** */");
+                    }
+
+                    // Build a Group document with hard line breaks (same as existing multiline handling)
+                    let lines = reformatted.lines().collect::<std::vec::Vec<_>>();
+                    let mut contents =
+                        bumpalo::collections::Vec::with_capacity_in(lines.len() * 2, self.arena);
+                    for (i, line) in lines.iter().enumerate() {
+                        contents.push(Document::String(self.arena.alloc_str(line)));
+                        if i < lines.len() - 1 {
+                            contents.push(Document::Line(crate::document::Line::hard()));
+                        }
+                    }
+
+                    return Document::Group(crate::document::Group::new(contents));
+                }
+                // Fall through to existing formatting on parse failure
+            }
+        }
+
         if comment.is_inline_comment() {
             if !comment.is_single_line {
                 return Document::String(content);
