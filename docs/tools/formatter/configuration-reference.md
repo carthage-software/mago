@@ -132,10 +132,10 @@ public function bar(
 | `inline-empty-constructor-braces` | `boolean` | `true` | Place empty constructor bodies on the same line. |
 | `inline-empty-classlike-braces` | `boolean` | `true` | Place empty class-like bodies on the same line. |
 | `inline-empty-anonymous-class-braces` | `boolean` | `true` | Place empty anonymous class bodies on the same line. |
-| `method-chain-breaking-style`| `enum("same-line", "next-line")` | `"next-line"` | How to break method chains. |
-| `first-method-chain-on-new-line` | `boolean` | `true` | When method chaining breaks across lines, place the first method call on a new line. Only applies to object method calls (`->`, `?->`), not static methods (`::`) or property access ([PER-CS 4.7](https://www.php-fig.org/per/coding-style/#47-method-and-function-calls) compliant). |
-| `method-chain-semicolon-on-next-line` | `boolean` | `false` | When a method chain breaks across multiple lines, place the semicolon on its own line. |
-| `preserve-breaking-member-access-chain` | `boolean` | `false` | Preserve existing line breaks in method chains. |
+| `method-chain-breaking-style`| `enum("same-line", "next-line")` | `"next-line"` | How to break method chains once the formatter decides a chain should span multiple lines. |
+| `first-method-chain-on-new-line` | `boolean` | `true` | When an object method chain (`->`, `?->`) breaks across lines, place the first object method call on a new line. Static access (`::`) stays attached to the target on its left ([PER-CS 4.7](https://www.php-fig.org/per/coding-style/#47-method-and-function-calls) compliant). |
+| `method-chain-semicolon-on-next-line` | `boolean` | `false` | When a multiline member-access chain is emitted as a statement, place the terminating semicolon on its own line. Single-line statements keep the semicolon on the same line. |
+| `preserve-breaking-member-access-chain` | `boolean` | `false` | Preserve existing line breaks in member-access chains. Existing multiline object chains stay multiline, and long single-line object chains may still expand to respect `print-width`. Static access (`::`) remains attached to its target. |
 | `preserve-breaking-argument-list` | `boolean` | `false` | Preserve existing line breaks in argument lists. |
 | `preserve-breaking-array-like` | `boolean` | `true` | Preserve existing line breaks in array-like structures. |
 | `preserve-breaking-parameter-list` | `boolean` | `false` | Preserve existing line breaks in parameter lists. |
