@@ -80,6 +80,8 @@ test_case!(use_sorting_with_expansion);
 test_case!(use_sorting_with_grouping);
 test_case!(use_sorting_with_grouping_and_separation);
 test_case!(use_sorting_separation_expansion);
+test_case!(ordered_imports);
+test_case!(ordered_imports_length);
 test_case!(use_no_change);
 test_case!(use_mixed_use_list);
 test_case!(use_mixed_use_list_expanded);
