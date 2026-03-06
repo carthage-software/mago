@@ -45,7 +45,6 @@ use crate::rule::LowercaseKeywordConfig;
 use crate::rule::LowercaseTypeHintConfig;
 use crate::rule::MiddlewareInRoutesConfig;
 use crate::rule::NoAliasFunctionConfig;
-use crate::rule::NoArrayMergeInLoopConfig;
 use crate::rule::NoAssignInArgumentConfig;
 use crate::rule::NoAssignInConditionConfig;
 use crate::rule::NoBooleanFlagParameterConfig;
@@ -53,7 +52,6 @@ use crate::rule::NoClosingTagConfig;
 use crate::rule::NoDbSchemaChangeConfig;
 use crate::rule::NoDebugSymbolsConfig;
 use crate::rule::NoDirectDbQueryConfig;
-use crate::rule::NoDirectExceptionThrowConfig;
 use crate::rule::NoElseClauseConfig;
 use crate::rule::NoEmptyCatchClauseConfig;
 use crate::rule::NoEmptyCommentConfig;
@@ -61,7 +59,6 @@ use crate::rule::NoEmptyConfig;
 use crate::rule::NoEmptyLoopConfig;
 use crate::rule::NoErrorControlOperatorConfig;
 use crate::rule::NoEvalConfig;
-use crate::rule::NoExecutableRegexModifierConfig;
 use crate::rule::NoFfiConfig;
 use crate::rule::NoGlobalConfig;
 use crate::rule::NoGotoConfig;
@@ -82,7 +79,6 @@ use crate::rule::NoProxyInterceptorInConstructorConfig;
 use crate::rule::NoOnlyConfig;
 use crate::rule::NoPhpTagTerminatorConfig;
 use crate::rule::NoProtectedInFinalConfig;
-use crate::rule::NoRawSqlQueryConfig;
 use crate::rule::NoRedundantBlockConfig;
 use crate::rule::NoRedundantContinueConfig;
 use crate::rule::NoRedundantFileConfig;
@@ -336,10 +332,6 @@ pub struct RulesSettings {
     pub no_this_in_template: RuleSettings<NoThisInTemplateConfig>,
     pub no_test_namespace_import: RuleSettings<NoTestNamespaceImportConfig>,
     pub no_literal_namespace_string: RuleSettings<NoLiteralNamespaceStringConfig>,
-    pub no_array_merge_in_loop: RuleSettings<NoArrayMergeInLoopConfig>,
-    pub no_direct_exception_throw: RuleSettings<NoDirectExceptionThrowConfig>,
-    pub no_executable_regex_modifier: RuleSettings<NoExecutableRegexModifierConfig>,
-    pub no_raw_sql_query: RuleSettings<NoRawSqlQueryConfig>,
 }
 
 impl<C: Config> RuleSettings<C> {

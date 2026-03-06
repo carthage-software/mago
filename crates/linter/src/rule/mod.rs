@@ -327,8 +327,4 @@ define_rules! {
     NoThisInTemplate(no_this_in_template @ NoThisInTemplateRule),
     NoTestNamespaceImport(no_test_namespace_import @ NoTestNamespaceImportRule),
     NoLiteralNamespaceString(no_literal_namespace_string @ NoLiteralNamespaceStringRule),
-    NoArrayMergeInLoop(no_array_merge_in_loop @ NoArrayMergeInLoopRule),
-    NoDirectExceptionThrow(no_direct_exception_throw @ NoDirectExceptionThrowRule),
-    NoExecutableRegexModifier(no_executable_regex_modifier @ NoExecutableRegexModifierRule),
-    NoRawSqlQuery(no_raw_sql_query @ NoRawSqlQueryRule),
 }

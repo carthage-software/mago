@@ -13,9 +13,7 @@ This document details the rules available in the `BestPractices` category.
 | Final Controller | [`final-controller`](#final-controller) |
 | Loop Does Not Iterate | [`loop-does-not-iterate`](#loop-does-not-iterate) |
 | Middleware In Routes | [`middleware-in-routes`](#middleware-in-routes) |
-| No array_merge In Loop | [`no-array-merge-in-loop`](#no-array-merge-in-loop) |
 | No Direct Database Queries | [`no-direct-db-query`](#no-direct-db-query) |
-| No Direct Exception Throw | [`no-direct-exception-throw`](#no-direct-exception-throw) |
 | No ini_set | [`no-ini-set`](#no-ini-set) |
 | No Inline | [`no-inline`](#no-inline) |
 | No Literal Namespace String | [`no-literal-namespace-string`](#no-literal-namespace-string) |
@@ -233,47 +231,6 @@ class UserController extends Controller
 ```
 
 
-## <a id="no-array-merge-in-loop"></a>`no-array-merge-in-loop`
-
-Flags `array_merge()` calls inside `foreach`, `for`, `while`, and `do-while` loops.
-Calling `array_merge()` in a loop causes quadratic time complexity because it copies
-the entire array on each iteration. Use spread operator or collect values and merge once.
-
-
-
-### Configuration
-
-| Option | Type | Default |
-| :--- | :--- | :--- |
-| `enabled` | `boolean` | `true` |
-| `level` | `string` | `"warning"` |
-
-### Examples
-
-#### Correct code
-
-```php
-<?php
-
-$collected = [];
-foreach ($items as $item) {
-    $collected[] = $item;
-}
-$result = array_merge($base, $collected);
-```
-
-#### Incorrect code
-
-```php
-<?php
-
-$result = [];
-foreach ($items as $item) {
-    $result = array_merge($result, $item);
-}
-```
-
-
 ## <a id="no-direct-db-query"></a>`no-direct-db-query`
 
 This rule flags all direct method calls on the global `$wpdb` object. Direct database queries
@@ -309,40 +266,6 @@ $posts = get_posts(['author' => $author_id]);
 
 global $wpdb;
 $posts = $wpdb->get_results("SELECT * FROM {$wpdb->posts} WHERE post_author = 1");
-```
-
-
-## <a id="no-direct-exception-throw"></a>`no-direct-exception-throw`
-
-Flags direct throwing of the generic `\Exception` base class. Use context-specific
-exception types instead (e.g. `InvalidArgumentException`, `RuntimeException`,
-or custom exception classes) for better error handling and debugging.
-
-
-
-### Configuration
-
-| Option | Type | Default |
-| :--- | :--- | :--- |
-| `enabled` | `boolean` | `true` |
-| `level` | `string` | `"warning"` |
-
-### Examples
-
-#### Correct code
-
-```php
-<?php
-
-throw new \InvalidArgumentException('Invalid value');
-```
-
-#### Incorrect code
-
-```php
-<?php
-
-throw new \Exception('Something went wrong');
 ```
 
 
