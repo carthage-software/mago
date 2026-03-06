@@ -322,4 +322,12 @@ define_rules! {
     NoDbSchemaChange(no_db_schema_change @ NoDbSchemaChangeRule),
     NoUnescapedOutput(no_unescaped_output @ NoUnescapedOutputRule),
     NoRolesAsCapabilities(no_roles_as_capabilities @ NoRolesAsCapabilitiesRule),
+    PreferPreIncrement(prefer_pre_increment @ PreferPreIncrementRule),
+    SwitchContinueToBreak(switch_continue_to_break @ SwitchContinueToBreakRule),
+    NoNullPropertyInit(no_null_property_init @ NoNullPropertyInitRule),
+    NoUnusedClosureImport(no_unused_closure_import @ NoUnusedClosureImportRule),
+    NoAlternativeSyntax(no_alternative_syntax @ NoAlternativeSyntaxRule),
+    NoShortBoolCast(no_short_bool_cast @ NoShortBoolCastRule),
+    NoUnneededImportAlias(no_unneeded_import_alias @ NoUnneededImportAliasRule),
+    NoBreakComment(no_break_comment @ NoBreakCommentRule),
 }
