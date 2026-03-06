@@ -160,6 +160,7 @@ schemars = { workspace = true }
 [dev-dependencies]
 temp-env = "0.3.6"
 pretty_assertions = { workspace = true }
+serde_json = { workspace = true }
 
 [build-dependencies]
 mago-prelude = { workspace = true, features = ["build"] }

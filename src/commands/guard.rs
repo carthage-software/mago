@@ -50,6 +50,7 @@ use mago_guard::settings::GuardMode;
 use mago_prelude::Prelude;
 
 use crate::commands::args::baseline_reporting::BaselineReportingArgs;
+use crate::commands::stdin_input;
 use crate::config::Configuration;
 use crate::consts::PRELUDE_BYTES;
 use crate::error::Error;
@@ -104,6 +105,12 @@ pub struct GuardCommand {
     /// restrictions) are checked. Structural rules are skipped.
     #[arg(long, conflicts_with = "structural")]
     pub perimeter: bool,
+
+    /// Read the file content from stdin and use the given path for baseline and reporting.
+    ///
+    /// Intended for editor integrations: pipe unsaved buffer content and pass the real file path.
+    #[arg(long, default_value_t = false)]
+    pub stdin_input: bool,
 
     /// Arguments related to reporting issues with baseline support.
     #[clap(flatten)]
@@ -177,11 +184,20 @@ impl GuardCommand {
         let editor_url = configuration.editor_url.take();
         let mut orchestrator = create_orchestrator(&configuration, color_choice, false, true, false);
         orchestrator.add_exclude_patterns(configuration.guard.excludes.iter());
-        if !self.path.is_empty() {
-            orchestrator.set_source_paths(self.path.iter().map(|p| p.to_string_lossy().to_string()));
+
+        let stdin_override = stdin_input::resolve_stdin_override(
+            self.stdin_input,
+            &self.path,
+            &configuration.source.workspace,
+            &mut orchestrator,
+        )?;
+
+        if !self.stdin_input && !self.path.is_empty() {
+            stdin_input::set_source_paths_from_paths(&mut orchestrator, &self.path);
         }
 
-        let mut database = orchestrator.load_database(&configuration.source.workspace, true, Some(database))?;
+        let mut database =
+            orchestrator.load_database(&configuration.source.workspace, true, Some(database), stdin_override)?;
 
         if !database.files().any(|f| f.file_type == FileType::Host) {
             tracing::warn!("No files found to check with guard.");
