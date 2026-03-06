@@ -47,7 +47,7 @@ impl MethodCallHook for CollectionViaFactoryHook {
         for class_name in get_receiver_class_names(call, context) {
             if context.is_instance_of(&class_name, "Magento\\Framework\\Model\\AbstractModel") {
                 context.report(
-                    IssueCode::MagentoCollectionViaFactory,
+                    IssueCode::DeprecatedMethod,
                     Issue::warning(format!(
                         "Collections should be retrieved via factory, not via `{}::getCollection()`.",
                         class_name,

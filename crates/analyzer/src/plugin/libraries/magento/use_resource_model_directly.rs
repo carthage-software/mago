@@ -53,7 +53,7 @@ impl MethodCallHook for UseResourceModelDirectlyHook {
         for class_name in get_receiver_class_names(call, context) {
             if context.is_instance_of(&class_name, "Magento\\Framework\\Model\\AbstractModel") {
                 context.report(
-                    IssueCode::MagentoUseResourceModelDirectly,
+                    IssueCode::DeprecatedMethod,
                     Issue::warning(format!(
                         "`{}::{}()` is deprecated. Use resource models directly.",
                         class_name, matched,

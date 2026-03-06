@@ -73,7 +73,7 @@ impl MethodCallHook for CollectionMockSubclassHook {
         // Check if the class extends Magento\Framework\Data\Collection
         if !context.is_instance_of(class_string_value.as_str(), "Magento\\Framework\\Data\\Collection") {
             context.report(
-                IssueCode::MagentoCollectionMockSubclass,
+                IssueCode::InvalidArgument,
                 Issue::error(format!(
                     "`{}` does not extend `\\Magento\\Framework\\Data\\Collection` as required by `getCollectionMock()`.",
                     class_string_value,

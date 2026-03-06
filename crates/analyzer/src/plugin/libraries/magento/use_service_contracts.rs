@@ -53,7 +53,7 @@ impl MethodCallHook for UseServiceContractsHook {
         for class_name in get_receiver_class_names(call, context) {
             if context.is_instance_of(&class_name, "Magento\\Framework\\Model\\AbstractModel") {
                 context.report(
-                    IssueCode::MagentoUseServiceContracts,
+                    IssueCode::DeprecatedMethod,
                     Issue::warning(format!(
                         "Use service contracts to persist entities instead of `{}::{}()`.",
                         class_name, matched,

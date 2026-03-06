@@ -88,34 +88,34 @@ namespace Vendor\Module\Test {
 
     function test_use_service_contracts(Product $product): void
     {
-        /** @mago-expect analysis:magento-use-service-contracts */
+        /** @mago-expect analysis:deprecated-method */
         $product->save();
 
-        /** @mago-expect analysis:magento-use-service-contracts */
+        /** @mago-expect analysis:deprecated-method */
         $product->load(1);
 
-        /** @mago-expect analysis:magento-use-service-contracts */
+        /** @mago-expect analysis:deprecated-method */
         $product->delete();
     }
 
     function test_collection_via_factory(Product $product): void
     {
-        /** @mago-expect analysis:magento-collection-via-factory */
+        /** @mago-expect analysis:deprecated-method */
         $product->getCollection();
     }
 
     function test_use_resource_model_directly(Product $product): void
     {
-        /** @mago-expect analysis:magento-use-resource-model-directly */
+        /** @mago-expect analysis:deprecated-method */
         $product->getResource();
 
-        /** @mago-expect analysis:magento-use-resource-model-directly */
+        /** @mago-expect analysis:deprecated-method */
         $product->_getResource();
     }
 
     function test_no_set_template_in_block(ProductView $block): void
     {
-        /** @mago-expect analysis:magento-no-set-template-in-block */
+        /** @mago-expect analysis:deprecated-method */
         $block->setTemplate('Vendor_Module::product/view.phtml');
     }
 
@@ -125,7 +125,7 @@ namespace Vendor\Module\Test {
         $product = $om->get(Product::class);
 
         // Since $product is resolved as Product (extends AbstractModel), save() is flagged
-        /** @mago-expect analysis:magento-use-service-contracts */
+        /** @mago-expect analysis:deprecated-method */
         $product->save();
     }
 }

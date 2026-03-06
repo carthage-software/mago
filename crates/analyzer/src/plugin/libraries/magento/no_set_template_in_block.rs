@@ -49,7 +49,7 @@ impl MethodCallHook for NoSetTemplateInBlockHook {
         for class_name in get_receiver_class_names(call, context) {
             if context.is_instance_of(&class_name, "Magento\\Framework\\View\\Element\\Template") {
                 context.report(
-                    IssueCode::MagentoNoSetTemplateInBlock,
+                    IssueCode::DeprecatedMethod,
                     Issue::warning(format!(
                         "Calling `{}::setTemplate()` is discouraged in Block classes.",
                         class_name
