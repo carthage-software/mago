@@ -1490,6 +1490,7 @@ dependencies = [
  "foldhash 0.2.0",
  "indoc",
  "mago-database",
+ "mago-docblock",
  "mago-php-version",
  "mago-span",
  "mago-syntax",
