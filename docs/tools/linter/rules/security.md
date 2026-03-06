@@ -14,6 +14,7 @@ This document details the rules available in the `Security` category.
 | No Debug Symbols | [`no-debug-symbols`](#no-debug-symbols) |
 | No Insecure Comparison | [`no-insecure-comparison`](#no-insecure-comparison) |
 | No Literal Password | [`no-literal-password`](#no-literal-password) |
+| No Raw SQL Query | [`no-raw-sql-query`](#no-raw-sql-query) |
 | No Roles As Capabilities | [`no-roles-as-capabilities`](#no-roles-as-capabilities) |
 | No Short Opening Tag | [`no-short-opening-tag`](#no-short-opening-tag) |
 | No Unescaped Output | [`no-unescaped-output`](#no-unescaped-output) |
@@ -229,6 +230,40 @@ $password = getenv('DB_PASSWORD');
 <?php
 
 $password = "supersecret";
+```
+
+
+## <a id="no-raw-sql-query"></a>`no-raw-sql-query`
+
+Flags string literals that contain raw SQL queries. Raw SQL in application code
+bypasses the database abstraction layer and can introduce SQL injection
+vulnerabilities. Use parameterized queries or the framework's query builder instead.
+
+
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `true` |
+| `level` | `string` | `"warning"` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+
+$collection->addFieldToFilter('status', 'active');
+```
+
+#### Incorrect code
+
+```php
+<?php
+
+$sql = "SELECT * FROM catalog_product_entity WHERE status = 1";
 ```
 
 
