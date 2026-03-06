@@ -192,6 +192,9 @@ const DEFAULT_PRESET: FormatSettings = FormatSettings {
     separate_class_like_members: true,
     indent_heredoc: true,
     uppercase_literal_keyword: false,
+    phpdoc_reformat: false,
+    phpdoc_align: PhpdocAlign::None,
+    phpdoc_null_position: PhpdocNullPosition::Keep,
 };
 
 /// The PSR-12 formatter preset.
@@ -276,6 +279,9 @@ const PSR12_PRESET: FormatSettings = FormatSettings {
     separate_class_like_members: true,
     indent_heredoc: true,
     uppercase_literal_keyword: false,
+    phpdoc_reformat: false,
+    phpdoc_align: PhpdocAlign::None,
+    phpdoc_null_position: PhpdocNullPosition::Keep,
 };
 
 /// The Pint formatter preset (Laravel Pint compatible).
@@ -360,6 +366,9 @@ const PINT_PRESET: FormatSettings = FormatSettings {
     separate_class_like_members: true,
     indent_heredoc: true,
     uppercase_literal_keyword: false,
+    phpdoc_reformat: false,
+    phpdoc_align: PhpdocAlign::None,
+    phpdoc_null_position: PhpdocNullPosition::Keep,
 };
 
 /// The Tempest formatter preset (Tempest framework compatible).
@@ -444,6 +453,9 @@ const TEMPEST_PRESET: FormatSettings = FormatSettings {
     separate_class_like_members: true,
     indent_heredoc: false,
     uppercase_literal_keyword: false,
+    phpdoc_reformat: false,
+    phpdoc_align: PhpdocAlign::None,
+    phpdoc_null_position: PhpdocNullPosition::Keep,
 };
 
 /// The Hack formatter preset (`hackfmt` compatible).
@@ -528,6 +540,9 @@ const HACK_PRESET: FormatSettings = FormatSettings {
     separate_class_like_members: true,
     indent_heredoc: false,
     uppercase_literal_keyword: false,
+    phpdoc_reformat: false,
+    phpdoc_align: PhpdocAlign::None,
+    phpdoc_null_position: PhpdocNullPosition::Keep,
 };
 
 /// The Drupal formatter preset.
@@ -612,4 +627,7 @@ const DRUPAL_PRESET: FormatSettings = FormatSettings {
     separate_class_like_members: true,
     indent_heredoc: true,
     uppercase_literal_keyword: true,
+    phpdoc_reformat: false,
+    phpdoc_align: PhpdocAlign::None,
+    phpdoc_null_position: PhpdocNullPosition::Keep,
 };

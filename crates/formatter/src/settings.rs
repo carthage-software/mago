@@ -1004,6 +1004,44 @@ generate_formatter_settings! {
     ///
     /// Default: false
     uppercase_literal_keyword: bool => "default_false",
+
+    /// Whether to reformat PHPDoc blocks (sort tags, align columns, normalize null position).
+    ///
+    /// Default: false
+    phpdoc_reformat: bool => "default_false",
+
+    /// Alignment style for PHPDoc tags.
+    ///
+    /// With `Vertical`, tag types, variables, and descriptions are aligned in columns:
+    /// ```php
+    /// /**
+    ///  * @param string      $name  The name
+    ///  * @param integer     $id    The ID
+    ///  *
+    ///  * @return string|null
+    ///  */
+    /// ```
+    ///
+    /// With `None`, no alignment is applied:
+    /// ```php
+    /// /**
+    ///  * @param string $name The name
+    ///  * @param integer $id The ID
+    ///  *
+    ///  * @return string|null
+    ///  */
+    /// ```
+    ///
+    /// Default: `None`
+    phpdoc_align: PhpdocAlign => "PhpdocAlign::default",
+
+    /// Position of `null` in PHPDoc union types.
+    ///
+    /// With `Last`, `null` is moved to the end: `string|null`
+    /// With `Keep`, the original position is preserved: `null|string`
+    ///
+    /// Default: `Keep`
+    phpdoc_null_position: PhpdocNullPosition => "PhpdocNullPosition::default",
 }
 
 impl Default for FormatSettings {
@@ -1140,6 +1178,26 @@ impl NullTypeHint {
     pub fn is_question(&self) -> bool {
         *self == Self::Question
     }
+}
+
+/// Alignment style for PHPDoc tags.
+#[derive(Default, Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, JsonSchema)]
+pub enum PhpdocAlign {
+    #[default]
+    #[serde(alias = "none")]
+    None,
+    #[serde(alias = "vertical")]
+    Vertical,
+}
+
+/// Position of `null` in PHPDoc union types.
+#[derive(Default, Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, JsonSchema)]
+pub enum PhpdocNullPosition {
+    #[default]
+    #[serde(alias = "keep")]
+    Keep,
+    #[serde(alias = "last")]
+    Last,
 }
 
 fn default_print_width() -> usize {

@@ -561,28 +561,14 @@ impl<'arena> FormatterState<'_, 'arena> {
                     mago_span::Position::new(comment.end),
                 );
 
-                if let Some(reformatted) =
+                if let Some(document) =
                     super::docblock::reformat_docblock(self.arena, &self.settings, content, span)
                 {
-                    if reformatted.is_empty() {
-                        // Empty docblock — signal removal by returning empty string.
-                        // The caller will still emit it; this is the best we can do
-                        // without restructuring the comment pipeline.
+                    if matches!(document, Document::String("")) {
                         return Document::String("/** */");
                     }
 
-                    // Build a Group document with hard line breaks (same as existing multiline handling)
-                    let lines = reformatted.lines().collect::<std::vec::Vec<_>>();
-                    let mut contents =
-                        bumpalo::collections::Vec::with_capacity_in(lines.len() * 2, self.arena);
-                    for (i, line) in lines.iter().enumerate() {
-                        contents.push(Document::String(self.arena.alloc_str(line)));
-                        if i < lines.len() - 1 {
-                            contents.push(Document::Line(crate::document::Line::hard()));
-                        }
-                    }
-
-                    return Document::Group(crate::document::Group::new(contents));
+                    return document;
                 }
                 // Fall through to existing formatting on parse failure
             }

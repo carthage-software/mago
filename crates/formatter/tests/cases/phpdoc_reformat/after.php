@@ -8,10 +8,10 @@ declare(strict_types=1);
 class UserService
 {
     /**
-     * @param bool        $active
+     * @param boolean     $active
      * @param string|null $name   The user name
      *
-     * @return int
+     * @return integer
      *
      * @throws \RuntimeException
      */
@@ -21,14 +21,14 @@ class UserService
     }
 
     /**
-     * @var string
+     * @type string
      */
     private string $foo;
 
     /**
-     * @param int         $id
+     * @param integer     $id
      * @param string|null $email    The email address
-     * @param bool        $verified
+     * @param boolean     $verified
      *
      * @return void
      */
@@ -37,10 +37,10 @@ class UserService
     /** */
 
     /**
-     * @param float $amount
-     * @param float $tax
+     * @param double $amount
+     * @param real   $tax
      *
-     * @return bool
+     * @return boolean
      */
     public function processPayment(float $amount, float $tax): bool
     {
@@ -50,7 +50,7 @@ class UserService
     /**
      * Get user by ID.
      *
-     * @param int $id The user ID
+     * @param integer $id The user ID
      *
      * @return UserInterface|null The user or null
      *

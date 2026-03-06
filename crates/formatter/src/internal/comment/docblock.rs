@@ -1,64 +1,56 @@
 use bumpalo::Bump;
+use bumpalo::collections::Vec as BumpVec;
 
 use mago_docblock::document::Element;
 use mago_docblock::document::TagKind;
+use mago_docblock::tag::split_tag_content;
 use mago_span::Span;
 
+use crate::document::BreakMode;
+use crate::document::Document;
+use crate::document::Group;
+use crate::document::Line;
 use crate::settings::FormatSettings;
 use crate::settings::PhpdocAlign;
 use crate::settings::PhpdocNullPosition;
 
 /// A parsed tag line ready for reconstruction.
 struct TagLine<'a> {
-    /// The tag name including `@`, e.g. `@param`.
     tag_name: &'a str,
-    /// The type portion, e.g. `string|null`. Already normalized.
     type_str: Option<String>,
-    /// The variable name, e.g. `$name`.
     variable: Option<String>,
-    /// The remainder description (single-line).
     description: String,
-    /// Sort priority: @param=0, @return=1, @throws=2, other=3.
     priority: u8,
-    /// Original index for stable sort.
     original_index: usize,
-    /// If the tag has multi-line content, store the raw reconstructed lines
-    /// (each line WITHOUT the ` * ` prefix). When set, type_str/variable/description are ignored.
-    raw_lines: Option<Vec<String>>,
+    raw_lines: Option<std::vec::Vec<String>>,
 }
 
-/// Attempt to reformat a docblock comment.
+/// Attempt to reformat a docblock comment, returning a `Document` IR.
 ///
-/// Returns `Some(reformatted)` allocated in the arena, or `None` if the docblock
-/// should be removed entirely (empty docblock → `no_empty_phpdoc`).
+/// Returns `Some(Document)` with the reformatted docblock, or `None` on parse
+/// failure so the caller falls through to default formatting.
 ///
-/// On parse failure, returns `None` so the caller falls through to default formatting.
+/// An empty `Document::String("")` signals an empty docblock.
 pub(crate) fn reformat_docblock<'arena>(
     arena: &'arena Bump,
     settings: &FormatSettings,
     content: &str,
     span: Span,
-) -> Option<&'arena str> {
-    // Only process multi-line docblocks
+) -> Option<Document<'arena>> {
     if !content.starts_with("/**") || !content.contains('\n') {
         return None;
     }
 
-    // Allocate content in the arena for the parser
     let arena_content = arena.alloc_str(content);
-
     let doc = mago_docblock::parse_phpdoc_with_span(arena, arena_content, span).ok()?;
 
-    // Skip docblocks containing code blocks — their formatting is too complex
-    // to reconstruct reliably and idempotently.
     let has_code_block = doc.elements.iter().any(|e| matches!(e, Element::Code(_)));
     if has_code_block {
         return None;
     }
 
-    // Separate description elements from tag elements
-    let mut description_lines: Vec<String> = Vec::new();
-    let mut tag_lines: Vec<TagLine<'_>> = Vec::new();
+    let mut description_lines: std::vec::Vec<String> = std::vec::Vec::new();
+    let mut tag_lines: std::vec::Vec<TagLine<'_>> = std::vec::Vec::new();
     let mut tag_index: usize = 0;
     let mut seen_tag = false;
 
@@ -66,7 +58,6 @@ pub(crate) fn reformat_docblock<'arena>(
         match element {
             Element::Text(text) => {
                 if !seen_tag {
-                    // Description text: reconstruct from segments
                     for segment in text.segments.iter() {
                         match segment {
                             mago_docblock::document::TextSegment::Paragraph { content: para, .. } => {
@@ -93,52 +84,18 @@ pub(crate) fn reformat_docblock<'arena>(
                     }
                 }
             }
-            Element::Code(code) => {
-                if !seen_tag {
-                    if code.directives.is_empty() {
-                        description_lines.push(format!("```\n{}\n```", code.content));
-                    } else {
-                        let directives: Vec<&str> =
-                            code.directives.iter().copied().collect();
-                        description_lines
-                            .push(format!("```{}\n{}\n```", directives.join(" "), code.content));
-                    }
-                }
-            }
             Element::Tag(tag) => {
                 seen_tag = true;
 
-                let kind = tag.kind;
                 let tag_name_str = tag.name;
-
-                // Filter out @access and @package tags
-                if matches!(kind, TagKind::Access | TagKind::Package) {
-                    continue;
-                }
-
-                // Rename alias tags
-                let effective_name = match kind {
-                    TagKind::Type => "var",
-                    _ => {
-                        if tag_name_str == "link" {
-                            "see"
-                        } else {
-                            tag_name_str
-                        }
-                    }
-                };
-
+                let kind = tag.kind;
                 let priority = tag_priority(kind);
-
                 let desc = tag.description.trim();
 
-                // Check if the description contains newlines — if so, this is a multi-line
-                // tag (e.g. @return array{\n *     id: int, ... }) that we should preserve
-                // structurally but still apply transformations to the first line.
                 if desc.contains('\n') {
-                    let raw = build_multiline_tag_raw(effective_name, desc, settings);
+                    let raw = build_multiline_tag_raw(tag_name_str, desc, settings);
                     tag_lines.push(TagLine {
-                        tag_name: arena.alloc_str(&format!("@{}", effective_name)),
+                        tag_name: arena.alloc_str(&format!("@{}", tag_name_str)),
                         type_str: None,
                         variable: None,
                         description: String::new(),
@@ -150,22 +107,18 @@ pub(crate) fn reformat_docblock<'arena>(
                     continue;
                 }
 
-                let (type_str, variable, rest) = parse_tag_parts(desc, kind);
+                let (type_str, variable, rest) = parse_tag_parts(desc, kind, tag.description_span);
 
-                // Apply scalar normalization to type
                 let type_str = type_str.map(|t| {
-                    let mut t = t;
-                    if settings.phpdoc_scalar_types {
-                        t = normalize_scalar_types(&t);
-                    }
                     if settings.phpdoc_null_position == PhpdocNullPosition::Last {
-                        t = move_null_to_end(&t);
+                        move_null_to_end(&t)
+                    } else {
+                        t
                     }
-                    t
                 });
 
                 tag_lines.push(TagLine {
-                    tag_name: arena.alloc_str(&format!("@{}", effective_name)),
+                    tag_name: arena.alloc_str(&format!("@{}", tag_name_str)),
                     type_str,
                     variable,
                     description: rest,
@@ -176,14 +129,9 @@ pub(crate) fn reformat_docblock<'arena>(
                 tag_index += 1;
             }
             Element::Line(_) => {
-                if !seen_tag {
-                    // Preserve blank lines in description area
-                    // Only add if we already have description content (avoid leading blanks)
-                    if !description_lines.is_empty() {
-                        description_lines.push(String::new());
-                    }
+                if !seen_tag && !description_lines.is_empty() {
+                    description_lines.push(String::new());
                 }
-                // In tag area, we handle spacing ourselves via group separators
             }
             Element::Annotation(ann) => {
                 if !seen_tag {
@@ -194,16 +142,17 @@ pub(crate) fn reformat_docblock<'arena>(
                     }
                 }
             }
+            _ => {}
         }
     }
 
     // Trim trailing empty lines from description
-    while description_lines.last().map_or(false, |l| l.is_empty()) {
+    while description_lines.last().is_some_and(|l| l.is_empty()) {
         description_lines.pop();
     }
 
-    // Collapse consecutive blank lines in description (no more than one)
-    let mut deduped_desc: Vec<String> = Vec::new();
+    // Collapse consecutive blank lines
+    let mut deduped_desc: std::vec::Vec<String> = std::vec::Vec::new();
     let mut prev_blank = false;
     for line in description_lines {
         if line.is_empty() {
@@ -218,36 +167,36 @@ pub(crate) fn reformat_docblock<'arena>(
     }
     let description_lines = deduped_desc;
 
-    // If both description and tags are empty, signal removal (no_empty_phpdoc)
     if description_lines.is_empty() && tag_lines.is_empty() {
-        return Some(""); // empty string signals removal to caller
+        return Some(Document::String(""));
     }
 
-    // Sort tags: stable sort by priority
+    // Sort tags by priority (stable)
     tag_lines.sort_by(|a, b| a.priority.cmp(&b.priority).then(a.original_index.cmp(&b.original_index)));
 
-    // Build the output
-    let mut output = String::with_capacity(content.len());
-    output.push_str("/**");
+    // Build Document IR
+    let mut parts = BumpVec::with_capacity_in(
+        2 + description_lines.len() * 2 + tag_lines.len() * 2 + 4,
+        arena,
+    );
 
-    // Description lines
+    parts.push(Document::String("/**"));
+
     for line in &description_lines {
-        output.push('\n');
+        parts.push(Document::Line(Line::hard()));
         if line.is_empty() {
-            output.push_str(" *");
+            parts.push(Document::String(" *"));
         } else {
-            output.push_str(" * ");
-            output.push_str(line);
+            parts.push(Document::String(arena.alloc_str(&format!(" * {}", line))));
         }
     }
 
     // Separator between description and tags
     if !description_lines.is_empty() && !tag_lines.is_empty() {
-        output.push('\n');
-        output.push_str(" *");
+        parts.push(Document::Line(Line::hard()));
+        parts.push(Document::String(" *"));
     }
 
-    // Tags — potentially with vertical alignment
     if !tag_lines.is_empty() {
         let formatted_tags = if settings.phpdoc_align == PhpdocAlign::Vertical {
             format_tags_aligned(&tag_lines)
@@ -256,57 +205,56 @@ pub(crate) fn reformat_docblock<'arena>(
         };
 
         for (i, line) in formatted_tags.iter().enumerate() {
-            // Insert blank line between different tag groups
             if i > 0 && tag_lines[i].priority != tag_lines[i - 1].priority {
-                output.push('\n');
-                output.push_str(" *");
+                parts.push(Document::Line(Line::hard()));
+                parts.push(Document::String(" *"));
             }
-            output.push('\n');
-            output.push_str(" * ");
-            output.push_str(line);
+
+            // Multi-line tag lines contain newlines; split into separate Document entries
+            if line.contains('\n') {
+                for (j, sub_line) in line.split('\n').enumerate() {
+                    if j > 0 {
+                        parts.push(Document::Line(Line::hard()));
+                    } else {
+                        parts.push(Document::Line(Line::hard()));
+                    }
+                    parts.push(Document::String(arena.alloc_str(&format!(" * {}", sub_line))));
+                }
+            } else {
+                parts.push(Document::Line(Line::hard()));
+                parts.push(Document::String(arena.alloc_str(&format!(" * {}", line))));
+            }
         }
     }
 
-    output.push('\n');
-    output.push_str(" */");
+    parts.push(Document::Line(Line::hard()));
+    parts.push(Document::String(" */"));
 
-    let result = arena.alloc_str(&output);
-    Some(result)
+    Some(Document::Group(Group::new(parts).with_break_mode(BreakMode::Force)))
 }
 
 /// Build raw lines for a multi-line tag, preserving structure.
-fn build_multiline_tag_raw(effective_name: &str, desc: &str, settings: &FormatSettings) -> Vec<String> {
-    let mut lines: Vec<String> = Vec::new();
-    let first_line_desc: &str;
-    let rest_lines: &str;
+fn build_multiline_tag_raw(tag_name: &str, desc: &str, settings: &FormatSettings) -> std::vec::Vec<String> {
+    let mut lines: std::vec::Vec<String> = std::vec::Vec::new();
 
-    if let Some(nl_pos) = desc.find('\n') {
-        first_line_desc = &desc[..nl_pos];
-        rest_lines = &desc[nl_pos + 1..];
+    let (first_line_desc, rest_lines) = if let Some(nl_pos) = desc.find('\n') {
+        (&desc[..nl_pos], &desc[nl_pos + 1..])
     } else {
-        first_line_desc = desc;
-        rest_lines = "";
-    }
+        (desc, "")
+    };
 
-    // Apply transformations to the first line's type portion
     let mut first = first_line_desc.to_string();
-    if settings.phpdoc_scalar_types {
-        first = normalize_scalar_types(&first);
-    }
     if settings.phpdoc_null_position == PhpdocNullPosition::Last {
         first = move_null_to_end(&first);
     }
 
-    lines.push(format!("@{} {}", effective_name, first.trim()));
+    lines.push(format!("@{} {}", tag_name, first.trim()));
 
-    // Add continuation lines with proper ` *` prefix handling
     for line in rest_lines.lines() {
         let trimmed = line.trim();
         if trimmed.is_empty() {
-            // Preserve internal blank lines within the type
             lines.push(String::new());
         } else {
-            // The parser strips ` * ` prefix, so the content is just the raw text
             lines.push(format!("  {}", trimmed));
         }
     }
@@ -314,7 +262,6 @@ fn build_multiline_tag_raw(effective_name: &str, desc: &str, settings: &FormatSe
     lines
 }
 
-/// Get sort priority for a tag kind.
 fn tag_priority(kind: TagKind) -> u8 {
     match kind {
         TagKind::Param | TagKind::PsalmParam | TagKind::PhpstanParam => 0,
@@ -324,8 +271,9 @@ fn tag_priority(kind: TagKind) -> u8 {
     }
 }
 
-/// Parse tag description into (type, variable, rest) parts.
-fn parse_tag_parts(desc: &str, kind: TagKind) -> (Option<String>, Option<String>, String) {
+/// Parse tag description into (type, variable, rest) parts using mago_docblock's
+/// `split_tag_content` for type extraction.
+fn parse_tag_parts(desc: &str, kind: TagKind, desc_span: Span) -> (Option<String>, Option<String>, String) {
     let desc = desc.trim();
     if desc.is_empty() {
         return (None, None, String::new());
@@ -333,90 +281,42 @@ fn parse_tag_parts(desc: &str, kind: TagKind) -> (Option<String>, Option<String>
 
     match kind {
         TagKind::Param | TagKind::PsalmParam | TagKind::PhpstanParam => {
-            let (type_str, rest) = split_type_from_desc(desc);
-            if let Some(type_str) = type_str {
+            if let Some((type_string, rest)) = split_tag_content(desc, desc_span) {
                 let rest = rest.trim_start();
                 let (var, remainder) = split_variable(rest);
-                (Some(type_str), var, remainder.trim_start().to_string())
+                (Some(type_string.value), var, remainder.trim_start().to_string())
             } else {
                 let (var, remainder) = split_variable(desc);
                 (None, var, remainder.trim_start().to_string())
             }
         }
         TagKind::Return | TagKind::PsalmReturn | TagKind::PhpstanReturn | TagKind::Throws => {
-            let (type_str, rest) = split_type_from_desc(desc);
-            (type_str, None, rest.trim_start().to_string())
+            if let Some((type_string, rest)) = split_tag_content(desc, desc_span) {
+                (Some(type_string.value), None, rest.trim_start().to_string())
+            } else {
+                (None, None, desc.to_string())
+            }
         }
         TagKind::Var | TagKind::PsalmVar | TagKind::PhpstanVar | TagKind::Type => {
-            let (type_str, rest) = split_type_from_desc(desc);
-            if let Some(type_str) = type_str {
+            if let Some((type_string, rest)) = split_tag_content(desc, desc_span) {
                 let rest = rest.trim_start();
                 let (var, remainder) = split_variable(rest);
-                (Some(type_str), var, remainder.trim_start().to_string())
+                (Some(type_string.value), var, remainder.trim_start().to_string())
             } else {
                 (None, None, desc.to_string())
             }
         }
         TagKind::Property | TagKind::PropertyRead | TagKind::PropertyWrite => {
-            let (type_str, rest) = split_type_from_desc(desc);
-            if let Some(type_str) = type_str {
+            if let Some((type_string, rest)) = split_tag_content(desc, desc_span) {
                 let rest = rest.trim_start();
                 let (var, remainder) = split_variable(rest);
-                (Some(type_str), var, remainder.trim_start().to_string())
+                (Some(type_string.value), var, remainder.trim_start().to_string())
             } else {
                 (None, None, desc.to_string())
             }
         }
         _ => (None, None, desc.to_string()),
     }
-}
-
-/// Split the leading type annotation from the remaining description.
-fn split_type_from_desc(s: &str) -> (Option<String>, &str) {
-    let s = s.trim_start();
-    if s.is_empty() {
-        return (None, s);
-    }
-
-    if s.starts_with('$') {
-        return (None, s);
-    }
-
-    let bytes = s.as_bytes();
-    let mut i = 0;
-    let len = bytes.len();
-    let mut depth = 0i32;
-
-    while i < len {
-        let b = bytes[i];
-        match b {
-            b'<' | b'(' | b'[' | b'{' => {
-                depth += 1;
-                i += 1;
-            }
-            b'>' | b')' | b']' | b'}' => {
-                depth -= 1;
-                i += 1;
-            }
-            b' ' | b'\t' if depth == 0 => {
-                break;
-            }
-            b'|' | b'&' if depth == 0 => {
-                i += 1;
-            }
-            _ => {
-                i += 1;
-            }
-        }
-    }
-
-    if i == 0 {
-        return (None, s);
-    }
-
-    let type_part = &s[..i];
-    let rest = &s[i..];
-    (Some(type_part.to_string()), rest)
 }
 
 /// Split a leading `$variable` (possibly with `...` or `&` prefix) from the rest.
@@ -445,84 +345,18 @@ fn split_variable(s: &str) -> (Option<String>, &str) {
     (Some(var.to_string()), rest)
 }
 
-/// Normalize scalar type names: `integer` → `int`, `boolean` → `bool`, etc.
-fn normalize_scalar_types(type_str: &str) -> String {
-    let mut result = String::with_capacity(type_str.len());
-    let mut last = 0;
-
-    let mut i = 0;
-    let byte_len = type_str.len();
-
-    while i < byte_len {
-        // Only check at word boundaries (start of string, or after non-alphanumeric)
-        let at_word_boundary = i == 0 || {
-            let prev = type_str.as_bytes()[i - 1];
-            !prev.is_ascii_alphanumeric() && prev != b'_'
-        };
-
-        if at_word_boundary {
-            let remaining = &type_str[i..];
-            if let Some((old_len, new_word)) = check_scalar_word(remaining) {
-                result.push_str(&type_str[last..i]);
-                result.push_str(new_word);
-                last = i + old_len;
-                i += old_len;
-                continue;
-            }
-        }
-
-        i += 1;
-    }
-
-    result.push_str(&type_str[last..]);
-    result
-}
-
-/// Check if a scalar type word starts at this position.
-fn check_scalar_word(s: &str) -> Option<(usize, &'static str)> {
-    let scalars: &[(&str, &str)] = &[
-        ("integer", "int"),
-        ("boolean", "bool"),
-        ("double", "float"),
-        ("real", "float"),
-    ];
-
-    for (old, new) in scalars {
-        if s.starts_with(old) {
-            let after = &s[old.len()..];
-            let is_boundary = after
-                .chars()
-                .next()
-                .map_or(true, |c| !c.is_ascii_alphanumeric() && c != '_');
-            if is_boundary {
-                return Some((old.len(), new));
-            }
-        }
-    }
-    None
-}
-
 /// Move `null` to the end of a union type string.
 fn move_null_to_end(type_str: &str) -> String {
-    if type_str.starts_with('?') {
+    if type_str.starts_with('?') || !type_str.contains('|') {
         return type_str.to_string();
     }
 
-    if !type_str.contains('|') {
-        return type_str.to_string();
-    }
-
-    reorder_outer_union_null(type_str)
-}
-
-/// Reorder null to end in a union type, respecting nesting depth.
-fn reorder_outer_union_null(type_str: &str) -> String {
     let parts = split_top_level(type_str, '|');
     if parts.len() <= 1 {
         return type_str.to_string();
     }
 
-    let mut non_null: Vec<&str> = Vec::new();
+    let mut non_null: std::vec::Vec<&str> = std::vec::Vec::new();
     let mut has_null = false;
 
     for part in &parts {
@@ -542,8 +376,8 @@ fn reorder_outer_union_null(type_str: &str) -> String {
 }
 
 /// Split a string on a delimiter, but only at the top level (depth 0).
-fn split_top_level(s: &str, delim: char) -> Vec<&str> {
-    let mut parts = Vec::new();
+fn split_top_level(s: &str, delim: char) -> std::vec::Vec<&str> {
+    let mut parts = std::vec::Vec::new();
     let mut depth = 0i32;
     let mut start = 0;
 
@@ -563,11 +397,11 @@ fn split_top_level(s: &str, delim: char) -> Vec<&str> {
 }
 
 /// Format tag lines without alignment (single spaces).
-fn format_tags_unaligned(tags: &[TagLine<'_>]) -> Vec<String> {
+fn format_tags_unaligned(tags: &[TagLine<'_>]) -> std::vec::Vec<String> {
     tags.iter()
         .map(|tag| {
             if let Some(ref raw) = tag.raw_lines {
-                return raw.join("\n * ");
+                return raw.join("\n");
             }
             let mut line = tag.tag_name.to_string();
             if let Some(ref t) = tag.type_str {
@@ -588,12 +422,12 @@ fn format_tags_unaligned(tags: &[TagLine<'_>]) -> Vec<String> {
 }
 
 /// Format tag lines with vertical alignment of type, variable, and description columns.
-fn format_tags_aligned(tags: &[TagLine<'_>]) -> Vec<String> {
+fn format_tags_aligned(tags: &[TagLine<'_>]) -> std::vec::Vec<String> {
     if tags.is_empty() {
-        return Vec::new();
+        return std::vec::Vec::new();
     }
 
-    let mut result: Vec<String> = Vec::with_capacity(tags.len());
+    let mut result: std::vec::Vec<String> = std::vec::Vec::with_capacity(tags.len());
     let mut group_start = 0;
 
     while group_start < tags.len() {
@@ -605,8 +439,7 @@ fn format_tags_aligned(tags: &[TagLine<'_>]) -> Vec<String> {
 
         let group = &tags[group_start..group_end];
 
-        // Calculate column widths, excluding raw_lines tags from alignment
-        let alignable: Vec<&TagLine<'_>> =
+        let alignable: std::vec::Vec<&TagLine<'_>> =
             group.iter().filter(|t| t.raw_lines.is_none()).collect();
 
         let max_tag_width = alignable.iter().map(|t| t.tag_name.len()).max().unwrap_or(0);
@@ -625,9 +458,8 @@ fn format_tags_aligned(tags: &[TagLine<'_>]) -> Vec<String> {
         let has_vars = alignable.iter().any(|t| t.variable.is_some());
 
         for tag in group {
-            // Multi-line tags: emit raw
             if let Some(ref raw) = tag.raw_lines {
-                result.push(raw.join("\n * "));
+                result.push(raw.join("\n"));
                 continue;
             }
 
