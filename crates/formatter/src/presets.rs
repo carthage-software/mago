@@ -29,6 +29,8 @@ pub enum FormatterPreset {
     Hack,
     /// Drupal preset.
     Drupal,
+    /// Symfony preset (PHP-CS-Fixer `@Symfony` compatible).
+    Symfony,
 }
 
 impl FormatterPreset {
@@ -42,6 +44,7 @@ impl FormatterPreset {
             Self::Tempest => TEMPEST_PRESET,
             Self::Hack => HACK_PRESET,
             Self::Drupal => DRUPAL_PRESET,
+            Self::Symfony => SYMFONY_PRESET,
         }
     }
 
@@ -55,6 +58,7 @@ impl FormatterPreset {
             Self::Tempest => "tempest",
             Self::Hack => "hack",
             Self::Drupal => "drupal",
+            Self::Symfony => "symfony",
         }
     }
 
@@ -66,13 +70,14 @@ impl FormatterPreset {
             Self::Tempest => "Tempest preset (Tempest framework compatible)",
             Self::Hack => "Hack preset (`hackfmt` compatible)",
             Self::Drupal => "Drupal preset",
+            Self::Symfony => "Symfony preset (PHP-CS-Fixer `@Symfony` compatible)",
         }
     }
 
     /// Returns all available presets.
     #[must_use]
     pub const fn all() -> &'static [FormatterPreset] {
-        &[Self::Default, Self::Psr12, Self::Pint, Self::Tempest, Self::Hack, Self::Drupal]
+        &[Self::Default, Self::Psr12, Self::Pint, Self::Tempest, Self::Hack, Self::Drupal, Self::Symfony]
     }
 }
 
@@ -87,6 +92,7 @@ impl FromStr for FormatterPreset {
             "tempest" | "tempest-php" | "tempest_php" => Ok(Self::Tempest),
             "hack" | "hackfmt" | "hhvm" => Ok(Self::Hack),
             "drupal" => Ok(Self::Drupal),
+            "symfony" => Ok(Self::Symfony),
             _ => Err(format!(
                 "unknown preset '{}', available presets: {}",
                 s,
@@ -612,4 +618,88 @@ const DRUPAL_PRESET: FormatSettings = FormatSettings {
     separate_class_like_members: true,
     indent_heredoc: true,
     uppercase_literal_keyword: true,
+};
+
+/// The Symfony formatter preset (PHP-CS-Fixer `@Symfony` compatible).
+const SYMFONY_PRESET: FormatSettings = FormatSettings {
+    print_width: 120,
+    tab_width: 4,
+    use_tabs: false,
+    end_of_line: EndOfLine::Auto,
+    single_quote: true,
+    trailing_comma: true,
+    remove_trailing_close_tag: true,
+    control_brace_style: BraceStyle::SameLine,
+    following_clause_on_newline: false,
+    closure_brace_style: BraceStyle::SameLine,
+    function_brace_style: BraceStyle::NextLine,
+    method_brace_style: BraceStyle::NextLine,
+    classlike_brace_style: BraceStyle::AlwaysNextLine,
+    inline_empty_control_braces: false,
+    inline_empty_closure_braces: true,
+    inline_empty_function_braces: false,
+    inline_empty_method_braces: false,
+    inline_empty_constructor_braces: false,
+    inline_empty_classlike_braces: false,
+    inline_empty_anonymous_class_braces: true,
+    method_chain_breaking_style: MethodChainBreakingStyle::SameLine,
+    first_method_chain_on_new_line: false,
+    method_chain_semicolon_on_next_line: false,
+    preserve_breaking_member_access_chain: true,
+    preserve_breaking_argument_list: true,
+    preserve_breaking_array_like: true,
+    preserve_breaking_parameter_list: true,
+    preserve_breaking_attribute_list: true,
+    preserve_breaking_conditional_expression: true,
+    break_promoted_properties_list: true,
+    parameter_attribute_on_new_line: true,
+    line_before_binary_operator: true,
+    always_break_named_arguments_list: false,
+    always_break_attribute_named_argument_lists: false,
+    array_table_style_alignment: true,
+    align_assignment_like: false,
+    sort_uses: true,
+    sort_class_methods: false,
+    separate_use_types: true,
+    expand_use_groups: true,
+    null_type_hint: NullTypeHint::Question,
+    parentheses_around_new_in_member_access: false,
+    parentheses_in_new_expression: true,
+    parentheses_in_exit_and_die: true,
+    parentheses_in_attribute: false,
+    space_before_arrow_function_parameter_list_parenthesis: true,
+    space_before_closure_parameter_list_parenthesis: true,
+    space_before_hook_parameter_list_parenthesis: false,
+    inline_abstract_property_hooks: true,
+    space_before_closure_use_clause_parenthesis: true,
+    space_after_cast_unary_prefix_operators: true,
+    space_after_reference_unary_prefix_operator: false,
+    space_after_error_control_unary_prefix_operator: false,
+    space_after_logical_not_unary_prefix_operator: false,
+    space_after_bitwise_not_unary_prefix_operator: false,
+    space_after_increment_unary_prefix_operator: false,
+    space_after_decrement_unary_prefix_operator: false,
+    space_after_additive_unary_prefix_operator: false,
+    space_around_concatenation_binary_operator: false,
+    space_around_assignment_in_declare: false,
+    space_within_grouping_parenthesis: false,
+    empty_line_after_control_structure: false,
+    empty_line_after_opening_tag: true,
+    empty_line_after_declare: true,
+    empty_line_after_namespace: true,
+    empty_line_after_use: true,
+    empty_line_after_symbols: true,
+    empty_line_between_same_symbols: true,
+    empty_line_after_class_like_constant: false,
+    empty_line_after_class_like_open: false,
+    empty_line_before_class_like_close: false,
+    empty_line_after_enum_case: false,
+    empty_line_after_trait_use: false,
+    empty_line_after_property: false,
+    empty_line_after_method: true,
+    empty_line_before_return: true,
+    empty_line_before_dangling_comments: true,
+    separate_class_like_members: true,
+    indent_heredoc: true,
+    uppercase_literal_keyword: false,
 };

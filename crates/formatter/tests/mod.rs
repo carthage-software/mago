@@ -246,6 +246,7 @@ test_case!(match_idempotency);
 test_case!(heredoc_indentation);
 test_case!(heredoc_indentation_disabled);
 test_case!(drupal_preset);
+test_case!(symfony_preset);
 test_case!(redundant_grouping_parens);
 test_case!(null_type_hint_null_pipe_last);
 
