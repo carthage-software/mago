@@ -96,11 +96,7 @@ impl<'ast, 'arena> MutWalker<'ast, 'arena, ()> for FqnCollector {
     }
 
     // \DateTime::createFromFormat() → Class kind
-    fn walk_in_static_method_call(
-        &mut self,
-        static_method_call: &'ast StaticMethodCall<'arena>,
-        _: &mut (),
-    ) {
+    fn walk_in_static_method_call(&mut self, static_method_call: &'ast StaticMethodCall<'arena>, _: &mut ()) {
         self.add_from_expression(static_method_call.class, NameKind::Class);
     }
 
@@ -114,11 +110,7 @@ impl<'ast, 'arena> MutWalker<'ast, 'arena, ()> for FqnCollector {
     }
 
     // \SomeClass::CONST → Class kind
-    fn walk_in_class_constant_access(
-        &mut self,
-        class_constant_access: &'ast ClassConstantAccess<'arena>,
-        _: &mut (),
-    ) {
+    fn walk_in_class_constant_access(&mut self, class_constant_access: &'ast ClassConstantAccess<'arena>, _: &mut ()) {
         self.add_from_expression(class_constant_access.class, NameKind::Class);
     }
 
@@ -137,11 +129,7 @@ impl<'ast, 'arena> MutWalker<'ast, 'arena, ()> for FqnCollector {
     }
 
     // \PHP_EOL → Constant kind
-    fn walk_in_constant_access(
-        &mut self,
-        constant_access: &'ast ConstantAccess<'arena>,
-        _: &mut (),
-    ) {
+    fn walk_in_constant_access(&mut self, constant_access: &'ast ConstantAccess<'arena>, _: &mut ()) {
         self.add_from_identifier(&constant_access.name, NameKind::Constant);
     }
 }
@@ -291,8 +279,7 @@ impl LintRule for GlobalNamespaceImportRule {
 
             // Skip positions inside use statements
             let offset = fqn_ref.span.start.offset;
-            let in_use_stmt =
-                use_statement_ranges.iter().any(|(start, end)| offset >= *start && offset < *end);
+            let in_use_stmt = use_statement_ranges.iter().any(|(start, end)| offset >= *start && offset < *end);
             if in_use_stmt {
                 continue;
             }
@@ -310,16 +297,12 @@ impl LintRule for GlobalNamespaceImportRule {
 
         for (fqn, occurrences) in &fqcn_occurrences {
             for fqcn_span in occurrences {
-                let issue = Issue::new(
-                    self.cfg.level(),
-                    format!("Fully-qualified name `\\{fqn}` should be imported"),
-                )
-                .with_code(self.meta.code)
-                .with_annotation(
-                    Annotation::primary(*fqcn_span)
-                        .with_message(format!("Use `{fqn}` instead of `\\{fqn}`")),
-                )
-                .with_help(format!("Add `use {fqn};` and replace `\\{fqn}` with `{fqn}`"));
+                let issue = Issue::new(self.cfg.level(), format!("Fully-qualified name `\\{fqn}` should be imported"))
+                    .with_code(self.meta.code)
+                    .with_annotation(
+                        Annotation::primary(*fqcn_span).with_message(format!("Use `{fqn}` instead of `\\{fqn}`")),
+                    )
+                    .with_help(format!("Add `use {fqn};` and replace `\\{fqn}` with `{fqn}`"));
 
                 if let Some(insert_offset) = insertion_offset {
                     ctx.collector.propose(issue, |edits| {
