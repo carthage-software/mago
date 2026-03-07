@@ -723,18 +723,7 @@ fn base_needs_parens<'arena>(f: &FormatterState<'_, 'arena>, base: &'arena Expre
 
     match base {
         Expression::Instantiation(instantiation) => f.instantiation_needs_parens(instantiation),
-        Expression::Binary(_)
-        | Expression::UnaryPrefix(_)
-        | Expression::UnaryPostfix(_)
-        | Expression::Assignment(_)
-        | Expression::Conditional(_)
-        | Expression::AnonymousClass(_)
-        | Expression::Closure(_)
-        | Expression::ArrowFunction(_)
-        | Expression::Match(_)
-        | Expression::Yield(_)
-        | Expression::Clone(_) => true,
-        _ => false,
+        _ => f.callee_expression_need_parenthesis(base, false),
     }
 }
 
