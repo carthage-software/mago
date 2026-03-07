@@ -184,8 +184,10 @@ pub(super) fn print_array_like<'arena>(
                 }
             }
         } else {
-            // Check if we should use key-value alignment with align_assignment_like
-            let kv_alignment_runs = detect_array_element_alignment_runs(f, &elements);
+            // Keep assignment-like alignment for arrays that are already multiline in source
+            // or are wide enough that they meaningfully break as arrays. Compact inline arrays
+            // should not gain padding just because align_assignment_like is enabled.
+            let kv_alignment_runs = detect_array_element_alignment_runs(f, &array_like, &elements, preserve_break);
 
             // Standard formatting with optional key-value alignment
             for (i, element) in elements.into_iter().enumerate() {
@@ -580,9 +582,14 @@ fn get_document_width(doc: &Document<'_>) -> usize {
 /// Detect alignment runs in array elements for key-value pairs.
 fn detect_array_element_alignment_runs<'arena>(
     f: &FormatterState<'_, 'arena>,
+    array_like: &ArrayLike<'arena>,
     elements: &[&'arena ArrayElement<'arena>],
+    preserve_break: bool,
 ) -> std::vec::Vec<AlignmentRun> {
-    if !f.settings.align_assignment_like || elements.is_empty() {
+    if !f.settings.align_assignment_like
+        || elements.is_empty()
+        || (!preserve_break && !array_like_exceeds_print_width(f, array_like))
+    {
         return std::vec::Vec::new();
     }
 
@@ -642,6 +649,28 @@ fn detect_array_element_alignment_runs<'arena>(
     }
 
     runs
+}
+
+fn array_like_exceeds_print_width<'arena>(f: &FormatterState<'_, 'arena>, array_like: &ArrayLike<'arena>) -> bool {
+    let start = array_like.start_offset() as usize;
+    let end = array_like.end_offset() as usize;
+    let source = &f.source_text[start..end];
+
+    let mut flattened = String::with_capacity(source.len());
+    let mut previous_was_whitespace = false;
+    for character in source.chars() {
+        if character.is_whitespace() {
+            if !previous_was_whitespace {
+                flattened.push(' ');
+                previous_was_whitespace = true;
+            }
+        } else {
+            flattened.push(character);
+            previous_was_whitespace = false;
+        }
+    }
+
+    string_width(flattened.trim()) > f.settings.print_width
 }
 
 fn calculate_array_element_widths(elements: &[&ArrayElement<'_>]) -> AlignmentWidths {
