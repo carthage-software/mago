@@ -548,6 +548,9 @@ generate_formatter_settings! {
     /// When enabled, consecutive variable assignments, class properties, class constants,
     /// global constants, array key-value pairs, and backed enum cases are column-aligned.
     ///
+    /// For arrays, this applies to multiline or width-broken mappings. Compact inline arrays
+    /// stay compact and are not padded into columns.
+    ///
     /// Example with `true`:
     /// ```php
     /// $foo     = 1;
