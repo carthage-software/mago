@@ -1753,6 +1753,17 @@ impl<'arena> Format<'arena> for FunctionLikeParameter<'arena> {
                 contents.push(Document::String("..."));
             }
 
+            if let (Some(padding), Some(list_id)) =
+                (f.parameter_state.variable_padding, f.parameter_state.list_group_id)
+                && padding > 0
+            {
+                let spaces = " ".repeat(padding);
+                contents.push(Document::IfBreak(
+                    IfBreak::new(f.arena, Document::String(f.arena.alloc_str(&spaces)), Document::empty())
+                        .with_id(list_id),
+                ));
+            }
+
             contents.push(self.variable.format(f));
             if let Some(default_value) = &self.default_value {
                 contents.push(Document::space());

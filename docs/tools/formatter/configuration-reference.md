@@ -146,6 +146,8 @@ public function bar(
 | `line-before-binary-operator` | `boolean` | `true` | Place the binary operator on the next line when breaking. |
 | `always-break-named-arguments-list` | `boolean` | `false` | Always break named argument lists into multiple lines. |
 | `always-break-attribute-named-argument-lists` | `boolean` | `false` | Always break named argument lists in attributes. |
+| `align-parameters` | `boolean` | `false` | Align multiline function and method parameter lists by the variable column. This is especially useful for promoted constructor properties with visibility modifiers. |
+| `align-named-arguments` | `boolean` | `false` | Align named arguments in multiline call and attribute argument lists. Single-line calls remain inline. |
 | `array-table-style-alignment` | `boolean` | `true` | Use table-style alignment for arrays. |
 | `align-assignment-like` | `boolean` | `false` | Align consecutive assignment-like constructs (variable assignments, array key-value pairs, class properties, constants, enum cases) in columns. |
 | `sort-uses` | `boolean` | `true` | Sort `use` statements alphabetically. |
