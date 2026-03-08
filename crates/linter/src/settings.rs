@@ -30,6 +30,7 @@ use crate::rule::ExplicitOctalConfig;
 use crate::rule::FileNameConfig;
 use crate::rule::FinalControllerConfig;
 use crate::rule::FunctionNameConfig;
+use crate::rule::GlobalNamespaceImportConfig;
 use crate::rule::HalsteadConfig;
 use crate::rule::IdentityComparisonConfig;
 use crate::rule::IneffectiveFormatIgnoreNextConfig;
@@ -313,6 +314,7 @@ pub struct RulesSettings {
     pub single_class_per_file: RuleSettings<SingleClassPerFileConfig>,
     pub readable_literal: RuleSettings<ReadableLiteralConfig>,
     pub yoda_conditions: RuleSettings<YodaConditionsConfig>,
+    pub global_namespace_import: RuleSettings<GlobalNamespaceImportConfig>,
     pub use_wp_functions: RuleSettings<UseWpFunctionsConfig>,
     pub no_direct_db_query: RuleSettings<NoDirectDbQueryConfig>,
     pub no_db_schema_change: RuleSettings<NoDbSchemaChangeConfig>,
