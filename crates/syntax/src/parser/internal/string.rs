@@ -54,11 +54,8 @@ impl<'input, 'arena> Parser<'input, 'arena> {
         } else {
             None
         };
-        let left_double_quote = if has_prefix {
-            Span { start: token_span.start.forward(1), ..token_span }
-        } else {
-            token_span
-        };
+        let left_double_quote =
+            if has_prefix { Span { start: token_span.start.forward(1), ..token_span } } else { token_span };
 
         let mut parts = self.new_vec();
         while let Some(part) = self.parse_optional_string_part(T!["\""])? {
@@ -87,16 +84,14 @@ impl<'input, 'arena> Parser<'input, 'arena> {
         let has_prefix = current.value.starts_with('b') || current.value.starts_with('B');
         let current_span = current.span_for(self.stream.file_id());
         let prefix = if has_prefix {
-            let prefix_span = Span { start: current_span.start, end: current_span.start.forward(1), file_id: current_span.file_id };
+            let prefix_span =
+                Span { start: current_span.start, end: current_span.start.forward(1), file_id: current_span.file_id };
             Some(Keyword { span: prefix_span, value: &current.value[..1] })
         } else {
             None
         };
-        let open_span = if has_prefix {
-            Span { start: current_span.start.forward(1), ..current_span }
-        } else {
-            current_span
-        };
+        let open_span =
+            if has_prefix { Span { start: current_span.start.forward(1), ..current_span } } else { current_span };
         let (open, kind) = match current.kind {
             TokenKind::DocumentStart(DocumentKind::Heredoc) => (open_span, AstDocumentKind::Heredoc),
             TokenKind::DocumentStart(DocumentKind::Nowdoc) => (open_span, AstDocumentKind::Nowdoc),
