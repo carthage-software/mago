@@ -219,6 +219,7 @@ define_rules! {
     NoTrailingSpace(no_trailing_space @ NoTrailingSpaceRule),
     NoRedundantWriteVisibility(no_redundant_write_visibility @ NoRedundantWriteVisibilityRule),
     NoRedundantStringConcat(no_redundant_string_concat @ NoRedundantStringConcatRule),
+    NoRedundantBinaryStringPrefix(no_redundant_binary_string_prefix @ NoRedundantBinaryStringPrefixRule),
     NoRedundantParentheses(no_redundant_parentheses @ NoRedundantParenthesesRule),
     NoRedundantMethodOverride(no_redundant_method_override @ NoRedundantMethodOverrideRule),
     NoRedundantIsset(no_redundant_isset @ NoRedundantIssetRule),
