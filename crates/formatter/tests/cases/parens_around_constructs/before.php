@@ -17,3 +17,12 @@
     ->withRules([SimplifyUselessVariableRector::class])
     ->withSets([SetList::CODE_QUALITY, SetList::DEAD_CODE])
     ->withTypeCoverageLevel(2);
+
+$a = (include 'file.php') + $x;
+$b = (require_once 'file.php') . $x;
+$c = (print 'hello') && $x;
+$d = (include 'file.php') ? 'yes' : 'no';
+$e = $x + (include 'file.php');
+$f = (isset($x)) && $y;
+$g = (include 'file.php');
+$h = (include 'file.php') |> strtoupper(...);
