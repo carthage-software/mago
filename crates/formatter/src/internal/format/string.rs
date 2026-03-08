@@ -43,11 +43,8 @@ pub(super) fn print_string<'arena>(
     text: &'arena str,
 ) -> &'arena str {
     // Strip binary string prefix (b/B) if present
-    let (prefix, text_without_prefix) = if text.starts_with('b') || text.starts_with('B') {
-        (&text[..1], &text[1..])
-    } else {
-        ("", text)
-    };
+    let (prefix, text_without_prefix) =
+        if text.starts_with('b') || text.starts_with('B') { (&text[..1], &text[1..]) } else { ("", text) };
 
     let quote = unsafe { text_without_prefix.chars().next().unwrap_unchecked() };
     let raw_text = &text_without_prefix[1..text_without_prefix.len() - 1];
