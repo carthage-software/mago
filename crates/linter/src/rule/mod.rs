@@ -321,4 +321,5 @@ define_rules! {
     NoDbSchemaChange(no_db_schema_change @ NoDbSchemaChangeRule),
     NoUnescapedOutput(no_unescaped_output @ NoUnescapedOutputRule),
     NoRolesAsCapabilities(no_roles_as_capabilities @ NoRolesAsCapabilitiesRule),
+    SwitchContinueToBreak(switch_continue_to_break @ SwitchContinueToBreakRule),
 }
