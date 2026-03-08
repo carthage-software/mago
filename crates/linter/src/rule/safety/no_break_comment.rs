@@ -13,8 +13,12 @@ use mago_syntax::ast::Expression;
 use mago_syntax::ast::IfBody;
 use mago_syntax::ast::Node;
 use mago_syntax::ast::NodeKind;
+use mago_syntax::ast::Sequence;
 use mago_syntax::ast::Statement;
+use mago_syntax::ast::Switch;
 use mago_syntax::ast::SwitchCase;
+use mago_syntax::ast::Trivia;
+use mago_syntax::comments::comment_lines;
 
 use crate::category::Category;
 use crate::context::LintContext;
@@ -97,7 +101,7 @@ impl LintRule for NoBreakCommentRule {
     }
 
     fn targets() -> &'static [NodeKind] {
-        const TARGETS: &[NodeKind] = &[NodeKind::Switch];
+        const TARGETS: &[NodeKind] = &[NodeKind::Program];
 
         TARGETS
     }
@@ -107,73 +111,202 @@ impl LintRule for NoBreakCommentRule {
     }
 
     fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
-        let Node::Switch(switch) = node else {
+        let Node::Program(program) = node else {
             return;
         };
 
-        let cases_vec: Vec<_> = switch.body.cases().iter().collect();
+        check_statements(self, ctx, program.statements.as_slice(), &program.trivia);
+    }
+}
 
-        // Check all cases except the last one (last case cannot fall through)
-        for (i, case) in cases_vec.iter().enumerate() {
-            if i == cases_vec.len() - 1 {
-                break;
-            }
+fn check_statements<'arena>(
+    rule: &NoBreakCommentRule,
+    ctx: &mut LintContext<'_, 'arena>,
+    statements: &[Statement<'arena>],
+    trivia: &Sequence<'arena, Trivia<'arena>>,
+) {
+    for statement in statements {
+        check_statement(rule, ctx, statement, trivia);
+    }
+}
 
-            let statements = case.statements();
+fn check_statement<'arena>(
+    rule: &NoBreakCommentRule,
+    ctx: &mut LintContext<'_, 'arena>,
+    statement: &Statement<'arena>,
+    trivia: &Sequence<'arena, Trivia<'arena>>,
+) {
+    match statement {
+        Statement::Switch(switch) => {
+            check_switch(rule, ctx, switch, trivia);
 
-            // Empty case body is allowed (grouping cases)
-            if statements.is_empty() {
-                continue;
-            }
-
-            if statements_terminate_switch_case(statements) {
-                continue;
-            }
-
-            // Case falls through — check for "no break" comment in source.
-            // We look from the current case start to the next case start, because
-            // comments like `// no break` sit between the last statement and the next case keyword,
-            // outside the current case's AST span.
-            let source_code = ctx.source_file.contents.as_ref();
-            let region_start = case.span().start_offset() as usize;
-            let region_end = cases_vec[i + 1].span().start_offset() as usize;
-            let case_text = &source_code[region_start..region_end];
-
-            let case_lower = case_text.to_ascii_lowercase();
-            let has_no_break_comment = case_lower.contains("// no break")
-                || case_lower.contains("// no-break")
-                || case_lower.contains("/* no break")
-                || case_lower.contains("/* no-break")
-                || case_lower.contains("// fall through")
-                || case_lower.contains("// fall-through")
-                || case_lower.contains("// fallthrough")
-                || case_lower.contains("/* fall through")
-                || case_lower.contains("/* fall-through")
-                || case_lower.contains("/* fallthrough")
-                || case_lower.contains("# no break")
-                || case_lower.contains("# no-break")
-                || case_lower.contains("# fall through")
-                || case_lower.contains("# fall-through")
-                || case_lower.contains("# fallthrough");
-
-            if !has_no_break_comment {
-                let case_keyword_span = match case {
-                    SwitchCase::Expression(expr_case) => expr_case.case.span(),
-                    SwitchCase::Default(default_case) => default_case.default.span(),
-                };
-
-                let issue = Issue::new(self.cfg.level(), "Switch case falls through without a `// no break` comment")
-                    .with_code(self.meta.code)
-                    .with_annotation(
-                        Annotation::primary(case_keyword_span).with_message("This case falls through to the next case"),
-                    )
-                    .with_note("Intentional fall-through should be documented with a `// no break` comment.")
-                    .with_help("Add a `// no break` comment at the end of the case, or add a `break` statement");
-
-                ctx.collector.report(issue);
+            // Also recurse into case statements in case there are nested switches
+            for case in switch.body.cases().iter() {
+                check_statements(rule, ctx, case.statements(), trivia);
             }
         }
+        Statement::Block(block) => {
+            check_statements(rule, ctx, block.statements.as_slice(), trivia);
+        }
+        Statement::Namespace(namespace) => {
+            check_statements(rule, ctx, namespace.statements().as_slice(), trivia);
+        }
+        Statement::If(r#if) => match &r#if.body {
+            IfBody::Statement(body) => {
+                check_statement(rule, ctx, body.statement, trivia);
+                for clause in body.else_if_clauses.iter() {
+                    check_statement(rule, ctx, clause.statement, trivia);
+                }
+                if let Some(else_clause) = &body.else_clause {
+                    check_statement(rule, ctx, else_clause.statement, trivia);
+                }
+            }
+            IfBody::ColonDelimited(body) => {
+                check_statements(rule, ctx, body.statements.as_slice(), trivia);
+                for clause in body.else_if_clauses.iter() {
+                    check_statements(rule, ctx, clause.statements.as_slice(), trivia);
+                }
+                if let Some(else_clause) = &body.else_clause {
+                    check_statements(rule, ctx, else_clause.statements.as_slice(), trivia);
+                }
+            }
+        },
+        Statement::Foreach(foreach) => match &foreach.body {
+            mago_syntax::ast::ForeachBody::Statement(stmt) => {
+                check_statement(rule, ctx, stmt, trivia);
+            }
+            mago_syntax::ast::ForeachBody::ColonDelimited(body) => {
+                check_statements(rule, ctx, body.statements.as_slice(), trivia);
+            }
+        },
+        Statement::For(r#for) => match &r#for.body {
+            mago_syntax::ast::ForBody::Statement(stmt) => {
+                check_statement(rule, ctx, stmt, trivia);
+            }
+            mago_syntax::ast::ForBody::ColonDelimited(body) => {
+                check_statements(rule, ctx, body.statements.as_slice(), trivia);
+            }
+        },
+        Statement::While(r#while) => match &r#while.body {
+            mago_syntax::ast::WhileBody::Statement(stmt) => {
+                check_statement(rule, ctx, stmt, trivia);
+            }
+            mago_syntax::ast::WhileBody::ColonDelimited(body) => {
+                check_statements(rule, ctx, body.statements.as_slice(), trivia);
+            }
+        },
+        Statement::DoWhile(do_while) => {
+            check_statement(rule, ctx, do_while.statement, trivia);
+        }
+        Statement::Try(r#try) => {
+            check_statements(rule, ctx, r#try.block.statements.as_slice(), trivia);
+            for catch in r#try.catch_clauses.iter() {
+                check_statements(rule, ctx, catch.block.statements.as_slice(), trivia);
+            }
+            if let Some(finally) = &r#try.finally_clause {
+                check_statements(rule, ctx, finally.block.statements.as_slice(), trivia);
+            }
+        }
+        Statement::Declare(declare) => match &declare.body {
+            DeclareBody::Statement(stmt) => {
+                check_statement(rule, ctx, stmt, trivia);
+            }
+            DeclareBody::ColonDelimited(body) => {
+                check_statements(rule, ctx, body.statements.as_slice(), trivia);
+            }
+        },
+        Statement::Function(function) => {
+            check_statements(rule, ctx, function.body.statements.as_slice(), trivia);
+        }
+        Statement::Class(class) => {
+            for member in class.members.iter() {
+                if let mago_syntax::ast::ClassLikeMember::Method(method) = member {
+                    match &method.body {
+                        mago_syntax::ast::MethodBody::Abstract(_) => {}
+                        mago_syntax::ast::MethodBody::Concrete(block) => {
+                            check_statements(rule, ctx, block.statements.as_slice(), trivia);
+                        }
+                    }
+                }
+            }
+        }
+        _ => {}
     }
+}
+
+fn check_switch<'arena>(
+    rule: &NoBreakCommentRule,
+    ctx: &mut LintContext<'_, 'arena>,
+    switch: &Switch<'arena>,
+    trivia: &Sequence<'arena, Trivia<'arena>>,
+) {
+    let cases_vec: Vec<_> = switch.body.cases().iter().collect();
+
+    for (i, case) in cases_vec.iter().enumerate() {
+        if i == cases_vec.len() - 1 {
+            break;
+        }
+
+        let statements = case.statements();
+
+        if statements.is_empty() {
+            continue;
+        }
+
+        if statements_terminate_switch_case(statements) {
+            continue;
+        }
+
+        // Check trivia for "no break" or "fall through" comment between this case's end
+        // and the next case's start.
+        let case_end = case.span().end_offset();
+        let next_case_start = cases_vec[i + 1].span().start_offset();
+
+        let has_no_break = trivia.iter().any(|t| {
+            if !t.kind.is_comment() {
+                return false;
+            }
+
+            let t_start = t.start_offset();
+            if t_start < case_end || t_start >= next_case_start {
+                return false;
+            }
+
+            for (_, line) in comment_lines(t) {
+                let trimmed = line.trim().to_lowercase();
+                if is_no_break_comment(&trimmed) {
+                    return true;
+                }
+            }
+
+            false
+        });
+
+        if !has_no_break {
+            let case_keyword_span = match case {
+                SwitchCase::Expression(expr_case) => expr_case.case.span(),
+                SwitchCase::Default(default_case) => default_case.default.span(),
+            };
+
+            let issue = Issue::new(rule.cfg.level(), "Switch case falls through without a `// no break` comment")
+                .with_code(rule.meta.code)
+                .with_annotation(
+                    Annotation::primary(case_keyword_span).with_message("This case falls through to the next case"),
+                )
+                .with_note("Intentional fall-through should be documented with a `// no break` comment.")
+                .with_help("Add a `// no break` comment at the end of the case, or add a `break` statement");
+
+            ctx.collector.report(issue);
+        }
+    }
+}
+
+fn is_no_break_comment(trimmed: &str) -> bool {
+    trimmed == "no break"
+        || trimmed == "no-break"
+        || trimmed == "fall through"
+        || trimmed == "fall-through"
+        || trimmed == "fallthrough"
 }
 
 #[inline]
@@ -299,6 +432,23 @@ mod tests {
                 case 1:
                     echo 'one';
                     // no break
+                case 2:
+                    echo 'two';
+                    break;
+            }
+        "}
+    }
+
+    test_lint_success! {
+        name = no_break_comment_with_extra_spaces_is_ok,
+        rule = NoBreakCommentRule,
+        code = indoc! {r"
+            <?php
+
+            switch ($value) {
+                case 1:
+                    echo 'one';
+                    //  no break
                 case 2:
                     echo 'two';
                     break;
