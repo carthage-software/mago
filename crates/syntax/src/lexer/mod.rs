@@ -334,15 +334,23 @@ impl<'input> Lexer<'input> {
                 }
 
                 if IDENT_START_TABLE[first_byte as usize] {
-                    let (token_kind, len) = self.scan_identifier_or_keyword_info();
+                    // Check for binary string prefix: b/B followed by ', ", or <<<
+                    let is_binary_string_prefix = matches!(first_byte, b'b' | b'B')
+                        && matches!(self.input.read(4), [_, b'\'' | b'"', ..] | [_, b'<', b'<', b'<']);
 
-                    if token_kind == TokenKind::HaltCompiler {
-                        self.mode = LexerMode::Halt(HaltStage::LookingForLeftParenthesis);
+                    if !is_binary_string_prefix {
+                        let (token_kind, len) = self.scan_identifier_or_keyword_info();
+
+                        if token_kind == TokenKind::HaltCompiler {
+                            self.mode = LexerMode::Halt(HaltStage::LookingForLeftParenthesis);
+                        }
+
+                        let buffer = self.input.consume(len);
+                        let end = self.input.current_position();
+                        return Some(Ok(self.token(token_kind, buffer, start, end)));
                     }
 
-                    let buffer = self.input.consume(len);
-                    let end = self.input.current_position();
-                    return Some(Ok(self.token(token_kind, buffer, start, end)));
+                    // Fall through to handle b-prefix strings in the match block below
                 }
 
                 if first_byte == b'$'
@@ -367,22 +375,22 @@ impl<'input> Lexer<'input> {
                     [b'<', b'<', b'='] => (TokenKind::LeftShiftEqual, 3),
                     [b'>', b'>', b'='] => (TokenKind::RightShiftEqual, 3),
                     [b'*', b'*', b'='] => (TokenKind::AsteriskAsteriskEqual, 3),
-                    [b'<', b'<', b'<'] if matches_start_of_heredoc_document(&self.input) => {
-                        let (length, whitespaces, label_length) = read_start_of_heredoc_document(&self.input, false);
+                    [b'<', b'<', b'<'] if matches_start_of_heredoc_document(&self.input, 0) => {
+                        let (length, whitespaces, label_length) = read_start_of_heredoc_document(&self.input, false, 0);
 
                         document_label = self.input.peek(3 + whitespaces, label_length);
 
                         (TokenKind::DocumentStart(DocumentKind::Heredoc), length)
                     }
-                    [b'<', b'<', b'<'] if matches_start_of_double_quote_heredoc_document(&self.input) => {
-                        let (length, whitespaces, label_length) = read_start_of_heredoc_document(&self.input, true);
+                    [b'<', b'<', b'<'] if matches_start_of_double_quote_heredoc_document(&self.input, 0) => {
+                        let (length, whitespaces, label_length) = read_start_of_heredoc_document(&self.input, true, 0);
 
                         document_label = self.input.peek(4 + whitespaces, label_length);
 
                         (TokenKind::DocumentStart(DocumentKind::Heredoc), length)
                     }
-                    [b'<', b'<', b'<'] if matches_start_of_nowdoc_document(&self.input) => {
-                        let (length, whitespaces, label_length) = read_start_of_nowdoc_document(&self.input);
+                    [b'<', b'<', b'<'] if matches_start_of_nowdoc_document(&self.input, 0) => {
+                        let (length, whitespaces, label_length) = read_start_of_nowdoc_document(&self.input, 0);
 
                         document_label = self.input.peek(4 + whitespaces, label_length);
 
@@ -472,9 +480,48 @@ impl<'input> Lexer<'input> {
                     [b'^', ..] => (TokenKind::Caret, 1),
                     [b'*', ..] => (TokenKind::Asterisk, 1),
                     [b'/', ..] => (TokenKind::Slash, 1),
-                    [quote @ b'\'', ..] => read_literal_string(&self.input, *quote),
-                    [quote @ b'"', ..] if matches_literal_double_quote_string(&self.input) => {
-                        read_literal_string(&self.input, *quote)
+                    [b'b' | b'B', b'\'', ..] => read_literal_string(&self.input, b'\'', 1),
+                    [b'b' | b'B', b'"', ..] if matches_literal_double_quote_string(&self.input, 1) => {
+                        read_literal_string(&self.input, b'"', 1)
+                    }
+                    [b'b' | b'B', b'"', ..] => (TokenKind::DoubleQuote, 2),
+                    [b'b' | b'B', b'<', b'<']
+                        if self.input.read(4).len() == 4
+                            && self.input.read(4)[3] == b'<'
+                            && matches_start_of_heredoc_document(&self.input, 1) =>
+                    {
+                        let (length, whitespaces, label_length) = read_start_of_heredoc_document(&self.input, false, 1);
+
+                        document_label = self.input.peek(4 + whitespaces, label_length);
+
+                        (TokenKind::DocumentStart(DocumentKind::Heredoc), length)
+                    }
+                    [b'b' | b'B', b'<', b'<']
+                        if self.input.read(4).len() == 4
+                            && self.input.read(4)[3] == b'<'
+                            && matches_start_of_double_quote_heredoc_document(&self.input, 1) =>
+                    {
+                        let (length, whitespaces, label_length) = read_start_of_heredoc_document(&self.input, true, 1);
+
+                        document_label = self.input.peek(5 + whitespaces, label_length);
+
+                        (TokenKind::DocumentStart(DocumentKind::Heredoc), length)
+                    }
+                    [b'b' | b'B', b'<', b'<']
+                        if self.input.read(4).len() == 4
+                            && self.input.read(4)[3] == b'<'
+                            && matches_start_of_nowdoc_document(&self.input, 1) =>
+                    {
+                        let (length, whitespaces, label_length) = read_start_of_nowdoc_document(&self.input, 1);
+
+                        document_label = self.input.peek(5 + whitespaces, label_length);
+
+                        (TokenKind::DocumentStart(DocumentKind::Nowdoc), length)
+                    }
+                    // Regular string literals
+                    [quote @ b'\'', ..] => read_literal_string(&self.input, *quote, 0),
+                    [quote @ b'"', ..] if matches_literal_double_quote_string(&self.input, 0) => {
+                        read_literal_string(&self.input, *quote, 0)
                     }
                     [b'"', ..] => (TokenKind::DoubleQuote, 1),
                     [b'(', ..] => 'parenthesis: {
@@ -1092,12 +1139,12 @@ impl HasFileId for Lexer<'_> {
 }
 
 #[inline]
-fn matches_start_of_heredoc_document(input: &Input) -> bool {
+fn matches_start_of_heredoc_document(input: &Input, prefix_len: usize) -> bool {
     let total = input.len();
     let base = input.current_offset();
 
-    // Start after the fixed opener (3 bytes).
-    let mut length = 3;
+    // Start after the prefix (if any) and the fixed opener (3 bytes).
+    let mut length = 3 + prefix_len;
     // Consume any following whitespace.
     while base + length < total && input.read_at(base + length).is_ascii_whitespace() {
         length += 1;
@@ -1131,12 +1178,12 @@ fn matches_start_of_heredoc_document(input: &Input) -> bool {
 }
 
 #[inline]
-fn matches_start_of_double_quote_heredoc_document(input: &Input) -> bool {
+fn matches_start_of_double_quote_heredoc_document(input: &Input, prefix_len: usize) -> bool {
     let total = input.len();
     let base = input.current_offset();
 
-    // Start after the fixed opener (3 bytes), then skip any whitespace.
-    let mut length = 3;
+    // Start after the prefix (if any) and the fixed opener (3 bytes), then skip any whitespace.
+    let mut length = 3 + prefix_len;
     while base + length < total && input.read_at(base + length).is_ascii_whitespace() {
         length += 1;
     }
@@ -1179,12 +1226,12 @@ fn matches_start_of_double_quote_heredoc_document(input: &Input) -> bool {
 }
 
 #[inline]
-fn matches_start_of_nowdoc_document(input: &Input) -> bool {
+fn matches_start_of_nowdoc_document(input: &Input, prefix_len: usize) -> bool {
     let total = input.len();
     let base = input.current_offset();
 
-    // Start after the fixed opener (3 bytes) and skip whitespace.
-    let mut length = 3;
+    // Start after the prefix (if any) and the fixed opener (3 bytes) and skip whitespace.
+    let mut length = 3 + prefix_len;
     while base + length < total && input.read_at(base + length).is_ascii_whitespace() {
         length += 1;
     }
@@ -1225,12 +1272,12 @@ fn matches_start_of_nowdoc_document(input: &Input) -> bool {
 }
 
 #[inline]
-fn matches_literal_double_quote_string(input: &Input) -> bool {
+fn matches_literal_double_quote_string(input: &Input, prefix_len: usize) -> bool {
     let total = input.len();
     let base = input.current_offset();
 
-    // Start after the initial double-quote (assumed consumed).
-    let mut pos = base + 1;
+    // Start after the prefix (if any) and the initial double-quote.
+    let mut pos = base + 1 + prefix_len;
     loop {
         if pos >= total {
             // Reached EOF: assume literal is complete.
@@ -1259,12 +1306,12 @@ fn matches_literal_double_quote_string(input: &Input) -> bool {
 }
 
 #[inline]
-fn read_start_of_heredoc_document(input: &Input, double_quoted: bool) -> (usize, usize, usize) {
+fn read_start_of_heredoc_document(input: &Input, double_quoted: bool, prefix_len: usize) -> (usize, usize, usize) {
     let total = input.len();
     let base = input.current_offset();
 
-    // Start reading at offset base+3 (the fixed opener length).
-    let mut pos = base + 3;
+    // Start reading after the prefix (if any) and the fixed opener (3 bytes).
+    let mut pos = base + 3 + prefix_len;
     let mut whitespaces = 0;
     while pos < total && input.read_at(pos).is_ascii_whitespace() {
         whitespaces += 1;
@@ -1272,10 +1319,10 @@ fn read_start_of_heredoc_document(input: &Input, double_quoted: bool) -> (usize,
     }
 
     // The label (or delimiter) starts after:
-    //   3 bytes + whitespace bytes + an extra offset:
+    //   prefix + 3 bytes + whitespace bytes + an extra offset:
     //      if double-quoted: 2 bytes (opening and closing quotes around the label)
     //      else: 1 byte.
-    let mut length = 3 + whitespaces + if double_quoted { 2 } else { 1 };
+    let mut length = 3 + prefix_len + whitespaces + if double_quoted { 2 } else { 1 };
 
     let mut label_length = 1; // Start with at least one byte for the label.
     let mut terminated = false; // For double-quoted heredoc, to track the closing quote.
@@ -1315,11 +1362,11 @@ fn read_start_of_heredoc_document(input: &Input, double_quoted: bool) -> (usize,
 }
 
 #[inline]
-fn read_start_of_nowdoc_document(input: &Input) -> (usize, usize, usize) {
+fn read_start_of_nowdoc_document(input: &Input, prefix_len: usize) -> (usize, usize, usize) {
     let total = input.len();
     let base = input.current_offset();
 
-    let mut pos = base + 3;
+    let mut pos = base + 3 + prefix_len;
     let mut whitespaces = 0;
     while pos < total && input.read_at(pos).is_ascii_whitespace() {
         whitespaces += 1;
@@ -1327,7 +1374,7 @@ fn read_start_of_nowdoc_document(input: &Input) -> (usize, usize, usize) {
     }
 
     // For nowdoc, the fixed extra offset is always 2.
-    let mut length = 3 + whitespaces + 2;
+    let mut length = 3 + prefix_len + whitespaces + 2;
 
     let mut label_length = 1;
     let mut terminated = false;
@@ -1365,25 +1412,27 @@ fn read_start_of_nowdoc_document(input: &Input) -> (usize, usize, usize) {
 }
 
 #[inline]
-fn read_literal_string(input: &Input, quote: u8) -> (TokenKind, usize) {
+fn read_literal_string(input: &Input, quote: u8, prefix_len: usize) -> (TokenKind, usize) {
     let total = input.len();
     let start = input.current_offset();
-    let mut length = 1; // We assume the opening quote is already consumed.
+    let skip = prefix_len + 1; // prefix + opening quote
+    let mut length = skip;
 
-    let bytes = input.peek(length, total - start - length);
+    let bytes = input.peek(skip, total - start - skip);
     loop {
-        match memchr2(quote, b'\\', &bytes[length - 1..]) {
+        let scan_start = length - skip;
+        match memchr2(quote, b'\\', &bytes[scan_start..]) {
             Some(pos) => {
-                let abs_pos = length - 1 + pos;
+                let abs_pos = scan_start + pos;
                 let byte = bytes[abs_pos];
 
                 if byte == b'\\' {
-                    length = abs_pos + 2 + 1; // +1 because bytes starts at offset 1
+                    length = skip + abs_pos + 2;
                     if length > total - start {
                         return (TokenKind::PartialLiteralString, total - start);
                     }
                 } else {
-                    length = abs_pos + 2; // +1 for the quote, +1 because bytes starts at offset 1
+                    length = skip + abs_pos + 1; // +1 for the closing quote
                     return (TokenKind::LiteralString, length);
                 }
             }

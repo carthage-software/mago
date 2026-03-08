@@ -1238,4 +1238,14 @@ mod parser {
     smoke_test!(pfa_nested_call, "<?php foo(bar(?))(?);");
     smoke_test!(pfa_chained, "<?php $obj->method(?)->bindTo(?);");
     smoke_test!(pfa_array_element, "<?php $arr[0](?);");
+    smoke_test!(binary_prefix_single_quoted, "<?php echo b'hello';");
+    smoke_test!(binary_prefix_single_quoted_upper, "<?php echo B'hello';");
+    smoke_test!(binary_prefix_double_quoted, "<?php echo b\"hello\";");
+    smoke_test!(binary_prefix_double_quoted_upper, "<?php echo B\"hello\";");
+    smoke_test!(binary_prefix_double_quoted_interpolated, "<?php echo b\"hello $name\";");
+    smoke_test!(binary_prefix_heredoc, "<?php echo b<<<EOT\nhello\nEOT;");
+    smoke_test!(binary_prefix_heredoc_double_quoted, "<?php echo b<<<\"EOT\"\nhello\nEOT;");
+    smoke_test!(binary_prefix_nowdoc, "<?php echo b<<<'EOT'\nhello\nEOT;");
+    smoke_test!(binary_prefix_escape_sequences, "<?php echo b\"hello\\nworld\";");
+    smoke_test!(binary_prefix_single_quoted_escape, "<?php echo b'hello\\'world';");
 }

@@ -24,6 +24,13 @@ pub fn parse_literal_string_in<'arena>(
         return Some("");
     }
 
+    let s = if has_quote && (s.starts_with("b\"") || s.starts_with("b'") || s.starts_with("B\"") || s.starts_with("B'"))
+    {
+        &s[1..]
+    } else {
+        s
+    };
+
     let (quote_char, content) = if let Some(quote_char) = quote_char {
         (Some(quote_char), s)
     } else if !has_quote {

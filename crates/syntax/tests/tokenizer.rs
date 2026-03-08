@@ -1107,6 +1107,125 @@ fn test_use_fully_qualified() -> Result<(), SyntaxError> {
     })
 }
 
+#[test]
+fn test_binary_string_prefix_single_quoted() -> Result<(), SyntaxError> {
+    let code = b"<?php b'hello' B'world'";
+    let expected = &[
+        TokenKind::OpenTag,
+        TokenKind::Whitespace,
+        TokenKind::LiteralString,
+        TokenKind::Whitespace,
+        TokenKind::LiteralString,
+    ];
+
+    test_lexer(code, expected).map_err(|err| {
+        panic!("unexpected error: {err}");
+    })
+}
+
+#[test]
+fn test_binary_string_prefix_double_quoted_literal() -> Result<(), SyntaxError> {
+    let code = b"<?php b\"hello\" B\"world\"";
+    let expected = &[
+        TokenKind::OpenTag,
+        TokenKind::Whitespace,
+        TokenKind::LiteralString,
+        TokenKind::Whitespace,
+        TokenKind::LiteralString,
+    ];
+
+    test_lexer(code, expected).map_err(|err| {
+        panic!("unexpected error: {err}");
+    })
+}
+
+#[test]
+fn test_binary_string_prefix_double_quoted_interpolated() -> Result<(), SyntaxError> {
+    let code = b"<?php b\"hello $name\"";
+    let expected = &[
+        TokenKind::OpenTag,
+        TokenKind::Whitespace,
+        TokenKind::DoubleQuote,
+        TokenKind::StringPart,
+        TokenKind::Variable,
+        TokenKind::DoubleQuote,
+    ];
+
+    test_lexer(code, expected).map_err(|err| {
+        panic!("unexpected error: {err}");
+    })
+}
+
+#[test]
+fn test_binary_string_prefix_heredoc() -> Result<(), SyntaxError> {
+    let code = b"<?php b<<<EOT\nhello\nEOT;";
+    let expected = &[
+        TokenKind::OpenTag,
+        TokenKind::Whitespace,
+        TokenKind::DocumentStart(DocumentKind::Heredoc),
+        TokenKind::StringPart,
+        TokenKind::DocumentEnd,
+        TokenKind::Semicolon,
+    ];
+
+    test_lexer(code, expected).map_err(|err| {
+        panic!("unexpected error: {err}");
+    })
+}
+
+#[test]
+fn test_binary_string_prefix_nowdoc() -> Result<(), SyntaxError> {
+    let code = b"<?php b<<<'EOT'\nhello\nEOT;";
+    let expected = &[
+        TokenKind::OpenTag,
+        TokenKind::Whitespace,
+        TokenKind::DocumentStart(DocumentKind::Nowdoc),
+        TokenKind::StringPart,
+        TokenKind::DocumentEnd,
+        TokenKind::Semicolon,
+    ];
+
+    test_lexer(code, expected).map_err(|err| {
+        panic!("unexpected error: {err}");
+    })
+}
+
+#[test]
+fn test_binary_string_prefix_heredoc_double_quoted() -> Result<(), SyntaxError> {
+    let code = b"<?php b<<<\"EOT\"\nhello\nEOT;";
+    let expected = &[
+        TokenKind::OpenTag,
+        TokenKind::Whitespace,
+        TokenKind::DocumentStart(DocumentKind::Heredoc),
+        TokenKind::StringPart,
+        TokenKind::DocumentEnd,
+        TokenKind::Semicolon,
+    ];
+
+    test_lexer(code, expected).map_err(|err| {
+        panic!("unexpected error: {err}");
+    })
+}
+
+#[test]
+fn test_b_identifier_not_followed_by_string() -> Result<(), SyntaxError> {
+    // 'b' not followed by string delimiter should still be an identifier
+    let code = b"<?php b + 1";
+    let expected = &[
+        TokenKind::OpenTag,
+        TokenKind::Whitespace,
+        TokenKind::Identifier,
+        TokenKind::Whitespace,
+        TokenKind::Plus,
+        TokenKind::Whitespace,
+        TokenKind::LiteralInteger,
+    ];
+
+    test_lexer(code, expected).map_err(|err| {
+        panic!("unexpected error: {err}");
+    })
+}
+
 fn test_lexer(code: &[u8], expected_kinds: &[TokenKind]) -> Result<(), SyntaxError> {
     test_lexer_with_settings(code, expected_kinds, LexerSettings::default())
 }
