@@ -42,15 +42,29 @@ pub(super) fn print_string<'arena>(
     kind: Option<LiteralStringKind>,
     text: &'arena str,
 ) -> &'arena str {
-    let quote = unsafe { text.chars().next().unwrap_unchecked() };
-    let raw_text = &text[1..text.len() - 1];
+    // Strip binary string prefix (b/B) if present
+    let (prefix, text_without_prefix) = if text.starts_with('b') || text.starts_with('B') {
+        (&text[..1], &text[1..])
+    } else {
+        ("", text)
+    };
+
+    let quote = unsafe { text_without_prefix.chars().next().unwrap_unchecked() };
+    let raw_text = &text_without_prefix[1..text_without_prefix.len() - 1];
     let enclosing_quote = get_preferred_quote(raw_text, quote, f.settings.single_quote);
 
     match kind {
         None => text,
         Some(LiteralStringKind::SingleQuoted) if enclosing_quote == '\'' => text,
         Some(LiteralStringKind::DoubleQuoted) if enclosing_quote == '"' => text,
-        _ => make_string_in(f.arena, raw_text, enclosing_quote),
+        _ if prefix.is_empty() => make_string_in(f.arena, raw_text, enclosing_quote),
+        _ => {
+            let inner = make_string_in(f.arena, raw_text, enclosing_quote);
+            let mut result = Vec::with_capacity_in(inner.len() + 1, f.arena);
+            result.extend_from_slice(prefix.as_bytes());
+            result.extend_from_slice(inner.as_bytes());
+            unsafe { std::str::from_utf8_unchecked(result.into_bump_slice()) }
+        }
     }
 }
 

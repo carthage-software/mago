@@ -36,7 +36,7 @@ impl<'input, 'arena> Parser<'input, 'arena> {
             T!["false"] => Literal::False(Keyword { span: token.span_for(self.stream.file_id()), value: token.value }),
             T!["null"] => Literal::Null(Keyword { span: token.span_for(self.stream.file_id()), value: token.value }),
             T![LiteralString] => Literal::String(LiteralString {
-                kind: Some(if token.value.starts_with('"') {
+                kind: Some(if token.value.starts_with('"') || token.value.starts_with("b\"") || token.value.starts_with("B\"") {
                     LiteralStringKind::DoubleQuoted
                 } else {
                     LiteralStringKind::SingleQuoted
@@ -46,7 +46,7 @@ impl<'input, 'arena> Parser<'input, 'arena> {
                 value: parse_literal_string_in(self.arena, token.value, None, true),
             }),
             T![PartialLiteralString] => {
-                let kind = if token.value.starts_with('"') {
+                let kind = if token.value.starts_with('"') || token.value.starts_with("b\"") || token.value.starts_with("B\"") {
                     LiteralStringKind::DoubleQuoted
                 } else {
                     LiteralStringKind::SingleQuoted
