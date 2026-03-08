@@ -47,6 +47,7 @@ use crate::rule::MiddlewareInRoutesConfig;
 use crate::rule::NoAliasFunctionConfig;
 use crate::rule::NoAssignInArgumentConfig;
 use crate::rule::NoAssignInConditionConfig;
+use crate::rule::NoBreakCommentConfig;
 use crate::rule::NoBooleanFlagParameterConfig;
 use crate::rule::NoClosingTagConfig;
 use crate::rule::NoDbSchemaChangeConfig;
@@ -313,6 +314,7 @@ pub struct RulesSettings {
     pub single_class_per_file: RuleSettings<SingleClassPerFileConfig>,
     pub readable_literal: RuleSettings<ReadableLiteralConfig>,
     pub yoda_conditions: RuleSettings<YodaConditionsConfig>,
+    pub no_break_comment: RuleSettings<NoBreakCommentConfig>,
     pub use_wp_functions: RuleSettings<UseWpFunctionsConfig>,
     pub no_direct_db_query: RuleSettings<NoDirectDbQueryConfig>,
     pub no_db_schema_change: RuleSettings<NoDbSchemaChangeConfig>,

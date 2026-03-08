@@ -1,4 +1,5 @@
 pub mod no_error_control_operator;
+pub mod no_break_comment;
 pub mod no_eval;
 pub mod no_ffi;
 pub mod no_global;
@@ -8,6 +9,7 @@ pub mod no_shell_execute_string;
 pub mod no_unsafe_finally;
 
 pub use no_error_control_operator::*;
+pub use no_break_comment::*;
 pub use no_eval::*;
 pub use no_ffi::*;
 pub use no_global::*;
