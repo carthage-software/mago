@@ -21,6 +21,7 @@ This document details the rules available in the `Correctness` category.
 | Strict Assertions | [`strict-assertions`](#strict-assertions) |
 | Strict Behavior | [`strict-behavior`](#strict-behavior) |
 | Strict Types | [`strict-types`](#strict-types) |
+| Switch Continue to Break | [`switch-continue-to-break`](#switch-continue-to-break) |
 | Use Specific Assertions | [`use-specific-assertions`](#use-specific-assertions) |
 
 
@@ -527,6 +528,50 @@ echo "Hello, World!";
 <?php
 
 echo "Hello, World!";
+```
+
+
+## <a id="switch-continue-to-break"></a>`switch-continue-to-break`
+
+Detects the use of `continue` inside a `switch` statement, which should
+be `break` instead.
+
+In PHP, `continue` inside a `switch` behaves the same as `break`, but
+using `continue` is misleading because it suggests continuing a loop.
+
+
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `false` |
+| `level` | `string` | `"warning"` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+
+switch ($value) {
+    case 1:
+        echo 'one';
+        break;
+}
+```
+
+#### Incorrect code
+
+```php
+<?php
+
+switch ($value) {
+    case 1:
+        echo 'one';
+        continue;
+}
 ```
 
 
