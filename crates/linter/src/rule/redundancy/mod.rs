@@ -1,6 +1,7 @@
 pub mod constant_condition;
 pub mod inline_variable_return;
 pub mod no_closing_tag;
+pub mod no_redundant_binary_string_prefix;
 pub mod no_empty_comment;
 pub mod no_empty_loop;
 pub mod no_noop;
@@ -26,6 +27,7 @@ pub mod no_self_assignment;
 pub use constant_condition::*;
 pub use inline_variable_return::*;
 pub use no_closing_tag::*;
+pub use no_redundant_binary_string_prefix::*;
 pub use no_empty_comment::*;
 pub use no_empty_loop::*;
 pub use no_noop::*;

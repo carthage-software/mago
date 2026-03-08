@@ -87,6 +87,7 @@ use crate::rule::NoRedundantMethodOverrideConfig;
 use crate::rule::NoRedundantNullsafeConfig;
 use crate::rule::NoRedundantParenthesesConfig;
 use crate::rule::NoRedundantReadonlyConfig;
+use crate::rule::NoRedundantBinaryStringPrefixConfig;
 use crate::rule::NoRedundantStringConcatConfig;
 use crate::rule::NoRedundantUseConfig;
 use crate::rule::NoRedundantWriteVisibilityConfig;
@@ -215,6 +216,7 @@ pub struct RulesSettings {
     pub no_trailing_space: RuleSettings<NoTrailingSpaceConfig>,
     pub no_redundant_write_visibility: RuleSettings<NoRedundantWriteVisibilityConfig>,
     pub no_redundant_string_concat: RuleSettings<NoRedundantStringConcatConfig>,
+    pub no_redundant_binary_string_prefix: RuleSettings<NoRedundantBinaryStringPrefixConfig>,
     pub no_redundant_parentheses: RuleSettings<NoRedundantParenthesesConfig>,
     pub no_redundant_method_override: RuleSettings<NoRedundantMethodOverrideConfig>,
     pub no_redundant_isset: RuleSettings<NoRedundantIssetConfig>,
