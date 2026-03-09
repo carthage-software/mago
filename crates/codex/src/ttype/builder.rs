@@ -364,6 +364,8 @@ pub fn get_union_from_type_ast(
                 };
 
                 classname
+            } else if member_reference.class.value.eq_ignore_ascii_case("parent") {
+                atom("parent")
             } else {
                 let (class_like_name, _) = scope.resolve(NameKind::Default, member_reference.class.value);
 
@@ -400,6 +402,8 @@ pub fn get_union_from_type_ast(
                 };
 
                 classname
+            } else if alias_reference.class.value.eq_ignore_ascii_case("parent") {
+                atom("parent")
             } else {
                 let (class_like_name, _) = scope.resolve(NameKind::Default, alias_reference.class.value);
 
@@ -673,6 +677,8 @@ fn get_shape_from_ast(
                                 || class_name.value.eq("$this")
                             {
                                 classname.unwrap_or_else(|| atom(class_name.value))
+                            } else if class_name.value.eq_ignore_ascii_case("parent") {
+                                atom("parent")
                             } else {
                                 let (resolved, _) = scope.resolve(NameKind::Default, class_name.value);
                                 atom(&resolved)
@@ -763,6 +769,8 @@ fn get_shape_from_ast(
                                 || class_name.value.eq("$this")
                             {
                                 classname.unwrap_or_else(|| atom(class_name.value))
+                            } else if class_name.value.eq_ignore_ascii_case("parent") {
+                                atom("parent")
                             } else {
                                 let (resolved, _) = scope.resolve(NameKind::Default, class_name.value);
                                 atom(&resolved)
@@ -864,6 +872,10 @@ fn get_reference_from_ast<'i>(
         is_this = reference_name != "self";
 
         classname.unwrap_or_else(|| atom("static"))
+    } else if reference_name == "parent" {
+        is_named_object = true;
+
+        atom("parent")
     } else {
         let reference_name_atom = atom(reference_name);
         if let Some(defining_entities) = type_context.get_template_definition(reference_name_atom)

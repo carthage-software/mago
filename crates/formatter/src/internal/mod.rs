@@ -31,7 +31,7 @@ pub struct ArgumentState {
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct ParameterState {
-    force_break: bool,
+    list_group_id: Option<GroupIdentifier>,
 }
 
 /// A region of source code that should not be formatted.

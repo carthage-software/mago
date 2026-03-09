@@ -16,6 +16,7 @@ This document details the rules available in the `Redundancy` category.
 | No Empty Loop | [`no-empty-loop`](#no-empty-loop) |
 | No Noop | [`no-noop`](#no-noop) |
 | No Protected in Final | [`no-protected-in-final`](#no-protected-in-final) |
+| No Redundant Binary String Prefix | [`no-redundant-binary-string-prefix`](#no-redundant-binary-string-prefix) |
 | No Redundant Block | [`no-redundant-block`](#no-redundant-block) |
 | No Redundant Continue | [`no-redundant-continue`](#no-redundant-continue) |
 | No Redundant File | [`no-redundant-file`](#no-redundant-file) |
@@ -319,6 +320,41 @@ final class Foo {
         // ...
     }
 }
+```
+
+
+## <a id="no-redundant-binary-string-prefix"></a>`no-redundant-binary-string-prefix`
+
+Detects the redundant `b`/`B` prefix on string literals. The binary string prefix
+has no effect in PHP and can be safely removed.
+
+
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `true` |
+| `level` | `string` | `"help"` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+
+$foo = 'hello';
+$bar = "world";
+```
+
+#### Incorrect code
+
+```php
+<?php
+
+$foo = b'hello';
+$bar = b"world";
 ```
 
 

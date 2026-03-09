@@ -16,6 +16,7 @@ use crate::document::Group;
 use crate::document::IfBreak;
 use crate::document::Line;
 use crate::document::clone_in_arena;
+use crate::document::group::GroupIdentifier;
 use crate::internal::FormatterState;
 use crate::internal::format::Format;
 use crate::internal::format::alignment::AlignmentRun;
@@ -106,6 +107,7 @@ pub(super) fn print_array_like<'arena>(
     f: &mut FormatterState<'_, 'arena>,
     array_like: ArrayLike<'arena>,
 ) -> Document<'arena> {
+    let group_id = f.next_id();
     let left_delimiter = {
         let mut left_delimiter_content = vec![in f.arena;];
         if let Some(prefix) = array_like.prefix(f) {
@@ -184,7 +186,6 @@ pub(super) fn print_array_like<'arena>(
                 }
             }
         } else {
-            // Check if we should use key-value alignment with align_assignment_like
             let kv_alignment_runs = detect_array_element_alignment_runs(f, &elements);
 
             // Standard formatting with optional key-value alignment
@@ -193,7 +194,7 @@ pub(super) fn print_array_like<'arena>(
 
                 // Set alignment context if this element is in an alignment run
                 if let Some(widths) = get_array_element_alignment(&kv_alignment_runs, i) {
-                    let alignment = calculate_array_element_alignment(element, &widths);
+                    let alignment = calculate_array_element_alignment(element, &widths, group_id);
                     f.set_alignment_context(Some(alignment));
                 }
 
@@ -233,7 +234,7 @@ pub(super) fn print_array_like<'arena>(
 
     let force_break = use_table_style || has_floating_comments;
 
-    Document::Group(Group::new(parts).with_break_mode(if force_break {
+    Document::Group(Group::new(parts).with_id(group_id).with_break_mode(if force_break {
         BreakMode::Force
     } else if preserve_break {
         BreakMode::Preserve
@@ -665,7 +666,11 @@ fn get_array_element_alignment(runs: &[AlignmentRun], index: usize) -> Option<Al
     runs.iter().find(|run| run.contains(index)).map(|run| run.widths)
 }
 
-fn calculate_array_element_alignment(element: &ArrayElement<'_>, widths: &AlignmentWidths) -> AssignmentAlignment {
+fn calculate_array_element_alignment(
+    element: &ArrayElement<'_>,
+    widths: &AlignmentWidths,
+    break_group_id: GroupIdentifier,
+) -> AssignmentAlignment {
     let current_key_width = match element {
         ArrayElement::KeyValue(kv) => get_expression_span_width(kv.key),
         _ => 0,
@@ -673,5 +678,5 @@ fn calculate_array_element_alignment(element: &ArrayElement<'_>, widths: &Alignm
 
     let name_padding = widths.name_width.saturating_sub(current_key_width);
 
-    AssignmentAlignment { type_padding: 0, name_padding }
+    AssignmentAlignment { type_padding: 0, name_padding, break_group_id: Some(break_group_id) }
 }

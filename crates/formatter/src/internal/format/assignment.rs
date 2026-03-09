@@ -24,8 +24,10 @@ use mago_syntax::ast::YieldPair;
 
 use crate::document::Document;
 use crate::document::Group;
+use crate::document::IfBreak;
 use crate::document::IndentIfBreak;
 use crate::document::Line;
+use crate::document::group::GroupIdentifier;
 use crate::internal::FormatterState;
 use crate::internal::comment::CommentFlags;
 use crate::internal::format::Format;
@@ -43,6 +45,8 @@ pub struct AssignmentAlignment {
     pub type_padding: usize,
     /// Padding to add after the name (before the `=` or `=>` operator).
     pub name_padding: usize,
+    /// Group id controlling whether padding should only appear when the containing group breaks.
+    pub break_group_id: Option<GroupIdentifier>,
 }
 
 /// Represents nodes in the Abstract Syntax Tree (AST) that involve assignment-like operations.
@@ -119,7 +123,13 @@ pub(super) fn print_assignment_with_alignment<'arena>(
         let padding = if align.name_padding > 0 {
             let mut spaces = Vec::with_capacity_in(align.name_padding, f.arena);
             spaces.resize(align.name_padding, b' ');
-            Document::String(unsafe { std::str::from_utf8_unchecked(spaces.into_bump_slice()) })
+            let spaces = Document::String(unsafe { std::str::from_utf8_unchecked(spaces.into_bump_slice()) });
+
+            if let Some(group_id) = align.break_group_id {
+                Document::IfBreak(IfBreak::new(f.arena, spaces, Document::empty()).with_id(group_id))
+            } else {
+                spaces
+            }
         } else {
             Document::empty()
         };

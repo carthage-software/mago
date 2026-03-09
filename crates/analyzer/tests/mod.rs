@@ -80,6 +80,7 @@ test_case!(non_empty_string_magic_constant);
 test_case!(numeric_reconciliation);
 test_case!(priority_queue_implementation);
 test_case!(psl_integration);
+test_case!(psl_int_range);
 test_case!(psr_container_get);
 test_case!(flow_php_integration);
 test_case!(reconcile_array_index_type);
@@ -700,6 +701,11 @@ test_case!(issue_1265);
 test_case!(issue_1266);
 test_case!(issue_1266_inheritdoc_narrowing);
 test_case!(issue_1267);
+test_case!(issue_1291);
+test_case!(issue_1249);
+test_case!(issue_1278);
+test_case!(issue_1287);
+test_case!(issue_1286);
 
 #[test]
 fn test_all_test_cases_are_ran() {

@@ -30,18 +30,12 @@ pub(super) fn print_function_like_parameters<'arena>(
     }
 
     let mut force_break = force_break_parameters(f, parameter_list);
-    let preserve_break = f.settings.preserve_breaking_parameter_list
-        && misc::has_new_line_in_range(
-            f.source_text,
-            parameter_list.left_parenthesis.start.offset,
-            parameter_list.parameters.as_slice()[0].span().start.offset,
-        );
+    let preserve_break = preserve_break_parameters(f, parameter_list);
     let should_break = force_break || preserve_break;
 
-    let previous_break = f.parameter_state.force_break;
-    if should_break {
-        f.parameter_state.force_break = true;
-    }
+    let list_id = f.next_id();
+    let previous_list_group_id = f.parameter_state.list_group_id;
+    f.parameter_state.list_group_id = Some(list_id);
 
     let should_hug_the_parameters = !should_break && should_hug_the_only_parameter(f, parameter_list);
 
@@ -110,9 +104,9 @@ pub(super) fn print_function_like_parameters<'arena>(
 
     parts.push(Document::String(")"));
 
-    f.parameter_state.force_break = previous_break;
+    f.parameter_state.list_group_id = previous_list_group_id;
 
-    Document::Group(Group::new(parts).with_break_mode(if force_break {
+    Document::Group(Group::new(parts).with_id(list_id).with_break_mode(if force_break {
         BreakMode::Force
     } else if preserve_break {
         BreakMode::Preserve
@@ -127,6 +121,19 @@ pub(super) fn force_break_parameters<'arena>(
 ) -> bool {
     f.settings.break_promoted_properties_list
         && parameter_list.parameters.iter().any(FunctionLikeParameter::is_promoted_property)
+}
+
+pub(super) fn preserve_break_parameters<'arena>(
+    f: &FormatterState<'_, 'arena>,
+    parameter_list: &'arena FunctionLikeParameterList<'arena>,
+) -> bool {
+    f.settings.preserve_breaking_parameter_list
+        && !parameter_list.parameters.is_empty()
+        && misc::has_new_line_in_range(
+            f.source_text,
+            parameter_list.left_parenthesis.start.offset,
+            parameter_list.parameters.as_slice()[0].span().start.offset,
+        )
 }
 
 pub(super) fn should_hug_the_only_parameter<'arena>(

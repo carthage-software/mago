@@ -1721,11 +1721,18 @@ impl<'arena> Format<'arena> for FunctionLikeParameter<'arena> {
             let mut contents = vec![in f.arena];
             if let Some(attributes) = print_attribute_list_sequence(f, &self.attribute_lists) {
                 contents.push(attributes);
-                contents.push(Document::Line(if f.parameter_state.force_break {
-                    Line::hard()
-                } else {
-                    Line::default()
-                }));
+                contents.push(
+                    if f.settings.parameter_attribute_on_new_line
+                        && let Some(list_id) = f.parameter_state.list_group_id
+                    {
+                        Document::IfBreak(
+                            IfBreak::new(f.arena, Document::Line(Line::hard()), Document::Line(Line::default()))
+                                .with_id(list_id),
+                        )
+                    } else {
+                        Document::Line(Line::default())
+                    },
+                );
             }
 
             contents.extend(print_modifiers(f, &self.modifiers));
@@ -1786,17 +1793,25 @@ impl<'arena> Format<'arena> for Try<'arena> {
         wrap!(f, self, Try, {
             let mut parts = vec![in f.arena; self.r#try.format(f), Document::space(), self.block.format(f)];
 
+            let mut prev_block_span = self.block.span();
             for clause in &self.catch_clauses {
-                if f.settings.following_clause_on_newline {
+                if f.settings.following_clause_on_newline
+                    || f.is_followed_by_comment_on_next_line(prev_block_span)
+                    || f.has_same_line_trailing_comment(prev_block_span)
+                {
                     parts.push(Document::Line(Line::hard()));
                 } else {
                     parts.push(Document::space());
                 }
                 parts.push(clause.format(f));
+                prev_block_span = clause.block.span();
             }
 
             if let Some(clause) = &self.finally_clause {
-                if f.settings.following_clause_on_newline {
+                if f.settings.following_clause_on_newline
+                    || f.is_followed_by_comment_on_next_line(prev_block_span)
+                    || f.has_same_line_trailing_comment(prev_block_span)
+                {
                     parts.push(Document::Line(Line::hard()));
                 } else {
                     parts.push(Document::space());

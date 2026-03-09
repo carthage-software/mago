@@ -1134,7 +1134,11 @@ impl<'arena> Format<'arena> for CompositeString<'arena> {
 impl<'arena> Format<'arena> for DocumentString<'arena> {
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
         wrap!(f, self, DocumentString, {
-            let mut contents = vec![in f.arena; Document::LineSuffixBoundary, Document::String("<<<")];
+            let mut contents = vec![in f.arena; Document::LineSuffixBoundary];
+            if let Some(prefix) = &self.prefix {
+                contents.push(Document::String(prefix.value));
+            }
+            contents.push(Document::String("<<<"));
             match self.kind {
                 DocumentKind::Heredoc => {
                     contents.push(Document::String(self.label));
@@ -1277,7 +1281,11 @@ impl<'arena> Format<'arena> for DocumentString<'arena> {
 impl<'arena> Format<'arena> for InterpolatedString<'arena> {
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
         wrap!(f, self, InterpolatedString, {
-            let mut parts = vec![in f.arena; Document::String("\"")];
+            let mut parts = vec![in f.arena;];
+            if let Some(prefix) = &self.prefix {
+                parts.push(Document::String(prefix.value));
+            }
+            parts.push(Document::String("\""));
             let mut last_part_indentation = Cow::Borrowed("");
 
             for part in &self.parts {

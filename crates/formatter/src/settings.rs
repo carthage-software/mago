@@ -468,6 +468,27 @@ generate_formatter_settings! {
     /// Default: true
     break_promoted_properties_list: bool => "default_true",
 
+    /// Whether to place parameter attributes on their own line when the parameter list breaks.
+    ///
+    /// When enabled, attributes are placed on a separate line
+    /// from the parameter when the parameter list spans multiple lines:
+    /// ```php
+    /// function foo(
+    ///     #[SensitiveParameter]
+    ///     string $password,
+    /// ) {}
+    /// ```
+    ///
+    /// When disabled, attributes stay on the same line as the parameter:
+    /// ```php
+    /// function foo(
+    ///     #[SensitiveParameter] string $password,
+    /// ) {}
+    /// ```
+    ///
+    /// Default: true ([PER-CS 12.2](https://www.php-fig.org/per/coding-style/#122-placement) compliant)
+    parameter_attribute_on_new_line: bool => "default_true",
+
     /// Whether to add a line before binary operators or after when breaking.
     ///
     /// When true:
@@ -534,6 +555,9 @@ generate_formatter_settings! {
     ///
     /// When enabled, consecutive variable assignments, class properties, class constants,
     /// global constants, array key-value pairs, and backed enum cases are column-aligned.
+    ///
+    /// For arrays, this applies to multiline or width-broken mappings. Compact inline arrays
+    /// stay compact and are not padded into columns.
     ///
     /// Example with `true`:
     /// ```php
@@ -862,6 +886,16 @@ generate_formatter_settings! {
     ///
     /// Default: false
     empty_line_after_control_structure: bool => "default_false",
+
+    /// Whether the opening `<?php` tag must be on its own line with no other statements.
+    ///
+    /// When enabled, a newline is always inserted after the opening tag, even if
+    /// the original source has statements on the same line (PER-CS compliant).
+    ///
+    /// When disabled, inline content after the opening tag is preserved with a space.
+    ///
+    /// Default: true
+    opening_tag_on_own_line: bool => "default_true",
 
     /// Whether to add an empty line after opening tag.
     ///

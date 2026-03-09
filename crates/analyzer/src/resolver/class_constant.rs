@@ -200,6 +200,8 @@ fn is_valid_trait_constant_access(origin: &ResolutionOrigin) -> bool {
         origin,
         // self::CONSTANT
         ResolutionOrigin::Named { is_self: true, .. }
+        // parent::CONSTANT
+        | ResolutionOrigin::Named { is_parent: true, .. }
         // static::CONSTANT
         | ResolutionOrigin::Static { .. }
         // $this::CONSTANT
