@@ -876,6 +876,16 @@ generate_formatter_settings! {
     /// Default: false
     empty_line_after_control_structure: bool => "default_false",
 
+    /// Whether the opening `<?php` tag must be on its own line with no other statements.
+    ///
+    /// When enabled, a newline is always inserted after the opening tag, even if
+    /// the original source has statements on the same line (PER-CS compliant).
+    ///
+    /// When disabled, inline content after the opening tag is preserved with a space.
+    ///
+    /// Default: true
+    opening_tag_on_own_line: bool => "default_true",
+
     /// Whether to add an empty line after opening tag.
     ///
     /// Note: if an empty line already exists, it will be preserved regardless of this
