@@ -713,6 +713,30 @@ fn scrape_type_properties(
                             combination.flags.insert(CombinationFlags::KEYED_ARRAY_ALWAYS_FILLED);
                             had_previous_keyed_array = false;
                         }
+
+                        if incoming_is_sealed
+                            && existing_is_sealed
+                            && !combination.keyed_array_entries.is_empty()
+                            && let Some(known_items_inner) = known_items.as_ref()
+                            && !known_items_inner.keys().any(|k| combination.keyed_array_entries.contains_key(k))
+                        {
+                            let frozen = TArray::Keyed(TKeyedArray {
+                                known_items: Some(std::mem::take(&mut combination.keyed_array_entries)),
+                                parameters: None,
+                                non_empty: combination.flags.contains(CombinationFlags::KEYED_ARRAY_SOMETIMES_FILLED),
+                            });
+                            combination.sealed_arrays.push(frozen);
+                            combination.sealed_arrays.push(TArray::Keyed(TKeyedArray {
+                                known_items,
+                                parameters,
+                                non_empty,
+                            }));
+                            combination.flags.remove(CombinationFlags::HAS_KEYED_ARRAY);
+                            combination.flags.remove(CombinationFlags::KEYED_ARRAY_SOMETIMES_FILLED);
+                            combination.flags.insert(CombinationFlags::KEYED_ARRAY_ALWAYS_FILLED);
+
+                            continue;
+                        }
                     }
 
                     combination.flags.insert(CombinationFlags::HAS_KEYED_ARRAY);
