@@ -367,6 +367,10 @@ fn should_add_new_line_or_space_after_stmt<'arena>(
             DeclareBody::ColonDelimited(_) => true,
         },
         Statement::OpeningTag(_) => {
+            if f.settings.opening_tag_on_own_line && !f.source_text.contains("?>") {
+                return (true, false);
+            }
+
             if let Some(index) = f.skip_to_line_end(Some(stmt.end_position().offset()))
                 && f.has_newline(index, false)
             {
