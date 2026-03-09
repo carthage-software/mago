@@ -827,5 +827,5 @@ fn calculate_statement_alignment(
 
     let name_padding = widths.name_width.saturating_sub(current_name_width);
 
-    AssignmentAlignment { type_padding: 0, name_padding }
+    AssignmentAlignment { type_padding: 0, name_padding, break_group_id: None }
 }

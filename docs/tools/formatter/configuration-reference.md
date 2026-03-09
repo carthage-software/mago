@@ -147,7 +147,7 @@ public function bar(
 | `always-break-named-arguments-list` | `boolean` | `false` | Always break named argument lists into multiple lines. |
 | `always-break-attribute-named-argument-lists` | `boolean` | `false` | Always break named argument lists in attributes. |
 | `array-table-style-alignment` | `boolean` | `true` | Use table-style alignment for arrays. |
-| `align-assignment-like` | `boolean` | `false` | Align consecutive assignment-like constructs (variable assignments, array key-value pairs, class properties, constants, enum cases) in columns. |
+| `align-assignment-like` | `boolean` | `false` | Align consecutive assignment-like constructs (variable assignments, multiline or width-broken array key-value pairs, class properties, constants, enum cases) in columns. Compact inline arrays stay unaligned. |
 | `sort-uses` | `boolean` | `true` | Sort `use` statements alphabetically. |
 | `sort-class-methods` | `boolean` | `false` | Sort class methods by visibility and type (constructor first, then static methods, then instance methods by visibility, destructor last). |
 | `separate-use-types` | `boolean` | `true` | Insert a blank line between different types of `use` statements. |
