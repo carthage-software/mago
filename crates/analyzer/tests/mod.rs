@@ -702,6 +702,7 @@ test_case!(issue_1266);
 test_case!(issue_1266_inheritdoc_narrowing);
 test_case!(issue_1267);
 test_case!(issue_1291);
+test_case!(issue_1278);
 test_case!(issue_1286);
 
 #[test]
