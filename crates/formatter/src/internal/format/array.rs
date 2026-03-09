@@ -16,6 +16,7 @@ use crate::document::Group;
 use crate::document::IfBreak;
 use crate::document::Line;
 use crate::document::clone_in_arena;
+use crate::document::group::GroupIdentifier;
 use crate::internal::FormatterState;
 use crate::internal::format::Format;
 use crate::internal::format::alignment::AlignmentRun;
