@@ -26,7 +26,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for StaticMethodCall<'arena> {
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
         if context.plugin_registry.has_static_method_call_hooks() {
-            let mut hook_context = HookContext::new(context.codebase, block_context, artifacts);
+            let mut hook_context = HookContext::new(context.codebase, context.resolved_names, block_context, artifacts);
             let result = context.plugin_registry.before_static_method_call(self, &mut hook_context)?;
             for reported in hook_context.take_issues() {
                 context.collector.report_with_code(reported.code, reported.issue);
@@ -110,7 +110,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for StaticMethodCall<'arena> {
         )?;
 
         if context.plugin_registry.has_static_method_call_hooks() {
-            let mut hook_context = HookContext::new(context.codebase, block_context, artifacts);
+            let mut hook_context = HookContext::new(context.codebase, context.resolved_names, block_context, artifacts);
             context.plugin_registry.after_static_method_call(self, &mut hook_context)?;
             for reported in hook_context.take_issues() {
                 context.collector.report_with_code(reported.code, reported.issue);

@@ -69,6 +69,8 @@ enum AnalyzerPlugin {
     FlowPhp,
     /// Type providers for psr/container package
     PsrContainer,
+    /// Type providers and analysis support for the Laravel framework
+    Laravel,
 }
 
 impl std::fmt::Display for AnalyzerPlugin {
@@ -77,6 +79,7 @@ impl std::fmt::Display for AnalyzerPlugin {
             Self::Psl => write!(f, "psl"),
             Self::FlowPhp => write!(f, "flow-php"),
             Self::PsrContainer => write!(f, "psr-container"),
+            Self::Laravel => write!(f, "laravel"),
         }
     }
 }
@@ -88,6 +91,7 @@ impl AnalyzerPlugin {
             Self::Psl => "PSL - Type providers for azjezz/psl package",
             Self::FlowPhp => "Flow-PHP - Type providers for flow-php/etl package",
             Self::PsrContainer => "PSR-11 Container - Type providers for psr/container package",
+            Self::Laravel => "Laravel - Type providers and analysis support for the Laravel framework",
         }
     }
 }
@@ -803,6 +807,10 @@ fn detect_analyzer_plugins_from_composer(composer: &ComposerPackage) -> Vec<Anal
         plugins.push(AnalyzerPlugin::FlowPhp);
     }
 
+    if has_package_prefix(composer, "laravel/") || has_package_prefix(composer, "illuminate/") {
+        plugins.push(AnalyzerPlugin::Laravel);
+    }
+
     plugins
 }
 
@@ -888,7 +896,7 @@ fn prompt_for_integrations(theme: &ColorfulTheme) -> Result<Vec<Integration>, Er
 }
 
 fn prompt_for_analyzer_plugins(theme: &ColorfulTheme) -> Result<Vec<AnalyzerPlugin>, Error> {
-    let items = &[AnalyzerPlugin::Psl, AnalyzerPlugin::FlowPhp, AnalyzerPlugin::PsrContainer];
+    let items = &[AnalyzerPlugin::Psl, AnalyzerPlugin::FlowPhp, AnalyzerPlugin::PsrContainer, AnalyzerPlugin::Laravel];
 
     let descriptions: Vec<&str> = items.iter().map(|p| p.description()).collect();
 
