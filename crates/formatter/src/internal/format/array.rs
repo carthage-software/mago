@@ -668,7 +668,7 @@ fn get_array_element_alignment(runs: &[AlignmentRun], index: usize) -> Option<Al
 fn calculate_array_element_alignment(
     element: &ArrayElement<'_>,
     widths: &AlignmentWidths,
-    break_group_id: crate::document::group::GroupIdentifier,
+    break_group_id: GroupIdentifier,
 ) -> AssignmentAlignment {
     let current_key_width = match element {
         ArrayElement::KeyValue(kv) => get_expression_span_width(kv.key),
