@@ -1731,4 +1731,3 @@ pub const KEYWORD_TYPES: [(&[u8], TokenKind); 84] = [
     (b"__namespace__", TokenKind::NamespaceConstant),
     (b"__halt_compiler", TokenKind::HaltCompiler),
 ];
-
