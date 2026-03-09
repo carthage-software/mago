@@ -753,7 +753,7 @@ impl<'input> Lexer<'input> {
                             }
                             [b'\\', ..] => {
                                 length += 1;
-                                last_was_slash = true;
+                                last_was_slash = !last_was_slash;
                             }
                             [b'`', ..] if !last_was_slash => {
                                 if length == 0 {
@@ -840,7 +840,7 @@ impl<'input> Lexer<'input> {
                                 }
                                 [b'\\', ..] => {
                                     length += 1;
-                                    last_was_slash = true;
+                                    last_was_slash = !last_was_slash;
                                     only_whitespaces = false;
                                 }
                                 [_, ..] => {
