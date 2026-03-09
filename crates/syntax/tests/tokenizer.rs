@@ -1344,6 +1344,294 @@ fn test_short_tags_enabled_treats_short_open_tag_as_php() -> Result<(), SyntaxEr
     Ok(())
 }
 
+#[test]
+fn test_double_quoted_escaped_backslash_before_braced_interpolation() -> Result<(), SyntaxError> {
+    let code = r#"<?= "\\{$string}";"#;
+    let expected = &[
+        TokenKind::EchoTag,
+        TokenKind::Whitespace,
+        TokenKind::DoubleQuote,
+        TokenKind::StringPart, // \\
+        TokenKind::LeftBrace,
+        TokenKind::Variable,
+        TokenKind::RightBrace,
+        TokenKind::DoubleQuote,
+        TokenKind::Semicolon,
+    ];
+
+    test_lexer(code.as_bytes(), expected).map_err(|err| {
+        panic!("unexpected error: {err}");
+    })
+}
+
+#[test]
+fn test_heredoc_escaped_backslash_before_braced_interpolation() -> Result<(), SyntaxError> {
+    let code = b"<?php $x = <<<EOF\n\\\\{$string}\nEOF;\n";
+    let expected = &[
+        TokenKind::OpenTag,
+        TokenKind::Whitespace,
+        TokenKind::Variable,
+        TokenKind::Whitespace,
+        TokenKind::Equal,
+        TokenKind::Whitespace,
+        TokenKind::DocumentStart(DocumentKind::Heredoc),
+        TokenKind::StringPart, // \\
+        TokenKind::LeftBrace,
+        TokenKind::Variable,
+        TokenKind::RightBrace,
+        TokenKind::StringPart, // \n
+        TokenKind::DocumentEnd,
+        TokenKind::Semicolon,
+        TokenKind::Whitespace,
+    ];
+
+    test_lexer(code, expected).map_err(|err| {
+        panic!("unexpected error: {err}");
+    })
+}
+
+#[test]
+fn test_shell_execute_escaped_backslash_before_braced_interpolation() -> Result<(), SyntaxError> {
+    let code = r#"<?= `\\{$string}`;"#;
+    let expected = &[
+        TokenKind::EchoTag,
+        TokenKind::Whitespace,
+        TokenKind::Backtick,
+        TokenKind::StringPart, // \\
+        TokenKind::LeftBrace,
+        TokenKind::Variable,
+        TokenKind::RightBrace,
+        TokenKind::Backtick,
+        TokenKind::Semicolon,
+    ];
+
+    test_lexer(code.as_bytes(), expected).map_err(|err| {
+        panic!("unexpected error: {err}");
+    })
+}
+
+#[test]
+fn test_heredoc_single_backslash_escapes_brace() -> Result<(), SyntaxError> {
+    let code = b"<?php $x = <<<EOF\n\\{$string}\nEOF;\n";
+    let expected = &[
+        TokenKind::OpenTag,
+        TokenKind::Whitespace,
+        TokenKind::Variable,
+        TokenKind::Whitespace,
+        TokenKind::Equal,
+        TokenKind::Whitespace,
+        TokenKind::DocumentStart(DocumentKind::Heredoc),
+        TokenKind::StringPart, // \{
+        TokenKind::Variable,   // $string
+        TokenKind::StringPart, // }
+        TokenKind::DocumentEnd,
+        TokenKind::Semicolon,
+        TokenKind::Whitespace,
+    ];
+
+    test_lexer(code, expected).map_err(|err| {
+        panic!("unexpected error: {err}");
+    })
+}
+
+#[test]
+fn test_shell_execute_single_backslash_escapes_brace() -> Result<(), SyntaxError> {
+    let code = r#"<?= `\{$string}`;"#;
+    let expected = &[
+        TokenKind::EchoTag,
+        TokenKind::Whitespace,
+        TokenKind::Backtick,
+        TokenKind::StringPart, // \{
+        TokenKind::Variable,   // $string
+        TokenKind::StringPart, // }
+        TokenKind::Backtick,
+        TokenKind::Semicolon,
+    ];
+
+    test_lexer(code.as_bytes(), expected).map_err(|err| {
+        panic!("unexpected error: {err}");
+    })
+}
+
+#[test]
+fn test_heredoc_triple_backslash_before_braced_interpolation() -> Result<(), SyntaxError> {
+    let code = b"<?php $x = <<<EOF\n\\\\\\{$string}\nEOF;\n";
+    let expected = &[
+        TokenKind::OpenTag,
+        TokenKind::Whitespace,
+        TokenKind::Variable,
+        TokenKind::Whitespace,
+        TokenKind::Equal,
+        TokenKind::Whitespace,
+        TokenKind::DocumentStart(DocumentKind::Heredoc),
+        TokenKind::StringPart, // \\\{
+        TokenKind::Variable,   // $string
+        TokenKind::StringPart, // }
+        TokenKind::DocumentEnd,
+        TokenKind::Semicolon,
+        TokenKind::Whitespace,
+    ];
+
+    test_lexer(code, expected).map_err(|err| {
+        panic!("unexpected error: {err}");
+    })
+}
+
+#[test]
+fn test_heredoc_quadruple_backslash_before_braced_interpolation() -> Result<(), SyntaxError> {
+    let code = b"<?php $x = <<<EOF\n\\\\\\\\{$string}\nEOF;\n";
+    let expected = &[
+        TokenKind::OpenTag,
+        TokenKind::Whitespace,
+        TokenKind::Variable,
+        TokenKind::Whitespace,
+        TokenKind::Equal,
+        TokenKind::Whitespace,
+        TokenKind::DocumentStart(DocumentKind::Heredoc),
+        TokenKind::StringPart, // \\\\
+        TokenKind::LeftBrace,
+        TokenKind::Variable,
+        TokenKind::RightBrace,
+        TokenKind::StringPart, // \n
+        TokenKind::DocumentEnd,
+        TokenKind::Semicolon,
+        TokenKind::Whitespace,
+    ];
+
+    test_lexer(code, expected).map_err(|err| {
+        panic!("unexpected error: {err}");
+    })
+}
+
+#[test]
+fn test_shell_execute_triple_backslash_before_braced_interpolation() -> Result<(), SyntaxError> {
+    let code = r#"<?= `\\\{$string}`;"#;
+    let expected = &[
+        TokenKind::EchoTag,
+        TokenKind::Whitespace,
+        TokenKind::Backtick,
+        TokenKind::StringPart, // \\\{
+        TokenKind::Variable,   // $string
+        TokenKind::StringPart, // }
+        TokenKind::Backtick,
+        TokenKind::Semicolon,
+    ];
+
+    test_lexer(code.as_bytes(), expected).map_err(|err| {
+        panic!("unexpected error: {err}");
+    })
+}
+
+#[test]
+fn test_shell_execute_quadruple_backslash_before_braced_interpolation() -> Result<(), SyntaxError> {
+    let code = r#"<?= `\\\\{$string}`;"#;
+    let expected = &[
+        TokenKind::EchoTag,
+        TokenKind::Whitespace,
+        TokenKind::Backtick,
+        TokenKind::StringPart, // \\\\
+        TokenKind::LeftBrace,
+        TokenKind::Variable,
+        TokenKind::RightBrace,
+        TokenKind::Backtick,
+        TokenKind::Semicolon,
+    ];
+
+    test_lexer(code.as_bytes(), expected).map_err(|err| {
+        panic!("unexpected error: {err}");
+    })
+}
+
+#[test]
+fn test_heredoc_escaped_backslash_before_dollar_interpolation() -> Result<(), SyntaxError> {
+    let code = b"<?php $x = <<<EOF\n\\\\$string\nEOF;\n";
+    let expected = &[
+        TokenKind::OpenTag,
+        TokenKind::Whitespace,
+        TokenKind::Variable,
+        TokenKind::Whitespace,
+        TokenKind::Equal,
+        TokenKind::Whitespace,
+        TokenKind::DocumentStart(DocumentKind::Heredoc),
+        TokenKind::StringPart, // \\
+        TokenKind::Variable,   // $string
+        TokenKind::StringPart, // \n
+        TokenKind::DocumentEnd,
+        TokenKind::Semicolon,
+        TokenKind::Whitespace,
+    ];
+
+    test_lexer(code, expected).map_err(|err| {
+        panic!("unexpected error: {err}");
+    })
+}
+
+#[test]
+fn test_shell_execute_escaped_backslash_before_dollar_interpolation() -> Result<(), SyntaxError> {
+    let code = r"<?= `\\$string`;";
+    let expected = &[
+        TokenKind::EchoTag,
+        TokenKind::Whitespace,
+        TokenKind::Backtick,
+        TokenKind::StringPart, // \\
+        TokenKind::Variable,   // $string
+        TokenKind::Backtick,
+        TokenKind::Semicolon,
+    ];
+
+    test_lexer(code.as_bytes(), expected).map_err(|err| {
+        panic!("unexpected error: {err}");
+    })
+}
+
+#[test]
+fn test_heredoc_no_interpolation_without_dollar() -> Result<(), SyntaxError> {
+    let code = b"<?php $x = <<<EOF\n\\\\{foo}\nEOF;\n";
+    let expected = &[
+        TokenKind::OpenTag,
+        TokenKind::Whitespace,
+        TokenKind::Variable,
+        TokenKind::Whitespace,
+        TokenKind::Equal,
+        TokenKind::Whitespace,
+        TokenKind::DocumentStart(DocumentKind::Heredoc),
+        TokenKind::StringPart, // \\{foo}\n
+        TokenKind::DocumentEnd,
+        TokenKind::Semicolon,
+        TokenKind::Whitespace,
+    ];
+
+    test_lexer(code, expected).map_err(|err| {
+        panic!("unexpected error: {err}");
+    })
+}
+
+#[test]
+fn test_heredoc_escaped_backslash_before_dollar_brace_interpolation() -> Result<(), SyntaxError> {
+    let code = b"<?php $x = <<<EOF\n\\\\${string}\nEOF;\n";
+    let expected = &[
+        TokenKind::OpenTag,
+        TokenKind::Whitespace,
+        TokenKind::Variable,
+        TokenKind::Whitespace,
+        TokenKind::Equal,
+        TokenKind::Whitespace,
+        TokenKind::DocumentStart(DocumentKind::Heredoc),
+        TokenKind::StringPart, // \\
+        TokenKind::DollarLeftBrace,
+        TokenKind::Identifier,
+        TokenKind::RightBrace,
+        TokenKind::StringPart, // \n
+        TokenKind::DocumentEnd,
+        TokenKind::Semicolon,
+        TokenKind::Whitespace,
+    ];
+
+    test_lexer(code, expected).map_err(|err| {
+        panic!("unexpected error: {err}");
+    })
+}
+
 pub const KEYWORD_TYPES: [(&[u8], TokenKind); 84] = [
     (b"eval", TokenKind::Eval),
     (b"die", TokenKind::Die),
