@@ -700,6 +700,7 @@ test_case!(issue_1265);
 test_case!(issue_1266);
 test_case!(issue_1266_inheritdoc_narrowing);
 test_case!(issue_1267);
+test_case!(issue_1291);
 
 #[test]
 fn test_all_test_cases_are_ran() {
