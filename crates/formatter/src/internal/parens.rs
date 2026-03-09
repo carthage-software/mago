@@ -464,7 +464,7 @@ impl<'arena> FormatterState<'_, 'arena> {
         false
     }
 
-    const fn callee_expression_need_parenthesis(
+    pub(crate) const fn callee_expression_need_parenthesis(
         &self,
         expression: &'arena Expression<'arena>,
         instantiation: bool,
