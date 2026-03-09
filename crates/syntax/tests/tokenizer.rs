@@ -1345,6 +1345,19 @@ fn test_short_tags_enabled_treats_short_open_tag_as_php() -> Result<(), SyntaxEr
 }
 
 #[test]
+fn test_invalid_octal_literal_is_parse_error() {
+    let code = b"<?=08;";
+    let expected = &[TokenKind::EchoTag];
+
+    let Err(SyntaxError::UnexpectedToken(_, byte, position)) = test_lexer(code, expected) else {
+        panic!("expected SyntaxError::UnexpectedToken");
+    };
+
+    assert_eq!(byte, b'8');
+    assert_eq!(position.offset, 4);
+}
+
+#[test]
 fn test_double_quoted_escaped_backslash_before_braced_interpolation() -> Result<(), SyntaxError> {
     let code = r#"<?= "\\{$string}";"#;
     let expected = &[

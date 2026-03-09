@@ -338,7 +338,8 @@ pub fn parse_literal_integer(value: &str) -> Option<u64> {
         [b'0', b'x' | b'X', ..] => (16u128, 2),
         [b'0', b'o' | b'O', ..] => (8u128, 2),
         [b'0', b'b' | b'B', ..] => (2u128, 2),
-        [b'0', _, ..] => (8u128, 1), // Legacy octal
+        [b'0', _, ..] if bytes[1..].iter().all(|&b| b == b'_' || (b'0'..=b'7').contains(&b)) => (8u128, 1), // Legacy octal
+        [b'0', _, ..] => (10u128, 0), // Invalid octal (contains 8/9), treat as decimal
         _ => (10u128, 0),
     };
 

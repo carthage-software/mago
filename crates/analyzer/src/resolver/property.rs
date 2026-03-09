@@ -637,6 +637,15 @@ fn find_property_in_class<'ctx, 'ast, 'arena>(
         );
     }
 
+    if !for_assignment
+        && property_metadata.type_declaration_metadata.is_some()
+        && !property_metadata.flags.has_default()
+        && !property_metadata.flags.is_promoted_property()
+        && !property_metadata.flags.is_virtual_property()
+    {
+        property_type.set_possibly_undefined(true, None);
+    }
+
     let is_visible = if for_assignment {
         check_property_write_visibility(
             context,
