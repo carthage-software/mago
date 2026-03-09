@@ -106,6 +106,7 @@ pub(super) fn print_array_like<'arena>(
     f: &mut FormatterState<'_, 'arena>,
     array_like: ArrayLike<'arena>,
 ) -> Document<'arena> {
+    let group_id = f.next_id();
     let left_delimiter = {
         let mut left_delimiter_content = vec![in f.arena;];
         if let Some(prefix) = array_like.prefix(f) {
@@ -184,10 +185,7 @@ pub(super) fn print_array_like<'arena>(
                 }
             }
         } else {
-            // Keep assignment-like alignment for arrays that are already multiline in source
-            // or are wide enough that they meaningfully break as arrays. Compact inline arrays
-            // should not gain padding just because align_assignment_like is enabled.
-            let kv_alignment_runs = detect_array_element_alignment_runs(f, &array_like, &elements, preserve_break);
+            let kv_alignment_runs = detect_array_element_alignment_runs(f, &elements);
 
             // Standard formatting with optional key-value alignment
             for (i, element) in elements.into_iter().enumerate() {
@@ -195,7 +193,7 @@ pub(super) fn print_array_like<'arena>(
 
                 // Set alignment context if this element is in an alignment run
                 if let Some(widths) = get_array_element_alignment(&kv_alignment_runs, i) {
-                    let alignment = calculate_array_element_alignment(element, &widths);
+                    let alignment = calculate_array_element_alignment(element, &widths, group_id);
                     f.set_alignment_context(Some(alignment));
                 }
 
@@ -235,7 +233,7 @@ pub(super) fn print_array_like<'arena>(
 
     let force_break = use_table_style || has_floating_comments;
 
-    Document::Group(Group::new(parts).with_break_mode(if force_break {
+    Document::Group(Group::new(parts).with_id(group_id).with_break_mode(if force_break {
         BreakMode::Force
     } else if preserve_break {
         BreakMode::Preserve
@@ -582,14 +580,9 @@ fn get_document_width(doc: &Document<'_>) -> usize {
 /// Detect alignment runs in array elements for key-value pairs.
 fn detect_array_element_alignment_runs<'arena>(
     f: &FormatterState<'_, 'arena>,
-    array_like: &ArrayLike<'arena>,
     elements: &[&'arena ArrayElement<'arena>],
-    preserve_break: bool,
 ) -> std::vec::Vec<AlignmentRun> {
-    if !f.settings.align_assignment_like
-        || elements.is_empty()
-        || (!preserve_break && !array_like_exceeds_print_width(f, array_like))
-    {
+    if !f.settings.align_assignment_like || elements.is_empty() {
         return std::vec::Vec::new();
     }
 
@@ -651,28 +644,6 @@ fn detect_array_element_alignment_runs<'arena>(
     runs
 }
 
-fn array_like_exceeds_print_width<'arena>(f: &FormatterState<'_, 'arena>, array_like: &ArrayLike<'arena>) -> bool {
-    let start = array_like.start_offset() as usize;
-    let end = array_like.end_offset() as usize;
-    let source = &f.source_text[start..end];
-
-    let mut flattened = String::with_capacity(source.len());
-    let mut previous_was_whitespace = false;
-    for character in source.chars() {
-        if character.is_whitespace() {
-            if !previous_was_whitespace {
-                flattened.push(' ');
-                previous_was_whitespace = true;
-            }
-        } else {
-            flattened.push(character);
-            previous_was_whitespace = false;
-        }
-    }
-
-    string_width(flattened.trim()) > f.settings.print_width
-}
-
 fn calculate_array_element_widths(elements: &[&ArrayElement<'_>]) -> AlignmentWidths {
     let mut max_key_width = 0usize;
 
@@ -694,7 +665,11 @@ fn get_array_element_alignment(runs: &[AlignmentRun], index: usize) -> Option<Al
     runs.iter().find(|run| run.contains(index)).map(|run| run.widths)
 }
 
-fn calculate_array_element_alignment(element: &ArrayElement<'_>, widths: &AlignmentWidths) -> AssignmentAlignment {
+fn calculate_array_element_alignment(
+    element: &ArrayElement<'_>,
+    widths: &AlignmentWidths,
+    break_group_id: crate::document::group::GroupIdentifier,
+) -> AssignmentAlignment {
     let current_key_width = match element {
         ArrayElement::KeyValue(kv) => get_expression_span_width(kv.key),
         _ => 0,
@@ -702,5 +677,5 @@ fn calculate_array_element_alignment(element: &ArrayElement<'_>, widths: &Alignm
 
     let name_padding = widths.name_width.saturating_sub(current_key_width);
 
-    AssignmentAlignment { type_padding: 0, name_padding }
+    AssignmentAlignment { type_padding: 0, name_padding, break_group_id: Some(break_group_id) }
 }
