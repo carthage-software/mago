@@ -1,9 +1,25 @@
 use std::cmp::min;
+use std::io;
 use std::io::BufRead;
 use std::io::Write;
-use std::io::{self};
 
-use super::error::UpdateError;
+use serde_json::Value;
+use ureq::typestate::WithoutBody;
+
+use crate::updater::error::UpdateError;
+
+/// Returns a GitHub authentication token from the environment, if available.
+fn get_github_token() -> Option<String> {
+    std::env::var("GITHUB_TOKEN").ok().or_else(|| std::env::var("GH_TOKEN").ok()).filter(|t| !t.is_empty())
+}
+
+/// Applies common headers (User-Agent, Accept, and optional Authorization) to a request.
+fn github_api_request(url: &str, accept: &str) -> ureq::RequestBuilder<WithoutBody> {
+    let req =
+        ureq::get(url).header("User-Agent", &format!("mago/{}", env!("CARGO_PKG_VERSION"))).header("Accept", accept);
+
+    if let Some(token) = get_github_token() { req.header("Authorization", &format!("Bearer {token}")) } else { req }
+}
 
 #[derive(Debug)]
 pub struct Release {
@@ -21,12 +37,7 @@ pub struct ReleaseAsset {
 pub fn get_latest_release(owner: &str, repo: &str) -> Result<Release, UpdateError> {
     let url = format!("https://api.github.com/repos/{owner}/{repo}/releases/latest");
 
-    let json: serde_json::Value = ureq::get(&url)
-        .header("User-Agent", &format!("mago/{}", env!("CARGO_PKG_VERSION")))
-        .header("Accept", "application/vnd.github.v3+json")
-        .call()?
-        .body_mut()
-        .read_json()?;
+    let json: Value = github_api_request(&url, "application/vnd.github.v3+json").call()?.body_mut().read_json()?;
 
     parse_release(&json)
 }
@@ -34,21 +45,13 @@ pub fn get_latest_release(owner: &str, repo: &str) -> Result<Release, UpdateErro
 pub fn get_release_version(owner: &str, repo: &str, tag: &str) -> Result<Release, UpdateError> {
     let url = format!("https://api.github.com/repos/{owner}/{repo}/releases/tags/{tag}");
 
-    let json: serde_json::Value = ureq::get(&url)
-        .header("User-Agent", &format!("mago/{}", env!("CARGO_PKG_VERSION")))
-        .header("Accept", "application/vnd.github.v3+json")
-        .call()?
-        .body_mut()
-        .read_json()?;
+    let json: Value = github_api_request(&url, "application/vnd.github.v3+json").call()?.body_mut().read_json()?;
 
     parse_release(&json)
 }
 
 pub fn download_asset(asset: &ReleaseAsset, dest: &mut impl Write) -> Result<(), UpdateError> {
-    let response = ureq::get(&asset.download_url)
-        .header("User-Agent", &format!("mago/{}", env!("CARGO_PKG_VERSION")))
-        .header("Accept", "application/octet-stream")
-        .call()?;
+    let response = github_api_request(&asset.download_url, "application/octet-stream").call()?;
 
     let size = response
         .headers()
@@ -99,7 +102,7 @@ pub fn download_asset(asset: &ReleaseAsset, dest: &mut impl Write) -> Result<(),
     Ok(())
 }
 
-fn parse_release(json: &serde_json::Value) -> Result<Release, UpdateError> {
+fn parse_release(json: &Value) -> Result<Release, UpdateError> {
     let tag = json["tag_name"].as_str().ok_or_else(|| UpdateError::Release("release missing `tag_name`".into()))?;
 
     let name = json["name"].as_str().unwrap_or(tag);
