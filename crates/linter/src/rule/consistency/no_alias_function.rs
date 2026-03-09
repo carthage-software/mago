@@ -1,4 +1,5 @@
 use indoc::indoc;
+use mago_text_edit::Safety;
 use mago_text_edit::TextEdit;
 use schemars::JsonSchema;
 use serde::Deserialize;
@@ -108,7 +109,7 @@ impl LintRule for NoAliasFunctionRule {
 
             ctx.collector.propose(issue, |edits| {
                 let function_span = function_call.function.span();
-                edits.push(TextEdit::replace(function_span, *original_name));
+                edits.push(TextEdit::replace(function_span, *original_name).with_safety(Safety::PotentiallyUnsafe));
             });
 
             break;
