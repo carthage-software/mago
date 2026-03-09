@@ -704,6 +704,7 @@ test_case!(issue_1267);
 test_case!(issue_1291);
 test_case!(issue_1249);
 test_case!(issue_1278);
+test_case!(issue_1287);
 test_case!(issue_1286);
 
 #[test]
