@@ -2588,11 +2588,10 @@ fn check_class_like_properties<'ctx>(context: &mut Context<'ctx, '_>, class_like
         }
 
         // Validate set hook parameter type is supertype of property type
-        // Use type_declaration_metadata (native type) not get_type_metadata() (merged with docblock)
         if let Some(set_hook) = property_metadata.hooks.get(&atom("set"))
             && let Some(param) = &set_hook.parameter
             && let Some(param_type) = param.type_declaration_metadata.as_ref()
-            && let Some(property_type) = property_metadata.type_declaration_metadata.as_ref()
+            && let Some(property_type) = property_metadata.type_metadata.as_ref()
         {
             // The set hook parameter type must contain the property type (contravariance)
             // i.e., any value assignable to the property type should be accepted by the hook
