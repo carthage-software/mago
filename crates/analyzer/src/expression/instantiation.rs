@@ -285,8 +285,11 @@ fn analyze_class_instantiation<'ctx, 'arena>(
 
     let mut template_result = TemplateResult::new(IndexMap::with_hasher(RandomState::default()), HashMap::default());
 
-    let is_spl_object_storage = classname_str.eq_ignore_ascii_case("splobjectstorage");
+    let has_internal_template_context =
+        classname.is_self() || classname.is_static() || classname.is_from_class_string();
+
     if let Some(constructor) = context.codebase.get_method_by_id(&constructor_declraing_id) {
+        let constructor_has_no_params = constructor.parameters.is_empty();
         has_inconsistent_constructor =
             has_inconsistent_constructor && !constructor.method_metadata.as_ref().is_some_and(|meta| meta.is_final);
         constructor_span = Some(constructor.name_span.unwrap_or(constructor.span));
@@ -380,7 +383,7 @@ fn analyze_class_instantiation<'ctx, 'arena>(
                     &metadata.template_extended_parameters,
                     &found_generic_parameters,
                 )
-            } else if is_spl_object_storage {
+            } else if constructor_has_no_params && !has_internal_template_context {
                 get_never()
             } else {
                 base_type.constraint.clone()
@@ -414,7 +417,11 @@ fn analyze_class_instantiation<'ctx, 'arena>(
             metadata
                 .template_types
                 .iter()
-                .map(|(_, template)| if is_spl_object_storage { get_never() } else { template.constraint.clone() })
+                .map(
+                    |(_, template)| {
+                        if has_internal_template_context { template.constraint.clone() } else { get_never() }
+                    },
+                )
                 .collect(),
         );
     }
