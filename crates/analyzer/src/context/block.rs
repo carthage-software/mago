@@ -723,7 +723,7 @@ mod tests {
     fn block_context_with_locals(vars: &[&str]) -> BlockContext<'static> {
         let mut block_context = BlockContext::new(ScopeContext::new(), false);
         for variable in vars {
-            let variable_atom = atom(*variable);
+            let variable_atom = atom(variable);
             block_context.locals.insert(variable_atom, Rc::new(get_mixed()));
             block_context.variables_possibly_in_scope.insert(variable_atom);
         }
