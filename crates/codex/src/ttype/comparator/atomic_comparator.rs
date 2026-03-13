@@ -170,7 +170,7 @@ pub fn is_contained_by(
         }
     }
 
-    if matches!(container_type_part, TAtomic::Placeholder) {
+    if matches!(container_type_part, TAtomic::Placeholder) || matches!(input_type_part, TAtomic::Placeholder) {
         return true;
     }
 

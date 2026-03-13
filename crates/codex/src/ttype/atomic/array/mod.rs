@@ -280,6 +280,19 @@ impl TArray {
         }
     }
 
+    /// Returns true if any type parameter in this array is a Placeholder.
+    #[inline]
+    #[must_use]
+    pub fn contains_placeholder(&self) -> bool {
+        match self {
+            Self::Keyed(keyed_array) => keyed_array
+                .parameters
+                .as_ref()
+                .is_some_and(|p| p.0.contains_placeholder() || p.1.contains_placeholder()),
+            Self::List(list) => list.element_type.contains_placeholder(),
+        }
+    }
+
     /// Removes placeholder types from the array type.
     #[inline]
     pub fn remove_placeholders(&mut self) {
