@@ -6,6 +6,7 @@ use mago_span::Span;
 use mago_syntax::ast::Access;
 use mago_syntax::ast::Argument;
 use mago_syntax::ast::ArrayAccess;
+use mago_syntax::ast::ArrayElement;
 use mago_syntax::ast::AttributeList;
 use mago_syntax::ast::Call;
 use mago_syntax::ast::ConstantAccess;
@@ -19,6 +20,7 @@ use mago_syntax::ast::Node;
 use mago_syntax::ast::Sequence;
 use mago_syntax::ast::Statement;
 use mago_syntax::ast::Terminator;
+use mago_syntax::ast::UnaryPrefixOperator;
 use mago_syntax::ast::Variable;
 use mago_syntax::ast::Yield;
 
@@ -424,6 +426,102 @@ pub(super) const fn is_string_word_type(node: &Expression) -> bool {
             | Expression::ConstantAccess(ConstantAccess { name: Identifier::Local(_) })
             | Expression::Variable(Variable::Direct(_))
     )
+}
+
+pub(super) fn is_simple_call_argument<'arena>(node: &'arena Expression<'arena>, depth: usize) -> bool {
+    let is_child_simple = |node: &'arena Expression<'arena>| {
+        if depth <= 1 {
+            return false;
+        }
+
+        is_simple_call_argument(node, depth - 1)
+    };
+
+    let is_simple_element = |node: &'arena ArrayElement<'arena>| match node {
+        ArrayElement::KeyValue(element) => is_child_simple(element.key) && is_child_simple(element.value),
+        ArrayElement::Value(element) => is_child_simple(element.value),
+        ArrayElement::Variadic(element) => is_child_simple(element.value),
+        ArrayElement::Missing(_) => true,
+    };
+
+    if node.is_literal() || is_string_word_type(node) {
+        return true;
+    }
+
+    match node {
+        Expression::Parenthesized(parenthesized) => is_simple_call_argument(parenthesized.expression, depth),
+        Expression::UnaryPrefix(operation) => {
+            if let UnaryPrefixOperator::PreIncrement(_) | UnaryPrefixOperator::PreDecrement(_) = operation.operator {
+                return false;
+            }
+
+            if operation.operator.is_cast() {
+                return false;
+            }
+
+            is_simple_call_argument(operation.operand, depth)
+        }
+        Expression::Array(array) => array.elements.iter().all(is_simple_element),
+        Expression::LegacyArray(array) => array.elements.iter().all(is_simple_element),
+        Expression::Call(call) => {
+            let argument_list = match call {
+                Call::Function(function_call) => {
+                    if !is_simple_call_argument(function_call.function, depth) {
+                        return false;
+                    }
+
+                    &function_call.argument_list
+                }
+                Call::Method(method_call) => {
+                    if !is_simple_call_argument(method_call.object, depth) {
+                        return false;
+                    }
+
+                    &method_call.argument_list
+                }
+                Call::NullSafeMethod(null_safe_method_call) => {
+                    if !is_simple_call_argument(null_safe_method_call.object, depth) {
+                        return false;
+                    }
+
+                    &null_safe_method_call.argument_list
+                }
+                Call::StaticMethod(static_method_call) => {
+                    if !is_simple_call_argument(static_method_call.class, depth) {
+                        return false;
+                    }
+
+                    &static_method_call.argument_list
+                }
+            };
+
+            argument_list.arguments.len() <= depth
+                && argument_list.arguments.iter().map(Argument::value).all(is_child_simple)
+        }
+        Expression::Access(access) => {
+            let object_or_class = match access {
+                Access::Property(property_access) => &property_access.object,
+                Access::NullSafeProperty(null_safe_property_access) => &null_safe_property_access.object,
+                Access::StaticProperty(static_property_access) => &static_property_access.class,
+                Access::ClassConstant(class_constant_access) => &class_constant_access.class,
+            };
+
+            is_simple_call_argument(object_or_class, depth)
+        }
+        Expression::ArrayAccess(array_access) => {
+            is_simple_call_argument(array_access.array, depth) && is_simple_call_argument(array_access.index, depth)
+        }
+        Expression::Instantiation(instantiation) if is_simple_call_argument(instantiation.class, depth) => {
+            match &instantiation.argument_list {
+                Some(argument_list) => {
+                    argument_list.arguments.len() <= depth
+                        && argument_list.arguments.iter().map(Argument::value).all(is_child_simple)
+                }
+                None => true,
+            }
+        }
+        _ => false,
+    }
 }
 
 pub(super) fn print_colon_delimited_body<'arena>(
