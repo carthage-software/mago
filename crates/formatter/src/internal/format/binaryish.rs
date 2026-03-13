@@ -336,10 +336,12 @@ fn print_binaryish_expression_parts<'arena>(
             None
         };
 
+    let force_break = f.must_break_condition && line_before_operator;
+
     let right_document = vec![
         in f.arena;
-        if operator_has_leading_comments || (line_before_operator && !should_inline_this_level) {
-            Document::Line(if has_space_around { Line::default() } else { Line::soft() })
+        if force_break || operator_has_leading_comments || (line_before_operator && !should_inline_this_level) {
+            Document::Line(if force_break { Line::hard() } else if has_space_around { Line::default() } else { Line::soft() })
         } else {
             Document::String(if has_space_around { " " } else { "" })
         },
