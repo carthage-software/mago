@@ -121,13 +121,6 @@ fn populate_codebase_inner(
     if let Some(dirty) = &dirty_symbols {
         for dirty_key in dirty {
             if let Some(function_like_metadata) = codebase.function_likes.get_mut(dirty_key) {
-                let is_closure_or_arrow = function_like_metadata.get_kind().is_closure()
-                    || function_like_metadata.get_kind().is_arrow_function();
-
-                if is_closure_or_arrow {
-                    continue;
-                }
-
                 let force_repopulation = function_like_metadata.flags.is_user_defined();
                 if function_like_metadata.flags.is_populated() && !force_repopulation {
                     continue;
