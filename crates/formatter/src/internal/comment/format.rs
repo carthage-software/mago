@@ -99,6 +99,33 @@ impl<'arena> FormatterState<'_, 'arena> {
         })
     }
 
+    pub(crate) fn has_leading_docblock_comment(&self, range: Span) -> bool {
+        let candidate_partition_idx =
+            self.all_comments.partition_point(|trivia| trivia.span.start.offset < range.start_offset());
+        if candidate_partition_idx == 0 {
+            return false;
+        }
+
+        let mut covered_from = range.start_offset();
+
+        for trivia in self.all_comments[..candidate_partition_idx].iter().rev() {
+            let trivia_end = trivia.span.end_offset();
+            let gap_slice = self.source_text.as_bytes().get(trivia_end as usize..covered_from as usize).unwrap_or(&[]);
+
+            if !gap_slice.iter().all(u8::is_ascii_whitespace) {
+                return false;
+            }
+
+            if trivia.kind.is_docblock() {
+                return true;
+            }
+
+            covered_from = trivia.span.start_offset();
+        }
+
+        false
+    }
+
     pub(crate) fn has_comment(&self, range: Span, flags: CommentFlags) -> bool {
         self.has_comment_with_filter(range, flags, |_| true)
     }

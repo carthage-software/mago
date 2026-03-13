@@ -8,6 +8,7 @@ use bumpalo::Bump;
 use mago_span::HasPosition;
 use mago_span::HasSpan;
 use mago_syntax::ast::Constant;
+use mago_syntax::ast::Construct;
 use mago_syntax::ast::Declare;
 use mago_syntax::ast::DeclareBody;
 use mago_syntax::ast::Echo;
@@ -24,6 +25,7 @@ use mago_syntax::ast::Use;
 use mago_syntax::ast::UseItem;
 use mago_syntax::ast::UseItems;
 use mago_syntax::ast::UseType;
+use mago_syntax::ast::Yield;
 
 use mago_syntax::ast::Expression;
 
@@ -40,6 +42,9 @@ use crate::internal::format::alignment::detect_statement_ref_alignment_runs;
 use crate::internal::format::alignment::get_statement_alignment;
 use crate::internal::format::assignment::AssignmentAlignment;
 use crate::internal::format::misc::has_new_line_in_range;
+use crate::settings::BlankLineBeforeStatement;
+use crate::settings::UseImportType;
+use crate::settings::UseSortAlgorithm;
 
 pub fn print_statement_sequence<'arena>(
     f: &mut FormatterState<'_, 'arena>,
@@ -306,8 +311,68 @@ const fn should_add_empty_line_after<'arena>(f: &FormatterState<'_, 'arena>, stm
 
 #[inline]
 fn should_add_empty_line_before<'arena>(f: &FormatterState<'_, 'arena>, stmt: &'arena Statement<'arena>) -> bool {
-    match stmt {
-        Statement::Return(_) => f.settings.empty_line_before_return,
+    let configured = match stmt {
+        Statement::Break(_) => f.settings.blank_line_before_statement.contains(BlankLineBeforeStatement::Break),
+        Statement::Continue(_) => f.settings.blank_line_before_statement.contains(BlankLineBeforeStatement::Continue),
+        Statement::Declare(_) => f.settings.blank_line_before_statement.contains(BlankLineBeforeStatement::Declare),
+        Statement::DoWhile(_) => f.settings.blank_line_before_statement.contains(BlankLineBeforeStatement::Do),
+        Statement::Foreach(_) => f.settings.blank_line_before_statement.contains(BlankLineBeforeStatement::Foreach),
+        Statement::For(_) => f.settings.blank_line_before_statement.contains(BlankLineBeforeStatement::For),
+        Statement::Goto(_) => f.settings.blank_line_before_statement.contains(BlankLineBeforeStatement::Goto),
+        Statement::If(_) => f.settings.blank_line_before_statement.contains(BlankLineBeforeStatement::If),
+        Statement::Return(_) => {
+            f.settings.empty_line_before_return
+                || f.settings.blank_line_before_statement.contains(BlankLineBeforeStatement::Return)
+        }
+        Statement::Switch(_) => f.settings.blank_line_before_statement.contains(BlankLineBeforeStatement::Switch),
+        Statement::Try(_) => f.settings.blank_line_before_statement.contains(BlankLineBeforeStatement::Try),
+        Statement::While(_) => f.settings.blank_line_before_statement.contains(BlankLineBeforeStatement::While),
+        Statement::Expression(expression) => should_add_empty_line_before_expression(f, &expression.expression),
+        _ => false,
+    };
+
+    configured
+        || (f.settings.blank_line_before_statement.contains(BlankLineBeforeStatement::Phpdoc)
+            && f.has_leading_docblock_comment(stmt.span()))
+}
+
+pub(super) fn should_add_empty_line_before_switch_case<'arena>(
+    f: &FormatterState<'_, 'arena>,
+    case: &'arena mago_syntax::ast::SwitchCase<'arena>,
+) -> bool {
+    match case {
+        mago_syntax::ast::SwitchCase::Expression(_) => {
+            f.settings.blank_line_before_statement.contains(BlankLineBeforeStatement::Case)
+        }
+        mago_syntax::ast::SwitchCase::Default(_) => {
+            f.settings.blank_line_before_statement.contains(BlankLineBeforeStatement::Default)
+        }
+    }
+}
+
+fn should_add_empty_line_before_expression<'arena>(
+    f: &FormatterState<'_, 'arena>,
+    expression: &'arena Expression<'arena>,
+) -> bool {
+    match expression {
+        Expression::Construct(construct) => match construct {
+            Construct::Include(_) => f.settings.blank_line_before_statement.contains(BlankLineBeforeStatement::Include),
+            Construct::IncludeOnce(_) => {
+                f.settings.blank_line_before_statement.contains(BlankLineBeforeStatement::IncludeOnce)
+            }
+            Construct::Require(_) => f.settings.blank_line_before_statement.contains(BlankLineBeforeStatement::Require),
+            Construct::RequireOnce(_) => {
+                f.settings.blank_line_before_statement.contains(BlankLineBeforeStatement::RequireOnce)
+            }
+            _ => false,
+        },
+        Expression::Throw(_) => f.settings.blank_line_before_statement.contains(BlankLineBeforeStatement::Throw),
+        Expression::Yield(r#yield) => match r#yield {
+            Yield::From(_) => f.settings.blank_line_before_statement.contains(BlankLineBeforeStatement::YieldFrom),
+            Yield::Pair(_) | Yield::Value(_) => {
+                f.settings.blank_line_before_statement.contains(BlankLineBeforeStatement::Yield)
+            }
+        },
         _ => false,
     }
 }
@@ -460,27 +525,8 @@ fn print_use_statements<'arena>(
 
     if should_sort {
         all_expanded_items.sort_by(|a, b| {
-            let a_type_order = match a.use_type {
-                None => 0,
-                Some(ty) => {
-                    if ty.is_function() {
-                        1
-                    } else {
-                        2
-                    }
-                }
-            };
-
-            let b_type_order = match b.use_type {
-                None => 0,
-                Some(ty) => {
-                    if ty.is_function() {
-                        1
-                    } else {
-                        2
-                    }
-                }
-            };
+            let a_type_order = f.settings.use_type_order.rank(use_import_type(a.use_type));
+            let b_type_order = f.settings.use_type_order.rank(use_import_type(b.use_type));
 
             if a_type_order != b_type_order {
                 return a_type_order.cmp(&b_type_order);
@@ -489,20 +535,12 @@ fn print_use_statements<'arena>(
             let a_full_name = join_item_name(f.arena, &a.namespace, a.name);
             let b_full_name = join_item_name(f.arena, &b.namespace, b.name);
 
-            let mut a_chars = a_full_name.chars().flat_map(char::to_lowercase);
-            let mut b_chars = b_full_name.chars().flat_map(char::to_lowercase);
-
-            loop {
-                match (a_chars.next(), b_chars.next()) {
-                    (Some(ac), Some(bc)) => match ac.cmp(&bc) {
-                        Ordering::Equal => {}
-                        other => return other,
-                    },
-                    (None, Some(_)) => return Ordering::Less,
-                    (Some(_), None) => return Ordering::Greater,
-                    (None, None) => return Ordering::Equal,
-                }
-            }
+            compare_use_names(
+                a_full_name,
+                b_full_name,
+                f.settings.sort_uses_algorithm,
+                f.settings.sort_uses_case_sensitive,
+            )
         });
     }
 
@@ -642,10 +680,12 @@ fn expand_use<'arena>(
                         expand_single_item(f, item, current_namespace.clone(), use_type, expanded_items, original_node);
                     }
                 } else {
-                    // Extract namespace and name from first item for sorting
-                    let (namespace, name) = seq
-                        .items
-                        .first()
+                    let representative = if f.settings.sort_uses {
+                        sort_use_items(f, seq.items.iter()).into_iter().next()
+                    } else {
+                        seq.items.first()
+                    };
+                    let (namespace, name) = representative
                         .map(|item| extract_namespace_and_name_from_item(f, item, current_namespace.clone()))
                         .unwrap_or((current_namespace, ""));
                     expanded_items.push(ExpandedUseItem { use_type, namespace, name, alias: None, original_node });
@@ -664,10 +704,12 @@ fn expand_use<'arena>(
                         );
                     }
                 } else {
-                    // Extract namespace and name from first item for sorting
-                    let (namespace, name) = seq
-                        .items
-                        .first()
+                    let representative = if f.settings.sort_uses {
+                        sort_use_items(f, seq.items.iter()).into_iter().next()
+                    } else {
+                        seq.items.first()
+                    };
+                    let (namespace, name) = representative
                         .map(|item| extract_namespace_and_name_from_item(f, item, current_namespace.clone()))
                         .unwrap_or((current_namespace, ""));
                     expanded_items.push(ExpandedUseItem {
@@ -694,11 +736,14 @@ fn expand_use<'arena>(
                         );
                     }
                 } else {
-                    // Extract namespace and name from first item for sorting
-                    // For grouped items, the name should be just the item name (not a full path)
+                    let representative = if f.settings.sort_uses {
+                        sort_use_items(f, list.items.iter()).into_iter().next()
+                    } else {
+                        list.items.first()
+                    };
                     let (namespace, name) = extract_namespace_and_name_from_grouped_list(
                         list.namespace.value(),
-                        list.items.first().map(|item| item.name.value()),
+                        representative.map(|item| item.name.value()),
                         current_namespace,
                     );
                     expanded_items.push(ExpandedUseItem {
@@ -725,15 +770,18 @@ fn expand_use<'arena>(
                         );
                     }
                 } else {
-                    // Extract namespace and name from first item for sorting
-                    // For grouped items, the name should be just the item name (not a full path)
+                    let representative = if f.settings.sort_uses {
+                        sort_maybe_typed_use_items(f, list.items.iter()).into_iter().next()
+                    } else {
+                        list.items.first()
+                    };
                     let (namespace, name) = extract_namespace_and_name_from_grouped_list(
                         list.namespace.value(),
-                        list.items.first().map(|item| item.item.name.value()),
+                        representative.map(|item| item.item.name.value()),
                         current_namespace,
                     );
                     expanded_items.push(ExpandedUseItem {
-                        use_type: list.items.first().and_then(|item| item.r#type.as_ref()),
+                        use_type: representative.and_then(|item| item.r#type.as_ref()),
                         namespace,
                         name,
                         alias: None,
@@ -772,33 +820,83 @@ fn expand_use<'arena>(
 }
 
 pub fn sort_use_items<'arena>(
+    f: &FormatterState<'_, 'arena>,
     items: impl Iterator<Item = &'arena UseItem<'arena>>,
 ) -> std::vec::Vec<&'arena UseItem<'arena>> {
     let mut items = items.collect::<std::vec::Vec<_>>();
-    items.sort_by_cached_key(|item| item.name.value().to_lowercase());
+    items.sort_by(|a, b| {
+        compare_use_names(
+            a.name.value(),
+            b.name.value(),
+            f.settings.sort_uses_algorithm,
+            f.settings.sort_uses_case_sensitive,
+        )
+    });
     items
 }
 
 pub fn sort_maybe_typed_use_items<'arena>(
+    f: &FormatterState<'_, 'arena>,
     items: impl Iterator<Item = &'arena MaybeTypedUseItem<'arena>>,
 ) -> std::vec::Vec<&'arena MaybeTypedUseItem<'arena>> {
     let mut items = items.collect::<std::vec::Vec<_>>();
-    items.sort_by_cached_key(|item| {
-        let type_order = match &item.r#type {
-            None => 0u8,
-            Some(ty) => {
-                if ty.is_function() {
-                    1
-                } else {
-                    2
-                }
-            }
-        };
+    items.sort_by(|a, b| {
+        let type_order = f.settings.use_type_order.rank(use_import_type(a.r#type.as_ref()));
+        let other_type_order = f.settings.use_type_order.rank(use_import_type(b.r#type.as_ref()));
 
-        (type_order, item.item.name.value().to_lowercase())
+        if type_order != other_type_order {
+            return type_order.cmp(&other_type_order);
+        }
+
+        compare_use_names(
+            a.item.name.value(),
+            b.item.name.value(),
+            f.settings.sort_uses_algorithm,
+            f.settings.sort_uses_case_sensitive,
+        )
     });
 
     items
+}
+
+fn use_import_type(use_type: Option<&UseType<'_>>) -> UseImportType {
+    match use_type {
+        None => UseImportType::Class,
+        Some(use_type) if use_type.is_function() => UseImportType::Function,
+        Some(_) => UseImportType::Const,
+    }
+}
+
+fn compare_use_names(a: &str, b: &str, algorithm: UseSortAlgorithm, case_sensitive: bool) -> Ordering {
+    match algorithm {
+        UseSortAlgorithm::None => Ordering::Equal,
+        UseSortAlgorithm::Alpha => compare_alpha(a, b, case_sensitive),
+        UseSortAlgorithm::Length => match a.chars().count().cmp(&b.chars().count()) {
+            Ordering::Equal => compare_alpha(a, b, case_sensitive),
+            ordering => ordering,
+        },
+    }
+}
+
+fn compare_alpha(a: &str, b: &str, case_sensitive: bool) -> Ordering {
+    if case_sensitive {
+        a.chars().cmp(b.chars())
+    } else {
+        let mut a_chars = a.chars().flat_map(char::to_lowercase);
+        let mut b_chars = b.chars().flat_map(char::to_lowercase);
+
+        loop {
+            match (a_chars.next(), b_chars.next()) {
+                (Some(ac), Some(bc)) => match ac.cmp(&bc) {
+                    Ordering::Equal => {}
+                    other => return other,
+                },
+                (None, Some(_)) => return Ordering::Less,
+                (Some(_), None) => return Ordering::Greater,
+                (None, None) => return Ordering::Equal,
+            }
+        }
+    }
 }
 
 fn calculate_statement_alignment(
