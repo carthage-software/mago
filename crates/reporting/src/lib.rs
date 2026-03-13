@@ -43,6 +43,48 @@ pub enum IgnoreEntry {
     },
 }
 
+/// Represents an entry in the analyzer's or linter's `only` configuration.
+///
+/// Same structure as [`IgnoreEntry`]: plain code (report only this code everywhere)
+/// or scoped (report this code only in specific paths). Paths are matched as prefixes
+/// against relative file paths from the project root.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(untagged)]
+pub enum OnlyEntry {
+    /// Report only this code everywhere: `"strict-types"`
+    Code(String),
+    /// Report this code only in specific paths: `{ code = "strict-types", in = "src/" }`
+    Scoped {
+        code: String,
+        #[serde(rename = "in", deserialize_with = "one_or_many")]
+        paths: Vec<String>,
+    },
+}
+
+/// Entry for `only-in` (scoped-only): "in these paths, only report this code".
+/// Files outside these paths are not restricted by this entry.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct OnlyInEntry {
+    pub code: String,
+    #[serde(rename = "in", deserialize_with = "one_or_many")]
+    pub paths: Vec<String>,
+}
+
+/// Returns the set of issue codes mentioned in `only` (for restricting which rules run).
+#[must_use]
+pub fn only_entry_codes(only: &[OnlyEntry]) -> Vec<String> {
+    let mut codes: Vec<String> = only
+        .iter()
+        .map(|e| match e {
+            OnlyEntry::Code(c) => c.clone(),
+            OnlyEntry::Scoped { code, .. } => code.clone(),
+        })
+        .collect();
+    codes.sort();
+    codes.dedup();
+    codes
+}
+
 fn one_or_many<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>
 where
     D: serde::Deserializer<'de>,
@@ -623,6 +665,72 @@ impl IssueCollection {
         });
     }
 
+    /// Retains only issues that match the `only` configuration (path-scoped allowlist).
+    ///
+    /// When `only` is empty, all issues are retained. Otherwise an issue is retained if its code
+    /// matches any entry and (for scoped entries) the file path matches the entry's paths.
+    pub fn filter_retain_only<F>(&mut self, only: &[OnlyEntry], resolve_file_name: F)
+    where
+        F: Fn(FileId) -> Option<String>,
+    {
+        if only.is_empty() {
+            return;
+        }
+
+        self.issues.retain(|issue| {
+            let Some(code) = &issue.code else {
+                return false;
+            };
+
+            for entry in only {
+                match entry {
+                    OnlyEntry::Code(c) if c == code => return true,
+                    OnlyEntry::Scoped { code: c, paths } if c == code => {
+                        let file_name = issue.primary_span().and_then(|span| resolve_file_name(span.file_id));
+
+                        if let Some(name) = file_name
+                            && is_path_match(&name, paths)
+                        {
+                            return true;
+                        }
+                    }
+                    _ => {}
+                }
+            }
+
+            false
+        });
+    }
+
+    /// Applies `only-in` (scoped-only) filtering: a code listed in an entry is reported only when the file
+    /// matches that entry's paths. Codes not in any only-in entry are unrestricted (retained everywhere).
+    pub fn filter_retain_only_in<F>(&mut self, only_in: &[OnlyInEntry], resolve_file_name: F)
+    where
+        F: Fn(FileId) -> Option<String>,
+    {
+        if only_in.is_empty() {
+            return;
+        }
+
+        self.issues.retain(|issue| {
+            let Some(code) = &issue.code else {
+                return false;
+            };
+
+            let entries_for_code: Vec<&OnlyInEntry> = only_in.iter().filter(|entry| entry.code == *code).collect();
+            if entries_for_code.is_empty() {
+                return true;
+            }
+
+            let file_name = match issue.primary_span().and_then(|span| resolve_file_name(span.file_id)) {
+                Some(name) => name,
+                None => return false,
+            };
+
+            entries_for_code.iter().any(|entry| is_path_match(&file_name, &entry.paths))
+        });
+    }
+
     pub fn filter_retain_codes(&mut self, retain_codes: &[String]) {
         self.issues.retain(|issue| if let Some(code) = &issue.code { retain_codes.contains(code) } else { false });
     }
@@ -748,6 +856,10 @@ fn is_path_match(file_name: &str, patterns: &[String]) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn only_in_class_must_be_final_src() -> Vec<OnlyInEntry> {
+        vec![OnlyInEntry { code: "class-must-be-final".to_string(), paths: vec!["src/".to_string()] }]
+    }
 
     #[test]
     pub fn test_highest_collection_level() {
@@ -893,5 +1005,171 @@ mod tests {
             .with_annotation(Annotation::primary(span_earlier));
 
         assert_eq!(issue.primary_span(), Some(span_earlier));
+    }
+
+    #[test]
+    pub fn test_only_entry_codes() {
+        let only = vec![
+            OnlyEntry::Code("code-a".to_string()),
+            OnlyEntry::Scoped { code: "code-b".to_string(), paths: vec!["src/".to_string()] },
+            OnlyEntry::Scoped { code: "code-a".to_string(), paths: vec!["tests/".to_string()] },
+        ];
+        let codes = only_entry_codes(&only);
+        assert_eq!(codes, vec!["code-a", "code-b"]);
+    }
+
+    #[test]
+    pub fn test_filter_retain_only_empty_retains_all() {
+        let file = FileId::zero();
+        let span = Span::new(file, 0_u32.into(), 5_u32.into());
+        let mut collection = IssueCollection::from(vec![
+            Issue::error("e1").with_code("E1").with_annotation(Annotation::primary(span)),
+            Issue::error("e2").with_code("E2").with_annotation(Annotation::primary(span)),
+        ]);
+        collection.filter_retain_only(&[], |_| Some("src/foo.php".to_string()));
+        assert_eq!(collection.len(), 2);
+    }
+
+    #[test]
+    pub fn test_filter_retain_only_plain_code() {
+        let file = FileId::zero();
+        let span = Span::new(file, 0_u32.into(), 5_u32.into());
+        let mut collection = IssueCollection::from(vec![
+            Issue::error("e1").with_code("strict-types").with_annotation(Annotation::primary(span)),
+            Issue::error("e2").with_code("other").with_annotation(Annotation::primary(span)),
+        ]);
+        collection
+            .filter_retain_only(&[OnlyEntry::Code("strict-types".to_string())], |_| Some("src/foo.php".to_string()));
+        assert_eq!(collection.len(), 1);
+        assert_eq!(collection.iter().next().unwrap().code.as_deref(), Some("strict-types"));
+    }
+
+    #[test]
+    pub fn test_filter_retain_only_scoped_path_match() {
+        let file = FileId::zero();
+        let span = Span::new(file, 0_u32.into(), 5_u32.into());
+        let mut collection = IssueCollection::from(vec![
+            Issue::error("e1").with_code("strict-types").with_annotation(Annotation::primary(span)),
+        ]);
+        collection.filter_retain_only(
+            &[OnlyEntry::Scoped { code: "strict-types".to_string(), paths: vec!["src/".to_string()] }],
+            |_| Some("src/foo.php".to_string()),
+        );
+        assert_eq!(collection.len(), 1);
+    }
+
+    #[test]
+    pub fn test_filter_retain_only_scoped_path_no_match() {
+        let file = FileId::zero();
+        let span = Span::new(file, 0_u32.into(), 5_u32.into());
+        let mut collection = IssueCollection::from(vec![
+            Issue::error("e1").with_code("strict-types").with_annotation(Annotation::primary(span)),
+        ]);
+        collection.filter_retain_only(
+            &[OnlyEntry::Scoped { code: "strict-types".to_string(), paths: vec!["tests/".to_string()] }],
+            |_| Some("src/foo.php".to_string()),
+        );
+        assert_eq!(collection.len(), 0);
+    }
+
+    #[test]
+    pub fn test_filter_retain_only_issue_without_code_removed() {
+        let file = FileId::zero();
+        let span = Span::new(file, 0_u32.into(), 5_u32.into());
+        let mut collection = IssueCollection::from(vec![Issue::error("e1").with_annotation(Annotation::primary(span))]);
+        collection
+            .filter_retain_only(&[OnlyEntry::Code("strict-types".to_string())], |_| Some("src/foo.php".to_string()));
+        assert_eq!(collection.len(), 0);
+    }
+
+    #[test]
+    pub fn test_filter_retain_only_in_empty_retains_all() {
+        let file = FileId::new("src/foo.php");
+        let span = Span::new(file, 0_u32.into(), 5_u32.into());
+        let mut collection = IssueCollection::from(vec![
+            Issue::error("e1").with_code("code-a").with_annotation(Annotation::primary(span)),
+        ]);
+        collection.filter_retain_only_in(&[], |_| Some("src/foo.php".to_string()));
+        assert_eq!(collection.len(), 1);
+    }
+
+    #[test]
+    pub fn test_filter_retain_only_in_file_outside_path_retained() {
+        let file = FileId::new("tests/bar.php");
+        let span = Span::new(file, 0_u32.into(), 5_u32.into());
+        let mut collection = IssueCollection::from(vec![
+            Issue::error("e1").with_code("other").with_annotation(Annotation::primary(span)),
+        ]);
+        collection.filter_retain_only_in(&only_in_class_must_be_final_src(), |f| {
+            if f == file { Some("tests/bar.php".to_string()) } else { None }
+        });
+        assert_eq!(collection.len(), 1);
+    }
+
+    #[test]
+    pub fn test_filter_retain_only_in_file_in_path_code_matches_retained() {
+        let file = FileId::new("src/foo.php");
+        let span = Span::new(file, 0_u32.into(), 5_u32.into());
+        let mut collection = IssueCollection::from(vec![
+            Issue::error("e1").with_code("class-must-be-final").with_annotation(Annotation::primary(span)),
+        ]);
+        collection.filter_retain_only_in(&only_in_class_must_be_final_src(), |f| {
+            if f == file { Some("src/foo.php".to_string()) } else { None }
+        });
+        assert_eq!(collection.len(), 1);
+    }
+
+    /// Code not in any only-in entry is unrestricted: retained regardless of path.
+    #[test]
+    pub fn test_filter_retain_only_in_file_in_path_code_mismatch_retained() {
+        let file = FileId::new("src/foo.php");
+        let span = Span::new(file, 0_u32.into(), 5_u32.into());
+        let mut collection = IssueCollection::from(vec![
+            Issue::error("e1").with_code("other").with_annotation(Annotation::primary(span)),
+        ]);
+        collection.filter_retain_only_in(&only_in_class_must_be_final_src(), |f| {
+            if f == file { Some("src/foo.php".to_string()) } else { None }
+        });
+        assert_eq!(collection.len(), 1);
+    }
+
+    /// only-in with a single file path: code is only reported in that file; same code in another file is removed.
+    #[test]
+    pub fn test_filter_retain_only_in_scoped_code_outside_path_removed() {
+        let only_in = vec![OnlyInEntry {
+            code: "class-must-be-final".to_string(),
+            paths: vec!["src/class-must-be-final.php".to_string()],
+        }];
+        let file = FileId::new("src/catch-type-not-throwable.php");
+        let span = Span::new(file, 0_u32.into(), 5_u32.into());
+        let mut collection = IssueCollection::from(vec![
+            Issue::warning("w1").with_code("class-must-be-final").with_annotation(Annotation::primary(span)),
+        ]);
+        collection.filter_retain_only_in(&only_in, |f| {
+            if f == file { Some("src/catch-type-not-throwable.php".to_string()) } else { None }
+        });
+        assert_eq!(
+            collection.len(),
+            0,
+            "class-must-be-final should be suppressed when file is outside the only-in path"
+        );
+    }
+
+    /// only-in with one entry scoped to a single file: issue with that code in a different file is removed.
+    #[test]
+    pub fn test_filter_retain_only_in_code_scoped_to_path_outside_path_removed() {
+        let only_in = vec![OnlyInEntry {
+            code: "class-must-be-final".to_string(),
+            paths: vec!["src/class-must-be-final.php".to_string()],
+        }];
+        let file = FileId::new("src/catch-type-not-throwable.php");
+        let span = Span::new(file, 0_u32.into(), 5_u32.into());
+        let mut collection = IssueCollection::from(vec![
+            Issue::warning("w1").with_code("class-must-be-final").with_annotation(Annotation::primary(span)),
+        ]);
+        collection.filter_retain_only_in(&only_in, |f| {
+            if f == file { Some("src/catch-type-not-throwable.php".to_string()) } else { None }
+        });
+        assert_eq!(collection.len(), 0);
     }
 }
