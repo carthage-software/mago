@@ -27,11 +27,13 @@ pub mod utils;
 pub struct ArgumentState {
     expand_first_argument: bool,
     expand_last_argument: bool,
+    named_argument_padding: Option<usize>,
 }
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct ParameterState {
     list_group_id: Option<GroupIdentifier>,
+    variable_padding: Option<usize>,
 }
 
 /// A region of source code that should not be formatted.
