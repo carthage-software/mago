@@ -434,10 +434,6 @@ impl<'arena> FormatterState<'_, 'arena> {
                 return self.function_callee_expression_need_parenthesis(expression);
             }
 
-            if let Expression::Instantiation(instantiation) = expression {
-                return self.instantiation_needs_parens(instantiation);
-            }
-
             return self.callee_expression_need_parenthesis(expression, false);
         }
 
@@ -482,11 +478,15 @@ impl<'arena> FormatterState<'_, 'arena> {
         false
     }
 
-    pub(crate) const fn callee_expression_need_parenthesis(
+    pub(crate) fn callee_expression_need_parenthesis(
         &self,
         expression: &'arena Expression<'arena>,
         instantiation: bool,
     ) -> bool {
+        if !instantiation && let Expression::Instantiation(i) = expression {
+            return self.instantiation_needs_parens(i);
+        }
+
         if instantiation && matches!(expression, Expression::Call(_)) {
             return true;
         }

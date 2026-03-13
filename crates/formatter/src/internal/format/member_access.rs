@@ -721,10 +721,7 @@ fn base_needs_parens<'arena>(f: &FormatterState<'_, 'arena>, base: &'arena Expre
         return base_needs_parens(f, parenthesized.expression);
     }
 
-    match base {
-        Expression::Instantiation(instantiation) => f.instantiation_needs_parens(instantiation),
-        _ => f.callee_expression_need_parenthesis(base, false),
-    }
+    f.callee_expression_need_parenthesis(base, false)
 }
 
 pub(super) fn format_access_operator<'arena>(
