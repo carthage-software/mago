@@ -14,6 +14,7 @@ use mago_codex::ttype::combiner::DEFAULT_INTEGER_COMBINATION_THRESHOLD;
 use mago_codex::ttype::combiner::DEFAULT_STRING_COMBINATION_THRESHOLD;
 use mago_php_version::PHPVersion;
 use mago_reporting::IgnoreEntry;
+use mago_reporting::Level;
 use mago_reporting::baseline::BaselineVariant;
 use schemars::JsonSchema;
 use serde::Deserialize;
@@ -44,6 +45,19 @@ pub struct AnalyzerConfiguration {
     /// The loose variant is more resilient to code changes as line number shifts
     /// don't affect the baseline.
     pub baseline_variant: BaselineVariant,
+
+    /// Set the minimum issue severity that causes the command to fail.
+    ///
+    /// The command will exit with a non-zero status if any issues at or above
+    /// this level are found. For example, setting this to `"warning"` means
+    /// the command fails on warnings and errors, but not on notes or help suggestions.
+    ///
+    /// Options: `"note"`, `"help"`, `"warning"`, `"error"`
+    ///
+    /// Can be overridden by the `--minimum-fail-level` CLI flag.
+    ///
+    /// Defaults to `"error"`.
+    pub minimum_fail_level: Level,
 
     /// Disable all default plugins (including stdlib).
     ///
@@ -384,6 +398,7 @@ impl Default for AnalyzerConfiguration {
             ignore: vec![],
             baseline: None,
             baseline_variant: BaselineVariant::default(),
+            minimum_fail_level: Level::Error,
             find_unused_expressions: defaults.find_unused_expressions,
             find_unused_definitions: defaults.find_unused_definitions,
             analyze_dead_code: defaults.analyze_dead_code,

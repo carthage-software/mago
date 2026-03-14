@@ -240,6 +240,7 @@ impl AnalyzeCommand {
             baseline,
             baseline_variant,
             configuration.editor_url.clone(),
+            configuration.analyzer.minimum_fail_level,
         );
 
         let (exit_code, changed_file_ids) = processor.process_issues(&orchestrator, &mut database, issues)?;
@@ -303,6 +304,7 @@ impl AnalyzeCommand {
             baseline,
             baseline_variant,
             configuration.editor_url.clone(),
+            configuration.analyzer.minimum_fail_level,
         );
 
         watcher.with_database_mut(|database| {
