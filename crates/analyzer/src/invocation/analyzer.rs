@@ -478,6 +478,58 @@ pub fn analyze_invocation<'ctx, 'arena>(
         }
     }
 
+    if !unpacked_arguments.is_empty()
+        && let Some(last_parameter_ref) = parameter_refs.last().copied()
+        && last_parameter_ref.is_variadic()
+    {
+        let base_variadic_parameter_type = get_parameter_type(
+            context,
+            Some(last_parameter_ref),
+            base_class_metadata,
+            calling_class_like_metadata,
+            calling_instance_type,
+            method_class_type,
+        );
+
+        if base_variadic_parameter_type.has_template_types() {
+            for unpacked_argument in &unpacked_arguments {
+                let Some(argument_expression) = unpacked_argument.value() else {
+                    continue;
+                };
+
+                if artifacts.get_expression_type(argument_expression).is_none() {
+                    analyze_and_store_argument_type(
+                        context,
+                        block_context,
+                        artifacts,
+                        &invocation.target,
+                        argument_expression,
+                        usize::MAX,
+                        &mut analyzed_argument_types,
+                        last_parameter_ref.is_by_reference(),
+                        None,
+                    )?;
+                }
+
+                let argument_value_type =
+                    artifacts.get_expression_type(argument_expression).cloned().unwrap_or_else(get_mixed);
+
+                let unpacked_element_type =
+                    get_unpacked_argument_type(context, &argument_value_type, argument_expression.span());
+
+                infer_parameter_templates_from_argument(
+                    context,
+                    &base_variadic_parameter_type,
+                    &unpacked_element_type,
+                    template_result,
+                    parameter_refs.len() - 1,
+                    argument_expression.span(),
+                    false,
+                );
+            }
+        }
+    }
+
     if let Some(template_types) = invocation.target.get_template_types() {
         for (template_name, template) in template_types {
             if template_result.has_lower_bound(*template_name, &template.defining_entity) {
