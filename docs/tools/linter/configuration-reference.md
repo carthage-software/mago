@@ -35,6 +35,7 @@ prefer-static-closure = { exclude = ["tests/"] }
 | `integrations`     | `string[]` | `[]`      | A list of framework integrations to enable (e.g., `"symfony"`, `"laravel"`). |
 | `baseline`         | `string`   | `null`    | Path to a baseline file to ignore listed issues. When specified, the linter will use this file as the default baseline, eliminating the need to pass `--baseline` on every run. Command-line `--baseline` arguments will override this setting. |
 | `baseline-variant` | `string`   | `"loose"` | The baseline format variant to use when generating new baselines. Options: `"loose"` (count-based, resilient to line changes) or `"strict"` (exact line matching). See [Baseline Variants](/fundamentals/baseline#baseline-variants) for details. |
+| `minimum-fail-level` | `string` | `"error"` | Set the minimum issue severity that causes the command to exit with a non-zero status. Options: `"note"`, `"help"`, `"warning"`, `"error"`. Can be overridden by the `--minimum-fail-level` CLI flag. |
 
 :::tip Tool-Specific Excludes
 The `excludes` option here is **additive** to the global `source.excludes` defined in the `[source]` section of your configuration. Files excluded globally will always be excluded from linting, and this option allows you to exclude additional files from the linter specifically.

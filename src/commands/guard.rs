@@ -205,7 +205,13 @@ impl GuardCommand {
 
         let baseline = configuration.guard.baseline.as_deref();
         let baseline_variant = configuration.guard.baseline_variant;
-        let processor = self.baseline_reporting.get_processor(color_choice, baseline, baseline_variant, editor_url);
+        let processor = self.baseline_reporting.get_processor(
+            color_choice,
+            baseline,
+            baseline_variant,
+            editor_url,
+            configuration.guard.minimum_fail_level,
+        );
 
         let (exit_code, _) = processor.process_issues(&orchestrator, &mut database, result.issues)?;
 

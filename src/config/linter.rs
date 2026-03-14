@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+use mago_reporting::Level;
 use mago_reporting::baseline::BaselineVariant;
 use schemars::JsonSchema;
 use serde::Deserialize;
@@ -13,7 +14,6 @@ use mago_php_version::PHPVersion;
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(default, rename_all = "kebab-case", deny_unknown_fields)]
-#[derive(Default)]
 pub struct LinterConfiguration {
     /// A list of patterns to exclude from linting.
     pub excludes: Vec<String>,
@@ -37,6 +37,28 @@ pub struct LinterConfiguration {
     /// The loose variant is more resilient to code changes as line number shifts
     /// don't affect the baseline.
     pub baseline_variant: BaselineVariant,
+
+    /// Set the minimum issue severity that causes the command to fail.
+    ///
+    /// Options: `"note"`, `"help"`, `"warning"`, `"error"`
+    ///
+    /// Can be overridden by the `--minimum-fail-level` CLI flag.
+    ///
+    /// Defaults to `"error"`.
+    pub minimum_fail_level: Level,
+}
+
+impl Default for LinterConfiguration {
+    fn default() -> Self {
+        Self {
+            excludes: vec![],
+            integrations: vec![],
+            rules: RulesSettings::default(),
+            baseline: None,
+            baseline_variant: BaselineVariant::default(),
+            minimum_fail_level: Level::Error,
+        }
+    }
 }
 
 impl LinterConfiguration {
