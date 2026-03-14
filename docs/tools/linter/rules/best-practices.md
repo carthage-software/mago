@@ -13,10 +13,18 @@ This document details the rules available in the `BestPractices` category.
 | Final Controller | [`final-controller`](#final-controller) |
 | Loop Does Not Iterate | [`loop-does-not-iterate`](#loop-does-not-iterate) |
 | Middleware In Routes | [`middleware-in-routes`](#middleware-in-routes) |
+| No array_merge In Loop | [`no-array-merge-in-loop`](#no-array-merge-in-loop) |
 | No Direct Database Queries | [`no-direct-db-query`](#no-direct-db-query) |
+| No Direct Exception Throw | [`no-direct-exception-throw`](#no-direct-exception-throw) |
 | No ini_set | [`no-ini-set`](#no-ini-set) |
 | No Inline | [`no-inline`](#no-inline) |
+| No Literal Namespace String | [`no-literal-namespace-string`](#no-literal-namespace-string) |
+| No ObjectManager Singleton | [`no-object-manager-singleton`](#no-object-manager-singleton) |
+| No ObjectManagerInterface Type Hint | [`no-object-manager-type-hint`](#no-object-manager-type-hint) |
+| No Proxy/Interceptor In Constructor | [`no-proxy-interceptor-in-constructor`](#no-proxy-interceptor-in-constructor) |
 | No Sprintf Concat | [`no-sprintf-concat`](#no-sprintf-concat) |
+| No Test Namespace Import | [`no-test-namespace-import`](#no-test-namespace-import) |
+| No $this In Template | [`no-this-in-template`](#no-this-in-template) |
 | Prefer Anonymous Migration | [`prefer-anonymous-migration`](#prefer-anonymous-migration) |
 | Prefer Arrow Function | [`prefer-arrow-function`](#prefer-arrow-function) |
 | Prefer Early Continue | [`prefer-early-continue`](#prefer-early-continue) |
@@ -225,6 +233,47 @@ class UserController extends Controller
 ```
 
 
+## <a id="no-array-merge-in-loop"></a>`no-array-merge-in-loop`
+
+Flags `array_merge()` calls inside `foreach`, `for`, `while`, and `do-while` loops.
+Calling `array_merge()` in a loop causes quadratic time complexity because it copies
+the entire array on each iteration. Use spread operator or collect values and merge once.
+
+
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `true` |
+| `level` | `string` | `"warning"` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+
+$collected = [];
+foreach ($items as $item) {
+    $collected[] = $item;
+}
+$result = array_merge($base, $collected);
+```
+
+#### Incorrect code
+
+```php
+<?php
+
+$result = [];
+foreach ($items as $item) {
+    $result = array_merge($result, $item);
+}
+```
+
+
 ## <a id="no-direct-db-query"></a>`no-direct-db-query`
 
 This rule flags all direct method calls on the global `$wpdb` object. Direct database queries
@@ -260,6 +309,40 @@ $posts = get_posts(['author' => $author_id]);
 
 global $wpdb;
 $posts = $wpdb->get_results("SELECT * FROM {$wpdb->posts} WHERE post_author = 1");
+```
+
+
+## <a id="no-direct-exception-throw"></a>`no-direct-exception-throw`
+
+Flags direct throwing of the generic `\Exception` base class. Use context-specific
+exception types instead (e.g. `InvalidArgumentException`, `RuntimeException`,
+or custom exception classes) for better error handling and debugging.
+
+
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `true` |
+| `level` | `string` | `"warning"` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+
+throw new \InvalidArgumentException('Invalid value');
+```
+
+#### Incorrect code
+
+```php
+<?php
+
+throw new \Exception('Something went wrong');
 ```
 
 
@@ -353,6 +436,209 @@ Goodbye
 ```
 
 
+## <a id="no-literal-namespace-string"></a>`no-literal-namespace-string`
+
+Flags hardcoded fully qualified class name strings. Use `::class` notation
+instead for better IDE support, refactoring safety, and static analysis.
+
+
+### Requirements
+
+- **Integration:** `Magento`
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `true` |
+| `level` | `string` | `"warning"` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+
+$className = \Magento\Catalog\Model\Product::class;
+```
+
+#### Incorrect code
+
+```php
+<?php
+
+$className = 'Magento\Catalog\Model\Product';
+```
+
+
+## <a id="no-object-manager-singleton"></a>`no-object-manager-singleton`
+
+Flags direct usage of `ObjectManager::getInstance()`. In Magento 2, the ObjectManager
+singleton should never be used directly. Dependencies should be injected via constructor
+dependency injection instead.
+
+
+### Requirements
+
+- **Integration:** `Magento`
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `true` |
+| `level` | `string` | `"warning"` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+
+namespace Vendor\Module\Model;
+
+use Magento\Catalog\Api\ProductRepositoryInterface;
+
+class Example
+{
+    public function __construct(
+        private ProductRepositoryInterface $productRepository,
+    ) {}
+}
+```
+
+#### Incorrect code
+
+```php
+<?php
+
+namespace Vendor\Module\Model;
+
+use Magento\Framework\App\ObjectManager;
+
+class Example
+{
+    public function doSomething(): void
+    {
+        $objectManager = ObjectManager::getInstance();
+    }
+}
+```
+
+
+## <a id="no-object-manager-type-hint"></a>`no-object-manager-type-hint`
+
+Flags type hints that reference `Magento\Framework\ObjectManagerInterface` directly.
+Injecting the ObjectManager into classes is considered an anti-pattern in Magento 2.
+Instead, inject the specific interfaces or classes you need and let the DI container
+handle the wiring.
+
+
+### Requirements
+
+- **Integration:** `Magento`
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `true` |
+| `level` | `string` | `"warning"` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+
+namespace Vendor\Module\Model;
+
+use Magento\Catalog\Api\ProductRepositoryInterface;
+
+class Example
+{
+    public function __construct(
+        private ProductRepositoryInterface $productRepository,
+    ) {}
+}
+```
+
+#### Incorrect code
+
+```php
+<?php
+
+namespace Vendor\Module\Model;
+
+use Magento\Framework\ObjectManagerInterface;
+
+class Example
+{
+    public function __construct(
+        private ObjectManagerInterface $objectManager,
+    ) {}
+}
+```
+
+
+## <a id="no-proxy-interceptor-in-constructor"></a>`no-proxy-interceptor-in-constructor`
+
+Flags type hints that reference Proxy or Interceptor classes. In Magento 2,
+Proxy and Interceptor classes are auto-generated by the framework. They should
+be configured in `di.xml`, not referenced directly in PHP code.
+
+
+### Requirements
+
+- **Integration:** `Magento`
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `true` |
+| `level` | `string` | `"error"` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+
+namespace Vendor\Module\Model;
+
+use Magento\Catalog\Api\ProductRepositoryInterface;
+
+class Example
+{
+    public function __construct(
+        private ProductRepositoryInterface $productRepository,
+    ) {}
+}
+```
+
+#### Incorrect code
+
+```php
+<?php
+
+namespace Vendor\Module\Model;
+
+use Magento\Catalog\Api\ProductRepositoryInterface\Proxy;
+
+class Example
+{
+    public function __construct(
+        private Proxy $productRepository,
+    ) {}
+}
+```
+
+
 ## <a id="no-sprintf-concat"></a>`no-sprintf-concat`
 
 Disallows string concatenation with the result of an `sprintf` call.
@@ -389,6 +675,83 @@ $greeting = sprintf('Hello, %s!', $name);
 
 $name = 'World';
 $greeting = 'Hello, ' . sprintf('%s!', $name);
+```
+
+
+## <a id="no-test-namespace-import"></a>`no-test-namespace-import`
+
+Flags `use` statements that import classes from test namespaces.
+Application modules should not depend on test classes in production code.
+
+
+### Requirements
+
+- **Integration:** `Magento`
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `true` |
+| `level` | `string` | `"warning"` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+
+namespace Vendor\Module\Model;
+
+use Magento\Catalog\Api\ProductRepositoryInterface;
+```
+
+#### Incorrect code
+
+```php
+<?php
+
+namespace Vendor\Module\Model;
+
+use Magento\TestFramework\Helper\Bootstrap;
+```
+
+
+## <a id="no-this-in-template"></a>`no-this-in-template`
+
+Flags usage of `$this` in `.phtml` template files. In Magento 2, `$this` is
+deprecated in templates since Magento 2.1. Use `$block` instead to access
+block methods, or better yet, use a ViewModel.
+
+
+### Requirements
+
+- **Integration:** `Magento`
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `true` |
+| `level` | `string` | `"warning"` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+/** @var \Magento\Framework\View\Element\Template $block */
+$block->getChildHtml('child');
+```
+
+#### Incorrect code
+
+```php
+<?php
+// In a .phtml template:
+$this->getChildHtml('child');
 ```
 
 
