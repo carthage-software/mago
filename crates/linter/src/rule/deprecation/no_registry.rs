@@ -115,10 +115,8 @@ impl LintRule for NoRegistryRule {
             Issue::new(self.cfg.level(), "`Magento\\Framework\\Registry` is deprecated since Magento 2.3.")
                 .with_code(self.meta.code)
                 .with_annotation(Annotation::primary(identifier.span()).with_message("Deprecated Registry usage"))
-                .with_help(
-                    "Use constructor dependency injection and proper state management \
-                 instead of the Registry singleton.",
-                ),
+                .with_help("Use constructor dependency injection instead of the Registry singleton.")
+                .with_note("The Registry singleton pattern is considered an anti-pattern since Magento 2.3."),
         );
     }
 }

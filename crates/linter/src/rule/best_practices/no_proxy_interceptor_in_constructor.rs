@@ -124,10 +124,7 @@ impl LintRule for NoProxyInterceptorInConstructorRule {
                     Annotation::primary(identifier.span())
                         .with_message(format!("`{matched}` classes should be configured in `di.xml`")),
                 )
-                .with_help(
-                    "Remove the Proxy/Interceptor type hint and configure lazy loading \
-                 in `di.xml` instead.",
-                ),
+                .with_help("Remove the Proxy/Interceptor type hint and configure lazy loading in `di.xml` instead."),
         );
     }
 }

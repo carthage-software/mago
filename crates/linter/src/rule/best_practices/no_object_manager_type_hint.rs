@@ -119,10 +119,7 @@ impl LintRule for NoObjectManagerTypeHintRule {
                     Annotation::primary(identifier.span())
                         .with_message("Inject the specific interface or class you need instead"),
                 )
-                .with_help(
-                    "Instead of injecting `ObjectManagerInterface`, inject the specific \
-                 interfaces or classes your code depends on.",
-                ),
+                .with_help("Inject the specific interfaces or classes your code depends on instead."),
         );
     }
 }
