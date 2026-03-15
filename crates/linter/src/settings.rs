@@ -80,6 +80,7 @@ use crate::rule::NoInsecureComparisonConfig;
 use crate::rule::NoIsNullConfig;
 use crate::rule::NoIssetConfig;
 use crate::rule::NoIteratorToArrayInForeachConfig;
+use crate::rule::NoLiteralNamespaceStringConfig;
 use crate::rule::NoLiteralPasswordConfig;
 use crate::rule::NoMultiAssignmentsConfig;
 use crate::rule::NoNestedTernaryConfig;
@@ -364,7 +365,11 @@ pub struct RulesSettings {
     pub no_db_schema_change: RuleSettings<NoDbSchemaChangeConfig>,
     pub no_unescaped_output: RuleSettings<NoUnescapedOutputConfig>,
     pub no_roles_as_capabilities: RuleSettings<NoRolesAsCapabilitiesConfig>,
+<<<<<<< HEAD
     pub missing_docs: RuleSettings<MissingDocsConfig>,
+=======
+    pub no_literal_namespace_string: RuleSettings<NoLiteralNamespaceStringConfig>,
+>>>>>>> 840b1823 (feat(linter): add no-literal-namespace-string lint rule)
 }
 
 impl<C: Config> RuleSettings<C> {
