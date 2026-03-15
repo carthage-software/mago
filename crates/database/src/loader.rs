@@ -37,17 +37,28 @@ pub struct DatabaseLoader<'a> {
     database: Option<Database<'a>>,
     configuration: DatabaseConfiguration<'a>,
     memory_sources: Vec<(&'static str, &'static str, FileType)>,
+    /// When set, content for this file (by logical name) is taken from here instead of disk.
+    /// Used for editor integrations: read content from stdin but use the given path for baseline and reporting.
+    stdin_override: Option<(Cow<'a, str>, String)>,
 }
 
 impl<'a> DatabaseLoader<'a> {
     #[must_use]
     pub fn new(configuration: DatabaseConfiguration<'a>) -> Self {
-        Self { configuration, memory_sources: vec![], database: None }
+        Self { configuration, memory_sources: vec![], database: None, stdin_override: None }
     }
 
     #[must_use]
     pub fn with_database(mut self, database: Database<'a>) -> Self {
         self.database = Some(database);
+        self
+    }
+
+    /// When set, the file with this logical name (workspace-relative path) will use the given
+    /// content instead of being read from disk. The logical name is used for baseline and reporting.
+    #[must_use]
+    pub fn with_stdin_override(mut self, logical_name: impl Into<Cow<'a, str>>, content: String) -> Self {
+        self.stdin_override = Some((logical_name.into(), content));
         self
     }
 
@@ -117,6 +128,17 @@ impl<'a> DatabaseLoader<'a> {
 
             all_files.insert(file_id, file_with_spec.file);
             file_decisions.insert(file_id, (FileType::Host, specificity));
+        }
+
+        // When stdin override is set, ensure that the file is in the database
+        // (covers new/unsaved files, not on disk)
+        if let Some((ref name, ref content)) = self.stdin_override {
+            let file = File::ephemeral(Cow::Owned(name.as_ref().to_string()), Cow::Owned(content.clone()));
+            let file_id = file.id;
+            if !all_files.contains_key(&file_id) {
+                all_files.insert(file_id, file);
+                file_decisions.insert(file_id, (FileType::Host, usize::MAX));
+            }
         }
 
         for file_with_spec in vendored_files_with_spec {
@@ -237,7 +259,30 @@ impl<'a> DatabaseLoader<'a> {
                     return None;
                 }
 
-                match read_file(self.configuration.workspace.as_ref(), &path, file_type) {
+                let workspace = self.configuration.workspace.as_ref();
+                #[cfg(windows)]
+                let logical_name = path
+                    .strip_prefix(workspace)
+                    .unwrap_or_else(|_| path.as_path())
+                    .to_string_lossy()
+                    .replace('\\', "/");
+                #[cfg(not(windows))]
+                let logical_name =
+                    path.strip_prefix(workspace).unwrap_or_else(|_| path.as_path()).to_string_lossy().into_owned();
+
+                if let Some((ref override_name, ref override_content)) = self.stdin_override {
+                    if override_name.as_ref() == logical_name {
+                        let file = File::new(
+                            Cow::Owned(logical_name),
+                            file_type,
+                            Some(path.clone()),
+                            Cow::Owned(override_content.clone()),
+                        );
+                        return Some(Ok(FileWithSpecificity { file, specificity }));
+                    }
+                }
+
+                match read_file(workspace, &path, file_type) {
                     Ok(file) => Some(Ok(FileWithSpecificity { file, specificity })),
                     Err(e) => Some(Err(e)),
                 }
@@ -441,5 +486,38 @@ mod tests {
 
         let file = db.files().find(|f| f.name.contains("lib.php")).unwrap();
         assert_eq!(file.file_type, FileType::Vendored, "File only in includes should be Vendored");
+    }
+
+    #[test]
+    fn test_stdin_override_replaces_file_content() {
+        let temp_dir = TempDir::new().unwrap();
+        create_test_file(&temp_dir, "src/foo.php", "<?php\n// on disk");
+
+        let config = create_test_config(&temp_dir, vec!["src/"], vec![]);
+        let loader = DatabaseLoader::new(config).with_stdin_override("src/foo.php", "<?php\n// from stdin".to_string());
+        let db = loader.load().unwrap();
+
+        let file = db.files().find(|f| f.name.contains("foo.php")).unwrap();
+        assert_eq!(
+            file.contents.as_ref(),
+            "<?php\n// from stdin",
+            "stdin override content should be used instead of disk"
+        );
+    }
+
+    #[test]
+    fn test_stdin_override_adds_file_when_not_on_disk() {
+        let temp_dir = TempDir::new().unwrap();
+        // Do not create src/foo.php on disk
+        create_test_file(&temp_dir, "src/.gitkeep", "");
+
+        let config = create_test_config(&temp_dir, vec!["src/"], vec![]);
+        let loader =
+            DatabaseLoader::new(config).with_stdin_override("src/unsaved.php", "<?php\n// unsaved buffer".to_string());
+        let db = loader.load().unwrap();
+
+        let file = db.files().find(|f| f.name.contains("unsaved.php")).unwrap();
+        assert_eq!(file.file_type, FileType::Host);
+        assert_eq!(file.contents.as_ref(), "<?php\n// unsaved buffer");
     }
 }

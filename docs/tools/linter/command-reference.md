@@ -24,7 +24,7 @@ Optional. A list of specific files or directories to lint. If you provide paths 
 ## Options
 
 | Flag, Alias(es)            | Description                                                                                                                                                                            |
-| :------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+|:---------------------------|:---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `--list-rules`             | List all enabled linter rules and their descriptions.                                                                                                                                  |
 | `--json`                   | Used with `--list-rules` to output the rule information in a machine-readable JSON format.                                                                                             |
 | `--explain <RULE_CODE>`    | Provide detailed documentation for a specific linter rule (e.g., `no-redundant-nullsafe`).                                                                                             |
@@ -32,7 +32,18 @@ Optional. A list of specific files or directories to lint. If you provide paths 
 | `--pedantic`               | Enable all linter rules for the most exhaustive analysis possible. This overrides your configuration, ignores PHP version constraints, and enables rules that are disabled by default. |
 | `--semantics`, `-s`        | Perform only the parsing and basic semantic checks without running any lint rules.                                                                                                     |
 | `--staged`                 | Only lint files that are staged in git. Designed for pre-commit hooks. Fails if not in a git repository.                                                                               |
+| `--stdin-input`            | Read file content from stdin and use the single path argument for baseline and reporting. Intended for editor integrations (e.g. unsaved buffers). Requires exactly one path.          |
 | `--help`, `-h`             | Print the help summary for the command.                                                                                                                                                |
+
+### Reading from stdin (editor integration)
+
+When using an editor or IDE that can pipe unsaved buffer content, you can run the linter on that content while still using the real file path for baseline lookup and issue locations:
+
+```sh
+cat src/Example.php | mago lint --stdin-input src/Example.php
+```
+
+You must pass **exactly one path**; it is used as the logical file name (workspace-relative) for baseline matching and diagnostics. The path is normalized (e.g. `./src/Example.php` is treated like `src/Example.php`). This mode conflicts with `--staged`.
 
 ### Shared Reporting and Fixing Options
 
