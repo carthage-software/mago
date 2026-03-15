@@ -72,9 +72,12 @@ use crate::rule::NoLiteralPasswordConfig;
 use crate::rule::NoMultiAssignmentsConfig;
 use crate::rule::NoNestedTernaryConfig;
 use crate::rule::NoNoopConfig;
+use crate::rule::NoObjectManagerSingletonConfig;
+use crate::rule::NoObjectManagerTypeHintConfig;
 use crate::rule::NoOnlyConfig;
 use crate::rule::NoPhpTagTerminatorConfig;
 use crate::rule::NoProtectedInFinalConfig;
+use crate::rule::NoProxyInterceptorInConstructorConfig;
 use crate::rule::NoRedundantBinaryStringPrefixConfig;
 use crate::rule::NoRedundantBlockConfig;
 use crate::rule::NoRedundantContinueConfig;
@@ -92,6 +95,7 @@ use crate::rule::NoRedundantStringConcatConfig;
 use crate::rule::NoRedundantUseConfig;
 use crate::rule::NoRedundantWriteVisibilityConfig;
 use crate::rule::NoRedundantYieldFromConfig;
+use crate::rule::NoRegistryConfig;
 use crate::rule::NoRequestAllConfig;
 use crate::rule::NoRequestVariableConfig;
 use crate::rule::NoRolesAsCapabilitiesConfig;
@@ -100,6 +104,8 @@ use crate::rule::NoShellExecuteStringConfig;
 use crate::rule::NoShortOpeningTagConfig;
 use crate::rule::NoShorthandTernaryConfig;
 use crate::rule::NoSprintfConcatConfig;
+use crate::rule::NoTestNamespaceImportConfig;
+use crate::rule::NoThisInTemplateConfig;
 use crate::rule::NoTrailingSpaceConfig;
 use crate::rule::NoUnderscoreClassConfig;
 use crate::rule::NoUnescapedOutputConfig;
@@ -322,6 +328,12 @@ pub struct RulesSettings {
     pub no_db_schema_change: RuleSettings<NoDbSchemaChangeConfig>,
     pub no_unescaped_output: RuleSettings<NoUnescapedOutputConfig>,
     pub no_roles_as_capabilities: RuleSettings<NoRolesAsCapabilitiesConfig>,
+    pub no_object_manager_singleton: RuleSettings<NoObjectManagerSingletonConfig>,
+    pub no_object_manager_type_hint: RuleSettings<NoObjectManagerTypeHintConfig>,
+    pub no_registry: RuleSettings<NoRegistryConfig>,
+    pub no_proxy_interceptor_in_constructor: RuleSettings<NoProxyInterceptorInConstructorConfig>,
+    pub no_this_in_template: RuleSettings<NoThisInTemplateConfig>,
+    pub no_test_namespace_import: RuleSettings<NoTestNamespaceImportConfig>,
 }
 
 impl<C: Config> RuleSettings<C> {

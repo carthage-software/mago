@@ -322,4 +322,10 @@ define_rules! {
     NoUnescapedOutput(no_unescaped_output @ NoUnescapedOutputRule),
     NoRolesAsCapabilities(no_roles_as_capabilities @ NoRolesAsCapabilitiesRule),
     SwitchContinueToBreak(switch_continue_to_break @ SwitchContinueToBreakRule),
+    NoObjectManagerSingleton(no_object_manager_singleton @ NoObjectManagerSingletonRule),
+    NoObjectManagerTypeHint(no_object_manager_type_hint @ NoObjectManagerTypeHintRule),
+    NoRegistry(no_registry @ NoRegistryRule),
+    NoProxyInterceptorInConstructor(no_proxy_interceptor_in_constructor @ NoProxyInterceptorInConstructorRule),
+    NoThisInTemplate(no_this_in_template @ NoThisInTemplateRule),
+    NoTestNamespaceImport(no_test_namespace_import @ NoTestNamespaceImportRule),
 }
