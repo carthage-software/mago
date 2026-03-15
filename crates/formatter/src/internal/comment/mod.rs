@@ -2,6 +2,7 @@ use mago_database::file::File;
 use mago_syntax::ast::Trivia;
 use mago_syntax::ast::TriviaKind;
 
+pub mod docblock;
 pub mod format;
 
 #[derive(Debug, Clone, Copy)]
@@ -24,6 +25,7 @@ pub struct Comment {
     pub end: u32,
     pub is_block: bool,
     pub is_shell_comment: bool,
+    pub is_docblock: bool,
     pub is_single_line: bool,
     pub has_line_suffix: bool,
 }
@@ -50,8 +52,15 @@ impl CommentFlags {
 }
 
 impl Comment {
-    pub fn new(start: u32, end: u32, is_block: bool, is_shell_comment: bool, is_single_line: bool) -> Self {
-        Self { start, end, is_block, is_shell_comment, is_single_line, has_line_suffix: false }
+    pub fn new(
+        start: u32,
+        end: u32,
+        is_block: bool,
+        is_shell_comment: bool,
+        is_docblock: bool,
+        is_single_line: bool,
+    ) -> Self {
+        Self { start, end, is_block, is_shell_comment, is_docblock, is_single_line, has_line_suffix: false }
     }
 
     pub fn from_trivia<'arena>(file: &File, trivia: &'arena Trivia<'arena>) -> Self {
@@ -61,8 +70,9 @@ impl Comment {
         let is_single_line =
             !is_block || (file.line_number(trivia.span.start.offset) == file.line_number(trivia.span.end.offset));
         let is_shell_comment = matches!(trivia.kind, TriviaKind::HashComment);
+        let is_docblock = matches!(trivia.kind, TriviaKind::DocBlockComment);
 
-        Self::new(trivia.span.start.offset, trivia.span.end.offset, is_block, is_shell_comment, is_single_line)
+        Self::new(trivia.span.start.offset, trivia.span.end.offset, is_block, is_shell_comment, is_docblock, is_single_line)
     }
 
     pub fn with_line_suffix(mut self, yes: bool) -> Self {

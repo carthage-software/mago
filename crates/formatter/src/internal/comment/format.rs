@@ -543,6 +543,28 @@ impl<'arena> FormatterState<'_, 'arena> {
     fn print_comment(&self, comment: Comment) -> Document<'arena> {
         let content = &self.source_text[comment.start as usize..comment.end as usize];
 
+        // PHPDoc reformatting: parse and reconstruct multi-line docblocks
+        if comment.is_docblock && !comment.is_single_line && self.settings.phpdoc_reformat {
+            if self.get_ignore_region_for(comment.start).is_none() {
+                let span = mago_span::Span::new(
+                    self.file.id,
+                    mago_span::Position::new(comment.start),
+                    mago_span::Position::new(comment.end),
+                );
+
+                if let Some(document) =
+                    super::docblock::reformat_docblock(self.arena, &self.settings, content, span)
+                {
+                    if matches!(document, Document::String("")) {
+                        return Document::String("/** */");
+                    }
+
+                    return document;
+                }
+                // Fall through to existing formatting on parse failure
+            }
+        }
+
         if comment.is_inline_comment() {
             if !comment.is_single_line {
                 return Document::String(content);
