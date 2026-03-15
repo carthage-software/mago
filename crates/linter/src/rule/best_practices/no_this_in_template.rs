@@ -91,12 +91,7 @@ impl LintRule for NoThisInTemplateRule {
             return;
         }
 
-        // Flag $this when used outside a class-like scope (common in .phtml templates)
-        // or when explicitly in a .phtml file
-        let in_class = ctx.scope.get_class_like_scope().is_some();
-        let is_template = ctx.source_file.name.ends_with(".phtml");
-
-        if in_class && !is_template {
+        if !ctx.source_file.name.ends_with(".phtml") {
             return;
         }
 
