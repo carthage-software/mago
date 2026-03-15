@@ -35,6 +35,10 @@ pub fn is_contained_by(
     inside_assertion: bool,
     atomic_comparison_result: &mut ComparisonResult,
 ) -> bool {
+    if std::ptr::eq(input_type_part, container_type_part) {
+        return true;
+    }
+
     if input_type_part == container_type_part {
         return true;
     }
