@@ -328,5 +328,4 @@ define_rules! {
     NoProxyInterceptorInConstructor(no_proxy_interceptor_in_constructor @ NoProxyInterceptorInConstructorRule),
     NoThisInTemplate(no_this_in_template @ NoThisInTemplateRule),
     NoTestNamespaceImport(no_test_namespace_import @ NoTestNamespaceImportRule),
-    NoLiteralNamespaceString(no_literal_namespace_string @ NoLiteralNamespaceStringRule),
 }

@@ -68,7 +68,6 @@ use crate::rule::NoIniSetConfig;
 use crate::rule::NoInlineConfig;
 use crate::rule::NoInsecureComparisonConfig;
 use crate::rule::NoIssetConfig;
-use crate::rule::NoLiteralNamespaceStringConfig;
 use crate::rule::NoLiteralPasswordConfig;
 use crate::rule::NoMultiAssignmentsConfig;
 use crate::rule::NoNestedTernaryConfig;
@@ -335,7 +334,6 @@ pub struct RulesSettings {
     pub no_proxy_interceptor_in_constructor: RuleSettings<NoProxyInterceptorInConstructorConfig>,
     pub no_this_in_template: RuleSettings<NoThisInTemplateConfig>,
     pub no_test_namespace_import: RuleSettings<NoTestNamespaceImportConfig>,
-    pub no_literal_namespace_string: RuleSettings<NoLiteralNamespaceStringConfig>,
 }
 
 impl<C: Config> RuleSettings<C> {
