@@ -7,8 +7,12 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_reporting::Level;
 use mago_span::HasSpan;
+use mago_syntax::ast::Identifier;
 use mago_syntax::ast::Node;
 use mago_syntax::ast::NodeKind;
+use mago_syntax::ast::Statement;
+use mago_syntax::ast::UseItem;
+use mago_syntax::ast::UseItems;
 
 use crate::category::Category;
 use crate::context::LintContext;
@@ -76,7 +80,7 @@ impl LintRule for NoTestNamespaceImportRule {
     }
 
     fn targets() -> &'static [NodeKind] {
-        const TARGETS: &[NodeKind] = &[NodeKind::UseItem];
+        const TARGETS: &[NodeKind] = &[NodeKind::Program];
 
         TARGETS
     }
@@ -86,23 +90,83 @@ impl LintRule for NoTestNamespaceImportRule {
     }
 
     fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
-        let Node::UseItem(use_item) = node else {
+        let Node::Program(program) = node else {
             return;
         };
 
-        // Use the raw identifier value since use items contain the full path
-        let fqcn = use_item.name.value();
+        for stmt in &program.statements {
+            if let Statement::Namespace(ns) = stmt {
+                // If the file's own namespace is a test namespace, skip entirely
+                if let Some(name) = &ns.name {
+                    if is_test_namespace(name.value()) {
+                        continue;
+                    }
+                }
 
-        // Check for common test namespace patterns
-        if !is_test_namespace(fqcn) {
-            return;
+                for ns_stmt in ns.statements() {
+                    self.check_use_statement(ctx, ns_stmt);
+                }
+            } else {
+                self.check_use_statement(ctx, stmt);
+            }
         }
+    }
+}
 
+impl NoTestNamespaceImportRule {
+    fn check_use_statement<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, stmt: &Statement<'arena>) {
+        let Statement::Use(use_stmt) = stmt else {
+            return;
+        };
+
+        match &use_stmt.items {
+            UseItems::Sequence(s) => {
+                for item in &s.items.nodes {
+                    self.report_if_test_import(ctx, item);
+                }
+            }
+            UseItems::TypedSequence(s) => {
+                for item in &s.items.nodes {
+                    self.report_if_test_import(ctx, item);
+                }
+            }
+            UseItems::TypedList(list) => {
+                // For grouped imports like `use Magento\TestFramework\{A, B}`, check the prefix
+                let prefix = list.namespace.value();
+                if is_test_namespace(prefix) {
+                    for item in &list.items.nodes {
+                        self.report_use_item(ctx, &item.name);
+                    }
+                }
+            }
+            UseItems::MixedList(list) => {
+                let prefix = list.namespace.value();
+                if is_test_namespace(prefix) {
+                    for item in &list.items.nodes {
+                        self.report_use_item(ctx, &item.item.name);
+                    }
+                }
+            }
+        }
+    }
+
+    fn report_if_test_import<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, use_item: &UseItem<'arena>) {
+        let fqcn = use_item.name.value();
+        if is_test_namespace(fqcn) {
+            self.report_use_item(ctx, &use_item.name);
+        }
+    }
+
+    fn report_use_item<'arena>(
+        &self,
+        ctx: &mut LintContext<'_, 'arena>,
+        name: &Identifier<'arena>,
+    ) {
         ctx.collector.report(
             Issue::new(self.cfg.level(), "Importing classes from test namespaces in production code is discouraged.")
                 .with_code(self.meta.code)
                 .with_annotation(
-                    Annotation::primary(use_item.name.span()).with_message("This import references a test namespace"),
+                    Annotation::primary(name.span()).with_message("This import references a test namespace"),
                 )
                 .with_help("Remove this import and use proper dependency injection or mocking in tests instead."),
         );
@@ -158,6 +222,18 @@ mod tests {
             namespace Vendor\Module\Model;
 
             use Vendor\Module\Test\Unit\SomeHelper;
+        "#
+    }
+
+    test_lint_success! {
+        name = test_import_from_test_namespace,
+        rule = NoTestNamespaceImportRule,
+        code = r#"
+            <?php
+
+            namespace Vendor\Module\Test\Unit;
+
+            use Magento\TestFramework\Helper\Bootstrap;
         "#
     }
 }
