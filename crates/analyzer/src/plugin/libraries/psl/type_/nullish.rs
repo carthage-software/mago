@@ -13,11 +13,8 @@ use crate::plugin::provider::ProviderMeta;
 use crate::plugin::provider::function::FunctionReturnTypeProvider;
 use crate::plugin::provider::function::FunctionTarget;
 
-static META: ProviderMeta = ProviderMeta::new(
-    "psl::type::nullish",
-    "Psl\\Type\\nullish",
-    "Returns TypeInterface with nullable inner type",
-);
+static META: ProviderMeta =
+    ProviderMeta::new("psl::type::nullish", "Psl\\Type\\nullish", "Returns TypeInterface with nullable inner type");
 
 /// Provider for the `Psl\Type\nullish()` function.
 ///
