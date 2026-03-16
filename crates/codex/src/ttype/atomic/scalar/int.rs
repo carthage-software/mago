@@ -1346,16 +1346,10 @@ impl Rem for TInteger {
                     Unspecified
                 }
             }
-            (To(_), Literal(l)) => {
-                if l > 0 {
-                    Range(0, l - 1)
-                } else if l < 0 {
-                    let f = l.abs();
+            (To(t), Literal(l)) if l != 0 => {
+                let abs_l = l.abs();
 
-                    Range(-(f - 1), 0)
-                } else {
-                    Unspecified
-                }
+                if t <= 0 { Range(-(abs_l - 1), 0) } else { Range(-(abs_l - 1), abs_l - 1) }
             }
             (Range(f, t), Literal(l)) => {
                 if l > 0 {
@@ -1711,7 +1705,7 @@ mod tests {
         assert_eq!(TInteger::Literal(15) % TInteger::Literal(0), TInteger::Unspecified);
         assert_eq!(TInteger::Literal(0) % TInteger::Literal(5), TInteger::Literal(0));
         assert_eq!(TInteger::From(10) % TInteger::Literal(3), TInteger::Range(0, 2));
-        assert_eq!(TInteger::To(10) % TInteger::Literal(3), TInteger::Range(0, 2));
+        assert_eq!(TInteger::To(10) % TInteger::Literal(3), TInteger::Range(-2, 2));
         assert_eq!(TInteger::Range(5, 15) % TInteger::Literal(4), TInteger::Range(0, 3));
         assert_eq!(TInteger::From(10) % TInteger::Literal(-3), TInteger::Range(0, 2));
         assert_eq!(TInteger::Literal(10) % TInteger::From(3), TInteger::Range(0, 2));
@@ -1734,6 +1728,10 @@ mod tests {
         assert_eq!(TInteger::Unspecified % TInteger::Range(1, 10), TInteger::Range(-9, 9));
         assert_eq!(TInteger::Unspecified % TInteger::From(5), TInteger::Unspecified);
         assert_eq!(TInteger::Unspecified % TInteger::To(5), TInteger::Unspecified);
+        assert_eq!(TInteger::To(10) % TInteger::Literal(-3), TInteger::Range(-2, 2));
+        assert_eq!(TInteger::To(-1) % TInteger::Literal(3), TInteger::Range(-2, 0));
+        assert_eq!(TInteger::To(-1) % TInteger::Literal(-3), TInteger::Range(-2, 0));
+        assert_eq!(TInteger::To(0) % TInteger::Literal(5), TInteger::Range(-4, 0));
         assert_eq!(TInteger::Range(5, 10) % TInteger::Literal(-3), TInteger::Range(0, 2));
         assert_eq!(TInteger::Range(-10, -5) % TInteger::Literal(-3), TInteger::Range(-2, 0));
         assert_eq!(TInteger::Range(0, 2) % TInteger::Literal(-5), TInteger::Range(0, 2));
