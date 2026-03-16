@@ -1319,6 +1319,7 @@ dependencies = [
  "mago-syntax-core",
  "mago-text-edit",
  "mimalloc",
+ "notify",
  "pretty_assertions",
  "rayon",
  "schemars",
