@@ -76,7 +76,6 @@ pub fn parse_literal_string_in<'arena>(
             'v' if quote_char == Some('"') => result.push(0x0B),
             'e' if quote_char == Some('"') => result.push(0x1B),
             'f' if quote_char == Some('"') => result.push(0x0C),
-            '0' if quote_char == Some('"') => result.push(0x00),
             'x' if quote_char == Some('"') => {
                 chars.next(); // Consume 'x'
                 let mut hex_val = 0u8;
@@ -119,21 +118,16 @@ pub fn parse_literal_string_in<'arena>(
                     result.push(octal_val as u8);
                 } else {
                     result.push(b'\\');
-                    result.push(b'0');
+                    result.extend_from_slice(next_char.encode_utf8(&mut buf).as_bytes());
+                    chars.next();
                 }
 
                 consumed = false;
             }
             _ => {
                 // Unrecognized escape sequence
-                if quote_char == Some('\'') {
-                    // In single quotes, only \' and \\ are special.
-                    result.push(b'\\');
-                    result.extend_from_slice(next_char.encode_utf8(&mut buf).as_bytes());
-                } else {
-                    // In double quotes, an invalid escape is just the character.
-                    result.extend_from_slice(next_char.encode_utf8(&mut buf).as_bytes());
-                }
+                result.push(b'\\');
+                result.extend_from_slice(next_char.encode_utf8(&mut buf).as_bytes());
             }
         }
 
@@ -232,10 +226,6 @@ pub fn parse_literal_string(s: &str, quote_char: Option<char>, has_quote: bool) 
                 result.push('\x0C');
                 chars.next();
             }
-            '0' if quote_char == Some('"') => {
-                result.push('\0');
-                chars.next();
-            }
             'x' if quote_char == Some('"') => {
                 chars.next();
 
@@ -274,20 +264,22 @@ pub fn parse_literal_string(s: &str, quote_char: Option<char>, has_quote: bool) 
                     }
                 }
 
-                result.push(u8::from_str_radix(&octal, 8).ok()? as char);
+                match u8::from_str_radix(&octal, 8) {
+                    Ok(val) => result.push(val as char),
+                    Err(_) => {
+                        result.push('\\');
+                        result.push_str(&octal);
+                    }
+                }
             }
             '$' if quote_char == Some('"') => {
                 result.push('$');
                 chars.next();
             }
             _ => {
-                if quote_char == Some('\'') {
-                    result.push(c);
-                    result.push(next_char);
-                    chars.next();
-                } else {
-                    result.push(c);
-                }
+                result.push(c);
+                result.push(next_char);
+                chars.next();
             }
         }
     }
