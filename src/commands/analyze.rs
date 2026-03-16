@@ -33,12 +33,19 @@
 //! checking even for external symbols. Stubs can be disabled with `--no-stubs`
 //! for debugging or testing purposes.
 
+use std::path::Path;
 use std::path::PathBuf;
 use std::process::ExitCode;
+use std::sync::mpsc;
 use std::time::Duration;
 
 use clap::ColorChoice;
 use clap::Parser;
+use notify::Config;
+use notify::EventKind;
+use notify::RecommendedWatcher;
+use notify::RecursiveMode;
+use notify::Watcher as NotifyWatcher;
 
 use mago_analyzer::code::IssueCode;
 use mago_codex::metadata::CodebaseMetadata;
@@ -57,6 +64,12 @@ use crate::consts::PRELUDE_BYTES;
 use crate::error::Error;
 use crate::utils::create_orchestrator;
 use crate::utils::git;
+
+/// The outcome of a watch mode session.
+enum WatchOutcome {
+    /// A restart was requested due to a configuration, baseline, or dependency file change.
+    Restart(String),
+}
 
 /// Command for performing static type analysis on PHP code.
 ///
@@ -110,6 +123,11 @@ pub struct AnalyzeCommand {
     /// When enabled, the analyzer watches the workspace for file changes and
     /// automatically re-runs analysis whenever PHP files are modified,
     /// created, or deleted. This provides instant feedback during development.
+    ///
+    /// The analyzer also watches configuration files (`mago.toml`), baseline
+    /// files, and Composer files (`composer.json`, `composer.lock`) for changes.
+    /// When any of these files change, the analyzer automatically restarts
+    /// with the updated configuration.
     ///
     /// Press Ctrl+C to stop watching.
     #[arg(long, default_value_t = false)]
@@ -178,6 +196,11 @@ impl AnalyzeCommand {
             return Ok(ExitCode::SUCCESS);
         }
 
+        // Check if watch mode is enabled early, since it needs a restart loop
+        if self.watch {
+            return self.run_watch_loop(configuration, color_choice);
+        }
+
         // 1. Establish the base prelude data.
         let Prelude { database, metadata, symbol_references } = if self.no_stubs {
             Prelude::default()
@@ -185,7 +208,7 @@ impl AnalyzeCommand {
             Prelude::decode(PRELUDE_BYTES).expect("Failed to decode embedded prelude")
         };
 
-        let mut orchestrator = create_orchestrator(&configuration, color_choice, false, !self.watch, self.watch);
+        let mut orchestrator = create_orchestrator(&configuration, color_choice, false, true, false);
         orchestrator.add_exclude_patterns(configuration.analyzer.excludes.iter());
 
         if self.staged {
@@ -202,18 +225,6 @@ impl AnalyzeCommand {
             orchestrator.set_source_paths(staged_paths.iter().map(|p| p.to_string_lossy().to_string()));
         } else if !self.path.is_empty() {
             orchestrator.set_source_paths(self.path.iter().map(|p| p.to_string_lossy().to_string()));
-        }
-
-        // Check if watch mode is enabled early, since it needs ownership of configuration
-        if self.watch {
-            return self.run_watch_mode(
-                orchestrator,
-                &configuration,
-                color_choice,
-                database,
-                metadata,
-                symbol_references,
-            );
         }
 
         let mut database = orchestrator.load_database(&configuration.source.workspace, true, Some(database))?;
@@ -252,21 +263,67 @@ impl AnalyzeCommand {
         Ok(exit_code)
     }
 
+    /// Wraps watch mode in a restart loop.
+    ///
+    /// When configuration files, baseline files, or Composer files change,
+    /// the watch session restarts with the reloaded configuration.
+    fn run_watch_loop(&self, mut configuration: Configuration, color_choice: ColorChoice) -> Result<ExitCode, Error> {
+        loop {
+            let Prelude { database, metadata, symbol_references } = if self.no_stubs {
+                Prelude::default()
+            } else {
+                Prelude::decode(PRELUDE_BYTES).expect("Failed to decode embedded prelude")
+            };
+
+            let mut orchestrator = create_orchestrator(&configuration, color_choice, false, false, true);
+            orchestrator.add_exclude_patterns(configuration.analyzer.excludes.iter());
+
+            if !self.path.is_empty() {
+                orchestrator.set_source_paths(self.path.iter().map(|p| p.to_string_lossy().to_string()));
+            }
+
+            match self.run_watch_mode(
+                orchestrator,
+                &configuration,
+                color_choice,
+                database,
+                metadata,
+                symbol_references,
+            )? {
+                WatchOutcome::Restart(reason) => {
+                    tracing::info!("Restarting analysis: {reason}");
+
+                    // Only pin the config file path if the user explicitly passed --config.
+                    // Otherwise, let load() re-discover it (the file might have been
+                    // deleted, renamed, or a different format might now take precedence).
+                    let explicit_config =
+                        if configuration.config_file_is_explicit { configuration.config_file.as_deref() } else { None };
+
+                    match Configuration::load(
+                        Some(configuration.source.workspace.clone()),
+                        explicit_config,
+                        Some(configuration.php_version),
+                        Some(configuration.threads),
+                        configuration.allow_unsupported_php_version,
+                    ) {
+                        Ok(new_config) => {
+                            configuration = new_config;
+                        }
+                        Err(e) => {
+                            tracing::error!("Failed to reload configuration: {e}");
+                            tracing::info!("Continuing with previous configuration.");
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     /// Runs in watch mode, continuously monitoring for file changes and re-analyzing.
     ///
-    /// # Arguments
-    ///
-    /// * `orchestrator` - The orchestrator for creating services
-    /// * `configuration` - The loaded configuration
-    /// * `color_choice` - Whether to use colored output
-    /// * `prelude_database` - The prelude database with builtin symbols
-    /// * `metadata` - The codebase metadata (from prelude)
-    /// * `symbol_references` - Symbol references (from prelude)
-    ///
-    /// # Returns
-    ///
-    /// - `Ok(ExitCode::SUCCESS)` when user interrupts with Ctrl+C
-    /// - `Err(e)` if watcher setup or analysis fails
+    /// Also monitors configuration files, baseline files, and Composer files for changes.
+    /// When any of these files change, returns `WatchOutcome::Restart` so the caller
+    /// can reload configuration and restart.
     fn run_watch_mode(
         &self,
         orchestrator: Orchestrator<'_>,
@@ -275,7 +332,7 @@ impl AnalyzeCommand {
         prelude_database: Database<'static>,
         metadata: CodebaseMetadata,
         symbol_references: SymbolReferences,
-    ) -> Result<ExitCode, Error> {
+    ) -> Result<WatchOutcome, Error> {
         tracing::info!("Starting watch mode. Press Ctrl+C to stop.");
 
         let database = orchestrator.load_database(&configuration.source.workspace, true, Some(prelude_database))?;
@@ -283,6 +340,9 @@ impl AnalyzeCommand {
         let mut watcher = DatabaseWatcher::new(database);
 
         watcher.watch(WatchOptions { poll_interval: Some(Duration::from_millis(500)), ..Default::default() })?;
+
+        // Set up a separate watcher for files that should trigger a full restart.
+        let restart_receiver = setup_restart_watcher(&configuration.source.workspace, configuration)?;
 
         tracing::info!("Watching {} for changes...", configuration.source.workspace.display());
         tracing::info!("Running initial analysis...");
@@ -314,6 +374,11 @@ impl AnalyzeCommand {
         tracing::info!("Initial analysis complete. Watching for changes...");
 
         loop {
+            // Check for restart triggers (config, baseline, composer changes).
+            if let Ok(reason) = restart_receiver.try_recv() {
+                return Ok(WatchOutcome::Restart(reason));
+            }
+
             let changed_file_ids = watcher.wait()?;
             if changed_file_ids.is_empty() {
                 continue;
@@ -338,4 +403,93 @@ impl AnalyzeCommand {
             tracing::info!("Analysis complete. Watching for changes...");
         }
     }
+}
+
+/// Sets up a file system watcher for non-PHP files that should trigger a full restart.
+///
+/// Watches:
+/// - Configuration files (`mago.toml`, `mago.dist.toml`, etc.)
+/// - Baseline file (if configured)
+/// - `composer.json` and `composer.lock` (if present)
+///
+/// Returns a receiver that delivers a human-readable reason string when a restart
+/// is triggered.
+fn setup_restart_watcher(workspace: &Path, configuration: &Configuration) -> Result<mpsc::Receiver<String>, Error> {
+    let (tx, rx) = mpsc::channel();
+
+    let mut watch_files: Vec<(PathBuf, &'static str)> = Vec::new();
+
+    if let Some(config_file) = &configuration.config_file {
+        watch_files.push((config_file.clone(), "configuration file"));
+    } else {
+        // No config file was found, watch all possible locations so we detect creation of a new config file.
+        for name in ["mago", "mago.dist"] {
+            for ext in ["toml", "yaml", "yml", "json"] {
+                watch_files.push((workspace.join(format!("{name}.{ext}")), "configuration file"));
+            }
+        }
+    }
+
+    if let Some(baseline) = &configuration.analyzer.baseline {
+        let path = if baseline.is_absolute() { baseline.clone() } else { workspace.join(baseline) };
+
+        watch_files.push((path, "baseline file"));
+    }
+
+    watch_files.push((workspace.join("composer.json"), "composer.json"));
+    watch_files.push((workspace.join("composer.lock"), "composer.lock"));
+
+    let file_labels: Vec<(PathBuf, String)> = watch_files
+        .iter()
+        .map(|(path, label)| {
+            let abs = if path.is_absolute() { path.clone() } else { workspace.join(path) };
+            (abs, label.to_string())
+        })
+        .collect();
+
+    let mut watcher = RecommendedWatcher::new(
+        move |res: Result<notify::Event, notify::Error>| {
+            let Ok(event) = res else {
+                return;
+            };
+
+            if matches!(event.kind, EventKind::Create(_) | EventKind::Modify(_) | EventKind::Remove(_)) {
+                for event_path in &event.paths {
+                    for (watched_path, label) in &file_labels {
+                        let matches = event_path
+                            .canonicalize()
+                            .ok()
+                            .and_then(|canon| watched_path.canonicalize().ok().map(|wc| canon == wc))
+                            .unwrap_or_else(|| event_path == watched_path);
+
+                        if matches {
+                            let _ = tx.send(format!("{label} changed ({})", event_path.display()));
+                            return;
+                        }
+                    }
+                }
+            }
+        },
+        Config::default(),
+    )
+    .map_err(|e| Error::Database(mago_database::error::DatabaseError::WatcherInit(e)))?;
+
+    let mut watched_dirs = std::collections::HashSet::new();
+    for (path, label) in &watch_files {
+        let watch_dir = path.parent().unwrap_or(workspace);
+        if watched_dirs.insert(watch_dir.to_path_buf()) {
+            if let Err(e) = watcher.watch(watch_dir, RecursiveMode::NonRecursive) {
+                tracing::warn!("Could not watch {label} at {}: {e}", watch_dir.display());
+            } else {
+                tracing::debug!("Watching {label}: {}", path.display());
+            }
+        }
+    }
+
+    // keep the watcher alive by leaking it. it will be cleaned up when the process exits
+    // or when the watch loop restarts. This is intentional: the watcher must outlive the
+    // function call since it runs on a background thread.
+    std::mem::forget(watcher);
+
+    Ok(rx)
 }

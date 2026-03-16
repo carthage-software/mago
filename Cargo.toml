@@ -154,6 +154,7 @@ rayon = { workspace = true }
 indoc = { workspace = true }
 bumpalo = { workspace = true }
 unicode-width = { workspace = true }
+notify = { workspace = true }
 dhat = { workspace = true, optional = true }
 schemars = { workspace = true }
 
