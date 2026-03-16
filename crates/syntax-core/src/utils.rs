@@ -76,7 +76,6 @@ pub fn parse_literal_string_in<'arena>(
             'v' if quote_char == Some('"') => result.push(0x0B),
             'e' if quote_char == Some('"') => result.push(0x1B),
             'f' if quote_char == Some('"') => result.push(0x0C),
-            '0' if quote_char == Some('"') => result.push(0x00),
             'x' if quote_char == Some('"') => {
                 chars.next(); // Consume 'x'
                 let mut hex_val = 0u8;
