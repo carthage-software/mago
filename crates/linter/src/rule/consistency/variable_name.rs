@@ -81,7 +81,6 @@ impl LintRule for VariableNameRule {
                 <?php
 
                 $MyVariable = 1;
-
                 $My_Variable = 2;
 
                 function foo($MyParam) {}
@@ -150,10 +149,10 @@ impl VariableNameRule {
     }
 
     fn check_variable_name(&self, ctx: &mut LintContext<'_, '_>, name: &str, span: Span) {
-        let name_without_dollar = name.strip_prefix('$').unwrap_or(name);
+        let clean_name = name.trim_start_matches(|c: char| c == '$' || c == '_' || c.is_ascii_digit());
 
         if self.cfg.either {
-            if !is_camel_case(name_without_dollar) && !is_snake_case(name_without_dollar) {
+            if !is_camel_case(clean_name) && !is_snake_case(clean_name) {
                 ctx.collector.report(
                     Issue::new(
                         self.cfg.level(),
@@ -168,8 +167,8 @@ impl VariableNameRule {
                     ))
                     .with_help(format!(
                         "Consider renaming it to `${}` or `${}` to adhere to the naming convention.",
-                        to_camel_case(name_without_dollar),
-                        to_snake_case(name_without_dollar)
+                        to_camel_case(clean_name),
+                        to_snake_case(clean_name)
                     )),
                 );
             }
@@ -177,7 +176,7 @@ impl VariableNameRule {
             return;
         }
 
-        if self.cfg.camel && !is_camel_case(name_without_dollar) {
+        if self.cfg.camel && !is_camel_case(clean_name) {
             ctx.collector.report(
                 Issue::new(self.cfg.level(), format!("Variable name `{name}` should be in camel case."))
                     .with_code(self.meta.code)
@@ -187,10 +186,10 @@ impl VariableNameRule {
                     .with_note(format!("The variable name `{name}` does not follow camel naming convention."))
                     .with_help(format!(
                         "Consider renaming it to `${}` to adhere to the naming convention.",
-                        to_camel_case(name_without_dollar)
+                        to_camel_case(clean_name)
                     )),
             );
-        } else if !self.cfg.camel && !is_snake_case(name_without_dollar) {
+        } else if !self.cfg.camel && !is_snake_case(clean_name) {
             ctx.collector.report(
                 Issue::new(self.cfg.level(), format!("Variable name `{name}` should be in snake case."))
                     .with_code(self.meta.code)
@@ -200,7 +199,7 @@ impl VariableNameRule {
                     .with_note(format!("The variable name `{name}` does not follow snake naming convention."))
                     .with_help(format!(
                         "Consider renaming it to `${}` to adhere to the naming convention.",
-                        to_snake_case(name_without_dollar)
+                        to_snake_case(clean_name)
                     )),
             );
         }
@@ -224,4 +223,130 @@ fn is_special_variable(name: &str) -> bool {
             | "$argc"
             | "$argv"
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use indoc::indoc;
+
+    use crate::settings::Settings;
+    use crate::test_lint_failure;
+    use crate::test_lint_success;
+
+    use super::*;
+
+    test_lint_success! {
+        name = snake_case_variable_success,
+        rule = VariableNameRule,
+        settings = |s: &mut Settings| {
+            s.rules.variable_name.config.camel = false;
+            s.rules.variable_name.config.either = false;
+        },
+        code = indoc! {r#"
+            <?php
+
+            $_ = 1;
+            $_foo_bar = 1;
+            $bar_baz = 2;
+            function foo($qux) {}
+        "#}
+    }
+
+    test_lint_success! {
+        name = camel_case_success,
+        rule = VariableNameRule,
+        settings = |s: &mut Settings| {
+            s.rules.variable_name.config.camel = true;
+            s.rules.variable_name.config.either = false;
+        },
+        code = "<?php $myVariableName = 1; $simple = 2;"
+    }
+
+    test_lint_success! {
+        name = either_case_success,
+        rule = VariableNameRule,
+        settings = |s: &mut Settings| {
+            s.rules.variable_name.config.either = true;
+        },
+        code = "<?php $snake_case = 1; $camelCase = 2;"
+    }
+
+    test_lint_success! {
+        name = leading_special_chars_success,
+        rule = VariableNameRule,
+        settings = |s: &mut Settings| { s.rules.variable_name.config.camel = false; },
+        code = "<?php $__hidden_variable = 1; $v1_name = 2;"
+    }
+
+    test_lint_success! {
+        name = special_variables_ignored,
+        rule = VariableNameRule,
+        code = "<?php $this->foo = $_GET; $GLOBALS['x'] = 1; $argv = [];"
+    }
+
+    test_lint_success! {
+        name = parameter_naming_success,
+        rule = VariableNameRule,
+        settings = |s: &mut Settings| { s.rules.variable_name.config.camel = false; },
+        code = "<?php function test($valid_param, $another_one) {}"
+    }
+
+    test_lint_success! {
+        name = skip_parameter_checks,
+        rule = VariableNameRule,
+        settings = |s: &mut Settings| {
+            s.rules.variable_name.config.check_parameters = false;
+            s.rules.variable_name.config.camel = true;
+        },
+        code = "<?php function test($bad_snake_param) {}"
+    }
+
+    test_lint_success! {
+        name = promoted_properties_ignored,
+        rule = VariableNameRule,
+        code = "<?php class Foo { public function __construct(public int $some_Property) {} }"
+    }
+
+    test_lint_success! {
+        name = complex_assignments_ignored,
+        rule = VariableNameRule,
+        code = "<?php $obj->SomeProp = 1; $$dynamic_Var = 2;"
+    }
+
+    test_lint_failure! {
+        name = snake_case_variable_failure,
+        rule = VariableNameRule,
+        count = 2,
+        settings = |s: &mut Settings| {
+            s.rules.variable_name.config.camel = false;
+            s.rules.variable_name.config.either = false;
+        },
+        code = indoc! {r#"
+            <?php
+
+            $_ = 1; // OK
+            $_fooBar = 1;
+            $barBaz = 2;
+            function foo($qux) {} // ok
+        "#}
+    }
+
+    test_lint_failure! {
+        name = camel_case_failure,
+        rule = VariableNameRule,
+        count = 1,
+        settings = |s: &mut Settings| {
+            s.rules.variable_name.config.camel = true;
+            s.rules.variable_name.config.either = false;
+        },
+        code = "<?php $my_variable_name = 1;"
+    }
+
+    test_lint_failure! {
+        name = pascal_case_failure,
+        rule = VariableNameRule,
+        count = 1,
+        settings = |s: &mut Settings| { s.rules.variable_name.config.either = true; },
+        code = "<?php $MyVariable = 1;"
+    }
 }
