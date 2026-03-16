@@ -226,10 +226,6 @@ pub fn parse_literal_string(s: &str, quote_char: Option<char>, has_quote: bool) 
                 result.push('\x0C');
                 chars.next();
             }
-            '0' if quote_char == Some('"') => {
-                result.push('\0');
-                chars.next();
-            }
             'x' if quote_char == Some('"') => {
                 chars.next();
 
