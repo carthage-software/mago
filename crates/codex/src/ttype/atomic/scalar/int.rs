@@ -1341,7 +1341,11 @@ impl Rem for TInteger {
                 if l > 0 {
                     if f >= 0 { Range(0, l - 1) } else { Range(-(l - 1), l - 1) }
                 } else if l < 0 {
-                    if f >= 0 { Range(0, l.saturating_neg().saturating_sub(1)) } else { Range(l.saturating_add(1), 0) }
+                    if f >= 0 {
+                        Range(0, l.saturating_neg().saturating_sub(1))
+                    } else {
+                        Range(l.saturating_add(1), l.saturating_neg().saturating_sub(1))
+                    }
                 } else {
                     Unspecified
                 }
@@ -1737,6 +1741,9 @@ mod tests {
         assert_eq!(TInteger::Range(0, 2) % TInteger::Literal(-5), TInteger::Range(0, 2));
         assert_eq!(TInteger::Range(-2, 0) % TInteger::Literal(-5), TInteger::Range(-2, 0));
         assert_eq!(TInteger::Range(-5, 5) % TInteger::Literal(-3), TInteger::Range(-2, 2));
+        assert_eq!(TInteger::From(-5) % TInteger::Literal(-3), TInteger::Range(-2, 2));
+        assert_eq!(TInteger::From(-10) % TInteger::Literal(-7), TInteger::Range(-6, 6));
+        assert_eq!(TInteger::From(-1) % TInteger::Literal(-2), TInteger::Range(-1, 1));
     }
 
     #[test]
