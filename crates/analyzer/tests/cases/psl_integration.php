@@ -72,6 +72,16 @@ namespace Psl\Type {
     {
         return optional($inner_type);
     }
+
+    /**
+     * @template T
+     * @param TypeInterface<T> $inner_type
+     * @return TypeInterface<T>
+     */
+    function nullish(TypeInterface $inner_type): TypeInterface
+    {
+        return nullish($inner_type);
+    }
 }
 
 namespace {
@@ -131,6 +141,7 @@ namespace {
             'city' => Psl\Type\string(),
             'country' => Psl\Type\optional(Psl\Type\string()),
         ]),
+        'nickname' => Psl\Type\nullish(Psl\Type\string()),
     ]);
 
     $list_type = Psl\Type\shape([
@@ -159,9 +170,14 @@ namespace {
     i_take_string($array['address']['street']);
     i_take_string($array['address']['city']);
     i_take_string($array['address']['country'] ?? '');
+    i_take_string($array['nickname'] ?? '');
 
     if (isset($array['address']['country'])) {
         i_take_string($array['address']['country']);
+    }
+
+    if ($array['nickname'] !== null) {
+        i_take_string($array['nickname']);
     }
 
     i_take_string($list[0]);
