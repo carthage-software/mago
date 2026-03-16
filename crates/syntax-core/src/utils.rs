@@ -268,7 +268,13 @@ pub fn parse_literal_string(s: &str, quote_char: Option<char>, has_quote: bool) 
                     }
                 }
 
-                result.push(u8::from_str_radix(&octal, 8).ok()? as char);
+                match u8::from_str_radix(&octal, 8) {
+                    Ok(val) => result.push(val as char),
+                    Err(_) => {
+                        result.push('\\');
+                        result.push_str(&octal);
+                    }
+                }
             }
             '$' if quote_char == Some('"') => {
                 result.push('$');
