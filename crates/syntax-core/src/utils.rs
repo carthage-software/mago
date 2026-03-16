@@ -126,14 +126,8 @@ pub fn parse_literal_string_in<'arena>(
             }
             _ => {
                 // Unrecognized escape sequence
-                if quote_char == Some('\'') {
-                    // In single quotes, only \' and \\ are special.
-                    result.push(b'\\');
-                    result.extend_from_slice(next_char.encode_utf8(&mut buf).as_bytes());
-                } else {
-                    // In double quotes, an invalid escape is just the character.
-                    result.extend_from_slice(next_char.encode_utf8(&mut buf).as_bytes());
-                }
+                result.push(b'\\');
+                result.extend_from_slice(next_char.encode_utf8(&mut buf).as_bytes());
             }
         }
 
@@ -281,13 +275,9 @@ pub fn parse_literal_string(s: &str, quote_char: Option<char>, has_quote: bool) 
                 chars.next();
             }
             _ => {
-                if quote_char == Some('\'') {
-                    result.push(c);
-                    result.push(next_char);
-                    chars.next();
-                } else {
-                    result.push(c);
-                }
+                result.push(c);
+                result.push(next_char);
+                chars.next();
             }
         }
     }
