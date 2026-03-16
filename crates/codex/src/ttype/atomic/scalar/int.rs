@@ -1370,9 +1370,9 @@ impl Rem for TInteger {
                     let v = l.abs();
 
                     if f >= 0 {
-                        Range(-(v - 1), 0)
+                        Range(0, (v - 1).min(t))
                     } else if t <= 0 {
-                        Range(0, v - 1)
+                        Range((-(v - 1)).max(f), 0)
                     } else {
                         Range(-(v - 1), v - 1)
                     }
@@ -1734,6 +1734,11 @@ mod tests {
         assert_eq!(TInteger::Unspecified % TInteger::Range(1, 10), TInteger::Range(-9, 9));
         assert_eq!(TInteger::Unspecified % TInteger::From(5), TInteger::Unspecified);
         assert_eq!(TInteger::Unspecified % TInteger::To(5), TInteger::Unspecified);
+        assert_eq!(TInteger::Range(5, 10) % TInteger::Literal(-3), TInteger::Range(0, 2));
+        assert_eq!(TInteger::Range(-10, -5) % TInteger::Literal(-3), TInteger::Range(-2, 0));
+        assert_eq!(TInteger::Range(0, 2) % TInteger::Literal(-5), TInteger::Range(0, 2));
+        assert_eq!(TInteger::Range(-2, 0) % TInteger::Literal(-5), TInteger::Range(-2, 0));
+        assert_eq!(TInteger::Range(-5, 5) % TInteger::Literal(-3), TInteger::Range(-2, 2));
     }
 
     #[test]
