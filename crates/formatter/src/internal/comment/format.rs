@@ -45,15 +45,6 @@ impl<'arena> FormatterState<'_, 'arena> {
     ///
     /// # Returns
     ///
-    /// `true` if the next line is a comment line, `false` otherwise.
-    /// Checks if a node is followed by a comment on its own line.
-    ///
-    /// # Arguments
-    ///
-    /// * `span` - The span of the node after which to check for a comment.
-    ///
-    /// # Returns
-    ///
     /// `true` if the next substantive line is a comment line, `false` otherwise.
     pub(crate) fn is_followed_by_comment_on_next_line(&self, span: Span) -> bool {
         let Some(first_char_offset) = self.skip_spaces(Some(span.end_offset()), false) else {

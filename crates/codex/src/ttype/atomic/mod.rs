@@ -74,6 +74,19 @@ pub enum TAtomic {
 }
 
 impl TAtomic {
+    /// Returns true if this atomic is a Placeholder or contains Placeholder in type parameters.
+    #[must_use]
+    pub fn contains_placeholder(&self) -> bool {
+        match self {
+            TAtomic::Placeholder => true,
+            TAtomic::Object(TObject::Named(named)) => {
+                named.get_type_parameters().is_some_and(|params| params.iter().any(|p| p.contains_placeholder()))
+            }
+            TAtomic::Array(array) => array.contains_placeholder(),
+            _ => false,
+        }
+    }
+
     #[must_use]
     pub fn is_numeric(&self) -> bool {
         match self {

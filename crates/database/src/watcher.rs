@@ -344,6 +344,7 @@ impl<'a> DatabaseWatcher<'a> {
                     if !changed_file.path.exists() {
                         self.database.delete(changed_file.id);
                         tracing::trace!("Deleted file from database: {}", file.name);
+                        continue;
                     }
 
                     match Self::read_stable_contents(&changed_file.path) {

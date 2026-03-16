@@ -490,6 +490,12 @@ impl TUnion {
         self.types.iter().all(|t| matches!(t, TAtomic::Placeholder)) && !self.types.is_empty()
     }
 
+    /// Returns true if this union or any type parameter within it contains a Placeholder.
+    #[must_use]
+    pub fn contains_placeholder(&self) -> bool {
+        self.types.iter().any(|t| t.contains_placeholder())
+    }
+
     pub fn is_true(&self) -> bool {
         self.types.iter().all(TAtomic::is_true) && !self.types.is_empty()
     }
@@ -1261,7 +1267,7 @@ impl TUnion {
         self.types.iter().any(|t| match t {
             TAtomic::GenericParameter(generic_parameter) => generic_parameter.constraint.accepts_null(),
             TAtomic::Mixed(mixed) if !mixed.is_non_null() => true,
-            TAtomic::Null => true,
+            TAtomic::Null | TAtomic::Placeholder => true,
             _ => false,
         })
     }

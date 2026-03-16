@@ -62,6 +62,7 @@ use mago_database::file::FileType;
 use mago_names::resolver::NameResolver;
 use mago_reporting::Issue;
 use mago_reporting::IssueCollection;
+use mago_reporting::Level;
 use mago_syntax::ast::*;
 use mago_syntax::lexer::Lexer;
 use mago_syntax_core::input::Input;
@@ -147,7 +148,7 @@ impl AstCommand {
             let editor_url = configuration.editor_url.take();
             let orchestrator = create_orchestrator(&configuration, color_choice, false, true, false);
 
-            self.reporting.get_processor(color_choice, editor_url).process_issues(
+            self.reporting.get_processor(color_choice, editor_url, Level::Error).process_issues(
                 &orchestrator,
                 &mut database,
                 issues,
@@ -187,13 +188,10 @@ impl AstCommand {
                     let editor_url = configuration.editor_url.take();
                     let orchestrator = create_orchestrator(&configuration, color_choice, false, true, false);
 
-                    let (exit_code, _) = self.reporting.get_processor(color_choice, editor_url).process_issues(
-                        &orchestrator,
-                        &mut database,
-                        IssueCollection::from([issue]),
-                        None,
-                        false,
-                    )?;
+                    let (exit_code, _) = self
+                        .reporting
+                        .get_processor(color_choice, editor_url, Level::Error)
+                        .process_issues(&orchestrator, &mut database, IssueCollection::from([issue]), None, false)?;
 
                     return Ok(exit_code);
                 }

@@ -180,9 +180,15 @@ jobs:
               target: x86_64-unknown-linux-gnu,
               os: ubuntu-latest,
               test: true,
+              pgo: true,
               wasm: true,
             }
-          - { target: x86_64-unknown-linux-musl, os: ubuntu-latest, test: true }
+          - {
+              target: x86_64-unknown-linux-musl,
+              os: ubuntu-latest,
+              test: true,
+              pgo: true,
+            }
 
           # Tier 2 targets:
 
@@ -220,6 +226,7 @@ jobs:
             arm-unknown-linux-*) sudo apt-get -y install gcc-arm-linux-gnueabihf ;;
             aarch64-unknown-linux-gnu) sudo apt-get -y install gcc-aarch64-linux-gnu ;;
             arm-unknown-linux-gnueabihf) sudo apt-get -y install gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf qemu-user ;;
+            x86_64-unknown-linux-musl) sudo apt-get -y install musl-tools ;;
           esac
 
       - name: install Rust toolchain
@@ -251,18 +258,18 @@ jobs:
           fi
 
       - name: install cross
-        if: startsWith(matrix.job.os, 'ubuntu')
+        if: startsWith(matrix.job.os, 'ubuntu') && !matrix.job.pgo
         uses: taiki-e/install-action@v2
         with:
           tool: cross
 
       - name: overwrite build command env variable (for cross)
-        if: startsWith(matrix.job.os, 'ubuntu')
+        if: startsWith(matrix.job.os, 'ubuntu') && !matrix.job.pgo
         shell: bash
         run: echo "BUILD_CMD=cross" >> $GITHUB_ENV
 
       - name: Configure cross-rs container image for glibc 2.17
-        if: contains(matrix.job.target, 'linux-gnu')
+        if: contains(matrix.job.target, 'linux-gnu') && !matrix.job.pgo
         shell: bash
         run: |
           IMAGE=""

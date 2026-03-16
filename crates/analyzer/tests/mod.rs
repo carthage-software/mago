@@ -80,6 +80,7 @@ test_case!(non_empty_string_magic_constant);
 test_case!(numeric_reconciliation);
 test_case!(priority_queue_implementation);
 test_case!(psl_integration);
+test_case!(psl_int_range);
 test_case!(psr_container_get);
 test_case!(flow_php_integration);
 test_case!(reconcile_array_index_type);
@@ -692,6 +693,7 @@ test_case!(issue_1230_simple, {
     s.strict_list_index_checks = true;
     s
 });
+test_case!(issue_1242_reference_count_sync);
 test_case!(issue_1226);
 test_case!(issue_1259);
 test_case!(issue_1262);
@@ -700,6 +702,21 @@ test_case!(issue_1265);
 test_case!(issue_1266);
 test_case!(issue_1266_inheritdoc_narrowing);
 test_case!(issue_1267);
+test_case!(issue_1291);
+test_case!(issue_1249);
+test_case!(issue_1278);
+test_case!(issue_1287);
+test_case!(issue_1286);
+test_case!(issue_1341);
+test_case!(issue_1342);
+test_case!(issue_1346);
+test_case!(issue_1352);
+test_case!(issue_1355);
+test_case!(issue_1365);
+test_case!(issue_1368);
+test_case!(issue_1372);
+test_case!(issue_1374);
+test_case!(issue_1375);
 
 #[test]
 fn test_all_test_cases_are_ran() {

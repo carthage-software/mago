@@ -323,7 +323,7 @@ fn resolve_array_key(key: ArrayKey, codebase: &CodebaseMetadata, options: &TypeE
         return key;
     };
 
-    // Resolve self/static/this to the actual class name
+    // Resolve self/static/this/parent to the actual class name
     let resolved_class_name = {
         let name_lc = ascii_lowercase_atom(&class_like_name);
         match name_lc.as_str() {
@@ -333,6 +333,16 @@ fn resolve_array_key(key: ArrayKey, codebase: &CodebaseMetadata, options: &TypeE
                     *name
                 } else {
                     options.self_class.unwrap_or(class_like_name)
+                }
+            }
+            "parent" => {
+                if let Some(self_class) = options.self_class
+                    && let Some(class_metadata) = codebase.get_class_like(&self_class)
+                    && let Some(parent) = class_metadata.direct_parent_class
+                {
+                    parent
+                } else {
+                    class_like_name
                 }
             }
             _ => class_like_name,

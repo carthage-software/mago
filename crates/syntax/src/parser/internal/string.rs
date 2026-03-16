@@ -1,5 +1,7 @@
 use mago_database::file::HasFileId;
 
+use mago_span::Span;
+
 use crate::T;
 use crate::ast::ast::ArrayAccess;
 use crate::ast::ast::BracedExpressionStringPart;
@@ -10,6 +12,7 @@ use crate::ast::ast::DocumentKind as AstDocumentKind;
 use crate::ast::ast::DocumentString;
 use crate::ast::ast::Expression;
 use crate::ast::ast::InterpolatedString;
+use crate::ast::ast::Keyword;
 use crate::ast::ast::LiteralStringPart;
 use crate::ast::ast::ShellExecuteString;
 use crate::ast::ast::StringPart;
@@ -42,7 +45,18 @@ impl<'input, 'arena> Parser<'input, 'arena> {
     }
 
     pub(crate) fn parse_interpolated_string(&mut self) -> Result<InterpolatedString<'arena>, ParseError> {
-        let left_double_quote = self.stream.eat_span(T!["\""])?;
+        let token = self.stream.consume()?;
+        let token_span = token.span_for(self.stream.file_id());
+        let has_prefix = token.value.starts_with('b') || token.value.starts_with('B');
+        let prefix = if has_prefix {
+            let prefix_span = Span { start: token_span.start, end: token_span.start.forward(1), ..token_span };
+            Some(Keyword { span: prefix_span, value: &token.value[..1] })
+        } else {
+            None
+        };
+        let left_double_quote =
+            if has_prefix { Span { start: token_span.start.forward(1), ..token_span } } else { token_span };
+
         let mut parts = self.new_vec();
         while let Some(part) = self.parse_optional_string_part(T!["\""])? {
             parts.push(part);
@@ -50,7 +64,7 @@ impl<'input, 'arena> Parser<'input, 'arena> {
 
         let right_double_quote = self.stream.eat_span(T!["\""])?;
 
-        Ok(InterpolatedString { left_double_quote, parts: Sequence::new(parts), right_double_quote })
+        Ok(InterpolatedString { prefix, left_double_quote, parts: Sequence::new(parts), right_double_quote })
     }
 
     pub(crate) fn parse_shell_execute_string(&mut self) -> Result<ShellExecuteString<'arena>, ParseError> {
@@ -67,10 +81,20 @@ impl<'input, 'arena> Parser<'input, 'arena> {
 
     pub(crate) fn parse_document_string(&mut self) -> Result<DocumentString<'arena>, ParseError> {
         let current = self.stream.consume()?;
+        let has_prefix = current.value.starts_with('b') || current.value.starts_with('B');
         let current_span = current.span_for(self.stream.file_id());
+        let prefix = if has_prefix {
+            let prefix_span =
+                Span { start: current_span.start, end: current_span.start.forward(1), file_id: current_span.file_id };
+            Some(Keyword { span: prefix_span, value: &current.value[..1] })
+        } else {
+            None
+        };
+        let open_span =
+            if has_prefix { Span { start: current_span.start.forward(1), ..current_span } } else { current_span };
         let (open, kind) = match current.kind {
-            TokenKind::DocumentStart(DocumentKind::Heredoc) => (current_span, AstDocumentKind::Heredoc),
-            TokenKind::DocumentStart(DocumentKind::Nowdoc) => (current_span, AstDocumentKind::Nowdoc),
+            TokenKind::DocumentStart(DocumentKind::Heredoc) => (open_span, AstDocumentKind::Heredoc),
+            TokenKind::DocumentStart(DocumentKind::Nowdoc) => (open_span, AstDocumentKind::Nowdoc),
             _ => {
                 return Err(self.stream.unexpected(
                     Some(current),
@@ -114,6 +138,7 @@ impl<'input, 'arena> Parser<'input, 'arena> {
         };
 
         Ok(DocumentString {
+            prefix,
             open,
             kind,
             indentation,

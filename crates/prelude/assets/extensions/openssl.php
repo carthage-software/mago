@@ -124,7 +124,7 @@ function openssl_x509_export_to_file(
 ): bool {}
 
 function openssl_x509_verify(
-    OpenSSLCertificate|false $certificate,
+    OpenSSLCertificate|string $certificate,
     OpenSSLAsymmetricKey|OpenSSLCertificate|array|string $public_key,
 ): int {}
 
@@ -178,7 +178,7 @@ function openssl_csr_sign(
     OpenSSLCertificate|string|null $ca_certificate,
     OpenSSLAsymmetricKey|OpenSSLCertificate|array|string $private_key,
     int $days,
-    ?array $options,
+    ?array $options = null,
     int $serial = 0,
     ?string $serial_hex = null,
 ): OpenSSLCertificate|false {}

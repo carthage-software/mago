@@ -27,6 +27,8 @@ impl Plugin for PslPlugin {
     fn register(&self, registry: &mut PluginRegistry) {
         registry.register_function_provider(type_::ShapeProvider);
         registry.register_function_provider(type_::OptionalProvider);
+        registry.register_function_provider(type_::NullishProvider);
+        registry.register_function_provider(type_::IntRangeProvider);
         registry.register_function_provider(str::StrProvider);
         registry.register_function_provider(regex::CaptureGroupsProvider);
     }

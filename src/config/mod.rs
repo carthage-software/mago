@@ -225,6 +225,22 @@ pub struct Configuration {
     /// Can be set via `MAGO_EDITOR_URL` environment variable or `editor-url` in `mago.toml`.
     #[serde(default)]
     pub editor_url: Option<String>,
+
+    /// The path to the configuration file that was loaded, if any.
+    ///
+    /// This is set during configuration loading and is not user-configurable.
+    /// It is used by watch mode to monitor the configuration file for changes.
+    #[serde(default, skip_serializing)]
+    #[schemars(skip)]
+    pub config_file: Option<PathBuf>,
+
+    /// Whether the configuration file was explicitly provided via `--config` CLI flag.
+    ///
+    /// When `true`, the config file path is pinned and won't be re-discovered on reload.
+    /// When `false`, the config file is auto-discovered and may change between reloads.
+    #[serde(default, skip_serializing)]
+    #[schemars(skip)]
+    pub config_file_is_explicit: bool,
 }
 
 impl Configuration {
@@ -296,9 +312,13 @@ impl Configuration {
         let mut configuration = Configuration::from_workspace(workspace_dir.clone());
         let mut builder = Config::builder().add_source(Config::try_from(&configuration)?);
 
+        let resolved_config_file;
+        let config_file_is_explicit;
         if let Some(file) = file {
             tracing::debug!("Sourcing configuration from {}.", file.display());
 
+            resolved_config_file = Some(file.to_path_buf());
+            config_file_is_explicit = true;
             builder = builder.add_source(File::from(file).required(true));
         } else {
             let formats = [FileFormat::Toml, FileFormat::Yaml, FileFormat::Json];
@@ -311,16 +331,23 @@ impl Configuration {
 
             if let Some((config_file, format)) = Self::find_config_files(&workspace_dir, &fallback_roots, &formats) {
                 tracing::debug!("Sourcing configuration from {}.", config_file.display());
+                resolved_config_file = Some(config_file.clone());
                 builder = builder.add_source(File::from(config_file).format(format).required(false));
             } else {
                 tracing::debug!("No configuration file found, using defaults and environment variables.");
+                resolved_config_file = None;
             }
+
+            config_file_is_explicit = false;
         }
 
         configuration = builder
             .add_source(Environment::with_prefix(ENVIRONMENT_PREFIX).convert_case(Case::Kebab))
             .build()?
             .try_deserialize::<Configuration>()?;
+
+        configuration.config_file = resolved_config_file;
+        configuration.config_file_is_explicit = config_file_is_explicit;
 
         if allow_unsupported_php_version && !configuration.allow_unsupported_php_version {
             tracing::warn!("Allowing unsupported PHP versions.");
@@ -455,6 +482,8 @@ impl Configuration {
             guard: GuardConfiguration::default(),
             log: Value::new(None, ValueKind::Nil),
             editor_url: None,
+            config_file: None,
+            config_file_is_explicit: false,
         }
     }
 }

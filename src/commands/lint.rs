@@ -254,7 +254,13 @@ impl LintCommand {
 
         let baseline = configuration.linter.baseline.as_deref();
         let baseline_variant = configuration.linter.baseline_variant;
-        let processor = self.baseline_reporting.get_processor(color_choice, baseline, baseline_variant, editor_url);
+        let processor = self.baseline_reporting.get_processor(
+            color_choice,
+            baseline,
+            baseline_variant,
+            editor_url,
+            configuration.linter.minimum_fail_level,
+        );
 
         let (exit_code, changed_file_ids) = processor.process_issues(&orchestrator, &mut database, issues)?;
 

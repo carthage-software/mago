@@ -16,6 +16,7 @@ use std::path::PathBuf;
 
 use clap::ColorChoice;
 use clap::Parser;
+use mago_reporting::Level;
 use mago_reporting::baseline::BaselineVariant;
 
 use crate::commands::args::reporting::ReportingArgs;
@@ -111,6 +112,7 @@ impl BaselineReportingArgs {
         baseline: Option<&Path>,
         baseline_variant: BaselineVariant,
         editor_url: Option<String>,
+        config_minimum_fail_level: Level,
     ) -> BaselineIssueProcessor {
         BaselineIssueProcessor {
             baseline_path: if self.ignore_baseline {
@@ -126,7 +128,7 @@ impl BaselineReportingArgs {
             verify_baseline: self.verify_baseline,
             fail_on_out_of_sync_baseline: self.fail_on_out_of_sync_baseline,
             baseline_variant,
-            issue_processor: self.reporting.get_processor(color_choice, editor_url),
+            issue_processor: self.reporting.get_processor(color_choice, editor_url, config_minimum_fail_level),
         }
     }
 }
