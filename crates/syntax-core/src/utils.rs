@@ -118,7 +118,8 @@ pub fn parse_literal_string_in<'arena>(
                     result.push(octal_val as u8);
                 } else {
                     result.push(b'\\');
-                    result.push(b'0');
+                    result.extend_from_slice(next_char.encode_utf8(&mut buf).as_bytes());
+                    chars.next();
                 }
 
                 consumed = false;
