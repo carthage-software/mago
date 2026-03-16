@@ -71,15 +71,19 @@ fn get_preferred_quote(raw: &str, enclosing_quote: char, prefer_single_quote: bo
     let mut preferred_quote_count = 0;
     let mut alternate_quote_count = 0;
 
-    for character in raw.chars() {
+    let mut chars = raw.chars().peekable();
+    while let Some(character) = chars.next() {
         if character == preferred_quote_char {
             preferred_quote_count += 1;
         } else if character == alternate_quote_char {
             alternate_quote_count += 1;
-        } else if character == '\\' && !matches!(raw.chars().next(), Some(c) if c == enclosing_quote) {
-            // If the string contains a backslash followed by the other quote character, we should
-            // prefer the existing quote character.
-            return enclosing_quote;
+        } else if character == '\\'
+            && let Some(&next_char) = chars.peek()
+        {
+            if next_char != enclosing_quote {
+                return enclosing_quote;
+            }
+            chars.next();
         }
     }
 
