@@ -103,7 +103,7 @@ pub fn populate_template_result_from_invocation<'ctx, 'arena>(
         }
 
         if let StaticClassType::Object(TObject::Named(instance_type)) = &method_context.class_type
-            && instance_type.name != declaring_class_metadata.name
+            && !instance_type.name.eq_ignore_ascii_case(&declaring_class_metadata.original_name)
             && let Some(calling_class_metadata) = context.codebase.get_class_like(&instance_type.name)
         {
             for (template_name, _) in &declaring_class_metadata.template_types {
@@ -162,7 +162,7 @@ pub fn populate_template_result_from_invocation<'ctx, 'arena>(
         }
     }
 
-    if instance_type.name != method_context.class_like_metadata.name
+    if !instance_type.name.eq_ignore_ascii_case(&method_context.class_like_metadata.original_name)
         && let Some(calling_class_metadata) = context.codebase.get_class_like(&instance_type.name)
     {
         for (template_name, _) in &method_context.class_like_metadata.template_types {
