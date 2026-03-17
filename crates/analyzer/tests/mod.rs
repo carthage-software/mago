@@ -718,6 +718,7 @@ test_case!(issue_1368);
 test_case!(issue_1372);
 test_case!(issue_1374);
 test_case!(issue_1375);
+test_case!(bitwise_shift_bounds);
 
 #[test]
 fn test_all_test_cases_are_ran() {
