@@ -11,7 +11,7 @@ pub struct RuleRegistry {
     integrations: IntegrationSet,
     rules: Vec<AnyRule>,
     rule_excludes: Vec<Vec<String>>,
-    by_kind: Vec<&'static [usize]>,
+    by_kind: Vec<Box<[usize]>>,
 }
 
 impl RuleRegistry {
@@ -41,8 +41,7 @@ impl RuleRegistry {
             }
         }
 
-        let by_kind: Vec<&'static [usize]> =
-            temp.into_iter().map(|v| Box::<[usize]>::leak(v.into_boxed_slice()) as &'static [usize]).collect();
+        let by_kind: Vec<Box<[usize]>> = temp.into_iter().map(|v| v.into_boxed_slice()).collect();
 
         Self { only, integrations, rules, rule_excludes, by_kind }
     }
@@ -87,8 +86,8 @@ impl RuleRegistry {
 
     #[inline]
     #[must_use]
-    pub fn for_kind(&self, kind: NodeKind) -> &'static [usize] {
-        self.by_kind[kind as usize]
+    pub fn for_kind(&self, kind: NodeKind) -> &[usize] {
+        &self.by_kind[kind as usize]
     }
 
     #[inline]
