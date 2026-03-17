@@ -69,6 +69,7 @@ test_case!(literal_float);
 test_case!(multiline_intersection_var);
 test_case!(multiline_union_param);
 test_case!(int_mask);
+test_case!(integer_literal_overflow);
 test_case!(integer_range_reconciliation);
 test_case!(integer_reconciliation);
 test_case!(isset_and_nullable_access_assertions);
