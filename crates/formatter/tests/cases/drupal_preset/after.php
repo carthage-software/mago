@@ -1296,7 +1296,7 @@ $form['frontend'] = [
   ->fields(['uid', 'last_sent', 'reminders'], [
     $user->id(),
     \Drupal::time()->getCurrentTime()
-      - (($i + 1) * (int) \Drupal::config('example_auth.settings')->get('email_verification_timeout')),
+      - ($i + 1) * (int) \Drupal::config('example_auth.settings')->get('email_verification_timeout'),
     $i,
   ])
   ->execute();
