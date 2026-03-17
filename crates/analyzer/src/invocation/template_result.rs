@@ -102,6 +102,33 @@ pub fn populate_template_result_from_invocation<'ctx, 'arena>(
             }
         }
 
+        if let StaticClassType::Object(TObject::Named(instance_type)) = &method_context.class_type
+            && instance_type.name != declaring_class_metadata.name
+            && let Some(calling_class_metadata) = context.codebase.get_class_like(&instance_type.name)
+        {
+            for (template_name, _) in &declaring_class_metadata.template_types {
+                if template_result.lower_bounds.get(template_name).is_some_and(|m| !m.is_empty()) {
+                    continue;
+                }
+
+                let template_type = get_specialized_template_type(
+                    context.codebase,
+                    *template_name,
+                    declaring_class_metadata.name,
+                    calling_class_metadata,
+                    instance_type.type_parameters.as_deref(),
+                );
+
+                if let Some(template_type) = template_type {
+                    template_result.add_lower_bound(
+                        *template_name,
+                        GenericParent::ClassLike(declaring_class_metadata.name),
+                        template_type,
+                    );
+                }
+            }
+        }
+
         return;
     }
 
@@ -132,6 +159,32 @@ pub fn populate_template_result_from_invocation<'ctx, 'arena>(
                 GenericParent::ClassLike(method_context.class_like_metadata.name),
                 template_type.clone(),
             );
+        }
+    }
+
+    if instance_type.name != method_context.class_like_metadata.name
+        && let Some(calling_class_metadata) = context.codebase.get_class_like(&instance_type.name)
+    {
+        for (template_name, _) in &method_context.class_like_metadata.template_types {
+            if template_result.lower_bounds.get(template_name).is_some_and(|m| !m.is_empty()) {
+                continue;
+            }
+
+            let template_type = get_specialized_template_type(
+                context.codebase,
+                *template_name,
+                method_context.class_like_metadata.name,
+                calling_class_metadata,
+                instance_type.type_parameters.as_deref(),
+            );
+
+            if let Some(template_type) = template_type {
+                template_result.add_lower_bound(
+                    *template_name,
+                    GenericParent::ClassLike(method_context.class_like_metadata.name),
+                    template_type,
+                );
+            }
         }
     }
 
