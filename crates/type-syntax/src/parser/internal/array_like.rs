@@ -202,9 +202,16 @@ pub fn parse_shape_field_key<'input>(stream: &mut TypeTokenStream<'input>) -> Re
 
     if stream.is_at(TypeTokenKind::LiteralInteger)? {
         let token = stream.consume()?;
-        let value = parse_literal_integer(token.value).unwrap_or_else(|| {
+        let raw_value = parse_literal_integer(token.value).unwrap_or_else(|| {
             unreachable!("lexer generated invalid integer `{}`; this should never happen.", token.value)
-        }) as i64;
+        });
+        let value = i64::try_from(raw_value).map_err(|_| {
+            ParseError::UnexpectedToken(
+                vec![TypeTokenKind::LiteralInteger],
+                token.kind,
+                token.span_for(stream.file_id()),
+            )
+        })?;
 
         return Ok(ShapeKey::Integer { value, span: token.span_for(stream.file_id()) });
     }
@@ -219,14 +226,29 @@ pub fn parse_shape_field_key<'input>(stream: &mut TypeTokenStream<'input>) -> Re
 
         if stream.is_at(TypeTokenKind::LiteralInteger)? {
             let token = stream.consume()?;
-            let value = parse_literal_integer(token.value).unwrap_or_else(|| {
+            let raw_value = parse_literal_integer(token.value).unwrap_or_else(|| {
                 unreachable!("lexer generated invalid integer `{}`; this should never happen.", token.value)
-            }) as i64;
-
-            return Ok(ShapeKey::Integer {
-                value: if is_negative { -value } else { value },
-                span: Span::new(stream.file_id(), sign_token.start, token.end()),
             });
+            let value = i64::try_from(raw_value).map_err(|_| {
+                ParseError::UnexpectedToken(
+                    vec![TypeTokenKind::LiteralInteger],
+                    token.kind,
+                    token.span_for(stream.file_id()),
+                )
+            })?;
+            let value = if is_negative {
+                value.checked_neg().ok_or_else(|| {
+                    ParseError::UnexpectedToken(
+                        vec![TypeTokenKind::LiteralInteger],
+                        token.kind,
+                        token.span_for(stream.file_id()),
+                    )
+                })?
+            } else {
+                value
+            };
+
+            return Ok(ShapeKey::Integer { value, span: Span::new(stream.file_id(), sign_token.start, token.end()) });
         } else if stream.is_at(TypeTokenKind::LiteralFloat)? {
             let token = stream.consume()?;
             return Ok(ShapeKey::String {
