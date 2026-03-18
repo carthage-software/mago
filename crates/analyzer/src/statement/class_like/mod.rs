@@ -834,7 +834,12 @@ pub(crate) fn analyze_class_like<'ctx, 'ast, 'arena>(
                             }
                         })
                         .unwrap_or_else(|| {
-                            class_like_metadata.all_parent_classes.iter().any(|parent_class_fqcn| {
+                            let mut all_parent_class = class_like_metadata
+                                .all_parent_classes
+                                .iter()
+                                .chain(class_like_metadata.used_traits.iter());
+
+                            all_parent_class.any(|parent_class_fqcn| {
                                 context
                                     .codebase
                                     .get_class_like(parent_class_fqcn)
