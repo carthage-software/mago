@@ -23,6 +23,7 @@ This document details the rules available in the `Consistency` category.
 | Lowercase Keyword | [`lowercase-keyword`](#lowercase-keyword) |
 | Lowercase Type Hint | [`lowercase-type-hint`](#lowercase-type-hint) |
 | No Alias Function | [`no-alias-function`](#no-alias-function) |
+| No Alternative Syntax | [`no-alternative-syntax`](#no-alternative-syntax) |
 | No Hash Comment | [`no-hash-comment`](#no-hash-comment) |
 | No Php Tag Terminator | [`no-php-tag-terminator`](#no-php-tag-terminator) |
 | No Trailing Space | [`no-trailing-space`](#no-trailing-space) |
@@ -619,6 +620,46 @@ $freeSpace = diskfreespace("/");
 ```
 
 
+## <a id="no-alternative-syntax"></a>`no-alternative-syntax`
+
+Detects the use of alternative syntax for control structures
+(`endif`, `endwhile`, `endfor`, `endforeach`, `endswitch`).
+
+The brace-style syntax is preferred for consistency with the rest
+of the codebase and is the convention used by the Symfony coding standards.
+
+
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `false` |
+| `level` | `string` | `"warning"` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+
+if ($condition) {
+    echo 'yes';
+}
+```
+
+#### Incorrect code
+
+```php
+<?php
+
+if ($condition):
+    echo 'yes';
+endif;
+```
+
+
 ## <a id="no-hash-comment"></a>`no-hash-comment`
 
 Detects shell-style comments ('#') in PHP code. Double slash comments ('//') are preferred
@@ -838,7 +879,6 @@ function foo($my_param) {}
 <?php
 
 $MyVariable = 1;
-
 $My_Variable = 2;
 
 function foo($MyParam) {}

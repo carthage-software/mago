@@ -22,6 +22,7 @@ This document details the rules available in the `BestPractices` category.
 | Prefer Early Continue | [`prefer-early-continue`](#prefer-early-continue) |
 | Prefer First Class Callable | [`prefer-first-class-callable`](#prefer-first-class-callable) |
 | Prefer Interface | [`prefer-interface`](#prefer-interface) |
+| Prefer Pre-Increment | [`prefer-pre-increment`](#prefer-pre-increment) |
 | Prefer Static Closure | [`prefer-static-closure`](#prefer-static-closure) |
 | Prefer View Array | [`prefer-view-array`](#prefer-view-array) |
 | Prefer While Loop | [`prefer-while-loop`](#prefer-while-loop) |
@@ -643,6 +644,47 @@ class UserController
         $this->serializer = $serializer;
     }
 }
+```
+
+
+## <a id="prefer-pre-increment"></a>`prefer-pre-increment`
+
+Enforces the use of pre-increment (`++$i`) and pre-decrement (`--$i`) over
+post-increment (`$i++`) and post-decrement (`$i--`).
+
+Pre-increment is marginally more efficient and is the convention used by
+the Symfony coding standards.
+
+
+### Requirements
+
+- **Integration:** `Symfony`
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `false` |
+| `level` | `string` | `"help"` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+
+++$i;
+--$count;
+```
+
+#### Incorrect code
+
+```php
+<?php
+
+$i++;
+$count--;
 ```
 
 

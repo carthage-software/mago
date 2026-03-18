@@ -17,6 +17,7 @@ This document details the rules available in the `Clarity` category.
 | No Isset | [`no-isset`](#no-isset) |
 | No Multi Assignments | [`no-multi-assignments`](#no-multi-assignments) |
 | No Nested Ternary | [`no-nested-ternary`](#no-nested-ternary) |
+| No Short Bool Cast | [`no-short-bool-cast`](#no-short-bool-cast) |
 | No Shorthand Ternary | [`no-shorthand-ternary`](#no-shorthand-ternary) |
 | No Variable Variable | [`no-variable-variable`](#no-variable-variable) |
 | Readable Literal | [`readable-literal`](#readable-literal) |
@@ -355,6 +356,41 @@ if ($user->isAdmin()) {
 <?php
 
 $allowed = $user->isAdmin() ? true : ($user->isEditor() ? true : false);
+```
+
+
+## <a id="no-short-bool-cast"></a>`no-short-bool-cast`
+
+Detects the use of double negation `!!$expr` as a shorthand for `(bool) $expr`.
+
+The explicit `(bool)` cast is clearer about the intent to convert a value
+to a boolean.
+
+
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `false` |
+| `level` | `string` | `"help"` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+
+$active = (bool) $value;
+```
+
+#### Incorrect code
+
+```php
+<?php
+
+$active = !!$value;
 ```
 
 
