@@ -258,7 +258,7 @@ jobs:
           fi
 
       - name: install cross
-        if: startsWith(matrix.job.os, 'ubuntu') && !matrix.job.pgo
+        if: startsWith(matrix.job.os, 'ubuntu')
         uses: taiki-e/install-action@v2
         with:
           tool: cross
@@ -269,7 +269,7 @@ jobs:
         run: echo "BUILD_CMD=cross" >> $GITHUB_ENV
 
       - name: Configure cross-rs container image for glibc 2.17
-        if: contains(matrix.job.target, 'linux-gnu') && !matrix.job.pgo
+        if: contains(matrix.job.target, 'linux-gnu')
         shell: bash
         run: |
           IMAGE=""
@@ -324,7 +324,18 @@ jobs:
           if [[ "${{ matrix.job.pgo }}" == "true" ]]; then
             cargo pgo build -- --target=${{ matrix.job.target }}
             cargo pgo run -- -- --workspace corpus/ analyze --reporting-format count || true
-            cargo pgo optimize build -- --target=${{ matrix.job.target }}
+
+            if [[ -n "${CROSS_IMAGE:-}" ]]; then
+              SYSROOT="$(rustc --print sysroot)"
+              "${SYSROOT}/lib/rustlib/x86_64-unknown-linux-gnu/bin/llvm-profdata" merge \
+                -o target/pgo-profiles/merged.profdata \
+                target/pgo-profiles/
+
+              RUSTFLAGS="-Cprofile-use=$(pwd)/target/pgo-profiles/merged.profdata -Cllvm-args=-pgo-warn-missing-function" \
+                cross build --locked --release --target=${{ matrix.job.target }}
+            else
+              cargo pgo optimize build -- --target=${{ matrix.job.target }}
+            fi
           else
             $BUILD_CMD build --locked --release --target=${{ matrix.job.target }}
           fi
@@ -354,7 +365,12 @@ jobs:
       - name: run tests
         if: matrix.job.test && !startsWith(github.ref, 'refs/pull/')
         shell: bash
-        run: $BUILD_CMD test --workspace --locked --target=${{ matrix.job.target }}
+        run: |
+          if [[ -n "${CROSS_IMAGE:-}" ]]; then
+            cross test --workspace --locked --target=${{ matrix.job.target }}
+          else
+            $BUILD_CMD test --workspace --locked --target=${{ matrix.job.target }}
+          fi
 
       - name: Cache wasm-pack
         if: matrix.job.wasm && !startsWith(github.ref, 'refs/pull/')
