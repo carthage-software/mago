@@ -1224,41 +1224,87 @@ fn find_property_in_intersection_types(
     let intersection_types = named_object.get_intersection_types()?;
 
     for atomic in intersection_types {
-        let class_name = match atomic {
-            TAtomic::Object(TObject::Named(named)) => named.name,
-            TAtomic::Object(TObject::Enum(enum_type)) => enum_type.name,
+        match atomic {
+            TAtomic::Object(TObject::Named(named)) => {
+                let class_name = named.name;
+                let declaring_class_id =
+                    context.codebase.get_declaring_property_class(&class_name, &prop_name).unwrap_or(class_name);
+
+                let Some(class_metadata) = context.codebase.get_class_like(&declaring_class_id) else {
+                    continue;
+                };
+
+                let Some(property_metadata) = class_metadata.properties.get(&prop_name) else {
+                    continue;
+                };
+
+                if !property_metadata.read_visibility.is_public() {
+                    continue;
+                }
+
+                let property_type = property_metadata
+                    .type_metadata
+                    .as_ref()
+                    .or(property_metadata.type_declaration_metadata.as_ref())
+                    .map(|type_metadata| type_metadata.type_union.clone())
+                    .unwrap_or_else(get_mixed);
+
+                return Some(ResolvedProperty {
+                    property_span: property_metadata.name_span.or(property_metadata.span),
+                    property_name: prop_name,
+                    declaring_class_id: Some(declaring_class_id),
+                    property_type,
+                    is_magic: false,
+                });
+            }
+            TAtomic::Object(TObject::Enum(enum_type)) => {
+                let class_name = enum_type.name;
+                let declaring_class_id =
+                    context.codebase.get_declaring_property_class(&class_name, &prop_name).unwrap_or(class_name);
+
+                let Some(class_metadata) = context.codebase.get_class_like(&declaring_class_id) else {
+                    continue;
+                };
+
+                let Some(property_metadata) = class_metadata.properties.get(&prop_name) else {
+                    continue;
+                };
+
+                if !property_metadata.read_visibility.is_public() {
+                    continue;
+                }
+
+                let property_type = property_metadata
+                    .type_metadata
+                    .as_ref()
+                    .or(property_metadata.type_declaration_metadata.as_ref())
+                    .map(|type_metadata| type_metadata.type_union.clone())
+                    .unwrap_or_else(get_mixed);
+
+                return Some(ResolvedProperty {
+                    property_span: property_metadata.name_span.or(property_metadata.span),
+                    property_name: prop_name,
+                    declaring_class_id: Some(declaring_class_id),
+                    property_type,
+                    is_magic: false,
+                });
+            }
+            TAtomic::Object(TObject::WithProperties(shaped)) => {
+                let prop_str: &str = prop_name.as_ref();
+                let key = mago_atom::atom(prop_str.trim_start_matches('$'));
+
+                if let Some((_optional, property_type)) = shaped.known_properties.get(&key) {
+                    return Some(ResolvedProperty {
+                        property_span: None,
+                        property_name: prop_name,
+                        declaring_class_id: None,
+                        property_type: property_type.clone(),
+                        is_magic: false,
+                    });
+                }
+            }
             _ => continue,
-        };
-
-        let declaring_class_id =
-            context.codebase.get_declaring_property_class(&class_name, &prop_name).unwrap_or(class_name);
-
-        let Some(class_metadata) = context.codebase.get_class_like(&declaring_class_id) else {
-            continue;
-        };
-
-        let Some(property_metadata) = class_metadata.properties.get(&prop_name) else {
-            continue;
-        };
-
-        if !property_metadata.read_visibility.is_public() {
-            continue;
         }
-
-        let property_type = property_metadata
-            .type_metadata
-            .as_ref()
-            .or(property_metadata.type_declaration_metadata.as_ref())
-            .map(|type_metadata| type_metadata.type_union.clone())
-            .unwrap_or_else(get_mixed);
-
-        return Some(ResolvedProperty {
-            property_span: property_metadata.name_span.or(property_metadata.span),
-            property_name: prop_name,
-            declaring_class_id: Some(declaring_class_id),
-            property_type,
-            is_magic: false,
-        });
     }
 
     None
