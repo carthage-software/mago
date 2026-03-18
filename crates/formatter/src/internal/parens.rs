@@ -291,9 +291,7 @@ impl<'arena> FormatterState<'_, 'arena> {
                 }
 
                 if (operator.is_arithmetic() && !e.operator.is_arithmetic())
-                    || (operator.is_multiplicative()
-                        && e.operator.is_multiplicative()
-                        && !e.operator.is_same_as(operator))
+                    || (operator.is_multiplicative() || e.operator.is_multiplicative())
                     || (operator.is_bit_shift() && !e.operator.is_bit_shift())
                     || (operator.is_bitwise() && e.operator.is_bitwise() && !e.operator.is_same_as(operator))
                 {
