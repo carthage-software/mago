@@ -360,13 +360,15 @@ pub fn get_method_ids_from_object<'ctx, 'ast, 'arena, 'object>(
     let mut ids = vec![];
 
     let Some(name) = object_type.get_name() else {
-        result.has_ambiguous_target = true;
+        if std::ptr::eq(object_type, outer_object) {
+            result.has_ambiguous_target = true;
 
-        if !has_magic_call {
-            let method_name_str: &str = method_name.as_ref();
-            let has_method_assertion = type_has_method_assertion(object_type, method_name_str);
-            if !has_method_assertion {
-                report_call_on_ambiguous_object(context, object.span(), selector.span());
+            if !has_magic_call {
+                let method_name_str: &str = method_name.as_ref();
+                let has_method_assertion = type_has_method_assertion(object_type, method_name_str);
+                if !has_method_assertion {
+                    report_call_on_ambiguous_object(context, object.span(), selector.span());
+                }
             }
         }
 
