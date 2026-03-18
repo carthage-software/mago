@@ -97,6 +97,7 @@ use crate::rule::NoRequestAllConfig;
 use crate::rule::NoRequestVariableConfig;
 use crate::rule::NoRolesAsCapabilitiesConfig;
 use crate::rule::NoSelfAssignmentConfig;
+use crate::rule::NoShortBoolCastConfig;
 use crate::rule::NoShellExecuteStringConfig;
 use crate::rule::NoShortOpeningTagConfig;
 use crate::rule::NoShorthandTernaryConfig;
@@ -318,6 +319,7 @@ pub struct RulesSettings {
     pub single_class_per_file: RuleSettings<SingleClassPerFileConfig>,
     pub readable_literal: RuleSettings<ReadableLiteralConfig>,
     pub yoda_conditions: RuleSettings<YodaConditionsConfig>,
+    pub no_short_bool_cast: RuleSettings<NoShortBoolCastConfig>,
     pub no_alternative_syntax: RuleSettings<NoAlternativeSyntaxConfig>,
     pub prefer_pre_increment: RuleSettings<PreferPreIncrementConfig>,
     pub switch_continue_to_break: RuleSettings<SwitchContinueToBreakConfig>,
