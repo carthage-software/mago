@@ -51,7 +51,7 @@ const availablePlugins = [
   {
     id: 'psl',
     name: 'PSL (PHP Standard Library)',
-    description: 'Type providers for azjezz/psl package',
+    description: 'Type providers for php-standard-library packages',
     defaultEnabled: false,
   },
   {
