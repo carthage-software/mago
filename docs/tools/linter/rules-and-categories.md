@@ -67,6 +67,7 @@ title: Rules & categories
 
 - [`final-controller`](./rules/best-practices#final-controller)
 - [`prefer-interface`](./rules/best-practices#prefer-interface)
+- [`prefer-pre-increment`](./rules/best-practices#prefer-pre-increment)
 
 ### Tempest
 
