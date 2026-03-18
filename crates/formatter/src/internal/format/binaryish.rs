@@ -293,7 +293,11 @@ fn print_binaryish_expression_parts<'arena>(
                     true,
                 )
             } else {
-                vec![in f.arena; left.format(f)]
+                let saved = f.is_wrapped_in_parens;
+                f.is_wrapped_in_parens = false;
+                let doc = left.format(f);
+                f.is_wrapped_in_parens = saved;
+                vec![in f.arena; doc]
             }
         }
         Expression::Conditional(conditional @ Conditional { then: None, .. }) => {
@@ -308,7 +312,11 @@ fn print_binaryish_expression_parts<'arena>(
                     true,
                 )
             } else {
-                vec![in f.arena; left.format(f)]
+                let saved = f.is_wrapped_in_parens;
+                f.is_wrapped_in_parens = false;
+                let doc = left.format(f);
+                f.is_wrapped_in_parens = saved;
+                vec![in f.arena; doc]
             }
         }
         _ => vec![in f.arena; left.format(f)],
@@ -336,6 +344,19 @@ fn print_binaryish_expression_parts<'arena>(
             None
         };
 
+    let right_needs_parens_reset = match right {
+        Expression::Binary(b) => !should_flatten(&operator, &BinaryishOperator::Binary(&b.operator)),
+        Expression::Conditional(c @ Conditional { then: None, .. }) => {
+            !should_flatten(&operator, &BinaryishOperator::Elvis(c.question_mark.join(c.colon)))
+        }
+        _ => false,
+    };
+
+    let saved_parens = f.is_wrapped_in_parens;
+    if right_needs_parens_reset {
+        f.is_wrapped_in_parens = false;
+    }
+
     let right_document = vec![
         in f.arena;
         if operator_has_leading_comments || (line_before_operator && !should_inline_this_level) {
@@ -361,6 +382,8 @@ fn print_binaryish_expression_parts<'arena>(
             right.format(f)
         },
     ];
+
+    f.is_wrapped_in_parens = saved_parens;
 
     let parent = f.parent_node();
 
