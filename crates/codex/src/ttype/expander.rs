@@ -526,17 +526,31 @@ fn resolve_static_type(
             }
 
             named.name = static_obj.name;
-            // For final classes, static === self, so is_this should be false
-            named.is_this = !codebase.get_class_like(&static_obj.name).is_some_and(|meta| meta.flags.is_final());
+            named.is_this = !is_effectively_final(&static_obj.name, codebase, options);
         }
         StaticClassType::Name(static_class)
             if (!check_compatibility || codebase.is_instance_of(static_class, &named.name)) =>
         {
             named.name = *static_class;
-            named.is_this = false;
+            named.is_this = !is_effectively_final(static_class, codebase, options);
         }
         _ => {}
     }
+}
+
+/// Checks whether a class is effectively final for the purpose of `$this`/`static` resolution.
+///
+/// A class is effectively final when it cannot be extended, meaning `static` === `self`:
+///
+/// - The class is declared `final`
+/// - The class is anonymous
+/// - The method is declared `final`
+fn is_effectively_final(class_name: &Atom, codebase: &CodebaseMetadata, options: &TypeExpansionOptions) -> bool {
+    if options.function_is_final {
+        return true;
+    }
+
+    codebase.get_class_like(class_name).is_some_and(|meta| meta.name_span.is_none() || meta.flags.is_final())
 }
 
 /// Checks if the static object type is compatible with a type that has is_this=true.
