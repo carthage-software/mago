@@ -180,7 +180,6 @@ jobs:
               target: x86_64-unknown-linux-gnu,
               os: ubuntu-latest,
               test: true,
-              pgo: true,
               wasm: true,
             }
           - {
@@ -258,7 +257,7 @@ jobs:
           fi
 
       - name: install cross
-        if: startsWith(matrix.job.os, 'ubuntu')
+        if: startsWith(matrix.job.os, 'ubuntu') && !matrix.job.pgo
         uses: taiki-e/install-action@v2
         with:
           tool: cross
@@ -269,7 +268,7 @@ jobs:
         run: echo "BUILD_CMD=cross" >> $GITHUB_ENV
 
       - name: Configure cross-rs container image for glibc 2.17
-        if: contains(matrix.job.target, 'linux-gnu')
+        if: contains(matrix.job.target, 'linux-gnu') && !matrix.job.pgo
         shell: bash
         run: |
           IMAGE=""
@@ -324,22 +323,7 @@ jobs:
           if [[ "${{ matrix.job.pgo }}" == "true" ]]; then
             cargo pgo build -- --target=${{ matrix.job.target }}
             cargo pgo run -- -- --workspace corpus/ analyze --reporting-format count || true
-
-            if [[ -n "${CROSS_IMAGE:-}" ]]; then
-              PROFDATA="$(pwd)/target/pgo-profiles/merged.profdata"
-              LLVM_PROFDATA="$(rustc --print sysroot)/lib/rustlib/x86_64-unknown-linux-gnu/bin/llvm-profdata"
-
-              echo "::group::Merging PGO profiles"
-              find target/pgo-profiles -name '*.profraw' | head -20
-              "${LLVM_PROFDATA}" merge -o "${PROFDATA}" target/pgo-profiles/
-              ls -lh "${PROFDATA}"
-              echo "::endgroup::"
-
-              RUSTFLAGS="-Cprofile-use=${PROFDATA} -Cllvm-args=-pgo-warn-missing-function" \
-                cross build --locked --release --target=${{ matrix.job.target }}
-            else
-              cargo pgo optimize build -- --target=${{ matrix.job.target }}
-            fi
+            cargo pgo optimize build -- --target=${{ matrix.job.target }}
           else
             $BUILD_CMD build --locked --release --target=${{ matrix.job.target }}
           fi
@@ -369,12 +353,7 @@ jobs:
       - name: run tests
         if: matrix.job.test && !startsWith(github.ref, 'refs/pull/')
         shell: bash
-        run: |
-          if [[ -n "${CROSS_IMAGE:-}" ]]; then
-            cross test --workspace --locked --target=${{ matrix.job.target }}
-          else
-            $BUILD_CMD test --workspace --locked --target=${{ matrix.job.target }}
-          fi
+        run: $BUILD_CMD test --workspace --locked --target=${{ matrix.job.target }}
 
       - name: Cache wasm-pack
         if: matrix.job.wasm && !startsWith(github.ref, 'refs/pull/')
