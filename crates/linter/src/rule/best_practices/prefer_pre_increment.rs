@@ -116,16 +116,12 @@ impl LintRule for PreferPreIncrementRule {
 impl PreferPreIncrementRule {
     fn report<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, unary_postfix: &UnaryPostfix<'arena>) {
         let (message, annotation_msg, fix_op) = match unary_postfix.operator {
-            UnaryPostfixOperator::PostIncrement(_) => (
-                "Use pre-increment `++$var` instead of post-increment `$var++`",
-                "Post-increment operator",
-                "++",
-            ),
-            UnaryPostfixOperator::PostDecrement(_) => (
-                "Use pre-decrement `--$var` instead of post-decrement `$var--`",
-                "Post-decrement operator",
-                "--",
-            ),
+            UnaryPostfixOperator::PostIncrement(_) => {
+                ("Use pre-increment `++$var` instead of post-increment `$var++`", "Post-increment operator", "++")
+            }
+            UnaryPostfixOperator::PostDecrement(_) => {
+                ("Use pre-decrement `--$var` instead of post-decrement `$var--`", "Post-decrement operator", "--")
+            }
         };
 
         let issue = Issue::new(self.cfg.level(), message)

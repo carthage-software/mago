@@ -225,7 +225,7 @@ Plugins extend the analyzer with specialized type information for libraries and 
 | Plugin ID       | Aliases                                    | Default  | Description                                                                      |
 | :-------------- | :----------------------------------------- | :------- | :------------------------------------------------------------------------------- |
 | `stdlib`        | `standard`, `std`, `php-stdlib`            | Enabled  | Type providers for PHP built-in functions (`strlen`, `array_*`, `json_*`, etc.)  |
-| `psl`           | `php-standard-library`, `azjezz-psl`       | Disabled | Type providers for [azjezz/psl](https://github.com/azjezz/psl) package           |
+| `psl`           | `php-standard-library`, `azjezz-psl`       | Disabled | Type providers for [php-standard-library](https://github.com/php-standard-library/php-standard-library) package           |
 | `flow-php`      | `flow`, `flow-etl`                         | Disabled | Type providers for [flow-php/etl](https://github.com/flow-php/etl) package       |
 | `psr-container` | `psr-11`                                   | Disabled | Type providers for [psr/container](https://github.com/php-fig/container) package |
 
