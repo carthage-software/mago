@@ -328,7 +328,8 @@ pub fn insert_variable_from_docblock<'ctx>(
             && !variable_type.is_mixed()
             && !previous_type.is_mixed()
             && !variable_type.is_generic_parameter()
-            && !previous_type.is_generic_parameter();
+            && !previous_type.is_generic_parameter()
+            && !previous_type.contains_placeholder();
 
         let is_impossible = !is_redundant
             && !is_super
@@ -401,7 +402,8 @@ pub fn check_docblock_type_incompatibility(
         && !docblock_type.is_mixed()
         && !inferred_type.is_mixed()
         && !docblock_type.is_generic_parameter()
-        && !inferred_type.is_generic_parameter();
+        && !inferred_type.is_generic_parameter()
+        && !inferred_type.contains_placeholder();
 
     let is_impossible = !is_redundant
         && !is_super

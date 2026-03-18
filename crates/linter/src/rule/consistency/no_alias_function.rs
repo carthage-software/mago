@@ -1,4 +1,6 @@
 use indoc::indoc;
+use mago_text_edit::Safety;
+use mago_text_edit::TextEdit;
 use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
@@ -105,9 +107,65 @@ impl LintRule for NoAliasFunctionRule {
                 .with_note(format!("The function `{function_name}` is an alias of `{original_name}`."))
                 .with_help(format!("Consider using the function `{original_name}` instead."));
 
-            ctx.collector.report(issue);
+            ctx.collector.propose(issue, |edits| {
+                let function_span = function_call.function.span();
+                edits.push(TextEdit::replace(function_span, *original_name).with_safety(Safety::PotentiallyUnsafe));
+            });
 
             break;
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_lint_failure;
+    use crate::test_lint_fix;
+    use crate::test_lint_success;
+
+    test_lint_success! {
+        name = canonical_implode_not_flagged,
+        rule = NoAliasFunctionRule,
+        code = indoc! {r#"
+            <?php
+
+            $str = implode(",", $arr);
+        "#}
+    }
+
+    test_lint_failure! {
+        name = alias_join_flagged,
+        rule = NoAliasFunctionRule,
+        code = indoc! {r#"
+            <?php
+
+            $str = join(",", $arr);
+        "#}
+    }
+
+    test_lint_failure! {
+        name = alias_sizeof_flagged,
+        rule = NoAliasFunctionRule,
+        code = indoc! {r#"
+            <?php
+
+            $len = sizeof($arr);
+        "#}
+    }
+
+    test_lint_fix! {
+        name = fix_join_to_implode,
+        rule = NoAliasFunctionRule,
+        code = indoc! {r#"
+            <?php
+
+            $str = join(",", $arr);
+        "#},
+        fixed = indoc! {r#"
+            <?php
+
+            $str = implode(",", $arr);
+        "#}
     }
 }

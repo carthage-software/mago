@@ -89,6 +89,7 @@ impl<'arena> FormatterState<'_, 'arena> {
             || self.pipe_node_needs_parens(node)
             || self.class_constant_access_needs_parens(node)
             || self.arrow_function_needs_parens(node)
+            || self.construct_needs_parens(node)
     }
 
     pub(crate) fn should_indent(&self, node: Node<'arena, 'arena>) -> bool {
@@ -212,6 +213,23 @@ impl<'arena> FormatterState<'_, 'arena> {
         matches!(self.nth_parent_kind(2), Some(Node::Pipe(_)))
     }
 
+    /// Unbounded constructs greedily consume everything to their right, so parentheses
+    /// are required when they appear as operands in binary, ternary, or pipe expressions.
+    ///
+    /// Example:
+    /// - `(include 'f.php') + $x` without parens becomes `include ('f.php' + $x)`
+    fn construct_needs_parens(&self, node: Node<'arena, 'arena>) -> bool {
+        let Node::Construct(construct) = node else {
+            return false;
+        };
+
+        if construct.has_bounds() {
+            return false;
+        }
+
+        matches!(self.nth_parent_kind(2), Some(Node::Binary(_) | Node::Conditional(_) | Node::Pipe(_)))
+    }
+
     /// Check if a class constant access needs parentheses based on its parent context.
     ///
     /// PHP grammar does not allow class constant access directly after `new` or `instanceof`:
@@ -273,7 +291,9 @@ impl<'arena> FormatterState<'_, 'arena> {
                 }
 
                 if (operator.is_arithmetic() && !e.operator.is_arithmetic())
-                    || (operator.is_multiplicative() || e.operator.is_multiplicative())
+                    || (operator.is_multiplicative()
+                        && e.operator.is_multiplicative()
+                        && !e.operator.is_same_as(operator))
                     || (operator.is_bit_shift() && !e.operator.is_bit_shift())
                     || (operator.is_bitwise() && e.operator.is_bitwise() && !e.operator.is_same_as(operator))
                 {
@@ -416,10 +436,6 @@ impl<'arena> FormatterState<'_, 'arena> {
                 return self.function_callee_expression_need_parenthesis(expression);
             }
 
-            if let Expression::Instantiation(instantiation) = expression {
-                return self.instantiation_needs_parens(instantiation);
-            }
-
             return self.callee_expression_need_parenthesis(expression, false);
         }
 
@@ -464,11 +480,15 @@ impl<'arena> FormatterState<'_, 'arena> {
         false
     }
 
-    const fn callee_expression_need_parenthesis(
+    pub(crate) fn callee_expression_need_parenthesis(
         &self,
         expression: &'arena Expression<'arena>,
         instantiation: bool,
     ) -> bool {
+        if !instantiation && let Expression::Instantiation(i) = expression {
+            return self.instantiation_needs_parens(i);
+        }
+
         if instantiation && matches!(expression, Expression::Call(_)) {
             return true;
         }

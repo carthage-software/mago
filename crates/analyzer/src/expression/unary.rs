@@ -521,17 +521,11 @@ fn increment_operand<'ctx, 'arena>(
                             if value.is_empty() {
                                 possibilities.push(TAtomic::Scalar(TScalar::literal_int(1)));
                             } else if let Ok(value) = value.parse::<i64>() {
-                                possibilities.push(TAtomic::Scalar(TScalar::literal_int(if negative {
-                                    value.wrapping_sub(1)
-                                } else {
-                                    value.wrapping_add(1)
-                                })));
+                                let signed_value = if negative { -value } else { value };
+                                possibilities.push(TAtomic::Scalar(TScalar::literal_int(signed_value.wrapping_add(1))));
                             } else if let Ok(value) = value.parse::<f64>() {
-                                possibilities.push(TAtomic::Scalar(TScalar::literal_float(if negative {
-                                    value - 1.0
-                                } else {
-                                    value + 1.0
-                                })));
+                                let signed_value = if negative { -value } else { value };
+                                possibilities.push(TAtomic::Scalar(TScalar::literal_float(signed_value + 1.0)));
                             } else {
                                 possibilities.push(TAtomic::Scalar(TScalar::int()));
                                 possibilities.push(TAtomic::Scalar(TScalar::float()));
@@ -763,17 +757,12 @@ fn decrement_operand<'ctx, 'arena>(
                                 if value.is_empty() {
                                     possibilities.push(TAtomic::Scalar(TScalar::literal_int(-1)));
                                 } else if let Ok(value) = value.parse::<i64>() {
-                                    possibilities.push(TAtomic::Scalar(TScalar::literal_int(if negative {
-                                        value.wrapping_add(1)
-                                    } else {
-                                        value.wrapping_sub(1)
-                                    })));
+                                    let signed_value = if negative { -value } else { value };
+                                    possibilities
+                                        .push(TAtomic::Scalar(TScalar::literal_int(signed_value.wrapping_sub(1))));
                                 } else if let Ok(value) = value.parse::<f64>() {
-                                    possibilities.push(TAtomic::Scalar(TScalar::literal_float(if negative {
-                                        value + 1.0
-                                    } else {
-                                        value - 1.0
-                                    })));
+                                    let signed_value = if negative { -value } else { value };
+                                    possibilities.push(TAtomic::Scalar(TScalar::literal_float(signed_value - 1.0)));
                                 } else {
                                     possibilities.push(TAtomic::Scalar(TScalar::int()));
                                     possibilities.push(TAtomic::Scalar(TScalar::float()));
@@ -1904,6 +1893,25 @@ mod tests {
             {
                 return (array) $obj;
             }
+        "}
+    }
+
+    test_analysis! {
+        name = negative_numeric_string_increment_decrement,
+        code = indoc! {r"
+            <?php
+
+            /**
+             * @param -4 $a
+             * @param -6 $b
+             */
+            function check(int $a, int $b): void {}
+
+            $a = '-5';
+            $a++;
+            $b = '-5';
+            $b--;
+            check($a, $b);
         "}
     }
 }

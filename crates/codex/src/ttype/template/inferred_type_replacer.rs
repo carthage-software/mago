@@ -72,19 +72,19 @@ pub fn replace(union: &TUnion, template_result: &TemplateResult, codebase: &Code
                 {
                     let template_type = get_most_specific_type_from_bounds(bounds, codebase);
 
-                    let mut class_template_type = None;
-
+                    let mut class_template_types = Vec::new();
                     for template_type_part in template_type.types.as_ref() {
                         if template_type_part.is_mixed() || matches!(template_type_part, TAtomic::Object(TObject::Any))
                         {
-                            class_template_type =
-                                Some(TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::Any { kind: *kind })));
+                            class_template_types
+                                .push(TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::Any { kind: *kind })));
                         } else if let TAtomic::Object(TObject::Named(_)) = template_type_part {
-                            class_template_type =
-                                Some(TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::OfType {
+                            class_template_types.push(TAtomic::Scalar(TScalar::ClassLikeString(
+                                TClassLikeString::OfType {
                                     kind: *kind,
                                     constraint: Arc::new(template_type_part.clone()),
-                                })));
+                                },
+                            )));
                         } else if let TAtomic::GenericParameter(TGenericParameter {
                             constraint,
                             parameter_name,
@@ -94,19 +94,20 @@ pub fn replace(union: &TUnion, template_result: &TemplateResult, codebase: &Code
                         {
                             let first_atomic_type = constraint.get_single();
 
-                            class_template_type =
-                                Some(TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::Generic {
+                            class_template_types.push(TAtomic::Scalar(TScalar::ClassLikeString(
+                                TClassLikeString::Generic {
                                     kind: *kind,
                                     parameter_name: *parameter_name,
                                     constraint: Arc::new(first_atomic_type.clone()),
                                     defining_entity: *defining_entity,
-                                })));
+                                },
+                            )));
                         }
                     }
 
-                    if let Some(class_template_type) = class_template_type {
+                    if !class_template_types.is_empty() {
                         keys_to_unset.insert(*parameter_name);
-                        new_types.push(class_template_type);
+                        new_types.extend(class_template_types);
                     } else {
                         new_types.push(atomic_type);
                     }

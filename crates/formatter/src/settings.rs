@@ -548,6 +548,9 @@ generate_formatter_settings! {
     /// When enabled, consecutive variable assignments, class properties, class constants,
     /// global constants, array key-value pairs, and backed enum cases are column-aligned.
     ///
+    /// For arrays, this applies to multiline or width-broken mappings. Compact inline arrays
+    /// stay compact and are not padded into columns.
+    ///
     /// Example with `true`:
     /// ```php
     /// $foo     = 1;
@@ -875,6 +878,16 @@ generate_formatter_settings! {
     ///
     /// Default: false
     empty_line_after_control_structure: bool => "default_false",
+
+    /// Whether the opening `<?php` tag must be on its own line with no other statements.
+    ///
+    /// When enabled, a newline is always inserted after the opening tag, even if
+    /// the original source has statements on the same line (PER-CS compliant).
+    ///
+    /// When disabled, inline content after the opening tag is preserved with a space.
+    ///
+    /// Default: true
+    opening_tag_on_own_line: bool => "default_true",
 
     /// Whether to add an empty line after opening tag.
     ///

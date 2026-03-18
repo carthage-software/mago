@@ -5,6 +5,7 @@ use mago_span::HasSpan;
 use mago_span::Span;
 
 use crate::ast::ast::expression::Expression;
+use crate::ast::ast::keyword::Keyword;
 use crate::ast::sequence::Sequence;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
@@ -24,6 +25,7 @@ pub struct ShellExecuteString<'arena> {
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub struct InterpolatedString<'arena> {
+    pub prefix: Option<Keyword<'arena>>,
     pub left_double_quote: Span,
     pub parts: Sequence<'arena, StringPart<'arena>>,
     pub right_double_quote: Span,
@@ -47,6 +49,7 @@ pub enum DocumentIndentation {
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub struct DocumentString<'arena> {
+    pub prefix: Option<Keyword<'arena>>,
     pub open: Span,
     pub kind: DocumentKind,
     pub indentation: DocumentIndentation,
@@ -105,13 +108,19 @@ impl HasSpan for ShellExecuteString<'_> {
 
 impl HasSpan for InterpolatedString<'_> {
     fn span(&self) -> Span {
-        self.left_double_quote.join(self.right_double_quote)
+        match self.prefix {
+            Some(prefix) => prefix.span.join(self.right_double_quote),
+            None => self.left_double_quote.join(self.right_double_quote),
+        }
     }
 }
 
 impl HasSpan for DocumentString<'_> {
     fn span(&self) -> Span {
-        self.open.join(self.close)
+        match self.prefix {
+            Some(prefix) => prefix.span.join(self.close),
+            None => self.open.join(self.close),
+        }
     }
 }
 

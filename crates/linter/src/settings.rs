@@ -45,6 +45,7 @@ use crate::rule::LowercaseKeywordConfig;
 use crate::rule::LowercaseTypeHintConfig;
 use crate::rule::MiddlewareInRoutesConfig;
 use crate::rule::NoAliasFunctionConfig;
+use crate::rule::NoAlternativeSyntaxConfig;
 use crate::rule::NoAssignInArgumentConfig;
 use crate::rule::NoAssignInConditionConfig;
 use crate::rule::NoBooleanFlagParameterConfig;
@@ -75,6 +76,7 @@ use crate::rule::NoNoopConfig;
 use crate::rule::NoOnlyConfig;
 use crate::rule::NoPhpTagTerminatorConfig;
 use crate::rule::NoProtectedInFinalConfig;
+use crate::rule::NoRedundantBinaryStringPrefixConfig;
 use crate::rule::NoRedundantBlockConfig;
 use crate::rule::NoRedundantContinueConfig;
 use crate::rule::NoRedundantFileConfig;
@@ -112,6 +114,7 @@ use crate::rule::PreferArrowFunctionConfig;
 use crate::rule::PreferEarlyContinueConfig;
 use crate::rule::PreferFirstClassCallableConfig;
 use crate::rule::PreferInterfaceConfig;
+use crate::rule::PreferPreIncrementConfig;
 use crate::rule::PreferStaticClosureConfig;
 use crate::rule::PreferViewArrayConfig;
 use crate::rule::PreferWhileLoopConfig;
@@ -135,6 +138,7 @@ use crate::rule::StrStartsWithConfig;
 use crate::rule::StrictAssertionsConfig;
 use crate::rule::StrictBehaviorConfig;
 use crate::rule::StrictTypesConfig;
+use crate::rule::SwitchContinueToBreakConfig;
 use crate::rule::TaggedFixmeConfig;
 use crate::rule::TaggedTodoConfig;
 use crate::rule::TaintedDataToSinkConfig;
@@ -216,6 +220,7 @@ pub struct RulesSettings {
     pub no_trailing_space: RuleSettings<NoTrailingSpaceConfig>,
     pub no_redundant_write_visibility: RuleSettings<NoRedundantWriteVisibilityConfig>,
     pub no_redundant_string_concat: RuleSettings<NoRedundantStringConcatConfig>,
+    pub no_redundant_binary_string_prefix: RuleSettings<NoRedundantBinaryStringPrefixConfig>,
     pub no_redundant_parentheses: RuleSettings<NoRedundantParenthesesConfig>,
     pub no_redundant_method_override: RuleSettings<NoRedundantMethodOverrideConfig>,
     pub no_redundant_isset: RuleSettings<NoRedundantIssetConfig>,
@@ -315,6 +320,9 @@ pub struct RulesSettings {
     pub readable_literal: RuleSettings<ReadableLiteralConfig>,
     pub yoda_conditions: RuleSettings<YodaConditionsConfig>,
     pub no_short_bool_cast: RuleSettings<NoShortBoolCastConfig>,
+    pub no_alternative_syntax: RuleSettings<NoAlternativeSyntaxConfig>,
+    pub prefer_pre_increment: RuleSettings<PreferPreIncrementConfig>,
+    pub switch_continue_to_break: RuleSettings<SwitchContinueToBreakConfig>,
     pub use_wp_functions: RuleSettings<UseWpFunctionsConfig>,
     pub no_direct_db_query: RuleSettings<NoDirectDbQueryConfig>,
     pub no_db_schema_change: RuleSettings<NoDbSchemaChangeConfig>,

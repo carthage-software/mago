@@ -297,6 +297,7 @@ fn is_visible_from_scope(
                 current_class_id.eq_ignore_ascii_case(declaring_class_id)
                     || context.codebase.is_instance_of(&current_class_id, declaring_class_id)
                     || context.codebase.is_instance_of(declaring_class_id, &current_class_id)
+                    || is_visible_via_required_extends(context, &current_class_id, declaring_class_id)
             } else {
                 false
             }
@@ -311,6 +312,35 @@ fn is_visible_from_scope(
             }
         }
     }
+}
+
+/// Checks if a protected member declared in `declaring_class_id` is accessible from
+/// `current_class_id` via `@require-extends`. This handles the case where a trait has
+/// `@require-extends BaseClass` and `BaseClass` uses another trait that declares the method.
+fn is_visible_via_required_extends(
+    context: &Context<'_, '_>,
+    current_class_id: &str,
+    declaring_class_id: &str,
+) -> bool {
+    let current_class_id_lc = mago_atom::ascii_lowercase_atom(current_class_id);
+
+    let Some(current_metadata) = context.codebase.get_class_like(&current_class_id_lc) else {
+        return false;
+    };
+
+    if current_metadata.require_extends.is_empty() {
+        return false;
+    }
+
+    for required_class in current_metadata.require_extends.iter() {
+        if context.codebase.is_instance_of(required_class, declaring_class_id)
+            || context.codebase.class_uses_trait(required_class, declaring_class_id)
+        {
+            return true;
+        }
+    }
+
+    false
 }
 
 fn can_initialize_readonly_property(

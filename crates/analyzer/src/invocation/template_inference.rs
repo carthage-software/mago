@@ -120,6 +120,7 @@ fn infer_templates_from_input_and_container_types(
     };
 
     let mut potential_template_violations = HashMap::default();
+    let generic_container_parts_len = generic_container_parts.len();
 
     for container_atomic_part in &generic_container_parts {
         match container_atomic_part {
@@ -735,7 +736,9 @@ fn infer_templates_from_input_and_container_types(
                     continue;
                 }
 
-                if let Some(template_types) = template_result.template_types.get(parameter_name) {
+                if !has_generic_parameter
+                    && let Some(template_types) = template_result.template_types.get(parameter_name)
+                {
                     for template in template_types {
                         if !union_comparator::is_contained_by(
                             context.codebase,
@@ -798,6 +801,24 @@ fn infer_templates_from_input_and_container_types(
                 &mut ComparisonResult::default(),
             )
         {
+            // when the input type doesn't satisfy the template constraint and this is the only
+            // generic container part that could accept it, report a constraint violation.
+            //
+            // skip when:
+            // - there are other generic parts (e.g., in `class-string<T>|T`) that might match
+            // - the constraint is mixed (accepts anything)
+            // - the input is a generic parameter (constraint will be checked at the call site)
+            if generic_container_parts_len == 1
+                && !container_generic.constraint.is_mixed()
+                && !residual_input_type.is_generic_parameter()
+            {
+                violations.push(TemplateInferenceViolation {
+                    template_name: *template_parameter_name,
+                    inferred_bound: residual_input_type.clone(),
+                    constraint: container_generic.constraint.as_ref().clone(),
+                });
+            }
+
             continue;
         }
 

@@ -16,6 +16,7 @@ use mago_syntax::ast::FunctionCall;
 use mago_syntax::ast::Literal;
 use mago_syntax::ast::Node;
 use mago_syntax::ast::NodeKind;
+use mago_text_edit::Safety;
 use mago_text_edit::TextEdit;
 
 use crate::category::Category;
@@ -193,22 +194,40 @@ impl LintRule for StrContainsRule {
                 // Replace entire binary expression with !str_contains(...)
                 if left {
                     // strpos(...) === false
-                    edits.push(TextEdit::replace(function_span, format!("!{STR_CONTAINS}")));
-                    edits.push(TextEdit::delete(binary.operator.span().join(binary.rhs.span())));
+                    edits.push(
+                        TextEdit::replace(function_span, format!("!{STR_CONTAINS}"))
+                            .with_safety(Safety::PotentiallyUnsafe),
+                    );
+                    edits.push(
+                        TextEdit::delete(binary.operator.span().join(binary.rhs.span()))
+                            .with_safety(Safety::PotentiallyUnsafe),
+                    );
                 } else {
                     // false === strpos(...)
-                    edits.push(TextEdit::delete(binary.lhs.span().join(binary.operator.span())));
-                    edits.push(TextEdit::replace(function_span, format!("!{STR_CONTAINS}")));
+                    edits.push(
+                        TextEdit::delete(binary.lhs.span().join(binary.operator.span()))
+                            .with_safety(Safety::PotentiallyUnsafe),
+                    );
+                    edits.push(
+                        TextEdit::replace(function_span, format!("!{STR_CONTAINS}"))
+                            .with_safety(Safety::PotentiallyUnsafe),
+                    );
                 }
             } else {
                 // For !== false, just replace with str_contains
-                edits.push(TextEdit::replace(function_span, STR_CONTAINS));
+                edits.push(TextEdit::replace(function_span, STR_CONTAINS).with_safety(Safety::PotentiallyUnsafe));
 
                 // Remove comparison part
                 if left {
-                    edits.push(TextEdit::delete(binary.operator.span().join(binary.rhs.span())));
+                    edits.push(
+                        TextEdit::delete(binary.operator.span().join(binary.rhs.span()))
+                            .with_safety(Safety::PotentiallyUnsafe),
+                    );
                 } else {
-                    edits.push(TextEdit::delete(binary.lhs.span().join(binary.operator.span())));
+                    edits.push(
+                        TextEdit::delete(binary.lhs.span().join(binary.operator.span()))
+                            .with_safety(Safety::PotentiallyUnsafe),
+                    );
                 }
             }
         });

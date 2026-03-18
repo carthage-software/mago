@@ -416,7 +416,7 @@ const SO_MEMINFO = 55;
 
 const SO_BPF_EXTENSIONS = 48;
 
-const SKF_AD_OFF = -096;
+const SKF_AD_OFF = -4096;
 
 const SKF_AD_PROTOCOL = 0;
 

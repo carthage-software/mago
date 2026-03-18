@@ -63,7 +63,7 @@ use crate::utils::version::extract_minimum_php_version;
 /// improving the analyzer's understanding of library-specific functions.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum AnalyzerPlugin {
-    /// Type providers for azjezz/psl package
+    /// Type providers for php-standard-library/php-standard-library package
     Psl,
     /// Type providers for flow-php/etl package
     FlowPhp,
@@ -85,7 +85,7 @@ impl AnalyzerPlugin {
     /// Returns a human-readable description of the plugin.
     fn description(&self) -> &'static str {
         match self {
-            Self::Psl => "PSL - Type providers for azjezz/psl package",
+            Self::Psl => "PSL - Type providers for php-standard-library/php-standard-library package",
             Self::FlowPhp => "Flow-PHP - Type providers for flow-php/etl package",
             Self::PsrContainer => "PSR-11 Container - Type providers for psr/container package",
         }
@@ -765,7 +765,7 @@ fn deduplicate_paths(mut paths: Vec<String>) -> Vec<String> {
 
 fn detect_integrations_from_composer(composer: &ComposerPackage) -> Vec<Integration> {
     let mut integrations = vec![];
-    if has_package(composer, "azjezz/psl") {
+    if has_package(composer, "azjezz/psl") || has_package_prefix(composer, "php-standard-library/") {
         integrations.push(Integration::Psl);
     }
 
@@ -795,7 +795,7 @@ fn detect_integrations_from_composer(composer: &ComposerPackage) -> Vec<Integrat
 fn detect_analyzer_plugins_from_composer(composer: &ComposerPackage) -> Vec<AnalyzerPlugin> {
     let mut plugins = vec![];
 
-    if has_package(composer, "azjezz/psl") {
+    if has_package(composer, "azjezz/psl") || has_package_prefix(composer, "php-standard-library/") {
         plugins.push(AnalyzerPlugin::Psl);
     }
 

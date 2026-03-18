@@ -170,7 +170,7 @@ pub fn is_contained_by(
         }
     }
 
-    if matches!(container_type_part, TAtomic::Placeholder) {
+    if matches!(container_type_part, TAtomic::Placeholder) || matches!(input_type_part, TAtomic::Placeholder) {
         return true;
     }
 
@@ -588,7 +588,7 @@ pub(crate) fn can_be_identical<'a>(
         || (second_part.is_list() && first_part.is_non_empty_list())
     {
         return if let Some(first_element_type) = first_part.get_list_element_type()
-            && let Some(second_element_type) = first_part.get_list_element_type()
+            && let Some(second_element_type) = second_part.get_list_element_type()
         {
             union_comparator::can_expression_types_be_identical(
                 codebase,

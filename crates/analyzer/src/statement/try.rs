@@ -234,17 +234,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
 
             inherit_branch_context_properties(context, block_context, &catch_block_context);
 
-            let catch_doesnt_leave_parent_scope = {
-                let catch_actions = &catch_actions[i];
-
-                if catch_actions.len() == 1 {
-                    !catch_actions.contains(ControlAction::End)
-                        && !catch_actions.contains(ControlAction::Continue)
-                        && !catch_actions.contains(ControlAction::Break)
-                } else {
-                    true
-                }
-            };
+            let catch_doesnt_leave_parent_scope = catch_actions[i].contains(ControlAction::None);
 
             if catch_doesnt_leave_parent_scope {
                 definitely_newly_assigned_var_ids = new_catch_assigned_variables_ids
