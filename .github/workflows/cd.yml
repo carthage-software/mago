@@ -326,12 +326,16 @@ jobs:
             cargo pgo run -- -- --workspace corpus/ analyze --reporting-format count || true
 
             if [[ -n "${CROSS_IMAGE:-}" ]]; then
-              SYSROOT="$(rustc --print sysroot)"
-              "${SYSROOT}/lib/rustlib/x86_64-unknown-linux-gnu/bin/llvm-profdata" merge \
-                -o target/pgo-profiles/merged.profdata \
-                target/pgo-profiles/
+              PROFDATA="$(pwd)/target/pgo-profiles/merged.profdata"
+              LLVM_PROFDATA="$(rustc --print sysroot)/lib/rustlib/x86_64-unknown-linux-gnu/bin/llvm-profdata"
 
-              RUSTFLAGS="-Cprofile-use=$(pwd)/target/pgo-profiles/merged.profdata -Cllvm-args=-pgo-warn-missing-function" \
+              echo "::group::Merging PGO profiles"
+              find target/pgo-profiles -name '*.profraw' | head -20
+              "${LLVM_PROFDATA}" merge -o "${PROFDATA}" target/pgo-profiles/
+              ls -lh "${PROFDATA}"
+              echo "::endgroup::"
+
+              RUSTFLAGS="-Cprofile-use=${PROFDATA} -Cllvm-args=-pgo-warn-missing-function" \
                 cross build --locked --release --target=${{ matrix.job.target }}
             else
               cargo pgo optimize build -- --target=${{ matrix.job.target }}
