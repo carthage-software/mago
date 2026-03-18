@@ -2,6 +2,7 @@ use mago_atom::Atom;
 
 use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_codex::ttype::atomic::TAtomic;
+use mago_codex::ttype::atomic::generic::TGenericParameter;
 use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::atomic::object::r#enum::TEnum;
 use mago_codex::ttype::atomic::scalar::TScalar;
@@ -186,7 +187,30 @@ fn handle_class_magic_constant<'ctx, 'ast, 'arena>(
                 ))
             }
         }
-        None => return Some(get_class_string()),
+        None => {
+            if let Some(expr_type) = artifacts.get_expression_type(class_expr) {
+                for atomic in expr_type.types.as_ref() {
+                    if let TAtomic::GenericParameter(TGenericParameter {
+                        parameter_name,
+                        defining_entity,
+                        constraint,
+                        ..
+                    }) = atomic
+                    {
+                        return Some(wrap_atomic(TAtomic::Scalar(TScalar::ClassLikeString(
+                            TClassLikeString::generic(
+                                TClassLikeStringKind::Class,
+                                *parameter_name,
+                                *defining_entity,
+                                constraint.get_single().clone(),
+                            ),
+                        ))));
+                    }
+                }
+            }
+
+            return Some(get_class_string());
+        }
     };
 
     Some(TUnion::from_atomic(TAtomic::Scalar(class_string)))
@@ -200,6 +224,8 @@ fn is_valid_trait_constant_access(origin: &ResolutionOrigin) -> bool {
         origin,
         // self::CONSTANT
         ResolutionOrigin::Named { is_self: true, .. }
+        // parent::CONSTANT
+        | ResolutionOrigin::Named { is_parent: true, .. }
         // static::CONSTANT
         | ResolutionOrigin::Static { .. }
         // $this::CONSTANT

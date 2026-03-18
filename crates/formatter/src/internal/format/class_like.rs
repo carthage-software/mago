@@ -473,7 +473,7 @@ fn calculate_member_alignment(member: &ClassLikeMember<'_>, widths: &AlignmentWi
     let type_padding = widths.type_width.saturating_sub(current_type_width);
     let name_padding = widths.name_width.saturating_sub(current_name_width);
 
-    AssignmentAlignment { type_padding, name_padding }
+    AssignmentAlignment { type_padding, name_padding, break_group_id: None }
 }
 
 fn get_plain_property_type_width(prop: &PlainProperty<'_>) -> usize {

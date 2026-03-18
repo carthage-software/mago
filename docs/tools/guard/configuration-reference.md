@@ -17,6 +17,7 @@ This is the main table for the guard tool.
 | `excludes`         | `string[]` | `[]`        | A list of paths or glob patterns to exclude from analysis. |
 | `baseline`         | `string`   | `null`      | Path to a baseline file to ignore listed issues. When specified, the guard will use this file as the default baseline. |
 | `baseline-variant` | `string`   | `"loose"`   | The baseline format variant to use when generating new baselines. Options: `"loose"` (count-based, resilient to line changes) or `"strict"` (exact line matching). See [Baseline Variants](/fundamentals/baseline#baseline-variants) for details. |
+| `minimum-fail-level` | `string` | `"error"` | Set the minimum issue severity that causes the command to exit with a non-zero status. Options: `"note"`, `"help"`, `"warning"`, `"error"`. Can be overridden by the `--minimum-fail-level` CLI flag. |
 
 ### `mode`
 

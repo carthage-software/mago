@@ -30,6 +30,7 @@ use crate::internal::format::Format;
 use crate::internal::format::call_arguments::print_argument_list;
 use crate::internal::format::misc;
 use crate::internal::format::misc::is_breaking_expression;
+use crate::internal::format::misc::is_simple_call_argument;
 use crate::internal::format::misc::is_simple_expression;
 use crate::internal::format::misc::is_string_word_type;
 use crate::internal::utils::string_width;
@@ -369,38 +370,19 @@ impl<'arena> MemberAccessChain<'arena> {
     }
 
     /// Checks if any method call in the chain has arguments that will force the chain to break.
-    /// This considers:
-    /// - Closures and anonymous classes (always break)
-    /// - Arrays/matches that are already formatted with line breaks
     #[inline]
-    fn has_breaking_arguments(&self, f: &FormatterState<'_, 'arena>) -> bool {
+    fn has_breaking_arguments(&self) -> bool {
+        let call_count = self.accesses.iter().filter(|a| a.get_arguments_list().is_some()).count();
+        if call_count <= 2 {
+            return false;
+        }
+
         self.accesses.iter().any(|access| {
             let Some(argument_list) = access.get_arguments_list() else {
                 return false;
             };
 
-            argument_list.arguments.iter().any(|arg| {
-                let value = arg.value();
-                match value {
-                    Expression::Closure(_) | Expression::AnonymousClass(_) => true,
-                    Expression::Array(arr) => misc::has_new_line_in_range(
-                        f.source_text,
-                        arr.left_bracket.start_offset(),
-                        arr.right_bracket.end_offset(),
-                    ),
-                    Expression::LegacyArray(arr) => misc::has_new_line_in_range(
-                        f.source_text,
-                        arr.array.span.start_offset(),
-                        arr.right_parenthesis.end_offset(),
-                    ),
-                    Expression::Match(m) => misc::has_new_line_in_range(
-                        f.source_text,
-                        m.r#match.span.start_offset(),
-                        m.right_brace.end_offset(),
-                    ),
-                    _ => false,
-                }
-            })
+            argument_list.arguments.iter().any(|arg| !is_simple_call_argument(arg.value(), 2))
         })
     }
 
@@ -674,7 +656,7 @@ pub(super) fn print_member_access_chain<'arena>(
         }
     }
 
-    let should_break = must_break || member_access_chain.has_breaking_arguments(f);
+    let should_break = must_break || member_access_chain.has_breaking_arguments();
     if should_break && !matches!(f.parent_node(), Node::Binary(_)) {
         parts.push(Document::BreakParent);
     }
@@ -721,21 +703,7 @@ fn base_needs_parens<'arena>(f: &FormatterState<'_, 'arena>, base: &'arena Expre
         return base_needs_parens(f, parenthesized.expression);
     }
 
-    match base {
-        Expression::Instantiation(instantiation) => f.instantiation_needs_parens(instantiation),
-        Expression::Binary(_)
-        | Expression::UnaryPrefix(_)
-        | Expression::UnaryPostfix(_)
-        | Expression::Assignment(_)
-        | Expression::Conditional(_)
-        | Expression::AnonymousClass(_)
-        | Expression::Closure(_)
-        | Expression::ArrowFunction(_)
-        | Expression::Match(_)
-        | Expression::Yield(_)
-        | Expression::Clone(_) => true,
-        _ => false,
-    }
+    f.callee_expression_need_parenthesis(base, false)
 }
 
 pub(super) fn format_access_operator<'arena>(

@@ -131,11 +131,7 @@ fn get_union_from_hint<'arena>(
         Hint::String(_) => get_string(),
         Hint::Object(_) => get_object(),
         Hint::Mixed(_) => get_mixed(),
-        Hint::Parent(k) => {
-            tracing::trace!("Unsupported parent hint in {} at {}", context.file.id, k.span.start,);
-
-            get_mixed()
-        }
+        Hint::Parent(_) => wrap_atomic(TAtomic::Object(TObject::Named(TNamedObject::new(atom("parent"))))),
         Hint::Intersection(intersection) => {
             let left = get_union_from_hint(intersection.left, classname, context);
             let right = get_union_from_hint(intersection.right, classname, context);

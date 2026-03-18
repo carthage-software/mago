@@ -1053,7 +1053,11 @@ fn handle_literal_equality_with_class_string(
                         trigger_issue_for_impossible(context, old_var_type_atom, key, assertion, true, negated, span);
                     }
 
-                    return TUnion::from_atomic(asserted_atomic);
+                    return if matches!(class_like_string, TClassLikeString::Generic { .. }) {
+                        existing_var_type.clone()
+                    } else {
+                        TUnion::from_atomic(asserted_atomic)
+                    };
                 }
             }
             TAtomic::Scalar(TScalar::String(TString {

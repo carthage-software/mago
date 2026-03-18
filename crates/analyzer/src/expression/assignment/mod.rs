@@ -40,6 +40,7 @@ use crate::code::IssueCode;
 use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::context::block::ReferenceConstraintSource;
+use crate::context::scope::var_references_dynamic;
 use crate::error::AnalysisError;
 use crate::expression::find_expression_logic_issues;
 use crate::formula::get_formula;
@@ -618,6 +619,8 @@ pub fn analyze_assignment_to_variable<'ctx, 'arena>(
             variable_id,
         );
     }
+
+    block_context.locals.retain(|var_id, _| !var_references_dynamic(*var_id, variable_id));
 
     block_context.locals.insert(variable_id, Rc::new(assigned_type));
 }

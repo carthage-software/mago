@@ -20,6 +20,8 @@ use mago_codex::ttype::atomic::object::named::TNamedObject;
 use mago_codex::ttype::atomic::resource::TResource;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::bool::TBool;
+use mago_codex::ttype::atomic::scalar::class_like_string::TClassLikeString;
+use mago_codex::ttype::atomic::scalar::class_like_string::TClassLikeStringKind;
 use mago_codex::ttype::atomic::scalar::float::TFloat;
 use mago_codex::ttype::atomic::scalar::int::TInteger;
 use mago_codex::ttype::atomic::scalar::string::TString;
@@ -2302,6 +2304,13 @@ fn reconcile_has_method(
                     acceptable_types.push(atomic);
                 }
             }
+            TAtomic::Scalar(TScalar::String(_) | TScalar::ClassLikeString(_)) => {
+                acceptable_types.push(TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::Any {
+                    kind: TClassLikeStringKind::Class,
+                })));
+
+                did_remove_type = true;
+            }
             TAtomic::Variable { .. } => {
                 acceptable_types.push(atomic.clone());
                 did_remove_type = true;
@@ -2381,6 +2390,13 @@ fn reconcile_has_property(
                 }) {
                     acceptable_types.push(atomic);
                 }
+            }
+            TAtomic::Scalar(TScalar::String(_) | TScalar::ClassLikeString(_)) => {
+                acceptable_types.push(TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::Any {
+                    kind: TClassLikeStringKind::Class,
+                })));
+
+                did_remove_type = true;
             }
             TAtomic::Variable { .. } => {
                 acceptable_types.push(atomic.clone());

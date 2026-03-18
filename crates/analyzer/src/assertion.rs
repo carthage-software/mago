@@ -893,15 +893,31 @@ fn get_null_equality_assertions(
         OtherValuePosition::Right => left,
     };
 
-    let var_name = get_expression_id(
-        base_conditional,
-        assertion_context.this_class_name,
-        assertion_context.resolved_names,
-        Some(assertion_context.codebase),
-    );
+    if let Expression::Binary(binary) = unwrap_expression(base_conditional)
+        && let BinaryOperator::NullCoalesce(_) = binary.operator
+        && let Expression::Literal(Literal::Null(_)) = unwrap_expression(binary.rhs)
+    {
+        let coalesce_lhs = binary.lhs;
 
-    if let Some(var_name) = var_name {
-        if_types.insert(var_name, vec![vec![Assertion::IsType(TAtomic::Null)]]);
+        if let Some(var_name) = get_expression_id(
+            coalesce_lhs,
+            assertion_context.this_class_name,
+            assertion_context.resolved_names,
+            Some(assertion_context.codebase),
+        ) {
+            if_types.insert(var_name, vec![vec![Assertion::IsNotIsset]]);
+        }
+    } else {
+        let var_name = get_expression_id(
+            base_conditional,
+            assertion_context.this_class_name,
+            assertion_context.resolved_names,
+            Some(assertion_context.codebase),
+        );
+
+        if let Some(var_name) = var_name {
+            if_types.insert(var_name, vec![vec![Assertion::IsType(TAtomic::Null)]]);
+        }
     }
 
     vec![if_types]

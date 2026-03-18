@@ -147,7 +147,7 @@ public function bar(
 | `always-break-named-arguments-list` | `boolean` | `false` | Always break named argument lists into multiple lines. |
 | `always-break-attribute-named-argument-lists` | `boolean` | `false` | Always break named argument lists in attributes. |
 | `array-table-style-alignment` | `boolean` | `true` | Use table-style alignment for arrays. |
-| `align-assignment-like` | `boolean` | `false` | Align consecutive assignment-like constructs (variable assignments, array key-value pairs, class properties, constants, enum cases) in columns. |
+| `align-assignment-like` | `boolean` | `false` | Align consecutive assignment-like constructs (variable assignments, multiline or width-broken array key-value pairs, class properties, constants, enum cases) in columns. Compact inline arrays stay unaligned. |
 | `sort-uses` | `boolean` | `true` | Sort `use` statements alphabetically. |
 | `sort-class-methods` | `boolean` | `false` | Sort class methods by visibility and type (constructor first, then static methods, then instance methods by visibility, destructor last). |
 | `separate-use-types` | `boolean` | `true` | Insert a blank line between different types of `use` statements. |
@@ -174,6 +174,7 @@ public function bar(
 | `space-around-assignment-in-declare` | `boolean` | `false` | Add spaces around `=` in `declare` statements. |
 | `space-within-grouping-parenthesis` | `boolean` | `false` | Add spaces inside grouping parentheses `( 1 + 2 )`. |
 | `empty-line-after-control-structure` | `boolean` | `false` | Add an empty line after control structures. |
+| `opening-tag-on-own-line` | `boolean` | `true` | Ensure the opening `<?php` tag is on its own line with no other statements ([PER-CS 3.0](https://www.php-fig.org/per/coding-style/#3-declare-statements-namespace-and-import-statements) compliant). Only applies to pure PHP files (not templates with inline HTML). When disabled, statements may remain on the same line as the opening tag. |
 | `empty-line-after-opening-tag` | `boolean` | `true` | Add an empty line after the opening `<?php` tag. |
 | `empty-line-after-declare` | `boolean` | `true` | Add an empty line after a `declare` statement. |
 | `empty-line-after-namespace` | `boolean` | `true` | Add an empty line after a `namespace` declaration. |

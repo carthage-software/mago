@@ -68,8 +68,8 @@ mod precedence {
     test_expression_format!(keep_parens_for_shift_vs_concat, "$a . ($b << $c)", "$a . ($b << $c)");
     test_expression_format!(keep_parens_for_shift_vs_addition, "$a << ($b + $c)", "$a << ($b + $c)");
     test_expression_format!(keep_parens_in_ternary_condition, "$a > ($b && $c) ? $d : $e", "$a > ($b && $c) ? $d : $e");
-    test_expression_format!(keep_redundant_simple_arithmetic, "($a * $b) + $c", "($a * $b) + $c");
-    test_expression_format!(keep_redundant_nested_arithmetic, "$a + (($b - $c) * $d)", "$a + (($b - $c) * $d)");
+    test_expression_format!(remove_redundant_simple_arithmetic, "($a * $b) + $c", "$a * $b + $c");
+    test_expression_format!(remove_redundant_nested_arithmetic, "$a + (($b - $c) * $d)", "$a + ($b - $c) * $d");
     test_expression_format!(remove_logical, "($a && $b) || $c", "$a && $b || $c");
     test_expression_format!(remove_comparison, "($a > $b) && ($c < $d)", "$a > $b && $c < $d");
     test_expression_format!(remove_left_associative, "($a - $b) - $c", "$a - $b - $c");
@@ -91,7 +91,7 @@ mod precedence {
     test_expression_format!(
         complex_1_messy,
         "(($a = (((((++$b * ((((-$c)))))))) + ($d / ($e ** $f))) && ($g || $h)))",
-        "$a = ((++$b * -$c) + ($d / ($e ** $f))) && ($g || $h)"
+        "$a = (++$b * -$c + $d / $e ** $f) && ($g || $h)"
     );
     test_expression_format!(
         complex_2_messy,
@@ -101,23 +101,23 @@ mod precedence {
     test_expression_format!(
         complex_3_messy,
         "$a = ($b << ($c + ($d * $e))) >> ($f - $g)",
-        "$a = ($b << ($c + ($d * $e))) >> ($f - $g)"
+        "$a = ($b << ($c + $d * $e)) >> ($f - $g)"
     );
-    test_expression_format!(complex_4_messy, "$a = ((!$b) + ((~$c * --$d) / @$e))", "$a = !$b + ((~$c * --$d) / @$e)");
+    test_expression_format!(complex_4_messy, "$a = ((!$b) + ((~$c * --$d) / @$e))", "$a = !$b + (~$c * --$d) / @$e");
     test_expression_format!(
         complex_5_messy,
         "($a = (($b + ($c * $d)) <=> (($e / $f) - $g)))",
-        "$a = ($b + ($c * $d)) <=> (($e / $f) - $g)"
+        "$a = ($b + $c * $d) <=> ($e / $f - $g)"
     );
     test_expression_format!(
         complex_6_messy,
         "(($a = (((((($b))) + ($c * $d)) > $e) && ((((($f))) & $g) | ($h ^ $i)))) or (($j = (((($k ?? $l)))))))",
-        "($a = ($b + ($c * $d)) > $e && ($f & $g) | ($h ^ $i)) or ($j = $k ?? $l)"
+        "($a = ($b + $c * $d) > $e && ($f & $g) | ($h ^ $i)) or ($j = $k ?? $l)"
     );
     test_expression_format!(
         complex_7_messy,
         "$a = ($b + ($c - (($d * $e) / ($f % ($g ** $h)))))",
-        "$a = $b + ($c - (($d * $e) / ($f % ($g ** $h))))"
+        "$a = $b + ($c - ($d * $e) / ($f % $g ** $h))"
     );
     test_expression_format!(complex_8_messy, "$a = ((($b ?? ($c ?? $d))) ? $e : $f)", "$a = $b ?? $c ?? $d ? $e : $f");
     test_expression_format!(

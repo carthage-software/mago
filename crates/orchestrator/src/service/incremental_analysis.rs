@@ -3801,4 +3801,41 @@ mod tests {
         service.analyze_incremental(None).expect("Incremental failed.");
         assert_matches_full(&service, &db, "both changed to be compatible");
     }
+
+    /// Body-only change in a file with a closure whose parameter references another class.
+    /// Reproduces a bug where closure/arrow function type references were never populated
+    /// in the targeted incremental path, leaving TReference::Symbol entries unresolved.
+    #[test]
+    fn test_watch_body_change_closure_with_typed_param() {
+        let exception_class = "<?php\nclass MyException extends \\Exception {\n    public function getDetails(): string { return 'details'; }\n}\n";
+        let service_v1 = concat!(
+            "<?php\nclass Service {\n",
+            "    public function run(): void {\n",
+            "        $handler = function(MyException $e): string {\n",
+            "            return $e->getDetails();\n",
+            "        };\n",
+            "    }\n",
+            "}\n",
+        );
+
+        let mut db = make_database(vec![("src/MyException.php", exception_class), ("src/Service.php", service_v1)]);
+        let mut service = make_watch_service(&db);
+        service.analyze().expect("Initial analysis failed.");
+        assert_matches_full(&service, &db, "initial");
+
+        // Body-only change: modify the closure body but keep the signature identical.
+        let service_v2 = concat!(
+            "<?php\nclass Service {\n",
+            "    public function run(): void {\n",
+            "        $handler = function(MyException $e): string {\n",
+            "            return $e->getDetails() . ' extra';\n",
+            "        };\n",
+            "    }\n",
+            "}\n",
+        );
+        db.update(FileId::new("src/Service.php"), Cow::Owned(service_v2.to_string()));
+        service.update_database(db.read_only());
+        service.analyze_incremental(None).expect("Incremental failed.");
+        assert_matches_full(&service, &db, "body change in closure with typed param");
+    }
 }

@@ -139,7 +139,7 @@ impl LintRule for BlockStatementRule {
                 }
 
                 if let Some(else_clause) = &body.else_clause
-                    && !matches!(else_clause.statement, Statement::Block(_))
+                    && !matches!(else_clause.statement, Statement::Block(_) | Statement::If(_))
                 {
                     report("else", else_clause.r#else.span(), else_clause.statement.span());
                 }
@@ -176,5 +176,323 @@ impl LintRule for BlockStatementRule {
             }
             _ => {}
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use crate::test_lint_failure;
+    use crate::test_lint_success;
+    use indoc::indoc;
+
+    test_lint_success! {
+        name = if_with_block,
+        rule = BlockStatementRule,
+        code = indoc! {r#"
+            <?php
+
+            if ($foo) {
+                echo "Hello";
+            }
+        "#}
+    }
+
+    test_lint_success! {
+        name = if_else_with_blocks,
+        rule = BlockStatementRule,
+        code = indoc! {r#"
+            <?php
+
+            if ($foo) {
+                echo "Hello";
+            } else {
+                echo "World";
+            }
+        "#}
+    }
+
+    test_lint_success! {
+        name = if_elseif_else_with_blocks,
+        rule = BlockStatementRule,
+        code = indoc! {r#"
+            <?php
+
+            if ($foo) {
+                echo "Hello";
+            } elseif ($bar) {
+                echo "World";
+            } else {
+                echo "!";
+            }
+        "#}
+    }
+
+    test_lint_success! {
+        name = if_else_if_with_blocks,
+        rule = BlockStatementRule,
+        code = indoc! {r#"
+            <?php
+
+            if ($foo) {
+                echo "Hello";
+            } else if ($bar) {
+                echo "World";
+            } else {
+                echo "!";
+            }
+        "#}
+    }
+
+    test_lint_success! {
+        name = if_else_if_chain_with_blocks,
+        rule = BlockStatementRule,
+        code = indoc! {r#"
+            <?php
+
+            if ($a) {
+                echo "a";
+            } else if ($b) {
+                echo "b";
+            } else if ($c) {
+                echo "c";
+            } else {
+                echo "d";
+            }
+        "#}
+    }
+
+    test_lint_success! {
+        name = for_with_block,
+        rule = BlockStatementRule,
+        code = indoc! {r#"
+            <?php
+
+            for ($i = 0; $i < 10; $i++) {
+                echo $i;
+            }
+        "#}
+    }
+
+    test_lint_success! {
+        name = foreach_with_block,
+        rule = BlockStatementRule,
+        code = indoc! {r#"
+            <?php
+
+            foreach ($items as $item) {
+                echo $item;
+            }
+        "#}
+    }
+
+    test_lint_success! {
+        name = while_with_block,
+        rule = BlockStatementRule,
+        code = indoc! {r#"
+            <?php
+
+            while ($foo) {
+                echo "Hello";
+            }
+        "#}
+    }
+
+    test_lint_success! {
+        name = do_while_with_block,
+        rule = BlockStatementRule,
+        code = indoc! {r#"
+            <?php
+
+            do {
+                echo "Hello";
+            } while ($foo);
+        "#}
+    }
+
+    test_lint_success! {
+        name = colon_delimited_if,
+        rule = BlockStatementRule,
+        code = indoc! {r#"
+            <?php
+
+            if ($foo):
+                echo "Hello";
+            endif;
+        "#}
+    }
+
+    test_lint_success! {
+        name = colon_delimited_for,
+        rule = BlockStatementRule,
+        code = indoc! {r#"
+            <?php
+
+            for ($i = 0; $i < 10; $i++):
+                echo $i;
+            endfor;
+        "#}
+    }
+
+    test_lint_failure! {
+        name = if_without_block,
+        rule = BlockStatementRule,
+        count = 1,
+        code = indoc! {r#"
+            <?php
+
+            if ($foo)
+                echo "Hello";
+        "#}
+    }
+
+    test_lint_failure! {
+        name = if_with_block_else_without_block,
+        rule = BlockStatementRule,
+        count = 1,
+        code = indoc! {r#"
+            <?php
+
+            if ($foo) {
+                echo "Hello";
+            } else
+                echo "World";
+        "#}
+    }
+
+    test_lint_failure! {
+        name = if_without_block_else_without_block,
+        rule = BlockStatementRule,
+        count = 2,
+        code = indoc! {r#"
+            <?php
+
+            if ($foo)
+                echo "Hello";
+            else
+                echo "World";
+        "#}
+    }
+
+    test_lint_failure! {
+        name = elseif_without_block,
+        rule = BlockStatementRule,
+        count = 1,
+        code = indoc! {r#"
+            <?php
+
+            if ($foo) {
+                echo "Hello";
+            } elseif ($bar)
+                echo "World";
+        "#}
+    }
+
+    test_lint_failure! {
+        name = for_without_block,
+        rule = BlockStatementRule,
+        count = 1,
+        code = indoc! {r#"
+            <?php
+
+            for ($i = 0; $i < 10; $i++)
+                echo $i;
+        "#}
+    }
+
+    test_lint_failure! {
+        name = foreach_without_block,
+        rule = BlockStatementRule,
+        count = 1,
+        code = indoc! {r#"
+            <?php
+
+            foreach ($items as $item)
+                echo $item;
+        "#}
+    }
+
+    test_lint_failure! {
+        name = while_without_block,
+        rule = BlockStatementRule,
+        count = 1,
+        code = indoc! {r#"
+            <?php
+
+            while ($foo)
+                echo "Hello";
+        "#}
+    }
+
+    test_lint_failure! {
+        name = do_while_without_block,
+        rule = BlockStatementRule,
+        count = 1,
+        code = indoc! {r#"
+            <?php
+
+            do
+                echo "Hello";
+            while ($foo);
+        "#}
+    }
+
+    test_lint_failure! {
+        name = else_without_block_not_else_if,
+        rule = BlockStatementRule,
+        count = 1,
+        code = indoc! {r#"
+            <?php
+
+            if ($foo) {
+                echo "Hello";
+            } else
+                echo "World";
+        "#}
+    }
+
+    test_lint_success! {
+        name = else_if_not_flagged,
+        rule = BlockStatementRule,
+        code = indoc! {r#"
+            <?php
+
+            if ($foo) {
+                echo "Hello";
+            } else if ($bar) {
+                echo "World";
+            }
+        "#}
+    }
+
+    test_lint_success! {
+        name = else_if_chain_not_flagged,
+        rule = BlockStatementRule,
+        code = indoc! {r#"
+            <?php
+
+            if ($a) {
+                echo "a";
+            } else if ($b) {
+                echo "b";
+            } else if ($c) {
+                echo "c";
+            }
+        "#}
+    }
+
+    test_lint_failure! {
+        name = else_if_without_block_in_inner_if,
+        rule = BlockStatementRule,
+        count = 1,
+        code = indoc! {r#"
+            <?php
+
+            if ($foo) {
+                echo "Hello";
+            } else if ($bar)
+                echo "World";  // <- this fails
+        "#}
     }
 }

@@ -834,7 +834,12 @@ pub(crate) fn analyze_class_like<'ctx, 'ast, 'arena>(
                             }
                         })
                         .unwrap_or_else(|| {
-                            class_like_metadata.all_parent_classes.iter().any(|parent_class_fqcn| {
+                            let mut all_parent_class = class_like_metadata
+                                .all_parent_classes
+                                .iter()
+                                .chain(class_like_metadata.used_traits.iter());
+
+                            all_parent_class.any(|parent_class_fqcn| {
                                 context
                                     .codebase
                                     .get_class_like(parent_class_fqcn)
@@ -2588,11 +2593,10 @@ fn check_class_like_properties<'ctx>(context: &mut Context<'ctx, '_>, class_like
         }
 
         // Validate set hook parameter type is supertype of property type
-        // Use type_declaration_metadata (native type) not get_type_metadata() (merged with docblock)
         if let Some(set_hook) = property_metadata.hooks.get(&atom("set"))
             && let Some(param) = &set_hook.parameter
             && let Some(param_type) = param.type_declaration_metadata.as_ref()
-            && let Some(property_type) = property_metadata.type_declaration_metadata.as_ref()
+            && let Some(property_type) = property_metadata.type_metadata.as_ref()
         {
             // The set hook parameter type must contain the property type (contravariance)
             // i.e., any value assignable to the property type should be accepted by the hook

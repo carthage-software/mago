@@ -639,7 +639,7 @@ impl IssueCollection {
 
     /// Sorts the issues in the collection.
     ///
-    /// The issues are sorted by severity level in descending order,
+    /// The issues are sorted by severity level in ascending order,
     /// then by code in ascending order, and finally by the primary annotation span.
     #[must_use]
     pub fn sorted(self) -> Self {

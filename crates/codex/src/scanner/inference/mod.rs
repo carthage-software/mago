@@ -380,8 +380,29 @@ pub(super) fn infer_with_constants<'arena>(
                             BinaryOperator::BitwiseAnd(_) => lhs & rhs,
                             BinaryOperator::BitwiseOr(_) => lhs | rhs,
                             BinaryOperator::BitwiseXor(_) => lhs ^ rhs,
-                            BinaryOperator::LeftShift(_) => lhs << rhs,
-                            BinaryOperator::RightShift(_) => lhs >> rhs,
+                            BinaryOperator::LeftShift(_) => {
+                                if rhs < 0 {
+                                    return Some(get_int());
+                                }
+
+                                u32::try_from(rhs).ok().and_then(|s| lhs.checked_shl(s)).unwrap_or_default()
+                            }
+                            BinaryOperator::RightShift(_) => {
+                                if rhs < 0 {
+                                    return Some(get_int());
+                                }
+
+                                match u32::try_from(rhs).ok().and_then(|s| lhs.checked_shr(s)) {
+                                    Some(v) => v,
+                                    None => {
+                                        if lhs >= 0 {
+                                            0
+                                        } else {
+                                            -1
+                                        }
+                                    }
+                                }
+                            }
                             _ => {
                                 unreachable!("unexpected bitwise operator: {:?}", operator);
                             }

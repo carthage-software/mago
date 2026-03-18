@@ -286,6 +286,7 @@ fn analyze_class_instantiation<'ctx, 'arena>(
     let mut template_result = TemplateResult::new(IndexMap::with_hasher(RandomState::default()), HashMap::default());
 
     let is_spl_object_storage = classname_str.eq_ignore_ascii_case("splobjectstorage");
+
     if let Some(constructor) = context.codebase.get_method_by_id(&constructor_declraing_id) {
         has_inconsistent_constructor =
             has_inconsistent_constructor && !constructor.method_metadata.as_ref().is_some_and(|meta| meta.is_final);
@@ -349,7 +350,7 @@ fn analyze_class_instantiation<'ctx, 'arena>(
         }
 
         let mut resolved_template_types = vec![];
-        for (template_name, base_type) in &metadata.template_types {
+        for (template_name, _) in &metadata.template_types {
             let template_type = if let Some(lower_bounds) =
                 template_result.get_lower_bounds_for_class_like(*template_name, metadata.name)
             {
@@ -383,7 +384,7 @@ fn analyze_class_instantiation<'ctx, 'arena>(
             } else if is_spl_object_storage {
                 get_never()
             } else {
-                base_type.constraint.clone()
+                wrap_atomic(TAtomic::Placeholder)
             };
 
             resolved_template_types.push(template_type);
@@ -414,7 +415,7 @@ fn analyze_class_instantiation<'ctx, 'arena>(
             metadata
                 .template_types
                 .iter()
-                .map(|(_, template)| if is_spl_object_storage { get_never() } else { template.constraint.clone() })
+                .map(|(_, _)| if is_spl_object_storage { get_never() } else { wrap_atomic(TAtomic::Placeholder) })
                 .collect(),
         );
     }

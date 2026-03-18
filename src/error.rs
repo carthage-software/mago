@@ -15,7 +15,8 @@
 //!    before the application exits
 //! 3. **Displayed**: User-friendly error messages are provided via the [`Display`](std::fmt::Display)
 //!    implementation, with technical details available through [`source()`](std::error::Error::source)
-//! 4. **Mapped to Exit Codes**: All errors result in [`ExitCode::FAILURE`](std::process::ExitCode::FAILURE)
+//! 4. **Mapped to Exit Codes**: Errors result in [`EXIT_CODE_ERROR`](crate::EXIT_CODE_ERROR).
+//!    Analysis/lint failures result in [`ExitCode::FAILURE`](std::process::ExitCode::FAILURE).
 //!
 //! # Error Categories
 //!
