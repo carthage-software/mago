@@ -512,7 +512,7 @@ pub(super) fn infer_with_constants<'arena>(
                 known_count: Some(entries.len()),
                 known_elements: Some(entries),
                 element_type: Arc::new(get_never()),
-                non_empty: true,
+                non_empty: !elements.is_empty(),
             }))))
         }
         Expression::Array(Array { elements, .. }) | Expression::LegacyArray(LegacyArray { elements, .. })
