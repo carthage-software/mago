@@ -147,12 +147,3 @@ mago lint
 mago fmt --check
 mago analyze
 ```
-
-## Limitations
-
-The container image is built from `scratch` and contains only the Mago binary. This means:
-
-- **No shell**: You cannot exec into the container or run shell commands inside it.
-- **No git**: The `--staged` flag for `lint` and `fmt` commands will not work, as there is no `git` binary available inside the container.
-
-For workflows that require `--staged` support, use a [native installation](/guide/installation).
