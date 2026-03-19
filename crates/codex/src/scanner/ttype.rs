@@ -116,7 +116,7 @@ fn get_union_from_hint<'arena>(
         Hint::Static(_) => {
             let classname = classname.unwrap_or_else(|| atom("static"));
 
-            wrap_atomic(TAtomic::Object(TObject::Named(TNamedObject::new_this(classname))))
+            wrap_atomic(TAtomic::Object(TObject::Named(TNamedObject::new_static(classname))))
         }
         Hint::Self_(_) => {
             let classname = classname.unwrap_or_else(|| atom("static"));

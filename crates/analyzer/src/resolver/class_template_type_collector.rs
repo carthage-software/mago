@@ -92,7 +92,7 @@ pub(crate) fn collect(
         }
 
         let self_call =
-            if let Some(TObject::Named(TNamedObject { name: self_class_name, is_this: true, .. })) = object_type {
+            if let Some(TObject::Named(TNamedObject { name: self_class_name, is_static: true, .. })) = object_type {
                 template_classname == &GenericParent::ClassLike(ascii_lowercase_atom(self_class_name))
             } else {
                 false

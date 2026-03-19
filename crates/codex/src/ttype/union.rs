@@ -630,7 +630,7 @@ impl TUnion {
             }
 
             if let TAtomic::Object(TObject::Named(named_object)) = atomic {
-                if named_object.is_this() {
+                if named_object.is_static {
                     return true;
                 }
 
@@ -968,14 +968,14 @@ impl TUnion {
     pub fn has_static_object(&self) -> bool {
         self.types
             .iter()
-            .any(|atomic| matches!(atomic, TAtomic::Object(TObject::Named(named_object)) if named_object.is_this()))
+            .any(|atomic| matches!(atomic, TAtomic::Object(TObject::Named(named_object)) if named_object.is_static))
     }
 
     #[must_use]
     pub fn is_static_object(&self) -> bool {
         self.types
             .iter()
-            .all(|atomic| matches!(atomic, TAtomic::Object(TObject::Named(named_object)) if named_object.is_this()))
+            .all(|atomic| matches!(atomic, TAtomic::Object(TObject::Named(named_object)) if named_object.is_static))
     }
 
     #[inline]

@@ -181,6 +181,11 @@ impl TAtomic {
     }
 
     #[must_use]
+    pub fn is_static(&self) -> bool {
+        matches!(self, TAtomic::Object(TObject::Named(named_object)) if named_object.is_static)
+    }
+
+    #[must_use]
     pub fn is_this(&self) -> bool {
         matches!(self, TAtomic::Object(TObject::Named(named_object)) if named_object.is_this())
     }

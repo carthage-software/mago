@@ -451,6 +451,7 @@ fn get_metadata_object<'ctx>(
 
         let interface_intersactions = std::mem::take(&mut interface_type.intersection_types);
 
+        interface_type.is_static = false;
         interface_type.is_this = false;
         intersections.push(TAtomic::Object(TObject::Named(interface_type)));
         if let Some(interface_intersactions) = interface_intersactions {
@@ -471,6 +472,7 @@ fn get_metadata_object<'ctx>(
 
         let parent_intersections = std::mem::take(&mut parent_type.intersection_types);
 
+        parent_type.is_static = false;
         parent_type.is_this = false;
         intersections.push(TAtomic::Object(TObject::Named(parent_type)));
         if let Some(parent_intersections) = parent_intersections {
@@ -511,6 +513,7 @@ fn get_metadata_object<'ctx>(
                     .collect::<Vec<_>>(),
             )
         },
+        is_static: true,
         is_this: true,
         intersection_types: if intersections.is_empty() { None } else { Some(intersections) },
         remapped_parameters: false,

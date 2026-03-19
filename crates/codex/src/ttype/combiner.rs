@@ -274,7 +274,7 @@ pub fn combine(types: Vec<TAtomic>, codebase: &CodebaseMetadata, options: Combin
     for (_, (generic_type, generic_type_parameters)) in combination.object_type_params {
         let generic_object = TAtomic::Object(TObject::Named(
             TNamedObject::new(generic_type)
-                .with_is_this(*combination.object_static.get(&generic_type).unwrap_or(&false))
+                .with_is_static(*combination.object_static.get(&generic_type).unwrap_or(&false))
                 .with_type_parameters(Some(generic_type_parameters)),
         ));
 
@@ -863,11 +863,11 @@ fn scrape_type_properties(
 
     if let TAtomic::Object(TObject::Named(named_object)) = &atomic {
         if let Some(object_static) = combination.object_static.get(&named_object.get_name()) {
-            if *object_static && !named_object.is_this() {
+            if *object_static && !named_object.is_static {
                 combination.object_static.insert(named_object.get_name(), false);
             }
         } else {
-            combination.object_static.insert(named_object.get_name(), named_object.is_this());
+            combination.object_static.insert(named_object.get_name(), named_object.is_static);
         }
     }
 
