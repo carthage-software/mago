@@ -386,7 +386,7 @@ fn method_returns_self_or_static(context: &Context<'_, '_>, class_name: Atom, me
     if let Some(return_type_meta) = &method_meta.return_type_declaration_metadata {
         for atomic in return_type_meta.type_union.types.iter() {
             match atomic {
-                TAtomic::Object(TObject::Named(named_obj)) if named_obj.is_this => return true,
+                TAtomic::Object(TObject::Named(named_obj)) if named_obj.is_static => return true,
                 TAtomic::Object(TObject::Named(named_obj)) if named_obj.name.eq_ignore_ascii_case(&class_name) => {
                     return true;
                 }

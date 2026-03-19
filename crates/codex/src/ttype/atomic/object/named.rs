@@ -20,7 +20,11 @@ pub struct TNamedObject {
     pub name: Atom,
     /// Concrete types provided for generic type parameters, if any.
     pub type_parameters: Option<Vec<TUnion>>,
-    /// `true` if this specifically represents the `$this` variable within its own class context.
+    /// `true` if this represents the `static` type (same class, possibly different instance).
+    /// Set for `new static()`, `: static` return type, and `$this`.
+    pub is_static: bool,
+    /// `true` if this specifically represents the `$this` variable (same instance).
+    /// Implies `is_static`. Only `return $this` satisfies a `$this` return type.
     pub is_this: bool,
     /// Represents additional types in an intersection type (`&B&S` part of `A&B&S`).
     /// Contains other *atomic* types (boxed due to potential recursion).
@@ -34,21 +38,56 @@ impl TNamedObject {
     #[inline]
     #[must_use]
     pub fn new(name: Atom) -> Self {
-        Self { name, type_parameters: None, is_this: false, remapped_parameters: false, intersection_types: None }
+        Self {
+            name,
+            type_parameters: None,
+            is_static: false,
+            is_this: false,
+            remapped_parameters: false,
+            intersection_types: None,
+        }
     }
 
     /// Creates metadata for a named object type with specified type parameters.
     #[inline]
     #[must_use]
     pub fn new_with_type_parameters(name: Atom, type_parameters: Option<Vec<TUnion>>) -> Self {
-        Self { name, type_parameters, is_this: false, remapped_parameters: false, intersection_types: None }
+        Self {
+            name,
+            type_parameters,
+            is_static: false,
+            is_this: false,
+            remapped_parameters: false,
+            intersection_types: None,
+        }
     }
 
-    /// Creates metadata representing the `$this` variable for a specific class.
+    /// Creates metadata representing the `static` type (same class, possibly different instance).
+    #[inline]
+    #[must_use]
+    pub fn new_static(name: Atom) -> Self {
+        Self {
+            name,
+            type_parameters: None,
+            is_static: true,
+            is_this: false,
+            remapped_parameters: false,
+            intersection_types: None,
+        }
+    }
+
+    /// Creates metadata representing the `$this` variable (same instance).
     #[inline]
     #[must_use]
     pub fn new_this(name: Atom) -> Self {
-        Self { name, type_parameters: None, is_this: true, remapped_parameters: false, intersection_types: None }
+        Self {
+            name,
+            type_parameters: None,
+            is_static: true,
+            is_this: true,
+            remapped_parameters: false,
+            intersection_types: None,
+        }
     }
 
     /// Returns the `Atom` for the primary class/interface name.
@@ -100,11 +139,26 @@ impl TNamedObject {
         self
     }
 
+    /// Returns a new instance with the `is_static` flag set.
+    #[inline]
+    #[must_use]
+    pub fn with_is_static(mut self, is_static: bool) -> Self {
+        self.is_static = is_static;
+        if !is_static {
+            self.is_this = false;
+        }
+        self
+    }
+
     /// Returns a new instance with the `$this` flag set.
     #[inline]
     #[must_use]
     pub fn with_is_this(mut self, is_this: bool) -> Self {
         self.is_this = is_this;
+        if is_this {
+            self.is_static = true;
+        }
+
         self
     }
 }
@@ -196,7 +250,13 @@ impl TType for TNamedObject {
             }
         }
 
-        if self.is_this { concat_atom!(result, "&static") } else { result }
+        if self.is_this {
+            concat_atom!("$this(", result, ")")
+        } else if self.is_static {
+            concat_atom!(result, "&static")
+        } else {
+            result
+        }
     }
 
     fn get_pretty_id_with_indent(&self, indent: usize) -> Atom {
@@ -245,6 +305,12 @@ impl TType for TNamedObject {
             }
         }
 
-        if self.is_this { concat_atom!(result, "&static") } else { result }
+        if self.is_this {
+            concat_atom!("$this(", result, ")")
+        } else if self.is_static {
+            concat_atom!(result, "&static")
+        } else {
+            result
+        }
     }
 }

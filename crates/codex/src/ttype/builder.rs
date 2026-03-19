@@ -866,10 +866,12 @@ fn get_reference_from_ast<'i>(
     let reference_name = reference_identifier.value;
 
     let mut is_this = false;
+    let mut is_static = false;
     let mut is_named_object = false;
     let fq_reference_name_id = if reference_name == "this" || reference_name == "static" || reference_name == "self" {
         is_named_object = true;
-        is_this = reference_name != "self";
+        is_this = reference_name == "this";
+        is_static = reference_name != "self";
 
         classname.unwrap_or_else(|| atom("static"))
     } else if reference_name == "parent" {
@@ -949,6 +951,7 @@ fn get_reference_from_ast<'i>(
             name: fq_reference_name_id,
             type_parameters,
             intersection_types: None,
+            is_static,
             is_this,
             remapped_parameters: false,
         })))

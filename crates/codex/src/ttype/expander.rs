@@ -481,10 +481,10 @@ fn resolve_special_class_names(object: &mut TObject, codebase: &CodebaseMetadata
     };
 
     let name_lc = ascii_lowercase_atom(&named.name);
-    let is_this = named.is_this;
+    let was_this = named.is_this;
 
     match name_lc.as_str() {
-        "static" | "$this" => resolve_static_type(named, false, codebase, options),
+        "static" | "$this" => resolve_static_type(named, was_this, false, codebase, options),
         "self" => {
             if let Some(self_class) = options.self_class {
                 named.name = self_class;
@@ -498,15 +498,18 @@ fn resolve_special_class_names(object: &mut TObject, codebase: &CodebaseMetadata
                 named.name = parent;
             }
         }
-        _ if is_this => resolve_static_type(named, true, codebase, options),
+        _ if named.is_static => resolve_static_type(named, was_this, true, codebase, options),
         _ => {}
     }
 }
 
 /// Resolves a `static` or `$this` type to a named object using the static class type from options.
-/// When `check_compatibility` is true, verifies the static type is compatible before resolving.
+///
+/// `is_this_type`: true when the original type was `$this` (same instance), false for `static`.
+/// `check_compatibility`: when true, verifies the static type is compatible before resolving.
 fn resolve_static_type(
     named: &mut TNamedObject,
+    is_this_type: bool,
     check_compatibility: bool,
     codebase: &CodebaseMetadata,
     options: &TypeExpansionOptions,
@@ -526,13 +529,17 @@ fn resolve_static_type(
             }
 
             named.name = static_obj.name;
-            named.is_this = !is_effectively_final(&static_obj.name, codebase, options);
+            let effectively_final = is_effectively_final(&static_obj.name, codebase, options);
+            named.is_static = !effectively_final;
+            named.is_this = !effectively_final && is_this_type;
         }
         StaticClassType::Name(static_class)
             if (!check_compatibility || codebase.is_instance_of(static_class, &named.name)) =>
         {
             named.name = *static_class;
-            named.is_this = !is_effectively_final(static_class, codebase, options);
+            let effectively_final = is_effectively_final(static_class, codebase, options);
+            named.is_static = !effectively_final;
+            named.is_this = !effectively_final && is_this_type;
         }
         _ => {}
     }
@@ -1273,7 +1280,7 @@ mod tests {
 
         assert!(actual.types.iter().any(|t| {
             if let TAtomic::Object(TObject::Named(named)) = t {
-                named.name == ascii_lowercase_atom("foo") && named.is_this
+                named.name == ascii_lowercase_atom("foo") && named.is_static && !named.is_this
             } else {
                 false
             }

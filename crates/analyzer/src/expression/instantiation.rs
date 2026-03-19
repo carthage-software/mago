@@ -476,7 +476,8 @@ fn analyze_class_instantiation<'ctx, 'arena>(
     let result_type = wrap_atomic(TAtomic::Object(TObject::Named(TNamedObject {
         name: metadata.original_name,
         type_parameters,
-        is_this: classname.is_static() || (classname.is_self() && metadata.flags.is_final()),
+        is_static: classname.is_static() || (classname.is_self() && metadata.flags.is_final()),
+        is_this: false,
         intersection_types: None,
         remapped_parameters: false,
     })));
