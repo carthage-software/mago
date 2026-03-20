@@ -314,7 +314,7 @@ jobs:
         shell: bash
         run: |
           cd corpus
-          composer install --ignore-platform-reqs
+          composer update --ignore-platform-reqs
           cd ..
 
       - name: build
