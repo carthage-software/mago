@@ -27,38 +27,6 @@ use crate::internal::utils::is_at_call_like_expression;
 use crate::internal::utils::is_at_callee;
 use crate::internal::utils::unwrap_parenthesized;
 
-/// Recursively finds the leftmost expression in a binary tree and checks if it has
-/// a leading own-line comment. This is needed for idempotent formatting because
-/// comments inside nested parentheses will "float up" to become leading comments
-/// after the parens are removed during formatting.
-fn has_leading_comment_in_leftmost(f: &FormatterState, expr: &Expression) -> bool {
-    let expr = unwrap_parenthesized(expr);
-
-    if f.has_leading_own_line_comment(expr.span()) {
-        return true;
-    }
-
-    match expr {
-        Expression::Binary(binary) => has_leading_comment_in_leftmost(f, binary.lhs),
-        Expression::Conditional(Conditional { then: None, condition, .. }) => {
-            has_leading_comment_in_leftmost(f, condition)
-        }
-        _ => false,
-    }
-}
-
-/// Gets the leftmost expression in a binary tree, recursively unwrapping
-/// parentheses and following the LHS of binary/elvis expressions.
-fn get_leftmost_expression<'a>(expr: &'a Expression<'a>) -> &'a Expression<'a> {
-    let expr = unwrap_parenthesized(expr);
-
-    match expr {
-        Expression::Binary(binary) => get_leftmost_expression(binary.lhs),
-        Expression::Conditional(Conditional { then: None, condition, .. }) => get_leftmost_expression(condition),
-        _ => expr,
-    }
-}
-
 /// An internal-only enum to represent operators that should be formatted
 /// like binary operators. This allows us to reuse the same complex formatting
 /// logic for both true `BinaryOperator`s and other constructs like the
@@ -268,11 +236,10 @@ fn print_binaryish_expression_parts<'arena>(
     let original_right = right;
     let right = unwrap_parenthesized(right);
     let is_original_right_parenthesized = !std::ptr::eq(original_right, right);
-    let should_break = f
-        .has_comment(operator.span(), CommentFlags::TRAILING | CommentFlags::LEADING | CommentFlags::LINE)
-        || f.has_comment(left.span(), CommentFlags::TRAILING | CommentFlags::LINE)
-        || f.has_leading_own_line_comment(right.span())
-        || (is_original_right_parenthesized && has_leading_comment_in_leftmost(f, original_right));
+    let should_break = f.has_placed_trailing_line_comment(left.span())
+        || f.has_placed_leading_own_line_comment(right.span())
+        || has_own_line_comment_in_left_chain(f, left)
+        || (is_original_right_parenthesized && has_placed_leading_comment_in_leftmost(f, original_right));
 
     let mut should_inline_this_level = !should_break && should_inline_binary_rhs_expression(f, right, &operator);
     should_inline_this_level = should_inline_this_level || f.is_in_inlined_binary_chain;
@@ -284,14 +251,21 @@ fn print_binaryish_expression_parts<'arena>(
         Expression::Binary(binary) => {
             let binaryish_operator = BinaryishOperator::Binary(&binary.operator);
             if should_flatten(&operator, &binaryish_operator) {
-                print_binaryish_expression_parts(
+                // Emit placed leading comments for the intermediate Binary node
+                // that won't go through wrap! due to flatten.
+                let placed = f.take_placed_leading(left.span());
+                let mut result = print_binaryish_expression_parts(
                     f,
                     binary.lhs,
                     binaryish_operator,
                     binary.rhs,
                     is_inside_parenthesis,
                     true,
-                )
+                );
+                if let Some(doc) = placed {
+                    result.insert(0, doc);
+                }
+                result
             } else {
                 vec![in f.arena; left.format(f)]
             }
@@ -299,20 +273,29 @@ fn print_binaryish_expression_parts<'arena>(
         Expression::Conditional(conditional @ Conditional { then: None, .. }) => {
             let binaryish_operator = BinaryishOperator::Elvis(conditional.question_mark.join(conditional.colon));
             if should_flatten(&operator, &binaryish_operator) {
-                print_binaryish_expression_parts(
+                let placed = f.take_placed_leading(left.span());
+                let mut result = print_binaryish_expression_parts(
                     f,
                     conditional.condition,
                     binaryish_operator,
                     conditional.r#else,
                     is_inside_parenthesis,
                     true,
-                )
+                );
+                if let Some(doc) = placed {
+                    result.insert(0, doc);
+                }
+                result
             } else {
                 vec![in f.arena; left.format(f)]
             }
         }
         _ => vec![in f.arena; left.format(f)],
     };
+
+    if let Some(trailing) = f.take_placed_trailing(left.span()) {
+        parts.push(trailing);
+    }
 
     f.is_in_inlined_binary_chain = old_inlined_chain_state;
 
@@ -323,44 +306,32 @@ fn print_binaryish_expression_parts<'arena>(
         _ => true,
     };
 
-    let has_leading_comment_on_right = f.has_leading_own_line_comment(right.span())
-        || (is_original_right_parenthesized && has_leading_comment_in_leftmost(f, original_right));
+    let has_leading_comment_on_right =
+        f.has_leading_own_line_comment(right.span()) || has_placed_leading_comment_in_leftmost(f, right);
     let line_before_operator = f.settings.line_before_binary_operator && !has_leading_comment_on_right;
     let operator_has_leading_comments = f.has_comment(operator.span(), CommentFlags::LEADING);
 
-    let leftmost_leading_comments =
-        if is_original_right_parenthesized && has_leading_comment_in_leftmost(f, original_right) {
-            let leftmost = get_leftmost_expression(original_right);
-            f.print_leading_comments(leftmost.span())
-        } else {
-            None
-        };
+    let mut right_document = vec![in f.arena];
 
-    let right_document = vec![
-        in f.arena;
-        if operator_has_leading_comments || (line_before_operator && !should_inline_this_level) {
-            Document::Line(if has_space_around { Line::default() } else { Line::soft() })
-        } else {
-            Document::String(if has_space_around { " " } else { "" })
-        },
-        format_token(f, operator.span(), operator.as_str()),
-        if operator_has_leading_comments || line_before_operator || should_inline_this_level {
-            Document::String(if has_space_around { " " } else { "" })
-        } else {
-            Document::Line(if has_space_around { Line::default() } else { Line::soft() })
-        },
-        if let Some(comments) = leftmost_leading_comments {
-            if should_inline_this_level {
-                Document::Array(vec![in f.arena; comments, Document::Group(Group::new(vec![in f.arena; right.format(f)]))])
-            } else {
-                Document::Array(vec![in f.arena; comments, right.format(f)])
-            }
-        } else if should_inline_this_level {
-            Document::Group(Group::new(vec![in f.arena; right.format(f)]))
-        } else {
-            right.format(f)
-        },
-    ];
+    right_document.push(if operator_has_leading_comments || (line_before_operator && !should_inline_this_level) {
+        Document::Line(if has_space_around { Line::default() } else { Line::soft() })
+    } else {
+        Document::String(if has_space_around { " " } else { "" })
+    });
+
+    right_document.push(format_token(f, operator.span(), operator.as_str()));
+
+    right_document.push(if operator_has_leading_comments || line_before_operator || should_inline_this_level {
+        Document::String(if has_space_around { " " } else { "" })
+    } else {
+        Document::Line(if has_space_around { Line::default() } else { Line::soft() })
+    });
+
+    right_document.push(if should_inline_this_level {
+        Document::Group(Group::new(vec![in f.arena; right.format(f)]))
+    } else {
+        right.format(f)
+    });
 
     let parent = f.parent_node();
 
@@ -473,6 +444,43 @@ fn should_inline_binary_rhs_expression(
         Expression::Binary(binary) => should_flatten(operator, &BinaryishOperator::Binary(&binary.operator)),
         Expression::Conditional(Conditional { then: None, .. }) => operator.is_elvis(),
         Expression::Throw(_) => operator.is_null_coalesce(),
+        _ => false,
+    }
+}
+
+fn has_placed_leading_comment_in_leftmost(f: &FormatterState, expr: &Expression) -> bool {
+    let expr = unwrap_parenthesized(expr);
+
+    if f.has_placed_leading_own_line_comment(expr.span()) {
+        return true;
+    }
+
+    match expr {
+        Expression::Binary(binary) => has_placed_leading_comment_in_leftmost(f, binary.lhs),
+        Expression::Conditional(Conditional { then: None, condition, .. }) => {
+            has_placed_leading_comment_in_leftmost(f, condition)
+        }
+        _ => false,
+    }
+}
+
+fn has_own_line_comment_in_left_chain(f: &FormatterState, expr: &Expression) -> bool {
+    let expr = unwrap_parenthesized(expr);
+    match expr {
+        Expression::Binary(binary) => {
+            let lhs = unwrap_parenthesized(binary.lhs);
+            let rhs = unwrap_parenthesized(binary.rhs);
+            f.has_placed_trailing_line_comment(lhs.span())
+                || f.has_placed_leading_own_line_comment(rhs.span())
+                || has_own_line_comment_in_left_chain(f, binary.lhs)
+        }
+        Expression::Conditional(Conditional { then: None, condition, r#else, .. }) => {
+            let cond = unwrap_parenthesized(condition);
+            let else_expr = unwrap_parenthesized(r#else);
+            f.has_placed_trailing_line_comment(cond.span())
+                || f.has_placed_leading_own_line_comment(else_expr.span())
+                || has_own_line_comment_in_left_chain(f, condition)
+        }
         _ => false,
     }
 }

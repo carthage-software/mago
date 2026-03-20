@@ -13,6 +13,8 @@ use mago_syntax::ast::Trivia;
 
 use crate::document::group::GroupIdentifier;
 use crate::document::group::GroupIdentifierBuilder;
+use crate::internal::comment::placement::Comments;
+use crate::internal::comment::placement::place_comments;
 use crate::internal::format::assignment::AssignmentAlignment;
 use crate::settings::FormatSettings;
 
@@ -109,6 +111,7 @@ pub struct FormatterState<'ctx, 'arena> {
     stack: BumpVec<'arena, Node<'arena, 'arena>>,
     all_comments: &'arena [Trivia<'arena>],
     next_comment_index: usize,
+    placed_comments: Comments,
     ignore_regions: &'arena [IgnoreRegion],
     ignore_next_markers: &'arena [IgnoreNextMarker],
     next_ignore_next_index: usize,
@@ -144,6 +147,8 @@ impl<'ctx, 'arena> FormatterState<'ctx, 'arena> {
         let (ignore_regions, ignore_next_markers) =
             build_ignore_markers(arena, all_comments, program.source_text.len() as u32);
 
+        let placed_comments = place_comments(program.source_text, Node::Program(program), all_comments);
+
         Self {
             arena,
             file,
@@ -153,6 +158,7 @@ impl<'ctx, 'arena> FormatterState<'ctx, 'arena> {
             stack: BumpVec::new_in(arena),
             all_comments,
             next_comment_index: 0,
+            placed_comments,
             ignore_regions,
             ignore_next_markers,
             next_ignore_next_index: 0,

@@ -253,6 +253,7 @@ test_case!(heredoc_indentation_disabled);
 test_case!(drupal_preset);
 test_case!(redundant_grouping_parens);
 test_case!(null_type_hint_null_pipe_last);
+test_case!(comment_placement_binary);
 
 // A special test case for regressions in the Psl codebase
 test_case!(psl_regressions);
@@ -340,6 +341,7 @@ test_case!(issue_796);
 test_case!(issue_812);
 test_case!(issue_813);
 test_case!(issue_816);
+test_case!(issue_817);
 test_case!(issue_825);
 test_case!(issue_888);
 test_case!(issue_926);

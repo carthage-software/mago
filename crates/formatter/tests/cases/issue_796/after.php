@@ -2,8 +2,8 @@
 
 if (
     $x &&
-    // Condition A
     (
+        // Condition A
         $x && $x ||
         // Condition B
         $x && $x
