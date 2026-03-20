@@ -105,7 +105,7 @@ impl LintRule for NoLiteralNamespaceStringRule {
 
 /// Checks if a string value looks like a fully qualified class name.
 ///
-/// Matches patterns like `Vendor\Module\ClassName` with at least 3 segments,
+/// Matches patterns like `Vendor\Module` or `Vendor\Module\ClassName` with at least 2 segments,
 /// each starting with an uppercase letter.
 fn looks_like_class_name(value: &str) -> bool {
     // Normalize double backslashes to single
@@ -127,8 +127,8 @@ fn looks_like_class_name(value: &str) -> bool {
 
     let segments: Vec<&str> = s.split('\\').collect();
 
-    // Need at least 3 segments (e.g. Vendor\Module\Class)
-    if segments.len() < 3 {
+    // Need at least 2 segments (e.g. Vendor\Module)
+    if segments.len() < 2 {
         return false;
     }
 
@@ -156,8 +156,8 @@ mod tests {
         "#
     }
 
-    test_lint_success! {
-        name = two_segment_string,
+    test_lint_failure! {
+        name = two_segment_namespace_string,
         rule = NoLiteralNamespaceStringRule,
         code = r#"
             <?php
