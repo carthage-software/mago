@@ -36,6 +36,10 @@ impl Default for NoLiteralNamespaceStringConfig {
 }
 
 impl Config for NoLiteralNamespaceStringConfig {
+    fn default_enabled() -> bool {
+        false
+    }
+
     fn level(&self) -> Level {
         self.level
     }
