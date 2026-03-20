@@ -5,6 +5,7 @@ use bumpalo::vec;
 use mago_span::HasSpan;
 use mago_span::Span;
 use mago_syntax::ast::Node;
+use mago_syntax::ast::Trivia;
 
 use crate::document::BreakMode;
 use crate::document::Document;
@@ -15,6 +16,9 @@ use crate::document::Space;
 use crate::internal::FormatterState;
 use crate::internal::comment::Comment;
 use crate::internal::comment::CommentFlags;
+use crate::internal::comment::placement::CommentLinePosition;
+use crate::internal::comment::placement::PlacedComment;
+use crate::internal::comment::placement::Placement;
 
 impl<'arena> FormatterState<'_, 'arena> {
     #[must_use]
@@ -161,12 +165,24 @@ impl<'arena> FormatterState<'_, 'arena> {
             let comment = Comment::from_trivia(self.file, trivia);
 
             if comment.end <= range.start_offset() {
+                if self.placed_comments.is_consumed(self.next_comment_index) {
+                    self.next_comment_index += 1;
+                    continue;
+                }
+
+                // Skip leading-placed comments -- emitted by wrap!/add_parens instead
+                if self.placed_comments.is_placed_leading(self.next_comment_index) {
+                    self.next_comment_index += 1;
+                    continue;
+                }
+
                 // Check if comment is in an ignore region - if so, preserve as-is
                 if self.get_ignore_region_for(comment.start).is_some() {
                     self.print_preserved_leading_comment(&mut parts, comment);
                 } else {
                     self.print_leading_comment(&mut parts, comment);
                 }
+                self.placed_comments.mark_consumed(self.next_comment_index);
                 self.next_comment_index += 1;
             } else {
                 break;
@@ -184,6 +200,11 @@ impl<'arena> FormatterState<'_, 'arena> {
         while let Some(trivia) = self.all_comments.get(self.next_comment_index) {
             let comment = Comment::from_trivia(self.file, trivia);
 
+            if self.placed_comments.is_consumed(self.next_comment_index) {
+                self.next_comment_index += 1;
+                continue;
+            }
+
             if range.end_offset() < comment.start && self.is_insignificant(range.end_offset(), comment.start) {
                 let gap = &self.source_text[(range.end_offset() as usize)..(comment.start as usize)];
                 if comment.is_block && gap.contains(',') {
@@ -198,6 +219,7 @@ impl<'arena> FormatterState<'_, 'arena> {
                     previous_comment =
                         Some(self.print_trailing_comment(&mut parts, comment, previous_comment, range.end_offset()));
                 }
+                self.placed_comments.mark_consumed(self.next_comment_index);
                 self.next_comment_index += 1;
             } else {
                 break;
@@ -374,10 +396,16 @@ impl<'arena> FormatterState<'_, 'arena> {
         let mut must_break = false;
         let mut consumed_count = 0;
 
-        for trivia in &self.all_comments[self.next_comment_index..] {
+        for (offset, trivia) in self.all_comments[self.next_comment_index..].iter().enumerate() {
+            let index = self.next_comment_index + offset;
             let comment = Comment::from_trivia(self.file, trivia);
 
             if comment.start >= range.start_offset() && comment.end <= range.end_offset() {
+                if self.placed_comments.is_consumed(index) {
+                    consumed_count += 1;
+                    continue;
+                }
+
                 must_break = must_break || !comment.is_block;
                 if !should_indent && self.is_next_line_empty(trivia.span) {
                     parts.push(Document::Array(
@@ -387,6 +415,7 @@ impl<'arena> FormatterState<'_, 'arena> {
                 } else {
                     parts.push(self.print_comment(comment));
                 }
+                self.placed_comments.mark_consumed(index);
                 consumed_count += 1;
             } else {
                 break;
@@ -430,10 +459,16 @@ impl<'arena> FormatterState<'_, 'arena> {
         let mut consumed_count = 0;
 
         // Iterate over the remaining comment slice.
-        for trivia in &self.all_comments[self.next_comment_index..] {
+        for (offset, trivia) in self.all_comments[self.next_comment_index..].iter().enumerate() {
+            let index = self.next_comment_index + offset;
             let comment = Comment::from_trivia(self.file, trivia);
 
             if comment.end <= range.end_offset() {
+                if self.placed_comments.is_consumed(index) {
+                    consumed_count += 1;
+                    continue;
+                }
+
                 if !indented && self.is_next_line_empty(trivia.span) {
                     parts.push(Document::Array(
                         vec![in self.arena; self.print_comment(comment), Document::Line(Line::hard())],
@@ -441,6 +476,7 @@ impl<'arena> FormatterState<'_, 'arena> {
                 } else {
                     parts.push(self.print_comment(comment));
                 }
+                self.placed_comments.mark_consumed(index);
                 consumed_count += 1;
             } else {
                 break;
@@ -478,14 +514,21 @@ impl<'arena> FormatterState<'_, 'arena> {
         let mut consumed_count = 0;
 
         // Iterate over the remaining comment slice.
-        for trivia in &self.all_comments[self.next_comment_index..] {
+        for (offset, trivia) in self.all_comments[self.next_comment_index..].iter().enumerate() {
+            let index = self.next_comment_index + offset;
             let comment = Comment::from_trivia(self.file, trivia);
 
             if comment.start >= after.end_offset()
                 && comment.end <= before.start_offset()
                 && self.is_insignificant(after.end_offset(), comment.start)
             {
+                if self.placed_comments.is_consumed(index) {
+                    consumed_count += 1;
+                    continue;
+                }
+
                 parts.push(self.print_comment(comment));
+                self.placed_comments.mark_consumed(index);
                 consumed_count += 1;
             } else {
                 break;
@@ -523,6 +566,11 @@ impl<'arena> FormatterState<'_, 'arena> {
         while let Some(trivia) = self.all_comments.get(self.next_comment_index) {
             let comment = Comment::from_trivia(self.file, trivia);
 
+            if self.placed_comments.is_consumed(self.next_comment_index) {
+                self.next_comment_index += 1;
+                continue;
+            }
+
             let is_between = comment.start >= after.end_offset() && comment.end <= before.start_offset();
             let gap_is_ok =
                 after.end_offset() == comment.start || self.is_insignificant(after.end_offset(), comment.start);
@@ -530,6 +578,7 @@ impl<'arena> FormatterState<'_, 'arena> {
             if is_between && gap_is_ok {
                 previous_comment =
                     Some(self.print_trailing_comment(&mut parts, comment, previous_comment, after.end_offset()));
+                self.placed_comments.mark_consumed(self.next_comment_index);
                 self.next_comment_index += 1;
             } else {
                 break;
@@ -633,5 +682,124 @@ impl<'arena> FormatterState<'_, 'arena> {
         }
 
         Document::Group(Group::new(contents))
+    }
+
+    pub(crate) fn has_placed_leading_own_line_comment(&self, span: Span) -> bool {
+        self.has_placed_comment_where(span, Placement::Leading, |_, t| {
+            !t.kind.is_block_comment() || t.value.contains('\n')
+        })
+    }
+
+    pub(crate) fn has_placed_trailing_line_comment(&self, span: Span) -> bool {
+        self.has_placed_comment_where(span, Placement::Trailing, |_, t| !t.kind.is_block_comment())
+    }
+
+    /// Check if any placed comment on `span` satisfies the predicate.
+    pub(crate) fn has_placed_comment_where<F>(&self, span: Span, placement: Placement, f: F) -> bool
+    where
+        F: Fn(&PlacedComment, &Trivia<'arena>) -> bool,
+    {
+        self.placed_comments.by_placement(span, placement).any(|placed| {
+            let trivia = &self.all_comments[placed.index];
+            f(placed, trivia)
+        })
+    }
+
+    /// Take placed leading comments as a Document, consuming them.
+    #[must_use]
+    pub(crate) fn take_placed_leading(&mut self, span: Span) -> Option<Document<'arena>> {
+        let comments: std::vec::Vec<_> = self.placed_comments.by_placement(span, Placement::Leading).copied().collect();
+        if comments.is_empty() {
+            return None;
+        }
+
+        let mut parts = bumpalo::vec![in self.arena];
+        for placed in &comments {
+            if self.placed_comments.is_consumed(placed.index) {
+                continue;
+            }
+
+            self.placed_comments.mark_consumed(placed.index);
+            let trivia = &self.all_comments[placed.index];
+            let comment = Comment::from_trivia(self.file, trivia);
+
+            parts.push(self.print_comment(comment));
+
+            if !trivia.kind.is_block_comment() {
+                parts.push(Document::BreakParent);
+                parts.push(Document::Line(Line::hard()));
+            } else {
+                parts.push(Document::Line(Line::default()));
+            }
+        }
+
+        if parts.is_empty() { None } else { Some(Document::Array(parts)) }
+    }
+
+    /// Take placed trailing comments as a Document, consuming them.
+    #[must_use]
+    pub(crate) fn take_placed_trailing(&mut self, span: Span) -> Option<Document<'arena>> {
+        let comments: std::vec::Vec<_> =
+            self.placed_comments.by_placement(span, Placement::Trailing).copied().collect();
+        if comments.is_empty() {
+            return None;
+        }
+
+        let mut parts = bumpalo::vec![in self.arena];
+        for placed in &comments {
+            if self.placed_comments.is_consumed(placed.index) {
+                continue;
+            }
+
+            self.placed_comments.mark_consumed(placed.index);
+            let trivia = &self.all_comments[placed.index];
+            let comment = Comment::from_trivia(self.file, trivia);
+
+            if !trivia.kind.is_block_comment() && placed.line_position == CommentLinePosition::EndOfLine {
+                let printed = self.print_comment(comment);
+                parts.push(Document::LineSuffix(bumpalo::vec![in self.arena; Document::Space(Space::soft()), printed]));
+                parts.push(Document::BreakParent);
+            } else if !trivia.kind.is_block_comment() {
+                parts.push(Document::BreakParent);
+                parts.push(Document::Line(Line::hard()));
+                parts.push(self.print_comment(comment));
+            } else {
+                parts.push(Document::Space(Space::soft()));
+                parts.push(self.print_comment(comment));
+            }
+        }
+
+        if parts.is_empty() { None } else { Some(Document::Array(parts)) }
+    }
+
+    /// Wrap document in parens, including any placed leading comments inside.
+    #[must_use]
+    pub(crate) fn add_parens_with_placed_leading(
+        &mut self,
+        document: Document<'arena>,
+        node: Node<'arena, 'arena>,
+        has_leading_comments: bool,
+    ) -> Document<'arena> {
+        let placed = self.take_placed_leading(node.span());
+        let (doc, has_leading) = if let Some(p) = placed {
+            (Document::Array(vec![in self.arena; p, document]), true)
+        } else {
+            (document, has_leading_comments)
+        };
+
+        self.add_parens(doc, node, has_leading)
+    }
+
+    /// Output any placed leading comments that no inner add_parens claimed.
+    #[must_use]
+    pub(crate) fn prepend_unclaimed_placed_leading(
+        &mut self,
+        span: Span,
+        document: Document<'arena>,
+    ) -> Document<'arena> {
+        match self.take_placed_leading(span) {
+            Some(placed) => Document::Array(vec![in self.arena; placed, document]),
+            None => document,
+        }
     }
 }

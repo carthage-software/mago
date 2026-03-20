@@ -3,6 +3,7 @@ use mago_syntax::ast::Trivia;
 use mago_syntax::ast::TriviaKind;
 
 pub mod format;
+pub mod placement;
 
 #[derive(Debug, Clone, Copy)]
 #[repr(transparent)]
