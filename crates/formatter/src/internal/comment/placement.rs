@@ -32,7 +32,6 @@ impl CommentLinePosition {
 pub enum Placement {
     Leading,
     Trailing,
-    Dangling,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -44,30 +43,15 @@ pub struct PlacedComment {
 
 pub struct DecoratedComment<'ast, 'arena> {
     pub enclosing: Node<'ast, 'arena>,
-    #[expect(dead_code)]
-    pub preceding: Option<Node<'ast, 'arena>>,
-    #[expect(dead_code)]
-    pub following: Option<Node<'ast, 'arena>>,
     pub line_position: CommentLinePosition,
     pub comment_index: usize,
     pub trivia_start: u32,
 }
 
 pub enum CommentPlacement<'ast, 'arena> {
-    Leading {
-        node: Node<'ast, 'arena>,
-        comment_index: usize,
-    },
-    Trailing {
-        node: Node<'ast, 'arena>,
-        comment_index: usize,
-    },
-    #[expect(dead_code)]
-    Dangling {
-        node: Node<'ast, 'arena>,
-        comment_index: usize,
-    },
-    Default(#[expect(dead_code)] DecoratedComment<'ast, 'arena>),
+    Leading { node: Node<'ast, 'arena>, comment_index: usize },
+    Trailing { node: Node<'ast, 'arena>, comment_index: usize },
+    Default,
 }
 
 pub struct Comments {
@@ -140,7 +124,7 @@ pub fn place_comments<'ast, 'arena>(
     collect_node_comments(source_text, root, all_comments, &mut comments, &mut cursor);
 
     while cursor < total {
-        let decorated = make_decorated(source_text, all_comments, cursor, root, None, None);
+        let decorated = make_decorated(source_text, all_comments, cursor, root);
         place_and_insert(decorated, &mut comments);
         cursor += 1;
     }
@@ -175,15 +159,13 @@ fn collect_node_comments<'ast, 'arena>(
                 break;
             }
 
-            let decorated = make_decorated(source_text, all_comments, *cursor, node, None, None);
+            let decorated = make_decorated(source_text, all_comments, *cursor, node);
             place_and_insert(decorated, comments);
             *cursor += 1;
         }
 
         return;
     }
-
-    let mut preceding: Option<Node<'ast, 'arena>> = None;
 
     for child in children.iter() {
         let child = unwrap_parenthesized_node(*child);
@@ -196,14 +178,12 @@ fn collect_node_comments<'ast, 'arena>(
                 break;
             }
 
-            let decorated = make_decorated(source_text, all_comments, *cursor, node, preceding, Some(child));
+            let decorated = make_decorated(source_text, all_comments, *cursor, node);
             place_and_insert(decorated, comments);
             *cursor += 1;
         }
 
         collect_node_comments(source_text, child, all_comments, comments, cursor);
-
-        preceding = Some(child);
     }
 
     while *cursor < total {
@@ -213,7 +193,7 @@ fn collect_node_comments<'ast, 'arena>(
             break;
         }
 
-        let decorated = make_decorated(source_text, all_comments, *cursor, node, preceding, None);
+        let decorated = make_decorated(source_text, all_comments, *cursor, node);
         place_and_insert(decorated, comments);
         *cursor += 1;
     }
@@ -224,15 +204,11 @@ fn make_decorated<'ast, 'arena>(
     all_comments: &'arena [Trivia<'arena>],
     cursor: usize,
     enclosing: Node<'ast, 'arena>,
-    preceding: Option<Node<'ast, 'arena>>,
-    following: Option<Node<'ast, 'arena>>,
 ) -> DecoratedComment<'ast, 'arena> {
     let trivia = &all_comments[cursor];
 
     DecoratedComment {
         enclosing,
-        preceding,
-        following,
         line_position: CommentLinePosition::at_offset(source_text, trivia.span.start.offset),
         comment_index: cursor,
         trivia_start: trivia.span.start.offset,
@@ -245,8 +221,7 @@ fn place_and_insert(decorated: DecoratedComment<'_, '_>, comments: &mut Comments
     let (node_span, placement, index) = match place_comment(decorated) {
         CommentPlacement::Leading { node, comment_index } => (node.span(), Placement::Leading, comment_index),
         CommentPlacement::Trailing { node, comment_index } => (node.span(), Placement::Trailing, comment_index),
-        CommentPlacement::Dangling { node, comment_index } => (node.span(), Placement::Dangling, comment_index),
-        CommentPlacement::Default(_) => return,
+        CommentPlacement::Default => return,
     };
 
     comments.insert(node_span, PlacedComment { index, placement, line_position });
@@ -268,13 +243,13 @@ fn unwrap_parenthesized_node<'ast, 'arena>(node: Node<'ast, 'arena>) -> Node<'as
 fn place_comment<'ast, 'arena>(comment: DecoratedComment<'ast, 'arena>) -> CommentPlacement<'ast, 'arena> {
     match comment.enclosing {
         Node::Binary(_) => place_binary(comment),
-        _ => CommentPlacement::Default(comment),
+        _ => CommentPlacement::Default,
     }
 }
 
 fn place_binary<'ast, 'arena>(comment: DecoratedComment<'ast, 'arena>) -> CommentPlacement<'ast, 'arena> {
     let Node::Binary(binary) = comment.enclosing else {
-        return CommentPlacement::Default(comment);
+        return CommentPlacement::Default;
     };
 
     let index = comment.comment_index;
@@ -302,5 +277,5 @@ fn place_binary<'ast, 'arena>(comment: DecoratedComment<'ast, 'arena>) -> Commen
         return CommentPlacement::Trailing { node: Node::Expression(rhs), comment_index: index };
     }
 
-    CommentPlacement::Default(comment)
+    CommentPlacement::Default
 }
