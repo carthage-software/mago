@@ -41,6 +41,7 @@ use function str_contains;
 use function strtolower;
 use function trim;
 use function unlink;
+use function usleep;
 
 use const CURLINFO_HTTP_CODE;
 use const CURLOPT_FILE;
@@ -49,8 +50,8 @@ use const CURLOPT_NOPROGRESS;
 use const CURLOPT_PROGRESSFUNCTION;
 use const STDERR;
 
-// 500ms in microseconds
-const STATUS_CHECK_INTERVAL = 1000 * 500;
+// 10ms prevents spin-locking while keeping worst-case overhead under 10ms.
+const STATUS_CHECK_INTERVAL = 10_000;
 
 /**
  * Get the installed mago version from Composer metadata.
@@ -492,7 +493,7 @@ function execute(string $executablePath, array $args): never
     }
 
     do {
-        \usleep(STATUS_CHECK_INTERVAL);
+        usleep(STATUS_CHECK_INTERVAL);
         $status = proc_get_status($process);
     } while ($status['running']);
 
