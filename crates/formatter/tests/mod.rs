@@ -376,6 +376,8 @@ test_case!(issue_1221);
 test_case!(issue_1231);
 test_case!(issue_1255);
 test_case!(issue_1350);
+test_case!(issue_1460);
+test_case!(bare_cr_line_endings);
 
 #[test]
 fn test_all_test_cases_are_ran() {

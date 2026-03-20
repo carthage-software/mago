@@ -156,6 +156,33 @@ pub fn will_break<'arena>(document: &'arena Document<'arena>) -> bool {
     }
 }
 
+/// Split a string on any line terminator: `\r\n`, `\n`, or bare `\r`.
+///
+/// behaves like `str::split('\n')` — a trailing line terminator produces a
+/// trailing empty string.
+fn split_any_newline(text: &str) -> impl Iterator<Item = &str> {
+    let mut remaining: Option<&str> = Some(text);
+    std::iter::from_fn(move || {
+        let text = remaining?;
+
+        let bytes = text.as_bytes();
+        for i in 0..bytes.len() {
+            if bytes[i] == b'\r' {
+                let line = &text[..i];
+                remaining = Some(if bytes.get(i + 1) == Some(&b'\n') { &text[i + 2..] } else { &text[i + 1..] });
+                return Some(line);
+            } else if bytes[i] == b'\n' {
+                let line = &text[..i];
+                remaining = Some(&text[i + 1..]);
+                return Some(line);
+            }
+        }
+
+        remaining = None;
+        Some(text)
+    })
+}
+
 #[inline]
 pub fn replace_end_of_line<'arena>(
     f: &FormatterState<'_, 'arena>,
@@ -174,7 +201,7 @@ pub fn replace_end_of_line<'arena>(
 
     Document::Array(Document::join(
         f.arena,
-        text.split('\n').map(Document::String).collect_in::<Vec<_>>(f.arena),
+        split_any_newline(text).map(Document::String).collect_in::<Vec<_>>(f.arena),
         replacement,
     ))
 }
