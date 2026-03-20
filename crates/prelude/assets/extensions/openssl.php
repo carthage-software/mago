@@ -98,27 +98,27 @@ function openssl_x509_free(OpenSSLCertificate $certificate): void {}
  *   'extensions': array,
  * }|false
  */
-function openssl_x509_parse(OpenSSLCertificate|false $certificate, bool $short_names = true): array|false {}
+function openssl_x509_parse(OpenSSLCertificate|string $certificate, bool $short_names = true): array|false {}
 
 function openssl_x509_checkpurpose(
-    OpenSSLCertificate|false $certificate,
+    OpenSSLCertificate|string $certificate,
     int $purpose,
     array $ca_info = [],
     ?string $untrusted_certificates_file = null,
 ): int|bool {}
 
 function openssl_x509_check_private_key(
-    OpenSSLCertificate|false $certificate,
+    OpenSSLCertificate|string $certificate,
     OpenSSLAsymmetricKey|OpenSSLCertificate|array|string $private_key,
 ): bool {}
 
 /**
  * @param-out string $output
  */
-function openssl_x509_export(OpenSSLCertificate|false $certificate, &$output, bool $no_text = true): bool {}
+function openssl_x509_export(OpenSSLCertificate|string $certificate, &$output, bool $no_text = true): bool {}
 
 function openssl_x509_export_to_file(
-    OpenSSLCertificate|false $certificate,
+    OpenSSLCertificate|string $certificate,
     string $output_filename,
     bool $no_text = true,
 ): bool {}
@@ -132,7 +132,7 @@ function openssl_x509_verify(
  * @param-out string $output
  */
 function openssl_pkcs12_export(
-    OpenSSLCertificate|false $certificate,
+    OpenSSLCertificate|string $certificate,
     &$output,
     OpenSSLAsymmetricKey|OpenSSLCertificate|array|string $private_key,
     string $passphrase,
@@ -140,7 +140,7 @@ function openssl_pkcs12_export(
 ): bool {}
 
 function openssl_pkcs12_export_to_file(
-    OpenSSLCertificate|false $certificate,
+    OpenSSLCertificate|string $certificate,
     string $output_filename,
     OpenSSLAsymmetricKey|OpenSSLCertificate|array|string $private_key,
     string $passphrase,
