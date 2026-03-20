@@ -492,7 +492,7 @@ function execute(string $executablePath, array $args): never
     }
 
     do {
-        usleep(STATUS_CHECK_INTERVAL);
+        \usleep(STATUS_CHECK_INTERVAL);
         $status = proc_get_status($process);
     } while ($status['running']);
 
