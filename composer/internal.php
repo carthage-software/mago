@@ -49,6 +49,9 @@ use const CURLOPT_NOPROGRESS;
 use const CURLOPT_PROGRESSFUNCTION;
 use const STDERR;
 
+// 500ms in microseconds
+const STATUS_CHECK_INTERVAL = 1000 * 500;
+
 /**
  * Get the installed mago version from Composer metadata.
  *
@@ -489,11 +492,15 @@ function execute(string $executablePath, array $args): never
     }
 
     do {
+        \usleep(STATUS_CHECK_INTERVAL);
         $status = proc_get_status($process);
     } while ($status['running']);
 
     $exitCode = $status['exitcode'];
-    proc_close($process);
+    if ($status['signaled']) {
+        $exitCode = $status['termsig'] + 128;
+    }
 
+    proc_close($process);
     exit($exitCode);
 }
