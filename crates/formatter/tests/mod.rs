@@ -86,6 +86,7 @@ test_case!(inline_html);
 test_case!(inline_php);
 test_case!(inline_html_alignment);
 test_case!(inline_echo);
+test_case!(inline_php_closing_tag_idempotency);
 test_case!(parameter_attributes);
 test_case!(parameter_attribute_on_new_line);
 test_case!(parameter_attribute_on_new_line_disabled);
@@ -372,6 +373,7 @@ test_case!(issue_1198);
 test_case!(issue_1221);
 test_case!(issue_1231);
 test_case!(issue_1255);
+test_case!(issue_1350);
 
 #[test]
 fn test_all_test_cases_are_ran() {
