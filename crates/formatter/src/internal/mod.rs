@@ -444,14 +444,18 @@ impl<'ctx, 'arena> FormatterState<'ctx, 'arena> {
         if matches!(c, b'\r') {
             let next_index = if backwards { start_index_usize - 1 } else { start_index_usize + 1 };
             let next_c = if backwards {
-                self.source_text[..=next_index].bytes().next_back()
+                self.source_text.get(..=next_index).and_then(|s| s.bytes().next_back())
             } else {
-                self.source_text[next_index..].bytes().next()
-            }?;
+                self.source_text.get(next_index..).and_then(|s| s.bytes().next())
+            };
 
-            if matches!(next_c, b'\n') {
+            if matches!(next_c, Some(b'\n')) {
+                // \r\n (CRLF) — skip both
                 return Some(if backwards { start_index - 2 } else { start_index + 2 });
             }
+
+            // bare \r — still a line terminator (classic Mac OS line ending)
+            return Some(if backwards { start_index - 1 } else { start_index + 1 });
         }
 
         Some(start_index)
@@ -474,14 +478,27 @@ impl<'ctx, 'arena> FormatterState<'ctx, 'arena> {
         let mut remaining = slice;
 
         while !remaining.is_empty() {
-            if let Some(pos) = remaining.find("\r\n") {
+            // find the earliest line terminator: \r\n, \n, or bare \r
+            let next_break = remaining.bytes().enumerate().find_map(|(i, b)| {
+                if b == b'\r' {
+                    // check for \r\n (CRLF) — consume both bytes
+                    if remaining.as_bytes().get(i + 1) == Some(&b'\n') {
+                        Some((i, 2))
+                    } else {
+                        // bare \r — still a line terminator
+                        Some((i, 1))
+                    }
+                } else if b == b'\n' {
+                    Some((i, 1))
+                } else {
+                    None
+                }
+            });
+
+            if let Some((pos, skip)) = next_break {
                 lines.push(&remaining[..pos]);
-                remaining = &remaining[pos + 2..];
-            } else if let Some(pos) = remaining.find('\n') {
-                lines.push(&remaining[..pos]);
-                remaining = &remaining[pos + 1..];
+                remaining = &remaining[pos + skip..];
             } else {
-                // No more newlines
                 if !remaining.is_empty() {
                     lines.push(remaining);
                 }

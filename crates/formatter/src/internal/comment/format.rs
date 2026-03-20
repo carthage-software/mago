@@ -1,4 +1,3 @@
-use bumpalo::collections::CollectIn;
 use bumpalo::collections::Vec;
 use bumpalo::vec;
 
@@ -575,7 +574,7 @@ impl<'arena> FormatterState<'_, 'arena> {
             return Document::String(content);
         }
 
-        let lines = content.lines().collect_in::<Vec<_>>(self.arena);
+        let lines = self.split_lines(content);
         let mut contents = Vec::with_capacity_in(lines.len() * 2, self.arena);
 
         let should_add_asterisks = if content.starts_with("/**") {
