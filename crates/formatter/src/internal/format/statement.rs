@@ -1,12 +1,13 @@
 use std::cmp::Ordering;
 
+use bumpalo::Bump;
 use bumpalo::collections::CollectIn;
 use bumpalo::collections::Vec;
 use bumpalo::vec;
 
-use bumpalo::Bump;
 use mago_span::HasPosition;
 use mago_span::HasSpan;
+use mago_syntax::ast::ClosingTag;
 use mago_syntax::ast::Constant;
 use mago_syntax::ast::Declare;
 use mago_syntax::ast::DeclareBody;
@@ -26,6 +27,7 @@ use mago_syntax::ast::UseItems;
 use mago_syntax::ast::UseType;
 
 use mago_syntax::ast::Expression;
+use mago_syntax::walker::MutWalker;
 
 use crate::document::Align;
 use crate::document::Document;
@@ -367,7 +369,7 @@ fn should_add_new_line_or_space_after_stmt<'arena>(
             DeclareBody::ColonDelimited(_) => true,
         },
         Statement::OpeningTag(_) => {
-            if f.settings.opening_tag_on_own_line && !f.source_text.contains("?>") {
+            if f.settings.opening_tag_on_own_line && !is_inline_php_template(stmts) {
                 return (true, false);
             }
 
@@ -395,6 +397,58 @@ fn should_add_new_line_or_space_after_stmt<'arena>(
     };
 
     (should_add_line, should_add_space)
+}
+
+/// Check if the program is an inline PHP template (mixes PHP and HTML).
+///
+/// When a file contains inline HTML content, the opening `<?php` tag should stay
+/// on the same line as the following statement (e.g., `<?php if ($foo): ?>`).
+/// When it's a pure PHP file, `<?php` should be on its own line.
+///
+/// Counts closing tags in the given statements. A trailing `ClosingTag` (last top-level statement)
+/// is not counted since the formatter removes it. If any other closing tags exist,
+/// the file is an inline PHP template.
+#[inline]
+#[allow(clippy::if_same_then_else)]
+fn is_inline_php_template(stmts: &[&Statement<'_>]) -> bool {
+    let trailing_close_tag_count = match stmts.len() {
+        0 => 0,
+        n => {
+            // Pattern: [..., ClosingTag, Inline(whitespace-only)] at end
+            if matches!(stmts.get(n.wrapping_sub(2)), Some(Statement::ClosingTag(_)))
+                && matches!(stmts.get(n - 1), Some(Statement::Inline(inline)) if inline.value.trim().is_empty())
+            {
+                1
+            // Pattern: [..., ClosingTag] at end (no trailing inline)
+            } else if matches!(stmts.last(), Some(Statement::ClosingTag(_))) {
+                1
+            } else {
+                0
+            }
+        }
+    };
+
+    let count = count_closing_tags(stmts);
+
+    count > trailing_close_tag_count
+}
+
+/// Count all `ClosingTag` nodes within a slice of statements at any depth.
+fn count_closing_tags(stmts: &[&Statement<'_>]) -> usize {
+    struct Counter(usize);
+
+    impl<'ast, 'arena> MutWalker<'ast, 'arena, ()> for Counter {
+        fn walk_in_closing_tag(&mut self, _: &'ast ClosingTag, _: &mut ()) {
+            self.0 += 1;
+        }
+    }
+
+    let mut counter = Counter(0);
+    for stmt in stmts {
+        counter.walk_statement(stmt, &mut ());
+    }
+
+    counter.0
 }
 
 fn should_add_new_line_after_use<'arena>(
