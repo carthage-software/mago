@@ -161,6 +161,7 @@ curl --proto '=https' --tlsv1.2 -sSf https://carthage.software/mago.sh | bash
 <a href="http://r0.fyi" title="Anatolij Vasilev" target="_blank" rel="noopener" class="sponsor-card sponsor-supporter"><img src="https://avatars.githubusercontent.com/u/3026792?u=bff97cda9842e84032af0ad0e7b0008b5c7a8b7f&v=4&s=48" alt="Anatolij Vasilev"><span>Anatolij Vasilev</span></a>
 <a href="https://devnix.dev/" title="Pablo Largo Mohedano" target="_blank" rel="noopener" class="sponsor-card sponsor-supporter"><img src="https://avatars.githubusercontent.com/u/1777519?v=4&s=48" alt="Pablo Largo Mohedano"><span>Pablo Largo Mohedano</span></a>
 <a href="https://github.com/JacerOmri" title="Jacer OMRI" target="_blank" rel="noopener" class="sponsor-card sponsor-supporter"><img src="https://avatars.githubusercontent.com/u/537996?u=6d425f3166884ff0c0da4ffc252d6388c9940714&v=4&s=48" alt="Jacer OMRI"><span>Jacer OMRI</span></a>
+<a href="http://alexandru.patranescu.ro" title="Alexandru Pătrănescu" target="_blank" rel="noopener" class="sponsor-card sponsor-supporter"><img src="https://avatars.githubusercontent.com/u/209984?v=4&s=48" alt="Alexandru Pătrănescu"><span>Alexandru Pătrănescu</span></a>
 </div></div>
 
 <!-- SPONSORS_END -->
