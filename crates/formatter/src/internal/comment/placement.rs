@@ -2,6 +2,7 @@ use foldhash::HashMap;
 
 use mago_span::HasSpan;
 use mago_span::Span;
+use mago_syntax::ast::Conditional;
 use mago_syntax::ast::Expression;
 use mago_syntax::ast::Node;
 use mago_syntax::ast::Trivia;
@@ -243,6 +244,7 @@ fn unwrap_parenthesized_node<'ast, 'arena>(node: Node<'ast, 'arena>) -> Node<'as
 fn place_comment<'ast, 'arena>(comment: DecoratedComment<'ast, 'arena>) -> CommentPlacement<'ast, 'arena> {
     match comment.enclosing {
         Node::Binary(_) => place_binary(comment),
+        Node::Conditional(_) => place_conditional(comment),
         _ => CommentPlacement::Default,
     }
 }
@@ -275,6 +277,69 @@ fn place_binary<'ast, 'arena>(comment: DecoratedComment<'ast, 'arena>) -> Commen
 
     if cs >= rhs_span.end.offset {
         return CommentPlacement::Trailing { node: Node::Expression(rhs), comment_index: index };
+    }
+
+    CommentPlacement::Default
+}
+
+fn place_conditional<'ast, 'arena>(comment: DecoratedComment<'ast, 'arena>) -> CommentPlacement<'ast, 'arena> {
+    let Node::Conditional(Conditional { condition, question_mark, then, colon, r#else }) = comment.enclosing else {
+        return CommentPlacement::Default;
+    };
+
+    let index = comment.comment_index;
+    let cs = comment.trivia_start;
+    let condition = unwrap_parenthesized(condition);
+    let condition_span = condition.span();
+    let r#else = unwrap_parenthesized(r#else);
+    let else_span = r#else.span();
+
+    // Handles comments exposed before condition by DFS parenthesized transparency.
+    if cs < condition_span.start.offset {
+        return CommentPlacement::Leading { node: Node::Expression(condition), comment_index: index };
+    }
+
+    match then {
+        Some(then) => {
+            let then = unwrap_parenthesized(then);
+            let then_span = then.span();
+
+            if cs >= condition_span.end.offset && cs < question_mark.start.offset {
+                return CommentPlacement::Trailing { node: Node::Expression(condition), comment_index: index };
+            }
+
+            if cs >= question_mark.end.offset && cs < then_span.start.offset {
+                return CommentPlacement::Leading { node: Node::Expression(then), comment_index: index };
+            }
+
+            if cs >= then_span.end.offset && cs < colon.start.offset {
+                return CommentPlacement::Trailing { node: Node::Expression(then), comment_index: index };
+            }
+
+            if cs >= colon.end.offset && cs < else_span.start.offset {
+                return CommentPlacement::Leading { node: Node::Expression(r#else), comment_index: index };
+            }
+
+            if cs >= else_span.end.offset {
+                return CommentPlacement::Trailing { node: Node::Expression(r#else), comment_index: index };
+            }
+        }
+        None => {
+            // Elvis (`?:`): condition and else only, no then branch.
+            if cs >= condition_span.end.offset && cs < question_mark.start.offset {
+                return CommentPlacement::Trailing { node: Node::Expression(condition), comment_index: index };
+            }
+
+            // Between `?` and `:` or after `:` but before else: treat as else leading,
+            // matching binary's "after operator" convention.
+            if cs >= question_mark.start.offset && cs < else_span.start.offset {
+                return CommentPlacement::Leading { node: Node::Expression(r#else), comment_index: index };
+            }
+
+            if cs >= else_span.end.offset {
+                return CommentPlacement::Trailing { node: Node::Expression(r#else), comment_index: index };
+            }
+        }
     }
 
     CommentPlacement::Default
