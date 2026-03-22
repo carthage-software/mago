@@ -60,3 +60,30 @@ Your setup is now complete.
 
 - With `editor.formatOnSave` enabled, your PHP files will be automatically formatted by Mago every time you save.
 - You can also manually format a file at any time by opening the command palette (`Ctrl+Shift+P`) and running the **Format Document** command.
+
+## Alternative: Run On Save extension
+
+If you prefer to run Mago directly on save (instead of through VS Code's formatter API), you can use the [Run On Save](https://marketplace.visualstudio.com/items?itemName=emeraldwalk.RunOnSave) extension.
+
+This approach can be useful when using a project-local Mago binary because the command runs in your workspace context and applies your repository configuration (including exclude rules in `mago.toml`).
+
+### Configure `settings.json`
+
+Add the following configuration to your workspace or user `settings.json`:
+
+```json
+{
+  // ... your other settings
+
+  "emeraldwalk.runonsave": {
+    "commands": [
+      {
+        "match": "\\.php$",
+        "cmd": "${workspaceFolder}/vendor/bin/mago fmt ${relativeFile}"
+      }
+    ]
+  }
+}
+```
+
+After saving a PHP file, VS Code will execute Mago for that file using your workspace's installed binary.
