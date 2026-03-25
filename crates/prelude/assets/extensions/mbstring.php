@@ -409,7 +409,6 @@ function mb_ord(string $string, ?string $encoding = null): int|false {}
 
 /**
  * @pure
- * @deprecated
  */
 function mb_scrub(string $string, ?string $encoding = null): string {}
 
