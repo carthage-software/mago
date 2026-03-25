@@ -1,3 +1,4 @@
+use bumpalo::collections::Vec;
 use bumpalo::vec;
 
 use mago_span::HasSpan;
@@ -211,19 +212,22 @@ fn parameter_list_exceeds_print_width<'arena>(
     let end = parameter_list.right_parenthesis.end.offset;
 
     let source = &f.source_text[start as usize..end as usize];
-    let mut flattened = String::with_capacity(source.len());
+    let mut flattened = Vec::with_capacity_in(source.len(), f.arena);
     let mut previous_was_whitespace = false;
     for character in source.chars() {
         if character.is_whitespace() {
             if !previous_was_whitespace {
-                flattened.push(' ');
+                flattened.push(b' ');
                 previous_was_whitespace = true;
             }
         } else {
-            flattened.push(character);
+            let mut buffer = [0; 4];
+            flattened.extend_from_slice(character.encode_utf8(&mut buffer).as_bytes());
             previous_was_whitespace = false;
         }
     }
+
+    let flattened = unsafe { std::str::from_utf8_unchecked(flattened.into_bump_slice()) };
 
     string_width(flattened.trim()) > f.settings.print_width
 }
@@ -233,8 +237,6 @@ fn get_max_parameter_prefix_width<'arena>(parameter_list: &'arena FunctionLikePa
 }
 
 fn needs_promoted_parameter_type_gutter<'arena>(parameter_list: &'arena FunctionLikeParameterList<'arena>) -> bool {
-    // Best-effort alignment for mixed promoted constructors that include an untyped promoted parameter.
-    // See tests/cases/align_parameters/after.php:105.
     parameter_list.parameters.iter().any(|parameter| parameter.is_promoted_property() && parameter.hint.is_none())
 }
 
@@ -279,8 +281,6 @@ fn can_align_parameter<'arena>(
     let prefix_before_variable =
         &f.source_text[parameter.start_offset() as usize..parameter.variable.start_offset() as usize];
 
-    // Best-effort bailout for pathological comment placement in parameter prefixes.
-    // See tests/cases/align_parameters/after.php:81-102.
     !contains_comment_marker(gap_before_parameter) && !contains_comment_marker(prefix_before_variable)
 }
 
