@@ -1757,11 +1757,10 @@ impl<'arena> Format<'arena> for FunctionLikeParameter<'arena> {
                 (f.parameter_state.variable_padding, f.parameter_state.list_group_id)
                 && padding > 0
             {
-                let spaces = " ".repeat(padding);
-                contents.push(Document::IfBreak(
-                    IfBreak::new(f.arena, Document::String(f.arena.alloc_str(&spaces)), Document::empty())
-                        .with_id(list_id),
-                ));
+                let mut spaces = Vec::with_capacity_in(padding, f.arena);
+                spaces.resize(padding, b' ');
+                let spaces = Document::String(unsafe { std::str::from_utf8_unchecked(spaces.into_bump_slice()) });
+                contents.push(Document::IfBreak(IfBreak::new(f.arena, spaces, Document::empty()).with_id(list_id)));
             }
 
             contents.push(self.variable.format(f));
