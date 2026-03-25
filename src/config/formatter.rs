@@ -293,4 +293,16 @@ mod tests {
         let config: FormatterConfiguration = toml::from_str(toml).unwrap();
         assert_eq!(config.settings.print_width, 120);
     }
+
+    #[test]
+    fn test_deserialize_preserve_breaking_member_access_chain_first_method_on_same_line() {
+        let toml = r#"
+            preserve-breaking-member-access-chain = true
+            preserve-breaking-member-access-chain-first-method-on-same-line = true
+        "#;
+
+        let config: FormatterConfiguration = toml::from_str(toml).unwrap();
+        assert!(config.settings.preserve_breaking_member_access_chain);
+        assert!(config.settings.preserve_breaking_member_access_chain_first_method_on_same_line);
+    }
 }

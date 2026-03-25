@@ -316,7 +316,11 @@ impl<'arena> MemberAccessChain<'arena> {
                 None => prev_selector.span().end,
             };
 
-            if misc::has_new_line_in_range(f.source_text, prev_selector_end.offset, access.get_operator_span().start_offset()) {
+            if misc::has_new_line_in_range(
+                f.source_text,
+                prev_selector_end.offset,
+                access.get_operator_span().start_offset(),
+            ) {
                 return true;
             }
         }
@@ -726,6 +730,17 @@ fn should_inline_first_access<'arena>(
     f: &FormatterState<'_, 'arena>,
     member_access_chain: &MemberAccessChain<'arena>,
 ) -> bool {
+    let preserve_same_line_first_method = f.settings.preserve_breaking_member_access_chain
+        && f.settings.preserve_breaking_member_access_chain_first_method_on_same_line
+        && member_access_chain.is_first_link_object_method_call()
+        && (member_access_chain.is_first_link_already_broken(f)
+            || member_access_chain.has_break_after_first_access(f)
+            || member_access_chain.exceeds_print_width(f));
+
+    if preserve_same_line_first_method {
+        return true;
+    }
+
     if f.settings.preserve_breaking_member_access_chain
         && member_access_chain.is_first_link_object_method_call()
         && member_access_chain.is_first_link_already_broken(f)
