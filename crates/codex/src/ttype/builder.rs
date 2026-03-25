@@ -76,6 +76,7 @@ use crate::ttype::get_non_empty_string;
 use crate::ttype::get_non_empty_unspecified_literal_string;
 use crate::ttype::get_non_empty_uppercase_string;
 use crate::ttype::get_non_negative_int;
+use crate::ttype::get_non_positive_int;
 use crate::ttype::get_null;
 use crate::ttype::get_nullable_float;
 use crate::ttype::get_nullable_int;
@@ -505,7 +506,7 @@ pub fn get_union_from_type_ast(
         },
         Type::PositiveInt(_) => get_positive_int(),
         Type::NegativeInt(_) => get_negative_int(),
-        Type::NonPositiveInt(_) => get_positive_int(),
+        Type::NonPositiveInt(_) => get_non_positive_int(),
         Type::NonNegativeInt(_) => get_non_negative_int(),
         Type::IntRange(range) => {
             let min = match range.min {
