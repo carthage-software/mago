@@ -32,6 +32,7 @@ use crate::internal::format::misc;
 use crate::internal::format::misc::is_breaking_expression;
 use crate::internal::format::misc::is_simple_expression;
 use crate::internal::format::misc::is_string_word_type;
+use crate::internal::utils::get_expression_width;
 use crate::internal::utils::string_width;
 use crate::internal::utils::unwrap_parenthesized;
 
@@ -95,6 +96,16 @@ impl<'arena> MemberAccess<'arena> {
             MemberAccess::StaticMethodCall(call) => Some(&call.argument_list),
             _ => None,
         }
+    }
+
+    fn get_flat_width(&self) -> Option<usize> {
+        let selector_width = get_selector_width(self.get_selector())?;
+        let arguments_width = match self.get_arguments_list() {
+            Some(argument_list) => get_argument_list_width(argument_list)?,
+            None => 0,
+        };
+
+        Some(string_width(self.get_operator_as_str()) + selector_width + arguments_width)
     }
 }
 
@@ -284,21 +295,11 @@ impl<'arena> MemberAccessChain<'arena> {
     }
 
     fn exceeds_print_width(&self, f: &FormatterState) -> bool {
-        let Some(last_access) = self.accesses.last() else {
+        let Some(width) = self.get_flat_width() else {
             return false;
         };
 
-        let end = match last_access.get_arguments_list() {
-            Some(args) => args.span().end.offset,
-            None => last_access.get_selector().span().end.offset,
-        };
-        let start = self.base.span().start.offset;
-
-        if misc::has_new_line_in_range(f.source_text, start, end) {
-            return false;
-        }
-
-        string_width(&f.source_text[start as usize..end as usize]) > f.settings.print_width
+        width > f.settings.print_width
     }
 
     #[inline]
@@ -325,6 +326,15 @@ impl<'arena> MemberAccessChain<'arena> {
         }
 
         false
+    }
+
+    fn get_flat_width(&self) -> Option<usize> {
+        let mut width = get_flat_expression_width(self.base)?;
+        for access in &self.accesses {
+            width += access.get_flat_width()?;
+        }
+
+        Some(width)
     }
 
     #[inline]
@@ -563,6 +573,82 @@ impl<'arena> MemberAccessChain<'arena> {
             Some(start) if start > 0 => Some(start),
             _ => None,
         }
+    }
+}
+
+fn get_argument_width(argument: &Argument<'_>) -> Option<usize> {
+    match argument {
+        Argument::Positional(argument) => {
+            let unpack_width = usize::from(argument.ellipsis.is_some()) * 3;
+
+            get_flat_expression_width(argument.value).map(|width| width + unpack_width)
+        }
+        Argument::Named(argument) => {
+            get_flat_expression_width(argument.value).map(|width| width + string_width(argument.name.value) + 2)
+        }
+    }
+}
+
+fn get_argument_list_width(argument_list: &ArgumentList<'_>) -> Option<usize> {
+    let mut width = 2;
+    for (i, argument) in argument_list.arguments.iter().enumerate() {
+        if i > 0 {
+            width += 2;
+        }
+
+        width += get_argument_width(argument)?;
+    }
+
+    Some(width)
+}
+
+fn get_variable_width(variable: &Variable<'_>) -> Option<usize> {
+    match variable {
+        Variable::Direct(variable) => Some(string_width(variable.name)),
+        Variable::Indirect(variable) => get_expression_width(variable.expression).map(|width| width + 3),
+        Variable::Nested(variable) => get_variable_width(variable.variable).map(|width| width + 1),
+    }
+}
+
+fn get_selector_width(selector: &ClassLikeMemberSelector<'_>) -> Option<usize> {
+    match selector {
+        ClassLikeMemberSelector::Identifier(identifier) => Some(string_width(identifier.value)),
+        ClassLikeMemberSelector::Variable(variable) => get_variable_width(variable),
+        ClassLikeMemberSelector::Expression(selector) => {
+            get_flat_expression_width(selector.expression).map(|width| width + 2)
+        }
+        ClassLikeMemberSelector::Missing(_) => None,
+    }
+}
+
+fn get_flat_expression_width(expression: &Expression<'_>) -> Option<usize> {
+    if let Some(width) = get_expression_width(expression) {
+        return Some(width);
+    }
+
+    match expression {
+        Expression::Parenthesized(parenthesized) => {
+            get_flat_expression_width(parenthesized.expression).map(|width| width + 2)
+        }
+        Expression::Access(Access::Property(access)) => get_flat_expression_width(access.object)
+            .zip(get_selector_width(&access.property))
+            .map(|(object, property)| object + string_width("->") + property),
+        Expression::Access(Access::NullSafeProperty(access)) => get_flat_expression_width(access.object)
+            .zip(get_selector_width(&access.property))
+            .map(|(object, property)| object + string_width("?->") + property),
+        Expression::Call(Call::Method(call)) => get_flat_expression_width(call.object)
+            .zip(get_selector_width(&call.method))
+            .zip(get_argument_list_width(&call.argument_list))
+            .map(|((object, method), arguments)| object + string_width("->") + method + arguments),
+        Expression::Call(Call::NullSafeMethod(call)) => get_flat_expression_width(call.object)
+            .zip(get_selector_width(&call.method))
+            .zip(get_argument_list_width(&call.argument_list))
+            .map(|((object, method), arguments)| object + string_width("?->") + method + arguments),
+        Expression::Call(Call::StaticMethod(call)) => get_flat_expression_width(call.class)
+            .zip(get_selector_width(&call.method))
+            .zip(get_argument_list_width(&call.argument_list))
+            .map(|((class, method), arguments)| class + string_width("::") + method + arguments),
+        _ => None,
     }
 }
 
