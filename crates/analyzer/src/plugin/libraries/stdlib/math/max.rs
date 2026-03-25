@@ -7,6 +7,8 @@ use mago_codex::ttype::union::TUnion;
 
 use crate::plugin::context::InvocationInfo;
 use crate::plugin::context::ProviderContext;
+use crate::plugin::libraries::stdlib::math::collect_integers;
+use crate::plugin::libraries::stdlib::math::get_integer_from_type;
 use crate::plugin::provider::Provider;
 use crate::plugin::provider::ProviderMeta;
 use crate::plugin::provider::function::FunctionReturnTypeProvider;
@@ -38,8 +40,9 @@ impl FunctionReturnTypeProvider for MaxProvider {
         context: &ProviderContext<'_, '_, '_>,
         invocation: &InvocationInfo<'_, '_, '_>,
     ) -> Option<TUnion> {
-        if invocation.argument_count() > 1 {
-            return None;
+        let arg_count = invocation.argument_count();
+        if arg_count >= 2 {
+            return get_max_of_args(context, invocation);
         }
 
         let value = invocation.get_argument(0, &["value"])?;
@@ -59,18 +62,11 @@ impl FunctionReturnTypeProvider for MaxProvider {
         }
 
         if let Some(known_resulting_type) = &resulting_type {
-            let mut possibilities = vec![];
-            for atomic in known_resulting_type.types.iter() {
-                let TAtomic::Scalar(TScalar::Integer(integer)) = atomic else {
-                    return resulting_type;
-                };
+            let integers = collect_integers(known_resulting_type)?;
 
-                possibilities.push(*integer);
-            }
-
-            let mut max_lb = possibilities[0].get_minimum_value();
-            let mut max_ub = possibilities[0].get_maximum_value();
-            for t in possibilities.iter().skip(1) {
+            let mut max_lb = integers[0].get_minimum_value();
+            let mut max_ub = integers[0].get_maximum_value();
+            for t in integers.iter().skip(1) {
                 let (lb, ub) = t.get_bounds();
 
                 max_lb = std::cmp::max(max_lb, lb);
@@ -87,4 +83,29 @@ impl FunctionReturnTypeProvider for MaxProvider {
 
         resulting_type
     }
+}
+
+fn get_max_of_args(context: &ProviderContext<'_, '_, '_>, invocation: &InvocationInfo<'_, '_, '_>) -> Option<TUnion> {
+    let first = invocation.get_argument(0, &["value"])?;
+    let first_type = context.get_expression_type(first)?;
+    let mut result = get_integer_from_type(first_type)?;
+
+    for i in 1..invocation.argument_count() {
+        let arg = invocation.get_argument(i, &[])?;
+        let arg_type = context.get_expression_type(arg)?;
+        let integer = get_integer_from_type(arg_type)?;
+
+        let (a_lb, a_ub) = result.get_bounds();
+        let (b_lb, b_ub) = integer.get_bounds();
+
+        let lb = std::cmp::max(a_lb, b_lb);
+        let ub = match (a_ub, b_ub) {
+            (Some(a), Some(b)) => Some(std::cmp::max(a, b)),
+            _ => None,
+        };
+
+        result = TInteger::from_bounds(lb, ub);
+    }
+
+    Some(TUnion::from_atomic(TAtomic::Scalar(TScalar::Integer(result))))
 }
