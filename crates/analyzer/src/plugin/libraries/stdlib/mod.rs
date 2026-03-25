@@ -49,6 +49,7 @@ impl Plugin for StdlibPlugin {
         registry.register_function_provider(filter::FilterInputProvider);
         registry.register_function_provider(math::MinProvider);
         registry.register_function_provider(math::MaxProvider);
+        registry.register_function_provider(math::AbsProvider);
 
         registry.register_method_provider(closure::ClosureGetCurrentProvider);
         registry.register_method_provider(r#enum::EnumCasesProvider);
