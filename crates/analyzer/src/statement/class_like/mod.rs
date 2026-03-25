@@ -36,6 +36,7 @@ use mago_span::Span;
 use mago_syntax::ast::Class;
 use mago_syntax::ast::ClassLikeMember;
 use mago_syntax::ast::Enum;
+use mago_syntax::ast::EnumCaseItem;
 use mago_syntax::ast::Extends;
 use mago_syntax::ast::Implements;
 use mago_syntax::ast::Interface;
@@ -669,6 +670,8 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Enum<'arena> {
             self.members.as_slice(),
         )?;
 
+        check_duplicate_enum_case_values(context, artifacts, name, self);
+
         if context.settings.check_missing_override {
             override_attribute::check_override_attribute(class_like_metadata, self.members.as_slice(), context);
         }
@@ -693,6 +696,67 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Enum<'arena> {
         }
 
         Ok(())
+    }
+}
+
+fn check_duplicate_enum_case_values<'arena>(
+    context: &mut Context<'_, 'arena>,
+    artifacts: &AnalysisArtifacts,
+    enum_name: &str,
+    r#enum: &Enum<'arena>,
+) {
+    let mut seen: Vec<(Atom, &str, Span)> = Vec::new();
+
+    for member in &r#enum.members {
+        let ClassLikeMember::EnumCase(case) = member else {
+            continue;
+        };
+
+        let EnumCaseItem::Backed(item) = &case.item else {
+            continue;
+        };
+
+        let case_name = item.name.value;
+
+        let Some(value_type) = artifacts.get_expression_type(item.value) else {
+            continue;
+        };
+
+        if !value_type.is_single() {
+            continue;
+        }
+
+        let atomic = value_type.get_single();
+        let is_literal = match atomic {
+            TAtomic::Scalar(s) => s.is_literal_value(),
+            _ => false,
+        };
+
+        if !is_literal {
+            continue;
+        }
+
+        let value_id = value_type.get_id();
+        let value_span = item.value.span();
+
+        if let Some((_, prev_case_name, prev_span)) = seen.iter().find(|(id, _, _)| *id == value_id) {
+            context.collector.report_with_code(
+                IssueCode::DuplicateEnumCaseValue,
+                Issue::error(format!(
+                    "Duplicate value in enum `{enum_name}`: case `{case_name}` has the same value as case `{prev_case_name}`."
+                ))
+                .with_annotation(
+                    Annotation::primary(value_span).with_message("This value is a duplicate"),
+                )
+                .with_annotation(
+                    Annotation::secondary(*prev_span)
+                        .with_message(format!("Case `{prev_case_name}` already uses this value")),
+                )
+                .with_help("Each case in a backed enum must have a unique value."),
+            );
+        } else {
+            seen.push((value_id, case_name, value_span));
+        }
     }
 }
 

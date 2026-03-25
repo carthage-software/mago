@@ -164,6 +164,7 @@ test_case!(keyed_array_list_inference);
 test_case!(require_implements_inherited);
 test_case!(readonly_proptected_set);
 test_case!(value_of_enum_resolution);
+test_case!(duplicate_enum_case_value);
 test_case!(properties_of_enum);
 test_case!(properties_of_class);
 test_case!(properties_of_generic);
