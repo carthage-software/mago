@@ -312,7 +312,11 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for If<'arena> {
             }
         }
 
-        if !if_scope.reasonable_clauses.is_empty()
+        let if_body_always_exits =
+            !if_scope.if_actions.is_empty() && !if_scope.if_actions.contains(ControlAction::None);
+
+        if if_body_always_exits
+            && !if_scope.reasonable_clauses.is_empty()
             && (if_scope.reasonable_clauses.len() > 1 || !if_scope.reasonable_clauses[0].wedge)
         {
             block_context.clauses = saturate_clauses(
