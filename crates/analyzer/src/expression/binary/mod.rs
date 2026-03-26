@@ -96,7 +96,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Binary<'arena> {
                     }
                 }
 
-                artifacts.set_expression_type(self, compute_instanceof_type(self, context, artifacts));
+                artifacts.set_expression_type(self, compute_instanceof_type(self, context, block_context, artifacts));
 
                 Ok(())
             }
@@ -104,14 +104,12 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Binary<'arena> {
     }
 }
 
-/// Computes the result type of an instanceof expression.
-///
-/// Returns:
-///
-/// - `true` if the LHS is already known to be an instance of the target class
-/// - `false` if the LHS can never be an instance of the target class
-/// - `bool` otherwise
-fn compute_instanceof_type(binary: &Binary<'_>, context: &Context<'_, '_>, artifacts: &AnalysisArtifacts) -> TUnion {
+fn compute_instanceof_type(
+    binary: &Binary<'_>,
+    context: &Context<'_, '_>,
+    block_context: &BlockContext<'_>,
+    artifacts: &AnalysisArtifacts,
+) -> TUnion {
     let Some(lhs_type) = artifacts.get_rc_expression_type(binary.lhs) else {
         return get_bool();
     };
@@ -120,13 +118,16 @@ fn compute_instanceof_type(binary: &Binary<'_>, context: &Context<'_, '_>, artif
         return get_bool();
     }
 
-    let Expression::Identifier(identifier) = binary.rhs else {
-        return get_bool();
+    let class_name = match binary.rhs {
+        Expression::Identifier(identifier) => atom(context.resolved_names.get(identifier)),
+        Expression::Self_(_) | Expression::Static(_) => match block_context.scope.get_class_like_name() {
+            Some(name) => name,
+            None => return get_bool(),
+        },
+        _ => return get_bool(),
     };
 
-    let class_name = context.resolved_names.get(identifier);
-
-    let target_type = TUnion::from_atomic(TAtomic::Object(TObject::Named(TNamedObject::new(atom(class_name)))));
+    let target_type = TUnion::from_atomic(TAtomic::Object(TObject::Named(TNamedObject::new(class_name))));
 
     let mut comparison_result = ComparisonResult::new();
     let is_already_subtype = union_comparator::is_contained_by(
