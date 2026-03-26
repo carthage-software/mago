@@ -20,6 +20,7 @@ pub struct LoopScope {
     pub variables_possibly_in_scope: AtomSet,
     pub final_actions: ControlActionSet,
     pub truthy_pre_conditions: bool,
+    pub condition_always_false: bool,
     pub parent_loop: Option<Box<LoopScope>>,
 }
 
@@ -37,6 +38,7 @@ impl LoopScope {
             variables_possibly_in_scope: AtomSet::default(),
             parent_loop,
             truthy_pre_conditions: true,
+            condition_always_false: false,
         }
     }
 

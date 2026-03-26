@@ -119,6 +119,25 @@ fn analyze_for_or_while_loop<'ctx, 'ast, 'arena>(
 
     let always_enters_loop = infinite_loop || loop_scope.truthy_pre_conditions;
 
+    if loop_scope.condition_always_false {
+        for condition in conditions {
+            let type_id = artifacts
+                .get_expression_type(*condition)
+                .map(|t| t.get_id())
+                .unwrap_or_else(|| mago_atom::atom("false"));
+
+            context.collector.report_with_code(
+                IssueCode::ImpossibleCondition,
+                Issue::warning(format!("This loop condition (type `{type_id}`) will always evaluate to false."))
+                    .with_annotation(
+                        Annotation::primary(condition.span())
+                            .with_message("This condition is always false, the loop body will never execute"),
+                    )
+                    .with_help("Check the logic of this loop condition. The loop body is unreachable."),
+            );
+        }
+    }
+
     inherit_loop_block_context(
         context,
         block_context,
@@ -149,27 +168,34 @@ fn inherit_loop_block_context<'ctx>(
     inherit_branch_context_properties(context, block_context, &inner_loop_block_context);
 
     if can_leave_loop {
-        for (variable, variable_type) in inner_loop_block_context.locals {
-            if !always_enters_loop {
+        if !always_enters_loop {
+            if loop_scope.condition_always_false {
+                for (variable, pre_loop_type) in &loop_scope.parent_context_variables {
+                    block_context.locals.insert(*variable, pre_loop_type.clone());
+                }
+            }
+
+            for (variable, _) in inner_loop_block_context.locals {
                 block_context.variables_possibly_in_scope.insert(variable);
-                continue;
             }
+        } else {
+            for (variable, variable_type) in inner_loop_block_context.locals {
+                if !has_break_or_continue {
+                    block_context.locals.insert(variable, variable_type);
+                    continue;
+                }
 
-            if !has_break_or_continue {
-                block_context.locals.insert(variable, variable_type);
-                continue;
-            }
-
-            if let Some(possible_type) = loop_scope.possibly_defined_loop_parent_variables.get(&variable) {
-                block_context.locals.insert(
-                    variable,
-                    Rc::new(ttype::combine_union_types(
-                        &variable_type,
-                        possible_type,
-                        context.codebase,
-                        CombinerOptions::default(),
-                    )),
-                );
+                if let Some(possible_type) = loop_scope.possibly_defined_loop_parent_variables.get(&variable) {
+                    block_context.locals.insert(
+                        variable,
+                        Rc::new(ttype::combine_union_types(
+                            &variable_type,
+                            possible_type,
+                            context.codebase,
+                            CombinerOptions::default(),
+                        )),
+                    );
+                }
             }
         }
     } else {
@@ -280,6 +306,7 @@ fn analyze<'ctx, 'ast, 'arena>(
     if assignment_depth == 0 || does_always_break {
         continue_context = loop_context.clone();
 
+        artifacts.set_loop_scope(loop_scope.clone());
         for (condition_offset, pre_condition) in pre_conditions.iter().enumerate() {
             let Some(clauses) = pre_condition_clauses.get(condition_offset) else {
                 continue;
@@ -298,8 +325,6 @@ fn analyze<'ctx, 'ast, 'arena>(
         }
 
         pre_conditions_applied = true;
-
-        artifacts.set_loop_scope(loop_scope.clone());
         analyze_statements(statements, context, &mut continue_context, artifacts)?;
         loop_scope = unsafe {
             // SAFETY: we know the loop scope will remain in the context.
@@ -320,6 +345,7 @@ fn analyze<'ctx, 'ast, 'arena>(
 
         let (result, mut recorded_issues) = context.record(|context| {
             if !is_do {
+                artifacts.set_loop_scope(loop_scope);
                 for (condition_offset, pre_condition) in pre_conditions.iter().enumerate() {
                     apply_pre_condition_to_loop_context(
                         context,
@@ -338,6 +364,8 @@ fn analyze<'ctx, 'ast, 'arena>(
                 }
 
                 pre_conditions_applied = true;
+
+                loop_scope = unsafe { artifacts.take_loop_scope_unchecked() };
             }
 
             let mut continue_context = loop_context.clone();
@@ -807,6 +835,62 @@ fn get_assignment_map_depth(first_variable_id: Atom, assignment_map: &mut BTreeM
     max_depth
 }
 
+/// Check if a loop condition can evaluate to false with the initial variable types.
+///
+/// For simple comparisons like `$i < $n`, tests whether the types' bounds
+/// allow the comparison to be false. For example, `int(0) < int<0, max>`
+/// can be false when `$n = 0`.
+fn can_condition_be_initially_false(pre_condition: &Expression<'_>, artifacts: &AnalysisArtifacts) -> bool {
+    let Expression::Binary(binary) = pre_condition else {
+        return false;
+    };
+
+    let Some(left_type) = artifacts.get_expression_type(binary.lhs) else {
+        return false;
+    };
+
+    let Some(right_type) = artifacts.get_expression_type(binary.rhs) else {
+        return false;
+    };
+
+    let left_int = left_type.types.iter().find_map(|a| match a {
+        TAtomic::Scalar(TScalar::Integer(i)) => Some(i),
+        _ => None,
+    });
+
+    let right_int = right_type.types.iter().find_map(|a| match a {
+        TAtomic::Scalar(TScalar::Integer(i)) => Some(i),
+        _ => None,
+    });
+
+    let (Some(left_int), Some(right_int)) = (left_int, right_int) else {
+        return false;
+    };
+
+    let (left_lb, left_ub) = left_int.get_bounds();
+    let (right_lb, right_ub) = right_int.get_bounds();
+
+    match &binary.operator {
+        // $a < $b is false when $a >= $b. Possible when min($a) >= min($b).
+        BinaryOperator::LessThan(_) => {
+            matches!((left_lb, right_lb), (Some(a), Some(b)) if a >= b)
+        }
+        // $a <= $b is false when $a > $b. Possible when min($a) > min($b).
+        BinaryOperator::LessThanOrEqual(_) => {
+            matches!((left_lb, right_lb), (Some(a), Some(b)) if a > b)
+        }
+        // $a > $b is false when $a <= $b. Possible when max($a) <= max($b).
+        BinaryOperator::GreaterThan(_) => {
+            matches!((left_ub, right_ub), (Some(a), Some(b)) if a <= b)
+        }
+        // $a >= $b is false when $a < $b. Possible when max($a) < max($b).
+        BinaryOperator::GreaterThanOrEqual(_) => {
+            matches!((left_ub, right_ub), (Some(a), Some(b)) if a < b)
+        }
+        _ => false,
+    }
+}
+
 fn apply_pre_condition_to_loop_context<'ctx, 'arena>(
     context: &mut Context<'ctx, 'arena>,
     pre_condition: &Expression<'arena>,
@@ -829,14 +913,24 @@ fn apply_pre_condition_to_loop_context<'ctx, 'arena>(
     loop_context.flags.set_inside_conditional(false);
 
     if first_application {
-        let is_truthy = if let Some(condition_type) = artifacts.get_expression_type(pre_condition) {
-            condition_type.is_always_truthy()
-        } else {
-            false
-        };
+        let condition_type = artifacts.get_expression_type(pre_condition);
+        let is_always_falsy = condition_type.is_some_and(|ct| ct.is_always_falsy());
+        let is_always_truthy = condition_type.is_some_and(|ct| ct.is_always_truthy());
 
-        if let Some(loop_scope) = artifacts.get_loop_scope_mut() {
-            loop_scope.truthy_pre_conditions = loop_scope.truthy_pre_conditions && is_truthy;
+        if is_always_falsy {
+            if let Some(loop_scope) = artifacts.get_loop_scope_mut() {
+                loop_scope.truthy_pre_conditions = false;
+                loop_scope.condition_always_false = true;
+            }
+        } else if !is_always_truthy {
+            // The condition is indeterminate (bool). Check if the loop condition
+            // can be false with the initial variable values by testing the boundary
+            // of integer ranges involved in the comparison.
+            if can_condition_be_initially_false(pre_condition, artifacts)
+                && let Some(loop_scope) = artifacts.get_loop_scope_mut()
+            {
+                loop_scope.truthy_pre_conditions = false;
+            }
         }
     }
 

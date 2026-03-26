@@ -500,13 +500,16 @@ impl TScalar {
             TScalar::Bool(b) => b.is_true(),
             TScalar::Integer(i) => match i.get_literal_value() {
                 Some(v) => v != 0,
-                None => match i.get_minimum_value() {
-                    Some(v) => v != 0,
-                    None => match i.get_maximum_value() {
-                        Some(v) => v != 0,
-                        None => false,
-                    },
-                },
+                None => {
+                    // A ranged integer is always truthy only when 0 is not in the range.
+                    // This requires either min > 0 or max < 0.
+                    let (lb, ub) = i.get_bounds();
+                    match (lb, ub) {
+                        (Some(min), _) if min > 0 => true,
+                        (_, Some(max)) if max < 0 => true,
+                        _ => false,
+                    }
+                }
             },
             TScalar::Float(f) => f.get_literal_value().is_some_and(|v| v != 0.0),
             TScalar::String(s) => s.is_truthy,
