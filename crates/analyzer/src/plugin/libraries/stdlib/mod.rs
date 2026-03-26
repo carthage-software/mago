@@ -2,6 +2,7 @@
 
 pub mod array;
 pub mod closure;
+pub mod cookie;
 pub mod r#enum;
 pub mod filter;
 pub mod json;
@@ -50,6 +51,8 @@ impl Plugin for StdlibPlugin {
         registry.register_function_provider(math::MinProvider);
         registry.register_function_provider(math::MaxProvider);
         registry.register_function_provider(math::AbsProvider);
+
+        registry.register_function_call_hook(cookie::SetCookieHook);
 
         registry.register_method_provider(closure::ClosureGetCurrentProvider);
         registry.register_method_provider(r#enum::EnumCasesProvider);

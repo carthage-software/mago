@@ -417,6 +417,9 @@ test_case!(possibly_undefined_string_key_in_union, {
 });
 test_case!(only_ascii_is_caseless);
 test_case!(allow_unknown_array_key_in_assignment);
+test_case!(psl_async_integration);
+test_case!(parent_static_call_template_resolution);
+test_case!(bitwise_shift_bounds);
 
 // Github Issues
 test_case!(issue_659);
@@ -728,9 +731,7 @@ test_case!(issue_1415);
 test_case!(issue_1416);
 test_case!(issue_1422);
 test_case!(issue_1429);
-test_case!(psl_async_integration);
-test_case!(parent_static_call_template_resolution);
-test_case!(bitwise_shift_bounds);
+test_case!(issue_1467);
 
 #[test]
 fn test_all_test_cases_are_ran() {
