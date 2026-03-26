@@ -1157,9 +1157,11 @@ fn scrape_lesser_than_assertions(
 
     // Generate assertions for the right variable based on the left variable's type.
     // For an expression `$a < $b`, this asserts `$b` is greater than the lower bound of `$a`.
-    // Same restriction: range bounds only used when the left operand is a trackable variable.
+    // Range bounds are NOT used here: using `$a`'s lower bound to assert `$b > min($a)` is
+    // correct for the true branch, but when negated gives `$b <= min($a)` which is wrong
+    // (the false branch only implies `$b <= $a`, not `$b <= min($a)`).
     if let (Some(right_var_id), Some(left_int)) = (right_id, &left_integer) {
-        let use_range_bounds = left_id.is_some();
+        let use_range_bounds = false;
 
         let assertion_result = if matches!(operator, BinaryOperator::LessThanOrEqual(_)) {
             match *left_int {
