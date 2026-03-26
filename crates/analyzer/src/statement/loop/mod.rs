@@ -1077,10 +1077,10 @@ fn update_loop_scope_contexts<'ctx>(
         }
 
         for (variable_id, pre_type) in &pre_outer_context.locals {
-            if let Some(current_type) = continue_context.locals.get(variable_id) {
-                if current_type.is_never() {
-                    continue_context.locals.insert(*variable_id, pre_type.clone());
-                }
+            if let Some(current_type) = continue_context.locals.get(variable_id)
+                && current_type.is_never()
+            {
+                continue_context.locals.insert(*variable_id, pre_type.clone());
             }
         }
     } else {
