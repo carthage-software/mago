@@ -254,6 +254,7 @@ define_rules! {
     NoEmptyComment(no_empty_comment @ NoEmptyCommentRule),
     NoEmptyCatchClause(no_empty_catch_clause @ NoEmptyCatchClauseRule),
     NoElseClause(no_else_clause @ NoElseClauseRule),
+    NoShorthandArrayType(no_shorthand_array_type @ NoShorthandArrayTypeRule),
     NoClosingTag(no_closing_tag @ NoClosingTagRule),
     NoBooleanFlagParameter(no_boolean_flag_parameter @ NoBooleanFlagParameterRule),
     NoAssignInArgument(no_assign_in_argument @ NoAssignInArgumentRule),
