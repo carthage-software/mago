@@ -60,22 +60,21 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for If<'arena> {
     ) -> Result<(), AnalysisError> {
         let mut if_scope = IfScope::new();
 
-        // We need to clone the original context for later use if we're exiting in this if conditional
-        if is_obvious_boolean_condition(self.condition) {
+        let needs_post_leaving_context = is_obvious_boolean_condition(self.condition) && {
             let final_actions =
                 ControlAction::from_statements(self.body.statements().iter().collect(), vec![], Some(artifacts), true);
 
-            let has_leaving_statements = final_actions.len() == 1 && final_actions.contains(ControlAction::End)
-                || (!final_actions.is_empty() && !final_actions.contains(ControlAction::None));
-
-            if has_leaving_statements {
-                if_scope.post_leaving_if_context = Some(block_context.clone());
-            }
-        }
+            final_actions.len() == 1 && final_actions.contains(ControlAction::End)
+                || (!final_actions.is_empty() && !final_actions.contains(ControlAction::None))
+        };
 
         let (mut if_conditional_scope, applied_block_context) =
             conditional::analyze(context, block_context.clone(), artifacts, &mut if_scope, self.condition, true)?;
         *block_context = applied_block_context;
+
+        if needs_post_leaving_context {
+            if_scope.post_leaving_if_context = Some(block_context.clone());
+        }
 
         let mut if_block_context = if_conditional_scope.if_body_context.clone();
 
