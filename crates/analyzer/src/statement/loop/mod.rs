@@ -1,3 +1,4 @@
+use std::cell::Cell;
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::rc::Rc;
@@ -12,12 +13,13 @@ use mago_algebra::saturate_clauses;
 use mago_atom::Atom;
 use mago_atom::AtomSet;
 use mago_atom::atom;
-
 use mago_codex::ttype;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::add_optional_union_type;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::array::TArray;
+use mago_codex::ttype::atomic::array::keyed::TKeyedArray;
+use mago_codex::ttype::atomic::array::list::TList;
 use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::bool::TBool;
@@ -148,6 +150,38 @@ fn analyze_for_or_while_loop<'ctx, 'ast, 'arena>(
         infinite_loop,
     );
 
+    if always_enters_loop && !infinite_loop {
+        for (_, variable_type) in block_context.locals.iter_mut() {
+            let mut union = (**variable_type).clone();
+            let mut changed = false;
+            for atomic in union.types.to_mut().iter_mut() {
+                match atomic {
+                    TAtomic::Array(TArray::Keyed(TKeyedArray { known_items: Some(items), .. })) => {
+                        for (optional, _) in items.values_mut() {
+                            if *optional {
+                                *optional = false;
+                                changed = true;
+                            }
+                        }
+                    }
+                    TAtomic::Array(TArray::List(TList { known_elements: Some(elements), .. })) => {
+                        for (optional, _) in elements.values_mut() {
+                            if *optional {
+                                *optional = false;
+                                changed = true;
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
+
+            if changed {
+                *variable_type = Rc::new(union);
+            }
+        }
+    }
+
     Ok(())
 }
 
@@ -223,6 +257,8 @@ fn analyze<'ctx, 'ast, 'arena>(
     is_do: bool,
     always_enters_loop: bool,
 ) -> Result<(BlockContext<'ctx>, LoopScope), AnalysisError> {
+    let always_enters_loop = Cell::new(always_enters_loop);
+
     let (assignment_map, first_variable_id) = get_assignment_map(pre_conditions, &post_expressions, statements);
     let assignment_depth = if let Some(first_variable_id) = first_variable_id {
         get_assignment_map_depth(first_variable_id, &mut assignment_map.clone())
@@ -325,6 +361,15 @@ fn analyze<'ctx, 'ast, 'arena>(
         }
 
         pre_conditions_applied = true;
+        if !pre_conditions.is_empty() {
+            loop_scope = unsafe { artifacts.take_loop_scope_unchecked() };
+            if loop_scope.truthy_pre_conditions {
+                always_enters_loop.set(true);
+            }
+
+            artifacts.set_loop_scope(loop_scope.clone());
+        }
+
         analyze_statements(statements, context, &mut continue_context, artifacts)?;
         loop_scope = unsafe {
             // SAFETY: we know the loop scope will remain in the context.
@@ -423,21 +468,20 @@ fn analyze<'ctx, 'ast, 'arena>(
 
         (loop_scope, continue_context) = result?;
 
+        if !pre_conditions.is_empty() && loop_scope.truthy_pre_conditions {
+            always_enters_loop.set(true);
+        }
+
         let mut i = 0;
         while i < assignment_depth {
             let mut variables_to_remove = Vec::new();
 
             loop_scope.iteration_count += 1;
 
-            let mut has_changes = false;
-
-            // reset the $continue_context to what it was before we started the analysis,
-            // but union the types with what's in the loop scope
-
-            if pre_loop_context.locals.iter().any(|(variable_id, _)| !continue_context.locals.contains_key(variable_id))
-            {
-                has_changes = true;
-            }
+            let mut has_changes = pre_loop_context
+                .locals
+                .iter()
+                .any(|(variable_id, _)| !continue_context.locals.contains_key(variable_id));
 
             let mut different_from_pre_loop_types = HashSet::default();
 
@@ -456,7 +500,6 @@ fn analyze<'ctx, 'ast, 'arena>(
                     if continue_context_type != *parent_context_type {
                         has_changes = true;
 
-                        // widen the foreach context type with the initial context type
                         continue_context.locals.insert(
                             variable_id,
                             Rc::new(simplify_generic_subset_arrays(combine_union_types(
@@ -477,7 +520,6 @@ fn analyze<'ctx, 'ast, 'arena>(
                             has_changes = true;
                         }
 
-                        // widen the foreach context type with the initial context type
                         let combined = combine_union_types(
                             &continue_context_type,
                             loop_context_type,
@@ -647,7 +689,10 @@ fn analyze<'ctx, 'ast, 'arena>(
                             possibly_redefined_variable_type,
                             do_context_type,
                             codebase,
-                            CombinerOptions { overwrite_empty_array: always_enters_loop, ..CombinerOptions::default() },
+                            CombinerOptions {
+                                overwrite_empty_array: always_enters_loop.get(),
+                                ..CombinerOptions::default()
+                            },
                         ))
                     };
                 }
@@ -663,7 +708,10 @@ fn analyze<'ctx, 'ast, 'arena>(
                         variable_type,
                         loop_parent_context_type,
                         codebase,
-                        CombinerOptions { overwrite_empty_array: always_enters_loop, ..CombinerOptions::default() },
+                        CombinerOptions {
+                            overwrite_empty_array: always_enters_loop.get(),
+                            ..CombinerOptions::default()
+                        },
                     ));
                 }
 
@@ -681,7 +729,10 @@ fn analyze<'ctx, 'ast, 'arena>(
                         variable_type,
                         loop_context_type,
                         codebase,
-                        CombinerOptions { overwrite_empty_array: always_enters_loop, ..CombinerOptions::default() },
+                        CombinerOptions {
+                            overwrite_empty_array: always_enters_loop.get(),
+                            ..CombinerOptions::default()
+                        },
                     )),
                 );
 
@@ -709,7 +760,10 @@ fn analyze<'ctx, 'ast, 'arena>(
                             &variable_type,
                             continue_context_type,
                             codebase,
-                            CombinerOptions { overwrite_empty_array: always_enters_loop, ..CombinerOptions::default() },
+                            CombinerOptions {
+                                overwrite_empty_array: always_enters_loop.get(),
+                                ..CombinerOptions::default()
+                            },
                         )),
                     );
                     loop_parent_context.remove_variable_from_conflicting_clauses(context, variable_id, None);
@@ -766,7 +820,7 @@ fn analyze<'ctx, 'ast, 'arena>(
         }
     }
 
-    if always_enters_loop {
+    if always_enters_loop.get() {
         let does_sometimes_continue = loop_scope.final_actions.contains(ControlAction::Continue);
 
         for (variable_id, variable_type) in &continue_context.locals {
