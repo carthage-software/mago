@@ -51,14 +51,14 @@ function iconv_strrpos(string $haystack, string $needle, ?string $encoding = nul
 function iconv_mime_encode(string $field_name, string $field_value, array $options = []): string|false {}
 
 /**
- * @param 1|2 $mode
+ * @param int<0, 3> $mode
  *
  * @pure
  */
 function iconv_mime_decode(string $string, int $mode = 0, ?string $encoding = null): string|false {}
 
 /**
- * @param 1|2 $mode
+ * @param int<0, 3> $mode
  *
  * @return array<string, string|non-empty-list<string>>|false
  *
