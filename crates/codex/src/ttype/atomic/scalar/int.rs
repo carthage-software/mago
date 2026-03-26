@@ -1398,25 +1398,52 @@ impl Neg for TInteger {
     }
 }
 
+/// Smears all bits below the MSB.
+/// e.g., 0b1010 → 0b1111, 0b10000 → 0b11111
+fn bit_smear(v: i64) -> i64 {
+    let mut v = v;
+    v |= v >> 1;
+    v |= v >> 2;
+    v |= v >> 4;
+    v |= v >> 8;
+    v |= v >> 16;
+    v |= v >> 32;
+    v
+}
+
 impl BitAnd for TInteger {
     type Output = TInteger;
 
     /// Performs a bitwise AND operation.
-    ///
-    /// The operation is only computed for two `Literal` values. All other
-    /// combinations result in `Unspecified` because the resulting set of
-    /// possible values is not guaranteed to be a continuous range.
     fn bitand(self, rhs: Self) -> Self::Output {
         use TInteger::Literal;
         use TInteger::Unspecified;
         use TInteger::UnspecifiedLiteral;
+
         match (self, rhs) {
-            (Literal(l1), Literal(l2)) => Literal(l1 & l2),
+            (Literal(l), Literal(r)) => Literal(l & r),
             (UnspecifiedLiteral | Literal(_), UnspecifiedLiteral) | (UnspecifiedLiteral, Literal(_)) => {
                 UnspecifiedLiteral
             }
-            (_, Literal(mask)) | (Literal(mask), _) if mask >= 0 => TInteger::from_bounds(Some(0), Some(mask)),
-            _ => Unspecified,
+            (l, r) => {
+                let l_non_neg = l.get_minimum_value().is_some_and(|v| v >= 0);
+                let r_non_neg = r.get_minimum_value().is_some_and(|v| v >= 0);
+
+                let upper = match (l_non_neg, r_non_neg) {
+                    (false, false) => {
+                        return Unspecified;
+                    }
+                    (true, true) => match (l.get_maximum_value(), r.get_maximum_value()) {
+                        (Some(a), Some(b)) => Some(a.min(b)),
+                        (Some(v), None) | (None, Some(v)) => Some(v),
+                        (None, None) => None,
+                    },
+                    (true, false) => l.get_maximum_value(),
+                    (false, true) => r.get_maximum_value(),
+                };
+
+                TInteger::from_bounds(Some(0), upper)
+            }
         }
     }
 }
@@ -1425,19 +1452,37 @@ impl BitOr for TInteger {
     type Output = TInteger;
 
     /// Performs a bitwise OR operation.
-    ///
-    /// The operation is only computed for two `Literal` values. All other
-    /// combinations result in `Unspecified`.
     fn bitor(self, rhs: Self) -> Self::Output {
         use TInteger::Literal;
         use TInteger::Unspecified;
         use TInteger::UnspecifiedLiteral;
+
         match (self, rhs) {
-            (Literal(l1), Literal(l2)) => Literal(l1 | l2),
+            (Literal(l), Literal(r)) => Literal(l | r),
             (UnspecifiedLiteral | Literal(_), UnspecifiedLiteral) | (UnspecifiedLiteral, Literal(_)) => {
                 UnspecifiedLiteral
             }
-            _ => Unspecified,
+            (l, r) => {
+                let l_non_neg = l.get_minimum_value().is_some_and(|v| v >= 0);
+                let r_non_neg = r.get_minimum_value().is_some_and(|v| v >= 0);
+
+                if !(l_non_neg && r_non_neg) {
+                    return Unspecified;
+                }
+
+                let lower = match (l.get_minimum_value(), r.get_minimum_value()) {
+                    (Some(a), Some(b)) => Some(a.max(b)),
+                    (Some(v), None) | (None, Some(v)) => Some(v),
+                    (None, None) => Some(0),
+                };
+
+                let upper = match (l.get_maximum_value(), r.get_maximum_value()) {
+                    (Some(a), Some(b)) => Some(bit_smear(a.max(b))),
+                    _ => None,
+                };
+
+                TInteger::from_bounds(lower, upper)
+            }
         }
     }
 }
@@ -1446,19 +1491,32 @@ impl BitXor for TInteger {
     type Output = TInteger;
 
     /// Performs a bitwise XOR operation.
-    ///
-    /// The operation is only computed for two `Literal` values. All other
-    /// combinations result in `Unspecified`.
     fn bitxor(self, rhs: Self) -> Self::Output {
         use TInteger::Literal;
         use TInteger::Unspecified;
         use TInteger::UnspecifiedLiteral;
+
         match (self, rhs) {
-            (Literal(l1), Literal(l2)) => Literal(l1 ^ l2),
+            (Literal(l), Literal(r)) => Literal(l ^ r),
+            (Literal(0), other) | (other, Literal(0)) => other,
             (UnspecifiedLiteral | Literal(_), UnspecifiedLiteral) | (UnspecifiedLiteral, Literal(_)) => {
                 UnspecifiedLiteral
             }
-            _ => Unspecified,
+            (l, r) => {
+                let l_non_neg = l.get_minimum_value().is_some_and(|v| v >= 0);
+                let r_non_neg = r.get_minimum_value().is_some_and(|v| v >= 0);
+
+                if !(l_non_neg && r_non_neg) {
+                    return Unspecified;
+                }
+
+                let upper = match (l.get_maximum_value(), r.get_maximum_value()) {
+                    (Some(a), Some(b)) => Some(bit_smear(a.max(b))),
+                    _ => None,
+                };
+
+                TInteger::from_bounds(Some(0), upper)
+            }
         }
     }
 }
@@ -1467,47 +1525,56 @@ impl Shl<TInteger> for TInteger {
     type Output = TInteger;
 
     /// Performs a bitwise left shift (`<<`) operation.
-    ///
-    /// This is computed precisely if the shift amount (`rhs`) is a non-negative `Literal`.
-    /// Otherwise, the result is `Unspecified`.
     fn shl(self, rhs: TInteger) -> Self::Output {
-        use TInteger::From;
-        use TInteger::Literal;
-        use TInteger::Range;
-        use TInteger::To;
-        use TInteger::Unspecified;
-        use TInteger::UnspecifiedLiteral;
-        // We can only calculate the result if the shift amount is a known literal.
-        if let Literal(shift_amount) = rhs {
-            // Shifts must be non-negative and less than the bit width of i64.
-            if !(0..64).contains(&shift_amount) {
-                return Unspecified;
-            }
+        use TInteger::*;
 
-            let shift_amount = shift_amount as u32;
-
-            return match self {
-                Literal(val) => Literal(val.shl(shift_amount)),
-                From(from) => From(from.shl(shift_amount)),
-                To(to) => To(to.shl(shift_amount)),
-                Range(from, to) => {
-                    // For left shifts, the order of bounds is always preserved.
-                    let r1 = from.shl(shift_amount);
-                    let r2 = to.shl(shift_amount);
-                    Range(r1, r2)
+        match (self, rhs) {
+            (Literal(0), _) => Literal(0),
+            (Literal(l), Literal(r)) => {
+                if !(0..64).contains(&r) {
+                    return Unspecified;
                 }
-                Unspecified => Unspecified,
-                UnspecifiedLiteral => UnspecifiedLiteral,
-            };
-        }
+                Literal(l.wrapping_shl(r as u32))
+            }
+            (UnspecifiedLiteral | Literal(_), UnspecifiedLiteral) | (UnspecifiedLiteral, Literal(_)) => {
+                UnspecifiedLiteral
+            }
+            (val, Literal(0)) => val,
+            (val, Literal(shift)) if (1..64).contains(&shift) => {
+                let s = shift as u32;
+                match val {
+                    Literal(v) => Literal(v.wrapping_shl(s)),
+                    From(lo) => lo.checked_shl(s).map_or(Unspecified, From),
+                    To(hi) => hi.checked_shl(s).map_or(Unspecified, To),
+                    Range(lo, hi) => match (lo.checked_shl(s), hi.checked_shl(s)) {
+                        (Some(a), Some(b)) => Range(a, b),
+                        _ => Unspecified,
+                    },
+                    Unspecified => Unspecified,
+                    UnspecifiedLiteral => UnspecifiedLiteral,
+                }
+            }
+            (ref val, ref shift) => {
+                let val_non_neg = val.get_minimum_value().is_some_and(|v| v >= 0);
+                let shift_non_neg = shift.get_minimum_value().is_some_and(|v| v >= 0);
+                let shift_bounded = shift.get_maximum_value().is_some_and(|v| v < 64);
 
-        // Special case: UnspecifiedLiteral shifted by UnspecifiedLiteral
-        if self.is_unspecified_literal() && rhs.is_unspecified_literal() {
-            return UnspecifiedLiteral;
-        }
+                if val_non_neg && shift_non_neg && shift_bounded {
+                    let s_min = shift.get_minimum_value().unwrap() as u32;
+                    let s_max = shift.get_maximum_value().unwrap() as u32;
+                    let lower = val.get_minimum_value().and_then(|v| v.checked_shl(s_min));
+                    let upper = val.get_maximum_value().and_then(|v| v.checked_shl(s_max));
 
-        // If the shift amount is a range, the result is not a continuous interval.
-        Unspecified
+                    match (lower, upper) {
+                        (Some(lo), Some(hi)) => TInteger::from_bounds(Some(lo), Some(hi)),
+                        (Some(lo), None) => From(lo),
+                        _ => Unspecified,
+                    }
+                } else {
+                    Unspecified
+                }
+            }
+        }
     }
 }
 
@@ -1515,45 +1582,55 @@ impl Shr for TInteger {
     type Output = TInteger;
 
     /// Performs a bitwise arithmetic right shift (`>>`) operation.
-    ///
-    /// This is computed precisely if the shift amount (`rhs`) is a non-negative `Literal`.
-    /// Otherwise, the result is `Unspecified`.
     fn shr(self, rhs: TInteger) -> Self::Output {
-        use TInteger::From;
-        use TInteger::Literal;
-        use TInteger::Range;
-        use TInteger::To;
-        use TInteger::Unspecified;
-        use TInteger::UnspecifiedLiteral;
+        use TInteger::*;
 
-        if let Literal(shift_amount) = rhs {
-            if !(0..64).contains(&shift_amount) {
-                return Unspecified;
-            }
-
-            let shift_amount = shift_amount as u32;
-
-            return match self {
-                Literal(val) => Literal(val.shr(shift_amount)),
-                From(from) => From(from.shr(shift_amount)),
-                To(to) => To(to.shr(shift_amount)),
-                Range(from, to) => {
-                    let r1 = from.shr(shift_amount);
-                    let r2 = to.shr(shift_amount);
-
-                    Range(min(r1, r2), max(r1, r2))
+        match (self, rhs) {
+            (Literal(l), Literal(r)) => {
+                if !(0..64).contains(&r) {
+                    return Unspecified;
                 }
-                Unspecified => Unspecified,
-                UnspecifiedLiteral => UnspecifiedLiteral,
-            };
-        }
+                Literal(l >> r as u32)
+            }
+            (UnspecifiedLiteral | Literal(_), UnspecifiedLiteral) | (UnspecifiedLiteral, Literal(_)) => {
+                UnspecifiedLiteral
+            }
+            (Literal(0), ref r) if r.get_minimum_value().is_some_and(|v| v >= 0) => Literal(0),
+            (val, Literal(0)) => val,
+            (val, Literal(shift)) if (1..64).contains(&shift) => {
+                let s = shift as u32;
+                match val {
+                    Literal(v) => Literal(v >> s),
+                    From(lo) => From(lo >> s),
+                    To(hi) => To(hi >> s),
+                    Range(lo, hi) => {
+                        let r1 = lo >> s;
+                        let r2 = hi >> s;
+                        Range(min(r1, r2), max(r1, r2))
+                    }
+                    Unspecified => Unspecified,
+                    UnspecifiedLiteral => UnspecifiedLiteral,
+                }
+            }
+            (ref val, ref shift) => {
+                let val_non_neg = val.get_minimum_value().is_some_and(|v| v >= 0);
+                let shift_non_neg = shift.get_minimum_value().is_some_and(|v| v >= 0);
 
-        // Special case: UnspecifiedLiteral shifted by UnspecifiedLiteral
-        if self.is_unspecified_literal() && rhs.is_unspecified_literal() {
-            return UnspecifiedLiteral;
-        }
+                if val_non_neg && shift_non_neg {
+                    let s_min = (shift.get_minimum_value().unwrap() as u32).min(63);
+                    let s_max = shift.get_maximum_value().map(|v| (v as u32).min(63));
+                    let upper = val.get_maximum_value().map(|v| v >> s_min);
+                    let lower = match s_max {
+                        Some(s) => val.get_minimum_value().map(|v| v >> s),
+                        None => Some(0),
+                    };
 
-        Unspecified
+                    TInteger::from_bounds(lower, upper)
+                } else {
+                    Unspecified
+                }
+            }
+        }
     }
 }
 
@@ -1766,39 +1843,125 @@ mod tests {
 
     #[test]
     fn test_bitwise_ops() {
+        // AND
         assert_eq!(TInteger::Literal(6) & TInteger::Literal(3), TInteger::Literal(2));
-        assert_eq!(TInteger::Literal(5) & TInteger::Range(0, 10), TInteger::Unspecified);
-        assert_eq!(TInteger::Range(0, 10) & TInteger::Literal(5), TInteger::Unspecified);
-        assert_eq!(TInteger::From(1) & TInteger::Literal(5), TInteger::Unspecified);
-        assert_eq!(TInteger::To(10) & TInteger::Literal(5), TInteger::Unspecified);
-        assert_eq!(TInteger::Range(0, 10) & TInteger::Range(0, 10), TInteger::Unspecified);
-        assert_eq!(TInteger::Unspecified & TInteger::Literal(5), TInteger::Unspecified);
-        assert_eq!(TInteger::Literal(5) | TInteger::Literal(2), TInteger::Literal(7));
-        assert_eq!(TInteger::Literal(5) | TInteger::Range(0, 10), TInteger::Unspecified);
-        assert_eq!(TInteger::Range(0, 10) | TInteger::Literal(5), TInteger::Unspecified);
-        assert_eq!(TInteger::Unspecified | TInteger::Literal(5), TInteger::Unspecified);
+        assert_eq!(TInteger::Literal(5) & TInteger::Range(0, 10), TInteger::Range(0, 5));
+        assert_eq!(TInteger::Range(0, 10) & TInteger::Literal(5), TInteger::Range(0, 5));
+        assert_eq!(TInteger::From(1) & TInteger::Literal(5), TInteger::Range(0, 5));
+        assert_eq!(TInteger::To(10) & TInteger::Literal(5), TInteger::Range(0, 5));
+        assert_eq!(TInteger::Unspecified & TInteger::Literal(5), TInteger::Range(0, 5));
+        assert_eq!(TInteger::Literal(6) & TInteger::Literal(3), TInteger::Literal(2));
+        assert_eq!(TInteger::Literal(0xFF) & TInteger::Literal(0x0F), TInteger::Literal(0x0F));
+        assert_eq!(TInteger::Literal(0) & TInteger::Literal(123), TInteger::Literal(0));
+        assert_eq!(TInteger::Literal(-1) & TInteger::Literal(7), TInteger::Literal(7));
+        assert_eq!(TInteger::Literal(-1) & TInteger::Literal(-1), TInteger::Literal(-1));
+        assert_eq!(TInteger::Literal(5) & TInteger::Range(0, 10), TInteger::Range(0, 5));
+        assert_eq!(TInteger::Range(0, 10) & TInteger::Literal(5), TInteger::Range(0, 5));
+        assert_eq!(TInteger::From(1) & TInteger::Literal(5), TInteger::Range(0, 5));
+        assert_eq!(TInteger::To(10) & TInteger::Literal(5), TInteger::Range(0, 5));
+        assert_eq!(TInteger::Unspecified & TInteger::Literal(5), TInteger::Range(0, 5));
+        assert_eq!(TInteger::Literal(15) & TInteger::Unspecified, TInteger::Range(0, 15));
+        assert_eq!(TInteger::Range(0, 10) & TInteger::Range(0, 10), TInteger::Range(0, 10));
+        assert_eq!(TInteger::Range(0, 100) & TInteger::Range(0, 10), TInteger::Range(0, 10));
+        assert_eq!(TInteger::Range(5, 15) & TInteger::Range(3, 7), TInteger::Range(0, 7));
+        assert_eq!(TInteger::Range(0, 255) & TInteger::Range(0, 15), TInteger::Range(0, 15));
+        assert_eq!(TInteger::Range(0, 10) & TInteger::From(0), TInteger::Range(0, 10));
+        assert_eq!(TInteger::From(0) & TInteger::Range(0, 10), TInteger::Range(0, 10));
+        assert_eq!(TInteger::Range(0, 255) & TInteger::From(5), TInteger::Range(0, 255));
+        assert_eq!(TInteger::From(0) & TInteger::From(0), TInteger::From(0));
+        assert_eq!(TInteger::From(5) & TInteger::From(3), TInteger::From(0));
+        assert_eq!(TInteger::Range(0, 10) & TInteger::Unspecified, TInteger::Range(0, 10));
+        assert_eq!(TInteger::Unspecified & TInteger::Range(0, 10), TInteger::Range(0, 10));
+        assert_eq!(TInteger::From(0) & TInteger::Unspecified, TInteger::From(0));
+        assert_eq!(TInteger::Range(0, 10) & TInteger::To(100), TInteger::Range(0, 10));
+        assert_eq!(TInteger::Range(0, 10) & TInteger::Range(-5, 20), TInteger::Range(0, 10));
+        assert_eq!(TInteger::To(10) & TInteger::To(10), TInteger::Unspecified);
+        assert_eq!(TInteger::Unspecified & TInteger::Unspecified, TInteger::Unspecified);
+        assert_eq!(TInteger::Range(-10, 10) & TInteger::Range(-10, 10), TInteger::Unspecified);
+        // OR
+        assert_eq!(TInteger::Literal(6) | TInteger::Literal(3), TInteger::Literal(7));
+        assert_eq!(TInteger::Literal(0) | TInteger::Literal(5), TInteger::Literal(5));
+        assert_eq!(TInteger::Literal(0xFF) | TInteger::Literal(0x0F), TInteger::Literal(0xFF));
+        assert_eq!(TInteger::Literal(-1) | TInteger::Literal(7), TInteger::Literal(-1));
+        assert_eq!(TInteger::Range(0, 10) | TInteger::Range(0, 10), TInteger::Range(0, 15));
+        assert_eq!(TInteger::Range(0, 15) | TInteger::Range(0, 15), TInteger::Range(0, 15));
+        assert_eq!(TInteger::Range(0, 8) | TInteger::Range(0, 1), TInteger::Range(0, 15));
+        assert_eq!(TInteger::Range(5, 10) | TInteger::Range(3, 7), TInteger::Range(5, 15));
+        assert_eq!(TInteger::Range(0, 255) | TInteger::Range(0, 15), TInteger::Range(0, 255));
+        assert_eq!(TInteger::Range(0, 10) | TInteger::Literal(3), TInteger::Range(3, 15));
+        assert_eq!(TInteger::Literal(0) | TInteger::Range(0, 255), TInteger::Range(0, 255));
+        assert_eq!(TInteger::Range(4, 8) | TInteger::Literal(1), TInteger::Range(4, 15));
+        assert_eq!(TInteger::Range(0, 10) | TInteger::From(0), TInteger::From(0));
+        assert_eq!(TInteger::From(5) | TInteger::From(3), TInteger::From(5));
+        assert_eq!(TInteger::From(0) | TInteger::Literal(7), TInteger::From(7));
+        assert_eq!(TInteger::Range(-5, 5) | TInteger::Range(0, 10), TInteger::Unspecified);
+        assert_eq!(TInteger::Unspecified | TInteger::Range(0, 10), TInteger::Unspecified);
+        assert_eq!(TInteger::Unspecified | TInteger::Unspecified, TInteger::Unspecified);
+        assert_eq!(TInteger::To(10) | TInteger::Range(0, 5), TInteger::Unspecified);
+        // XOR
         assert_eq!(TInteger::Literal(6) ^ TInteger::Literal(3), TInteger::Literal(5));
-        assert_eq!(TInteger::Literal(5) ^ TInteger::Range(0, 10), TInteger::Unspecified);
-        assert_eq!(TInteger::Range(0, 10) ^ TInteger::Literal(5), TInteger::Unspecified);
-        assert_eq!(TInteger::Unspecified ^ TInteger::Literal(5), TInteger::Unspecified);
+        assert_eq!(TInteger::Literal(5) ^ TInteger::Literal(5), TInteger::Literal(0));
+        assert_eq!(TInteger::Literal(0xFF) ^ TInteger::Literal(0x0F), TInteger::Literal(0xF0));
+        assert_eq!(TInteger::Range(0, 10) ^ TInteger::Range(0, 10), TInteger::Range(0, 15));
+        assert_eq!(TInteger::Range(0, 7) ^ TInteger::Range(0, 7), TInteger::Range(0, 7));
+        assert_eq!(TInteger::Range(0, 255) ^ TInteger::Range(0, 15), TInteger::Range(0, 255));
+        assert_eq!(TInteger::Range(5, 10) ^ TInteger::Range(3, 7), TInteger::Range(0, 15));
+        assert_eq!(TInteger::Range(0, 10) ^ TInteger::Literal(3), TInteger::Range(0, 15));
+        assert_eq!(TInteger::Range(0, 255) ^ TInteger::Literal(0xFF), TInteger::Range(0, 255));
+        assert_eq!(TInteger::Range(0, 10) ^ TInteger::From(0), TInteger::From(0));
+        assert_eq!(TInteger::From(0) ^ TInteger::From(0), TInteger::From(0));
+        assert_eq!(TInteger::Range(-5, 5) ^ TInteger::Range(0, 10), TInteger::Unspecified);
+        assert_eq!(TInteger::Unspecified ^ TInteger::Range(0, 10), TInteger::Unspecified);
+        assert_eq!(TInteger::Unspecified ^ TInteger::Unspecified, TInteger::Unspecified);
+        assert_eq!(TInteger::Literal(0) ^ TInteger::Range(0, 10), TInteger::Range(0, 10));
+        assert_eq!(TInteger::Literal(0) ^ TInteger::Literal(5), TInteger::Literal(5));
+        assert_eq!(TInteger::Range(0, 10) ^ TInteger::Literal(0), TInteger::Range(0, 10));
     }
 
     #[test]
     fn test_shift_ops() {
-        assert_eq!(TInteger::Literal(5) << TInteger::Literal(2), TInteger::Literal(20));
-        assert_eq!(TInteger::Range(10, 20) << TInteger::Literal(1), TInteger::Range(20, 40));
-        assert_eq!(TInteger::From(100) << TInteger::Literal(2), TInteger::From(400));
-        assert_eq!(TInteger::To(-10) << TInteger::Literal(1), TInteger::To(-20));
-        assert_eq!(TInteger::Literal(5) << TInteger::Range(1, 3), TInteger::Unspecified);
-        assert_eq!(TInteger::Literal(5) << TInteger::Literal(-1), TInteger::Unspecified);
-
-        assert_eq!(TInteger::Literal(20) >> TInteger::Literal(2), TInteger::Literal(5));
-        assert_eq!(TInteger::Literal(-20) >> TInteger::Literal(2), TInteger::Literal(-5));
-        assert_eq!(TInteger::Range(10, 20) >> TInteger::Literal(1), TInteger::Range(5, 10));
-        assert_eq!(TInteger::From(400) >> TInteger::Literal(2), TInteger::From(100));
-        assert_eq!(TInteger::To(-20) >> TInteger::Literal(1), TInteger::To(-10));
-        assert_eq!(TInteger::Range(-10, 10) >> TInteger::Literal(1), TInteger::Range(-5, 5));
-        assert_eq!(TInteger::Literal(20) >> TInteger::Range(1, 2), TInteger::Unspecified);
+        // SHL
+        assert_eq!(TInteger::Literal(1) << TInteger::Literal(4), TInteger::Literal(16));
+        assert_eq!(TInteger::Literal(3) << TInteger::Literal(0), TInteger::Literal(3));
+        assert_eq!(TInteger::Literal(0) << TInteger::Literal(10), TInteger::Literal(0));
+        assert_eq!(TInteger::Range(0, 10) << TInteger::Literal(0), TInteger::Range(0, 10));
+        assert_eq!(TInteger::From(5) << TInteger::Literal(0), TInteger::From(5));
+        assert_eq!(TInteger::Unspecified << TInteger::Literal(0), TInteger::Unspecified);
+        assert_eq!(TInteger::Literal(0) << TInteger::Range(0, 63), TInteger::Literal(0));
+        assert_eq!(TInteger::Literal(0) << TInteger::From(0), TInteger::Literal(0));
+        // fails: Unspecified min is None, not >= 0
+        assert_eq!(TInteger::Literal(0) << TInteger::Unspecified, TInteger::Literal(0));
+        assert_eq!(TInteger::Range(0, 10) << TInteger::Literal(2), TInteger::Range(0, 40));
+        assert_eq!(TInteger::Range(1, 8) << TInteger::Literal(3), TInteger::Range(8, 64));
+        assert_eq!(TInteger::From(1) << TInteger::Literal(1), TInteger::From(2));
+        assert_eq!(TInteger::Range(0, 10) << TInteger::Range(0, 2), TInteger::Range(0, 40));
+        assert_eq!(TInteger::Range(1, 3) << TInteger::Range(1, 4), TInteger::Range(2, 48));
+        assert_eq!(TInteger::Literal(1) << TInteger::Range(0, 3), TInteger::Range(1, 8));
+        assert_eq!(TInteger::Literal(1) << TInteger::Literal(64), TInteger::Unspecified);
+        assert_eq!(TInteger::Literal(1) << TInteger::Literal(-1), TInteger::Unspecified);
+        assert_eq!(TInteger::Range(0, 10) << TInteger::Unspecified, TInteger::Unspecified);
+        // SHR
+        assert_eq!(TInteger::Literal(16) >> TInteger::Literal(4), TInteger::Literal(1));
+        assert_eq!(TInteger::Literal(127) >> TInteger::Literal(4), TInteger::Literal(7));
+        assert_eq!(TInteger::Literal(-1) >> TInteger::Literal(4), TInteger::Literal(-1));
+        assert_eq!(TInteger::Range(0, 255) >> TInteger::Literal(0), TInteger::Range(0, 255));
+        assert_eq!(TInteger::From(5) >> TInteger::Literal(0), TInteger::From(5));
+        assert_eq!(TInteger::Literal(0) >> TInteger::Range(0, 63), TInteger::Literal(0));
+        assert_eq!(TInteger::Literal(0) >> TInteger::From(0), TInteger::Literal(0));
+        assert_eq!(TInteger::Range(16, 127) >> TInteger::Literal(4), TInteger::Range(1, 7));
+        assert_eq!(TInteger::Range(0, 255) >> TInteger::Literal(4), TInteger::Range(0, 15));
+        assert_eq!(TInteger::From(8) >> TInteger::Literal(3), TInteger::From(1));
+        assert_eq!(TInteger::Range(0, 255) >> TInteger::Range(0, 4), TInteger::Range(0, 255));
+        assert_eq!(TInteger::Range(0, 255) >> TInteger::Range(4, 8), TInteger::Range(0, 15));
+        assert_eq!(TInteger::Range(100, 200) >> TInteger::Range(1, 3), TInteger::Range(12, 100));
+        assert_eq!(TInteger::Range(0, 255) >> TInteger::From(0), TInteger::Range(0, 255));
+        assert_eq!(TInteger::Range(0, 255) >> TInteger::From(4), TInteger::Range(0, 15));
+        assert_eq!(TInteger::Literal(255) >> TInteger::Range(0, 7), TInteger::Range(1, 255));
+        assert_eq!(TInteger::Range(0, 1000) >> TInteger::From(0), TInteger::Range(0, 1000));
+        assert_eq!(TInteger::From(5) >> TInteger::From(0), TInteger::From(0));
+        assert_eq!(TInteger::Range(-10, 10) >> TInteger::Range(0, 4), TInteger::Unspecified);
+        assert_eq!(TInteger::Unspecified >> TInteger::Range(0, 4), TInteger::Unspecified);
+        assert_eq!(TInteger::Literal(1) >> TInteger::Literal(64), TInteger::Unspecified);
     }
 
     #[test]
