@@ -3587,7 +3587,7 @@ function array_column(array $array, string|int|null $column_key, string|int|null
  * @param array<K, V> $array
  * @param bool $preserve_keys
  *
- * @return ($preserve_keys is true ? array<K, V> : list<V>)
+ * @return ($array is list<V> ? ($preserve_keys is true ? array<K, V> : list<V>) : array<K, V>)
  *
  * @no-named-arguments
  * @pure
