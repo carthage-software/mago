@@ -6,6 +6,7 @@ use serde::de::DeserializeOwned;
 use mago_php_version::PHPVersion;
 
 use crate::integration::IntegrationSet;
+use crate::rule::AmbiguousConstantAccessConfig;
 use crate::rule::AmbiguousFunctionCallConfig;
 use crate::rule::ArrayStyleConfig;
 use crate::rule::AssertDescriptionConfig;
@@ -61,6 +62,7 @@ use crate::rule::NoEmptyLoopConfig;
 use crate::rule::NoErrorControlOperatorConfig;
 use crate::rule::NoEvalConfig;
 use crate::rule::NoFfiConfig;
+use crate::rule::NoFullyQualifiedGlobalConfig;
 use crate::rule::NoGlobalConfig;
 use crate::rule::NoGotoConfig;
 use crate::rule::NoHashCommentConfig;
@@ -180,6 +182,7 @@ pub struct RuleSettings<C: Config> {
 #[derive(Debug, Clone, Serialize, Deserialize, Default, JsonSchema)]
 #[serde(default, rename_all = "kebab-case", deny_unknown_fields)]
 pub struct RulesSettings {
+    pub ambiguous_constant_access: RuleSettings<AmbiguousConstantAccessConfig>,
     pub ambiguous_function_call: RuleSettings<AmbiguousFunctionCallConfig>,
     pub use_dedicated_expectation: RuleSettings<UseDedicatedExpectationConfig>,
     pub use_simpler_expectation: RuleSettings<UseSimplerExpectationConfig>,
@@ -260,6 +263,7 @@ pub struct RulesSettings {
     pub no_boolean_flag_parameter: RuleSettings<NoBooleanFlagParameterConfig>,
     pub no_assign_in_argument: RuleSettings<NoAssignInArgumentConfig>,
     pub no_assign_in_condition: RuleSettings<NoAssignInConditionConfig>,
+    pub no_fully_qualified_global: RuleSettings<NoFullyQualifiedGlobalConfig>,
     pub no_alias_function: RuleSettings<NoAliasFunctionConfig>,
     pub lowercase_type_hint: RuleSettings<LowercaseTypeHintConfig>,
     pub identity_comparison: RuleSettings<IdentityComparisonConfig>,
