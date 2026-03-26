@@ -1496,6 +1496,9 @@ fn reconcile_non_empty_countable(
             TAtomic::Array(TArray::Keyed(TKeyedArray { non_empty, parameters, known_items })) => {
                 if !non_empty {
                     did_remove_type = true;
+                    if parameters.is_none() && known_items.as_ref().is_none_or(|items| items.is_empty()) {
+                        continue;
+                    }
                 }
 
                 acceptable_types.push(TAtomic::Array(TArray::Keyed(TKeyedArray {

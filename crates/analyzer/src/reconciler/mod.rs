@@ -352,10 +352,10 @@ fn adjust_array_type(
                 };
 
                 if let Some(known_items) = known_items {
-                    if let Some((_, existing_item_type)) = known_items.get(&dictkey) {
+                    if let Some((existing_optional, existing_item_type)) = known_items.get(&dictkey) {
                         match intersect_union_types(result_type, existing_item_type, codebase) {
                             Some(intersected) if !intersected.is_never() => {
-                                known_items.insert(dictkey, (false, intersected));
+                                known_items.insert(dictkey, (*existing_optional, intersected));
                             }
                             _ => {
                                 continue;

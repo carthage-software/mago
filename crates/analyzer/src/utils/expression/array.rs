@@ -593,7 +593,7 @@ pub(crate) fn handle_array_access_on_list<'ctx>(
         }
 
         return result;
-    } else if let TAtomic::Array(TArray::List(TList { element_type, .. })) = list {
+    } else if let TAtomic::Array(TArray::List(TList { element_type, non_empty, .. })) = list {
         return if element_type.is_never() {
             if !in_assignment
                 && !block_context.flags.inside_isset()
@@ -616,7 +616,11 @@ pub(crate) fn handle_array_access_on_list<'ctx>(
             get_null()
         } else {
             let mut elem_type = TUnion::clone(element_type);
-            elem_type.set_possibly_undefined(true, None);
+
+            let is_definitely_defined = *non_empty && dim_type.get_single_literal_int_value() == Some(0);
+            if !is_definitely_defined {
+                elem_type.set_possibly_undefined(true, None);
+            }
 
             elem_type
         };

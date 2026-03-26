@@ -3,21 +3,15 @@
 /**
  * @param null $value
  */
-function expectsNull($value): void
-{
-}
+function expectsNull($value): void {}
 
-function expectsString(string $value): void
-{
-}
+function expectsString(string $value): void {}
 
 /**
  * @param array{bar?: string} $value
  * @return void
  */
-function expectsArray(array $value): void
-{
-}
+function expectsArray(array $value): void {}
 
 /** @var array{foo?: string} $x */
 $x = [];
@@ -44,6 +38,8 @@ $y = [];
 
 if (!isset($y['foo']['bar'])) {
     // After !isset($y['foo']['bar']), we know 'bar' doesn't exist in $y['foo']
+    // @mago-expect analysis:possibly-undefined-string-array-index - `$y['foo']` is possibly undefined
+    // @mago-expect analysis:possibly-null-array-access - `$['foo']` is possibly null, because of undefined
     // @mago-expect analysis:undefined-string-array-index
     expectsNull($y['foo']['bar']);
 } else {
@@ -53,7 +49,9 @@ if (!isset($y['foo']['bar'])) {
 if (isset($y['foo']['bar'])) {
     expectsString($y['foo']['bar']);
 } else {
-    // @mago-expect analysis:undefined-string-array-index
+    // @mago-expect analysis:possibly-undefined-string-array-index - `$y['foo']` is possibly undefined
+    // @mago-expect analysis:possibly-null-array-access - `$['foo']` is possibly null, because of undefined
+    // @mago-expect analysis:undefined-string-array-index - `['bar']` is known to be undefined
     expectsNull($y['foo']['bar']);
 }
 

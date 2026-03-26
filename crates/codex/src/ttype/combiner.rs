@@ -640,6 +640,10 @@ fn scrape_type_properties(
                                                 options,
                                             );
 
+                                            if !candidate_optional {
+                                                has_defined_keys = true;
+                                            }
+
                                             continue;
                                         }
 
