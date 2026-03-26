@@ -131,11 +131,10 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
 
         let indexed_cases = cases.iter().enumerate().collect::<IndexMap<_, _>>();
 
-        let mut last_case_index = cases.len() - 1;
-        for (i, case) in &indexed_cases {
+        let last_case_index = cases.len() - 1;
+        for (_, case) in &indexed_cases {
             if case.is_default() {
                 self.has_default_case = true;
-                last_case_index = *i;
                 break;
             }
         }
@@ -176,7 +175,9 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
                 previously_matching_case,
             )?;
 
-            if let Some(true) = is_matching {
+            if let Some(true) = is_matching
+                && !case.is_default()
+            {
                 previously_matching_case = Some((all_options_returned, case.span()));
             }
 
