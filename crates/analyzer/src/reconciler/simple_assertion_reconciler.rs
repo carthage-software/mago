@@ -1058,13 +1058,15 @@ fn intersect_string(
                 did_remove_type = true;
             }
             _ => {
-                if atomic_comparator::is_contained_by(
-                    context.codebase,
-                    atomic,
-                    get_string_with_props(is_numeric, is_truthy, is_non_empty, casing).get_single(),
-                    false,
-                    &mut ComparisonResult::new(),
-                ) {
+                if (matches!(assertion, Assertion::IsEqual(_)) && atomic.is_numeric())
+                    || atomic_comparator::is_contained_by(
+                        context.codebase,
+                        atomic,
+                        get_string_with_props(is_numeric, is_truthy, is_non_empty, casing).get_single(),
+                        false,
+                        &mut ComparisonResult::new(),
+                    )
+                {
                     acceptable_types.push(atomic.clone());
                 } else {
                     did_remove_type = true;
