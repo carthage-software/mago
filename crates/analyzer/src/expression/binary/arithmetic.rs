@@ -515,8 +515,8 @@ pub fn assign_arithmetic_type(artifacts: &mut AnalysisArtifacts, cond_type: TUni
 
 fn determine_numeric_result(op: &BinaryOperator<'_>, left: &TAtomic, right: &TAtomic, in_loop: bool) -> Vec<TAtomic> {
     if in_loop
-        && (matches!(left, TAtomic::Scalar(TScalar::Integer(_)))
-            || matches!(right, TAtomic::Scalar(TScalar::Integer(_))))
+        && (matches!(left, TAtomic::Scalar(TScalar::Integer(i)) if i.is_unspecified())
+            || matches!(right, TAtomic::Scalar(TScalar::Integer(i)) if i.is_unspecified()))
     {
         return match (left, right) {
             (TAtomic::Scalar(TScalar::Integer(_)), TAtomic::Scalar(TScalar::Integer(_))) => match op {

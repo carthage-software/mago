@@ -214,7 +214,6 @@ final class PriorityQueue implements PriorityQueueInterface
             $count += count($list);
         }
 
-        /** @var int<0, max> */
         return $count;
     }
 }

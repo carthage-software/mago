@@ -1415,6 +1415,7 @@ impl BitAnd for TInteger {
             (UnspecifiedLiteral | Literal(_), UnspecifiedLiteral) | (UnspecifiedLiteral, Literal(_)) => {
                 UnspecifiedLiteral
             }
+            (_, Literal(mask)) | (Literal(mask), _) if mask >= 0 => TInteger::from_bounds(Some(0), Some(mask)),
             _ => Unspecified,
         }
     }
