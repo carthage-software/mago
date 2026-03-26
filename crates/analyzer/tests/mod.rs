@@ -748,6 +748,7 @@ test_case!(issue_1502);
 test_case!(issue_1503);
 test_case!(issue_1504);
 test_case!(issue_1505);
+test_case!(issue_1506);
 test_case!(psl_break_mixed);
 test_case!(psl_max_return_type);
 test_case!(psl_min_return_type);

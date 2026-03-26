@@ -1572,6 +1572,11 @@ fn reconcile_exactly_countable(
             if !non_empty {
                 existing_var_type.remove_type(atomic);
 
+                let known_item_count = known_items.as_ref().map_or(0, |items| items.len());
+                if parameters.is_none() && known_item_count < count {
+                    continue;
+                }
+
                 existing_var_type.types.to_mut().push(TAtomic::Array(TArray::Keyed(TKeyedArray {
                     known_items: known_items.clone(),
                     parameters: parameters.clone(),
