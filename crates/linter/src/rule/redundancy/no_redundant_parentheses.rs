@@ -1,4 +1,5 @@
 use indoc::indoc;
+use mago_text_edit::TextEdit;
 use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
@@ -203,6 +204,9 @@ impl LintRule for NoRedundantParenthesesRule {
             )
             .with_help("Remove the redundant inner parentheses.");
 
-        ctx.collector.report(issue);
+        ctx.collector.propose(issue, |edits| {
+            edits.push(TextEdit::delete(parenthesized.left_parenthesis));
+            edits.push(TextEdit::delete(parenthesized.right_parenthesis));
+        });
     }
 }
