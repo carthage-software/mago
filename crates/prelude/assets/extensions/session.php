@@ -71,27 +71,23 @@ function session_destroy(): bool {}
 function session_unset(): bool {}
 
 function session_set_save_handler(
-    callable $open,
-    callable $close,
-    callable $read,
-    callable $write,
-    callable $destroy,
-    callable $gc,
+    object|callable $open,
+    callable|bool $close = UNKNOWN,
+    callable $read = UNKNOWN,
+    callable $write = UNKNOWN,
+    callable $destroy = UNKNOWN,
+    callable $gc = UNKNOWN,
     ?callable $create_sid = null,
     ?callable $validate_sid = null,
     ?callable $update_timestamp = null,
 ): bool {}
 
-function session_set_save_handler(SessionHandlerInterface $sessionhandler, bool $register_shutdown = true): bool {}
-
 function session_cache_limiter(?string $value = null): string|false {}
 
 function session_cache_expire(?int $value = null): int|false {}
 
-function session_set_cookie_params(array $lifetime_or_options): bool {}
-
 function session_set_cookie_params(
-    int $lifetime_or_options,
+    array|int $lifetime_or_options,
     ?string $path = null,
     ?string $domain = null,
     ?bool $secure = null,

@@ -8,6 +8,7 @@ pub mod filter;
 pub mod json;
 pub mod math;
 pub mod random;
+pub mod session;
 pub mod spl;
 pub mod string;
 pub mod url;
@@ -53,6 +54,8 @@ impl Plugin for StdlibPlugin {
         registry.register_function_provider(math::AbsProvider);
 
         registry.register_function_call_hook(cookie::SetCookieHook);
+        registry.register_function_call_hook(session::SessionSetSaveHandlerHook);
+        registry.register_function_call_hook(session::SessionSetCookieParamsHook);
 
         registry.register_method_provider(closure::ClosureGetCurrentProvider);
         registry.register_method_provider(r#enum::EnumCasesProvider);
