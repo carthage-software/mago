@@ -177,6 +177,7 @@ macro_rules! define_rules {
 }
 
 define_rules! {
+    AmbiguousConstantAccess(ambiguous_constant_access @ AmbiguousConstantAccessRule),
     AmbiguousFunctionCall(ambiguous_function_call @ AmbiguousFunctionCallRule),
     ArrayStyle(array_style @ ArrayStyleRule),
     AssertDescription(assert_description @ AssertDescriptionRule),
@@ -245,6 +246,7 @@ define_rules! {
     NoEmptyComment(no_empty_comment @ NoEmptyCommentRule),
     NoEmptyCatchClause(no_empty_catch_clause @ NoEmptyCatchClauseRule),
     NoElseClause(no_else_clause @ NoElseClauseRule),
+    NoFullyQualifiedGlobal(no_fully_qualified_global @ NoFullyQualifiedGlobalRule),
     NoClosingTag(no_closing_tag @ NoClosingTagRule),
     NoBooleanLiteralComparison(no_boolean_literal_comparison @ NoBooleanLiteralComparisonRule),
     NoBooleanFlagParameter(no_boolean_flag_parameter @ NoBooleanFlagParameterRule),

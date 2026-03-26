@@ -1,3 +1,4 @@
+pub mod ambiguous_constant_access;
 pub mod ambiguous_function_call;
 pub mod array_style;
 pub mod assertion_style;
@@ -11,6 +12,7 @@ pub mod interface_name;
 pub mod lowercase_keyword;
 pub mod lowercase_type_hint;
 pub mod no_alias_function;
+pub mod no_fully_qualified_global;
 pub mod no_hash_comment;
 pub mod no_php_tag_terminator;
 pub mod no_trailing_space;
@@ -18,6 +20,7 @@ pub mod property_name;
 pub mod trait_name;
 pub mod variable_name;
 
+pub use ambiguous_constant_access::*;
 pub use ambiguous_function_call::*;
 pub use array_style::*;
 pub use assertion_style::*;
@@ -31,6 +34,7 @@ pub use interface_name::*;
 pub use lowercase_keyword::*;
 pub use lowercase_type_hint::*;
 pub use no_alias_function::*;
+pub use no_fully_qualified_global::*;
 pub use no_hash_comment::*;
 pub use no_php_tag_terminator::*;
 pub use no_trailing_space::*;
