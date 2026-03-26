@@ -2,11 +2,11 @@ use std::rc::Rc;
 
 use foldhash::HashMap;
 use indexmap::IndexMap;
+
+use mago_algebra::clause::Clause;
 use mago_atom::Atom;
 use mago_atom::AtomMap;
 use mago_atom::AtomSet;
-
-use mago_algebra::clause::Clause;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::combine_union_types;
 use mago_codex::ttype::combiner::CombinerOptions;
@@ -72,6 +72,7 @@ struct SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
     possibly_redefined_variables: Option<AtomMap<Rc<TUnion>>>,
     leftover_statements: Vec<Statement<'arena>>,
     leftover_case_equality_expression: Option<Expression<'arena>>,
+    has_fallthrough: bool,
     negated_clauses: Vec<Clause>,
     new_assigned_variable_ids: AtomMap<u32>,
     last_case_exit_type: ControlAction,
@@ -97,6 +98,7 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
             possibly_redefined_variables: None,
             leftover_statements: vec![],
             leftover_case_equality_expression: None,
+            has_fallthrough: false,
             negated_clauses: vec![],
             new_assigned_variable_ids: AtomMap::default(),
             last_case_exit_type: ControlAction::Break,
@@ -455,8 +457,8 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
                     case_equality_expression
                 });
 
+            self.has_fallthrough = true;
             self.leftover_statements = case_stmts;
-
             self.artifacts.expression_types = old_expression_types;
 
             return Ok(result);
@@ -472,12 +474,12 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
         }
 
         case_block_context.break_types.push(BreakContext::Switch);
+        if !self.has_fallthrough {
+            self.leftover_statements = vec![];
+        }
 
-        self.leftover_statements = vec![];
         self.leftover_case_equality_expression = None;
-
         let assertion_context = self.context.get_assertion_context_from_block(self.block_context);
-
         let case_clauses = if let Some(case_equality_expr) = &case_equality_expression {
             let span = if let Some(case_condition) = switch_case.expression() {
                 case_condition.span()
@@ -586,7 +588,32 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
 
         self.artifacts.case_scopes.push(CaseScope::new());
 
-        analyze_statements(&case_stmts, self.context, &mut case_block_context, self.artifacts)?;
+        if self.has_fallthrough {
+            self.has_fallthrough = false;
+
+            let leftover = std::mem::take(&mut self.leftover_statements);
+            analyze_statements(&leftover, self.context, &mut case_block_context, self.artifacts)?;
+
+            for (var_id, original_type) in &original_block_context.locals {
+                if let Some(current_type) = case_block_context.locals.get(var_id)
+                    && current_type != original_type
+                {
+                    case_block_context.locals.insert(
+                        *var_id,
+                        Rc::new(combine_union_types(
+                            current_type,
+                            original_type,
+                            self.context.codebase,
+                            CombinerOptions::default(),
+                        )),
+                    );
+                }
+            }
+
+            analyze_statements(switch_case.statements(), self.context, &mut case_block_context, self.artifacts)?;
+        } else {
+            analyze_statements(&case_stmts, self.context, &mut case_block_context, self.artifacts)?;
+        }
 
         let Some(case_scope) = self.artifacts.case_scopes.pop() else {
             return Ok(result);
