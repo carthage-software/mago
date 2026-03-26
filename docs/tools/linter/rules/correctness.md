@@ -10,20 +10,18 @@ This document details the rules available in the `Correctness` category.
 | Rule | Code |
 | :--- | :---------- |
 | Assert Description | [`assert-description`](#assert-description) |
-| Constant Type | [`constant-type`](#constant-type) |
 | Identity Comparison | [`identity-comparison`](#identity-comparison) |
 | Ineffective Format Ignore Next | [`ineffective-format-ignore-next`](#ineffective-format-ignore-next) |
 | Ineffective Format Ignore Region | [`ineffective-format-ignore-region`](#ineffective-format-ignore-region) |
 | Invalid Open Tag | [`invalid-open-tag`](#invalid-open-tag) |
+| No Assign In Argument | [`no-assign-in-argument`](#no-assign-in-argument) |
 | No Assign In Condition | [`no-assign-in-condition`](#no-assign-in-condition) |
-| No Boolean Literal Comparison | [`no-boolean-literal-comparison`](#no-boolean-literal-comparison) |
 | No Empty Catch Clause | [`no-empty-catch-clause`](#no-empty-catch-clause) |
-| Parameter Type | [`parameter-type`](#parameter-type) |
-| Property Type | [`property-type`](#property-type) |
-| Return Type | [`return-type`](#return-type) |
+| No Only | [`no-only`](#no-only) |
 | Strict Assertions | [`strict-assertions`](#strict-assertions) |
 | Strict Behavior | [`strict-behavior`](#strict-behavior) |
 | Strict Types | [`strict-types`](#strict-types) |
+| Switch Continue to Break | [`switch-continue-to-break`](#switch-continue-to-break) |
 | Use Specific Assertions | [`use-specific-assertions`](#use-specific-assertions) |
 
 
@@ -58,69 +56,6 @@ assert($user->isActivated(), 'User MUST be activated at this point.');
 <?php
 
 assert($user->isActivated());
-```
-
-
-## <a id="constant-type"></a>`constant-type`
-
-Detects class constants that are missing a type hint.
-
-
-### Requirements
-
-- **PHP version:** >= `8.3.0`
-
-### Configuration
-
-| Option | Type | Default |
-| :--- | :--- | :--- |
-| `enabled` | `boolean` | `false` |
-| `level` | `string` | `"warning"` |
-
-### Examples
-
-#### Correct code
-
-```php
-<?php
-
-declare(strict_types=1);
-
-namespace Psl\IO\Internal;
-
-use Psl\IO;
-
-class ResourceHandle implements IO\CloseSeekReadWriteStreamHandleInterface {
-    use IO\ReadHandleConvenienceMethodsTrait;
-    use IO\WriteHandleConvenienceMethodsTrait;
-
-    public const int DEFAULT_READ_BUFFER_SIZE = 4096;
-    public const int MAXIMUM_READ_BUFFER_SIZE = 786432;
-
-    // ...
-}
-```
-
-#### Incorrect code
-
-```php
-<?php
-
-declare(strict_types=1);
-
-namespace Psl\IO\Internal;
-
-use Psl\IO;
-
-class ResourceHandle implements IO\CloseSeekReadWriteStreamHandleInterface {
-    use IO\ReadHandleConvenienceMethodsTrait;
-    use IO\WriteHandleConvenienceMethodsTrait;
-
-    public const DEFAULT_READ_BUFFER_SIZE = 4096;
-    public const MAXIMUM_READ_BUFFER_SIZE = 786432;
-
-    // ...
-}
 ```
 
 
@@ -297,6 +232,40 @@ echo 'Hello, world!';
 ```
 
 
+## <a id="no-assign-in-argument"></a>`no-assign-in-argument`
+
+Detects assignments in function call arguments which can lead to unexpected behavior and make
+the code harder to read and understand.
+
+
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `false` |
+| `level` | `string` | `"warning"` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+
+$x = 5;
+foo($x);
+```
+
+#### Incorrect code
+
+```php
+<?php
+
+foo($x = 5);
+```
+
+
 ## <a id="no-assign-in-condition"></a>`no-assign-in-condition`
 
 Detects assignments in conditions which can lead to unexpected behavior and make the code harder
@@ -332,44 +301,6 @@ if ($x == 1) {
 if ($x = 1) {
     // ...
 }
-```
-
-
-## <a id="no-boolean-literal-comparison"></a>`no-boolean-literal-comparison`
-
-Disallows comparisons where a boolean literal is used as an operand.
-
-Comparing with a boolean literal (`true` or `false`) is redundant and can often be simplified.
-For example, `if ($x === true)` is equivalent to the more concise `if ($x)`, and
-`if ($y !== false)` is the same as `if ($y)`.
-
-
-
-### Configuration
-
-| Option | Type | Default |
-| :--- | :--- | :--- |
-| `enabled` | `boolean` | `false` |
-| `level` | `string` | `"note"` |
-
-### Examples
-
-#### Correct code
-
-```php
-<?php
-
-if ($x) { /* ... */ }
-if (!$y) { /* ... */ }
-```
-
-#### Incorrect code
-
-```php
-<?php
-
-if ($x === true) { /* ... */ }
-if ($y != false) { /* ... */ }
 ```
 
 
@@ -418,23 +349,24 @@ try {
 ```
 
 
-## <a id="parameter-type"></a>`parameter-type`
+## <a id="no-only"></a>`no-only`
 
-Detects parameters that are missing a type hint.
+Detects usage of `->only()` in Pest tests which should not be committed.
+
+The `->only()` modifier causes only that specific test to run, which can lead to
+incomplete test coverage if accidentally committed to the repository.
 
 
 ### Requirements
 
-- **PHP version:** >= `7.0.0`
+- **Integration:** `Pest`
 
 ### Configuration
 
 | Option | Type | Default |
 | :--- | :--- | :--- |
-| `enabled` | `boolean` | `false` |
-| `level` | `string` | `"warning"` |
-| `ignore-closure` | `boolean` | `false` |
-| `ignore-arrow-function` | `boolean` | `false` |
+| `enabled` | `boolean` | `true` |
+| `level` | `string` | `"error"` |
 
 ### Examples
 
@@ -443,10 +375,13 @@ Detects parameters that are missing a type hint.
 ```php
 <?php
 
-function foo(string $bar): void
-{
-    // ...
-}
+test('example test', function () {
+    expect(true)->toBeTrue();
+});
+
+it('does something', function () {
+    expect(1)->toBe(1);
+});
 ```
 
 #### Incorrect code
@@ -454,92 +389,13 @@ function foo(string $bar): void
 ```php
 <?php
 
-function foo($bar): void
-{
-    // ...
-}
-```
+test('example test', function () {
+    expect(true)->toBeTrue();
+})->only();
 
-
-## <a id="property-type"></a>`property-type`
-
-Detects class-like properties that are missing a type hint.
-
-
-### Requirements
-
-- **PHP version:** >= `7.4.0`
-
-### Configuration
-
-| Option | Type | Default |
-| :--- | :--- | :--- |
-| `enabled` | `boolean` | `false` |
-| `level` | `string` | `"warning"` |
-
-### Examples
-
-#### Correct code
-
-```php
-<?php
-
-class Foo
-{
-    public int $bar;
-}
-```
-
-#### Incorrect code
-
-```php
-<?php
-
-class Foo
-{
-    public $bar;
-}
-```
-
-
-## <a id="return-type"></a>`return-type`
-
-Detects functions, methods, closures, and arrow functions that are missing a return type hint.
-
-
-### Requirements
-
-- **PHP version:** >= `7.0.0`
-
-### Configuration
-
-| Option | Type | Default |
-| :--- | :--- | :--- |
-| `enabled` | `boolean` | `false` |
-| `level` | `string` | `"warning"` |
-| `ignore-closure` | `boolean` | `false` |
-| `ignore-arrow-function` | `boolean` | `false` |
-
-### Examples
-
-#### Correct code
-
-```php
-<?php
-
-function foo(): int {
-    return 42;
-}
-```
-
-#### Incorrect code
-
-```php
-<?php
-
-function foo() {
-    return 42;
-}
+it('does something', function () {
+    expect(1)->toBe(1);
+})->only();
 ```
 
 
@@ -672,6 +528,50 @@ echo "Hello, World!";
 <?php
 
 echo "Hello, World!";
+```
+
+
+## <a id="switch-continue-to-break"></a>`switch-continue-to-break`
+
+Detects the use of `continue` inside a `switch` statement, which should
+be `break` instead.
+
+In PHP, `continue` inside a `switch` behaves the same as `break`, but
+using `continue` is misleading because it suggests continuing a loop.
+
+
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `false` |
+| `level` | `string` | `"warning"` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+
+switch ($value) {
+    case 1:
+        echo 'one';
+        break;
+}
+```
+
+#### Incorrect code
+
+```php
+<?php
+
+switch ($value) {
+    case 1:
+        echo 'one';
+        continue;
+}
 ```
 
 

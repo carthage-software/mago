@@ -103,7 +103,7 @@ impl LintRule for NoRolesAsCapabilitiesRule {
 
         // Check the first argument for WordPress roles
         if let Some(Argument::Positional(first_arg)) = argument_list.arguments.first()
-            && let Some(role_name) = extract_string_literal(&first_arg.value)
+            && let Some(role_name) = extract_string_literal(first_arg.value)
             && is_wordpress_role(role_name)
         {
             let issue = Issue::new(

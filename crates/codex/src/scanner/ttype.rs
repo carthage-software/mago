@@ -116,7 +116,7 @@ fn get_union_from_hint<'arena>(
         Hint::Static(_) => {
             let classname = classname.unwrap_or_else(|| atom("static"));
 
-            wrap_atomic(TAtomic::Object(TObject::Named(TNamedObject::new_this(classname))))
+            wrap_atomic(TAtomic::Object(TObject::Named(TNamedObject::new_static(classname))))
         }
         Hint::Self_(_) => {
             let classname = classname.unwrap_or_else(|| atom("static"));
@@ -131,11 +131,7 @@ fn get_union_from_hint<'arena>(
         Hint::String(_) => get_string(),
         Hint::Object(_) => get_object(),
         Hint::Mixed(_) => get_mixed(),
-        Hint::Parent(k) => {
-            tracing::trace!("Unsupported parent hint in {} at {}", context.file.id, k.span.start,);
-
-            get_mixed()
-        }
+        Hint::Parent(_) => wrap_atomic(TAtomic::Object(TObject::Named(TNamedObject::new(atom("parent"))))),
         Hint::Intersection(intersection) => {
             let left = get_union_from_hint(intersection.left, classname, context);
             let right = get_union_from_hint(intersection.right, classname, context);
@@ -156,7 +152,20 @@ fn get_union_from_hint<'arena>(
                     }
 
                     let mut intersection = left_type.clone();
-                    intersection.add_intersection_type(right_type.clone());
+                    if let Some(nested_intersections) = right_type.get_intersection_types() {
+                        let mut right_base = right_type.clone();
+                        if let Some(intersections) = right_base.get_intersection_types_mut() {
+                            intersections.clear();
+                        }
+
+                        intersection.add_intersection_type(right_base);
+                        for nested in nested_intersections {
+                            intersection.add_intersection_type(nested.clone());
+                        }
+                    } else {
+                        intersection.add_intersection_type(right_type.clone());
+                    }
+
                     intersection_types.push(intersection);
                 }
             }
@@ -217,8 +226,7 @@ pub fn merge_type_preserving_nullability(
     docblock_type: TypeMetadata,
     real_type: Option<&TypeMetadata>,
 ) -> TypeMetadata {
-    // Don't merge nullability if docblock has expandable types
-    if docblock_type.type_union.is_expandable() {
+    if docblock_type.type_union.types.iter().any(|t| t.is_conditional()) {
         return docblock_type;
     }
 

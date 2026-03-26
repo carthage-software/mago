@@ -1,12 +1,8 @@
 <?php
 
-final class V8JsTimeLimitException extends Exception
-{
-}
+final class V8JsTimeLimitException extends Exception {}
 
-final class V8JsMemoryLimitException extends Exception
-{
-}
+final class V8JsMemoryLimitException extends Exception {}
 
 class V8Js
 {
@@ -28,13 +24,9 @@ class V8Js
         $snapshot_blob = null,
     ) {}
 
-    public function setModuleLoader(callable $loader)
-    {
-    }
+    public function setModuleLoader(callable $loader) {}
 
-    public function setModuleNormaliser(callable $normaliser)
-    {
-    }
+    public function setModuleNormaliser(callable $normaliser) {}
 
     /**
      * @param string $script
@@ -49,8 +41,7 @@ class V8Js
         $flags = V8Js::FLAG_NONE,
         $time_limit = 0,
         $memory_limit = 0,
-    ) {
-    }
+    ) {}
 
     /**
      * @param string $script
@@ -58,9 +49,7 @@ class V8Js
      *
      * @return resource
      */
-    public function compileString($script, $identifier = '')
-    {
-    }
+    public function compileString($script, $identifier = '') {}
 
     /**
      * @param resource $script
@@ -68,41 +57,29 @@ class V8Js
      * @param int $time_limit
      * @param int $memory_limit
      */
-    public function executeScript($script, $flags = V8Js::FLAG_NONE, $time_limit = 0, $memory_limit = 0)
-    {
-    }
+    public function executeScript($script, $flags = V8Js::FLAG_NONE, $time_limit = 0, $memory_limit = 0) {}
 
     /**
      * @param int $limit
      */
-    public function setTimeLimit($limit)
-    {
-    }
+    public function setTimeLimit($limit) {}
 
     /**
      * @param int $limit
      */
-    public function setMemoryLimit($limit)
-    {
-    }
+    public function setMemoryLimit($limit) {}
 
     /**
      * @param int $average_object_size
      */
-    public function setAverageObjectSize($average_object_size)
-    {
-    }
+    public function setAverageObjectSize($average_object_size) {}
 
     /**
      * @return V8JsScriptException|null
      */
-    public function getPendingException()
-    {
-    }
+    public function getPendingException() {}
 
-    public function clearPendingException()
-    {
-    }
+    public function clearPendingException() {}
 
     /**
      * @param string $extension_name
@@ -110,25 +87,19 @@ class V8Js
      * @param bool $auto_enable
      * @return bool
      */
-    public static function registerExtension($extension_name, $code, array $dependencies, $auto_enable = false)
-    {
-    }
+    public static function registerExtension($extension_name, $code, array $dependencies, $auto_enable = false) {}
 
     /**
      * @return list<string>
      */
-    public static function getExtensions()
-    {
-    }
+    public static function getExtensions() {}
 
     /**
      * @param string $embed_source
      *
      * @return string|false
      */
-    public static function createSnapshot($embed_source)
-    {
-    }
+    public static function createSnapshot($embed_source) {}
 }
 
 final class V8JsScriptException extends Exception
@@ -136,42 +107,30 @@ final class V8JsScriptException extends Exception
     /**
      * @return string
      */
-    final public function getJsFileName()
-    {
-    }
+    final public function getJsFileName() {}
 
     /**
      * @return int
      */
-    final public function getJsLineNumber()
-    {
-    }
+    final public function getJsLineNumber() {}
 
     /**
      * @return int
      */
-    final public function getJsStartColumn()
-    {
-    }
+    final public function getJsStartColumn() {}
 
     /**
      * @return int
      */
-    final public function getJsEndColumn()
-    {
-    }
+    final public function getJsEndColumn() {}
 
     /**
      * @return string
      */
-    final public function getJsSourceLine()
-    {
-    }
+    final public function getJsSourceLine() {}
 
     /**
      * @return string
      */
-    final public function getJsTrace()
-    {
-    }
+    final public function getJsTrace() {}
 }

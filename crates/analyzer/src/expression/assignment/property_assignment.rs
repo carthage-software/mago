@@ -43,8 +43,8 @@ pub fn analyze<'ctx, 'arena>(
         Some(context.codebase),
     );
 
-    let was_inside_assignment = block_context.inside_assignment;
-    block_context.inside_assignment = true;
+    let was_inside_assignment = block_context.flags.inside_assignment();
+    block_context.flags.set_inside_assignment(true);
     let resolution_result = resolve_instance_properties(
         context,
         block_context,
@@ -55,7 +55,7 @@ pub fn analyze<'ctx, 'arena>(
         false, // `null_safe`
         true,  // `for_assignment`
     )?;
-    block_context.inside_assignment = was_inside_assignment;
+    block_context.flags.set_inside_assignment(was_inside_assignment);
 
     let mut resolved_property_type = None;
     let mut matched_all_properties = true;
@@ -198,7 +198,7 @@ pub fn analyze<'ctx, 'arena>(
 
     artifacts.set_rc_expression_type(property_access, resulting_type);
 
-    if block_context.collect_initializations
+    if block_context.flags.collect_initializations()
         && let Expression::Variable(Variable::Direct(var)) = property_access.object
         && var.name == "$this"
         && let ClassLikeMemberSelector::Identifier(ident) = &property_access.property

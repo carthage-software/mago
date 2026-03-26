@@ -163,12 +163,9 @@ impl FormatCommand {
             orchestrator.set_source_paths(self.path.iter().map(|p| p.to_string_lossy().to_string()));
         }
 
-        let mut database = orchestrator.load_database(&configuration.source.workspace, false, None)?;
-        let service = orchestrator.get_format_service(database.read_only());
-
         if self.stdin_input {
             let file = Self::create_file_from_stdin()?;
-            let status = service.format_file(&file)?;
+            let status = orchestrator.format_file(&file)?;
 
             let exit_code = match status {
                 FileFormatStatus::Unchanged => {
@@ -190,6 +187,9 @@ impl FormatCommand {
 
             return Ok(exit_code);
         }
+
+        let mut database = orchestrator.load_database(&configuration.source.workspace, false, None)?;
+        let service = orchestrator.get_format_service(database.read_only());
 
         let result = service.run()?;
 

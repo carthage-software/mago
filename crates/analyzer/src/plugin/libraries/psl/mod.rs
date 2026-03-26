@@ -1,5 +1,6 @@
 //! PSL (PHP Standard Library) providers.
 
+pub mod async_;
 pub mod regex;
 pub mod str;
 pub mod type_;
@@ -25,8 +26,12 @@ impl Plugin for PslPlugin {
     }
 
     fn register(&self, registry: &mut PluginRegistry) {
+        registry.register_function_provider(async_::AllProvider);
+        registry.register_function_provider(async_::ConcurrentlyProvider);
         registry.register_function_provider(type_::ShapeProvider);
         registry.register_function_provider(type_::OptionalProvider);
+        registry.register_function_provider(type_::NullishProvider);
+        registry.register_function_provider(type_::IntRangeProvider);
         registry.register_function_provider(str::StrProvider);
         registry.register_function_provider(regex::CaptureGroupsProvider);
     }

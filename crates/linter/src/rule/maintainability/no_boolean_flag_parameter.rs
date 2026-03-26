@@ -17,6 +17,7 @@ use crate::requirements::RuleRequirements;
 use crate::rule::Config;
 use crate::rule::LintRule;
 use crate::rule_meta::RuleMeta;
+use crate::scope::FunctionLikeScope;
 use crate::settings::RuleSettings;
 
 #[derive(Debug, Clone)]
@@ -29,11 +30,15 @@ pub struct NoBooleanFlagParameterRule {
 #[serde(default, rename_all = "kebab-case", deny_unknown_fields)]
 pub struct NoBooleanFlagParameterConfig {
     pub level: Level,
+    /// When enabled, methods whose name starts with `set` are exempt from this rule.
+    pub exclude_setters: bool,
+    /// When enabled, constructors are exempt from this rule.
+    pub exclude_constructors: bool,
 }
 
 impl Default for NoBooleanFlagParameterConfig {
     fn default() -> Self {
-        Self { level: Level::Help }
+        Self { level: Level::Help, exclude_setters: false, exclude_constructors: true }
     }
 }
 
@@ -104,6 +109,16 @@ impl LintRule for NoBooleanFlagParameterRule {
         let Some(Hint::Bool(bool_hint)) = &parameter.hint else {
             return;
         };
+
+        if let Some(FunctionLikeScope::Method(name)) = ctx.scope.get_function_like_scope() {
+            if self.cfg.exclude_constructors && name.eq_ignore_ascii_case("__construct") {
+                return;
+            }
+
+            if self.cfg.exclude_setters && name.len() > 3 && name[..3].eq_ignore_ascii_case("set") {
+                return;
+            }
+        }
 
         let issue = Issue::new(self.cfg.level, "Avoid boolean flag parameters.")
             .with_code(self.meta.code)

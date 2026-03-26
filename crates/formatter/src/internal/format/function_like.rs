@@ -1,19 +1,5 @@
-use crate::document::Document;
-use crate::document::Group;
-use crate::document::IfBreak;
-use crate::document::Line;
-use crate::document::Separator;
-use crate::document::group::GroupIdentifier;
-use crate::internal::FormatterState;
-use crate::internal::format::Format;
-use crate::internal::format::block::block_is_empty;
-use crate::internal::format::format_token;
-use crate::internal::format::misc::print_modifiers;
-use crate::internal::format::parameters::should_break_parameters;
-use crate::internal::format::parameters::should_hug_the_only_parameter;
-use crate::settings::BraceStyle;
-use crate::wrap;
 use bumpalo::vec;
+
 use mago_span::HasSpan;
 use mago_span::Span;
 use mago_syntax::ast::AttributeList;
@@ -31,6 +17,23 @@ use mago_syntax::ast::MethodAbstractBody;
 use mago_syntax::ast::MethodBody;
 use mago_syntax::ast::Modifier;
 use mago_syntax::ast::Sequence;
+
+use crate::document::Document;
+use crate::document::Group;
+use crate::document::IfBreak;
+use crate::document::Line;
+use crate::document::Separator;
+use crate::document::group::GroupIdentifier;
+use crate::internal::FormatterState;
+use crate::internal::format::Format;
+use crate::internal::format::block::block_is_empty;
+use crate::internal::format::format_token;
+use crate::internal::format::misc::print_modifiers;
+use crate::internal::format::parameters::force_break_parameters;
+use crate::internal::format::parameters::preserve_break_parameters;
+use crate::internal::format::parameters::should_hug_the_only_parameter;
+use crate::settings::BraceStyle;
+use crate::wrap;
 
 #[derive(Debug, Clone, Copy)]
 enum FunctionLikeBody<'arena> {
@@ -229,6 +232,13 @@ impl<'arena> FunctionLikeParts<'arena> {
     ) -> Document<'arena> {
         match settings.brace_style {
             BraceStyle::SameLine => Document::space(),
+            BraceStyle::AlwaysNextLine => {
+                if inlined_braces {
+                    Document::space()
+                } else {
+                    Document::Line(Line::hard())
+                }
+            }
             BraceStyle::NextLine => {
                 if inlined_braces {
                     return Document::space();
@@ -287,7 +297,7 @@ impl<'arena> FunctionLikeParts<'arena> {
 
         let parameter_list_will_break = if self.parameter_list.parameters.is_empty() {
             if f.has_inner_comment(self.parameter_list.span()) { None } else { Some(false) }
-        } else if should_break_parameters(f, self.parameter_list) {
+        } else if force_break_parameters(f, self.parameter_list) || preserve_break_parameters(f, self.parameter_list) {
             Some(true)
         } else if should_hug_the_only_parameter(f, self.parameter_list) {
             Some(false)
@@ -295,6 +305,7 @@ impl<'arena> FunctionLikeParts<'arena> {
             None
         };
 
+        let (signature, signature_id) = self.format_signature(f, settings.space_before_params);
         let dangling_comments = match (&self.body, parameter_list_will_break) {
             (_, Some(false)) => None,
             (FunctionLikeBody::Block(block), _) => {
@@ -304,7 +315,6 @@ impl<'arena> FunctionLikeParts<'arena> {
             (FunctionLikeBody::Abstract(_), _) => None,
         };
 
-        let (signature, signature_id) = self.format_signature(f, settings.space_before_params);
         let body = self.format_body(f, settings, signature_id, parameter_list_will_break, dangling_comments);
 
         Document::Group(Group::new(vec![

@@ -1,5 +1,5 @@
-use ahash::HashMap;
-use ahash::RandomState;
+use foldhash::HashMap;
+use foldhash::fast::RandomState;
 use indexmap::IndexMap;
 
 use mago_atom::Atom;
@@ -7,6 +7,7 @@ use mago_atom::AtomMap;
 use mago_atom::ascii_lowercase_atom;
 use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
+use mago_codex::metadata::class_like::TemplateTypes;
 use mago_codex::misc::GenericParent;
 use mago_codex::ttype::add_optional_union_type;
 use mago_codex::ttype::atomic::TAtomic;
@@ -22,13 +23,12 @@ pub(crate) fn collect(
     class_metadata: &ClassLikeMetadata,
     static_class_metadata: &ClassLikeMetadata,
     object_type: Option<&TObject>,
-) -> Option<IndexMap<Atom, HashMap<GenericParent, TUnion>, RandomState>> {
+) -> Option<HashMap<Atom, HashMap<GenericParent, TUnion>>> {
     if class_metadata.template_types.is_empty() {
         return None;
     }
 
-    let mut class_template_parameters: IndexMap<Atom, HashMap<GenericParent, TUnion>, RandomState> =
-        IndexMap::default();
+    let mut class_template_parameters: HashMap<Atom, HashMap<GenericParent, TUnion>> = HashMap::default();
 
     if let Some(TObject::Named(TNamedObject { type_parameters: Some(parameters), .. })) = &object_type {
         if class_metadata.name == static_class_metadata.name && !static_class_metadata.template_types.is_empty() {
@@ -70,40 +70,40 @@ pub(crate) fn collect(
         }
     }
 
-    for (template_name, type_map) in &class_metadata.template_types {
-        for (template_classname, type_) in type_map {
-            if class_metadata.name != static_class_metadata.name
-                && let Some(extended_type) = static_class_metadata
-                    .template_extended_parameters
-                    .get(&class_metadata.name)
-                    .and_then(|m| m.get(template_name))
-            {
-                class_template_parameters
-                    .entry(*template_name)
-                    .or_default()
-                    .entry(GenericParent::ClassLike(class_metadata.name))
-                    .or_insert(TUnion::from_vec(expand_type(
-                        extended_type,
-                        &static_class_metadata.template_extended_parameters,
-                        static_class_metadata.name,
-                        &static_class_metadata.template_types,
-                    )));
-            }
+    for (template_name, template) in &class_metadata.template_types {
+        let template_classname = &template.defining_entity;
+        let type_ = &template.constraint;
+        if class_metadata.name != static_class_metadata.name
+            && let Some(extended_type) = static_class_metadata
+                .template_extended_parameters
+                .get(&class_metadata.name)
+                .and_then(|m| m.get(template_name))
+        {
+            class_template_parameters
+                .entry(*template_name)
+                .or_default()
+                .entry(GenericParent::ClassLike(class_metadata.name))
+                .or_insert(TUnion::from_vec(expand_type(
+                    extended_type,
+                    &static_class_metadata.template_extended_parameters,
+                    static_class_metadata.name,
+                    &static_class_metadata.template_types,
+                )));
+        }
 
-            let self_call =
-                if let Some(TObject::Named(TNamedObject { name: self_class_name, is_this: true, .. })) = object_type {
-                    template_classname == &GenericParent::ClassLike(ascii_lowercase_atom(self_class_name))
-                } else {
-                    false
-                };
+        let self_call =
+            if let Some(TObject::Named(TNamedObject { name: self_class_name, is_static: true, .. })) = object_type {
+                template_classname == &GenericParent::ClassLike(ascii_lowercase_atom(self_class_name))
+            } else {
+                false
+            };
 
-            if !self_call {
-                class_template_parameters
-                    .entry(*template_name)
-                    .or_default()
-                    .entry(GenericParent::ClassLike(class_metadata.name))
-                    .or_insert(type_.clone());
-            }
+        if !self_call {
+            class_template_parameters
+                .entry(*template_name)
+                .or_default()
+                .entry(GenericParent::ClassLike(class_metadata.name))
+                .or_insert(type_.clone());
         }
     }
 
@@ -126,7 +126,7 @@ pub(crate) fn resolve_template_parameter(
         }) = &type_extends_atomic
         {
             if let Some(entry) =
-                static_class_storage.template_types.iter().enumerate().find(|(_, (k, _))| k == parameter_name)
+                static_class_storage.template_types.iter().enumerate().find(|(_, (k, _))| *k == parameter_name)
             {
                 let mapped_offset = entry.0;
 
@@ -164,7 +164,7 @@ fn expand_type(
     input_type_extends: &TUnion,
     template_extended_parameters: &AtomMap<IndexMap<Atom, TUnion, RandomState>>,
     static_class_name: Atom,
-    static_class_template_types: &[(Atom, Vec<(GenericParent, TUnion)>)],
+    static_class_template_types: &TemplateTypes,
 ) -> Vec<TAtomic> {
     let mut output_type_extends = Vec::new();
 
@@ -179,8 +179,7 @@ fn expand_type(
             continue;
         };
 
-        if static_class_name == *defining_entity && static_class_template_types.iter().any(|(k, _)| k == parameter_name)
-        {
+        if static_class_name == *defining_entity && static_class_template_types.contains_key(parameter_name) {
             output_type_extends.push(extends_atomic.clone());
             continue;
         }

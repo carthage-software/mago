@@ -28,7 +28,7 @@ pub mod r#while;
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub struct Continue<'arena> {
     pub r#continue: Keyword<'arena>,
-    pub level: Option<Expression<'arena>>,
+    pub level: Option<&'arena Expression<'arena>>,
     pub terminator: Terminator<'arena>,
 }
 
@@ -48,7 +48,7 @@ pub struct Continue<'arena> {
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub struct Break<'arena> {
     pub r#break: Keyword<'arena>,
-    pub level: Option<Expression<'arena>>,
+    pub level: Option<&'arena Expression<'arena>>,
     pub terminator: Terminator<'arena>,
 }
 

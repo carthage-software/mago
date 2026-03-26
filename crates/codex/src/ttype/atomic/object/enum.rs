@@ -46,13 +46,6 @@ impl TEnum {
         self.name
     }
 
-    /// Returns a reference to the `Atom` for the enum's FQCN.
-    #[inline]
-    #[must_use]
-    pub const fn get_name_ref(&self) -> &Atom {
-        &self.name
-    }
-
     /// Returns the `Atom` for the enum case, if it exists.
     #[inline]
     #[must_use]

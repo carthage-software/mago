@@ -279,6 +279,7 @@ pub(crate) fn is_array_contained_by_array(
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeMap;
+    use std::sync::Arc;
 
     use mago_atom::atom;
 
@@ -314,7 +315,7 @@ mod tests {
         let container = t_keyed(
             TKeyedArray::new()
                 .with_known_items(BTreeMap::from([(ArrayKey::String(atom("required_field")), (false, get_string()))]))
-                .with_parameters(Box::new(get_arraykey()), Box::new(get_mixed())),
+                .with_parameters(Arc::new(get_arraykey()), Arc::new(get_mixed())),
         );
 
         assert_is_contained_by(&codebase, &input, &container, false, &mut ComparisonResult::default());
@@ -392,9 +393,9 @@ mod tests {
     fn test_unsealed_compatible_generics() {
         let codebase = create_test_codebase("<?php");
         // array<string, int>
-        let input = t_keyed(TKeyedArray::new_with_parameters(Box::new(get_string()), Box::new(get_int())));
+        let input = t_keyed(TKeyedArray::new_with_parameters(Arc::new(get_string()), Arc::new(get_int())));
         // array<array-key, mixed>
-        let container = t_keyed(TKeyedArray::new_with_parameters(Box::new(get_arraykey()), Box::new(get_mixed())));
+        let container = t_keyed(TKeyedArray::new_with_parameters(Arc::new(get_arraykey()), Arc::new(get_mixed())));
         assert_is_contained_by(&codebase, &input, &container, true, &mut ComparisonResult::default());
     }
 
@@ -402,9 +403,9 @@ mod tests {
     fn test_unsealed_incompatible_value_generic() {
         let codebase = create_test_codebase("<?php");
         // array<string, int>
-        let input = t_keyed(TKeyedArray::new_with_parameters(Box::new(get_string()), Box::new(get_int())));
+        let input = t_keyed(TKeyedArray::new_with_parameters(Arc::new(get_string()), Arc::new(get_int())));
         // array<array-key, string>
-        let container = t_keyed(TKeyedArray::new_with_parameters(Box::new(get_arraykey()), Box::new(get_string())));
+        let container = t_keyed(TKeyedArray::new_with_parameters(Arc::new(get_arraykey()), Arc::new(get_string())));
         assert_is_contained_by(&codebase, &input, &container, false, &mut ComparisonResult::default());
     }
 
@@ -412,9 +413,9 @@ mod tests {
     fn test_unsealed_incompatible_key_generic() {
         let codebase = create_test_codebase("<?php");
         // array<array-key, int>
-        let input = t_keyed(TKeyedArray::new_with_parameters(Box::new(get_arraykey()), Box::new(get_int())));
+        let input = t_keyed(TKeyedArray::new_with_parameters(Arc::new(get_arraykey()), Arc::new(get_int())));
         // array<string, int>
-        let container = t_keyed(TKeyedArray::new_with_parameters(Box::new(get_string()), Box::new(get_int())));
+        let container = t_keyed(TKeyedArray::new_with_parameters(Arc::new(get_string()), Arc::new(get_int())));
         assert_is_contained_by(&codebase, &input, &container, false, &mut ComparisonResult::default());
     }
 
@@ -426,7 +427,7 @@ mod tests {
             TKeyedArray::new().with_known_items(BTreeMap::from([(ArrayKey::String(atom("a")), (false, get_string()))])),
         );
         // array<array-key, mixed>
-        let container = t_keyed(TKeyedArray::new_with_parameters(Box::new(get_arraykey()), Box::new(get_mixed())));
+        let container = t_keyed(TKeyedArray::new_with_parameters(Arc::new(get_arraykey()), Arc::new(get_mixed())));
         assert_is_contained_by(&codebase, &input, &container, true, &mut ComparisonResult::default());
     }
 
@@ -438,7 +439,7 @@ mod tests {
             TKeyedArray::new().with_known_items(BTreeMap::from([(ArrayKey::String(atom("a")), (false, get_string()))])),
         );
         // array<array-key, int>
-        let container = t_keyed(TKeyedArray::new_with_parameters(Box::new(get_arraykey()), Box::new(get_int())));
+        let container = t_keyed(TKeyedArray::new_with_parameters(Arc::new(get_arraykey()), Arc::new(get_int())));
         assert_is_contained_by(&codebase, &input, &container, false, &mut ComparisonResult::default());
     }
 
@@ -454,7 +455,7 @@ mod tests {
         let container = t_keyed(
             TKeyedArray::new()
                 .with_known_items(BTreeMap::from([(ArrayKey::String(atom("a")), (false, get_string()))]))
-                .with_parameters(Box::new(get_arraykey()), Box::new(get_int())),
+                .with_parameters(Arc::new(get_arraykey()), Arc::new(get_int())),
         );
         assert_is_contained_by(&codebase, &input, &container, true, &mut ComparisonResult::default());
     }
@@ -471,7 +472,7 @@ mod tests {
         let container = t_keyed(
             TKeyedArray::new()
                 .with_known_items(BTreeMap::from([(ArrayKey::String(atom("a")), (false, get_string()))]))
-                .with_parameters(Box::new(get_arraykey()), Box::new(get_int())),
+                .with_parameters(Arc::new(get_arraykey()), Arc::new(get_int())),
         );
         assert_is_contained_by(&codebase, &input, &container, false, &mut ComparisonResult::default());
     }
@@ -480,7 +481,7 @@ mod tests {
     fn test_unsealed_does_not_satisfy_required_sealed() {
         let codebase = create_test_codebase("<?php");
         // array<array-key, string>
-        let input = t_keyed(TKeyedArray::new_with_parameters(Box::new(get_arraykey()), Box::new(get_string())));
+        let input = t_keyed(TKeyedArray::new_with_parameters(Arc::new(get_arraykey()), Arc::new(get_string())));
         // array{'a': string}
         let container = t_keyed(
             TKeyedArray::new().with_known_items(BTreeMap::from([(ArrayKey::String(atom("a")), (false, get_string()))])),
@@ -492,7 +493,7 @@ mod tests {
     fn test_unsealed_does_not_satisfy_incompatible_sealed() {
         let codebase = create_test_codebase("<?php");
         // array<array-key, string>
-        let input = t_keyed(TKeyedArray::new_with_parameters(Box::new(get_arraykey()), Box::new(get_string())));
+        let input = t_keyed(TKeyedArray::new_with_parameters(Arc::new(get_arraykey()), Arc::new(get_string())));
         // array{'a': int}
         let container = t_keyed(
             TKeyedArray::new().with_known_items(BTreeMap::from([(ArrayKey::String(atom("a")), (false, get_int()))])),
@@ -505,11 +506,11 @@ mod tests {
         let codebase = create_test_codebase("<?php");
         // non-empty-array<array-key, mixed>
         let input = t_keyed(
-            TKeyedArray::new_with_parameters(Box::new(get_arraykey()), Box::new(get_mixed())).with_non_empty(true),
+            TKeyedArray::new_with_parameters(Arc::new(get_arraykey()), Arc::new(get_mixed())).with_non_empty(true),
         );
         // array<array-key, mixed>
         let container = t_keyed(
-            TKeyedArray::new_with_parameters(Box::new(get_arraykey()), Box::new(get_mixed())).with_non_empty(false),
+            TKeyedArray::new_with_parameters(Arc::new(get_arraykey()), Arc::new(get_mixed())).with_non_empty(false),
         );
         assert_is_contained_by(&codebase, &input, &container, true, &mut ComparisonResult::default());
     }
@@ -519,11 +520,11 @@ mod tests {
         let codebase = create_test_codebase("<?php");
         // array<array-key, mixed>
         let input = t_keyed(
-            TKeyedArray::new_with_parameters(Box::new(get_arraykey()), Box::new(get_mixed())).with_non_empty(false),
+            TKeyedArray::new_with_parameters(Arc::new(get_arraykey()), Arc::new(get_mixed())).with_non_empty(false),
         );
         // non-empty-array<array-key, mixed>
         let container = t_keyed(
-            TKeyedArray::new_with_parameters(Box::new(get_arraykey()), Box::new(get_mixed())).with_non_empty(true),
+            TKeyedArray::new_with_parameters(Arc::new(get_arraykey()), Arc::new(get_mixed())).with_non_empty(true),
         );
         assert_is_contained_by(&codebase, &input, &container, false, &mut ComparisonResult::default());
     }
@@ -533,7 +534,7 @@ mod tests {
         let codebase = create_test_codebase("<?php");
         // array<array-key, mixed>
         let input = t_keyed(
-            TKeyedArray::new_with_parameters(Box::new(get_arraykey()), Box::new(get_mixed())).with_non_empty(false),
+            TKeyedArray::new_with_parameters(Arc::new(get_arraykey()), Arc::new(get_mixed())).with_non_empty(false),
         );
         // array{'a': string}
         let container = t_keyed(
@@ -551,7 +552,7 @@ mod tests {
         let input = t_keyed(
             TKeyedArray::new()
                 .with_known_items(BTreeMap::from([(ArrayKey::String(atom("a")), (false, get_string()))]))
-                .with_parameters(Box::new(get_arraykey()), Box::new(get_string())),
+                .with_parameters(Arc::new(get_arraykey()), Arc::new(get_string())),
         );
 
         // container: array{'a': string, 'b'?: int, ...<array-key, mixed>}
@@ -561,7 +562,7 @@ mod tests {
                     (ArrayKey::String(atom("a")), (false, get_string())),
                     (ArrayKey::String(atom("b")), (true, get_int())),
                 ]))
-                .with_parameters(Box::new(get_arraykey()), Box::new(get_mixed())),
+                .with_parameters(Arc::new(get_arraykey()), Arc::new(get_mixed())),
         );
 
         // This should be false, because input could have a key 'b' which would be a string,

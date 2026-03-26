@@ -1,4 +1,3 @@
-use std::io::IsTerminal;
 use std::path::PathBuf;
 
 use clap::ColorChoice;
@@ -10,11 +9,18 @@ use mago_analyzer::settings::DEFAULT_FORMULA_SIZE_THRESHOLD;
 use mago_analyzer::settings::Settings;
 use mago_atom::ascii_lowercase_atom;
 use mago_atom::atom;
+use mago_codex::ttype::combiner::DEFAULT_ARRAY_COMBINATION_THRESHOLD;
+use mago_codex::ttype::combiner::DEFAULT_INTEGER_COMBINATION_THRESHOLD;
+use mago_codex::ttype::combiner::DEFAULT_STRING_COMBINATION_THRESHOLD;
 use mago_php_version::PHPVersion;
+use mago_reporting::IgnoreEntry;
+use mago_reporting::Level;
 use mago_reporting::baseline::BaselineVariant;
 use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
+
+use crate::utils::should_use_colors;
 
 /// Configuration options for the static analyzer.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
@@ -23,8 +29,8 @@ pub struct AnalyzerConfiguration {
     /// A list of patterns to exclude from analysis.
     pub excludes: Vec<String>,
 
-    /// Ignore specific issues based on their code.
-    pub ignore: Vec<String>,
+    /// Ignore specific issues based on their code, optionally scoped to paths.
+    pub ignore: Vec<IgnoreEntry>,
 
     /// Path to a baseline file to ignore listed issues.
     pub baseline: Option<PathBuf>,
@@ -40,6 +46,19 @@ pub struct AnalyzerConfiguration {
     /// don't affect the baseline.
     pub baseline_variant: BaselineVariant,
 
+    /// Set the minimum issue severity that causes the command to fail.
+    ///
+    /// The command will exit with a non-zero status if any issues at or above
+    /// this level are found. For example, setting this to `"warning"` means
+    /// the command fails on warnings and errors, but not on notes or help suggestions.
+    ///
+    /// Options: `"note"`, `"help"`, `"warning"`, `"error"`
+    ///
+    /// Can be overridden by the `--minimum-fail-level` CLI flag.
+    ///
+    /// Defaults to `"error"`.
+    pub minimum_fail_level: Level,
+
     /// Disable all default plugins (including stdlib).
     ///
     /// When set to `true`, no plugins will be loaded by default, and only plugins
@@ -54,6 +73,7 @@ pub struct AnalyzerConfiguration {
     /// - `stdlib` (aliases: `standard`, `std`, `php-stdlib`)
     /// - `psl` (aliases: `php-standard-library`, `azjezz-psl`)
     /// - `flow-php` (aliases: `flow`, `flow-etl`)
+    /// - `psr-container` (aliases: `psr-11`)
     ///
     /// Example: `plugins = ["stdlib", "psl"]`
     pub plugins: Vec<String>,
@@ -197,6 +217,22 @@ pub struct AnalyzerConfiguration {
     /// Defaults to `false`.
     pub check_use_statements: bool,
 
+    /// Enforce that concrete classes are declared `final`.
+    ///
+    /// When enabled, the analyzer reports a warning for any class that is not
+    /// `final`, `abstract`, or annotated with `@api`, provided the class has no children.
+    ///
+    /// Defaults to `false`.
+    pub enforce_class_finality: bool,
+
+    /// Require `@api` or `@internal` annotations on abstract classes, interfaces, and traits.
+    ///
+    /// When enabled, the analyzer reports a warning for any abstract class, interface,
+    /// or trait that is not annotated with either `@api` or `@internal`.
+    ///
+    /// Defaults to `false`.
+    pub require_api_or_internal: bool,
+
     /// **Deprecated**: Use `check-missing-override` and `find-unused-parameters` instead.
     ///
     /// When set to `true`, enables both `check-missing-override` and `find-unused-parameters`.
@@ -261,6 +297,35 @@ pub struct PerformanceConfiguration {
     ///
     /// Defaults to `512`.
     pub formula_size_threshold: u16,
+
+    /// Maximum number of literal strings to track before generalizing.
+    ///
+    /// When combining types with many different literal string values, tracking each
+    /// literal individually causes O(n) memory and O(n²) comparison time.
+    /// Once the threshold is exceeded, we generalize to the base string type.
+    ///
+    /// Defaults to `128`.
+    #[serde(alias = "string_concat_combination_threshold", alias = "string-concat-combination-threshold")]
+    pub string_combination_threshold: u16,
+
+    /// Maximum number of literal integers to track before generalizing.
+    ///
+    /// When combining types with many different literal integer values, tracking each
+    /// literal individually causes O(n) memory and O(n²) comparison time.
+    /// Once the threshold is exceeded, we generalize to the base int type.
+    ///
+    /// Defaults to `128`.
+    pub integer_combination_threshold: u16,
+
+    /// Maximum number of array elements to track individually.
+    ///
+    /// When building array types through repeated push operations (`$arr[] = ...`),
+    /// this limits how many individual elements are tracked before generalizing
+    /// to a simpler array type. This prevents memory explosion on files with
+    /// thousands of array pushes.
+    ///
+    /// Defaults to `128`.
+    pub array_combination_threshold: u16,
 }
 
 impl Default for PerformanceConfiguration {
@@ -271,6 +336,9 @@ impl Default for PerformanceConfiguration {
             negation_complexity_threshold: DEFAULT_NEGATION_COMPLEXITY,
             consensus_limit_threshold: DEFAULT_CONSENSUS_LIMIT,
             formula_size_threshold: DEFAULT_FORMULA_SIZE_THRESHOLD,
+            string_combination_threshold: DEFAULT_STRING_COMBINATION_THRESHOLD,
+            integer_combination_threshold: DEFAULT_INTEGER_COMBINATION_THRESHOLD,
+            array_combination_threshold: DEFAULT_ARRAY_COMBINATION_THRESHOLD,
         }
     }
 }
@@ -295,15 +363,13 @@ impl AnalyzerConfiguration {
             find_unused_parameters,
             strict_list_index_checks: self.strict_list_index_checks,
             no_boolean_literal_comparison: self.no_boolean_literal_comparison,
+            enforce_class_finality: self.enforce_class_finality,
+            require_api_or_internal: self.require_api_or_internal,
             check_missing_type_hints: self.check_missing_type_hints,
             check_closure_missing_type_hints: self.check_closure_missing_type_hints,
             check_arrow_function_missing_type_hints: self.check_arrow_function_missing_type_hints,
             register_super_globals: self.register_super_globals,
-            use_colors: match color_choice {
-                ColorChoice::Always => true,
-                ColorChoice::Never => false,
-                ColorChoice::Auto => std::io::stdout().is_terminal(),
-            },
+            use_colors: should_use_colors(color_choice),
             diff: enable_diff,
             trust_existence_checks: self.trust_existence_checks,
             class_initializers: self.class_initializers.iter().map(|s| ascii_lowercase_atom(s.as_str())).collect(),
@@ -314,6 +380,9 @@ impl AnalyzerConfiguration {
             negation_complexity_threshold: self.performance.negation_complexity_threshold,
             consensus_limit_threshold: self.performance.consensus_limit_threshold,
             formula_size_threshold: self.performance.formula_size_threshold,
+            string_combination_threshold: self.performance.string_combination_threshold,
+            integer_combination_threshold: self.performance.integer_combination_threshold,
+            array_combination_threshold: self.performance.array_combination_threshold,
         }
     }
 }
@@ -329,6 +398,7 @@ impl Default for AnalyzerConfiguration {
             ignore: vec![],
             baseline: None,
             baseline_variant: BaselineVariant::default(),
+            minimum_fail_level: Level::Error,
             find_unused_expressions: defaults.find_unused_expressions,
             find_unused_definitions: defaults.find_unused_definitions,
             analyze_dead_code: defaults.analyze_dead_code,
@@ -341,6 +411,8 @@ impl Default for AnalyzerConfiguration {
             find_unused_parameters: defaults.find_unused_parameters,
             strict_list_index_checks: defaults.strict_list_index_checks,
             no_boolean_literal_comparison: defaults.no_boolean_literal_comparison,
+            enforce_class_finality: defaults.enforce_class_finality,
+            require_api_or_internal: defaults.require_api_or_internal,
             check_missing_type_hints: defaults.check_missing_type_hints,
             check_closure_missing_type_hints: defaults.check_closure_missing_type_hints,
             check_arrow_function_missing_type_hints: defaults.check_arrow_function_missing_type_hints,

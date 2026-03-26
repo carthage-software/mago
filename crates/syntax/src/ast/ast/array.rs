@@ -75,7 +75,6 @@ pub struct LegacyArray<'arena> {
 /// Represents an array element.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 #[serde(tag = "type", content = "value")]
-#[repr(u8)]
 pub enum ArrayElement<'arena> {
     KeyValue(KeyValueArrayElement<'arena>),
     Value(ValueArrayElement<'arena>),

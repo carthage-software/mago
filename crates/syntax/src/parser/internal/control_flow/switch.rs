@@ -1,3 +1,5 @@
+use mago_database::file::HasFileId;
+
 use crate::T;
 use crate::ast::ast::Statement;
 use crate::ast::ast::Switch;
@@ -10,130 +12,116 @@ use crate::ast::ast::SwitchDefaultCase;
 use crate::ast::ast::SwitchExpressionCase;
 use crate::ast::sequence::Sequence;
 use crate::error::ParseError;
-use crate::parser::internal::expression::parse_expression;
-use crate::parser::internal::statement::parse_statement;
-use crate::parser::internal::terminator::parse_optional_terminator;
-use crate::parser::internal::terminator::parse_terminator;
-use crate::parser::internal::token_stream::TokenStream;
-use crate::parser::internal::utils;
+use crate::parser::Parser;
 
-pub fn parse_switch<'arena>(stream: &mut TokenStream<'_, 'arena>) -> Result<Switch<'arena>, ParseError> {
-    Ok(Switch {
-        switch: utils::expect_keyword(stream, T!["switch"])?,
-        left_parenthesis: utils::expect_span(stream, T!["("])?,
-        expression: {
-            let expression = parse_expression(stream)?;
-
-            stream.alloc(expression)
-        },
-        right_parenthesis: utils::expect_span(stream, T![")"])?,
-        body: parse_switch_body(stream)?,
-    })
-}
-
-pub fn parse_switch_body<'arena>(stream: &mut TokenStream<'_, 'arena>) -> Result<SwitchBody<'arena>, ParseError> {
-    let token = utils::peek(stream)?;
-
-    Ok(match token.kind {
-        T![":"] => SwitchBody::ColonDelimited(parse_switch_colon_delimited_body(stream)?),
-        T!["{"] => SwitchBody::BraceDelimited(parse_switch_brace_delimited_body(stream)?),
-        _ => {
-            return Err(utils::unexpected(stream, Some(token), T![":", "{"]));
-        }
-    })
-}
-
-pub fn parse_switch_brace_delimited_body<'arena>(
-    stream: &mut TokenStream<'_, 'arena>,
-) -> Result<SwitchBraceDelimitedBody<'arena>, ParseError> {
-    let left_brace = utils::expect_span(stream, T!["{"])?;
-    let optional_terminator = parse_optional_terminator(stream)?;
-    let cases = parse_switch_cases(stream)?;
-    let right_brace = utils::expect_span(stream, T!["}"])?;
-
-    Ok(SwitchBraceDelimitedBody { left_brace, optional_terminator, cases, right_brace })
-}
-
-pub fn parse_switch_colon_delimited_body<'arena>(
-    stream: &mut TokenStream<'_, 'arena>,
-) -> Result<SwitchColonDelimitedBody<'arena>, ParseError> {
-    Ok(SwitchColonDelimitedBody {
-        colon: utils::expect_span(stream, T![":"])?,
-        optional_terminator: parse_optional_terminator(stream)?,
-        cases: parse_switch_cases(stream)?,
-        end_switch: utils::expect_keyword(stream, T!["endswitch"])?,
-        terminator: parse_terminator(stream)?,
-    })
-}
-
-pub fn parse_switch_cases<'arena>(
-    stream: &mut TokenStream<'_, 'arena>,
-) -> Result<Sequence<'arena, SwitchCase<'arena>>, ParseError> {
-    let mut cases = stream.new_vec();
-    loop {
-        if matches!(utils::peek(stream)?.kind, T!["endswitch" | "}"]) {
-            break;
-        }
-
-        cases.push(parse_switch_case(stream)?);
+impl<'input, 'arena> Parser<'input, 'arena> {
+    pub(crate) fn parse_switch(&mut self) -> Result<Switch<'arena>, ParseError> {
+        Ok(Switch {
+            switch: self.expect_keyword(T!["switch"])?,
+            left_parenthesis: self.stream.eat_span(T!["("])?,
+            expression: self.arena.alloc(self.parse_expression()?),
+            right_parenthesis: self.stream.eat_span(T![")"])?,
+            body: self.parse_switch_body()?,
+        })
     }
 
-    Ok(Sequence::new(cases))
-}
+    fn parse_switch_body(&mut self) -> Result<SwitchBody<'arena>, ParseError> {
+        let token = self.stream.lookahead(0)?.ok_or_else(|| self.stream.unexpected(None, &[]))?;
 
-pub fn parse_switch_case<'arena>(stream: &mut TokenStream<'_, 'arena>) -> Result<SwitchCase<'arena>, ParseError> {
-    Ok(match utils::peek(stream)?.kind {
-        T!["default"] => SwitchCase::Default(parse_switch_default_case(stream)?),
-        _ => SwitchCase::Expression(parse_switch_expression_case(stream)?),
-    })
-}
-
-pub fn parse_switch_expression_case<'arena>(
-    stream: &mut TokenStream<'_, 'arena>,
-) -> Result<SwitchExpressionCase<'arena>, ParseError> {
-    Ok(SwitchExpressionCase {
-        case: utils::expect_keyword(stream, T!["case"])?,
-        expression: {
-            let expression = parse_expression(stream)?;
-
-            stream.alloc(expression)
-        },
-        separator: parse_switch_case_separator(stream)?,
-        statements: parse_switch_statements(stream)?,
-    })
-}
-
-pub fn parse_switch_default_case<'arena>(
-    stream: &mut TokenStream<'_, 'arena>,
-) -> Result<SwitchDefaultCase<'arena>, ParseError> {
-    Ok(SwitchDefaultCase {
-        default: utils::expect_keyword(stream, T!["default"])?,
-        separator: parse_switch_case_separator(stream)?,
-        statements: parse_switch_statements(stream)?,
-    })
-}
-
-pub fn parse_switch_statements<'arena>(
-    stream: &mut TokenStream<'_, 'arena>,
-) -> Result<Sequence<'arena, Statement<'arena>>, ParseError> {
-    let mut statements = stream.new_vec();
-    loop {
-        if matches!(utils::peek(stream)?.kind, T!["case" | "default" | "endswitch" | "}"]) {
-            break;
-        }
-
-        statements.push(parse_statement(stream)?);
+        Ok(match token.kind {
+            T![":"] => SwitchBody::ColonDelimited(self.parse_switch_colon_delimited_body()?),
+            T!["{"] => SwitchBody::BraceDelimited(self.parse_switch_brace_delimited_body()?),
+            _ => {
+                return Err(self.stream.unexpected(Some(token), T![":", "{"]));
+            }
+        })
     }
 
-    Ok(Sequence::new(statements))
-}
+    fn parse_switch_brace_delimited_body(&mut self) -> Result<SwitchBraceDelimitedBody<'arena>, ParseError> {
+        let left_brace = self.stream.eat_span(T!["{"])?;
+        let optional_terminator = self.parse_optional_terminator()?;
+        let cases = self.parse_switch_cases()?;
+        let right_brace = self.stream.eat_span(T!["}"])?;
 
-pub fn parse_switch_case_separator(stream: &mut TokenStream<'_, '_>) -> Result<SwitchCaseSeparator, ParseError> {
-    let token = utils::expect_one_of(stream, T![":", ";"])?;
+        Ok(SwitchBraceDelimitedBody { left_brace, optional_terminator, cases, right_brace })
+    }
 
-    Ok(match token.kind {
-        T![":"] => SwitchCaseSeparator::Colon(token.span),
-        T![";"] => SwitchCaseSeparator::SemiColon(token.span),
-        _ => unreachable!(),
-    })
+    fn parse_switch_colon_delimited_body(&mut self) -> Result<SwitchColonDelimitedBody<'arena>, ParseError> {
+        Ok(SwitchColonDelimitedBody {
+            colon: self.stream.eat_span(T![":"])?,
+            optional_terminator: self.parse_optional_terminator()?,
+            cases: self.parse_switch_cases()?,
+            end_switch: self.expect_keyword(T!["endswitch"])?,
+            terminator: self.parse_terminator()?,
+        })
+    }
+
+    fn parse_switch_cases(&mut self) -> Result<Sequence<'arena, SwitchCase<'arena>>, ParseError> {
+        let mut cases = self.new_vec();
+        loop {
+            if matches!(self.stream.peek_kind(0)?, Some(T!["endswitch" | "}"])) {
+                break;
+            }
+
+            cases.push(self.parse_switch_case()?);
+        }
+
+        Ok(Sequence::new(cases))
+    }
+
+    fn parse_switch_case(&mut self) -> Result<SwitchCase<'arena>, ParseError> {
+        Ok(match self.stream.peek_kind(0)? {
+            Some(T!["default"]) => SwitchCase::Default(self.parse_switch_default_case()?),
+            _ => SwitchCase::Expression(self.parse_switch_expression_case()?),
+        })
+    }
+
+    fn parse_switch_expression_case(&mut self) -> Result<SwitchExpressionCase<'arena>, ParseError> {
+        Ok(SwitchExpressionCase {
+            case: self.expect_keyword(T!["case"])?,
+            expression: self.arena.alloc(self.parse_expression()?),
+            separator: self.parse_switch_case_separator()?,
+            statements: self.parse_switch_statements()?,
+        })
+    }
+
+    fn parse_switch_default_case(&mut self) -> Result<SwitchDefaultCase<'arena>, ParseError> {
+        Ok(SwitchDefaultCase {
+            default: self.expect_keyword(T!["default"])?,
+            separator: self.parse_switch_case_separator()?,
+            statements: self.parse_switch_statements()?,
+        })
+    }
+
+    fn parse_switch_statements(&mut self) -> Result<Sequence<'arena, Statement<'arena>>, ParseError> {
+        let mut statements = self.new_vec();
+        loop {
+            if matches!(self.stream.peek_kind(0)?, None | Some(T!["case" | "default" | "endswitch" | "}"])) {
+                break;
+            }
+            let position_before = self.stream.current_position();
+            statements.push(self.parse_statement()?);
+            if self.stream.current_position() == position_before {
+                if let Ok(Some(token)) = self.stream.lookahead(0) {
+                    self.errors.push(self.stream.unexpected(Some(token), &[]));
+                    let _ = self.stream.consume();
+                } else {
+                    break;
+                }
+            }
+        }
+
+        Ok(Sequence::new(statements))
+    }
+
+    fn parse_switch_case_separator(&mut self) -> Result<SwitchCaseSeparator, ParseError> {
+        let token = self.stream.consume()?;
+        let span = token.span_for(self.stream.file_id());
+
+        Ok(match token.kind {
+            T![":"] => SwitchCaseSeparator::Colon(span),
+            T![";"] => SwitchCaseSeparator::SemiColon(span),
+            _ => return Err(self.stream.unexpected(Some(token), T![":", ";"])),
+        })
+    }
 }

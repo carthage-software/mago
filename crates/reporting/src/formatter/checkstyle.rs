@@ -31,7 +31,7 @@ impl Formatter for CheckstyleFormatter {
         let mut issues_by_file: HashMap<String, Vec<String>> = HashMap::new();
 
         for issue in issues.iter() {
-            let (filename, line, column) = match issue.annotations.iter().find(|annotation| annotation.is_primary()) {
+            let (filename, line, column) = match issue.primary_annotation() {
                 Some(annotation) => {
                     let file = database.get(&annotation.span.file_id())?;
 

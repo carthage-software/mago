@@ -16,6 +16,7 @@ use std::path::PathBuf;
 
 use clap::ColorChoice;
 use clap::Parser;
+use mago_reporting::Level;
 use mago_reporting::baseline::BaselineVariant;
 
 use crate::commands::args::reporting::ReportingArgs;
@@ -68,6 +69,21 @@ pub struct BaselineReportingArgs {
     #[arg(long, conflicts_with = "generate_baseline", conflicts_with = "verify_baseline")]
     pub fail_on_out_of_sync_baseline: bool,
 
+    /// Ignore the baseline file, reporting all issues.
+    ///
+    /// When this flag is set, any configured or specified baseline file is ignored,
+    /// and all issues are reported as if no baseline exists. This is useful for
+    /// fixing issues that are currently suppressed by the baseline.
+    #[arg(
+        long,
+        conflicts_with = "baseline",
+        conflicts_with = "generate_baseline",
+        conflicts_with = "verify_baseline",
+        conflicts_with = "backup_baseline",
+        conflicts_with = "fail_on_out_of_sync_baseline"
+    )]
+    pub ignore_baseline: bool,
+
     /// Arguments related to reporting and fixing issues.
     #[clap(flatten)]
     pub reporting: ReportingArgs,
@@ -95,18 +111,24 @@ impl BaselineReportingArgs {
         color_choice: ColorChoice,
         baseline: Option<&Path>,
         baseline_variant: BaselineVariant,
+        editor_url: Option<String>,
+        config_minimum_fail_level: Level,
     ) -> BaselineIssueProcessor {
         BaselineIssueProcessor {
-            baseline_path: match &self.baseline {
-                Some(path) => Some(Cow::Owned(path.to_path_buf())),
-                None => baseline.map(|p| Cow::Owned(p.to_path_buf())),
+            baseline_path: if self.ignore_baseline {
+                None
+            } else {
+                match &self.baseline {
+                    Some(path) => Some(Cow::Owned(path.to_path_buf())),
+                    None => baseline.map(|p| Cow::Owned(p.to_path_buf())),
+                }
             },
             generate_baseline: self.generate_baseline,
             backup_baseline: self.backup_baseline,
             verify_baseline: self.verify_baseline,
             fail_on_out_of_sync_baseline: self.fail_on_out_of_sync_baseline,
             baseline_variant,
-            issue_processor: self.reporting.get_processor(color_choice),
+            issue_processor: self.reporting.get_processor(color_choice, editor_url, config_minimum_fail_level),
         }
     }
 }

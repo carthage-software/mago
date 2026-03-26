@@ -17,6 +17,9 @@ no-redundant-use = { enabled = true }
 no-variable-variable = { enabled = true }
 no-redundant-readonly = { enabled = true }
 sensitive-parameter = { enabled = true }
+# Disable for scripts
+single-class-per-file = { exclude = ["scripts"] }
+file-name = { exclude = ["scripts"] }
 
 [analyzer]
 find-unused-expressions = true
@@ -31,3 +34,4 @@ strict-list-index-checks = true
 no-boolean-literal-comparison = true
 allow-possibly-undefined-array-keys = false
 trust-existence-checks = false
+check-use-statements = true

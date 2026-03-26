@@ -21,11 +21,47 @@ If this variable is set to any value (e.g., `1`, `true`), it disables all colore
 
 - **Example**: `NO_COLOR=1 mago lint`
 
+See [no-color.org](https://no-color.org/) for more information.
+
+### `FORCE_COLOR`
+
+If this variable is set to any non-empty value (e.g., `1`, `true`), it forces colored output from Mago, even when the output is not a terminal (e.g., when piping to a file or another command).
+
+This takes precedence over `NO_COLOR`.
+
+- **Example**: `FORCE_COLOR=1 mago lint | less -R`
+
+See [force-color.org](https://force-color.org/) for more information.
+
 ### `XDG_CONFIG_HOME`
 
-Mago follows the XDG Base Directory Specification. You can use this environment variable to change the directory where Mago looks for its global configuration file. If unset, it defaults to `$HOME/.config`.
+Mago follows the [XDG Base Directory Specification](https://specifications.freedesktop.org/basedir-spec/latest/). When no configuration file is found in the workspace, Mago searches for a global configuration file in the following order:
+
+1. `$XDG_CONFIG_HOME/mago.toml` — if `XDG_CONFIG_HOME` is set
+2. `$HOME/.config/mago.toml` — the default XDG config directory
+3. `$HOME/mago.toml` — the user's home directory
+
+Set this variable to change the first lookup directory:
 
 - **Example**: `XDG_CONFIG_HOME=/path/to/config mago lint`
+
+## Reserved `MAGO_` prefix
+
+The `MAGO_` prefix is reserved for Mago configuration. Mago reads **all** environment variables starting with `MAGO_` and attempts to map them to configuration fields. If any `MAGO_`-prefixed environment variable does not correspond to a valid configuration field, Mago will fail with an "unknown field" error.
+
+For example, setting `MAGO_LINT=1` or `MAGO_MY_CUSTOM_VAR=foo` in your environment will cause an error like:
+
+```
+ERROR Failed to build the configuration: unknown field `lint`, expected one of ...
+```
+
+If you encounter unexpected configuration errors, check your environment for any `MAGO_`-prefixed variables that are not listed below:
+
+```bash
+env | grep ^MAGO_
+```
+
+Remove or rename any variables that are not recognized by Mago.
 
 ## Overriding Configuration
 

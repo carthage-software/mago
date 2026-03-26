@@ -15,6 +15,8 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_span::Span;
+use mago_syntax::ast::Access;
+use mago_syntax::ast::Call;
 use mago_syntax::ast::Expression;
 
 use crate::analyzable::Analyzable;
@@ -155,6 +157,12 @@ impl ResolvedClassname {
         matches!(self.origin, ResolutionOrigin::Named { .. })
     }
 
+    /// Checks if the resolution is from the `parent` keyword.
+    #[inline]
+    pub const fn is_parent(&self) -> bool {
+        matches!(self.origin, ResolutionOrigin::Named { is_parent: true, .. })
+    }
+
     /// Checks if the resolution is from a `self`, `static`, or `parent` keyword.
     #[inline]
     pub const fn is_relative(&self) -> bool {
@@ -168,22 +176,22 @@ impl ResolvedClassname {
 
     #[inline]
     pub fn get_object_type(&self, codebase: &CodebaseMetadata) -> TAtomic {
-        let mut object_atomic = if let ResolutionOrigin::SpecificClassLikeString(class_string) = &self.origin {
-            class_string.get_object_type(codebase)
-        } else {
-            TAtomic::Object(match self.fqcn {
-                Some(fqcn) => {
-                    let lowercase_fqcn = ascii_lowercase_atom(&fqcn);
+        if let ResolutionOrigin::SpecificClassLikeString(class_string) = &self.origin {
+            return class_string.get_object_type(codebase);
+        }
 
-                    if codebase.symbols.contains_enum(&lowercase_fqcn) {
-                        TObject::Enum(TEnum::new(fqcn))
-                    } else {
-                        TObject::Named(TNamedObject::new(fqcn))
-                    }
+        let mut object_atomic = TAtomic::Object(match self.fqcn {
+            Some(fqcn) => {
+                let lowercase_fqcn = ascii_lowercase_atom(&fqcn);
+
+                if codebase.symbols.contains_enum(lowercase_fqcn) {
+                    TObject::Enum(TEnum::new(fqcn))
+                } else {
+                    TObject::Named(TNamedObject::new(fqcn))
                 }
-                None => TObject::Any,
-            })
-        };
+            }
+            None => TObject::Any,
+        });
 
         for intersection_class in &self.intersections {
             object_atomic.add_intersection_type(intersection_class.get_object_type(codebase));
@@ -319,19 +327,49 @@ pub fn resolve_classnames_from_expression<'ctx, 'arena>(
         expression => {
             // If the expression is not already analyzed, we analyze it now.
             if !class_is_analyzed {
-                let was_inside_call = block_context.inside_call;
-                block_context.inside_call = true;
+                let was_inside_call = block_context.flags.inside_call();
+                block_context.flags.set_inside_call(true);
                 expression.analyze(context, block_context, artifacts)?;
-                block_context.inside_call = was_inside_call;
+                block_context.flags.set_inside_call(was_inside_call);
             }
 
             let expression_type = artifacts.get_expression_type(expression);
 
+            let is_directly_nullsafe = matches!(
+                expression.unparenthesized(),
+                Expression::Access(Access::NullSafeProperty(_)) | Expression::Call(Call::NullSafeMethod(_))
+            );
+
             for atomic in expression_type.map(|u| u.types.iter()).unwrap_or_default() {
                 if let Some(resolved_classname) = get_class_name_from_atomic(context.codebase, atomic) {
                     possible_types.push(resolved_classname);
-                } else if expression_is_nullsafe(expression) && atomic.is_null() {
-                    // Special case: nullsafe operator resulting in null type is ignored for class name resolution.
+                } else if atomic.is_null() && is_directly_nullsafe {
+                    context.collector.report_with_code(
+                        IssueCode::PossiblyNullPropertyAccess,
+                        Issue::error("Attempting static access on a possibly `null` value.")
+                            .with_annotation(
+                                Annotation::primary(expression.span())
+                                    .with_message("This expression can be `null` here"),
+                            )
+                            .with_note("PHP's nullsafe operator (`?->`) does not short-circuit static access (`::`).")
+                            .with_help(
+                                "Add a null check before the static access, or ensure the expression is never null.",
+                            ),
+                    );
+                } else if atomic.is_null() && expression_is_nullsafe(expression) {
+                    // Nullsafe in chain short-circuits, skip error
+                } else if atomic.is_null() {
+                    context.collector.report_with_code(
+                        IssueCode::PossiblyNullPropertyAccess,
+                        Issue::error("Attempting static access on a possibly `null` value.")
+                            .with_annotation(
+                                Annotation::primary(expression.span())
+                                    .with_message("This expression can be `null` here"),
+                            )
+                            .with_help(
+                                "Add a null check before the static access, or ensure the expression is never null.",
+                            ),
+                    );
                 } else {
                     possible_types.push(ResolvedClassname::invalid());
 

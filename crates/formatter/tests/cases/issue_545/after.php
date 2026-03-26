@@ -2,9 +2,7 @@
 
 class Example
 {
-    private static function extractLineFeatures(string $line): SubmissionFeatures
-    {
-    }
+    private static function extractLineFeatures(string $line): SubmissionFeatures {}
 }
 
 if (false) {

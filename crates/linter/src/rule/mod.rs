@@ -85,7 +85,7 @@ macro_rules! define_rules {
         )*}
 
         impl AnyRule {
-            pub fn get_all_for(settings: &Settings, only: Option<&[String]>, include_disabled: bool) -> Vec<Self> {
+            pub fn get_all_for(settings: &Settings, only: Option<&[String]>, include_disabled: bool) -> Vec<(Self, Vec<String>)> {
                 let mut rules = Vec::new();
 
                 $(
@@ -94,7 +94,7 @@ macro_rules! define_rules {
                     // If `--only` is used, check if this rule's code is in the list.
                     if let Some(only_codes) = &only {
                         if only_codes.iter().any(|c| c == meta.code) {
-                            rules.push(AnyRule::$variant($rule::build(&settings.rules.$module)));
+                            rules.push((AnyRule::$variant($rule::build(&settings.rules.$module)), settings.rules.$module.exclude.clone()));
                         }
                     } else {
                         let is_enabled = include_disabled || (
@@ -103,7 +103,7 @@ macro_rules! define_rules {
                         );
 
                         if is_enabled {
-                            rules.push(AnyRule::$variant($rule::build(&settings.rules.$module)));
+                            rules.push((AnyRule::$variant($rule::build(&settings.rules.$module)), settings.rules.$module.exclude.clone()));
                         }
                     }
                 )*
@@ -179,6 +179,10 @@ macro_rules! define_rules {
 define_rules! {
     AmbiguousConstantAccess(ambiguous_constant_access @ AmbiguousConstantAccessRule),
     AmbiguousFunctionCall(ambiguous_function_call @ AmbiguousFunctionCallRule),
+    UseDedicatedExpectation(use_dedicated_expectation @ UseDedicatedExpectationRule),
+    UseSimplerExpectation(use_simpler_expectation @ UseSimplerExpectationRule),
+    UseSpecificExpectations(use_specific_expectations @ UseSpecificExpectationsRule),
+    NoOnly(no_only @ NoOnlyRule),
     ArrayStyle(array_style @ ArrayStyleRule),
     AssertDescription(assert_description @ AssertDescriptionRule),
     AssertionStyle(assertion_style @ AssertionStyleRule),
@@ -187,7 +191,6 @@ define_rules! {
     ClassName(class_name @ ClassNameRule),
     CombineConsecutiveIssets(combine_consecutive_issets @ CombineConsecutiveIssetsRule),
     ConstantName(constant_name @ ConstantNameRule),
-    ConstantType(constant_type @ ConstantTypeRule),
     CyclomaticComplexity(cyclomatic_complexity @ CyclomaticComplexityRule),
     DisallowedFunctions(disallowed_functions @ DisallowedFunctionsRule),
     EnumName(enum_name @ EnumNameRule),
@@ -206,6 +209,9 @@ define_rules! {
     NoShorthandTernary(no_shorthand_ternary @ NoShorthandTernaryRule),
     NoSprintfConcat(no_sprintf_concat @ NoSprintfConcatRule),
     OptionalParamOrder(optional_param_order @ OptionalParamOrderRule),
+    DeprecatedCast(deprecated_cast @ DeprecatedCastRule),
+    DeprecatedShellExecuteString(deprecated_shell_execute_string @ DeprecatedShellExecuteStringRule),
+    DeprecatedSwitchSemicolon(deprecated_switch_semicolon @ DeprecatedSwitchSemicolonRule),
     PreferInterface(prefer_interface @ PreferInterfaceRule),
     PreferAnonymousMigration(prefer_anonymous_migration @ PreferAnonymousMigrationRule),
     PreferFirstClassCallable(prefer_first_class_callable @ PreferFirstClassCallableRule),
@@ -214,8 +220,10 @@ define_rules! {
     NoTrailingSpace(no_trailing_space @ NoTrailingSpaceRule),
     NoRedundantWriteVisibility(no_redundant_write_visibility @ NoRedundantWriteVisibilityRule),
     NoRedundantStringConcat(no_redundant_string_concat @ NoRedundantStringConcatRule),
+    NoRedundantBinaryStringPrefix(no_redundant_binary_string_prefix @ NoRedundantBinaryStringPrefixRule),
     NoRedundantParentheses(no_redundant_parentheses @ NoRedundantParenthesesRule),
     NoRedundantMethodOverride(no_redundant_method_override @ NoRedundantMethodOverrideRule),
+    NoRedundantIsset(no_redundant_isset @ NoRedundantIssetRule),
     NoRedundantNullsafe(no_redundant_nullsafe @ NoRedundantNullsafeRule),
     NoRedundantMath(no_redundant_math @ NoRedundantMathRule),
     NoRedundantLabel(no_redundant_label @ NoRedundantLabelRule),
@@ -242,14 +250,15 @@ define_rules! {
     NoEval(no_eval @ NoEvalRule),
     NoErrorControlOperator(no_error_control_operator @ NoErrorControlOperatorRule),
     NoEmpty(no_empty @ NoEmptyRule),
+    NoIsset(no_isset @ NoIssetRule),
     NoEmptyLoop(no_empty_loop @ NoEmptyLoopRule),
     NoEmptyComment(no_empty_comment @ NoEmptyCommentRule),
     NoEmptyCatchClause(no_empty_catch_clause @ NoEmptyCatchClauseRule),
     NoElseClause(no_else_clause @ NoElseClauseRule),
     NoFullyQualifiedGlobal(no_fully_qualified_global @ NoFullyQualifiedGlobalRule),
     NoClosingTag(no_closing_tag @ NoClosingTagRule),
-    NoBooleanLiteralComparison(no_boolean_literal_comparison @ NoBooleanLiteralComparisonRule),
     NoBooleanFlagParameter(no_boolean_flag_parameter @ NoBooleanFlagParameterRule),
+    NoAssignInArgument(no_assign_in_argument @ NoAssignInArgumentRule),
     NoAssignInCondition(no_assign_in_condition @ NoAssignInConditionRule),
     NoAliasFunction(no_alias_function @ NoAliasFunctionRule),
     LowercaseTypeHint(lowercase_type_hint @ LowercaseTypeHintRule),
@@ -260,6 +269,7 @@ define_rules! {
     InstanceofStringable(instanceof_stringable @ InstanceofStringableRule),
     InterfaceName(interface_name @ InterfaceNameRule),
     InvalidOpenTag(invalid_open_tag @ InvalidOpenTagRule),
+    FileName(file_name @ FileNameRule),
     FunctionName(function_name @ FunctionNameRule),
     ExplicitOctal(explicit_octal @ ExplicitOctalRule),
     ReadableLiteral(readable_literal @ ReadableLiteralRule),
@@ -278,7 +288,6 @@ define_rules! {
     PslRegexFunctions(psl_regex_functions @ PslRegexFunctionsRule),
     PslSleepFunctions(psl_sleep_functions @ PslSleepFunctionsRule),
     PslStringFunctions(psl_string_functions @ PslStringFunctionsRule),
-    ReturnType(return_type @ ReturnTypeRule),
     StrContains(str_contains @ StrContainsRule),
     StrStartsWith(str_starts_with @ StrStartsWithRule),
     StrictBehavior(strict_behavior @ StrictBehaviorRule),
@@ -293,13 +302,12 @@ define_rules! {
     VariableName(variable_name @ VariableNameRule),
     ConstantCondition(constant_condition @ ConstantConditionRule),
     NoIniSet(no_ini_set @ NoIniSetRule),
+    NoInline(no_inline @ NoInlineRule),
     NoInsecureComparison(no_insecure_comparison @ NoInsecureComparisonRule),
     NoLiteralPassword(no_literal_password @ NoLiteralPasswordRule),
     TaintedDataToSink(tainted_data_to_sink @ TaintedDataToSinkRule),
     SensitiveParameter(sensitive_parameter @ SensitiveParameterRule),
-    ParameterType(parameter_type @ ParameterTypeRule),
     PropertyName(property_name @ PropertyNameRule),
-    PropertyType(property_type @ PropertyTypeRule),
     NoUnsafeFinally(no_unsafe_finally @ NoUnsafeFinallyRule),
     StrictAssertions(strict_assertions @ StrictAssertionsRule),
     UseSpecificAssertions(use_specific_assertions @ UseSpecificAssertionsRule),
@@ -308,10 +316,15 @@ define_rules! {
     UseCompoundAssignment(use_compound_assignment @ UseCompoundAssignmentRule),
     RequirePregQuoteDelimiter(require_preg_quote_delimiter @ RequirePregQuoteDelimiterRule),
     RequireNamespace(require_namespace @ RequireNamespaceRule),
+    SingleClassPerFile(single_class_per_file @ SingleClassPerFileRule),
     YodaConditions(yoda_conditions @ YodaConditionsRule),
     UseWpFunctions(use_wp_functions @ UseWpFunctionsRule),
     NoDirectDbQuery(no_direct_db_query @ NoDirectDbQueryRule),
     NoDbSchemaChange(no_db_schema_change @ NoDbSchemaChangeRule),
     NoUnescapedOutput(no_unescaped_output @ NoUnescapedOutputRule),
     NoRolesAsCapabilities(no_roles_as_capabilities @ NoRolesAsCapabilitiesRule),
+    NoShortBoolCast(no_short_bool_cast @ NoShortBoolCastRule),
+    NoAlternativeSyntax(no_alternative_syntax @ NoAlternativeSyntaxRule),
+    PreferPreIncrement(prefer_pre_increment @ PreferPreIncrementRule),
+    SwitchContinueToBreak(switch_continue_to_break @ SwitchContinueToBreakRule),
 }

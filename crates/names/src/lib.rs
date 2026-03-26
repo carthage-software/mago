@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use ahash::HashMap;
+use foldhash::HashMap;
 use serde::Serialize;
 
 use mago_span::HasPosition;

@@ -2,15 +2,13 @@ use bumpalo::collections::Vec;
 use bumpalo::vec;
 
 use mago_span::HasSpan;
-use mago_syntax::ast::Access;
 use mago_syntax::ast::Argument;
 use mago_syntax::ast::ArgumentList;
-use mago_syntax::ast::ArrayElement;
 use mago_syntax::ast::Call;
 use mago_syntax::ast::Expression;
 use mago_syntax::ast::PartialArgumentList;
-use mago_syntax::ast::UnaryPrefixOperator;
 
+use crate::document::BreakMode;
 use crate::document::Document;
 use crate::document::Group;
 use crate::document::IfBreak;
@@ -26,11 +24,13 @@ use crate::internal::format::format_token;
 use crate::internal::format::misc;
 use crate::internal::format::misc::is_breaking_expression;
 use crate::internal::format::misc::is_expandable_expression;
+use crate::internal::format::misc::is_simple_call_argument;
 use crate::internal::format::misc::is_simple_expression;
 use crate::internal::format::misc::is_simple_single_line_expression;
-use crate::internal::format::misc::is_string_word_type;
 use crate::internal::format::misc::should_hug_expression;
 use crate::internal::utils::could_expand_value;
+use crate::internal::utils::foreach_binary_operand;
+use crate::internal::utils::get_expression_width;
 use crate::internal::utils::unwrap_parenthesized;
 use crate::internal::utils::will_break;
 
@@ -101,7 +101,7 @@ pub(super) fn print_argument_list<'arena>(
     if !force_break {
         let args = argument_list.arguments.as_slice();
         for (i, arg) in args.iter().enumerate() {
-            if i < args.len() - 1 && f.has_comment(arg.span(), CommentFlags::Trailing | CommentFlags::Line) {
+            if i < args.len() - 1 && f.has_comment(arg.span(), CommentFlags::TRAILING | CommentFlags::LINE) {
                 force_break = true;
                 break;
             }
@@ -205,7 +205,7 @@ pub(super) fn print_argument_list<'arena>(
 
         parts.push(print_right_parenthesis(f, dangling_comments.as_ref(), &right_parenthesis, Some(true)));
 
-        Document::Group(Group::new(parts).with_break(true))
+        Document::Group(Group::new(parts).with_break_mode(BreakMode::Force))
     };
 
     if should_break_all {
@@ -269,7 +269,7 @@ pub(super) fn print_argument_list<'arena>(
                     vec![
                         in f.arena;
                         clone_in_arena(f.arena, &left_parenthesis),
-                        Document::Group(Group::new(vec![in f.arena; first_argument]).with_break(true)),
+                        Document::Group(Group::new(vec![in f.arena; first_argument]).with_break_mode(BreakMode::Force)),
                         Document::String(", "),
                         last_argument,
                         print_right_parenthesis(f, dangling_comments.as_ref(), &right_parenthesis, None),
@@ -295,7 +295,7 @@ pub(super) fn print_argument_list<'arena>(
                     Document::Array(vec![
                         in f.arena;
                         clone_in_arena(f.arena, &left_parenthesis),
-                        Document::Group(Group::new(vec![in f.arena; first_argument]).with_break(true)),
+                        Document::Group(Group::new(vec![in f.arena; first_argument]).with_break_mode(BreakMode::Force)),
                         Document::String(", "),
                         last_argument,
                         print_right_parenthesis(f, dangling_comments.as_ref(), &right_parenthesis, None),
@@ -326,7 +326,7 @@ pub(super) fn print_argument_list<'arena>(
                     in f.arena;
                     clone_in_arena(f.arena, &left_parenthesis),
                     Document::Array(first_arguments),
-                    Document::Group(Group::new(vec![in f.arena; last_argument]).with_break(true)),
+                    Document::Group(Group::new(vec![in f.arena; last_argument]).with_break_mode(BreakMode::Force)),
                     print_right_parenthesis(f, dangling_comments.as_ref(), &right_parenthesis, None),
                 ],
                 vec![
@@ -379,16 +379,18 @@ fn print_right_parenthesis<'arena>(
 
 #[inline]
 fn argument_has_surrounding_comments(f: &FormatterState, argument: &Argument) -> bool {
-    f.has_comment(argument.span(), CommentFlags::Leading | CommentFlags::Trailing)
-        || f.has_comment(argument.span(), CommentFlags::Leading | CommentFlags::Trailing)
+    f.has_comment(argument.span(), CommentFlags::LEADING | CommentFlags::TRAILING)
+        || f.has_comment(argument.span(), CommentFlags::LEADING | CommentFlags::TRAILING)
 }
 
 pub(super) fn print_partial_argument_list<'arena>(
     f: &mut FormatterState<'_, 'arena>,
     argument_list: &'arena PartialArgumentList<'arena>,
-    _for_attribute: bool,
-    _can_expand_first_or_last: bool,
 ) -> Document<'arena> {
+    if argument_list.is_first_class_callable() {
+        return Document::String("(...)");
+    }
+
     let left_parenthesis = Document::String("(");
     let mut contents = vec![in f.arena; left_parenthesis];
 
@@ -439,6 +441,20 @@ pub(super) fn print_partial_argument_list<'arena>(
     Document::Group(Group::new(contents))
 }
 
+/// Checks if an expression is a concatenation chain (3+ operands) that exceeds print width.
+/// This is used to determine if the parent call should break.
+pub fn is_breaking_binary(f: &FormatterState, expr: &Expression) -> bool {
+    let threshold = f.settings.print_width + f.settings.tab_width;
+
+    let mut estimated_total_width = 0;
+    foreach_binary_operand(expr, &mut |operand: &Expression| {
+        estimated_total_width += 3; // for the operator and spaces
+        estimated_total_width += get_expression_width(operand).unwrap_or(0);
+    });
+
+    estimated_total_width > threshold
+}
+
 #[inline]
 pub fn should_break_all_arguments(f: &FormatterState, argument_list: &ArgumentList, for_attributes: bool) -> bool {
     if f.settings.always_break_named_arguments_list
@@ -462,6 +478,13 @@ pub fn should_break_all_arguments(f: &FormatterState, argument_list: &ArgumentLi
 
     if argument_list.arguments.len() >= 2
         && argument_list.arguments.iter().any(|a| is_call_with_wrapping_arrow_function(a.value()))
+    {
+        return true;
+    }
+
+    if argument_list.arguments.len() == 1
+        && let Some(arg) = argument_list.arguments.first()
+        && is_breaking_binary(f, arg.value())
     {
         return true;
     }
@@ -598,8 +621,8 @@ pub fn should_expand_first_arg<'arena>(
     let first_argument = &arguments[0];
     let second_argument = &arguments[1];
 
-    if f.has_comment(first_argument.span(), CommentFlags::Leading | CommentFlags::Trailing)
-        || f.has_comment(second_argument.span(), CommentFlags::Leading | CommentFlags::Trailing)
+    if f.has_comment(first_argument.span(), CommentFlags::LEADING | CommentFlags::TRAILING)
+        || f.has_comment(second_argument.span(), CommentFlags::LEADING | CommentFlags::TRAILING)
     {
         return false;
     }
@@ -616,7 +639,7 @@ pub fn should_expand_last_arg<'arena>(
     nested_args: bool,
 ) -> bool {
     let Some(last_argument) = argument_list.arguments.last() else { return false };
-    if f.has_comment(last_argument.span(), CommentFlags::Leading | CommentFlags::Trailing) {
+    if f.has_comment(last_argument.span(), CommentFlags::LEADING | CommentFlags::TRAILING) {
         return false;
     }
 
@@ -628,7 +651,7 @@ pub fn should_expand_last_arg<'arena>(
     };
 
     let penultimate_argument_comments =
-        penultimate_argument.is_some_and(|a| f.has_comment(a.span(), CommentFlags::Leading | CommentFlags::Trailing));
+        penultimate_argument.is_some_and(|a| f.has_comment(a.span(), CommentFlags::LEADING | CommentFlags::TRAILING));
 
     could_expand_value(f, last_argument_value, nested_args)
         // If the last two arguments are of the same type,
@@ -681,105 +704,5 @@ fn is_hopefully_short_call_argument(mut node: &Expression) -> bool {
             is_simple_call_argument(operation.lhs, 1) && is_simple_call_argument(operation.rhs, 1)
         }
         _ => is_simple_call_argument(node, 2),
-    }
-}
-
-fn is_simple_call_argument<'arena>(node: &'arena Expression<'arena>, depth: usize) -> bool {
-    let is_child_simple = |node: &'arena Expression<'arena>| {
-        if depth <= 1 {
-            return false;
-        }
-
-        is_simple_call_argument(node, depth - 1)
-    };
-
-    let is_simple_element = |node: &'arena ArrayElement<'arena>| match node {
-        ArrayElement::KeyValue(element) => is_child_simple(element.key) && is_child_simple(element.value),
-        ArrayElement::Value(element) => is_child_simple(element.value),
-        ArrayElement::Variadic(element) => is_child_simple(element.value),
-        ArrayElement::Missing(_) => true,
-    };
-
-    if node.is_literal() || is_string_word_type(node) {
-        return true;
-    }
-
-    match node {
-        Expression::Parenthesized(parenthesized) => is_simple_call_argument(parenthesized.expression, depth),
-        Expression::UnaryPrefix(operation) => {
-            if let UnaryPrefixOperator::PreIncrement(_) | UnaryPrefixOperator::PreDecrement(_) = operation.operator {
-                return false;
-            }
-
-            if operation.operator.is_cast() {
-                return false;
-            }
-
-            is_simple_call_argument(operation.operand, depth)
-        }
-        Expression::Array(array) => array.elements.iter().all(is_simple_element),
-        Expression::LegacyArray(array) => array.elements.iter().all(is_simple_element),
-        Expression::Call(call) => {
-            let argument_list = match call {
-                Call::Function(function_call) => {
-                    if !is_simple_call_argument(function_call.function, depth) {
-                        return false;
-                    }
-
-                    &function_call.argument_list
-                }
-                Call::Method(method_call) => {
-                    if !is_simple_call_argument(method_call.object, depth) {
-                        return false;
-                    }
-
-                    &method_call.argument_list
-                }
-                Call::NullSafeMethod(null_safe_method_call) => {
-                    if !is_simple_call_argument(null_safe_method_call.object, depth) {
-                        return false;
-                    }
-
-                    &null_safe_method_call.argument_list
-                }
-                Call::StaticMethod(static_method_call) => {
-                    if !is_simple_call_argument(static_method_call.class, depth) {
-                        return false;
-                    }
-
-                    &static_method_call.argument_list
-                }
-            };
-
-            argument_list.arguments.len() <= depth
-                && argument_list.arguments.iter().map(Argument::value).all(is_child_simple)
-        }
-        Expression::Access(access) => {
-            let object_or_class = match access {
-                Access::Property(property_access) => &property_access.object,
-                Access::NullSafeProperty(null_safe_property_access) => &null_safe_property_access.object,
-                Access::StaticProperty(static_property_access) => &static_property_access.class,
-                Access::ClassConstant(class_constant_access) => &class_constant_access.class,
-            };
-
-            is_simple_call_argument(object_or_class, depth)
-        }
-        Expression::ArrayAccess(array_access) => {
-            is_simple_call_argument(array_access.array, depth) && is_simple_call_argument(array_access.index, depth)
-        }
-        Expression::Instantiation(instantiation) => {
-            if is_simple_call_argument(instantiation.class, depth) {
-                match &instantiation.argument_list {
-                    Some(argument_list) => {
-                        argument_list.arguments.len() <= depth
-                            && argument_list.arguments.iter().map(Argument::value).all(is_child_simple)
-                    }
-                    None => true,
-                }
-            } else {
-                false
-            }
-        }
-        _ => false,
     }
 }

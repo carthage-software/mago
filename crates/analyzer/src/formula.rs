@@ -1,5 +1,6 @@
 use indexmap::IndexMap;
 
+use itertools::Itertools;
 use mago_algebra::AlgebraThresholds;
 use mago_algebra::assertion_set::AssertionSet;
 use mago_algebra::clause::Clause;
@@ -558,28 +559,16 @@ fn handle_binary_and_operation(
 
 pub fn remove_clauses_with_mixed_variables(
     clauses: Vec<Clause>,
-    mut mixed_var_ids: Vec<&Atom>,
+    mut mixed_var_ids: Vec<Atom>,
     cond_object_id: Span,
 ) -> Vec<Clause> {
     clauses
         .into_iter()
         .map(|c| {
-            let keys = c.possibilities.keys().copied().collect::<Vec<Atom>>();
+            mixed_var_ids.retain(|id| !c.possibilities.contains_key(id));
 
-            let mut new_mixed_var_ids = vec![];
-            for i in &mixed_var_ids {
-                if !keys.contains(i) {
-                    new_mixed_var_ids.push(*i);
-                }
-            }
-
-            mixed_var_ids = new_mixed_var_ids;
-            for key in &keys {
-                for mixed_var_id in &mixed_var_ids {
-                    if var_has_root(*key, **mixed_var_id) {
-                        return Clause::new(IndexMap::new(), cond_object_id, cond_object_id, Some(true), None, None);
-                    }
-                }
+            if c.possibilities.keys().cartesian_product(&mixed_var_ids).any(|(key, id)| var_has_root(*key, *id)) {
+                return Clause::new(IndexMap::new(), cond_object_id, cond_object_id, Some(true), None, None);
             }
 
             c

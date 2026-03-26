@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -30,7 +32,7 @@ impl TArray {
     /// Creates a new `ArrayType::List` with the given element type.
     #[inline]
     #[must_use]
-    pub fn new_list(element_type: Box<TUnion>) -> Self {
+    pub fn new_list(element_type: Arc<TUnion>) -> Self {
         Self::List(TList::new(element_type))
     }
 
@@ -44,7 +46,7 @@ impl TArray {
     /// Creates a new `ArrayType::Keyed` with the specified generic key and value types.
     #[inline]
     #[must_use]
-    pub fn new_keyed_with_generics(key_type: Box<TUnion>, value_type: Box<TUnion>) -> Self {
+    pub fn new_keyed_with_generics(key_type: Arc<TUnion>, value_type: Arc<TUnion>) -> Self {
         Self::Keyed(TKeyedArray::new_with_parameters(key_type, value_type))
     }
 
@@ -278,6 +280,19 @@ impl TArray {
         }
     }
 
+    /// Returns true if any type parameter in this array is a Placeholder.
+    #[inline]
+    #[must_use]
+    pub fn contains_placeholder(&self) -> bool {
+        match self {
+            Self::Keyed(keyed_array) => keyed_array
+                .parameters
+                .as_ref()
+                .is_some_and(|p| p.0.contains_placeholder() || p.1.contains_placeholder()),
+            Self::List(list) => list.element_type.contains_placeholder(),
+        }
+    }
+
     /// Removes placeholder types from the array type.
     #[inline]
     pub fn remove_placeholders(&mut self) {
@@ -285,17 +300,17 @@ impl TArray {
             Self::Keyed(keyed_array) => {
                 if let Some(parameters) = keyed_array.parameters.as_mut() {
                     if let TAtomic::Placeholder = parameters.0.get_single() {
-                        *parameters.0 = get_arraykey();
+                        *Arc::make_mut(&mut parameters.0) = get_arraykey();
                     }
 
                     if let TAtomic::Placeholder = parameters.1.get_single() {
-                        *parameters.1 = get_mixed();
+                        *Arc::make_mut(&mut parameters.1) = get_mixed();
                     }
                 }
             }
             Self::List(list) => {
                 if let TAtomic::Placeholder = list.element_type.get_single() {
-                    *list.element_type = get_mixed();
+                    *Arc::make_mut(&mut list.element_type) = get_mixed();
                 }
             }
         }

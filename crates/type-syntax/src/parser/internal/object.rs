@@ -1,3 +1,5 @@
+use mago_database::file::HasFileId;
+
 use crate::ast::Keyword;
 use crate::ast::ShapeField;
 use crate::ast::ShapeFieldKey;
@@ -12,7 +14,7 @@ use crate::token::TypeTokenKind;
 
 #[inline]
 pub fn parse_object_type<'input>(stream: &mut TypeTokenStream<'input>) -> Result<Type<'input>, ParseError> {
-    let keyword = Keyword::from(stream.eat(TypeTokenKind::Object)?);
+    let keyword = Keyword::from_token(stream.eat(TypeTokenKind::Object)?, stream.file_id());
     if !stream.is_at(TypeTokenKind::LeftBrace)? {
         return Ok(Type::Object(ObjectType { keyword, properties: None }));
     }
@@ -20,7 +22,7 @@ pub fn parse_object_type<'input>(stream: &mut TypeTokenStream<'input>) -> Result
     Ok(Type::Object(ObjectType {
         keyword,
         properties: Some(ObjectProperties {
-            left_brace: stream.eat(TypeTokenKind::LeftBrace)?.span,
+            left_brace: stream.eat(TypeTokenKind::LeftBrace)?.span_for(stream.file_id()),
             fields: {
                 let mut fields = Vec::new();
                 while !stream.is_at(TypeTokenKind::RightBrace)? && !stream.is_at(TypeTokenKind::Ellipsis)? {
@@ -39,15 +41,13 @@ pub fn parse_object_type<'input>(stream: &mut TypeTokenStream<'input>) -> Result
                                     found_key = true;
                                     break;
                                 }
-                                TypeTokenKind::Question => {
-                                    // If we find a question mark, it could indicate a key,
-                                    // if the following token is a colon.
-                                    if stream.lookahead(i + 1)?.is_some_and(|t| t.kind == TypeTokenKind::Colon) {
-                                        found_key = true;
-                                        break;
-                                    }
-                                    // If the question mark is not followed by a colon,
-                                    // it could be part of the key.
+                                // If we find a question mark, it could indicate a key,
+                                // if the following token is a colon.
+                                TypeTokenKind::Question
+                                    if stream.lookahead(i + 1)?.is_some_and(|t| t.kind == TypeTokenKind::Colon) =>
+                                {
+                                    found_key = true;
+                                    break;
                                 }
                                 // If we find any of these tokens, what came before must have
                                 // been a full value type, not a key.
@@ -74,17 +74,21 @@ pub fn parse_object_type<'input>(stream: &mut TypeTokenStream<'input>) -> Result
                             Some(ShapeFieldKey {
                                 key: parse_shape_field_key(stream)?,
                                 question_mark: if stream.is_at(TypeTokenKind::Question)? {
-                                    Some(stream.consume()?.span)
+                                    Some(stream.consume()?.span_for(stream.file_id()))
                                 } else {
                                     None
                                 },
-                                colon: stream.eat(TypeTokenKind::Colon)?.span,
+                                colon: stream.eat(TypeTokenKind::Colon)?.span_for(stream.file_id()),
                             })
                         } else {
                             None
                         },
                         value: Box::new(parse_type(stream)?),
-                        comma: if stream.is_at(TypeTokenKind::Comma)? { Some(stream.consume()?.span) } else { None },
+                        comma: if stream.is_at(TypeTokenKind::Comma)? {
+                            Some(stream.consume()?.span_for(stream.file_id()))
+                        } else {
+                            None
+                        },
                     };
 
                     if field.comma.is_none() {
@@ -97,8 +101,12 @@ pub fn parse_object_type<'input>(stream: &mut TypeTokenStream<'input>) -> Result
 
                 fields
             },
-            ellipsis: if stream.is_at(TypeTokenKind::Ellipsis)? { Some(stream.consume()?.span) } else { None },
-            right_brace: stream.eat(TypeTokenKind::RightBrace)?.span,
+            ellipsis: if stream.is_at(TypeTokenKind::Ellipsis)? {
+                Some(stream.consume()?.span_for(stream.file_id()))
+            } else {
+                None
+            },
+            right_brace: stream.eat(TypeTokenKind::RightBrace)?.span_for(stream.file_id()),
         }),
     }))
 }

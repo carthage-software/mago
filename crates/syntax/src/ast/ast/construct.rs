@@ -11,7 +11,6 @@ use crate::ast::sequence::TokenSeparatedSequence;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
-#[repr(u8)]
 pub enum Construct<'arena> {
     Isset(IssetConstruct<'arena>),
     Empty(EmptyConstruct<'arena>),
@@ -29,7 +28,7 @@ pub enum Construct<'arena> {
 pub struct IssetConstruct<'arena> {
     pub isset: Keyword<'arena>,
     pub left_parenthesis: Span,
-    pub values: TokenSeparatedSequence<'arena, Expression<'arena>>,
+    pub values: TokenSeparatedSequence<'arena, &'arena Expression<'arena>>,
     pub right_parenthesis: Span,
 }
 

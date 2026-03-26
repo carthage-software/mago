@@ -6,6 +6,7 @@ use mago_syntax::ast::Node;
 use mago_syntax::ast::Sequence;
 use mago_syntax::ast::Statement;
 
+use crate::document::BreakMode;
 use crate::document::Document;
 use crate::document::Group;
 use crate::document::Line;
@@ -149,7 +150,7 @@ pub(super) fn print_block<'arena>(
         contents.push(comments);
     }
 
-    Document::Group(Group::new(contents).with_break(should_break))
+    Document::Group(Group::new(contents).with_break_mode(if should_break { BreakMode::Force } else { BreakMode::Auto }))
 }
 
 pub(super) fn print_block_body<'arena>(

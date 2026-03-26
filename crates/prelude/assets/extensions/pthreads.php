@@ -32,37 +32,27 @@ class Pool
     /**
      * @return int
      */
-    public function collect(null|callable $collector = null)
-    {
-    }
+    public function collect(?callable $collector = null) {}
 
     /**
      * @return void
      */
-    public function resize(int $size)
-    {
-    }
+    public function resize(int $size) {}
 
     /**
      * @return void
      */
-    public function shutdown()
-    {
-    }
+    public function shutdown() {}
 
     /**
      * @return int
      */
-    public function submit(Threaded $task)
-    {
-    }
+    public function submit(Threaded $task) {}
 
     /**
      * @return int
      */
-    public function submitTo(int $worker, Threaded $task)
-    {
-    }
+    public function submitTo(int $worker, Threaded $task) {}
 }
 
 class Threaded implements Collectable, Traversable, Countable, ArrayAccess
@@ -75,9 +65,7 @@ class Threaded implements Collectable, Traversable, Countable, ArrayAccess
     /**
      * @return void
      */
-    public function addRef()
-    {
-    }
+    public function addRef() {}
 
     /**
      * @param int $size
@@ -85,122 +73,82 @@ class Threaded implements Collectable, Traversable, Countable, ArrayAccess
      *
      * @return array
      */
-    public function chunk($size, $preserve = false)
-    {
-    }
+    public function chunk($size, $preserve = false) {}
 
     /**
      * @return int
      */
-    public function count()
-    {
-    }
+    public function count() {}
 
     /**
      * @return void
      */
-    public function delRef()
-    {
-    }
+    public function delRef() {}
 
     /**
      * @param string $class
      *
      * @return bool
      */
-    public static function extend($class)
-    {
-    }
+    public static function extend($class) {}
 
     /**
      * @return int
      */
-    public function getRefCount()
-    {
-    }
+    public function getRefCount() {}
 
     /**
      * @return bool
      */
-    public function isRunning()
-    {
-    }
+    public function isRunning() {}
 
-    public function isGarbage(): bool
-    {
-    }
+    public function isGarbage(): bool {}
 
     /**
      * @return bool
      */
-    public function isTerminated()
-    {
-    }
+    public function isTerminated() {}
 
     /**
      * @var bool $overwrite
      *
      * @return bool
      */
-    public function merge($from, $overwrite = true)
-    {
-    }
+    public function merge($from, $overwrite = true) {}
 
     /**
      * @return bool
      */
-    public function notify()
-    {
-    }
+    public function notify() {}
 
     /**
      * @return bool
      */
-    public function notifyOne()
-    {
-    }
+    public function notifyOne() {}
 
-    public function pop()
-    {
-    }
+    public function pop() {}
 
     /**
      * @return void
      */
-    public function run()
-    {
-    }
+    public function run() {}
 
-    public function shift()
-    {
-    }
+    public function shift() {}
 
-    public function synchronized(Closure $block, ...$_)
-    {
-    }
+    public function synchronized(Closure $block, ...$_) {}
 
     /**
      * @return bool
      */
-    public function wait(int $timeout = 0)
-    {
-    }
+    public function wait(int $timeout = 0) {}
 
-    public function offsetExists($offset)
-    {
-    }
+    public function offsetExists($offset) {}
 
-    public function offsetGet($offset)
-    {
-    }
+    public function offsetGet($offset) {}
 
-    public function offsetSet($offset, $value)
-    {
-    }
+    public function offsetSet($offset, $value) {}
 
-    public function offsetUnset($offset)
-    {
-    }
+    public function offsetUnset($offset) {}
 }
 
 class Thread extends Threaded implements Countable, Traversable, ArrayAccess
@@ -208,58 +156,42 @@ class Thread extends Threaded implements Countable, Traversable, ArrayAccess
     /**
      * @return int
      */
-    public function getCreatorId()
-    {
-    }
+    public function getCreatorId() {}
 
     /**
      * @return Thread
      */
-    public static function getCurrentThread()
-    {
-    }
+    public static function getCurrentThread() {}
 
     /**
      * @return int
      */
-    public static function getCurrentThreadId()
-    {
-    }
+    public static function getCurrentThreadId() {}
 
     /**
      * @return int
      */
-    public function getThreadId()
-    {
-    }
+    public function getThreadId() {}
 
     /**
      * @return bool
      */
-    public function isJoined()
-    {
-    }
+    public function isJoined() {}
 
     /**
      * @return bool
      */
-    public function isStarted()
-    {
-    }
+    public function isStarted() {}
 
     /**
      * @return bool
      */
-    public function join()
-    {
-    }
+    public function join() {}
 
     /**
      * @return bool
      */
-    public function start(int $options = PTHREADS_INHERIT_ALL)
-    {
-    }
+    public function start(int $options = PTHREADS_INHERIT_ALL) {}
 }
 
 class Worker extends Thread implements Traversable, Countable, ArrayAccess
@@ -267,44 +199,32 @@ class Worker extends Thread implements Traversable, Countable, ArrayAccess
     /**
      * @return int
      */
-    public function collect(null|callable $collector = null)
-    {
-    }
+    public function collect(?callable $collector = null) {}
 
     /**
      * @return int
      */
-    public function getStacked()
-    {
-    }
+    public function getStacked() {}
 
     /**
      * @return bool
      */
-    public function isShutdown()
-    {
-    }
+    public function isShutdown() {}
 
     /**
      * @return bool
      */
-    public function shutdown()
-    {
-    }
+    public function shutdown() {}
 
     /**
      * @return int
      */
-    public function stack(Threaded $work)
-    {
-    }
+    public function stack(Threaded $work) {}
 
     /**
      * @return Threaded|null
      */
-    public function unstack()
-    {
-    }
+    public function unstack() {}
 }
 
 interface Collectable
@@ -312,9 +232,7 @@ interface Collectable
     public function isGarbage(): bool;
 }
 
-class Volatile extends Threaded implements Collectable, Traversable
-{
-}
+class Volatile extends Threaded implements Collectable, Traversable {}
 
 const PTHREADS_INHERIT_ALL = 1118481;
 

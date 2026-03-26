@@ -2,7 +2,33 @@ use serde::Deserialize;
 use serde::Serialize;
 use strum::Display;
 
+use mago_database::file::FileId;
+use mago_span::Position;
 use mago_span::Span;
+
+/// Type parsing precedence levels.
+///
+/// Lower ordinal values = lower precedence = binds more loosely.
+/// Higher ordinal values = higher precedence = binds more tightly.
+///
+/// For example, in `Closure(): int|string`:
+/// - With `Lowest` precedence: parses as `Union(Closure(): int, string)` (correct PHPStan/Psalm behavior)
+/// - Callable return types use `Callable` precedence, which stops before `|`, `&`, and `is`
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub enum TypePrecedence {
+    /// Lowest precedence - parses everything including unions, intersections, conditionals
+    Lowest,
+    /// Conditional types: `T is U ? V : W`
+    Conditional,
+    /// Union types: `T|U`
+    Union,
+    /// Intersection types: `T&U`
+    Intersection,
+    /// Postfix operations: `T[]`, `T[K]`
+    Postfix,
+    /// Callable return type context - stops before `|`, `&`, `is`
+    Callable,
+}
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
 pub enum TypeTokenKind {
@@ -22,12 +48,15 @@ pub enum TypeTokenKind {
     NonEmptyArray,
     NonEmptyString,
     NonEmptyLowercaseString,
+    NonEmptyUppercaseString,
     NonFalsyString,
     LowercaseString,
+    UppercaseString,
     TruthyString,
     Iterable,
     Null,
     Mixed,
+    NonEmptyMixed,
     NumericString,
     ClassString,
     InterfaceString,
@@ -107,8 +136,31 @@ pub enum TypeTokenKind {
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 pub struct TypeToken<'input> {
     pub kind: TypeTokenKind,
+    pub start: Position,
     pub value: &'input str,
-    pub span: Span,
+}
+
+impl<'input> TypeToken<'input> {
+    /// Creates a new TypeToken.
+    #[inline]
+    #[must_use]
+    pub const fn new(kind: TypeTokenKind, value: &'input str, start: Position) -> Self {
+        Self { kind, start, value }
+    }
+
+    /// Computes the end position from start + value length.
+    #[inline]
+    #[must_use]
+    pub const fn end(&self) -> Position {
+        Position::new(self.start.offset + self.value.len() as u32)
+    }
+
+    /// Creates a span with the provided file_id.
+    #[inline]
+    #[must_use]
+    pub const fn span_for(&self, file_id: FileId) -> Span {
+        Span::new(file_id, self.start, self.end())
+    }
 }
 
 impl TypeTokenKind {
@@ -152,11 +204,14 @@ impl TypeTokenKind {
                 | Self::NonEmptyString
                 | Self::NonEmptyLowercaseString
                 | Self::LowercaseString
+                | Self::NonEmptyUppercaseString
+                | Self::UppercaseString
                 | Self::TruthyString
                 | Self::NonFalsyString
                 | Self::Iterable
                 | Self::Null
                 | Self::Mixed
+                | Self::NonEmptyMixed
                 | Self::NumericString
                 | Self::ClassString
                 | Self::InterfaceString

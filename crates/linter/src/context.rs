@@ -17,6 +17,7 @@ pub struct LintContext<'ctx, 'arena> {
     pub resolved_names: &'ctx ResolvedNames<'arena>,
     pub collector: Collector<'ctx, 'arena>,
     pub scope: ScopeStack<'arena>,
+    pub constant_expression_depth: usize,
 }
 
 impl<'ctx, 'arena> LintContext<'ctx, 'arena> {
@@ -28,7 +29,24 @@ impl<'ctx, 'arena> LintContext<'ctx, 'arena> {
         resolved_names: &'ctx ResolvedNames<'arena>,
         collector: Collector<'ctx, 'arena>,
     ) -> Self {
-        Self { php_version, arena, registry, source_file, resolved_names, collector, scope: ScopeStack::new() }
+        Self {
+            php_version,
+            arena,
+            registry,
+            source_file,
+            resolved_names,
+            collector,
+            scope: ScopeStack::new(),
+            constant_expression_depth: 0,
+        }
+    }
+
+    /// Checks if we are currently inside a constant expression context.
+    ///
+    /// Constant expression contexts include attribute arguments, parameter default values,
+    /// property default values, and constant values.
+    pub fn is_in_constant_expression(&self) -> bool {
+        self.constant_expression_depth > 0
     }
 
     /// Checks if a name at a given position is imported.

@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use mago_atom::u32_atom;
 use mago_atom::u64_atom;
 use serde::Deserialize;
@@ -33,7 +35,7 @@ pub struct TCallableSignature {
     /// Ordered list of parameters expected by the callable signature.
     pub parameters: Vec<TCallableParameter>,
     /// The return type of the callable, if specified. `None` implies `mixed` or unknown.
-    pub return_type: Option<Box<TUnion>>, // Keep Box<TUnion> as in original
+    pub return_type: Option<Arc<TUnion>>,
     /// The source code starting position if this signature originated from a specific closure definition.
     /// `None` if it represents a general callable type not tied to a specific closure literal.
     pub closure_location: Option<(FileId, Position)>,
@@ -64,8 +66,8 @@ impl TCallableSignature {
     #[must_use]
     pub fn mixed(is_closure: bool) -> Self {
         TCallableSignature::new(false, is_closure)
-            .with_parameters(vec![TCallableParameter::new(Some(Box::new(get_mixed())), false, true, true)])
-            .with_return_type(Some(Box::new(get_mixed())))
+            .with_parameters(vec![TCallableParameter::new(Some(Arc::new(get_mixed())), false, true, true)])
+            .with_return_type(Some(Arc::new(get_mixed())))
     }
 
     /// Returns a slice of the callable parameters.
@@ -91,7 +93,7 @@ impl TCallableSignature {
     /// Returns a mutable reference to the return type (`TUnion`), if specified.
     #[inline]
     pub fn get_return_type_mut(&mut self) -> Option<&mut TUnion> {
-        self.return_type.as_deref_mut()
+        self.return_type.as_mut().map(Arc::make_mut)
     }
 
     /// Returns the closure's starting position, if this signature represents a specific closure literal.
@@ -162,7 +164,7 @@ impl TCallableSignature {
     /// Returns a new instance with the return type set.
     #[inline]
     #[must_use]
-    pub fn with_return_type(mut self, return_type: Option<Box<TUnion>>) -> Self {
+    pub fn with_return_type(mut self, return_type: Option<Arc<TUnion>>) -> Self {
         self.return_type = return_type;
         self
     }

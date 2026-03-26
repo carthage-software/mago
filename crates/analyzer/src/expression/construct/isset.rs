@@ -32,10 +32,10 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for IssetConstruct<'arena> {
                 );
             }
 
-            let was_inside_isset = block_context.inside_isset;
-            block_context.inside_isset = true;
+            let was_inside_isset = block_context.flags.inside_isset();
+            block_context.flags.set_inside_isset(true);
             value.analyze(context, block_context, artifacts)?;
-            block_context.inside_isset = was_inside_isset;
+            block_context.flags.set_inside_isset(was_inside_isset);
         }
 
         artifacts.set_expression_type(self, get_bool());

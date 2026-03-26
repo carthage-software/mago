@@ -58,7 +58,8 @@ use std::sync::Arc;
 use bumpalo::Bump;
 use clap::ColorChoice;
 use mago_database::file::FileId;
-use mago_syntax::parser::parse_file_content;
+use mago_syntax::parser::parse_file_content_with_settings;
+use mago_syntax::settings::ParserSettings;
 use rayon::iter::IntoParallelIterator;
 use rayon::iter::ParallelIterator;
 
@@ -157,6 +158,13 @@ pub struct IssueProcessor {
     /// Useful for reviewing fixes before applying them. Only applies in fix mode.
     pub dry_run: bool,
 
+    /// Exit with failure if there are remaining unfixed issues after applying fixes.
+    ///
+    /// When `true`, the command exits with a non-zero status code if any issues
+    /// could not be automatically fixed and require manual attention.
+    /// Only applies in fix mode.
+    pub fail_on_remaining: bool,
+
     /// Output target for issue reports (stdout or stderr).
     ///
     /// Determines where the reporter sends its output. Only applies in report mode.
@@ -191,6 +199,12 @@ pub struct IssueProcessor {
     /// Controls whether colored output is used in diffs (fix mode) and reports
     /// (report mode).
     pub color_choice: ColorChoice,
+
+    /// Editor URL template for OSC 8 terminal hyperlinks on file paths.
+    ///
+    /// When set, file paths in diagnostic output become clickable links in
+    /// terminals that support OSC 8 hyperlinks.
+    pub editor_url: Option<String>,
 }
 
 /// Baseline-aware issue processor for incremental issue adoption.
@@ -301,11 +315,12 @@ impl IssueProcessor {
         issues: IssueCollection,
         baseline: Option<Baseline>,
         fail_on_out_of_sync_baseline: bool,
-    ) -> Result<ExitCode, Error> {
+    ) -> Result<(ExitCode, Vec<FileId>), Error> {
         if self.fix {
-            self.handle_fix_mode(orchestrator, database, issues)
+            self.handle_fix_mode(orchestrator, database, issues, baseline)
         } else {
             self.handle_report_mode(database, issues, baseline, fail_on_out_of_sync_baseline)
+                .map(|code| (code, Vec::new()))
         }
     }
 
@@ -321,9 +336,15 @@ impl IssueProcessor {
         orchestrator: &Orchestrator<'_>,
         database: &mut Database<'_>,
         issues: IssueCollection,
-    ) -> Result<ExitCode, Error> {
+        baseline: Option<Baseline>,
+    ) -> Result<(ExitCode, Vec<FileId>), Error> {
+        let issues =
+            if let Some(baseline) = baseline { baseline.filter_issues(issues, &database.read_only()) } else { issues };
+
+        let unfixable_count = (&issues).into_iter().filter(|i| i.edits.is_empty()).count();
+
         let dry_run = self.dry_run;
-        let (applied_fixes, skipped_unsafe, skipped_potentially_unsafe, bugs) =
+        let (applied_fixes, skipped_unsafe, skipped_potentially_unsafe, bugs, changed_file_ids) =
             self.apply_fixes(orchestrator, database, issues)?;
 
         if skipped_unsafe > 0 {
@@ -355,10 +376,30 @@ impl IssueProcessor {
         if bugs > 0 {
             tracing::error!("Encountered {bugs} bugs while applying fixes. Please report them at {}", ISSUE_URL);
 
-            return Ok(ExitCode::FAILURE);
+            return Ok((ExitCode::FAILURE, changed_file_ids));
         }
 
-        Ok(if success { ExitCode::SUCCESS } else { ExitCode::FAILURE })
+        if success && self.fail_on_remaining {
+            let skipped_safety = skipped_unsafe + skipped_potentially_unsafe;
+            let remaining = unfixable_count + skipped_safety;
+            if remaining > 0 {
+                if unfixable_count > 0 {
+                    tracing::warn!(
+                        "{unfixable_count} issues require manual attention and cannot be fixed automatically."
+                    );
+                }
+
+                if skipped_safety > 0 {
+                    tracing::warn!(
+                        "{skipped_safety} issues were skipped due to safety level. Use `--potentially-unsafe` or `--unsafe` to apply them.",
+                    );
+                }
+
+                return Ok((ExitCode::FAILURE, changed_file_ids));
+            }
+        }
+
+        Ok((if success { ExitCode::SUCCESS } else { ExitCode::FAILURE }, changed_file_ids))
     }
 
     /// Reports issues to the configured output target when `--fix` is not enabled.
@@ -414,6 +455,7 @@ impl IssueProcessor {
             filter_fixable: self.fixable_only,
             sort: self.sort,
             minimum_report_level: self.minimum_report_level,
+            editor_url: self.editor_url.clone(),
         };
 
         let reporter = Reporter::new(read_database, reporter_configuration);
@@ -469,7 +511,7 @@ impl IssueProcessor {
         orchestrator: &Orchestrator<'_>,
         database: &mut Database<'_>,
         issues: IssueCollection,
-    ) -> Result<(usize, usize, usize, usize), Error> {
+    ) -> Result<(usize, usize, usize, usize, Vec<FileId>), Error> {
         let read_database = Arc::new(database.read_only());
         let change_log = ChangeLog::new();
 
@@ -485,19 +527,20 @@ impl IssueProcessor {
         // Collect edit batches by file (each batch = all edits from one issue)
         let batches_by_file = issues.to_edit_batches();
         if batches_by_file.is_empty() {
-            return Ok((0, 0, 0, 0));
+            return Ok((0, 0, 0, 0, Vec::new()));
         }
 
         let format_after_fix = self.format_after_fix;
         let dry_run = self.dry_run;
         let color_choice = self.color_choice;
+        let parser_settings = orchestrator.config.parser_settings;
 
         let results: Vec<(bool, usize, usize, usize)> = batches_by_file
             .into_par_iter()
             .map_init(Bump::new, |arena, (file_id, batches)| {
                 let file = read_database.get_ref(&file_id)?;
                 let mut editor = TextEditor::with_safety(&file.contents, safety_threshold);
-                let checker = |code: &str| check_php_code(arena, file_id, code);
+                let checker = |code: &str| check_php_code(arena, file_id, code, parser_settings);
 
                 let mut skipped_unsafe = 0usize;
                 let mut skipped_potentially_unsafe = 0usize;
@@ -569,9 +612,13 @@ impl IssueProcessor {
             })
             .collect::<Result<Vec<(bool, usize, usize, usize)>, Error>>()?;
 
-        if !dry_run {
+        let changed_file_ids = if !dry_run {
+            let ids = change_log.changed_file_ids()?;
             database.commit(change_log, true)?;
-        }
+            ids
+        } else {
+            Vec::new()
+        };
 
         let mut applied_fix_count = 0;
         let mut total_skipped_unsafe = 0;
@@ -587,7 +634,7 @@ impl IssueProcessor {
             total_bugs += bugs;
         }
 
-        Ok((applied_fix_count, total_skipped_unsafe, total_skipped_potentially_unsafe, total_bugs))
+        Ok((applied_fix_count, total_skipped_unsafe, total_skipped_potentially_unsafe, total_bugs, changed_file_ids))
     }
 }
 
@@ -627,7 +674,7 @@ impl BaselineIssueProcessor {
         orchestrator: &Orchestrator<'_>,
         database: &mut Database<'_>,
         issues: IssueCollection,
-    ) -> Result<ExitCode, Error> {
+    ) -> Result<(ExitCode, Vec<FileId>), Error> {
         // Extract baseline_path before consuming self
         let baseline = if let Some(baseline_path_cow) = self.baseline_path.as_ref() {
             let baseline_path = baseline_path_cow.as_ref();
@@ -635,20 +682,20 @@ impl BaselineIssueProcessor {
                 let read_database = database.read_only();
                 self.generate_baseline(baseline_path, &read_database, issues)?;
 
-                return Ok(ExitCode::SUCCESS);
+                return Ok((ExitCode::SUCCESS, Vec::new()));
             }
 
             if self.verify_baseline {
                 let read_database = database.read_only();
                 let success = self.verify_baseline(baseline_path, &read_database, issues)?;
 
-                return Ok(if success { ExitCode::SUCCESS } else { ExitCode::FAILURE });
+                return Ok((if success { ExitCode::SUCCESS } else { ExitCode::FAILURE }, Vec::new()));
             }
 
             self.get_baseline(Some(baseline_path))
         } else {
             if !self.validate_baseline_parameters() {
-                return Ok(ExitCode::FAILURE);
+                return Ok((ExitCode::FAILURE, Vec::new()));
             }
 
             None
@@ -851,12 +898,11 @@ impl BaselineIssueProcessor {
 /// * `arena` - The memory arena to use for parsing.
 /// * `file_id` - The identifier for the temporary file.
 /// * `code` - The PHP code snippet to check.
+/// * `parser_settings` - The parser settings to use for parsing.
 ///
 /// # Returns
 ///
 /// * `true` if the code is syntactically valid, `false` otherwise.
-fn check_php_code(arena: &Bump, file_id: FileId, code: &str) -> bool {
-    let parse_result = parse_file_content(arena, file_id, code);
-
-    parse_result.1.is_none()
+fn check_php_code(arena: &Bump, file_id: FileId, code: &str, parser_settings: ParserSettings) -> bool {
+    !parse_file_content_with_settings(arena, file_id, code, parser_settings).has_errors()
 }

@@ -21,7 +21,6 @@ pub struct EnumCase<'arena> {
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
-#[repr(u8)]
 pub enum EnumCaseItem<'arena> {
     Unit(EnumCaseUnitItem<'arena>),
     Backed(EnumCaseBackedItem<'arena>),
@@ -36,7 +35,7 @@ pub struct EnumCaseUnitItem<'arena> {
 pub struct EnumCaseBackedItem<'arena> {
     pub name: LocalIdentifier<'arena>,
     pub equals: Span,
-    pub value: Expression<'arena>,
+    pub value: &'arena Expression<'arena>,
 }
 
 impl<'arena> EnumCaseItem<'arena> {

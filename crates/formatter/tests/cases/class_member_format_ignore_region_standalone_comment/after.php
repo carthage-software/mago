@@ -11,9 +11,7 @@ class StandaloneCommentInIgnoreRegion
     */
     // @mago-format-ignore-end
 
-    public function bar(): void
-    {
-    }
+    public function bar(): void {}
 }
 
 class MultipleStandaloneComments

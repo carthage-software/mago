@@ -44,10 +44,10 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for CompositeString<'arena> {
                     continue;
                 }
                 StringPart::Expression(expression) => {
-                    let was_inside_general_use = block_context.inside_general_use;
-                    block_context.inside_general_use = true;
+                    let was_inside_general_use = block_context.flags.inside_general_use();
+                    block_context.flags.set_inside_general_use(true);
                     expression.analyze(context, block_context, artifacts)?;
-                    block_context.inside_general_use = was_inside_general_use;
+                    block_context.flags.set_inside_general_use(was_inside_general_use);
 
                     (
                         artifacts.get_rc_expression_type(expression).cloned(),
@@ -60,10 +60,10 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for CompositeString<'arena> {
                     )
                 }
                 StringPart::BracedExpression(braced_expression) => {
-                    let was_inside_general_use = block_context.inside_general_use;
-                    block_context.inside_general_use = true;
+                    let was_inside_general_use = block_context.flags.inside_general_use();
+                    block_context.flags.set_inside_general_use(true);
                     braced_expression.expression.analyze(context, block_context, artifacts)?;
-                    block_context.inside_general_use = was_inside_general_use;
+                    block_context.flags.set_inside_general_use(was_inside_general_use);
 
                     (
                         artifacts.get_rc_expression_type(&braced_expression.expression).cloned(),

@@ -22,10 +22,8 @@ class Session
     }
 }
 
-/**
- * @var Config $config
- * @var Session $session
- */
+/** @var Config $config */
+/** @var Session $session */
 if (!$session->isLoggedIn()) {
 }
 

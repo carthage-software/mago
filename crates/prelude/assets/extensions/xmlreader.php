@@ -53,122 +53,67 @@ class XMLReader
 
     public string $xmlLang;
 
-    public function close(): true
-    {
-    }
+    public function close(): true {}
 
-    public function getAttribute(string $name): null|string
-    {
-    }
+    public function getAttribute(string $name): ?string {}
 
-    public function getAttributeNo(int $index): null|string
-    {
-    }
+    public function getAttributeNo(int $index): ?string {}
 
-    public function getAttributeNs(string $name, string $namespace): null|string
-    {
-    }
+    public function getAttributeNs(string $name, string $namespace): ?string {}
 
-    public function getParserProperty(int $property): bool
-    {
-    }
+    public function getParserProperty(int $property): bool {}
 
-    public function isValid(): bool
-    {
-    }
+    public function isValid(): bool {}
 
-    public function lookupNamespace(string $prefix): null|string
-    {
-    }
+    public function lookupNamespace(string $prefix): ?string {}
 
-    public function moveToAttribute(string $name): bool
-    {
-    }
+    public function moveToAttribute(string $name): bool {}
 
-    public function moveToAttributeNo(int $index): bool
-    {
-    }
+    public function moveToAttributeNo(int $index): bool {}
 
-    public function moveToAttributeNs(string $name, string $namespace): bool
-    {
-    }
+    public function moveToAttributeNs(string $name, string $namespace): bool {}
 
-    public function moveToElement(): bool
-    {
-    }
+    public function moveToElement(): bool {}
 
-    public function moveToFirstAttribute(): bool
-    {
-    }
+    public function moveToFirstAttribute(): bool {}
 
-    public function moveToNextAttribute(): bool
-    {
-    }
+    public function moveToNextAttribute(): bool {}
 
-    public function read(): bool
-    {
-    }
+    public function read(): bool {}
 
-    public function next(null|string $name = null): bool
-    {
-    }
+    public function next(?string $name = null): bool {}
 
     /** @return bool|XMLReader */
-    public static function open(string $uri, null|string $encoding = null, int $flags = 0)
-    {
-    }
+    public static function open(string $uri, ?string $encoding = null, int $flags = 0) {}
 
-    public static function fromUri(string $uri, null|string $encoding = null, int $flags = 0): static
-    {
-    }
+    public static function fromUri(string $uri, ?string $encoding = null, int $flags = 0): static {}
 
     /** @param resource $stream */
     public static function fromStream(
         $stream,
-        null|string $encoding = null,
+        ?string $encoding = null,
         int $flags = 0,
-        null|string $documentUri = null,
-    ): static {
-    }
+        ?string $documentUri = null,
+    ): static {}
 
-    public function readInnerXml(): string
-    {
-    }
+    public function readInnerXml(): string {}
 
-    public function readOuterXml(): string
-    {
-    }
+    public function readOuterXml(): string {}
 
-    public function readString(): string
-    {
-    }
+    public function readString(): string {}
 
-    public function setSchema(null|string $filename): bool
-    {
-    }
+    public function setSchema(?string $filename): bool {}
 
-    public function setParserProperty(int $property, bool $value): bool
-    {
-    }
+    public function setParserProperty(int $property, bool $value): bool {}
 
-    public function setRelaxNGSchema(null|string $filename): bool
-    {
-    }
+    public function setRelaxNGSchema(?string $filename): bool {}
 
-    public function setRelaxNGSchemaSource(null|string $source): bool
-    {
-    }
+    public function setRelaxNGSchemaSource(?string $source): bool {}
 
     /** @return bool|XMLReader */
-    public static function XML(string $source, null|string $encoding = null, int $flags = 0)
-    {
-    }
+    public static function XML(string $source, ?string $encoding = null, int $flags = 0) {}
 
-    public static function fromString(string $source, null|string $encoding = null, int $flags = 0): static
-    {
-    }
+    public static function fromString(string $source, ?string $encoding = null, int $flags = 0): static {}
 
-    public function expand(null|DOMNode $baseNode = null): DOMNode|false
-    {
-    }
+    public function expand(?DOMNode $baseNode = null): DOMNode|false {}
 }

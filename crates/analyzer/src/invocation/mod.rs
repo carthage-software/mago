@@ -1,9 +1,11 @@
+use std::sync::Arc;
+
 use mago_atom::Atom;
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::identifier::method::MethodIdentifier;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
+use mago_codex::metadata::class_like::TemplateTypes;
 use mago_codex::metadata::function_like::FunctionLikeMetadata;
-use mago_codex::metadata::function_like::TemplateTuple;
 use mago_codex::metadata::parameter::FunctionLikeParameterMetadata;
 use mago_codex::misc::VariableIdentifier;
 use mago_codex::ttype::atomic::callable::TCallableSignature;
@@ -76,7 +78,7 @@ pub enum InvocationTarget<'ctx> {
         /// Function/method metadata.
         metadata: &'ctx FunctionLikeMetadata,
         /// Inferred return type (used for closures/arrow functions).
-        inferred_return_type: Option<Box<TUnion>>,
+        inferred_return_type: Option<Arc<TUnion>>,
         /// Method call context, if applicable.
         method_context: Option<MethodTargetContext<'ctx>>,
         /// The span of the callable part.
@@ -237,7 +239,7 @@ impl<'ctx> InvocationTarget<'ctx> {
 
     /// Returns the template type definitions if the target is a generic function or method.
     #[inline]
-    pub fn get_template_types(&self) -> Option<&'ctx [TemplateTuple]> {
+    pub fn get_template_types(&self) -> Option<&'ctx TemplateTypes> {
         match self {
             InvocationTarget::FunctionLike { metadata, .. } => Some(&metadata.template_types),
             _ => None,
@@ -442,8 +444,8 @@ impl<'ast, 'arena> InvocationArgument<'ast, 'arena> {
     pub const fn value(&self) -> Option<&'ast Expression<'arena>> {
         match self {
             InvocationArgument::PipedValue(expr) => Some(expr),
-            InvocationArgument::Positional(pos_arg) => Some(&pos_arg.value),
-            InvocationArgument::Named(named_arg) => Some(&named_arg.value),
+            InvocationArgument::Positional(pos_arg) => Some(pos_arg.value),
+            InvocationArgument::Named(named_arg) => Some(named_arg.value),
             _ => None,
         }
     }

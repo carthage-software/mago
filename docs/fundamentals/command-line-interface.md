@@ -25,13 +25,22 @@ These options can be used with the main `mago` command and any of its subcommand
 | Flag, Alias(es)                   | Description                                                                                                     |
 | :-------------------------------- | :-------------------------------------------------------------------------------------------------------------- |
 | `--workspace <PATH>`              | Sets the path to the workspace directory, which is the root of your project. Defaults to the current directory. |
-| `--config <PATH>`                 | Specifies the path to the configuration file. If not provided, Mago searches for `mago.toml` in the workspace.  |
+| `--config <PATH>`                 | Specifies the path to the configuration file. If not provided, Mago searches for `mago.toml` in the workspace, `$XDG_CONFIG_HOME`, `~/.config`, and `~`. See [Configuration File Discovery](/guide/configuration#configuration-file-discovery). |
 | `--php-version <VERSION>`         | Overrides the PHP version (e.g., `8.2`) specified in the configuration file.                                    |
 | `--threads <NUMBER>`              | Overrides the number of threads Mago will use. Defaults to the number of available logical CPUs.                |
 | `--allow-unsupported-php-version` | Allows Mago to run against a PHP version that is not officially supported. Use with caution.                    |
 | `--colors <WHEN>`                 | Controls when to use colors in the output. Options: `always`, `never`, `auto` (default).                        |
 | `-h`, `--help`                    | Print help information.                                                                                         |
 | `-V`, `--version`                 | Print version information.                                                                                      |
+
+## Environment Variables
+
+In addition to the `MAGO_*` prefix for [configuration options](/guide/configuration), Mago recognizes these environment variables:
+
+| Variable          | Description                                                                                                     |
+| :---------------- | :-------------------------------------------------------------------------------------------------------------- |
+| `MAGO_LOG`        | Set the log filter for tracing output (e.g., `debug`, `info`, `warn`).                                         |
+| `MAGO_EDITOR_URL` | Editor URL template for clickable file paths in terminal output. See [Editor Integration](/guide/configuration#editor-integration). |
 
 ## Subcommands
 

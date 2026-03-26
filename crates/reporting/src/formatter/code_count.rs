@@ -1,7 +1,8 @@
 use std::cmp::Ordering;
+use std::io::IsTerminal;
 use std::io::Write;
 
-use ahash::HashMap;
+use foldhash::HashMap;
 
 use mago_database::ReadDatabase;
 
@@ -48,15 +49,15 @@ impl Formatter for CodeCountFormatter {
         });
 
         // Determine if we should use colors
-        let use_colors = config.color_choice.should_use_colors(atty::is(atty::Stream::Stdout));
+        let use_colors = config.color_choice.should_use_colors(std::io::stdout().is_terminal());
 
         // Write results
         for (code, (count, level)) in counts_vec {
             if use_colors {
                 let ansi_code = level_ansi_code(level);
-                writeln!(writer, "\x1b[{ansi_code}m\x1b[1m{code}:\x1b[0m {count}")?;
+                writeln!(writer, "\x1b[{ansi_code}m\x1b[1m{level}[{code}]:\x1b[0m {count}")?;
             } else {
-                writeln!(writer, "{code}: {count}")?;
+                writeln!(writer, "{level}[{code}]: {count}")?;
             }
         }
 

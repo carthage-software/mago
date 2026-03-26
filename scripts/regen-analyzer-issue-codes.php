@@ -18,9 +18,6 @@ use function ucwords;
  *
  * This utility class is used internally to keep the list of issue codes
  * in sync without manual editing of Rust files.
- *
- * @mago-expect lint:kan-defect
- * @mago-expect lint:cyclomatic-complexity
  */
 final class AnalyzerCodeModuleGenerator
 {
@@ -91,6 +88,7 @@ final class AnalyzerCodeModuleGenerator
         'non-existent-method',
         'non-existent-property',
         'possibly-non-existent-property',
+        'possibly-non-existent-method',
         'never-return',
         'null-array-index',
         'nullable-return-statement',
@@ -177,6 +175,7 @@ final class AnalyzerCodeModuleGenerator
         'invalid-foreach-value',
         'undefined-variable-in-closure-use',
         'duplicate-closure-use-variable',
+        'duplicate-definition',
         'invalid-yield-value-type',
         'invalid-yield-key-type',
         'unknown-yield-from-iterator-type',
@@ -259,9 +258,11 @@ final class AnalyzerCodeModuleGenerator
         'invalid-property-read',
         'deprecated-constant',
         'invalid-enum-case-value',
+        'duplicate-enum-case-value',
         'condition-is-too-complex',
         'expression-is-too-complex',
         'where-constraint-violation',
+        'write-only-property',
         'extend-final-class',
         'non-existent-class-constant',
         'possibly-false-argument',
@@ -270,6 +271,7 @@ final class AnalyzerCodeModuleGenerator
         'null-argument',
         'never-matching-switch-case',
         'always-matching-switch-case',
+        'unreachable-else-clause',
         'unreachable-switch-case',
         'unreachable-switch-default',
         'invalid-isset-expression',
@@ -303,6 +305,8 @@ final class AnalyzerCodeModuleGenerator
         'invalid-override-attribute',
         'unused-parameter',
         'unused-template-parameter',
+        'unused-method',
+        'unused-property',
         'reference-reused-from-confusing-scope',
         'non-documented-method',
         'non-documented-property',
@@ -313,6 +317,9 @@ final class AnalyzerCodeModuleGenerator
         'missing-return-type',
         'invalid-array-access-assignment-value',
         'non-existent-use-import',
+        'class-must-be-final',
+        'missing-api-or-internal',
+        'imprecise-type',
     ];
 
     /**
@@ -347,12 +354,20 @@ final class AnalyzerCodeModuleGenerator
 
     private function generateEnum(): string
     {
-        if (count($this->allCodes) > 65535) {
+        if (count($this->allCodes) > 65_535) {
             throw new \RuntimeException('Too many issue codes; cannot be represented by a u16.');
         }
 
-        $enum = "#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]\n";
+        $enum = '//! This file is auto-generated. Do not edit manually.' . "\n\n";
+        $enum .= "/// An issue code representing a specific type of analysis issue.\n";
+        $enum .= "///\n";
+        $enum .= "/// Each issue code corresponds to a unique identifier for a particular\n";
+        $enum .= "/// kind of issue that the analyzer can detect during code analysis.\n";
+        $enum .= "///\n";
+        $enum .= "/// This enum is non-exhaustive; new issue codes may be added in future versions.\n";
+        $enum .= "#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]\n";
         $enum .= "#[repr(u16)]\n";
+        $enum .= "#[non_exhaustive]\n";
         $enum .= "pub enum IssueCode {\n";
         foreach ($this->allCodes as $code => $_) {
             $enum .= "    {$code},\n";
@@ -378,6 +393,14 @@ final class AnalyzerCodeModuleGenerator
         $impl .= "        *self as u16\n";
         $impl .= "    }\n\n";
 
+        // all() method
+        $impl .= "    pub fn all() -> &'static [IssueCode] {\n";
+        $impl .= "        &[\n";
+        foreach ($this->allCodes as $code => $_) {
+            $impl .= "            Self::{$code},\n";
+        }
+        $impl .= "        ]\n    }\n\n";
+
         return $impl . "}\n\n";
     }
 
@@ -396,45 +419,45 @@ final class AnalyzerCodeModuleGenerator
 
         // Boilerplate trait impls
         $boilerplate = <<<RUST
-        impl std::fmt::Display for IssueCode {
-            fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-                write!(f, "{}", self.as_str())
+            impl std::fmt::Display for IssueCode {
+                fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                    write!(f, "{}", self.as_str())
+                }
             }
-        }
 
-        impl std::convert::TryFrom<&str> for IssueCode {
-            type Error = &'static str;
+            impl std::convert::TryFrom<&str> for IssueCode {
+                type Error = &'static str;
 
-            fn try_from(value: &str) -> Result<Self, Self::Error> {
-                <Self as std::str::FromStr>::from_str(value)
+                fn try_from(value: &str) -> Result<Self, Self::Error> {
+                    <Self as std::str::FromStr>::from_str(value)
+                }
             }
-        }
 
-        impl std::convert::From<IssueCode> for &'static str {
-            fn from(val: IssueCode) -> Self {
-                val.as_str()
+            impl std::convert::From<IssueCode> for &'static str {
+                fn from(val: IssueCode) -> Self {
+                    val.as_str()
+                }
             }
-        }
 
-        impl std::convert::From<IssueCode> for String {
-            fn from(val: IssueCode) -> Self {
-                val.as_str().to_string()
+            impl std::convert::From<IssueCode> for String {
+                fn from(val: IssueCode) -> Self {
+                    val.as_str().to_string()
+                }
             }
-        }
 
-        impl std::borrow::Borrow<str> for IssueCode {
-            fn borrow(&self) -> &'static str {
-                self.as_str()
+            impl std::borrow::Borrow<str> for IssueCode {
+                fn borrow(&self) -> &'static str {
+                    self.as_str()
+                }
             }
-        }
 
-        impl<'a> std::borrow::Borrow<str> for &'a IssueCode {
-            fn borrow(&self) -> &'a str {
-                self.as_str()
+            impl<'a> std::borrow::Borrow<str> for &'a IssueCode {
+                fn borrow(&self) -> &'a str {
+                    self.as_str()
+                }
             }
-        }
 
-        RUST;
+            RUST;
 
         return $fromStr . $boilerplate;
     }

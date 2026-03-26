@@ -1,4 +1,3 @@
-use std::io::IsTerminal;
 use std::io::Result;
 use std::io::Stderr;
 use std::io::Write;
@@ -10,22 +9,21 @@ use tracing_subscriber::fmt;
 
 use mago_orchestrator::progress::GLOBAL_PROGRESS_MANAGER;
 
+use super::should_use_colors;
+
 /// Initializes the logger with the specified directive and environment variable.
 ///
 /// # Arguments
 ///
 /// * `directive` - A logging directive that controls the log level and filtering rules.
 /// * `env_var` - The environment variable used to override log filtering rules.
+/// * `color_choice` - The color choice for log output.
 pub fn initialize_logger(directive: impl Into<Directive>, env_var: impl Into<String>, color_choice: ColorChoice) {
     let logger = fmt()
         .with_env_filter(
             EnvFilter::builder().with_default_directive(directive.into()).with_env_var(env_var.into()).from_env_lossy(),
         )
-        .with_ansi(match color_choice {
-            ColorChoice::Always => true,
-            ColorChoice::Never => false,
-            ColorChoice::Auto => std::io::stdout().is_terminal(),
-        })
+        .with_ansi(should_use_colors(color_choice))
         .with_writer(LoggerWriter::stderr);
 
     if cfg!(debug_assertions) {

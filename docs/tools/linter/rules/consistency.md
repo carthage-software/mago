@@ -17,11 +17,13 @@ This document details the rules available in the `Consistency` category.
 | Class Name | [`class-name`](#class-name) |
 | Constant Name | [`constant-name`](#constant-name) |
 | Enum Name | [`enum-name`](#enum-name) |
+| File Name | [`file-name`](#file-name) |
 | Function Name | [`function-name`](#function-name) |
 | Interface Name | [`interface-name`](#interface-name) |
 | Lowercase Keyword | [`lowercase-keyword`](#lowercase-keyword) |
 | Lowercase Type Hint | [`lowercase-type-hint`](#lowercase-type-hint) |
 | No Alias Function | [`no-alias-function`](#no-alias-function) |
+| No Alternative Syntax | [`no-alternative-syntax`](#no-alternative-syntax) |
 | No Hash Comment | [`no-hash-comment`](#no-hash-comment) |
 | No Php Tag Terminator | [`no-php-tag-terminator`](#no-php-tag-terminator) |
 | No Trailing Space | [`no-trailing-space`](#no-trailing-space) |
@@ -381,6 +383,53 @@ enum MY_ENUM {}
 ```
 
 
+## <a id="file-name"></a>`file-name`
+
+Ensures that a file containing a single class-like definition is named after that definition.
+
+For example, a file containing `class Foo` must be named `Foo.php`.
+Optionally, this rule can also check functions: a file containing a single function `foo`
+must be named `foo.php`.
+
+
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `true` |
+| `level` | `string` | `"warning"` |
+| `check-functions` | `boolean` | `false` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+// File: test.php
+
+namespace App;
+
+class test
+{
+}
+```
+
+#### Incorrect code
+
+```php
+<?php
+// File: test.php
+
+namespace App;
+
+class Foo
+{
+}
+```
+
+
 ## <a id="function-name"></a>`function-name`
 
 Detects function declarations that do not follow camel or snake naming convention.
@@ -568,6 +617,46 @@ $freeSpace = disk_free_space("/");
 
 // 'diskfreespace' is an alias for 'disk_free_space'
 $freeSpace = diskfreespace("/");
+```
+
+
+## <a id="no-alternative-syntax"></a>`no-alternative-syntax`
+
+Detects the use of alternative syntax for control structures
+(`endif`, `endwhile`, `endfor`, `endforeach`, `endswitch`).
+
+The brace-style syntax is preferred for consistency with the rest
+of the codebase and is the convention used by the Symfony coding standards.
+
+
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `false` |
+| `level` | `string` | `"warning"` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+
+if ($condition) {
+    echo 'yes';
+}
+```
+
+#### Incorrect code
+
+```php
+<?php
+
+if ($condition):
+    echo 'yes';
+endif;
 ```
 
 
@@ -790,8 +879,8 @@ function foo($my_param) {}
 <?php
 
 $MyVariable = 1;
-
 $My_Variable = 2;
 
 function foo($MyParam) {}
 ```
+

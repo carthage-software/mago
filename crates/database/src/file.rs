@@ -257,10 +257,23 @@ pub(crate) fn line_starts(source: &str) -> Vec<u32> {
     let mut lines = Vec::with_capacity(bytes.len() / LINE_WIDTH_HEURISTIC);
     lines.push(0);
 
-    for pos in memchr::memchr_iter(b'\n', bytes) {
-        let next_start = if pos > 0 && bytes[pos - 1] == b'\r' { pos } else { pos + 1 };
+    // Find all line terminators: \n, \r\n (as one), and bare \r.
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'\n' {
+            lines.push((i + 1) as u32);
+        } else if bytes[i] == b'\r' {
+            if bytes.get(i + 1) == Some(&b'\n') {
+                // \r\n — next line starts after the \n
+                lines.push((i + 2) as u32);
+                i += 1; // skip the \n
+            } else {
+                // bare \r — next line starts after the \r
+                lines.push((i + 1) as u32);
+            }
+        }
 
-        lines.push(next_start as u32);
+        i += 1;
     }
 
     lines

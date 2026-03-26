@@ -39,6 +39,13 @@ enum ClassLikeMemberKind {
     Method,
 }
 
+/// A class member paired with its associated comment index.
+/// Used when sorting members to ensure comments move with their associated member.
+struct SortedMember<'arena> {
+    member: &'arena ClassLikeMember<'arena>,
+    comment_index: usize,
+}
+
 pub fn print_class_like_body<'arena>(
     f: &mut FormatterState<'_, 'arena>,
     left_brace: &'arena Span,
@@ -67,11 +74,24 @@ pub fn print_class_like_body<'arena>(
             let mut last_has_line_after = false;
             let mut members = vec![in f.arena; Document::Line(Line::hard())];
 
+            // If enabled, add an empty line directly after the opening brace.
+            // This forces a blank line between the `{` and the first member
+            // regardless of the original source layout.
+            if f.settings.empty_line_after_class_like_open {
+                members.push(Document::Line(Line::hard()));
+            }
+
             // Conditionally sort members if sort_class_methods is enabled
-            let members_to_format = if f.settings.sort_class_methods {
-                sort_class_members(f.arena, class_like_members)
+            let (members_to_format, is_sorted) = if f.settings.sort_class_methods {
+                (sort_class_members(f.arena, f, class_like_members), true)
             } else {
-                class_like_members.iter().collect_in::<Vec<_>>(f.arena)
+                // When not sorting, wrap members without comment tracking
+                let wrapped: Vec<'arena, SortedMember<'arena>> = class_like_members
+                    .iter()
+                    .map(|member| SortedMember { member, comment_index: 0 })
+                    .collect_in(f.arena);
+
+                (wrapped, false)
             };
 
             let alignment_runs = detect_class_member_alignment_runs(f, class_like_members.as_slice());
@@ -79,7 +99,8 @@ pub fn print_class_like_body<'arena>(
             let mut i = 0;
             let mut formatted_count = 0;
             while i < length {
-                let item = members_to_format[i];
+                let sorted_member = &members_to_format[i];
+                let item = sorted_member.member;
                 let member_start = item.span().start.offset;
                 let member_end = item.span().end.offset;
 
@@ -93,7 +114,7 @@ pub fn print_class_like_body<'arena>(
 
                     f.skip_comments_until(region.end);
 
-                    while i < length && members_to_format[i].span().end.offset <= region.end {
+                    while i < length && members_to_format[i].member.span().end.offset <= region.end {
                         i += 1;
                     }
 
@@ -156,6 +177,10 @@ pub fn print_class_like_body<'arena>(
                     f.set_alignment_context(Some(alignment));
                 }
 
+                if is_sorted {
+                    f.set_next_comment_index(sorted_member.comment_index);
+                }
+
                 members.push(item.format(f));
 
                 f.set_alignment_context(None);
@@ -178,6 +203,22 @@ pub fn print_class_like_body<'arena>(
                 i += 1;
             }
 
+            if is_sorted && length > 0 {
+                let last_member_end = class_like_members.iter().map(|m| m.span().end.offset).max().unwrap_or(0);
+
+                let all_comments = f.all_comments();
+                let mut final_index = f.get_next_comment_index();
+                while let Some(comment) = all_comments.get(final_index) {
+                    if comment.span.end.offset <= last_member_end {
+                        final_index += 1;
+                    } else {
+                        break;
+                    }
+                }
+
+                f.set_next_comment_index(final_index);
+            }
+
             contents.push(Document::Indent(members));
         }
 
@@ -188,6 +229,10 @@ pub fn print_class_like_body<'arena>(
 
             contents.push(comments);
         } else if length > 0 || !should_inline {
+            contents.push(Document::Line(Line::hard()));
+        }
+
+        if length > 0 && f.settings.empty_line_before_class_like_close {
             contents.push(Document::Line(Line::hard()));
         }
 
@@ -207,6 +252,7 @@ pub fn print_class_like_body<'arena>(
             match anonymous_class_signature_id {
                 Some(signature_id) => match f.settings.closure_brace_style {
                     BraceStyle::SameLine => Document::space(),
+                    BraceStyle::AlwaysNextLine => Document::Array(vec![in f.arena; Document::Line(Line::hard()), Document::BreakParent]),
                     BraceStyle::NextLine => Document::IfBreak(
                         IfBreak::new(
                             f.arena,
@@ -218,7 +264,7 @@ pub fn print_class_like_body<'arena>(
                 },
                 None => match f.settings.classlike_brace_style {
                     BraceStyle::SameLine => Document::space(),
-                    BraceStyle::NextLine => Document::Array(vec![in f.arena; Document::Line(Line::hard()), Document::BreakParent]),
+                    BraceStyle::NextLine | BraceStyle::AlwaysNextLine => Document::Array(vec![in f.arena; Document::Line(Line::hard()), Document::BreakParent]),
                 },
             }
         },
@@ -258,15 +304,35 @@ const fn should_add_empty_line_after(
 
 /// Sorts class members, specifically methods, according to a consistent ordering.
 /// Non-method members (constants, properties, trait uses, enum cases) maintain their original order.
-fn sort_class_members<'arena>(
+///
+/// Returns sorted members paired with their original comment indices, ensuring that
+/// leading comments (including doc comments) move with their associated methods.
+fn sort_class_members<'a, 'arena>(
     arena: &'arena bumpalo::Bump,
+    f: &FormatterState<'a, 'arena>,
     members: &'arena Sequence<'arena, ClassLikeMember<'arena>>,
-) -> Vec<'arena, &'arena ClassLikeMember<'arena>> {
-    let mut sorted_members = members.iter().collect_in::<Vec<_>>(arena);
+) -> Vec<'arena, SortedMember<'arena>> {
+    let mut members_with_indices: Vec<'arena, SortedMember<'arena>> = Vec::new_in(arena);
 
-    // Use stable sort to preserve relative order of non-methods and equal methods
-    sorted_members.sort_by(|a, b| {
-        match (*a, *b) {
+    let all_comments = f.all_comments();
+    let mut current_comment_index = f.get_next_comment_index();
+
+    for member in members.iter() {
+        let member_comment_index = current_comment_index;
+
+        while let Some(comment) = all_comments.get(current_comment_index) {
+            if comment.span.end.offset <= member.span().end.offset {
+                current_comment_index += 1;
+            } else {
+                break;
+            }
+        }
+
+        members_with_indices.push(SortedMember { member, comment_index: member_comment_index });
+    }
+
+    members_with_indices.sort_by(|a, b| {
+        match (a.member, b.member) {
             // Only compare and sort methods; keep all other members in their original relative order
             (ClassLikeMember::Method(method_a), ClassLikeMember::Method(method_b)) => {
                 compare_methods(method_a, method_b)
@@ -276,7 +342,7 @@ fn sort_class_members<'arena>(
         }
     });
 
-    sorted_members
+    members_with_indices
 }
 
 /// Compares two methods for sorting purposes.
@@ -407,7 +473,7 @@ fn calculate_member_alignment(member: &ClassLikeMember<'_>, widths: &AlignmentWi
     let type_padding = widths.type_width.saturating_sub(current_type_width);
     let name_padding = widths.name_width.saturating_sub(current_name_width);
 
-    AssignmentAlignment { type_padding, name_padding }
+    AssignmentAlignment { type_padding, name_padding, break_group_id: None }
 }
 
 fn get_plain_property_type_width(prop: &PlainProperty<'_>) -> usize {

@@ -11,10 +11,9 @@ mod runner {
     pub fn smoke_test(name: &'static str, code: &'static str) {
         let arena = Bump::new();
         let file = File::ephemeral(Cow::Borrowed(name), Cow::Borrowed(code));
-
-        let (_program, error) = parse_file(&arena, &file);
-        if let Some(parse_error) = error {
-            panic!("Test case '{name}' failed to parse. Error: {parse_error}");
+        let program = parse_file(&arena, &file);
+        if !program.errors.is_empty() {
+            panic!("Test case '{name}' failed to parse. Errors: {:?}", program.errors);
         }
     }
 
@@ -38,6 +37,7 @@ mod runner {
                 ClassLikeMemberSelector::Expression(s) => {
                     format!("{{{}}}", format_expression(s.expression))
                 }
+                ClassLikeMemberSelector::Missing(_) => "<missing>".to_string(),
             }
         }
 
@@ -47,6 +47,7 @@ mod runner {
                 ClassLikeConstantSelector::Expression(s) => {
                     format!("{{{}}}", format_expression(s.expression))
                 }
+                ClassLikeConstantSelector::Missing(_) => "<missing>".to_string(),
             }
         }
 
@@ -189,6 +190,7 @@ mod runner {
                         )
                     }
                 },
+                Expression::Error(_) => "<error>".to_string(),
                 _ => {
                     let expression_kind = Node::Expression(expr)
                         .children()
@@ -204,9 +206,9 @@ mod runner {
         let arena = Bump::new();
         let file = File::ephemeral(Cow::Borrowed(name), Cow::Owned(code));
 
-        let (program, error) = parse_file(&arena, &file);
-        if let Some(parse_error) = error {
-            panic!("Test case '{name}' failed to parse. Error: {parse_error}");
+        let program = parse_file(&arena, &file);
+        if !program.errors.is_empty() {
+            panic!("Test case '{name}' failed to parse. Errors: {:?}", program.errors);
         }
 
         let statement = program.statements.get(1).expect("Expected an expression statement here");
@@ -1188,6 +1190,12 @@ mod parser {
     smoke_test!(keyword_private_in_string_array_access, "<?php echo \"$arr[private]\";");
     smoke_test!(keyword_protected_in_string_array_access, "<?php echo \"$arr[protected]\";");
 
+    // Namespaced class constants in braced string interpolation
+    smoke_test!(namespaced_constant_in_braced_string_interpolation, r#"<?php echo "{$arr[A\B::VALUE]}";"#);
+    smoke_test!(fully_qualified_constant_in_braced_string_interpolation, r#"<?php echo "{$arr[\Foo\Bar::VALUE]}";"#);
+    smoke_test!(deeply_qualified_constant_in_braced_string_interpolation, r#"<?php echo "{$arr[A\B\C\D::VALUE]}";"#);
+    smoke_test!(namespaced_static_method_in_braced_string_interpolation, r#"<?php echo "{$arr[A\B::method()]}";"#);
+
     smoke_test!(fcc_function, "<?php foo(...);");
     smoke_test!(fcc_method, "<?php $obj->method(...);");
     smoke_test!(fcc_static_method, "<?php Foo::method(...);");
@@ -1230,4 +1238,14 @@ mod parser {
     smoke_test!(pfa_nested_call, "<?php foo(bar(?))(?);");
     smoke_test!(pfa_chained, "<?php $obj->method(?)->bindTo(?);");
     smoke_test!(pfa_array_element, "<?php $arr[0](?);");
+    smoke_test!(binary_prefix_single_quoted, "<?php echo b'hello';");
+    smoke_test!(binary_prefix_single_quoted_upper, "<?php echo B'hello';");
+    smoke_test!(binary_prefix_double_quoted, "<?php echo b\"hello\";");
+    smoke_test!(binary_prefix_double_quoted_upper, "<?php echo B\"hello\";");
+    smoke_test!(binary_prefix_double_quoted_interpolated, "<?php echo b\"hello $name\";");
+    smoke_test!(binary_prefix_heredoc, "<?php echo b<<<EOT\nhello\nEOT;");
+    smoke_test!(binary_prefix_heredoc_double_quoted, "<?php echo b<<<\"EOT\"\nhello\nEOT;");
+    smoke_test!(binary_prefix_nowdoc, "<?php echo b<<<'EOT'\nhello\nEOT;");
+    smoke_test!(binary_prefix_escape_sequences, "<?php echo b\"hello\\nworld\";");
+    smoke_test!(binary_prefix_single_quoted_escape, "<?php echo b'hello\\'world';");
 }

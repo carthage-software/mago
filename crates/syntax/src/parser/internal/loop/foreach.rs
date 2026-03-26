@@ -7,78 +7,67 @@ use crate::ast::ast::ForeachTarget;
 use crate::ast::ast::ForeachValueTarget;
 use crate::ast::sequence::Sequence;
 use crate::error::ParseError;
-use crate::parser::internal::expression::parse_expression;
-use crate::parser::internal::statement::parse_statement;
-use crate::parser::internal::terminator::parse_terminator;
-use crate::parser::internal::token_stream::TokenStream;
-use crate::parser::internal::utils;
+use crate::parser::Parser;
 
-pub fn parse_foreach<'arena>(stream: &mut TokenStream<'_, 'arena>) -> Result<Foreach<'arena>, ParseError> {
-    Ok(Foreach {
-        foreach: utils::expect_keyword(stream, T!["foreach"])?,
-        left_parenthesis: utils::expect_span(stream, T!["("])?,
-        expression: {
-            let expression = parse_expression(stream)?;
+impl<'input, 'arena> Parser<'input, 'arena> {
+    pub(crate) fn parse_foreach(&mut self) -> Result<Foreach<'arena>, ParseError> {
+        Ok(Foreach {
+            foreach: self.expect_keyword(T!["foreach"])?,
+            left_parenthesis: self.stream.eat_span(T!["("])?,
+            expression: self.arena.alloc(self.parse_expression()?),
+            r#as: self.expect_keyword(T!["as"])?,
+            target: self.parse_foreach_target()?,
+            right_parenthesis: self.stream.eat_span(T![")"])?,
+            body: self.parse_foreach_body()?,
+        })
+    }
 
-            stream.alloc(expression)
-        },
-        r#as: utils::expect_keyword(stream, T!["as"])?,
-        target: parse_foreach_target(stream)?,
-        right_parenthesis: utils::expect_span(stream, T![")"])?,
-        body: parse_foreach_body(stream)?,
-    })
-}
+    fn parse_foreach_target(&mut self) -> Result<ForeachTarget<'arena>, ParseError> {
+        let key_or_value = self.arena.alloc(self.parse_expression()?);
 
-pub fn parse_foreach_target<'arena>(stream: &mut TokenStream<'_, 'arena>) -> Result<ForeachTarget<'arena>, ParseError> {
-    let key_or_value = {
-        let expression = parse_expression(stream)?;
+        Ok(match self.stream.peek_kind(0)? {
+            Some(T!["=>"]) => ForeachTarget::KeyValue(ForeachKeyValueTarget {
+                key: key_or_value,
+                double_arrow: self.stream.consume_span()?,
+                value: self.arena.alloc(self.parse_expression()?),
+            }),
+            _ => ForeachTarget::Value(ForeachValueTarget { value: key_or_value }),
+        })
+    }
 
-        stream.alloc(expression)
-    };
+    fn parse_foreach_body(&mut self) -> Result<ForeachBody<'arena>, ParseError> {
+        Ok(match self.stream.peek_kind(0)? {
+            Some(T![":"]) => ForeachBody::ColonDelimited(self.parse_foreach_colon_delimited_body()?),
+            _ => ForeachBody::Statement(self.arena.alloc(self.parse_statement()?)),
+        })
+    }
 
-    Ok(match utils::maybe_peek(stream)?.map(|t| t.kind) {
-        Some(T!["=>"]) => ForeachTarget::KeyValue(ForeachKeyValueTarget {
-            key: key_or_value,
-            double_arrow: utils::expect_any(stream)?.span,
-            value: {
-                let expression = parse_expression(stream)?;
+    fn parse_foreach_colon_delimited_body(&mut self) -> Result<ForeachColonDelimitedBody<'arena>, ParseError> {
+        Ok(ForeachColonDelimitedBody {
+            colon: self.stream.eat_span(T![":"])?,
+            statements: {
+                let mut statements = self.new_vec();
+                loop {
+                    if matches!(self.stream.peek_kind(0)?, Some(T!["endforeach"])) {
+                        break;
+                    }
 
-                stream.alloc(expression)
-            },
-        }),
-        _ => ForeachTarget::Value(ForeachValueTarget { value: key_or_value }),
-    })
-}
-
-pub fn parse_foreach_body<'arena>(stream: &mut TokenStream<'_, 'arena>) -> Result<ForeachBody<'arena>, ParseError> {
-    Ok(match utils::peek(stream)?.kind {
-        T![":"] => ForeachBody::ColonDelimited(parse_foreach_colon_delimited_body(stream)?),
-        _ => ForeachBody::Statement({
-            let stmt = parse_statement(stream)?;
-
-            stream.alloc(stmt)
-        }),
-    })
-}
-
-pub fn parse_foreach_colon_delimited_body<'arena>(
-    stream: &mut TokenStream<'_, 'arena>,
-) -> Result<ForeachColonDelimitedBody<'arena>, ParseError> {
-    Ok(ForeachColonDelimitedBody {
-        colon: utils::expect_span(stream, T![":"])?,
-        statements: {
-            let mut statements = stream.new_vec();
-            loop {
-                if matches!(utils::peek(stream)?.kind, T!["endforeach"]) {
-                    break;
+                    let position_before = self.stream.current_position();
+                    statements.push(self.parse_statement()?);
+                    if self.stream.current_position() == position_before {
+                        if let Ok(Some(token)) = self.stream.lookahead(0) {
+                            self.errors.push(self.stream.unexpected(Some(token), &[]));
+                            let _ = self.stream.consume();
+                        } else {
+                            break;
+                        }
+                    }
                 }
 
-                statements.push(parse_statement(stream)?);
-            }
-
-            Sequence::new(statements)
-        },
-        end_foreach: utils::expect_keyword(stream, T!["endforeach"])?,
-        terminator: parse_terminator(stream)?,
-    })
+                Sequence::new(statements)
+            },
+            end_foreach: self.expect_keyword(T!["endforeach"])?,
+            terminator: self.parse_terminator()?,
+        })
+    }
 }

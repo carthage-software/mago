@@ -1,9 +1,8 @@
 use std::borrow::Cow;
 use std::hash::Hash;
 use std::hash::Hasher;
+use std::sync::Arc;
 
-use bitflags::bitflags;
-use derivative::Derivative;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -33,39 +32,12 @@ use crate::ttype::atomic::scalar::class_like_string::TClassLikeString;
 use crate::ttype::atomic::scalar::int::TInteger;
 use crate::ttype::atomic::scalar::string::TString;
 use crate::ttype::atomic::scalar::string::TStringLiteral;
+use crate::ttype::flags::UnionFlags;
 use crate::ttype::get_arraykey;
 use crate::ttype::get_int;
 use crate::ttype::get_mixed;
 
-bitflags! {
-    /// Flags representing various properties of a type union.
-    ///
-    /// This replaces 9 individual boolean fields with a compact 16-bit representation,
-    /// reducing memory usage from 9 bytes to 2 bytes per TUnion instance.
-    #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
-    pub struct UnionFlags: u16 {
-        /// Indicates the union had a template type at some point.
-        const HAD_TEMPLATE = 1 << 0;
-        /// Indicates the value is passed by reference.
-        const BY_REFERENCE = 1 << 1;
-        /// Indicates no references exist to this type.
-        const REFERENCE_FREE = 1 << 2;
-        /// Indicates the type may be undefined due to a try block.
-        const POSSIBLY_UNDEFINED_FROM_TRY = 1 << 3;
-        /// Indicates the type may be undefined.
-        const POSSIBLY_UNDEFINED = 1 << 4;
-        /// Indicates nullable issues should be ignored for this type.
-        const IGNORE_NULLABLE_ISSUES = 1 << 5;
-        /// Indicates falsable issues should be ignored for this type.
-        const IGNORE_FALSABLE_ISSUES = 1 << 6;
-        /// Indicates the type came from a template default value.
-        const FROM_TEMPLATE_DEFAULT = 1 << 7;
-        /// Indicates the type has been populated with codebase information.
-        const POPULATED = 1 << 8;
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, Derivative, PartialOrd, Ord)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialOrd, Ord)]
 pub struct TUnion {
     pub types: Cow<'static, [TAtomic]>,
     pub flags: UnionFlags,
@@ -108,32 +80,20 @@ impl TUnion {
                  in type construction - unions must contain at least one type. \
                  Consider using TAtomic::Never for empty/impossible types."
             );
+        }
 
-            if types.len() > 1
-                && types.iter().any(|atomic| {
-                    atomic.is_never() || atomic.map_generic_parameter_constraint(TUnion::is_never).unwrap_or(false)
-                })
-            {
-                panic!(
-                    "TUnion::from_vec() received a mix of 'never' and other types. \
-                     This indicates a logic error - 'never' should be filtered out before \
-                     creating unions since (A | never) = A. Types received: {types:#?}"
-                )
-            }
-        } else {
-            // If we have more than one type, 'never' is redundant and can be removed,
-            // as the union `A|never` is simply `A`.
-            if types.len() > 1 {
-                types.retain(|atomic| {
-                    !atomic.is_never() && !atomic.map_generic_parameter_constraint(TUnion::is_never).unwrap_or(false)
-                });
-            }
+        // If we have more than one type, 'never' is redundant and can be removed,
+        // as the union `A|never` is simply `A`.
+        if types.len() > 1 {
+            types.retain(|atomic| {
+                !atomic.is_never() && !atomic.map_generic_parameter_constraint(TUnion::is_never).unwrap_or(false)
+            });
+        }
 
-            // If the vector was originally empty, or contained only 'never' types
-            // which were removed, ensure the final union is `never`.
-            if types.is_empty() {
-                types.push(TAtomic::Never);
-            }
+        // If the vector was originally empty, or contained only 'never' types
+        // which were removed, ensure the final union is `never`.
+        if types.is_empty() {
+            types.push(TAtomic::Never);
         }
 
         Self::new(Cow::Owned(types))
@@ -223,6 +183,12 @@ impl TUnion {
     }
 
     #[inline]
+    #[must_use]
+    pub const fn has_nullsafe_null(&self) -> bool {
+        self.flags.contains(UnionFlags::NULLSAFE_NULL)
+    }
+
+    #[inline]
     pub fn set_had_template(&mut self, value: bool) {
         self.flags.set(UnionFlags::HAD_TEMPLATE, value);
     }
@@ -262,6 +228,11 @@ impl TUnion {
         self.flags.set(UnionFlags::POPULATED, value);
     }
 
+    #[inline]
+    pub fn set_nullsafe_null(&mut self, value: bool) {
+        self.flags.set(UnionFlags::NULLSAFE_NULL, value);
+    }
+
     /// Creates a new `TUnion` with the same properties as the original, but with a new set of types.
     #[must_use]
     pub fn clone_with_types(&self, types: Vec<TAtomic>) -> TUnion {
@@ -270,7 +241,7 @@ impl TUnion {
 
     #[must_use]
     pub fn to_non_nullable(&self) -> TUnion {
-        TUnion { types: Cow::Owned(self.get_non_nullable_types()), flags: self.flags }
+        TUnion { types: Cow::Owned(self.get_non_nullable_types()), flags: self.flags & !UnionFlags::NULLSAFE_NULL }
     }
 
     #[must_use]
@@ -288,7 +259,7 @@ impl TUnion {
                     parameter_name: parameter.parameter_name,
                     defining_entity: parameter.defining_entity,
                     intersection_types: parameter.intersection_types.clone(),
-                    constraint: Box::new(parameter.constraint.to_non_nullable()),
+                    constraint: Arc::new(parameter.constraint.to_non_nullable()),
                 })),
                 TAtomic::Mixed(mixed) => Some(TAtomic::Mixed(mixed.with_is_non_null(true))),
                 atomic => Some(atomic.clone()),
@@ -305,7 +276,7 @@ impl TUnion {
                     parameter_name: parameter.parameter_name,
                     defining_entity: parameter.defining_entity,
                     intersection_types: parameter.intersection_types.clone(),
-                    constraint: Box::new(parameter.constraint.to_truthy()),
+                    constraint: Arc::new(parameter.constraint.to_truthy()),
                 })),
                 TAtomic::Mixed(mixed) => Some(TAtomic::Mixed(mixed.with_truthiness(TMixedTruthiness::Truthy))),
                 atomic => {
@@ -519,6 +490,12 @@ impl TUnion {
         self.types.iter().all(|t| matches!(t, TAtomic::Placeholder)) && !self.types.is_empty()
     }
 
+    /// Returns true if this union or any type parameter within it contains a Placeholder.
+    #[must_use]
+    pub fn contains_placeholder(&self) -> bool {
+        self.types.iter().any(|t| t.contains_placeholder())
+    }
+
     pub fn is_true(&self) -> bool {
         self.types.iter().all(TAtomic::is_true) && !self.types.is_empty()
     }
@@ -653,7 +630,7 @@ impl TUnion {
             }
 
             if let TAtomic::Object(TObject::Named(named_object)) = atomic {
-                if named_object.is_this() {
+                if named_object.is_static {
                     return true;
                 }
 
@@ -797,6 +774,17 @@ impl TUnion {
         self.types.iter().any(|t| match t {
             TAtomic::Null => self.types.len() >= 2,
             TAtomic::GenericParameter(param) => param.constraint.is_nullable(),
+            _ => false,
+        })
+    }
+
+    #[must_use]
+    pub fn can_be_null(&self) -> bool {
+        self.types.iter().any(|t| match t {
+            TAtomic::Null => true,
+            TAtomic::Void => true,
+            TAtomic::Mixed(mixed) if !mixed.is_non_null() => true,
+            TAtomic::GenericParameter(param) => param.constraint.can_be_null(),
             _ => false,
         })
     }
@@ -980,14 +968,14 @@ impl TUnion {
     pub fn has_static_object(&self) -> bool {
         self.types
             .iter()
-            .any(|atomic| matches!(atomic, TAtomic::Object(TObject::Named(named_object)) if named_object.is_this()))
+            .any(|atomic| matches!(atomic, TAtomic::Object(TObject::Named(named_object)) if named_object.is_static))
     }
 
     #[must_use]
     pub fn is_static_object(&self) -> bool {
         self.types
             .iter()
-            .all(|atomic| matches!(atomic, TAtomic::Object(TObject::Named(named_object)) if named_object.is_this()))
+            .all(|atomic| matches!(atomic, TAtomic::Object(TObject::Named(named_object)) if named_object.is_static))
     }
 
     #[inline]
@@ -1183,7 +1171,7 @@ impl TUnion {
             TAtomic::Array(array) => match array {
                 TArray::List(_) => Some(get_int()),
                 TArray::Keyed(keyed_array) => match &keyed_array.parameters {
-                    Some((k, _)) => Some(*k.clone()),
+                    Some((k, _)) => Some((**k).clone()),
                     None => Some(get_arraykey()),
                 },
             },
@@ -1279,7 +1267,7 @@ impl TUnion {
         self.types.iter().any(|t| match t {
             TAtomic::GenericParameter(generic_parameter) => generic_parameter.constraint.accepts_null(),
             TAtomic::Mixed(mixed) if !mixed.is_non_null() => true,
-            TAtomic::Null => true,
+            TAtomic::Null | TAtomic::Placeholder => true,
             _ => false,
         })
     }
@@ -1392,6 +1380,10 @@ impl TType for TUnion {
 
 impl PartialEq for TUnion {
     fn eq(&self, other: &TUnion) -> bool {
+        if std::ptr::eq(self, other) {
+            return true;
+        }
+
         const SEMANTIC_FLAGS: UnionFlags = UnionFlags::HAD_TEMPLATE
             .union(UnionFlags::BY_REFERENCE)
             .union(UnionFlags::REFERENCE_FREE)
@@ -1410,10 +1402,32 @@ impl PartialEq for TUnion {
             return false;
         }
 
+        // Fast path: unions are commonly constructed in stable type order.
+        // When order already matches, this keeps comparison linear.
+        if self.types == other.types {
+            return true;
+        }
+
+        // Check self ⊆ other
         for i in 0..len {
             let mut has_match = false;
             for j in 0..len {
                 if self.types[i] == other.types[j] {
+                    has_match = true;
+                    break;
+                }
+            }
+
+            if !has_match {
+                return false;
+            }
+        }
+
+        // Check other ⊆ self (needed when duplicates exist in either side)
+        for i in 0..len {
+            let mut has_match = false;
+            for j in 0..len {
+                if other.types[i] == self.types[j] {
                     has_match = true;
                     break;
                 }
@@ -1450,11 +1464,13 @@ pub fn populate_union_type(
             TAtomic::Scalar(TScalar::ClassLikeString(
                 TClassLikeString::Generic { constraint, .. } | TClassLikeString::OfType { constraint, .. },
             )) => {
-                let mut new_constraint = (**constraint).clone();
-
-                populate_atomic_type(&mut new_constraint, codebase_symbols, reference_source, symbol_references, force);
-
-                **constraint = new_constraint;
+                populate_atomic_type(
+                    Arc::make_mut(constraint),
+                    codebase_symbols,
+                    reference_source,
+                    symbol_references,
+                    force,
+                );
             }
             _ => {
                 populate_atomic_type(unpopulated_atomic, codebase_symbols, reference_source, symbol_references, force);

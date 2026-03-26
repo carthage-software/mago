@@ -111,8 +111,7 @@ function snmpget(
     array|string $object_id,
     int $timeout = -1,
     int $retries = -1,
-): mixed {
-}
+): mixed {}
 
 function snmpgetnext(
     string $hostname,
@@ -120,8 +119,7 @@ function snmpgetnext(
     array|string $object_id,
     int $timeout = -1,
     int $retries = -1,
-): mixed {
-}
+): mixed {}
 
 function snmpwalk(
     string $hostname,
@@ -129,8 +127,7 @@ function snmpwalk(
     array|string $object_id,
     int $timeout = -1,
     int $retries = -1,
-): array|false {
-}
+): array|false {}
 
 function snmprealwalk(
     string $hostname,
@@ -138,8 +135,7 @@ function snmprealwalk(
     array|string $object_id,
     int $timeout = -1,
     int $retries = -1,
-): array|false {
-}
+): array|false {}
 
 /** @alias snmprealwalk */
 function snmpwalkoid(
@@ -148,8 +144,7 @@ function snmpwalkoid(
     array|string $object_id,
     int $timeout = -1,
     int $retries = -1,
-): array|false {
-}
+): array|false {}
 
 function snmpset(
     string $hostname,
@@ -159,29 +154,18 @@ function snmpset(
     array|string $value,
     int $timeout = -1,
     int $retries = -1,
-): bool {
-}
+): bool {}
 
-function snmp_get_quick_print(): bool
-{
-}
+function snmp_get_quick_print(): bool {}
 
-function snmp_set_quick_print(bool $enable): true
-{
-}
+function snmp_set_quick_print(bool $enable): true {}
 
-function snmp_set_enum_print(bool $enable): true
-{
-}
+function snmp_set_enum_print(bool $enable): true {}
 
-function snmp_set_oid_output_format(int $format): true
-{
-}
+function snmp_set_oid_output_format(int $format): true {}
 
 /** @alias snmp_set_oid_output_format */
-function snmp_set_oid_numeric_print(int $format): true
-{
-}
+function snmp_set_oid_numeric_print(int $format): true {}
 
 function snmp2_get(
     string $hostname,
@@ -189,8 +173,7 @@ function snmp2_get(
     array|string $object_id,
     int $timeout = -1,
     int $retries = -1,
-): mixed {
-}
+): mixed {}
 
 function snmp2_getnext(
     string $hostname,
@@ -198,8 +181,7 @@ function snmp2_getnext(
     array|string $object_id,
     int $timeout = -1,
     int $retries = -1,
-): mixed {
-}
+): mixed {}
 
 function snmp2_walk(
     string $hostname,
@@ -207,8 +189,7 @@ function snmp2_walk(
     array|string $object_id,
     int $timeout = -1,
     int $retries = -1,
-): array|false {
-}
+): array|false {}
 
 function snmp2_real_walk(
     string $hostname,
@@ -216,8 +197,7 @@ function snmp2_real_walk(
     array|string $object_id,
     int $timeout = -1,
     int $retries = -1,
-): array|false {
-}
+): array|false {}
 
 function snmp2_set(
     string $hostname,
@@ -227,8 +207,7 @@ function snmp2_set(
     array|string $value,
     int $timeout = -1,
     int $retries = -1,
-): bool {
-}
+): bool {}
 
 function snmp3_get(
     string $hostname,
@@ -241,8 +220,7 @@ function snmp3_get(
     array|string $object_id,
     int $timeout = -1,
     int $retries = -1,
-): mixed {
-}
+): mixed {}
 
 function snmp3_getnext(
     string $hostname,
@@ -255,8 +233,7 @@ function snmp3_getnext(
     array|string $object_id,
     int $timeout = -1,
     int $retries = -1,
-): mixed {
-}
+): mixed {}
 
 function snmp3_walk(
     string $hostname,
@@ -269,8 +246,7 @@ function snmp3_walk(
     array|string $object_id,
     int $timeout = -1,
     int $retries = -1,
-): array|false {
-}
+): array|false {}
 
 function snmp3_real_walk(
     string $hostname,
@@ -283,8 +259,7 @@ function snmp3_real_walk(
     array|string $object_id,
     int $timeout = -1,
     int $retries = -1,
-): array|false {
-}
+): array|false {}
 
 function snmp3_set(
     string $hostname,
@@ -299,20 +274,13 @@ function snmp3_set(
     array|string $value,
     int $timeout = -1,
     int $retries = -1,
-): bool {
-}
+): bool {}
 
-function snmp_set_valueretrieval(int $method): true
-{
-}
+function snmp_set_valueretrieval(int $method): true {}
 
-function snmp_get_valueretrieval(): int
-{
-}
+function snmp_get_valueretrieval(): int {}
 
-function snmp_read_mib(string $filename): bool
-{
-}
+function snmp_read_mib(string $filename): bool {}
 
 class SNMP
 {
@@ -331,7 +299,7 @@ class SNMP
 
     /** @readonly */
     public array $info;
-    public null|int $max_oids;
+    public ?int $max_oids;
     public int $valueretrieval;
     public bool $quick_print;
     public bool $enum_print;
@@ -347,9 +315,7 @@ class SNMP
         int $retries = -1,
     ) {}
 
-    public function close(): bool
-    {
-    }
+    public function close(): bool {}
 
     public function setSecurity(
         string $securityLevel,
@@ -359,38 +325,24 @@ class SNMP
         string $privacyPassphrase = '',
         string $contextName = '',
         string $contextEngineId = '',
-    ): bool {
-    }
+    ): bool {}
 
-    public function get(array|string $objectId, bool $preserveKeys = false): mixed
-    {
-    }
+    public function get(array|string $objectId, bool $preserveKeys = false): mixed {}
 
-    public function getnext(array|string $objectId): mixed
-    {
-    }
+    public function getnext(array|string $objectId): mixed {}
 
     public function walk(
         array|string $objectId,
         bool $suffixAsKey = false,
         int $maxRepetitions = -1,
         int $nonRepeaters = -1,
-    ): array|false {
-    }
+    ): array|false {}
 
-    public function set(array|string $objectId, array|string $type, array|string $value): bool
-    {
-    }
+    public function set(array|string $objectId, array|string $type, array|string $value): bool {}
 
-    public function getErrno(): int
-    {
-    }
+    public function getErrno(): int {}
 
-    public function getError(): string
-    {
-    }
+    public function getError(): string {}
 }
 
-class SNMPException extends RuntimeException
-{
-}
+class SNMPException extends RuntimeException {}

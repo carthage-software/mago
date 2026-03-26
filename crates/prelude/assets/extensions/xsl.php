@@ -83,64 +83,38 @@ class XSLTProcessor
     /**
      * @param DOMDocument|DOM\Document|SimpleXMLElement $stylesheet
      */
-    public function importStylesheet(object $stylesheet): bool
-    {
-    }
+    public function importStylesheet(object $stylesheet): bool {}
 
     /**
      * @param DOMDocument|DOM\Document|SimpleXMLElement $document
      */
-    public function transformToDoc(object $document, null|string $returnClass = null): object|false
-    {
-    }
+    public function transformToDoc(object $document, ?string $returnClass = null): object|false {}
 
     /**
      * @param DOMDocument|DOM\Document|SimpleXMLElement $document
      */
-    public function transformToUri(object $document, string $uri): int
-    {
-    }
+    public function transformToUri(object $document, string $uri): int {}
 
     /**
      * @param DOMDocument|DOM\Document|SimpleXMLElement $document
      */
-    public function transformToXml(object $document): string|null|false
-    {
-    }
+    public function transformToXml(object $document): string|null|false {}
 
-    public function setParameter(string $namespace, array|string $name, null|string $value = null): bool
-    {
-    }
+    public function setParameter(string $namespace, array|string $name, ?string $value = null): bool {}
 
-    public function getParameter(string $namespace, string $name): string|false
-    {
-    }
+    public function getParameter(string $namespace, string $name): string|false {}
 
-    public function removeParameter(string $namespace, string $name): bool
-    {
-    }
+    public function removeParameter(string $namespace, string $name): bool {}
 
-    public function hasExsltSupport(): bool
-    {
-    }
+    public function hasExsltSupport(): bool {}
 
-    public function registerPHPFunctions(array|string|null $functions = null): void
-    {
-    }
+    public function registerPHPFunctions(array|string|null $functions = null): void {}
 
-    public function registerPHPFunctionNS(string $namespaceURI, string $name, callable $callable): void
-    {
-    }
+    public function registerPHPFunctionNS(string $namespaceURI, string $name, callable $callable): void {}
 
-    public function setProfiling(null|string $filename): true
-    {
-    }
+    public function setProfiling(?string $filename): true {}
 
-    public function setSecurityPrefs(int $preferences): int
-    {
-    }
+    public function setSecurityPrefs(int $preferences): int {}
 
-    public function getSecurityPrefs(): int
-    {
-    }
+    public function getSecurityPrefs(): int {}
 }

@@ -104,6 +104,7 @@ pub fn get_password_from_selector(selector: &ClassLikeMemberSelector<'_>) -> Opt
         ClassLikeMemberSelector::Expression(class_like_member_expression_selector) => {
             get_password(class_like_member_expression_selector.expression)
         }
+        ClassLikeMemberSelector::Missing(_) => None,
     }
 }
 
@@ -121,6 +122,7 @@ pub fn get_password_from_constant_selector(selector: &ClassLikeConstantSelector<
         ClassLikeConstantSelector::Expression(class_like_member_expression_selector) => {
             get_password(class_like_member_expression_selector.expression)
         }
+        ClassLikeConstantSelector::Missing(_) => None,
     }
 }
 
@@ -159,6 +161,11 @@ pub fn is_password_literal<'arena>(literal: &'arena LiteralString<'arena>) -> bo
 #[inline]
 #[must_use]
 pub fn is_password(mut str: &str) -> bool {
+    // cli flags, e.g `$foo === '--password'` -> ignore
+    if str.starts_with("--") {
+        return false;
+    }
+
     if str.starts_with('$') {
         str = &str[1..];
     }

@@ -458,6 +458,10 @@ pub enum NodeKind {
     IndirectVariable,
     NestedVariable,
     Variable,
+    Error,
+    MissingTerminator,
+    ClassLikeMemberMissingSelector,
+    ClassLikeConstantMissingSelector,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
@@ -688,6 +692,10 @@ pub enum Node<'ast, 'arena> {
     NestedVariable(&'ast NestedVariable<'arena>),
     Variable(&'ast Variable<'arena>),
     Pipe(&'ast Pipe<'arena>),
+    Error(Span),
+    MissingTerminator(Span),
+    ClassLikeMemberMissingSelector(Span),
+    ClassLikeConstantMissingSelector(Span),
 }
 
 impl<'ast, 'arena> Node<'ast, 'arena> {
@@ -995,6 +1003,10 @@ impl<'ast, 'arena> Node<'ast, 'arena> {
             Self::NestedVariable(_) => NodeKind::NestedVariable,
             Self::Variable(_) => NodeKind::Variable,
             Self::Pipe(_) => NodeKind::Pipe,
+            Self::Error(_) => NodeKind::Error,
+            Self::MissingTerminator(_) => NodeKind::MissingTerminator,
+            Self::ClassLikeMemberMissingSelector(_) => NodeKind::ClassLikeMemberMissingSelector,
+            Self::ClassLikeConstantMissingSelector(_) => NodeKind::ClassLikeConstantMissingSelector,
         }
     }
 
@@ -1058,13 +1070,13 @@ impl<'ast, 'arena> Node<'ast, 'arena> {
                 children
             }
             Node::NamedArgument(node) => {
-                vec![Node::LocalIdentifier(&node.name), Node::Expression(&node.value)]
+                vec![Node::LocalIdentifier(&node.name), Node::Expression(node.value)]
             }
             Node::NamedPlaceholderArgument(node) => {
                 vec![Node::LocalIdentifier(&node.name)]
             }
             Node::PlaceholderArgument(_) => vec![],
-            Node::PositionalArgument(node) => vec![Node::Expression(&node.value)],
+            Node::PositionalArgument(node) => vec![Node::Expression(node.value)],
             Node::VariadicPlaceholderArgument(_) => vec![],
             Node::Array(node) => {
                 let mut children = vec![];
@@ -1174,7 +1186,7 @@ impl<'ast, 'arena> Node<'ast, 'arena> {
                 children
             }
             Node::ClassLikeConstantItem(node) => {
-                vec![Node::LocalIdentifier(&node.name), Node::Expression(&node.value)]
+                vec![Node::LocalIdentifier(&node.name), Node::Expression(node.value)]
             }
             Node::EnumCase(node) => {
                 let mut children = vec![];
@@ -1189,7 +1201,7 @@ impl<'ast, 'arena> Node<'ast, 'arena> {
                 children
             }
             Node::EnumCaseBackedItem(node) => {
-                vec![Node::LocalIdentifier(&node.name), Node::Expression(&node.value)]
+                vec![Node::LocalIdentifier(&node.name), Node::Expression(node.value)]
             }
             Node::EnumCaseItem(node) => match &node {
                 EnumCaseItem::Backed(node) => vec![Node::EnumCaseBackedItem(node)],
@@ -1217,6 +1229,7 @@ impl<'ast, 'arena> Node<'ast, 'arena> {
                 ClassLikeConstantSelector::Expression(node) => {
                     vec![Node::ClassLikeMemberExpressionSelector(node)]
                 }
+                ClassLikeConstantSelector::Missing(span) => vec![Node::ClassLikeConstantMissingSelector(*span)],
             },
             Node::ClassLikeMember(node) => match node {
                 ClassLikeMember::TraitUse(node) => vec![Node::TraitUse(node)],
@@ -1232,6 +1245,7 @@ impl<'ast, 'arena> Node<'ast, 'arena> {
                 ClassLikeMemberSelector::Expression(node) => {
                     vec![Node::ClassLikeMemberExpressionSelector(node)]
                 }
+                ClassLikeMemberSelector::Missing(span) => vec![Node::ClassLikeMemberMissingSelector(*span)],
             },
             Node::Method(node) => {
                 let mut children: Vec<Node> = vec![];
@@ -1282,7 +1296,7 @@ impl<'ast, 'arena> Node<'ast, 'arena> {
                 vec![Node::DirectVariable(&node.variable)]
             }
             Node::PropertyConcreteItem(node) => {
-                vec![Node::DirectVariable(&node.variable), Node::Expression(&node.value)]
+                vec![Node::DirectVariable(&node.variable), Node::Expression(node.value)]
             }
             Node::PropertyHook(node) => {
                 let mut children: Vec<Node> = vec![];
@@ -1306,7 +1320,7 @@ impl<'ast, 'arena> Node<'ast, 'arena> {
                 PropertyHookConcreteBody::Expression(node) => Node::PropertyHookConcreteExpressionBody(node),
                 PropertyHookConcreteBody::Block(node) => Node::Block(node),
             }],
-            Node::PropertyHookConcreteExpressionBody(node) => vec![Node::Expression(&node.expression)],
+            Node::PropertyHookConcreteExpressionBody(node) => vec![Node::Expression(node.expression)],
             Node::PropertyHookList(node) => node.hooks.iter().map(Node::PropertyHook).collect(),
             Node::PropertyItem(node) => match node {
                 PropertyItem::Abstract(node) => vec![Node::PropertyAbstractItem(node)],
@@ -1475,7 +1489,7 @@ impl<'ast, 'arena> Node<'ast, 'arena> {
                 children
             }
             Node::ConstantItem(node) => {
-                vec![Node::LocalIdentifier(&node.name), Node::Expression(&node.value)]
+                vec![Node::LocalIdentifier(&node.name), Node::Expression(node.value)]
             }
             Node::Construct(node) => vec![match node {
                 Construct::Isset(node) => Node::IssetConstruct(node),
@@ -1491,7 +1505,7 @@ impl<'ast, 'arena> Node<'ast, 'arena> {
             }],
             Node::IssetConstruct(node) => {
                 let mut children = vec![Node::Keyword(&node.isset)];
-                children.extend(node.values.iter().map(Node::Expression));
+                children.extend(node.values.iter().map(|e| Node::Expression(e)));
 
                 children
             }
@@ -1596,7 +1610,7 @@ impl<'ast, 'arena> Node<'ast, 'arena> {
             Node::MatchExpressionArm(node) => {
                 let mut children = vec![];
 
-                children.extend(node.conditions.iter().map(Node::Expression));
+                children.extend(node.conditions.iter().map(|e| Node::Expression(e)));
                 children.push(Node::Expression(node.expression));
 
                 children
@@ -1680,18 +1694,18 @@ impl<'ast, 'arena> Node<'ast, 'arena> {
                 children
             }
             Node::DeclareItem(node) => {
-                vec![Node::LocalIdentifier(&node.name), Node::Expression(&node.value)]
+                vec![Node::LocalIdentifier(&node.name), Node::Expression(node.value)]
             }
             Node::EchoTag(node) => {
                 let mut children = vec![];
-                children.extend(node.values.iter().map(Node::Expression));
+                children.extend(node.values.iter().map(|e| Node::Expression(e)));
                 children.push(Node::Terminator(&node.terminator));
 
                 children
             }
             Node::Echo(node) => {
                 let mut children = vec![Node::Keyword(&node.echo)];
-                children.extend(node.values.iter().map(Node::Expression));
+                children.extend(node.values.iter().map(|e| Node::Expression(e)));
                 children.push(Node::Terminator(&node.terminator));
 
                 children
@@ -1731,6 +1745,7 @@ impl<'ast, 'arena> Node<'ast, 'arena> {
                 Expression::Instantiation(node) => Node::Instantiation(node),
                 Expression::MagicConstant(node) => Node::MagicConstant(node),
                 Expression::Pipe(node) => Node::Pipe(node),
+                Expression::Error(span) => return vec![Node::Error(*span)],
             }],
             Node::Binary(node) => {
                 vec![Node::Expression(node.lhs), Node::BinaryOperator(&node.operator), Node::Expression(node.rhs)]
@@ -1847,7 +1862,7 @@ impl<'ast, 'arena> Node<'ast, 'arena> {
 
                 children
             }
-            Node::FunctionLikeParameterDefaultValue(node) => vec![Node::Expression(&node.value)],
+            Node::FunctionLikeParameterDefaultValue(node) => vec![Node::Expression(node.value)],
             Node::FunctionLikeReturnTypeHint(hint) => vec![Node::Hint(&hint.hint)],
             Node::Global(node) => {
                 let mut children: Vec<Node> = vec![];
@@ -1995,9 +2010,9 @@ impl<'ast, 'arena> Node<'ast, 'arena> {
             Node::For(node) => {
                 let mut children = vec![Node::Keyword(&node.r#for)];
 
-                children.extend(node.initializations.iter().map(Node::Expression));
-                children.extend(node.conditions.iter().map(Node::Expression));
-                children.extend(node.increments.iter().map(Node::Expression));
+                children.extend(node.initializations.iter().map(|e| Node::Expression(e)));
+                children.extend(node.conditions.iter().map(|e| Node::Expression(e)));
+                children.extend(node.increments.iter().map(|e| Node::Expression(e)));
                 children.push(Node::ForBody(&node.body));
 
                 children
@@ -2080,7 +2095,7 @@ impl<'ast, 'arena> Node<'ast, 'arena> {
                 vec![Node::DirectVariable(&node.variable)]
             }
             Node::StaticConcreteItem(node) => {
-                vec![Node::DirectVariable(&node.variable), Node::Expression(&node.value)]
+                vec![Node::DirectVariable(&node.variable), Node::Expression(node.value)]
             }
             Node::Try(node) => {
                 let mut children = vec![];
@@ -2271,6 +2286,7 @@ impl<'ast, 'arena> Node<'ast, 'arena> {
                 Terminator::TagPair(closing_tag, opening_tag) => {
                     vec![Node::ClosingTag(closing_tag), Node::OpeningTag(opening_tag)]
                 }
+                Terminator::Missing(span) => vec![Node::MissingTerminator(*span)],
             },
             Node::Throw(node) => vec![Node::Keyword(&node.throw), Node::Expression(node.exception)],
             Node::Hint(node) => match &node {
@@ -2305,7 +2321,7 @@ impl<'ast, 'arena> Node<'ast, 'arena> {
             Node::UnionHint(node) => vec![Node::Hint(node.left), Node::Hint(node.right)],
             Node::Unset(node) => {
                 let mut children = vec![Node::Keyword(&node.unset)];
-                children.extend(node.values.iter().map(Node::Expression));
+                children.extend(node.values.iter().map(|e| Node::Expression(e)));
                 children.push(Node::Terminator(&node.terminator));
 
                 children
@@ -2323,6 +2339,10 @@ impl<'ast, 'arena> Node<'ast, 'arena> {
             Node::Pipe(pipe) => {
                 vec![Node::Expression(pipe.input), Node::Expression(pipe.callable)]
             }
+            Node::Error(_)
+            | Node::MissingTerminator(_)
+            | Node::ClassLikeMemberMissingSelector(_)
+            | Node::ClassLikeConstantMissingSelector(_) => vec![],
         }
     }
 }
@@ -2553,6 +2573,10 @@ impl HasSpan for Node<'_, '_> {
             Self::NestedVariable(node) => node.span(),
             Self::Variable(node) => node.span(),
             Self::Pipe(node) => node.span(),
+            Self::Error(span)
+            | Self::MissingTerminator(span)
+            | Self::ClassLikeMemberMissingSelector(span)
+            | Self::ClassLikeConstantMissingSelector(span) => *span,
         }
     }
 }

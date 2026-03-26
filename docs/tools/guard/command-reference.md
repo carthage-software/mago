@@ -23,7 +23,26 @@ Optional. A list of specific files or directories to analyze. If you provide pat
 
 ## Options
 
-The `guard` command currently does not have any specific flags of its own, but it shares the common set of options for reporting issues.
+### Mode Selection
+
+These flags control which guard checks are executed. They are mutually exclusive.
+
+| Flag           | Description                                                                                     |
+| :------------- | :---------------------------------------------------------------------------------------------- |
+| `--structural` | Run only structural guard checks (naming conventions, modifiers, inheritance constraints).       |
+| `--perimeter`  | Run only perimeter guard checks (dependency boundaries, layer restrictions).                     |
+
+If neither flag is specified, both structural and perimeter guards will run (equivalent to `mode = "default"` in configuration).
+
+:::tip
+These flags override the `mode` setting in your `mago.toml` configuration. If you specify a flag that matches the configured mode, a warning will be shown indicating the flag is redundant.
+:::
+
+### Other Options
+
+| Flag         | Description                                                                                      |
+| :----------- | :----------------------------------------------------------------------------------------------- |
+| `--no-stubs` | Disable built-in PHP and library stubs. May result in more warnings when external symbols can't be resolved. |
 
 ### Shared Reporting Options
 

@@ -2,6 +2,7 @@ use crate::metadata::CodebaseMetadata;
 use crate::ttype::atomic::TAtomic;
 use crate::ttype::atomic::scalar::TScalar;
 use crate::ttype::atomic::scalar::float::TFloat;
+use crate::ttype::atomic::scalar::string::TStringCasing;
 use crate::ttype::comparator::ComparisonResult;
 use crate::ttype::comparator::class_string_comparator;
 
@@ -28,7 +29,7 @@ pub fn is_contained_by(
         (TAtomic::Scalar(TScalar::Integer(ci)), TAtomic::Scalar(TScalar::Integer(ii))) if ci.contains(*ii) => {
             return true;
         }
-        (TAtomic::Scalar(TScalar::Float(TFloat::Float)), TAtomic::Scalar(TScalar::Float(_) | TScalar::Integer(_))) => {
+        (TAtomic::Scalar(TScalar::Float(TFloat::Float)), TAtomic::Scalar(TScalar::Integer(_))) if !inside_assertion => {
             return true;
         }
         (TAtomic::Scalar(TScalar::Float(container_float)), TAtomic::Scalar(TScalar::Float(input_float)))
@@ -63,8 +64,22 @@ pub fn is_contained_by(
                 return false;
             }
 
-            if c.is_lowercase() && !i.is_lowercase() {
-                return false;
+            if !i.is_empty() {
+                match c.casing {
+                    TStringCasing::Lowercase => {
+                        if !i.is_lowercase() {
+                            return false;
+                        }
+                    }
+                    TStringCasing::Uppercase => {
+                        if !i.is_uppercase() {
+                            return false;
+                        }
+                    }
+                    TStringCasing::Unspecified => {
+                        // No need to check the input casing if the container is unspecified.
+                    }
+                }
             }
 
             if c.is_unspecified_literal() && !i.is_literal_origin() {

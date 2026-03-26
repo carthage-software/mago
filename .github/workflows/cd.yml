@@ -12,6 +12,9 @@ env:
 permissions:
   contents: write
   discussions: write
+  id-token: write
+  attestations: write
+  packages: write
 
 jobs:
   crate_metadata:
@@ -53,8 +56,84 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ needs.crate_metadata.outputs.msrv }}
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: msrv-${{ needs.crate_metadata.outputs.msrv }}
+          cache-on-failure: true
+
       - name: Run tests
         run: cargo test --workspace --locked --all-targets
+
+  source_archive:
+    name: Create source code archives
+    runs-on: ubuntu-latest
+    needs: crate_metadata
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+
+      - name: Set version
+        id: version
+        run: echo "VERSION=${{ needs.crate_metadata.outputs.version }}" >> $GITHUB_OUTPUT
+
+      - name: Create source archives
+        id: source_package
+        run: |
+          VERSION="${{ steps.version.outputs.VERSION }}"
+
+          STAGING="${{ env.CICD_INTERMEDIATES_DIR }}/source"
+          mkdir -p "${STAGING}"
+          rsync -a --exclude='.git' --exclude="${{ env.CICD_INTERMEDIATES_DIR }}" . "${STAGING}/mago-${VERSION}/"
+          TAR_NAME="source-code.tar.gz"
+          tar -czf "${STAGING}/${TAR_NAME}" -C "${STAGING}" "mago-${VERSION}"
+          echo "TAR_NAME=${TAR_NAME}" >> $GITHUB_OUTPUT
+          echo "TAR_PATH=${STAGING}/${TAR_NAME}" >> $GITHUB_OUTPUT
+          ZIP_NAME="source-code.zip"
+          cd "${STAGING}"
+          zip -r "${ZIP_NAME}" "mago-${VERSION}"
+          cd -
+          echo "ZIP_NAME=${ZIP_NAME}" >> $GITHUB_OUTPUT
+          echo "ZIP_PATH=${STAGING}/${ZIP_NAME}" >> $GITHUB_OUTPUT
+
+      - name: Generate artifact attestation (source tar.gz)
+        uses: actions/attest-build-provenance@v3
+        with:
+          subject-path: ${{ steps.source_package.outputs.TAR_PATH }}
+
+      - name: Generate artifact attestation (source zip)
+        uses: actions/attest-build-provenance@v3
+        with:
+          subject-path: ${{ steps.source_package.outputs.ZIP_PATH }}
+
+      - name: "Artifact upload: source tar.gz"
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.source_package.outputs.TAR_NAME }}
+          path: ${{ steps.source_package.outputs.TAR_PATH }}
+
+      - name: "Artifact upload: source zip"
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.source_package.outputs.ZIP_NAME }}
+          path: ${{ steps.source_package.outputs.ZIP_PATH }}
+
+      - name: Check for release
+        id: is-release
+        run: |
+          unset IS_RELEASE ; if [[ $GITHUB_REF =~ ^refs/tags/[0-9].* ]]; then IS_RELEASE='true' ; fi
+          echo "IS_RELEASE=${IS_RELEASE}" >> $GITHUB_OUTPUT
+
+      - name: Publish source archives
+        uses: softprops/action-gh-release@v2
+        if: steps.is-release.outputs.IS_RELEASE
+        with:
+          files: |
+            ${{ steps.source_package.outputs.TAR_PATH }}
+            ${{ steps.source_package.outputs.ZIP_PATH }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   build:
     name: ${{ matrix.job.target }} (${{ matrix.job.os }})
@@ -67,20 +146,48 @@ jobs:
           # Each job in this matrix defines a build target. The following custom keys control the pipeline steps:
           # - `test: true`: Enables the test suite to be run for this build.
           # - `wasm: true`: Triggers an additional WebAssembly build and packaging for this release.
-          # - `debian-package: true`: Generates a Debian package for the release.
 
           # Tier 1 targets:
 
           ## Windows MSVC: x86_64
-          - { target: x86_64-pc-windows-msvc, os: windows-latest, test: true, pgo: true }
+          - {
+              target: x86_64-pc-windows-msvc,
+              os: windows-latest,
+              test: true,
+              pgo: true,
+            }
           ## macOS: aarch64, x86_64
-          - { target: aarch64-apple-darwin, os: macos-latest, test: true, pgo: true }
-          - { target: x86_64-apple-darwin, os: macos-latest, test: true, pgo: true }
+          - {
+              target: aarch64-apple-darwin,
+              os: macos-latest,
+              test: true,
+              pgo: true,
+            }
+          - {
+              target: x86_64-apple-darwin,
+              os: macos-latest,
+              test: true,
+              pgo: true,
+            }
           ## Linux: aarch64, x86_64
-          - { target: aarch64-unknown-linux-gnu, os: ubuntu-latest, test: true, debian-package: true }
-          - { target: aarch64-unknown-linux-musl, os: ubuntu-latest, test: true }
-          - { target: x86_64-unknown-linux-gnu, os: ubuntu-latest, test: true, wasm: true, debian-package: true }
-          - { target: x86_64-unknown-linux-musl, os: ubuntu-latest, test: true }
+          - { target: aarch64-unknown-linux-gnu, os: ubuntu-latest, test: true }
+          - {
+              target: aarch64-unknown-linux-musl,
+              os: ubuntu-latest,
+              test: true,
+            }
+          - {
+              target: x86_64-unknown-linux-gnu,
+              os: ubuntu-latest,
+              test: true,
+              wasm: true,
+            }
+          - {
+              target: x86_64-unknown-linux-musl,
+              os: ubuntu-latest,
+              test: true,
+              pgo: true,
+            }
 
           # Tier 2 targets:
 
@@ -88,17 +195,13 @@ jobs:
           - { target: x86_64-pc-windows-gnu, os: windows-latest }
           # FreeBSD: x86_64
           - { target: x86_64-unknown-freebsd, os: ubuntu-latest }
-          # Linux: arm, armv7, powerpc, powerpc64, powerpc64le, s390x
+          # Linux: arm, armv7
           - { target: arm-unknown-linux-gnueabi, os: ubuntu-latest }
           - { target: arm-unknown-linux-gnueabihf, os: ubuntu-latest }
           - { target: arm-unknown-linux-musleabi, os: ubuntu-latest }
           - { target: arm-unknown-linux-musleabihf, os: ubuntu-latest }
           - { target: armv7-unknown-linux-gnueabihf, os: ubuntu-latest }
           - { target: armv7-unknown-linux-musleabihf, os: ubuntu-latest }
-          - { target: powerpc-unknown-linux-gnu, os: ubuntu-latest }
-          - { target: powerpc64-unknown-linux-gnu, os: ubuntu-latest }
-          - { target: powerpc64le-unknown-linux-gnu, os: ubuntu-latest }
-          - { target: s390x-unknown-linux-gnu, os: ubuntu-latest }
 
     env:
       BUILD_CMD: cargo
@@ -122,6 +225,7 @@ jobs:
             arm-unknown-linux-*) sudo apt-get -y install gcc-arm-linux-gnueabihf ;;
             aarch64-unknown-linux-gnu) sudo apt-get -y install gcc-aarch64-linux-gnu ;;
             arm-unknown-linux-gnueabihf) sudo apt-get -y install gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf qemu-user ;;
+            x86_64-unknown-linux-musl) sudo apt-get -y install musl-tools ;;
           esac
 
       - name: install Rust toolchain
@@ -130,34 +234,47 @@ jobs:
           toolchain: ${{ needs.crate_metadata.outputs.msrv }}
           targets: ${{ matrix.job.target }}
 
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.job.target }}
+          cache-on-failure: true
+
+      - name: Cache cargo-pgo
+        if: matrix.job.pgo
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/cargo-pgo
+          key: cargo-pgo-${{ runner.os }}
+
       - name: install PGO tools
         if: matrix.job.pgo
         shell: bash
         run: |
           rustup component add llvm-tools-preview
-          cargo install cargo-pgo
+          if ! command -v cargo-pgo &>/dev/null; then
+            cargo install cargo-pgo
+          fi
 
       - name: install cross
-        if: startsWith(matrix.job.os, 'ubuntu')
+        if: startsWith(matrix.job.os, 'ubuntu') && !matrix.job.pgo
         uses: taiki-e/install-action@v2
         with:
           tool: cross
 
       - name: overwrite build command env variable (for cross)
-        if: startsWith(matrix.job.os, 'ubuntu')
+        if: startsWith(matrix.job.os, 'ubuntu') && !matrix.job.pgo
         shell: bash
         run: echo "BUILD_CMD=cross" >> $GITHUB_ENV
 
       - name: Configure cross-rs container image for glibc 2.17
-        if: contains(matrix.job.target, 'linux-gnu')
+        if: contains(matrix.job.target, 'linux-gnu') && !matrix.job.pgo
         shell: bash
         run: |
           IMAGE=""
           case ${{ matrix.job.target }} in
             x86_64-unknown-linux-gnu) IMAGE="quay.io/pypa/manylinux2014_x86_64" ;;
             aarch64-unknown-linux-gnu) IMAGE="quay.io/pypa/manylinux2014_aarch64" ;;
-            powerpc64le-unknown-linux-gnu) IMAGE="quay.io/pypa/manylinux2014_ppc64le" ;;
-            s390x-unknown-linux-gnu) IMAGE="quay.io/pypa/manylinux2014_s390x" ;;
           esac
           if [[ -n "$IMAGE" ]]; then
             echo "Using custom image for glibc 2.17: $IMAGE"
@@ -182,15 +299,22 @@ jobs:
         if: matrix.job.pgo
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.3'
+          php-version: "8.3"
           tools: composer
+
+      - name: Cache composer dependencies for PGO corpus
+        if: matrix.job.pgo
+        uses: actions/cache@v4
+        with:
+          path: corpus/vendor
+          key: composer-corpus-${{ hashFiles('corpus/composer.lock') }}
 
       - name: setup PHP corpus for PGO profiling
         if: matrix.job.pgo
         shell: bash
         run: |
           cd corpus
-          composer install --ignore-platform-reqs
+          composer update --ignore-platform-reqs
           cd ..
 
       - name: build
@@ -199,7 +323,7 @@ jobs:
           if [[ "${{ matrix.job.pgo }}" == "true" ]]; then
             cargo pgo build -- --target=${{ matrix.job.target }}
             cargo pgo run -- -- --workspace corpus/ analyze --reporting-format count || true
-            cargo pgo optimize -- build --target=${{ matrix.job.target }}
+            cargo pgo optimize build -- --target=${{ matrix.job.target }}
           else
             $BUILD_CMD build --locked --release --target=${{ matrix.job.target }}
           fi
@@ -231,10 +355,19 @@ jobs:
         shell: bash
         run: $BUILD_CMD test --workspace --locked --target=${{ matrix.job.target }}
 
+      - name: Cache wasm-pack
+        if: matrix.job.wasm && !startsWith(github.ref, 'refs/pull/')
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/wasm-pack
+          key: wasm-pack-0.13.1-${{ runner.os }}
+
       - name: Install wasm-pack and build WASM
         if: matrix.job.wasm && !startsWith(github.ref, 'refs/pull/')
         run: |
-          cargo install wasm-pack --version 0.13.1 --locked
+          if ! command -v wasm-pack &>/dev/null; then
+            cargo install wasm-pack --version 0.13.1 --locked
+          fi
           cd crates/wasm
           wasm-pack build -d pkg --release
           cd ../..
@@ -296,55 +429,16 @@ jobs:
 
           echo "WASM_PKG_PATH=${WASM_STAGING}/${WASM_PKG_NAME}" >> $GITHUB_OUTPUT
 
-      - name: create Debian package
-        id: debian-package
-        shell: bash
-        if: matrix.job.debian-package && !startsWith(github.ref, 'refs/pull/')
-        run: |
-          VERSION="${{ steps.version.outputs.VERSION }}"
-          TARGET="${{ matrix.job.target }}"
+      - name: Generate artifact attestation (binary)
+        uses: actions/attest-build-provenance@v3
+        with:
+          subject-path: ${{ steps.package.outputs.PKG_PATH }}
 
-          # Derive arch from target:
-          case "$TARGET" in
-            *x86_64*) DPKG_ARCH="amd64" ;;
-            *aarch64*|*arm64*) DPKG_ARCH="arm64" ;;
-            *arm*hf*) DPKG_ARCH="armhf" ;;
-            *arm*) DPKG_ARCH="armel" ;;
-            *powerpc64*) DPKG_ARCH="ppc64el" ;;
-            *powerpc*) DPKG_ARCH="powerpc" ;;
-            *s390x*) DPKG_ARCH="s390x" ;;
-          esac
-
-          DPKG_NAME="mago-${VERSION}-${TARGET}.deb"
-
-          echo "DPKG_NAME=${DPKG_NAME}" >> $GITHUB_OUTPUT
-
-          DPKG_STAGING="${{ env.CICD_INTERMEDIATES_DIR }}/debian-package"
-          DPKG_DIR="${DPKG_STAGING}/dpkg"
-          mkdir -p "${DPKG_DIR}"
-
-          install -Dm755 "${{ steps.bin.outputs.BIN_PATH }}" "${DPKG_DIR}/usr/bin/${{ steps.bin.outputs.BIN_NAME }}"
-
-          install -Dm644 "README.md" "${DPKG_DIR}/usr/share/doc/mago/README.md" || true
-          install -Dm644 "LICENSE-MIT" "${DPKG_DIR}/usr/share/doc/mago/LICENSE-MIT" || true
-          install -Dm644 "LICENSE-APACHE" "${DPKG_DIR}/usr/share/doc/mago/LICENSE-APACHE" || true
-
-          mkdir -p "${DPKG_DIR}/DEBIAN"
-          cat > "${DPKG_DIR}/DEBIAN/control" <<EOF
-          Package: mago
-          Version: ${VERSION}
-          Section: devel
-          Priority: optional
-          Maintainer: ${{ needs.crate_metadata.outputs.maintainer }}
-          Homepage: ${{ needs.crate_metadata.outputs.homepage }}
-          Architecture: ${DPKG_ARCH}
-          Description: Mago is a toolchain for PHP that aims to provide a set of tools to help developers write better code.
-          EOF
-
-          DPKG_PATH="${DPKG_STAGING}/${DPKG_NAME}"
-          echo "DPKG_PATH=${DPKG_PATH}" >> $GITHUB_OUTPUT
-
-          fakeroot dpkg-deb --build "${DPKG_DIR}" "${DPKG_PATH}"
+      - name: Generate artifact attestation (WASM)
+        if: matrix.job.wasm && !startsWith(github.ref, 'refs/pull/')
+        uses: actions/attest-build-provenance@v3
+        with:
+          subject-path: ${{ steps.wasm_package.outputs.WASM_PKG_PATH }}
 
       - name: "Artifact upload: tarball"
         uses: actions/upload-artifact@v4
@@ -359,13 +453,6 @@ jobs:
           name: ${{ steps.wasm_package.outputs.WASM_PKG_NAME }}
           path: ${{ steps.wasm_package.outputs.WASM_PKG_PATH }}
 
-      - name: "Artifact upload: Debian package"
-        uses: actions/upload-artifact@v4
-        if: steps.debian-package.outputs.DPKG_NAME
-        with:
-          name: ${{ steps.debian-package.outputs.DPKG_NAME }}
-          path: ${{ steps.debian-package.outputs.DPKG_PATH }}
-
       - name: check for release
         id: is-release
         shell: bash
@@ -379,7 +466,73 @@ jobs:
         with:
           files: |
             ${{ steps.package.outputs.PKG_PATH }}
-            ${{ steps.debian-package.outputs.DPKG_PATH }}
             ${{ steps.wasm_package.outputs.WASM_PKG_PATH }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  docker:
+    name: Build and push container image
+    runs-on: ubuntu-latest
+    needs: [crate_metadata, build]
+    if: startsWith(github.ref, 'refs/tags/')
+    permissions:
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: mago-${{ needs.crate_metadata.outputs.version }}-x86_64-unknown-linux-musl.tar.gz
+          path: /tmp/x86_64
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: mago-${{ needs.crate_metadata.outputs.version }}-aarch64-unknown-linux-musl.tar.gz
+          path: /tmp/aarch64
+
+      - name: Extract binaries
+        run: |
+          VERSION="${{ needs.crate_metadata.outputs.version }}"
+          tar xzf /tmp/x86_64/mago-${VERSION}-x86_64-unknown-linux-musl.tar.gz -C /tmp/x86_64 --strip-components=1
+          tar xzf /tmp/aarch64/mago-${VERSION}-aarch64-unknown-linux-musl.tar.gz -C /tmp/aarch64 --strip-components=1
+          chmod +x /tmp/x86_64/mago /tmp/aarch64/mago
+
+      - name: Build and push (amd64)
+        uses: docker/build-push-action@v6
+        with:
+          context: /tmp/x86_64
+          file: ./Dockerfile
+          push: true
+          platforms: linux/amd64
+          tags: ghcr.io/carthage-software/mago:${{ needs.crate_metadata.outputs.version }}-amd64
+
+      - name: Build and push (arm64)
+        uses: docker/build-push-action@v6
+        with:
+          context: /tmp/aarch64
+          file: ./Dockerfile
+          push: true
+          platforms: linux/arm64
+          tags: ghcr.io/carthage-software/mago:${{ needs.crate_metadata.outputs.version }}-arm64
+
+      - name: Create and push multi-arch manifest
+        run: |
+          VERSION="${{ needs.crate_metadata.outputs.version }}"
+          MAJOR="${VERSION%%.*}"
+          MINOR="${VERSION%.*}"
+          docker buildx imagetools create \
+            --tag ghcr.io/carthage-software/mago:${VERSION} \
+            --tag ghcr.io/carthage-software/mago:${MINOR} \
+            --tag ghcr.io/carthage-software/mago:${MAJOR} \
+            --tag ghcr.io/carthage-software/mago:latest \
+            ghcr.io/carthage-software/mago:${VERSION}-amd64 \
+            ghcr.io/carthage-software/mago:${VERSION}-arm64

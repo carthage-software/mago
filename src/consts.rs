@@ -1,10 +1,30 @@
 use std::path::PathBuf;
 use std::sync::LazyLock;
 
-use num_cpus::get as get_logical_cpus;
 use tracing::error;
 
 use mago_php_version::PHPVersion;
+
+/// Targets for which official pre-built binaries are provided.
+///
+/// This list must match the build matrix in `.github/workflows/cd.yml`.
+pub const SUPPORTED_TARGETS: &[&str] = &[
+    "x86_64-pc-windows-msvc",
+    "aarch64-apple-darwin",
+    "x86_64-apple-darwin",
+    "aarch64-unknown-linux-gnu",
+    "aarch64-unknown-linux-musl",
+    "x86_64-unknown-linux-gnu",
+    "x86_64-unknown-linux-musl",
+    "x86_64-pc-windows-gnu",
+    "x86_64-unknown-freebsd",
+    "arm-unknown-linux-gnueabi",
+    "arm-unknown-linux-gnueabihf",
+    "arm-unknown-linux-musleabi",
+    "arm-unknown-linux-musleabihf",
+    "armv7-unknown-linux-gnueabihf",
+    "armv7-unknown-linux-musleabihf",
+];
 
 /// The current version of mago.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -39,6 +59,9 @@ pub const ENVIRONMENT_PREFIX: &str = "MAGO";
 /// The name of the configuration file for mago.
 pub const CONFIGURATION_FILE_NAME: &str = "mago";
 
+/// The name of the distributed configuration file for mago.
+pub const CONFIGURATION_DIST_FILE_NAME: &str = "mago.dist";
+
 /// The name of `composer.json` file.
 pub const COMPOSER_JSON_FILE: &str = "composer.json";
 
@@ -61,7 +84,15 @@ pub const MINIMUM_PHP_VERSION: PHPVersion = PHPVersion::PHP80;
 pub const MAXIMUM_PHP_VERSION: PHPVersion = PHPVersion::NEXT;
 
 /// The number of logical CPUs on the system.
-pub static LOGICAL_CPUS: LazyLock<usize> = LazyLock::new(get_logical_cpus);
+pub static LOGICAL_CPUS: LazyLock<usize> = LazyLock::new(|| {
+    std::thread::available_parallelism().map(|n| n.get()).unwrap_or_else(|e| {
+        error!("Failed to get the number of logical CPUs: {}", e);
+        error!("Falling back to 1 logical CPU. This might result in slower performance.");
+        error!("Need help? Open an issue at {}.", ISSUE_URL);
+
+        1
+    })
+});
 
 /// The current working directory.
 pub static CURRENT_DIR: LazyLock<PathBuf> = LazyLock::new(|| {

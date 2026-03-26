@@ -1,9 +1,10 @@
 use std::borrow::Cow;
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
-use ahash::HashMap;
+use foldhash::HashMap;
 
-use ahash::HashSet;
+use foldhash::HashSet;
 use mago_atom::Atom;
 
 use mago_codex::metadata::class_like::ClassLikeMetadata;
@@ -22,6 +23,7 @@ use mago_codex::ttype::atomic::object::named::TNamedObject;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::class_like_string::TClassLikeString;
 use mago_codex::ttype::cast::cast_atomic_to_callable;
+use mago_codex::ttype::combiner::CombinerOptions;
 use mago_codex::ttype::comparator::ComparisonResult;
 use mago_codex::ttype::comparator::atomic_comparator;
 use mago_codex::ttype::comparator::union_comparator;
@@ -70,27 +72,27 @@ fn infer_templates_from_input_and_container_types(
         return;
     }
 
-    let (generic_container_parts, concrete_container_parts) = container_type.types.iter().partition::<Vec<_>, _>(|t| {
-        matches!(
-            t,
+    let (generic_container_parts, concrete_container_parts) =
+        container_type.types.iter().partition::<Vec<_>, _>(|t| match t {
             TAtomic::GenericParameter(_)
-                | TAtomic::Array(_)
-                | TAtomic::Iterable(_)
-                | TAtomic::Object(TObject::Named(_))
-                | TAtomic::Callable(_)
-                | TAtomic::Scalar(TScalar::ClassLikeString(_))
-        )
-    });
+            | TAtomic::Array(_)
+            | TAtomic::Iterable(_)
+            | TAtomic::Callable(_)
+            | TAtomic::Scalar(TScalar::ClassLikeString(_)) => true,
+            TAtomic::Object(TObject::Named(named)) => named.type_parameters.as_ref().is_some_and(|p| !p.is_empty()),
+            _ => false,
+        });
 
     let has_generic_class_string = generic_container_parts
         .iter()
         .any(|t| matches!(t, TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::Generic { .. }))));
 
+    let has_bare_generic_parameter = generic_container_parts.iter().any(|t| matches!(t, TAtomic::GenericParameter(_)));
     let residual_input_types = input_type
         .types
         .iter()
         .filter(|argument_atomic| {
-            !argument_atomic.is_empty_array()
+            (!argument_atomic.is_empty_array() || has_bare_generic_parameter)
                 && !concrete_container_parts.iter().any(|container_atomic| {
                     if has_generic_class_string
                         && matches!(argument_atomic, TAtomic::Scalar(TScalar::ClassLikeString(_)))
@@ -118,6 +120,7 @@ fn infer_templates_from_input_and_container_types(
     };
 
     let mut potential_template_violations = HashMap::default();
+    let generic_container_parts_len = generic_container_parts.len();
 
     for container_atomic_part in &generic_container_parts {
         match container_atomic_part {
@@ -172,7 +175,7 @@ fn infer_templates_from_input_and_container_types(
                                                     input_element.clone(),
                                                     input_value_type.as_ref(),
                                                     context.codebase,
-                                                    false,
+                                                    CombinerOptions::default(),
                                                 ));
                                             }
                                         }
@@ -335,7 +338,7 @@ fn infer_templates_from_input_and_container_types(
                                                     input_item.clone(),
                                                     input_value_type.as_ref(),
                                                     context.codebase,
-                                                    false,
+                                                    CombinerOptions::default(),
                                                 ));
                                             }
                                         }
@@ -624,14 +627,14 @@ fn infer_templates_from_input_and_container_types(
                         for generic_parameter in generic_parameters {
                             has_direct_generic = true;
 
-                            let Some((template_name, _)) = container_meta.template_types.get(index) else {
+                            let Some((template_name, _)) = container_meta.template_types.get_index(index) else {
                                 continue;
                             };
 
                             if let Some(inferred_bound) = get_specialized_template_type(
                                 context.codebase,
-                                template_name,
-                                &container_meta.name,
+                                *template_name,
+                                container_meta.name,
                                 input_meta,
                                 input_obj.get_type_parameters(),
                             ) {
@@ -733,12 +736,14 @@ fn infer_templates_from_input_and_container_types(
                     continue;
                 }
 
-                if let Some(template_types) = template_result.template_types.get(parameter_name) {
-                    for (_, template_type) in template_types {
+                if !has_generic_parameter
+                    && let Some(template_types) = template_result.template_types.get(parameter_name)
+                {
+                    for template in template_types {
                         if !union_comparator::is_contained_by(
                             context.codebase,
                             &lower_bound_type,
-                            template_type,
+                            &template.constraint,
                             false,
                             false,
                             false,
@@ -747,7 +752,7 @@ fn infer_templates_from_input_and_container_types(
                             violations.push(TemplateInferenceViolation {
                                 template_name: *parameter_name,
                                 inferred_bound: lower_bound_type.clone(),
-                                constraint: template_type.clone(),
+                                constraint: template.constraint.clone(),
                             });
                         }
                     }
@@ -796,15 +801,39 @@ fn infer_templates_from_input_and_container_types(
                 &mut ComparisonResult::default(),
             )
         {
+            // when the input type doesn't satisfy the template constraint and this is the only
+            // generic container part that could accept it, report a constraint violation.
+            //
+            // skip when:
+            // - there are other generic parts (e.g., in `class-string<T>|T`) that might match
+            // - the constraint is mixed (accepts anything)
+            // - the input is a generic parameter (constraint will be checked at the call site)
+            if generic_container_parts_len == 1
+                && !container_generic.constraint.is_mixed()
+                && !residual_input_type.is_generic_parameter()
+            {
+                violations.push(TemplateInferenceViolation {
+                    template_name: *template_parameter_name,
+                    inferred_bound: residual_input_type.clone(),
+                    constraint: container_generic.constraint.as_ref().clone(),
+                });
+            }
+
             continue;
         }
 
         let mut has_violation = false;
+        let mut constraint_has_unresolved_templates = false;
 
         if let Some(template_types) = template_result.template_types.get(template_parameter_name) {
-            for (_, template_type) in template_types {
+            for template in template_types {
                 let resolved_template_type =
-                    inferred_type_replacer::replace(template_type, template_result, context.codebase);
+                    inferred_type_replacer::replace(&template.constraint, template_result, context.codebase);
+
+                if resolved_template_type.has_template_types() {
+                    constraint_has_unresolved_templates = true;
+                    continue;
+                }
 
                 if !union_comparator::is_contained_by(
                     context.codebase,
@@ -827,8 +856,19 @@ fn infer_templates_from_input_and_container_types(
             }
         }
 
-        if has_violation {
+        if has_violation && !constraint_has_unresolved_templates {
             continue;
+        }
+
+        if container_generic.constraint.has_template_types() {
+            infer_templates_from_input_and_container_types(
+                context,
+                &container_generic.constraint,
+                &residual_input_type,
+                template_result,
+                InferenceOptions { infer_only_if_new: true, ..options },
+                violations,
+            );
         }
 
         insert_bound_type(
@@ -842,7 +882,28 @@ fn infer_templates_from_input_and_container_types(
         );
     }
 
-    for ((template_parameter_name, defining_entity), (inferred_type, constraint, _)) in potential_template_violations {
+    for ((template_parameter_name, defining_entity), (inferred_type, constraint, _container_generic)) in
+        potential_template_violations
+    {
+        let re_resolved_constraint = inferred_type_replacer::replace(&constraint, template_result, context.codebase);
+        if re_resolved_constraint.has_template_types() {
+            continue;
+        }
+
+        if re_resolved_constraint != constraint
+            && union_comparator::is_contained_by(
+                context.codebase,
+                &inferred_type,
+                &re_resolved_constraint,
+                false,
+                false,
+                false,
+                &mut ComparisonResult::default(),
+            )
+        {
+            continue;
+        }
+
         let is_unresolved = template_result
             .lower_bounds
             .get(&template_parameter_name)
@@ -853,14 +914,14 @@ fn infer_templates_from_input_and_container_types(
             violations.push(TemplateInferenceViolation {
                 template_name: template_parameter_name,
                 inferred_bound: inferred_type,
-                constraint: constraint.clone(),
+                constraint: re_resolved_constraint.clone(),
             });
 
             insert_bound_type(
                 template_result,
                 template_parameter_name,
                 &defining_entity,
-                constraint,
+                re_resolved_constraint,
                 StandinOptions { appearance_depth: 1, ..Default::default() },
                 options.argument_offset,
                 options.source_span,
@@ -881,8 +942,8 @@ pub fn infer_templates_for_method_call<'ctx>(
         for (template_name, _) in &declaring_class_like_metadata.template_types {
             let template_type = get_specialized_template_type(
                 context.codebase,
-                template_name,
-                &declaring_class_like_metadata.name,
+                *template_name,
+                declaring_class_like_metadata.name,
                 method_target_context.class_like_metadata,
                 object_type.get_type_parameters(),
             );
@@ -900,8 +961,8 @@ pub fn infer_templates_for_method_call<'ctx>(
     for (template_name, where_constraint) in &method_metadata.where_constraints {
         let Some(actual_type) = get_specialized_template_type(
             context.codebase,
-            template_name,
-            &declaring_class_like_metadata.name,
+            *template_name,
+            declaring_class_like_metadata.name,
             method_target_context.class_like_metadata,
             object_type.get_type_parameters(),
         ) else {
@@ -1059,7 +1120,7 @@ fn resolve_atomic_unbound_templates(atomic: &TAtomic) -> TAtomic {
             let new_array = match array {
                 TArray::List(list) => {
                     let mut new_list = list.clone();
-                    *new_list.element_type = resolve_unbound_templates_to_constraints(&list.element_type);
+                    new_list.element_type = Arc::new(resolve_unbound_templates_to_constraints(&list.element_type));
                     if let Some(known_elements) = &list.known_elements {
                         let new_elements: BTreeMap<usize, (bool, TUnion)> = known_elements
                             .iter()
@@ -1073,8 +1134,8 @@ fn resolve_atomic_unbound_templates(atomic: &TAtomic) -> TAtomic {
                     let mut new_keyed = keyed.clone();
                     if let Some(params) = &keyed.parameters {
                         new_keyed.parameters = Some((
-                            Box::new(resolve_unbound_templates_to_constraints(&params.0)),
-                            Box::new(resolve_unbound_templates_to_constraints(&params.1)),
+                            Arc::new(resolve_unbound_templates_to_constraints(&params.0)),
+                            Arc::new(resolve_unbound_templates_to_constraints(&params.1)),
                         ));
                     }
                     if let Some(known_items) = &keyed.known_items {
@@ -1094,7 +1155,7 @@ fn resolve_atomic_unbound_templates(atomic: &TAtomic) -> TAtomic {
                 TCallable::Signature(sig) => {
                     let mut new_sig = sig.clone();
                     if let Some(return_type) = &sig.return_type {
-                        new_sig.return_type = Some(Box::new(resolve_unbound_templates_to_constraints(return_type)));
+                        new_sig.return_type = Some(Arc::new(resolve_unbound_templates_to_constraints(return_type)));
                     }
                     TCallable::Signature(new_sig)
                 }

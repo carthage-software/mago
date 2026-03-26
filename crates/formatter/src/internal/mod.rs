@@ -13,6 +13,8 @@ use mago_syntax::ast::Trivia;
 
 use crate::document::group::GroupIdentifier;
 use crate::document::group::GroupIdentifierBuilder;
+use crate::internal::comment::placement::Comments;
+use crate::internal::comment::placement::place_comments;
 use crate::internal::format::assignment::AssignmentAlignment;
 use crate::settings::FormatSettings;
 
@@ -31,7 +33,7 @@ pub struct ArgumentState {
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct ParameterState {
-    force_break: bool,
+    list_group_id: Option<GroupIdentifier>,
 }
 
 /// A region of source code that should not be formatted.
@@ -109,6 +111,7 @@ pub struct FormatterState<'ctx, 'arena> {
     stack: BumpVec<'arena, Node<'arena, 'arena>>,
     all_comments: &'arena [Trivia<'arena>],
     next_comment_index: usize,
+    placed_comments: Comments,
     ignore_regions: &'arena [IgnoreRegion],
     ignore_next_markers: &'arena [IgnoreNextMarker],
     next_ignore_next_index: usize,
@@ -122,6 +125,7 @@ pub struct FormatterState<'ctx, 'arena> {
     is_in_inlined_binary_chain: bool,
     halted_compilation: bool,
     alignment_context: Option<AssignmentAlignment>,
+    member_access_chain_group_id: Option<GroupIdentifier>,
 }
 
 impl<'ctx, 'arena> FormatterState<'ctx, 'arena> {
@@ -143,6 +147,8 @@ impl<'ctx, 'arena> FormatterState<'ctx, 'arena> {
         let (ignore_regions, ignore_next_markers) =
             build_ignore_markers(arena, all_comments, program.source_text.len() as u32);
 
+        let placed_comments = place_comments(program.source_text, Node::Program(program), all_comments);
+
         Self {
             arena,
             file,
@@ -152,6 +158,7 @@ impl<'ctx, 'arena> FormatterState<'ctx, 'arena> {
             stack: BumpVec::new_in(arena),
             all_comments,
             next_comment_index: 0,
+            placed_comments,
             ignore_regions,
             ignore_next_markers,
             next_ignore_next_index: 0,
@@ -165,6 +172,7 @@ impl<'ctx, 'arena> FormatterState<'ctx, 'arena> {
             halted_compilation: false,
             in_script_terminating_statement: false,
             alignment_context: None,
+            member_access_chain_group_id: None,
         }
     }
 
@@ -178,6 +186,36 @@ impl<'ctx, 'arena> FormatterState<'ctx, 'arena> {
     #[inline]
     pub fn set_alignment_context(&mut self, context: Option<AssignmentAlignment>) {
         self.alignment_context = context;
+    }
+
+    /// Get the current next comment index.
+    #[inline]
+    pub(crate) fn get_next_comment_index(&self) -> usize {
+        self.next_comment_index
+    }
+
+    /// Set the next comment index (used when formatting sorted members).
+    #[inline]
+    pub(crate) fn set_next_comment_index(&mut self, index: usize) {
+        self.next_comment_index = index;
+    }
+
+    /// Get the all_comments slice.
+    #[inline]
+    pub(crate) fn all_comments(&self) -> &'arena [Trivia<'arena>] {
+        self.all_comments
+    }
+
+    /// Take the member access chain group ID, resetting it to None.
+    #[inline]
+    pub(crate) fn take_member_access_chain_group_id(&mut self) -> Option<GroupIdentifier> {
+        self.member_access_chain_group_id.take()
+    }
+
+    /// Set the member access chain group ID.
+    #[inline]
+    pub(crate) fn set_member_access_chain_group_id(&mut self, id: GroupIdentifier) {
+        self.member_access_chain_group_id = Some(id);
     }
 
     fn next_id(&mut self) -> GroupIdentifier {
@@ -412,14 +450,18 @@ impl<'ctx, 'arena> FormatterState<'ctx, 'arena> {
         if matches!(c, b'\r') {
             let next_index = if backwards { start_index_usize - 1 } else { start_index_usize + 1 };
             let next_c = if backwards {
-                self.source_text[..=next_index].bytes().next_back()
+                self.source_text.get(..=next_index).and_then(|s| s.bytes().next_back())
             } else {
-                self.source_text[next_index..].bytes().next()
-            }?;
+                self.source_text.get(next_index..).and_then(|s| s.bytes().next())
+            };
 
-            if matches!(next_c, b'\n') {
+            if matches!(next_c, Some(b'\n')) {
+                // \r\n (CRLF) — skip both
                 return Some(if backwards { start_index - 2 } else { start_index + 2 });
             }
+
+            // bare \r — still a line terminator (classic Mac OS line ending)
+            return Some(if backwards { start_index - 1 } else { start_index + 1 });
         }
 
         Some(start_index)
@@ -442,14 +484,27 @@ impl<'ctx, 'arena> FormatterState<'ctx, 'arena> {
         let mut remaining = slice;
 
         while !remaining.is_empty() {
-            if let Some(pos) = remaining.find("\r\n") {
+            // find the earliest line terminator: \r\n, \n, or bare \r
+            let next_break = remaining.bytes().enumerate().find_map(|(i, b)| {
+                if b == b'\r' {
+                    // check for \r\n (CRLF) — consume both bytes
+                    if remaining.as_bytes().get(i + 1) == Some(&b'\n') {
+                        Some((i, 2))
+                    } else {
+                        // bare \r — still a line terminator
+                        Some((i, 1))
+                    }
+                } else if b == b'\n' {
+                    Some((i, 1))
+                } else {
+                    None
+                }
+            });
+
+            if let Some((pos, skip)) = next_break {
                 lines.push(&remaining[..pos]);
-                remaining = &remaining[pos + 2..];
-            } else if let Some(pos) = remaining.find('\n') {
-                lines.push(&remaining[..pos]);
-                remaining = &remaining[pos + 1..];
+                remaining = &remaining[pos + skip..];
             } else {
-                // No more newlines
                 if !remaining.is_empty() {
                     lines.push(remaining);
                 }

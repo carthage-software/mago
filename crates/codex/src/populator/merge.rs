@@ -60,6 +60,7 @@ pub fn merge_metadata_from_parent_class_like(
     metadata.all_parent_interfaces.extend(parent_metadata.all_parent_interfaces.iter().copied());
     metadata.used_traits.extend(parent_metadata.used_traits.iter().copied());
     metadata.invalid_dependencies.extend(parent_metadata.invalid_dependencies.iter().copied());
+    metadata.mixins.extend(parent_metadata.mixins.iter().cloned());
 
     if let Some(inheritors) = &parent_metadata.permitted_inheritors {
         metadata.permitted_inheritors.get_or_insert_default().extend(inheritors.iter().copied());
@@ -125,6 +126,7 @@ pub fn merge_metadata_from_trait(
 
     metadata.all_parent_interfaces.extend(trait_metadata.direct_parent_interfaces.iter().copied());
     metadata.invalid_dependencies.extend(trait_metadata.invalid_dependencies.iter().copied());
+    metadata.mixins.extend(trait_metadata.mixins.iter().cloned());
     metadata.add_used_traits(trait_metadata.used_traits.iter().copied());
 
     extend_template_parameters(metadata, trait_metadata);

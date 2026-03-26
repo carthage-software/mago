@@ -29,15 +29,15 @@ impl MethodIdentifier {
     /// Returns the `Atom` for the class name.
     #[inline]
     #[must_use]
-    pub const fn get_class_name(&self) -> &Atom {
-        &self.class_name
+    pub const fn get_class_name(&self) -> Atom {
+        self.class_name
     }
 
     /// Returns the `Atom` for the method name.
     #[inline]
     #[must_use]
-    pub const fn get_method_name(&self) -> &Atom {
-        &self.method_name
+    pub const fn get_method_name(&self) -> Atom {
+        self.method_name
     }
 
     /// Converts the identifier to a human-readable string "`ClassName::methodName`".

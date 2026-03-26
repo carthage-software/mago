@@ -62,6 +62,28 @@ impl LintRule for PreferAnonymousMigrationRule {
                 use Illuminate\Database\Schema\Blueprint;
                 use Illuminate\Support\Facades\Schema;
 
+                return new class extends Migration {
+                    public function up(): void {
+                        Schema::create('flights', function (Blueprint $table) {
+                            $table->id();
+                            $table->string('name');
+                            $table->string('airline');
+                            $table->timestamps();
+                        });
+                    }
+
+                    public function down(): void {
+                        Schema::drop('flights');
+                    }
+                };
+            "},
+            bad_example: indoc! {r"
+                <?php
+
+                use Illuminate\Database\Migrations\Migration;
+                use Illuminate\Database\Schema\Blueprint;
+                use Illuminate\Support\Facades\Schema;
+
                 class MyMigration extends Migration {
                     public function up(): void {
                         Schema::create('flights', function (Blueprint $table) {
@@ -79,28 +101,6 @@ impl LintRule for PreferAnonymousMigrationRule {
 
                 return new MyMigration();
             "},
-            bad_example: indoc! {r"
-                <?php
-
-                use Illuminate\Database\Migrations\Migration;
-                use Illuminate\Database\Schema\Blueprint;
-                use Illuminate\Support\Facades\Schema;
-
-                return new class extends Migration {
-                    public function up(): void {
-                        Schema::create('flights', function (Blueprint $table) {
-                            $table->id();
-                            $table->string('name');
-                                $table->string('airline');
-                                $table->timestamps();
-                        });
-                    }
-
-                    public function down(): void {
-                        Schema::drop('flights');
-                    }
-                };
-            "},
             category: Category::BestPractices,
             requirements: RuleRequirements::Integration(Integration::Laravel),
         };
@@ -109,7 +109,7 @@ impl LintRule for PreferAnonymousMigrationRule {
     }
 
     fn targets() -> &'static [NodeKind] {
-        const TARGETS: &[NodeKind] = &[NodeKind::AnonymousClass];
+        const TARGETS: &[NodeKind] = &[NodeKind::Class];
 
         TARGETS
     }
@@ -119,7 +119,7 @@ impl LintRule for PreferAnonymousMigrationRule {
     }
 
     fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
-        let Node::AnonymousClass(class) = node else {
+        let Node::Class(class) = node else {
             return;
         };
 
@@ -127,17 +127,14 @@ impl LintRule for PreferAnonymousMigrationRule {
             return;
         };
 
-        let mut is_migration = false;
-        for extended_type in &extends.types {
-            let name = ctx.lookup_name(extended_type);
+        // A class can only extend one parent, so check the first (and only) type
+        let Some(parent) = extends.types.nodes.first() else {
+            return;
+        };
 
-            if name.eq_ignore_ascii_case("Illuminate\\Database\\Migrations\\Migration") {
-                is_migration = true;
-                break;
-            }
-        }
+        let name = ctx.lookup_name(parent);
 
-        if !is_migration {
+        if !name.eq_ignore_ascii_case("Illuminate\\Database\\Migrations\\Migration") {
             return;
         }
 
@@ -150,5 +147,79 @@ impl LintRule for PreferAnonymousMigrationRule {
                 .with_note("Anonymous classes are the recommended approach for Laravel migrations.")
                 .with_help("Refactor the migration to use an anonymous class by removing the class name."),
         );
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_lint_failure;
+    use crate::test_lint_success;
+
+    test_lint_success! {
+        name = anonymous_migration,
+        rule = PreferAnonymousMigrationRule,
+        code = r#"
+            <?php
+
+            use Illuminate\Database\Migrations\Migration;
+
+            return new class extends Migration {
+                public function up(): void {}
+                public function down(): void {}
+            };
+        "#
+    }
+
+    test_lint_success! {
+        name = class_not_extending_migration,
+        rule = PreferAnonymousMigrationRule,
+        code = r#"
+            <?php
+
+            class MyService {
+                public function run(): void {}
+            }
+        "#
+    }
+
+    test_lint_success! {
+        name = class_extending_other,
+        rule = PreferAnonymousMigrationRule,
+        code = r#"
+            <?php
+
+            class MyController extends BaseController {
+                public function index(): void {}
+            }
+        "#
+    }
+
+    test_lint_failure! {
+        name = named_class_extends_migration,
+        rule = PreferAnonymousMigrationRule,
+        code = r#"
+            <?php
+
+            use Illuminate\Database\Migrations\Migration;
+
+            class CreateUsersTable extends Migration {
+                public function up(): void {}
+                public function down(): void {}
+            }
+        "#
+    }
+
+    test_lint_failure! {
+        name = named_class_extends_fqn_migration,
+        rule = PreferAnonymousMigrationRule,
+        code = r#"
+            <?php
+
+            class CreatePostsTable extends \Illuminate\Database\Migrations\Migration {
+                public function up(): void {}
+                public function down(): void {}
+            }
+        "#
     }
 }

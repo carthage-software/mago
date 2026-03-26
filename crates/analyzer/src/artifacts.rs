@@ -1,7 +1,7 @@
 use std::rc::Rc;
 
-use ahash::HashMap;
-use ahash::HashSet;
+use foldhash::HashMap;
+use foldhash::HashSet;
 use mago_atom::Atom;
 use mago_atom::AtomMap;
 use mago_atom::AtomSet;
@@ -14,12 +14,25 @@ use mago_span::HasSpan;
 use crate::context::scope::case_scope::CaseScope;
 use crate::context::scope::loop_scope::LoopScope;
 
+/// Represents scope information extracted from a `Closure::bind()` or `Closure::bindTo()` call.
+/// This is used to pass the bound class scope to closure/arrow function analysis.
+#[derive(Debug, Clone)]
+pub struct ClosureBindScope {
+    /// The class name for the bound scope (from the newScope argument).
+    pub class_name: Option<Atom>,
+    /// Whether the closure has `$this` bound (newThis argument is non-null object).
+    pub has_this: bool,
+}
+
 #[derive(Debug, Clone)]
 pub struct AnalysisArtifacts {
     pub expression_types: HashMap<(u32, u32), Rc<TUnion>>,
     pub if_true_assertions: HashMap<(u32, u32), AtomMap<AssertionSet>>,
     pub if_false_assertions: HashMap<(u32, u32), AtomMap<AssertionSet>>,
+    pub true_branch_only_assertions: HashMap<(u32, u32), AtomMap<AssertionSet>>,
     pub inferred_return_types: Vec<Rc<TUnion>>,
+    pub inferred_yield_key_types: Vec<TUnion>,
+    pub inferred_yield_value_types: Vec<TUnion>,
     pub symbol_references: SymbolReferences,
     pub loop_scope: Option<LoopScope>,
     pub case_scopes: Vec<CaseScope>,
@@ -29,6 +42,7 @@ pub struct AnalysisArtifacts {
     pub method_calls_this_methods: HashMap<(Atom, Atom), HashSet<Atom>>,
     pub method_calls_parent_constructor: HashMap<(Atom, Atom), bool>,
     pub method_calls_parent_initializer: HashMap<(Atom, Atom), Atom>,
+    pub closure_bind_scope: Option<ClosureBindScope>,
 }
 
 impl AnalysisArtifacts {
@@ -36,8 +50,11 @@ impl AnalysisArtifacts {
         Self {
             expression_types: HashMap::default(),
             inferred_return_types: Vec::new(),
+            inferred_yield_key_types: Vec::new(),
+            inferred_yield_value_types: Vec::new(),
             if_true_assertions: HashMap::default(),
             if_false_assertions: HashMap::default(),
+            true_branch_only_assertions: HashMap::default(),
             symbol_references: SymbolReferences::new(),
             case_scopes: Vec::new(),
             loop_scope: None,
@@ -47,6 +64,7 @@ impl AnalysisArtifacts {
             method_calls_this_methods: HashMap::default(),
             method_calls_parent_constructor: HashMap::default(),
             method_calls_parent_initializer: HashMap::default(),
+            closure_bind_scope: None,
         }
     }
 

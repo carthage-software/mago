@@ -44,12 +44,12 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for StaticMethodCall<'arena> {
             }
         }
 
-        if block_context.collect_initializations
+        if block_context.flags.collect_initializations()
             && let Expression::Parent(_) = self.class
             && let ClassLikeMemberSelector::Identifier(method_ident) = &self.method
         {
             if method_ident.value.eq_ignore_ascii_case("__construct") {
-                block_context.calls_parent_constructor = true;
+                block_context.flags.set_calls_parent_constructor(true);
             } else {
                 let method_name = mago_atom::ascii_lowercase_atom(method_ident.value);
                 if context.settings.class_initializers.contains(&method_name) {
@@ -81,8 +81,8 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for StaticMethodCall<'arena> {
 
             invocation_targets.push(InvocationTarget::FunctionLike {
                 identifier: FunctionLikeIdentifier::Method(
-                    *resolved_method.method_identifier.get_class_name(),
-                    *resolved_method.method_identifier.get_method_name(),
+                    resolved_method.method_identifier.get_class_name(),
+                    resolved_method.method_identifier.get_method_name(),
                 ),
                 metadata: method_metadata,
                 inferred_return_type: None,
@@ -90,6 +90,8 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for StaticMethodCall<'arena> {
                 span: self.span(),
             });
         }
+
+        let class_has_nullsafe_null = artifacts.get_expression_type(self.class).is_some_and(|t| t.has_nullsafe_null());
 
         analyze_invocation_targets(
             context,
@@ -102,7 +104,9 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for StaticMethodCall<'arena> {
             None,
             method_resolution.has_invalid_target,
             method_resolution.encountered_mixed,
-            expression_is_nullsafe(self.class),
+            expression_is_nullsafe(self.class) || method_resolution.encountered_null,
+            class_has_nullsafe_null,
+            method_resolution.all_methods_non_nullable_return,
         )?;
 
         if context.plugin_registry.has_static_method_call_hooks() {

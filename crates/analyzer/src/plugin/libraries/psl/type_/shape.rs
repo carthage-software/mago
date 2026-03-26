@@ -1,6 +1,7 @@
 //! `Psl\Type\shape()` return type provider.
 
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
 use mago_atom::atom;
 use mago_codex::ttype::atomic::TAtomic;
@@ -90,9 +91,9 @@ impl FunctionReturnTypeProvider for ShapeProvider {
                     atom("Psl\\Type\\TypeInterface"),
                     Some(vec![TUnion::from_atomic(TAtomic::Array(TArray::List(TList {
                         element_type: if allows_unknown_elements {
-                            Box::new(get_mixed())
+                            Arc::new(get_mixed())
                         } else {
-                            Box::new(get_never())
+                            Arc::new(get_never())
                         },
                         known_count: Some(known_elements.len()),
                         non_empty: !known_elements.is_empty(),
@@ -119,7 +120,7 @@ impl FunctionReturnTypeProvider for ShapeProvider {
                     atom("Psl\\Type\\TypeInterface"),
                     Some(vec![TUnion::from_atomic(TAtomic::Array(TArray::Keyed(TKeyedArray {
                         parameters: if allows_unknown_elements {
-                            Some((Box::new(get_arraykey()), Box::new(get_mixed())))
+                            Some((Arc::new(get_arraykey()), Arc::new(get_mixed())))
                         } else {
                             None
                         },

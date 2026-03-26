@@ -4,97 +4,67 @@ final class HashContext
 {
     private function __construct() {}
 
-    public function __serialize(): array
-    {
-    }
+    public function __serialize(): array {}
 
-    public function __unserialize(array $data): void
-    {
-    }
+    public function __unserialize(array $data): void {}
 
-    public function __debugInfo(): array
-    {
-    }
+    public function __debugInfo(): array {}
 }
 
 /**
  * @pure
  */
-function hash(string $algo, string $data, bool $binary = false, array $options = []): string
-{
-}
+function hash(string $algo, string $data, bool $binary = false, array $options = []): string {}
 
 /**
  * @pure
  */
-function hash_equals(string $known_string, string $user_string): bool
-{
-}
+function hash_equals(string $known_string, string $user_string): bool {}
 
 /**
  * @pure
  */
-function hash_file(string $algo, string $filename, bool $binary = false, array $options = []): string|false
-{
-}
+function hash_file(string $algo, string $filename, bool $binary = false, array $options = []): string|false {}
 
 /**
  * @pure
  */
-function hash_hmac(string $algo, string $data, string $key, bool $binary = false): string
-{
-}
+function hash_hmac(string $algo, string $data, string $key, bool $binary = false): string {}
 
 /**
  * @pure
  */
-function hash_hmac_file(string $algo, string $filename, string $key, bool $binary = false): string|false
-{
-}
+function hash_hmac_file(string $algo, string $filename, string $key, bool $binary = false): string|false {}
 
 /**
  * @pure
  */
-function hash_init(string $algo, int $flags = 0, string $key = '', array $options = []): HashContext
-{
-}
+function hash_init(string $algo, int $flags = 0, string $key = '', array $options = []): HashContext {}
 
-function hash_update(HashContext $context, string $data): bool
-{
-}
+function hash_update(HashContext $context, string $data): bool {}
 
 /**
  * @param resource $stream
  */
-function hash_update_stream(HashContext $context, $stream, int $length = -1): int
-{
-}
+function hash_update_stream(HashContext $context, $stream, int $length = -1): int {}
 
 /**
  * @param ?resource $stream_context
  */
-function hash_update_file(HashContext $context, string $filename, $stream_context = null): bool
-{
-}
+function hash_update_file(HashContext $context, string $filename, $stream_context = null): bool {}
 
-function hash_final(HashContext $context, bool $binary = false): string
-{
-}
+function hash_final(HashContext $context, bool $binary = false): string {}
 
 /**
  * @pure
  */
-function hash_copy(HashContext $context): HashContext
-{
-}
+function hash_copy(HashContext $context): HashContext {}
 
 /**
  * @return non-empty-list<non-empty-string>
  * @pure
  */
-function hash_algos(): array
-{
-}
+function hash_algos(): array {}
 
 /**
  * @param non-empty-string $key
@@ -102,18 +72,14 @@ function hash_algos(): array
  *
  * @pure
  */
-function hash_hkdf(string $algo, string $key, int $length = 0, string $info = '', string $salt = ''): string
-{
-}
+function hash_hkdf(string $algo, string $key, int $length = 0, string $info = '', string $salt = ''): string {}
 
 /**
  * @return non-empty-list<non-empty-string>
  *
  * @pure
  */
-function hash_hmac_algos(): array
-{
-}
+function hash_hmac_algos(): array {}
 
 /**
  * @param int<1, max> $iterations
@@ -129,8 +95,7 @@ function hash_pbkdf2(
     int $length = 0,
     bool $binary = false,
     array $options = [],
-): string {
-}
+): string {}
 
 /**
  * @param int<0, max> $length
@@ -138,17 +103,13 @@ function hash_pbkdf2(
  * @deprecated
  * @pure
  */
-function mhash_keygen_s2k(int $algo, string $password, string $salt, int $length): string|false
-{
-}
+function mhash_keygen_s2k(int $algo, string $password, string $salt, int $length): string|false {}
 
 /**
  * @deprecated
  * @pure
  */
-function mhash_get_block_size(int $algo): int|false
-{
-}
+function mhash_get_block_size(int $algo): int|false {}
 
 /**
  * @return string|false
@@ -156,9 +117,7 @@ function mhash_get_block_size(int $algo): int|false
  * @deprecated
  * @pure
  */
-function mhash_get_hash_name(int $algo): string|false
-{
-}
+function mhash_get_hash_name(int $algo): string|false {}
 
 /**
  * @return int<0, max>
@@ -166,17 +125,13 @@ function mhash_get_hash_name(int $algo): string|false
  * @deprecated
  * @pure
  */
-function mhash_count(): int
-{
-}
+function mhash_count(): int {}
 
 /**
  * @deprecated
  * @pure
  */
-function mhash(int $algo, string $data, null|string $key = null): string|false
-{
-}
+function mhash(int $algo, string $data, ?string $key = null): string|false {}
 
 const HASH_HMAC = 1;
 

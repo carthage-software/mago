@@ -10,7 +10,6 @@ use crate::ast::ast::expression::Expression;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
-#[repr(u8)]
 pub enum PartialApplication<'arena> {
     Function(FunctionPartialApplication<'arena>),
     Method(MethodPartialApplication<'arena>),

@@ -8,11 +8,14 @@ title: Analyzer configuration Reference
 
 ```toml
 [analyzer]
-# Disable a specific issue category
-redundancy-issues = false
-
 # Ignore a specific error code across the whole project
 ignore = ["mixed-argument"]
+
+# Ignore an error code only in specific paths
+ignore = [
+  "mixed-argument",
+  { code = "missing-return-type", in = "tests/" },
+]
 
 # Use a baseline file to ignore existing issues
 baseline = "analyzer-baseline.toml"
@@ -23,9 +26,10 @@ baseline = "analyzer-baseline.toml"
 | Option             | Type       | Default   | Description                                                |
 | :----------------- | :--------- | :-------- | :--------------------------------------------------------- |
 | `excludes`         | `string[]` | `[]`      | A list of paths or glob patterns to exclude from analysis. |
-| `ignore`           | `string[]` | `[]`      | A list of specific issue codes to ignore globally.         |
+| `ignore`           | `(string \| object)[]` | `[]` | Issue codes to ignore, optionally scoped to specific paths. See [Path-scoped ignoring](#path-scoped-ignoring). |
 | `baseline`         | `string`   | `null`    | Path to a baseline file to ignore listed issues. When specified, the analyzer will use this file as the default baseline, eliminating the need to pass `--baseline` on every run. Command-line `--baseline` arguments will override this setting. |
 | `baseline-variant` | `string`   | `"loose"` | The baseline format variant to use when generating new baselines. Options: `"loose"` (count-based, resilient to line changes) or `"strict"` (exact line matching). See [Baseline Variants](/fundamentals/baseline#baseline-variants) for details. |
+| `minimum-fail-level` | `string` | `"error"` | Set the minimum issue severity that causes the command to exit with a non-zero status. Options: `"note"`, `"help"`, `"warning"`, `"error"`. Can be overridden by the `--minimum-fail-level` CLI flag. |
 
 :::tip Tool-Specific Excludes
 The `excludes` option here is **additive** to the global `source.excludes` defined in the `[source]` section of your configuration. Files excluded globally will always be excluded from analysis, and this option allows you to exclude additional files from the analyzer specifically.
@@ -38,6 +42,46 @@ excludes = ["cache/**"]  # Excluded from ALL tools
 [analyzer]
 excludes = ["tests/**/*.php"]  # Additionally excluded from analyzer only
 ```
+:::
+
+### Path-scoped ignoring
+
+The `ignore` option accepts three formats:
+
+**Plain string** — ignore a code everywhere:
+```toml
+ignore = ["missing-return-type"]
+```
+
+**Object with single path** — ignore a code only in a specific directory or file:
+```toml
+ignore = [
+  { code = "missing-return-type", in = "tests/" },
+]
+```
+
+**Object with multiple paths** — ignore a code in several locations:
+```toml
+ignore = [
+  { code = "missing-return-type", in = ["tests/", "src/Legacy/"] },
+]
+```
+
+All three formats can be mixed in the same `ignore` list:
+```toml
+ignore = [
+  "mixed-argument",
+  { code = "missing-return-type", in = "tests/" },
+  { code = "unused-parameter", in = ["tests/", "src/Generated/"] },
+]
+```
+
+Paths are matched as prefixes against relative file paths from the project root. Both `"tests"` and `"tests/"` will match all files under the `tests` directory.
+
+:::tip
+Path-scoped ignoring is different from `excludes`:
+- `excludes` removes files from analysis entirely — they won't be parsed for type information.
+- `ignore` with `in` still analyzes the files but suppresses specific issue codes in the output.
 :::
 
 ## Feature flags
@@ -63,13 +107,15 @@ These flags control specific, powerful analysis capabilities.
 | `trust-existence-checks`              | `true`  | When `true`, narrows types based on `method_exists()`, `property_exists()`, `function_exists()`, and `defined()` checks. |
 | `check-property-initialization`       | `false` | When `true`, checks that typed properties are initialized in constructors or class initializers.      |
 | `check-use-statements`                | `false` | When `true`, reports use statements that import non-existent classes, functions, or constants.        |
+| `enforce-class-finality`              | `false` | When `true`, reports classes that are not `final`, `abstract`, or annotated with `@api` and have no children. |
+| `require-api-or-internal`             | `false` | When `true`, requires abstract classes, interfaces, and traits to have `@api` or `@internal` annotations. |
 
 ## Property initialization
 
 These options control how the analyzer checks property initialization.
 
-| Option                           | Type       | Default | Description                                                                         |
-| :------------------------------- | :--------- | :------ | :---------------------------------------------------------------------------------- |
+| Option                           | Type       | Default | Description                                                                          |
+| :------------------------------- | :--------- | :------ | :----------------------------------------------------------------------------------- |
 | `check-property-initialization`  | `bool`     | `false` | Enable/disable property initialization checking entirely.                            |
 | `class-initializers`             | `string[]` | `[]`    | Method names treated as class initializers (like `__construct`).                     |
 
@@ -176,11 +222,12 @@ Plugins extend the analyzer with specialized type information for libraries and 
 
 ### Available plugins
 
-| Plugin ID   | Aliases                                    | Default | Description                                                    |
-| :---------- | :----------------------------------------- | :------ | :------------------------------------------------------------- |
-| `stdlib`    | `standard`, `std`, `php-stdlib`            | Enabled | Type providers for PHP built-in functions (`strlen`, `array_*`, `json_*`, etc.) |
-| `psl`       | `php-standard-library`, `azjezz-psl`       | Disabled| Type providers for [azjezz/psl](https://github.com/azjezz/psl) package |
-| `flow-php`  | `flow`, `flow-etl`                         | Disabled| Type providers for [flow-php/etl](https://github.com/flow-php/etl) package |
+| Plugin ID       | Aliases                                    | Default  | Description                                                                      |
+| :-------------- | :----------------------------------------- | :------- | :------------------------------------------------------------------------------- |
+| `stdlib`        | `standard`, `std`, `php-stdlib`            | Enabled  | Type providers for PHP built-in functions (`strlen`, `array_*`, `json_*`, etc.)  |
+| `psl`           | `php-standard-library`, `azjezz-psl`       | Disabled | Type providers for [php-standard-library](https://github.com/php-standard-library/php-standard-library) package           |
+| `flow-php`      | `flow`, `flow-etl`                         | Disabled | Type providers for [flow-php/etl](https://github.com/flow-php/etl) package       |
+| `psr-container` | `psr-11`                                   | Disabled | Type providers for [psr/container](https://github.com/php-fig/container) package |
 
 ### How plugins work
 
@@ -207,7 +254,7 @@ By default, the `stdlib` plugin is enabled:
 
 ```toml
 [analyzer]
-plugins = ["psl", "flow-php"]
+plugins = ["psl", "flow-php", "psr-container"]
 ```
 
 #### Disabling all plugins
@@ -249,6 +296,8 @@ find-unused-parameters = true
 check-missing-type-hints = true
 check-closure-missing-type-hints = true
 check-arrow-function-missing-type-hints = true
+enforce-class-finality = true
+require-api-or-internal = true
 
 # Enable strict checks
 strict-list-index-checks = true
@@ -309,6 +358,8 @@ function process(object $obj): mixed
 | `check-missing-override` | `true` | Reports missing `#[Override]` attributes on overriding methods (PHP 8.3+). |
 | `find-unused-parameters` | `true` | Reports unused function/method parameters. |
 | `no-boolean-literal-comparison` | `true` | Disallows comparisons like `$a === true` or `$b == false`. |
+| `enforce-class-finality` | `true` | Reports classes not declared `final`, `abstract`, or annotated with `@api`. |
+| `require-api-or-internal` | `true` | Requires abstract classes, interfaces, and traits to have `@api` or `@internal`. |
 
 #### Exception handling
 
@@ -326,6 +377,8 @@ For a more lenient analysis (useful for legacy codebases or gradual adoption), u
 check-missing-type-hints = false
 strict-list-index-checks = false
 no-boolean-literal-comparison = false
+enforce-class-finality = false
+require-api-or-internal = false
 
 # Enable lenient behaviors
 allow-possibly-undefined-array-keys = true
@@ -350,6 +403,13 @@ The analyzer uses internal thresholds to balance analysis depth against performa
 | `negation-complexity-threshold`       | `u16` | `4096`  | Maximum cumulative complexity when negating formulas.                    |
 | `consensus-limit-threshold`           | `u16` | `256`   | Upper limit for consensus optimization passes.                           |
 | `formula-size-threshold`              | `u16` | `512`   | Maximum logical formula size before simplification is skipped.           |
+| `string-combination-threshold`        | `u16` | `128`   | Maximum literal strings to track before generalizing to `string`.        |
+| `integer-combination-threshold`       | `u16` | `128`   | Maximum literal integers to track before generalizing to `int`.          |
+| `array-combination-threshold`         | `u16` | `128`   | Maximum array elements to track individually before generalizing.        |
+
+:::tip Backward compatibility
+The `string-concat-combination-threshold` option is still supported as an alias for `string-combination-threshold`.
+:::
 
 ### When to adjust thresholds
 
@@ -367,6 +427,9 @@ The analyzer converts type constraints into CNF (Conjunctive Normal Form) logica
 - **Negation complexity**: Limits expansion when negating formulas (e.g., for `else` branches). Deeply nested conditions may hit this limit.
 - **Consensus limit**: Controls an optimization pass that detects logical tautologies. Higher values may find more simplifications.
 - **Formula size**: Overall limit on formula complexity before the analyzer falls back to simpler inference.
+- **String combination**: Limits the number of literal string values tracked during type combination. When combining many different string literals (e.g., in large arrays or switch statements), the analyzer generalizes to `string` after this threshold to prevent O(n²) complexity.
+- **Integer combination**: Limits the number of literal integer values tracked during type combination. When exceeded, the analyzer generalizes to `int`.
+- **Array combination**: Limits the number of array elements tracked individually. When building array types through repeated push operations (`$arr[] = ...`), elements beyond this threshold are generalized to prevent memory explosion.
 
 ### Example configurations
 
@@ -381,6 +444,9 @@ disjunction-complexity-threshold = 1024
 negation-complexity-threshold = 1024
 consensus-limit-threshold = 64
 formula-size-threshold = 128
+string-combination-threshold = 64
+integer-combination-threshold = 64
+array-combination-threshold = 64
 ```
 
 #### Deep analysis (slower, more precise)
@@ -394,8 +460,11 @@ disjunction-complexity-threshold = 8192
 negation-complexity-threshold = 8192
 consensus-limit-threshold = 512
 formula-size-threshold = 1024
+string-combination-threshold = 256
+integer-combination-threshold = 256
+array-combination-threshold = 256
 ```
 
 :::warning Performance impact
-Increasing these thresholds can significantly impact analysis time on codebases with complex conditional logic. Test on your codebase before deploying to CI.
+Increasing these thresholds can significantly impact analysis time on codebases with complex conditional logic or files with thousands of array operations. Test on your codebase before deploying to CI.
 :::

@@ -8,10 +8,10 @@ final class Entity
 {
     public string $id = '';
     public string $name = '';
-    protected string $internalId = '';
-    protected int $version = 0;
-    private string $secret = '';
-    private bool $dirty = false;
+    protected string $_internalId = '';
+    protected int $_version = 0;
+    private string $_secret = '';
+    private bool $_dirty = false;
 }
 
 // Non-final class for unsealed array tests
@@ -19,7 +19,7 @@ class BaseModel
 {
     public string $id = '';
     protected int $createdAt = 0;
-    private bool $initialized = false;
+    private bool $_initialized = false;
 }
 
 /**
@@ -32,18 +32,18 @@ function accepts_public_entity_props(array $_): void
 }
 
 /**
- * protected-properties-of<Entity> = array{internalId: string, version: int}
+ * protected-properties-of<Entity> = array{_internalId: string, _version: int}
  *
- * @param array{internalId: string, version: int} $_
+ * @param array{_internalId: string, _version: int} $_
  */
 function accepts_protected_entity_props(array $_): void
 {
 }
 
 /**
- * private-properties-of<Entity> = array{secret: string, dirty: bool}
+ * private-properties-of<Entity> = array{_secret: string, _dirty: bool}
  *
- * @param array{secret: string, dirty: bool} $_
+ * @param array{_secret: string, _dirty: bool} $_
  */
 function accepts_private_entity_props(array $_): void
 {
@@ -72,7 +72,7 @@ function get_public_entity_props(): array
  */
 function get_protected_entity_props(): array
 {
-    return ['internalId' => 'internal', 'version' => 1];
+    return ['_internalId' => 'internal', '_version' => 1];
 }
 
 /**
@@ -80,7 +80,7 @@ function get_protected_entity_props(): array
  */
 function get_private_entity_props(): array
 {
-    return ['secret' => 'shh', 'dirty' => false];
+    return ['_secret' => 'shh', '_dirty' => false];
 }
 
 /**

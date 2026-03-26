@@ -36,6 +36,7 @@ use colored::Colorize;
 use mago_database::DatabaseReader;
 use mago_linter::registry::RuleRegistry;
 use mago_linter::rule::AnyRule;
+use mago_linter::rule_meta::RuleEntry;
 use mago_orchestrator::service::lint::LintMode;
 use mago_reporting::Level;
 
@@ -43,6 +44,7 @@ use crate::commands::args::baseline_reporting::BaselineReportingArgs;
 use crate::config::Configuration;
 use crate::error::Error;
 use crate::utils::create_orchestrator;
+use crate::utils::git;
 
 /// Command for linting PHP source code.
 ///
@@ -153,8 +155,17 @@ pub struct LintCommand {
     /// Provide a comma-separated list of rule codes to run only those rules.
     /// This overrides your mago.toml configuration and is useful for targeted
     /// analysis or testing specific rules.
-    #[arg(short, long, conflicts_with = "semantics")]
+    #[arg(short, long, conflicts_with = "semantics", num_args = 1.., value_delimiter = ',')]
     pub only: Vec<String>,
+
+    /// Only lint files that are staged in git.
+    ///
+    /// This flag is designed for git pre-commit hooks. It will find all PHP files
+    /// currently staged for commit and lint only those files.
+    ///
+    /// Fails if not in a git repository.
+    #[arg(long, conflicts_with_all = ["path", "list_rules", "explain"])]
+    pub staged: bool,
 
     #[clap(flatten)]
     pub baseline_reporting: BaselineReportingArgs,
@@ -189,10 +200,23 @@ impl LintCommand {
     /// - **Explain Mode** (`--explain`): Displays detailed rule documentation and exits
     /// - **List Mode** (`--list-rules`): Shows all enabled rules and exits
     /// - **Empty Database**: Logs a message and exits successfully if no files found
-    pub fn execute(self, configuration: Configuration, color_choice: ColorChoice) -> Result<ExitCode, Error> {
+    pub fn execute(self, mut configuration: Configuration, color_choice: ColorChoice) -> Result<ExitCode, Error> {
+        let editor_url = configuration.editor_url.take();
         let mut orchestrator = create_orchestrator(&configuration, color_choice, self.pedantic, true, false);
         orchestrator.add_exclude_patterns(configuration.linter.excludes.iter());
-        if !self.path.is_empty() {
+        if self.staged {
+            let staged_paths = git::get_staged_file_paths(&configuration.source.workspace)?;
+            if staged_paths.is_empty() {
+                tracing::info!("No staged files to lint.");
+                return Ok(ExitCode::SUCCESS);
+            }
+
+            if self.baseline_reporting.reporting.fix {
+                git::ensure_staged_files_are_clean(&configuration.source.workspace, &staged_paths)?;
+            }
+
+            orchestrator.set_source_paths(staged_paths.iter().map(|p| p.to_string_lossy().to_string()));
+        } else if !self.path.is_empty() {
             orchestrator.set_source_paths(self.path.iter().map(|p| p.to_string_lossy().to_string()));
         }
 
@@ -230,9 +254,21 @@ impl LintCommand {
 
         let baseline = configuration.linter.baseline.as_deref();
         let baseline_variant = configuration.linter.baseline_variant;
-        let processor = self.baseline_reporting.get_processor(color_choice, baseline, baseline_variant);
+        let processor = self.baseline_reporting.get_processor(
+            color_choice,
+            baseline,
+            baseline_variant,
+            editor_url,
+            configuration.linter.minimum_fail_level,
+        );
 
-        processor.process_issues(&orchestrator, &mut database, issues)
+        let (exit_code, changed_file_ids) = processor.process_issues(&orchestrator, &mut database, issues)?;
+
+        if self.staged && !changed_file_ids.is_empty() {
+            git::stage_files(&configuration.source.workspace, &database, changed_file_ids)?;
+        }
+
+        Ok(exit_code)
     }
 }
 
@@ -340,8 +376,9 @@ pub fn list_rules(rules: &[AnyRule], json: bool) -> Result<ExitCode, Error> {
     }
 
     if json {
-        let metas: Vec<_> = rules.iter().map(|r| r.meta()).collect();
-        println!("{}", serde_json::to_string_pretty(&metas)?);
+        let entries: Vec<_> = rules.iter().map(|r| RuleEntry { meta: r.meta(), level: r.default_level() }).collect();
+
+        println!("{}", serde_json::to_string_pretty(&entries)?);
 
         return Ok(ExitCode::SUCCESS);
     }

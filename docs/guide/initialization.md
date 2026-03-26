@@ -51,6 +51,7 @@ If no `composer.json` is found, or if you choose to configure things manually, t
   - These will be saved to the `excludes` configuration option
 - **PHP version** - The PHP version your project targets
 - **Linter integrations** - Framework-specific rules to enable (Symfony, Laravel, etc.)
+- **Formatter configuration** - You can choose to use a preset (Default, PSR-12, Laravel, or Drupal) or customize individual formatter settings
 
 Once the process is complete, you'll have a `mago.toml` file in your project root. For more details on the available options in this file, see the [Configuration Overview](/guide/configuration.md).
 

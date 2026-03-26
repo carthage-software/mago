@@ -528,51 +528,37 @@ namespace {
         /**
          * @return void
          */
-        public function __destruct()
-        {
-        }
+        public function __destruct() {}
 
         /**
          * @return bool
          */
-        public function isConnected()
-        {
-        }
+        public function isConnected() {}
 
         /**
          * @return void
          */
-        public function close()
-        {
-        }
+        public function close() {}
 
         /**
          * @return void
          */
-        public function reconnect()
-        {
-        }
+        public function reconnect() {}
 
         /**
          * @return int|null null if not enabled
          */
-        public function shmKey()
-        {
-        }
+        public function shmKey() {}
 
         /**
          * @return string
          */
-        public function error()
-        {
-        }
+        public function error() {}
 
         /**
          * @return int
          */
-        public function errorno()
-        {
-        }
+        public function errorno() {}
 
         /**
          * @param string $ns
@@ -584,9 +570,7 @@ namespace {
          *
          * @no-named-arguments
          */
-        public function initKey($ns, $set, $pk, $is_digest = false)
-        {
-        }
+        public function initKey($ns, $set, $pk, $is_digest = false) {}
 
         /**
          * @param string $ns
@@ -597,9 +581,7 @@ namespace {
          *
          * @no-named-arguments
          */
-        public function getKeyDigest($ns, $set, $pk)
-        {
-        }
+        public function getKeyDigest($ns, $set, $pk) {}
 
         /**
          * @param array $key
@@ -611,9 +593,7 @@ namespace {
          *
          * @no-named-arguments
          */
-        public function put(array $key, array $bins, $ttl = 0, array $options = [])
-        {
-        }
+        public function put(array $key, array $bins, $ttl = 0, array $options = []) {}
 
         /**
          * @param array $key
@@ -625,9 +605,7 @@ namespace {
          *
          * @no-named-arguments
          */
-        public function get(array $key, &$record, $select = null, array $options = [])
-        {
-        }
+        public function get(array $key, &$record, $select = null, array $options = []) {}
 
         /**
          * @param array $key
@@ -638,9 +616,7 @@ namespace {
          *
          * @no-named-arguments
          */
-        public function exists(array $key, &$metadata, array $options = [])
-        {
-        }
+        public function exists(array $key, &$metadata, array $options = []) {}
 
         /**
          * @param array $key
@@ -651,9 +627,7 @@ namespace {
          *
          * @no-named-arguments
          */
-        public function touch(array $key, $ttl = 0, array $options = [])
-        {
-        }
+        public function touch(array $key, $ttl = 0, array $options = []) {}
 
         /**
          * @param array $key
@@ -663,9 +637,7 @@ namespace {
          *
          * @no-named-arguments
          */
-        public function remove(array $key, array $options = [])
-        {
-        }
+        public function remove(array $key, array $options = []) {}
 
         /**
          * @param array $key
@@ -676,9 +648,7 @@ namespace {
          *
          * @no-named-arguments
          */
-        public function removeBin(array $key, array $bins, array $options = [])
-        {
-        }
+        public function removeBin(array $key, array $bins, array $options = []) {}
 
         /**
          * @param string $ns
@@ -690,9 +660,7 @@ namespace {
          *
          * @no-named-arguments
          */
-        public function truncate($ns, $set, $nanos, array $options = [])
-        {
-        }
+        public function truncate($ns, $set, $nanos, array $options = []) {}
 
         /**
          * @param array $key
@@ -704,9 +672,7 @@ namespace {
          *
          * @no-named-arguments
          */
-        public function increment(array $key, $bin, $offset, array $options = [])
-        {
-        }
+        public function increment(array $key, $bin, $offset, array $options = []) {}
 
         /**
          * @param array $key
@@ -718,9 +684,7 @@ namespace {
          *
          * @no-named-arguments
          */
-        public function append(array $key, $bin, $value, array $options = [])
-        {
-        }
+        public function append(array $key, $bin, $value, array $options = []) {}
 
         /**
          * @param array $key
@@ -732,9 +696,7 @@ namespace {
          *
          * @no-named-arguments
          */
-        public function prepend(array $key, $bin, $value, array $options = [])
-        {
-        }
+        public function prepend(array $key, $bin, $value, array $options = []) {}
 
         /**
          * @param array $key
@@ -746,9 +708,7 @@ namespace {
          *
          * @no-named-arguments
          */
-        public function operate(array $key, array $operations, &$returned, array $options = [])
-        {
-        }
+        public function operate(array $key, array $operations, &$returned, array $options = []) {}
 
         /**
          * @param array $key
@@ -760,9 +720,7 @@ namespace {
          *
          * @no-named-arguments
          */
-        public function operateOrdered(array $key, array $operations, &$returned, array $options = [])
-        {
-        }
+        public function operateOrdered(array $key, array $operations, &$returned, array $options = []) {}
 
         /**
          * @param array  $key
@@ -774,9 +732,7 @@ namespace {
          *
          * @no-named-arguments
          */
-        public function listSize(array $key, $bin, &$count, array $options = [])
-        {
-        }
+        public function listSize(array $key, $bin, &$count, array $options = []) {}
 
         /**
          * @param array  $key
@@ -788,9 +744,7 @@ namespace {
          *
          * @no-named-arguments
          */
-        public function listAppend(array $key, $bin, $value, array $options = [])
-        {
-        }
+        public function listAppend(array $key, $bin, $value, array $options = []) {}
 
         /**
          * @param array  $key
@@ -802,9 +756,7 @@ namespace {
          *
          * @no-named-arguments
          */
-        public function listMerge(array $key, $bin, array $items, array $options = [])
-        {
-        }
+        public function listMerge(array $key, $bin, array $items, array $options = []) {}
 
         /**
          * @param array  $key
@@ -817,9 +769,7 @@ namespace {
          *
          * @no-named-arguments
          */
-        public function listInsert(array $key, $bin, $index, $value, array $options = [])
-        {
-        }
+        public function listInsert(array $key, $bin, $index, $value, array $options = []) {}
 
         /**
          * @param array  $key
@@ -832,9 +782,7 @@ namespace {
          *
          * @no-named-arguments
          */
-        public function listInsertItems(array $key, $bin, $index, array $elements, array $options = [])
-        {
-        }
+        public function listInsertItems(array $key, $bin, $index, array $elements, array $options = []) {}
 
         /**
          * @param array  $key
@@ -847,9 +795,7 @@ namespace {
          *
          * @no-named-arguments
          */
-        public function listPop(array $key, $bin, $index, &$element, array $options = [])
-        {
-        }
+        public function listPop(array $key, $bin, $index, &$element, array $options = []) {}
 
         /**
          * @param array  $key
@@ -863,9 +809,7 @@ namespace {
          *
          * @no-named-arguments
          */
-        public function listPopRange(array $key, $bin, $index, $count, &$elements, array $options = [])
-        {
-        }
+        public function listPopRange(array $key, $bin, $index, $count, &$elements, array $options = []) {}
 
         /**
          * @param array  $key
@@ -877,9 +821,7 @@ namespace {
          *
          * @no-named-arguments
          */
-        public function listRemove(array $key, $bin, $index, array $options = [])
-        {
-        }
+        public function listRemove(array $key, $bin, $index, array $options = []) {}
 
         /**
          * @param array  $key
@@ -892,9 +834,7 @@ namespace {
          *
          * @no-named-arguments
          */
-        public function listRemoveRange(array $key, $bin, $index, $count, array $options = [])
-        {
-        }
+        public function listRemoveRange(array $key, $bin, $index, $count, array $options = []) {}
 
         /**
          * @param array  $key
@@ -907,9 +847,7 @@ namespace {
          *
          * @no-named-arguments
          */
-        public function listTrim(array $key, $bin, $index, $count, array $options = [])
-        {
-        }
+        public function listTrim(array $key, $bin, $index, $count, array $options = []) {}
 
         /**
          * @param array  $key
@@ -920,9 +858,7 @@ namespace {
          *
          * @no-named-arguments
          */
-        public function listClear(array $key, $bin, array $options = [])
-        {
-        }
+        public function listClear(array $key, $bin, array $options = []) {}
 
         /**
          * @param array  $key
@@ -935,9 +871,7 @@ namespace {
          *
          * @no-named-arguments
          */
-        public function listSet(array $key, $bin, $index, $value, array $options = [])
-        {
-        }
+        public function listSet(array $key, $bin, $index, $value, array $options = []) {}
 
         /**
          * @param array  $key
@@ -950,9 +884,7 @@ namespace {
          *
          * @no-named-arguments
          */
-        public function listGet(array $key, $bin, $index, array &$element, array $options = [])
-        {
-        }
+        public function listGet(array $key, $bin, $index, array &$element, array $options = []) {}
 
         /**
          * @param array  $key
@@ -966,9 +898,7 @@ namespace {
          *
          * @no-named-arguments
          */
-        public function listGetRange(array $key, $bin, $index, $count, &$elements, array $options = [])
-        {
-        }
+        public function listGetRange(array $key, $bin, $index, $count, &$elements, array $options = []) {}
 
         /**
          * @param array $keys
@@ -978,9 +908,7 @@ namespace {
          *
          * @return int
          */
-        public function getMany(array $keys, &$records, array $select = [], array $options = [])
-        {
-        }
+        public function getMany(array $keys, &$records, array $select = [], array $options = []) {}
 
         /**
          * @param array $keys
@@ -991,9 +919,7 @@ namespace {
          *
          * @no-named-arguments
          */
-        public function existsMany(array $keys, array &$metadata, array $options = [])
-        {
-        }
+        public function existsMany(array $keys, array &$metadata, array $options = []) {}
 
         /**
          * @param string   $ns
@@ -1006,9 +932,7 @@ namespace {
          *
          * @no-named-arguments
          */
-        public function scan($ns, $set, callable $record_cb, array $select = [], array $options = [])
-        {
-        }
+        public function scan($ns, $set, callable $record_cb, array $select = [], array $options = []) {}
 
         /**
          * @param string    $ns
@@ -1022,9 +946,7 @@ namespace {
          *
          * @no-named-arguments
          */
-        public function query($ns, $set, array $where, callable $record_cb, array $select = [], array $options = [])
-        {
-        }
+        public function query($ns, $set, array $where, callable $record_cb, array $select = [], array $options = []) {}
 
         /**
          * @param string     $bin
@@ -1034,9 +956,7 @@ namespace {
          *
          * @no-named-arguments
          */
-        public static function predicateEquals($bin, $val)
-        {
-        }
+        public static function predicateEquals($bin, $val) {}
 
         /**
          * @param string $bin
@@ -1047,9 +967,7 @@ namespace {
          *
          * @no-named-arguments
          */
-        public static function predicateBetween($bin, $min, $max)
-        {
-        }
+        public static function predicateBetween($bin, $min, $max) {}
 
         /**
          * @param string     $bin
@@ -1060,9 +978,7 @@ namespace {
          *
          * @no-named-arguments
          */
-        public static function predicateContains($bin, $index_type, $val)
-        {
-        }
+        public static function predicateContains($bin, $index_type, $val) {}
 
         /**
          * @param string $bin
@@ -1074,9 +990,7 @@ namespace {
          *
          * @no-named-arguments
          */
-        public static function predicateRange($bin, $index_type, $min, $max)
-        {
-        }
+        public static function predicateRange($bin, $index_type, $min, $max) {}
 
         /**
          * @param string $bin
@@ -1086,9 +1000,7 @@ namespace {
          *
          * @no-named-arguments
          */
-        public static function predicateGeoContainsGeoJSONPoint($bin, $point)
-        {
-        }
+        public static function predicateGeoContainsGeoJSONPoint($bin, $point) {}
 
         /**
          * @param string $bin
@@ -1099,9 +1011,7 @@ namespace {
          *
          * @no-named-arguments
          */
-        public static function predicateGeoContainsPoint($bin, $long, $lat)
-        {
-        }
+        public static function predicateGeoContainsPoint($bin, $long, $lat) {}
 
         /**
          * @param string $bin
@@ -1111,9 +1021,7 @@ namespace {
          *
          * @no-named-arguments
          */
-        public static function predicateGeoWithinGeoJSONRegion($bin, $region)
-        {
-        }
+        public static function predicateGeoWithinGeoJSONRegion($bin, $region) {}
 
         /**
          * @param string $bin
@@ -1125,9 +1033,7 @@ namespace {
          *
          * @no-named-arguments
          */
-        public static function predicateGeoWithinRadius($bin, $long, $lat, $radiusMeter)
-        {
-        }
+        public static function predicateGeoWithinRadius($bin, $long, $lat, $radiusMeter) {}
 
         /**
          * @param array $options
@@ -1136,9 +1042,7 @@ namespace {
          *
          * @no-named-arguments
          */
-        public function jobInfo($job_id, $job_type, array &$info, array $options = [])
-        {
-        }
+        public function jobInfo($job_id, $job_type, array &$info, array $options = []) {}
 
         /**
          * @param string $path
@@ -1150,9 +1054,7 @@ namespace {
          *
          * @no-named-arguments
          */
-        public function register($path, $module, $language = Aerospike::UDF_TYPE_LUA, $options = [])
-        {
-        }
+        public function register($path, $module, $language = Aerospike::UDF_TYPE_LUA, $options = []) {}
 
         /**
          * @param string $module
@@ -1162,9 +1064,7 @@ namespace {
          *
          * @no-named-arguments
          */
-        public function deregister($module, $options = [])
-        {
-        }
+        public function deregister($module, $options = []) {}
 
         /**
          * @param array $modules
@@ -1175,9 +1075,7 @@ namespace {
          *
          * @no-named-arguments
          */
-        public function listRegistered(&$modules, $language = Aerospike::UDF_TYPE_LUA, $options = [])
-        {
-        }
+        public function listRegistered(&$modules, $language = Aerospike::UDF_TYPE_LUA, $options = []) {}
 
         /**
          * @param string $module
@@ -1189,9 +1087,7 @@ namespace {
          *
          * @no-named-arguments
          */
-        public function getRegistered($module, &$code, $language = Aerospike::UDF_TYPE_LUA, $options = [])
-        {
-        }
+        public function getRegistered($module, &$code, $language = Aerospike::UDF_TYPE_LUA, $options = []) {}
 
         /**
          * @param array  $key
@@ -1205,9 +1101,7 @@ namespace {
          *
          * @no-named-arguments
          */
-        public function apply(array $key, $module, $function, array $args = [], &$returned = null, $options = [])
-        {
-        }
+        public function apply(array $key, $module, $function, array $args = [], &$returned = null, $options = []) {}
 
         /**
          * @param string $ns
@@ -1222,9 +1116,7 @@ namespace {
          *
          * @no-named-arguments
          */
-        public function scanApply($ns, $set, $module, $function, array $args, &$job_id, array $options = [])
-        {
-        }
+        public function scanApply($ns, $set, $module, $function, array $args, &$job_id, array $options = []) {}
 
         /**
          * @param string $module
@@ -1246,8 +1138,7 @@ namespace {
             array $args,
             &$job_id,
             array $options = [],
-        ) {
-        }
+        ) {}
 
         /**
          * @param string $module
@@ -1269,8 +1160,7 @@ namespace {
             array $args,
             &$returned,
             array $options = [],
-        ) {
-        }
+        ) {}
 
         /**
          * @param string $ns
@@ -1285,9 +1175,7 @@ namespace {
          *
          * @no-named-arguments
          */
-        public function addIndex($ns, $set, $bin, $name, $indexType, $dataType, array $options = [])
-        {
-        }
+        public function addIndex($ns, $set, $bin, $name, $indexType, $dataType, array $options = []) {}
 
         /**
          * @param string $ns
@@ -1298,9 +1186,7 @@ namespace {
          *
          * @no-named-arguments
          */
-        public function dropIndex($ns, $name, array $options = [])
-        {
-        }
+        public function dropIndex($ns, $name, array $options = []) {}
 
         /**
          * @param string        $request
@@ -1312,9 +1198,7 @@ namespace {
          *
          * @no-named-arguments
          */
-        public function info($request, &$response, $host = null, array $options = [])
-        {
-        }
+        public function info($request, &$response, $host = null, array $options = []) {}
 
         /**
          * @param string     $request
@@ -1325,48 +1209,36 @@ namespace {
          *
          * @no-named-arguments
          */
-        public function infoMany($request, $host = null, array $options = [])
-        {
-        }
+        public function infoMany($request, $host = null, array $options = []) {}
 
         /**
          * @return array
          *
          * @no-named-arguments
          */
-        public function getNodes()
-        {
-        }
+        public function getNodes() {}
 
         /**
          * @param int $log_level
          *
          * @no-named-arguments
          */
-        public function setLogLevel($log_level)
-        {
-        }
+        public function setLogLevel($log_level) {}
 
         /**
          * @no-named-arguments
          */
-        public function setLogHandler(callable $log_handler)
-        {
-        }
+        public function setLogHandler(callable $log_handler) {}
 
         /**
          * @no-named-arguments
          */
-        public function setSerializer(callable $serialize_cb)
-        {
-        }
+        public function setSerializer(callable $serialize_cb) {}
 
         /**
          * @no-named-arguments
          */
-        public function setDeserializer(callable $unserialize_cb)
-        {
-        }
+        public function setDeserializer(callable $unserialize_cb) {}
     }
 }
 
@@ -1390,9 +1262,7 @@ namespace Aerospike {
         /**
          * @return string
          */
-        public function serialize()
-        {
-        }
+        public function serialize() {}
 
         /**
          * @param string $bin_str
@@ -1400,24 +1270,18 @@ namespace Aerospike {
          *
          * @no-named-arguments
          */
-        public function unserialize($bin_str)
-        {
-        }
+        public function unserialize($bin_str) {}
 
         /**
          * @return string
          */
-        public function __toString()
-        {
-        }
+        public function __toString() {}
 
         /**
          * @return string
          *
          * @no-named-arguments
          */
-        public static function unwrap(Bytes $bytes_wrap)
-        {
-        }
+        public static function unwrap(Bytes $bytes_wrap) {}
     }
 }

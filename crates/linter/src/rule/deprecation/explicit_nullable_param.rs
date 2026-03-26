@@ -1,4 +1,6 @@
 use indoc::indoc;
+use mago_syntax::ast::Hint;
+use mago_text_edit::TextEdit;
 use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
@@ -128,6 +130,13 @@ impl LintRule for ExplicitNullableParamRule {
         .with_note("Updating this will future-proof your code and align it with PHP 8.4 standards.")
         .with_help("Consider using an explicit nullable type hint or replacing the default value.");
 
-        ctx.collector.report(issue);
+        ctx.collector.propose(issue, |edits| match hint {
+            Hint::Intersection(_) => {
+                edits.push(TextEdit::insert(hint.start_offset(), "null|("));
+                edits.push(TextEdit::insert(hint.end_offset(), ")"));
+            }
+            Hint::Union(_) => edits.push(TextEdit::insert(hint.start_offset(), "null|")),
+            _ => edits.push(TextEdit::insert(hint.start_offset(), "?")),
+        });
     }
 }

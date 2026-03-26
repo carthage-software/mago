@@ -185,9 +185,7 @@ class MyClassWithAttribute
 }
 
 // Named arguments
-function namedArgs(string $name = 'foo', int $age = 30)
-{
-}
+function namedArgs(string $name = 'foo', int $age = 30) {}
 
 namedArgs(
     name: 'bar',

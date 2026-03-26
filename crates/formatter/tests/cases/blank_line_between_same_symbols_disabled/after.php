@@ -4,12 +4,8 @@ const A = 1;
 const B = 2;
 const C = 3;
 
-function foo()
-{
-}
-function bar()
-{
-}
+function foo() {}
+function bar() {}
 
 class X
 {

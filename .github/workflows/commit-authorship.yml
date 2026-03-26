@@ -1,0 +1,53 @@
+name: Commit Authorship
+
+on:
+  pull_request:
+
+jobs:
+  check:
+    name: Check commit authorship
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: check for AI authorship
+        run: |
+          pattern='claude|anthropic|gemini|codex|openai|cursor|copilot'
+          failed=0
+
+          for sha in $(git log --format='%H' origin/${{ github.base_ref }}..HEAD); do
+            author=$(git log -1 --format='%an <%ae>' "$sha")
+            committer=$(git log -1 --format='%cn <%ce>' "$sha")
+            body=$(git log -1 --format='%b' "$sha")
+
+            if echo "$author" | grep -iqE "$pattern"; then
+              echo "::error::Commit $sha has AI author: $author"
+              failed=1
+            fi
+
+            if echo "$committer" | grep -iqE "$pattern"; then
+              echo "::error::Commit $sha has AI committer: $committer"
+              failed=1
+            fi
+
+            if echo "$body" | grep -iqE "^co-authored-by:.*($pattern)"; then
+              trailer=$(echo "$body" | grep -iE "^co-authored-by:.*($pattern)")
+              echo "::error::Commit $sha has AI co-author: $trailer"
+              failed=1
+            fi
+          done
+
+          if [ "$failed" -eq 1 ]; then
+            echo ""
+            echo "Commits must be authored by humans. AI tools are welcome, but"
+            echo "the commit author must be a real person we can reach out to."
+            echo ""
+            echo "Please rebase and amend your commits to use your own identity,"
+            echo "and remove any AI Co-Authored-By trailers."
+            exit 1
+          fi

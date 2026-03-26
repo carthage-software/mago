@@ -224,7 +224,9 @@ pub fn analyze_statements<'ctx, 'arena>(
     artifacts: &mut AnalysisArtifacts,
 ) -> Result<(), AnalysisError> {
     for statement in statements {
-        if block.has_returned {
+        let is_declaration = statement.is_declaration();
+
+        if block.flags.has_returned() {
             if context.settings.find_unused_expressions {
                 let is_harmless = match &statement {
                     Statement::Break(_) => true,
@@ -243,7 +245,7 @@ pub fn analyze_statements<'ctx, 'arena>(
                             .with_note("This statement is unreachable because the block has already returned.")
                             .with_help("Consider removing this statement as it does not do anything in this context."),
                     );
-                } else {
+                } else if !is_declaration {
                     context.collector.report_with_code(
                         IssueCode::UnevaluatedCode,
                         Issue::help("Unreachable code detected.")
@@ -254,7 +256,7 @@ pub fn analyze_statements<'ctx, 'arena>(
                 }
             }
 
-            if !context.settings.analyze_dead_code {
+            if !is_declaration && !context.settings.analyze_dead_code {
                 continue;
             }
         }

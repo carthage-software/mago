@@ -17,7 +17,6 @@ use crate::ast::ast::expression::Expression;
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
-#[repr(u8)]
 pub enum Variable<'arena> {
     Direct(DirectVariable<'arena>),
     Indirect(IndirectVariable<'arena>),

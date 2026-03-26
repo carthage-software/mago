@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
 use mago_atom::ascii_lowercase_atom;
 use mago_atom::atom;
@@ -150,6 +151,17 @@ pub(crate) fn reconcile(
                     assertion.has_equality(),
                 ));
             }
+            TAtomic::Scalar(TScalar::Numeric) => {
+                return Some(subtract_numeric(
+                    context,
+                    assertion,
+                    existing_var_type,
+                    key,
+                    negated,
+                    span,
+                    assertion.has_equality(),
+                ));
+            }
             TAtomic::Array(TArray::List(_)) => {
                 return Some(subtract_list_array(
                     context,
@@ -161,18 +173,18 @@ pub(crate) fn reconcile(
                     assertion.has_equality(),
                 ));
             }
-            TAtomic::Array(TArray::Keyed(TKeyedArray { known_items: None, parameters: Some(parameters), .. })) => {
-                if parameters.0.is_placeholder() && parameters.1.is_placeholder() {
-                    return Some(subtract_keyed_array(
-                        context,
-                        assertion,
-                        existing_var_type,
-                        key,
-                        negated,
-                        span,
-                        assertion.has_equality(),
-                    ));
-                }
+            TAtomic::Array(TArray::Keyed(TKeyedArray { known_items: None, parameters: Some(parameters), .. }))
+                if parameters.0.is_placeholder() && parameters.1.is_placeholder() =>
+            {
+                return Some(subtract_keyed_array(
+                    context,
+                    assertion,
+                    existing_var_type,
+                    key,
+                    negated,
+                    span,
+                    assertion.has_equality(),
+                ));
             }
             TAtomic::Null => {
                 return Some(subtract_null(context, assertion, existing_var_type, key, negated, span));
@@ -244,8 +256,10 @@ pub(crate) fn reconcile(
                 match existing_atomic {
                     TAtomic::Array(_) => {}
                     TAtomic::Iterable(iterable) => {
-                        let mut traversable = TNamedObject::new(atom("Traversable"))
-                            .with_type_parameters(Some(vec![*iterable.key_type.clone(), *iterable.value_type.clone()]));
+                        let mut traversable = TNamedObject::new(atom("Traversable")).with_type_parameters(Some(vec![
+                            (*iterable.key_type).clone(),
+                            (*iterable.value_type).clone(),
+                        ]));
 
                         if let Some(intersections) = iterable.get_intersection_types() {
                             for intersection in intersections.iter().cloned() {
@@ -317,27 +331,38 @@ fn subtract_object(
             } else if let TAtomic::Object(TObject::Named(existing_named)) = &atomic
                 && let Some(TAtomic::Object(TObject::Named(subtracting_named))) = type_to_subtract
             {
-                let lowercase_subtracting_name = ascii_lowercase_atom(subtracting_named.get_name_ref());
+                let lowercase_subtracting_name = ascii_lowercase_atom(&subtracting_named.get_name());
 
                 // If the class names match (case-insensitive), this type is being subtracted - don't add it
-                if existing_named.get_name_ref().eq_ignore_ascii_case(&lowercase_subtracting_name) {
+                if existing_named.get_name().eq_ignore_ascii_case(&lowercase_subtracting_name) {
                     // Type is removed, don't add to acceptable_types
-                } else if let Some(existing_metadata) = context.codebase.get_class_like(existing_named.get_name_ref())
+                } else if let Some(existing_metadata) = context.codebase.get_class_like(&existing_named.get_name())
                     // Check if the existing type has permitted inheritors
                     && let Some(permitted_inheritors) = &existing_metadata.permitted_inheritors
                     // Check if the subtracting type is an inheritor of the existing type
-                    && context.codebase.is_instance_of(&lowercase_subtracting_name, existing_named.get_name_ref())
+                    && context.codebase.is_instance_of(&lowercase_subtracting_name, &existing_named.get_name())
                     // If the type we're subtracting is one of the permitted inheritors
                     // PHP class names are case-insensitive, so we need to compare case-insensitively
                     && permitted_inheritors.contains(&lowercase_subtracting_name)
                 {
                     // This is a sealed BASE class/interface and we're subtracting one of its permitted inheritors
-                    // Expand to all OTHER permitted inheritors
+                    // Expand to all OTHER permitted inheritors, transferring parent's type params
+                    let parent_type_params = existing_named.get_type_parameters();
                     acceptable_types.extend(
                         permitted_inheritors
                             .iter()
                             .filter(|inheritor| !inheritor.eq_ignore_ascii_case(&lowercase_subtracting_name))
-                            .map(|inheritor| TNamedObject::new(*inheritor))
+                            .map(|inheritor| {
+                                let child = TNamedObject::new(
+                                    context.codebase.get_class_like(inheritor).map_or(*inheritor, |m| m.original_name),
+                                );
+
+                                if let Some(type_params) = parent_type_params {
+                                    child.with_type_parameters(Some(type_params.to_vec()))
+                                } else {
+                                    child
+                                }
+                            })
                             .map(TObject::Named)
                             .map(TAtomic::Object),
                     );
@@ -562,6 +587,101 @@ fn subtract_string(
             } else {
                 acceptable_types.push(TAtomic::Scalar(TScalar::int()));
                 acceptable_types.push(TAtomic::Scalar(TScalar::float()));
+            }
+        } else {
+            acceptable_types.push(atomic);
+        }
+    }
+
+    get_acceptable_type(
+        context,
+        acceptable_types,
+        did_remove_type,
+        key,
+        span,
+        existing_var_type,
+        assertion,
+        negated,
+        true,
+        new_var_type,
+    )
+}
+
+fn subtract_numeric(
+    context: &mut Context<'_, '_>,
+    assertion: &Assertion,
+    existing_var_type: &TUnion,
+    key: Option<&str>,
+    negated: bool,
+    span: Option<&Span>,
+    is_equality: bool,
+) -> TUnion {
+    if existing_var_type.is_mixed() {
+        return existing_var_type.clone();
+    }
+
+    let mut did_remove_type = false;
+    let mut new_var_type = existing_var_type.clone();
+    let mut acceptable_types = vec![];
+
+    for atomic in new_var_type.types.to_mut().drain(..) {
+        if let TAtomic::GenericParameter(generic_parameter) = &atomic {
+            did_remove_type = true;
+
+            if !is_equality && !generic_parameter.constraint.is_mixed() {
+                if let Some(atomic) = map_generic_constraint(generic_parameter, |constraint| {
+                    subtract_numeric(context, assertion, constraint, None, false, None, is_equality)
+                }) {
+                    acceptable_types.push(atomic);
+                }
+            } else {
+                acceptable_types.push(atomic);
+            }
+        } else if let TAtomic::Scalar(TScalar::ArrayKey) = atomic {
+            did_remove_type = true;
+
+            if is_equality {
+                acceptable_types.push(atomic);
+            } else {
+                acceptable_types.push(TAtomic::Scalar(TScalar::string()));
+            }
+        } else if let TAtomic::Scalar(TScalar::Generic) = atomic {
+            did_remove_type = true;
+
+            if is_equality {
+                acceptable_types.push(atomic);
+            } else {
+                acceptable_types.push(TAtomic::Scalar(TScalar::string()));
+                acceptable_types.push(TAtomic::Scalar(TScalar::bool()));
+            }
+        } else if let TAtomic::Scalar(TScalar::Numeric) = atomic {
+            did_remove_type = true;
+
+            if is_equality {
+                acceptable_types.push(atomic);
+            }
+        } else if let TAtomic::Scalar(TScalar::Integer(_)) = atomic {
+            did_remove_type = true;
+
+            if is_equality {
+                acceptable_types.push(atomic);
+            }
+        } else if let TAtomic::Scalar(TScalar::Float(_)) = atomic {
+            did_remove_type = true;
+
+            if is_equality {
+                acceptable_types.push(atomic);
+            }
+        } else if let TAtomic::Scalar(TScalar::String(existing_string)) = &atomic {
+            if existing_string.is_numeric {
+                did_remove_type = true;
+
+                if is_equality {
+                    acceptable_types.push(atomic);
+                }
+            } else {
+                did_remove_type = true;
+                acceptable_types.push(atomic);
             }
         } else {
             acceptable_types.push(atomic);
@@ -1144,7 +1264,7 @@ fn reconcile_falsy_or_empty(
                     acceptable_types.push(atomic);
                 }
                 TAtomic::Array(TArray::List(_)) => {
-                    acceptable_types.push(TAtomic::Array(TArray::List(TList::new(Box::new(get_never())))));
+                    acceptable_types.push(TAtomic::Array(TArray::List(TList::new(Arc::new(get_never())))));
                 }
                 TAtomic::Array(TArray::Keyed(_)) => {
                     acceptable_types.push(TAtomic::Array(TArray::Keyed(TKeyedArray::new())));
@@ -1243,7 +1363,7 @@ fn reconcile_empty_countable(
             did_remove_type = true;
 
             if !atomic.is_truthy() {
-                acceptable_types.push(TAtomic::Array(TArray::List(TList::new(Box::new(get_never())))));
+                acceptable_types.push(TAtomic::Array(TArray::List(TList::new(Arc::new(get_never())))));
             }
         } else if let TAtomic::Array(TArray::Keyed(_)) = atomic {
             did_remove_type = true;
@@ -1531,7 +1651,7 @@ fn subtract_list_elements(existing_list: &TList, list_to_subtract: &TList) -> Op
                     known_elements.insert(element_index, (false, single_element_union));
                 }
 
-                let mut result_list = TList::new(Box::new(get_never()));
+                let mut result_list = TList::new(Arc::new(get_never()));
                 result_list.known_elements = Some(known_elements);
                 result_list.known_count = Some(existing_size);
                 result_list.non_empty = existing_list.non_empty || existing_size > 0;

@@ -1,15 +1,18 @@
 use crate::T;
 use crate::ast::ast::Return;
 use crate::error::ParseError;
-use crate::parser::internal::expression::parse_expression;
-use crate::parser::internal::terminator::parse_terminator;
-use crate::parser::internal::token_stream::TokenStream;
-use crate::parser::internal::utils;
+use crate::parser::Parser;
 
-pub fn parse_return<'arena>(stream: &mut TokenStream<'_, 'arena>) -> Result<Return<'arena>, ParseError> {
-    Ok(Return {
-        r#return: utils::expect_keyword(stream, T!["return"])?,
-        value: if matches!(utils::peek(stream)?.kind, T![";" | "?>"]) { None } else { Some(parse_expression(stream)?) },
-        terminator: parse_terminator(stream)?,
-    })
+impl<'input, 'arena> Parser<'input, 'arena> {
+    pub(crate) fn parse_return(&mut self) -> Result<Return<'arena>, ParseError> {
+        Ok(Return {
+            r#return: self.expect_keyword(T!["return"])?,
+            value: if matches!(self.stream.peek_kind(0)?, Some(T![";" | "?>"])) {
+                None
+            } else {
+                Some(self.parse_expression()?)
+            },
+            terminator: self.parse_terminator()?,
+        })
+    }
 }

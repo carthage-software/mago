@@ -2,9 +2,11 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use indexmap::IndexMap;
+
+use mago_atom::Atom;
 use mago_atom::AtomMap;
 use mago_atom::AtomSet;
-
+use mago_codex::assertion::Assertion;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::union::TUnion;
 use mago_reporting::Annotation;
@@ -77,9 +79,9 @@ pub(crate) fn analyze<'ctx, 'arena>(
         if_body_context = Some(externally_applied_context.clone());
     }
 
-    let was_inside_conditional = externally_applied_context.inside_conditional;
+    let was_inside_conditional = externally_applied_context.flags.inside_conditional();
 
-    externally_applied_context.inside_conditional = true;
+    externally_applied_context.flags.set_inside_conditional(true);
     let tmp_if_body_context = std::mem::take(&mut externally_applied_context.if_body_context);
     externally_applied_if_cond_expr.analyze(context, &mut externally_applied_context, artifacts)?;
     externally_applied_context.if_body_context = tmp_if_body_context;
@@ -89,7 +91,7 @@ pub(crate) fn analyze<'ctx, 'arena>(
 
     externally_applied_context.assigned_variable_ids.extend(pre_assigned_var_ids);
     externally_applied_context.conditionally_referenced_variable_ids.extend(pre_referenced_var_ids);
-    externally_applied_context.inside_conditional = was_inside_conditional;
+    externally_applied_context.flags.set_inside_conditional(was_inside_conditional);
 
     let mut if_body_context = if_body_context.unwrap_or_else(|| externally_applied_context.clone());
 
@@ -106,10 +108,10 @@ pub(crate) fn analyze<'ctx, 'arena>(
         if_conditional_context.assigned_variable_ids = AtomMap::default();
         if_conditional_context.conditionally_referenced_variable_ids = AtomSet::default();
 
-        let was_inside_conditional = if_conditional_context.inside_conditional;
-        if_conditional_context.inside_conditional = true;
+        let was_inside_conditional = if_conditional_context.flags.inside_conditional();
+        if_conditional_context.flags.set_inside_conditional(true);
         condition.analyze(context, &mut if_conditional_context, artifacts)?;
-        if_conditional_context.inside_conditional = was_inside_conditional;
+        if_conditional_context.flags.set_inside_conditional(was_inside_conditional);
 
         if_conditional_context.conditionally_referenced_variable_ids.extend(first_cond_referenced_var_ids);
         if_conditional_context.assigned_variable_ids.extend(first_cond_assigned_var_ids);
@@ -146,6 +148,38 @@ pub(crate) fn analyze<'ctx, 'arena>(
     };
 
     if_body_context.if_body_context = tmp_if_body_context_nested;
+
+    let condition_span = condition.span();
+    let condition_range = (condition_span.start_offset(), condition_span.end_offset());
+    if let Some(assertions) = artifacts.if_true_assertions.get(&condition_range) {
+        for (key, assertion_set) in assertions {
+            if key.ends_with("()") {
+                if_body_context.active_method_call_assertions.entry(*key).or_default().extend(assertion_set.clone());
+            }
+        }
+    }
+
+    if let Some(assertions) = artifacts.true_branch_only_assertions.get(&condition_range) {
+        let mut var_assertions: IndexMap<Atom, Vec<Vec<Assertion>>> = IndexMap::new();
+        for (key, assertion_set) in assertions {
+            var_assertions.entry(*key).or_default().extend(assertion_set.clone());
+        }
+
+        if !var_assertions.is_empty() {
+            let mut changed_var_ids = AtomSet::default();
+            reconcile_keyed_types(
+                context,
+                &var_assertions,
+                IndexMap::new(),
+                &mut if_body_context,
+                &mut changed_var_ids,
+                &AtomSet::default(),
+                &condition_span,
+                false,
+                false,
+            );
+        }
+    }
 
     Ok((
         IfConditionalScope {

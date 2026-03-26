@@ -5,10 +5,10 @@ declare(strict_types=1);
 class Foo
 {
     /**
-     * @param int $requestType bad type hint
+     * @param int $_requestType bad type hint
      */
     public function __construct(
-        private readonly null|int $requestType,
+        private readonly null|int $_requestType,
     ) {}
 }
 

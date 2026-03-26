@@ -32,6 +32,11 @@ pub struct FormatterConfig {
     pub minimum_level: Option<Level>,
     /// Whether to filter to only fixable issues.
     pub filter_fixable: bool,
+    /// Optional editor URL template for OSC 8 terminal hyperlinks.
+    ///
+    /// Supported placeholders: `%file%` (absolute path), `%line%`, `%column%`.
+    /// Example: `"phpstorm://open?file=%file%&line=%line%"`
+    pub editor_url: Option<String>,
 }
 
 /// Trait for formatting issues to a writer.

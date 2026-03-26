@@ -5,18 +5,14 @@
  * @param resource $compCode
  * @param resource $reason
  */
-function mqseries_back($hconn, &$compCode, &$reason)
-{
-}
+function mqseries_back($hconn, &$compCode, &$reason) {}
 
 /**
  * @param resource $hconn
  * @param resource $compCode
  * @param resource $reason
  */
-function mqseries_begin($hconn, array $beginOptions, &$compCode, &$reason)
-{
-}
+function mqseries_begin($hconn, array $beginOptions, &$compCode, &$reason) {}
 
 /**
  * @param resource $hconn
@@ -24,45 +20,35 @@ function mqseries_begin($hconn, array $beginOptions, &$compCode, &$reason)
  * @param resource $compCode
  * @param resource $reason
  */
-function mqseries_close($hconn, $hobj, int $options, &$compCode, &$reason)
-{
-}
+function mqseries_close($hconn, $hobj, int $options, &$compCode, &$reason) {}
 
 /**
  * @param resource $hconn
  * @param resource $compCode
  * @param resource $reason
  */
-function mqseries_cmit($hconn, &$compCode, &$reason)
-{
-}
+function mqseries_cmit($hconn, &$compCode, &$reason) {}
 
 /**
  * @param resource $hconn
  * @param resource $compCode
  * @param resource $reason
  */
-function mqseries_conn(string $qManagerName, &$hconn, &$compCode, &$reason)
-{
-}
+function mqseries_conn(string $qManagerName, &$hconn, &$compCode, &$reason) {}
 
 /**
  * @param resource $hconn
  * @param resource $compCode
  * @param resource $reason
  */
-function mqseries_connx(string $qManagerName, array &$connOptions, &$hconn, &$compCode, &$reason)
-{
-}
+function mqseries_connx(string $qManagerName, array &$connOptions, &$hconn, &$compCode, &$reason) {}
 
 /**
  * @param resource $hconn
  * @param resource $compCode
  * @param resource $reason
  */
-function mqseries_disc($hconn, &$compCode, &$reason)
-{
-}
+function mqseries_disc($hconn, &$compCode, &$reason) {}
 
 /**
  * @param resource $hConn
@@ -80,8 +66,7 @@ function mqseries_get(
     int &$data_length,
     &$compCode,
     &$reason,
-) {
-}
+) {}
 
 /**
  * @param resource $hconn
@@ -102,8 +87,7 @@ function mqseries_inq(
     &$charAttr,
     &$compCode,
     &$reason,
-) {
-}
+) {}
 
 /**
  * @param resource $hconn
@@ -112,9 +96,7 @@ function mqseries_inq(
  * @param resource $compCode
  * @param resource $reason
  */
-function mqseries_open($hconn, array &$objDesc, int $option, &$hobj, &$compCode, &$reason)
-{
-}
+function mqseries_open($hconn, array &$objDesc, int $option, &$hobj, &$compCode, &$reason) {}
 
 /**
  * @param resource $hconn
@@ -124,9 +106,7 @@ function mqseries_open($hconn, array &$objDesc, int $option, &$hobj, &$compCode,
  * @param resource $compCode
  * @param resource $reason
  */
-function mqseries_put1($hconn, &$objDesc, &$msgDesc, &$pmo, string $buffer, &$compCode, &$reason)
-{
-}
+function mqseries_put1($hconn, &$objDesc, &$msgDesc, &$pmo, string $buffer, &$compCode, &$reason) {}
 
 /**
  * @param resource $hConn
@@ -134,9 +114,7 @@ function mqseries_put1($hconn, &$objDesc, &$msgDesc, &$pmo, string $buffer, &$co
  * @param resource $compCode
  * @param resource $reason
  */
-function mqseries_put($hConn, $hObj, array &$md, array &$pmo, string $message, &$compCode, &$reason)
-{
-}
+function mqseries_put($hConn, $hObj, array &$md, array &$pmo, string $message, &$compCode, &$reason) {}
 
 /**
  * @param resource $hconn
@@ -155,12 +133,9 @@ function mqseries_set(
     array $charattrs,
     &$compCode,
     &$reason,
-) {
-}
+) {}
 
-function mqseries_strerror(int $reason): string
-{
-}
+function mqseries_strerror(int $reason): string {}
 
 const MQSERIES_MQCC_OK = 0;
 

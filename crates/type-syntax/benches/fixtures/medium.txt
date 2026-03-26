@@ -1,0 +1,28 @@
+array{name: string, age: int}
+array{name: string, age: int, active?: bool}
+array{0: int, 1: string, 2: bool}
+Closure(int, string): void
+Closure(mixed...): array<string>
+callable(int, string): bool
+array<int, array<string, mixed>>
+array<string, object{id: int, name: string}>
+int|string|null|bool
+Foo&Bar&Baz
+(Foo&Bar)|null
+list<array{id: int, name: string}>
+non-empty-array<string, mixed>
+non-empty-list<int>
+non-empty-string
+positive-int
+negative-int
+non-positive-int
+non-negative-int
+int<0, 100>
+int<min, max>
+class-string<Foo>
+interface-string<Bar>
+trait-string<Baz>
+key-of<array<string, int>>
+value-of<array<string, int>>
+iterable<int, string>
+Generator<int, string, mixed, void>

@@ -18,8 +18,8 @@
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 
-use ahash::HashMap;
-use ahash::HashSet;
+use foldhash::HashMap;
+use foldhash::HashSet;
 use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;

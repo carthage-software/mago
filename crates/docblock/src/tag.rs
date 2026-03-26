@@ -236,7 +236,7 @@ fn parse_var_ident(raw: &str, allow_property_access: bool) -> Option<Variable> {
             pos += 1;
         }
 
-        // Now parse any property/array access chains
+        // Now parse any property/call/array access chains
         while pos < bytes.len() {
             if pos + 1 < bytes.len() && &bytes[pos..pos + 2] == b"->" {
                 // Object property access: ->identifier
@@ -267,6 +267,10 @@ fn parse_var_ident(raw: &str, allow_property_access: bool) -> Option<Variable> {
                 if bracket_depth != 0 {
                     return None; // Unmatched brackets
                 }
+            } else if bytes[pos] == b'(' && bytes.get(pos + 1).is_some_and(|b| *b == b')') {
+                pos += 2; // Skip ()
+                // Method calls terminate the property access chain
+                break;
             } else {
                 // End of valid property access chain
                 break;
@@ -954,7 +958,12 @@ pub fn split_tag_content(content: &str, input_span: Span) -> Option<(TypeString,
                     if next_char.is_whitespace() {
                         temp_iter.next();
                     } else {
-                        found_continuation = next_char == ':' || next_char == '|' || next_char == '&';
+                        found_continuation = next_char == ':'
+                            || next_char == '|'
+                            || (next_char == '&' && {
+                                temp_iter.next(); // consume '&'
+                                !temp_iter.peek().is_some_and(|&(_, c)| c == '$' || c == '.')
+                            });
                         break;
                     }
                 }
@@ -1178,19 +1187,15 @@ pub fn parse_method_tag(mut content: &str, mut span: Span) -> Result<MethodTag, 
 }
 
 fn consume_whitespace(input: &str) -> (&str, usize) {
-    let mut iter = input.chars().peekable();
-    let mut count = 0;
-
-    while let Some(ch) = iter.peek() {
+    let mut byte_count = 0;
+    for ch in input.chars() {
         if ch.is_whitespace() {
-            iter.next();
-            count += 1;
+            byte_count += ch.len_utf8();
         } else {
             break;
         }
     }
-
-    (&input[count..], count)
+    (&input[byte_count..], byte_count)
 }
 
 fn try_consume<'a>(input: &'a str, token: &str) -> Option<(&'a str, usize)> {
@@ -1623,7 +1628,26 @@ mod tests {
         let content = " int $x,";
         let span = test_span_for(content);
         let result = parse_assertion_tag(content, span).unwrap();
+        assert_eq!(result.type_string.value, "int");
         assert_eq!(result.variable.name, "$x");
+    }
+
+    #[test]
+    fn test_assertion_method_call() {
+        let content = " Statement $this->first()";
+        let span = test_span_for(content);
+        let result = parse_assertion_tag(content, span).unwrap();
+        assert_eq!(result.type_string.value, "Statement");
+        assert_eq!(result.variable.name, "$this->first()");
+    }
+
+    #[test]
+    fn test_assertion_property_access() {
+        let content = " Statement $this->property";
+        let span = test_span_for(content);
+        let result = parse_assertion_tag(content, span).unwrap();
+        assert_eq!(result.type_string.value, "Statement");
+        assert_eq!(result.variable.name, "$this->property");
     }
 
     #[test]
@@ -1692,5 +1716,30 @@ mod tests {
         let (ts3, rest3) = split_tag_content(input3, span3).unwrap();
         assert_eq!(ts3.value, "callable(string): string");
         assert_eq!(rest3, "$callback");
+    }
+
+    #[test]
+    fn test_consume_whitespace_with_fullwidth_space() {
+        // Test case for multi-byte whitespace (Issue #967)
+        // Full-width space U+3000 is 3 bytes, but chars().count() returns 1
+        // The function should return byte count, not character count
+
+        // Single full-width space (3 bytes)
+        let input = "\u{3000}rest";
+        let (rest, count) = consume_whitespace(input);
+        assert_eq!(rest, "rest", "Should skip the full-width space");
+        assert_eq!(count, 3, "Should return byte count (3), not char count (1)");
+
+        // Multiple full-width spaces (6 bytes)
+        let input2 = "\u{3000}\u{3000}rest";
+        let (rest2, count2) = consume_whitespace(input2);
+        assert_eq!(rest2, "rest", "Should skip both full-width spaces");
+        assert_eq!(count2, 6, "Should return byte count (6), not char count (2)");
+
+        // Mixed ASCII and full-width spaces
+        let input3 = " \u{3000} rest";
+        let (rest3, count3) = consume_whitespace(input3);
+        assert_eq!(rest3, "rest", "Should skip all whitespace");
+        assert_eq!(count3, 5, "Should return byte count: 1 (space) + 3 (U+3000) + 1 (space) = 5");
     }
 }

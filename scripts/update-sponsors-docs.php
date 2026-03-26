@@ -80,7 +80,7 @@ final class SponsorsData
         /**
          * @var array<
          *  int<0, max>,
-         *  list<array{login: string, name: string, avatarUrl: string, websiteUrl: ?string, monthlyPriceInDollars: int, isCustomAmount: bool, isOneTime: bool}>
+         *  list<array{login: string, name?: null|string, avatarUrl: string, websiteUrl: ?string, monthlyPriceInDollars: int, isCustomAmount: bool, isOneTime: bool}>
          * > $sponsors_by_tier
          */
         $sponsors_by_tier = json_decode($sponsors_json, true, 512, JSON_THROW_ON_ERROR);
@@ -91,7 +91,7 @@ final class SponsorsData
             foreach ($sponsors as $sponsor) {
                 $sponsor = new Sponsor(
                     login: $sponsor['login'],
-                    name: $sponsor['name'],
+                    name: $sponsor['name'] ?? $sponsor['login'],
                     /** @mago-expect lint:no-shorthand-ternary */
                     avatarUrl: preg_replace('/\?s=\d+$/', '', $sponsor['avatarUrl']) ?: $sponsor['avatarUrl'],
                     websiteUrl: $sponsor['websiteUrl'] ?? null,
@@ -109,28 +109,34 @@ final class SponsorsData
         return new static(sponsorsByAmount: $sponsorsByAmount);
     }
 
+    /**
+     * @mago-expect lint:halstead
+     */
     public function renderForDocs(): string
     {
-        $large_sponsors_html = '';
-        $medium_sponsors_html = '';
-        $small_sponsors_html = '';
+        $gold_sponsors_html = '';
+        $silver_sponsors_html = '';
+        $bronze_sponsors_html = '';
+        $supporters_html = '';
 
         foreach ($this->sponsorsByAmount as $amount => $sponsors) {
             foreach ($sponsors as $sponsor) {
                 $url = $sponsor->websiteUrl ?? sprintf('https://github.com/%s', $sponsor->login);
                 if (!str_starts_with($url, 'http://') && !str_starts_with($url, 'https://')) {
-                    $url = sprintf('http://%s', $url); // Corrected from https to http
+                    $url = sprintf('http://%s', $url);
                 }
 
                 if ($amount >= self::LARGE_SPONSOR_THRESHOLD) {
-                    $large_sponsors_html .= sprintf(
-                        '<div class="sponsor-item-large"><a href="%s" title="%s" target="_blank" rel="noopener"><img src="%s&s=256" alt="%s"></a><div class="sponsor-name"><a href="%s" target="_blank" rel="noopener">%s</a></div></div>'
+                    $gold_sponsors_html .= sprintf(
+                        '<a href="%s" title="%s" target="_blank" rel="noopener" class="sponsor-card sponsor-gold">'
+                        . '<img src="%s&s=128" alt="%s">'
+                        . '<span>%s</span>'
+                        . '</a>'
                         . "\n",
                         $url,
                         $sponsor->name,
                         $sponsor->avatarUrl,
                         $sponsor->name,
-                        $url,
                         $sponsor->name,
                     );
 
@@ -138,55 +144,79 @@ final class SponsorsData
                 }
 
                 if ($amount >= self::MEDIUM_SPONSOR_THRESHOLD) {
-                    $medium_sponsors_html .= sprintf(
-                        '<div class="sponsor-item-medium"><a href="%s" title="%s" target="_blank" rel="noopener"><img src="%s&s=96" alt="%s"></a></div>'
+                    $silver_sponsors_html .= sprintf(
+                        '<a href="%s" title="%s" target="_blank" rel="noopener" class="sponsor-card sponsor-silver">'
+                        . '<img src="%s&s=80" alt="%s">'
+                        . '<span>%s</span>'
+                        . '</a>'
                         . "\n",
                         $url,
                         $sponsor->name,
                         $sponsor->avatarUrl,
+                        $sponsor->name,
                         $sponsor->name,
                     );
 
                     continue;
                 }
 
-                if ($amount < self::SMALL_SPONSOR_THRESHOLD) {
+                if ($amount >= self::SMALL_SPONSOR_THRESHOLD) {
+                    $bronze_sponsors_html .= sprintf(
+                        '<a href="%s" title="%s" target="_blank" rel="noopener" class="sponsor-card sponsor-bronze">'
+                        . '<img src="%s&s=64" alt="%s">'
+                        . '<span>%s</span>'
+                        . '</a>'
+                        . "\n",
+                        $url,
+                        $sponsor->name,
+                        $sponsor->avatarUrl,
+                        $sponsor->name,
+                        $sponsor->name,
+                    );
+
                     continue;
                 }
 
-                $small_sponsors_html .= sprintf(
-                    '<a class="sponsor-item-small" href="%s" title="%s" target="_blank" rel="noopener"><img src="%s&s=48" alt="%s"></a>'
+                // All other sponsors (below $25)
+                $supporters_html .= sprintf(
+                    '<a href="%s" title="%s" target="_blank" rel="noopener" class="sponsor-card sponsor-supporter">'
+                    . '<img src="%s&s=48" alt="%s">'
+                    . '<span>%s</span>'
+                    . '</a>'
                     . "\n",
                     $url,
                     $sponsor->name,
                     $sponsor->avatarUrl,
                     $sponsor->name,
+                    $sponsor->name,
                 );
             }
         }
 
-        $html = '<div class="sponsors-list">';
-        if ('' !== $large_sponsors_html) {
-            $html .= '<div class="sponsors-list-large">' . $large_sponsors_html . '</div>';
+        $html = '';
+        if ('' !== $gold_sponsors_html) {
+            $html .= '<div class="sponsor-tier">';
+            $html .= '<div class="sponsor-tier-grid">' . $gold_sponsors_html . '</div>';
+            $html .= '</div>' . "\n";
         }
 
-        if ('' !== $medium_sponsors_html) {
-            if ('' !== $large_sponsors_html) {
-                $html .= '<hr>';
-            } // Corrected spacing
-            $html .= '<div class="sponsors-list-medium">' . $medium_sponsors_html . '</div>';
+        if ('' !== $silver_sponsors_html) {
+            $html .= '<div class="sponsor-tier">';
+            $html .= '<div class="sponsor-tier-grid">' . $silver_sponsors_html . '</div>';
+            $html .= '</div>' . "\n";
         }
 
-        if ('' !== $small_sponsors_html) {
-            if ('' !== $large_sponsors_html || '' !== $medium_sponsors_html) {
-                $html .= '<hr>';
-            } // Corrected spacing
-            $html .= '<div class="sponsors-list-small">' . $small_sponsors_html . '</div>';
+        if ('' !== $bronze_sponsors_html) {
+            $html .= '<div class="sponsor-tier">';
+            $html .= '<div class="sponsor-tier-grid">' . $bronze_sponsors_html . '</div>';
+            $html .= '</div>' . "\n";
         }
 
-        $html .= '</div>';
-        $html .= '<hr />';
-        $html .= '<p style="text-align: center;">Your logo here? <a href="https://github.com/sponsors/azjezz" target="_blank" rel="noopener">Become a sponsor!</a></p>';
+        if ('' !== $supporters_html) {
+            $html .= '<div class="sponsor-tier">';
+            $html .= '<div class="sponsor-tier-grid">' . $supporters_html . '</div>';
+            $html .= '</div>' . "\n";
+        }
 
         return $html;
     }
@@ -291,14 +321,14 @@ final class SponsorsData
 function overwrite_sponsors_file(string $new_content): void
 {
     $header = <<<MD
-    # Sponsors
+        # Sponsors
 
-    A heartfelt thank you to the generous individuals and organizations listed below. Their support is instrumental in the continued development and maintenance of [Psl](https://github.com/azjezz/psl) and [Mago](https://github.com/carthage-software/mago).
+        A heartfelt thank you to the generous individuals and organizations listed below. Their support is instrumental in the continued development and maintenance of [Psl](https://github.com/azjezz/psl) and [Mago](https://github.com/carthage-software/mago).
 
-    To become a sponsor, please visit [the sponsorship page](https://github.com/sponsors/azjezz).
+        To become a sponsor, please visit [the sponsorship page](https://github.com/sponsors/azjezz).
 
-    ---
-    MD;
+        ---
+        MD;
 
     $full_content = $header . "\n" . $new_content;
     file_put_contents(SPONSORS_PATH, $full_content);

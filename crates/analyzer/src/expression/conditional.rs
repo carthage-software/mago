@@ -1,11 +1,10 @@
 use std::ops::Deref;
 use std::rc::Rc;
 
-use mago_atom::AtomSet;
-
 use mago_algebra::clause::Clause;
 use mago_algebra::find_satisfying_assignments;
 use mago_algebra::saturate_clauses;
+use mago_atom::AtomSet;
 use mago_codex::assertion::Assertion;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::combine_optional_union_types;
@@ -106,7 +105,7 @@ pub(super) fn analyze_conditional<'ctx, 'ast, 'arena>(
     }
 
     for clause in &mut if_clauses {
-        let keys = clause.possibilities.keys().copied().collect::<Vec<mago_atom::Atom>>();
+        let keys: AtomSet = clause.possibilities.keys().copied().collect();
         mixed_variables.retain(|i| !keys.contains(i));
 
         'outer: for key in keys {
@@ -253,10 +252,10 @@ pub(super) fn analyze_conditional<'ctx, 'ast, 'arena>(
     // Extract function_exists/defined assertions for the "else" branch.
     extract_function_constant_existence(condition, artifacts, &mut else_block_context, true);
 
-    let was_inside_general_use = else_block_context.inside_general_use;
-    else_block_context.inside_general_use = true;
+    let was_inside_general_use = else_block_context.flags.inside_general_use();
+    else_block_context.flags.set_inside_general_use(true);
     r#else.analyze(context, &mut else_block_context, artifacts)?;
-    else_block_context.inside_general_use = was_inside_general_use;
+    else_block_context.flags.set_inside_general_use(was_inside_general_use);
 
     let if_assigned_variables = if_block_context.assigned_variable_ids.keys().copied().collect::<AtomSet>();
     let else_assigned_variables = else_block_context.assigned_variable_ids.keys().copied().collect::<AtomSet>();
@@ -273,7 +272,12 @@ pub(super) fn analyze_conditional<'ctx, 'ast, 'arena>(
 
         block_context.locals.insert(
             assigned_variable,
-            Rc::new(combine_union_types(if_type.as_ref(), else_type.as_ref(), context.codebase, false)),
+            Rc::new(combine_union_types(
+                if_type.as_ref(),
+                else_type.as_ref(),
+                context.codebase,
+                context.settings.combiner_options(),
+            )),
         );
     }
 
@@ -358,7 +362,7 @@ pub(super) fn analyze_conditional<'ctx, 'ast, 'arena>(
             &Assertion::Truthy,
             Some(condition_type.as_ref()),
             Some(""),
-            block_context.inside_loop,
+            block_context.flags.inside_loop(),
             Some(&condition.span()),
             false,
             false,
@@ -486,7 +490,12 @@ pub(super) fn analyze_conditional<'ctx, 'ast, 'arena>(
                 Rc::new(get_mixed())
             }
         } else if let (Some(then_type), Some(else_type)) = (then_type, artifacts.get_rc_expression_type(r#else)) {
-            Rc::new(combine_union_types(then_type.as_ref(), else_type.as_ref(), context.codebase, false))
+            Rc::new(combine_union_types(
+                then_type.as_ref(),
+                else_type.as_ref(),
+                context.codebase,
+                context.settings.combiner_options(),
+            ))
         } else {
             Rc::new(get_mixed())
         },

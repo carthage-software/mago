@@ -56,7 +56,6 @@ pub struct Parenthesized<'arena> {
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
-#[repr(u8)]
 #[non_exhaustive]
 pub enum Expression<'arena> {
     Binary(Binary<'arena>),
@@ -92,6 +91,7 @@ pub enum Expression<'arena> {
     Instantiation(Instantiation<'arena>),
     MagicConstant(MagicConstant<'arena>),
     Pipe(Pipe<'arena>),
+    Error(Span),
 }
 
 impl<'arena> Expression<'arena> {
@@ -447,6 +447,7 @@ impl<'arena> Expression<'arena> {
             Expression::Static(_) => NodeKind::Keyword,
             Expression::Self_(_) => NodeKind::Keyword,
             Expression::Pipe(_) => NodeKind::Pipe,
+            Expression::Error(_) => NodeKind::Error,
         }
     }
 }
@@ -493,6 +494,7 @@ impl HasSpan for Expression<'_> {
             Expression::Instantiation(expression) => expression.span(),
             Expression::MagicConstant(expression) => expression.span(),
             Expression::Pipe(expression) => expression.span(),
+            Expression::Error(span) => *span,
         }
     }
 }

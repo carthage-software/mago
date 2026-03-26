@@ -1,5 +1,7 @@
+use mago_syntax::ast::ClassLikeMemberSelector;
 use mago_syntax::ast::Expression;
 use mago_syntax::ast::FunctionCall;
+use mago_syntax::ast::MethodCall;
 
 use crate::context::LintContext;
 
@@ -70,4 +72,24 @@ fn function_name_matches_any<'arena, 'name>(
     }
 
     None
+}
+
+/// Gets the method name from a method call.
+pub fn get_method_name<'a>(method_call: &'a MethodCall<'a>) -> Option<&'a str> {
+    match &method_call.method {
+        ClassLikeMemberSelector::Identifier(identifier) => Some(identifier.value),
+        _ => None,
+    }
+}
+
+/// Case-insensitive method name check (PHP methods are case-insensitive).
+pub fn method_name_equals(method_call: &MethodCall<'_>, name: &str) -> bool {
+    get_method_name(method_call).is_some_and(|n| n.eq_ignore_ascii_case(name))
+}
+
+/// Case-insensitive check against multiple method names.
+/// Returns the matched name from the list if found.
+pub fn method_name_matches_any<'a>(method_call: &MethodCall<'_>, names: &[&'a str]) -> Option<&'a str> {
+    let method_name = get_method_name(method_call)?;
+    names.iter().find(|&n| method_name.eq_ignore_ascii_case(n)).copied()
 }

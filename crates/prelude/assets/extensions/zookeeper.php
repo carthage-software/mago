@@ -71,17 +71,13 @@ class Zookeeper
      * @throws ZookeeperException
      * @throws ZookeeperConnectionException
      */
-    public function connect($host, $watcher_cb = null, $recv_timeout = 10000)
-    {
-    }
+    public function connect($host, $watcher_cb = null, $recv_timeout = 10000) {}
 
     /**
      * @throws ZookeeperException
      * @throws ZookeeperConnectionException
      */
-    public function close()
-    {
-    }
+    public function close() {}
 
     /**
      * @param string $path
@@ -94,9 +90,7 @@ class Zookeeper
      * @throws ZookeeperException
      * @throws ZookeeperNoNodeException
      */
-    public function create($path, $value, $acl, $flags = null)
-    {
-    }
+    public function create($path, $value, $acl, $flags = null) {}
 
     /**
      * @param string $path
@@ -107,9 +101,7 @@ class Zookeeper
      * @throws ZookeeperException
      * @throws ZookeeperNoNodeException
      */
-    public function delete($path, $version = -1)
-    {
-    }
+    public function delete($path, $version = -1) {}
 
     /**
      * @param string $path
@@ -123,9 +115,7 @@ class Zookeeper
      * @throws ZookeeperException
      * @throws ZookeeperNoNodeException
      */
-    public function set($path, $data, $version = -1, &$stat = null)
-    {
-    }
+    public function set($path, $data, $version = -1, &$stat = null) {}
 
     /**
      * @param string $path
@@ -139,9 +129,7 @@ class Zookeeper
      * @throws ZookeeperException
      * @throws ZookeeperNoNodeException
      */
-    public function get($path, $watcher_cb = null, &$stat = null, $max_size = 0)
-    {
-    }
+    public function get($path, $watcher_cb = null, &$stat = null, $max_size = 0) {}
 
     /**
      * @param string $path
@@ -152,9 +140,7 @@ class Zookeeper
      * @throws ZookeeperException
      * @throws ZookeeperNoNodeException
      */
-    public function getChildren($path, $watcher_cb = null)
-    {
-    }
+    public function getChildren($path, $watcher_cb = null) {}
 
     /**
      * @param string $path
@@ -164,9 +150,7 @@ class Zookeeper
      *
      * @throws ZookeeperException
      */
-    public function exists($path, $watcher_cb = null)
-    {
-    }
+    public function exists($path, $watcher_cb = null) {}
 
     /**
      * @param string $path
@@ -175,9 +159,7 @@ class Zookeeper
      *
      * @throws ZookeeperException
      */
-    public function getAcl($path)
-    {
-    }
+    public function getAcl($path) {}
 
     /**
      * @param string $path
@@ -188,9 +170,7 @@ class Zookeeper
      *
      * @throws ZookeeperException
      */
-    public function setAcl($path, $version, $acls)
-    {
-    }
+    public function setAcl($path, $version, $acls) {}
 
     /**
      * @return int
@@ -198,9 +178,7 @@ class Zookeeper
      * @throws ZookeeperException
      * @throws ZookeeperConnectionException
      */
-    public function getClientId()
-    {
-    }
+    public function getClientId() {}
 
     /**
      * @param callable $watcher_cb
@@ -210,9 +188,7 @@ class Zookeeper
      * @throws ZookeeperException
      * @throws ZookeeperConnectionException
      */
-    public function setWatcher($watcher_cb)
-    {
-    }
+    public function setWatcher($watcher_cb) {}
 
     /**
      * @return int
@@ -220,9 +196,7 @@ class Zookeeper
      * @throws ZookeeperException
      * @throws ZookeeperConnectionException
      */
-    public function getState()
-    {
-    }
+    public function getState() {}
 
     /**
      * @return int
@@ -230,9 +204,7 @@ class Zookeeper
      * @throws ZookeeperException
      * @throws ZookeeperConnectionException
      */
-    public function getRecvTimeout()
-    {
-    }
+    public function getRecvTimeout() {}
 
     /**
      * @param string $scheme
@@ -244,9 +216,7 @@ class Zookeeper
      * @throws ZookeeperException
      * @throws ZookeeperConnectionException
      */
-    public function addAuth($scheme, $cert, $completion_cb = null)
-    {
-    }
+    public function addAuth($scheme, $cert, $completion_cb = null) {}
 
     /**
      * @return bool
@@ -254,62 +224,40 @@ class Zookeeper
      * @throws ZookeeperException
      * @throws ZookeeperConnectionException
      */
-    public function isRecoverable()
-    {
-    }
+    public function isRecoverable() {}
 
     /**
      * @param resource $file
      *
      * @return bool
      */
-    public function setLogStream($file)
-    {
-    }
+    public function setLogStream($file) {}
 
     /**
      * @param int $level
      *
      * @return bool
      */
-    public static function setDebugLevel($level)
-    {
-    }
+    public static function setDebugLevel($level) {}
 
     /**
      * @param bool $trueOrFalse
      *
      * @return bool
      */
-    public static function setDeterministicConnOrder($trueOrFalse)
-    {
-    }
+    public static function setDeterministicConnOrder($trueOrFalse) {}
 }
 
-class ZookeeperException extends Exception
-{
-}
+class ZookeeperException extends Exception {}
 
-class ZookeeperOperationTimeoutException extends ZookeeperException
-{
-}
+class ZookeeperOperationTimeoutException extends ZookeeperException {}
 
-class ZookeeperConnectionException extends ZookeeperException
-{
-}
+class ZookeeperConnectionException extends ZookeeperException {}
 
-class ZookeeperMarshallingException extends ZookeeperException
-{
-}
+class ZookeeperMarshallingException extends ZookeeperException {}
 
-class ZookeeperAuthenticationException extends ZookeeperException
-{
-}
+class ZookeeperAuthenticationException extends ZookeeperException {}
 
-class ZookeeperSessionException extends ZookeeperException
-{
-}
+class ZookeeperSessionException extends ZookeeperException {}
 
-class ZookeeperNoNodeException extends ZookeeperException
-{
-}
+class ZookeeperNoNodeException extends ZookeeperException {}

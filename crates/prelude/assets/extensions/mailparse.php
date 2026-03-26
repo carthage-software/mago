@@ -11,16 +11,12 @@ const MAILPARSE_EXTRACT_RETURN = 2;
  *
  * @return string
  */
-function mailparse_determine_best_xfer_encoding($fp)
-{
-}
+function mailparse_determine_best_xfer_encoding($fp) {}
 
 /**
  * @return resource
  */
-function mailparse_msg_create()
-{
-}
+function mailparse_msg_create() {}
 
 /**
  * @param resource $mimemail
@@ -29,9 +25,7 @@ function mailparse_msg_create()
  *
  * @return string|bool
  */
-function mailparse_msg_extract_part_file($mimemail, $filename, $callbackfunc = null)
-{
-}
+function mailparse_msg_extract_part_file($mimemail, $filename, $callbackfunc = null) {}
 
 /**
  * @param resource $mimemail
@@ -39,9 +33,7 @@ function mailparse_msg_extract_part_file($mimemail, $filename, $callbackfunc = n
  * @param null|callable $callbackfunc
  * @return void
  */
-function mailparse_msg_extract_part($mimemail, $msgbody, $callbackfunc = null)
-{
-}
+function mailparse_msg_extract_part($mimemail, $msgbody, $callbackfunc = null) {}
 
 /**
  * @param resource $mimemail
@@ -50,27 +42,21 @@ function mailparse_msg_extract_part($mimemail, $msgbody, $callbackfunc = null)
  *
  * @return string
  */
-function mailparse_msg_extract_whole_part_file($mimemail, $filename, $callbackfunc = null)
-{
-}
+function mailparse_msg_extract_whole_part_file($mimemail, $filename, $callbackfunc = null) {}
 
 /**
  * @param resource $mimemail
  *
  * @return bool
  */
-function mailparse_msg_free($mimemail)
-{
-}
+function mailparse_msg_free($mimemail) {}
 
 /**
  * @param resource $mimemail
  *
  * @return array
  */
-function mailparse_msg_get_part_data($mimemail)
-{
-}
+function mailparse_msg_get_part_data($mimemail) {}
 
 /**
  * @param resource $mimemail
@@ -78,27 +64,21 @@ function mailparse_msg_get_part_data($mimemail)
  *
  * @return resource|false
  */
-function mailparse_msg_get_part($mimemail, $mimesection)
-{
-}
+function mailparse_msg_get_part($mimemail, $mimesection) {}
 
 /**
  * @param resource $mimemail
  *
  * @return array
  */
-function mailparse_msg_get_structure($mimemail)
-{
-}
+function mailparse_msg_get_structure($mimemail) {}
 
 /**
  * @param string $filename
  *
  * @return resource|false
  */
-function mailparse_msg_parse_file($filename)
-{
-}
+function mailparse_msg_parse_file($filename) {}
 
 /**
  * @param resource $mimemail
@@ -106,18 +86,14 @@ function mailparse_msg_parse_file($filename)
  *
  * @return bool
  */
-function mailparse_msg_parse($mimemail, $data)
-{
-}
+function mailparse_msg_parse($mimemail, $data) {}
 
 /**
  * @param string $addresses
  *
  * @return array
  */
-function mailparse_rfc822_parse_addresses($addresses)
-{
-}
+function mailparse_rfc822_parse_addresses($addresses) {}
 
 /**
  * @param resource $sourcefp
@@ -126,14 +102,10 @@ function mailparse_rfc822_parse_addresses($addresses)
  *
  * @return bool
  */
-function mailparse_stream_encode($sourcefp, $destfp, $encoding)
-{
-}
+function mailparse_stream_encode($sourcefp, $destfp, $encoding) {}
 
 /**
  * @param resource $fp
  * @return array
  */
-function mailparse_uudecode_all($fp)
-{
-}
+function mailparse_uudecode_all($fp) {}

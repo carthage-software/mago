@@ -1,0 +1,20 @@
+int
+string
+bool
+float
+mixed
+null
+void
+never
+array
+object
+callable
+iterable
+resource
+array<string>
+array<int, string>
+?string
+int|string
+Foo
+Bar\Baz
+\Fully\Qualified\Name

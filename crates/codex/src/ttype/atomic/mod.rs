@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -72,6 +74,19 @@ pub enum TAtomic {
 }
 
 impl TAtomic {
+    /// Returns true if this atomic is a Placeholder or contains Placeholder in type parameters.
+    #[must_use]
+    pub fn contains_placeholder(&self) -> bool {
+        match self {
+            TAtomic::Placeholder => true,
+            TAtomic::Object(TObject::Named(named)) => {
+                named.get_type_parameters().is_some_and(|params| params.iter().any(|p| p.contains_placeholder()))
+            }
+            TAtomic::Array(array) => array.contains_placeholder(),
+            _ => false,
+        }
+    }
+
     #[must_use]
     pub fn is_numeric(&self) -> bool {
         match self {
@@ -166,6 +181,11 @@ impl TAtomic {
     }
 
     #[must_use]
+    pub fn is_static(&self) -> bool {
+        matches!(self, TAtomic::Object(TObject::Named(named_object)) if named_object.is_static)
+    }
+
+    #[must_use]
     pub fn is_this(&self) -> bool {
         matches!(self, TAtomic::Object(TObject::Named(named_object)) if named_object.is_this())
     }
@@ -222,7 +242,7 @@ impl TAtomic {
                 break 'parameters None;
             };
 
-            let object_name = named_object.get_name_ref();
+            let object_name = named_object.get_name();
             if !object_name.eq_ignore_ascii_case("Generator") {
                 break 'parameters None;
             }
@@ -345,15 +365,17 @@ impl TAtomic {
 
                 return false;
             }
+            // bottom type: subtype of all types
+            TAtomic::Never => return true,
             _ => return false,
         };
 
         if let Some(object_name) = object.get_name() {
-            if *object_name == interface {
+            if object_name == interface {
                 return true;
             }
 
-            if codebase.is_instance_of(object_name, interface) {
+            if codebase.is_instance_of(&object_name, interface) {
                 return true;
             }
         }
@@ -1097,7 +1119,7 @@ pub fn populate_atomic_type(
         TAtomic::Array(array) => match array {
             TArray::List(list) => {
                 populate_union_type(
-                    list.element_type.as_mut(),
+                    Arc::make_mut(&mut list.element_type),
                     codebase_symbols,
                     reference_source,
                     symbol_references,
@@ -1119,7 +1141,7 @@ pub fn populate_atomic_type(
 
                 if let Some(parameters) = &mut keyed_array.parameters {
                     populate_union_type(
-                        parameters.0.as_mut(),
+                        Arc::make_mut(&mut parameters.0),
                         codebase_symbols,
                         reference_source,
                         symbol_references,
@@ -1127,7 +1149,7 @@ pub fn populate_atomic_type(
                     );
 
                     populate_union_type(
-                        parameters.1.as_mut(),
+                        Arc::make_mut(&mut parameters.1),
                         codebase_symbols,
                         reference_source,
                         symbol_references,
@@ -1152,7 +1174,7 @@ pub fn populate_atomic_type(
 
             if !named_object.is_intersection()
                 && !named_object.has_type_parameters()
-                && codebase_symbols.contains_enum(&name)
+                && codebase_symbols.contains_enum(name)
             {
                 *unpopulated_atomic = TAtomic::Object(TObject::new_enum(name));
             } else {
@@ -1239,7 +1261,7 @@ pub fn populate_atomic_type(
                     }
                 }
 
-                if let Some(symbol_kind) = codebase_symbols.get_kind(&ascii_lowercase_atom(name)) {
+                if let Some(symbol_kind) = codebase_symbols.get_kind(ascii_lowercase_atom(name)) {
                     if symbol_kind == SymbolKind::Enum {
                         *unpopulated_atomic = TAtomic::Object(TObject::new_enum(*name));
                     } else {
@@ -1289,7 +1311,13 @@ pub fn populate_atomic_type(
             }
         },
         TAtomic::GenericParameter(TGenericParameter { constraint, intersection_types, .. }) => {
-            populate_union_type(constraint.as_mut(), codebase_symbols, reference_source, symbol_references, force);
+            populate_union_type(
+                Arc::make_mut(constraint),
+                codebase_symbols,
+                reference_source,
+                symbol_references,
+                force,
+            );
 
             if let Some(intersection_types) = intersection_types.as_mut() {
                 for intersection_type in intersection_types {
@@ -1306,7 +1334,13 @@ pub fn populate_atomic_type(
         TAtomic::Scalar(TScalar::ClassLikeString(
             TClassLikeString::OfType { constraint, .. } | TClassLikeString::Generic { constraint, .. },
         )) => {
-            populate_atomic_type(constraint.as_mut(), codebase_symbols, reference_source, symbol_references, force);
+            populate_atomic_type(
+                Arc::make_mut(constraint),
+                codebase_symbols,
+                reference_source,
+                symbol_references,
+                force,
+            );
         }
         TAtomic::Conditional(conditional) => {
             populate_union_type(

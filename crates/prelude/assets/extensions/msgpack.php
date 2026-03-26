@@ -5,32 +5,24 @@ const MESSAGEPACK_OPT_PHPONLY = -1001;
 /**
  * @return string
  */
-function msgpack_serialize($value)
-{
-}
+function msgpack_serialize($value) {}
 
 /**
  * @param string $str
  * @param null|array|string|object $object
  */
-function msgpack_unserialize($str, $object = null)
-{
-}
+function msgpack_unserialize($str, $object = null) {}
 
 /**
  * @return string
  */
-function msgpack_pack($value)
-{
-}
+function msgpack_pack($value) {}
 
 /**
  * @param string $str
  * @param null|array|string|object $object
  */
-function msgpack_unpack($str, $object = null)
-{
-}
+function msgpack_unpack($str, $object = null) {}
 
 class MessagePack
 {
@@ -38,48 +30,28 @@ class MessagePack
 
     public function __construct($opt) {}
 
-    public function setOption($option, $value)
-    {
-    }
+    public function setOption($option, $value) {}
 
-    public function pack($value)
-    {
-    }
+    public function pack($value) {}
 
-    public function unpack($str, $object)
-    {
-    }
+    public function unpack($str, $object) {}
 
-    public function unpacker()
-    {
-    }
+    public function unpacker() {}
 }
 
 class MessagePackUnpacker
 {
     public function __construct($opt) {}
 
-    public function __destruct()
-    {
-    }
+    public function __destruct() {}
 
-    public function setOption($option, $value)
-    {
-    }
+    public function setOption($option, $value) {}
 
-    public function feed($str)
-    {
-    }
+    public function feed($str) {}
 
-    public function execute($str, &$offset)
-    {
-    }
+    public function execute($str, &$offset) {}
 
-    public function data($object)
-    {
-    }
+    public function data($object) {}
 
-    public function reset()
-    {
-    }
+    public function reset() {}
 }

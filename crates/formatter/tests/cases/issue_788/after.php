@@ -5,5 +5,4 @@ function foo(
     $aaaaaaaaaaaaaaaaaaaaaaaaa2,
     $aaaaaaaaaaaaaaaaaaaaaaaaa3,
     $aaaaaaaaaaaaaaaaaaaaaaaaa4,
-) { //: void
-}
+) {} //: void

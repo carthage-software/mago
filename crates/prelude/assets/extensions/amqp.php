@@ -67,119 +67,91 @@ const AMQP_EXTENSION_VERSION_ID = '10112';
 class AMQPBasicProperties
 {
     public function __construct(
-        null|string $contentType = null,
-        null|string $contentEncoding = null,
+        ?string $contentType = null,
+        ?string $contentEncoding = null,
         array $headers = [],
         int $deliveryMode = AMQP_DELIVERY_MODE_TRANSIENT,
         int $priority = 0,
-        null|string $correlationId = null,
-        null|string $replyTo = null,
-        null|string $expiration = null,
-        null|string $messageId = null,
-        null|int $timestamp = null,
-        null|string $type = null,
-        null|string $userId = null,
-        null|string $appId = null,
-        null|string $clusterId = null,
+        ?string $correlationId = null,
+        ?string $replyTo = null,
+        ?string $expiration = null,
+        ?string $messageId = null,
+        ?int $timestamp = null,
+        ?string $type = null,
+        ?string $userId = null,
+        ?string $appId = null,
+        ?string $clusterId = null,
     ) {}
 
     /**
      * @return string|null
      */
-    public function getContentType()
-    {
-    }
+    public function getContentType() {}
 
     /**
      * @return string|null
      */
-    public function getContentEncoding()
-    {
-    }
+    public function getContentEncoding() {}
 
     /**
      * @return array
      */
-    public function getHeaders()
-    {
-    }
+    public function getHeaders() {}
 
     /**
      * @return int
      */
-    public function getDeliveryMode()
-    {
-    }
+    public function getDeliveryMode() {}
 
     /**
      * @return int
      */
-    public function getPriority()
-    {
-    }
+    public function getPriority() {}
 
     /**
      * @return string|null
      */
-    public function getCorrelationId()
-    {
-    }
+    public function getCorrelationId() {}
 
     /**
      * @return string|null
      */
-    public function getReplyTo()
-    {
-    }
+    public function getReplyTo() {}
 
     /**
      * @return string|null
      */
-    public function getExpiration()
-    {
-    }
+    public function getExpiration() {}
 
     /**
      * @return string|null
      */
-    public function getMessageId()
-    {
-    }
+    public function getMessageId() {}
 
     /**
      * @return int|null
      */
-    public function getTimestamp()
-    {
-    }
+    public function getTimestamp() {}
 
     /**
      * @return string|null
      */
-    public function getType()
-    {
-    }
+    public function getType() {}
 
     /**
      * @return string|null
      */
-    public function getUserId()
-    {
-    }
+    public function getUserId() {}
 
     /**
      * @return string|null
      */
-    public function getAppId()
-    {
-    }
+    public function getAppId() {}
 
     /**
      * @return string|null
      */
-    public function getClusterId()
-    {
-    }
+    public function getClusterId() {}
 }
 
 class AMQPChannel
@@ -190,9 +162,7 @@ class AMQPChannel
      *
      * @return void
      */
-    public function commitTransaction()
-    {
-    }
+    public function commitTransaction() {}
 
     /**
      * @param AMQPConnection $amqp_connection
@@ -204,23 +174,17 @@ class AMQPChannel
     /**
      * @return bool
      */
-    public function isConnected()
-    {
-    }
+    public function isConnected() {}
 
     /**
      * @return void
      */
-    public function close()
-    {
-    }
+    public function close() {}
 
     /**
      * @return int
      */
-    public function getChannelId()
-    {
-    }
+    public function getChannelId() {}
 
     /**
      * @param int $size
@@ -231,9 +195,7 @@ class AMQPChannel
      *
      * @return void
      */
-    public function qos($size, $count, $global = false)
-    {
-    }
+    public function qos($size, $count, $global = false) {}
 
     /**
      * @throws AMQPChannelException
@@ -241,9 +203,7 @@ class AMQPChannel
      *
      * @return void
      */
-    public function rollbackTransaction()
-    {
-    }
+    public function rollbackTransaction() {}
 
     /**
      * @param int $count
@@ -252,16 +212,12 @@ class AMQPChannel
      *
      * @return void
      */
-    public function setPrefetchCount($count)
-    {
-    }
+    public function setPrefetchCount($count) {}
 
     /**
      * @return int
      */
-    public function getPrefetchCount()
-    {
-    }
+    public function getPrefetchCount() {}
 
     /**
      * @param int $size
@@ -270,16 +226,12 @@ class AMQPChannel
      *
      * @return void
      */
-    public function setPrefetchSize($size)
-    {
-    }
+    public function setPrefetchSize($size) {}
 
     /**
      * @return int
      */
-    public function getPrefetchSize()
-    {
-    }
+    public function getPrefetchSize() {}
 
     /**
      * @param int $count
@@ -288,16 +240,12 @@ class AMQPChannel
      *
      * @return void
      */
-    public function setGlobalPrefetchCount($count)
-    {
-    }
+    public function setGlobalPrefetchCount($count) {}
 
     /**
      * @return int
      */
-    public function getGlobalPrefetchCount()
-    {
-    }
+    public function getGlobalPrefetchCount() {}
 
     /**
      * @param int $size
@@ -306,48 +254,36 @@ class AMQPChannel
      *
      * @return void
      */
-    public function setGlobalPrefetchSize($size)
-    {
-    }
+    public function setGlobalPrefetchSize($size) {}
 
     /**
      * @return int
      */
-    public function getGlobalPrefetchSize()
-    {
-    }
+    public function getGlobalPrefetchSize() {}
 
     /**
      * @throws AMQPConnectionException
      *
      * @return void
      */
-    public function startTransaction()
-    {
-    }
+    public function startTransaction() {}
 
     /**
      * @return AMQPConnection
      */
-    public function getConnection()
-    {
-    }
+    public function getConnection() {}
 
     /**
      * @param bool $requeue
      *
      * @return void
      */
-    public function basicRecover($requeue = true)
-    {
-    }
+    public function basicRecover($requeue = true) {}
 
     /**
      * @return void
      */
-    public function confirmSelect()
-    {
-    }
+    public function confirmSelect() {}
 
     /**
      * @param callable|null $ack_callback
@@ -355,9 +291,7 @@ class AMQPChannel
      *
      * @return void
      */
-    public function setConfirmCallback(callable $ack_callback = null, callable $nack_callback = null)
-    {
-    }
+    public function setConfirmCallback(callable $ack_callback = null, callable $nack_callback = null) {}
 
     /**
      * @param float $timeout
@@ -366,18 +300,14 @@ class AMQPChannel
      *
      * @return void
      */
-    public function waitForConfirm($timeout = 0.0)
-    {
-    }
+    public function waitForConfirm($timeout = 0.0) {}
 
     /**
      * @param callable|null $return_callback
      *
      * @return void
      */
-    public function setReturnCallback(callable $return_callback = null)
-    {
-    }
+    public function setReturnCallback(callable $return_callback = null) {}
 
     /**
      * @param float $timeout
@@ -386,21 +316,15 @@ class AMQPChannel
      *
      * @return void
      */
-    public function waitForBasicReturn($timeout = 0.0)
-    {
-    }
+    public function waitForBasicReturn($timeout = 0.0) {}
 
     /**
      * @return AMQPQueue[]
      */
-    public function getConsumers()
-    {
-    }
+    public function getConsumers() {}
 }
 
-class AMQPChannelException extends AMQPException
-{
-}
+class AMQPChannelException extends AMQPException {}
 
 class AMQPConnection
 {
@@ -412,102 +336,76 @@ class AMQPConnection
     /**
      * @return bool
      */
-    public function isConnected()
-    {
-    }
+    public function isConnected() {}
 
     /**
      * @return bool
      */
-    public function isPersistent()
-    {
-    }
+    public function isPersistent() {}
 
     /**
      * @throws AMQPConnectionException
      *
      * @return void
      */
-    public function connect()
-    {
-    }
+    public function connect() {}
 
     /**
      * @throws AMQPConnectionException
      *
      * @return void
      */
-    public function disconnect()
-    {
-    }
+    public function disconnect() {}
 
     /**
      * @return void
      */
-    public function reconnect()
-    {
-    }
+    public function reconnect() {}
 
     /**
      * @throws AMQPConnectionException
      * @return void
      */
-    public function pconnect()
-    {
-    }
+    public function pconnect() {}
 
     /**
      * @throws AMQPConnectionException
      *
      * @return void
      */
-    public function pdisconnect()
-    {
-    }
+    public function pdisconnect() {}
 
     /**
      * @throws AMQPConnectionException
      *
      * @return void
      */
-    public function preconnect()
-    {
-    }
+    public function preconnect() {}
 
     /**
      * @return string
      */
-    public function getHost()
-    {
-    }
+    public function getHost() {}
 
     /**
      * @return string
      */
-    public function getLogin()
-    {
-    }
+    public function getLogin() {}
 
     /**
      * @return string
      */
-    public function getPassword()
-    {
-    }
+    public function getPassword() {}
 
     /**
      * @return int
      */
-    public function getPort()
-    {
-    }
+    public function getPort() {}
 
     /**
      * @return string
      */
-    public function getVhost()
-    {
-    }
+    public function getVhost() {}
 
     /**
      * @param string $host
@@ -516,9 +414,7 @@ class AMQPConnection
      *
      * @return void
      */
-    public function setHost($host)
-    {
-    }
+    public function setHost($host) {}
 
     /**
      * @param string $login
@@ -527,9 +423,7 @@ class AMQPConnection
      *
      * @return void
      */
-    public function setLogin($login)
-    {
-    }
+    public function setLogin($login) {}
 
     /**
      * @param string $password
@@ -538,9 +432,7 @@ class AMQPConnection
      *
      * @return void
      */
-    public function setPassword($password)
-    {
-    }
+    public function setPassword($password) {}
 
     /**
      * @param int $port
@@ -549,9 +441,7 @@ class AMQPConnection
      *
      * @return void
      */
-    public function setPort($port)
-    {
-    }
+    public function setPort($port) {}
 
     /**
      * @param string $vhost
@@ -560,9 +450,7 @@ class AMQPConnection
      *
      * @return void
      */
-    public function setVhost($vhost)
-    {
-    }
+    public function setVhost($vhost) {}
 
     /**
      * @param float $timeout
@@ -572,17 +460,13 @@ class AMQPConnection
      * @return void
      */
     #[Deprecated]
-    public function setTimeout($timeout)
-    {
-    }
+    public function setTimeout($timeout) {}
 
     /**
      * @return float
      */
     #[Deprecated]
-    public function getTimeout()
-    {
-    }
+    public function getTimeout() {}
 
     /**
      * @param float $timeout
@@ -591,16 +475,12 @@ class AMQPConnection
      *
      * @return void
      */
-    public function setReadTimeout($timeout)
-    {
-    }
+    public function setReadTimeout($timeout) {}
 
     /**
      * @return float
      */
-    public function getReadTimeout()
-    {
-    }
+    public function getReadTimeout() {}
 
     /**
      * @param float $timeout
@@ -609,22 +489,16 @@ class AMQPConnection
      *
      * @return void
      */
-    public function setWriteTimeout($timeout)
-    {
-    }
+    public function setWriteTimeout($timeout) {}
 
     /**
      * @return float
      */
-    public function getWriteTimeout()
-    {
-    }
+    public function getWriteTimeout() {}
 
     /**
      */
-    public function getConnectTimeout(): float
-    {
-    }
+    public function getConnectTimeout(): float {}
 
     /**
      * @param float $timeout
@@ -633,137 +507,99 @@ class AMQPConnection
      *
      * @return void
      */
-    public function setRpcTimeout($timeout)
-    {
-    }
+    public function setRpcTimeout($timeout) {}
 
     /**
      * @return float
      */
-    public function getRpcTimeout()
-    {
-    }
+    public function getRpcTimeout() {}
 
     /**
      * @return int
      */
-    public function getUsedChannels()
-    {
-    }
+    public function getUsedChannels() {}
 
     /**
      * @return int
      */
-    public function getMaxChannels()
-    {
-    }
+    public function getMaxChannels() {}
 
     /**
      * @return int
      */
-    public function getMaxFrameSize()
-    {
-    }
+    public function getMaxFrameSize() {}
 
     /**
      * @return int
      */
-    public function getHeartbeatInterval()
-    {
-    }
+    public function getHeartbeatInterval() {}
 
     /**
      * @return string|null
      */
-    public function getCACert()
-    {
-    }
+    public function getCACert() {}
 
     /**
      * @param string $cacert
      *
      * @return void
      */
-    public function setCACert($cacert)
-    {
-    }
+    public function setCACert($cacert) {}
 
     /**
      * @return string|null
      */
-    public function getCert()
-    {
-    }
+    public function getCert() {}
 
     /**
      * @param string $cert
      *
      * @return void
      */
-    public function setCert($cert)
-    {
-    }
+    public function setCert($cert) {}
 
     /**
      * @return string|null
      */
-    public function getKey()
-    {
-    }
+    public function getKey() {}
 
     /**
      * @param string|null $key
      *
      * @return void
      */
-    public function setKey($key)
-    {
-    }
+    public function setKey($key) {}
 
     /**
      * @return bool
      */
-    public function getVerify()
-    {
-    }
+    public function getVerify() {}
 
     /**
      * @param bool $verify
      *
      * @return void
      */
-    public function setVerify($verify)
-    {
-    }
+    public function setVerify($verify) {}
 
     /**
      * @param int $method
      *
      * @return void
      */
-    public function setSaslMethod($method)
-    {
-    }
+    public function setSaslMethod($method) {}
 
     /**
      * @return int
      */
-    public function getSaslMethod()
-    {
-    }
+    public function getSaslMethod() {}
 
-    public function setConnectionName(null|string $connectionName): void
-    {
-    }
+    public function setConnectionName(?string $connectionName): void {}
 
-    public function getConnectionName(): null|string
-    {
-    }
+    public function getConnectionName(): ?string {}
 }
 
-class AMQPConnectionException extends AMQPException
-{
-}
+class AMQPConnectionException extends AMQPException {}
 
 interface AMQPValue
 {
@@ -786,18 +622,12 @@ final class AMQPDecimal implements AMQPValue
     public function __construct($exponent, $significand) {}
 
     /** @return int */
-    public function getExponent()
-    {
-    }
+    public function getExponent() {}
 
     /** @return int */
-    public function getSignificand()
-    {
-    }
+    public function getSignificand() {}
 
-    public function toAmqpValue(): float|array|AMQPDecimal|bool|int|AMQPValue|string|AMQPTimestamp|null
-    {
-    }
+    public function toAmqpValue(): float|array|AMQPDecimal|bool|int|AMQPValue|string|AMQPTimestamp|null {}
 }
 
 class AMQPEnvelope extends AMQPBasicProperties
@@ -805,72 +635,52 @@ class AMQPEnvelope extends AMQPBasicProperties
     /**
      * @return string
      */
-    public function getBody()
-    {
-    }
+    public function getBody() {}
 
     /**
      * @return string
      */
-    public function getRoutingKey()
-    {
-    }
+    public function getRoutingKey() {}
 
     /**
      * @return string|null
      */
-    public function getConsumerTag()
-    {
-    }
+    public function getConsumerTag() {}
 
     /**
      * @return int|null
      */
-    public function getDeliveryTag()
-    {
-    }
+    public function getDeliveryTag() {}
 
     /**
      * @return string|null
      */
-    public function getExchangeName()
-    {
-    }
+    public function getExchangeName() {}
 
     /**
      * @return bool
      */
-    public function isRedelivery()
-    {
-    }
+    public function isRedelivery() {}
 
     /**
      * @param string $headerName
      */
-    public function getHeader($headerName)
-    {
-    }
+    public function getHeader($headerName) {}
 
     /**
      * @param string $headerName
      *
      * @return bool
      */
-    public function hasHeader($headerName)
-    {
-    }
+    public function hasHeader($headerName) {}
 }
 
 class AMQPEnvelopeException extends AMQPException
 {
-    public function getEnvelope(): AMQPEnvelope
-    {
-    }
+    public function getEnvelope(): AMQPEnvelope {}
 }
 
-class AMQPException extends Exception
-{
-}
+class AMQPException extends Exception {}
 
 class AMQPExchange
 {
@@ -893,9 +703,7 @@ class AMQPExchange
      *
      * @return void
      */
-    public function bind($exchangeName, $routingKey = '', array $arguments = [])
-    {
-    }
+    public function bind($exchangeName, $routingKey = '', array $arguments = []) {}
 
     /**
      * @param string $exchangeName
@@ -908,9 +716,7 @@ class AMQPExchange
      *
      * @return void
      */
-    public function unbind($exchangeName, $routingKey = '', array $arguments = [])
-    {
-    }
+    public function unbind($exchangeName, $routingKey = '', array $arguments = []) {}
 
     /**
      * @throws AMQPExchangeException
@@ -919,9 +725,7 @@ class AMQPExchange
      *
      * @return void
      */
-    public function declareExchange()
-    {
-    }
+    public function declareExchange() {}
 
     /**
      * @throws AMQPExchangeException
@@ -930,9 +734,7 @@ class AMQPExchange
      *
      * @return void
      */
-    public function declare(): void
-    {
-    }
+    public function declare(): void {}
 
     /**
      * @param string  $exchangeName
@@ -944,9 +746,7 @@ class AMQPExchange
      *
      * @return void
      */
-    public function delete($exchangeName = null, $flags = AMQP_NOPARAM)
-    {
-    }
+    public function delete($exchangeName = null, $flags = AMQP_NOPARAM) {}
 
     /**
      * @param string $argumentName
@@ -955,46 +755,34 @@ class AMQPExchange
      *
      * @return bool|int|float|string|null
      */
-    public function getArgument($argumentName)
-    {
-    }
+    public function getArgument($argumentName) {}
 
     /**
      * @param string $argumentName
      *
      * @return bool
      */
-    public function hasArgument($argumentName)
-    {
-    }
+    public function hasArgument($argumentName) {}
 
     /**
      * @return array
      */
-    public function getArguments()
-    {
-    }
+    public function getArguments() {}
 
     /**
      * @return int
      */
-    public function getFlags()
-    {
-    }
+    public function getFlags() {}
 
     /**
      * @return string|null
      */
-    public function getName()
-    {
-    }
+    public function getName() {}
 
     /**
      * @return string|null
      */
-    public function getType()
-    {
-    }
+    public function getType() {}
 
     /**
      * @param string $message
@@ -1008,9 +796,7 @@ class AMQPExchange
      *
      * @return void
      */
-    public function publish($message, $routingKey = null, $flags = null, array $headers = [])
-    {
-    }
+    public function publish($message, $routingKey = null, $flags = null, array $headers = []) {}
 
     /**
      * @param string $argumentName
@@ -1018,69 +804,51 @@ class AMQPExchange
      *
      * @return void
      */
-    public function setArgument($argumentName, $argumentValue)
-    {
-    }
+    public function setArgument($argumentName, $argumentValue) {}
 
     /**
      * @param string $argumentName
      */
-    public function removeArgument(string $argumentName): void
-    {
-    }
+    public function removeArgument(string $argumentName): void {}
 
     /**
      * @return bool
      */
-    public function setArguments(array $arguments)
-    {
-    }
+    public function setArguments(array $arguments) {}
 
     /**
      * @param int|null $flags
      *
      * @return void
      */
-    public function setFlags($flags)
-    {
-    }
+    public function setFlags($flags) {}
 
     /**
      * @param string $exchangeName
      *
      * @return void
      */
-    public function setName($exchangeName)
-    {
-    }
+    public function setName($exchangeName) {}
 
     /**
      * @param string $exchangeType
      *
      * @return void
      */
-    public function setType($exchangeType)
-    {
-    }
+    public function setType($exchangeType) {}
 
     /**
      * @return AMQPChannel
      */
-    public function getChannel()
-    {
-    }
+    public function getChannel() {}
 
     /**
      * @return AMQPConnection
      */
-    public function getConnection()
-    {
-    }
+    public function getConnection() {}
 }
 
-class AMQPExchangeException extends AMQPException
-{
-}
+class AMQPExchangeException extends AMQPException {}
 
 class AMQPQueue
 {
@@ -1099,9 +867,7 @@ class AMQPQueue
      *
      * @return void
      */
-    public function ack($deliveryTag, $flags = null)
-    {
-    }
+    public function ack($deliveryTag, $flags = null) {}
 
     /**
      * @param string $exchangeName
@@ -1113,9 +879,7 @@ class AMQPQueue
      *
      * @return bool
      */
-    public function bind($exchangeName, $routingKey = null, array $arguments = [])
-    {
-    }
+    public function bind($exchangeName, $routingKey = null, array $arguments = []) {}
 
     /**
      * @param string $consumer_tag
@@ -1125,9 +889,7 @@ class AMQPQueue
      *
      * @return bool
      */
-    public function cancel($consumer_tag = '')
-    {
-    }
+    public function cancel($consumer_tag = '') {}
 
     /**
      * @param int|null $flags
@@ -1140,9 +902,7 @@ class AMQPQueue
      *
      * @return void
      */
-    public function consume(callable $callback = null, $flags = null, $consumerTag = null)
-    {
-    }
+    public function consume(callable $callback = null, $flags = null, $consumerTag = null) {}
 
     /**
      * @throws AMQPChannelException
@@ -1151,9 +911,7 @@ class AMQPQueue
      *
      * @return int
      */
-    public function declareQueue()
-    {
-    }
+    public function declareQueue() {}
 
     /**
      * @throws AMQPChannelException
@@ -1162,9 +920,7 @@ class AMQPQueue
      *
      * @return int
      */
-    public function declare(): int
-    {
-    }
+    public function declare(): int {}
 
     /**
      * @param int $flags
@@ -1174,9 +930,7 @@ class AMQPQueue
      *
      * @return int
      */
-    public function delete($flags = AMQP_NOPARAM)
-    {
-    }
+    public function delete($flags = AMQP_NOPARAM) {}
 
     /**
      * @param null|int $flags
@@ -1187,17 +941,11 @@ class AMQPQueue
      *
      * @return AMQPEnvelope|null
      */
-    public function get($flags = null)
-    {
-    }
+    public function get($flags = null) {}
 
-    public function getFlags(): int
-    {
-    }
+    public function getFlags(): int {}
 
-    public function getName(): null|string
-    {
-    }
+    public function getName(): ?string {}
 
     /**
      * @param int $deliveryTag
@@ -1208,9 +956,7 @@ class AMQPQueue
      *
      * @return bool
      */
-    public function nack($deliveryTag, $flags = AMQP_NOPARAM)
-    {
-    }
+    public function nack($deliveryTag, $flags = AMQP_NOPARAM) {}
 
     /**
      * @param int $deliveryTag
@@ -1221,17 +967,13 @@ class AMQPQueue
      *
      * @return bool
      */
-    public function reject($deliveryTag, $flags = null)
-    {
-    }
+    public function reject($deliveryTag, $flags = null) {}
 
     /**
      * @throws AMQPConnectionException
      * @throws AMQPChannelException
      */
-    public function recover(bool $requeue = true): void
-    {
-    }
+    public function recover(bool $requeue = true): void {}
 
     /**
      * @throws AMQPChannelException
@@ -1239,9 +981,7 @@ class AMQPQueue
      *
      * @return int
      */
-    public function purge()
-    {
-    }
+    public function purge() {}
 
     /**
      * @param string $argumentName
@@ -1250,52 +990,36 @@ class AMQPQueue
      *
      * @throws AMQPQueueException
      */
-    public function getArgument($argumentName)
-    {
-    }
+    public function getArgument($argumentName) {}
 
     /**
      * @param bool|int|float|string|null|array|AMQPValue|AMQPDecimal|AMQPTimestamp $argumentValue The argument value to set.
      *
      * @return void
      */
-    public function setArgument(string $argumentName, $argumentValue)
-    {
-    }
+    public function setArgument(string $argumentName, $argumentValue) {}
 
-    public function removeArgument(string $argumentName): void
-    {
-    }
+    public function removeArgument(string $argumentName): void {}
 
-    public function setArguments(array $arguments): void
-    {
-    }
+    public function setArguments(array $arguments): void {}
 
-    public function getArguments(): array
-    {
-    }
+    public function getArguments(): array {}
 
-    public function hasArgument(string $argumentName): bool
-    {
-    }
+    public function hasArgument(string $argumentName): bool {}
 
     /**
      * @param int|null $flags
      *
      * @return bool
      */
-    public function setFlags($flags = null)
-    {
-    }
+    public function setFlags($flags = null) {}
 
     /**
      * @param string $name
      *
      * @return bool
      */
-    public function setName($name)
-    {
-    }
+    public function setName($name) {}
 
     /**
      * @param string $exchangeName
@@ -1306,39 +1030,27 @@ class AMQPQueue
      * @throws AMQPChannelException
      * @throws AMQPConnectionException
      */
-    public function unbind($exchangeName, $routingKey = null, array $arguments = [])
-    {
-    }
+    public function unbind($exchangeName, $routingKey = null, array $arguments = []) {}
 
     /**
      * @return AMQPChannel
      */
-    public function getChannel()
-    {
-    }
+    public function getChannel() {}
 
     /**
      * @return AMQPConnection
      */
-    public function getConnection()
-    {
-    }
+    public function getConnection() {}
 
     /**
      * @return string|null
      */
-    public function getConsumerTag()
-    {
-    }
+    public function getConsumerTag() {}
 }
 
-class AMQPQueueException extends AMQPException
-{
-}
+class AMQPQueueException extends AMQPException {}
 
-class AMQPValueException extends AMQPException
-{
-}
+class AMQPValueException extends AMQPException {}
 
 final class AMQPTimestamp implements AMQPValue
 {
@@ -1350,19 +1062,11 @@ final class AMQPTimestamp implements AMQPValue
      */
     public function __construct(float $timestamp) {}
 
-    public function __toString(): string
-    {
-    }
+    public function __toString(): string {}
 
-    public function getTimestamp(): float
-    {
-    }
+    public function getTimestamp(): float {}
 
-    public function toAmqpValue(): float|array|AMQPDecimal|bool|int|AMQPValue|string|AMQPTimestamp|null
-    {
-    }
+    public function toAmqpValue(): float|array|AMQPDecimal|bool|int|AMQPValue|string|AMQPTimestamp|null {}
 }
 
-class AMQPExchangeValue extends AMQPException
-{
-}
+class AMQPExchangeValue extends AMQPException {}

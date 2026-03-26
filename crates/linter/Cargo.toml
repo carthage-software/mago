@@ -24,7 +24,7 @@ mago-casing = { workspace = true }
 mago-names = { workspace = true }
 mago-php-version = { workspace = true }
 mago-collector = { workspace = true }
-ahash = { workspace = true }
+foldhash = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 regex = { workspace = true }

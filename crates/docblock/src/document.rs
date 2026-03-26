@@ -471,7 +471,7 @@ where
             "nonamedarguments" => TagKind::NoNamedArguments,
             "no-named-arguments" => TagKind::NoNamedArguments,
             "api" => TagKind::Api,
-            "psalm-api" => TagKind::PsalmApi,
+            "psalm-api" | "psalmapi" => TagKind::PsalmApi,
             "psalm-inheritors" | "psalminheritors" => TagKind::PsalmInheritors,
             "inheritors" => TagKind::Inheritors,
             "return" => TagKind::Return,

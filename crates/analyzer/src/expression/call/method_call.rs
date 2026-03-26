@@ -37,7 +37,6 @@ use crate::invocation::template_result::populate_template_result_from_invocation
 use crate::plugin::ExpressionHookResult;
 use crate::plugin::context::HookContext;
 use crate::resolver::method::resolve_method_targets;
-use crate::utils::expression::expression_is_nullsafe;
 use crate::utils::expression::get_expression_id;
 use crate::visibility::check_method_visibility;
 
@@ -186,8 +185,8 @@ pub fn analyze_implicit_method_call<'ctx, 'arena>(
     if !check_method_visibility(
         context,
         block_context,
-        method_identifier.get_class_name(),
-        method_identifier.get_method_name(),
+        &method_identifier.get_class_name(),
+        &method_identifier.get_method_name(),
         span,
         None,
     ) {
@@ -205,8 +204,8 @@ pub fn analyze_implicit_method_call<'ctx, 'arena>(
     let invocation = Invocation::new(
         InvocationTarget::FunctionLike {
             identifier: FunctionLikeIdentifier::Method(
-                *method_identifier.get_class_name(),
-                *method_identifier.get_method_name(),
+                method_identifier.get_class_name(),
+                method_identifier.get_method_name(),
             ),
             metadata: method_metadata,
             inferred_return_type: None,
@@ -252,16 +251,7 @@ fn analyze_method_call<'ctx, 'ast, 'arena>(
     is_null_safe: bool,
     span: Span,
 ) -> Result<(), AnalysisError> {
-    let is_null_safe = is_null_safe || expression_is_nullsafe(object);
-
-    // When using nullsafe operator, mark that we're in a nullsafe chain
-    // This propagates to all subsequent accesses in the chain and persists
-    // through the entire expression evaluation
-    if is_null_safe {
-        block_context.inside_nullsafe_chain = true;
-    }
-
-    if block_context.collect_initializations
+    if block_context.flags.collect_initializations()
         && let ClassLikeMemberSelector::Identifier(method_ident) = selector
         && is_this_or_self_returning_chain(object, context, block_context)
     {
@@ -293,8 +283,8 @@ fn analyze_method_call<'ctx, 'ast, 'arena>(
 
         invocation_targets.push(InvocationTarget::FunctionLike {
             identifier: FunctionLikeIdentifier::Method(
-                *resolved_method.method_identifier.get_class_name(),
-                *resolved_method.method_identifier.get_method_name(),
+                resolved_method.method_identifier.get_class_name(),
+                resolved_method.method_identifier.get_method_name(),
             ),
             metadata: method_metadata,
             inferred_return_type: None,
@@ -310,6 +300,16 @@ fn analyze_method_call<'ctx, 'ast, 'arena>(
         Some(context.codebase),
     );
 
+    if is_null_safe && let Some(ref var_id) = this_variable {
+        artifacts
+            .true_branch_only_assertions
+            .entry((span.start.offset, span.end.offset))
+            .or_default()
+            .entry(*var_id)
+            .or_default()
+            .push(vec![mago_codex::assertion::Assertion::IsNotType(mago_codex::ttype::atomic::TAtomic::Null)]);
+    }
+
     analyze_invocation_targets(
         context,
         block_context,
@@ -322,6 +322,8 @@ fn analyze_method_call<'ctx, 'ast, 'arena>(
         method_resolution.has_invalid_target,
         method_resolution.encountered_mixed,
         is_null_safe && method_resolution.encountered_null,
+        artifacts.get_expression_type(object).is_some_and(|t| t.has_nullsafe_null()),
+        method_resolution.all_methods_non_nullable_return,
     )
 }
 
@@ -384,7 +386,7 @@ fn method_returns_self_or_static(context: &Context<'_, '_>, class_name: Atom, me
     if let Some(return_type_meta) = &method_meta.return_type_declaration_metadata {
         for atomic in return_type_meta.type_union.types.iter() {
             match atomic {
-                TAtomic::Object(TObject::Named(named_obj)) if named_obj.is_this => return true,
+                TAtomic::Object(TObject::Named(named_obj)) if named_obj.is_static => return true,
                 TAtomic::Object(TObject::Named(named_obj)) if named_obj.name.eq_ignore_ascii_case(&class_name) => {
                     return true;
                 }
@@ -685,6 +687,9 @@ mod tests {
                 }
             }
         "},
+        issues = [
+            IssueCode::WriteOnlyProperty,
+        ]
     }
 
     test_analysis! {

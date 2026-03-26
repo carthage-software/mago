@@ -20,6 +20,8 @@ use crate::context::LintContext;
 use crate::requirements::RuleRequirements;
 use crate::rule::Config;
 use crate::rule::LintRule;
+use crate::rule::utils::isset::build_access_path;
+use crate::rule::utils::isset::is_redundant;
 use crate::rule_meta::RuleMeta;
 use crate::settings::RuleSettings;
 
@@ -124,14 +126,44 @@ impl LintRule for CombineConsecutiveIssetsRule {
             return;
         }
 
-        ctx.collector.propose(issue, |edits| {
-            let to_replace = left_isset.right_parenthesis.join(binary.operator.span());
-            let to_delete = right_isset.isset.span.join(right_isset.left_parenthesis);
+        let all_left_redundant = all_args_redundant(&left_isset.values, &right_isset.values);
+        let all_right_redundant = all_args_redundant(&right_isset.values, &left_isset.values);
 
-            edits.push(TextEdit::replace(to_replace, ","));
-            edits.push(TextEdit::delete(to_delete));
+        ctx.collector.propose(issue, |edits| {
+            if all_left_redundant {
+                edits.push(TextEdit::delete(left_isset.start_offset()..right_isset.start_offset()));
+            } else if all_right_redundant {
+                edits.push(TextEdit::delete(left_isset.end_offset()..right_isset.end_offset()));
+            } else {
+                let to_replace = left_isset.right_parenthesis.join(binary.operator.span());
+                let to_delete = right_isset.isset.span.join(right_isset.left_parenthesis);
+
+                edits.push(TextEdit::replace(to_replace, ","));
+                edits.push(TextEdit::delete(to_delete));
+            }
         });
     }
+}
+
+/// Returns `true` if every argument in `candidate` is redundant given the arguments in `other`.
+///
+/// An argument is redundant if it is a proper prefix of (or equal to) any argument in `other`.
+fn all_args_redundant<'arena>(
+    candidate: &mago_syntax::ast::sequence::TokenSeparatedSequence<'arena, &'arena Expression<'arena>>,
+    other: &mago_syntax::ast::sequence::TokenSeparatedSequence<'arena, &'arena Expression<'arena>>,
+) -> bool {
+    let other_paths: Vec<_> = other.iter().filter_map(|expr| build_access_path(expr)).collect();
+    if other_paths.is_empty() {
+        return false;
+    }
+
+    candidate.iter().all(|expr| {
+        let Some(path) = build_access_path(expr) else {
+            return false;
+        };
+
+        other_paths.iter().any(|other_path| is_redundant(&path, other_path))
+    })
 }
 
 fn get_isset_construct<'ast, 'arena>(

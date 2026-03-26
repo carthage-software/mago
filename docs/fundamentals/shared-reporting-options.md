@@ -28,7 +28,7 @@ These options customize how Mago reports the issues it finds.
 | `--sort`                             | Sort reported issues by level, code, and location.                                                                              |
 | `--reporting-target <TARGET>`        | Specify where to report results. Options: `stdout`, `stderr`. Default: `stdout`.                                                |
 | `--reporting-format <FORMAT>`        | Choose the output format. See below for options. Default: `rich`.                                                               |
-| `--minimum-fail-level <LEVEL>`, `-m` | Set the minimum issue level that will cause a failure exit code. Options: `note`, `help`, `warning`, `error`. Default: `error`. |
+| `--minimum-fail-level <LEVEL>`, `-m` | Set the minimum issue level that will cause a failure exit code. Options: `note`, `help`, `warning`, `error`. Defaults to the value set in the configuration file, or `error` if not configured. |
 | `--minimum-report-level <LEVEL>`     | Set the minimum issue severity to include in the report. Issues below this level are filtered out.                              |
 | `--retain-code <CODE>`               | Retain only issues with the specified code(s). Can be specified multiple times. **This is a reporting filter only** - all rules/checks still run. See below for details. |
 
@@ -75,3 +75,4 @@ For a complete guide, see the [Baseline documentation](/fundamentals/baseline.md
 | `--generate-baseline` | Generate a new baseline file, capturing all current issues.                                     |
 | `--baseline <PATH>`   | Specify the path to a baseline file to use for ignoring issues.                                 |
 | `--backup-baseline`   | Create a backup of the old baseline file (e.g., `baseline.toml.bkp`) when generating a new one. |
+| `--ignore-baseline`   | Ignore any configured or specified baseline, reporting all issues.                               |

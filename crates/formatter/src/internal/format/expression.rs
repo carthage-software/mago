@@ -92,6 +92,7 @@ use mago_syntax::ast::YieldPair;
 use mago_syntax::ast::YieldValue;
 
 use crate::document::Align;
+use crate::document::BreakMode;
 use crate::document::Document;
 use crate::document::Line;
 use crate::internal::FormatterState;
@@ -109,10 +110,12 @@ use crate::internal::format::assignment::print_assignment_with_alignment;
 use crate::internal::format::binaryish;
 use crate::internal::format::binaryish::BinaryishOperator;
 use crate::internal::format::call_arguments::print_argument_list;
+use crate::internal::format::call_arguments::print_partial_argument_list;
 use crate::internal::format::call_node::CallLikeNode;
 use crate::internal::format::call_node::print_call_like_node;
 use crate::internal::format::class_like::print_class_like_body;
 use crate::internal::format::format_token;
+use crate::internal::format::format_token_with_only_leading_comments;
 use crate::internal::format::member_access::collect_member_access_chain;
 use crate::internal::format::member_access::print_member_access_chain;
 use crate::internal::format::misc;
@@ -122,6 +125,7 @@ use crate::internal::format::misc::print_modifiers;
 use crate::internal::format::print_lowercase_keyword;
 use crate::internal::format::return_value::format_return_value;
 use crate::internal::format::string::print_string;
+use crate::internal::format::string::print_uppercase_keyword;
 use crate::internal::utils;
 use crate::internal::utils::could_expand_value;
 use crate::internal::utils::unwrap_parenthesized;
@@ -188,6 +192,7 @@ impl<'arena> Format<'arena> for Expression<'arena> {
                 Expression::Instantiation(i) => i.format(f),
                 Expression::MagicConstant(c) => c.format(f),
                 Expression::Pipe(p) => p.format(f),
+                Expression::Error(_) => Document::empty(),
                 Expression::Parenthesized(_) => unreachable!("Parenthesized expressions are handled separately"),
                 _ => unreachable!("An expression variant was not handled in formatter: {self:?}"),
             }
@@ -206,7 +211,7 @@ impl<'arena> Format<'arena> for Binary<'arena> {
 impl<'arena> Format<'arena> for Pipe<'arena> {
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
         wrap!(f, self, Pipe, {
-            let has_trailing_comments = f.has_comment(self.span(), CommentFlags::Trailing);
+            let has_trailing_comments = f.has_comment(self.span(), CommentFlags::TRAILING);
             let mut should_break = has_trailing_comments;
 
             let mut callables: Vec<&'arena Expression<'arena>> = vec![in f.arena];
@@ -229,7 +234,7 @@ impl<'arena> Format<'arena> for Pipe<'arena> {
                 contents.push(Document::Line(Line::default()));
                 contents.push(Document::String("|> "));
 
-                let callable_has_trailing_comments = f.has_comment(callable.span(), CommentFlags::Trailing);
+                let callable_has_trailing_comments = f.has_comment(callable.span(), CommentFlags::TRAILING);
                 contents.push(callable.format(f));
                 if callable_has_trailing_comments {
                     should_break = true;
@@ -237,7 +242,8 @@ impl<'arena> Format<'arena> for Pipe<'arena> {
             }
 
             Document::Group(
-                Group::new(vec![in f.arena; formatted_input, Document::Indent(contents)]).with_break(should_break),
+                Group::new(vec![in f.arena; formatted_input, Document::Indent(contents)])
+                    .with_break_mode(if should_break { BreakMode::Force } else { BreakMode::Auto }),
             )
         })
     }
@@ -246,7 +252,19 @@ impl<'arena> Format<'arena> for Pipe<'arena> {
 impl<'arena> Format<'arena> for UnaryPrefix<'arena> {
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
         wrap!(f, self, UnaryPrefix, {
-            Document::Group(Group::new(vec![in f.arena; self.operator.format(f), self.operand.format(f)]))
+            let operator = self.operator.format(f);
+            let operand_trailing_comments = if let Expression::Parenthesized(p) = self.operand {
+                f.print_trailing_comments_between_nodes(p.left_parenthesis, p.expression.span())
+            } else {
+                None
+            };
+
+            match operand_trailing_comments {
+                Some(operand_trailing_comments) => Document::Group(Group::new(
+                    vec![in f.arena; operator, operand_trailing_comments, self.operand.format(f)],
+                )),
+                None => Document::Group(Group::new(vec![in f.arena; operator, self.operand.format(f)])),
+            }
         })
     }
 }
@@ -307,9 +325,13 @@ impl<'arena> Format<'arena> for Literal<'arena> {
                 Literal::String(literal) => literal.format(f),
                 Literal::Integer(literal) => literal.format(f),
                 Literal::Float(literal) => literal.format(f),
-                Literal::True(keyword) => keyword.format(f),
-                Literal::False(keyword) => keyword.format(f),
-                Literal::Null(keyword) => keyword.format(f),
+                Literal::True(keyword) | Literal::False(keyword) | Literal::Null(keyword) => {
+                    if f.settings.uppercase_literal_keyword {
+                        wrap!(f, keyword, Keyword, { Document::String(print_uppercase_keyword(f, keyword.value)) })
+                    } else {
+                        wrap!(f, keyword, Keyword, { Document::String(print_lowercase_keyword(f, keyword.value)) })
+                    }
+                }
             }
         })
     }
@@ -620,10 +642,7 @@ impl<'arena> Format<'arena> for NamedArgument<'arena> {
 
 impl<'arena> Format<'arena> for PartialArgumentList<'arena> {
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
-        wrap!(f, self, PartialArgumentList, {
-            use crate::internal::format::call_arguments::print_partial_argument_list;
-            print_partial_argument_list(f, self, false, false)
-        })
+        wrap!(f, self, PartialArgumentList, { print_partial_argument_list(f, self) })
     }
 }
 
@@ -744,6 +763,7 @@ impl<'arena> Format<'arena> for ClassLikeMemberSelector<'arena> {
                 ClassLikeMemberSelector::Identifier(s) => s.format(f),
                 ClassLikeMemberSelector::Variable(s) => s.format(f),
                 ClassLikeMemberSelector::Expression(s) => s.format(f),
+                ClassLikeMemberSelector::Missing(_) => Document::empty(),
             }
         })
     }
@@ -765,6 +785,7 @@ impl<'arena> Format<'arena> for ClassLikeConstantSelector<'arena> {
             match self {
                 ClassLikeConstantSelector::Identifier(s) => s.format(f),
                 ClassLikeConstantSelector::Expression(s) => s.format(f),
+                ClassLikeConstantSelector::Missing(_) => Document::empty(),
             }
         })
     }
@@ -901,12 +922,23 @@ impl<'arena> Format<'arena> for MatchExpressionArm<'arena> {
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
         wrap!(f, self, MatchExpressionArm, {
             let len = self.conditions.len();
+
+            let must_break = self
+                .conditions
+                .iter()
+                .take(len.saturating_sub(1))
+                .any(|condition| f.has_comment(condition.span(), CommentFlags::TRAILING | CommentFlags::LINE));
+
             let mut contents = vec![in f.arena];
             for (i, condition) in self.conditions.iter().enumerate() {
                 contents.push(condition.format(f));
                 if i != (len - 1) {
                     contents.push(Document::String(","));
-                    contents.push(Document::Line(Line::default()));
+                    contents.push(if must_break {
+                        Document::Line(Line::hard())
+                    } else {
+                        Document::Line(Line::default())
+                    });
                 } else if f.settings.trailing_comma && i > 0 {
                     contents.push(Document::IfBreak(IfBreak::then(f.arena, Document::String(","))));
                 }
@@ -917,7 +949,7 @@ impl<'arena> Format<'arena> for MatchExpressionArm<'arena> {
                 group_id,
                 vec![
                     in f.arena;
-                    Document::Line(Line::default()),
+                    if must_break { Document::Line(Line::hard()) } else { Document::Line(Line::default()) },
                     format_token(f, self.arrow, "=> "),
                 ],
             )));
@@ -925,10 +957,11 @@ impl<'arena> Format<'arena> for MatchExpressionArm<'arena> {
             Document::Group(
                 Group::new(vec![
                     in f.arena;
-                    Document::Group(Group::new(contents)),
+                    Document::Group(Group::new(contents).with_break_mode(if must_break { BreakMode::Force } else { BreakMode::Auto })),
                     self.expression.format(f),
                 ])
-                .with_id(group_id),
+                .with_id(group_id)
+                .with_break_mode(if must_break { BreakMode::Force } else { BreakMode::Auto }),
             )
         })
     }
@@ -954,6 +987,9 @@ impl<'arena> Format<'arena> for Match<'arena> {
                 }
                 BraceStyle::NextLine => {
                     contents.push(Document::Line(Line::default()));
+                }
+                BraceStyle::AlwaysNextLine => {
+                    contents.push(Document::Line(Line::hard()));
                 }
             }
 
@@ -1002,7 +1038,11 @@ impl<'arena> Format<'arena> for Match<'arena> {
 
             contents.push(format_token(f, self.right_brace, "}"));
 
-            Document::Group(Group::new(contents).with_break(should_break))
+            Document::Group(Group::new(contents).with_break_mode(if should_break {
+                BreakMode::Force
+            } else {
+                BreakMode::Auto
+            }))
         })
     }
 }
@@ -1010,7 +1050,7 @@ impl<'arena> Format<'arena> for Match<'arena> {
 impl<'arena> Format<'arena> for Conditional<'arena> {
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
         wrap!(f, self, Conditional, {
-            let must_break = f.settings.preserve_breaking_conditional_expression && {
+            let preserve_break = f.settings.preserve_breaking_conditional_expression && {
                 misc::has_new_line_in_range(f.source_text, self.condition.span().end.offset, self.colon.start.offset)
                     || self.then.as_ref().is_some_and(|t| {
                         misc::has_new_line_in_range(
@@ -1032,21 +1072,18 @@ impl<'arena> Format<'arena> for Conditional<'arena> {
                     let conditional_id = f.next_id();
                     let then_id = f.next_id();
 
-                    let break_group = must_break
-                        && matches!(unwrap_parenthesized(self.condition), Expression::Binary(Binary { lhs, rhs, .. }) if lhs.is_binary() || rhs.is_binary());
-
                     Document::Group(
                         Group::new(vec![
                             in f.arena;
                             self.condition.format(f),
                             Document::Indent(vec![
                                 in f.arena;
-                                Document::Line(if must_break { Line::hard() } else { Line::default() }),
-                                format_token(f, self.question_mark, "? "),
+                                Document::Line(Line::default()),
+                                format_token_with_only_leading_comments(f, self.question_mark, "? "),
                                 Document::Group(Group::new(vec![in f.arena; then.format(f)]).with_id(then_id)),
                                 {
                                     if inline_colon {
-                                        if must_break {
+                                        if preserve_break {
                                             Document::space()
                                         } else {
                                             Document::IfBreak(
@@ -1060,14 +1097,14 @@ impl<'arena> Format<'arena> for Conditional<'arena> {
                                             )
                                         }
                                     } else {
-                                        Document::Line(if must_break { Line::hard() } else { Line::default() })
+                                        Document::Line(Line::default())
                                     }
                                 },
-                                format_token(f, self.colon, ": "),
+                                format_token_with_only_leading_comments(f, self.colon, ": "),
                                 self.r#else.format(f),
                             ]),
                         ])
-                        .with_break(break_group)
+                        .with_break_mode(if preserve_break { BreakMode::Preserve } else { BreakMode::Auto })
                         .with_id(conditional_id),
                     )
                 }
@@ -1097,7 +1134,11 @@ impl<'arena> Format<'arena> for CompositeString<'arena> {
 impl<'arena> Format<'arena> for DocumentString<'arena> {
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
         wrap!(f, self, DocumentString, {
-            let mut contents = vec![in f.arena; Document::LineSuffixBoundary, Document::String("<<<")];
+            let mut contents = vec![in f.arena; Document::LineSuffixBoundary];
+            if let Some(prefix) = &self.prefix {
+                contents.push(Document::String(prefix.value));
+            }
+            contents.push(Document::String("<<<"));
             match self.kind {
                 DocumentKind::Heredoc => {
                     contents.push(Document::String(self.label));
@@ -1116,7 +1157,7 @@ impl<'arena> Format<'arena> for DocumentString<'arena> {
                 DocumentIndentation::Mixed(t, w) => t + w,
             };
 
-            contents.push(Document::Line(Line::hard()));
+            let mut inner = vec![in f.arena; Document::Line(Line::hard())];
 
             // Track the indentation from the last line of the previous literal part
             let mut last_part_indentation = Cow::Borrowed("");
@@ -1181,15 +1222,33 @@ impl<'arena> Format<'arena> for DocumentString<'arena> {
 
                     Document::Array(part_contents)
                 } else {
-                    let base_alignment = match self.indentation {
-                        DocumentIndentation::None => Cow::Borrowed(""),
-                        DocumentIndentation::Whitespace(n) => Cow::Owned(" ".repeat(n)),
-                        DocumentIndentation::Tab(n) => Cow::Owned("\t".repeat(n)),
-                        DocumentIndentation::Mixed(t, w) => Cow::Owned("\t".repeat(t) + &" ".repeat(w)),
+                    let (base_alignment, adjusted_last_part) = if f.settings.indent_heredoc {
+                        let scope = if f.settings.use_tabs {
+                            Cow::Borrowed("\t")
+                        } else {
+                            Cow::Owned(" ".repeat(f.settings.tab_width))
+                        };
+
+                        let adjusted = if !last_part_indentation.is_empty() {
+                            Cow::Owned(format!("{scope}{last_part_indentation}"))
+                        } else {
+                            Cow::Borrowed("")
+                        };
+
+                        (scope, adjusted)
+                    } else {
+                        let base = match self.indentation {
+                            DocumentIndentation::None => Cow::Borrowed(""),
+                            DocumentIndentation::Whitespace(n) => Cow::Owned(" ".repeat(n)),
+                            DocumentIndentation::Tab(n) => Cow::Owned("\t".repeat(n)),
+                            DocumentIndentation::Mixed(t, w) => Cow::Owned("\t".repeat(t) + &" ".repeat(w)),
+                        };
+
+                        (base, last_part_indentation.clone())
                     };
 
-                    let combined_alignment = if !base_alignment.is_empty() || !last_part_indentation.is_empty() {
-                        Cow::Owned(format!("{base_alignment}{last_part_indentation}"))
+                    let combined_alignment = if !base_alignment.is_empty() || !adjusted_last_part.is_empty() {
+                        Cow::Owned(format!("{base_alignment}{adjusted_last_part}"))
                     } else {
                         Cow::Borrowed("")
                     };
@@ -1203,10 +1262,16 @@ impl<'arena> Format<'arena> for DocumentString<'arena> {
                     })
                 };
 
-                contents.push(formatted);
+                inner.push(formatted);
             }
 
-            contents.push(Document::String(self.label));
+            inner.push(Document::String(self.label));
+
+            if f.settings.indent_heredoc {
+                contents.push(Document::Indent(inner));
+            } else {
+                contents.extend(inner);
+            }
 
             Document::Group(Group::new(contents))
         })
@@ -1216,7 +1281,11 @@ impl<'arena> Format<'arena> for DocumentString<'arena> {
 impl<'arena> Format<'arena> for InterpolatedString<'arena> {
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
         wrap!(f, self, InterpolatedString, {
-            let mut parts = vec![in f.arena; Document::String("\"")];
+            let mut parts = vec![in f.arena;];
+            if let Some(prefix) = &self.prefix {
+                parts.push(Document::String(prefix.value));
+            }
+            parts.push(Document::String("\""));
             let mut last_part_indentation = Cow::Borrowed("");
 
             for part in &self.parts {
@@ -1496,19 +1565,6 @@ impl<'arena> Format<'arena> for StaticMethodPartialApplication<'arena> {
 impl<'arena> Format<'arena> for AnonymousClass<'arena> {
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
         wrap!(f, self, AnonymousClass, {
-            let initialization = {
-                let mut contents = vec![in f.arena; self.new.format(f)];
-                if let Some(attributes) = misc::print_attribute_list_sequence(f, &self.attribute_lists) {
-                    contents.push(Document::Line(Line::default()));
-                    contents.push(attributes);
-                    contents.push(Document::Line(Line::hard()));
-                } else {
-                    contents.push(Document::space());
-                }
-
-                Document::Group(Group::new(contents))
-            };
-
             let mut signature = print_modifiers(f, &self.modifiers);
             if !signature.is_empty() {
                 signature.push(Document::space());
@@ -1532,12 +1588,30 @@ impl<'arena> Format<'arena> for AnonymousClass<'arena> {
             let signature_id = f.next_id();
             let signature = Document::Group(Group::new(signature).with_id(signature_id));
 
-            Document::Group(Group::new(vec![
-                in f.arena;
-                initialization,
-                signature,
-                print_class_like_body(f, &self.left_brace, &self.members, &self.right_brace, Some(signature_id)),
-            ]))
+            let body = print_class_like_body(f, &self.left_brace, &self.members, &self.right_brace, Some(signature_id));
+
+            if let Some(attributes) = misc::print_attribute_list_sequence(f, &self.attribute_lists) {
+                Document::Group(Group::new(vec![
+                    in f.arena;
+                    self.new.format(f),
+                    Document::Indent(vec![
+                        in f.arena;
+                        Document::Line(Line::hard()),
+                        attributes,
+                        Document::Line(Line::hard()),
+                        signature,
+                        body,
+                    ]),
+                ]))
+            } else {
+                Document::Group(Group::new(vec![
+                    in f.arena;
+                    self.new.format(f),
+                    Document::space(),
+                    signature,
+                    body,
+                ]))
+            }
         })
     }
 }

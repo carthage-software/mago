@@ -1,6 +1,8 @@
-use ahash::HashMap;
-use ahash::RandomState;
+use foldhash::HashMap;
+use foldhash::fast::RandomState;
 use indexmap::IndexMap;
+use serde::Deserialize;
+use serde::Serialize;
 
 use mago_atom::Atom;
 use mago_span::Span;
@@ -12,22 +14,51 @@ pub mod inferred_type_replacer;
 pub mod standin_type_replacer;
 pub mod variance;
 
+/// Represents a template parameter definition with its source and constraint type.
+///
+/// This struct pairs a `GenericParent` (identifying where the template is defined)
+/// with a `TUnion` (the constraint type for the template parameter).
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct GenericTemplate {
+    /// The entity (class or function) where this template parameter is defined.
+    pub defining_entity: GenericParent,
+    /// The constraint type for this template parameter (e.g., `object` for `@template T of object`).
+    pub constraint: TUnion,
+}
+
 #[derive(Clone, Debug, Default)]
 pub struct TemplateResult {
-    pub template_types: IndexMap<Atom, Vec<(GenericParent, TUnion)>, RandomState>,
-    pub lower_bounds: IndexMap<Atom, HashMap<GenericParent, Vec<TemplateBound>>, RandomState>,
-    pub upper_bounds: IndexMap<Atom, HashMap<GenericParent, TemplateBound>, RandomState>,
+    pub template_types: IndexMap<Atom, Vec<GenericTemplate>, RandomState>,
+    pub lower_bounds: HashMap<Atom, HashMap<GenericParent, Vec<TemplateBound>>>,
+    pub upper_bounds: HashMap<Atom, HashMap<GenericParent, TemplateBound>>,
     pub readonly: bool,
     pub upper_bounds_unintersectable_types: Vec<TUnion>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct TemplateBound {
+    pub bound_type: TUnion,
+    pub appearance_depth: usize,
+    pub argument_offset: Option<usize>,
+    pub equality_bound_classlike: Option<Atom>,
+    pub span: Option<Span>,
+}
+
+impl GenericTemplate {
+    /// Creates a new `GenericTemplate` with the given source and constraint type.
+    #[must_use]
+    pub fn new(template_source: GenericParent, template_type: TUnion) -> Self {
+        Self { defining_entity: template_source, constraint: template_type }
+    }
 }
 
 impl TemplateResult {
     #[must_use]
     pub fn new(
-        template_types: IndexMap<Atom, Vec<(GenericParent, TUnion)>, RandomState>,
-        lower_bounds: IndexMap<Atom, HashMap<GenericParent, TUnion>, RandomState>,
+        template_types: IndexMap<Atom, Vec<GenericTemplate>, RandomState>,
+        lower_bounds: HashMap<Atom, HashMap<GenericParent, TUnion>>,
     ) -> TemplateResult {
-        let mut new_lower_bounds = IndexMap::with_hasher(RandomState::new());
+        let mut new_lower_bounds = HashMap::default();
 
         for (k, v) in lower_bounds {
             let mut th = HashMap::default();
@@ -42,7 +73,7 @@ impl TemplateResult {
         TemplateResult {
             template_types,
             lower_bounds: new_lower_bounds,
-            upper_bounds: IndexMap::with_hasher(RandomState::new()),
+            upper_bounds: HashMap::default(),
             readonly: false,
             upper_bounds_unintersectable_types: Vec::new(),
         }
@@ -53,7 +84,7 @@ impl TemplateResult {
         !self.template_types.is_empty()
     }
 
-    pub fn add_lower_bounds(&mut self, lower_bounds: IndexMap<Atom, HashMap<GenericParent, TUnion>, RandomState>) {
+    pub fn add_lower_bounds(&mut self, lower_bounds: HashMap<Atom, HashMap<GenericParent, TUnion>>) {
         for (k, v) in lower_bounds {
             let mut th = HashMap::default();
 
@@ -73,7 +104,7 @@ impl TemplateResult {
 
     pub fn add_template_type(&mut self, parameter_name: Atom, generic_parent: GenericParent, constraint: TUnion) {
         let entry = self.template_types.entry(parameter_name).or_default();
-        entry.push((generic_parent, constraint));
+        entry.push(GenericTemplate::new(generic_parent, constraint));
     }
 
     pub fn add_upper_bound(&mut self, parameter_name: Atom, generic_parent: GenericParent, bound: TemplateBound) {
@@ -86,35 +117,26 @@ impl TemplateResult {
     }
 
     #[must_use]
-    pub fn has_lower_bound(&self, parameter_name: &Atom, generic_parent: &GenericParent) -> bool {
+    pub fn has_lower_bound(&self, parameter_name: Atom, generic_parent: &GenericParent) -> bool {
         self.lower_bounds
-            .get(parameter_name)
+            .get(&parameter_name)
             .and_then(|bounds| bounds.get(generic_parent))
             .is_some_and(|bounds| !bounds.is_empty())
     }
 
     #[must_use]
-    pub fn has_lower_bound_for_class_like(&self, parameter_name: &Atom, classlike_name: &Atom) -> bool {
+    pub fn has_lower_bound_for_class_like(&self, parameter_name: Atom, classlike_name: &Atom) -> bool {
         self.has_lower_bound(parameter_name, &GenericParent::ClassLike(*classlike_name))
     }
 
     #[must_use]
     pub fn get_lower_bounds_for_class_like(
         &self,
-        parameter_name: &Atom,
-        classlike_name: &Atom,
+        parameter_name: Atom,
+        classlike_name: Atom,
     ) -> Option<&Vec<TemplateBound>> {
-        self.lower_bounds.get(parameter_name).and_then(|bounds| bounds.get(&GenericParent::ClassLike(*classlike_name)))
+        self.lower_bounds.get(&parameter_name).and_then(|bounds| bounds.get(&GenericParent::ClassLike(classlike_name)))
     }
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct TemplateBound {
-    pub bound_type: TUnion,
-    pub appearance_depth: usize,
-    pub argument_offset: Option<usize>,
-    pub equality_bound_classlike: Option<Atom>,
-    pub span: Option<Span>,
 }
 
 impl TemplateBound {

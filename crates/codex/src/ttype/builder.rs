@@ -1,9 +1,11 @@
 use std::borrow::Cow;
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
 use mago_atom::Atom;
 use mago_atom::ascii_lowercase_atom;
 use mago_atom::atom;
+use mago_atom::concat_atom;
 use mago_atom::i64_atom;
 use mago_names::kind::NameKind;
 use mago_names::scope::NamespaceScope;
@@ -27,7 +29,6 @@ use mago_type_syntax::ast::Type;
 use mago_type_syntax::ast::UnionType;
 use mago_type_syntax::ast::object::ObjectType;
 
-use crate::misc::GenericParent;
 use crate::ttype::TType;
 use crate::ttype::atomic::TAtomic;
 use crate::ttype::atomic::alias::TAlias;
@@ -73,7 +74,9 @@ use crate::ttype::get_never;
 use crate::ttype::get_non_empty_lowercase_string;
 use crate::ttype::get_non_empty_string;
 use crate::ttype::get_non_empty_unspecified_literal_string;
+use crate::ttype::get_non_empty_uppercase_string;
 use crate::ttype::get_non_negative_int;
+use crate::ttype::get_non_positive_int;
 use crate::ttype::get_null;
 use crate::ttype::get_nullable_float;
 use crate::ttype::get_nullable_int;
@@ -88,12 +91,15 @@ use crate::ttype::get_resource;
 use crate::ttype::get_scalar;
 use crate::ttype::get_string;
 use crate::ttype::get_true;
+use crate::ttype::get_truthy_mixed;
 use crate::ttype::get_truthy_string;
 use crate::ttype::get_unspecified_literal_float;
 use crate::ttype::get_unspecified_literal_int;
 use crate::ttype::get_unspecified_literal_string;
+use crate::ttype::get_uppercase_string;
 use crate::ttype::get_void;
 use crate::ttype::resolution::TypeResolutionContext;
+use crate::ttype::template::GenericTemplate;
 use crate::ttype::union::TUnion;
 use crate::ttype::wrap_atomic;
 
@@ -201,6 +207,30 @@ pub fn get_union_from_type_ast(
             TUnion::from_vec(combined_types)
         }
         Type::Intersection(intersection) => {
+            if matches!(intersection.left.as_ref(), Type::NonEmptyString(_)) {
+                match intersection.right.as_ref() {
+                    Type::String(_) => return Ok(get_non_empty_string()),
+                    Type::NonEmptyString(_) => return Ok(get_non_empty_string()),
+                    Type::LowercaseString(_) => return Ok(get_non_empty_lowercase_string()),
+                    Type::NonEmptyLowercaseString(_) => return Ok(get_non_empty_lowercase_string()),
+                    Type::UppercaseString(_) => return Ok(get_non_empty_uppercase_string()),
+                    Type::NonEmptyUppercaseString(_) => return Ok(get_non_empty_uppercase_string()),
+                    _ => {}
+                }
+            }
+
+            if matches!(intersection.right.as_ref(), Type::NonEmptyString(_)) {
+                match intersection.left.as_ref() {
+                    Type::String(_) => return Ok(get_non_empty_string()),
+                    Type::NonEmptyString(_) => return Ok(get_non_empty_string()),
+                    Type::LowercaseString(_) => return Ok(get_non_empty_lowercase_string()),
+                    Type::NonEmptyLowercaseString(_) => return Ok(get_non_empty_lowercase_string()),
+                    Type::UppercaseString(_) => return Ok(get_non_empty_uppercase_string()),
+                    Type::NonEmptyUppercaseString(_) => return Ok(get_non_empty_uppercase_string()),
+                    _ => {}
+                }
+            }
+
             let left = get_union_from_type_ast(&intersection.left, scope, type_context, classname)?;
             let right = get_union_from_type_ast(&intersection.right, scope, type_context, classname)?;
 
@@ -335,6 +365,8 @@ pub fn get_union_from_type_ast(
                 };
 
                 classname
+            } else if member_reference.class.value.eq_ignore_ascii_case("parent") {
+                atom("parent")
             } else {
                 let (class_like_name, _) = scope.resolve(NameKind::Default, member_reference.class.value);
 
@@ -371,6 +403,8 @@ pub fn get_union_from_type_ast(
                 };
 
                 classname
+            } else if alias_reference.class.value.eq_ignore_ascii_case("parent") {
+                atom("parent")
             } else {
                 let (class_like_name, _) = scope.resolve(NameKind::Default, alias_reference.class.value);
 
@@ -392,11 +426,11 @@ pub fn get_union_from_type_ast(
         Type::Reference(reference_type) => {
             let reference_name_atom = atom(reference_type.identifier.value);
 
-            if let Some((source_class, original_name)) = type_context.get_imported_type_alias(&reference_name_atom) {
+            if let Some((source_class, original_name)) = type_context.get_imported_type_alias(reference_name_atom) {
                 return Ok(wrap_atomic(TAtomic::Alias(TAlias::new(*source_class, *original_name))));
             }
 
-            if type_context.has_type_alias(&reference_name_atom)
+            if type_context.has_type_alias(reference_name_atom)
                 && let Some(class_name) = classname
             {
                 return Ok(wrap_atomic(TAtomic::Alias(TAlias::new(class_name, reference_name_atom))));
@@ -411,6 +445,7 @@ pub fn get_union_from_type_ast(
             )?)
         }
         Type::Mixed(_) => get_mixed(),
+        Type::NonEmptyMixed(_) => get_truthy_mixed(),
         Type::Null(_) => get_null(),
         Type::Void(_) => get_void(),
         Type::Never(_) => get_never(),
@@ -433,6 +468,8 @@ pub fn get_union_from_type_ast(
         Type::NonEmptyUnspecifiedLiteralString(_) => get_non_empty_unspecified_literal_string(),
         Type::NonEmptyLowercaseString(_) => get_non_empty_lowercase_string(),
         Type::LowercaseString(_) => get_lowercase_string(),
+        Type::NonEmptyUppercaseString(_) => get_non_empty_uppercase_string(),
+        Type::UppercaseString(_) => get_uppercase_string(),
         Type::UnspecifiedLiteralInt(_) => get_unspecified_literal_int(),
         Type::UnspecifiedLiteralFloat(_) => get_unspecified_literal_float(),
         Type::LiteralFloat(lit) => get_literal_float(*lit.value),
@@ -453,7 +490,7 @@ pub fn get_union_from_type_ast(
                     let value_type =
                         get_union_from_type_ast(&parameters.entries[0].inner, scope, type_context, classname)?;
 
-                    wrap_atomic(TAtomic::Iterable(TIterable::of_value(Box::new(value_type))))
+                    wrap_atomic(TAtomic::Iterable(TIterable::of_value(Arc::new(value_type))))
                 }
                 _ => {
                     let key_type =
@@ -462,14 +499,14 @@ pub fn get_union_from_type_ast(
                     let value_type =
                         get_union_from_type_ast(&parameters.entries[1].inner, scope, type_context, classname)?;
 
-                    wrap_atomic(TAtomic::Iterable(TIterable::new(Box::new(key_type), Box::new(value_type))))
+                    wrap_atomic(TAtomic::Iterable(TIterable::new(Arc::new(key_type), Arc::new(value_type))))
                 }
             },
             None => wrap_atomic(TAtomic::Iterable(TIterable::mixed())),
         },
         Type::PositiveInt(_) => get_positive_int(),
         Type::NegativeInt(_) => get_negative_int(),
-        Type::NonPositiveInt(_) => get_positive_int(),
+        Type::NonPositiveInt(_) => get_non_positive_int(),
         Type::NonNegativeInt(_) => get_non_negative_int(),
         Type::IntRange(range) => {
             let min = match range.min {
@@ -497,18 +534,24 @@ pub fn get_union_from_type_ast(
             TUnion::from_single(Cow::Owned(TAtomic::Scalar(TScalar::Integer(TInteger::from_bounds(min, max)))))
         }
         Type::Conditional(conditional) => TUnion::from_single(Cow::Owned(TAtomic::Conditional(TConditional::new(
-            Box::new(get_union_from_type_ast(&conditional.subject, scope, type_context, classname)?),
-            Box::new(get_union_from_type_ast(&conditional.target, scope, type_context, classname)?),
-            Box::new(get_union_from_type_ast(&conditional.then, scope, type_context, classname)?),
-            Box::new(get_union_from_type_ast(&conditional.otherwise, scope, type_context, classname)?),
+            Arc::new(get_union_from_type_ast(&conditional.subject, scope, type_context, classname)?),
+            Arc::new(get_union_from_type_ast(&conditional.target, scope, type_context, classname)?),
+            Arc::new(get_union_from_type_ast(&conditional.then, scope, type_context, classname)?),
+            Arc::new(get_union_from_type_ast(&conditional.otherwise, scope, type_context, classname)?),
             conditional.is_negated(),
         )))),
-        Type::Variable(variable_type) => TUnion::from_single(Cow::Owned(TAtomic::Variable(atom(variable_type.value)))),
-        Type::KeyOf(key_of_type) => TUnion::from_atomic(TAtomic::Derived(TDerived::KeyOf(TKeyOf::new(Box::new(
+        Type::Variable(variable_type) => {
+            if variable_type.value == "$this" {
+                TUnion::from_single(Cow::Owned(TAtomic::Object(TObject::Named(TNamedObject::new_this(atom("$this"))))))
+            } else {
+                TUnion::from_single(Cow::Owned(TAtomic::Variable(atom(variable_type.value))))
+            }
+        }
+        Type::KeyOf(key_of_type) => TUnion::from_atomic(TAtomic::Derived(TDerived::KeyOf(TKeyOf::new(Arc::new(
             get_union_from_type_ast(&key_of_type.parameter.entry.inner, scope, type_context, classname)?,
         ))))),
         Type::ValueOf(value_of_type) => TUnion::from_atomic(TAtomic::Derived(TDerived::ValueOf(TValueOf::new(
-            Box::new(get_union_from_type_ast(&value_of_type.parameter.entry.inner, scope, type_context, classname)?),
+            Arc::new(get_union_from_type_ast(&value_of_type.parameter.entry.inner, scope, type_context, classname)?),
         )))),
         Type::IntMask(int_mask_type) => {
             let mut values = Vec::new();
@@ -518,31 +561,31 @@ pub fn get_union_from_type_ast(
             TUnion::from_atomic(TAtomic::Derived(TDerived::IntMask(TIntMask::new(values))))
         }
         Type::IntMaskOf(int_mask_of_type) => {
-            TUnion::from_atomic(TAtomic::Derived(TDerived::IntMaskOf(TIntMaskOf::new(Box::new(
+            TUnion::from_atomic(TAtomic::Derived(TDerived::IntMaskOf(TIntMaskOf::new(Arc::new(
                 get_union_from_type_ast(&int_mask_of_type.parameter.entry.inner, scope, type_context, classname)?,
             )))))
         }
         Type::PropertiesOf(properties_of_type) => {
             TUnion::from_atomic(TAtomic::Derived(TDerived::PropertiesOf(match properties_of_type.filter {
-                PropertiesOfFilter::All => TPropertiesOf::new(Box::new(get_union_from_type_ast(
+                PropertiesOfFilter::All => TPropertiesOf::new(Arc::new(get_union_from_type_ast(
                     &properties_of_type.parameter.entry.inner,
                     scope,
                     type_context,
                     classname,
                 )?)),
-                PropertiesOfFilter::Public => TPropertiesOf::public(Box::new(get_union_from_type_ast(
+                PropertiesOfFilter::Public => TPropertiesOf::public(Arc::new(get_union_from_type_ast(
                     &properties_of_type.parameter.entry.inner,
                     scope,
                     type_context,
                     classname,
                 )?)),
-                PropertiesOfFilter::Protected => TPropertiesOf::protected(Box::new(get_union_from_type_ast(
+                PropertiesOfFilter::Protected => TPropertiesOf::protected(Arc::new(get_union_from_type_ast(
                     &properties_of_type.parameter.entry.inner,
                     scope,
                     type_context,
                     classname,
                 )?)),
-                PropertiesOfFilter::Private => TPropertiesOf::private(Box::new(get_union_from_type_ast(
+                PropertiesOfFilter::Private => TPropertiesOf::private(Arc::new(get_union_from_type_ast(
                     &properties_of_type.parameter.entry.inner,
                     scope,
                     type_context,
@@ -584,6 +627,9 @@ fn get_object_from_ast(
         let key = match field_key.key {
             ShapeKey::String { value, .. } => atom(value),
             ShapeKey::Integer { value, .. } => i64_atom(value),
+            ShapeKey::ClassLikeConstant { ref class_name, ref constant_name, .. } => {
+                concat_atom!(class_name.value, "::", constant_name.value)
+            }
         };
 
         let property_type = get_union_from_type_ast(&property.value, scope, type_context, classname)?;
@@ -604,14 +650,14 @@ fn get_shape_from_ast(
     if shape.kind.is_list() {
         let mut list = TList::new(match &shape.additional_fields {
             Some(additional_fields) => match &additional_fields.parameters {
-                Some(parameters) => Box::new(if let Some(k) = parameters.entries.first().map(|g| &g.inner) {
+                Some(parameters) => Arc::new(if let Some(k) = parameters.entries.first().map(|g| &g.inner) {
                     get_union_from_type_ast(k, scope, type_context, classname)?
                 } else {
                     get_mixed()
                 }),
-                None => Box::new(get_mixed()),
+                None => Arc::new(get_mixed()),
             },
-            None => Box::new(get_never()),
+            None => Arc::new(get_never()),
         });
 
         list.known_elements = Some({
@@ -625,6 +671,22 @@ fn get_shape_from_ast(
                     let array_key = match field_key.key {
                         ShapeKey::String { value, .. } => ArrayKey::String(atom(value)),
                         ShapeKey::Integer { value, .. } => ArrayKey::Integer(value),
+                        ShapeKey::ClassLikeConstant { ref class_name, ref constant_name, .. } => {
+                            let class_like_name = if class_name.value.eq_ignore_ascii_case("self")
+                                || class_name.value.eq_ignore_ascii_case("static")
+                                || class_name.value.eq("this")
+                                || class_name.value.eq("$this")
+                            {
+                                classname.unwrap_or_else(|| atom(class_name.value))
+                            } else if class_name.value.eq_ignore_ascii_case("parent") {
+                                atom("parent")
+                            } else {
+                                let (resolved, _) = scope.resolve(NameKind::Default, class_name.value);
+                                atom(&resolved)
+                            };
+
+                            ArrayKey::ClassLikeConstant { class_like_name, constant_name: atom(constant_name.value) }
+                        }
                     };
 
                     if let ArrayKey::Integer(offset) = array_key {
@@ -674,18 +736,18 @@ fn get_shape_from_ast(
         keyed_array.parameters = match &shape.additional_fields {
             Some(additional_fields) => Some(match &additional_fields.parameters {
                 Some(parameters) => (
-                    Box::new(if let Some(k) = parameters.entries.first().map(|g| &g.inner) {
+                    Arc::new(if let Some(k) = parameters.entries.first().map(|g| &g.inner) {
                         get_union_from_type_ast(k, scope, type_context, classname)?
                     } else {
                         get_mixed()
                     }),
-                    Box::new(if let Some(v) = parameters.entries.get(1).map(|g| &g.inner) {
+                    Arc::new(if let Some(v) = parameters.entries.get(1).map(|g| &g.inner) {
                         get_union_from_type_ast(v, scope, type_context, classname)?
                     } else {
                         get_mixed()
                     }),
                 ),
-                None => (Box::new(get_arraykey()), Box::new(get_mixed())),
+                None => (Arc::new(get_arraykey()), Arc::new(get_mixed())),
             }),
             None => None,
         };
@@ -701,6 +763,22 @@ fn get_shape_from_ast(
                     let array_key = match field_key.key {
                         ShapeKey::String { value, .. } => ArrayKey::String(atom(value)),
                         ShapeKey::Integer { value, .. } => ArrayKey::Integer(value),
+                        ShapeKey::ClassLikeConstant { ref class_name, ref constant_name, .. } => {
+                            let class_like_name = if class_name.value.eq_ignore_ascii_case("self")
+                                || class_name.value.eq_ignore_ascii_case("static")
+                                || class_name.value.eq("this")
+                                || class_name.value.eq("$this")
+                            {
+                                classname.unwrap_or_else(|| atom(class_name.value))
+                            } else if class_name.value.eq_ignore_ascii_case("parent") {
+                                atom("parent")
+                            } else {
+                                let (resolved, _) = scope.resolve(NameKind::Default, class_name.value);
+                                atom(&resolved)
+                            };
+
+                            ArrayKey::ClassLikeConstant { class_like_name, constant_name: atom(constant_name.value) }
+                        }
                     };
 
                     if let ArrayKey::Integer(offset) = array_key
@@ -754,7 +832,7 @@ fn get_callable_from_ast(
             };
 
             parameters.push(TCallableParameter::new(
-                Some(Box::new(parameter_type)),
+                Some(Arc::new(parameter_type)),
                 false,
                 parameter_ast.is_variadic(),
                 parameter_ast.is_optional(),
@@ -767,14 +845,14 @@ fn get_callable_from_ast(
     } else {
         // `callable` without a specification should be treated the same as
         // `callable(mixed...): mixed`
-        parameters.push(TCallableParameter::new(Some(Box::new(get_mixed())), false, true, false));
+        parameters.push(TCallableParameter::new(Some(Arc::new(get_mixed())), false, true, false));
         return_type = Some(get_mixed());
     }
 
     Ok(TAtomic::Callable(TCallable::Signature(
         TCallableSignature::new(callable.kind.is_pure(), callable.kind.is_closure())
             .with_parameters(parameters)
-            .with_return_type(return_type.map(Box::new)),
+            .with_return_type(return_type.map(Arc::new)),
     )))
 }
 
@@ -789,17 +867,24 @@ fn get_reference_from_ast<'i>(
     let reference_name = reference_identifier.value;
 
     let mut is_this = false;
+    let mut is_static = false;
     let mut is_named_object = false;
     let fq_reference_name_id = if reference_name == "this" || reference_name == "static" || reference_name == "self" {
         is_named_object = true;
-        is_this = reference_name != "self";
+        is_this = reference_name == "this";
+        is_static = reference_name != "self";
 
         classname.unwrap_or_else(|| atom("static"))
+    } else if reference_name == "parent" {
+        is_named_object = true;
+
+        atom("parent")
     } else {
-        if let Some(defining_entities) = type_context.get_template_definition(reference_name)
+        let reference_name_atom = atom(reference_name);
+        if let Some(defining_entities) = type_context.get_template_definition(reference_name_atom)
             && generics.is_none()
         {
-            return Ok(get_template_atomic(defining_entities, atom(reference_name)));
+            return Ok(get_template_atomic(defining_entities, reference_name_atom));
         }
 
         let (fq_reference_name, _) = scope.resolve(NameKind::Default, reference_name);
@@ -808,8 +893,8 @@ fn get_reference_from_ast<'i>(
         if fq_reference_name.eq_ignore_ascii_case("Closure") && generics.is_none() {
             return Ok(TAtomic::Callable(TCallable::Signature(
                 TCallableSignature::new(false, true)
-                    .with_parameters(vec![TCallableParameter::new(Some(Box::new(get_mixed())), false, true, false)])
-                    .with_return_type(Some(Box::new(get_mixed()))),
+                    .with_parameters(vec![TCallableParameter::new(Some(Arc::new(get_mixed())), false, true, false)])
+                    .with_return_type(Some(Arc::new(get_mixed()))),
             )));
         }
 
@@ -867,6 +952,7 @@ fn get_reference_from_ast<'i>(
             name: fq_reference_name_id,
             type_parameters,
             intersection_types: None,
+            is_static,
             is_this,
             remapped_parameters: false,
         })))
@@ -893,12 +979,12 @@ fn get_array_type_from_ast<'i, 'p>(
     }
 
     let mut array = TKeyedArray::new_with_parameters(
-        Box::new(if let Some(k) = key {
+        Arc::new(if let Some(k) = key {
             get_union_from_type_ast(k, scope, type_context, classname)?
         } else {
             get_arraykey()
         }),
-        Box::new(if let Some(v) = value {
+        Arc::new(if let Some(v) = value {
             get_union_from_type_ast(v, scope, type_context, classname)?
         } else {
             get_mixed()
@@ -919,7 +1005,7 @@ fn get_list_type_from_ast(
     classname: Option<Atom>,
 ) -> Result<TAtomic, TypeError> {
     Ok(TAtomic::Array(TArray::List(TList {
-        element_type: Box::new(if let Some(v) = value {
+        element_type: Arc::new(if let Some(v) = value {
             get_union_from_type_ast(v, scope, type_context, classname)?
         } else {
             get_mixed()
@@ -947,7 +1033,8 @@ fn get_class_string_type_from_ast(
             for constraint in constraint_union.types.into_owned() {
                 match constraint {
                     TAtomic::Object(TObject::Named(_) | TObject::Enum(_))
-                    | TAtomic::Reference(TReference::Symbol { .. }) => class_strings
+                    | TAtomic::Reference(TReference::Symbol { .. })
+                    | TAtomic::Alias(_) => class_strings
                         .push(TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::of_type(kind, constraint)))),
                     TAtomic::GenericParameter(TGenericParameter {
                         parameter_name,
@@ -955,7 +1042,7 @@ fn get_class_string_type_from_ast(
                         constraint,
                         ..
                     }) => {
-                        for constraint_atomic in constraint.types.into_owned() {
+                        for constraint_atomic in Arc::unwrap_or_clone(constraint).types.into_owned() {
                             class_strings.push(TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::generic(
                                 kind,
                                 parameter_name,
@@ -984,13 +1071,13 @@ fn get_class_string_type_from_ast(
 }
 
 #[inline]
-fn get_template_atomic(defining_entities: &[(GenericParent, TUnion)], parameter_name: Atom) -> TAtomic {
-    let (defining_entity, constraint) = &defining_entities[0];
+fn get_template_atomic(defining_entities: &[GenericTemplate], parameter_name: Atom) -> TAtomic {
+    let GenericTemplate { defining_entity: template_source, constraint: template_type } = &defining_entities[0];
 
     TAtomic::GenericParameter(TGenericParameter {
         parameter_name,
-        constraint: Box::new(constraint.clone()),
-        defining_entity: *defining_entity,
+        constraint: Arc::new(template_type.clone()),
+        defining_entity: *template_source,
         intersection_types: None,
     })
 }

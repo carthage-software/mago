@@ -31,15 +31,15 @@ impl TObjectHasProperty {
     /// Returns the property name.
     #[inline]
     #[must_use]
-    pub const fn get_property(&self) -> &Atom {
-        &self.property
+    pub const fn get_property(&self) -> Atom {
+        self.property
     }
 
     /// Checks if this property name matches the given name.
     #[inline]
     #[must_use]
-    pub fn has_property(&self, property_name: &Atom) -> bool {
-        &self.property == property_name
+    pub fn has_property(&self, property_name: Atom) -> bool {
+        self.property == property_name
     }
 }
 

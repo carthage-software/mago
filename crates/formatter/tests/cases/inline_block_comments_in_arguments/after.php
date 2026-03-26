@@ -14,7 +14,5 @@ qux(1 /* one */, 2 /* two */, 3 /* three */);
 
 class Example
 {
-    private function addFooooos($foooooIds, /*string*/ $precision)
-    {
-    }
+    private function addFooooos($foooooIds, /*string*/ $precision) {}
 }

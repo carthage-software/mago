@@ -76,7 +76,7 @@ pub fn analyze_spaceship_operation<'ctx, 'arena>(
         );
     }
 
-    let result_type = if !block_context.inside_loop_expressions && is_always_greater_than(lhs_type, rhs_type) {
+    let result_type = if !block_context.flags.inside_loop_expressions() && is_always_greater_than(lhs_type, rhs_type) {
         context.collector.report_with_code(
             IssueCode::RedundantTypeComparison,
             Issue::help("Redundant spaceship comparison: left-hand side is always greater than right-hand side.")
@@ -87,7 +87,7 @@ pub fn analyze_spaceship_operation<'ctx, 'arena>(
         );
 
         get_one_int()
-    } else if !block_context.inside_loop_expressions && is_always_identical_to(lhs_type, rhs_type) {
+    } else if !block_context.flags.inside_loop_expressions() && is_always_identical_to(lhs_type, rhs_type) {
         context.collector.report_with_code(
             IssueCode::RedundantTypeComparison,
             Issue::help("Redundant spaceship comparison: left-hand side is always equal to right-hand side.")
@@ -98,7 +98,7 @@ pub fn analyze_spaceship_operation<'ctx, 'arena>(
         );
 
         get_zero_int()
-    } else if !block_context.inside_loop_expressions && is_always_less_than(lhs_type, rhs_type) {
+    } else if !block_context.flags.inside_loop_expressions() && is_always_less_than(lhs_type, rhs_type) {
         context.collector.report_with_code(
             IssueCode::RedundantTypeComparison,
             Issue::help("Redundant spaceship comparison: left-hand side is always less than right-hand side.")
@@ -134,7 +134,7 @@ fn check_spaceship_operand<'arena>(
              .with_note("PHP compares `null` with other types according to specific rules (e.g., `null == 0` is true, `null < 1` is true).")
              .with_help("Ensure this comparison with `null` is intended, or provide a non-null operand."),
          );
-    } else if operand_type.is_nullable() && !operand_type.is_mixed() {
+    } else if operand_type.can_be_null() && !operand_type.is_mixed() {
         context.collector.report_with_code(
             IssueCode::PossiblyNullOperand,
             Issue::warning(format!(

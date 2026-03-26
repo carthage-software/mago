@@ -17,7 +17,6 @@ pub struct ConstantAccess<'arena> {
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
-#[repr(u8)]
 pub enum Access<'arena> {
     Property(PropertyAccess<'arena>),
     NullSafeProperty(NullSafePropertyAccess<'arena>),

@@ -1,5 +1,7 @@
 use std::fs;
 
+use crate::framework::default_test_settings;
+
 mod framework;
 
 /// A macro to automatically generate a test case from a corresponding PHP file.
@@ -34,11 +36,15 @@ macro_rules! test_case {
 test_case!(accessing_undefined_class_constant);
 test_case!(argument_count);
 test_case!(array_list_reconciliation);
+test_case!(array_map_non_empty_array);
+test_case!(array_map_non_empty_list);
 test_case!(array_shape_fields);
+test_case!(array_type_combination_threshold);
 test_case!(array_unique_non_empty);
 test_case!(assert_concrete_to_template_type);
 test_case!(assert_generic_array_key_is_array_key);
 test_case!(bare_identifier_in_array_access);
+test_case!(bin2hex);
 test_case!(break_narrowing);
 test_case!(by_reference_invalidation);
 test_case!(callable_template_inference);
@@ -50,16 +56,20 @@ test_case!(conditional_return_resolved_to_left);
 test_case!(conditional_return_resolved_to_right);
 test_case!(conditional_return_with_assignment_in_condition);
 test_case!(const_array_key);
+test_case!(docblock_type_mismatch);
 test_case!(docblock_type_narrowing);
 test_case!(docblock_type_parsing_verification);
 test_case!(docblock_var_on_non_assignment);
 test_case!(empty_switch);
+test_case!(empty_construct);
+test_case!(generator_return_yield);
 test_case!(generic_shape_coercion);
 test_case!(int_or_float);
 test_case!(literal_float);
 test_case!(multiline_intersection_var);
 test_case!(multiline_union_param);
 test_case!(int_mask);
+test_case!(integer_literal_overflow);
 test_case!(integer_range_reconciliation);
 test_case!(integer_reconciliation);
 test_case!(isset_and_nullable_access_assertions);
@@ -71,6 +81,8 @@ test_case!(non_empty_string_magic_constant);
 test_case!(numeric_reconciliation);
 test_case!(priority_queue_implementation);
 test_case!(psl_integration);
+test_case!(psl_int_range);
+test_case!(psr_container_get);
 test_case!(flow_php_integration);
 test_case!(reconcile_array_index_type);
 test_case!(reconcile_empty_string);
@@ -152,6 +164,7 @@ test_case!(keyed_array_list_inference);
 test_case!(require_implements_inherited);
 test_case!(readonly_proptected_set);
 test_case!(value_of_enum_resolution);
+test_case!(duplicate_enum_case_value);
 test_case!(properties_of_enum);
 test_case!(properties_of_class);
 test_case!(properties_of_generic);
@@ -216,6 +229,8 @@ test_case!(var_docblock);
 test_case!(redundant_var_docblock);
 test_case!(magic_method_trait);
 test_case!(real_pseudo_method);
+test_case!(pseudo_method_override);
+test_case!(parent_magic_method_call);
 test_case!(chunk);
 test_case!(chunk_with_keys);
 test_case!(trait_alias_vis_self);
@@ -270,6 +285,7 @@ test_case!(inheritdoc_multiple_interfaces);
 test_case!(inheritdoc_nested_generics);
 test_case!(inheritdoc_priority);
 test_case!(inheritdoc_contravariant_parameters);
+test_case!(inherited_docblock_narrowing);
 test_case!(type_alias_basic);
 test_case!(type_alias_import);
 test_case!(type_alias_import_rename);
@@ -301,9 +317,13 @@ test_case!(union_template_constraint);
 test_case!(class_string_union_constraint);
 test_case!(float_string_concat);
 test_case!(array_key_concat);
+test_case!(string_concat_combination_threshold);
 test_case!(iterator_type_inference);
 test_case!(unused_template_parameter);
 test_case!(unused_function_template_parameter);
+test_case!(unused_method);
+test_case!(unused_property);
+test_case!(unused_edge_cases);
 test_case!(uninitialized_property);
 test_case!(property_hooks);
 test_case!(interface_property_hook);
@@ -311,6 +331,7 @@ test_case!(trait_require_implements_self_return);
 test_case!(trait_require_extends_self_return);
 test_case!(trait_require_combined);
 test_case!(interface_assertion);
+test_case!(nullsafe_chain_bug);
 test_case!(class_string_instantiation);
 test_case!(class_string_comparison);
 test_case!(static_var_lazy_init);
@@ -331,6 +352,7 @@ test_case!(enum_empty_check);
 test_case!(optional_chain_method);
 test_case!(compound_condition);
 test_case!(instanceof_assertion);
+test_case!(instanceof_unresolved_class);
 test_case!(type_narrowing_external);
 test_case!(post_narrowing_check);
 test_case!(data_transformer_type);
@@ -364,6 +386,40 @@ test_case!(bad_path_redundant_nullsafe);
 test_case!(bad_path_assignment_to_this);
 test_case!(typed_property_null_coalesce);
 test_case!(docblock_var_override_foreach);
+test_case!(mixin);
+test_case!(issue_contravariant_params_diamond);
+test_case!(issue_contravariant_params_simple);
+test_case!(anonymous_class_constructor_args);
+test_case!(undefined_type_reference);
+test_case!(duplicate_definition);
+test_case!(method_call_assertions);
+test_case!(class_must_be_final, {
+    let mut s = crate::framework::default_test_settings();
+    s.enforce_class_finality = true;
+    s
+});
+test_case!(missing_api_or_internal, {
+    let mut s = crate::framework::default_test_settings();
+    s.require_api_or_internal = true;
+    s
+});
+test_case!(spread_list);
+test_case!(or_never);
+test_case!(abstract_method_inheritance);
+test_case!(variadic_array_type);
+test_case!(parse_str);
+test_case!(assertion_after_side_effect);
+test_case!(undefined_string_key_in_union);
+test_case!(possibly_undefined_string_key_in_union, {
+    let mut s = crate::framework::default_test_settings();
+    s.allow_possibly_undefined_array_keys = true;
+    s
+});
+test_case!(only_ascii_is_caseless);
+test_case!(allow_unknown_array_key_in_assignment);
+test_case!(psl_async_integration);
+test_case!(parent_static_call_template_resolution);
+test_case!(bitwise_shift_bounds);
 
 // Github Issues
 test_case!(issue_659);
@@ -373,6 +429,7 @@ test_case!(issue_265);
 test_case!(issue_275);
 test_case!(issue_306);
 test_case!(issue_355);
+test_case!(issue_356);
 test_case!(issue_357);
 test_case!(issue_358);
 test_case!(issue_359);
@@ -513,6 +570,169 @@ test_case!(issue_789);
 test_case!(issue_801);
 test_case!(issue_806);
 test_case!(issue_809);
+test_case!(issue_822);
+test_case!(issue_830);
+test_case!(issue_835);
+test_case!(issue_837);
+test_case!(issue_845);
+test_case!(issue_849);
+test_case!(issue_859);
+test_case!(issue_861);
+test_case!(issue_863);
+test_case!(issue_870);
+test_case!(issue_871);
+test_case!(issue_872);
+test_case!(issue_880);
+test_case!(issue_886);
+test_case!(issue_900);
+test_case!(issue_912);
+test_case!(issue_923);
+test_case!(issue_932);
+test_case!(issue_940);
+test_case!(issue_941);
+test_case!(issue_945);
+test_case!(issue_946);
+test_case!(issue_949);
+test_case!(issue_954);
+test_case!(issue_955);
+test_case!(issue_957);
+test_case!(issue_958);
+test_case!(issue_960);
+test_case!(issue_962);
+test_case!(issue_964);
+test_case!(issue_969);
+test_case!(issue_970);
+test_case!(issue_973);
+test_case!(issue_976);
+test_case!(issue_980);
+test_case!(issue_984);
+test_case!(issue_985);
+test_case!(issue_996);
+test_case!(issue_998);
+test_case!(issue_1002_part_1);
+test_case!(issue_1002_part_2);
+test_case!(issue_1002_part_3);
+test_case!(issue_1002_part_4);
+test_case!(issue_1005);
+test_case!(issue_1006);
+test_case!(issue_1021);
+test_case!(issue_1025);
+test_case!(issue_1026);
+test_case!(issue_1029);
+test_case!(issue_1030);
+test_case!(issue_1038);
+test_case!(issue_1040);
+test_case!(issue_1045);
+test_case!(issue_1057);
+test_case!(issue_1064);
+test_case!(issue_1061);
+test_case!(issue_1068);
+test_case!(issue_1069, {
+    let mut s = default_test_settings();
+    s.find_unused_definitions = true;
+    s
+});
+test_case!(issue_1070);
+test_case!(issue_1071);
+test_case!(issue_1072);
+test_case!(issue_1074);
+test_case!(issue_1031);
+test_case!(issue_1081);
+test_case!(issue_1083);
+test_case!(issue_1084);
+test_case!(issue_1086);
+test_case!(issue_1087);
+test_case!(issue_1088);
+test_case!(issue_1089);
+test_case!(issue_1096);
+test_case!(issue_1099);
+test_case!(issue_1103);
+test_case!(issue_1106);
+test_case!(issue_1107);
+test_case!(issue_1110);
+test_case!(issue_1112);
+test_case!(issue_1116);
+test_case!(issue_1104);
+test_case!(issue_1117);
+test_case!(issue_1119);
+test_case!(issue_1108);
+test_case!(issue_1102);
+test_case!(issue_1093);
+test_case!(issue_1126);
+test_case!(issue_1127);
+test_case!(issue_1130);
+test_case!(issue_1131);
+test_case!(issue_1144);
+test_case!(issue_1073);
+test_case!(issue_1150);
+test_case!(issue_1156);
+test_case!(issue_1157);
+test_case!(issue_1165);
+test_case!(issue_1169);
+test_case!(issue_1184);
+test_case!(issue_1184_methods);
+test_case!(issue_1190);
+test_case!(issue_1191, {
+    let mut s = crate::framework::default_test_settings();
+    s.check_missing_type_hints = true;
+    s
+});
+test_case!(issue_1202);
+test_case!(issue_1206);
+test_case!(issue_1207);
+test_case!(issue_1215);
+test_case!(issue_1223, {
+    let mut s = crate::framework::default_test_settings();
+    s.check_missing_type_hints = true;
+    s
+});
+test_case!(issue_1230, {
+    let mut s = crate::framework::default_test_settings();
+    s.allow_possibly_undefined_array_keys = false;
+    s.strict_list_index_checks = true;
+    s
+});
+test_case!(issue_1230_simple, {
+    let mut s = crate::framework::default_test_settings();
+    s.allow_possibly_undefined_array_keys = false;
+    s.strict_list_index_checks = true;
+    s
+});
+test_case!(issue_1242_reference_count_sync);
+test_case!(issue_1226);
+test_case!(issue_1259);
+test_case!(issue_1262);
+test_case!(issue_1264);
+test_case!(issue_1265);
+test_case!(issue_1266);
+test_case!(issue_1266_inheritdoc_narrowing);
+test_case!(issue_1267);
+test_case!(issue_1291);
+test_case!(issue_1249);
+test_case!(issue_1278);
+test_case!(issue_1287);
+test_case!(issue_1286);
+test_case!(issue_1341);
+test_case!(issue_1342);
+test_case!(issue_1346);
+test_case!(issue_1352);
+test_case!(issue_1355);
+test_case!(issue_1365);
+test_case!(issue_1368);
+test_case!(issue_1372);
+test_case!(issue_1374);
+test_case!(issue_1375);
+test_case!(issue_1387);
+test_case!(issue_1410);
+test_case!(issue_1411);
+test_case!(issue_1412);
+test_case!(issue_1413);
+test_case!(issue_1415);
+test_case!(issue_1416);
+test_case!(issue_1422);
+test_case!(issue_1429);
+test_case!(issue_1467);
+test_case!(issue_1491);
 
 #[test]
 fn test_all_test_cases_are_ran() {
@@ -526,9 +746,8 @@ fn test_all_test_cases_are_ran() {
         }
 
         let file_name = path.file_stem().unwrap().to_str().unwrap();
-        assert!(
-            test_case_file.contains(&format!("test_case!({file_name})")),
-            "File '{file_name}' was not found as a test case"
-        );
+        let has_test = test_case_file.contains(&format!("test_case!({file_name})"))
+            || test_case_file.contains(&format!("test_case!({file_name},"));
+        assert!(has_test, "File '{file_name}' was not found as a test case");
     }
 }

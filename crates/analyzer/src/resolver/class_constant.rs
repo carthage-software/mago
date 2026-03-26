@@ -2,6 +2,7 @@ use mago_atom::Atom;
 
 use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_codex::ttype::atomic::TAtomic;
+use mago_codex::ttype::atomic::generic::TGenericParameter;
 use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::atomic::object::r#enum::TEnum;
 use mago_codex::ttype::atomic::scalar::TScalar;
@@ -186,7 +187,30 @@ fn handle_class_magic_constant<'ctx, 'ast, 'arena>(
                 ))
             }
         }
-        None => return Some(get_class_string()),
+        None => {
+            if let Some(expr_type) = artifacts.get_expression_type(class_expr) {
+                for atomic in expr_type.types.as_ref() {
+                    if let TAtomic::GenericParameter(TGenericParameter {
+                        parameter_name,
+                        defining_entity,
+                        constraint,
+                        ..
+                    }) = atomic
+                    {
+                        return Some(wrap_atomic(TAtomic::Scalar(TScalar::ClassLikeString(
+                            TClassLikeString::generic(
+                                TClassLikeStringKind::Class,
+                                *parameter_name,
+                                *defining_entity,
+                                constraint.get_single().clone(),
+                            ),
+                        ))));
+                    }
+                }
+            }
+
+            return Some(get_class_string());
+        }
     };
 
     Some(TUnion::from_atomic(TAtomic::Scalar(class_string)))
@@ -200,6 +224,8 @@ fn is_valid_trait_constant_access(origin: &ResolutionOrigin) -> bool {
         origin,
         // self::CONSTANT
         ResolutionOrigin::Named { is_self: true, .. }
+        // parent::CONSTANT
+        | ResolutionOrigin::Named { is_parent: true, .. }
         // static::CONSTANT
         | ResolutionOrigin::Static { .. }
         // $this::CONSTANT
@@ -234,12 +260,21 @@ fn find_constant_in_class<'ctx>(
 
     // Check for a defined constant
     if let Some(constant_metadata) = metadata.constants.get(&const_name) {
-        let mut const_type = constant_metadata
-            .inferred_type
-            .clone()
-            .map(wrap_atomic)
-            .or_else(|| constant_metadata.type_metadata.clone().map(|s| s.type_union))
-            .unwrap_or_else(get_mixed);
+        // Prefer the docblock type (@var) when it exists, as it reflects the user's
+        // intended type. When type_metadata was merely copied from the type declaration
+        // (they are equal), fall back to the more specific inferred type.
+        let mut const_type = if let Some(type_metadata) = &constant_metadata.type_metadata
+            && type_metadata.from_docblock
+        {
+            type_metadata.type_union.clone()
+        } else {
+            constant_metadata
+                .inferred_type
+                .clone()
+                .map(wrap_atomic)
+                .or_else(|| constant_metadata.type_metadata.clone().map(|s| s.type_union))
+                .unwrap_or_else(get_mixed)
+        };
 
         expander::expand_union(
             context.codebase,
@@ -262,6 +297,50 @@ fn find_constant_in_class<'ctx>(
             TUnion::from_atomic(TAtomic::Object(TObject::Enum(TEnum::new_case(metadata.original_name, const_name))));
 
         return Some(ResolvedConstant { const_type });
+    }
+
+    for required_class in metadata.require_extends.iter().chain(metadata.require_implements.iter()) {
+        let Some(required_metadata) = context.codebase.get_class_like(required_class) else {
+            continue;
+        };
+
+        if let Some(constant_metadata) = required_metadata.constants.get(&const_name) {
+            let mut const_type = if let Some(type_metadata) = &constant_metadata.type_metadata
+                && type_metadata.from_docblock
+            {
+                type_metadata.type_union.clone()
+            } else {
+                constant_metadata
+                    .inferred_type
+                    .clone()
+                    .map(wrap_atomic)
+                    .or_else(|| constant_metadata.type_metadata.clone().map(|s| s.type_union))
+                    .unwrap_or_else(get_mixed)
+            };
+
+            expander::expand_union(
+                context.codebase,
+                &mut const_type,
+                &TypeExpansionOptions {
+                    self_class: Some(required_metadata.name),
+                    static_class_type: StaticClassType::Name(required_metadata.name),
+                    parent_class: required_metadata.direct_parent_class,
+                    function_is_final: required_metadata.flags.is_final(),
+                    ..Default::default()
+                },
+            );
+
+            return Some(ResolvedConstant { const_type });
+        }
+
+        if required_metadata.kind.is_enum() && required_metadata.enum_cases.contains_key(&const_name) {
+            let const_type = TUnion::from_atomic(TAtomic::Object(TObject::Enum(TEnum::new_case(
+                required_metadata.original_name,
+                const_name,
+            ))));
+
+            return Some(ResolvedConstant { const_type });
+        }
     }
 
     // Not found, report error.

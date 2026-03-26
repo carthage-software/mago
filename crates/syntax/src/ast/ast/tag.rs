@@ -6,7 +6,6 @@ use mago_span::Span;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
-#[repr(u8)]
 pub enum OpeningTag<'arena> {
     Full(FullOpeningTag<'arena>),
     Short(ShortOpeningTag),

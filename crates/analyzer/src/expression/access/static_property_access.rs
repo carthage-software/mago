@@ -1,10 +1,13 @@
 use std::rc::Rc;
 
+use mago_atom::atom;
 use mago_codex::ttype::add_optional_union_type;
 use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::get_never;
 use mago_codex::ttype::get_null;
+use mago_syntax::ast::Expression;
 use mago_syntax::ast::StaticPropertyAccess;
+use mago_syntax::ast::Variable;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -33,6 +36,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for StaticPropertyAccess<'arena> {
             && let Some(property_access_id) = &property_access_id
             && let Some(existing_type) = block_context.locals.get(property_access_id).cloned()
         {
+            add_memoized_static_property_reference(context, block_context, artifacts, self.class, &self.property)?;
             artifacts.set_rc_expression_type(self, existing_type);
 
             return Ok(());
@@ -45,10 +49,10 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for StaticPropertyAccess<'arena> {
         if !resolution_result.has_error_path {
             for resolved_property in resolution_result.properties {
                 if let Some(declaring_class_id) = resolved_property.declaring_class_id {
-                    artifacts.symbol_references.add_reference_to_class_member(
+                    artifacts.symbol_references.add_reference_for_property_read(
                         &block_context.scope,
-                        (declaring_class_id, resolved_property.property_name),
-                        false,
+                        declaring_class_id,
+                        resolved_property.property_name,
                     );
                 }
 
@@ -82,6 +86,42 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for StaticPropertyAccess<'arena> {
 
         Ok(())
     }
+}
+
+/// Adds symbol reference for a memoized static property access.
+fn add_memoized_static_property_reference<'ctx, 'ast, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    block_context: &mut BlockContext<'ctx>,
+    artifacts: &mut AnalysisArtifacts,
+    class: &'ast Expression<'arena>,
+    property: &'ast Variable<'arena>,
+) -> Result<(), AnalysisError> {
+    let property_name = match property {
+        Variable::Direct(var) => atom(var.name),
+        _ => return Ok(()),
+    };
+
+    let class_name = match class.unparenthesized() {
+        Expression::Identifier(ident) => atom(context.resolved_names.get(ident)),
+        Expression::Self_(_) | Expression::Parent(_) | Expression::Static(_) => {
+            block_context.scope.get_class_like_name().unwrap_or_else(|| atom(""))
+        }
+        _ => return Ok(()),
+    };
+
+    if class_name.is_empty() {
+        return Ok(());
+    }
+
+    if let Some(declaring_class) = context.codebase.get_declaring_property_class(&class_name, &property_name) {
+        artifacts.symbol_references.add_reference_for_property_read(
+            &block_context.scope,
+            declaring_class,
+            property_name,
+        );
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -186,6 +226,7 @@ mod tests {
             echo MyClass::$secret;
         "},
         issues = [
+            IssueCode::UnusedProperty,
             IssueCode::InvalidPropertyRead,
             IssueCode::NoValue,
         ]
@@ -203,6 +244,7 @@ mod tests {
             }
         "},
         issues = [
+            IssueCode::UnusedProperty,
             IssueCode::NonExistentProperty,
         ]
     }

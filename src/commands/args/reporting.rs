@@ -101,6 +101,15 @@ pub struct ReportingArgs {
     #[arg(long, short = 'd', requires = "fix", alias = "diff")]
     pub dry_run: bool,
 
+    /// Exit with a non-zero status code if there are remaining issues after fixing.
+    ///
+    /// When used with --fix, the command will exit with code 1 if there are any
+    /// issues that could not be automatically fixed and require manual attention.
+    /// This is useful in CI/CD pipelines to ensure all issues are addressed.
+    /// Requires --fix to be enabled.
+    #[arg(long, requires = "fix")]
+    pub fail_on_remaining: bool,
+
     /// Specify where to send the output.
     ///
     /// Choose stdout for normal output or stderr for error streams.
@@ -134,14 +143,15 @@ pub struct ReportingArgs {
     /// The command will exit with a non-zero status if any issues at or above
     /// this level are found. For example, setting this to 'warning' means
     /// the command fails on warnings and errors, but not on notes or help suggestions.
+    ///
+    /// Defaults to 'error', or the value set in the configuration file.
     #[arg(
         long,
         short = 'm',
-        default_value_t = Level::Error,
         value_parser = enum_variants!(Level),
         conflicts_with = "fix"
     )]
-    pub minimum_fail_level: Level,
+    pub minimum_fail_level: Option<Level>,
 
     /// Set the minimum issue severity to be shown in the report.
     ///
@@ -190,7 +200,12 @@ impl ReportingArgs {
     ///
     /// An [`IssueProcessor`] configured with all the reporting and fixing options
     /// from this argument set.
-    pub fn get_processor(&self, color_choice: ColorChoice) -> IssueProcessor {
+    pub fn get_processor(
+        &self,
+        color_choice: ColorChoice,
+        editor_url: Option<String>,
+        config_minimum_fail_level: Level,
+    ) -> IssueProcessor {
         IssueProcessor {
             fixable_only: self.fixable_only,
             sort: self.sort,
@@ -199,12 +214,14 @@ impl ReportingArgs {
             potentially_unsafe: self.potentially_unsafe,
             format_after_fix: self.format_after_fix,
             dry_run: self.dry_run,
+            fail_on_remaining: self.fail_on_remaining,
             reporting_target: self.reporting_target.clone(),
             reporting_format: self.reporting_format,
-            minimum_fail_level: self.minimum_fail_level,
+            minimum_fail_level: self.minimum_fail_level.unwrap_or(config_minimum_fail_level),
             minimum_report_level: self.minimum_report_level,
             retain_code: self.retain_code.clone(),
             color_choice,
+            editor_url,
         }
     }
 }

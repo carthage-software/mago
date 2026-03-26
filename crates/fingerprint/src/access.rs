@@ -104,6 +104,9 @@ impl Fingerprintable for ClassLikeMemberSelector<'_> {
             ClassLikeMemberSelector::Identifier(id) => id.fingerprint_with_hasher(hasher, resolved_names, options),
             ClassLikeMemberSelector::Variable(var) => var.fingerprint_with_hasher(hasher, resolved_names, options),
             ClassLikeMemberSelector::Expression(expr) => expr.fingerprint_with_hasher(hasher, resolved_names, options),
+            ClassLikeMemberSelector::Missing(_) => {
+                hasher.write(b"__missing__");
+            }
         }
     }
 }
@@ -119,6 +122,9 @@ impl Fingerprintable for ClassLikeConstantSelector<'_> {
             ClassLikeConstantSelector::Identifier(id) => id.fingerprint_with_hasher(hasher, resolved_names, options),
             ClassLikeConstantSelector::Expression(expr) => {
                 expr.fingerprint_with_hasher(hasher, resolved_names, options);
+            }
+            ClassLikeConstantSelector::Missing(_) => {
+                hasher.write(b"__missing__");
             }
         }
     }

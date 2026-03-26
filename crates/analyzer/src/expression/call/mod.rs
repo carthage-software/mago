@@ -1,10 +1,13 @@
+use std::sync::Arc;
+
+use mago_atom::Atom;
 use mago_atom::AtomMap;
 use mago_atom::ascii_lowercase_atom;
+use mago_atom::concat_atom;
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::identifier::method::MethodIdentifier;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::add_optional_union_type;
-use mago_codex::ttype::combine_union_types;
 use mago_codex::ttype::expander::StaticClassType;
 use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::get_null;
@@ -31,6 +34,7 @@ use crate::invocation::MethodTargetContext;
 use crate::invocation::analyzer::analyze_invocation;
 use crate::invocation::post_process::post_invocation_process;
 use crate::invocation::return_type_fetcher::fetch_invocation_return_type;
+use crate::reconciler::assertion_reconciler;
 
 pub mod function_call;
 pub mod method_call;
@@ -65,7 +69,23 @@ fn analyze_invocation_targets<'ctx, 'ast, 'arena>(
     encountered_invalid_targets: bool,
     encountered_mixed_targets: bool,
     should_add_null: bool,
+    object_has_nullsafe_null: bool,
+    all_targets_non_nullable_return: bool,
 ) -> Result<(), AnalysisError> {
+    let method_name_for_assertions: Option<Atom> = invocation_targets.iter().find_map(|target| {
+        if let InvocationTarget::FunctionLike {
+            identifier: FunctionLikeIdentifier::Method(_, _),
+            method_context: Some(_),
+            metadata,
+            ..
+        } = target
+        {
+            metadata.original_name
+        } else {
+            None
+        }
+    });
+
     let mut resulting_type = None;
     for target in invocation_targets {
         if let InvocationTarget::FunctionLike { metadata, .. } = &target
@@ -154,7 +174,16 @@ fn analyze_invocation_targets<'ctx, 'ast, 'arena>(
         } else if encountered_mixed_targets {
             get_mixed()
         } else if should_add_null {
-            combine_union_types(&resulting_type, &get_null(), context.codebase, false)
+            let mut result_with_null = add_optional_union_type(get_null(), Some(&resulting_type), context.codebase);
+            if all_targets_non_nullable_return {
+                result_with_null.set_nullsafe_null(true);
+            }
+
+            result_with_null
+        } else if object_has_nullsafe_null && all_targets_non_nullable_return {
+            let mut result_with_null = add_optional_union_type(get_null(), Some(&resulting_type), context.codebase);
+            result_with_null.set_nullsafe_null(true);
+            result_with_null
         } else {
             resulting_type
         }
@@ -164,13 +193,13 @@ fn analyze_invocation_targets<'ctx, 'ast, 'arena>(
                 argument_list.analyze(context, block_context, artifacts)?;
             }
             InvocationArgumentsSource::PipeInput(pipe) => {
-                let was_inside_call = block_context.inside_call;
-                let was_inside_general_use = block_context.inside_general_use;
-                block_context.inside_call = true;
-                block_context.inside_general_use = true;
+                let was_inside_call = block_context.flags.inside_call();
+                let was_inside_general_use = block_context.flags.inside_general_use();
+                block_context.flags.set_inside_call(true);
+                block_context.flags.set_inside_general_use(true);
                 pipe.input.analyze(context, block_context, artifacts)?;
-                block_context.inside_call = was_inside_call;
-                block_context.inside_general_use = was_inside_general_use;
+                block_context.flags.set_inside_call(was_inside_call);
+                block_context.flags.set_inside_general_use(was_inside_general_use);
             }
             _ => {}
         }
@@ -182,10 +211,13 @@ fn analyze_invocation_targets<'ctx, 'ast, 'arena>(
         }
     };
 
-    if resulting_type.is_never() && !block_context.inside_loop {
+    let resulting_type =
+        apply_method_call_assertions(context, block_context, this_variable, method_name_for_assertions, resulting_type);
+
+    if resulting_type.is_never() && !block_context.flags.inside_loop() {
         artifacts.set_expression_type(&call_span, resulting_type);
 
-        block_context.has_returned = true;
+        block_context.flags.set_has_returned(true);
         block_context.control_actions.insert(ControlAction::End);
         return Ok(());
     }
@@ -194,12 +226,60 @@ fn analyze_invocation_targets<'ctx, 'ast, 'arena>(
     Ok(())
 }
 
+/// Applies active method call assertions to narrow the return type.
+///
+/// When inside a conditional like `if ($obj->isValid())` where `isValid` has method call
+/// assertions like `@phpstan-assert-if-true Statement $this->first()`, this function
+/// narrows the return type of `first()` from `Statement|null` to `Statement`.
+fn apply_method_call_assertions<'ctx, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    block_context: &BlockContext<'ctx>,
+    this_variable: Option<&str>,
+    method_name: Option<Atom>,
+    mut return_type: TUnion,
+) -> TUnion {
+    let Some(this_var) = this_variable else {
+        return return_type;
+    };
+
+    let Some(method) = method_name else {
+        return return_type;
+    };
+
+    if block_context.active_method_call_assertions.is_empty() {
+        return return_type;
+    }
+
+    let method_call_key = concat_atom!(this_var, "->", method, "()");
+    let Some(assertions) = block_context.active_method_call_assertions.get(&method_call_key) else {
+        return return_type;
+    };
+
+    // Apply the assertions to narrow the return type using the reconciler
+    for clause in assertions.iter() {
+        for assertion in clause {
+            return_type = assertion_reconciler::reconcile(
+                context,
+                assertion,
+                Some(&return_type),
+                None,
+                block_context.flags.inside_loop(),
+                None,
+                false,
+                false,
+            );
+        }
+    }
+
+    return_type
+}
+
 fn get_function_like_target<'ctx>(
     context: &mut Context<'ctx, '_>,
     function_like: FunctionLikeIdentifier,
     alternative: Option<FunctionLikeIdentifier>,
     span: Span,
-    inferred_return_type: Option<Box<TUnion>>,
+    inferred_return_type: Option<Arc<TUnion>>,
 ) -> Option<InvocationTarget<'ctx>> {
     get_function_like_target_inner(context, function_like, alternative, span, inferred_return_type, false)
 }
@@ -209,7 +289,7 @@ pub(super) fn get_function_like_target_with_skip<'ctx>(
     function_like: FunctionLikeIdentifier,
     alternative: Option<FunctionLikeIdentifier>,
     span: Span,
-    inferred_return_type: Option<Box<TUnion>>,
+    inferred_return_type: Option<Arc<TUnion>>,
     skip_error_on_not_found: bool,
 ) -> Option<InvocationTarget<'ctx>> {
     get_function_like_target_inner(
@@ -227,7 +307,7 @@ fn get_function_like_target_inner<'ctx>(
     function_like: FunctionLikeIdentifier,
     alternative: Option<FunctionLikeIdentifier>,
     span: Span,
-    inferred_return_type: Option<Box<TUnion>>,
+    inferred_return_type: Option<Arc<TUnion>>,
     skip_error_on_not_found: bool,
 ) -> Option<InvocationTarget<'ctx>> {
     let mut identifier = function_like;
@@ -246,9 +326,9 @@ fn get_function_like_target_inner<'ctx>(
                         let declaring_class_id = declaring_method_id.get_class_name();
                         context
                             .codebase
-                            .get_function_like(&FunctionLikeIdentifier::Method(*declaring_class_id, method_name))
+                            .get_function_like(&FunctionLikeIdentifier::Method(declaring_class_id, method_name))
                             .inspect(|_| {
-                                identifier = FunctionLikeIdentifier::Method(*declaring_class_id, method_name);
+                                identifier = FunctionLikeIdentifier::Method(declaring_class_id, method_name);
                             })
                     } else {
                         None
@@ -344,13 +424,13 @@ fn inspect_arguments<'ctx, 'arena>(
             argument_list.analyze(context, block_context, artifacts)?;
         }
         InvocationArgumentsSource::PipeInput(pipe) => {
-            let was_inside_call = block_context.inside_call;
-            let was_inside_general_use = block_context.inside_general_use;
-            block_context.inside_call = true;
-            block_context.inside_general_use = true;
+            let was_inside_call = block_context.flags.inside_call();
+            let was_inside_general_use = block_context.flags.inside_general_use();
+            block_context.flags.set_inside_call(true);
+            block_context.flags.set_inside_general_use(true);
             pipe.input.analyze(context, block_context, artifacts)?;
-            block_context.inside_call = was_inside_call;
-            block_context.inside_general_use = was_inside_general_use;
+            block_context.flags.set_inside_call(was_inside_call);
+            block_context.flags.set_inside_general_use(was_inside_general_use);
         }
         _ => {}
     }
@@ -402,13 +482,13 @@ fn confirm_argument_type<'ctx, 'arena>(
             argument_list.analyze(context, block_context, artifacts)?;
         }
         InvocationArgumentsSource::PipeInput(pipe) => {
-            let was_inside_call = block_context.inside_call;
-            let was_inside_general_use = block_context.inside_general_use;
-            block_context.inside_call = true;
-            block_context.inside_general_use = true;
+            let was_inside_call = block_context.flags.inside_call();
+            let was_inside_general_use = block_context.flags.inside_general_use();
+            block_context.flags.set_inside_call(true);
+            block_context.flags.set_inside_general_use(true);
             pipe.input.analyze(context, block_context, artifacts)?;
-            block_context.inside_call = was_inside_call;
-            block_context.inside_general_use = was_inside_general_use;
+            block_context.flags.set_inside_call(was_inside_call);
+            block_context.flags.set_inside_general_use(was_inside_general_use);
         }
         _ => {}
     }

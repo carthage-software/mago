@@ -37,13 +37,12 @@ pub struct Declare<'arena> {
 pub struct DeclareItem<'arena> {
     pub name: LocalIdentifier<'arena>,
     pub equal: Span,
-    pub value: Expression<'arena>,
+    pub value: &'arena Expression<'arena>,
 }
 
 /// Represents the body of a declare statement.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
-#[repr(u8)]
 pub enum DeclareBody<'arena> {
     Statement(&'arena Statement<'arena>),
     ColonDelimited(DeclareColonDelimitedBody<'arena>),

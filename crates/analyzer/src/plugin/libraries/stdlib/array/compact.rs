@@ -1,6 +1,7 @@
 //! `compact()` return type provider.
 
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
 use mago_atom::Atom;
 use mago_codex::ttype::atomic::TAtomic;
@@ -79,7 +80,7 @@ impl FunctionReturnTypeProvider for CompactProvider {
         keyed_array.known_items = Some(known_items);
         keyed_array.non_empty = true;
         if has_unknown {
-            keyed_array.parameters = Some((Box::new(get_string()), Box::new(get_mixed())));
+            keyed_array.parameters = Some((Arc::new(get_string()), Arc::new(get_mixed())));
         }
 
         Some(TUnion::from_atomic(TAtomic::Array(TArray::Keyed(keyed_array))))

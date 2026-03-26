@@ -3,7 +3,7 @@
 namespace {
     class PDOException extends RuntimeException
     {
-        public array|null $errorInfo;
+        public ?array $errorInfo;
         protected $code;
     }
 
@@ -404,114 +404,82 @@ namespace {
          */
         public function __construct(
             string $dsn,
-            string|null $username = null,
-            string|null $password = null,
-            array|null $options = null,
+            ?string $username = null,
+            ?string $password = null,
+            ?array $options = null,
         ) {}
 
         /**
          * @throws PDOException
          */
-        public function prepare(string $query, array $options = []): PDOStatement|false
-        {
-        }
+        public function prepare(string $query, array $options = []): PDOStatement|false {}
 
         /**
          * @throws PDOException
          */
-        public function beginTransaction(): bool
-        {
-        }
+        public function beginTransaction(): bool {}
 
         /**
          * @throws PDOException
          */
-        public function commit(): bool
-        {
-        }
+        public function commit(): bool {}
 
         /**
          * @throws PDOException
          */
-        public function rollBack(): bool
-        {
-        }
+        public function rollBack(): bool {}
 
         #[TentativeType]
-        public function inTransaction(): bool
-        {
-        }
+        public function inTransaction(): bool {}
 
         /**
          * @throws PDOException
          */
         #[TentativeType]
-        public function setAttribute(int $attribute, mixed $value): bool
-        {
-        }
+        public function setAttribute(int $attribute, mixed $value): bool {}
 
         /**
          * @throws PDOException
          */
-        public function exec(string $statement): int|false
-        {
-        }
+        public function exec(string $statement): int|false {}
 
         /**
          * @return PDOStatement|false
          *
          * @throws PDOException
          */
-        public function query(string $query, int|null $fetchMode = null, mixed ...$fetchModeArgs)
-        {
-        }
+        public function query(string $query, ?int $fetchMode = null, mixed ...$fetchModeArgs) {}
 
         /**
          * @throws PDOException
          */
         #[TentativeType]
-        public function lastInsertId(string|null $name = null): string|false
-        {
-        }
+        public function lastInsertId(?string $name = null): string|false {}
 
         #[TentativeType]
-        public function errorCode(): null|string
-        {
-        }
+        public function errorCode(): ?string {}
 
         /**
          * @return array{0: string, 1: int, 2: string}
          */
         #[TentativeType]
-        public function errorInfo(): array
-        {
-        }
+        public function errorInfo(): array {}
 
         /**
          * @throws PDOException
          */
         #[TentativeType]
-        public function getAttribute(int $attribute): mixed
-        {
-        }
+        public function getAttribute(int $attribute): mixed {}
 
         #[TentativeType]
-        public function quote(string $string, int $type = PDO::PARAM_STR): string|false
-        {
-        }
+        public function quote(string $string, int $type = PDO::PARAM_STR): string|false {}
 
-        final public function __wakeup()
-        {
-        }
+        final public function __wakeup() {}
 
-        final public function __sleep()
-        {
-        }
+        final public function __sleep() {}
 
         #[TentativeType]
-        public static function getAvailableDrivers(): array
-        {
-        }
+        public static function getAvailableDrivers(): array {}
 
         /**
          * @param string $function_name
@@ -521,9 +489,7 @@ namespace {
          *
          * @return bool
          */
-        public function sqliteCreateAggregate($function_name, $step_func, $finalize_func, $num_args = -1)
-        {
-        }
+        public function sqliteCreateAggregate($function_name, $step_func, $finalize_func, $num_args = -1) {}
 
         /**
          * @param string $name
@@ -531,9 +497,7 @@ namespace {
          *
          * @return bool
          */
-        public function sqliteCreateCollation($name, $callback)
-        {
-        }
+        public function sqliteCreateCollation($name, $callback) {}
 
         /**
          * @param string $function_name
@@ -543,9 +507,7 @@ namespace {
          *
          * @return bool
          */
-        public function sqliteCreateFunction($function_name, $callback, $num_args = -1, $flags = 0)
-        {
-        }
+        public function sqliteCreateFunction($function_name, $callback, $num_args = -1, $flags = 0) {}
 
         /**
          * @param string $tableName
@@ -562,8 +524,7 @@ namespace {
             $separator = "\t",
             $nullAs = "\\\\N",
             $fields = null,
-        ) {
-        }
+        ) {}
 
         /**
          * @param string $tableName
@@ -574,9 +535,13 @@ namespace {
          *
          * @return bool
          */
-        public function pgsqlCopyFromFile($tableName, $filename, $separator = "\t", $nullAs = "\\\\N", $fields = null)
-        {
-        }
+        public function pgsqlCopyFromFile(
+            $tableName,
+            $filename,
+            $separator = "\t",
+            $nullAs = "\\\\N",
+            $fields = null,
+        ) {}
 
         /**
          * @param string $tableName
@@ -586,9 +551,7 @@ namespace {
          *
          * @return array|false
          */
-        public function pgsqlCopyToArray($tableName, $separator = "\t", $nullAs = "\\\\N", $fields = null)
-        {
-        }
+        public function pgsqlCopyToArray($tableName, $separator = "\t", $nullAs = "\\\\N", $fields = null) {}
 
         /**
          * @param string $tableName
@@ -599,16 +562,12 @@ namespace {
          *
          * @return bool
          */
-        public function pgsqlCopyToFile($tableName, $filename, $separator = "\t", $nullAs = "\\\\N", $fields = null)
-        {
-        }
+        public function pgsqlCopyToFile($tableName, $filename, $separator = "\t", $nullAs = "\\\\N", $fields = null) {}
 
         /**
          * @return string|false
          */
-        public function pgsqlLOBCreate()
-        {
-        }
+        public function pgsqlLOBCreate() {}
 
         /**
          * @param string $oid
@@ -616,18 +575,14 @@ namespace {
          *
          * @return resource|false
          */
-        public function pgsqlLOBOpen($oid, $mode = 'rb')
-        {
-        }
+        public function pgsqlLOBOpen($oid, $mode = 'rb') {}
 
         /**
          * @param string $oid
          *
          * @return bool
          */
-        public function pgsqlLOBUnlink($oid)
-        {
-        }
+        public function pgsqlLOBUnlink($oid) {}
 
         /**
          * @param int $fetchMode
@@ -635,27 +590,22 @@ namespace {
          *
          * @return array|false
          */
-        public function pgsqlGetNotify($fetchMode = PDO::FETCH_DEFAULT, $timeoutMilliseconds = 0)
-        {
-        }
+        public function pgsqlGetNotify($fetchMode = PDO::FETCH_DEFAULT, $timeoutMilliseconds = 0) {}
 
         /**
          * @return int
          */
-        public function pgsqlGetPid()
-        {
-        }
+        public function pgsqlGetPid() {}
 
         /**
          * @throws PDOException
          */
         public static function connect(
             string $dsn,
-            null|string $username = null,
-            null|string $password = null,
-            null|array $options = null,
-        ): static {
-        }
+            ?string $username = null,
+            ?string $password = null,
+            ?array $options = null,
+        ): static {}
     }
 
     class PDOStatement implements IteratorAggregate
@@ -666,9 +616,7 @@ namespace {
          * @throws PDOException
          */
         #[TentativeType]
-        public function execute(array|null $params = null): bool
-        {
-        }
+        public function execute(?array $params = null): bool {}
 
         /**
          * @throws PDOException
@@ -678,8 +626,7 @@ namespace {
             int $mode = PDO::FETCH_DEFAULT,
             int $cursorOrientation = PDO::FETCH_ORI_NEXT,
             int $cursorOffset = 0,
-        ): mixed {
-        }
+        ): mixed {}
 
         /**
          * @throws PDOException
@@ -691,8 +638,7 @@ namespace {
             int $type = PDO::PARAM_STR,
             int $maxLength = 0,
             mixed $driverOptions = null,
-        ): bool {
-        }
+        ): bool {}
 
         /**
          * @throws PDOException
@@ -704,40 +650,31 @@ namespace {
             int $type = PDO::PARAM_STR,
             int $maxLength = 0,
             mixed $driverOptions = null,
-        ): bool {
-        }
+        ): bool {}
 
         /**
          * @throws PDOException
          */
         #[TentativeType]
-        public function bindValue(int|string $param, mixed $value, int $type = PDO::PARAM_STR): bool
-        {
-        }
+        public function bindValue(int|string $param, mixed $value, int $type = PDO::PARAM_STR): bool {}
 
         /**
          * @throws PDOException
          */
         #[TentativeType]
-        public function rowCount(): int
-        {
-        }
+        public function rowCount(): int {}
 
         /**
          * @throws PDOException
          */
         #[TentativeType]
-        public function fetchColumn(int $column = 0): mixed
-        {
-        }
+        public function fetchColumn(int $column = 0): mixed {}
 
         /**
          * @throws PDOException
          */
         #[TentativeType]
-        public function fetchAll(int $mode = PDO::FETCH_DEFAULT, mixed ...$args): array
-        {
-        }
+        public function fetchAll(int $mode = PDO::FETCH_DEFAULT, mixed ...$args): array {}
 
         /**
          * @template T of object
@@ -749,43 +686,31 @@ namespace {
          * @throws PDOException
          */
         #[TentativeType]
-        public function fetchObject(string|null $class = 'stdClass', array $constructorArgs = []): object|false
-        {
-        }
+        public function fetchObject(?string $class = 'stdClass', array $constructorArgs = []): object|false {}
 
         #[TentativeType]
-        public function errorCode(): null|string
-        {
-        }
+        public function errorCode(): ?string {}
 
         /**
          * @return array{0: string, 1: int, 2: string}
          */
         #[TentativeType]
-        public function errorInfo(): array
-        {
-        }
+        public function errorInfo(): array {}
 
         /**
          * @throws PDOException
          */
         #[TentativeType]
-        public function setAttribute(int $attribute, mixed $value): bool
-        {
-        }
+        public function setAttribute(int $attribute, mixed $value): bool {}
 
         #[TentativeType]
-        public function getAttribute(int $name): mixed
-        {
-        }
+        public function getAttribute(int $name): mixed {}
 
         /**
          * @throws PDOException
          */
         #[TentativeType]
-        public function columnCount(): int
-        {
-        }
+        public function columnCount(): int {}
 
         /**
          * @return array{
@@ -800,9 +725,7 @@ namespace {
          * }|false
          */
         #[TentativeType]
-        public function getColumnMeta(int $column): array|false
-        {
-        }
+        public function getColumnMeta(int $column): array|false {}
 
         /**
          * @param int $mode
@@ -812,43 +735,27 @@ namespace {
          *
          * @throws PDOException
          */
-        public function setFetchMode($mode, ...$args)
-        {
-        }
+        public function setFetchMode($mode, ...$args) {}
 
         /**
          * @throws PDOException
          */
-        public function nextRowset(): bool
-        {
-        }
+        public function nextRowset(): bool {}
 
         /**
          * @throws PDOException
          */
-        public function closeCursor(): bool
-        {
-        }
+        public function closeCursor(): bool {}
 
-        public function debugDumpParams(): null|bool
-        {
-        }
+        public function debugDumpParams(): ?bool {}
 
-        final public function __wakeup()
-        {
-        }
+        final public function __wakeup() {}
 
-        final public function __sleep()
-        {
-        }
+        final public function __sleep() {}
 
-        public function getIterator(): Iterator
-        {
-        }
+        public function getIterator(): Iterator {}
 
-        public function connect()
-        {
-        }
+        public function connect() {}
     }
 
     final class PDORow
@@ -859,13 +766,9 @@ namespace {
     /**
      * @return array
      */
-    function pdo_drivers(): array
-    {
-    }
+    function pdo_drivers(): array {}
 
-    function confirm_pdo_ibm_compiled()
-    {
-    }
+    function confirm_pdo_ibm_compiled() {}
 }
 
 namespace Pdo {
@@ -881,35 +784,27 @@ namespace Pdo {
         public const int ATTR_READONLY_STATEMENT = 0;
         public const int ATTR_EXTENDED_RESULT_CODES = 0;
 
-        public function createAggregate(string $name, callable $step, callable $finalize, int $numArgs = -1): bool
-        {
-        }
+        public function createAggregate(string $name, callable $step, callable $finalize, int $numArgs = -1): bool {}
 
-        public function createCollation(string $name, callable $callback): bool
-        {
-        }
+        public function createCollation(string $name, callable $callback): bool {}
 
         public function createFunction(
             string $function_name,
             callable $callback,
             int $num_args = -1,
             int $flags = 0,
-        ): bool {
-        }
+        ): bool {}
 
-        public function loadExtension(string $name): void
-        {
-        }
+        public function loadExtension(string $name): void {}
 
         /** @return resource|false */
         public function openBlob(
             string $table,
             string $column,
             int $rowid,
-            null|string $dbname = 'main',
+            ?string $dbname = 'main',
             int $flags = \Pdo\Sqlite::OPEN_READONLY,
-        ) {
-        }
+        ) {}
     }
 
     class Mysql extends PDO
@@ -934,9 +829,7 @@ namespace Pdo {
         public const int ATTR_SSL_VERIFY_SERVER_CERT = 0;
         public const int ATTR_LOCAL_INFILE_DIRECTORY = 0;
 
-        public function getWarningCount(): int
-        {
-        }
+        public function getWarningCount(): int {}
     }
 
     class Pgsql extends PDO
@@ -954,65 +847,47 @@ namespace Pdo {
             array $rows,
             string $separator = "\t",
             string $nullAs = "\\\\N",
-            null|string $fields = null,
-        ): bool {
-        }
+            ?string $fields = null,
+        ): bool {}
 
         public function copyFromFile(
             string $tableName,
             string $filename,
             string $separator = "\t",
             string $nullAs = "\\\\N",
-            null|string $fields = null,
-        ): bool {
-        }
+            ?string $fields = null,
+        ): bool {}
 
         public function copyToArray(
             string $tableName,
             string $separator = "\t",
             string $nullAs = "\\\\N",
-            null|string $fields = null,
-        ): array|false {
-        }
+            ?string $fields = null,
+        ): array|false {}
 
         public function copyToFile(
             string $tableName,
             string $filename,
             string $separator = "\t",
             string $nullAs = "\\\\N",
-            null|string $fields = null,
-        ): bool {
-        }
+            ?string $fields = null,
+        ): bool {}
 
-        public function escapeIdentifier(string $input): string
-        {
-        }
+        public function escapeIdentifier(string $input): string {}
 
-        public function getNotify(int $fetchMode = \PDO::FETCH_DEFAULT, int $timeoutMilliseconds = 0): array|false
-        {
-        }
+        public function getNotify(int $fetchMode = \PDO::FETCH_DEFAULT, int $timeoutMilliseconds = 0): array|false {}
 
-        public function getPid(): int
-        {
-        }
+        public function getPid(): int {}
 
-        public function lobCreate(): string|false
-        {
-        }
+        public function lobCreate(): string|false {}
 
         /**
          * @return resource|false
          */
-        public function lobOpen(string $oid, string $mode = 'rb')
-        {
-        }
+        public function lobOpen(string $oid, string $mode = 'rb') {}
 
-        public function lobUnlink(string $oid): bool
-        {
-        }
+        public function lobUnlink(string $oid): bool {}
 
-        public function setNoticeCallback(null|callable $callback): void
-        {
-        }
+        public function setNoticeCallback(?callable $callback): void {}
     }
 }

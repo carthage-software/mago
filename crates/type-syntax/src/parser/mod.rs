@@ -1,3 +1,5 @@
+use mago_database::file::HasFileId;
+
 use crate::ast::Type;
 use crate::error::ParseError;
 use crate::lexer::TypeLexer;
@@ -16,7 +18,7 @@ pub fn construct(lexer: TypeLexer<'_>) -> Result<Type<'_>, ParseError> {
     let ty = internal::parse_type(&mut stream)?;
 
     if let Some(next) = stream.lookahead(0)? {
-        return Err(ParseError::UnexpectedToken(vec![], next.kind, next.span));
+        return Err(ParseError::UnexpectedToken(vec![], next.kind, next.span_for(stream.file_id())));
     }
 
     Ok(ty)

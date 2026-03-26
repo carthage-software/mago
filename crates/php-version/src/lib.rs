@@ -303,7 +303,8 @@ impl PHPVersion {
             | Feature::DateTimeExceptions
             | Feature::OverrideAttribute
             | Feature::DynamicClassConstantAccess
-            | Feature::ReadonlyAnonymousClasses => self.0 >= 0x08_03_00,
+            | Feature::ReadonlyAnonymousClasses
+            | Feature::ReadonlyPropertyReinitializationInClone => self.0 >= 0x08_03_00,
             Feature::AsymmetricVisibility
             | Feature::LazyObjects
             | Feature::HighlightStringDoesNotReturnFalse

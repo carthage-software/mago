@@ -1,17 +1,10 @@
 use crate::T;
 use crate::ast::ast::Throw;
 use crate::error::ParseError;
-use crate::parser::internal::expression::parse_expression;
-use crate::parser::internal::token_stream::TokenStream;
-use crate::parser::internal::utils;
+use crate::parser::Parser;
 
-pub fn parse_throw<'arena>(stream: &mut TokenStream<'_, 'arena>) -> Result<Throw<'arena>, ParseError> {
-    Ok(Throw {
-        throw: utils::expect_keyword(stream, T!["throw"])?,
-        exception: {
-            let expression = parse_expression(stream)?;
-
-            stream.alloc(expression)
-        },
-    })
+impl<'input, 'arena> Parser<'input, 'arena> {
+    pub(crate) fn parse_throw(&mut self) -> Result<Throw<'arena>, ParseError> {
+        Ok(Throw { throw: self.expect_keyword(T!["throw"])?, exception: self.arena.alloc(self.parse_expression()?) })
+    }
 }

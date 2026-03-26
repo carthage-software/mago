@@ -1,5 +1,6 @@
 use serde::Serialize;
 
+use mago_database::file::FileId;
 use mago_span::HasSpan;
 use mago_span::Span;
 
@@ -17,10 +18,11 @@ impl HasSpan for Identifier<'_> {
     }
 }
 
-impl<'input> From<TypeToken<'input>> for Identifier<'input> {
+impl<'input> Identifier<'input> {
+    /// Creates an Identifier from a TypeToken and file_id.
     #[inline]
-    fn from(token: TypeToken<'input>) -> Self {
-        Identifier { span: token.span, value: token.value }
+    pub fn from_token(token: TypeToken<'input>, file_id: FileId) -> Self {
+        Identifier { span: token.span_for(file_id), value: token.value }
     }
 }
 

@@ -256,7 +256,7 @@ namespace {
         /**
          * @readonly
          */
-        public null|string $internalSubset;
+        public ?string $internalSubset;
     }
 
     class DOMCdataSection extends DOMText
@@ -309,7 +309,7 @@ namespace {
          */
         public string $nodeName;
 
-        public null|string $nodeValue;
+        public ?string $nodeValue;
 
         /**
          * @readonly
@@ -319,12 +319,12 @@ namespace {
         /**
          * @readonly
          */
-        public null|DOMNode $parentNode;
+        public ?DOMNode $parentNode;
 
         /**
          * @readonly
          */
-        public null|DOMElement $parentElement;
+        public ?DOMElement $parentElement;
 
         /**
          * @readonly
@@ -334,28 +334,28 @@ namespace {
         /**
          * @readonly
          */
-        public null|DOMNode $firstChild;
+        public ?DOMNode $firstChild;
 
         /**
          * @readonly
          */
-        public null|DOMNode $lastChild;
+        public ?DOMNode $lastChild;
 
         /**
          * @readonly
          */
-        public null|DOMNode $previousSibling;
+        public ?DOMNode $previousSibling;
 
         /**
          * @readonly
          */
-        public null|DOMNode $nextSibling;
+        public ?DOMNode $nextSibling;
 
         /**
          * @readonly
          * @var DOMNamedNodeMap<DOMAttr>
          */
-        public null|DOMNamedNodeMap $attributes;
+        public ?DOMNamedNodeMap $attributes;
 
         /**
          * @readonly
@@ -365,132 +365,88 @@ namespace {
         /**
          * @readonly
          */
-        public null|DOMDocument $ownerDocument;
+        public ?DOMDocument $ownerDocument;
 
         /**
          * @readonly
          */
-        public null|string $namespaceURI;
+        public ?string $namespaceURI;
 
         public string $prefix;
 
         /**
          * @readonly
          */
-        public null|string $localName;
+        public ?string $localName;
 
         /**
          * @readonly
          */
-        public null|string $baseURI;
+        public ?string $baseURI;
 
         public string $textContent;
 
         /** @return DOMNode|false */
-        public function appendChild(DOMNode $node)
-        {
-        }
+        public function appendChild(DOMNode $node) {}
 
         public function C14N(
             bool $exclusive = false,
             bool $withComments = false,
-            null|array $xpath = null,
-            null|array $nsPrefixes = null,
-        ): string|false {
-        }
+            ?array $xpath = null,
+            ?array $nsPrefixes = null,
+        ): string|false {}
 
         public function C14NFile(
             string $uri,
             bool $exclusive = false,
             bool $withComments = false,
-            null|array $xpath = null,
-            null|array $nsPrefixes = null,
-        ): int|false {
-        }
+            ?array $xpath = null,
+            ?array $nsPrefixes = null,
+        ): int|false {}
 
         /** @return DOMNode|false */
-        public function cloneNode(bool $deep = false)
-        {
-        }
+        public function cloneNode(bool $deep = false) {}
 
-        public function getLineNo(): int
-        {
-        }
+        public function getLineNo(): int {}
 
-        public function getNodePath(): null|string
-        {
-        }
+        public function getNodePath(): ?string {}
 
-        public function hasAttributes(): bool
-        {
-        }
+        public function hasAttributes(): bool {}
 
-        public function hasChildNodes(): bool
-        {
-        }
+        public function hasChildNodes(): bool {}
 
         /** @return DOMNode|false */
-        public function insertBefore(DOMNode $node, null|DOMNode $child = null)
-        {
-        }
+        public function insertBefore(DOMNode $node, ?DOMNode $child = null) {}
 
-        public function isDefaultNamespace(string $namespace): bool
-        {
-        }
+        public function isDefaultNamespace(string $namespace): bool {}
 
-        public function isSameNode(DOMNode $otherNode): bool
-        {
-        }
+        public function isSameNode(DOMNode $otherNode): bool {}
 
-        public function isEqualNode(null|DOMNode $otherNode): bool
-        {
-        }
+        public function isEqualNode(?DOMNode $otherNode): bool {}
 
-        public function isSupported(string $feature, string $version): bool
-        {
-        }
+        public function isSupported(string $feature, string $version): bool {}
 
-        public function lookupNamespaceURI(null|string $prefix): null|string
-        {
-        }
+        public function lookupNamespaceURI(?string $prefix): ?string {}
 
-        public function lookupPrefix(string $namespace): null|string
-        {
-        }
+        public function lookupPrefix(string $namespace): ?string {}
 
-        public function normalize(): void
-        {
-        }
+        public function normalize(): void {}
 
         /** @return DOMNode|false */
-        public function removeChild(DOMNode $child)
-        {
-        }
+        public function removeChild(DOMNode $child) {}
 
         /** @return DOMNode|false */
-        public function replaceChild(DOMNode $node, DOMNode $child)
-        {
-        }
+        public function replaceChild(DOMNode $node, DOMNode $child) {}
 
-        public function contains(DOMNode|DOMNameSpaceNode|null $other): bool
-        {
-        }
+        public function contains(DOMNode|DOMNameSpaceNode|null $other): bool {}
 
-        public function getRootNode(null|array $options = null): DOMNode
-        {
-        }
+        public function getRootNode(?array $options = null): DOMNode {}
 
-        public function compareDocumentPosition(DOMNode $other): int
-        {
-        }
+        public function compareDocumentPosition(DOMNode $other): int {}
 
-        public function __sleep(): array
-        {
-        }
+        public function __sleep(): array {}
 
-        public function __wakeup(): void
-        {
-        }
+        public function __wakeup(): void {}
     }
 
     class DOMNameSpaceNode
@@ -503,7 +459,7 @@ namespace {
         /**
          * @readonly
          */
-        public null|string $nodeValue;
+        public ?string $nodeValue;
 
         /**
          * @readonly
@@ -518,12 +474,12 @@ namespace {
         /**
          * @readonly
          */
-        public null|string $localName;
+        public ?string $localName;
 
         /**
          * @readonly
          */
-        public null|string $namespaceURI;
+        public ?string $namespaceURI;
 
         /**
          * @readonly
@@ -533,48 +489,37 @@ namespace {
         /**
          * @readonly
          */
-        public null|DOMDocument $ownerDocument;
+        public ?DOMDocument $ownerDocument;
 
         /**
          * @readonly
          */
-        public null|DOMNode $parentNode;
+        public ?DOMNode $parentNode;
 
         /**
          * @readonly
          */
-        public null|DOMElement $parentElement;
+        public ?DOMElement $parentElement;
 
-        public function __sleep(): array
-        {
-        }
+        public function __sleep(): array {}
 
-        public function __wakeup(): void
-        {
-        }
+        public function __wakeup(): void {}
     }
 
     class DOMImplementation
     {
-        public function getFeature(string $feature, string $version): never
-        {
-        }
+        public function getFeature(string $feature, string $version): never {}
 
-        public function hasFeature(string $feature, string $version): bool
-        {
-        }
+        public function hasFeature(string $feature, string $version): bool {}
 
         /** @return DOMDocumentType|false */
-        public function createDocumentType(string $qualifiedName, string $publicId = '', string $systemId = '')
-        {
-        }
+        public function createDocumentType(string $qualifiedName, string $publicId = '', string $systemId = '') {}
 
         public function createDocument(
-            null|string $namespace = null,
+            ?string $namespace = null,
             string $qualifiedName = '',
-            null|DOMDocumentType $doctype = null,
-        ): DOMDocument {
-        }
+            ?DOMDocumentType $doctype = null,
+        ): DOMDocument {}
     }
 
     class DOMDocumentFragment extends DOMNode implements DOMParentNode
@@ -582,12 +527,12 @@ namespace {
         /**
          * @readonly
          */
-        public null|DOMElement $firstElementChild;
+        public ?DOMElement $firstElementChild;
 
         /**
          * @readonly
          */
-        public null|DOMElement $lastElementChild;
+        public ?DOMElement $lastElementChild;
 
         /**
          * @readonly
@@ -596,30 +541,22 @@ namespace {
 
         public function __construct() {}
 
-        public function appendXML(string $data): bool
-        {
-        }
+        public function appendXML(string $data): bool {}
 
         /**
          * @param DOMNode|string $nodes
          */
-        public function append(...$nodes): void
-        {
-        }
+        public function append(...$nodes): void {}
 
         /**
          * @param DOMNode|string $nodes
          */
-        public function prepend(...$nodes): void
-        {
-        }
+        public function prepend(...$nodes): void {}
 
         /**
          * @param DOMNode|string $nodes
          */
-        public function replaceChildren(...$nodes): void
-        {
-        }
+        public function replaceChildren(...$nodes): void {}
     }
 
     /**
@@ -634,23 +571,17 @@ namespace {
          */
         public int $length;
 
-        public function count(): int
-        {
-        }
+        public function count(): int {}
 
         /**
          * @return Iterator<int, TNode>
          */
-        public function getIterator(): Iterator
-        {
-        }
+        public function getIterator(): Iterator {}
 
         /**
          * @return TNode|null
          */
-        public function item(int $index)
-        {
-        }
+        public function item(int $index) {}
     }
 
     class DOMCharacterData extends DOMNode implements DOMChildNode
@@ -665,58 +596,40 @@ namespace {
         /**
          * @readonly
          */
-        public null|DOMElement $previousElementSibling;
+        public ?DOMElement $previousElementSibling;
 
         /**
          * @readonly
          */
-        public null|DOMElement $nextElementSibling;
+        public ?DOMElement $nextElementSibling;
 
-        public function appendData(string $data): true
-        {
-        }
+        public function appendData(string $data): true {}
 
         /** @return string|false */
-        public function substringData(int $offset, int $count)
-        {
-        }
+        public function substringData(int $offset, int $count) {}
 
-        public function insertData(int $offset, string $data): bool
-        {
-        }
+        public function insertData(int $offset, string $data): bool {}
 
-        public function deleteData(int $offset, int $count): bool
-        {
-        }
+        public function deleteData(int $offset, int $count): bool {}
 
-        public function replaceData(int $offset, int $count, string $data): bool
-        {
-        }
+        public function replaceData(int $offset, int $count, string $data): bool {}
 
         /**
          * @param DOMNode|string $nodes
          */
-        public function replaceWith(...$nodes): void
-        {
-        }
+        public function replaceWith(...$nodes): void {}
 
-        public function remove(): void
-        {
-        }
+        public function remove(): void {}
 
         /**
          * @param DOMNode|string $nodes
          */
-        public function before(...$nodes): void
-        {
-        }
+        public function before(...$nodes): void {}
 
         /**
          * @param DOMNode|string $nodes
          */
-        public function after(...$nodes): void
-        {
-        }
+        public function after(...$nodes): void {}
     }
 
     class DOMAttr extends DOMNode
@@ -736,7 +649,7 @@ namespace {
         /**
          * @readonly
          */
-        public null|DOMElement $ownerElement;
+        public ?DOMElement $ownerElement;
 
         /**
          * @readonly
@@ -745,9 +658,7 @@ namespace {
 
         public function __construct(string $name, string $value = '') {}
 
-        public function isId(): bool
-        {
-        }
+        public function isId(): bool {}
     }
 
     class DOMElement extends DOMNode implements \DOMParentNode, \DOMChildNode
@@ -769,12 +680,12 @@ namespace {
         /**
          * @readonly
          */
-        public null|DOMElement $firstElementChild;
+        public ?DOMElement $firstElementChild;
 
         /**
          * @readonly
          */
-        public null|DOMElement $lastElementChild;
+        public ?DOMElement $lastElementChild;
 
         /**
          * @readonly
@@ -784,148 +695,90 @@ namespace {
         /**
          * @readonly
          */
-        public null|DOMElement $previousElementSibling;
+        public ?DOMElement $previousElementSibling;
 
         /**
          * @readonly
          */
-        public null|DOMElement $nextElementSibling;
+        public ?DOMElement $nextElementSibling;
 
-        public function __construct(string $qualifiedName, null|string $value = null, string $namespace = '') {}
+        public function __construct(string $qualifiedName, ?string $value = null, string $namespace = '') {}
 
-        public function getAttribute(string $qualifiedName): string
-        {
-        }
+        public function getAttribute(string $qualifiedName): string {}
 
-        public function getAttributeNames(): array
-        {
-        }
+        public function getAttributeNames(): array {}
 
-        public function getAttributeNS(null|string $namespace, string $localName): string
-        {
-        }
+        public function getAttributeNS(?string $namespace, string $localName): string {}
 
         /** @return DOMAttr|DOMNameSpaceNode|false */
-        public function getAttributeNode(string $qualifiedName)
-        {
-        }
+        public function getAttributeNode(string $qualifiedName) {}
 
         /** @return DOMAttr|DOMNameSpaceNode|null */
-        public function getAttributeNodeNS(null|string $namespace, string $localName)
-        {
-        }
+        public function getAttributeNodeNS(?string $namespace, string $localName) {}
 
         /**
          * @return DOMNodeList<DOMElement>
          */
-        public function getElementsByTagName(string $qualifiedName): DOMNodeList
-        {
-        }
+        public function getElementsByTagName(string $qualifiedName): DOMNodeList {}
 
         /**
          * @return DOMNodeList<DOMElement>
          */
-        public function getElementsByTagNameNS(null|string $namespace, string $localName): DOMNodeList
-        {
-        }
+        public function getElementsByTagNameNS(?string $namespace, string $localName): DOMNodeList {}
 
-        public function hasAttribute(string $qualifiedName): bool
-        {
-        }
+        public function hasAttribute(string $qualifiedName): bool {}
 
-        public function hasAttributeNS(null|string $namespace, string $localName): bool
-        {
-        }
+        public function hasAttributeNS(?string $namespace, string $localName): bool {}
 
-        public function removeAttribute(string $qualifiedName): bool
-        {
-        }
+        public function removeAttribute(string $qualifiedName): bool {}
 
-        public function removeAttributeNS(null|string $namespace, string $localName): void
-        {
-        }
+        public function removeAttributeNS(?string $namespace, string $localName): void {}
 
         /** @return DOMAttr|false */
-        public function removeAttributeNode(DOMAttr $attr)
-        {
-        }
+        public function removeAttributeNode(DOMAttr $attr) {}
 
         /** @return DOMAttr|bool */
-        public function setAttribute(string $qualifiedName, string $value)
-        {
-        }
+        public function setAttribute(string $qualifiedName, string $value) {}
 
-        public function setAttributeNS(null|string $namespace, string $qualifiedName, string $value): void
-        {
-        }
+        public function setAttributeNS(?string $namespace, string $qualifiedName, string $value): void {}
 
         /** @return DOMAttr|null|false */
-        public function setAttributeNode(DOMAttr $attr)
-        {
-        }
+        public function setAttributeNode(DOMAttr $attr) {}
 
         /** @return DOMAttr|null|false */
-        public function setAttributeNodeNS(DOMAttr $attr)
-        {
-        }
+        public function setAttributeNodeNS(DOMAttr $attr) {}
 
-        public function setIdAttribute(string $qualifiedName, bool $isId): void
-        {
-        }
+        public function setIdAttribute(string $qualifiedName, bool $isId): void {}
 
-        public function setIdAttributeNS(string $namespace, string $qualifiedName, bool $isId): void
-        {
-        }
+        public function setIdAttributeNS(string $namespace, string $qualifiedName, bool $isId): void {}
 
-        public function setIdAttributeNode(DOMAttr $attr, bool $isId): void
-        {
-        }
+        public function setIdAttributeNode(DOMAttr $attr, bool $isId): void {}
 
-        public function toggleAttribute(string $qualifiedName, null|bool $force = null): bool
-        {
-        }
+        public function toggleAttribute(string $qualifiedName, ?bool $force = null): bool {}
 
-        public function remove(): void
-        {
-        }
+        public function remove(): void {}
 
         /** @param DOMNode|string $nodes */
-        public function before(...$nodes): void
-        {
-        }
+        public function before(...$nodes): void {}
 
         /** @param DOMNode|string $nodes */
-        public function after(...$nodes): void
-        {
-        }
+        public function after(...$nodes): void {}
 
         /** @param DOMNode|string $nodes */
-        public function replaceWith(...$nodes): void
-        {
-        }
+        public function replaceWith(...$nodes): void {}
 
         /** @param DOMNode|string $nodes */
-        public function append(...$nodes): void
-        {
-        }
+        public function append(...$nodes): void {}
 
         /** @param DOMNode|string $nodes */
-        public function prepend(...$nodes): void
-        {
-        }
+        public function prepend(...$nodes): void {}
 
         /** @param DOMNode|string $nodes */
-        public function replaceChildren(...$nodes): void
-        {
-        }
+        public function replaceChildren(...$nodes): void {}
 
-        public function insertAdjacentElement(string $where, DOMElement $element): null|DOMElement
-        {
-        }
+        public function insertAdjacentElement(string $where, DOMElement $element): ?DOMElement {}
 
-        public function insertAdjacentText(string $where, string $data): void
-        {
-        }
+        public function insertAdjacentText(string $where, string $data): void {}
     }
 
     class DOMDocument extends DOMNode implements DOMParentNode
@@ -933,7 +786,7 @@ namespace {
         /**
          * @readonly
          */
-        public null|DOMDocumentType $doctype;
+        public ?DOMDocumentType $doctype;
 
         /**
          * @readonly
@@ -943,32 +796,32 @@ namespace {
         /**
          * @readonly
          */
-        public null|DOMElement $documentElement;
+        public ?DOMElement $documentElement;
 
         /**
          * @readonly
          * @deprecated
          */
-        public null|string $actualEncoding;
+        public ?string $actualEncoding;
 
-        public null|string $encoding;
+        public ?string $encoding;
 
         /**
          * @readonly
          */
-        public null|string $xmlEncoding;
+        public ?string $xmlEncoding;
 
         public bool $standalone;
 
         public bool $xmlStandalone;
 
-        public null|string $version;
+        public ?string $version;
 
-        public null|string $xmlVersion;
+        public ?string $xmlVersion;
 
         public bool $strictErrorChecking;
 
-        public null|string $documentURI;
+        public ?string $documentURI;
 
         /**
          * @readonly
@@ -991,12 +844,12 @@ namespace {
         /**
          * @readonly
          */
-        public null|DOMElement $firstElementChild;
+        public ?DOMElement $firstElementChild;
 
         /**
          * @readonly
          */
-        public null|DOMElement $lastElementChild;
+        public ?DOMElement $lastElementChild;
 
         /**
          * @readonly
@@ -1006,161 +859,93 @@ namespace {
         public function __construct(string $version = '1.0', string $encoding = '') {}
 
         /** @return DOMAttr|false */
-        public function createAttribute(string $localName)
-        {
-        }
+        public function createAttribute(string $localName) {}
 
         /** @return DOMAttr|false */
-        public function createAttributeNS(null|string $namespace, string $qualifiedName)
-        {
-        }
+        public function createAttributeNS(?string $namespace, string $qualifiedName) {}
 
         /** @return DOMCdataSection|false */
-        public function createCDATASection(string $data)
-        {
-        }
+        public function createCDATASection(string $data) {}
 
-        public function createComment(string $data): DOMComment
-        {
-        }
+        public function createComment(string $data): DOMComment {}
 
-        public function createDocumentFragment(): DOMDocumentFragment
-        {
-        }
+        public function createDocumentFragment(): DOMDocumentFragment {}
 
         /** @return DOMElement|false */
-        public function createElement(string $localName, string $value = '')
-        {
-        }
+        public function createElement(string $localName, string $value = '') {}
 
         /** @return DOMElement|false */
-        public function createElementNS(null|string $namespace, string $qualifiedName, string $value = '')
-        {
-        }
+        public function createElementNS(?string $namespace, string $qualifiedName, string $value = '') {}
 
         /** @return DOMEntityReference|false */
-        public function createEntityReference(string $name)
-        {
-        }
+        public function createEntityReference(string $name) {}
 
         /** @return DOMProcessingInstruction|false */
-        public function createProcessingInstruction(string $target, string $data = '')
-        {
-        }
+        public function createProcessingInstruction(string $target, string $data = '') {}
 
-        public function createTextNode(string $data): DOMText
-        {
-        }
+        public function createTextNode(string $data): DOMText {}
 
-        public function getElementById(string $elementId): null|DOMElement
-        {
-        }
+        public function getElementById(string $elementId): ?DOMElement {}
 
         /**
          * @return DOMNodeList<DOMElement>
          */
-        public function getElementsByTagName(string $qualifiedName): DOMNodeList
-        {
-        }
+        public function getElementsByTagName(string $qualifiedName): DOMNodeList {}
 
         /**
          * @return DOMNodeList<DOMElement>
          */
-        public function getElementsByTagNameNS(null|string $namespace, string $localName): DOMNodeList
-        {
-        }
+        public function getElementsByTagNameNS(?string $namespace, string $localName): DOMNodeList {}
 
         /** @return DOMNode|false */
-        public function importNode(DOMNode $node, bool $deep = false)
-        {
-        }
+        public function importNode(DOMNode $node, bool $deep = false) {}
 
-        public function load(string $filename, int $options = 0): bool
-        {
-        }
+        public function load(string $filename, int $options = 0): bool {}
 
-        public function loadXML(string $source, int $options = 0): bool
-        {
-        }
+        public function loadXML(string $source, int $options = 0): bool {}
 
-        public function normalizeDocument(): void
-        {
-        }
+        public function normalizeDocument(): void {}
 
-        public function registerNodeClass(string $baseClass, null|string $extendedClass): true
-        {
-        }
+        public function registerNodeClass(string $baseClass, ?string $extendedClass): true {}
 
-        public function save(string $filename, int $options = 0): int|false
-        {
-        }
+        public function save(string $filename, int $options = 0): int|false {}
 
-        public function loadHTML(string $source, int $options = 0): bool
-        {
-        }
+        public function loadHTML(string $source, int $options = 0): bool {}
 
-        public function loadHTMLFile(string $filename, int $options = 0): bool
-        {
-        }
+        public function loadHTMLFile(string $filename, int $options = 0): bool {}
 
-        public function saveHTML(null|DOMNode $node = null): string|false
-        {
-        }
+        public function saveHTML(?DOMNode $node = null): string|false {}
 
-        public function saveHTMLFile(string $filename): int|false
-        {
-        }
+        public function saveHTMLFile(string $filename): int|false {}
 
-        public function saveXML(null|DOMNode $node = null, int $options = 0): string|false
-        {
-        }
+        public function saveXML(?DOMNode $node = null, int $options = 0): string|false {}
 
-        public function schemaValidate(string $filename, int $flags = 0): bool
-        {
-        }
+        public function schemaValidate(string $filename, int $flags = 0): bool {}
 
-        public function schemaValidateSource(string $source, int $flags = 0): bool
-        {
-        }
+        public function schemaValidateSource(string $source, int $flags = 0): bool {}
 
-        public function relaxNGValidate(string $filename): bool
-        {
-        }
+        public function relaxNGValidate(string $filename): bool {}
 
-        public function relaxNGValidateSource(string $source): bool
-        {
-        }
+        public function relaxNGValidateSource(string $source): bool {}
 
-        public function validate(): bool
-        {
-        }
+        public function validate(): bool {}
 
-        public function xinclude(int $options = 0): int|false
-        {
-        }
+        public function xinclude(int $options = 0): int|false {}
 
-        public function adoptNode(DOMNode $node): DOMNode|false
-        {
-        }
+        public function adoptNode(DOMNode $node): DOMNode|false {}
 
         /**
          * @param DOMNode|string $nodes
          */
-        public function append(...$nodes): void
-        {
-        }
+        public function append(...$nodes): void {}
 
         /**
          * @param DOMNode|string $nodes
          */
-        public function prepend(...$nodes): void
-        {
-        }
+        public function prepend(...$nodes): void {}
 
         /** @param DOMNode|string $nodes */
-        public function replaceChildren(...$nodes): void
-        {
-        }
+        public function replaceChildren(...$nodes): void {}
     }
 
     final class DOMException extends Exception
@@ -1180,18 +965,12 @@ namespace {
 
         public function __construct(string $data = '') {}
 
-        public function isWhitespaceInElementContent(): bool
-        {
-        }
+        public function isWhitespaceInElementContent(): bool {}
 
-        public function isElementContentWhitespace(): bool
-        {
-        }
+        public function isElementContentWhitespace(): bool {}
 
         /** @return DOMText|false */
-        public function splitText(int $offset)
-        {
-        }
+        public function splitText(int $offset) {}
     }
 
     /**
@@ -1206,30 +985,20 @@ namespace {
         public int $length;
 
         /** @return null|TNode */
-        public function getNamedItem(string $qualifiedName): null|DOMNode
-        {
-        }
+        public function getNamedItem(string $qualifiedName): ?DOMNode {}
 
         /** @return null|TNode */
-        public function getNamedItemNS(null|string $namespace, string $localName): null|DOMNode
-        {
-        }
+        public function getNamedItemNS(?string $namespace, string $localName): ?DOMNode {}
 
         /** @return null|TNode */
-        public function item(int $index): null|DOMNode
-        {
-        }
+        public function item(int $index): ?DOMNode {}
 
-        public function count(): int
-        {
-        }
+        public function count(): int {}
 
         /**
          * @return Iterator<string, TNode>
          */
-        public function getIterator(): Iterator
-        {
-        }
+        public function getIterator(): Iterator {}
     }
 
     class DOMEntity extends DOMNode
@@ -1237,35 +1006,35 @@ namespace {
         /**
          * @readonly
          */
-        public null|string $publicId;
+        public ?string $publicId;
 
         /**
          * @readonly
          */
-        public null|string $systemId;
+        public ?string $systemId;
 
         /**
          * @readonly
          */
-        public null|string $notationName;
-
-        /**
-         * @readonly
-         * @deprecated
-         */
-        public null|string $actualEncoding = null;
+        public ?string $notationName;
 
         /**
          * @readonly
          * @deprecated
          */
-        public null|string $encoding = null;
+        public ?string $actualEncoding = null;
 
         /**
          * @readonly
          * @deprecated
          */
-        public null|string $version = null;
+        public ?string $encoding = null;
+
+        /**
+         * @readonly
+         * @deprecated
+         */
+        public ?string $version = null;
     }
 
     class DOMEntityReference extends DOMNode
@@ -1311,35 +1080,22 @@ namespace {
 
         public function evaluate(
             string $expression,
-            null|DOMNode $contextNode = null,
+            ?DOMNode $contextNode = null,
             bool $registerNodeNS = true,
-        ): mixed {
-        }
+        ): mixed {}
 
-        public function query(string $expression, null|DOMNode $contextNode = null, bool $registerNodeNS = true): mixed
-        {
-        }
+        public function query(string $expression, ?DOMNode $contextNode = null, bool $registerNodeNS = true): mixed {}
 
-        public function registerNamespace(string $prefix, string $namespace): bool
-        {
-        }
+        public function registerNamespace(string $prefix, string $namespace): bool {}
 
-        public function registerPhpFunctions(string|array|null $restrict = null): void
-        {
-        }
+        public function registerPhpFunctions(string|array|null $restrict = null): void {}
 
-        public function registerPhpFunctionNS(string $namespaceURI, string $name, callable $callable): void
-        {
-        }
+        public function registerPhpFunctionNS(string $namespaceURI, string $name, callable $callable): void {}
 
-        public static function quote(string $str): string
-        {
-        }
+        public static function quote(string $str): string {}
     }
 
-    function dom_import_simplexml(object $node): DOMElement|DOMAttr
-    {
-    }
+    function dom_import_simplexml(object $node): DOMElement|DOMAttr {}
 }
 
 namespace Dom {
@@ -1435,7 +1191,7 @@ namespace Dom {
 
         public function replaceChildren(Node|string ...$nodes): void;
 
-        public function querySelector(string $selectors): null|Element;
+        public function querySelector(string $selectors): ?Element;
 
         public function querySelectorAll(string $selectors): NodeList;
     }
@@ -1456,20 +1212,15 @@ namespace Dom {
      */
     class Implementation
     {
-        public function createDocumentType(string $qualifiedName, string $publicId, string $systemId): DocumentType
-        {
-        }
+        public function createDocumentType(string $qualifiedName, string $publicId, string $systemId): DocumentType {}
 
         public function createDocument(
-            null|string $namespace,
+            ?string $namespace,
             string $qualifiedName,
-            null|DocumentType $doctype = null,
-        ): XMLDocument {
-        }
+            ?DocumentType $doctype = null,
+        ): XMLDocument {}
 
-        public function createHTMLDocument(null|string $title = null): HTMLDocument
-        {
-        }
+        public function createHTMLDocument(?string $title = null): HTMLDocument {}
     }
 
     /** @strict-properties */
@@ -1500,25 +1251,21 @@ namespace Dom {
         /**
          * @readonly
          */
-        public null|Document $ownerDocument;
+        public ?Document $ownerDocument;
 
-        public function getRootNode(array $options = []): Node
-        {
-        }
+        public function getRootNode(array $options = []): Node {}
 
         /**
          * @readonly
          */
-        public null|Node $parentNode;
+        public ?Node $parentNode;
 
         /**
          * @readonly
          */
-        public null|Element $parentElement;
+        public ?Element $parentElement;
 
-        public function hasChildNodes(): bool
-        {
-        }
+        public function hasChildNodes(): bool {}
 
         /**
          * @readonly
@@ -1529,41 +1276,33 @@ namespace Dom {
         /**
          * @readonly
          */
-        public null|Node $firstChild;
+        public ?Node $firstChild;
 
         /**
          * @readonly
          */
-        public null|Node $lastChild;
+        public ?Node $lastChild;
 
         /**
          * @readonly
          */
-        public null|Node $previousSibling;
+        public ?Node $previousSibling;
 
         /**
          * @readonly
          */
-        public null|Node $nextSibling;
+        public ?Node $nextSibling;
 
-        public null|string $nodeValue;
-        public null|string $textContent;
+        public ?string $nodeValue;
+        public ?string $textContent;
 
-        public function normalize(): void
-        {
-        }
+        public function normalize(): void {}
 
-        public function cloneNode(bool $deep = false): Node
-        {
-        }
+        public function cloneNode(bool $deep = false): Node {}
 
-        public function isEqualNode(null|Node $otherNode): bool
-        {
-        }
+        public function isEqualNode(?Node $otherNode): bool {}
 
-        public function isSameNode(null|Node $otherNode): bool
-        {
-        }
+        public function isSameNode(?Node $otherNode): bool {}
 
         public const int DOCUMENT_POSITION_DISCONNECTED = 0x01;
         public const int DOCUMENT_POSITION_PRECEDING = 0x02;
@@ -1572,74 +1311,46 @@ namespace Dom {
         public const int DOCUMENT_POSITION_CONTAINED_BY = 0x10;
         public const int DOCUMENT_POSITION_IMPLEMENTATION_SPECIFIC = 0x20;
 
-        public function compareDocumentPosition(Node $other): int
-        {
-        }
+        public function compareDocumentPosition(Node $other): int {}
 
-        public function contains(null|Node $other): bool
-        {
-        }
+        public function contains(?Node $other): bool {}
 
-        public function lookupPrefix(null|string $namespace): null|string
-        {
-        }
+        public function lookupPrefix(?string $namespace): ?string {}
 
-        public function lookupNamespaceURI(null|string $prefix): null|string
-        {
-        }
+        public function lookupNamespaceURI(?string $prefix): ?string {}
 
-        public function isDefaultNamespace(null|string $namespace): bool
-        {
-        }
+        public function isDefaultNamespace(?string $namespace): bool {}
 
-        public function insertBefore(Node $node, null|Node $child): Node
-        {
-        }
+        public function insertBefore(Node $node, ?Node $child): Node {}
 
-        public function appendChild(Node $node): Node
-        {
-        }
+        public function appendChild(Node $node): Node {}
 
-        public function replaceChild(Node $node, Node $child): Node
-        {
-        }
+        public function replaceChild(Node $node, Node $child): Node {}
 
-        public function removeChild(Node $child): Node
-        {
-        }
+        public function removeChild(Node $child): Node {}
 
-        public function getLineNo(): int
-        {
-        }
+        public function getLineNo(): int {}
 
-        public function getNodePath(): string
-        {
-        }
+        public function getNodePath(): string {}
 
         public function C14N(
             bool $exclusive = false,
             bool $withComments = false,
-            null|array $xpath = null,
-            null|array $nsPrefixes = null,
-        ): string|false {
-        }
+            ?array $xpath = null,
+            ?array $nsPrefixes = null,
+        ): string|false {}
 
         public function C14NFile(
             string $uri,
             bool $exclusive = false,
             bool $withComments = false,
-            null|array $xpath = null,
-            null|array $nsPrefixes = null,
-        ): int|false {
-        }
+            ?array $xpath = null,
+            ?array $nsPrefixes = null,
+        ): int|false {}
 
-        public function __sleep(): array
-        {
-        }
+        public function __sleep(): array {}
 
-        public function __wakeup(): void
-        {
-        }
+        public function __wakeup(): void {}
     }
 
     /**
@@ -1654,23 +1365,17 @@ namespace Dom {
          */
         public int $length;
 
-        public function count(): int
-        {
-        }
+        public function count(): int {}
 
         /**
          * @return iterable<int, TNode>
          */
-        public function getIterator(): Iterator
-        {
-        }
+        public function getIterator(): Iterator {}
 
         /**
          * @return TNode
          */
-        public function item(int $index): null|Node
-        {
-        }
+        public function item(int $index): ?Node {}
     }
 
     /**
@@ -1683,28 +1388,18 @@ namespace Dom {
          */
         public int $length;
 
-        public function item(int $index): null|Attr
-        {
-        }
+        public function item(int $index): ?Attr {}
 
-        public function getNamedItem(string $qualifiedName): null|Attr
-        {
-        }
+        public function getNamedItem(string $qualifiedName): ?Attr {}
 
-        public function getNamedItemNS(null|string $namespace, string $localName): null|Attr
-        {
-        }
+        public function getNamedItemNS(?string $namespace, string $localName): ?Attr {}
 
-        public function count(): int
-        {
-        }
+        public function count(): int {}
 
         /**
          * @return Iterator<array-key, Attr>
          */
-        public function getIterator(): Iterator
-        {
-        }
+        public function getIterator(): Iterator {}
     }
 
     /**
@@ -1717,28 +1412,18 @@ namespace Dom {
          */
         public int $length;
 
-        public function item(int $index): Entity|Notation|null
-        {
-        }
+        public function item(int $index): Entity|Notation|null {}
 
-        public function getNamedItem(string $qualifiedName): Entity|Notation|null
-        {
-        }
+        public function getNamedItem(string $qualifiedName): Entity|Notation|null {}
 
-        public function getNamedItemNS(null|string $namespace, string $localName): Entity|Notation|null
-        {
-        }
+        public function getNamedItemNS(?string $namespace, string $localName): Entity|Notation|null {}
 
-        public function count(): int
-        {
-        }
+        public function count(): int {}
 
         /**
          * @return Iterator<string, Entity|Notation>
          */
-        public function getIterator(): Iterator
-        {
-        }
+        public function getIterator(): Iterator {}
     }
 
     /**
@@ -1751,24 +1436,16 @@ namespace Dom {
          */
         public int $length;
 
-        public function item(int $index): null|Element
-        {
-        }
+        public function item(int $index): ?Element {}
 
-        public function namedItem(string $key): null|Element
-        {
-        }
+        public function namedItem(string $key): ?Element {}
 
-        public function count(): int
-        {
-        }
+        public function count(): int {}
 
         /**
          * @return Iterator<array-key, Element>
          */
-        public function getIterator(): Iterator
-        {
-        }
+        public function getIterator(): Iterator {}
     }
 
     enum AdjacentPosition: string
@@ -1784,12 +1461,12 @@ namespace Dom {
         /**
          * @readonly
          */
-        public null|string $namespaceURI;
+        public ?string $namespaceURI;
 
         /**
          * @readonly
          */
-        public null|string $prefix;
+        public ?string $prefix;
 
         /**
          * @readonly
@@ -1809,100 +1486,60 @@ namespace Dom {
          */
         public TokenList $classList;
 
-        public function hasAttributes(): bool
-        {
-        }
+        public function hasAttributes(): bool {}
 
         /**
          * @readonly
          */
         public NamedNodeMap $attributes;
 
-        public function getAttributeNames(): array
-        {
-        }
+        public function getAttributeNames(): array {}
 
-        public function getAttribute(string $qualifiedName): null|string
-        {
-        }
+        public function getAttribute(string $qualifiedName): ?string {}
 
-        public function getAttributeNS(null|string $namespace, string $localName): null|string
-        {
-        }
+        public function getAttributeNS(?string $namespace, string $localName): ?string {}
 
-        public function setAttribute(string $qualifiedName, string $value): void
-        {
-        }
+        public function setAttribute(string $qualifiedName, string $value): void {}
 
-        public function setAttributeNS(null|string $namespace, string $qualifiedName, string $value): void
-        {
-        }
+        public function setAttributeNS(?string $namespace, string $qualifiedName, string $value): void {}
 
-        public function removeAttribute(string $qualifiedName): void
-        {
-        }
+        public function removeAttribute(string $qualifiedName): void {}
 
-        public function removeAttributeNS(null|string $namespace, string $localName): void
-        {
-        }
+        public function removeAttributeNS(?string $namespace, string $localName): void {}
 
-        public function toggleAttribute(string $qualifiedName, null|bool $force = null): bool
-        {
-        }
+        public function toggleAttribute(string $qualifiedName, ?bool $force = null): bool {}
 
-        public function hasAttribute(string $qualifiedName): bool
-        {
-        }
+        public function hasAttribute(string $qualifiedName): bool {}
 
-        public function hasAttributeNS(null|string $namespace, string $localName): bool
-        {
-        }
+        public function hasAttributeNS(?string $namespace, string $localName): bool {}
 
-        public function getAttributeNode(string $qualifiedName): null|Attr
-        {
-        }
+        public function getAttributeNode(string $qualifiedName): ?Attr {}
 
-        public function getAttributeNodeNS(null|string $namespace, string $localName): null|Attr
-        {
-        }
+        public function getAttributeNodeNS(?string $namespace, string $localName): ?Attr {}
 
-        public function setAttributeNode(Attr $attr): null|Attr
-        {
-        }
+        public function setAttributeNode(Attr $attr): ?Attr {}
 
-        public function setAttributeNodeNS(Attr $attr): null|Attr
-        {
-        }
+        public function setAttributeNodeNS(Attr $attr): ?Attr {}
 
-        public function removeAttributeNode(Attr $attr): Attr
-        {
-        }
+        public function removeAttributeNode(Attr $attr): Attr {}
 
-        public function getElementsByTagName(string $qualifiedName): HTMLCollection
-        {
-        }
+        public function getElementsByTagName(string $qualifiedName): HTMLCollection {}
 
-        public function getElementsByTagNameNS(null|string $namespace, string $localName): HTMLCollection
-        {
-        }
+        public function getElementsByTagNameNS(?string $namespace, string $localName): HTMLCollection {}
 
-        public function insertAdjacentElement(AdjacentPosition $where, Element $element): null|Element
-        {
-        }
+        public function insertAdjacentElement(AdjacentPosition $where, Element $element): ?Element {}
 
-        public function insertAdjacentText(AdjacentPosition $where, string $data): void
-        {
-        }
+        public function insertAdjacentText(AdjacentPosition $where, string $data): void {}
 
         /**
          * @readonly
          */
-        public null|Element $firstElementChild;
+        public ?Element $firstElementChild;
 
         /**
          * @readonly
          */
-        public null|Element $lastElementChild;
+        public ?Element $lastElementChild;
 
         /**
          * @readonly
@@ -1912,103 +1549,67 @@ namespace Dom {
         /**
          * @readonly
          */
-        public null|Element $previousElementSibling;
+        public ?Element $previousElementSibling;
 
         /**
          * @readonly
          */
-        public null|Element $nextElementSibling;
+        public ?Element $nextElementSibling;
 
-        public function setIdAttribute(string $qualifiedName, bool $isId): void
-        {
-        }
+        public function setIdAttribute(string $qualifiedName, bool $isId): void {}
 
-        public function setIdAttributeNS(null|string $namespace, string $qualifiedName, bool $isId): void
-        {
-        }
+        public function setIdAttributeNS(?string $namespace, string $qualifiedName, bool $isId): void {}
 
-        public function setIdAttributeNode(Attr $attr, bool $isId): void
-        {
-        }
+        public function setIdAttributeNode(Attr $attr, bool $isId): void {}
 
-        public function remove(): void
-        {
-        }
+        public function remove(): void {}
 
-        public function before(Node|string ...$nodes): void
-        {
-        }
+        public function before(Node|string ...$nodes): void {}
 
-        public function after(Node|string ...$nodes): void
-        {
-        }
+        public function after(Node|string ...$nodes): void {}
 
-        public function replaceWith(Node|string ...$nodes): void
-        {
-        }
+        public function replaceWith(Node|string ...$nodes): void {}
 
-        public function append(Node|string ...$nodes): void
-        {
-        }
+        public function append(Node|string ...$nodes): void {}
 
-        public function prepend(Node|string ...$nodes): void
-        {
-        }
+        public function prepend(Node|string ...$nodes): void {}
 
-        public function replaceChildren(Node|string ...$nodes): void
-        {
-        }
+        public function replaceChildren(Node|string ...$nodes): void {}
 
-        public function querySelector(string $selectors): null|Element
-        {
-        }
+        public function querySelector(string $selectors): ?Element {}
 
-        public function querySelectorAll(string $selectors): NodeList
-        {
-        }
+        public function querySelectorAll(string $selectors): NodeList {}
 
-        public function closest(string $selectors): null|Element
-        {
-        }
+        public function closest(string $selectors): ?Element {}
 
-        public function matches(string $selectors): bool
-        {
-        }
+        public function matches(string $selectors): bool {}
 
         public string $innerHTML;
 
         public string $substitutedNodeValue;
 
         /** @return list<NamespaceInfo> */
-        public function getInScopeNamespaces(): array
-        {
-        }
+        public function getInScopeNamespaces(): array {}
 
         /** @return list<NamespaceInfo> */
-        public function getDescendantNamespaces(): array
-        {
-        }
+        public function getDescendantNamespaces(): array {}
 
-        public function rename(null|string $namespaceURI, string $qualifiedName): void
-        {
-        }
+        public function rename(?string $namespaceURI, string $qualifiedName): void {}
     }
 
-    class HTMLElement extends Element
-    {
-    }
+    class HTMLElement extends Element {}
 
     class Attr extends Node
     {
         /**
          * @readonly
          */
-        public null|string $namespaceURI;
+        public ?string $namespaceURI;
 
         /**
          * @readonly
          */
-        public null|string $prefix;
+        public ?string $prefix;
 
         /**
          * @readonly
@@ -2025,20 +1626,16 @@ namespace Dom {
         /**
          * @readonly
          */
-        public null|Element $ownerElement;
+        public ?Element $ownerElement;
 
         /**
          * @readonly
          */
         public bool $specified = true;
 
-        public function isId(): bool
-        {
-        }
+        public function isId(): bool {}
 
-        public function rename(null|string $namespaceURI, string $qualifiedName): void
-        {
-        }
+        public function rename(?string $namespaceURI, string $qualifiedName): void {}
     }
 
     class CharacterData extends Node implements ChildNode
@@ -2046,12 +1643,12 @@ namespace Dom {
         /**
          * @readonly
          */
-        public null|Element $previousElementSibling;
+        public ?Element $previousElementSibling;
 
         /**
          * @readonly
          */
-        public null|Element $nextElementSibling;
+        public ?Element $nextElementSibling;
 
         public string $data;
 
@@ -2060,48 +1657,28 @@ namespace Dom {
          */
         public int $length;
 
-        public function substringData(int $offset, int $count): string
-        {
-        }
+        public function substringData(int $offset, int $count): string {}
 
-        public function appendData(string $data): void
-        {
-        }
+        public function appendData(string $data): void {}
 
-        public function insertData(int $offset, string $data): void
-        {
-        }
+        public function insertData(int $offset, string $data): void {}
 
-        public function deleteData(int $offset, int $count): void
-        {
-        }
+        public function deleteData(int $offset, int $count): void {}
 
-        public function replaceData(int $offset, int $count, string $data): void
-        {
-        }
+        public function replaceData(int $offset, int $count, string $data): void {}
 
-        public function remove(): void
-        {
-        }
+        public function remove(): void {}
 
-        public function before(Node|string ...$nodes): void
-        {
-        }
+        public function before(Node|string ...$nodes): void {}
 
-        public function after(Node|string ...$nodes): void
-        {
-        }
+        public function after(Node|string ...$nodes): void {}
 
-        public function replaceWith(Node|string ...$nodes): void
-        {
-        }
+        public function replaceWith(Node|string ...$nodes): void {}
     }
 
     class Text extends CharacterData
     {
-        public function splitText(int $offset): Text
-        {
-        }
+        public function splitText(int $offset): Text {}
 
         /**
          * @readonly
@@ -2109,9 +1686,7 @@ namespace Dom {
         public string $wholeText;
     }
 
-    class CDATASection extends Text
-    {
-    }
+    class CDATASection extends Text {}
 
     class ProcessingInstruction extends CharacterData
     {
@@ -2121,9 +1696,7 @@ namespace Dom {
         public string $target;
     }
 
-    class Comment extends CharacterData
-    {
-    }
+    class Comment extends CharacterData {}
 
     class DocumentType extends Node implements ChildNode
     {
@@ -2155,23 +1728,15 @@ namespace Dom {
         /**
          * @readonly
          */
-        public null|string $internalSubset;
+        public ?string $internalSubset;
 
-        public function remove(): void
-        {
-        }
+        public function remove(): void {}
 
-        public function before(Node|string ...$nodes): void
-        {
-        }
+        public function before(Node|string ...$nodes): void {}
 
-        public function after(Node|string ...$nodes): void
-        {
-        }
+        public function after(Node|string ...$nodes): void {}
 
-        public function replaceWith(Node|string ...$nodes): void
-        {
-        }
+        public function replaceWith(Node|string ...$nodes): void {}
     }
 
     class DocumentFragment extends Node implements ParentNode
@@ -2179,41 +1744,29 @@ namespace Dom {
         /**
          * @readonly
          */
-        public null|Element $firstElementChild;
+        public ?Element $firstElementChild;
 
         /**
          * @readonly
          */
-        public null|Element $lastElementChild;
+        public ?Element $lastElementChild;
 
         /**
          * @readonly
          */
         public int $childElementCount;
 
-        public function appendXml(string $data): bool
-        {
-        }
+        public function appendXml(string $data): bool {}
 
-        public function append(Node|string ...$nodes): void
-        {
-        }
+        public function append(Node|string ...$nodes): void {}
 
-        public function prepend(Node|string ...$nodes): void
-        {
-        }
+        public function prepend(Node|string ...$nodes): void {}
 
-        public function replaceChildren(Node|string ...$nodes): void
-        {
-        }
+        public function replaceChildren(Node|string ...$nodes): void {}
 
-        public function querySelector(string $selectors): null|Element
-        {
-        }
+        public function querySelector(string $selectors): ?Element {}
 
-        public function querySelectorAll(string $selectors): NodeList
-        {
-        }
+        public function querySelectorAll(string $selectors): NodeList {}
     }
 
     class Entity extends Node
@@ -2221,22 +1774,20 @@ namespace Dom {
         /**
          * @readonly
          */
-        public null|string $publicId;
+        public ?string $publicId;
 
         /**
          * @readonly
          */
-        public null|string $systemId;
+        public ?string $systemId;
 
         /**
          * @readonly
          */
-        public null|string $notationName;
+        public ?string $notationName;
     }
 
-    class EntityReference extends Node
-    {
-    }
+    class EntityReference extends Node {}
 
     class Notation extends Node
     {
@@ -2266,193 +1817,127 @@ namespace Dom {
         /**
          * @readonly
          */
-        public null|DocumentType $doctype;
+        public ?DocumentType $doctype;
 
         /**
          * @readonly
          */
-        public null|Element $documentElement;
+        public ?Element $documentElement;
 
-        public function getElementsByTagName(string $qualifiedName): HTMLCollection
-        {
-        }
+        public function getElementsByTagName(string $qualifiedName): HTMLCollection {}
 
-        public function getElementsByTagNameNS(null|string $namespace, string $localName): HTMLCollection
-        {
-        }
+        public function getElementsByTagNameNS(?string $namespace, string $localName): HTMLCollection {}
 
-        public function createElement(string $localName): Element
-        {
-        }
+        public function createElement(string $localName): Element {}
 
-        public function createElementNS(null|string $namespace, string $qualifiedName): Element
-        {
-        }
+        public function createElementNS(?string $namespace, string $qualifiedName): Element {}
 
-        public function createDocumentFragment(): DocumentFragment
-        {
-        }
+        public function createDocumentFragment(): DocumentFragment {}
 
-        public function createTextNode(string $data): Text
-        {
-        }
+        public function createTextNode(string $data): Text {}
 
-        public function createCDATASection(string $data): CDATASection
-        {
-        }
+        public function createCDATASection(string $data): CDATASection {}
 
-        public function createComment(string $data): Comment
-        {
-        }
+        public function createComment(string $data): Comment {}
 
-        public function createProcessingInstruction(string $target, string $data): ProcessingInstruction
-        {
-        }
+        public function createProcessingInstruction(string $target, string $data): ProcessingInstruction {}
 
-        public function importNode(null|Node $node, bool $deep = false): Node
-        {
-        }
+        public function importNode(?Node $node, bool $deep = false): Node {}
 
-        public function adoptNode(Node $node): Node
-        {
-        }
+        public function adoptNode(Node $node): Node {}
 
-        public function createAttribute(string $localName): Attr
-        {
-        }
+        public function createAttribute(string $localName): Attr {}
 
-        public function createAttributeNS(null|string $namespace, string $qualifiedName): Attr
-        {
-        }
+        public function createAttributeNS(?string $namespace, string $qualifiedName): Attr {}
 
         /**
          * @readonly
          */
-        public null|Element $firstElementChild;
+        public ?Element $firstElementChild;
 
         /**
          * @readonly
          */
-        public null|Element $lastElementChild;
+        public ?Element $lastElementChild;
 
         /**
          * @readonly
          */
         public int $childElementCount;
 
-        public function getElementById(string $elementId): null|Element
-        {
-        }
+        public function getElementById(string $elementId): ?Element {}
 
-        public function registerNodeClass(string $baseClass, null|string $extendedClass): void
-        {
-        }
+        public function registerNodeClass(string $baseClass, ?string $extendedClass): void {}
 
-        public function schemaValidate(string $filename, int $flags = 0): bool
-        {
-        }
+        public function schemaValidate(string $filename, int $flags = 0): bool {}
 
-        public function schemaValidateSource(string $source, int $flags = 0): bool
-        {
-        }
+        public function schemaValidateSource(string $source, int $flags = 0): bool {}
 
-        public function relaxNgValidate(string $filename): bool
-        {
-        }
+        public function relaxNgValidate(string $filename): bool {}
 
-        public function relaxNgValidateSource(string $source): bool
-        {
-        }
+        public function relaxNgValidateSource(string $source): bool {}
 
-        public function append(Node|string ...$nodes): void
-        {
-        }
+        public function append(Node|string ...$nodes): void {}
 
-        public function prepend(Node|string ...$nodes): void
-        {
-        }
+        public function prepend(Node|string ...$nodes): void {}
 
-        public function replaceChildren(Node|string ...$nodes): void
-        {
-        }
+        public function replaceChildren(Node|string ...$nodes): void {}
 
-        public function importLegacyNode(\DOMNode $node, bool $deep = false): Node
-        {
-        }
+        public function importLegacyNode(\DOMNode $node, bool $deep = false): Node {}
 
-        public function querySelector(string $selectors): null|Element
-        {
-        }
+        public function querySelector(string $selectors): ?Element {}
 
-        public function querySelectorAll(string $selectors): NodeList
-        {
-        }
+        public function querySelectorAll(string $selectors): NodeList {}
 
-        public null|HTMLElement $body;
+        public ?HTMLElement $body;
 
         /**
          * @readonly
          */
-        public null|HTMLElement $head;
+        public ?HTMLElement $head;
         public string $title;
     }
 
     final class HTMLDocument extends Document
     {
-        public static function createEmpty(string $encoding = 'UTF-8'): HTMLDocument
-        {
-        }
+        public static function createEmpty(string $encoding = 'UTF-8'): HTMLDocument {}
 
         public static function createFromFile(
             string $path,
             int $options = 0,
-            null|string $overrideEncoding = null,
-        ): HTMLDocument {
-        }
+            ?string $overrideEncoding = null,
+        ): HTMLDocument {}
 
         public static function createFromString(
             string $source,
             int $options = 0,
-            null|string $overrideEncoding = null,
-        ): HTMLDocument {
-        }
+            ?string $overrideEncoding = null,
+        ): HTMLDocument {}
 
-        public function saveXml(null|Node $node = null, int $options = 0): string|false
-        {
-        }
+        public function saveXml(?Node $node = null, int $options = 0): string|false {}
 
-        public function saveXmlFile(string $filename, int $options = 0): int|false
-        {
-        }
+        public function saveXmlFile(string $filename, int $options = 0): int|false {}
 
-        public function saveHtml(null|Node $node = null): string
-        {
-        }
+        public function saveHtml(?Node $node = null): string {}
 
-        public function saveHtmlFile(string $filename): int|false
-        {
-        }
+        public function saveHtmlFile(string $filename): int|false {}
     }
 
     final class XMLDocument extends Document
     {
-        public static function createEmpty(string $version = '1.0', string $encoding = 'UTF-8'): XMLDocument
-        {
-        }
+        public static function createEmpty(string $version = '1.0', string $encoding = 'UTF-8'): XMLDocument {}
 
         public static function createFromFile(
             string $path,
             int $options = 0,
-            null|string $overrideEncoding = null,
-        ): XMLDocument {
-        }
+            ?string $overrideEncoding = null,
+        ): XMLDocument {}
 
         public static function createFromString(
             string $source,
             int $options = 0,
-            null|string $overrideEncoding = null,
-        ): XMLDocument {
-        }
+            ?string $overrideEncoding = null,
+        ): XMLDocument {}
 
         /**
          * @readonly
@@ -2465,25 +1950,15 @@ namespace Dom {
 
         public bool $formatOutput;
 
-        public function createEntityReference(string $name): EntityReference
-        {
-        }
+        public function createEntityReference(string $name): EntityReference {}
 
-        public function validate(): bool
-        {
-        }
+        public function validate(): bool {}
 
-        public function xinclude(int $options = 0): int
-        {
-        }
+        public function xinclude(int $options = 0): int {}
 
-        public function saveXml(null|Node $node = null, int $options = 0): string|false
-        {
-        }
+        public function saveXml(?Node $node = null, int $options = 0): string|false {}
 
-        public function saveXmlFile(string $filename, int $options = 0): int|false
-        {
-        }
+        public function saveXmlFile(string $filename, int $options = 0): int|false {}
     }
 
     final class TokenList implements IteratorAggregate, Countable
@@ -2495,49 +1970,31 @@ namespace Dom {
          */
         public int $length;
 
-        public function item(int $index): null|string
-        {
-        }
+        public function item(int $index): ?string {}
 
-        public function contains(string $token): bool
-        {
-        }
+        public function contains(string $token): bool {}
 
-        public function add(string ...$tokens): void
-        {
-        }
+        public function add(string ...$tokens): void {}
 
-        public function remove(string ...$tokens): void
-        {
-        }
+        public function remove(string ...$tokens): void {}
 
-        public function toggle(string $token, null|bool $force = null): bool
-        {
-        }
+        public function toggle(string $token, ?bool $force = null): bool {}
 
-        public function replace(string $token, string $newToken): bool
-        {
-        }
+        public function replace(string $token, string $newToken): bool {}
 
-        public function supports(string $token): bool
-        {
-        }
+        public function supports(string $token): bool {}
 
         public string $value;
 
-        public function count(): int
-        {
-        }
+        public function count(): int {}
 
-        public function getIterator(): Iterator
-        {
-        }
+        public function getIterator(): Iterator {}
     }
 
     final readonly class NamespaceInfo
     {
-        public null|string $prefix;
-        public null|string $namespaceURI;
+        public ?string $prefix;
+        public ?string $namespaceURI;
         public Element $element;
 
         private function __construct() {}
@@ -2556,33 +2013,20 @@ namespace Dom {
 
         public function evaluate(
             string $expression,
-            null|Node $contextNode = null,
+            ?Node $contextNode = null,
             bool $registerNodeNS = true,
-        ): null|bool|float|string|NodeList {
-        }
+        ): null|bool|float|string|NodeList {}
 
-        public function query(string $expression, null|Node $contextNode = null, bool $registerNodeNS = true): NodeList
-        {
-        }
+        public function query(string $expression, ?Node $contextNode = null, bool $registerNodeNS = true): NodeList {}
 
-        public function registerNamespace(string $prefix, string $namespace): bool
-        {
-        }
+        public function registerNamespace(string $prefix, string $namespace): bool {}
 
-        public function registerPhpFunctions(string|array|null $restrict = null): void
-        {
-        }
+        public function registerPhpFunctions(string|array|null $restrict = null): void {}
 
-        public function registerPhpFunctionNS(string $namespaceURI, string $name, callable $callable): void
-        {
-        }
+        public function registerPhpFunctionNS(string $namespaceURI, string $name, callable $callable): void {}
 
-        public static function quote(string $str): string
-        {
-        }
+        public static function quote(string $str): string {}
     }
 
-    function import_simplexml(object $node): Element
-    {
-    }
+    function import_simplexml(object $node): Element {}
 }

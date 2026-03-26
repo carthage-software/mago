@@ -1,4 +1,6 @@
-use ahash::HashSet;
+use std::sync::Arc;
+
+use foldhash::HashSet;
 
 use mago_atom::atom;
 use mago_codex::context::ScopeContext;
@@ -7,8 +9,11 @@ use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::ttype::add_optional_union_type;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::callable::TCallable;
+use mago_codex::ttype::atomic::object::TObject;
+use mago_codex::ttype::atomic::object::named::TNamedObject;
 use mago_codex::ttype::expander::TypeExpansionOptions;
 use mago_codex::ttype::expander::get_signature_of_function_like_metadata;
+use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::get_never;
 use mago_codex::ttype::get_void;
 use mago_codex::ttype::union::TUnion;
@@ -24,6 +29,7 @@ use crate::statement::function_like::FunctionLikeBody;
 use crate::statement::function_like::analyze_function_like;
 use crate::statement::function_like::unused_parameter;
 use crate::utils::expression::variable::get_variables_referenced_in_expression;
+use crate::utils::missing_type_hints;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for ArrowFunction<'arena> {
     fn analyze<'ctx>(
@@ -46,8 +52,18 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ArrowFunction<'arena> {
 
         let mut scope = ScopeContext::new();
         scope.set_function_like(Some(function_metadata));
-        scope.set_class_like(block_context.scope.get_class_like());
-        scope.set_static(self.r#static.is_some());
+        if let Some(bind_scope) = &artifacts.closure_bind_scope {
+            if let Some(class_name) = bind_scope.class_name {
+                scope.set_class_like(context.codebase.get_class_like(&class_name));
+            } else {
+                scope.set_class_like(block_context.scope.get_class_like());
+            }
+
+            scope.set_static(!bind_scope.has_this);
+        } else {
+            scope.set_class_like(block_context.scope.get_class_like());
+            scope.set_static(self.r#static.is_some());
+        }
 
         let mut inner_block_context = BlockContext::new(scope, context.settings.register_super_globals);
 
@@ -76,7 +92,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ArrowFunction<'arena> {
 
         // Check for missing type hints
         for parameter in &self.parameter_list.parameters {
-            crate::utils::missing_type_hints::check_parameter_type_hint(
+            missing_type_hints::check_parameter_type_hint(
                 context,
                 block_context.scope.get_class_like(),
                 function_metadata,
@@ -84,13 +100,25 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ArrowFunction<'arena> {
             );
         }
 
-        crate::utils::missing_type_hints::check_return_type_hint(
+        missing_type_hints::check_return_type_hint(
             context,
             block_context.scope.get_class_like(),
             function_metadata,
             "arrow function",
             self.return_type_hint.as_ref(),
             self.span(),
+        );
+
+        // Check for imprecise type hints (bare `array` or `iterable`)
+        for (i, parameter) in self.parameter_list.parameters.iter().enumerate() {
+            missing_type_hints::check_imprecise_parameter_type_hint(context, function_metadata, parameter, i);
+        }
+
+        missing_type_hints::check_imprecise_return_type_hint(
+            context,
+            function_metadata,
+            "arrow function",
+            self.return_type_hint.as_ref(),
         );
 
         let inferred_parameter_types = artifacts.inferred_parameter_types.take();
@@ -114,22 +142,49 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ArrowFunction<'arena> {
         );
 
         if function_metadata.template_types.is_empty() {
-            let mut inferred_return_type = None;
-            for inferred_return in inner_artifacts.inferred_return_types {
-                inferred_return_type = Some(add_optional_union_type(
-                    (*inferred_return).clone(),
-                    inferred_return_type.as_ref(),
-                    context.codebase,
-                ));
-            }
+            if function_metadata.flags.has_yield() && function_metadata.return_type_metadata.is_none() {
+                let mut key_type = None;
+                for k in inner_artifacts.inferred_yield_key_types {
+                    key_type = Some(add_optional_union_type(k, key_type.as_ref(), context.codebase));
+                }
 
-            if let Some(inferred_return_type) = inferred_return_type {
-                signature.return_type = Some(Box::new(inferred_return_type));
+                let mut value_type = None;
+                for v in inner_artifacts.inferred_yield_value_types {
+                    value_type = Some(add_optional_union_type(v, value_type.as_ref(), context.codebase));
+                }
+
+                let mut return_type = None;
+                for r in inner_artifacts.inferred_return_types {
+                    return_type = Some(add_optional_union_type((*r).clone(), return_type.as_ref(), context.codebase));
+                }
+
+                let generator = TNamedObject::new_with_type_parameters(
+                    atom("Generator"),
+                    Some(vec![
+                        key_type.unwrap_or_else(get_mixed),
+                        value_type.unwrap_or_else(get_mixed),
+                        get_mixed(),
+                        return_type.unwrap_or_else(get_void),
+                    ]),
+                );
+
+                signature.return_type = Some(Arc::new(TUnion::from_atomic(TAtomic::Object(TObject::Named(generator)))));
             } else if !function_metadata.flags.has_yield() {
-                if inner_block_context.has_returned {
-                    signature.return_type = Some(Box::new(get_never()));
+                let mut inferred_return_type = None;
+                for inferred_return in inner_artifacts.inferred_return_types {
+                    inferred_return_type = Some(add_optional_union_type(
+                        (*inferred_return).clone(),
+                        inferred_return_type.as_ref(),
+                        context.codebase,
+                    ));
+                }
+
+                if let Some(inferred_return_type) = inferred_return_type {
+                    signature.return_type = Some(Arc::new(inferred_return_type));
+                } else if inner_block_context.flags.has_returned() {
+                    signature.return_type = Some(Arc::new(get_never()));
                 } else {
-                    signature.return_type = Some(Box::new(get_void()));
+                    signature.return_type = Some(Arc::new(get_void()));
                 }
             }
         }

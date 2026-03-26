@@ -1,6 +1,11 @@
 use std::rc::Rc;
 
+use mago_atom::Atom;
+use mago_atom::concat_atom;
 use mago_codex::ttype::add_optional_union_type;
+use mago_codex::ttype::expander::StaticClassType;
+use mago_codex::ttype::expander::TypeExpansionOptions;
+use mago_codex::ttype::expander::expand_union;
 use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::get_never;
 use mago_codex::ttype::get_null;
@@ -10,6 +15,7 @@ use mago_syntax::ast::ClassLikeMemberSelector;
 use mago_syntax::ast::Expression;
 use mago_syntax::ast::NullSafePropertyAccess;
 use mago_syntax::ast::PropertyAccess;
+use mago_syntax::ast::Variable;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -17,6 +23,7 @@ use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
 use crate::resolver::property::resolve_instance_properties;
+use crate::utils::expression::get_expression_id;
 use crate::utils::expression::get_property_access_expression_id;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for PropertyAccess<'arena> {
@@ -70,13 +77,6 @@ fn analyze_property_access<'ctx, 'ast, 'arena>(
     property_selector: &'ast ClassLikeMemberSelector<'arena>,
     is_null_safe: bool,
 ) -> Result<(), AnalysisError> {
-    // When using nullsafe operator, mark that we're in a nullsafe chain
-    // This propagates to all subsequent accesses in the chain and persists
-    // through the entire expression evaluation
-    if is_null_safe {
-        block_context.inside_nullsafe_chain = true;
-    }
-
     let property_access_id = get_property_access_expression_id(
         object,
         property_selector,
@@ -90,6 +90,8 @@ fn analyze_property_access<'ctx, 'ast, 'arena>(
         && let Some(property_access_id) = &property_access_id
         && let Some(existing_type) = block_context.locals.get(property_access_id).cloned()
     {
+        add_memoized_property_reference(context, block_context, artifacts, object, property_selector)?;
+
         artifacts.set_rc_expression_type(&span, existing_type);
 
         return Ok(());
@@ -130,12 +132,101 @@ fn analyze_property_access<'ctx, 'ast, 'arena>(
         }
     }
 
-    let resulting_type = Rc::new(resulting_expression_type.unwrap_or_else(get_never));
+    let mut resulting_type = resulting_expression_type.unwrap_or_else(get_never);
+
+    if is_null_safe
+        && let Some(var_id) = get_expression_id(
+            object,
+            block_context.scope.get_class_like_name(),
+            context.resolved_names,
+            Some(context.codebase),
+        )
+    {
+        artifacts
+            .true_branch_only_assertions
+            .entry((span.start.offset, span.end.offset))
+            .or_default()
+            .entry(var_id)
+            .or_default()
+            .push(vec![mago_codex::assertion::Assertion::IsNotType(mago_codex::ttype::atomic::TAtomic::Null)]);
+    }
+
+    let object_has_nullsafe_null = artifacts.get_expression_type(object).is_some_and(|t| t.has_nullsafe_null());
+    if resolution_result.all_properties_non_nullable
+        && ((is_null_safe && resolution_result.encountered_null) || object_has_nullsafe_null)
+    {
+        resulting_type.set_nullsafe_null(true);
+    }
+
+    expand_union(
+        context.codebase,
+        &mut resulting_type,
+        &TypeExpansionOptions {
+            self_class: block_context.scope.get_class_like_name(),
+            static_class_type: if let Some(calling_class) = block_context.scope.get_class_like_name() {
+                StaticClassType::Name(calling_class)
+            } else {
+                StaticClassType::None
+            },
+            ..Default::default()
+        },
+    );
+
+    let resulting_type = Rc::new(resulting_type);
     if let Some(property_access_id) = property_access_id {
         block_context.locals.insert(property_access_id, resulting_type.clone());
     }
 
     artifacts.set_rc_expression_type(&span, resulting_type);
+
+    Ok(())
+}
+
+/// Adds symbol reference for a memoized property access.
+///
+/// When property access is memoized, we still need to track the symbol reference
+/// so that unused property detection works correctly.
+fn add_memoized_property_reference<'ctx, 'ast, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    block_context: &mut BlockContext<'ctx>,
+    artifacts: &mut AnalysisArtifacts,
+    object: &'ast Expression<'arena>,
+    property_selector: &'ast ClassLikeMemberSelector<'arena>,
+) -> Result<(), AnalysisError> {
+    let property_name = match property_selector {
+        ClassLikeMemberSelector::Identifier(ident) => concat_atom!("$", ident.value),
+        _ => return Ok(()),
+    };
+
+    let is_this = matches!(object, Expression::Variable(Variable::Direct(var)) if var.name == "$this");
+    let mut declaring_classes: Vec<Atom> = Vec::new();
+
+    if is_this {
+        if let Some(class_name) = block_context.scope.get_class_like_name()
+            && let Some(declaring_class) = context.codebase.get_declaring_property_class(&class_name, &property_name)
+        {
+            declaring_classes.push(declaring_class);
+        }
+    } else if let Some(object_type) = artifacts.get_rc_expression_type(object) {
+        for atomic in object_type.types.iter() {
+            for class_name in atomic.get_all_object_names() {
+                if let Some(declaring_class) =
+                    context.codebase.get_declaring_property_class(&class_name, &property_name)
+                {
+                    declaring_classes.push(declaring_class);
+                }
+            }
+        }
+    }
+
+    // Add references (after releasing the immutable borrow)
+    for declaring_class in declaring_classes {
+        artifacts.symbol_references.add_reference_for_property_read(
+            &block_context.scope,
+            declaring_class,
+            property_name,
+        );
+    }
 
     Ok(())
 }
@@ -176,7 +267,7 @@ mod tests {
     }
 
     test_analysis! {
-        name = accessing_enum_properties,
+        name = accessing_string_enum_properties,
         code = indoc! {r"
             <?php
 
@@ -198,6 +289,88 @@ mod tests {
              */
             function get_color_value(Color $color): string {
                 return $color->value;
+            }
+
+            /**
+             * @return 'Red'
+             */
+            function get_specific_case_name(): string {
+                return Color::Red->name;
+            }
+
+            /**
+             * @return 'red'
+             */
+            function get_specific_case_value(): string {
+                return Color::Red->value;
+            }
+        "}
+    }
+
+    test_analysis! {
+        name = accessing_int_enum_properties,
+        code = indoc! {r"
+            <?php
+
+            enum Color: int {
+                case Red = 0;
+                case Green = 1;
+                case Blue = 2;
+            }
+
+            /**
+             * @return 'Red'|'Green'|'Blue'
+             */
+            function get_color_name(Color $color): string {
+                return $color->name;
+            }
+
+            /**
+             * @return 0|1|2
+             */
+            function get_color_value(Color $color): int {
+                return $color->value;
+            }
+
+            /**
+             * @return 'Red'
+             */
+            function get_specific_case_name(): string {
+                return Color::Red->name;
+            }
+
+            /**
+             * @return 0
+             */
+            function get_specific_case_value(): int {
+                return Color::Red->value;
+            }
+        "}
+    }
+
+    test_analysis! {
+        name = accessing_enum_properties,
+        code = indoc! {r"
+            <?php
+
+            enum Color {
+                case Red;
+                case Green;
+                case Blue;
+            }
+
+            /**
+             * @return 'Red'|'Green'|'Blue'
+             */
+            function get_color_name(Color $color): string {
+                return $color->name;
+            }
+
+            /**
+             * @return 'Red'
+             */
+            function get_specific_case_name(): string {
+                return Color::Red->name;
             }
         "}
     }
@@ -605,6 +778,7 @@ mod tests {
             }
         "},
         issues = [
+            IssueCode::NonExistentClassLike,
             IssueCode::NonExistentClassLike,
             IssueCode::UnusedStatement,
         ]

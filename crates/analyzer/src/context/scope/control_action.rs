@@ -1,5 +1,3 @@
-use ahash::HashSet;
-
 use mago_span::HasSpan;
 use mago_syntax::ast::Construct;
 use mago_syntax::ast::Expression;
@@ -14,32 +12,48 @@ use crate::artifacts::AnalysisArtifacts;
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash, Debug)]
 #[repr(u8)]
 pub enum ControlAction {
-    End,
-    Break,
-    BreakImmediateLoop,
-    Continue,
-    LeaveSwitch,
-    None,
-    Return,
+    End = 0b0000001,
+    Break = 0b0000010,
+    BreakImmediateLoop = 0b0000100,
+    Continue = 0b0001000,
+    LeaveSwitch = 0b0010000,
+    None = 0b0100000,
+    Return = 0b1000000,
 }
+
+/// A compact bitfield set for ControlAction values.
+/// Uses a single u8 instead of HashSet for better performance.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[repr(transparent)]
+pub struct ControlActionSet(u8);
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash, Debug)]
 #[repr(u8)]
 pub enum BreakType {
-    Switch,
-    Loop,
+    Switch = 0b01,
+    Loop = 0b10,
 }
 
 impl ControlAction {
+    pub const ALL: [ControlAction; 7] = [
+        ControlAction::End,
+        ControlAction::Break,
+        ControlAction::BreakImmediateLoop,
+        ControlAction::Continue,
+        ControlAction::LeaveSwitch,
+        ControlAction::None,
+        ControlAction::Return,
+    ];
+
     pub fn from_statements(
         statements: Vec<&Statement>,
         break_type: Vec<BreakType>,
         artifacts: Option<&AnalysisArtifacts>,
         return_is_exit: bool,
-    ) -> HashSet<ControlAction> {
+    ) -> ControlActionSet {
         let statements_len = statements.len();
         if 0 == statements_len {
-            return HashSet::from_iter([ControlAction::None]);
+            return ControlActionSet::from_single(ControlAction::None);
         }
 
         if 1 == statements_len
@@ -53,7 +67,7 @@ impl ControlAction {
             );
         }
 
-        let mut control_actions = HashSet::default();
+        let mut control_actions = ControlActionSet::new();
         'statements_loop: for statement in statements {
             match statement {
                 _ if is_return_or_throw_or_exit(statement) => {
@@ -160,14 +174,14 @@ impl ControlAction {
                         return_is_exit,
                     );
 
-                    if !block_actions.contains(&ControlAction::None) {
+                    if !block_actions.contains(ControlAction::None) {
                         control_actions.extend(block_actions);
-                        control_actions.retain(|action| *action != ControlAction::None);
+                        control_actions.retain(|action| action != ControlAction::None);
 
                         return control_actions;
                     }
 
-                    block_actions.retain(|action| *action != ControlAction::None);
+                    block_actions.retain(|action| action != ControlAction::None);
                     control_actions.extend(block_actions);
                 }
                 Statement::Expression(statement_expression) => {
@@ -240,7 +254,7 @@ impl ControlAction {
                     let mut has_ended = false;
                     let mut has_non_breaking_default = false;
                     let mut has_default_terminator = false;
-                    let mut all_case_actions = vec![];
+                    let mut all_case_actions = ControlActionSet::new();
 
                     for case in switch.body.cases().iter().rev() {
                         let mut case_break_type = break_type.clone();
@@ -297,7 +311,7 @@ impl ControlAction {
                         return_is_exit,
                     );
 
-                    let mut all_leave = if_statement_actions.iter().all(|c| !c.is_none());
+                    let mut all_leave = !if_statement_actions.contains(ControlAction::None);
 
                     let mut has_else_actions = false;
                     let else_statement_actions = match if_statement.body.else_statements() {
@@ -311,16 +325,16 @@ impl ControlAction {
                                 return_is_exit,
                             );
 
-                            all_leave = all_leave && else_statement_actions.iter().all(|c| !c.is_none());
+                            all_leave = all_leave && !else_statement_actions.contains(ControlAction::None);
 
                             else_statement_actions
                         }
-                        None => HashSet::default(),
+                        None => ControlActionSet::new(),
                     };
 
-                    all_leave = all_leave && has_else_actions && else_statement_actions.iter().all(|c| !c.is_none());
+                    all_leave = all_leave && has_else_actions && !else_statement_actions.contains(ControlAction::None);
 
-                    let mut all_elseif_actions = vec![];
+                    let mut all_elseif_actions = ControlActionSet::new();
                     for else_if_statements in if_statement.body.else_if_statements() {
                         let elseif_control_actions = ControlAction::from_statements(
                             else_if_statements.iter().collect(),
@@ -329,7 +343,7 @@ impl ControlAction {
                             return_is_exit,
                         );
 
-                        all_leave = all_leave && elseif_control_actions.iter().all(|c| !c.is_none());
+                        all_leave = all_leave && !elseif_control_actions.contains(ControlAction::None);
 
                         all_elseif_actions.extend(elseif_control_actions);
                     }
@@ -342,7 +356,7 @@ impl ControlAction {
                         return control_actions;
                     }
 
-                    control_actions.retain(|action| *action != ControlAction::None);
+                    control_actions.retain(|action| action != ControlAction::None);
                 }
                 Statement::Try(try_catch) => {
                     let try_statement_actions = ControlAction::from_statements(
@@ -352,9 +366,9 @@ impl ControlAction {
                         return_is_exit,
                     );
 
-                    let try_leaves = try_statement_actions.iter().all(|c| !c.is_none());
+                    let try_leaves = !try_statement_actions.contains(ControlAction::None);
 
-                    let mut all_catch_actions = vec![];
+                    let mut all_catch_actions = ControlActionSet::new();
                     if !try_catch.catch_clauses.is_empty() {
                         let mut all_catches_leave = try_leaves;
                         for catch in &try_catch.catch_clauses {
@@ -365,7 +379,7 @@ impl ControlAction {
                                 return_is_exit,
                             );
 
-                            all_catches_leave = all_catches_leave && catch_actions.iter().all(|c| !c.is_none());
+                            all_catches_leave = all_catches_leave && !catch_actions.contains(ControlAction::None);
 
                             if all_catches_leave {
                                 all_catch_actions.extend(catch_actions);
@@ -396,7 +410,7 @@ impl ControlAction {
                             return_is_exit,
                         );
 
-                        if !finally_statement_actions.iter().any(|c| c.is_none()) {
+                        if !finally_statement_actions.contains(ControlAction::None) {
                             control_actions.retain(|c| !c.is_none());
                             control_actions.extend(finally_statement_actions);
 
@@ -446,6 +460,75 @@ impl BreakType {
     #[inline]
     pub const fn is_switch(self) -> bool {
         matches!(self, BreakType::Switch)
+    }
+}
+
+impl ControlActionSet {
+    pub const EMPTY: Self = Self(0);
+
+    #[inline]
+    pub const fn new() -> Self {
+        Self(0)
+    }
+
+    #[inline]
+    pub const fn from_single(action: ControlAction) -> Self {
+        Self(action as u8)
+    }
+
+    #[inline]
+    pub fn insert(&mut self, action: ControlAction) {
+        self.0 |= action as u8;
+    }
+
+    #[inline]
+    pub const fn contains(&self, action: ControlAction) -> bool {
+        (self.0 & action as u8) != 0
+    }
+
+    #[inline]
+    pub fn extend(&mut self, other: Self) {
+        self.0 |= other.0;
+    }
+
+    #[inline]
+    pub const fn is_empty(&self) -> bool {
+        self.0 == 0
+    }
+
+    /// Returns the number of actions in the set
+    #[inline]
+    pub const fn len(&self) -> u32 {
+        self.0.count_ones()
+    }
+
+    /// Retain only actions that satisfy the predicate
+    #[inline]
+    pub fn retain<F>(&mut self, mut f: F)
+    where
+        F: FnMut(ControlAction) -> bool,
+    {
+        for action in ControlAction::ALL {
+            if self.contains(action) && !f(action) {
+                self.0 &= !(action as u8);
+            }
+        }
+    }
+
+    /// Iterator over all actions in the set
+    #[inline]
+    pub fn iter(&self) -> impl Iterator<Item = ControlAction> + '_ {
+        ControlAction::ALL.into_iter().filter(|&action| self.contains(action))
+    }
+}
+
+impl FromIterator<ControlAction> for ControlActionSet {
+    fn from_iter<T: IntoIterator<Item = ControlAction>>(iter: T) -> Self {
+        let mut set = Self::new();
+        for action in iter {
+            set.insert(action);
+        }
+        set
     }
 }
 

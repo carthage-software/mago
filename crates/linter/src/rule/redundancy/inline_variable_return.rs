@@ -1,4 +1,6 @@
 use indoc::indoc;
+use mago_syntax::ast::UnaryPrefix;
+use mago_syntax::ast::UnaryPrefixOperator;
 use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
@@ -7,11 +9,13 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_reporting::Level;
 use mago_span::HasSpan;
+use mago_syntax::ast::Closure;
 use mago_syntax::ast::Expression;
 use mago_syntax::ast::Node;
 use mago_syntax::ast::NodeKind;
 use mago_syntax::ast::Statement;
 use mago_syntax::ast::Variable;
+use mago_syntax::walker::MutWalker;
 use mago_text_edit::TextEdit;
 
 use crate::category::Category;
@@ -169,6 +173,10 @@ impl LintRule for InlineVariableReturnRule {
                 continue;
             }
 
+            if involves_references(assignment.rhs, assigned_var.name) {
+                continue;
+            }
+
             let rhs_text = &ctx.source_file.contents[assignment.rhs.span().to_range_usize()];
 
             let issue = Issue::new(self.cfg.level(), "Variable assignment can be inlined into the return statement.")
@@ -195,6 +203,39 @@ impl LintRule for InlineVariableReturnRule {
             });
         }
     }
+}
+
+/// Check if the expression is by reference,
+/// or has a reference capture of the given variable name.
+fn involves_references(expr: &Expression<'_>, var_name: &str) -> bool {
+    if let Expression::Parenthesized(parenthesized) = expr {
+        return involves_references(parenthesized.expression, var_name);
+    }
+
+    if let Expression::UnaryPrefix(UnaryPrefix { operator: UnaryPrefixOperator::Reference(_), .. }) = expr {
+        return true;
+    }
+
+    struct RefCaptureChecker<'a> {
+        var_name: &'a str,
+        found: bool,
+    }
+
+    impl<'arena> MutWalker<'_, 'arena, ()> for RefCaptureChecker<'_> {
+        fn walk_closure(&mut self, closure: &'_ Closure<'arena>, _: &mut ()) {
+            let Some(use_clause) = &closure.use_clause else {
+                return;
+            };
+
+            if use_clause.variables.iter().any(|v| v.ampersand.is_some() && v.variable.name == self.var_name) {
+                self.found = true;
+            }
+        }
+    }
+
+    let mut checker = RefCaptureChecker { var_name, found: false };
+    checker.walk_expression(expr, &mut ());
+    checker.found
 }
 
 /// Find the next non-whitespace character position after the given offset.
@@ -310,6 +351,44 @@ mod tests {
         "}
     }
 
+    test_lint_success! {
+        name = valid_closure_with_reference_capture,
+        rule = InlineVariableReturnRule,
+        code = indoc! {r"
+            <?php
+
+            function getValue() {
+                $result = function() use (&$result) { return $result; };
+                return $result;
+            }
+        "}
+    }
+
+    test_lint_success! {
+        name = valid_parenthesized_closure_with_reference_capture,
+        rule = InlineVariableReturnRule,
+        code = indoc! {r"
+            <?php
+
+            function getValue() {
+                $result = (function() use (&$result) { return $result; });
+                return $result;
+            }
+        "}
+    }
+
+    test_lint_success! {
+        name = valid_by_ref,
+        rule = InlineVariableReturnRule,
+        code = indoc! {r"
+            <?php
+
+            function &get_category_by_path(string $path): ?array {
+                return &find_node();
+            }
+        "}
+    }
+
     test_lint_failure! {
         name = simple_function_call,
         rule = InlineVariableReturnRule,
@@ -383,6 +462,32 @@ mod tests {
 
             function getResult() {
                 $result = $this->service->process()->getData();
+                return $result;
+            }
+        "}
+    }
+
+    test_lint_failure! {
+        name = closure_with_value_capture,
+        rule = InlineVariableReturnRule,
+        code = indoc! {r"
+            <?php
+
+            function getValue() {
+                $result = function() use ($result) { return $result; };
+                return $result;
+            }
+        "}
+    }
+
+    test_lint_failure! {
+        name = closure_with_different_reference_capture,
+        rule = InlineVariableReturnRule,
+        code = indoc! {r"
+            <?php
+
+            function getValue() {
+                $result = function() use (&$other) { return $other; };
                 return $result;
             }
         "}

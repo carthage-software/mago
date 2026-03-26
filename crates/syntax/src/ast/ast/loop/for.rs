@@ -26,11 +26,11 @@ use crate::ast::sequence::TokenSeparatedSequence;
 pub struct For<'arena> {
     pub r#for: Keyword<'arena>,
     pub left_parenthesis: Span,
-    pub initializations: TokenSeparatedSequence<'arena, Expression<'arena>>,
+    pub initializations: TokenSeparatedSequence<'arena, &'arena Expression<'arena>>,
     pub initializations_semicolon: Span,
-    pub conditions: TokenSeparatedSequence<'arena, Expression<'arena>>,
+    pub conditions: TokenSeparatedSequence<'arena, &'arena Expression<'arena>>,
     pub conditions_semicolon: Span,
-    pub increments: TokenSeparatedSequence<'arena, Expression<'arena>>,
+    pub increments: TokenSeparatedSequence<'arena, &'arena Expression<'arena>>,
     pub right_parenthesis: Span,
     pub body: ForBody<'arena>,
 }
@@ -38,7 +38,6 @@ pub struct For<'arena> {
 /// Represents the body of a for statement.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
-#[repr(u8)]
 pub enum ForBody<'arena> {
     Statement(&'arena Statement<'arena>),
     ColonDelimited(ForColonDelimitedBody<'arena>),

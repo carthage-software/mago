@@ -19,6 +19,7 @@ use crate::context::LintContext;
 use crate::requirements::RuleRequirements;
 use crate::rule::Config;
 use crate::rule::LintRule;
+use crate::rule::utils::misc::get_class_like_header_span;
 use crate::rule::utils::misc::is_method_setter_or_getter;
 use crate::rule_meta::RuleMeta;
 use crate::settings::RuleSettings;
@@ -185,14 +186,16 @@ impl LintRule for CyclomaticComplexityRule {
     }
 
     fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
+        let span = get_class_like_header_span(node);
+
         match node {
-            Node::Class(n) => self.check_class_like("Class", n.members.as_slice(), n.span(), ctx),
-            Node::Trait(n) => self.check_class_like("Trait", n.members.as_slice(), n.span(), ctx),
-            Node::AnonymousClass(n) => self.check_class_like("Class", n.members.as_slice(), n.span(), ctx),
-            Node::Enum(n) => self.check_class_like("Enum", n.members.as_slice(), n.span(), ctx),
-            Node::Interface(n) => self.check_class_like("Interface", n.members.as_slice(), n.span(), ctx),
-            Node::Function(n) => self.check_function_like("Function", &n.body, n.span(), ctx),
-            Node::Closure(n) => self.check_function_like("Closure", &n.body, n.span(), ctx),
+            Node::Class(n) => self.check_class_like("Class", n.members.as_slice(), span, ctx),
+            Node::Trait(n) => self.check_class_like("Trait", n.members.as_slice(), span, ctx),
+            Node::AnonymousClass(n) => self.check_class_like("Class", n.members.as_slice(), span, ctx),
+            Node::Enum(n) => self.check_class_like("Enum", n.members.as_slice(), span, ctx),
+            Node::Interface(n) => self.check_class_like("Interface", n.members.as_slice(), span, ctx),
+            Node::Function(n) => self.check_function_like("Function", &n.body, span, ctx),
+            Node::Closure(n) => self.check_function_like("Closure", &n.body, span, ctx),
             _ => (),
         }
     }

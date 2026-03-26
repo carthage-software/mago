@@ -162,7 +162,7 @@ mod tests {
     use std::borrow::Cow;
     use std::collections::BTreeMap;
 
-    use ahash::HashSet;
+    use foldhash::HashSet;
 
     use mago_atom::AtomSet;
     use mago_codex::metadata::CodebaseMetadata;
@@ -225,8 +225,8 @@ mod tests {
         let arena = bumpalo::Bump::new();
         let source_file = File::ephemeral(Cow::Borrowed(config.name), Cow::Borrowed(config.content));
 
-        let (program, parse_issues) = parse_file(&arena, &source_file);
-        assert!(parse_issues.is_none(), "Test '{}' failed during parsing:\n{:#?}", config.name, parse_issues);
+        let program = parse_file(&arena, &source_file);
+        assert!(!program.has_errors(), "Parse failed: {:?}", program.errors);
 
         let resolver = NameResolver::new(&arena);
         let resolved_names = resolver.resolve(program);

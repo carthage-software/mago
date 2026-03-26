@@ -17,6 +17,10 @@ const COLLECTOR_CATEGORIES: &[&str] = &["guard"];
 pub struct FortressReport {
     pub boundary_breaches: Vec<BoundaryBreach>,
     pub structural_flaws: Vec<StructuralFlaw>,
+    /// Whether perimeter guard was skipped due to missing configuration.
+    pub missing_perimeter_configuration: bool,
+    /// Whether structural guard was skipped due to missing configuration.
+    pub missing_structural_configuration: bool,
 }
 
 impl FortressReport {

@@ -1,8 +1,6 @@
-use std::collections::BTreeMap;
 use std::rc::Rc;
 
-use ahash::HashMap;
-use ahash::HashSet;
+use foldhash::HashMap;
 use indexmap::IndexMap;
 use mago_atom::Atom;
 use mago_atom::AtomMap;
@@ -10,8 +8,8 @@ use mago_atom::AtomSet;
 
 use mago_algebra::clause::Clause;
 use mago_codex::ttype::TType;
-use mago_codex::ttype::combine_optional_union_types;
 use mago_codex::ttype::combine_union_types;
+use mago_codex::ttype::combiner::CombinerOptions;
 use mago_codex::ttype::comparator::union_comparator::can_expression_types_be_identical;
 use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::union::TUnion;
@@ -40,6 +38,7 @@ use crate::context::block::BreakContext;
 use crate::context::scope::case_scope::CaseScope;
 use crate::context::scope::control_action::BreakType;
 use crate::context::scope::control_action::ControlAction;
+use crate::context::scope::control_action::ControlActionSet;
 use crate::context::utils::inherit_branch_context_properties;
 use crate::error::AnalysisError;
 use crate::expression::binary::utils::is_always_identical_to;
@@ -68,16 +67,16 @@ struct SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
     context: &'anlyz mut Context<'ctx, 'arena>,
     block_context: &'anlyz mut BlockContext<'ctx>,
     artifacts: &'anlyz mut AnalysisArtifacts,
-    new_locals: Option<BTreeMap<Atom, Rc<TUnion>>>,
+    new_locals: Option<AtomMap<Rc<TUnion>>>,
     redefined_variables: Option<AtomMap<Rc<TUnion>>>,
-    possibly_redefined_variables: Option<BTreeMap<Atom, TUnion>>,
+    possibly_redefined_variables: Option<AtomMap<Rc<TUnion>>>,
     leftover_statements: Vec<Statement<'arena>>,
     leftover_case_equality_expression: Option<Expression<'arena>>,
     negated_clauses: Vec<Clause>,
     new_assigned_variable_ids: AtomMap<u32>,
     last_case_exit_type: ControlAction,
     case_exit_types: HashMap<usize, ControlAction>,
-    case_actions: HashMap<usize, HashSet<ControlAction>>,
+    case_actions: HashMap<usize, ControlActionSet>,
     has_default_case: bool,
 }
 
@@ -108,10 +107,10 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
     }
 
     pub fn analyze(mut self, switch: &Switch<'arena>) -> Result<(), AnalysisError> {
-        let was_inside_conditional = self.block_context.inside_conditional;
-        self.block_context.inside_conditional = true;
+        let was_inside_conditional = self.block_context.flags.inside_conditional();
+        self.block_context.flags.set_inside_conditional(true);
         switch.expression.analyze(self.context, self.block_context, self.artifacts)?;
-        self.block_context.inside_conditional = was_inside_conditional;
+        self.block_context.flags.set_inside_conditional(was_inside_conditional);
 
         let subject_type = match self.artifacts.get_rc_expression_type(&switch.expression).cloned() {
             Some(t) => t,
@@ -182,26 +181,6 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
             previous_empty_cases = vec![];
         }
 
-        let mut possibly_redefined_vars = self.possibly_redefined_variables.unwrap_or_default();
-        if let Some(new_locals) = self.new_locals {
-            possibly_redefined_vars.retain(|k, _| !new_locals.contains_key(k));
-            self.block_context.locals.extend(new_locals);
-        }
-
-        if let Some(redefined_vars) = self.redefined_variables {
-            possibly_redefined_vars.retain(|k, _| !redefined_vars.contains_key(k));
-            self.block_context.locals.extend(redefined_vars.iter().map(|(k, v)| (*k, v.clone())));
-        }
-
-        for (var_id, var_type) in possibly_redefined_vars {
-            if let Some(context_type) = self.block_context.locals.get(&var_id).cloned() {
-                self.block_context.locals.insert(
-                    var_id,
-                    Rc::new(combine_union_types(&var_type, &context_type, self.context.codebase, false)),
-                );
-            }
-        }
-
         let is_exhaustive = self.has_default_case || {
             let mut final_else_context = original_context.clone();
             let final_else_clauses: Vec<_> =
@@ -231,9 +210,40 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
                     .is_some_and(|id| final_else_context.locals.get(id).is_some_and(|t| t.is_never()))
         };
 
+        let mut possibly_redefined_vars = self.possibly_redefined_variables.unwrap_or_default();
+        if let Some(new_locals) = self.new_locals {
+            possibly_redefined_vars.retain(|k, _| !new_locals.contains_key(k));
+            self.block_context.locals.extend(new_locals);
+        }
+
+        if let Some(redefined_vars) = self.redefined_variables {
+            if is_exhaustive {
+                possibly_redefined_vars.retain(|k, _| !redefined_vars.contains_key(k));
+                self.block_context.locals.extend(redefined_vars.iter().map(|(k, v)| (*k, v.clone())));
+            } else {
+                for (var_id, var_type) in redefined_vars {
+                    possibly_redefined_vars.insert(var_id, var_type);
+                }
+            }
+        }
+
+        for (var_id, var_type) in possibly_redefined_vars {
+            if let Some(context_type) = self.block_context.locals.get(&var_id).cloned() {
+                self.block_context.locals.insert(
+                    var_id,
+                    Rc::new(combine_union_types(
+                        &var_type,
+                        &context_type,
+                        self.context.codebase,
+                        CombinerOptions::default(),
+                    )),
+                );
+            }
+        }
+
         self.artifacts.fully_matched_switch_offsets.insert(switch.start_position().offset);
         self.block_context.assigned_variable_ids.extend(self.new_assigned_variable_ids);
-        self.block_context.has_returned = all_options_returned && is_exhaustive;
+        self.block_context.flags.set_has_returned(all_options_returned && is_exhaustive);
 
         Ok(())
     }
@@ -307,9 +317,9 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
         let case_actions = &self.case_actions[&case_index];
         let case_exit_type = self.case_exit_types[&case_index];
 
-        let has_ending_statements = case_actions.len() == 1 && case_actions.contains(&ControlAction::End);
+        let has_ending_statements = case_actions.len() == 1 && case_actions.contains(ControlAction::End);
         let has_leaving_statements =
-            has_ending_statements || (!case_actions.is_empty() && !case_actions.contains(&ControlAction::None));
+            has_ending_statements || (!case_actions.is_empty() && !case_actions.contains(ControlAction::None));
 
         let mut case_block_context = original_block_context.clone();
 
@@ -597,11 +607,15 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
                 for (var_id, var_type) in break_vars {
                     possibly_redefined_var_ids.insert(
                         *var_id,
-                        combine_optional_union_types(
-                            Some(var_type),
-                            possibly_redefined_var_ids.get(var_id),
-                            self.context.codebase,
-                        ),
+                        match possibly_redefined_var_ids.get(var_id) {
+                            Some(possibly_redefined_var_type) => Rc::new(combine_union_types(
+                                var_type,
+                                possibly_redefined_var_type,
+                                self.context.codebase,
+                                CombinerOptions::default(),
+                            )),
+                            None => var_type.clone(),
+                        },
                     );
                 }
             } else {
@@ -620,8 +634,12 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
                     if let Some(break_var_type) = break_vars.get(&var_id) {
                         if case_block_context.locals.contains_key(&var_id) {
                             let var_type = new_locals.get(&var_id).unwrap();
-                            let combined =
-                                Rc::new(combine_union_types(break_var_type, var_type, self.context.codebase, false));
+                            let combined = Rc::new(combine_union_types(
+                                break_var_type,
+                                var_type,
+                                self.context.codebase,
+                                CombinerOptions::default(),
+                            ));
                             new_locals.insert(var_id, combined);
                         } else {
                             new_locals.remove(&var_id);
@@ -637,8 +655,12 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
                 for var_id in var_ids {
                     if let Some(break_var_type) = break_vars.get(&var_id) {
                         let var_type = redefined_vars.get(&var_id).unwrap();
-                        let combined =
-                            Rc::new(combine_union_types(break_var_type, var_type, self.context.codebase, false));
+                        let combined = Rc::new(combine_union_types(
+                            break_var_type,
+                            var_type,
+                            self.context.codebase,
+                            CombinerOptions::default(),
+                        ));
                         redefined_vars.insert(var_id, combined);
                     } else {
                         redefined_vars.remove(&var_id);
@@ -668,11 +690,15 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
             for (var_id, var_type) in &case_redefined_vars {
                 possibly_redefined_var_ids.insert(
                     *var_id,
-                    combine_optional_union_types(
-                        Some(var_type),
-                        possibly_redefined_var_ids.get(var_id),
-                        self.context.codebase,
-                    ),
+                    match possibly_redefined_var_ids.get(var_id) {
+                        Some(possibly_redefined_var_type) => Rc::new(combine_union_types(
+                            var_type,
+                            possibly_redefined_var_type,
+                            self.context.codebase,
+                            CombinerOptions::default(),
+                        )),
+                        None => var_type.clone(),
+                    },
                 );
             }
         } else {
@@ -690,14 +716,19 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
             for var_id in var_ids {
                 if let Some(break_var_type) = case_redefined_vars.get(&var_id) {
                     let var_type = redefined_vars.get(&var_id).unwrap();
-                    let combined = Rc::new(combine_union_types(break_var_type, var_type, self.context.codebase, false));
+                    let combined = Rc::new(combine_union_types(
+                        break_var_type,
+                        var_type,
+                        self.context.codebase,
+                        CombinerOptions::default(),
+                    ));
                     redefined_vars.insert(var_id, combined);
                 } else {
                     redefined_vars.remove(&var_id);
                 }
             }
         } else {
-            self.redefined_variables = Some(case_redefined_vars.into_iter().map(|(k, v)| (k, Rc::new(v))).collect());
+            self.redefined_variables = Some(case_redefined_vars);
         }
 
         if let Some(new_locals) = &mut self.new_locals {
@@ -705,8 +736,12 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
             for var_id in var_ids {
                 if let Some(existing_var_type) = case_block_context.locals.get(&var_id) {
                     let var_type = new_locals.get(&var_id).unwrap();
-                    let combined =
-                        Rc::new(combine_union_types(existing_var_type, var_type, self.context.codebase, false));
+                    let combined = Rc::new(combine_union_types(
+                        existing_var_type,
+                        var_type,
+                        self.context.codebase,
+                        CombinerOptions::default(),
+                    ));
                     new_locals.insert(var_id, combined);
                 } else {
                     new_locals.remove(&var_id);
@@ -748,15 +783,24 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
     }
 
     fn update_case_exit_map(&mut self, case: &SwitchCase, case_index: usize) {
-        let raw_actions = ControlAction::from_statements(
+        let actions_set = ControlAction::from_statements(
             case.statements().iter().collect(),
             vec![BreakType::Switch],
             Some(self.artifacts),
             true,
         );
 
-        let actions_set: HashSet<ControlAction> = raw_actions.into_iter().collect();
-        let effective_action = Self::get_last_action(&actions_set);
+        let effective_action = if actions_set.contains(ControlAction::None)
+            && matches!(self.last_case_exit_type, ControlAction::Return)
+            && !actions_set.contains(ControlAction::LeaveSwitch)
+            && !actions_set.contains(ControlAction::Break)
+            && !actions_set.contains(ControlAction::BreakImmediateLoop)
+            && !actions_set.contains(ControlAction::Continue)
+        {
+            Some(ControlAction::Return)
+        } else {
+            Self::get_last_action(&actions_set)
+        };
 
         if let Some(action) = effective_action {
             self.last_case_exit_type = action;
@@ -766,13 +810,13 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
         self.case_actions.insert(case_index, actions_set);
     }
 
-    fn get_last_action(case_actions: &HashSet<ControlAction>) -> Option<ControlAction> {
+    fn get_last_action(case_actions: &ControlActionSet) -> Option<ControlAction> {
         match (
             case_actions.len(),
-            case_actions.contains(&ControlAction::None),
-            case_actions.contains(&ControlAction::End),
-            case_actions.contains(&ControlAction::Continue),
-            case_actions.contains(&ControlAction::LeaveSwitch),
+            case_actions.contains(ControlAction::None),
+            case_actions.contains(ControlAction::End),
+            case_actions.contains(ControlAction::Continue),
+            case_actions.contains(ControlAction::LeaveSwitch),
         ) {
             (1, false, true, _, _) => Some(ControlAction::Return),
             (1, false, _, true, _) => Some(ControlAction::Continue),

@@ -1,14 +1,21 @@
 use std::borrow::Cow;
 
-use ahash::HashMap;
+use foldhash::HashMap;
 use itertools::Itertools;
 
 use mago_atom::Atom;
 use mago_atom::AtomMap;
 use mago_atom::concat_atom;
+use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::atomic::TAtomic;
+use mago_codex::ttype::atomic::callable::TCallable;
+use mago_codex::ttype::atomic::object::TObject;
+use mago_codex::ttype::atomic::scalar::TScalar;
+use mago_codex::ttype::atomic::scalar::class_like_string::TClassLikeString;
+use mago_codex::ttype::atomic::scalar::string::TString;
+use mago_codex::ttype::atomic::scalar::string::TStringLiteral;
 use mago_codex::ttype::expander;
 use mago_codex::ttype::expander::StaticClassType;
 use mago_codex::ttype::expander::TypeExpansionOptions;
@@ -22,6 +29,7 @@ use mago_span::HasSpan;
 use mago_syntax::ast::Expression;
 
 use crate::artifacts::AnalysisArtifacts;
+use crate::artifacts::ClosureBindScope;
 use crate::code::IssueCode;
 use crate::context::Context;
 use crate::context::block::BlockContext;
@@ -115,6 +123,7 @@ pub fn analyze_invocation<'ctx, 'arena>(
     let method_call_context = invocation.target.get_method_context();
     let base_class_metadata = method_call_context.map(|ctx| ctx.class_like_metadata).or(calling_class_like_metadata);
     let calling_instance_type = calling_class_like.and_then(|(_, atomic)| atomic);
+    let method_class_type = method_call_context.map(|ctx| &ctx.class_type);
 
     for (argument_offset, argument) in &non_closure_arguments {
         let Some(argument_expression) = argument.value() else {
@@ -144,6 +153,7 @@ pub fn analyze_invocation<'ctx, 'arena>(
                 base_class_metadata,
                 calling_class_like_metadata,
                 calling_instance_type,
+                method_class_type,
             );
 
             if parameter_type.has_template_types() {
@@ -159,6 +169,10 @@ pub fn analyze_invocation<'ctx, 'arena>(
             }
         }
     }
+
+    let closure_bind_scope = detect_closure_bind_scope(context, invocation, &analyzed_argument_types);
+    let previous_bind_scope = artifacts.closure_bind_scope.take();
+    artifacts.closure_bind_scope = closure_bind_scope;
 
     for (argument_offset, argument) in &closure_arguments {
         let Some(argument_expression) = argument.value() else {
@@ -178,6 +192,7 @@ pub fn analyze_invocation<'ctx, 'arena>(
                 base_class_metadata,
                 calling_class_like_metadata,
                 calling_instance_type,
+                method_class_type,
             );
 
             if base_parameter_type.has_template_types() {
@@ -201,6 +216,13 @@ pub fn analyze_invocation<'ctx, 'arena>(
             } else {
                 Some(base_parameter_type)
             }
+        } else {
+            None
+        };
+
+        let parameter_type = if let Some(mut pt) = parameter_type {
+            filter_array_filter_callback_type(&invocation.target, &mut pt, &analyzed_argument_types);
+            Some(pt)
         } else {
             None
         };
@@ -234,6 +256,9 @@ pub fn analyze_invocation<'ctx, 'arena>(
             );
         }
     }
+
+    // Restore the previous closure bind scope after analyzing closure arguments
+    artifacts.closure_bind_scope = previous_bind_scope;
 
     if let Some(function_like_metadata) = invocation.target.get_function_like_metadata() {
         let class_generic_parameters = get_class_template_parameters_from_result(template_result, context);
@@ -335,6 +360,7 @@ pub fn analyze_invocation<'ctx, 'arena>(
                 base_class_metadata,
                 calling_class_like_metadata,
                 calling_instance_type,
+                method_class_type,
             );
 
             let final_parameter_type =
@@ -432,6 +458,7 @@ pub fn analyze_invocation<'ctx, 'arena>(
                 base_class_metadata,
                 calling_class_like_metadata,
                 calling_instance_type,
+                method_class_type,
             );
 
             let default_type =
@@ -451,13 +478,65 @@ pub fn analyze_invocation<'ctx, 'arena>(
         }
     }
 
-    for (template_name, constraints) in invocation.target.get_template_types().into_iter().flatten() {
-        for (generic_parent, type_constraint) in constraints {
-            if template_result.has_lower_bound(template_name, generic_parent) {
+    if !unpacked_arguments.is_empty()
+        && let Some(last_parameter_ref) = parameter_refs.last().copied()
+        && last_parameter_ref.is_variadic()
+    {
+        let base_variadic_parameter_type = get_parameter_type(
+            context,
+            Some(last_parameter_ref),
+            base_class_metadata,
+            calling_class_like_metadata,
+            calling_instance_type,
+            method_class_type,
+        );
+
+        if base_variadic_parameter_type.has_template_types() {
+            for unpacked_argument in &unpacked_arguments {
+                let Some(argument_expression) = unpacked_argument.value() else {
+                    continue;
+                };
+
+                if artifacts.get_expression_type(argument_expression).is_none() {
+                    analyze_and_store_argument_type(
+                        context,
+                        block_context,
+                        artifacts,
+                        &invocation.target,
+                        argument_expression,
+                        usize::MAX,
+                        &mut analyzed_argument_types,
+                        last_parameter_ref.is_by_reference(),
+                        None,
+                    )?;
+                }
+
+                let argument_value_type =
+                    artifacts.get_expression_type(argument_expression).cloned().unwrap_or_else(get_mixed);
+
+                let unpacked_element_type =
+                    get_unpacked_argument_type(context, &argument_value_type, argument_expression.span());
+
+                infer_parameter_templates_from_argument(
+                    context,
+                    &base_variadic_parameter_type,
+                    &unpacked_element_type,
+                    template_result,
+                    parameter_refs.len() - 1,
+                    argument_expression.span(),
+                    false,
+                );
+            }
+        }
+    }
+
+    if let Some(template_types) = invocation.target.get_template_types() {
+        for (template_name, template) in template_types {
+            if template_result.has_lower_bound(*template_name, &template.defining_entity) {
                 continue;
             }
 
-            template_result.add_lower_bound(*template_name, *generic_parent, type_constraint.clone());
+            template_result.add_lower_bound(*template_name, template.defining_entity, template.constraint.clone());
         }
     }
 
@@ -474,6 +553,7 @@ pub fn analyze_invocation<'ctx, 'arena>(
                     base_class_metadata,
                     calling_class_like_metadata,
                     calling_instance_type,
+                    method_class_type,
                 );
 
                 let final_variadic_parameter_type =
@@ -612,6 +692,7 @@ pub fn analyze_invocation<'ctx, 'arena>(
                             base_class_metadata,
                             calling_class_like_metadata,
                             calling_instance_type,
+                            method_class_type,
                             &invocation.target,
                             template_result,
                             current_parameter_position,
@@ -747,6 +828,7 @@ fn get_parameter_type<'ctx>(
     base_class_metadata: Option<&'ctx ClassLikeMetadata>,
     calling_class_like_metadata: Option<&'ctx ClassLikeMetadata>,
     calling_instance_type: Option<&TAtomic>,
+    method_class_type: Option<&StaticClassType>,
 ) -> TUnion {
     let Some(invocation_target_parameter) = invocation_target_parameter else {
         return get_mixed();
@@ -756,19 +838,27 @@ fn get_parameter_type<'ctx>(
 
     let mut resolved_parameter_type = parameter_type;
 
-    expander::expand_union(
-        context.codebase,
-        &mut resolved_parameter_type,
-        &TypeExpansionOptions {
-            self_class: base_class_metadata.map(|meta| meta.name),
-            static_class_type: calling_class_like_metadata.map_or(StaticClassType::None, |calling_meta| {
+    let static_class_type = method_class_type
+        .filter(|t| !matches!(t, StaticClassType::None))
+        .cloned()
+        .or_else(|| {
+            calling_class_like_metadata.map(|calling_meta| {
                 calling_instance_type
                     .and_then(|instance| match instance {
                         TAtomic::Object(obj) => Some(StaticClassType::Object(obj.clone())),
                         _ => None,
                     })
                     .unwrap_or(StaticClassType::Name(calling_meta.name))
-            }),
+            })
+        })
+        .unwrap_or(StaticClassType::None);
+
+    expander::expand_union(
+        context.codebase,
+        &mut resolved_parameter_type,
+        &TypeExpansionOptions {
+            self_class: base_class_metadata.map(|meta| meta.name),
+            static_class_type,
             parent_class: base_class_metadata.and_then(|meta| meta.direct_parent_class),
             function_is_final: calling_class_like_metadata.is_some_and(|meta| meta.flags.is_final()),
             ..Default::default()
@@ -787,6 +877,7 @@ fn validate_unpacked_argument_elements<'ctx, 'arena>(
     base_class_metadata: Option<&'ctx ClassLikeMetadata>,
     calling_class_like_metadata: Option<&'ctx ClassLikeMetadata>,
     calling_instance_type: Option<&TAtomic>,
+    method_class_type: Option<&StaticClassType>,
     invocation_target: &InvocationTarget<'_>,
     template_result: &TemplateResult,
     starting_parameter_position: usize,
@@ -817,6 +908,7 @@ fn validate_unpacked_argument_elements<'ctx, 'arena>(
                                 base_class_metadata,
                                 calling_class_like_metadata,
                                 calling_instance_type,
+                                method_class_type,
                             );
 
                             let final_parameter_type = if template_result.has_template_types() {
@@ -867,6 +959,7 @@ fn validate_unpacked_argument_elements<'ctx, 'arena>(
                                 base_class_metadata,
                                 calling_class_like_metadata,
                                 calling_instance_type,
+                                method_class_type,
                             );
 
                             let final_parameter_type = if template_result.has_template_types() {
@@ -913,6 +1006,7 @@ fn validate_unpacked_argument_elements<'ctx, 'arena>(
                     base_class_metadata,
                     calling_class_like_metadata,
                     calling_instance_type,
+                    method_class_type,
                     invocation_target,
                     template_result,
                     target_kind_str,
@@ -931,6 +1025,7 @@ fn validate_keyed_array_elements<'ctx, 'arena>(
     base_class_metadata: Option<&'ctx ClassLikeMetadata>,
     calling_class_like_metadata: Option<&'ctx ClassLikeMetadata>,
     calling_instance_type: Option<&TAtomic>,
+    method_class_type: Option<&StaticClassType>,
     invocation_target: &InvocationTarget<'_>,
     template_result: &TemplateResult,
     target_kind_str: &str,
@@ -958,6 +1053,9 @@ fn validate_keyed_array_elements<'ctx, 'arena>(
                     continue;
                 }
             }
+            ArrayKey::ClassLikeConstant { .. } => {
+                continue;
+            }
         };
 
         if let Some(parameter_ref) =
@@ -969,6 +1067,7 @@ fn validate_keyed_array_elements<'ctx, 'arena>(
                 base_class_metadata,
                 calling_class_like_metadata,
                 calling_instance_type,
+                method_class_type,
             );
 
             let final_parameter_type =
@@ -1048,4 +1147,166 @@ fn validate_keyed_array_elements<'ctx, 'arena>(
             }
         }
     }
+}
+
+/// Detects if the current invocation is a `Closure::bind` or `Closure::bindTo` call
+/// and extracts the bound scope information from its arguments.
+///
+/// Returns `Some(ClosureBindScope)` if this is a Closure::bind/bindTo call with extractable scope,
+/// `None` otherwise.
+fn detect_closure_bind_scope<'ctx, 'arena>(
+    context: &Context<'ctx, 'arena>,
+    invocation: &Invocation<'ctx, '_, 'arena>,
+    analyzed_argument_types: &HashMap<usize, (TUnion, mago_span::Span)>,
+) -> Option<ClosureBindScope> {
+    let identifier = invocation.target.get_function_like_identifier()?;
+
+    let FunctionLikeIdentifier::Method(class_id, method_id) = identifier else {
+        return None;
+    };
+
+    if !class_id.eq_ignore_ascii_case("closure") {
+        return None;
+    }
+
+    let method_name = method_id.as_str().to_ascii_lowercase();
+
+    let (new_this_offset, new_scope_offset) = if method_name.eq_ignore_ascii_case("bind") {
+        (1, 2)
+    } else {
+        return None;
+    };
+
+    let new_this_type = analyzed_argument_types.get(&new_this_offset).map(|(t, _)| t);
+    let has_this = new_this_type.is_some_and(|t| !t.is_null());
+
+    let class_name = if let Some((scope_type, _)) = analyzed_argument_types.get(&new_scope_offset) {
+        extract_class_name_from_scope_arg(context, scope_type)
+    } else if has_this {
+        new_this_type.and_then(extract_class_name_from_type)
+    } else {
+        None
+    };
+
+    if class_name.is_some() || has_this { Some(ClosureBindScope { class_name, has_this }) } else { None }
+}
+
+/// Extracts a class name from a scope argument (typically the 3rd argument to Closure::bind).
+/// This handles cases like `Foo::class`, `'Foo'`, or a class instance type.
+fn extract_class_name_from_scope_arg(context: &Context<'_, '_>, scope_type: &TUnion) -> Option<Atom> {
+    for atomic in scope_type.types.as_ref() {
+        match atomic {
+            TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::Literal { value })) => {
+                return Some(*value);
+            }
+            TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::OfType { constraint, .. })) => {
+                if let Some(name) = extract_class_name_from_atomic(constraint) {
+                    return Some(name);
+                }
+            }
+            TAtomic::Scalar(TScalar::String(TString { literal: Some(TStringLiteral::Value(value)), .. })) => {
+                if context.codebase.get_class_like(value).is_some() {
+                    return Some(*value);
+                }
+            }
+            TAtomic::Object(TObject::Named(named)) => {
+                return Some(named.name);
+            }
+            TAtomic::Object(TObject::Enum(enum_obj)) => {
+                return Some(enum_obj.name);
+            }
+            _ => continue,
+        }
+    }
+
+    None
+}
+
+/// Extracts a class name from a type union (typically for $this type).
+fn extract_class_name_from_type(t: &TUnion) -> Option<Atom> {
+    for atomic in t.types.as_ref() {
+        if let Some(name) = extract_class_name_from_atomic(atomic) {
+            return Some(name);
+        }
+    }
+    None
+}
+
+/// Extracts a class name from an atomic type.
+fn extract_class_name_from_atomic(atomic: &TAtomic) -> Option<Atom> {
+    match atomic {
+        TAtomic::Object(TObject::Named(named)) => Some(named.name),
+        TAtomic::Object(TObject::Enum(enum_obj)) => Some(enum_obj.name),
+        _ => None,
+    }
+}
+
+/// Filters the callable parameter type for `array_filter` based on the `mode` argument.
+/// For `array_filter`, narrows the callback parameter type to only the callable signature
+/// matching the `mode` argument, so closure parameters get the correct inferred type.
+///
+/// mode 0 (default) → `callable(V): bool`, mode 1 → `callable(V, K): bool`, mode 2 → `callable(K): bool`
+fn filter_array_filter_callback_type(
+    target: &InvocationTarget<'_>,
+    parameter_type: &mut TUnion,
+    analyzed_argument_types: &HashMap<usize, (TUnion, mago_span::Span)>,
+) {
+    let is_array_filter = target.get_function_like_identifier().is_some_and(
+        |id| matches!(id, FunctionLikeIdentifier::Function(name) if name.eq_ignore_ascii_case("array_filter")),
+    );
+
+    if !is_array_filter {
+        return;
+    }
+
+    let mode = analyzed_argument_types
+        .get(&2)
+        .and_then(|(mode_type, _)| mode_type.get_single_literal_int_value())
+        .unwrap_or(0);
+
+    let expected_params: usize = if mode == 1 { 2 } else { 1 };
+
+    let value_type_id = if expected_params == 1 {
+        parameter_type.types.as_ref().iter().find_map(|atomic| {
+            if let TAtomic::Callable(TCallable::Signature(sig)) = atomic
+                && sig.parameters.len() == 2
+            {
+                sig.parameters.first().and_then(|p| p.get_type_signature()).map(|t| t.get_id())
+            } else {
+                None
+            }
+        })
+    } else {
+        None
+    };
+
+    let mut kept_one = false;
+    parameter_type.types.to_mut().retain(|atomic| {
+        let TAtomic::Callable(TCallable::Signature(sig)) = atomic else {
+            return true;
+        };
+
+        if sig.parameters.len() != expected_params {
+            return false;
+        }
+
+        if expected_params == 2 {
+            return if kept_one {
+                false
+            } else {
+                kept_one = true;
+                true
+            };
+        }
+
+        let is_value = sig.parameters.first().and_then(|p| p.get_type_signature()).map(|t| t.get_id()) == value_type_id;
+
+        let want_value = mode != 2;
+        if is_value == want_value && !kept_one {
+            kept_one = true;
+            true
+        } else {
+            false
+        }
+    });
 }

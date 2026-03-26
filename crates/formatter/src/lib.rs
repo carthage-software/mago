@@ -7,11 +7,13 @@
 use std::borrow::Cow;
 
 use bumpalo::Bump;
+
 use mago_database::file::File;
 use mago_php_version::PHPVersion;
 use mago_syntax::ast::Program;
 use mago_syntax::error::ParseError;
-use mago_syntax::parser::parse_file;
+use mago_syntax::parser::parse_file_with_settings;
+use mago_syntax::settings::ParserSettings;
 
 use crate::document::Document;
 use crate::internal::FormatterState;
@@ -20,6 +22,7 @@ use crate::internal::printer::Printer;
 use crate::settings::FormatSettings;
 
 pub mod document;
+pub mod presets;
 pub mod settings;
 
 mod internal;
@@ -38,12 +41,28 @@ pub struct Formatter<'arena> {
     arena: &'arena Bump,
     php_version: PHPVersion,
     settings: FormatSettings,
+    parser_settings: ParserSettings,
 }
 
 impl<'arena> Formatter<'arena> {
     /// Creates a new `Formatter` with the specified configuration.
+    ///
+    /// # Arguments
+    ///
+    /// * `arena` - A reference to a `Bump` arena for memory allocation.
+    /// * `php_version` - The target PHP version for formatting.
+    /// * `settings` - The formatting settings to use.
     pub fn new(arena: &'arena Bump, php_version: PHPVersion, settings: FormatSettings) -> Self {
-        Self { arena, php_version, settings }
+        Self { arena, php_version, settings, parser_settings: ParserSettings::default() }
+    }
+
+    /// Sets custom parser settings for the formatter.
+    ///
+    /// This allows customization of parsing behavior, such as enabling or disabling
+    /// certain PHP syntax features.
+    pub fn with_parser_settings(mut self, parser_settings: ParserSettings) -> Self {
+        self.parser_settings = parser_settings;
+        self
     }
 
     /// Formats a string of PHP code.
@@ -69,11 +88,11 @@ impl<'arena> Formatter<'arena> {
     ///
     /// # Errors
     ///
-    /// Returns a [`ParseError`] if the file's content contains syntax errors.
+    /// Returns the first [`ParseError`] if the file's content contains syntax errors.
     pub fn format_file<'ctx>(&self, file: &'ctx File) -> Result<&'arena str, ParseError> {
-        let (program, error) = parse_file(self.arena, file);
-        if let Some(error) = error {
-            return Err(error);
+        let program = parse_file_with_settings(self.arena, file, self.parser_settings);
+        if let Some(error) = program.errors.first() {
+            return Err(error.clone());
         }
 
         Ok(self.format(file, program))

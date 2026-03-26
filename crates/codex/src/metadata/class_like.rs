@@ -1,5 +1,5 @@
-use ahash::HashMap;
-use ahash::RandomState;
+use foldhash::HashMap;
+use foldhash::fast::RandomState;
 use indexmap::IndexMap;
 use serde::Deserialize;
 use serde::Serialize;
@@ -18,20 +18,23 @@ use crate::metadata::enum_case::EnumCaseMetadata;
 use crate::metadata::flags::MetadataFlags;
 use crate::metadata::property::PropertyMetadata;
 use crate::metadata::ttype::TypeMetadata;
-use crate::misc::GenericParent;
 use crate::symbol::SymbolKind;
 use crate::ttype::atomic::TAtomic;
+use crate::ttype::template::GenericTemplate;
 use crate::ttype::template::variance::Variance;
 use crate::ttype::union::TUnion;
 use crate::visibility::Visibility;
 
-type TemplateTuple = (Atom, Vec<(GenericParent, TUnion)>);
+/// Type alias for template types stored in metadata.
+/// Maps template parameter names to their defining entity and constraint type.
+pub type TemplateTypes = IndexMap<Atom, GenericTemplate, RandomState>;
 
 /// Contains comprehensive metadata for a PHP class-like structure (class, interface, trait, enum).
 ///
 /// Aggregates information about inheritance, traits, generics, methods, properties, constants,
 /// attributes, docblock tags, analysis flags, and more.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct ClassLikeMetadata {
     pub name: Atom,
     pub original_name: Atom,
@@ -49,7 +52,7 @@ pub struct ClassLikeMetadata {
     pub child_class_likes: Option<AtomSet>,
     pub name_span: Option<Span>,
     pub kind: SymbolKind,
-    pub template_types: Vec<TemplateTuple>,
+    pub template_types: TemplateTypes,
     pub template_readonly: AtomSet,
     pub template_variance: HashMap<usize, Variance>,
     pub template_extended_offsets: AtomMap<Vec<TUnion>>,
@@ -63,16 +66,16 @@ pub struct ClassLikeMetadata {
     pub declaring_method_ids: AtomMap<MethodIdentifier>,
     pub appearing_method_ids: AtomMap<MethodIdentifier>,
     pub inheritable_method_ids: AtomMap<MethodIdentifier>,
-    pub overridden_method_ids: AtomMap<HashMap<Atom, MethodIdentifier>>,
+    pub overridden_method_ids: AtomMap<IndexMap<Atom, MethodIdentifier, RandomState>>,
     pub properties: AtomMap<PropertyMetadata>,
     pub appearing_property_ids: AtomMap<Atom>,
     pub declaring_property_ids: AtomMap<Atom>,
     pub inheritable_property_ids: AtomMap<Atom>,
     pub overridden_property_ids: AtomMap<AtomSet>,
     pub initialized_properties: AtomSet,
-    pub constants: IndexMap<Atom, ClassLikeConstantMetadata, RandomState>,
+    pub constants: AtomMap<ClassLikeConstantMetadata>,
     pub trait_constant_ids: AtomMap<Atom>,
-    pub enum_cases: IndexMap<Atom, EnumCaseMetadata, RandomState>,
+    pub enum_cases: AtomMap<EnumCaseMetadata>,
     pub invalid_dependencies: AtomSet,
     pub attributes: Vec<AttributeMetadata>,
     pub enum_type: Option<TAtomic>,
@@ -85,6 +88,9 @@ pub struct ClassLikeMetadata {
     pub type_aliases: AtomMap<TypeMetadata>,
     /// Imported type aliases in the form of (`from_fqcn`, `type_name`, span)
     pub imported_type_aliases: AtomMap<(Atom, Atom, Span)>,
+    /// Mixin types from @mixin annotations - these types' methods/properties
+    /// can be accessed via magic methods (__call, __get, __set, __callStatic)
+    pub mixins: Vec<TUnion>,
 }
 
 impl ClassLikeMetadata {
@@ -97,9 +103,9 @@ impl ClassLikeMetadata {
         flags: MetadataFlags,
     ) -> ClassLikeMetadata {
         ClassLikeMetadata {
-            constants: IndexMap::with_hasher(RandomState::new()),
+            constants: AtomMap::default(),
             trait_constant_ids: AtomMap::default(),
-            enum_cases: IndexMap::with_hasher(RandomState::new()),
+            enum_cases: AtomMap::default(),
             flags,
             kind: SymbolKind::Class,
             direct_parent_interfaces: AtomSet::default(),
@@ -132,7 +138,7 @@ impl ClassLikeMetadata {
             template_extended_offsets: AtomMap::default(),
             template_type_implements_count: AtomMap::default(),
             template_type_uses_count: AtomMap::default(),
-            template_types: Vec::default(),
+            template_types: TemplateTypes::default(),
             used_traits: AtomSet::default(),
             trait_alias_map: AtomMap::default(),
             trait_visibility_map: AtomMap::default(),
@@ -148,6 +154,7 @@ impl ClassLikeMetadata {
             attribute_flags: None,
             type_aliases: AtomMap::default(),
             imported_type_aliases: AtomMap::default(),
+            mixins: Vec::default(),
         }
     }
 
@@ -162,60 +169,57 @@ impl ClassLikeMetadata {
     #[inline]
     #[must_use]
     pub fn get_template_type_names(&self) -> Vec<Atom> {
-        self.template_types.iter().map(|(name, _)| *name).collect()
+        self.template_types.keys().copied().collect()
     }
 
     /// Returns type parameters for a specific generic parameter name.
     #[inline]
     #[must_use]
-    pub fn get_template_type(&self, name: &Atom) -> Option<&Vec<(GenericParent, TUnion)>> {
-        self.template_types.iter().find_map(|(param_name, types)| if param_name == name { Some(types) } else { None })
+    pub fn get_template_type(&self, name: Atom) -> Option<&GenericTemplate> {
+        self.template_types.get(&name)
     }
 
     /// Returns type parameters for a specific generic parameter name with its index.
     #[inline]
     #[must_use]
-    pub fn get_template_type_with_index(&self, name: &Atom) -> Option<(usize, &Vec<(GenericParent, TUnion)>)> {
-        self.template_types
-            .iter()
-            .enumerate()
-            .find_map(|(index, (param_name, types))| if param_name == name { Some((index, types)) } else { None })
+    pub fn get_template_type_with_index(&self, name: Atom) -> Option<(usize, &GenericTemplate)> {
+        self.template_types.get_full(&name).map(|(index, _, types)| (index, types))
     }
 
     #[must_use]
-    pub fn get_template_for_index(&self, index: usize) -> Option<(Atom, &Vec<(GenericParent, TUnion)>)> {
-        self.template_types.get(index).map(|(name, types)| (*name, types))
+    pub fn get_template_for_index(&self, index: usize) -> Option<(Atom, &GenericTemplate)> {
+        self.template_types.get_index(index).map(|(name, types)| (*name, types))
     }
 
     #[must_use]
     pub fn get_template_name_for_index(&self, index: usize) -> Option<Atom> {
-        self.template_types.get(index).map(|(name, _)| *name)
+        self.template_types.get_index(index).map(|(name, _)| *name)
     }
 
     #[must_use]
-    pub fn get_template_index_for_name(&self, name: &Atom) -> Option<usize> {
-        self.template_types.iter().position(|(param_name, _)| param_name == name)
+    pub fn get_template_index_for_name(&self, name: Atom) -> Option<usize> {
+        self.template_types.get_index_of(&name)
     }
 
     /// Checks if a specific parent is either a parent class or interface.
     #[inline]
     #[must_use]
-    pub fn has_parent(&self, parent: &Atom) -> bool {
-        self.all_parent_classes.contains(parent) || self.all_parent_interfaces.contains(parent)
+    pub fn has_parent(&self, parent: Atom) -> bool {
+        self.all_parent_classes.contains(&parent) || self.all_parent_interfaces.contains(&parent)
     }
 
     /// Checks if a specific parent has template extended parameters.
     #[inline]
     #[must_use]
-    pub fn has_template_extended_parameter(&self, parent: &Atom) -> bool {
-        self.template_extended_parameters.contains_key(parent)
+    pub fn has_template_extended_parameter(&self, parent: Atom) -> bool {
+        self.template_extended_parameters.contains_key(&parent)
     }
 
     /// Checks if a specific method appears in this class-like.
     #[inline]
     #[must_use]
-    pub fn has_appearing_method(&self, method: &Atom) -> bool {
-        self.appearing_method_ids.contains_key(method)
+    pub fn has_appearing_method(&self, method: Atom) -> bool {
+        self.appearing_method_ids.contains_key(&method)
     }
 
     /// Returns a vector of property names.
@@ -228,15 +232,15 @@ impl ClassLikeMetadata {
     /// Checks if a specific property appears in this class-like.
     #[inline]
     #[must_use]
-    pub fn has_appearing_property(&self, name: &Atom) -> bool {
-        self.appearing_property_ids.contains_key(name)
+    pub fn has_appearing_property(&self, name: Atom) -> bool {
+        self.appearing_property_ids.contains_key(&name)
     }
 
     /// Checks if a specific property is declared in this class-like.
     #[inline]
     #[must_use]
-    pub fn has_declaring_property(&self, name: &Atom) -> bool {
-        self.declaring_property_ids.contains_key(name)
+    pub fn has_declaring_property(&self, name: Atom) -> bool {
+        self.declaring_property_ids.contains_key(&name)
     }
 
     /// Takes ownership of the issues found for this class-like structure.
@@ -296,8 +300,8 @@ impl ClassLikeMetadata {
 
     /// Adds a single template type definition.
     #[inline]
-    pub fn add_template_type(&mut self, template: TemplateTuple) {
-        self.template_types.push(template);
+    pub fn add_template_type(&mut self, name: Atom, constraint: GenericTemplate) {
+        self.template_types.insert(name, constraint);
     }
 
     /// Adds or updates the variance for a specific parameter index. Returns the previous variance if one existed.
@@ -363,7 +367,7 @@ impl ClassLikeMetadata {
         self.overridden_method_ids
             .entry(method)
             .or_default()
-            .insert(*parent_method_id.get_class_name(), parent_method_id)
+            .insert(parent_method_id.get_class_name(), parent_method_id)
     }
 
     /// Adds or updates a property's metadata. Returns the previous metadata if the property existed.
