@@ -973,7 +973,7 @@ fn get_assignment_map_depth(first_variable_id: Atom, assignment_map: &mut BTreeM
 /// can be false when `$n = 0`.
 fn can_condition_be_initially_false(pre_condition: &Expression<'_>, artifacts: &AnalysisArtifacts) -> bool {
     let Expression::Binary(binary) = pre_condition else {
-        return false;
+        return artifacts.get_expression_type(pre_condition).is_none_or(|ct| !ct.is_always_truthy());
     };
 
     let Some(left_type) = artifacts.get_expression_type(binary.lhs) else {
