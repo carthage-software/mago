@@ -21,7 +21,9 @@ impl Fingerprintable for Inline<'_> {
 mod tests {
     use std::hash::Hasher;
 
-    use ahash::AHasher;
+    use std::hash::BuildHasher;
+
+    use foldhash::fast::FixedState;
 
     use mago_database::file::FileId;
     use mago_span::Position;
@@ -43,7 +45,7 @@ mod tests {
     }
 
     fn fingerprint_inline(inline: &Inline, opts: &FingerprintOptions, names: &ResolvedNames) -> u64 {
-        let mut hasher = AHasher::default();
+        let mut hasher = FixedState::default().build_hasher();
         inline.fingerprint_with_hasher(&mut hasher, names, opts);
         hasher.finish()
     }

@@ -17,7 +17,9 @@ use mago_codex::ttype::comparator::union_comparator::is_contained_by;
 use mago_codex::ttype::expander::StaticClassType;
 use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::get_specialized_template_type;
+use mago_codex::ttype::template::GenericTemplate;
 use mago_codex::ttype::template::TemplateResult;
+use mago_codex::ttype::union::TUnion;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
@@ -46,6 +48,18 @@ pub struct ResolvedMethod {
     pub static_class_type: StaticClassType,
     /// True if this method is static, meaning it can be called without an instance.
     pub is_static: bool,
+    /// If Some, this method was found in a mixin but the target class lacks the magic method
+    /// needed to forward the call. Contains the mixin class name and whether the target is final.
+    pub mixin_without_magic_method: Option<MixinWithoutMagicMethod>,
+}
+
+/// Represents a method found in a mixin where the calling class lacks the required magic method.
+#[derive(Debug, Clone)]
+pub struct MixinWithoutMagicMethod {
+    /// The name of the mixin class where the method was found.
+    pub mixin_class_name: Atom,
+    /// Whether the target class (that has the mixin) is final.
+    pub target_is_final: bool,
 }
 
 /// Holds the results of resolving a method call, including valid targets and summary flags.
@@ -65,6 +79,10 @@ pub struct MethodResolutionResult {
     pub encountered_mixed: bool,
     /// True if an access on a `null` type was encountered.
     pub encountered_null: bool,
+    /// True if all resolved methods have non-nullable return types.
+    /// When combined with `encountered_null` and nullsafe access, indicates
+    /// the null in the result type came ONLY from nullsafe short-circuit.
+    pub all_methods_non_nullable_return: bool,
 }
 
 /// Resolves all possible method targets from an object expression and a member selector.
@@ -86,10 +104,10 @@ pub fn resolve_method_targets<'ctx, 'ast, 'arena>(
 ) -> Result<MethodResolutionResult, AnalysisError> {
     let mut result = MethodResolutionResult::default();
 
-    let was_inside_general_use = block_context.inside_general_use;
-    block_context.inside_general_use = true;
+    let was_inside_general_use = block_context.flags.inside_general_use();
+    block_context.flags.set_inside_general_use(true);
     object.analyze(context, block_context, artifacts)?;
-    block_context.inside_general_use = was_inside_general_use;
+    block_context.flags.set_inside_general_use(was_inside_general_use);
 
     let resolved_selectors = resolve_member_selector(context, block_context, artifacts, selector)?;
     let mut method_names = Vec::new();
@@ -121,7 +139,7 @@ pub fn resolve_method_targets<'ctx, 'ast, 'arena>(
 
             if object_atomic.is_null() {
                 result.encountered_null = true;
-                if !object_type.ignore_nullable_issues() && !is_null_safe && !block_context.inside_nullsafe_chain {
+                if !object_type.ignore_nullable_issues() && !is_null_safe && !object_type.has_nullsafe_null() {
                     result.has_invalid_target = true;
 
                     context.collector.report_with_code(
@@ -164,14 +182,14 @@ pub fn resolve_method_targets<'ctx, 'ast, 'arena>(
                 &mut result,
             );
 
-            for method_name in &method_names {
+            for &method_name in &method_names {
                 let resolved_methods = resolve_method_from_object(
                     context,
                     block_context,
                     object,
                     selector,
                     obj_type,
-                    *method_name,
+                    method_name,
                     access_span,
                     !resolved_magic_call_method.is_empty(),
                     &mut result,
@@ -188,16 +206,16 @@ pub fn resolve_method_targets<'ctx, 'ast, 'arena>(
                                     context,
                                     object.span(),
                                     selector.span(),
-                                    *classname,
-                                    *method_name,
+                                    classname,
+                                    method_name,
                                 );
                             } else {
                                 report_non_documented_method(
                                     context,
                                     object.span(),
                                     selector.span(),
-                                    *classname,
-                                    *method_name,
+                                    classname,
+                                    method_name,
                                 );
                             }
 
@@ -205,6 +223,36 @@ pub fn resolve_method_targets<'ctx, 'ast, 'arena>(
                         }
                     } else {
                         // ambiguous
+                    }
+                } else {
+                    // Check if any resolved method was found in a mixin without magic method support
+                    for resolved_method in &resolved_methods {
+                        if let Some(mixin_info) = &resolved_method.mixin_without_magic_method
+                            && let Some(classname) = obj_type.get_name()
+                        {
+                            if mixin_info.target_is_final {
+                                // Final class - error, method can never work at runtime
+                                report_non_existent_mixin_method(
+                                    context,
+                                    object.span(),
+                                    selector.span(),
+                                    classname,
+                                    method_name,
+                                    mixin_info.mixin_class_name,
+                                );
+                                result.has_invalid_target = true;
+                            } else {
+                                // Non-final class - warning, subclass might implement __call
+                                report_possibly_non_existent_mixin_method(
+                                    context,
+                                    object.span(),
+                                    selector.span(),
+                                    classname,
+                                    method_name,
+                                    mixin_info.mixin_class_name,
+                                );
+                            }
+                        }
                     }
                 }
 
@@ -216,6 +264,17 @@ pub fn resolve_method_targets<'ctx, 'ast, 'arena>(
         result.encountered_mixed = true;
         report_call_on_non_object(context, &TAtomic::Mixed(TMixed::new()), object.span(), selector.span());
     }
+
+    // Compute whether all resolved methods have non-nullable return types.
+    // This is used to determine if null in the result type came only from nullsafe short-circuit.
+    result.all_methods_non_nullable_return = !result.resolved_methods.is_empty()
+        && result.resolved_methods.iter().all(|resolved_method| {
+            context
+                .codebase
+                .get_method_by_id(&resolved_method.method_identifier)
+                .and_then(|method| method.return_type_metadata.as_ref())
+                .is_some_and(|return_type| !return_type.type_union.is_nullable())
+        });
 
     Ok(result)
 }
@@ -246,9 +305,9 @@ pub fn resolve_method_from_object<'ctx, 'ast, 'arena>(
         result,
     );
 
-    for (metadata, declaring_method_id, object, classname) in method_ids {
+    for (metadata, declaring_method_id, object, classname, mixin_without_magic_method) in method_ids {
         let declaring_class_metadata =
-            context.codebase.get_class_like(declaring_method_id.get_class_name()).unwrap_or(metadata);
+            context.codebase.get_class_like(&declaring_method_id.get_class_name()).unwrap_or(metadata);
 
         let class_template_parameters = super::class_template_type_collector::collect(
             context.codebase,
@@ -271,7 +330,7 @@ pub fn resolve_method_from_object<'ctx, 'ast, 'arena>(
                 .template_types
                 .entry(template_name)
                 .or_default()
-                .push((GenericParent::ClassLike(metadata.name), parameter.clone()));
+                .push(GenericTemplate::new(GenericParent::ClassLike(metadata.name), parameter.clone()));
         }
 
         resolved_methods.push(ResolvedMethod {
@@ -279,6 +338,7 @@ pub fn resolve_method_from_object<'ctx, 'ast, 'arena>(
             static_class_type: StaticClassType::Object(object.clone()),
             classname,
             is_static: false,
+            mixin_without_magic_method,
         });
     }
 
@@ -296,30 +356,32 @@ pub fn get_method_ids_from_object<'ctx, 'ast, 'arena, 'object>(
     access_span: Span,
     has_magic_call: bool,
     result: &mut MethodResolutionResult,
-) -> Vec<(&'ctx ClassLikeMetadata, MethodIdentifier, &'object TObject, Atom)> {
+) -> Vec<(&'ctx ClassLikeMetadata, MethodIdentifier, TObject, Atom, Option<MixinWithoutMagicMethod>)> {
     let mut ids = vec![];
 
     let Some(name) = object_type.get_name() else {
-        result.has_ambiguous_target = true;
+        if std::ptr::eq(object_type, outer_object) {
+            result.has_ambiguous_target = true;
 
-        if !has_magic_call {
-            let method_name_str: &str = method_name.as_ref();
-            let has_method_assertion = type_has_method_assertion(object_type, method_name_str);
-            if !has_method_assertion {
-                report_call_on_ambiguous_object(context, object.span(), selector.span());
+            if !has_magic_call {
+                let method_name_str: &str = method_name.as_ref();
+                let has_method_assertion = type_has_method_assertion(object_type, method_name_str);
+                if !has_method_assertion {
+                    report_call_on_ambiguous_object(context, object.span(), selector.span());
+                }
             }
         }
 
         return ids;
     };
 
-    let Some(class_metadata) = context.codebase.get_class_like(name) else {
+    let Some(class_metadata) = context.codebase.get_class_like(&name) else {
         result.has_invalid_target = true;
-        report_non_existent_class_like(context, object.span(), *name);
+        report_non_existent_class_like(context, object.span(), name);
         return ids;
     };
 
-    let mut method_id = MethodIdentifier::new(atom(&class_metadata.original_name), atom(&method_name));
+    let mut method_id = MethodIdentifier::new(class_metadata.original_name, method_name);
     if !context.codebase.method_identifier_exists(&method_id) {
         method_id = context.codebase.get_declaring_method_identifier(&method_id);
     }
@@ -395,7 +457,67 @@ pub fn get_method_ids_from_object<'ctx, 'ast, 'arena, 'object>(
             }
         }
 
-        ids.push((class_metadata, method_id, outer_object, *name));
+        ids.push((class_metadata, method_id, outer_object.clone(), name, None));
+    } else if !class_metadata.require_extends.is_empty() || !class_metadata.require_implements.is_empty() {
+        for required_class in class_metadata.require_extends.iter().chain(class_metadata.require_implements.iter()) {
+            let Some(required_metadata) = context.codebase.get_class_like(required_class) else {
+                continue;
+            };
+
+            let mut required_method_id = MethodIdentifier::new(required_metadata.original_name, method_name);
+            if !context.codebase.method_identifier_exists(&required_method_id) {
+                required_method_id = context.codebase.get_declaring_method_identifier(&required_method_id);
+            }
+
+            if context.codebase.get_method_by_id(&required_method_id).is_some() {
+                ids.push((required_metadata, required_method_id, outer_object.clone(), *required_class, None));
+                break;
+            }
+        }
+    } else if !class_metadata.mixins.is_empty() {
+        // Search mixins for the method. If has_magic_call is false, we track that
+        // the method was found in a mixin without the required magic method.
+        let mixin_types = collect_mixin_types(class_metadata, outer_object, &class_metadata.mixins);
+
+        for (mixin_class_name, mixin_object) in mixin_types {
+            let Some(mixin_metadata) = context.codebase.get_class_like(&mixin_class_name) else {
+                continue;
+            };
+
+            let mut mixin_method_id = MethodIdentifier::new(mixin_metadata.original_name, method_name);
+            if !context.codebase.method_identifier_exists(&mixin_method_id) {
+                mixin_method_id = context.codebase.get_declaring_method_identifier(&mixin_method_id);
+            }
+
+            if let Some(function_like_metadata) = context.codebase.get_method_by_id(&mixin_method_id) {
+                if !check_method_visibility(
+                    context,
+                    block_context,
+                    &mixin_metadata.original_name,
+                    &method_name,
+                    access_span,
+                    Some(selector.span()),
+                ) {
+                    result.has_invalid_target = true;
+                    continue;
+                }
+
+                if let Some(method_metadata) = &function_like_metadata.method_metadata
+                    && !method_metadata.visibility.is_public()
+                {
+                    continue;
+                }
+
+                // Track if this method was found without magic call support
+                let mixin_info = if has_magic_call {
+                    None
+                } else {
+                    Some(MixinWithoutMagicMethod { mixin_class_name, target_is_final: class_metadata.flags.is_final() })
+                };
+
+                ids.push((mixin_metadata, mixin_method_id, mixin_object.clone(), mixin_class_name, mixin_info));
+            }
+        }
     }
 
     if let Some(intersection_types) = object_type.get_intersection_types() {
@@ -463,11 +585,11 @@ fn check_where_method_constraints(
         return true;
     }
 
-    for (template_name, constraint) in &method_metadata.where_constraints {
+    for (&template_name, constraint) in &method_metadata.where_constraints {
         let actual_template_type = get_specialized_template_type(
             context.codebase,
             template_name,
-            &defining_class_id,
+            defining_class_id,
             class_like_metadata,
             object_type.get_type_parameters(),
         )
@@ -593,6 +715,69 @@ pub(super) fn report_non_documented_method(
     );
 }
 
+/// Reports a warning when a method is found in a mixin but the target class lacks __call.
+/// This is a warning because a subclass might implement __call.
+fn report_possibly_non_existent_mixin_method(
+    context: &mut Context,
+    obj_span: Span,
+    selector_span: Span,
+    classname: Atom,
+    method_name: Atom,
+    mixin_classname: Atom,
+) {
+    context.collector.report_with_code(
+        IssueCode::PossiblyNonExistentMethod,
+        Issue::warning(format!(
+            "Method `{method_name}` might not exist on type `{classname}` at runtime."
+        ))
+        .with_annotation(
+            Annotation::primary(selector_span).with_message("Method might not exist"),
+        )
+        .with_annotation(
+            Annotation::secondary(obj_span).with_message(format!("On an instance of `{classname}`")),
+        )
+        .with_note(format!(
+            "The method `{method_name}` is defined in mixin class `{mixin_classname}`, but `{classname}` does not have a `__call` method to forward the call."
+        ))
+        .with_note(
+            "A subclass of this class could implement `__call` to handle this, so the call might succeed at runtime."
+        )
+        .with_help(format!(
+            "Add a `__call` method to `{classname}`, or make `{classname}` final if this should be an error."
+        )),
+    );
+}
+
+/// Reports an error when a method is found in a mixin but the target final class lacks __call.
+/// This is an error because no subclass can exist to implement __call.
+fn report_non_existent_mixin_method(
+    context: &mut Context,
+    obj_span: Span,
+    selector_span: Span,
+    classname: Atom,
+    method_name: Atom,
+    mixin_classname: Atom,
+) {
+    context.collector.report_with_code(
+        IssueCode::NonExistentMethod,
+        Issue::error(format!(
+            "Method `{method_name}` does not exist on final type `{classname}`."
+        ))
+        .with_annotation(
+            Annotation::primary(selector_span).with_message("Method does not exist"),
+        )
+        .with_annotation(
+            Annotation::secondary(obj_span).with_message(format!("On an instance of final class `{classname}`")),
+        )
+        .with_note(format!(
+            "The method `{method_name}` is defined in mixin class `{mixin_classname}`, but `{classname}` is final and does not have a `__call` method to forward the call."
+        ))
+        .with_help(format!(
+            "Add a `__call` method to `{classname}` to handle mixin method calls."
+        )),
+    );
+}
+
 pub(super) fn report_magic_call_without_call_method(
     context: &mut Context,
     obj_span: Span,
@@ -701,4 +886,70 @@ fn type_has_method_assertion(object_type: &TObject, method_name: &str) -> bool {
         }),
         _ => false,
     }
+}
+
+fn collect_mixin_types<'object>(
+    class_metadata: &ClassLikeMetadata,
+    outer_object: &'object TObject,
+    mixins: &'object [TUnion],
+) -> Vec<(Atom, &'object TObject)> {
+    let mut results = Vec::new();
+
+    for mixin_type in mixins {
+        for mixin_atomic in mixin_type.types.as_ref() {
+            match mixin_atomic {
+                TAtomic::Object(obj @ TObject::Named(named)) => {
+                    results.push((ascii_lowercase_atom(&named.name), obj));
+                }
+                TAtomic::Object(obj @ TObject::Enum(enum_type)) => {
+                    results.push((ascii_lowercase_atom(&enum_type.name), obj));
+                }
+                TAtomic::GenericParameter(TGenericParameter {
+                    parameter_name, constraint, defining_entity, ..
+                }) => {
+                    let mut resolved = false;
+
+                    if let TObject::Named(named_object) = outer_object
+                        && let Some(type_params) = named_object.get_type_parameters()
+                        && let GenericParent::ClassLike(defining_class) = defining_entity
+                        && named_object.name.eq_ignore_ascii_case(defining_class)
+                        && let Some(index) = class_metadata.get_template_index_for_name(*parameter_name)
+                        && let Some(concrete_type) = type_params.get(index)
+                    {
+                        for atomic in concrete_type.types.as_ref() {
+                            match atomic {
+                                TAtomic::Object(obj @ TObject::Named(named)) => {
+                                    results.push((ascii_lowercase_atom(&named.name), obj));
+                                    resolved = true;
+                                }
+                                TAtomic::Object(obj @ TObject::Enum(enum_type)) => {
+                                    results.push((ascii_lowercase_atom(&enum_type.name), obj));
+                                    resolved = true;
+                                }
+                                _ => {}
+                            }
+                        }
+                    }
+
+                    // Fallback to constraint if we couldn't resolve
+                    if !resolved {
+                        for constraint_atomic in constraint.types.as_ref() {
+                            match constraint_atomic {
+                                TAtomic::Object(obj @ TObject::Named(named)) => {
+                                    results.push((ascii_lowercase_atom(&named.name), obj));
+                                }
+                                TAtomic::Object(obj @ TObject::Enum(enum_type)) => {
+                                    results.push((ascii_lowercase_atom(&enum_type.name), obj));
+                                }
+                                _ => {}
+                            }
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+
+    results
 }

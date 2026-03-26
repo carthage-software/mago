@@ -13,18 +13,18 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ArgumentList<'arena> {
         block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
-        let was_inside_call = block_context.inside_call;
-        let was_inside_general_use = block_context.inside_general_use;
+        let was_inside_call = block_context.flags.inside_call();
+        let was_inside_general_use = block_context.flags.inside_general_use();
 
-        block_context.inside_call = true;
-        block_context.inside_general_use = true;
+        block_context.flags.set_inside_call(true);
+        block_context.flags.set_inside_general_use(true);
 
         for argument in &self.arguments {
             argument.value().analyze(context, block_context, artifacts)?;
         }
 
-        block_context.inside_call = was_inside_call;
-        block_context.inside_general_use = was_inside_general_use;
+        block_context.flags.set_inside_call(was_inside_call);
+        block_context.flags.set_inside_general_use(was_inside_general_use);
 
         Ok(())
     }

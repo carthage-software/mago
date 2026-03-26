@@ -12,6 +12,7 @@ use crate::ttype::atomic::scalar::class_like_string::TClassLikeString;
 use crate::ttype::atomic::scalar::float::TFloat;
 use crate::ttype::atomic::scalar::int::TInteger;
 use crate::ttype::atomic::scalar::string::TString;
+use crate::ttype::atomic::scalar::string::TStringCasing;
 
 pub mod bool;
 pub mod class_like_string;
@@ -24,7 +25,6 @@ pub mod string;
 /// This includes general types (int, float, string, bool), literal types,
 /// union types (num, array-key), and the top type (scalar).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Eq, Hash, PartialOrd, Ord)]
-#[repr(u8)]
 pub enum TScalar {
     /// Represents the top type `scalar`, encompassing all other scalar variants.
     Generic,
@@ -119,7 +119,7 @@ impl TScalar {
     #[inline]
     #[must_use]
     pub const fn numeric_string() -> Self {
-        TScalar::String(TString::general_with_props(true, false, false, false))
+        TScalar::String(TString::general_with_props(true, false, false, TStringCasing::Unspecified))
     }
 
     /// Creates the general `string` type.
@@ -500,13 +500,16 @@ impl TScalar {
             TScalar::Bool(b) => b.is_true(),
             TScalar::Integer(i) => match i.get_literal_value() {
                 Some(v) => v != 0,
-                None => match i.get_minimum_value() {
-                    Some(v) => v != 0,
-                    None => match i.get_maximum_value() {
-                        Some(v) => v != 0,
-                        None => false,
-                    },
-                },
+                None => {
+                    // A ranged integer is always truthy only when 0 is not in the range.
+                    // This requires either min > 0 or max < 0.
+                    let (lb, ub) = i.get_bounds();
+                    match (lb, ub) {
+                        (Some(min), _) if min > 0 => true,
+                        (_, Some(max)) if max < 0 => true,
+                        _ => false,
+                    }
+                }
             },
             TScalar::Float(f) => f.get_literal_value().is_some_and(|v| v != 0.0),
             TScalar::String(s) => s.is_truthy,

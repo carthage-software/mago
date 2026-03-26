@@ -12,6 +12,7 @@ use crate::ttype::atomic::TAtomic;
 use crate::visibility::Visibility;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct ClassLikeConstantMetadata {
     pub attributes: Vec<AttributeMetadata>,
     pub name: Atom,

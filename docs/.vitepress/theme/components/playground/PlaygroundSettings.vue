@@ -51,13 +51,19 @@ const availablePlugins = [
   {
     id: 'psl',
     name: 'PSL (PHP Standard Library)',
-    description: 'Type providers for azjezz/psl package',
+    description: 'Type providers for php-standard-library packages',
     defaultEnabled: false,
   },
   {
     id: 'flow-php',
     name: 'Flow-PHP',
     description: 'Type providers for flow-php/etl package',
+    defaultEnabled: false,
+  },
+  {
+    id: 'psr-container',
+    name: 'PSR-11 Container',
+    description: 'Type providers for psr/container package',
     defaultEnabled: false,
   },
 ];
@@ -112,6 +118,11 @@ const analyzerOptions = [
     key: 'noBooleanLiteralComparison',
     label: 'Allow boolean literal comparison',
     description: 'Disable warnings for comparisons to true/false literals',
+  },
+  {
+    key: 'enforceClassFinality',
+    label: 'Enforce class finality',
+    description: 'Report classes that are not marked final but have no subclasses',
   },
   {
     key: 'checkMissingTypeHints',

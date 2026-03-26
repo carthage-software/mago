@@ -1,3 +1,5 @@
+use mago_atom::AtomSet;
+use mago_atom::atom;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -69,6 +71,7 @@ impl SymbolKind {
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
 pub struct Symbols {
     all: AtomMap<SymbolKind>,
+    namespaces: AtomSet,
 }
 
 impl Symbols {
@@ -76,30 +79,34 @@ impl Symbols {
     #[inline]
     #[must_use]
     pub fn new() -> Symbols {
-        Symbols { all: AtomMap::default() }
+        Symbols { all: AtomMap::default(), namespaces: AtomSet::default() }
     }
 
     /// Adds or updates a symbol name identified as a `Class`.
     #[inline]
     pub fn add_class_name(&mut self, name: Atom) {
+        self.namespaces.extend(get_symbol_namespaces(name));
         self.all.insert(name, SymbolKind::Class);
     }
 
     /// Adds or updates a symbol name identified as an `Interface`.
     #[inline]
     pub fn add_interface_name(&mut self, name: Atom) {
+        self.namespaces.extend(get_symbol_namespaces(name));
         self.all.insert(name, SymbolKind::Interface);
     }
 
     /// Adds or updates a symbol name identified as a `Trait`.
     #[inline]
     pub fn add_trait_name(&mut self, name: Atom) {
+        self.namespaces.extend(get_symbol_namespaces(name));
         self.all.insert(name, SymbolKind::Trait);
     }
 
     /// Adds or updates a symbol name identified as an `Enum`.
     #[inline]
     pub fn add_enum_name(&mut self, name: Atom) {
+        self.namespaces.extend(get_symbol_namespaces(name));
         self.all.insert(name, SymbolKind::Enum);
     }
 
@@ -114,8 +121,8 @@ impl Symbols {
     /// `Some(SymbolKind)` if the symbol exists in the map, `None` otherwise.
     #[inline]
     #[must_use]
-    pub fn get_kind(&self, name: &Atom) -> Option<SymbolKind> {
-        self.all.get(name).copied() // Use copied() since SymbolKind is Copy
+    pub fn get_kind(&self, name: Atom) -> Option<SymbolKind> {
+        self.all.get(&name).copied() // Use copied() since SymbolKind is Copy
     }
 
     /// Checks if a symbol with the given name is known.
@@ -129,8 +136,21 @@ impl Symbols {
     /// `true` if the symbol exists in the map, `false` otherwise.
     #[inline]
     #[must_use]
-    pub fn contains(&self, name: &Atom) -> bool {
-        self.all.contains_key(name)
+    pub fn contains(&self, name: Atom) -> bool {
+        self.all.contains_key(&name)
+    }
+
+    /// Check if any symbol within the table is part of the given namespace.
+    ///
+    /// # Arguments
+    ///
+    /// * `namespace`: The `Atom` of the namespace to check for.
+    ///
+    /// # Returns
+    ///
+    /// `true` if the namespace is present, `false` otherwise.
+    pub fn contains_namespace(&self, namespace: Atom) -> bool {
+        self.namespaces.contains(&namespace)
     }
 
     /// Checks if a symbol with the given name is a `Class`.
@@ -144,7 +164,7 @@ impl Symbols {
     /// `true` if the symbol is a `Class`, `false` otherwise.
     #[inline]
     #[must_use]
-    pub fn contains_class(&self, name: &Atom) -> bool {
+    pub fn contains_class(&self, name: Atom) -> bool {
         matches!(self.get_kind(name), Some(SymbolKind::Class))
     }
 
@@ -159,7 +179,7 @@ impl Symbols {
     /// `true` if the symbol is an `Interface`, `false` otherwise.
     #[inline]
     #[must_use]
-    pub fn contains_interface(&self, name: &Atom) -> bool {
+    pub fn contains_interface(&self, name: Atom) -> bool {
         matches!(self.get_kind(name), Some(SymbolKind::Interface))
     }
 
@@ -174,7 +194,7 @@ impl Symbols {
     /// `true` if the symbol is a `Trait`, `false` otherwise.
     #[inline]
     #[must_use]
-    pub fn contains_trait(&self, name: &Atom) -> bool {
+    pub fn contains_trait(&self, name: Atom) -> bool {
         matches!(self.get_kind(name), Some(SymbolKind::Trait))
     }
 
@@ -189,7 +209,7 @@ impl Symbols {
     /// `true` if the symbol is an `Enum`, `false` otherwise.
     #[inline]
     #[must_use]
-    pub fn contains_enum(&self, name: &Atom) -> bool {
+    pub fn contains_enum(&self, name: Atom) -> bool {
         matches!(self.get_kind(name), Some(SymbolKind::Enum))
     }
 
@@ -203,9 +223,28 @@ impl Symbols {
     /// Extends the current `Symbols` map with another one.
     #[inline]
     pub fn extend(&mut self, other: Symbols) {
+        self.namespaces.extend(other.namespaces);
         for (entry, kind) in other.all {
             self.all.entry(entry).or_insert(kind);
         }
+    }
+
+    /// Extends the current `Symbols` map from a reference without consuming the source.
+    #[inline]
+    pub fn extend_ref(&mut self, other: &Symbols) {
+        self.namespaces.extend(other.namespaces.iter().copied());
+
+        for (entry, kind) in &other.all {
+            self.all.entry(*entry).or_insert(*kind);
+        }
+    }
+
+    /// Removes a symbol by its FQCN.
+    ///
+    /// Note: does not remove namespaces (they may be shared by other symbols).
+    #[inline]
+    pub fn remove(&mut self, name: Atom) {
+        self.all.remove(&name);
     }
 }
 
@@ -215,4 +254,15 @@ impl Default for Symbols {
     fn default() -> Self {
         Self::new()
     }
+}
+/// Returns an iterator that yields all parent namespaces of a given symbol.
+///
+/// For example, if the symbol is `Foo\Bar\Baz\Qux`, the iterator yields:
+/// 1. `Foo`
+/// 2. `Foo\Bar`
+/// 3. `Foo\Bar\Baz`
+pub(super) fn get_symbol_namespaces(symbol_name: Atom) -> impl Iterator<Item = Atom> {
+    let s = symbol_name.as_str();
+
+    s.as_bytes().iter().enumerate().filter_map(move |(i, &byte)| if byte == b'\\' { Some(atom(&s[..i])) } else { None })
 }

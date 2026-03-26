@@ -1,5 +1,5 @@
 <?php
 
 $string = <<<'ERROR'
-foo
-ERROR;
+    foo
+    ERROR;

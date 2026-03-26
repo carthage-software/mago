@@ -23,6 +23,7 @@ extend-ignore-re = [
 "trivias" = "trivias"
 "invokable" = "invokable"
 "encrypter" = "encrypter"
+"consts" = "consts"
 
 [type.rust.extend-identifiers]
 "thr" = "thr"

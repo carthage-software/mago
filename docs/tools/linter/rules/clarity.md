@@ -14,8 +14,10 @@ This document details the rules available in the `Clarity` category.
 | Literal Named Argument | [`literal-named-argument`](#literal-named-argument) |
 | No Empty | [`no-empty`](#no-empty) |
 | No Hash Emoji | [`no-hash-emoji`](#no-hash-emoji) |
+| No Isset | [`no-isset`](#no-isset) |
 | No Multi Assignments | [`no-multi-assignments`](#no-multi-assignments) |
 | No Nested Ternary | [`no-nested-ternary`](#no-nested-ternary) |
+| No Short Bool Cast | [`no-short-bool-cast`](#no-short-bool-cast) |
 | No Shorthand Ternary | [`no-shorthand-ternary`](#no-shorthand-ternary) |
 | No Variable Variable | [`no-variable-variable`](#no-variable-variable) |
 | Readable Literal | [`readable-literal`](#readable-literal) |
@@ -23,6 +25,9 @@ This document details the rules available in the `Clarity` category.
 | Str Starts With | [`str-starts-with`](#str-starts-with) |
 | Tagged FIXME | [`tagged-fixme`](#tagged-fixme) |
 | Tagged TODO | [`tagged-todo`](#tagged-todo) |
+| Use Dedicated Expectation | [`use-dedicated-expectation`](#use-dedicated-expectation) |
+| Use Simpler Expectation | [`use-simpler-expectation`](#use-simpler-expectation) |
+| Use Specific Expectations | [`use-specific-expectations`](#use-specific-expectations) |
 | Valid Docblock | [`valid-docblock`](#valid-docblock) |
 
 
@@ -238,6 +243,50 @@ class Foo {}
 ```
 
 
+## <a id="no-isset"></a>`no-isset`
+
+Detects the use of the `isset()` construct.
+
+The `isset()` language construct checks whether a variable is set and is not null.
+However, it can lead to ambiguous code because it conflates two distinct checks:
+variable existence and null comparison. Using explicit null checks or the null
+coalescing operator (`??`) is often clearer and more maintainable.
+
+
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `true` |
+| `level` | `string` | `"warning"` |
+| `allow-array-checks` | `boolean` | `false` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+
+if ($value !== null) {
+    // ...
+}
+
+$result = $value ?? 'default';
+```
+
+#### Incorrect code
+
+```php
+<?php
+
+if (isset($value)) {
+    // ...
+}
+```
+
+
 ## <a id="no-multi-assignments"></a>`no-multi-assignments`
 
 Flags any instances of multiple assignments in a single statement. This can lead to
@@ -307,6 +356,41 @@ if ($user->isAdmin()) {
 <?php
 
 $allowed = $user->isAdmin() ? true : ($user->isEditor() ? true : false);
+```
+
+
+## <a id="no-short-bool-cast"></a>`no-short-bool-cast`
+
+Detects the use of double negation `!!$expr` as a shorthand for `(bool) $expr`.
+
+The explicit `(bool)` cast is clearer about the intent to convert a value
+to a boolean.
+
+
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `false` |
+| `level` | `string` | `"help"` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+
+$active = (bool) $value;
+```
+
+#### Incorrect code
+
+```php
+<?php
+
+$active = !!$value;
 ```
 
 
@@ -397,7 +481,7 @@ Enforces using underscore separators in numeric literals for improved readabilit
 
 | Option | Type | Default |
 | :--- | :--- | :--- |
-| `enabled` | `boolean` | `false` |
+| `enabled` | `boolean` | `true` |
 | `level` | `string` | `"warning"` |
 | `min-digits` | `integer` | `5` |
 
@@ -584,6 +668,182 @@ makes it easier to track progress and ensures that tasks are not forgotten.
 <?php
 
 // TODO: This is an invalid TODO comment.
+```
+
+
+## <a id="use-dedicated-expectation"></a>`use-dedicated-expectation`
+
+Use dedicated matchers instead of function calls in Pest tests.
+
+Instead of `expect(is_array($x))->toBeTrue()`, use `expect($x)->toBeArray()`.
+This provides clearer intent and better error messages.
+
+Supported patterns:
+- Type checks: is_array, is_string, is_int, is_float, is_bool, is_numeric, is_callable, is_iterable, is_object, is_resource, is_scalar, is_null
+- String: str_starts_with, str_ends_with, ctype_alpha, ctype_alnum
+- Array: in_array, array_key_exists
+- File: is_file, is_dir, is_readable, is_writable, file_exists
+- Object: property_exists
+
+
+### Requirements
+
+- **Integration:** `Pest`
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `true` |
+| `level` | `string` | `"warning"` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+
+test('dedicated matchers', function () {
+    expect($value)->toBeArray();
+    expect($value)->toBeString();
+    expect($string)->toStartWith('prefix');
+    expect($array)->toContain($item);
+    expect($path)->toBeFile();
+    expect($obj)->toHaveProperty('name');
+});
+```
+
+#### Incorrect code
+
+```php
+<?php
+
+test('function calls', function () {
+    expect(is_array($value))->toBeTrue();
+    expect(is_string($value))->toBeTrue();
+    expect(str_starts_with($string, 'prefix'))->toBeTrue();
+    expect(in_array($item, $array))->toBeTrue();
+    expect(is_file($path))->toBeTrue();
+    expect(property_exists($obj, 'name'))->toBeTrue();
+});
+```
+
+
+## <a id="use-simpler-expectation"></a>`use-simpler-expectation`
+
+Simplify expect() expressions in Pest tests by using dedicated matchers.
+
+This rule detects patterns where the expect() argument contains an expression that can be simplified:
+- `expect(!$x)->toBeTrue()` -> `expect($x)->toBeFalse()`
+- `expect(!$x)->toBeFalse()` -> `expect($x)->toBeTrue()`
+- `expect($a > $b)->toBeTrue()` -> `expect($a)->toBeGreaterThan($b)`
+- `expect($a >= $b)->toBeTrue()` -> `expect($a)->toBeGreaterThanOrEqual($b)`
+- `expect($a < $b)->toBeTrue()` -> `expect($a)->toBeLessThan($b)`
+- `expect($a <= $b)->toBeTrue()` -> `expect($a)->toBeLessThanOrEqual($b)`
+- `expect($a === $b)->toBeTrue()` -> `expect($a)->toBe($b)`
+- `expect($a !== $b)->toBeTrue()` -> `expect($a)->not->toBe($b)`
+- `expect($x instanceof Y)->toBeTrue()` -> `expect($x)->toBeInstanceOf(Y::class)`
+- `expect($x >= min && $x <= max)->toBeTrue()` -> `expect($x)->toBeBetween(min, max)`
+
+Using dedicated matchers provides clearer intent and better error messages.
+
+
+### Requirements
+
+- **Integration:** `Pest`
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `true` |
+| `level` | `string` | `"warning"` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+
+test('simplified expectations', function () {
+    expect($condition)->toBeFalse();
+    expect($a)->toBeGreaterThan($b);
+    expect($a)->toBe($b);
+    expect($obj)->toBeInstanceOf(ClassName::class);
+    expect($x)->toBeBetween(1, 10);
+});
+```
+
+#### Incorrect code
+
+```php
+<?php
+
+test('complex expectations', function () {
+    expect(!$condition)->toBeTrue();
+    expect($a > $b)->toBeTrue();
+    expect($a === $b)->toBeTrue();
+    expect($obj instanceof ClassName)->toBeTrue();
+    expect($x >= 1 && $x <= 10)->toBeTrue();
+});
+```
+
+
+## <a id="use-specific-expectations"></a>`use-specific-expectations`
+
+Use dedicated matchers instead of generic comparisons in Pest tests.
+
+This rule suggests more specific matchers for common patterns:
+- `toBe(true)` / `toEqual(true)` -> `toBeTrue()`
+- `toBe(false)` / `toEqual(false)` -> `toBeFalse()`
+- `toBe(null)` / `toEqual(null)` -> `toBeNull()`
+- `toBe([])` / `toBe('')` -> `toBeEmpty()`
+- `not->toBeFalse()` -> `toBeTrue()`
+- `not->toBeTrue()` -> `toBeFalse()`
+
+Using dedicated matchers provides clearer intent and better error messages.
+
+
+### Requirements
+
+- **Integration:** `Pest`
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `true` |
+| `level` | `string` | `"warning"` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+
+test('specific matchers', function () {
+    expect($value)->toBeTrue();
+    expect($value)->toBeFalse();
+    expect($value)->toBeNull();
+    expect($array)->toBeEmpty();
+});
+```
+
+#### Incorrect code
+
+```php
+<?php
+
+test('generic comparisons', function () {
+    expect($value)->toBe(true);
+    expect($value)->toBe(false);
+    expect($value)->toBe(null);
+    expect($array)->toBe([]);
+    expect($value)->not->toBeFalse();
+});
 ```
 
 

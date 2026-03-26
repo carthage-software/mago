@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -16,23 +18,23 @@ use crate::ttype::union::TUnion;
 /// For example, if `Foo` has constants `READ = 1`, `WRITE = 2`, `EXECUTE = 4`,
 /// then `int-mask-of<Foo::*>` expands to `0|1|2|3|4|5|6|7`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Eq, Hash, PartialOrd, Ord)]
-pub struct TIntMaskOf(Box<TUnion>);
+pub struct TIntMaskOf(Arc<TUnion>);
 
 impl TIntMaskOf {
     #[must_use]
-    pub fn new(target: Box<TUnion>) -> Self {
+    pub fn new(target: Arc<TUnion>) -> Self {
         Self(target)
     }
 
     #[inline]
     #[must_use]
-    pub const fn get_target_type(&self) -> &TUnion {
+    pub fn get_target_type(&self) -> &TUnion {
         &self.0
     }
 
     #[inline]
-    pub const fn get_target_type_mut(&mut self) -> &mut TUnion {
-        &mut self.0
+    pub fn get_target_type_mut(&mut self) -> &mut TUnion {
+        Arc::make_mut(&mut self.0)
     }
 }
 

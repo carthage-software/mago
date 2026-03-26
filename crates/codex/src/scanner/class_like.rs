@@ -33,6 +33,7 @@ use crate::identifier::method::MethodIdentifier;
 use crate::issue::ScanningIssueKind;
 use crate::metadata::CodebaseMetadata;
 use crate::metadata::class_like::ClassLikeMetadata;
+use crate::metadata::class_like::TemplateTypes;
 use crate::metadata::flags::MetadataFlags;
 use crate::metadata::function_like::FunctionLikeKind;
 use crate::metadata::function_like::FunctionLikeMetadata;
@@ -66,6 +67,7 @@ use crate::ttype::get_named_object;
 use crate::ttype::get_non_empty_list;
 use crate::ttype::get_string;
 use crate::ttype::resolution::TypeResolutionContext;
+use crate::ttype::template::GenericTemplate;
 use crate::ttype::template::variance::Variance;
 use crate::ttype::union::TUnion;
 use crate::visibility::Visibility;
@@ -362,9 +364,10 @@ fn scan_class_like<'arena>(
             match enum_type {
                 Some(backing_type) => {
                     if backing_type.hint.is_string() {
-                        class_like_metadata.add_direct_parent_interface(atom("stringbackedenum"));
+                        class_like_metadata
+                            .add_direct_parent_interface(atom("__internal_do_not_use__stringbackedenum"));
                     } else if backing_type.hint.is_int() {
-                        class_like_metadata.add_direct_parent_interface(atom("intbackedenum"));
+                        class_like_metadata.add_direct_parent_interface(atom("__internal_do_not_use__intbackedenum"));
                     } else {
                         class_like_metadata.add_direct_parent_interface(atom("backedenum"));
                     }
@@ -445,6 +448,10 @@ fn scan_class_like<'arena>(
             class_like_metadata.flags |= MetadataFlags::INTERNAL;
         }
 
+        if docblock.is_api {
+            class_like_metadata.flags |= MetadataFlags::API;
+        }
+
         if docblock.has_consistent_constructor {
             class_like_metadata.flags |= MetadataFlags::CONSISTENT_CONSTRUCTOR;
         }
@@ -485,10 +492,10 @@ fn scan_class_like<'arena>(
                 get_mixed()
             };
 
-            let definition = vec![(GenericParent::ClassLike(name), template_as_type)];
+            let definition = GenericTemplate::new(GenericParent::ClassLike(name), template_as_type);
 
-            class_like_metadata.add_template_type((template_name, definition.clone()));
-            type_context = type_context.with_template_definition(template_name, definition);
+            class_like_metadata.add_template_type(template_name, definition.clone());
+            type_context = type_context.with_template_definition(template_name, vec![definition]);
 
             let variance = if template.covariant {
                 Variance::Covariant
@@ -503,6 +510,55 @@ fn scan_class_like<'arena>(
             }
 
             class_like_metadata.add_template_variance_parameter(i, variance);
+        }
+
+        // Process imported type aliases first so they're available when building
+        // type alias definitions AND when resolving @template-extends/@template-implements
+        for imported_type_alias in docblock.imported_type_aliases {
+            let fqcn = ascii_lowercase_atom(&scope.resolve_str(NameKind::Default, &imported_type_alias.from).0);
+            let type_name = atom(&imported_type_alias.name);
+            let alias = imported_type_alias.alias.as_deref().map_or(type_name, atom);
+
+            if fqcn == name {
+                class_like_metadata.issues.push(
+                    Issue::help("Type alias is importing from itself, which is unnecessary.")
+                        .with_code(ScanningIssueKind::CircularTypeImport)
+                        .with_annotation(
+                            Annotation::primary(imported_type_alias.span)
+                                .with_message(format!("Type alias `{type_name}` is already defined in this class")),
+                        )
+                        .with_help("Remove this import statement as the type is already available locally."),
+                );
+
+                continue;
+            }
+
+            class_like_metadata.imported_type_aliases.insert(alias, (fqcn, type_name, imported_type_alias.span));
+            type_context = type_context.with_imported_type_alias(alias, fqcn, type_name);
+        }
+
+        for type_alias in &docblock.type_aliases {
+            type_context = type_context.with_type_alias(atom(&type_alias.name));
+        }
+
+        for type_alias in &docblock.type_aliases {
+            let alias_name = atom(&type_alias.name);
+            match get_type_metadata_from_type_string(&type_alias.type_string, Some(name), &type_context, scope) {
+                Ok(type_metadata) => {
+                    class_like_metadata.type_aliases.insert(alias_name, type_metadata);
+                }
+                Err(typing_error) => {
+                    class_like_metadata.issues.push(
+                        Issue::error("Could not resolve the type in the `@type` tag.")
+                            .with_code(ScanningIssueKind::InvalidTypeTag)
+                            .with_annotation(
+                                Annotation::primary(typing_error.span()).with_message(typing_error.to_string()),
+                            )
+                            .with_note(typing_error.note())
+                            .with_help(typing_error.help()),
+                    );
+                }
+            }
         }
 
         for extended_type in docblock.template_extends {
@@ -881,6 +937,25 @@ fn scan_class_like<'arena>(
             }
         }
 
+        for mixin in &docblock.mixins {
+            match builder::get_type_from_string(&mixin.value, mixin.span, scope, &type_context, Some(name)) {
+                Ok(mixin_type) => {
+                    class_like_metadata.mixins.push(mixin_type);
+                }
+                Err(typing_error) => {
+                    class_like_metadata.issues.push(
+                        Issue::error("Could not resolve the type in the `@mixin` tag.")
+                            .with_code(ScanningIssueKind::InvalidMixinTag)
+                            .with_annotation(
+                                Annotation::primary(typing_error.span()).with_message(typing_error.to_string()),
+                            )
+                            .with_note(typing_error.note())
+                            .with_help(typing_error.help()),
+                    );
+                }
+            }
+        }
+
         for method_tag in &docblock.methods {
             let method_name = ascii_lowercase_atom(&method_tag.method.name);
             class_like_metadata.methods.insert(method_name);
@@ -991,55 +1066,6 @@ fn scan_class_like<'arena>(
             new_property.flags.set(MetadataFlags::MAGIC_PROPERTY, true);
 
             class_like_metadata.add_property_metadata(new_property);
-        }
-
-        // Process imported type aliases FIRST so they're available when building type alias definitions
-        for imported_type_alias in docblock.imported_type_aliases {
-            let fqcn = ascii_lowercase_atom(&scope.resolve_str(NameKind::Default, &imported_type_alias.from).0);
-            let type_name = atom(&imported_type_alias.name);
-            let alias = imported_type_alias.alias.as_deref().map_or(type_name, atom);
-
-            // Skip self-imports to prevent infinite recursion during type expansion
-            // Self-imports are useless since the type is already available locally
-            if fqcn == name {
-                class_like_metadata.issues.push(
-                    Issue::help("Type alias is importing from itself, which is unnecessary.")
-                        .with_code(ScanningIssueKind::CircularTypeImport)
-                        .with_annotation(
-                            Annotation::primary(imported_type_alias.span)
-                                .with_message(format!("Type alias `{type_name}` is already defined in this class")),
-                        )
-                        .with_help("Remove this import statement as the type is already available locally."),
-                );
-
-                continue;
-            }
-
-            class_like_metadata.imported_type_aliases.insert(alias, (fqcn, type_name, imported_type_alias.span));
-            type_context = type_context.with_imported_type_alias(alias, fqcn, type_name);
-        }
-
-        // Now build type alias definitions (can reference imported aliases)
-        for type_alias in &docblock.type_aliases {
-            let alias_name = atom(&type_alias.name);
-            match get_type_metadata_from_type_string(&type_alias.type_string, Some(name), &type_context, scope) {
-                Ok(type_metadata) => {
-                    type_context = type_context.with_type_alias(alias_name);
-
-                    class_like_metadata.type_aliases.insert(alias_name, type_metadata);
-                }
-                Err(typing_error) => {
-                    class_like_metadata.issues.push(
-                        Issue::error("Could not resolve the type in the `@type` tag.")
-                            .with_code(ScanningIssueKind::InvalidTypeTag)
-                            .with_annotation(
-                                Annotation::primary(typing_error.span()).with_message(typing_error.to_string()),
-                            )
-                            .with_note(typing_error.note())
-                            .with_help(typing_error.help()),
-                    );
-                }
-            }
         }
     }
 
@@ -1426,7 +1452,7 @@ fn create_enum_from_method(enum_name: &str, enum_method_span: Span, backing_type
             TUnion::from_vec(vec![TAtomic::Object(TObject::Enum(TEnum { name: atom(enum_name), case: None }))]),
             enum_method_span,
         )),
-        template_types: vec![],
+        template_types: TemplateTypes::default(),
         attributes: vec![],
         method_metadata: Some(MethodMetadata {
             is_final: true,
@@ -1482,7 +1508,7 @@ fn create_enum_try_from_method(enum_name: &str, enum_method_span: Span, backing_
             ]),
             enum_method_span,
         )),
-        template_types: vec![],
+        template_types: TemplateTypes::default(),
         attributes: vec![],
         method_metadata: Some(MethodMetadata {
             is_final: true,
@@ -1539,7 +1565,7 @@ fn create_enum_cases_method(enum_name: &str, enum_method_span: Span, has_cases: 
             },
             enum_method_span,
         )),
-        template_types: vec![],
+        template_types: TemplateTypes::default(),
         attributes: vec![],
         method_metadata: Some(MethodMetadata {
             is_final: true,

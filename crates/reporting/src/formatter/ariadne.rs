@@ -1,3 +1,4 @@
+use std::io::IsTerminal;
 use std::io::Write;
 
 use ariadne::Color;
@@ -31,7 +32,7 @@ impl Formatter for AriadneFormatter {
         let issues = apply_filters(issues, config);
 
         // Determine if we should use colors
-        let use_colors = config.color_choice.should_use_colors(atty::is(atty::Stream::Stdout));
+        let use_colors = config.color_choice.should_use_colors(std::io::stdout().is_terminal());
 
         for issue in issues {
             let kind = match issue.level {
@@ -46,7 +47,7 @@ impl Formatter for AriadneFormatter {
                 Level::Error => Color::Red,
             };
 
-            let (file_path, range) = match issue.annotations.iter().find(|annotation| annotation.is_primary()) {
+            let (file_path, range) = match issue.primary_annotation() {
                 Some(annotation) => {
                     let file = database.get(&annotation.span.file_id())?;
 

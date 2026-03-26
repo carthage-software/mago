@@ -927,7 +927,7 @@ impl TInteger {
             };
         }
 
-        intervals.sort_unstable_by(|a, b| a.0.cmp(&b.0));
+        intervals.sort_unstable_by_key(|a| a.0);
 
         let mut merged = Vec::with_capacity(intervals.len() + 1);
         if has_unspecified_literal {
@@ -1341,21 +1341,19 @@ impl Rem for TInteger {
                 if l > 0 {
                     if f >= 0 { Range(0, l - 1) } else { Range(-(l - 1), l - 1) }
                 } else if l < 0 {
-                    if f >= 0 { Range(0, l.saturating_neg().saturating_sub(1)) } else { Range(l.saturating_add(1), 0) }
+                    if f >= 0 {
+                        Range(0, l.saturating_neg().saturating_sub(1))
+                    } else {
+                        Range(l.saturating_add(1), l.saturating_neg().saturating_sub(1))
+                    }
                 } else {
                     Unspecified
                 }
             }
-            (To(_), Literal(l)) => {
-                if l > 0 {
-                    Range(0, l - 1)
-                } else if l < 0 {
-                    let f = l.abs();
+            (To(t), Literal(l)) if l != 0 => {
+                let abs_l = l.abs();
 
-                    Range(-(f - 1), 0)
-                } else {
-                    Unspecified
-                }
+                if t <= 0 { Range(-(abs_l - 1), 0) } else { Range(-(abs_l - 1), abs_l - 1) }
             }
             (Range(f, t), Literal(l)) => {
                 if l > 0 {
@@ -1370,9 +1368,9 @@ impl Rem for TInteger {
                     let v = l.abs();
 
                     if f >= 0 {
-                        Range(-(v - 1), 0)
+                        Range(0, (v - 1).min(t))
                     } else if t <= 0 {
-                        Range(0, v - 1)
+                        Range((-(v - 1)).max(f), 0)
                     } else {
                         Range(-(v - 1), v - 1)
                     }
@@ -1711,7 +1709,7 @@ mod tests {
         assert_eq!(TInteger::Literal(15) % TInteger::Literal(0), TInteger::Unspecified);
         assert_eq!(TInteger::Literal(0) % TInteger::Literal(5), TInteger::Literal(0));
         assert_eq!(TInteger::From(10) % TInteger::Literal(3), TInteger::Range(0, 2));
-        assert_eq!(TInteger::To(10) % TInteger::Literal(3), TInteger::Range(0, 2));
+        assert_eq!(TInteger::To(10) % TInteger::Literal(3), TInteger::Range(-2, 2));
         assert_eq!(TInteger::Range(5, 15) % TInteger::Literal(4), TInteger::Range(0, 3));
         assert_eq!(TInteger::From(10) % TInteger::Literal(-3), TInteger::Range(0, 2));
         assert_eq!(TInteger::Literal(10) % TInteger::From(3), TInteger::Range(0, 2));
@@ -1734,6 +1732,18 @@ mod tests {
         assert_eq!(TInteger::Unspecified % TInteger::Range(1, 10), TInteger::Range(-9, 9));
         assert_eq!(TInteger::Unspecified % TInteger::From(5), TInteger::Unspecified);
         assert_eq!(TInteger::Unspecified % TInteger::To(5), TInteger::Unspecified);
+        assert_eq!(TInteger::To(10) % TInteger::Literal(-3), TInteger::Range(-2, 2));
+        assert_eq!(TInteger::To(-1) % TInteger::Literal(3), TInteger::Range(-2, 0));
+        assert_eq!(TInteger::To(-1) % TInteger::Literal(-3), TInteger::Range(-2, 0));
+        assert_eq!(TInteger::To(0) % TInteger::Literal(5), TInteger::Range(-4, 0));
+        assert_eq!(TInteger::Range(5, 10) % TInteger::Literal(-3), TInteger::Range(0, 2));
+        assert_eq!(TInteger::Range(-10, -5) % TInteger::Literal(-3), TInteger::Range(-2, 0));
+        assert_eq!(TInteger::Range(0, 2) % TInteger::Literal(-5), TInteger::Range(0, 2));
+        assert_eq!(TInteger::Range(-2, 0) % TInteger::Literal(-5), TInteger::Range(-2, 0));
+        assert_eq!(TInteger::Range(-5, 5) % TInteger::Literal(-3), TInteger::Range(-2, 2));
+        assert_eq!(TInteger::From(-5) % TInteger::Literal(-3), TInteger::Range(-2, 2));
+        assert_eq!(TInteger::From(-10) % TInteger::Literal(-7), TInteger::Range(-6, 6));
+        assert_eq!(TInteger::From(-1) % TInteger::Literal(-2), TInteger::Range(-1, 1));
     }
 
     #[test]

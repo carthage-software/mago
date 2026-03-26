@@ -5,130 +5,123 @@ use crate::ast::ast::NullableHint;
 use crate::ast::ast::ParenthesizedHint;
 use crate::ast::ast::UnionHint;
 use crate::error::ParseError;
-use crate::parser::internal::identifier;
-use crate::parser::internal::token_stream::TokenStream;
-use crate::parser::internal::utils;
+use crate::parser::Parser;
 
-pub fn is_at_type_hint(stream: &mut TokenStream<'_, '_>) -> Result<bool, ParseError> {
-    Ok(matches!(
-        utils::peek(stream)?.kind,
-        T!["?"
-            | "("
-            | "array"
-            | "callable"
-            | "null"
-            | "true"
-            | "false"
-            | "static"
-            | "self"
-            | "parent"
-            | "enum"
-            | "from"
-            | Identifier
-            | QualifiedIdentifier
-            | FullyQualifiedIdentifier]
-    ))
-}
+impl<'input, 'arena> Parser<'input, 'arena> {
+    pub(crate) fn is_at_type_hint(&mut self) -> Result<bool, ParseError> {
+        Ok(matches!(
+            self.stream.peek_kind(0)?,
+            Some(T!["?"
+                | "("
+                | "array"
+                | "callable"
+                | "null"
+                | "true"
+                | "false"
+                | "static"
+                | "self"
+                | "parent"
+                | "enum"
+                | "from"
+                | Identifier
+                | QualifiedIdentifier
+                | FullyQualifiedIdentifier])
+        ))
+    }
 
-pub fn parse_optional_type_hint<'arena>(
-    stream: &mut TokenStream<'_, 'arena>,
-) -> Result<Option<Hint<'arena>>, ParseError> {
-    if is_at_type_hint(stream)? { Ok(Some(parse_type_hint(stream)?)) } else { Ok(None) }
-}
+    pub(crate) fn parse_optional_type_hint(&mut self) -> Result<Option<Hint<'arena>>, ParseError> {
+        if self.is_at_type_hint()? { Ok(Some(self.parse_type_hint()?)) } else { Ok(None) }
+    }
 
-pub fn parse_type_hint<'arena>(stream: &mut TokenStream<'_, 'arena>) -> Result<Hint<'arena>, ParseError> {
-    let token = utils::peek(stream)?;
+    pub(crate) fn parse_type_hint(&mut self) -> Result<Hint<'arena>, ParseError> {
+        let token = self.stream.lookahead(0)?.ok_or_else(|| self.stream.unexpected(None, &[]))?;
 
-    let hint = match &token.kind {
-        T!["?"] => Hint::Nullable(parse_nullable_type_hint(stream)?),
-        T!["("] => Hint::Parenthesized(parse_parenthesized_type_hint(stream)?),
-        T!["array"] => Hint::Array(utils::expect_any_keyword(stream)?),
-        T!["callable"] => Hint::Callable(utils::expect_any_keyword(stream)?),
-        T!["null"] => Hint::Null(utils::expect_any_keyword(stream)?),
-        T!["true"] => Hint::True(utils::expect_any_keyword(stream)?),
-        T!["false"] => Hint::False(utils::expect_any_keyword(stream)?),
-        T!["static"] => Hint::Static(utils::expect_any_keyword(stream)?),
-        T!["self"] => Hint::Self_(utils::expect_any_keyword(stream)?),
-        T!["parent"] => Hint::Parent(utils::expect_any_keyword(stream)?),
-        T!["enum" | "from" | QualifiedIdentifier | FullyQualifiedIdentifier] => {
-            Hint::Identifier(identifier::parse_identifier(stream)?)
-        }
-        T![Identifier] => match token.value {
-            val if val.eq_ignore_ascii_case("void") => Hint::Void(identifier::parse_local_identifier(stream)?),
-            val if val.eq_ignore_ascii_case("never") => Hint::Never(identifier::parse_local_identifier(stream)?),
-            val if val.eq_ignore_ascii_case("float") => Hint::Float(identifier::parse_local_identifier(stream)?),
-            val if val.eq_ignore_ascii_case("bool") => Hint::Bool(identifier::parse_local_identifier(stream)?),
-            val if val.eq_ignore_ascii_case("int") => Hint::Integer(identifier::parse_local_identifier(stream)?),
-            val if val.eq_ignore_ascii_case("string") => Hint::String(identifier::parse_local_identifier(stream)?),
-            val if val.eq_ignore_ascii_case("object") => Hint::Object(identifier::parse_local_identifier(stream)?),
-            val if val.eq_ignore_ascii_case("mixed") => Hint::Mixed(identifier::parse_local_identifier(stream)?),
-            val if val.eq_ignore_ascii_case("iterable") => Hint::Iterable(identifier::parse_local_identifier(stream)?),
-            _ => Hint::Identifier(identifier::parse_identifier(stream)?),
-        },
-        _ => {
-            return Err(utils::unexpected(
-                stream,
-                Some(token),
-                T![
-                    "?",
-                    "(",
-                    "array",
-                    "callable",
-                    "null",
-                    "true",
-                    "false",
-                    "static",
-                    "self",
-                    "parent",
-                    "enum",
-                    "from",
-                    Identifier,
-                    QualifiedIdentifier,
-                    FullyQualifiedIdentifier,
-                ],
-            ));
-        }
-    };
+        let hint = match &token.kind {
+            T!["?"] => Hint::Nullable(self.parse_nullable_type_hint()?),
+            T!["("] => Hint::Parenthesized(self.parse_parenthesized_type_hint()?),
+            T!["array"] => Hint::Array(self.expect_any_keyword()?),
+            T!["callable"] => Hint::Callable(self.expect_any_keyword()?),
+            T!["null"] => Hint::Null(self.expect_any_keyword()?),
+            T!["true"] => Hint::True(self.expect_any_keyword()?),
+            T!["false"] => Hint::False(self.expect_any_keyword()?),
+            T!["static"] => Hint::Static(self.expect_any_keyword()?),
+            T!["self"] => Hint::Self_(self.expect_any_keyword()?),
+            T!["parent"] => Hint::Parent(self.expect_any_keyword()?),
+            T!["enum" | "from" | QualifiedIdentifier | FullyQualifiedIdentifier] => {
+                Hint::Identifier(self.parse_identifier()?)
+            }
+            T![Identifier] => match token.value {
+                val if val.eq_ignore_ascii_case("void") => Hint::Void(self.parse_local_identifier()?),
+                val if val.eq_ignore_ascii_case("never") => Hint::Never(self.parse_local_identifier()?),
+                val if val.eq_ignore_ascii_case("float") => Hint::Float(self.parse_local_identifier()?),
+                val if val.eq_ignore_ascii_case("bool") => Hint::Bool(self.parse_local_identifier()?),
+                val if val.eq_ignore_ascii_case("int") => Hint::Integer(self.parse_local_identifier()?),
+                val if val.eq_ignore_ascii_case("string") => Hint::String(self.parse_local_identifier()?),
+                val if val.eq_ignore_ascii_case("object") => Hint::Object(self.parse_local_identifier()?),
+                val if val.eq_ignore_ascii_case("mixed") => Hint::Mixed(self.parse_local_identifier()?),
+                val if val.eq_ignore_ascii_case("iterable") => Hint::Iterable(self.parse_local_identifier()?),
+                _ => Hint::Identifier(self.parse_identifier()?),
+            },
+            _ => {
+                return Err(self.stream.unexpected(
+                    Some(token),
+                    T![
+                        "?",
+                        "(",
+                        "array",
+                        "callable",
+                        "null",
+                        "true",
+                        "false",
+                        "static",
+                        "self",
+                        "parent",
+                        "enum",
+                        "from",
+                        Identifier,
+                        QualifiedIdentifier,
+                        FullyQualifiedIdentifier,
+                    ],
+                ));
+            }
+        };
 
-    Ok(match utils::peek(stream)?.kind {
-        T!["|"] => {
-            let left = hint;
-            let pipe = utils::expect(stream, T!["|"])?.span;
-            let right = parse_type_hint(stream)?;
+        let next = self.stream.lookahead(0)?;
+        Ok(match next.map(|t| t.kind) {
+            Some(T!["|"]) => {
+                let left = hint;
+                let pipe = self.stream.eat_span(T!["|"])?;
+                let right = self.parse_type_hint()?;
 
-            Hint::Union(UnionHint { left: stream.alloc(left), pipe, right: stream.alloc(right) })
-        }
-        T!["&"]
-            if !matches!(
-                utils::maybe_peek_nth(stream, 1)?.map(|t| t.kind),
-                Some(T!["$variable"] | T!["..."] | T!["&"])
-            ) =>
-        {
-            let left = hint;
-            let ampersand = utils::expect(stream, T!["&"])?.span;
-            let right = parse_type_hint(stream)?;
+                Hint::Union(UnionHint { left: self.arena.alloc(left), pipe, right: self.arena.alloc(right) })
+            }
+            Some(T!["&"]) if !matches!(self.stream.peek_kind(1)?, Some(T!["$variable"] | T!["..."] | T!["&"])) => {
+                let left = hint;
+                let ampersand = self.stream.eat_span(T!["&"])?;
+                let right = self.parse_type_hint()?;
 
-            Hint::Intersection(IntersectionHint { left: stream.alloc(left), ampersand, right: stream.alloc(right) })
-        }
-        _ => hint,
-    })
-}
+                Hint::Intersection(IntersectionHint {
+                    left: self.arena.alloc(left),
+                    ampersand,
+                    right: self.arena.alloc(right),
+                })
+            }
+            _ => hint,
+        })
+    }
 
-pub fn parse_nullable_type_hint<'arena>(
-    stream: &mut TokenStream<'_, 'arena>,
-) -> Result<NullableHint<'arena>, ParseError> {
-    let question_mark = utils::expect(stream, T!["?"])?.span;
-    let hint = parse_type_hint(stream)?;
+    pub(crate) fn parse_nullable_type_hint(&mut self) -> Result<NullableHint<'arena>, ParseError> {
+        let question_mark = self.stream.eat_span(T!["?"])?;
+        let hint = self.parse_type_hint()?;
 
-    Ok(NullableHint { question_mark, hint: stream.alloc(hint) })
-}
+        Ok(NullableHint { question_mark, hint: self.arena.alloc(hint) })
+    }
 
-pub fn parse_parenthesized_type_hint<'arena>(
-    stream: &mut TokenStream<'_, 'arena>,
-) -> Result<ParenthesizedHint<'arena>, ParseError> {
-    let left_parenthesis = utils::expect(stream, T!["("])?.span;
-    let hint = parse_type_hint(stream)?;
-    let right_parenthesis = utils::expect(stream, T![")"])?.span;
+    pub(crate) fn parse_parenthesized_type_hint(&mut self) -> Result<ParenthesizedHint<'arena>, ParseError> {
+        let left_parenthesis = self.stream.eat_span(T!["("])?;
+        let hint = self.parse_type_hint()?;
+        let right_parenthesis = self.stream.eat_span(T![")"])?;
 
-    Ok(ParenthesizedHint { left_parenthesis, hint: stream.alloc(hint), right_parenthesis })
+        Ok(ParenthesizedHint { left_parenthesis, hint: self.arena.alloc(hint), right_parenthesis })
+    }
 }

@@ -41,7 +41,7 @@ jobs:
       - name: Build WASM module
         run: |
           cd crates/wasm
-          wasm-pack build --target web --out-dir pkg-web
+          wasm-pack build --target web --out-dir pkg-web --release
 
       - name: Copy WASM to docs
         run: |

@@ -20,6 +20,44 @@ pub mod logger;
 pub mod progress;
 pub mod version;
 
+/// Determines whether colors should be used based on the color choice and environment.
+///
+/// This function considers:
+/// - The explicit color choice (Always/Never/Auto)
+/// - The FORCE_COLOR environment variable (if Auto) - forces colors when set to non-empty value
+/// - The NO_COLOR environment variable (if Auto) - disables colors when set
+/// - Whether stdout is a terminal (if Auto)
+///
+/// Priority (for Auto mode): FORCE_COLOR > NO_COLOR > TTY check
+///
+/// See: <https://force-color.org/> and <https://no-color.org/>
+#[inline]
+pub fn should_use_colors(color_choice: ColorChoice) -> bool {
+    match color_choice {
+        ColorChoice::Always => true,
+        ColorChoice::Never => false,
+        ColorChoice::Auto => {
+            // FORCE_COLOR takes precedence - any non-empty value forces colors
+            if let Some(force_color) = std::env::var_os("FORCE_COLOR") {
+                return !force_color.is_empty();
+            }
+
+            // Then check NO_COLOR and TTY
+            std::io::stdout().is_terminal() && std::env::var_os("NO_COLOR").is_none()
+        }
+    }
+}
+
+/// Configures global color settings based on the color choice.
+///
+/// This should be called early in the application to ensure consistent color behavior
+/// across all crates that respect global color settings (like `colored`).
+#[inline]
+pub fn configure_colors(color_choice: ColorChoice) {
+    let use_colors = should_use_colors(color_choice);
+    colored::control::set_override(use_colors);
+}
+
 pub(crate) fn create_orchestrator<'a>(
     configuration: &'a Configuration,
     color_choice: ColorChoice,
@@ -43,6 +81,7 @@ pub(crate) fn create_orchestrator<'a>(
 
     let orchestrator_config = OrchestratorConfiguration {
         php_version: configuration.php_version,
+        parser_settings: configuration.parser.to_settings(),
         analyzer_settings: configuration.analyzer.to_settings(configuration.php_version, color_choice, enable_diff),
         linter_settings,
         guard_settings: configuration.guard.settings.clone(),
@@ -92,13 +131,7 @@ pub fn apply_update(
         let patch = diffy::create_patch(&file.contents, modified_contents);
         let mut formatter = PatchFormatter::new();
 
-        let should_use_colors = match color_choice {
-            ColorChoice::Always => true,
-            ColorChoice::Never => false,
-            ColorChoice::Auto => std::io::stdout().is_terminal(),
-        };
-
-        if should_use_colors {
+        if should_use_colors(color_choice) {
             formatter = formatter.with_color();
         };
 

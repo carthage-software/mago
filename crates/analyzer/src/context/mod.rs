@@ -5,7 +5,7 @@ use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::ttype::resolution::TypeResolutionContext;
 use mago_collector::Collector;
 use mago_database::file::File;
-use mago_docblock::document::Document;
+use mago_docblock::document::Element;
 use mago_names::ResolvedNames;
 use mago_names::scope::NamespaceScope;
 use mago_reporting::Annotation;
@@ -27,6 +27,7 @@ use crate::settings::Settings;
 
 pub mod assertion;
 pub mod block;
+pub mod block_flags;
 pub mod scope;
 pub mod utils;
 
@@ -137,46 +138,44 @@ impl<'ctx, 'arena> Context<'ctx, 'arena> {
         }
     }
 
-    pub fn get_docblock(&self) -> Option<&'arena Trivia<'arena>> {
-        comments::docblock::get_docblock_before_position(
-            self.source_file,
-            self.comments,
-            self.statement_span.start.offset,
-        )
-    }
+    pub fn get_parsed_docblocks(&mut self) -> Vec<Element<'arena>> {
+        let mut elements = vec![];
+        let mut start = self.statement_span.start.offset;
+        while let Some(trivia) =
+            comments::docblock::get_docblock_before_position(self.source_file, self.comments, start)
+        {
+            match mago_docblock::parse_trivia(self.arena, trivia) {
+                Ok(document) => elements.extend(document.elements),
+                Err(error) => {
+                    let error_span = error.span();
 
-    pub fn get_parsed_docblock(&mut self) -> Option<Document<'arena>> {
-        let trivia = self.get_docblock()?;
+                    let mut issue = Issue::error(error.to_string())
+                        .with_annotation(
+                            Annotation::primary(error_span)
+                                .with_message("This part of the docblock has a syntax error"),
+                        )
+                        .with_note(error.note());
 
-        match mago_docblock::parse_trivia(self.arena, trivia) {
-            Ok(document) => Some(document),
-            Err(error) => {
-                let error_span = error.span();
+                    if trivia.span != error_span {
+                        issue = issue.with_annotation(
+                            Annotation::secondary(trivia.span).with_message("The error is within this docblock"),
+                        );
+                    }
 
-                let mut issue = Issue::error(error.to_string())
-                    .with_annotation(
-                        Annotation::primary(error_span).with_message("This part of the docblock has a syntax error"),
-                    )
-                    .with_note(error.note());
-
-                if trivia.span != error_span {
                     issue = issue.with_annotation(
-                        Annotation::secondary(trivia.span).with_message("The error is within this docblock"),
+                        Annotation::secondary(self.statement_span)
+                            .with_message("This docblock is associated with the following statement"),
                     );
+
+                    issue = issue.with_help(error.help());
+
+                    self.collector.report_with_code(IssueCode::InvalidDocblock, issue);
                 }
-
-                issue = issue.with_annotation(
-                    Annotation::secondary(self.statement_span)
-                        .with_message("This docblock is associated with the following statement"),
-                );
-
-                issue = issue.with_help(error.help());
-
-                self.collector.report_with_code(IssueCode::InvalidDocblock, issue);
-
-                None
             }
+            start = trivia.span.start.offset;
         }
+
+        elements
     }
 
     pub fn record<T>(&mut self, callback: impl FnOnce(&mut Context<'ctx, 'arena>) -> T) -> (T, IssueCollection) {

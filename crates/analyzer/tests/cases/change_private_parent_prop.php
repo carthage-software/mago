@@ -2,10 +2,10 @@
 
 class A
 {
-    private array $data = [];
+    private array $_data = [];
 }
 
 class B extends A
 {
-    private static array $data = [];
+    private static array $_data = [];
 }

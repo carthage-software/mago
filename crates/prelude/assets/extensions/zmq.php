@@ -111,21 +111,13 @@ class ZMQ
     /**
      * @return int
      */
-    public function clock()
-    {
-    }
+    public function clock() {}
 
-    public function z85encode($data)
-    {
-    }
+    public function z85encode($data) {}
 
-    public function z85decode($data)
-    {
-    }
+    public function z85decode($data) {}
 
-    public function curvekeypair()
-    {
-    }
+    public function curvekeypair() {}
 }
 
 class ZMQContext
@@ -139,21 +131,13 @@ class ZMQContext
     /**
      * @return ZMQContext
      */
-    public function acquire()
-    {
-    }
+    public function acquire() {}
 
-    public function getsocketcount()
-    {
-    }
+    public function getsocketcount() {}
 
-    public function getsocket($type, $dsn, $on_new_socket = '')
-    {
-    }
+    public function getsocket($type, $dsn, $on_new_socket = '') {}
 
-    public function ispersistent()
-    {
-    }
+    public function ispersistent() {}
 
     /**
      * @param int $option
@@ -161,18 +145,14 @@ class ZMQContext
      *
      * @return ZMQContext
      */
-    public function setOpt($option, $value)
-    {
-    }
+    public function setOpt($option, $value) {}
 
     /**
      * @param int $option
      *
      * @return ZMQContext
      */
-    public function getOpt($option)
-    {
-    }
+    public function getOpt($option) {}
 }
 
 class ZMQSocket
@@ -192,18 +172,14 @@ class ZMQSocket
      *
      * @return ZMQSocket
      */
-    public function send($message, $mode = '')
-    {
-    }
+    public function send($message, $mode = '') {}
 
     /**
      * @param int $mode
      *
      * @return string|false
      */
-    public function recv($mode = '')
-    {
-    }
+    public function recv($mode = '') {}
 
     /**
      * @param array $message
@@ -211,18 +187,14 @@ class ZMQSocket
      *
      * @return ZMQSocket
      */
-    public function sendmulti($message, $mode = '')
-    {
-    }
+    public function sendmulti($message, $mode = '') {}
 
     /**
      * @param int $mode
      *
      * @return string[]
      */
-    public function recvmulti($mode = '')
-    {
-    }
+    public function recvmulti($mode = '') {}
 
     /**
      * @param string $dsn
@@ -230,9 +202,7 @@ class ZMQSocket
      *
      * @return ZMQSocket
      */
-    public function bind($dsn, $force = '')
-    {
-    }
+    public function bind($dsn, $force = '') {}
 
     /**
      * @param string $dsn
@@ -240,67 +210,41 @@ class ZMQSocket
      *
      * @return ZMQSocket
      */
-    public function connect($dsn, $force = '')
-    {
-    }
+    public function connect($dsn, $force = '') {}
 
-    public function monitor($dsn, $events = '')
-    {
-    }
+    public function monitor($dsn, $events = '') {}
 
-    public function recvevent($flags = '')
-    {
-    }
+    public function recvevent($flags = '') {}
 
     /**
      * @param string $dsn
      *
      * @return ZMQSocket
      */
-    public function unbind($dsn)
-    {
-    }
+    public function unbind($dsn) {}
 
     /**
      * @param string $dsn
      *
      * @return ZMQSocket
      */
-    public function disconnect($dsn)
-    {
-    }
+    public function disconnect($dsn) {}
 
-    public function setsockopt($key, $value)
-    {
-    }
+    public function setsockopt($key, $value) {}
 
-    public function getendpoints()
-    {
-    }
+    public function getendpoints() {}
 
-    public function getsockettype()
-    {
-    }
+    public function getsockettype() {}
 
-    public function ispersistent()
-    {
-    }
+    public function ispersistent() {}
 
-    public function getpersistentid()
-    {
-    }
+    public function getpersistentid() {}
 
-    public function getsockopt($key)
-    {
-    }
+    public function getsockopt($key) {}
 
-    public function sendmsg($message, $mode = '')
-    {
-    }
+    public function sendmsg($message, $mode = '') {}
 
-    public function recvmsg($mode = '')
-    {
-    }
+    public function recvmsg($mode = '') {}
 }
 
 class ZMQPoll
@@ -310,30 +254,22 @@ class ZMQPoll
      * @return int
      * @throws ZMQPollException
      */
-    public function add(ZMQSocket $entry, $type)
-    {
-    }
+    public function add(ZMQSocket $entry, $type) {}
 
     /**
      * @return ZMQPoll
      */
-    public function clear()
-    {
-    }
+    public function clear() {}
 
     /**
      * @return int
      */
-    public function count()
-    {
-    }
+    public function count() {}
 
     /**
      * @return int[]
      */
-    public function getLastErrors()
-    {
-    }
+    public function getLastErrors() {}
 
     /**
      * @param-out array $readable
@@ -342,17 +278,13 @@ class ZMQPoll
      * @throws ZMQPollException
      * @return int
      */
-    public function poll(array &$readable, array &$writable, $timeout = -1)
-    {
-    }
+    public function poll(array &$readable, array &$writable, $timeout = -1) {}
 
     /**
      * @param ZMQSocket|string|mixed $item
      * @return bool
      */
-    public function remove($item)
-    {
-    }
+    public function remove($item) {}
 }
 
 class ZMQDevice
@@ -368,51 +300,27 @@ class ZMQDevice
     /**
      * @return void
      */
-    public function run()
-    {
-    }
+    public function run() {}
 
-    public function setidlecallback($idle_callback, $timeout, $user_data = '')
-    {
-    }
+    public function setidlecallback($idle_callback, $timeout, $user_data = '') {}
 
-    public function setidletimeout($timeout)
-    {
-    }
+    public function setidletimeout($timeout) {}
 
-    public function getidletimeout()
-    {
-    }
+    public function getidletimeout() {}
 
-    public function settimercallback($idle_callback, $timeout, $user_data = '')
-    {
-    }
+    public function settimercallback($idle_callback, $timeout, $user_data = '') {}
 
-    public function settimertimeout($timeout)
-    {
-    }
+    public function settimertimeout($timeout) {}
 
-    public function gettimertimeout()
-    {
-    }
+    public function gettimertimeout() {}
 }
 
-class ZMQException extends Exception
-{
-}
+class ZMQException extends Exception {}
 
-class ZMQContextException extends ZMQException
-{
-}
+class ZMQContextException extends ZMQException {}
 
-class ZMQSocketException extends ZMQException
-{
-}
+class ZMQSocketException extends ZMQException {}
 
-class ZMQPollException extends ZMQException
-{
-}
+class ZMQPollException extends ZMQException {}
 
-class ZMQDeviceException extends ZMQException
-{
-}
+class ZMQDeviceException extends ZMQException {}

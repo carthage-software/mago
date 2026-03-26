@@ -15,6 +15,7 @@ use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::int::TInteger;
 use mago_codex::ttype::atomic::scalar::string::TStringLiteral;
+use mago_codex::ttype::combiner::CombinerOptions;
 use mago_codex::ttype::comparator::ComparisonResult;
 use mago_codex::ttype::comparator::union_comparator::is_contained_by;
 use mago_codex::ttype::get_arraykey;
@@ -27,6 +28,7 @@ use mago_codex::ttype::get_non_negative_int;
 use mago_codex::ttype::get_null;
 use mago_codex::ttype::get_specialized_template_type;
 use mago_codex::ttype::get_string;
+use mago_codex::ttype::get_undefined_null;
 use mago_codex::ttype::union::TUnion;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
@@ -41,7 +43,6 @@ use crate::context::Context;
 use crate::context::block::BlockContext;
 
 #[derive(Debug, Clone, Copy)]
-#[repr(u8)]
 pub enum ArrayTarget<'ast, 'arena> {
     Access(&'ast ArrayAccess<'arena>),
     Append(&'ast ArrayAppend<'arena>),
@@ -128,7 +129,7 @@ pub(crate) fn get_array_target_type_given_index<'ctx>(
         );
     }
 
-    if !block_context.inside_isset {
+    if !block_context.flags.inside_isset() {
         if index_type.is_nullable() && !index_type.ignore_nullable_issues() {
             context.collector.report_with_code(
                 IssueCode::PossiblyNullArrayIndex,
@@ -174,6 +175,7 @@ pub(crate) fn get_array_target_type_given_index<'ctx>(
     let mut value_type = None;
     let mut expected_index_types = vec![];
     let mut has_union_key_mismatch = false; // Track if we're in a union where key exists in some but not all variants
+    let mut reported_undefined_key = false;
     while let Some(atomic_var_type) = array_atomic_types.pop() {
         if let TAtomic::GenericParameter(parameter) = atomic_var_type {
             array_atomic_types.extend(parameter.constraint.types.as_ref());
@@ -195,7 +197,8 @@ pub(crate) fn get_array_target_type_given_index<'ctx>(
                 );
 
                 if let Some(existing_type) = value_type {
-                    value_type = Some(add_union_type(existing_type, &new_type, context.codebase, false));
+                    value_type =
+                        Some(add_union_type(existing_type, &new_type, context.codebase, CombinerOptions::default()));
                 } else {
                     value_type = Some(new_type);
                 }
@@ -216,6 +219,7 @@ pub(crate) fn get_array_target_type_given_index<'ctx>(
                     &mut expected_index_types,
                     array_like_type,
                     &mut has_key_in_other_variant,
+                    &mut reported_undefined_key,
                 );
 
                 new_type.set_possibly_undefined(possibly_undefined, None);
@@ -225,7 +229,8 @@ pub(crate) fn get_array_target_type_given_index<'ctx>(
                 }
 
                 if let Some(existing_type) = value_type {
-                    value_type = Some(add_union_type(existing_type, &new_type, context.codebase, false));
+                    value_type =
+                        Some(add_union_type(existing_type, &new_type, context.codebase, CombinerOptions::default()));
                 } else {
                     value_type = Some(new_type);
                 }
@@ -240,7 +245,8 @@ pub(crate) fn get_array_target_type_given_index<'ctx>(
                 );
 
                 if let Some(existing_type) = value_type {
-                    value_type = Some(add_union_type(existing_type, &new_type, context.codebase, false));
+                    value_type =
+                        Some(add_union_type(existing_type, &new_type, context.codebase, CombinerOptions::default()));
                 } else {
                     value_type = Some(new_type);
                 }
@@ -249,7 +255,8 @@ pub(crate) fn get_array_target_type_given_index<'ctx>(
                 let new_type = handle_array_access_on_mixed(context, block_context, access_span, atomic_var_type);
 
                 if let Some(existing_type) = value_type {
-                    value_type = Some(add_union_type(existing_type, &new_type, context.codebase, false));
+                    value_type =
+                        Some(add_union_type(existing_type, &new_type, context.codebase, CombinerOptions::default()));
                 } else {
                     value_type = Some(new_type);
                 }
@@ -260,7 +267,8 @@ pub(crate) fn get_array_target_type_given_index<'ctx>(
                 let new_type = handle_array_access_on_mixed(context, block_context, access_span, atomic_var_type);
 
                 if let Some(existing_type) = value_type {
-                    value_type = Some(add_union_type(existing_type, &new_type, context.codebase, false));
+                    value_type =
+                        Some(add_union_type(existing_type, &new_type, context.codebase, CombinerOptions::default()));
                 } else {
                     value_type = Some(new_type);
                 }
@@ -404,7 +412,7 @@ pub(crate) fn get_array_target_type_given_index<'ctx>(
 
             // Report warning for possibly undefined array keys when accessing union types
             // Only report if we detected that some variants have the key while others don't
-            if has_union_key_mismatch && !block_context.inside_isset && !in_assignment {
+            if has_union_key_mismatch && !block_context.flags.inside_isset() && !in_assignment {
                 // Determine if this is likely a string or integer key based on the index type
                 let is_likely_string_key =
                     index_type.types.iter().any(|t| matches!(t, TAtomic::Scalar(TScalar::String(_))));
@@ -501,8 +509,8 @@ pub(crate) fn handle_array_access_on_list<'ctx>(
                 if *actual_possibly_undefined {
                     resulting_type.set_possibly_undefined(true, None);
 
-                    if !block_context.inside_isset
-                        && !block_context.inside_unset
+                    if !block_context.flags.inside_isset()
+                        && !block_context.flags.inside_unset()
                         && !in_assignment
                         && let Some(span) = span
                     {
@@ -571,15 +579,25 @@ pub(crate) fn handle_array_access_on_list<'ctx>(
         }
 
         for (_, known_item) in known_elements.values() {
-            type_param = Cow::Owned(add_union_type(type_param.into_owned(), known_item, context.codebase, false));
+            type_param = Cow::Owned(add_union_type(
+                type_param.into_owned(),
+                known_item,
+                context.codebase,
+                CombinerOptions::default(),
+            ));
         }
 
-        return if type_param.is_never() { get_mixed() } else { type_param.into_owned() };
+        let mut result = if type_param.is_never() { get_mixed() } else { type_param.into_owned() };
+        if !in_assignment {
+            result.set_possibly_undefined(true, None);
+        }
+
+        return result;
     } else if let TAtomic::Array(TArray::List(TList { element_type, .. })) = list {
         return if element_type.is_never() {
             if !in_assignment
-                && !block_context.inside_isset
-                && !block_context.inside_unset
+                && !block_context.flags.inside_isset()
+                && !block_context.flags.inside_unset()
                 && let Some(span) = span
             {
                 context.collector.report_with_code(
@@ -597,10 +615,10 @@ pub(crate) fn handle_array_access_on_list<'ctx>(
 
             get_null()
         } else {
-            let mut element_type = *element_type.clone();
-            element_type.set_possibly_undefined(true, None);
+            let mut elem_type = TUnion::clone(element_type);
+            elem_type.set_possibly_undefined(true, None);
 
-            element_type
+            elem_type
         };
     }
 
@@ -619,13 +637,14 @@ pub(crate) fn handle_array_access_on_keyed_array<'ctx>(
     has_matching_array_key: &mut bool,
     expected_index_types: &mut Vec<TUnion>,
     array_like_type: &TUnion,
-    key_in_other_variant: &mut bool, // NEW: Track if key exists in other union variants but not this one
+    key_in_other_variant: &mut bool,
+    reported_undefined_key: &mut bool,
 ) -> TUnion {
     let TAtomic::Array(TArray::Keyed(keyed_array)) = keyed_array else {
         return get_never();
     };
 
-    let key_parameter = if in_assignment || block_context.inside_isset {
+    let key_parameter = if in_assignment || block_context.flags.inside_isset() {
         Cow::Owned(get_arraykey())
     } else if let Some(parameters) = keyed_array.get_generic_parameters() {
         Cow::Borrowed(parameters.0)
@@ -662,7 +681,7 @@ pub(crate) fn handle_array_access_on_keyed_array<'ctx>(
                 if actual_possibly_undefined {
                     *has_possibly_undefined = true;
                     expression_type.set_possibly_undefined(true, None);
-                    if !in_assignment && !block_context.inside_isset && !block_context.inside_unset {
+                    if !in_assignment && !block_context.flags.inside_isset() && !block_context.flags.inside_unset() {
                         context.collector.report_with_code(
                             match &array_key {
                                 ArrayKey::Integer(_) => IssueCode::PossiblyUndefinedIntArrayIndex,
@@ -712,16 +731,20 @@ pub(crate) fn handle_array_access_on_keyed_array<'ctx>(
                 // This handles cases like $_SERVER (which has ...<non-empty-string, string>)
                 // But NOT unsealed arrays with just `...` (which have mixed as value type)
                 value_parameter.into_owned()
-            } else if !block_context.inside_isset {
+            } else if !block_context.flags.inside_isset() {
                 // Check if we're in a union type and if ANY other member has this key
                 let key_exists_in_other_variant = if array_like_type.types.len() > 1 {
                     array_like_type.types.iter().any(|atomic_type| {
                         if let TAtomic::Array(TArray::Keyed(other_keyed)) = atomic_type {
-                            if let Some(other_known_items) = other_keyed.get_known_items() {
+                            // Array with generic parameters might have any key
+                            if context.settings.allow_possibly_undefined_array_keys
+                                && other_keyed.get_generic_parameters().is_some()
+                            {
+                                true
+                            } else if let Some(other_known_items) = other_keyed.get_known_items() {
                                 other_known_items.contains_key(&array_key)
                             } else {
-                                // Array with generic parameters might have any key
-                                other_keyed.get_generic_parameters().is_some()
+                                false
                             }
                         } else {
                             false
@@ -737,27 +760,31 @@ pub(crate) fn handle_array_access_on_keyed_array<'ctx>(
                     *has_possibly_undefined = true;
                     *key_in_other_variant = true;
                 } else {
-                    // Key doesn't exist in any variant - report error
-                    context.collector.report_with_code(
-                        IssueCode::UndefinedStringArrayIndex,
-                        Issue::error(format!(
-                            "Undefined array key {} accessed on `{}`.",
-                            array_key,
-                            keyed_array.get_id()
-                        ))
-                        .with_annotation(
-                            Annotation::primary(span)
-                                .with_message(format!("Key {array_key} does not exist."))
-                        )
-                        .with_note(
-                            "Attempting to access a non-existent string key will raise a warning/notice at runtime."
-                        )
-                        .with_help(
-                            format!(
-                                "Ensure the key {array_key} exists before accessing it, or use `isset()` or the null coalesce operator (`??`) to handle potential missing keys."
+                    // Key doesn't exist in any variant - report error (only once for union types)
+                    if !in_assignment && !*reported_undefined_key {
+                        *reported_undefined_key = true;
+
+                        context.collector.report_with_code(
+                            IssueCode::UndefinedStringArrayIndex,
+                            Issue::error(format!(
+                                "Undefined array key {} accessed on `{}`.",
+                                array_key,
+                                keyed_array.get_id()
+                            ))
+                            .with_annotation(
+                                Annotation::primary(span)
+                                    .with_message(format!("Key {array_key} does not exist."))
                             )
-                        ),
-                    );
+                            .with_note(
+                                "Attempting to access a non-existent string key will raise a warning/notice at runtime."
+                            )
+                            .with_help(
+                                format!(
+                                    "Ensure the key {array_key} exists before accessing it, or use `isset()` or the null coalesce operator (`??`) to handle potential missing keys."
+                                )
+                            ),
+                        );
+                    }
                 }
 
                 if has_value_parameter { get_mixed() } else { get_null() }
@@ -775,11 +802,13 @@ pub(crate) fn handle_array_access_on_keyed_array<'ctx>(
                     // This is a union type - check if any other atomic type has this key
                     !array_like_type.types.iter().any(|atomic_type| {
                         if let TAtomic::Array(TArray::Keyed(other_keyed)) = atomic_type {
-                            if let Some(other_known_items) = other_keyed.get_known_items() {
+                            // Array with generic parameters might have any key
+                            if other_keyed.get_generic_parameters().is_some() {
+                                true
+                            } else if let Some(other_known_items) = other_keyed.get_known_items() {
                                 other_known_items.contains_key(&array_key)
                             } else {
-                                // Array with generic parameters might have any key
-                                other_keyed.get_generic_parameters().is_some()
+                                false
                             }
                         } else {
                             false
@@ -813,7 +842,7 @@ pub(crate) fn handle_array_access_on_keyed_array<'ctx>(
                     );
                 }
 
-                get_mixed()
+                get_undefined_null()
             };
 
             // since we're emitting a very specific error
@@ -828,14 +857,22 @@ pub(crate) fn handle_array_access_on_keyed_array<'ctx>(
         if !possible_keys.is_empty() && possible_keys.len() == index_type.types.len() {
             for key in &possible_keys {
                 if let Some((_, known_item)) = known_items.get(key) {
-                    value_parameter =
-                        Cow::Owned(add_union_type(value_parameter.into_owned(), known_item, context.codebase, false));
+                    value_parameter = Cow::Owned(add_union_type(
+                        value_parameter.into_owned(),
+                        known_item,
+                        context.codebase,
+                        CombinerOptions::default(),
+                    ));
                 }
             }
         } else {
             for (_, known_item) in known_items.values() {
-                value_parameter =
-                    Cow::Owned(add_union_type(value_parameter.into_owned(), known_item, context.codebase, false));
+                value_parameter = Cow::Owned(add_union_type(
+                    value_parameter.into_owned(),
+                    known_item,
+                    context.codebase,
+                    CombinerOptions::default(),
+                ));
             }
         }
 
@@ -859,7 +896,7 @@ pub(crate) fn handle_array_access_on_keyed_array<'ctx>(
         value_parameter.into_owned()
     } else {
         // TODO Handle Assignments
-        // if (block_context.inside_assignment && replacement_type) {
+        // if (block_context.flags.inside_assignment() && replacement_type) {
 
         // }
         if has_value_parameter {
@@ -867,8 +904,8 @@ pub(crate) fn handle_array_access_on_keyed_array<'ctx>(
                 *has_possibly_undefined = true;
 
                 if !context.settings.allow_possibly_undefined_array_keys
-                    && !block_context.inside_isset
-                    && !block_context.inside_unset
+                    && !block_context.flags.inside_isset()
+                    && !block_context.flags.inside_unset()
                     && index_type.get_single_array_key().is_some()
                 {
                     let index_type_str = index_type.get_id();
@@ -936,18 +973,19 @@ pub(crate) fn handle_array_access_on_named_object(
                 break 'metadata None;
             };
 
-            let Some(key_template_name) = array_access_metadata.template_types.first().map(|(name, _)| name) else {
+            let Some(key_template_name) = array_access_metadata.template_types.first().map(|(name, _)| *name) else {
                 break 'metadata None;
             };
 
-            let Some(value_template_name) = array_access_metadata.template_types.get(1).map(|(name, _)| name) else {
+            let Some(value_template_name) = array_access_metadata.template_types.get_index(1).map(|(name, _)| *name)
+            else {
                 break 'metadata None;
             };
 
             let key_type = get_specialized_template_type(
                 context.codebase,
                 key_template_name,
-                &array_access,
+                array_access,
                 metadata,
                 named_object.get_type_parameters(),
             )
@@ -956,7 +994,7 @@ pub(crate) fn handle_array_access_on_named_object(
             let value_type = get_specialized_template_type(
                 context.codebase,
                 value_template_name,
-                &array_access,
+                array_access,
                 metadata,
                 named_object.get_type_parameters(),
             )
@@ -1121,8 +1159,8 @@ pub(crate) fn handle_array_access_on_mixed<'ctx>(
     span: Span,
     mixed: &TAtomic,
 ) -> TUnion {
-    if !block_context.inside_isset {
-        if block_context.inside_assignment {
+    if !block_context.flags.inside_isset() {
+        if block_context.flags.inside_assignment() {
             if let TAtomic::Never = mixed {
                 context.collector.report_with_code(
                     IssueCode::ImpossibleArrayAssignment,

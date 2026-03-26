@@ -6,6 +6,7 @@ use mago_span::Span;
 
 use crate::ast::Type;
 use crate::ast::generics::GenericParameters;
+use crate::ast::identifier::Identifier;
 use crate::ast::keyword::Keyword;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
@@ -30,8 +31,20 @@ pub struct ShapeType<'input> {
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub enum ShapeKey<'input> {
-    String { value: &'input str, span: Span },
-    Integer { value: i64, span: Span },
+    String {
+        value: &'input str,
+        span: Span,
+    },
+    Integer {
+        value: i64,
+        span: Span,
+    },
+    ClassLikeConstant {
+        class_name: Identifier<'input>,
+        double_colon: Span,
+        constant_name: Identifier<'input>,
+        span: Span,
+    },
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
@@ -108,6 +121,7 @@ impl HasSpan for ShapeKey<'_> {
         match self {
             ShapeKey::String { span, .. } => *span,
             ShapeKey::Integer { span, .. } => *span,
+            ShapeKey::ClassLikeConstant { span, .. } => *span,
         }
     }
 }
@@ -146,6 +160,9 @@ impl std::fmt::Display for ShapeKey<'_> {
         match self {
             ShapeKey::String { value, .. } => write!(f, "{value}"),
             ShapeKey::Integer { value, .. } => write!(f, "{value}"),
+            ShapeKey::ClassLikeConstant { class_name, constant_name, .. } => {
+                write!(f, "{}::{}", class_name, constant_name)
+            }
         }
     }
 }

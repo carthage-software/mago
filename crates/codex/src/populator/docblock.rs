@@ -1,6 +1,8 @@
 use std::collections::BTreeMap;
 
 use mago_atom::Atom;
+use mago_atom::AtomMap;
+use mago_atom::AtomSet;
 use mago_span::Span;
 
 use crate::assertion::Assertion;
@@ -96,6 +98,22 @@ fn should_inherit_docblock_type(
     };
 
     if covariant {
+        if let Some(parent_docblock) = parent_docblock {
+            let child_contained_in_parent_docblock = union_comparator::is_contained_by(
+                codebase,
+                child_native,
+                &parent_docblock.type_union,
+                false,
+                false,
+                false,
+                &mut ComparisonResult::new(),
+            );
+
+            if child_contained_in_parent_docblock {
+                return false;
+            }
+        }
+
         let child_contained_in_parent = union_comparator::is_contained_by(
             codebase,
             child_native,
@@ -116,7 +134,31 @@ fn should_inherit_docblock_type(
             &mut ComparisonResult::new(),
         ) && child_contained_in_parent;
 
-        types_equal || !child_contained_in_parent
+        if types_equal || !child_contained_in_parent {
+            return true;
+        }
+
+        if let Some(parent_docblock) = parent_docblock {
+            let docblock_type = if !child_native.accepts_null() && parent_docblock.type_union.has_null() {
+                parent_docblock.type_union.to_non_nullable()
+            } else {
+                parent_docblock.type_union.clone()
+            };
+
+            let docblock_compatible_with_child = union_comparator::is_contained_by(
+                codebase,
+                &docblock_type,
+                child_native,
+                false,
+                false,
+                false,
+                &mut ComparisonResult::new(),
+            );
+
+            return docblock_compatible_with_child;
+        }
+
+        false
     } else {
         let parent_contained_in_child = union_comparator::is_contained_by(
             codebase,
@@ -150,59 +192,105 @@ fn should_inherit_docblock_type(
 ///
 /// Template parameters (e.g., `T`) are substituted with concrete types
 /// (e.g., `string` when class implements `Interface<string>`).
-pub fn inherit_method_docblocks(codebase: &mut CodebaseMetadata) {
+///
+/// When `safe_symbols` is non-empty, classes where both the child and parent
+/// are safe are skipped — their docblock inheritance is unchanged from the
+/// previous run.
+///
+/// When `dirty_classes` is provided, only those classes (and their descendants)
+/// are considered — O(dirty + descendants) instead of O(all classes).
+pub fn inherit_method_docblocks(
+    codebase: &mut CodebaseMetadata,
+    safe_symbols: &mago_atom::AtomSet,
+    dirty_classes: Option<&AtomSet>,
+) {
     let mut inheritance_work: Vec<(Atom, Atom, Atom, Atom)> = Vec::new();
 
-    for (class_name, class_metadata) in &codebase.class_likes {
-        for (method_name, method_ids) in &class_metadata.overridden_method_ids {
-            let child_method_id = (*class_name, *method_name);
+    // When dirty_classes is provided, expand to include descendants,
+    // then use targeted lookups instead of iterating all class_likes.
+    if let Some(dirty) = dirty_classes {
+        let mut targets = dirty.clone();
+        for class_name in dirty {
+            if let Some(descendants) = codebase.all_class_like_descendants.get(class_name) {
+                targets.extend(descendants.iter().copied());
+            }
+        }
 
-            let Some(child_method) = codebase.function_likes.get(&child_method_id) else {
+        for class_name in &targets {
+            if !safe_symbols.is_empty() && safe_symbols.contains(class_name) {
                 continue;
-            };
-
-            if !child_method.needs_docblock_inheritance() {
+            }
+            if let Some(class_metadata) = codebase.class_likes.get(class_name) {
+                collect_inheritance_work(*class_name, class_metadata, &codebase.class_likes, &mut inheritance_work);
+            }
+        }
+    } else {
+        for (class_name, class_metadata) in &codebase.class_likes {
+            if !safe_symbols.is_empty() && safe_symbols.contains(class_name) {
                 continue;
             }
-
-            let mut parent_method_id = None;
-
-            if let Some(parent_class) = &class_metadata.direct_parent_class
-                && method_ids.contains_key(parent_class)
-            {
-                parent_method_id = Some((*parent_class, *method_name));
-            }
-
-            if parent_method_id.is_none() {
-                for interface in &class_metadata.all_parent_interfaces {
-                    if method_ids.contains_key(interface) {
-                        parent_method_id = Some((*interface, *method_name));
-                        break;
-                    }
-                }
-            }
-
-            if parent_method_id.is_none() {
-                for trait_name in &class_metadata.used_traits {
-                    if method_ids.contains_key(trait_name) {
-                        parent_method_id = Some((*trait_name, *method_name));
-                        break;
-                    }
-                }
-            }
-
-            if parent_method_id.is_none()
-                && let Some((declaring_class, method_id)) = method_ids.iter().next()
-            {
-                parent_method_id = Some((*declaring_class, *method_id.get_method_name()));
-            }
-
-            if let Some((parent_class, parent_method)) = parent_method_id {
-                inheritance_work.push((*class_name, *method_name, parent_class, parent_method));
-            }
+            collect_inheritance_work(*class_name, class_metadata, &codebase.class_likes, &mut inheritance_work);
         }
     }
 
+    inheritance_work.sort_by_key(|(class_name, _, _, _)| {
+        codebase.class_likes.get(class_name).map_or(0, |m| m.all_parent_classes.len() + m.all_parent_interfaces.len())
+    });
+
+    apply_inheritance_work(codebase, inheritance_work);
+}
+
+/// Collects inheritance work items for a single class.
+fn collect_inheritance_work(
+    class_name: Atom,
+    class_metadata: &crate::metadata::class_like::ClassLikeMetadata,
+    class_likes: &AtomMap<crate::metadata::class_like::ClassLikeMetadata>,
+    inheritance_work: &mut Vec<(Atom, Atom, Atom, Atom)>,
+) {
+    for (method_name, method_ids) in &class_metadata.overridden_method_ids {
+        let mut parent_method_id = None;
+
+        let mut current_class = class_metadata.direct_parent_class;
+        while let Some(parent_name) = current_class {
+            if method_ids.contains_key(&parent_name) {
+                parent_method_id = Some((parent_name, *method_name));
+                break;
+            }
+            current_class = class_likes.get(&parent_name).and_then(|m| m.direct_parent_class);
+        }
+
+        if parent_method_id.is_none() {
+            for interface in &class_metadata.all_parent_interfaces {
+                if method_ids.contains_key(interface) {
+                    parent_method_id = Some((*interface, *method_name));
+                    break;
+                }
+            }
+        }
+
+        if parent_method_id.is_none() {
+            for trait_name in &class_metadata.used_traits {
+                if method_ids.contains_key(trait_name) {
+                    parent_method_id = Some((*trait_name, *method_name));
+                    break;
+                }
+            }
+        }
+
+        if parent_method_id.is_none()
+            && let Some((declaring_class, method_id)) = method_ids.first()
+        {
+            parent_method_id = Some((*declaring_class, method_id.get_method_name()));
+        }
+
+        if let Some((parent_class, parent_method)) = parent_method_id {
+            inheritance_work.push((class_name, *method_name, parent_class, parent_method));
+        }
+    }
+}
+
+/// Sorts and applies docblock inheritance work items.
+fn apply_inheritance_work(codebase: &mut CodebaseMetadata, mut inheritance_work: Vec<(Atom, Atom, Atom, Atom)>) {
     inheritance_work.sort_by_key(|(class_name, _, _, _)| {
         codebase.class_likes.get(class_name).map_or(0, |m| m.all_parent_classes.len() + m.all_parent_interfaces.len())
     });
@@ -216,6 +304,7 @@ pub fn inherit_method_docblocks(codebase: &mut CodebaseMetadata) {
         };
 
         let parent_return_type = parent_method.return_type_metadata.as_ref();
+        let parent_native_return_type = parent_method.return_type_declaration_metadata.as_ref();
         let parent_parameters = &parent_method.parameters;
         let parent_template_types = &parent_method.template_types;
         let parent_thrown_types = &parent_method.thrown_types;
@@ -227,11 +316,11 @@ pub fn inherit_method_docblocks(codebase: &mut CodebaseMetadata) {
             continue;
         };
 
-        let template_map = child_class.template_extended_parameters.get(&parent_class);
+        let parent_template_params = child_class.template_extended_parameters.get(&parent_class);
 
-        let template_result = template_map.map(|template_map| {
+        let template_result = parent_template_params.map(|parent_params| {
             let mut template_result = TemplateResult::default();
-            for (template_name, concrete_type) in template_map {
+            for (template_name, concrete_type) in parent_params {
                 template_result.add_lower_bound(
                     *template_name,
                     GenericParent::ClassLike(parent_class),
@@ -246,12 +335,12 @@ pub fn inherit_method_docblocks(codebase: &mut CodebaseMetadata) {
             if let Some(ref template_result) = template_result {
                 return_type = inferred_type_replacer::replace(&return_type, template_result, codebase);
             }
-            Some((return_type, parent_return.span))
+            Some((return_type, parent_return.span, parent_return.from_docblock))
         } else {
             None
         };
 
-        let substituted_param_types: Vec<Option<(TUnion, Span)>> = parent_parameters
+        let substituted_param_types: Vec<Option<(TUnion, Span, bool)>> = parent_parameters
             .iter()
             .map(|parent_param| {
                 if let Some(parent_param_type) = parent_param.type_metadata.as_ref() {
@@ -259,7 +348,7 @@ pub fn inherit_method_docblocks(codebase: &mut CodebaseMetadata) {
                     if let Some(ref template_result) = template_result {
                         param_type = inferred_type_replacer::replace(&param_type, template_result, codebase);
                     }
-                    Some((param_type, parent_param_type.span))
+                    Some((param_type, parent_param_type.span, parent_param_type.from_docblock))
                 } else {
                     None
                 }
@@ -294,7 +383,7 @@ pub fn inherit_method_docblocks(codebase: &mut CodebaseMetadata) {
             let has_explicit_inherit_doc = child_method.flags.contains(MetadataFlags::INHERITS_DOCS);
 
             let should_inherit_return = should_inherit_docblock_type(
-                parent_return_type.filter(|m| !m.from_docblock).map(|m| &m.type_union),
+                parent_native_return_type.map(|m| &m.type_union),
                 parent_return_type.filter(|m| m.from_docblock),
                 child_method.return_type_declaration_metadata.as_ref().map(|m| &m.type_union),
                 child_method.return_type_metadata.as_ref().filter(|m| m.from_docblock),
@@ -370,20 +459,53 @@ pub fn inherit_method_docblocks(codebase: &mut CodebaseMetadata) {
             None
         };
 
+        let narrowed_return = if should_inherit_return
+            && let Some((type_union, span, from_docblock)) = substituted_return_type
+        {
+            let child_native_return =
+                codebase.function_likes.get(&child_method_id).and_then(|m| m.return_type_declaration_metadata.as_ref());
+
+            let narrowed_type = if let Some(child_native_return) = child_native_return {
+                let child_is_more_specific = union_comparator::is_contained_by(
+                    codebase,
+                    &child_native_return.type_union,
+                    &type_union,
+                    false,
+                    false,
+                    false,
+                    &mut ComparisonResult::new(),
+                );
+
+                if child_is_more_specific {
+                    child_native_return.type_union.clone()
+                } else if !child_native_return.type_union.accepts_null() && type_union.has_null() {
+                    type_union.to_non_nullable()
+                } else {
+                    type_union
+                }
+            } else {
+                type_union
+            };
+
+            Some(TypeMetadata { type_union: narrowed_type, span, from_docblock, inferred: false })
+        } else {
+            None
+        };
+
         let Some(child_method) = codebase.function_likes.get_mut(&child_method_id) else {
             continue;
         };
 
-        if should_inherit_return && let Some((type_union, span)) = substituted_return_type {
-            child_method.return_type_metadata = Some(TypeMetadata::from_docblock(type_union, span));
+        if let Some(narrowed_return) = narrowed_return {
+            child_method.return_type_metadata = Some(narrowed_return);
         }
 
         for (i, substituted_param) in substituted_param_types.into_iter().enumerate() {
             if let Some(true) = params_to_inherit.get(i).copied()
                 && let Some(child_param) = child_method.parameters.get_mut(i)
-                && let Some((type_union, span)) = substituted_param
+                && let Some((type_union, span, from_docblock)) = substituted_param
             {
-                child_param.type_metadata = Some(TypeMetadata::from_docblock(type_union, span));
+                child_param.type_metadata = Some(TypeMetadata { type_union, span, from_docblock, inferred: false });
             }
         }
 

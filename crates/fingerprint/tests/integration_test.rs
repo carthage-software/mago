@@ -6,15 +6,16 @@ use mago_fingerprint::Fingerprintable;
 fn get_fingerprint(code: &'static str) -> u64 {
     let arena = Bump::new();
     let file = File::ephemeral("test.php".into(), code.into());
-    let (program, error) = mago_syntax::parser::parse_file(&arena, &file);
-    assert!(error.is_none(), "Parse error: {error:?}");
+    let program = mago_syntax::parser::parse_file(&arena, &file);
+    assert!(!program.has_errors(), "Parse failed: {:?}", program.errors);
 
     let resolved_names = mago_names::resolver::NameResolver::new(&arena).resolve(program);
     let options = FingerprintOptions::default();
 
-    use ahash::AHasher;
+    use foldhash::fast::FixedState;
+    use std::hash::BuildHasher;
     use std::hash::Hasher;
-    let mut hasher = AHasher::default();
+    let mut hasher = FixedState::default().build_hasher();
     program.fingerprint_with_hasher(&mut hasher, &resolved_names, &options);
     hasher.finish()
 }
@@ -22,14 +23,15 @@ fn get_fingerprint(code: &'static str) -> u64 {
 fn get_fingerprint_with_options(code: &'static str, options: FingerprintOptions) -> u64 {
     let arena = Bump::new();
     let file = File::ephemeral("test.php".into(), code.into());
-    let (program, error) = mago_syntax::parser::parse_file(&arena, &file);
-    assert!(error.is_none(), "Parse error: {error:?}");
+    let program = mago_syntax::parser::parse_file(&arena, &file);
+    assert!(!program.has_errors(), "Parse failed: {:?}", program.errors);
 
     let resolved_names = mago_names::resolver::NameResolver::new(&arena).resolve(program);
 
-    use ahash::AHasher;
+    use foldhash::fast::FixedState;
+    use std::hash::BuildHasher;
     use std::hash::Hasher;
-    let mut hasher = AHasher::default();
+    let mut hasher = FixedState::default().build_hasher();
     program.fingerprint_with_hasher(&mut hasher, &resolved_names, &options);
     hasher.finish()
 }

@@ -64,3 +64,16 @@ pub fn long_message(issue: &Issue, include_annotations: bool) -> String {
 
     message
 }
+
+/// Build an OSC 8 hyperlink wrapping `display_text`.
+///
+/// The URL is constructed by replacing `%file%`, `%line%`, and `%column%` placeholders
+/// in `template` with the provided values.
+pub fn osc8_hyperlink(template: &str, abs_path: &str, line: u32, column: u32, display_text: &str) -> String {
+    let url = template
+        .replace("%file%", abs_path)
+        .replace("%line%", &line.to_string())
+        .replace("%column%", &column.to_string());
+
+    format!("\x1b]8;;{url}\x1b\\{display_text}\x1b]8;;\x1b\\")
+}

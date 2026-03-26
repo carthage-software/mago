@@ -8,6 +8,7 @@ use mago_codex::metadata::property::PropertyMetadata;
 use mago_codex::metadata::property_hook::PropertyHookMetadata;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::combine_union_types;
+use mago_codex::ttype::combiner::CombinerOptions;
 use mago_codex::ttype::comparator::ComparisonResult;
 use mago_codex::ttype::comparator::union_comparator::is_contained_by;
 use mago_codex::ttype::expander::StaticClassType;
@@ -43,9 +44,9 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Return<'arena> {
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
         let inferred_return_type = if let Some(return_value) = self.value.as_ref() {
-            block_context.inside_return = true;
+            block_context.flags.set_inside_return(true);
             return_value.analyze(context, block_context, artifacts)?;
-            block_context.inside_return = false;
+            block_context.flags.set_inside_return(false);
 
             let inferred_return_type = artifacts.get_rc_expression_type(&return_value).cloned();
 
@@ -94,7 +95,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Return<'arena> {
             Rc::new(get_void())
         };
 
-        handle_return_value(context, block_context, artifacts, self.value.as_ref(), inferred_return_type, self.span());
+        handle_return_value(context, block_context, artifacts, self.value, inferred_return_type, self.span());
 
         Ok(())
     }
@@ -116,24 +117,35 @@ pub fn handle_return_value<'ctx>(
         let mut finally_scope = (*finally_scope).borrow_mut();
         for (var_id, var_type) in &block_context.locals {
             if let Some(finally_type) = finally_scope.locals.get_mut(var_id) {
-                *finally_type = Rc::new(combine_union_types(finally_type, var_type, context.codebase, false));
+                *finally_type =
+                    Rc::new(combine_union_types(finally_type, var_type, context.codebase, CombinerOptions::default()));
             } else {
                 finally_scope.locals.insert(*var_id, var_type.clone());
             }
         }
     }
 
-    block_context.has_returned = true;
+    block_context.flags.set_has_returned(true);
     block_context.control_actions.insert(ControlAction::Return);
 
     // Check for uninitialized properties when returning from a constructor
-    if block_context.collect_initializations
+    if block_context.flags.collect_initializations()
         && let Some(FunctionLikeIdentifier::Method(class_name, method_name)) =
             block_context.scope.get_function_like_identifier()
         && method_name.eq_ignore_ascii_case("__construct")
     {
         check_constructor_early_return(context, block_context, return_span, class_name);
     }
+
+    let mut expansion_options = TypeExpansionOptions {
+        self_class: block_context.scope.get_class_like_name(),
+        static_class_type: if let Some(calling_class) = block_context.scope.get_class_like_name() {
+            StaticClassType::Name(calling_class)
+        } else {
+            StaticClassType::None
+        },
+        ..Default::default()
+    };
 
     // Check if we're in a property hook context
     if let Some((property_name, hook_metadata)) = block_context.scope.get_property_hook() {
@@ -142,9 +154,9 @@ pub fn handle_return_value<'ctx>(
             block_context,
             return_value,
             inferred_return_type,
-            return_span,
             property_name,
             hook_metadata,
+            &expansion_options,
         );
 
         return;
@@ -157,14 +169,16 @@ pub fn handle_return_value<'ctx>(
         return;
     };
 
+    expansion_options.function_is_final = if let Some(method_metadata) = &function_like_metadata.method_metadata {
+        method_metadata.is_final
+    } else {
+        false
+    };
+
     if inferred_return_type.is_expandable() {
         let mut inner_union = (*inferred_return_type).clone();
 
-        expand_union(
-            context.codebase,
-            &mut inner_union,
-            &TypeExpansionOptions { self_class: block_context.scope.get_class_like_name(), ..Default::default() },
-        );
+        expand_union(context.codebase, &mut inner_union, &expansion_options);
 
         inferred_return_type = Rc::new(inner_union);
     }
@@ -179,24 +193,24 @@ pub fn handle_return_value<'ctx>(
 
         if !is_referenceable {
             context.collector.report_with_code(
-                    IssueCode::InvalidReturnStatement,
-                    Issue::error(format!(
-                        "Cannot return a non-referenceable value from function `{function_name}`.",
-                    ))
-                    .with_annotation(Annotation::primary(return_value.span()).with_message(
-                        "This value cannot be returned by reference.",
-                    ))
-                    .with_annotation(
-                        Annotation::secondary(function_like_metadata.name_span.unwrap_or(function_like_metadata.span))
-                            .with_message("Function is declared to return by reference here."),
-                    )
-                    .with_note(
-                        "You can only return variables, properties, array elements, or the result of another function call that itself returns a reference."
-                    )
-                    .with_help(
-                        "To fix this, either return a valid reference or remove the `&` from the function declaration to return by value."
-                    ),
-                );
+                IssueCode::InvalidReturnStatement,
+                Issue::error(format!(
+                    "Cannot return a non-referenceable value from function `{function_name}`.",
+                ))
+                .with_annotation(Annotation::primary(return_value.span()).with_message(
+                    "This value cannot be returned by reference.",
+                ))
+                .with_annotation(
+                    Annotation::secondary(function_like_metadata.name_span.unwrap_or(function_like_metadata.span))
+                        .with_message("Function is declared to return by reference here."),
+                )
+                .with_note(
+                    "You can only return variables, properties, array elements, or the result of another function call that itself returns a reference."
+                )
+                .with_help(
+                    "To fix this, either return a valid reference or remove the `&` from the function declaration to return by value."
+                ),
+            );
         }
     }
 
@@ -239,7 +253,7 @@ pub fn handle_return_value<'ctx>(
 
     if function_like_metadata.flags.has_yield() {
         if let Some((return_type, is_from_generator)) = get_generator_return_type(context, &expected_return_type) {
-            if !is_from_generator {
+            if !is_from_generator && function_like_metadata.return_type_metadata.is_some() {
                 let inferred_return_type_str = inferred_return_type.get_id();
                 let expected_return_type_str = expected_return_type.get_id();
 
@@ -276,7 +290,9 @@ pub fn handle_return_value<'ctx>(
         } else {
             // ignore this, it will be handled by the `yield` analyzer
         }
-    } else if return_value.is_some() {
+    }
+
+    if return_value.is_some() {
         artifacts.inferred_return_types.push(inferred_return_type.clone());
     }
 
@@ -521,9 +537,9 @@ fn handle_property_hook_return<'ctx>(
     block_context: &BlockContext<'ctx>,
     return_value: Option<&Expression>,
     mut inferred_return_type: Rc<TUnion>,
-    _return_span: Span,
     property_name: Atom,
     hook_metadata: &PropertyHookMetadata,
+    expansion_options: &TypeExpansionOptions,
 ) {
     if !hook_metadata.is_get() {
         return;
@@ -536,26 +552,11 @@ fn handle_property_hook_return<'ctx>(
     let Some(type_metadata) = &property.type_metadata else { return };
 
     let mut expected_return_type = type_metadata.type_union.clone();
-    expand_union(
-        context.codebase,
-        &mut expected_return_type,
-        &TypeExpansionOptions {
-            self_class: block_context.scope.get_class_like_name(),
-            static_class_type: block_context
-                .scope
-                .get_class_like_name()
-                .map_or(StaticClassType::None, StaticClassType::Name),
-            ..Default::default()
-        },
-    );
+    expand_union(context.codebase, &mut expected_return_type, expansion_options);
 
     if inferred_return_type.is_expandable() {
         let mut inner = (*inferred_return_type).clone();
-        expand_union(
-            context.codebase,
-            &mut inner,
-            &TypeExpansionOptions { self_class: block_context.scope.get_class_like_name(), ..Default::default() },
-        );
+        expand_union(context.codebase, &mut inner, expansion_options);
         inferred_return_type = Rc::new(inner);
     }
 
@@ -773,8 +774,12 @@ fn get_generator_return_type(context: &Context, return_type: &TUnion) -> Option<
 
         match generator_return.as_mut() {
             Some(existing_return) => {
-                *existing_return =
-                    combine_union_types(existing_return, &generator_parameters.3, context.codebase, false);
+                *existing_return = combine_union_types(
+                    existing_return,
+                    &generator_parameters.3,
+                    context.codebase,
+                    CombinerOptions::default(),
+                );
             }
             None => {
                 generator_return = Some(generator_parameters.3);
@@ -1106,6 +1111,9 @@ mod tests {
                 public function __construct(array $elements = []) {
                     $this->elements = $elements;
                 }
+
+                /** @return array<Tk, Tv> */
+                public function getElements(): array { return $this->elements; }
 
                 /**
                  * @return Map<Tk, Tv>

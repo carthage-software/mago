@@ -1,9 +1,9 @@
 use std::cell::RefCell;
-use std::collections::BTreeMap;
 use std::rc::Rc;
 
-use ahash::HashSet;
+use foldhash::HashSet;
 
+use mago_algebra::assertion_set::AssertionSet;
 use mago_algebra::clause::Clause;
 use mago_atom::Atom;
 use mago_atom::AtomMap;
@@ -24,7 +24,8 @@ use mago_span::Span;
 
 use crate::common::global::get_super_globals;
 use crate::context::Context;
-use crate::context::scope::control_action::ControlAction;
+use crate::context::block_flags::BlockContextFlags;
+use crate::context::scope::control_action::ControlActionSet;
 use crate::context::scope::finally_scope::FinallyScope;
 use crate::context::scope::var_has_root;
 use crate::reconciler::assertion_reconciler;
@@ -54,7 +55,7 @@ pub struct ReferenceConstraint {
 #[derive(Clone, Debug)]
 pub struct BlockContext<'ctx> {
     pub scope: ScopeContext<'ctx>,
-    pub locals: BTreeMap<Atom, Rc<TUnion>>,
+    pub locals: AtomMap<Rc<TUnion>>,
     pub static_locals: AtomSet,
     pub variables_possibly_in_scope: AtomSet,
     pub conditionally_referenced_variable_ids: AtomSet,
@@ -83,32 +84,19 @@ pub struct BlockContext<'ctx> {
     /// where the key is the variable name and the value is the reference constraint.
     pub by_reference_constraints: AtomMap<ReferenceConstraint>,
 
-    pub inside_conditional: bool,
-    pub inside_isset: bool,
-    pub inside_unset: bool,
-    pub inside_general_use: bool,
-    pub inside_return: bool,
-    pub inside_throw: bool,
-    pub inside_assignment: bool,
-    pub inside_assignment_operation: bool,
-    pub inside_loop: bool,
-    pub inside_call: bool,
-    pub inside_nullsafe_chain: bool,
-    pub inside_try: bool,
-    pub inside_loop_expressions: bool,
-    pub inside_negation: bool,
-    pub inside_variable_reference: bool,
+    /// Bitflags for various context states (inside_conditional, inside_isset, etc.)
+    pub flags: BlockContextFlags,
+
     pub clauses: Vec<Rc<Clause>>,
     pub reconciled_expression_clauses: Vec<Rc<Clause>>,
     pub known_functions: AtomSet,
     pub known_constants: AtomSet,
     pub break_types: Vec<BreakContext>,
     pub finally_scope: Option<Rc<RefCell<FinallyScope>>>,
-    pub has_returned: bool,
     pub parent_conflicting_clause_variables: AtomSet,
     pub loop_bounds: (u32, u32),
     pub if_body_context: Option<Rc<RefCell<Self>>>,
-    pub control_actions: HashSet<ControlAction>,
+    pub control_actions: ControlActionSet,
     pub possibly_thrown_exceptions: AtomMap<HashSet<Span>>,
 
     /// Properties that are DEFINITELY initialized in ALL code paths.
@@ -127,16 +115,17 @@ pub struct BlockContext<'ctx> {
     /// Uses union semantics.
     pub called_methods: HashSet<Atom>,
 
-    /// Flag indicating we're collecting initialization data (only in constructors).
-    pub collect_initializations: bool,
-
-    /// Set to true if this method calls `parent::`__`construct()`.
-    /// Used to include parent constructor's property initializations.
-    pub calls_parent_constructor: bool,
-
     /// If this method calls `parent::`<method>() where <method> is a class initializer,
     /// this holds the initializer method name.
     pub calls_parent_initializer: Option<Atom>,
+
+    /// Active method call assertions from guard methods.
+    /// When inside a conditional like `if ($obj->isValid())`, this tracks assertions
+    /// about method return types that should be applied.
+    ///
+    /// Key: method call expression id (e.g., "$statements->first()")
+    /// Value: assertion set to apply to the method's return type
+    pub active_method_call_assertions: AtomMap<AssertionSet>,
 }
 
 impl BreakContext {
@@ -175,7 +164,7 @@ impl<'ctx> BlockContext<'ctx> {
     pub fn new(scope: ScopeContext<'ctx>, register_super_globals: bool) -> Self {
         let mut block_context = Self {
             scope,
-            locals: BTreeMap::new(),
+            locals: AtomMap::default(),
             static_locals: AtomSet::default(),
             variables_possibly_in_scope: AtomSet::default(),
             conditionally_referenced_variable_ids: AtomSet::default(),
@@ -186,40 +175,24 @@ impl<'ctx> BlockContext<'ctx> {
             references_to_external_scope: AtomSet::default(),
             references_possibly_from_confusing_scope: AtomSet::default(),
             by_reference_constraints: AtomMap::default(),
-            inside_conditional: false,
-            inside_isset: false,
-            inside_unset: false,
-            inside_general_use: false,
-            inside_return: false,
-            inside_throw: false,
-            inside_assignment: false,
-            inside_assignment_operation: false,
-            inside_loop_expressions: false,
-            inside_negation: false,
-            inside_call: false,
-            inside_nullsafe_chain: false,
-            inside_try: false,
-            inside_variable_reference: false,
-            has_returned: false,
+            flags: BlockContextFlags::new(),
             clauses: Vec::new(),
             reconciled_expression_clauses: Vec::new(),
             known_functions: AtomSet::default(),
             known_constants: AtomSet::default(),
             break_types: Vec::new(),
-            inside_loop: false,
             finally_scope: None,
             parent_conflicting_clause_variables: AtomSet::default(),
             loop_bounds: (0, 0),
             if_body_context: None,
-            control_actions: HashSet::default(),
+            control_actions: ControlActionSet::new(),
             possibly_thrown_exceptions: AtomMap::default(),
             definitely_initialized_properties: AtomSet::default(),
             possibly_initialized_properties: AtomSet::default(),
             definitely_called_methods: HashSet::default(),
             called_methods: HashSet::default(),
-            collect_initializations: false,
-            calls_parent_constructor: false,
             calls_parent_initializer: None,
+            active_method_call_assertions: AtomMap::default(),
         };
 
         if register_super_globals {
@@ -255,10 +228,10 @@ impl<'ctx> BlockContext<'ctx> {
 
     pub fn get_redefined_locals(
         &self,
-        new_locals: &BTreeMap<Atom, Rc<TUnion>>,
+        new_locals: &AtomMap<Rc<TUnion>>,
         include_new_vars: bool,
         removed_vars: &mut AtomSet,
-    ) -> AtomMap<TUnion> {
+    ) -> AtomMap<Rc<TUnion>> {
         let mut redefined_vars = AtomMap::default();
 
         let mut var_ids = self.locals.keys().collect::<Vec<_>>();
@@ -268,10 +241,10 @@ impl<'ctx> BlockContext<'ctx> {
             if let Some(this_type) = self.locals.get(var_id) {
                 if let Some(new_type) = new_locals.get(var_id) {
                     if new_type != this_type {
-                        redefined_vars.insert(*var_id, (**this_type).clone());
+                        redefined_vars.insert(*var_id, this_type.clone());
                     }
                 } else if include_new_vars {
-                    redefined_vars.insert(*var_id, (**this_type).clone());
+                    redefined_vars.insert(*var_id, this_type.clone());
                 }
             } else {
                 removed_vars.insert(*var_id);
@@ -538,9 +511,17 @@ impl<'ctx> BlockContext<'ctx> {
             );
 
             if !references.is_empty() {
+                self.referenced_counts.remove(&remove_var_atom);
+
                 let first_reference = references.remove(0);
                 if !references.is_empty() {
-                    self.referenced_counts.insert(first_reference, references.len() as u32);
+                    let reassigned_references = references.len() as u32;
+                    if let Some(existing_count) = self.referenced_counts.get_mut(&first_reference) {
+                        *existing_count += reassigned_references;
+                    } else {
+                        self.referenced_counts.insert(first_reference, reassigned_references);
+                    }
+
                     for reference in references {
                         self.references_in_scope.insert(reference, first_reference);
                     }
@@ -568,6 +549,10 @@ impl<'ctx> BlockContext<'ctx> {
         vars_to_update: &AtomSet,
         updated_vars: &mut AtomSet,
     ) {
+        if vars_to_update.is_empty() {
+            return;
+        }
+
         for (variable_id, old_type) in &start_block_context.locals {
             if !vars_to_update.contains(variable_id) {
                 continue;
@@ -722,5 +707,96 @@ fn should_keep_clause(clause: &Rc<Clause>, remove_var_id: Atom, new_type: Option
         false
     } else {
         true
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::rc::Rc;
+
+    use mago_atom::atom;
+    use mago_codex::context::ScopeContext;
+    use mago_codex::ttype::get_mixed;
+
+    use super::BlockContext;
+
+    fn block_context_with_locals(vars: &[&str]) -> BlockContext<'static> {
+        let mut block_context = BlockContext::new(ScopeContext::new(), false);
+        for variable in vars {
+            let variable_atom = atom(variable);
+            block_context.locals.insert(variable_atom, Rc::new(get_mixed()));
+            block_context.variables_possibly_in_scope.insert(variable_atom);
+        }
+
+        block_context
+    }
+
+    #[test]
+    fn remove_possible_reference_preserves_promoted_reference_counts() {
+        let mut block_context = block_context_with_locals(&["$a", "$b", "$c"]);
+
+        // Model: $b =& $a; $c =& $b.
+        block_context.references_in_scope.insert(atom("$b"), atom("$a"));
+        block_context.references_in_scope.insert(atom("$c"), atom("$b"));
+        block_context.referenced_counts.insert(atom("$a"), 1);
+        block_context.referenced_counts.insert(atom("$b"), 1);
+
+        block_context.remove_possible_reference("$a");
+
+        // $b is promoted to root, but still has $c pointing to it.
+        assert_eq!(block_context.references_in_scope.get(&atom("$c")).copied(), Some(atom("$b")));
+        assert_eq!(block_context.referenced_counts.get(&atom("$b")).copied(), Some(1));
+
+        // Removing $b should re-root $c and clear dangling reference links.
+        block_context.remove_possible_reference("$b");
+        assert!(!block_context.references_in_scope.contains_key(&atom("$c")));
+    }
+
+    #[test]
+    fn remove_possible_reference_adds_to_existing_promoted_count() {
+        let mut block_context = block_context_with_locals(&["$a", "$b", "$c", "$d"]);
+
+        // Model before removal:
+        // $b =& $a, $c =& $a, and $d =& $b.
+        block_context.references_in_scope.insert(atom("$b"), atom("$a"));
+        block_context.references_in_scope.insert(atom("$c"), atom("$a"));
+        block_context.references_in_scope.insert(atom("$d"), atom("$b"));
+        block_context.referenced_counts.insert(atom("$a"), 2);
+        block_context.referenced_counts.insert(atom("$b"), 1);
+
+        block_context.remove_possible_reference("$a");
+
+        // $b is promoted and keeps its prior 1, plus 1 reassigned reference from $c.
+        assert_eq!(block_context.referenced_counts.get(&atom("$b")).copied(), Some(2));
+        assert_eq!(block_context.references_in_scope.get(&atom("$c")).copied(), Some(atom("$b")));
+        assert_eq!(block_context.references_in_scope.get(&atom("$d")).copied(), Some(atom("$b")));
+    }
+
+    #[test]
+    fn remove_possible_reference_sets_promoted_count_when_missing() {
+        let mut block_context = block_context_with_locals(&["$a", "$b", "$c"]);
+
+        // Model before removal:
+        // $b =& $a, $c =& $a with no prior count entry for $b.
+        block_context.references_in_scope.insert(atom("$b"), atom("$a"));
+        block_context.references_in_scope.insert(atom("$c"), atom("$a"));
+        block_context.referenced_counts.insert(atom("$a"), 2);
+
+        block_context.remove_possible_reference("$a");
+
+        // $b becomes primary and should have count 1 (the reassigned $c).
+        assert_eq!(block_context.referenced_counts.get(&atom("$b")).copied(), Some(1));
+        assert_eq!(block_context.references_in_scope.get(&atom("$c")).copied(), Some(atom("$b")));
+    }
+
+    #[test]
+    #[cfg(debug_assertions)]
+    #[should_panic(expected = "No references found for variable")]
+    fn remove_possible_reference_panics_on_stale_counts_in_debug() {
+        let mut block_context = block_context_with_locals(&["$stale"]);
+        block_context.referenced_counts.insert(atom("$stale"), 1);
+
+        // No references_in_scope entry for $stale -> intentional debug panic.
+        block_context.remove_possible_reference("$stale");
     }
 }

@@ -1,14 +1,17 @@
 use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_codex::metadata::function_like::FunctionLikeKind;
 use mago_codex::metadata::function_like::FunctionLikeMetadata;
+use mago_codex::metadata::property::PropertyMetadata;
 use mago_php_version::PHPVersion;
 use mago_php_version::feature::Feature;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
+use mago_span::Span;
 use mago_syntax::ast::ClassLikeConstant;
 use mago_syntax::ast::FunctionLikeParameter;
 use mago_syntax::ast::FunctionLikeReturnTypeHint;
+use mago_syntax::ast::Hint;
 use mago_syntax::ast::Property;
 use mago_syntax::ast::PropertyItem;
 
@@ -146,6 +149,7 @@ pub fn check_parameter_type_hint<'arena>(
     {
         return;
     }
+
     if matches!(function_like_metadata.kind, FunctionLikeKind::ArrowFunction)
         && !context.settings.check_arrow_function_missing_type_hints
     {
@@ -185,7 +189,7 @@ pub fn check_return_type_hint<'arena>(
     function_like_metadata: &FunctionLikeMetadata,
     function_name: &str,
     return_type_hint: Option<&FunctionLikeReturnTypeHint<'arena>>,
-    span: mago_span::Span,
+    span: Span,
 ) {
     if !context.settings.check_missing_type_hints || context.settings.version < PHPVersion::PHP70 {
         return;
@@ -229,6 +233,183 @@ pub fn check_return_type_hint<'arena>(
             )
             .with_note("Return type hints improve code readability and help prevent type-related errors.")
             .with_help(format!("Consider adding a return type hint to function `{function_name}`.")),
+    );
+}
+
+/// Check if a return type hint uses a bare `array` or `iterable` without a more specific
+/// docblock annotation.
+pub fn check_imprecise_return_type_hint<'arena>(
+    context: &mut Context<'_, 'arena>,
+    function_like_metadata: &FunctionLikeMetadata,
+    function_name: &str,
+    return_type_hint: Option<&FunctionLikeReturnTypeHint<'arena>>,
+) {
+    if !context.settings.check_missing_type_hints {
+        return;
+    }
+
+    if matches!(function_like_metadata.kind, FunctionLikeKind::Closure)
+        && !context.settings.check_closure_missing_type_hints
+    {
+        return;
+    }
+
+    if matches!(function_like_metadata.kind, FunctionLikeKind::ArrowFunction)
+        && !context.settings.check_arrow_function_missing_type_hints
+    {
+        return;
+    }
+
+    let Some(return_type_hint) = return_type_hint else {
+        return;
+    };
+
+    if function_like_metadata.return_type_metadata.as_ref().is_some_and(|m| m.from_docblock) {
+        return;
+    }
+
+    for (type_name, span) in collect_imprecise_hints(&return_type_hint.hint) {
+        report_imprecise_type(context, type_name, span, &format!("return type of `{function_name}`"));
+    }
+}
+
+/// Check if a parameter type hint uses a bare `array` or `iterable` without a more specific
+/// docblock annotation.
+pub fn check_imprecise_parameter_type_hint<'arena>(
+    context: &mut Context<'_, 'arena>,
+    function_like_metadata: &FunctionLikeMetadata,
+    parameter: &FunctionLikeParameter<'arena>,
+    parameter_index: usize,
+) {
+    if !context.settings.check_missing_type_hints {
+        return;
+    }
+
+    // Skip closures/arrow functions based on settings
+    if matches!(function_like_metadata.kind, FunctionLikeKind::Closure)
+        && !context.settings.check_closure_missing_type_hints
+    {
+        return;
+    }
+    if matches!(function_like_metadata.kind, FunctionLikeKind::ArrowFunction)
+        && !context.settings.check_arrow_function_missing_type_hints
+    {
+        return;
+    }
+
+    let Some(hint) = &parameter.hint else {
+        return;
+    };
+
+    // If the docblock provides a more specific type, skip
+    if let Some(param_meta) = function_like_metadata.parameters.get(parameter_index)
+        && param_meta.type_metadata.as_ref().is_some_and(|m| m.from_docblock)
+    {
+        return;
+    }
+
+    for (type_name, span) in collect_imprecise_hints(hint) {
+        report_imprecise_type(context, type_name, span, &format!("parameter `{}`", parameter.variable.name));
+    }
+}
+
+/// Check if a property type hint uses a bare `array` or `iterable` without a more specific
+/// docblock annotation.
+pub fn check_imprecise_property_type_hint<'arena>(
+    context: &mut Context<'_, 'arena>,
+    property: &Property<'arena>,
+    property_metadata: Option<&PropertyMetadata>,
+) {
+    if !context.settings.check_missing_type_hints {
+        return;
+    }
+
+    let hint = match property {
+        Property::Plain(plain) => plain.hint.as_ref(),
+        Property::Hooked(hooked) => hooked.hint.as_ref(),
+    };
+
+    let Some(hint) = hint else {
+        return;
+    };
+
+    // If the docblock provides a more specific type, skip
+    if let Some(prop_meta) = property_metadata
+        && prop_meta.type_metadata.as_ref().is_some_and(|m| m.from_docblock)
+    {
+        return;
+    }
+
+    let variables = match property {
+        Property::Plain(plain) => plain
+            .items
+            .iter()
+            .filter_map(|item| if let PropertyItem::Concrete(c) = item { Some(c.variable.name) } else { None })
+            .collect::<Vec<_>>(),
+        Property::Hooked(hooked) => match &hooked.item {
+            PropertyItem::Concrete(c) => vec![c.variable.name],
+            PropertyItem::Abstract(_) => vec![],
+        },
+    };
+
+    let imprecise = collect_imprecise_hints(hint);
+    if imprecise.is_empty() {
+        return;
+    }
+
+    for variable_name in variables {
+        for &(type_name, span) in &imprecise {
+            report_imprecise_type(context, type_name, span, &format!("property `{variable_name}`"));
+        }
+    }
+}
+
+/// Collect all bare `array` or `iterable` hints from a type hint, recursing into
+/// unions, intersections, nullable, and parenthesized types.
+fn collect_imprecise_hints(hint: &Hint<'_>) -> Vec<(&'static str, Span)> {
+    let mut results = vec![];
+    collect_imprecise_hints_inner(hint, &mut results);
+    results
+}
+
+fn collect_imprecise_hints_inner(hint: &Hint<'_>, results: &mut Vec<(&'static str, Span)>) {
+    match hint {
+        Hint::Array(keyword) => {
+            results.push(("array", keyword.span()));
+        }
+        Hint::Iterable(identifier) => {
+            results.push(("iterable", identifier.span()));
+        }
+        Hint::Nullable(nullable) => {
+            collect_imprecise_hints_inner(nullable.hint, results);
+        }
+        Hint::Union(union) => {
+            collect_imprecise_hints_inner(union.left, results);
+            collect_imprecise_hints_inner(union.right, results);
+        }
+        Hint::Intersection(intersection) => {
+            collect_imprecise_hints_inner(intersection.left, results);
+            collect_imprecise_hints_inner(intersection.right, results);
+        }
+        Hint::Parenthesized(parenthesized) => {
+            collect_imprecise_hints_inner(parenthesized.hint, results);
+        }
+        _ => {}
+    }
+}
+
+fn report_imprecise_type(context: &mut Context<'_, '_>, type_name: &str, span: Span, location: &str) {
+    // `iterable` can have any key type (not just array-key), since iterators support arbitrary keys.
+    let equivalent = if type_name == "iterable" { "iterable<mixed, mixed>" } else { "array<array-key, mixed>" };
+
+    context.collector.report_with_code(
+        IssueCode::ImpreciseType,
+        Issue::warning(format!("Type `{type_name}` in {location} is imprecise, equivalent to `{equivalent}`."))
+            .with_annotation(Annotation::primary(span).with_message(format!("imprecise `{type_name}` type hint")))
+            .with_note(format!("Bare `{type_name}` does not specify key or value types, making it difficult for the analyzer to verify correctness."))
+            .with_help(format!(
+                "Specify a more precise type in a docblock annotation (e.g., `{type_name}<string, int>`, `list<Foo>`), or use `{equivalent}` to be explicit."
+            )),
     );
 }
 

@@ -1,4 +1,4 @@
-use ahash::HashSet;
+use foldhash::HashSet;
 
 use mago_atom::Atom;
 use mago_codex::ttype::get_mixed;
@@ -54,7 +54,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Foreach<'arena> {
         );
 
         let (always_enters_loop, mut key_type, mut value_type) =
-            r#loop::analyze_iterator(context, block_context, artifacts, iterator, iterator_variable_id.as_ref(), self)?;
+            r#loop::analyze_iterator(context, block_context, artifacts, iterator, iterator_variable_id, self)?;
 
         if key_type.is_never() {
             key_type = get_mixed();
@@ -65,7 +65,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Foreach<'arena> {
         }
 
         let mut loop_block_context = block_context.clone();
-        loop_block_context.inside_loop = true;
+        loop_block_context.flags.set_inside_loop(true);
         loop_block_context.break_types.push(BreakContext::Loop);
 
         if let Some(key_expression) = self.target.key() {

@@ -1,12 +1,13 @@
 use std::cmp::Ordering;
 
+use bumpalo::Bump;
 use bumpalo::collections::CollectIn;
 use bumpalo::collections::Vec;
 use bumpalo::vec;
 
-use bumpalo::Bump;
 use mago_span::HasPosition;
 use mago_span::HasSpan;
+use mago_syntax::ast::ClosingTag;
 use mago_syntax::ast::Constant;
 use mago_syntax::ast::Declare;
 use mago_syntax::ast::DeclareBody;
@@ -26,6 +27,7 @@ use mago_syntax::ast::UseItems;
 use mago_syntax::ast::UseType;
 
 use mago_syntax::ast::Expression;
+use mago_syntax::walker::MutWalker;
 
 use crate::document::Align;
 use crate::document::Document;
@@ -39,6 +41,7 @@ use crate::internal::format::alignment::AlignmentWidths;
 use crate::internal::format::alignment::detect_statement_ref_alignment_runs;
 use crate::internal::format::alignment::get_statement_alignment;
 use crate::internal::format::assignment::AssignmentAlignment;
+use crate::internal::format::misc::has_new_line_in_range;
 
 pub fn print_statement_sequence<'arena>(
     f: &mut FormatterState<'_, 'arena>,
@@ -150,7 +153,7 @@ fn print_statement_slice<'ctx, 'arena>(
         }
 
         if let Some(widths) = get_statement_alignment(&alignment_runs, i) {
-            let alignment = calculate_statement_alignment(stmt, &widths);
+            let alignment = calculate_statement_alignment(f, stmt, &widths);
             f.set_alignment_context(Some(alignment));
         }
 
@@ -158,35 +161,49 @@ fn print_statement_slice<'ctx, 'arena>(
 
         f.set_alignment_context(None);
 
-        if let Statement::OpeningTag(tag) = stmt {
-            let offset = tag.span().start.offset;
+        let tag_offset = match stmt {
+            Statement::OpeningTag(tag) => Some(tag.span().start.offset),
+            Statement::EchoTag(tag) => Some(tag.tag.start.offset),
+            _ => None,
+        };
+
+        if let Some(offset) = tag_offset {
             let line = f.file.line_number(offset);
 
             if let Some(line_start_offset) = f.file.get_line_start_offset(line) {
                 let c = &f.source_text[line_start_offset as usize..offset as usize];
                 let ws = c.chars().take_while(|c| c.is_whitespace()).collect::<String>();
                 if !ws.is_empty() {
-                    let mut j = i + 1;
-                    let mut stmts_to_format = vec![in f.arena];
-                    while j < stmts.len() {
-                        let next_stmt = stmts[j];
-                        stmts_to_format.push(next_stmt);
-                        if next_stmt.terminates_scripting() {
-                            break;
+                    if matches!(stmt, Statement::OpeningTag(_)) {
+                        let mut j = i + 1;
+                        let mut stmts_to_format = vec![in f.arena];
+                        while j < stmts.len() {
+                            let next_stmt = stmts[j];
+                            stmts_to_format.push(next_stmt);
+                            if next_stmt.terminates_scripting() {
+                                break;
+                            }
+
+                            j += 1;
                         }
 
-                        j += 1;
+                        parts.push(Document::Group(Group::new(vec![in f.arena; Document::Align(Align {
+                            alignment: f.as_str(&ws),
+                            contents: {
+                                formatted_statement.extend(print_statement_slice(f, stmts_to_format.as_slice()));
+                                formatted_statement
+                            },
+                        })])));
+
+                        i = j + 1;
+                    } else {
+                        parts.push(Document::Group(Group::new(vec![in f.arena; Document::Align(Align {
+                            alignment: f.as_str(&ws),
+                            contents: formatted_statement,
+                        })])));
+
+                        i += 1;
                     }
-
-                    parts.push(Document::Group(Group::new(vec![in f.arena; Document::Align(Align {
-                        alignment: f.as_str(&ws),
-                        contents: {
-                            formatted_statement.extend(print_statement_slice(f, stmts_to_format.as_slice()));
-                            formatted_statement
-                        },
-                    })])));
-
-                    i = j + 1;
 
                     continue;
                 }
@@ -352,13 +369,17 @@ fn should_add_new_line_or_space_after_stmt<'arena>(
             DeclareBody::ColonDelimited(_) => true,
         },
         Statement::OpeningTag(_) => {
+            if f.settings.opening_tag_on_own_line && !is_inline_php_template(stmts) {
+                return (true, false);
+            }
+
             if let Some(index) = f.skip_to_line_end(Some(stmt.end_position().offset()))
                 && f.has_newline(index, false)
             {
                 return (true, false);
             }
 
-            should_add_space = !f.has_comment(stmt.span(), CommentFlags::Trailing);
+            should_add_space = !f.has_comment(stmt.span(), CommentFlags::TRAILING);
 
             false
         }
@@ -366,7 +387,7 @@ fn should_add_new_line_or_space_after_stmt<'arena>(
             if f.has_newline(stmt.end_position().offset(), false) {
                 true
             } else if let Some(Statement::ClosingTag(_)) = stmts.get(i + 1) {
-                should_add_space = !f.has_comment(stmt.span(), CommentFlags::Trailing);
+                should_add_space = !f.has_comment(stmt.span(), CommentFlags::TRAILING);
 
                 false
             } else {
@@ -376,6 +397,58 @@ fn should_add_new_line_or_space_after_stmt<'arena>(
     };
 
     (should_add_line, should_add_space)
+}
+
+/// Check if the program is an inline PHP template (mixes PHP and HTML).
+///
+/// When a file contains inline HTML content, the opening `<?php` tag should stay
+/// on the same line as the following statement (e.g., `<?php if ($foo): ?>`).
+/// When it's a pure PHP file, `<?php` should be on its own line.
+///
+/// Counts closing tags in the given statements. A trailing `ClosingTag` (last top-level statement)
+/// is not counted since the formatter removes it. If any other closing tags exist,
+/// the file is an inline PHP template.
+#[inline]
+#[allow(clippy::if_same_then_else)]
+fn is_inline_php_template(stmts: &[&Statement<'_>]) -> bool {
+    let trailing_close_tag_count = match stmts.len() {
+        0 => 0,
+        n => {
+            // Pattern: [..., ClosingTag, Inline(whitespace-only)] at end
+            if matches!(stmts.get(n.wrapping_sub(2)), Some(Statement::ClosingTag(_)))
+                && matches!(stmts.get(n - 1), Some(Statement::Inline(inline)) if inline.value.trim().is_empty())
+            {
+                1
+            // Pattern: [..., ClosingTag] at end (no trailing inline)
+            } else if matches!(stmts.last(), Some(Statement::ClosingTag(_))) {
+                1
+            } else {
+                0
+            }
+        }
+    };
+
+    let count = count_closing_tags(stmts);
+
+    count > trailing_close_tag_count
+}
+
+/// Count all `ClosingTag` nodes within a slice of statements at any depth.
+fn count_closing_tags(stmts: &[&Statement<'_>]) -> usize {
+    struct Counter(usize);
+
+    impl<'ast, 'arena> MutWalker<'ast, 'arena, ()> for Counter {
+        fn walk_in_closing_tag(&mut self, _: &'ast ClosingTag, _: &mut ()) {
+            self.0 += 1;
+        }
+    }
+
+    let mut counter = Counter(0);
+    for stmt in stmts {
+        counter.walk_statement(stmt, &mut ());
+    }
+
+    counter.0
 }
 
 fn should_add_new_line_after_use<'arena>(
@@ -390,7 +463,7 @@ fn should_add_new_line_after_use<'arena>(
     } else if f.has_newline(last_use.span().end_position().offset, false) {
         true
     } else if let Some(Statement::ClosingTag(_)) = stmts.get(i) {
-        should_add_space = !f.has_comment(last_use.span(), CommentFlags::Trailing);
+        should_add_space = !f.has_comment(last_use.span(), CommentFlags::TRAILING);
 
         false
     } else {
@@ -782,14 +855,21 @@ pub fn sort_maybe_typed_use_items<'arena>(
     items
 }
 
-fn calculate_statement_alignment(stmt: &Statement<'_>, widths: &AlignmentWidths) -> AssignmentAlignment {
+fn calculate_statement_alignment(
+    f: &mut FormatterState<'_, '_>,
+    stmt: &Statement<'_>,
+    widths: &AlignmentWidths,
+) -> AssignmentAlignment {
     let current_name_width = match stmt {
         Statement::Expression(expr_stmt) => {
             if let Expression::Assignment(assign) = &expr_stmt.expression {
-                if let Expression::Variable(var) = assign.lhs {
-                    (var.span().end.offset - var.span().start.offset) as usize
-                } else {
+                let lhs_span = assign.lhs.span();
+
+                // Skip multiline LHS expressions for alignment
+                if has_new_line_in_range(f.source_text, lhs_span.start_offset(), lhs_span.end_offset()) {
                     0
+                } else {
+                    lhs_span.length() as usize
                 }
             } else {
                 0
@@ -801,5 +881,5 @@ fn calculate_statement_alignment(stmt: &Statement<'_>, widths: &AlignmentWidths)
 
     let name_padding = widths.name_width.saturating_sub(current_name_width);
 
-    AssignmentAlignment { type_padding: 0, name_padding }
+    AssignmentAlignment { type_padding: 0, name_padding, break_group_id: None }
 }

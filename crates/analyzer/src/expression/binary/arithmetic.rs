@@ -1,5 +1,6 @@
 use std::collections::VecDeque;
 use std::rc::Rc;
+use std::sync::Arc;
 
 use mago_codex::ttype::TType;
 use mago_codex::ttype::atomic::TAtomic;
@@ -33,11 +34,11 @@ pub fn analyze_arithmetic_operation<'ctx, 'arena>(
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
 ) -> Result<(), AnalysisError> {
-    let was_inside_general_use = block_context.inside_general_use;
-    block_context.inside_general_use = true;
+    let was_inside_general_use = block_context.flags.inside_general_use();
+    block_context.flags.set_inside_general_use(true);
     binary.lhs.analyze(context, block_context, artifacts)?;
     binary.rhs.analyze(context, block_context, artifacts)?;
-    block_context.inside_general_use = was_inside_general_use;
+    block_context.flags.set_inside_general_use(was_inside_general_use);
 
     let fallback = Rc::new(get_mixed());
     let left_type = artifacts.get_rc_expression_type(&binary.lhs).cloned().unwrap_or_else(|| fallback.clone());
@@ -192,7 +193,7 @@ pub fn analyze_arithmetic_operation<'ctx, 'arena>(
         .cloned()
         .flat_map(|atomic| {
             if let TAtomic::GenericParameter(parameter) = atomic {
-                parameter.constraint.types.into_owned()
+                Arc::unwrap_or_clone(parameter.constraint).types.into_owned()
             } else {
                 vec![atomic]
             }
@@ -205,7 +206,7 @@ pub fn analyze_arithmetic_operation<'ctx, 'arena>(
         .cloned()
         .flat_map(|atomic| {
             if let TAtomic::GenericParameter(parameter) = atomic {
-                parameter.constraint.types.into_owned()
+                Arc::unwrap_or_clone(parameter.constraint).types.into_owned()
             } else {
                 vec![atomic]
             }
@@ -291,8 +292,11 @@ pub fn analyze_arithmetic_operation<'ctx, 'arena>(
                     // PHP array addition: $a + $b keeps all keys from $a and adds keys from $b that don't exist in $a
                     // If either operand is non-empty, the result is non-empty
                     // We use the combiner for merging types but fix the non_empty flag afterwards
-                    let mut combined =
-                        combiner::combine(vec![left_atomic.clone(), right_atomic.clone()], context.codebase, false);
+                    let mut combined = combiner::combine(
+                        vec![left_atomic.clone(), right_atomic.clone()],
+                        context.codebase,
+                        context.settings.combiner_options(),
+                    );
 
                     // Fix the non_empty flag: if either operand is non-empty, result is non-empty
                     if let (TAtomic::Array(left_array), TAtomic::Array(right_array)) = (&left_atomic, right_atomic) {
@@ -334,8 +338,12 @@ pub fn analyze_arithmetic_operation<'ctx, 'arena>(
                     invalid_pair = true;
                 }
             } else if left_atomic.is_numeric() && right_atomic.is_numeric() {
-                let numeric_results =
-                    determine_numeric_result(&binary.operator, &left_atomic, &right_atomic, block_context.inside_loop);
+                let numeric_results = determine_numeric_result(
+                    &binary.operator,
+                    &left_atomic,
+                    &right_atomic,
+                    block_context.flags.inside_loop(),
+                );
 
                 if numeric_results.iter().any(|a| matches!(a, TAtomic::Never)) {
                     invalid_pair = true;
@@ -465,7 +473,7 @@ pub fn analyze_arithmetic_operation<'ctx, 'arena>(
         // Otherwise, default to mixed.
         get_mixed()
     } else {
-        TUnion::from_vec(combiner::combine(result_atomic_types, context.codebase, false))
+        TUnion::from_vec(combiner::combine(result_atomic_types, context.codebase, context.settings.combiner_options()))
     };
 
     assign_arithmetic_type(artifacts, final_type, binary);

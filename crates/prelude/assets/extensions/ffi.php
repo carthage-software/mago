@@ -13,120 +13,80 @@ namespace {
          *
          * @throws ParserException
          */
-        public static function cdef(string $code = '', null|string $lib = null): FFI
-        {
-        }
+        public static function cdef(string $code = '', ?string $lib = null): FFI {}
 
         /**
          * @param string $filename
          *
          * @return FFI|null
          */
-        public static function load(string $filename): null|FFI
-        {
-        }
+        public static function load(string $filename): ?FFI {}
 
-        public static function scope(string $name): FFI
-        {
-        }
+        public static function scope(string $name): FFI {}
 
         /**
          * @param string|CType $type
          *
          * @throws ParserException
          */
-        public static function new($type, bool $owned = true, bool $persistent = false): null|CData
-        {
-        }
+        public static function new($type, bool $owned = true, bool $persistent = false): ?CData {}
 
-        public static function free(CData $ptr): void
-        {
-        }
+        public static function free(CData $ptr): void {}
 
         /**
          * @param CType|string $type
          * @param CData|int|float|bool|null $ptr
          */
-        public static function cast($type, $ptr): null|CData
-        {
-        }
+        public static function cast($type, $ptr): ?CData {}
 
-        public static function type(string $type): null|CType
-        {
-        }
+        public static function type(string $type): ?CType {}
 
-        public static function typeof(CData $ptr): CType
-        {
-        }
+        public static function typeof(CData $ptr): CType {}
 
         /**
          * @param list<int> $dimensions
          */
-        public static function arrayType(CType $type, array $dimensions): CType
-        {
-        }
+        public static function arrayType(CType $type, array $dimensions): CType {}
 
-        public static function addr(CData $ptr): CData
-        {
-        }
+        public static function addr(CData $ptr): CData {}
 
         /**
          * @param CData|CType $ptr
          */
-        public static function sizeof($ptr): int
-        {
-        }
+        public static function sizeof($ptr): int {}
 
         /**
          * @param CData|CType $ptr
          */
-        public static function alignof($ptr): int
-        {
-        }
+        public static function alignof($ptr): int {}
 
         /**
          * @param CData|string $from
          */
-        public static function memcpy(CData $to, $from, int $size): void
-        {
-        }
+        public static function memcpy(CData $to, $from, int $size): void {}
 
         /**
          * @param CData|string $ptr1
          * @param CData|string $ptr2
          */
-        public static function memcmp($ptr1, $ptr2, int $size): int
-        {
-        }
+        public static function memcmp($ptr1, $ptr2, int $size): int {}
 
-        public static function memset(CData $ptr, int $value, int $size): void
-        {
-        }
+        public static function memset(CData $ptr, int $value, int $size): void {}
 
-        public static function string(CData $ptr, null|int $size = null): string
-        {
-        }
+        public static function string(CData $ptr, ?int $size = null): string {}
 
-        public static function isNull(CData $ptr): bool
-        {
-        }
+        public static function isNull(CData $ptr): bool {}
     }
 }
 
 namespace FFI {
     use Error;
 
-    class Exception extends Error
-    {
-    }
+    class Exception extends Error {}
 
-    class ParserException extends Exception
-    {
-    }
+    class ParserException extends Exception {}
 
-    final class CData
-    {
-    }
+    final class CData {}
 
     final class CType
     {
@@ -206,103 +166,71 @@ namespace FFI {
 
         public const ABI_VECTORCALL = 9;
 
-        public function getName(): string
-        {
-        }
+        public function getName(): string {}
 
-        public function getKind(): int
-        {
-        }
+        public function getKind(): int {}
 
-        public function getSize(): int
-        {
-        }
+        public function getSize(): int {}
 
-        public function getAlignment(): int
-        {
-        }
+        public function getAlignment(): int {}
 
-        public function getAttributes(): int
-        {
-        }
+        public function getAttributes(): int {}
 
         /**
          * @throws Exception
          */
-        public function getEnumKind(): int
-        {
-        }
+        public function getEnumKind(): int {}
 
         /**
          * @throws Exception
          */
-        public function getArrayElementType(): CType
-        {
-        }
+        public function getArrayElementType(): CType {}
 
         /**
          * @throws Exception
          */
-        public function getArrayLength(): int
-        {
-        }
+        public function getArrayLength(): int {}
 
         /**
          * @throws Exception
          */
-        public function getPointerType(): CType
-        {
-        }
+        public function getPointerType(): CType {}
 
         /**
          * @return list<string>
          *
          * @throws Exception
          */
-        public function getStructFieldNames(): array
-        {
-        }
+        public function getStructFieldNames(): array {}
 
         /**
          * @throws Exception
          */
-        public function getStructFieldOffset(string $name): int
-        {
-        }
+        public function getStructFieldOffset(string $name): int {}
 
         /**
          * @throws Exception
          */
-        public function getStructFieldType(string $name): CType
-        {
-        }
+        public function getStructFieldType(string $name): CType {}
 
         /**
          * @throws Exception
          */
-        public function getFuncABI(): int
-        {
-        }
+        public function getFuncABI(): int {}
 
         /**
          * @throws Exception
          */
-        public function getFuncReturnType(): CType
-        {
-        }
+        public function getFuncReturnType(): CType {}
 
         /**
          * @throws Exception
          */
-        public function getFuncParameterCount(): int
-        {
-        }
+        public function getFuncParameterCount(): int {}
 
         /**
          * @throws Exception
          */
-        public function getFuncParameterType(int $index): CType
-        {
-        }
+        public function getFuncParameterType(int $index): CType {}
     }
 }

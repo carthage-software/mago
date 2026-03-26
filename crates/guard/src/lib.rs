@@ -28,7 +28,6 @@ impl ArchitecturalGuard {
     ///
     /// # Arguments
     ///
-    /// * `arena` - The bump allocator to use for memory management
     /// * `settings` - The guard settings containing architectural rules
     #[must_use]
     pub fn new(settings: Settings) -> Self {
@@ -45,7 +44,7 @@ impl ArchitecturalGuard {
     ///
     /// # Returns
     ///
-    /// A `GuardResult` containing all violations found.
+    /// A `FortressReport` with all violations found and skip status.
     #[must_use]
     pub fn check<'ast, 'arena>(
         &self,
@@ -55,9 +54,30 @@ impl ArchitecturalGuard {
     ) -> FortressReport {
         let mut context = GuardContext::new(resolved_names, &self.settings, codebase);
 
-        DependenciesGuardWalker.walk_program(program, &mut context);
-        StructuralGuardWalker.walk_program(program, &mut context);
+        let mut missing_perimeter_configuration = false;
+        let mut missing_structural_configuration = false;
 
-        context.report()
+        // Run perimeter guard based on settings
+        match self.settings.should_run_perimeter() {
+            Some(true) => DependenciesGuardWalker.walk_program(program, &mut context),
+            Some(false) => missing_perimeter_configuration = true,
+            None => {
+                // Mode doesn't allow perimeter
+            }
+        }
+
+        // Run structural guard based on settings
+        match self.settings.should_run_structural() {
+            Some(true) => StructuralGuardWalker.walk_program(program, &mut context),
+            Some(false) => missing_structural_configuration = true,
+            None => {
+                // Mode doesn't allow structural
+            }
+        }
+
+        let mut report = context.report();
+        report.missing_perimeter_configuration = missing_perimeter_configuration;
+        report.missing_structural_configuration = missing_structural_configuration;
+        report
     }
 }

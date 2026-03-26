@@ -17,5 +17,5 @@ mago-span = { workspace = true }
 mago-syntax = { workspace = true }
 serde = { workspace = true }
 strum = { workspace = true }
-ahash = { workspace = true }
+foldhash = { workspace = true }
 bumpalo = { workspace = true }

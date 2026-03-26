@@ -117,6 +117,17 @@ The variant setting only affects **generation** of new baselines. When **reading
 
 Baseline files created with older versions of Mago (before variant support) don't have a `variant` header. When Mago encounters such a file, it assumes the **strict** variant and displays a warning recommending you regenerate the baseline to add the header.
 
+## Ignoring the Baseline
+
+If you want to temporarily see all issues — including those suppressed by the baseline — you can use the `--ignore-baseline` flag:
+
+```bash
+mago lint --ignore-baseline
+mago analyze --ignore-baseline
+```
+
+This is useful when you want to fix issues that are currently in the baseline without having to edit or remove your baseline file.
+
 ## Maintaining the Baseline
 
 Over time, as you fix issues that are part of the baseline, their entries in the baseline file become "dead" or "stale." Mago will detect this and warn you that your baseline file contains entries for issues that no longer exist.

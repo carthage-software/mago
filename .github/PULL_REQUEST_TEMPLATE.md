@@ -18,7 +18,6 @@
 - [ ] Linter
 - [ ] Formatter
 - [ ] CLI
-- [ ] Composer Plugin
 - [ ] Dependencies
 - [ ] Documentation
 - [ ] Other (please specify):

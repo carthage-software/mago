@@ -17,14 +17,17 @@ use crate::rule::CombineConsecutiveIssetsConfig;
 use crate::rule::Config;
 use crate::rule::ConstantConditionConfig;
 use crate::rule::ConstantNameConfig;
-use crate::rule::ConstantTypeConfig;
 use crate::rule::CyclomaticComplexityConfig;
+use crate::rule::DeprecatedCastConfig;
+use crate::rule::DeprecatedShellExecuteStringConfig;
+use crate::rule::DeprecatedSwitchSemicolonConfig;
 use crate::rule::DisallowedFunctionsConfig;
 use crate::rule::EnumNameConfig;
 use crate::rule::ExcessiveNestingConfig;
 use crate::rule::ExcessiveParameterListConfig;
 use crate::rule::ExplicitNullableParamConfig;
 use crate::rule::ExplicitOctalConfig;
+use crate::rule::FileNameConfig;
 use crate::rule::FinalControllerConfig;
 use crate::rule::FunctionNameConfig;
 use crate::rule::HalsteadConfig;
@@ -42,10 +45,11 @@ use crate::rule::LowercaseKeywordConfig;
 use crate::rule::LowercaseTypeHintConfig;
 use crate::rule::MiddlewareInRoutesConfig;
 use crate::rule::NoAliasFunctionConfig;
+use crate::rule::NoAlternativeSyntaxConfig;
+use crate::rule::NoAssignInArgumentConfig;
 use crate::rule::NoShorthandArrayTypeConfig;
 use crate::rule::NoAssignInConditionConfig;
 use crate::rule::NoBooleanFlagParameterConfig;
-use crate::rule::NoBooleanLiteralComparisonConfig;
 use crate::rule::NoClosingTagConfig;
 use crate::rule::NoDbSchemaChangeConfig;
 use crate::rule::NoDebugSymbolsConfig;
@@ -63,17 +67,22 @@ use crate::rule::NoGotoConfig;
 use crate::rule::NoHashCommentConfig;
 use crate::rule::NoHashEmojiConfig;
 use crate::rule::NoIniSetConfig;
+use crate::rule::NoInlineConfig;
 use crate::rule::NoInsecureComparisonConfig;
+use crate::rule::NoIssetConfig;
 use crate::rule::NoLiteralPasswordConfig;
 use crate::rule::NoMultiAssignmentsConfig;
 use crate::rule::NoNestedTernaryConfig;
 use crate::rule::NoNoopConfig;
+use crate::rule::NoOnlyConfig;
 use crate::rule::NoPhpTagTerminatorConfig;
 use crate::rule::NoProtectedInFinalConfig;
+use crate::rule::NoRedundantBinaryStringPrefixConfig;
 use crate::rule::NoRedundantBlockConfig;
 use crate::rule::NoRedundantContinueConfig;
 use crate::rule::NoRedundantFileConfig;
 use crate::rule::NoRedundantFinalConfig;
+use crate::rule::NoRedundantIssetConfig;
 use crate::rule::NoRedundantLabelConfig;
 use crate::rule::NoRedundantLiteralReturnConfig;
 use crate::rule::NoRedundantMathConfig;
@@ -90,6 +99,7 @@ use crate::rule::NoRequestVariableConfig;
 use crate::rule::NoRolesAsCapabilitiesConfig;
 use crate::rule::NoSelfAssignmentConfig;
 use crate::rule::NoShellExecuteStringConfig;
+use crate::rule::NoShortBoolCastConfig;
 use crate::rule::NoShortOpeningTagConfig;
 use crate::rule::NoShorthandTernaryConfig;
 use crate::rule::NoSprintfConcatConfig;
@@ -100,17 +110,16 @@ use crate::rule::NoUnsafeFinallyConfig;
 use crate::rule::NoVariableVariableConfig;
 use crate::rule::NoVoidReferenceReturnConfig;
 use crate::rule::OptionalParamOrderConfig;
-use crate::rule::ParameterTypeConfig;
 use crate::rule::PreferAnonymousMigrationConfig;
 use crate::rule::PreferArrowFunctionConfig;
 use crate::rule::PreferEarlyContinueConfig;
 use crate::rule::PreferFirstClassCallableConfig;
 use crate::rule::PreferInterfaceConfig;
+use crate::rule::PreferPreIncrementConfig;
 use crate::rule::PreferStaticClosureConfig;
 use crate::rule::PreferViewArrayConfig;
 use crate::rule::PreferWhileLoopConfig;
 use crate::rule::PropertyNameConfig;
-use crate::rule::PropertyTypeConfig;
 use crate::rule::PslArrayFunctionsConfig;
 use crate::rule::PslDataStructuresConfig;
 use crate::rule::PslDatetimeConfig;
@@ -123,13 +132,14 @@ use crate::rule::PslStringFunctionsConfig;
 use crate::rule::ReadableLiteralConfig;
 use crate::rule::RequireNamespaceConfig;
 use crate::rule::RequirePregQuoteDelimiterConfig;
-use crate::rule::ReturnTypeConfig;
 use crate::rule::SensitiveParameterConfig;
+use crate::rule::SingleClassPerFileConfig;
 use crate::rule::StrContainsConfig;
 use crate::rule::StrStartsWithConfig;
 use crate::rule::StrictAssertionsConfig;
 use crate::rule::StrictBehaviorConfig;
 use crate::rule::StrictTypesConfig;
+use crate::rule::SwitchContinueToBreakConfig;
 use crate::rule::TaggedFixmeConfig;
 use crate::rule::TaggedTodoConfig;
 use crate::rule::TaintedDataToSinkConfig;
@@ -138,7 +148,10 @@ use crate::rule::TooManyMethodsConfig;
 use crate::rule::TooManyPropertiesConfig;
 use crate::rule::TraitNameConfig;
 use crate::rule::UseCompoundAssignmentConfig;
+use crate::rule::UseDedicatedExpectationConfig;
+use crate::rule::UseSimplerExpectationConfig;
 use crate::rule::UseSpecificAssertionsConfig;
+use crate::rule::UseSpecificExpectationsConfig;
 use crate::rule::UseWpFunctionsConfig;
 use crate::rule::ValidDocblockConfig;
 use crate::rule::VariableNameConfig;
@@ -158,6 +171,9 @@ pub struct Settings {
 pub struct RuleSettings<C: Config> {
     pub enabled: bool,
 
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub exclude: Vec<String>,
+
     #[serde(flatten)]
     pub config: C,
 }
@@ -166,6 +182,9 @@ pub struct RuleSettings<C: Config> {
 #[serde(default, rename_all = "kebab-case", deny_unknown_fields)]
 pub struct RulesSettings {
     pub ambiguous_function_call: RuleSettings<AmbiguousFunctionCallConfig>,
+    pub use_dedicated_expectation: RuleSettings<UseDedicatedExpectationConfig>,
+    pub use_simpler_expectation: RuleSettings<UseSimplerExpectationConfig>,
+    pub use_specific_expectations: RuleSettings<UseSpecificExpectationsConfig>,
     pub array_style: RuleSettings<ArrayStyleConfig>,
     pub assert_description: RuleSettings<AssertDescriptionConfig>,
     pub assertion_style: RuleSettings<AssertionStyleConfig>,
@@ -174,7 +193,6 @@ pub struct RulesSettings {
     pub class_name: RuleSettings<ClassNameConfig>,
     pub combine_consecutive_issets: RuleSettings<CombineConsecutiveIssetsConfig>,
     pub constant_name: RuleSettings<ConstantNameConfig>,
-    pub constant_type: RuleSettings<ConstantTypeConfig>,
     pub cyclomatic_complexity: RuleSettings<CyclomaticComplexityConfig>,
     pub disallowed_functions: RuleSettings<DisallowedFunctionsConfig>,
     pub enum_name: RuleSettings<EnumNameConfig>,
@@ -193,6 +211,9 @@ pub struct RulesSettings {
     pub no_shorthand_ternary: RuleSettings<NoShorthandTernaryConfig>,
     pub no_sprintf_concat: RuleSettings<NoSprintfConcatConfig>,
     pub optional_param_order: RuleSettings<OptionalParamOrderConfig>,
+    pub deprecated_cast: RuleSettings<DeprecatedCastConfig>,
+    pub deprecated_shell_execute_string: RuleSettings<DeprecatedShellExecuteStringConfig>,
+    pub deprecated_switch_semicolon: RuleSettings<DeprecatedSwitchSemicolonConfig>,
     pub prefer_anonymous_migration: RuleSettings<PreferAnonymousMigrationConfig>,
     pub prefer_first_class_callable: RuleSettings<PreferFirstClassCallableConfig>,
     pub no_void_reference_return: RuleSettings<NoVoidReferenceReturnConfig>,
@@ -200,8 +221,10 @@ pub struct RulesSettings {
     pub no_trailing_space: RuleSettings<NoTrailingSpaceConfig>,
     pub no_redundant_write_visibility: RuleSettings<NoRedundantWriteVisibilityConfig>,
     pub no_redundant_string_concat: RuleSettings<NoRedundantStringConcatConfig>,
+    pub no_redundant_binary_string_prefix: RuleSettings<NoRedundantBinaryStringPrefixConfig>,
     pub no_redundant_parentheses: RuleSettings<NoRedundantParenthesesConfig>,
     pub no_redundant_method_override: RuleSettings<NoRedundantMethodOverrideConfig>,
+    pub no_redundant_isset: RuleSettings<NoRedundantIssetConfig>,
     pub no_redundant_nullsafe: RuleSettings<NoRedundantNullsafeConfig>,
     pub no_redundant_math: RuleSettings<NoRedundantMathConfig>,
     pub no_redundant_label: RuleSettings<NoRedundantLabelConfig>,
@@ -217,6 +240,7 @@ pub struct RulesSettings {
     pub no_protected_in_final: RuleSettings<NoProtectedInFinalConfig>,
     pub no_php_tag_terminator: RuleSettings<NoPhpTagTerminatorConfig>,
     pub no_noop: RuleSettings<NoNoopConfig>,
+    pub no_only: RuleSettings<NoOnlyConfig>,
     pub no_multi_assignments: RuleSettings<NoMultiAssignmentsConfig>,
     pub no_nested_ternary: RuleSettings<NoNestedTernaryConfig>,
     pub no_hash_emoji: RuleSettings<NoHashEmojiConfig>,
@@ -228,13 +252,14 @@ pub struct RulesSettings {
     pub no_eval: RuleSettings<NoEvalConfig>,
     pub no_error_control_operator: RuleSettings<NoErrorControlOperatorConfig>,
     pub no_empty: RuleSettings<NoEmptyConfig>,
+    pub no_isset: RuleSettings<NoIssetConfig>,
     pub no_empty_loop: RuleSettings<NoEmptyLoopConfig>,
     pub no_empty_comment: RuleSettings<NoEmptyCommentConfig>,
     pub no_empty_catch_clause: RuleSettings<NoEmptyCatchClauseConfig>,
     pub no_else_clause: RuleSettings<NoElseClauseConfig>,
     pub no_closing_tag: RuleSettings<NoClosingTagConfig>,
-    pub no_boolean_literal_comparison: RuleSettings<NoBooleanLiteralComparisonConfig>,
     pub no_boolean_flag_parameter: RuleSettings<NoBooleanFlagParameterConfig>,
+    pub no_assign_in_argument: RuleSettings<NoAssignInArgumentConfig>,
     pub no_assign_in_condition: RuleSettings<NoAssignInConditionConfig>,
     pub no_shorthand_array_type: RuleSettings<NoShorthandArrayTypeConfig>,
     pub no_alias_function: RuleSettings<NoAliasFunctionConfig>,
@@ -246,6 +271,7 @@ pub struct RulesSettings {
     pub instanceof_stringable: RuleSettings<InstanceofStringableConfig>,
     pub interface_name: RuleSettings<InterfaceNameConfig>,
     pub invalid_open_tag: RuleSettings<InvalidOpenTagConfig>,
+    pub file_name: RuleSettings<FileNameConfig>,
     pub function_name: RuleSettings<FunctionNameConfig>,
     pub explicit_nullable_param: RuleSettings<ExplicitNullableParamConfig>,
     pub explicit_octal: RuleSettings<ExplicitOctalConfig>,
@@ -264,7 +290,6 @@ pub struct RulesSettings {
     pub psl_regex_functions: RuleSettings<PslRegexFunctionsConfig>,
     pub psl_sleep_functions: RuleSettings<PslSleepFunctionsConfig>,
     pub psl_string_functions: RuleSettings<PslStringFunctionsConfig>,
-    pub return_type: RuleSettings<ReturnTypeConfig>,
     pub str_contains: RuleSettings<StrContainsConfig>,
     pub str_starts_with: RuleSettings<StrStartsWithConfig>,
     pub strict_behavior: RuleSettings<StrictBehaviorConfig>,
@@ -279,13 +304,12 @@ pub struct RulesSettings {
     pub variable_name: RuleSettings<VariableNameConfig>,
     pub constant_condition: RuleSettings<ConstantConditionConfig>,
     pub no_ini_set: RuleSettings<NoIniSetConfig>,
+    pub no_inline: RuleSettings<NoInlineConfig>,
     pub no_insecure_comparison: RuleSettings<NoInsecureComparisonConfig>,
     pub no_literal_password: RuleSettings<NoLiteralPasswordConfig>,
     pub tainted_data_to_sink: RuleSettings<TaintedDataToSinkConfig>,
     pub sensitive_parameter: RuleSettings<SensitiveParameterConfig>,
-    pub parameter_type: RuleSettings<ParameterTypeConfig>,
     pub property_name: RuleSettings<PropertyNameConfig>,
-    pub property_type: RuleSettings<PropertyTypeConfig>,
     pub no_unsafe_finally: RuleSettings<NoUnsafeFinallyConfig>,
     pub strict_assertions: RuleSettings<StrictAssertionsConfig>,
     pub use_specific_assertions: RuleSettings<UseSpecificAssertionsConfig>,
@@ -294,8 +318,13 @@ pub struct RulesSettings {
     pub use_compound_assignment: RuleSettings<UseCompoundAssignmentConfig>,
     pub require_preg_quote_delimiter: RuleSettings<RequirePregQuoteDelimiterConfig>,
     pub require_namespace: RuleSettings<RequireNamespaceConfig>,
+    pub single_class_per_file: RuleSettings<SingleClassPerFileConfig>,
     pub readable_literal: RuleSettings<ReadableLiteralConfig>,
     pub yoda_conditions: RuleSettings<YodaConditionsConfig>,
+    pub no_short_bool_cast: RuleSettings<NoShortBoolCastConfig>,
+    pub no_alternative_syntax: RuleSettings<NoAlternativeSyntaxConfig>,
+    pub prefer_pre_increment: RuleSettings<PreferPreIncrementConfig>,
+    pub switch_continue_to_break: RuleSettings<SwitchContinueToBreakConfig>,
     pub use_wp_functions: RuleSettings<UseWpFunctionsConfig>,
     pub no_direct_db_query: RuleSettings<NoDirectDbQueryConfig>,
     pub no_db_schema_change: RuleSettings<NoDbSchemaChangeConfig>,
@@ -322,6 +351,6 @@ impl Default for Settings {
 
 impl<C: Config> Default for RuleSettings<C> {
     fn default() -> Self {
-        Self { enabled: C::default_enabled(), config: C::default() }
+        Self { enabled: C::default_enabled(), exclude: Vec::new(), config: C::default() }
     }
 }

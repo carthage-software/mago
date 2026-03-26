@@ -10,6 +10,7 @@ use mago_span::HasSpan;
 use mago_span::Span;
 use mago_syntax::ast::Node;
 use mago_syntax::ast::NodeKind;
+use mago_text_edit::TextEdit;
 
 use crate::category::Category;
 use crate::context::LintContext;
@@ -92,10 +93,10 @@ impl LintRule for NoTrailingSpaceRule {
             }
 
             let comment_span = trivia.span();
-            let lines = trivia.value.lines().collect::<Vec<_>>();
+            let value = trivia.value;
 
-            let mut offset = 0;
-            for line in &lines {
+            for line in value.lines() {
+                let offset = (line.as_ptr() as usize) - (value.as_ptr() as usize);
                 let trimmed = line.trim_end();
                 let trimmed_length = trimmed.len();
                 let trailing_whitespace_length = line.len() - trimmed_length;
@@ -119,10 +120,10 @@ impl LintRule for NoTrailingSpaceRule {
                         .with_note("Trailing whitespaces can cause unnecessary diffs and formatting issues.")
                         .with_help("Remove the extra whitespace.");
 
-                    ctx.collector.report(issue);
+                    ctx.collector.propose(issue, |edits| {
+                        edits.push(TextEdit::delete(whitespace_span));
+                    });
                 }
-
-                offset += line.len() + 1;
             }
         }
     }

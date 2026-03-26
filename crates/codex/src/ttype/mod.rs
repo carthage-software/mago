@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::sync::Arc;
 
 use mago_atom::Atom;
 use mago_atom::atom;
@@ -19,6 +20,7 @@ use crate::ttype::atomic::scalar::class_like_string::TClassLikeString;
 use crate::ttype::atomic::scalar::class_like_string::TClassLikeStringKind;
 use crate::ttype::atomic::scalar::int::TInteger;
 use crate::ttype::atomic::scalar::string::TString;
+use crate::ttype::atomic::scalar::string::TStringCasing;
 use crate::ttype::atomic::scalar::string::TStringLiteral;
 use crate::ttype::comparator::ComparisonResult;
 use crate::ttype::comparator::union_comparator;
@@ -49,6 +51,7 @@ use crate::ttype::shared::NEVER_ATOMIC;
 use crate::ttype::shared::NON_EMPTY_LOWERCASE_STRING_ATOMIC;
 use crate::ttype::shared::NON_EMPTY_STRING_ATOMIC;
 use crate::ttype::shared::NON_EMPTY_UNSPECIFIED_LITERAL_STRING_ATOMIC;
+use crate::ttype::shared::NON_EMPTY_UPPERCASE_STRING_ATOMIC;
 use crate::ttype::shared::NON_NEGATIVE_INT_ATOMIC;
 use crate::ttype::shared::NON_POSITIVE_INT_ATOMIC;
 use crate::ttype::shared::NULL_ATOMIC;
@@ -72,10 +75,13 @@ use crate::ttype::shared::STRING_ATOMIC;
 use crate::ttype::shared::TRAIT_STRING_ATOMIC;
 use crate::ttype::shared::TRUE_ATOMIC;
 use crate::ttype::shared::TRUTHY_LOWERCASE_STRING_ATOMIC;
+use crate::ttype::shared::TRUTHY_MIXED_ATOMIC;
 use crate::ttype::shared::TRUTHY_STRING_ATOMIC;
+use crate::ttype::shared::TRUTHY_UPPERCASE_STRING_ATOMIC;
 use crate::ttype::shared::UNSPECIFIED_LITERAL_FLOAT_ATOMIC;
 use crate::ttype::shared::UNSPECIFIED_LITERAL_INT_ATOMIC;
 use crate::ttype::shared::UNSPECIFIED_LITERAL_STRING_ATOMIC;
+use crate::ttype::shared::UPPERCASE_STRING_ATOMIC;
 use crate::ttype::shared::VOID_ATOMIC;
 use crate::ttype::shared::ZERO_INT_ATOMIC;
 use crate::ttype::template::TemplateResult;
@@ -90,6 +96,7 @@ pub mod combiner;
 pub mod comparator;
 pub mod error;
 pub mod expander;
+pub mod flags;
 pub mod resolution;
 pub mod shared;
 pub mod template;
@@ -112,7 +119,7 @@ pub trait TType {
     /// Returns a vector of all child type nodes, including nested ones.
     fn get_all_child_nodes(&self) -> Vec<TypeRef<'_>> {
         let mut child_nodes = self.get_child_nodes();
-        let mut all_child_nodes = vec![];
+        let mut all_child_nodes = Vec::with_capacity(16);
 
         while let Some(child_node) = child_nodes.pop() {
             let new_child_nodes = match child_node {
@@ -465,19 +472,22 @@ pub fn get_string() -> TUnion {
 /// This function maps all possible boolean property combinations to a canonical,
 /// static `TAtomic` instance, avoiding heap allocations for common string types.
 #[must_use]
-pub fn get_string_with_props(is_numeric: bool, is_truthy: bool, is_non_empty: bool, is_lowercase: bool) -> TUnion {
-    let atomic_ref = match (is_numeric, is_truthy, is_non_empty, is_lowercase) {
+pub fn get_string_with_props(is_numeric: bool, is_truthy: bool, is_non_empty: bool, casing: TStringCasing) -> TUnion {
+    let atomic_ref = match (is_numeric, is_truthy, is_non_empty, casing) {
         // is_numeric = true
         (true, true, _, _) => NUMERIC_TRUTHY_STRING_ATOMIC,
         (true, false, _, _) => NUMERIC_STRING_ATOMIC,
         // is_numeric = false, is_truthy = true
-        (false, true, _, false) => TRUTHY_STRING_ATOMIC,
-        (false, true, _, true) => TRUTHY_LOWERCASE_STRING_ATOMIC,
+        (false, true, _, TStringCasing::Unspecified) => TRUTHY_STRING_ATOMIC,
+        (false, true, _, TStringCasing::Uppercase) => TRUTHY_UPPERCASE_STRING_ATOMIC,
+        (false, true, _, TStringCasing::Lowercase) => TRUTHY_LOWERCASE_STRING_ATOMIC,
         // is_numeric = false, is_truthy = false
-        (false, false, false, false) => STRING_ATOMIC,
-        (false, false, false, true) => LOWERCASE_STRING_ATOMIC,
-        (false, false, true, false) => NON_EMPTY_STRING_ATOMIC,
-        (false, false, true, true) => NON_EMPTY_LOWERCASE_STRING_ATOMIC,
+        (false, false, false, TStringCasing::Unspecified) => STRING_ATOMIC,
+        (false, false, false, TStringCasing::Uppercase) => UPPERCASE_STRING_ATOMIC,
+        (false, false, false, TStringCasing::Lowercase) => LOWERCASE_STRING_ATOMIC,
+        (false, false, true, TStringCasing::Unspecified) => NON_EMPTY_STRING_ATOMIC,
+        (false, false, true, TStringCasing::Uppercase) => NON_EMPTY_UPPERCASE_STRING_ATOMIC,
+        (false, false, true, TStringCasing::Lowercase) => NON_EMPTY_LOWERCASE_STRING_ATOMIC,
     };
 
     TUnion::from_single(Cow::Borrowed(atomic_ref))
@@ -567,6 +577,12 @@ pub fn get_literal_float(v: f64) -> TUnion {
 #[must_use]
 pub fn get_mixed() -> TUnion {
     TUnion::from_single(Cow::Borrowed(MIXED_ATOMIC))
+}
+
+#[inline]
+#[must_use]
+pub fn get_truthy_mixed() -> TUnion {
+    TUnion::from_single(Cow::Borrowed(TRUTHY_MIXED_ATOMIC))
 }
 
 #[inline]
@@ -686,6 +702,18 @@ pub fn get_non_empty_lowercase_string() -> TUnion {
 
 #[inline]
 #[must_use]
+pub fn get_uppercase_string() -> TUnion {
+    TUnion::from_single(Cow::Borrowed(UPPERCASE_STRING_ATOMIC))
+}
+
+#[inline]
+#[must_use]
+pub fn get_non_empty_uppercase_string() -> TUnion {
+    TUnion::from_single(Cow::Borrowed(NON_EMPTY_UPPERCASE_STRING_ATOMIC))
+}
+
+#[inline]
+#[must_use]
 pub fn get_non_empty_string() -> TUnion {
     TUnion::from_single(Cow::Borrowed(NON_EMPTY_STRING_ATOMIC))
 }
@@ -766,13 +794,14 @@ pub fn get_mixed_closure() -> TUnion {
 #[must_use]
 pub fn get_named_object(name: Atom, type_resolution_context: Option<&TypeResolutionContext>) -> TUnion {
     if let Some(type_resolution_context) = type_resolution_context
-        && let Some(defining_entities) = type_resolution_context.get_template_definition(&name)
+        && let Some(defining_entities) = type_resolution_context.get_template_definition(name)
     {
+        let first = &defining_entities[0];
         return wrap_atomic(TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::Generic {
             kind: TClassLikeStringKind::Class,
             parameter_name: name,
-            defining_entity: defining_entities[0].0,
-            constraint: Box::new((*(defining_entities[0].1.get_single())).clone()),
+            defining_entity: first.defining_entity,
+            constraint: Arc::new((*(first.constraint.get_single())).clone()),
         })));
     }
 
@@ -782,34 +811,38 @@ pub fn get_named_object(name: Atom, type_resolution_context: Option<&TypeResolut
 #[inline]
 #[must_use]
 pub fn get_iterable(key_parameter: TUnion, value_parameter: TUnion) -> TUnion {
-    wrap_atomic(TAtomic::Iterable(TIterable::new(Box::new(key_parameter), Box::new(value_parameter))))
+    wrap_atomic(TAtomic::Iterable(TIterable::new(Arc::new(key_parameter), Arc::new(value_parameter))))
 }
 
 #[inline]
 #[must_use]
 pub fn get_list(element_type: TUnion) -> TUnion {
-    wrap_atomic(TAtomic::Array(TArray::List(TList::new(Box::new(element_type)))))
+    wrap_atomic(TAtomic::Array(TArray::List(TList::new(Arc::new(element_type)))))
 }
 
 #[inline]
 #[must_use]
 pub fn get_non_empty_list(element_type: TUnion) -> TUnion {
-    wrap_atomic(TAtomic::Array(TArray::List(TList::new_non_empty(Box::new(element_type)))))
+    wrap_atomic(TAtomic::Array(TArray::List(TList::new_non_empty(Arc::new(element_type)))))
 }
 
 #[inline]
 #[must_use]
 pub fn get_keyed_array(key_parameter: TUnion, value_parameter: TUnion) -> TUnion {
     wrap_atomic(TAtomic::Array(TArray::Keyed(TKeyedArray::new_with_parameters(
-        Box::new(key_parameter),
-        Box::new(value_parameter),
+        Arc::new(key_parameter),
+        Arc::new(value_parameter),
     ))))
 }
 
 #[inline]
 #[must_use]
 pub fn add_optional_union_type(base_type: TUnion, maybe_type: Option<&TUnion>, codebase: &CodebaseMetadata) -> TUnion {
-    if let Some(type_2) = maybe_type { add_union_type(base_type, type_2, codebase, false) } else { base_type }
+    if let Some(type_2) = maybe_type {
+        add_union_type(base_type, type_2, codebase, combiner::CombinerOptions::default())
+    } else {
+        base_type
+    }
 }
 
 #[inline]
@@ -820,7 +853,9 @@ pub fn combine_optional_union_types(
     codebase: &CodebaseMetadata,
 ) -> TUnion {
     match (type_1, type_2) {
-        (Some(type_1), Some(type_2)) => combine_union_types(type_1, type_2, codebase, false),
+        (Some(type_1), Some(type_2)) => {
+            combine_union_types(type_1, type_2, codebase, combiner::CombinerOptions::default())
+        }
         (Some(type_1), None) => type_1.clone(),
         (None, Some(type_2)) => type_2.clone(),
         (None, None) => get_mixed(),
@@ -833,7 +868,7 @@ pub fn combine_union_types(
     type_1: &TUnion,
     type_2: &TUnion,
     codebase: &CodebaseMetadata,
-    overwrite_empty_array: bool,
+    options: combiner::CombinerOptions,
 ) -> TUnion {
     if type_1 == type_2 {
         return type_1.clone();
@@ -849,7 +884,7 @@ pub fn combine_union_types(
         let mut all_atomic_types = type_1.types.to_vec();
         all_atomic_types.extend(type_2.types.iter().cloned());
 
-        let mut result = TUnion::from_vec(combiner::combine(all_atomic_types, codebase, overwrite_empty_array));
+        let mut result = TUnion::from_vec(combiner::combine(all_atomic_types, codebase, options));
 
         if type_1.had_template() && type_2.had_template() {
             result.set_had_template(true);
@@ -883,13 +918,13 @@ pub fn add_union_type(
     mut base_type: TUnion,
     other_type: &TUnion,
     codebase: &CodebaseMetadata,
-    overwrite_empty_array: bool,
+    options: combiner::CombinerOptions,
 ) -> TUnion {
     if &base_type != other_type {
         base_type.types = if base_type.is_vanilla_mixed() && other_type.is_vanilla_mixed() {
             base_type.types
         } else {
-            combine_union_types(&base_type, other_type, codebase, overwrite_empty_array).types
+            combine_union_types(&base_type, other_type, codebase, options).types
         };
 
         if !other_type.had_template() {
@@ -952,7 +987,7 @@ pub fn intersect_union_types(type_1: &TUnion, type_2: &TUnion, codebase: &Codeba
 
     let mut combined_type: Option<TUnion> = None;
     if !intersected_atomic_types.is_empty() {
-        let combined_vec = combiner::combine(intersected_atomic_types, codebase, false);
+        let combined_vec = combiner::combine(intersected_atomic_types, codebase, combiner::CombinerOptions::default());
         if !combined_vec.is_empty() {
             combined_type = Some(TUnion::from_vec(combined_vec));
         }
@@ -1105,7 +1140,11 @@ fn intersect_atomic_types(
             is_numeric: s1.is_numeric || s2.is_numeric,
             is_truthy: s1.is_truthy || s2.is_truthy,
             is_non_empty: s1.is_non_empty || s2.is_non_empty,
-            is_lowercase: s1.is_lowercase || s2.is_lowercase,
+            casing: match (s1.casing, s2.casing) {
+                (TStringCasing::Lowercase, TStringCasing::Lowercase) => TStringCasing::Lowercase,
+                (TStringCasing::Uppercase, TStringCasing::Uppercase) => TStringCasing::Uppercase,
+                _ => TStringCasing::Unspecified,
+            },
             literal: if s1.is_literal_origin() && s2.is_literal_origin() {
                 Some(TStringLiteral::Unspecified)
             } else {
@@ -1178,17 +1217,17 @@ pub fn get_iterable_parameters(atomic: &TAtomic, codebase: &CodebaseMetadata) ->
                 let iterator = atom("iterator");
                 let iterator_aggregate = atom("iteratoraggregate");
 
-                let class_metadata = codebase.get_class_like(name)?;
+                let class_metadata = codebase.get_class_like(&name)?;
                 if !codebase.is_instance_of(&class_metadata.name, &traversable) {
                     break 'parameters None;
                 }
 
-                let is_iterator_interface = name == &iterator || name == &traversable || name == &iterator_aggregate;
+                let is_iterator_interface = name == iterator || name == traversable || name == iterator_aggregate;
                 if !is_iterator_interface
                     && codebase.is_instance_of(&class_metadata.name, &iterator)
                     && let (Some(key_type), Some(value_type)) = (
-                        get_iterator_method_return_type(codebase, *name, "key"),
-                        get_iterator_method_return_type(codebase, *name, "current"),
+                        get_iterator_method_return_type(codebase, name, "key"),
+                        get_iterator_method_return_type(codebase, name, "current"),
                     )
                 {
                     let contains_generic_param = |t: &TUnion| t.types.iter().any(atomic::TAtomic::is_generic_parameter);
@@ -1203,13 +1242,13 @@ pub fn get_iterable_parameters(atomic: &TAtomic, codebase: &CodebaseMetadata) ->
                 }
 
                 let traversable_metadata = codebase.get_class_like(&traversable)?;
-                let key_template = traversable_metadata.template_types.first().map(|(name, _)| name)?;
-                let value_template = traversable_metadata.template_types.get(1).map(|(name, _)| name)?;
+                let key_template = traversable_metadata.template_types.get_index(0).map(|(name, _)| *name)?;
+                let value_template = traversable_metadata.template_types.get_index(1).map(|(name, _)| *name)?;
 
                 let key_type = get_specialized_template_type(
                     codebase,
                     key_template,
-                    &traversable,
+                    traversable,
                     class_metadata,
                     object.get_type_parameters(),
                 )
@@ -1218,7 +1257,7 @@ pub fn get_iterable_parameters(atomic: &TAtomic, codebase: &CodebaseMetadata) ->
                 let value_type = get_specialized_template_type(
                     codebase,
                     value_template,
-                    &traversable,
+                    traversable,
                     class_metadata,
                     object.get_type_parameters(),
                 )
@@ -1263,11 +1302,12 @@ pub fn get_array_parameters(array_type: &TArray, codebase: &CodebaseMetadata) ->
             if let Some(known_items) = &keyed_data.known_items {
                 for (key, (_, item_type)) in known_items {
                     key_types.push(key.to_atomic());
-                    value_param = add_union_type(value_param, item_type, codebase, false);
+                    value_param =
+                        add_union_type(value_param, item_type, codebase, combiner::CombinerOptions::default());
                 }
             }
 
-            let combined_key_types = combiner::combine(key_types, codebase, false);
+            let combined_key_types = combiner::combine(key_types, codebase, combiner::CombinerOptions::default());
             let key_param_union = TUnion::from_vec(combined_key_types);
 
             (key_param_union, value_param)
@@ -1280,7 +1320,8 @@ pub fn get_array_parameters(array_type: &TArray, codebase: &CodebaseMetadata) ->
                 for (key_idx, (_, element_type)) in known_elements {
                     key_types.push(TAtomic::Scalar(TScalar::literal_int(*key_idx as i64)));
 
-                    value_type = combine_union_types(element_type, &value_type, codebase, false);
+                    value_type =
+                        combine_union_types(element_type, &value_type, codebase, combiner::CombinerOptions::default());
                 }
             }
 
@@ -1292,7 +1333,8 @@ pub fn get_array_parameters(array_type: &TArray, codebase: &CodebaseMetadata) ->
                 }
             }
 
-            let key_type = TUnion::from_vec(combiner::combine(key_types, codebase, false));
+            let key_type =
+                TUnion::from_vec(combiner::combine(key_types, codebase, combiner::CombinerOptions::default()));
 
             (key_type, value_type)
         }
@@ -1312,18 +1354,18 @@ pub fn get_iterable_value_parameter(atomic: &TAtomic, codebase: &CodebaseMetadat
             let name = object.get_name()?;
             let traversable = atom("traversable");
 
-            let class_metadata = codebase.get_class_like(name)?;
+            let class_metadata = codebase.get_class_like(&name)?;
             if !codebase.is_instance_of(&class_metadata.name, &traversable) {
                 return None;
             }
 
             let traversable_metadata = codebase.get_class_like(&traversable)?;
-            let value_template = traversable_metadata.template_types.get(1).map(|(name, _)| name)?;
+            let value_template = traversable_metadata.template_types.get_index(1).map(|(name, _)| *name)?;
 
             get_specialized_template_type(
                 codebase,
                 value_template,
-                &traversable,
+                traversable,
                 class_metadata,
                 object.get_type_parameters(),
             )
@@ -1360,7 +1402,8 @@ pub fn get_array_value_parameter(array_type: &TArray, codebase: &CodebaseMetadat
 
             if let Some(known_items) = &keyed_data.known_items {
                 for (_, item_type) in known_items.values() {
-                    value_param = combine_union_types(item_type, &value_param, codebase, false);
+                    value_param =
+                        combine_union_types(item_type, &value_param, codebase, combiner::CombinerOptions::default());
                 }
             }
 
@@ -1371,7 +1414,8 @@ pub fn get_array_value_parameter(array_type: &TArray, codebase: &CodebaseMetadat
 
             if let Some(known_elements) = &list_data.known_elements {
                 for (_, element_type) in known_elements.values() {
-                    value_param = combine_union_types(element_type, &value_param, codebase, false);
+                    value_param =
+                        combine_union_types(element_type, &value_param, codebase, combiner::CombinerOptions::default());
                 }
             }
 
@@ -1387,19 +1431,19 @@ pub fn get_array_value_parameter(array_type: &TArray, codebase: &CodebaseMetadat
 #[must_use]
 pub fn get_specialized_template_type(
     codebase: &CodebaseMetadata,
-    template_name: &Atom,
-    template_defining_class_id: &Atom,
+    template_name: Atom,
+    template_defining_class_id: Atom,
     instantiated_class_metadata: &ClassLikeMetadata,
     instantiated_type_parameters: Option<&[TUnion]>,
 ) -> Option<TUnion> {
-    let defining_class_metadata = codebase.get_class_like(template_defining_class_id)?;
+    let defining_class_metadata = codebase.get_class_like(&template_defining_class_id)?;
 
     if defining_class_metadata.name == instantiated_class_metadata.name {
         let index = instantiated_class_metadata.get_template_index_for_name(template_name)?;
 
         let Some(instantiated_type_parameters) = instantiated_type_parameters else {
-            let type_map = instantiated_class_metadata.get_template_type(template_name)?;
-            let mut result = type_map.first().map(|(_, constraint)| constraint).cloned()?;
+            let template = instantiated_class_metadata.get_template_type(template_name)?;
+            let mut result = template.constraint.clone();
 
             expander::expand_union(codebase, &mut result, &TypeExpansionOptions::default());
 
@@ -1413,24 +1457,17 @@ pub fn get_specialized_template_type(
         return Some(result);
     }
 
-    let defining_template_type = defining_class_metadata.get_template_type(template_name)?;
-    let template_union = TUnion::from_vec(
-        defining_template_type
-            .iter()
-            .map(|(defining_entity, constraint)| {
-                TAtomic::GenericParameter(TGenericParameter {
-                    parameter_name: *template_name,
-                    defining_entity: *defining_entity,
-                    constraint: Box::new(constraint.clone()),
-                    intersection_types: None,
-                })
-            })
-            .collect::<Vec<_>>(),
-    );
+    let template = defining_class_metadata.get_template_type(template_name)?;
+    let template_union = wrap_atomic(TAtomic::GenericParameter(TGenericParameter {
+        parameter_name: template_name,
+        defining_entity: template.defining_entity,
+        constraint: Arc::new(template.constraint.clone()),
+        intersection_types: None,
+    }));
 
     let mut template_result = TemplateResult::default();
-    for (defining_class, type_parameters_map) in &instantiated_class_metadata.template_extended_parameters {
-        for (parameter_name, parameter_type) in type_parameters_map {
+    for (defining_class, template_parameters) in &instantiated_class_metadata.template_extended_parameters {
+        for (parameter_name, parameter_type) in template_parameters {
             template_result.add_lower_bound(
                 *parameter_name,
                 GenericParent::ClassLike(*defining_class),

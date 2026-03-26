@@ -3,9 +3,7 @@
 /**
  * @return resource|false
  */
-function radius_acct_open()
-{
-}
+function radius_acct_open() {}
 
 /**
  * @param resource $radius_handle
@@ -17,25 +15,19 @@ function radius_acct_open()
  *
  * @return bool
  */
-function radius_add_server($radius_handle, $hostname, $port, $secret, $timeout, $max_tries)
-{
-}
+function radius_add_server($radius_handle, $hostname, $port, $secret, $timeout, $max_tries) {}
 
 /**
  * @return resource|false
  */
-function radius_auth_open()
-{
-}
+function radius_auth_open() {}
 
 /**
  * @param resource $radius_handle
  *
  * @return bool
  */
-function radius_close($radius_handle)
-{
-}
+function radius_close($radius_handle) {}
 
 /**
  * @param resource $radius_handle
@@ -43,9 +35,7 @@ function radius_close($radius_handle)
  *
  * @return bool
  */
-function radius_config($radius_handle, $file)
-{
-}
+function radius_config($radius_handle, $file) {}
 
 /**
  * @param resource $radius_handle
@@ -53,9 +43,7 @@ function radius_config($radius_handle, $file)
  *
  * @return bool
  */
-function radius_create_request($radius_handle, $type)
-{
-}
+function radius_create_request($radius_handle, $type) {}
 
 const RADIUS_MPPE_KEY_LEN = 16;
 

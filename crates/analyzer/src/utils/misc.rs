@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-use ahash::HashMap;
+use foldhash::HashMap;
 
 use mago_algebra::AlgebraThresholds;
 use mago_algebra::clause::Clause;

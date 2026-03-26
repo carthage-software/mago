@@ -25,3 +25,12 @@ $options = $this->multiple
                 'ctrl+c' => 'cancel',
             ];
         }
+
+function getControlsInline(): array
+{
+    return [
+        ...($this->bufferEnabled ? ['esc' => 'select', 'tab' => 'next', 'shift+tab' => 'prev'] : ['/' => 'filter', 'space' => 'select', 'tab' => 'next', 'shift+tab' => 'prev']),
+        'up' => 'up',
+        'down' => 'down',
+    ];
+}

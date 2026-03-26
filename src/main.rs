@@ -52,6 +52,7 @@ use crate::config::Configuration;
 use crate::consts::MAXIMUM_PHP_VERSION;
 use crate::consts::MINIMUM_PHP_VERSION;
 use crate::error::Error;
+use crate::utils::configure_colors;
 use crate::utils::logger::initialize_logger;
 
 mod baseline;
@@ -61,9 +62,13 @@ mod consts;
 mod error;
 mod macros;
 mod service;
+mod updater;
 mod utils;
 
-#[cfg(all(not(feature = "dhat-heap"), any(target_os = "macos", target_os = "windows", target_env = "musl")))]
+#[cfg(all(
+    not(feature = "dhat-heap"),
+    any(target_os = "macos", target_os = "windows", target_env = "musl", target_env = "gnu")
+))]
 #[global_allocator]
 static ALLOC: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
@@ -133,6 +138,11 @@ pub fn main() -> ExitCode {
 #[inline(always)]
 pub fn run() -> Result<ExitCode, Error> {
     let arguments = CliArguments::parse();
+
+    // Configure global color settings based on the color choice.
+    // This must be done before initializing the logger or any other
+    // component that uses colors.
+    configure_colors(arguments.colors);
 
     initialize_logger(
         if cfg!(debug_assertions) { LevelFilter::DEBUG } else { LevelFilter::INFO },

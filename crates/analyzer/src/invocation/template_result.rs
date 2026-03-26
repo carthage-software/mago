@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use ahash::RandomState;
+use foldhash::fast::RandomState;
 use indexmap::IndexMap;
 
 use mago_atom::Atom;
@@ -13,10 +13,11 @@ use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::comparator::ComparisonResult;
 use mago_codex::ttype::comparator::union_comparator;
 use mago_codex::ttype::expander::StaticClassType;
+use mago_codex::ttype::get_specialized_template_type;
+use mago_codex::ttype::template::GenericTemplate;
 use mago_codex::ttype::template::TemplateBound;
 use mago_codex::ttype::template::TemplateResult;
 use mago_codex::ttype::template::standin_type_replacer::get_most_specific_type_from_bounds;
-use mago_codex::ttype::union::TUnion;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::Span;
@@ -55,30 +56,91 @@ pub fn populate_template_result_from_invocation<'ctx, 'arena>(
     };
 
     for (template_name, template_details) in &metadata.template_types {
-        template_result.template_types.insert(*template_name, template_details.clone());
+        template_result.template_types.entry(*template_name).or_default().push(template_details.clone());
     }
 
     let Some(method_metadata) = &metadata.method_metadata else {
         return;
     };
 
-    if method_metadata.is_static {
-        return;
-    }
-
     let Some(method_context) = method_context else {
         return;
     };
 
-    let StaticClassType::Object(TObject::Named(instance_type)) = &method_context.class_type else {
+    if method_metadata.is_static {
+        let Some(identifier) = method_context.declaring_method_id else {
+            return;
+        };
+
+        let Some(declaring_class_metadata) = context.codebase.get_class_like(&identifier.get_class_name()) else {
+            return;
+        };
+
+        for (template_name, template_details) in &declaring_class_metadata.template_types {
+            if !template_result.template_types.contains_key(template_name) {
+                template_result.template_types.entry(*template_name).or_default().push(template_details.clone());
+            }
+        }
+
+        if declaring_class_metadata.name != method_context.class_like_metadata.name {
+            for (template_name, _) in &declaring_class_metadata.template_types {
+                let template_type = get_specialized_template_type(
+                    context.codebase,
+                    *template_name,
+                    declaring_class_metadata.name,
+                    method_context.class_like_metadata,
+                    None,
+                );
+
+                if let Some(template_type) = template_type {
+                    template_result.add_lower_bound(
+                        *template_name,
+                        GenericParent::ClassLike(declaring_class_metadata.name),
+                        template_type,
+                    );
+                }
+            }
+        }
+
+        if let StaticClassType::Object(TObject::Named(instance_type)) = &method_context.class_type
+            && !instance_type.name.eq_ignore_ascii_case(&declaring_class_metadata.original_name)
+            && let Some(calling_class_metadata) = context.codebase.get_class_like(&instance_type.name)
+        {
+            for (template_name, _) in &declaring_class_metadata.template_types {
+                if template_result.lower_bounds.get(template_name).is_some_and(|m| !m.is_empty()) {
+                    continue;
+                }
+
+                let template_type = get_specialized_template_type(
+                    context.codebase,
+                    *template_name,
+                    declaring_class_metadata.name,
+                    calling_class_metadata,
+                    instance_type.type_parameters.as_deref(),
+                );
+
+                if let Some(template_type) = template_type {
+                    template_result.add_lower_bound(
+                        *template_name,
+                        GenericParent::ClassLike(declaring_class_metadata.name),
+                        template_type,
+                    );
+                }
+            }
+        }
+
         return;
-    };
+    }
 
     for (template_name, template_details) in &method_context.class_like_metadata.template_types {
         if !template_result.template_types.contains_key(template_name) {
-            template_result.template_types.insert(*template_name, template_details.clone());
+            template_result.template_types.entry(*template_name).or_default().push(template_details.clone());
         }
     }
+
+    let StaticClassType::Object(TObject::Named(instance_type)) = &method_context.class_type else {
+        return;
+    };
 
     if let Some(type_parameters) = &instance_type.type_parameters {
         for (template_index, template_type) in type_parameters.iter().enumerate() {
@@ -100,11 +162,37 @@ pub fn populate_template_result_from_invocation<'ctx, 'arena>(
         }
     }
 
+    if !instance_type.name.eq_ignore_ascii_case(&method_context.class_like_metadata.original_name)
+        && let Some(calling_class_metadata) = context.codebase.get_class_like(&instance_type.name)
+    {
+        for (template_name, _) in &method_context.class_like_metadata.template_types {
+            if template_result.lower_bounds.get(template_name).is_some_and(|m| !m.is_empty()) {
+                continue;
+            }
+
+            let template_type = get_specialized_template_type(
+                context.codebase,
+                *template_name,
+                method_context.class_like_metadata.name,
+                calling_class_metadata,
+                instance_type.type_parameters.as_deref(),
+            );
+
+            if let Some(template_type) = template_type {
+                template_result.add_lower_bound(
+                    *template_name,
+                    GenericParent::ClassLike(method_context.class_like_metadata.name),
+                    template_type,
+                );
+            }
+        }
+    }
+
     let Some(identifier) = method_context.declaring_method_id else {
         return;
     };
 
-    let Some(metadata) = context.codebase.get_class_like(identifier.get_class_name()) else {
+    let Some(metadata) = context.codebase.get_class_like(&identifier.get_class_name()) else {
         return;
     };
 
@@ -136,9 +224,9 @@ pub fn populate_template_result_from_invocation<'ctx, 'arena>(
 pub(super) fn get_class_template_parameters_from_result(
     template_result: &TemplateResult,
     context: &Context<'_, '_>,
-) -> IndexMap<Atom, Vec<(GenericParent, TUnion)>, RandomState> {
-    let mut class_generic_parameters: IndexMap<Atom, Vec<(GenericParent, TUnion)>, RandomState> =
-        IndexMap::with_hasher(RandomState::new());
+) -> IndexMap<Atom, Vec<GenericTemplate>, RandomState> {
+    let mut class_generic_parameters: IndexMap<Atom, Vec<GenericTemplate>, RandomState> =
+        IndexMap::with_hasher(RandomState::default());
 
     for (template_name, type_map) in &template_result.lower_bounds {
         for (generic_parent, lower_bounds) in type_map {
@@ -148,7 +236,7 @@ pub(super) fn get_class_template_parameters_from_result(
                 class_generic_parameters
                     .entry(*template_name)
                     .or_default()
-                    .push((*generic_parent, specific_bound_type));
+                    .push(GenericTemplate::new(*generic_parent, specific_bound_type));
             }
         }
     }
@@ -175,7 +263,7 @@ pub(super) fn refine_template_result_for_function_like<'ctx>(
     base_class_metadata: Option<&'ctx ClassLikeMetadata>,
     calling_class_like_metadata: Option<&'ctx ClassLikeMetadata>,
     function_like_metadata: &'ctx FunctionLikeMetadata,
-    class_template_parameters: &IndexMap<Atom, Vec<(GenericParent, TUnion)>, RandomState>,
+    class_template_parameters: &IndexMap<Atom, Vec<GenericTemplate>, RandomState>,
 ) {
     if !template_result.template_types.is_empty() {
         return;
@@ -196,7 +284,15 @@ pub(super) fn refine_template_result_for_function_like<'ctx>(
 
     template_result.template_types = resolved_template_types
         .into_iter()
-        .map(|(template_name, type_map)| (template_name, type_map.into_iter().collect()))
+        .map(|(template_name, type_map)| {
+            (
+                template_name,
+                type_map
+                    .into_iter()
+                    .map(|(source, template_type)| GenericTemplate::new(source, template_type))
+                    .collect(),
+            )
+        })
         .collect::<IndexMap<_, _, RandomState>>();
 }
 

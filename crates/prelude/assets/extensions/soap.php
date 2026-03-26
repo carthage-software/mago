@@ -1,63 +1,42 @@
 <?php
 
 namespace Soap {
-    final class Url
-    {
-    }
+    final class Url {}
 
-    final class Sdl
-    {
-    }
+    final class Sdl {}
 }
 
 namespace {
     class SoapClient
     {
-        public function __construct(string|null $wsdl, array $options = []) {}
+        public function __construct(?string $wsdl, array $options = []) {}
 
         /**
          * @deprecated
          */
-        public function __call(string $name, array $args): mixed
-        {
-        }
+        public function __call(string $name, array $args): mixed {}
 
         public function __soapCall(
             string $name,
             array $args,
-            array|null $options = null,
+            ?array $options = null,
             $inputHeaders = null,
             &$outputHeaders = null,
-        ): mixed {
-        }
+        ): mixed {}
 
-        public function __getLastRequest(): null|string
-        {
-        }
+        public function __getLastRequest(): ?string {}
 
-        public function __getLastResponse(): null|string
-        {
-        }
+        public function __getLastResponse(): ?string {}
 
-        public function __getLastRequestHeaders(): null|string
-        {
-        }
+        public function __getLastRequestHeaders(): ?string {}
 
-        public function __getLastResponseHeaders(): null|string
-        {
-        }
+        public function __getLastResponseHeaders(): ?string {}
 
-        public function __getFunctions(): null|array
-        {
-        }
+        public function __getFunctions(): ?array {}
 
-        public function __getTypes(): null|array
-        {
-        }
+        public function __getTypes(): ?array {}
 
-        public function __getCookies(): array
-        {
-        }
+        public function __getCookies(): array {}
 
         public function __doRequest(
             string $request,
@@ -65,20 +44,13 @@ namespace {
             string $action,
             int $version,
             bool $oneWay = false,
-        ): null|string {
-        }
+        ): ?string {}
 
-        public function __setCookie(string $name, null|string $value): void
-        {
-        }
+        public function __setCookie(string $name, ?string $value): void {}
 
-        public function __setLocation(string|null $location = null): null|string
-        {
-        }
+        public function __setLocation(?string $location = null): ?string {}
 
-        public function __setSoapHeaders($headers = null): bool
-        {
-        }
+        public function __setSoapHeaders($headers = null): bool {}
     }
 
     class SoapVar
@@ -87,51 +59,39 @@ namespace {
 
         public mixed $enc_value;
 
-        public string|null $enc_stype;
+        public ?string $enc_stype;
 
-        public string|null $enc_ns;
+        public ?string $enc_ns;
 
-        public string|null $enc_name;
+        public ?string $enc_name;
 
-        public string|null $enc_namens;
+        public ?string $enc_namens;
 
         public function __construct(
             mixed $data,
-            int|null $encoding,
-            null|string $typeName,
-            string|null $typeNamespace = null,
-            string|null $nodeName = null,
-            string|null $nodeNamespace = null,
+            ?int $encoding,
+            ?string $typeName,
+            ?string $typeNamespace = null,
+            ?string $nodeName = null,
+            ?string $nodeNamespace = null,
         ) {}
     }
 
     class SoapServer
     {
-        public function __construct(string|null $wsdl, array $options = []) {}
+        public function __construct(?string $wsdl, array $options = []) {}
 
-        public function setPersistence(int $mode): void
-        {
-        }
+        public function setPersistence(int $mode): void {}
 
-        public function setClass(string $class, mixed ...$args): void
-        {
-        }
+        public function setClass(string $class, mixed ...$args): void {}
 
-        public function setObject(object $object): void
-        {
-        }
+        public function setObject(object $object): void {}
 
-        public function addFunction($functions): void
-        {
-        }
+        public function addFunction($functions): void {}
 
-        public function getFunctions(): array
-        {
-        }
+        public function getFunctions(): array {}
 
-        public function handle(string|null $request = null): void
-        {
-        }
+        public function handle(?string $request = null): void {}
 
         public function fault(
             string $code,
@@ -139,28 +99,23 @@ namespace {
             string $actor = '',
             mixed $details = null,
             string $name = '',
-        ): void {
-        }
+        ): void {}
 
-        public function addSoapHeader(SoapHeader $header): void
-        {
-        }
+        public function addSoapHeader(SoapHeader $header): void {}
 
-        public function __getLastResponse(): null|string
-        {
-        }
+        public function __getLastResponse(): ?string {}
     }
 
     class SoapFault extends Exception
     {
-        public null|string $faultcode;
+        public ?string $faultcode;
 
         /**
          * @var string
          */
         public string $faultstring;
 
-        public null|string $faultactor;
+        public ?string $faultactor;
 
         public mixed $detail;
 
@@ -168,22 +123,20 @@ namespace {
 
         public mixed $headerfault;
 
-        public string|null $faultcodens;
+        public ?string $faultcodens;
 
-        public string|null $_name;
+        public ?string $_name;
 
         public function __construct(
             array|string|null $code,
             string $string,
-            string|null $actor = null,
+            ?string $actor = null,
             mixed $details = null,
-            string|null $name = null,
+            ?string $name = null,
             mixed $headerFault = null,
         ) {}
 
-        public function __toString(): string
-        {
-        }
+        public function __toString(): string {}
     }
 
     class SoapParam
@@ -224,9 +177,7 @@ namespace {
      * </p>
      * @return bool the original value.
      */
-    function use_soap_error_handler(bool $enable = true): bool
-    {
-    }
+    function use_soap_error_handler(bool $enable = true): bool {}
 
     /**
      * Checks if a SOAP call has failed
@@ -236,9 +187,7 @@ namespace {
      * </p>
      * @return bool This will return <b>TRUE</b> on error, and <b>FALSE</b> otherwise.
      */
-    function is_soap_fault(mixed $object): bool
-    {
-    }
+    function is_soap_fault(mixed $object): bool {}
 
     const SOAP_1_1 = 1;
 

@@ -18,7 +18,7 @@ function i_take_int(int $a): void
  * @method int b(int $a) with types
  * @method static int c(int $a) with static
  * @method static int d(callable(int): int $callable) with static and callable param
- * @method private static int f() private method
+ * @method private static int _f() private method
  */
 class Test
 {
@@ -60,7 +60,7 @@ Test::x();
 Test::a(10);
 
 /** @mago-expect analysis:invalid-method-access */
-Test::f();
+Test::_f();
 
 class X
 {

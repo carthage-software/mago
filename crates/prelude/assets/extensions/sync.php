@@ -14,18 +14,14 @@ class SyncMutex
      *
      * @return bool
      */
-    public function lock($wait = -1)
-    {
-    }
+    public function lock($wait = -1) {}
 
     /**
      * @param bool $all
      *
      * @return bool
      */
-    public function unlock($all = false)
-    {
-    }
+    public function unlock($all = false) {}
 }
 
 class SyncSemaphore
@@ -44,18 +40,14 @@ class SyncSemaphore
      *
      * @return bool
      */
-    public function lock($wait = -1)
-    {
-    }
+    public function lock($wait = -1) {}
 
     /**
      * @param-out int $prevcount
      *
      * @return bool
      */
-    public function unlock(&$prevcount = 0)
-    {
-    }
+    public function unlock(&$prevcount = 0) {}
 }
 
 class SyncEvent
@@ -72,25 +64,19 @@ class SyncEvent
     /**
      * @return bool
      */
-    public function fire()
-    {
-    }
+    public function fire() {}
 
     /**
      * @return bool
      */
-    public function reset()
-    {
-    }
+    public function reset() {}
 
     /**
      * @param int $wait
      *
      * @return bool
      */
-    public function wait($wait = -1)
-    {
-    }
+    public function wait($wait = -1) {}
 }
 
 class SyncReaderWriter
@@ -108,32 +94,24 @@ class SyncReaderWriter
      *
      * @return bool
      */
-    public function readlock($wait = -1)
-    {
-    }
+    public function readlock($wait = -1) {}
 
     /**
      * @return bool
      */
-    public function readunlock()
-    {
-    }
+    public function readunlock() {}
 
     /**
      * @param int $wait
      *
      * @return bool
      */
-    public function writelock($wait = -1)
-    {
-    }
+    public function writelock($wait = -1) {}
 
     /**
      * @return bool
      */
-    public function writeunlock()
-    {
-    }
+    public function writeunlock() {}
 }
 
 class SyncSharedMemory
@@ -149,9 +127,7 @@ class SyncSharedMemory
     /**
      * @return bool
      */
-    public function first()
-    {
-    }
+    public function first() {}
 
     /**
      * @param int $start
@@ -159,16 +135,12 @@ class SyncSharedMemory
      *
      * @return string
      */
-    public function read($start = 0, $length)
-    {
-    }
+    public function read($start = 0, $length) {}
 
     /**
      * @return int
      */
-    public function size()
-    {
-    }
+    public function size() {}
 
     /**
      * @param string $string
@@ -176,7 +148,5 @@ class SyncSharedMemory
      *
      * @return int
      */
-    public function write($string, $start = 0)
-    {
-    }
+    public function write($string, $start = 0) {}
 }

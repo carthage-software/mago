@@ -71,7 +71,7 @@ fn return_argument_has_leading_comment<'arena>(
     argument: &'arena Expression<'arena>,
 ) -> bool {
     if f.has_leading_own_line_comment(argument.span())
-        || f.has_comment_with_filter(argument.span(), CommentFlags::Leading, |comment| {
+        || f.has_comment_with_filter(argument.span(), CommentFlags::LEADING, |comment| {
             has_new_line_in_range(f.source_text, comment.start, comment.end)
         })
     {

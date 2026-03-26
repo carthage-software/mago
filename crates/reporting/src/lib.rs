@@ -14,8 +14,8 @@ use std::cmp::Ordering;
 use std::iter::Once;
 use std::str::FromStr;
 
-use ahash::HashMap;
-use ahash::HashMapExt;
+use foldhash::HashMap;
+use foldhash::HashMapExt;
 use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
@@ -25,6 +25,40 @@ use strum::VariantNames;
 use mago_database::file::FileId;
 use mago_span::Span;
 use mago_text_edit::TextEdit;
+
+/// Represents an entry in the analyzer's `ignore` configuration.
+///
+/// Can be either a plain code string (ignored everywhere) or a scoped entry
+/// that only ignores a code in specific paths.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(untagged)]
+pub enum IgnoreEntry {
+    /// Ignore a code everywhere: `"code1"`
+    Code(String),
+    /// Ignore a code in specific paths: `{ code = "code2", in = "path/" }`
+    Scoped {
+        code: String,
+        #[serde(rename = "in", deserialize_with = "one_or_many")]
+        paths: Vec<String>,
+    },
+}
+
+fn one_or_many<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum OneOrMany {
+        One(String),
+        Many(Vec<String>),
+    }
+
+    match OneOrMany::deserialize(deserializer)? {
+        OneOrMany::One(s) => Ok(vec![s]),
+        OneOrMany::Many(v) => Ok(v),
+    }
+}
 
 mod formatter;
 mod internal;
@@ -392,6 +426,20 @@ impl Issue {
         self
     }
 
+    /// Returns the deterministic primary annotation for this issue.
+    ///
+    /// If multiple primary annotations exist, the one with the smallest span is returned.
+    #[must_use]
+    pub fn primary_annotation(&self) -> Option<&Annotation> {
+        self.annotations.iter().filter(|annotation| annotation.is_primary()).min_by_key(|annotation| annotation.span)
+    }
+
+    /// Returns the deterministic primary span for this issue.
+    #[must_use]
+    pub fn primary_span(&self) -> Option<Span> {
+        self.primary_annotation().map(|annotation| annotation.span)
+    }
+
     /// Add a note to this issue.
     ///
     /// # Examples
@@ -485,6 +533,10 @@ impl IssueCollection {
         self.issues.extend(issues);
     }
 
+    pub fn reserve(&mut self, additional: usize) {
+        self.issues.reserve(additional);
+    }
+
     pub fn shrink_to_fit(&mut self) {
         self.issues.shrink_to_fit();
     }
@@ -538,8 +590,37 @@ impl IssueCollection {
         self.issues.iter().map(|issue| issue.level).min()
     }
 
-    pub fn filter_out_ignored(&mut self, ignore: &[String]) {
-        self.issues.retain(|issue| if let Some(code) = &issue.code { !ignore.contains(code) } else { true });
+    pub fn filter_out_ignored<F>(&mut self, ignore: &[IgnoreEntry], resolve_file_name: F)
+    where
+        F: Fn(FileId) -> Option<String>,
+    {
+        if ignore.is_empty() {
+            return;
+        }
+
+        self.issues.retain(|issue| {
+            let Some(code) = &issue.code else {
+                return true;
+            };
+
+            for entry in ignore {
+                match entry {
+                    IgnoreEntry::Code(ignored) if ignored == code => return false,
+                    IgnoreEntry::Scoped { code: ignored, paths } if ignored == code => {
+                        let file_name = issue.primary_span().and_then(|span| resolve_file_name(span.file_id));
+
+                        if let Some(name) = file_name
+                            && is_path_match(&name, paths)
+                        {
+                            return false;
+                        }
+                    }
+                    _ => {}
+                }
+            }
+
+            true
+        });
     }
 
     pub fn filter_retain_codes(&mut self, retain_codes: &[String]) {
@@ -558,7 +639,7 @@ impl IssueCollection {
 
     /// Sorts the issues in the collection.
     ///
-    /// The issues are sorted by severity level in descending order,
+    /// The issues are sorted by severity level in ascending order,
     /// then by code in ascending order, and finally by the primary annotation span.
     #[must_use]
     pub fn sorted(self) -> Self {
@@ -571,17 +652,8 @@ impl IssueCollection {
                 Ordering::Less => Ordering::Less,
                 Ordering::Greater => Ordering::Greater,
                 Ordering::Equal => {
-                    let a_span = a
-                        .annotations
-                        .iter()
-                        .find(|annotation| annotation.is_primary())
-                        .map(|annotation| annotation.span);
-
-                    let b_span = b
-                        .annotations
-                        .iter()
-                        .find(|annotation| annotation.is_primary())
-                        .map(|annotation| annotation.span);
+                    let a_span = a.primary_span();
+                    let b_span = b.primary_span();
 
                     match (a_span, b_span) {
                         (Some(a_span), Some(b_span)) => a_span.cmp(&b_span),
@@ -660,6 +732,17 @@ impl FromIterator<Issue> for IssueCollection {
     fn from_iter<T: IntoIterator<Item = Issue>>(iter: T) -> Self {
         Self { issues: iter.into_iter().collect() }
     }
+}
+
+fn is_path_match(file_name: &str, patterns: &[String]) -> bool {
+    patterns.iter().any(|pattern| {
+        if pattern.ends_with('/') {
+            file_name.starts_with(pattern.as_str())
+        } else {
+            let dir_prefix = format!("{pattern}/");
+            file_name.starts_with(&dir_prefix) || file_name == pattern
+        }
+    })
 }
 
 #[cfg(test)]
@@ -797,5 +880,18 @@ mod tests {
         assert_eq!(collection.get_level_count(Level::Warning), 1);
         assert_eq!(collection.get_level_count(Level::Help), 1);
         assert_eq!(collection.get_level_count(Level::Note), 1);
+    }
+
+    #[test]
+    pub fn test_primary_span_is_deterministic() {
+        let file = FileId::zero();
+        let span_later = Span::new(file, 20_u32.into(), 25_u32.into());
+        let span_earlier = Span::new(file, 5_u32.into(), 10_u32.into());
+
+        let issue = Issue::error("x")
+            .with_annotation(Annotation::primary(span_later))
+            .with_annotation(Annotation::primary(span_earlier));
+
+        assert_eq!(issue.primary_span(), Some(span_earlier));
     }
 }

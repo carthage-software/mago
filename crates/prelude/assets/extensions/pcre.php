@@ -43,18 +43,14 @@ const PCRE_JIT_SUPPORT = 1;
  *
  * @return int|false
  */
-function preg_match(string $pattern, string $subject, &$matches = [], int $flags = 0, int $offset = 0): int|false
-{
-}
+function preg_match(string $pattern, string $subject, &$matches = [], int $flags = 0, int $offset = 0): int|false {}
 
 /**
  * @param-out list<array<string>> $matches
  *
  * @pure
  */
-function preg_match_all(string $pattern, string $subject, &$matches, int $flags = 0, int $offset = 0): int|false
-{
-}
+function preg_match_all(string $pattern, string $subject, &$matches, int $flags = 0, int $offset = 0): int|false {}
 
 /**
  * @param string|array<string> $pattern
@@ -73,8 +69,7 @@ function preg_replace(
     array|string $subject,
     int $limit = -1,
     &$count = null,
-): array|string|null {
-}
+): array|string|null {}
 
 /**
  * @param string|array<string> $pattern
@@ -92,8 +87,7 @@ function preg_replace_callback(
     int $limit = -1,
     &$count = null,
     int $flags = 0,
-): array|string|null {
-}
+): array|string|null {}
 
 /**
  * @param array<(callable(array<string>): string)> $pattern
@@ -109,8 +103,7 @@ function preg_replace_callback_array(
     int $limit = -1,
     &$count = null,
     int $flags = 0,
-): array|string|null {
-}
+): array|string|null {}
 
 /**
  * @param string|array<string> $pattern
@@ -127,26 +120,21 @@ function preg_filter(
     array|string $subject,
     int $limit = -1,
     &$count = null,
-): array|string|null {
-}
+): array|string|null {}
 
 /**
  * @return ($subject is non-empty-string ? list<non-empty-string>|false : list<string>|false)
  *
  * @pure
  */
-function preg_split(string $pattern, string $subject, int $limit = -1, int $flags = 0): array|false
-{
-}
+function preg_split(string $pattern, string $subject, int $limit = -1, int $flags = 0): array|false {}
 
 /**
  * @return ($str is non-empty-string ? non-empty-string : string)
  *
  * @pure
  */
-function preg_quote(string $str, null|string $delimiter = null): string
-{
-}
+function preg_quote(string $str, ?string $delimiter = null): string {}
 
 /**
  * @template K of array-key
@@ -157,14 +145,8 @@ function preg_quote(string $str, null|string $delimiter = null): string
  *
  * @pure
  */
-function preg_grep(string $pattern, array $array, int $flags = 0): array|false
-{
-}
+function preg_grep(string $pattern, array $array, int $flags = 0): array|false {}
 
-function preg_last_error(): int
-{
-}
+function preg_last_error(): int {}
 
-function preg_last_error_msg(): string
-{
-}
+function preg_last_error_msg(): string {}

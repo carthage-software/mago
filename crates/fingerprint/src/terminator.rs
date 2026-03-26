@@ -19,7 +19,9 @@ impl Fingerprintable for Terminator<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ahash::AHasher;
+    use std::hash::BuildHasher;
+
+    use foldhash::fast::FixedState;
     use mago_database::file::FileId;
     use mago_span::Position;
     use mago_span::Span;
@@ -29,7 +31,7 @@ mod tests {
     use std::hash::Hasher;
 
     fn fingerprint_item<T: Fingerprintable>(item: &T, opts: &FingerprintOptions, names: &ResolvedNames) -> u64 {
-        let mut hasher = AHasher::default();
+        let mut hasher = FixedState::default().build_hasher();
         item.fingerprint_with_hasher(&mut hasher, names, opts);
         hasher.finish()
     }

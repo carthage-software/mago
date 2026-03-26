@@ -199,11 +199,11 @@ impl TObject {
     /// Returns the primary name identifier if this is a `Named` or `Enum` variant.
     #[inline]
     #[must_use]
-    pub const fn get_name(&self) -> Option<&Atom> {
+    pub const fn get_name(&self) -> Option<Atom> {
         match self {
             TObject::Any | TObject::WithProperties(_) | TObject::HasMethod(_) | TObject::HasProperty(_) => None,
-            TObject::Enum(enum_object) => Some(&enum_object.name),
-            TObject::Named(named_object) => Some(&named_object.name),
+            TObject::Enum(enum_object) => Some(enum_object.name),
+            TObject::Named(named_object) => Some(named_object.name),
         }
     }
 

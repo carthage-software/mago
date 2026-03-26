@@ -11,6 +11,7 @@ use crate::ttype::union::TUnion;
 /// about *how* and *where* this type information was determined or declared in the source code
 /// or related documentation.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct TypeMetadata {
     /// The specific location (span) in the source code or documentation
     /// that this type metadata corresponds to.

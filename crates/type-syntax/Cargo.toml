@@ -19,3 +19,10 @@ mago-syntax-core = { workspace = true }
 serde = { workspace = true }
 strum = { workspace = true }
 ordered-float = { workspace = true, features = ["serde", "rand"] }
+
+[dev-dependencies]
+criterion = { workspace = true }
+
+[[bench]]
+name = "parser"
+harness = false

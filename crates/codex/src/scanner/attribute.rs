@@ -62,14 +62,12 @@ pub fn get_attribute_flags<'arena>(
             Some(value as u8)
         });
 
-        let attributes = if let Some(bits) = bits {
+        return Some(if let Some(bits) = bits {
             AttributeFlags::from_bits(bits)
         } else {
             // Unable to infer the target, allow all targets + repeatable
-            Some(AttributeFlags::all())
-        };
-
-        return attributes;
+            AttributeFlags::all()
+        });
     }
 
     None

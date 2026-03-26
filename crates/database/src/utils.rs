@@ -41,7 +41,11 @@ pub(crate) fn read_file(workspace: &Path, path: &Path, file_type: FileType) -> R
         return Err(DatabaseError::FileTooLarge(path.to_path_buf(), bytes.len(), MAXIMUM_FILE_SIZE));
     }
 
-    let logical_name = path.strip_prefix(workspace).unwrap_or(path).to_string_lossy().to_string();
+    // Normalize to forward slashes for cross-platform determinism
+    #[cfg(windows)]
+    let logical_name = path.strip_prefix(workspace).unwrap_or(path).to_string_lossy().replace('\\', "/");
+    #[cfg(not(windows))]
+    let logical_name = path.strip_prefix(workspace).unwrap_or(path).to_string_lossy().into_owned();
     let contents = if simdutf8::basic::from_utf8(&bytes).is_ok() {
         unsafe {
             // SAFETY: We just validated it with simdutf8, no need to check again.

@@ -13,6 +13,7 @@ use mago_codex::ttype::atomic::object::named::TNamedObject;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::int::TInteger;
 use mago_codex::ttype::atomic::scalar::string::TString;
+use mago_codex::ttype::atomic::scalar::string::TStringCasing;
 use mago_codex::ttype::get_array_value_parameter;
 use mago_codex::ttype::get_iterable_value_parameter;
 use mago_span::HasSpan;
@@ -86,20 +87,6 @@ pub fn scrape_assertions(
                         artifacts,
                         function_call,
                     ));
-                }
-                // If its a null-safe method call, assert that
-                // the lhs is non-null.
-                Call::NullSafeMethod(null_safe_method_call) => {
-                    let object_var_id = get_expression_id(
-                        null_safe_method_call.object,
-                        assertion_context.this_class_name,
-                        assertion_context.resolved_names,
-                        Some(assertion_context.codebase),
-                    );
-
-                    if let Some(object_var_id) = object_var_id {
-                        if_types.insert(object_var_id, vec![vec![Assertion::IsNotType(TAtomic::Null)]]);
-                    }
                 }
                 _ => {}
             }
@@ -205,18 +192,6 @@ pub fn scrape_assertions(
             }
             _ => {}
         },
-        Expression::Access(Access::NullSafeProperty(null_safe_property_access)) => {
-            let object_var_id = get_expression_id(
-                null_safe_property_access.object,
-                assertion_context.this_class_name,
-                assertion_context.resolved_names,
-                Some(assertion_context.codebase),
-            );
-
-            if let Some(object_var_id) = object_var_id {
-                if_types.insert(object_var_id, vec![vec![Assertion::IsNotType(TAtomic::Null)]]);
-            }
-        }
         _ => {}
     }
 
@@ -327,13 +302,28 @@ fn scrape_special_function_call_assertions(
             "ctype_digit" => Some((
                 0,
                 vec![Assertion::IsType(TAtomic::Scalar(TScalar::String(TString::general_with_props(
-                    true, false, false, false,
+                    true,
+                    false,
+                    false,
+                    TStringCasing::Unspecified,
                 ))))],
             )),
             "ctype_lower" => Some((
                 0,
                 vec![Assertion::IsType(TAtomic::Scalar(TScalar::String(TString::general_with_props(
-                    false, false, true, true,
+                    false,
+                    false,
+                    true,
+                    TStringCasing::Lowercase,
+                ))))],
+            )),
+            "ctype_upper" => Some((
+                0,
+                vec![Assertion::IsType(TAtomic::Scalar(TScalar::String(TString::general_with_props(
+                    false,
+                    false,
+                    true,
+                    TStringCasing::Uppercase,
                 ))))],
             )),
             "count" => Some((0, vec![Assertion::HasAtLeastCount(1)])),
@@ -358,6 +348,45 @@ fn scrape_special_function_call_assertions(
                     .and_then(|ty| ty.get_single_literal_string_value())?;
 
                 Some((0, vec![Assertion::IsType(TAtomic::Object(TObject::new_has_property(atom(property_name))))]))
+            }
+            "is_a" | "is_subclass_of" => {
+                let class_name_type = function_call
+                    .argument_list
+                    .arguments
+                    .get(1)
+                    .map(mago_syntax::ast::Argument::value)
+                    .and_then(|expr| artifacts.get_expression_type(expr))?;
+
+                let is_subclass_of_call = name == "is_subclass_of";
+                let allow_string = function_call
+                    .argument_list
+                    .arguments
+                    .get(2)
+                    .and_then(|argument| artifacts.get_expression_type(argument.value()))
+                    .map_or(is_subclass_of_call, |t| !t.is_false());
+
+                let mut assertions = vec![];
+                for atomic in class_name_type.types.as_ref() {
+                    let Some(resolved) = get_class_name_from_atomic(assertion_context.codebase, atomic) else {
+                        continue;
+                    };
+
+                    let object_type = resolved.get_object_type(assertion_context.codebase);
+
+                    if allow_string {
+                        assertions.push(Assertion::IsType(TAtomic::Scalar(TScalar::class_string_of_type(
+                            object_type.clone(),
+                        ))));
+                    }
+
+                    assertions.push(Assertion::IsType(object_type));
+                }
+
+                if assertions.is_empty() {
+                    return None;
+                }
+
+                Some((0, assertions))
             }
             "in_array" => {
                 let should_strict_check = function_call
@@ -417,23 +446,42 @@ fn scrape_special_function_call_assertions(
         found_assertions
     };
 
-    let extract_expression_id = |argument_expression| {
-        get_expression_id(
+    let extract_expression_id = |argument_expression: &Expression| {
+        if let Some(id) = get_expression_id(
             argument_expression,
             assertion_context.this_class_name,
             assertion_context.resolved_names,
             Some(assertion_context.codebase),
-        )
+        ) {
+            return Some((id, false));
+        }
+
+        if let Expression::Binary(binary) = unwrap_expression(argument_expression)
+            && matches!(binary.operator, BinaryOperator::NullCoalesce(_))
+            && matches!(unwrap_expression(binary.rhs), Expression::Literal(Literal::Null(_)))
+            && let Some(lhs_id) = get_expression_id(
+                binary.lhs,
+                assertion_context.this_class_name,
+                assertion_context.resolved_names,
+                Some(assertion_context.codebase),
+            )
+        {
+            return Some((lhs_id, true));
+        }
+
+        None
     };
 
-    if let Some(first_argument_variable_id) = function_call
-        .argument_list
-        .arguments
-        .get(argument_variable_id_position)
-        .map(mago_syntax::ast::Argument::value)
-        .and_then(extract_expression_id)
+    if let Some(argument) =
+        function_call.argument_list.arguments.get(argument_variable_id_position).map(mago_syntax::ast::Argument::value)
+        && let Some((variable_id, needs_isset)) = extract_expression_id(argument)
     {
-        if_types.insert(first_argument_variable_id, vec![function_assertions]);
+        let mut assertions = vec![function_assertions];
+        if needs_isset {
+            assertions.push(vec![Assertion::IsIsset]);
+        }
+
+        if_types.insert(variable_id, assertions);
     }
 
     if_types
@@ -845,15 +893,31 @@ fn get_null_equality_assertions(
         OtherValuePosition::Right => left,
     };
 
-    let var_name = get_expression_id(
-        base_conditional,
-        assertion_context.this_class_name,
-        assertion_context.resolved_names,
-        Some(assertion_context.codebase),
-    );
+    if let Expression::Binary(binary) = unwrap_expression(base_conditional)
+        && let BinaryOperator::NullCoalesce(_) = binary.operator
+        && let Expression::Literal(Literal::Null(_)) = unwrap_expression(binary.rhs)
+    {
+        let coalesce_lhs = binary.lhs;
 
-    if let Some(var_name) = var_name {
-        if_types.insert(var_name, vec![vec![Assertion::IsType(TAtomic::Null)]]);
+        if let Some(var_name) = get_expression_id(
+            coalesce_lhs,
+            assertion_context.this_class_name,
+            assertion_context.resolved_names,
+            Some(assertion_context.codebase),
+        ) {
+            if_types.insert(var_name, vec![vec![Assertion::IsNotIsset]]);
+        }
+    } else {
+        let var_name = get_expression_id(
+            base_conditional,
+            assertion_context.this_class_name,
+            assertion_context.resolved_names,
+            Some(assertion_context.codebase),
+        );
+
+        if let Some(var_name) = var_name {
+            if_types.insert(var_name, vec![vec![Assertion::IsType(TAtomic::Null)]]);
+        }
     }
 
     vec![if_types]
@@ -1042,19 +1106,32 @@ fn scrape_lesser_than_assertions(
 
     // Generate assertions for the left variable based on the right variable's type.
     // For an expression `$a < $b`, this asserts `$a` is less than the upper bound of `$b`.
+    // Range bounds are only used when the right operand is a trackable variable;
+    // for non-variable expressions (e.g. function calls), using a bound produces
+    // incorrect narrowing when the assertion is negated for the else branch.
     if let (Some(left_var_id), Some(right_int)) = (left_id, &right_integer) {
+        let use_range_bounds = right_id.is_some();
+
         let assertion_result = if matches!(operator, BinaryOperator::LessThanOrEqual(_)) {
             match *right_int {
                 TInteger::Literal(count) => Some((Assertion::IsLessThanOrEqual(count), count)),
-                TInteger::To(upper_bound) => Some((Assertion::IsLessThanOrEqual(upper_bound), upper_bound)),
-                TInteger::Range(_, upper_bound) => Some((Assertion::IsLessThanOrEqual(upper_bound), upper_bound)),
+                TInteger::To(upper_bound) if use_range_bounds => {
+                    Some((Assertion::IsLessThanOrEqual(upper_bound), upper_bound))
+                }
+                TInteger::Range(_, upper_bound) if use_range_bounds => {
+                    Some((Assertion::IsLessThanOrEqual(upper_bound), upper_bound))
+                }
                 _ => None,
             }
         } else {
             match *right_int {
                 TInteger::Literal(count) => Some((Assertion::IsLessThan(count), count)),
-                TInteger::To(upper_bound) => Some((Assertion::IsLessThan(upper_bound), upper_bound)),
-                TInteger::Range(_, upper_bound) => Some((Assertion::IsLessThan(upper_bound), upper_bound)),
+                TInteger::To(upper_bound) if use_range_bounds => {
+                    Some((Assertion::IsLessThan(upper_bound), upper_bound))
+                }
+                TInteger::Range(_, upper_bound) if use_range_bounds => {
+                    Some((Assertion::IsLessThan(upper_bound), upper_bound))
+                }
                 _ => None,
             }
         };
@@ -1080,19 +1157,30 @@ fn scrape_lesser_than_assertions(
 
     // Generate assertions for the right variable based on the left variable's type.
     // For an expression `$a < $b`, this asserts `$b` is greater than the lower bound of `$a`.
+    // Same restriction: range bounds only used when the left operand is a trackable variable.
     if let (Some(right_var_id), Some(left_int)) = (right_id, &left_integer) {
+        let use_range_bounds = left_id.is_some();
+
         let assertion_result = if matches!(operator, BinaryOperator::LessThanOrEqual(_)) {
             match *left_int {
                 TInteger::Literal(count) => Some((Assertion::IsGreaterThanOrEqual(count), count)),
-                TInteger::From(lower_bound) => Some((Assertion::IsGreaterThanOrEqual(lower_bound), lower_bound)),
-                TInteger::Range(lower_bound, _) => Some((Assertion::IsGreaterThanOrEqual(lower_bound), lower_bound)),
+                TInteger::From(lower_bound) if use_range_bounds => {
+                    Some((Assertion::IsGreaterThanOrEqual(lower_bound), lower_bound))
+                }
+                TInteger::Range(lower_bound, _) if use_range_bounds => {
+                    Some((Assertion::IsGreaterThanOrEqual(lower_bound), lower_bound))
+                }
                 _ => None,
             }
         } else {
             match *left_int {
                 TInteger::Literal(count) => Some((Assertion::IsGreaterThan(count), count)),
-                TInteger::From(lower_bound) => Some((Assertion::IsGreaterThan(lower_bound), lower_bound)),
-                TInteger::Range(lower_bound, _) => Some((Assertion::IsGreaterThan(lower_bound), lower_bound)),
+                TInteger::From(lower_bound) if use_range_bounds => {
+                    Some((Assertion::IsGreaterThan(lower_bound), lower_bound))
+                }
+                TInteger::Range(lower_bound, _) if use_range_bounds => {
+                    Some((Assertion::IsGreaterThan(lower_bound), lower_bound))
+                }
                 _ => None,
             }
         };
@@ -1185,6 +1273,9 @@ fn scrape_greater_than_assertions(
 
     // Generate assertions for the left variable based on the right variable's type.
     // For an expression `$a > $b`, this asserts `$a` is greater than the lower bound of `$b`.
+    // Range bounds are only used when the right operand is a trackable variable;
+    // for non-variable expressions (e.g. function calls), using a bound produces
+    // incorrect narrowing when the assertion is negated for the else branch.
     if let Some(right_int) = &right_integer
         && let Some(left_var_id) = get_expression_id(
             left,
@@ -1193,18 +1284,34 @@ fn scrape_greater_than_assertions(
             Some(assertion_context.codebase),
         )
     {
+        let use_range_bounds = get_expression_id(
+            right,
+            assertion_context.this_class_name,
+            assertion_context.resolved_names,
+            Some(assertion_context.codebase),
+        )
+        .is_some();
+
         let assertion_result = if matches!(operator, BinaryOperator::GreaterThanOrEqual(_)) {
             match *right_int {
                 TInteger::Literal(count) => Some((Assertion::IsGreaterThanOrEqual(count), count)),
-                TInteger::From(lower_bound) => Some((Assertion::IsGreaterThanOrEqual(lower_bound), lower_bound)),
-                TInteger::Range(lower_bound, _) => Some((Assertion::IsGreaterThanOrEqual(lower_bound), lower_bound)),
+                TInteger::From(lower_bound) if use_range_bounds => {
+                    Some((Assertion::IsGreaterThanOrEqual(lower_bound), lower_bound))
+                }
+                TInteger::Range(lower_bound, _) if use_range_bounds => {
+                    Some((Assertion::IsGreaterThanOrEqual(lower_bound), lower_bound))
+                }
                 _ => None,
             }
         } else {
             match *right_int {
                 TInteger::Literal(count) => Some((Assertion::IsGreaterThan(count), count)),
-                TInteger::From(lower_bound) => Some((Assertion::IsGreaterThan(lower_bound), lower_bound)),
-                TInteger::Range(lower_bound, _) => Some((Assertion::IsGreaterThan(lower_bound), lower_bound)),
+                TInteger::From(lower_bound) if use_range_bounds => {
+                    Some((Assertion::IsGreaterThan(lower_bound), lower_bound))
+                }
+                TInteger::Range(lower_bound, _) if use_range_bounds => {
+                    Some((Assertion::IsGreaterThan(lower_bound), lower_bound))
+                }
                 _ => None,
             }
         };
@@ -1238,18 +1345,34 @@ fn scrape_greater_than_assertions(
             Some(assertion_context.codebase),
         )
     {
+        let use_range_bounds = get_expression_id(
+            left,
+            assertion_context.this_class_name,
+            assertion_context.resolved_names,
+            Some(assertion_context.codebase),
+        )
+        .is_some();
+
         let assertion_result = if matches!(operator, BinaryOperator::GreaterThanOrEqual(_)) {
             match *left_int {
                 TInteger::Literal(count) => Some((Assertion::IsLessThanOrEqual(count), count)),
-                TInteger::To(upper_bound) => Some((Assertion::IsLessThanOrEqual(upper_bound), upper_bound)),
-                TInteger::Range(_, upper_bound) => Some((Assertion::IsLessThanOrEqual(upper_bound), upper_bound)),
+                TInteger::To(upper_bound) if use_range_bounds => {
+                    Some((Assertion::IsLessThanOrEqual(upper_bound), upper_bound))
+                }
+                TInteger::Range(_, upper_bound) if use_range_bounds => {
+                    Some((Assertion::IsLessThanOrEqual(upper_bound), upper_bound))
+                }
                 _ => None,
             }
         } else {
             match *left_int {
                 TInteger::Literal(count) => Some((Assertion::IsLessThan(count), count)),
-                TInteger::To(upper_bound) => Some((Assertion::IsLessThan(upper_bound), upper_bound)),
-                TInteger::Range(_, upper_bound) => Some((Assertion::IsLessThan(upper_bound), upper_bound)),
+                TInteger::To(upper_bound) if use_range_bounds => {
+                    Some((Assertion::IsLessThan(upper_bound), upper_bound))
+                }
+                TInteger::Range(_, upper_bound) if use_range_bounds => {
+                    Some((Assertion::IsLessThan(upper_bound), upper_bound))
+                }
                 _ => None,
             }
         };
@@ -1396,10 +1519,25 @@ fn get_comparison_literal_operand(
 }
 
 fn get_expression_integer_value(artifacts: &AnalysisArtifacts, expression: &Expression) -> Option<TInteger> {
-    artifacts
+    if let Some(int) = artifacts
         .get_expression_type(expression)
         .and_then(mago_codex::ttype::union::TUnion::get_single_int)
         .filter(|integer| !integer.is_unspecified())
+    {
+        return Some(int);
+    }
+
+    match expression {
+        Expression::Literal(Literal::Integer(lit)) => lit.value.map(|v| TInteger::Literal(v as i64)),
+        Expression::UnaryPrefix(UnaryPrefix { operator: UnaryPrefixOperator::Negation(_), operand, .. }) => {
+            if let Expression::Literal(Literal::Integer(lit)) = operand {
+                lit.value.map(|v| TInteger::Literal(-(v as i64)))
+            } else {
+                None
+            }
+        }
+        _ => None,
+    }
 }
 
 fn get_expression_array_key(artifacts: &AnalysisArtifacts, expression: &Expression) -> Option<ArrayKey> {
@@ -1508,7 +1646,6 @@ pub fn has_typed_value_comparison(
     }
 
     if let Some(left_type) = artifacts.get_expression_type(&left.span())
-        && left_var_id.is_none()
         && left_type.is_single()
         && !left_type.is_mixed()
     {

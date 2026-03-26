@@ -71,13 +71,17 @@ pub type AtomSet = HashSet<Atom, BuildHasherDefault<IdentityHasher>>;
 /// The maximum size in bytes for a string to be processed on the stack.
 const STACK_BUF_SIZE: usize = 256;
 
+thread_local! {
+    static EMPTY_ATOM: Atom = atom("");
+}
+
 /// Returns the canonical `Atom` for an empty string.
 ///
 /// This is a very cheap operation.
 #[inline]
 #[must_use]
 pub fn empty_atom() -> Atom {
-    atom("")
+    EMPTY_ATOM.with(|&atom| atom)
 }
 
 /// A macro to concatenate between 2 and 12 string slices into a single `Atom`.
@@ -183,27 +187,13 @@ pub fn ascii_lowercase_constant_name_atom(name: &str) -> Atom {
 pub fn ascii_lowercase_atom(s: &str) -> Atom {
     let bytes = s.as_bytes();
 
-    // Fast path: single pass to check if already lowercase ASCII
-    // This combines the is_ascii() and any(is_ascii_uppercase) checks into one iteration
-    let mut needs_lowercasing = false;
-    let mut is_ascii = true;
-    for &b in bytes {
-        if b > 127 {
-            is_ascii = false;
-            break;
-        }
-        if b.is_ascii_uppercase() {
-            needs_lowercasing = true;
-        }
-    }
-
-    // If it's ASCII and already lowercase, return as-is
-    if is_ascii && !needs_lowercasing {
+    // Fast path: check if all ASCII is already lowercase
+    if !bytes.iter().any(u8::is_ascii_uppercase) {
         return atom(s);
     }
 
-    // Fast path for ASCII-only strings: use simple byte manipulation
-    if is_ascii && s.len() <= STACK_BUF_SIZE {
+    // Fast path for short strings, use a stack buffer
+    if s.len() <= STACK_BUF_SIZE {
         let mut stack_buf = [0u8; STACK_BUF_SIZE];
         for (i, &b) in bytes.iter().enumerate() {
             stack_buf[i] = b.to_ascii_lowercase();
@@ -214,32 +204,7 @@ pub fn ascii_lowercase_atom(s: &str) -> Atom {
         );
     }
 
-    // Non-ASCII path: handle Unicode lowercasing
-    if s.len() <= STACK_BUF_SIZE {
-        let mut stack_buf = [0u8; STACK_BUF_SIZE];
-        let mut index = 0;
-
-        for c in s.chars() {
-            for lower_c in c.to_lowercase() {
-                let mut char_buf = [0u8; 4];
-                let encoded = lower_c.encode_utf8(&mut char_buf).as_bytes();
-
-                if index + encoded.len() > STACK_BUF_SIZE {
-                    return atom(&s.to_lowercase());
-                }
-
-                stack_buf[index..index + encoded.len()].copy_from_slice(encoded);
-                index += encoded.len();
-            }
-        }
-
-        return atom(
-            // SAFETY: We only write valid UTF-8 bytes into the stack buffer.
-            unsafe { std::str::from_utf8_unchecked(&stack_buf[..index]) },
-        );
-    }
-
-    atom(&s.to_lowercase())
+    atom(&s.to_ascii_lowercase())
 }
 
 /// Checks if `haystack` starts with `prefix`, ignoring ASCII case.
@@ -255,6 +220,8 @@ pub fn ascii_lowercase_atom(s: &str) -> Atom {
 /// assert!(starts_with_ignore_case("HelloWorld", "hello"));
 /// assert!(starts_with_ignore_case("FOOBAR", "FooBar"));
 /// assert!(starts_with_ignore_case("test", "TEST"));
+/// assert!(starts_with_ignore_case("abcdefghijklmnop", "ABCDEFGHIJKLMNOP"));
+/// assert!(starts_with_ignore_case("abcdefghijklmnopqrstuvwxyzabcdef", "ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEF"));
 /// assert!(!starts_with_ignore_case("hello", "world"));
 /// assert!(!starts_with_ignore_case("hi", "hello"));
 /// ```
@@ -268,8 +235,8 @@ pub fn starts_with_ignore_case(haystack: &str, prefix: &str) -> bool {
             let haystack_bytes = haystack.as_bytes();
             let prefix_bytes = prefix.as_bytes();
 
-            let lower_a = _mm256_set1_epi8(b'a' as i8);
-            let lower_z = _mm256_set1_epi8(b'z' as i8);
+            let upper_a = _mm256_set1_epi8(b'A' as i8);
+            let upper_z = _mm256_set1_epi8(b'Z' as i8);
             let case_bit = _mm256_set1_epi8(0x20);
 
             let mut i = 0;
@@ -278,18 +245,18 @@ pub fn starts_with_ignore_case(haystack: &str, prefix: &str) -> bool {
                 let p = _mm256_loadu_si256(prefix_bytes.as_ptr().add(i) as *const __m256i);
 
                 // Convert haystack chunk to lowercase
-                let h_is_lower = _mm256_and_si256(
-                    _mm256_cmpgt_epi8(h, _mm256_sub_epi8(lower_a, _mm256_set1_epi8(1))),
-                    _mm256_cmpgt_epi8(_mm256_add_epi8(lower_z, _mm256_set1_epi8(1)), h),
+                let h_is_upper = _mm256_and_si256(
+                    _mm256_cmpgt_epi8(h, _mm256_sub_epi8(upper_a, _mm256_set1_epi8(1))),
+                    _mm256_cmpgt_epi8(_mm256_add_epi8(upper_z, _mm256_set1_epi8(1)), h),
                 );
-                let h_lower = _mm256_or_si256(h, _mm256_and_si256(h_is_lower, case_bit));
+                let h_lower = _mm256_or_si256(h, _mm256_and_si256(h_is_upper, case_bit));
 
                 // Convert prefix chunk to lowercase
-                let p_is_lower = _mm256_and_si256(
-                    _mm256_cmpgt_epi8(p, _mm256_sub_epi8(lower_a, _mm256_set1_epi8(1))),
-                    _mm256_cmpgt_epi8(_mm256_add_epi8(lower_z, _mm256_set1_epi8(1)), p),
+                let p_is_upper = _mm256_and_si256(
+                    _mm256_cmpgt_epi8(p, _mm256_sub_epi8(upper_a, _mm256_set1_epi8(1))),
+                    _mm256_cmpgt_epi8(_mm256_add_epi8(upper_z, _mm256_set1_epi8(1)), p),
                 );
-                let p_lower = _mm256_or_si256(p, _mm256_and_si256(p_is_lower, case_bit));
+                let p_lower = _mm256_or_si256(p, _mm256_and_si256(p_is_upper, case_bit));
 
                 let eq = _mm256_cmpeq_epi8(h_lower, p_lower);
                 let mask = _mm256_movemask_epi8(eq);
@@ -312,8 +279,8 @@ pub fn starts_with_ignore_case(haystack: &str, prefix: &str) -> bool {
             let haystack_bytes = haystack.as_bytes();
             let prefix_bytes = prefix.as_bytes();
 
-            let lower_a = vdupq_n_u8(b'a');
-            let lower_z = vdupq_n_u8(b'z');
+            let upper_a = vdupq_n_u8(b'A');
+            let upper_z = vdupq_n_u8(b'Z');
             let case_bit = vdupq_n_u8(0x20);
 
             let mut i = 0;
@@ -322,16 +289,16 @@ pub fn starts_with_ignore_case(haystack: &str, prefix: &str) -> bool {
                 let p = vld1q_u8(prefix_bytes.as_ptr().add(i));
 
                 // Convert haystack chunk to lowercase
-                let h_ge_a = vcgeq_u8(h, lower_a);
-                let h_le_z = vcleq_u8(h, lower_z);
-                let h_is_lower = vandq_u8(h_ge_a, h_le_z);
-                let h_lower = vorrq_u8(h, vandq_u8(h_is_lower, case_bit));
+                let h_ge_a = vcgeq_u8(h, upper_a);
+                let h_le_z = vcleq_u8(h, upper_z);
+                let h_is_upper = vandq_u8(h_ge_a, h_le_z);
+                let h_lower = vorrq_u8(h, vandq_u8(h_is_upper, case_bit));
 
                 // Convert prefix chunk to lowercase
-                let p_ge_a = vcgeq_u8(p, lower_a);
-                let p_le_z = vcleq_u8(p, lower_z);
-                let p_is_lower = vandq_u8(p_ge_a, p_le_z);
-                let p_lower = vorrq_u8(p, vandq_u8(p_is_lower, case_bit));
+                let p_ge_a = vcgeq_u8(p, upper_a);
+                let p_le_z = vcleq_u8(p, upper_z);
+                let p_is_upper = vandq_u8(p_ge_a, p_le_z);
+                let p_lower = vorrq_u8(p, vandq_u8(p_is_upper, case_bit));
 
                 let eq = vceqq_u8(h_lower, p_lower);
                 let min = vminvq_u8(eq);

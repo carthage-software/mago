@@ -3,7 +3,7 @@
 //! These providers allow plugins to specify what exceptions an expression,
 //! function call, or method call can throw.
 
-use ahash::HashSet;
+use foldhash::HashSet;
 
 use mago_atom::Atom;
 use mago_syntax::ast::Expression;

@@ -1,0 +1,134 @@
+int
+string
+bool
+float
+mixed
+null
+void
+never
+array
+object
+callable
+iterable
+resource
+scalar
+numeric
+array-key
+array<string>
+array<int, string>
+array<string, mixed>
+?string
+?int
+?bool
+?float
+?array
+int|string
+int|string|null
+int|string|bool|null
+Foo
+Bar\Baz
+\Fully\Qualified\Name
+Namespace\Class\Name
+array{name: string}
+array{name: string, age: int}
+array{name: string, age: int, active?: bool}
+array{name: string, age: int, active?: bool, metadata?: array<string, mixed>}
+array{0: int, 1: string}
+array{0: int, 1: string, 2: bool}
+array{0: int, 1: string, 2: bool, 3?: mixed}
+Closure(): void
+Closure(int): string
+Closure(int, string): void
+Closure(mixed...): array<string>
+Closure(int, string, bool): array{success: bool, data: mixed}
+callable(): void
+callable(int): string
+callable(int, string): bool
+callable(mixed...): array
+array<int, array<string>>
+array<int, array<string, mixed>>
+array<string, array<int, bool>>
+array<int, array<string, array<int, mixed>>>
+array<string, object{id: int}>
+array<string, object{id: int, name: string}>
+array<string, object{id: int, name: string, active: bool}>
+array<int, object{id: positive-int, name: non-empty-string, email?: string}>
+int|string|null
+int|string|bool|null
+int|string|bool|float|null
+Foo|Bar|Baz|null
+Foo&Bar
+Foo&Bar&Baz
+Foo&Bar&Baz&Qux
+(Foo&Bar)|null
+(Foo&Bar&Baz)|null
+(Foo|Bar)&Baz
+list<int>
+list<string>
+list<mixed>
+list<array{id: int, name: string}>
+list<array{id: int, name: string, roles: list<string>}>
+non-empty-array<string>
+non-empty-array<int, string>
+non-empty-array<string, mixed>
+non-empty-list<int>
+non-empty-list<string>
+non-empty-list<array{id: int}>
+non-empty-string
+literal-string
+numeric-string
+class-string
+class-string<Foo>
+class-string<Foo\Bar>
+interface-string<Baz>
+trait-string<Qux>
+positive-int
+negative-int
+non-positive-int
+non-negative-int
+int<0, 100>
+int<1, 1000>
+int<min, 0>
+int<0, max>
+int<min, max>
+key-of<array<string, int>>
+value-of<array<string, int>>
+key-of<Foo>
+value-of<Bar>
+iterable<int>
+iterable<string>
+iterable<int, string>
+iterable<string, mixed>
+Generator<int, string, mixed, void>
+Generator<int, array{id: int, name: string}, mixed, bool>
+Traversable<int, string>
+Iterator<string, mixed>
+IteratorAggregate<int, object{id: int}>
+ArrayAccess<string, mixed>
+Countable
+Stringable
+array{
+    users: list<object{id: int, name: string, email: string}>,
+    pagination: object{page: int, per_page: int, total: int}
+}
+array{
+    config: array<string, mixed>,
+    handlers: list<callable(mixed): void>,
+    logger?: object{level: string, handler: callable(string): void}
+}
+Closure(
+    array{id: int, name: string},
+    list<string>,
+    ?object{active: bool}
+): array{success: bool, errors?: list<string>}
+array<string, array{
+    type: class-string,
+    factory: callable(): object,
+    singleton?: bool,
+    tags?: list<string>
+}>
+object{
+    request: object{method: string, uri: string, headers: array<string, string>},
+    response: object{status: int, body: string, headers: array<string, string>},
+    metadata?: array<string, mixed>
+}

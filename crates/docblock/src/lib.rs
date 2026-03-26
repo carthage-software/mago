@@ -728,7 +728,8 @@ mod tests {
         };
 
         let content_str = code.content;
-        assert_eq!(content_str, " └─ comment 2\n\u{a0}\u{a0} └─ comment 4\n └─ comment 3");
+        // After fix: correctly strips indent_len characters (not bytes) from each line
+        assert_eq!(content_str, "└─ comment 2\n\u{a0}\u{a0} └─ comment 4\n└─ comment 3");
         assert_eq!(
             &phpdoc[code.span.start.offset as usize..code.span.end.offset as usize],
             " \u{a0} └─ comment 2\n        *    \u{a0}\u{a0} └─ comment 4\n        *  \u{a0} └─ comment 3"
@@ -820,5 +821,90 @@ mod tests {
         };
         assert_eq!(tag3.name, "see");
         assert_eq!(tag3.description, "中文类::方法() 说明");
+    }
+
+    #[test]
+    fn test_indented_code_with_fullwidth_space_in_indent() {
+        // Test case for multi-byte whitespace in indented code (Issue #967)
+        // parse_indented_code is only called when line starts with ASCII space/tab
+        // The bug occurs when indent contains full-width space after ASCII spaces
+        //
+        // After lexer processing, content becomes "  \u{3000}code"
+        // is_indented_line returns true (starts with ASCII space)
+        // indent_len = 3 (2 ASCII spaces + 1 full-width space char)
+        // But byte offset should be 2 + 3 = 5
+        let arena = Bump::new();
+        // Format: " * " (asterisk + space) + "  " (2 ASCII spaces) + "\u{3000}" (full-width) + "code"
+        let phpdoc = "/**\n *   \u{3000}code\n */";
+        let span = Span::new(FileId::zero(), Position::new(0), Position::new(phpdoc.len() as u32));
+
+        let result = parse_phpdoc_with_span(&arena, phpdoc, span);
+        assert!(result.is_ok(), "Parsing should succeed without panic");
+
+        let document = result.unwrap();
+        assert_eq!(document.elements.len(), 1);
+        let Element::Code(code) = &document.elements[0] else {
+            panic!("Expected Element::Code, got {:?}", document.elements[0]);
+        };
+        assert_eq!(code.content, "code");
+    }
+
+    #[test]
+    fn test_indented_code_with_mixed_multibyte_whitespace() {
+        // Multiple lines with mixed ASCII and full-width whitespace
+        let arena = Bump::new();
+        let phpdoc = "/**\n *  \u{3000}first line\n *  \u{3000}second line\n */";
+        let span = Span::new(FileId::zero(), Position::new(0), Position::new(phpdoc.len() as u32));
+
+        let result = parse_phpdoc_with_span(&arena, phpdoc, span);
+        assert!(result.is_ok(), "Parsing should succeed without panic");
+
+        let document = result.unwrap();
+        assert_eq!(document.elements.len(), 1);
+        let Element::Code(code) = &document.elements[0] else {
+            panic!("Expected Element::Code, got {:?}", document.elements[0]);
+        };
+        assert_eq!(code.content, "first line\nsecond line");
+    }
+
+    #[test]
+    fn test_indented_code_with_tab_and_fullwidth_space() {
+        // Tab + full-width space: is_indented_line checks for '\t' as well
+        let arena = Bump::new();
+        // After "* " there is a tab followed by full-width space
+        let phpdoc = "/**\n * \t\u{3000}code\n */";
+        let span = Span::new(FileId::zero(), Position::new(0), Position::new(phpdoc.len() as u32));
+
+        let result = parse_phpdoc_with_span(&arena, phpdoc, span);
+        assert!(result.is_ok(), "Parsing should succeed without panic");
+
+        let document = result.unwrap();
+        assert_eq!(document.elements.len(), 1);
+        let Element::Code(code) = &document.elements[0] else {
+            panic!("Expected Element::Code, got {:?}", document.elements[0]);
+        };
+        assert_eq!(code.content, "code");
+    }
+
+    #[test]
+    fn test_issue_967_original_pattern() {
+        // Original Issue #967 reproduction case
+        // Error: byte index 3 is not a char boundary; it is inside '\u{3000}' (bytes 1..4) of ` 　 メールクリックがない`
+        // After lexer processing: " " + "\u{3000}" + " " + Japanese text
+        // This triggers parse_indented_code because line starts with ASCII space
+        let arena = Bump::new();
+        // Format: " * " + " " (1 ASCII space) + "\u{3000}" (full-width) + " " (1 ASCII space) + text
+        let phpdoc = "/**\n *  \u{3000} メールクリックがない\n */";
+        let span = Span::new(FileId::zero(), Position::new(0), Position::new(phpdoc.len() as u32));
+
+        let result = parse_phpdoc_with_span(&arena, phpdoc, span);
+        assert!(result.is_ok(), "Parsing should succeed without panic");
+
+        let document = result.unwrap();
+        assert_eq!(document.elements.len(), 1);
+        let Element::Code(code) = &document.elements[0] else {
+            panic!("Expected Element::Code, got {:?}", document.elements[0]);
+        };
+        assert_eq!(code.content, "メールクリックがない");
     }
 }

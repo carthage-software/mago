@@ -15,6 +15,7 @@ use crate::visibility::Visibility;
 /// This includes information about its name, location, visibility (potentially asymmetric),
 /// type hints, default values, and various modifiers (`static`, `readonly`, `abstract`, etc.).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct PropertyMetadata {
     /// The identifier (name) of the property, including the leading '$'.
     pub name: VariableIdentifier,
@@ -118,11 +119,14 @@ impl PropertyMetadata {
         &self.name
     }
 
-    /// Checks if the property is effectively final (private read or write access).
+    /// Checks if the property is effectively final (private read access).
+    ///
+    /// A property with `private(set)` (private write but public read) is NOT final
+    /// because child classes can still read and override it.
     #[inline]
     #[must_use]
     pub fn is_final(&self) -> bool {
-        self.read_visibility.is_private() || self.write_visibility.is_private()
+        self.read_visibility.is_private()
     }
 
     /// Sets the span for the property name identifier.

@@ -1,10 +1,12 @@
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::rc::Rc;
+use std::sync::Arc;
 
-use ahash::HashSet;
+use foldhash::HashSet;
 
 use mago_atom::AtomSet;
+use mago_atom::ascii_lowercase_atom;
 use mago_atom::atom;
 use mago_atom::empty_atom;
 use mago_codex::ttype::TType;
@@ -14,6 +16,7 @@ use mago_codex::ttype::atomic::array::key::ArrayKey;
 use mago_codex::ttype::atomic::array::keyed::TKeyedArray;
 use mago_codex::ttype::atomic::array::list::TList;
 use mago_codex::ttype::atomic::mixed::TMixed;
+use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::string::TString;
 use mago_codex::ttype::combine_union_types;
@@ -102,6 +105,7 @@ struct ArrayCreationInfo {
     int_offset: i64,
     is_list: bool,
     can_be_empty: bool,
+    known_int_offset: bool,
 }
 
 fn analyze_array_elements<'ctx, 'arena>(
@@ -127,15 +131,16 @@ fn analyze_array_elements<'ctx, 'arena>(
         int_offset: -1,
         is_list: true,
         can_be_empty: true,
+        known_int_offset: true,
     };
 
     for element in elements {
         let (item_key_value, key_type, item_is_list_item, value) = match element {
             ArrayElement::KeyValue(key_value_array_element) => {
-                let was_inside_general_use = block_context.inside_general_use;
-                block_context.inside_general_use = true;
+                let was_inside_general_use = block_context.flags.inside_general_use();
+                block_context.flags.set_inside_general_use(true);
                 key_value_array_element.key.analyze(context, block_context, artifacts)?;
-                block_context.inside_general_use = was_inside_general_use;
+                block_context.flags.set_inside_general_use(was_inside_general_use);
 
                 let (item_key_value, key_type) = artifacts
                     .get_expression_type(key_value_array_element.key)
@@ -224,20 +229,24 @@ fn analyze_array_elements<'ctx, 'arena>(
                     break;
                 }
 
-                array_creation_info.int_offset += 1;
+                if array_creation_info.known_int_offset {
+                    array_creation_info.int_offset += 1;
 
-                (
-                    Some(ArrayKey::Integer(array_creation_info.int_offset)),
-                    get_literal_int(array_creation_info.int_offset),
-                    true,
-                    value_array_element.value,
-                )
+                    (
+                        Some(ArrayKey::Integer(array_creation_info.int_offset)),
+                        get_literal_int(array_creation_info.int_offset),
+                        true,
+                        value_array_element.value,
+                    )
+                } else {
+                    (None, get_int(), true, value_array_element.value)
+                }
             }
             ArrayElement::Variadic(variadic_array_element) => {
-                let was_inside_general_use = block_context.inside_general_use;
-                block_context.inside_general_use = true;
+                let was_inside_general_use = block_context.flags.inside_general_use();
+                block_context.flags.set_inside_general_use(true);
                 variadic_array_element.value.analyze(context, block_context, artifacts)?;
-                block_context.inside_general_use = was_inside_general_use;
+                block_context.flags.set_inside_general_use(was_inside_general_use);
 
                 if let Some(variadic_array_element_type) = artifacts.get_expression_type(&variadic_array_element.value)
                 {
@@ -275,10 +284,10 @@ fn analyze_array_elements<'ctx, 'arena>(
             }
         };
 
-        let was_inside_general_use = block_context.inside_general_use;
-        block_context.inside_general_use = true;
+        let was_inside_general_use = block_context.flags.inside_general_use();
+        block_context.flags.set_inside_general_use(true);
         value.analyze(context, block_context, artifacts)?;
-        block_context.inside_general_use = was_inside_general_use;
+        block_context.flags.set_inside_general_use(was_inside_general_use);
 
         array_creation_info.can_be_empty = false;
         array_creation_info.is_list &= item_is_list_item;
@@ -347,22 +356,78 @@ fn analyze_array_elements<'ctx, 'arena>(
         }
     }
 
+    if array_creation_info.is_list
+        && array_creation_info.property_types.len() == 2
+        && let (Some((_, first_type)), Some((_, second_type))) = (
+            array_creation_info.property_types.get(&ArrayKey::Integer(0)),
+            array_creation_info.property_types.get(&ArrayKey::Integer(1)),
+        )
+    {
+        let class_names: Vec<_> = first_type
+            .types
+            .iter()
+            .filter_map(|atomic| {
+                if let Some(class_name) = atomic.get_class_string_value() {
+                    Some(class_name)
+                } else if let Some(literal_str) = atomic.get_literal_string_value() {
+                    Some(atom(literal_str))
+                } else if let TAtomic::Object(obj) = atomic {
+                    match obj {
+                        TObject::Named(named) => Some(named.name),
+                        TObject::Enum(r#enum) => Some(r#enum.name),
+                        _ => None,
+                    }
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        let method_names: Vec<_> = second_type
+            .types
+            .iter()
+            .filter_map(|atomic| atomic.get_literal_string_value().map(ascii_lowercase_atom))
+            .collect();
+
+        for class_name in &class_names {
+            for method_name in &method_names {
+                artifacts.symbol_references.add_reference_to_class_member(
+                    &block_context.scope,
+                    (ascii_lowercase_atom(class_name), *method_name),
+                    false,
+                );
+            }
+        }
+    }
+
     let item_key_type = if array_creation_info.item_key_atomic_types.is_empty() {
         None
     } else {
-        Some(TUnion::from_vec(combine(array_creation_info.item_key_atomic_types, context.codebase, false)))
+        Some(TUnion::from_vec(combine(
+            array_creation_info.item_key_atomic_types,
+            context.codebase,
+            context.settings.combiner_options(),
+        )))
     };
 
     let item_value_type = if array_creation_info.item_value_atomic_types.is_empty() {
         None
     } else {
-        Some(TUnion::from_vec(combine(array_creation_info.item_value_atomic_types, context.codebase, false)))
+        Some(TUnion::from_vec(combine(
+            array_creation_info.item_value_atomic_types,
+            context.codebase,
+            context.settings.combiner_options(),
+        )))
     };
 
     let array_type = if !array_creation_info.property_types.is_empty() {
         if array_creation_info.is_list {
             TUnion::from_vec(vec![TAtomic::Array(TArray::List(TList {
-                known_count: Some(array_creation_info.property_types.len()),
+                known_count: if array_creation_info.known_int_offset {
+                    Some(array_creation_info.property_types.len())
+                } else {
+                    None
+                },
                 known_elements: Some(
                     array_creation_info
                         .property_types
@@ -371,7 +436,7 @@ fn analyze_array_elements<'ctx, 'arena>(
                         .map(|(index, (_, value_tuple))| (index, (value_tuple.0, value_tuple.1)))
                         .collect(),
                 ),
-                element_type: Box::new(match item_value_type {
+                element_type: Arc::new(match item_value_type {
                     Some(value) => value,
                     None => get_never(),
                 }),
@@ -386,10 +451,10 @@ fn analyze_array_elements<'ctx, 'arena>(
                     None
                 } else {
                     match (item_key_type, item_value_type) {
-                        (Some(key), Some(value)) => Some((Box::new(key), Box::new(value))),
-                        (Some(key), None) => Some((Box::new(key), Box::new(get_mixed()))),
-                        (None, Some(value)) => Some((Box::new(get_arraykey()), Box::new(value))),
-                        _ => Some((Box::new(get_arraykey()), Box::new(get_mixed()))),
+                        (Some(key), Some(value)) => Some((Arc::new(key), Arc::new(value))),
+                        (Some(key), None) => Some((Arc::new(key), Arc::new(get_mixed()))),
+                        (None, Some(value)) => Some((Arc::new(get_arraykey()), Arc::new(value))),
+                        _ => Some((Arc::new(get_arraykey()), Arc::new(get_mixed()))),
                     }
                 },
                 non_empty: true,
@@ -400,7 +465,7 @@ fn analyze_array_elements<'ctx, 'arena>(
     } else if array_creation_info.is_list {
         TUnion::from_vec(vec![TAtomic::Array(TArray::List(TList {
             known_elements: None,
-            element_type: Box::new(item_value_type.unwrap_or_else(get_mixed)),
+            element_type: Arc::new(item_value_type.unwrap_or_else(get_mixed)),
             known_count: None,
             non_empty: !array_creation_info.can_be_empty,
         }))])
@@ -408,10 +473,10 @@ fn analyze_array_elements<'ctx, 'arena>(
         TUnion::from_vec(vec![TAtomic::Array(TArray::Keyed(TKeyedArray {
             known_items: None,
             parameters: match (item_key_type, item_value_type) {
-                (Some(key), Some(value)) => Some((Box::new(key), Box::new(value))),
-                (Some(key), None) => Some((Box::new(key), Box::new(get_mixed()))),
-                (None, Some(value)) => Some((Box::new(get_arraykey()), Box::new(value))),
-                _ => Some((Box::new(get_arraykey()), Box::new(get_mixed()))),
+                (Some(key), Some(value)) => Some((Arc::new(key), Arc::new(value))),
+                (Some(key), None) => Some((Arc::new(key), Arc::new(get_mixed()))),
+                (None, Some(value)) => Some((Arc::new(get_arraykey()), Arc::new(value))),
+                _ => Some((Arc::new(get_arraykey()), Arc::new(get_mixed()))),
             },
             non_empty: !array_creation_info.can_be_empty,
         }))])
@@ -492,9 +557,13 @@ fn handle_variadic_array_element<'arena>(
                                         .push(TAtomic::Scalar(TScalar::String(TString::known_literal(*string_key))));
                                     ArrayKey::String(*string_key)
                                 }
+                                ArrayKey::ClassLikeConstant { .. } => {
+                                    // unresolved class-like constant key; treat as opaque
+                                    array_creation_info.is_list = false;
+                                    *key
+                                }
                             };
 
-                            array_creation_info.array_keys.insert(new_offset_key);
                             array_creation_info.property_types.insert(new_offset_key, (false, value_type.clone()));
                         }
                     }
@@ -512,13 +581,14 @@ fn handle_variadic_array_element<'arena>(
                     }
                 }
                 TArray::List(list_data) => {
-                    // Process known elements
+                    let has_unknown_count = list_data.known_count.is_none();
+                    if has_unknown_count {
+                        array_creation_info.known_int_offset = false;
+                    }
+
                     if let Some(known_elements) = &list_data.known_elements {
-                        // Original logic iterated values(), not keys. Let's adjust to match the old intent if needed.
-                        // Assuming the goal IS to add elements sequentially based on the values in the spread list:
-                        for (definite, value_type) in known_elements.values() {
-                            // Key _idx ignored if appending
-                            if !*definite {
+                        for (possibly_undefined, value_type) in known_elements.values() {
+                            if *possibly_undefined {
                                 continue;
                             }
 
@@ -683,7 +753,8 @@ fn handle_variadic_array_element<'arena>(
                     false,
                     &mut ComparisonResult::new(),
                 ) {
-                    let new_prop_val = combine_union_types(&v.1, &value_type, context.codebase, false);
+                    let new_prop_val =
+                        combine_union_types(&v.1, &value_type, context.codebase, context.settings.combiner_options());
 
                     *v = (v.0, new_prop_val);
                 }

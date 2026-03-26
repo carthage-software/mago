@@ -1,13 +1,24 @@
 import { defineConfig } from "vitepress";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 
 const hostname = "https://mago.carthage.software";
+
+// Read version from root Cargo.toml for WASM cache-busting
+const cargoToml = readFileSync(resolve(__dirname, "../../Cargo.toml"), "utf-8");
+const magoVersion = cargoToml.match(/^version\s*=\s*"(.+)"/m)?.[1] ?? "dev";
 
 export default defineConfig({
   srcDir: ".",
   vite: {
     assetsInclude: ["**/*.wasm"],
+    define: {
+      __MAGO_VERSION__: JSON.stringify(magoVersion),
+    },
     build: {
       target: "esnext",
+      cssMinify: true,
+      minify: "esbuild",
     },
     optimizeDeps: {
       exclude: ["mago-wasm"],
@@ -19,6 +30,18 @@ export default defineConfig({
   sitemap: { hostname },
   lang: "en-US",
   head: [
+    [
+      "link",
+      { rel: "dns-prefetch", href: "https://avatars.githubusercontent.com" },
+    ],
+    [
+      "link",
+      {
+        rel: "preconnect",
+        href: "https://avatars.githubusercontent.com",
+        crossorigin: "",
+      },
+    ],
     ["link", { rel: "apple-touch-icon", href: "/assets/apple-touch-icon.png" }],
     [
       "link",
@@ -63,14 +86,14 @@ export default defineConfig({
   lastUpdated: true,
   cleanUrls: true,
   themeConfig: {
-    logo: "/assets/icon.svg",
+    logo: "/assets/icon.png",
     nav: [
       { text: "Guide", link: "/guide/getting-started" },
       { text: "Tools", link: "/tools/overview" },
       { text: "Playground", link: "/playground" },
       { text: "Benchmarks", link: "/benchmarks" },
       { text: "FAQ", link: "/faq" },
-      { text: "Sponsor", link: "https://github.com/sponsors/azjezz" },
+      { text: "Sponsors", link: "/#our-sponsors" },
     ],
     sidebar: [
       {
@@ -202,6 +225,7 @@ export default defineConfig({
         text: "🧩 Recipes",
         collapsed: true,
         items: [
+          { text: "Docker", link: "/recipes/docker" },
           { text: "GitHub Actions", link: "/recipes/github-actions" },
           { text: "Zed", link: "/recipes/zed" },
           { text: "Helix", link: "/recipes/helix" },

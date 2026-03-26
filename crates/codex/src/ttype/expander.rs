@@ -1,7 +1,10 @@
 use std::borrow::Cow;
 use std::cell::RefCell;
+use std::sync::Arc;
 
-use ahash::HashSet;
+use std::collections::HashSet;
+
+use foldhash::fast::FixedState;
 use mago_atom::Atom;
 use mago_atom::ascii_lowercase_atom;
 
@@ -12,6 +15,7 @@ use crate::ttype::TType;
 use crate::ttype::atomic::TAtomic;
 use crate::ttype::atomic::alias::TAlias;
 use crate::ttype::atomic::array::TArray;
+use crate::ttype::atomic::array::key::ArrayKey;
 use crate::ttype::atomic::callable::TCallable;
 use crate::ttype::atomic::callable::TCallableSignature;
 use crate::ttype::atomic::callable::parameter::TCallableParameter;
@@ -29,17 +33,19 @@ use crate::ttype::atomic::reference::TReference;
 use crate::ttype::atomic::reference::TReferenceMemberSelector;
 use crate::ttype::atomic::scalar::TScalar;
 use crate::ttype::atomic::scalar::class_like_string::TClassLikeString;
+use crate::ttype::atomic::scalar::int::TInteger;
+use crate::ttype::atomic::scalar::string::TString;
+use crate::ttype::atomic::scalar::string::TStringLiteral;
 use crate::ttype::combiner;
-use crate::ttype::get_mixed;
 use crate::ttype::union::TUnion;
 
 thread_local! {
     /// Thread-local set for tracking currently expanding aliases (cycle detection).
     /// Uses a HashSet for accurate tracking without false positives from hash collisions.
-    static EXPANDING_ALIASES: RefCell<HashSet<(Atom, Atom)>> = const { RefCell::new(HashSet::with_hasher(ahash::RandomState::with_seeds(0, 0, 0, 0))) };
+    static EXPANDING_ALIASES: RefCell<HashSet<(Atom, Atom), FixedState>> = const { RefCell::new(HashSet::with_hasher(FixedState::with_seed(0))) };
 
     /// Thread-local set for tracking objects whose type parameters are being expanded (cycle detection).
-    static EXPANDING_OBJECT_PARAMS: RefCell<HashSet<Atom>> = const { RefCell::new(HashSet::with_hasher(ahash::RandomState::with_seeds(0, 0, 0, 0))) };
+    static EXPANDING_OBJECT_PARAMS: RefCell<HashSet<Atom, FixedState>> = const { RefCell::new(HashSet::with_hasher(FixedState::with_seed(0))) };
 }
 
 /// Resets the thread-local alias expansion state.
@@ -167,12 +173,12 @@ pub fn expand_union(codebase: &CodebaseMetadata, return_type: &mut TUnion, optio
         }
 
         types = if new_return_type_parts.len() > 1 {
-            combiner::combine(new_return_type_parts, codebase, false)
+            combiner::combine(new_return_type_parts, codebase, combiner::CombinerOptions::default())
         } else {
             new_return_type_parts
         };
     } else if types.len() > 1 {
-        types = combiner::combine(types, codebase, false);
+        types = combiner::combine(types, codebase, combiner::CombinerOptions::default());
     }
 
     return_type.types = Cow::Owned(types);
@@ -189,18 +195,30 @@ pub(crate) fn expand_atomic(
         TAtomic::Array(array_type) => match array_type {
             TArray::Keyed(keyed_data) => {
                 if let Some((key_parameter, value_parameter)) = &mut keyed_data.parameters {
-                    expand_union(codebase, key_parameter, options);
-                    expand_union(codebase, value_parameter, options);
+                    expand_union(codebase, Arc::make_mut(key_parameter), options);
+                    expand_union(codebase, Arc::make_mut(value_parameter), options);
                 }
 
                 if let Some(known_items) = &mut keyed_data.known_items {
-                    for (_, item_type) in known_items.values_mut() {
-                        expand_union(codebase, item_type, options);
+                    // Check if any keys need resolution
+                    let needs_key_resolution = known_items.keys().any(|k| k.is_class_like_constant());
+
+                    if needs_key_resolution {
+                        let old_items = std::mem::take(known_items);
+                        for (key, (is_optional, mut value_type)) in old_items {
+                            expand_union(codebase, &mut value_type, options);
+                            let resolved_key = resolve_array_key(key, codebase, options);
+                            known_items.insert(resolved_key, (is_optional, value_type));
+                        }
+                    } else {
+                        for (_, item_type) in known_items.values_mut() {
+                            expand_union(codebase, item_type, options);
+                        }
                     }
                 }
             }
             TArray::List(list_data) => {
-                expand_union(codebase, &mut list_data.element_type, options);
+                expand_union(codebase, Arc::make_mut(&mut list_data.element_type), options);
 
                 if let Some(known_elements) = &mut list_data.known_elements {
                     for (_, element_type) in known_elements.values_mut() {
@@ -224,14 +242,14 @@ pub(crate) fn expand_atomic(
             }
         }
         TAtomic::GenericParameter(parameter) => {
-            expand_union(codebase, parameter.constraint.as_mut(), options);
+            expand_union(codebase, Arc::make_mut(&mut parameter.constraint), options);
         }
         TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::OfType { constraint, .. })) => {
             let mut atomic_return_type_parts = vec![];
-            expand_atomic(constraint, codebase, options, &mut false, &mut atomic_return_type_parts);
+            expand_atomic(Arc::make_mut(constraint), codebase, options, &mut false, &mut atomic_return_type_parts);
 
             if !atomic_return_type_parts.is_empty() {
-                **constraint = atomic_return_type_parts.remove(0);
+                *Arc::make_mut(constraint) = atomic_return_type_parts.remove(0);
             }
         }
         TAtomic::Reference(TReference::Member { class_like_name, member_selector }) => {
@@ -247,8 +265,8 @@ pub(crate) fn expand_atomic(
         TAtomic::Conditional(conditional) => {
             *skip_key = true;
 
-            let mut then = conditional.then.clone();
-            let mut otherwise = conditional.otherwise.clone();
+            let mut then = (*conditional.then).clone();
+            let mut otherwise = (*conditional.otherwise).clone();
 
             expand_union(codebase, &mut then, options);
             expand_union(codebase, &mut otherwise, options);
@@ -287,11 +305,86 @@ pub(crate) fn expand_atomic(
             }
         },
         TAtomic::Iterable(iterable) => {
-            expand_union(codebase, &mut iterable.key_type, options);
-            expand_union(codebase, &mut iterable.value_type, options);
+            expand_union(codebase, Arc::make_mut(&mut iterable.key_type), options);
+            expand_union(codebase, Arc::make_mut(&mut iterable.value_type), options);
         }
         _ => {}
     }
+}
+
+/// Resolves a `ClassLikeConstant` array key to its concrete `Integer` or `String` value.
+///
+/// Looks up the class constant or enum case in the codebase metadata and returns:
+/// - `ArrayKey::Integer(value)` if the constant resolves to a literal integer
+/// - `ArrayKey::String(value)` if the constant resolves to a literal string
+/// - The original key unchanged if it cannot be resolved
+fn resolve_array_key(key: ArrayKey, codebase: &CodebaseMetadata, options: &TypeExpansionOptions) -> ArrayKey {
+    let ArrayKey::ClassLikeConstant { class_like_name, constant_name } = key else {
+        return key;
+    };
+
+    // Resolve self/static/this/parent to the actual class name
+    let resolved_class_name = {
+        let name_lc = ascii_lowercase_atom(&class_like_name);
+        match name_lc.as_str() {
+            "self" => options.self_class.unwrap_or(class_like_name),
+            "static" | "$this" => {
+                if let StaticClassType::Name(name) = &options.static_class_type {
+                    *name
+                } else {
+                    options.self_class.unwrap_or(class_like_name)
+                }
+            }
+            "parent" => {
+                if let Some(self_class) = options.self_class
+                    && let Some(class_metadata) = codebase.get_class_like(&self_class)
+                    && let Some(parent) = class_metadata.direct_parent_class
+                {
+                    parent
+                } else {
+                    class_like_name
+                }
+            }
+            _ => class_like_name,
+        }
+    };
+
+    let Some(class_like) = codebase.get_class_like(&resolved_class_name) else {
+        return ArrayKey::ClassLikeConstant { class_like_name, constant_name };
+    };
+
+    // Try class constants first
+    if let Some(constant) = class_like.constants.get(&constant_name)
+        && let Some(inferred) = &constant.inferred_type
+    {
+        match inferred {
+            TAtomic::Scalar(TScalar::Integer(TInteger::Literal(i))) => {
+                return ArrayKey::Integer(*i);
+            }
+            TAtomic::Scalar(TScalar::String(TString { literal: Some(TStringLiteral::Value(s)), .. })) => {
+                return ArrayKey::String(*s);
+            }
+            _ => {}
+        }
+    }
+
+    // Try enum cases
+    if let Some(enum_case) = class_like.enum_cases.get(&constant_name)
+        && let Some(value_type) = &enum_case.value_type
+    {
+        match value_type {
+            TAtomic::Scalar(TScalar::Integer(TInteger::Literal(i))) => {
+                return ArrayKey::Integer(*i);
+            }
+            TAtomic::Scalar(TScalar::String(TString { literal: Some(TStringLiteral::Value(s)), .. })) => {
+                return ArrayKey::String(*s);
+            }
+            _ => {}
+        }
+    }
+
+    // Cannot resolve - keep as-is
+    ArrayKey::ClassLikeConstant { class_like_name, constant_name }
 }
 
 #[cold]
@@ -308,7 +401,7 @@ fn expand_member_reference(
     };
 
     for (constant_name, constant) in &class_like.constants {
-        if !member_selector.matches(constant_name) {
+        if !member_selector.matches(*constant_name) {
             continue;
         }
 
@@ -330,10 +423,18 @@ fn expand_member_reference(
     }
 
     for enum_case_name in class_like.enum_cases.keys() {
-        if !member_selector.matches(enum_case_name) {
+        if !member_selector.matches(*enum_case_name) {
             continue;
         }
         new_return_type_parts.push(TAtomic::Object(TObject::new_enum_case(class_like.original_name, *enum_case_name)));
+    }
+
+    if let TReferenceMemberSelector::Identifier(member_name) = member_selector
+        && let Some(type_alias) = class_like.type_aliases.get(member_name)
+    {
+        let mut alias_type = type_alias.type_union.clone();
+        expand_union(codebase, &mut alias_type, options);
+        new_return_type_parts.extend(alias_type.types.into_owned());
     }
 
     if new_return_type_parts.is_empty() {
@@ -341,103 +442,179 @@ fn expand_member_reference(
     }
 }
 
-fn expand_object(named_object: &mut TObject, codebase: &CodebaseMetadata, options: &TypeExpansionOptions) {
-    let Some(name) = named_object.get_name().copied() else {
+fn expand_object(object: &mut TObject, codebase: &CodebaseMetadata, options: &TypeExpansionOptions) {
+    resolve_special_class_names(object, codebase, options);
+
+    let TObject::Named(named) = object else {
         return;
     };
 
-    let is_this = if let TObject::Named(named_object) = named_object { named_object.is_this() } else { false };
-    let name_str_lc = ascii_lowercase_atom(&name);
+    let Some(_guard) = ObjectParamsExpansionGuard::try_new(named.name) else {
+        return;
+    };
 
-    if is_this || name_str_lc == "static" || name_str_lc == "$this" {
-        match &options.static_class_type {
-            StaticClassType::Object(TObject::Enum(static_enum)) => {
-                *named_object = TObject::Enum(static_enum.clone());
-            }
-            StaticClassType::Object(TObject::Named(static_object)) => {
-                if let TObject::Named(named_object) = named_object {
-                    if let Some(static_object_intersections) = &static_object.intersection_types {
-                        let intersections = named_object.intersection_types.get_or_insert_with(Vec::new);
-                        intersections.extend(static_object_intersections.iter().cloned());
-                    }
-
-                    if named_object.type_parameters.is_none() {
-                        named_object.type_parameters.clone_from(&static_object.type_parameters);
-                    }
-
-                    named_object.name = static_object.name;
-                    named_object.is_this = true;
-                }
-            }
-            StaticClassType::Name(static_class_name)
-                if name_str_lc == "static"
-                    || name_str_lc == "$this"
-                    || codebase.is_instance_of(static_class_name, &name) =>
-            {
-                if let TObject::Named(named_object) = named_object {
-                    named_object.name = *static_class_name;
-                    named_object.is_this = false;
-                }
-            }
-            _ => {}
+    if let Some(class_metadata) = codebase.get_class_like(&named.name) {
+        for &required in class_metadata.require_extends.iter().chain(&class_metadata.require_implements) {
+            named.add_intersection_type(TAtomic::Object(TObject::Named(TNamedObject::new(required))));
         }
-    } else if name_str_lc == "self" {
-        if let Some(self_class_name) = options.self_class
-            && let TObject::Named(named_object) = named_object
+    }
+
+    expand_or_fill_type_parameters(named, codebase, options);
+}
+
+/// Resolves `static`, `$this`, `self`, and `parent` to their concrete class names.
+fn resolve_special_class_names(object: &mut TObject, codebase: &CodebaseMetadata, options: &TypeExpansionOptions) {
+    if let TObject::Named(named) = object {
+        let name_lc = ascii_lowercase_atom(&named.name);
+        let needs_static_resolution = matches!(name_lc.as_str(), "static" | "$this") || named.is_this;
+
+        if needs_static_resolution
+            && let StaticClassType::Object(TObject::Enum(static_enum)) = &options.static_class_type
         {
-            named_object.name = self_class_name;
-        }
-    } else if name_str_lc == "parent"
-        && let Some(self_class_name) = options.self_class
-        && let Some(class_metadata) = codebase.get_class_like(&self_class_name)
-        && let Some(parent_name) = class_metadata.direct_parent_class
-        && let TObject::Named(named_object) = named_object
-    {
-        named_object.name = parent_name;
-    }
-
-    let TObject::Named(named_object) = named_object else {
-        return;
-    };
-
-    let Some(_guard) = ObjectParamsExpansionGuard::try_new(named_object.name) else {
-        return;
-    };
-
-    if let Some(class_like_metadata) = codebase.get_class_like(&named_object.name) {
-        for required_parent in &class_like_metadata.require_extends {
-            named_object.add_intersection_type(TAtomic::Object(TObject::Named(TNamedObject::new(*required_parent))));
-        }
-
-        for required_interface in &class_like_metadata.require_implements {
-            named_object.add_intersection_type(TAtomic::Object(TObject::Named(TNamedObject::new(*required_interface))));
+            *object = TObject::Enum(static_enum.clone());
+            return;
         }
     }
 
-    match &mut named_object.type_parameters {
-        Some(type_parameters) if !type_parameters.is_empty() => {
-            for type_parameter in type_parameters.iter_mut() {
-                expand_union(codebase, type_parameter, options);
+    let TObject::Named(named) = object else {
+        return;
+    };
+
+    let name_lc = ascii_lowercase_atom(&named.name);
+    let was_this = named.is_this;
+
+    match name_lc.as_str() {
+        "static" | "$this" => resolve_static_type(named, was_this, false, codebase, options),
+        "self" => {
+            if let Some(self_class) = options.self_class {
+                named.name = self_class;
             }
         }
-        _ => {
-            if let Some(class_like_metadata) = codebase.get_class_like(&named_object.name)
-                && !class_like_metadata.template_types.is_empty()
+        "parent" => {
+            if let Some(self_class) = options.self_class
+                && let Some(class_metadata) = codebase.get_class_like(&self_class)
+                && let Some(parent) = class_metadata.direct_parent_class
             {
-                let default_params: Vec<TUnion> = class_like_metadata
-                    .template_types
-                    .iter()
-                    .map(|(_, template_map)| {
-                        template_map.iter().map(|(_, t)| t).next().cloned().unwrap_or_else(get_mixed)
-                    })
-                    .collect();
-
-                if !default_params.is_empty() {
-                    named_object.type_parameters = Some(default_params);
-                }
+                named.name = parent;
             }
         }
+        _ if named.is_static => resolve_static_type(named, was_this, true, codebase, options),
+        _ => {}
     }
+}
+
+/// Resolves a `static` or `$this` type to a named object using the static class type from options.
+///
+/// `is_this_type`: true when the original type was `$this` (same instance), false for `static`.
+/// `check_compatibility`: when true, verifies the static type is compatible before resolving.
+fn resolve_static_type(
+    named: &mut TNamedObject,
+    is_this_type: bool,
+    check_compatibility: bool,
+    codebase: &CodebaseMetadata,
+    options: &TypeExpansionOptions,
+) {
+    match &options.static_class_type {
+        StaticClassType::Object(TObject::Named(static_obj)) => {
+            if check_compatibility && !is_static_type_compatible(named, static_obj, codebase) {
+                return;
+            }
+
+            if let Some(intersections) = &static_obj.intersection_types {
+                named.intersection_types.get_or_insert_with(Vec::new).extend(intersections.iter().cloned());
+            }
+
+            if static_obj.type_parameters.is_some() && should_use_static_type_params(named, static_obj, codebase) {
+                named.type_parameters.clone_from(&static_obj.type_parameters);
+            }
+
+            named.name = static_obj.name;
+            let effectively_final = is_effectively_final(&static_obj.name, codebase, options);
+            named.is_static = !effectively_final;
+            named.is_this = !effectively_final && is_this_type;
+        }
+        StaticClassType::Name(static_class)
+            if (!check_compatibility || codebase.is_instance_of(static_class, &named.name)) =>
+        {
+            named.name = *static_class;
+            let effectively_final = is_effectively_final(static_class, codebase, options);
+            named.is_static = !effectively_final;
+            named.is_this = !effectively_final && is_this_type;
+        }
+        _ => {}
+    }
+}
+
+/// Checks whether a class is effectively final for the purpose of `$this`/`static` resolution.
+///
+/// A class is effectively final when it cannot be extended, meaning `static` === `self`:
+///
+/// - The class is declared `final`
+/// - The class is anonymous
+/// - The method is declared `final`
+fn is_effectively_final(class_name: &Atom, codebase: &CodebaseMetadata, options: &TypeExpansionOptions) -> bool {
+    if options.function_is_final {
+        return true;
+    }
+
+    codebase.get_class_like(class_name).is_some_and(|meta| meta.name_span.is_none() || meta.flags.is_final())
+}
+
+/// Checks if the static object type is compatible with a type that has is_this=true.
+fn is_static_type_compatible(named: &TNamedObject, static_obj: &TNamedObject, codebase: &CodebaseMetadata) -> bool {
+    codebase.is_instance_of(&static_obj.name, &named.name)
+        || static_obj
+            .intersection_types
+            .iter()
+            .flatten()
+            .filter_map(|t| if let TAtomic::Object(obj) = t { obj.get_name() } else { None })
+            .any(|name| codebase.is_instance_of(&name, &named.name))
+}
+
+/// Returns true if we should use the static object's type parameters instead of the current ones.
+/// This is true when current params are None or match the class's default template bounds.
+fn should_use_static_type_params(named: &TNamedObject, static_obj: &TNamedObject, codebase: &CodebaseMetadata) -> bool {
+    let Some(current_params) = &named.type_parameters else {
+        return true;
+    };
+
+    let Some(class_metadata) = codebase.get_class_like(&static_obj.name) else {
+        return false;
+    };
+
+    let templates = &class_metadata.template_types;
+
+    current_params.len() == templates.len()
+        && current_params.iter().zip(templates.values()).all(|(current, template)| current == &template.constraint)
+}
+
+/// Expands existing type parameters or fills them with default template bounds.
+fn expand_or_fill_type_parameters(
+    named: &mut TNamedObject,
+    codebase: &CodebaseMetadata,
+    options: &TypeExpansionOptions,
+) {
+    if let Some(params) = &mut named.type_parameters
+        && !params.is_empty()
+    {
+        for param in params.iter_mut() {
+            expand_union(codebase, param, options);
+        }
+        return;
+    }
+
+    let Some(class_metadata) = codebase.get_class_like(&named.name) else {
+        return;
+    };
+
+    if class_metadata.template_types.is_empty() {
+        return;
+    }
+
+    let defaults: Vec<TUnion> =
+        class_metadata.template_types.values().map(|template| template.constraint.clone()).collect();
+
+    named.type_parameters = Some(defaults);
 }
 
 #[must_use]
@@ -507,7 +684,7 @@ pub fn get_signature_of_function_like_metadata(
             let type_signature = if let Some(t) = parameter_metadata.get_type_metadata() {
                 let mut t = t.type_union.clone();
                 expand_union(codebase, &mut t, options);
-                Some(Box::new(t))
+                Some(Arc::new(t))
             } else {
                 None
             };
@@ -524,7 +701,7 @@ pub fn get_signature_of_function_like_metadata(
     let return_type = if let Some(type_metadata) = function_like_metadata.return_type_metadata.as_ref() {
         let mut return_type = type_metadata.type_union.clone();
         expand_union(codebase, &mut return_type, options);
-        Some(Box::new(return_type))
+        Some(Arc::new(return_type))
     } else {
         None
     };
@@ -684,6 +861,7 @@ mod tests {
     use super::*;
 
     use std::borrow::Cow;
+    use std::sync::Arc;
 
     use bumpalo::Bump;
 
@@ -721,13 +899,13 @@ mod tests {
     use crate::ttype::atomic::scalar::TScalar;
     use crate::ttype::atomic::scalar::class_like_string::TClassLikeString;
     use crate::ttype::atomic::scalar::class_like_string::TClassLikeStringKind;
+    use crate::ttype::flags::UnionFlags;
     use crate::ttype::get_int;
     use crate::ttype::get_mixed;
     use crate::ttype::get_never;
     use crate::ttype::get_null;
     use crate::ttype::get_string;
     use crate::ttype::get_void;
-    use crate::ttype::union::UnionFlags;
 
     fn create_test_codebase(code: &'static str) -> CodebaseMetadata {
         let file = File::ephemeral(Cow::Borrowed("code.php"), Cow::Borrowed(code));
@@ -739,7 +917,8 @@ mod tests {
         let mut codebase = CodebaseMetadata::new();
         let arena = Bump::new();
         for file in database.files() {
-            let program = parse_file(&arena, &file).0;
+            let program = parse_file(&arena, &file);
+            assert!(!program.has_errors(), "Parse failed: {:?}", program.errors);
             let resolved_names = NameResolver::new(&arena).resolve(program);
             let program_codebase = scan_program(&arena, &file, program, &resolved_names);
 
@@ -764,9 +943,8 @@ mod tests {
     }
 
     fn options_with_static_object(object: TObject) -> TypeExpansionOptions {
-        let name = object.get_name().copied();
         TypeExpansionOptions {
-            self_class: name,
+            self_class: object.get_name(),
             static_class_type: StaticClassType::Object(object),
             ..Default::default()
         }
@@ -847,7 +1025,7 @@ mod tests {
         let codebase = create_test_codebase(code);
 
         let mut keyed = TKeyedArray::new();
-        keyed.parameters = Some((Box::new(make_self_object()), Box::new(get_int())));
+        keyed.parameters = Some((Arc::new(make_self_object()), Arc::new(get_int())));
         let input = TUnion::from_atomic(TAtomic::Array(TArray::Keyed(keyed)));
 
         let options = options_with_self("Foo");
@@ -873,7 +1051,7 @@ mod tests {
         let codebase = create_test_codebase(code);
 
         let mut keyed = TKeyedArray::new();
-        keyed.parameters = Some((Box::new(get_string()), Box::new(make_self_object())));
+        keyed.parameters = Some((Arc::new(get_string()), Arc::new(make_self_object())));
         let input = TUnion::from_atomic(TAtomic::Array(TArray::Keyed(keyed)));
 
         let options = options_with_self("Foo");
@@ -930,7 +1108,7 @@ mod tests {
         let code = r"<?php class Foo {}";
         let codebase = create_test_codebase(code);
 
-        let list = TList::new(Box::new(make_self_object()));
+        let list = TList::new(Arc::new(make_self_object()));
         let input = TUnion::from_atomic(TAtomic::Array(TArray::List(list)));
 
         let options = options_with_self("Foo");
@@ -955,7 +1133,7 @@ mod tests {
 
         use std::collections::BTreeMap;
 
-        let mut list = TList::new(Box::new(get_mixed()));
+        let mut list = TList::new(Arc::new(get_mixed()));
         let mut known_elements = BTreeMap::new();
         known_elements.insert(0, (false, make_self_object()));
         list.known_elements = Some(known_elements);
@@ -984,11 +1162,11 @@ mod tests {
         let code = r"<?php class Foo {}";
         let codebase = create_test_codebase(code);
 
-        let inner_list = TList::new(Box::new(make_self_object()));
+        let inner_list = TList::new(Arc::new(make_self_object()));
         let inner_array = TUnion::from_atomic(TAtomic::Array(TArray::List(inner_list)));
 
         let mut outer = TKeyedArray::new();
-        outer.parameters = Some((Box::new(make_self_object()), Box::new(inner_array)));
+        outer.parameters = Some((Arc::new(make_self_object()), Arc::new(inner_array)));
         let input = TUnion::from_atomic(TAtomic::Array(TArray::Keyed(outer)));
 
         let options = options_with_self("Foo");
@@ -1031,7 +1209,7 @@ mod tests {
         let code = r"<?php class Foo {}";
         let codebase = create_test_codebase(code);
 
-        let mut list = TList::new(Box::new(make_self_object()));
+        let mut list = TList::new(Arc::new(make_self_object()));
         list.non_empty = true;
         let input = TUnion::from_atomic(TAtomic::Array(TArray::List(list)));
 
@@ -1102,7 +1280,7 @@ mod tests {
 
         assert!(actual.types.iter().any(|t| {
             if let TAtomic::Object(TObject::Named(named)) = t {
-                named.name == ascii_lowercase_atom("foo") && named.is_this
+                named.name == ascii_lowercase_atom("foo") && named.is_static && !named.is_this
             } else {
                 false
             }
@@ -1290,7 +1468,7 @@ mod tests {
         let code = r"<?php class Foo {}";
         let codebase = create_test_codebase(code);
 
-        let sig = TCallableSignature::new(false, false).with_return_type(Some(Box::new(make_self_object())));
+        let sig = TCallableSignature::new(false, false).with_return_type(Some(Arc::new(make_self_object())));
         let input = TUnion::from_atomic(TAtomic::Callable(TCallable::Signature(sig)));
 
         let options = options_with_self("Foo");
@@ -1315,7 +1493,7 @@ mod tests {
         let code = r"<?php class Foo {}";
         let codebase = create_test_codebase(code);
 
-        let param = TCallableParameter::new(Some(Box::new(make_self_object())), false, false, false);
+        let param = TCallableParameter::new(Some(Arc::new(make_self_object())), false, false, false);
         let sig = TCallableSignature::new(false, false).with_parameters(vec![param]);
         let input = TUnion::from_atomic(TAtomic::Callable(TCallable::Signature(sig)));
 
@@ -1390,7 +1568,7 @@ mod tests {
         let code = r"<?php class Foo {}";
         let codebase = create_test_codebase(code);
 
-        let sig = TCallableSignature::new(false, true).with_return_type(Some(Box::new(make_self_object())));
+        let sig = TCallableSignature::new(false, true).with_return_type(Some(Arc::new(make_self_object())));
         let input = TUnion::from_atomic(TAtomic::Callable(TCallable::Signature(sig)));
 
         let options = options_with_self("Foo");
@@ -1417,7 +1595,7 @@ mod tests {
 
         let generic = TGenericParameter::new(
             atom("T"),
-            Box::new(make_self_object()),
+            Arc::new(make_self_object()),
             GenericParent::ClassLike(ascii_lowercase_atom("foo")),
         );
         let input = TUnion::from_atomic(TAtomic::GenericParameter(generic));
@@ -1448,7 +1626,7 @@ mod tests {
 
         let generic = TGenericParameter::new(
             atom("T"),
-            Box::new(constraint),
+            Arc::new(constraint),
             GenericParent::ClassLike(ascii_lowercase_atom("bar")),
         );
         let input = TUnion::from_atomic(TAtomic::GenericParameter(generic));
@@ -1481,7 +1659,7 @@ mod tests {
 
         let mut generic = TGenericParameter::new(
             atom("T"),
-            Box::new(make_self_object()),
+            Arc::new(make_self_object()),
             GenericParent::ClassLike(ascii_lowercase_atom("foo")),
         );
         generic.intersection_types =
@@ -1509,7 +1687,7 @@ mod tests {
         let code = r"<?php class Foo {}";
         let codebase = create_test_codebase(code);
 
-        let constraint = Box::new(TAtomic::Object(TObject::Named(TNamedObject::new(atom("self")))));
+        let constraint = Arc::new(TAtomic::Object(TObject::Named(TNamedObject::new(atom("self")))));
         let class_string = TClassLikeString::OfType { kind: TClassLikeStringKind::Class, constraint };
         let input = TUnion::from_atomic(TAtomic::Scalar(TScalar::ClassLikeString(class_string)));
 
@@ -1529,7 +1707,7 @@ mod tests {
         let code = r"<?php class Foo {}";
         let codebase = create_test_codebase(code);
 
-        let constraint = Box::new(TAtomic::Object(TObject::Named(TNamedObject::new(atom("static")))));
+        let constraint = Arc::new(TAtomic::Object(TObject::Named(TNamedObject::new(atom("static")))));
         let class_string = TClassLikeString::OfType { kind: TClassLikeStringKind::Class, constraint };
         let input = TUnion::from_atomic(TAtomic::Scalar(TScalar::ClassLikeString(class_string)));
 
@@ -1549,7 +1727,7 @@ mod tests {
         let code = r"<?php interface MyInterface {}";
         let codebase = create_test_codebase(code);
 
-        let constraint = Box::new(TAtomic::Object(TObject::Named(TNamedObject::new(atom("self")))));
+        let constraint = Arc::new(TAtomic::Object(TObject::Named(TNamedObject::new(atom("self")))));
         let class_string = TClassLikeString::OfType { kind: TClassLikeStringKind::Interface, constraint };
         let input = TUnion::from_atomic(TAtomic::Scalar(TScalar::ClassLikeString(class_string)));
 
@@ -1764,10 +1942,10 @@ mod tests {
         let codebase = create_test_codebase(code);
 
         let conditional = TConditional::new(
-            Box::new(get_mixed()),
-            Box::new(get_string()),
-            Box::new(make_self_object()),
-            Box::new(make_self_object()),
+            Arc::new(get_mixed()),
+            Arc::new(get_string()),
+            Arc::new(make_self_object()),
+            Arc::new(make_self_object()),
             false,
         );
         let input = TUnion::from_atomic(TAtomic::Conditional(conditional));
@@ -1791,10 +1969,10 @@ mod tests {
         let codebase = create_test_codebase(code);
 
         let conditional = TConditional::new(
-            Box::new(get_mixed()),
-            Box::new(get_string()),
-            Box::new(make_self_object()),
-            Box::new(get_int()),
+            Arc::new(get_mixed()),
+            Arc::new(get_string()),
+            Arc::new(make_self_object()),
+            Arc::new(get_int()),
             false,
         );
         let input = TUnion::from_atomic(TAtomic::Conditional(conditional));
@@ -1812,10 +1990,10 @@ mod tests {
         let codebase = create_test_codebase(code);
 
         let conditional = TConditional::new(
-            Box::new(get_mixed()),
-            Box::new(get_string()),
-            Box::new(get_int()),
-            Box::new(make_self_object()),
+            Arc::new(get_mixed()),
+            Arc::new(get_string()),
+            Arc::new(get_int()),
+            Arc::new(make_self_object()),
             false,
         );
         let input = TUnion::from_atomic(TAtomic::Conditional(conditional));
@@ -1914,10 +2092,10 @@ mod tests {
         let codebase = CodebaseMetadata::new();
 
         let mut keyed = TKeyedArray::new();
-        keyed.parameters = Some((Box::new(get_string()), Box::new(get_int())));
+        keyed.parameters = Some((Arc::new(get_string()), Arc::new(get_int())));
         let array_type = TUnion::from_atomic(TAtomic::Array(TArray::Keyed(keyed)));
 
-        let key_of = TKeyOf::new(Box::new(array_type));
+        let key_of = TKeyOf::new(Arc::new(array_type));
         let input = TUnion::from_atomic(TAtomic::Derived(TDerived::KeyOf(key_of)));
 
         let mut actual = input.clone();
@@ -1932,10 +2110,10 @@ mod tests {
         let codebase = create_test_codebase(code);
 
         let mut keyed = TKeyedArray::new();
-        keyed.parameters = Some((Box::new(make_self_object()), Box::new(get_int())));
+        keyed.parameters = Some((Arc::new(make_self_object()), Arc::new(get_int())));
         let array_type = TUnion::from_atomic(TAtomic::Array(TArray::Keyed(keyed)));
 
-        let key_of = TKeyOf::new(Box::new(array_type));
+        let key_of = TKeyOf::new(Arc::new(array_type));
         let input = TUnion::from_atomic(TAtomic::Derived(TDerived::KeyOf(key_of)));
 
         let options = options_with_self("Foo");
@@ -1950,10 +2128,10 @@ mod tests {
         let codebase = CodebaseMetadata::new();
 
         let mut keyed = TKeyedArray::new();
-        keyed.parameters = Some((Box::new(get_string()), Box::new(get_int())));
+        keyed.parameters = Some((Arc::new(get_string()), Arc::new(get_int())));
         let array_type = TUnion::from_atomic(TAtomic::Array(TArray::Keyed(keyed)));
 
-        let value_of = TValueOf::new(Box::new(array_type));
+        let value_of = TValueOf::new(Arc::new(array_type));
         let input = TUnion::from_atomic(TAtomic::Derived(TDerived::ValueOf(value_of)));
 
         let mut actual = input.clone();
@@ -1974,7 +2152,7 @@ mod tests {
 
         let enum_type = TUnion::from_atomic(TAtomic::Object(TObject::Enum(TEnum::new(ascii_lowercase_atom("status")))));
 
-        let value_of = TValueOf::new(Box::new(enum_type));
+        let value_of = TValueOf::new(Arc::new(enum_type));
         let input = TUnion::from_atomic(TAtomic::Derived(TDerived::ValueOf(value_of)));
 
         let mut actual = input.clone();
@@ -2040,7 +2218,7 @@ mod tests {
         let code = r"<?php class Foo {}";
         let codebase = create_test_codebase(code);
 
-        let iterable = TIterable::new(Box::new(make_self_object()), Box::new(get_int()));
+        let iterable = TIterable::new(Arc::new(make_self_object()), Arc::new(get_int()));
         let input = TUnion::from_atomic(TAtomic::Iterable(iterable));
 
         let options = options_with_self("Foo");
@@ -2063,7 +2241,7 @@ mod tests {
         let code = r"<?php class Foo {}";
         let codebase = create_test_codebase(code);
 
-        let iterable = TIterable::new(Box::new(get_int()), Box::new(make_self_object()));
+        let iterable = TIterable::new(Arc::new(get_int()), Arc::new(make_self_object()));
         let input = TUnion::from_atomic(TAtomic::Iterable(iterable));
 
         let options = options_with_self("Foo");
@@ -2211,9 +2389,9 @@ mod tests {
         let code = r"<?php class Foo {}";
         let codebase = create_test_codebase(code);
 
-        let inner = TList::new(Box::new(make_self_object()));
-        let middle = TList::new(Box::new(TUnion::from_atomic(TAtomic::Array(TArray::List(inner)))));
-        let outer = TList::new(Box::new(TUnion::from_atomic(TAtomic::Array(TArray::List(middle)))));
+        let inner = TList::new(Arc::new(make_self_object()));
+        let middle = TList::new(Arc::new(TUnion::from_atomic(TAtomic::Array(TArray::List(inner)))));
+        let outer = TList::new(Arc::new(TUnion::from_atomic(TAtomic::Array(TArray::List(middle)))));
         let input = TUnion::from_atomic(TAtomic::Array(TArray::List(outer)));
 
         let options = options_with_self("Foo");

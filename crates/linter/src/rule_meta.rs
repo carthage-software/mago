@@ -13,3 +13,10 @@ pub struct RuleMeta {
     pub category: Category,
     pub requirements: RuleRequirements,
 }
+
+#[derive(Debug, Serialize)]
+pub struct RuleEntry {
+    #[serde(flatten)]
+    pub meta: &'static RuleMeta,
+    pub level: mago_reporting::Level,
+}

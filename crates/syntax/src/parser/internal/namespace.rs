@@ -4,45 +4,55 @@ use crate::ast::ast::NamespaceBody;
 use crate::ast::ast::NamespaceImplicitBody;
 use crate::ast::sequence::Sequence;
 use crate::error::ParseError;
-use crate::parser::internal::block::parse_block;
-use crate::parser::internal::identifier::parse_identifier;
-use crate::parser::internal::statement::parse_statement;
-use crate::parser::internal::terminator::parse_terminator;
-use crate::parser::internal::token_stream::TokenStream;
-use crate::parser::internal::utils;
+use crate::parser::Parser;
 
-pub fn parse_namespace<'arena>(stream: &mut TokenStream<'_, 'arena>) -> Result<Namespace<'arena>, ParseError> {
-    let namespace = utils::expect_keyword(stream, T!["namespace"])?;
-    let name = match utils::peek(stream)?.kind {
-        T![";" | "?>" | "{"] => None,
-        _ => Some(parse_identifier(stream)?),
-    };
-    let body = parse_namespace_body(stream)?;
+impl<'input, 'arena> Parser<'input, 'arena> {
+    pub(crate) fn parse_namespace(&mut self) -> Result<Namespace<'arena>, ParseError> {
+        let namespace = self.expect_keyword(T!["namespace"])?;
+        let name = match self.stream.peek_kind(0)? {
+            Some(T![";" | "?>" | "{"]) => None,
+            _ => Some(self.parse_identifier()?),
+        };
+        let body = self.parse_namespace_body()?;
 
-    Ok(Namespace { namespace, name, body })
-}
-
-pub fn parse_namespace_body<'arena>(stream: &mut TokenStream<'_, 'arena>) -> Result<NamespaceBody<'arena>, ParseError> {
-    let next = utils::peek(stream)?;
-    match next.kind {
-        T!["{"] => Ok(NamespaceBody::BraceDelimited(parse_block(stream)?)),
-        _ => Ok(NamespaceBody::Implicit(parse_namespace_implicit_body(stream)?)),
+        Ok(Namespace { namespace, name, body })
     }
-}
 
-pub fn parse_namespace_implicit_body<'arena>(
-    stream: &mut TokenStream<'_, 'arena>,
-) -> Result<NamespaceImplicitBody<'arena>, ParseError> {
-    let terminator = parse_terminator(stream)?;
-    let mut statements = stream.new_vec();
-    loop {
-        let next = utils::maybe_peek(stream)?.map(|t| t.kind);
-        if matches!(next, None | Some(T!["namespace"])) {
-            break;
+    pub(crate) fn parse_namespace_body(&mut self) -> Result<NamespaceBody<'arena>, ParseError> {
+        match self.stream.peek_kind(0)? {
+            Some(T!["{"]) => Ok(NamespaceBody::BraceDelimited(self.parse_block()?)),
+            _ => Ok(NamespaceBody::Implicit(self.parse_namespace_implicit_body()?)),
+        }
+    }
+
+    pub(crate) fn parse_namespace_implicit_body(&mut self) -> Result<NamespaceImplicitBody<'arena>, ParseError> {
+        let terminator = self.parse_terminator()?;
+        let mut statements = self.new_vec();
+        loop {
+            let next = self.stream.peek_kind(0)?;
+            if matches!(next, None | Some(T!["namespace"])) {
+                break;
+            }
+
+            let position_before = self.stream.current_position();
+            match self.parse_statement() {
+                Ok(statement) => statements.push(statement),
+                Err(err) => self.errors.push(err),
+            }
+            // Safety: prevent infinite loop
+            if self.stream.current_position() == position_before {
+                if let Ok(Some(token)) = self.stream.lookahead(0) {
+                    if token.kind == T!["namespace"] {
+                        break;
+                    }
+                    self.errors.push(self.stream.unexpected(Some(token), &[]));
+                    let _ = self.stream.consume();
+                } else {
+                    break;
+                }
+            }
         }
 
-        statements.push(parse_statement(stream)?);
+        Ok(NamespaceImplicitBody { terminator, statements: Sequence::new(statements) })
     }
-
-    Ok(NamespaceImplicitBody { terminator, statements: Sequence::new(statements) })
 }

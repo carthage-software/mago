@@ -1,4 +1,4 @@
-use ahash::HashMap;
+use foldhash::HashMap;
 
 use mago_codex::flags::attribute::AttributeFlags;
 
@@ -16,7 +16,6 @@ use crate::context::block::BlockContext;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u8)]
-#[allow(dead_code)]
 pub enum AttributeTarget {
     ClassLike,
     Method,

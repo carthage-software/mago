@@ -1,3 +1,5 @@
+use mago_database::file::HasFileId;
+
 use crate::T;
 use crate::ast::ast::Array;
 use crate::ast::ast::ArrayElement;
@@ -7,136 +9,63 @@ use crate::ast::ast::List;
 use crate::ast::ast::MissingArrayElement;
 use crate::ast::ast::ValueArrayElement;
 use crate::ast::ast::VariadicArrayElement;
-use crate::ast::sequence::TokenSeparatedSequence;
 use crate::error::ParseError;
-use crate::parser::internal::expression::parse_expression;
-use crate::parser::internal::token_stream::TokenStream;
-use crate::parser::internal::utils;
+use crate::parser::Parser;
 
-pub fn parse_array<'arena>(stream: &mut TokenStream<'_, 'arena>) -> Result<Array<'arena>, ParseError> {
-    Ok(Array {
-        left_bracket: utils::expect_span(stream, T!["["])?,
-        elements: {
-            let mut element = stream.new_vec();
-            let mut commas = stream.new_vec();
-            loop {
-                let next = utils::peek(stream)?;
-                if next.kind == T!["]"] {
-                    break;
-                }
+impl<'input, 'arena> Parser<'input, 'arena> {
+    pub(crate) fn parse_array(&mut self) -> Result<Array<'arena>, ParseError> {
+        let result = self.parse_comma_separated_sequence(T!["["], T!["]"], |p| p.parse_array_element())?;
 
-                element.push(parse_array_element(stream)?);
+        Ok(Array { left_bracket: result.open, elements: result.sequence, right_bracket: result.close })
+    }
 
-                let next = utils::peek(stream)?;
-                if next.kind == T![","] {
-                    commas.push(utils::expect_any(stream)?);
-                } else {
-                    break;
+    pub(crate) fn parse_list(&mut self) -> Result<List<'arena>, ParseError> {
+        let list = self.expect_keyword(T!["list"])?;
+        let result = self.parse_comma_separated_sequence(T!["("], T![")"], |p| p.parse_array_element())?;
+
+        Ok(List { list, left_parenthesis: result.open, elements: result.sequence, right_parenthesis: result.close })
+    }
+
+    pub(crate) fn parse_legacy_array(&mut self) -> Result<LegacyArray<'arena>, ParseError> {
+        let array = self.expect_keyword(T!["array"])?;
+        let result = self.parse_comma_separated_sequence(T!["("], T![")"], |p| p.parse_array_element())?;
+
+        Ok(LegacyArray {
+            array,
+            left_parenthesis: result.open,
+            elements: result.sequence,
+            right_parenthesis: result.close,
+        })
+    }
+
+    pub(crate) fn parse_array_element(&mut self) -> Result<ArrayElement<'arena>, ParseError> {
+        Ok(match self.stream.peek_kind(0)? {
+            Some(T!["..."]) => {
+                let ellipsis = self.stream.consume_span()?;
+                ArrayElement::Variadic(VariadicArrayElement {
+                    ellipsis,
+                    value: self.arena.alloc(self.parse_expression()?),
+                })
+            }
+            Some(T![","]) => {
+                let next = self.stream.lookahead(0)?.ok_or_else(|| self.stream.unexpected(None, &[]))?;
+                ArrayElement::Missing(MissingArrayElement { comma: next.span_for(self.stream.file_id()) })
+            }
+            _ => {
+                let expr = self.arena.alloc(self.parse_expression()?);
+
+                match self.stream.peek_kind(0)? {
+                    Some(T!["=>"]) => {
+                        let double_arrow = self.stream.consume_span()?;
+                        ArrayElement::KeyValue(KeyValueArrayElement {
+                            key: expr,
+                            double_arrow,
+                            value: self.arena.alloc(self.parse_expression()?),
+                        })
+                    }
+                    _ => ArrayElement::Value(ValueArrayElement { value: expr }),
                 }
             }
-
-            TokenSeparatedSequence::new(element, commas)
-        },
-        right_bracket: utils::expect_span(stream, T!["]"])?,
-    })
-}
-
-pub fn parse_list<'arena>(stream: &mut TokenStream<'_, 'arena>) -> Result<List<'arena>, ParseError> {
-    Ok(List {
-        list: utils::expect_keyword(stream, T!["list"])?,
-        left_parenthesis: utils::expect_span(stream, T!["("])?,
-        elements: {
-            let mut element = stream.new_vec();
-            let mut commas = stream.new_vec();
-            loop {
-                let next = utils::peek(stream)?;
-                if next.kind == T![")"] {
-                    break;
-                }
-
-                element.push(parse_array_element(stream)?);
-
-                let next = utils::peek(stream)?;
-                if next.kind == T![","] {
-                    commas.push(utils::expect_any(stream)?);
-                } else {
-                    break;
-                }
-            }
-            TokenSeparatedSequence::new(element, commas)
-        },
-        right_parenthesis: utils::expect_span(stream, T![")"])?,
-    })
-}
-
-pub fn parse_legacy_array<'arena>(stream: &mut TokenStream<'_, 'arena>) -> Result<LegacyArray<'arena>, ParseError> {
-    Ok(LegacyArray {
-        array: utils::expect_keyword(stream, T!["array"])?,
-        left_parenthesis: utils::expect_span(stream, T!["("])?,
-        elements: {
-            let mut element = stream.new_vec();
-            let mut commas = stream.new_vec();
-            loop {
-                let next = utils::peek(stream)?;
-                if next.kind == T![")"] {
-                    break;
-                }
-
-                element.push(parse_array_element(stream)?);
-
-                let next = utils::peek(stream)?;
-                if next.kind == T![","] {
-                    commas.push(utils::expect_any(stream)?);
-                } else {
-                    break;
-                }
-            }
-            TokenSeparatedSequence::new(element, commas)
-        },
-        right_parenthesis: utils::expect_span(stream, T![")"])?,
-    })
-}
-
-pub fn parse_array_element<'arena>(stream: &mut TokenStream<'_, 'arena>) -> Result<ArrayElement<'arena>, ParseError> {
-    Ok(match utils::maybe_peek(stream)?.map(|t| t.kind) {
-        Some(T!["..."]) => {
-            let ellipsis = utils::expect_any(stream)?.span;
-            let value = {
-                let expression = parse_expression(stream)?;
-
-                stream.alloc(expression)
-            };
-
-            ArrayElement::Variadic(VariadicArrayElement { ellipsis, value })
-        }
-        Some(T![","]) => {
-            let comma = utils::peek(stream)?.span;
-
-            ArrayElement::Missing(MissingArrayElement { comma })
-        }
-        _ => {
-            let expression = {
-                let expression = parse_expression(stream)?;
-
-                stream.alloc(expression)
-            };
-
-            match utils::maybe_peek(stream)?.map(|t| t.kind) {
-                Some(T!["=>"]) => {
-                    let double_arrow = utils::expect_any(stream)?.span;
-
-                    ArrayElement::KeyValue(KeyValueArrayElement {
-                        key: expression,
-                        double_arrow,
-                        value: {
-                            let expression = parse_expression(stream)?;
-
-                            stream.alloc(expression)
-                        },
-                    })
-                }
-                _ => ArrayElement::Value(ValueArrayElement { value: expression }),
-            }
-        }
-    })
+        })
+    }
 }

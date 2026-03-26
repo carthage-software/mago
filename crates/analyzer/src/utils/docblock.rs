@@ -2,10 +2,15 @@ use std::rc::Rc;
 
 use mago_atom::Atom;
 use mago_codex::ttype::TType;
+use mago_codex::ttype::TypeRef;
+use mago_codex::ttype::atomic::TAtomic;
+use mago_codex::ttype::atomic::reference::TReference;
 use mago_codex::ttype::builder::get_type_from_string;
 use mago_codex::ttype::comparator::ComparisonResult;
 use mago_codex::ttype::comparator::union_comparator::can_expression_types_be_identical;
 use mago_codex::ttype::comparator::union_comparator::is_contained_by;
+use mago_codex::ttype::expander;
+use mago_codex::ttype::expander::TypeExpansionOptions;
 use mago_codex::ttype::union::TUnion;
 use mago_codex::ttype::union::populate_union_type;
 use mago_docblock::document::Element;
@@ -55,6 +60,25 @@ pub fn populate_docblock_variables_excluding<'ctx>(
     exclude_variable: Option<Atom>,
 ) {
     for (name, variable_type, variable_type_span) in get_docblock_variables(context, block_context, artifacts, true) {
+        // Check for undefined type references in ALL @var types, regardless of variable name.
+        for type_ref in variable_type.get_all_child_nodes() {
+            let TypeRef::Atomic(TAtomic::Reference(TReference::Symbol { name: ref_name, .. })) = type_ref else {
+                continue;
+            };
+
+            context.collector.report_with_code(
+                IssueCode::NonExistentClassLike,
+                Issue::error(format!("Cannot find class, interface, enum, or type alias `{ref_name}`."))
+                    .with_annotation(
+                        Annotation::primary(variable_type_span)
+                            .with_message(format!("`{ref_name}` is not defined in the current codebase")),
+                    )
+                    .with_note("This error occurs when a type is referenced but not found in any analyzed source files or stubs.")
+                    .with_note("If this type comes from an optional dependency or extension, you can safely suppress this issue using `@mago-ignore` or `@mago-expect`.")
+                    .with_help("Verify the type name is spelled correctly, the file containing it is included in analysis, and any required `use` statements are present."),
+            );
+        }
+
         let Some(variable_name) = name else {
             continue;
         };
@@ -75,10 +99,10 @@ pub fn populate_docblock_variables_excluding<'ctx>(
     }
 }
 
-/// Retrieves all `@var`, `@psalm-var`, and `@phpstan-var` tags from the docblock of the
+/// Retrieves all `@var`, `@psalm-var`, and `@phpstan-var` tags from the docblocks preceding the
 /// current statement in the context, parsing their variable types.
 ///
-/// This function scans the docblock associated with the current statement in the context,
+/// This function scans the docblocks associated with the current statement in the context,
 /// extracting all variable type declarations. It returns a vector of tuples, each containing:
 ///
 /// - An optional variable name (if specified in the tag)
@@ -104,11 +128,7 @@ pub fn get_docblock_variables<'ctx>(
     artifacts: &mut AnalysisArtifacts,
     allow_tracing: bool,
 ) -> Vec<(Option<mago_atom::Atom>, TUnion, Span)> {
-    let Some(elements) = context.get_parsed_docblock().map(|document| document.elements) else {
-        return vec![];
-    };
-
-    elements
+    context.get_parsed_docblocks()
         .into_iter()
         // Filter out non-tag elements
         .filter_map(|element| match element {
@@ -186,6 +206,15 @@ pub fn get_docblock_variables<'ctx>(
                         true,
                     );
 
+                    expander::expand_union(
+                        context.codebase,
+                        &mut variable_type,
+                        &TypeExpansionOptions {
+                            self_class: block_context.scope.get_class_like_name(),
+                            ..Default::default()
+                        },
+                    );
+
                     Some((variable_name, variable_type, type_string.span))
                 }
                 Err(type_error) => {
@@ -233,7 +262,8 @@ pub fn get_type_from_var_docblock<'ctx>(
     value_expression_variable_id: Option<&str>,
     mut allow_unnamed: bool,
 ) -> Option<(TUnion, Span)> {
-    allow_unnamed = allow_unnamed && !block_context.inside_return && !block_context.inside_loop_expressions;
+    allow_unnamed =
+        allow_unnamed && !block_context.flags.inside_return() && !block_context.flags.inside_loop_expressions();
 
     get_docblock_variables(context, block_context, artifacts, false)
         .into_iter()
@@ -298,7 +328,8 @@ pub fn insert_variable_from_docblock<'ctx>(
             && !variable_type.is_mixed()
             && !previous_type.is_mixed()
             && !variable_type.is_generic_parameter()
-            && !previous_type.is_generic_parameter();
+            && !previous_type.is_generic_parameter()
+            && !previous_type.contains_placeholder();
 
         let is_impossible = !is_redundant
             && !is_super
@@ -371,7 +402,8 @@ pub fn check_docblock_type_incompatibility(
         && !docblock_type.is_mixed()
         && !inferred_type.is_mixed()
         && !docblock_type.is_generic_parameter()
-        && !inferred_type.is_generic_parameter();
+        && !inferred_type.is_generic_parameter()
+        && !inferred_type.contains_placeholder();
 
     let is_impossible = !is_redundant
         && !is_super

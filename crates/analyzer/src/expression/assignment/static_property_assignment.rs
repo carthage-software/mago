@@ -36,10 +36,10 @@ pub(crate) fn analyze<'ctx, 'arena>(
     let mut matched_all_properties = true;
     for resolved_property in property_resolution.properties {
         if let Some(declaring_class_id) = resolved_property.declaring_class_id {
-            artifacts.symbol_references.add_reference_to_class_member(
+            artifacts.symbol_references.add_reference_for_property_write(
                 &block_context.scope,
-                (declaring_class_id, resolved_property.property_name),
-                false,
+                declaring_class_id,
+                resolved_property.property_name,
             );
         }
 
@@ -193,6 +193,9 @@ mod tests {
                 }
             }
         "},
+        issues = [
+            IssueCode::WriteOnlyProperty,
+        ]
     }
 
     test_analysis! {
@@ -227,6 +230,7 @@ mod tests {
             PrivateWrite::$value = 1;
         "},
         issues = [
+            IssueCode::UnusedProperty,
             IssueCode::InvalidPropertyRead,
         ]
     }

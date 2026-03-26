@@ -43,6 +43,7 @@ pub struct ClassLikeDocblockComment {
     pub is_deprecated: bool,
     pub is_final: bool,
     pub is_internal: bool,
+    pub is_api: bool,
     pub is_enum_interface: bool,
     pub has_consistent_constructor: bool,
     pub has_consistent_templates: bool,
@@ -59,6 +60,7 @@ pub struct ClassLikeDocblockComment {
     pub properties: Vec<PropertyTag>,
     pub type_aliases: Vec<TypeTag>,
     pub imported_type_aliases: Vec<ImportTypeTag>,
+    pub mixins: Vec<TypeString>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
@@ -67,6 +69,8 @@ pub struct FunctionLikeDocblockComment {
     pub is_deprecated: bool,
     pub is_internal: bool,
     pub is_pure: bool,
+    pub is_external_mutation_free: bool,
+    pub is_mutation_free: bool,
     pub ignore_nullable_return: bool,
     pub ignore_falsable_return: bool,
     pub inherits_docs: bool,
@@ -131,6 +135,7 @@ impl ClassLikeDocblockComment {
         let mut is_final = false;
         let mut is_deprecated = false;
         let mut is_internal = false;
+        let mut is_api = false;
         let mut has_consistent_constructor = false;
         let mut has_consistent_templates = false;
         let mut has_sealed_properties = None;
@@ -147,6 +152,7 @@ impl ClassLikeDocblockComment {
         let mut properties = Vec::new();
         let mut type_aliases = Vec::new();
         let mut imported_type_aliases = Vec::new();
+        let mut mixins = Vec::new();
 
         let parsed_docblock = parse_trivia(context.arena, docblock)?;
 
@@ -173,6 +179,9 @@ impl ClassLikeDocblockComment {
                 }
                 TagKind::PsalmInternal | TagKind::Internal => {
                     is_internal = true;
+                }
+                TagKind::Api | TagKind::PsalmApi => {
+                    is_api = true;
                 }
                 TagKind::PsalmSealProperties | TagKind::SealProperties => {
                     has_sealed_properties = Some(true);
@@ -280,6 +289,11 @@ impl ClassLikeDocblockComment {
                     let import_type_tag = parse_import_type_tag(tag.description, tag.description_span)?;
                     imported_type_aliases.push(import_type_tag);
                 }
+                TagKind::Mixin => {
+                    if let Some((mixin_type, _)) = split_tag_content(tag.description, tag.description_span) {
+                        mixins.push(mixin_type);
+                    }
+                }
                 _ => {
                     // Ignore other tags
                 }
@@ -291,6 +305,7 @@ impl ClassLikeDocblockComment {
             is_deprecated,
             is_final,
             is_internal,
+            is_api,
             is_enum_interface,
             has_sealed_properties,
             has_sealed_methods,
@@ -307,6 +322,7 @@ impl ClassLikeDocblockComment {
             properties,
             type_aliases,
             imported_type_aliases,
+            mixins,
         }))
     }
 }
@@ -324,6 +340,8 @@ impl FunctionLikeDocblockComment {
         let mut is_deprecated = false;
         let mut is_internal = false;
         let mut is_pure = false;
+        let mut is_external_mutation_free = false;
+        let mut is_mutation_free = false;
         let mut ignore_nullable_return = false;
         let mut ignore_falsable_return = false;
         let mut inherits_docs = false;
@@ -458,6 +476,13 @@ impl FunctionLikeDocblockComment {
                 TagKind::InheritDoc => {
                     inherits_docs = true;
                 }
+                TagKind::MutationFree | TagKind::PsalmMutationFree => {
+                    is_mutation_free = true;
+                    is_external_mutation_free = true;
+                }
+                TagKind::ExternalMutationFree | TagKind::PsalmExternalMutationFree => {
+                    is_external_mutation_free = true;
+                }
                 _ => {
                     // Ignore other tags
                 }
@@ -469,6 +494,8 @@ impl FunctionLikeDocblockComment {
             is_deprecated,
             is_internal,
             is_pure,
+            is_external_mutation_free,
+            is_mutation_free,
             ignore_nullable_return,
             ignore_falsable_return,
             inherits_docs,

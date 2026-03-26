@@ -4,10 +4,14 @@ declare(strict_types=1);
 
 class Entity
 {
-    private null|int $id = null;
+    // @mago-expect analysis:write-only-property
+    private ?int $id = null;
+    // @mago-expect analysis:write-only-property
     private string $name;
-    private null|DateTimeImmutable $dateCreated = null;
-    private null|DateTimeImmutable $dateUpdated = null;
+    // @mago-expect analysis:write-only-property
+    private ?DateTimeImmutable $dateCreated = null;
+    // @mago-expect analysis:write-only-property
+    private ?DateTimeImmutable $dateUpdated = null;
 
     public function __construct(string $name)
     {
@@ -33,10 +37,10 @@ class Entity
 class EntityFactory
 {
     public static function make(
-        null|int $id = 1,
-        null|string $name = null,
-        null|DateTimeImmutable $dateCreated = null,
-        null|DateTimeImmutable $dateUpdated = null,
+        ?int $id = 1,
+        ?string $name = null,
+        ?DateTimeImmutable $dateCreated = null,
+        ?DateTimeImmutable $dateUpdated = null,
     ): Entity {
         $entity = new Entity($name ?? 'Default Name');
 
@@ -60,11 +64,7 @@ function test(): void
 {
     $entity1 = EntityFactory::make();
 
-    $entity2 = EntityFactory::make(
-        id: 42,
-        name: 'Custom Name',
-        dateCreated: new DateTimeImmutable('2024-01-01'),
-    );
+    $entity2 = EntityFactory::make(id: 42, name: 'Custom Name', dateCreated: new DateTimeImmutable('2024-01-01'));
 
     $entity3 = EntityFactory::make(dateUpdated: new DateTimeImmutable('2024-12-01'));
 }

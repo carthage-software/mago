@@ -1,9 +1,10 @@
 use std::borrow::Cow;
 use std::cmp::Ordering;
+use std::sync::Arc;
 
-use ahash::HashMap;
-use ahash::HashSet;
-use ahash::RandomState;
+use foldhash::HashMap;
+use foldhash::HashSet;
+use foldhash::fast::RandomState;
 use indexmap::IndexMap;
 
 use mago_atom::Atom;
@@ -27,6 +28,7 @@ use crate::ttype::atomic::scalar::TScalar;
 use crate::ttype::atomic::scalar::class_like_string::TClassLikeString;
 use crate::ttype::atomic::scalar::class_like_string::TClassLikeStringKind;
 use crate::ttype::combiner;
+use crate::ttype::combiner::CombinerOptions;
 use crate::ttype::comparator::union_comparator;
 use crate::ttype::expander;
 use crate::ttype::expander::StaticClassType;
@@ -35,6 +37,7 @@ use crate::ttype::get_iterable_parameters;
 use crate::ttype::get_iterable_value_parameter;
 use crate::ttype::get_mixed;
 use crate::ttype::get_mixed_maybe_from_loop;
+use crate::ttype::template::GenericTemplate;
 use crate::ttype::template::TemplateBound;
 use crate::ttype::template::TemplateResult;
 use crate::ttype::template::inferred_type_replacer;
@@ -142,7 +145,7 @@ pub fn replace(
     }
 
     let mut new_union_type = TUnion::from_vec(if new_parameter_atomics.len() > 1 {
-        combiner::combine(new_parameter_atomics, codebase, false)
+        combiner::combine(new_parameter_atomics, codebase, combiner::CombinerOptions::default())
     } else {
         new_parameter_atomics
     });
@@ -176,12 +179,12 @@ fn handle_atomic_standin(
 
     if let TAtomic::GenericParameter(TGenericParameter { parameter_name, defining_entity, .. }) = parameter_atomic
         && let Some(template_type) =
-            template_types_contains(&template_result.template_types.clone(), *parameter_name, defining_entity)
+            template_types_contains(&template_result.template_types, *parameter_name, defining_entity).cloned()
     {
         return handle_template_param_standin(
             parameter_atomic,
             normalized_key,
-            template_type,
+            &template_type,
             template_result,
             codebase,
             argument_type,
@@ -195,7 +198,7 @@ fn handle_atomic_standin(
     if let TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::Generic {
         parameter_name, defining_entity, ..
     })) = parameter_atomic
-        && template_types_contains(&template_result.template_types.clone(), *parameter_name, defining_entity).is_some()
+        && template_types_contains(&template_result.template_types, *parameter_name, defining_entity).is_some()
     {
         return handle_template_param_class_standin(
             parameter_atomic,
@@ -297,7 +300,7 @@ fn replace_atomic(
                         let input_parameters =
                             if let Some(input) = &input_type { get_iterable_parameters(input, codebase) } else { None };
 
-                        *parameters.0 = self::replace(
+                        *Arc::make_mut(&mut parameters.0) = self::replace(
                             &parameters.0,
                             template_result,
                             codebase,
@@ -307,7 +310,7 @@ fn replace_atomic(
                             StandinOptions { iteration_depth: opts.iteration_depth + 1, ..opts },
                         );
 
-                        *parameters.1 = self::replace(
+                        *Arc::make_mut(&mut parameters.1) = self::replace(
                             &parameters.1, // Pass &TUnion
                             template_result,
                             codebase,
@@ -348,7 +351,7 @@ fn replace_atomic(
                             None
                         };
 
-                        *list_data.element_type = self::replace(
+                        *Arc::make_mut(&mut list_data.element_type) = self::replace(
                             &list_data.element_type,
                             template_result,
                             codebase,
@@ -370,7 +373,7 @@ fn replace_atomic(
                     object @ TAtomic::Object(TObject::Named(TNamedObject { type_parameters: Some(_), .. })),
                 ) = &input_type
                 {
-                    Some(get_mapped_generic_type_parameters(codebase, object, &object_name, object_rempped_parameters))
+                    Some(get_mapped_generic_type_parameters(codebase, object, object_name, object_rempped_parameters))
                 } else {
                     None
                 };
@@ -467,7 +470,7 @@ fn replace_atomic(
             return atomic_type;
         }
         TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::OfType { constraint, .. })) => {
-            **constraint = replace_atomic(
+            *Arc::make_mut(constraint) = replace_atomic(
                 constraint,
                 template_result,
                 codebase,
@@ -476,7 +479,7 @@ fn replace_atomic(
                     ..
                 }))) = input_type
                 {
-                    Some(*input_constraint)
+                    Some(Arc::unwrap_or_clone(input_constraint))
                 } else {
                     None
                 },
@@ -630,7 +633,7 @@ fn handle_template_param_standin(
 
     let mut matching_input_keys: Vec<Atom> = Vec::new();
 
-    let mut as_type = constraint.clone();
+    let mut as_type = constraint.as_ref().clone();
 
     expander::expand_union(
         codebase,
@@ -825,7 +828,7 @@ fn handle_template_param_class_standin(
         )
     };
 
-    let mut atomic_type_as = *constraint.clone();
+    let mut atomic_type_as = constraint.as_ref().clone();
     if let Some(calling_class) = options.calling_class
         && defining_entity == &GenericParent::ClassLike(calling_class)
     {
@@ -847,7 +850,7 @@ fn handle_template_param_class_standin(
                     TClassLikeString::Generic { parameter_name, defining_entity, constraint, .. } => {
                         TAtomic::GenericParameter(TGenericParameter {
                             parameter_name: *parameter_name,
-                            constraint: Box::new(wrap_atomic(*constraint.clone())),
+                            constraint: Arc::new(wrap_atomic(constraint.as_ref().clone())),
                             defining_entity: *defining_entity,
                             intersection_types: None,
                         })
@@ -896,7 +899,7 @@ fn handle_template_param_class_standin(
                         generic_param,
                         &get_most_specific_type_from_bounds(template_bounds, codebase),
                         codebase,
-                        false,
+                        CombinerOptions::default(),
                     ),
                     appearance_depth: options.appearance_depth,
                     argument_offset: input_argument_offset,
@@ -922,8 +925,8 @@ fn handle_template_param_class_standin(
             .get(parameter_name)
             .unwrap()
             .iter()
-            .filter(|(e, _)| e == defining_entity)
-            .map(|(_, v)| v)
+            .filter(|t| &t.defining_entity == defining_entity)
+            .map(|t| &t.constraint)
             .next()
             .unwrap();
 
@@ -931,7 +934,7 @@ fn handle_template_param_class_standin(
             if let TAtomic::Object(_) = &template_atomic_type {
                 atomic_types.push(TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::OfType {
                     kind: *kind,
-                    constraint: Box::new(template_atomic_type.clone()),
+                    constraint: Arc::new(template_atomic_type.clone()),
                 })));
             }
         }
@@ -943,12 +946,12 @@ fn handle_template_param_class_standin(
                 kind: *kind,
                 parameter_name: parameter.parameter_name,
                 defining_entity: parameter.defining_entity,
-                constraint: Box::new(atomic_type_as.clone()),
+                constraint: Arc::new(atomic_type_as.clone()),
             })));
         } else {
             atomic_types.push(TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::OfType {
                 kind: *kind,
-                constraint: Box::new(atomic_type_as.clone()),
+                constraint: Arc::new(atomic_type_as.clone()),
             })));
         }
     }
@@ -957,24 +960,25 @@ fn handle_template_param_class_standin(
 }
 
 #[must_use]
-pub fn get_actual_type_from_literal(name: &Atom, codebase: &CodebaseMetadata) -> Vec<TAtomic> {
-    if codebase.class_like_exists(name) {
-        vec![TAtomic::Object(TObject::Named(TNamedObject::new(*name)))]
+pub fn get_actual_type_from_literal(name: Atom, codebase: &CodebaseMetadata) -> Vec<TAtomic> {
+    if codebase.class_like_exists(&name) {
+        vec![TAtomic::Object(TObject::Named(TNamedObject::new(name)))]
     } else {
         vec![]
     }
 }
 
 fn template_types_contains<'a>(
-    template_types: &'a IndexMap<Atom, Vec<(GenericParent, TUnion)>, RandomState>,
+    template_types: &'a IndexMap<Atom, Vec<GenericTemplate>, RandomState>,
     parameter_name: Atom,
     defining_entity: &GenericParent,
 ) -> Option<&'a TUnion> {
-    if let Some(mapped_classes) = template_types.get(&parameter_name) {
-        return mapped_classes.iter().filter(|(e, _)| e == defining_entity).map(|(_, v)| v).next();
-    }
-
-    None
+    template_types.get(&parameter_name).and_then(|mapped_classes| {
+        mapped_classes
+            .iter()
+            .find(|template| &template.defining_entity == defining_entity)
+            .map(|template| &template.constraint)
+    })
 }
 
 fn find_matching_atomic_types_for_template(
@@ -1017,7 +1021,7 @@ fn find_matching_atomic_types_for_template(
                         matching_atomic_types.push(TAtomic::Scalar(TScalar::ClassLikeString(
                             TClassLikeString::OfType {
                                 kind: TClassLikeStringKind::Class,
-                                constraint: Box::new(constraint_object),
+                                constraint: Arc::new(constraint_object),
                             },
                         )));
                     }
@@ -1038,7 +1042,7 @@ fn find_matching_atomic_types_for_template(
                     continue;
                 };
 
-                if input_type_parameters.is_some() && class_metadata.has_template_extended_parameter(&base_name) {
+                if input_type_parameters.is_some() && class_metadata.has_template_extended_parameter(base_name) {
                     matching_atomic_types.push(atomic_input_type.clone());
                     continue;
                 }
@@ -1117,7 +1121,7 @@ fn find_matching_atomic_types_for_template(
 pub fn get_mapped_generic_type_parameters(
     codebase: &CodebaseMetadata,
     input_type_part: &TAtomic,
-    container_name: &Atom,
+    container_name: Atom,
     container_remapped_parameters: bool,
 ) -> Vec<(Option<usize>, TUnion)> {
     let mut input_type_parameters = match input_type_part {
@@ -1144,14 +1148,14 @@ pub fn get_mapped_generic_type_parameters(
         return vec![];
     };
 
-    if input_name == *container_name {
+    if input_name == container_name {
         return input_type_parameters;
     }
 
     let input_template_types = &input_class_metadata.template_types;
 
     let mut i = 0;
-    let mut replacement_templates = IndexMap::with_hasher(RandomState::new());
+    let mut replacement_templates: HashMap<Atom, HashMap<GenericParent, TUnion>> = HashMap::default();
     if matches!(input_type_part, TAtomic::Object(TObject::Named(o)) if !o.remapped_parameters)
         && !container_remapped_parameters
     {
@@ -1159,7 +1163,7 @@ pub fn get_mapped_generic_type_parameters(
             if let Some(input_type) = input_type_parameters.get(i) {
                 replacement_templates
                     .entry(*template_name)
-                    .or_insert_with(HashMap::default)
+                    .or_default()
                     .insert(GenericParent::ClassLike(input_name), input_type.clone().1);
 
                 i += 1;
@@ -1169,7 +1173,7 @@ pub fn get_mapped_generic_type_parameters(
         }
     }
 
-    if let Some(parameters) = input_class_metadata.template_extended_parameters.get(container_name) {
+    if let Some(parameters) = input_class_metadata.template_extended_parameters.get(&container_name) {
         let mut new_input_parameters = Vec::new();
 
         for (_, extended_input_parameter) in parameters {
@@ -1185,9 +1189,9 @@ pub fn get_mapped_generic_type_parameters(
                 let mut candidate_parameter_type: Option<_> = None;
 
                 if let Some(TAtomic::GenericParameter(parameter)) = extended_input_parameter_types.first()
-                    && let Some((old_parameters_offset, defining_classes)) =
-                        input_class_metadata.get_template_type_with_index(&parameter.parameter_name)
-                    && defining_classes.iter().any(|(e, _)| parameter.defining_entity == *e)
+                    && let Some((old_parameters_offset, GenericTemplate { defining_entity, .. })) =
+                        input_class_metadata.get_template_type_with_index(parameter.parameter_name)
+                    && parameter.defining_entity == *defining_entity
                 {
                     let candidate_parameter_type_inner =
                         input_type_parameters.get(old_parameters_offset).unwrap_or(&(None, get_mixed())).clone().1;
@@ -1202,7 +1206,12 @@ pub fn get_mapped_generic_type_parameters(
                 candidate_parameter_type.set_from_template_default(true);
 
                 new_input_parameter = if let Some(new_input_param) = new_input_parameter {
-                    Some(add_union_type(new_input_param, &candidate_parameter_type, codebase, true))
+                    Some(add_union_type(
+                        new_input_param,
+                        &candidate_parameter_type,
+                        codebase,
+                        CombinerOptions::default().with_overwrite_empty_array(),
+                    ))
                 } else {
                     Some(candidate_parameter_type.clone())
                 };
@@ -1213,7 +1222,10 @@ pub fn get_mapped_generic_type_parameters(
                     mapped_input_offset,
                     inferred_type_replacer::replace(
                         &new_input_parameter,
-                        &TemplateResult::new(IndexMap::with_hasher(RandomState::new()), replacement_templates.clone()),
+                        &TemplateResult::new(
+                            IndexMap::with_hasher(RandomState::default()),
+                            replacement_templates.clone(),
+                        ),
                         codebase,
                     ),
                 ));
@@ -1269,7 +1281,7 @@ pub fn get_extended_templated_types<'a>(
 }
 
 pub(crate) fn get_root_template_type(
-    lower_bounds: &IndexMap<Atom, HashMap<GenericParent, Vec<TemplateBound>>, RandomState>,
+    lower_bounds: &HashMap<Atom, HashMap<GenericParent, Vec<TemplateBound>>>,
     parameter_name: Atom,
     defining_entity: &GenericParent,
     mut visited_entities: HashSet<GenericParent>,
@@ -1320,7 +1332,7 @@ pub fn get_most_specific_type_from_bounds(lower_bounds: &[TemplateBound], codeba
     let mut specific_type = relevant_bounds[0].bound_type.clone();
 
     for bound in relevant_bounds {
-        specific_type = add_union_type(specific_type, &bound.bound_type, codebase, false);
+        specific_type = add_union_type(specific_type, &bound.bound_type, codebase, CombinerOptions::default());
     }
 
     specific_type

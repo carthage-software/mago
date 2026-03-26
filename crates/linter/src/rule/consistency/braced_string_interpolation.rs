@@ -12,6 +12,7 @@ use mago_syntax::ast::Node;
 use mago_syntax::ast::NodeKind;
 use mago_syntax::ast::StringPart;
 use mago_syntax::ast::Variable;
+use mago_text_edit::TextEdit;
 
 use crate::category::Category;
 use crate::context::LintContext;
@@ -136,6 +137,11 @@ impl LintRule for BracedStringInterpolationRule {
         issue = issue.with_note("Using curly braces around variables in interpolated strings improves readability and prevents potential parsing issues.")
             .with_help("Wrap the variable in curly braces, e.g., `{$variable}`.");
 
-        ctx.collector.report(issue);
+        ctx.collector.propose(issue, |edits| {
+            for (span, _) in &unbraced_expressions {
+                edits.push(TextEdit::insert(span.start_offset(), "{"));
+                edits.push(TextEdit::insert(span.end_offset(), "}"));
+            }
+        });
     }
 }

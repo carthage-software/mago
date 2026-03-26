@@ -1,6 +1,8 @@
 //! `array_filter()` return type provider.
 
 use mago_codex::assertion::Assertion;
+use mago_codex::ttype::add_optional_union_type;
+use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::get_array_parameters;
 use mago_codex::ttype::get_keyed_array;
 use mago_codex::ttype::union::TUnion;
@@ -42,15 +44,30 @@ impl FunctionReturnTypeProvider for ArrayFilterProvider {
 
         let callback_argument = invocation.get_argument(1, &["callback"]);
 
-        let array = array_type.get_single_array()?;
         let codebase = context.codebase();
-        let (key_type, mut value_type) = get_array_parameters(array, codebase);
+
+        let mut key_type: Option<TUnion> = None;
+        let mut value_type: Option<TUnion> = None;
+        for atomic in array_type.types.as_ref() {
+            if let TAtomic::Array(array) = atomic {
+                let (k, v) = get_array_parameters(array, codebase);
+                key_type = Some(add_optional_union_type(k, key_type.as_ref(), codebase));
+                value_type = Some(add_optional_union_type(v, value_type.as_ref(), codebase));
+            } else {
+                // If it's not an array, we can't determine the return type
+                return None;
+            }
+        }
+
+        let key_type = key_type?;
+        let mut value_type = value_type?;
 
         if let Some(callback_arg) = callback_argument {
             let callback_type = context.get_expression_type(callback_arg)?;
 
             if !callback_type.is_null() {
-                if let Some(callback_metadata) = context.get_closure_metadata(callback_arg)
+                // Try to get metadata from closures OR first-class callables like is_string(...)
+                if let Some(callback_metadata) = context.get_callable_metadata(callback_arg)
                     && !callback_metadata.if_true_assertions.is_empty()
                     && let Some(first_param) = callback_metadata.parameters.first()
                 {

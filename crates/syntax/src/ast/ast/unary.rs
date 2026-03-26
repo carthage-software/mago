@@ -10,7 +10,6 @@ use crate::token::Precedence;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
-#[repr(u8)]
 pub enum UnaryPrefixOperator<'arena> {
     ErrorControl(Span),             // `@$expr`
     Reference(Span),                // `&$expr`
@@ -37,7 +36,6 @@ pub enum UnaryPrefixOperator<'arena> {
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
-#[repr(u8)]
 pub enum UnaryPostfixOperator {
     PostIncrement(Span), // `$expr++`
     PostDecrement(Span), // `$expr--`

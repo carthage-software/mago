@@ -1,6 +1,7 @@
+use std::hash::BuildHasher;
 use std::hash::Hasher;
 
-use ahash::AHasher;
+use foldhash::fast::FixedState;
 
 use mago_names::ResolvedNames;
 
@@ -56,7 +57,7 @@ const DEFAULT_IMPORTANT_COMMENT_PATTERNS: &[&str] = &["@mago-", "@"];
 
 pub trait Fingerprintable {
     fn fingerprint(&self, resolved_names: &ResolvedNames, options: &FingerprintOptions<'_>) -> u64 {
-        let mut hasher = AHasher::default();
+        let mut hasher = FixedState::default().build_hasher();
         self.fingerprint_with_hasher(&mut hasher, resolved_names, options);
         hasher.finish()
     }
@@ -100,11 +101,16 @@ where
 pub struct FingerprintOptions<'a> {
     pub include_use_statements: bool,
     pub important_comment_patterns: &'a [&'a str],
+    pub signature_only: bool,
 }
 
 impl Default for FingerprintOptions<'_> {
     fn default() -> Self {
-        Self { include_use_statements: false, important_comment_patterns: DEFAULT_IMPORTANT_COMMENT_PATTERNS }
+        Self {
+            include_use_statements: false,
+            important_comment_patterns: DEFAULT_IMPORTANT_COMMENT_PATTERNS,
+            signature_only: false,
+        }
     }
 }
 
@@ -116,7 +122,7 @@ impl<'a> FingerprintOptions<'a> {
 
     #[must_use]
     pub fn strict() -> Self {
-        Self { include_use_statements: true, important_comment_patterns: &[] }
+        Self { include_use_statements: true, important_comment_patterns: &[], signature_only: false }
     }
 
     #[must_use]
@@ -157,11 +163,12 @@ mod tests {
     pub(crate) fn fingerprint_code(code: &'static str) -> u64 {
         let arena = Bump::new();
         let file = File::ephemeral("code.php".into(), code.into());
-        let (program, _parse_error) = parse_file(&arena, &file);
+        let program = parse_file(&arena, &file);
+        assert!(!program.has_errors(), "Failed to parse code, errors: {:?}", program.errors);
         let resolved_names = NameResolver::new(&arena).resolve(program);
         let options = FingerprintOptions::default();
 
-        let mut hasher = ahash::AHasher::default();
+        let mut hasher = foldhash::fast::FixedState::default().build_hasher();
         program.fingerprint_with_hasher(&mut hasher, &resolved_names, &options);
         hasher.finish()
     }

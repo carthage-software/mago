@@ -19,7 +19,7 @@ use crate::ast::sequence::TokenSeparatedSequence;
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub struct EchoTag<'arena> {
     pub tag: Span,
-    pub values: TokenSeparatedSequence<'arena, Expression<'arena>>,
+    pub values: TokenSeparatedSequence<'arena, &'arena Expression<'arena>>,
     pub terminator: Terminator<'arena>,
 }
 
@@ -36,7 +36,7 @@ pub struct EchoTag<'arena> {
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub struct Echo<'arena> {
     pub echo: Keyword<'arena>,
-    pub values: TokenSeparatedSequence<'arena, Expression<'arena>>,
+    pub values: TokenSeparatedSequence<'arena, &'arena Expression<'arena>>,
     pub terminator: Terminator<'arena>,
 }
 

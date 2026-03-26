@@ -3,59 +3,45 @@
 /**
  * @param resource $fd
  */
-function dio_close($fd): void
-{
-}
+function dio_close($fd): void {}
 
 /**
  * @param resource $fd
  */
-function dio_fcntl($fd, int $cmd, ...$args)
-{
-}
+function dio_fcntl($fd, int $cmd, ...$args) {}
 
 /**
  * @return resource|false
  */
-function dio_open(string $filename, int $flags, int $mode = 0)
-{
-}
+function dio_open(string $filename, int $flags, int $mode = 0) {}
 
 /**
  * @param resource $fd
  *
  * @return string
  */
-function dio_read($fd, int $len = 1024)
-{
-}
+function dio_read($fd, int $len = 1024) {}
 
 /**
  * @param resource $fd
  *
  * @return int
  */
-function dio_seek($fd, int $pos, int $whence = SEEK_SET)
-{
-}
+function dio_seek($fd, int $pos, int $whence = SEEK_SET) {}
 
 /**
  * @param resource $fd
  *
  * @return array|null
  */
-function dio_stat($fd)
-{
-}
+function dio_stat($fd) {}
 
 /**
  * @param resource $fd
  *
  * @return void
  */
-function dio_tcsetattr($fd, array $options)
-{
-}
+function dio_tcsetattr($fd, array $options) {}
 
 /**
  * @param resource $fd
@@ -63,32 +49,24 @@ function dio_tcsetattr($fd, array $options)
  *
  * @return bool
  */
-function dio_truncate($fd, int $offset)
-{
-}
+function dio_truncate($fd, int $offset) {}
 
 /**
  * @param resource $fd
  *
  * @return int
  */
-function dio_write($fd, string $data, int $len = 0)
-{
-}
+function dio_write($fd, string $data, int $len = 0) {}
 
 /**
  * @return resource|null
  */
-function dio_raw(string $filename, string $mode, null|array $options)
-{
-}
+function dio_raw(string $filename, string $mode, ?array $options) {}
 
 /**
  * @return resource|null
  */
-function dio_serial(string $filename, string $mode, null|array $options)
-{
-}
+function dio_serial(string $filename, string $mode, ?array $options) {}
 
 const O_RDONLY = 0;
 

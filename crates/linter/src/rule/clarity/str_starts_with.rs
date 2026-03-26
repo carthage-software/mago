@@ -17,6 +17,7 @@ use mago_syntax::ast::Literal;
 use mago_syntax::ast::LiteralInteger;
 use mago_syntax::ast::Node;
 use mago_syntax::ast::NodeKind;
+use mago_text_edit::Safety;
 use mago_text_edit::TextEdit;
 
 use crate::category::Category;
@@ -143,20 +144,29 @@ impl LintRule for StrStartsWithRule {
         .with_note("Using `str_starts_with` makes the code easier to understand and more expressive.");
 
         ctx.collector.propose(issue, |edits| {
-            if !equal {
-                edits.push(TextEdit::insert(binary.span().start_offset(), "!"));
-            }
-
             let function_span = call.function.span();
 
-            edits.push(TextEdit::replace(function_span, STR_STARTS_WITH));
+            if equal {
+                edits.push(TextEdit::replace(function_span, STR_STARTS_WITH).with_safety(Safety::PotentiallyUnsafe));
+            } else {
+                edits.push(
+                    TextEdit::replace(function_span, format!("!{STR_STARTS_WITH}"))
+                        .with_safety(Safety::PotentiallyUnsafe),
+                );
+            }
 
             if left {
                 // delete the `=== 0` part
-                edits.push(TextEdit::delete(binary.operator.span().join(binary.rhs.span())));
+                edits.push(
+                    TextEdit::delete(binary.operator.span().join(binary.rhs.span()))
+                        .with_safety(Safety::PotentiallyUnsafe),
+                );
             } else {
                 // delete the `0 ===` part
-                edits.push(TextEdit::delete(binary.lhs.span().join(binary.operator.span())));
+                edits.push(
+                    TextEdit::delete(binary.lhs.span().join(binary.operator.span()))
+                        .with_safety(Safety::PotentiallyUnsafe),
+                );
             }
         });
     }

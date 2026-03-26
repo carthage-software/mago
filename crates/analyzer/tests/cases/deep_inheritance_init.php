@@ -117,35 +117,35 @@ class ConcreteAtEndNoInit extends AbstractL3
 
 class Shadow1
 {
-    private string $shadow;
+    private string $_shadow;
 
     public function __construct()
     {
-        $this->shadow = 's1';
+        $this->_shadow = 's1';
     }
 }
 
 class Shadow2 extends Shadow1
 {
-    private string $shadow;
+    private string $_shadow;
 
     public function __construct()
     {
         parent::__construct();
-        $this->shadow = 's2';
+        $this->_shadow = 's2';
     }
 }
 
 class Shadow3 extends Shadow2
 {
     // @mago-expect analysis:uninitialized-property
-    private string $shadow;
+    private string $_shadow;
 
     public function __construct()
     {
         parent::__construct();
 
-        // parent initializes Shadow2::$shadow, not Shadow3::$shadow
+        // parent initializes Shadow2::$_shadow, not Shadow3::$_shadow
     }
 }
 

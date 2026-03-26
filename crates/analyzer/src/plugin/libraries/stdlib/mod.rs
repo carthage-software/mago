@@ -2,8 +2,11 @@
 
 pub mod array;
 pub mod closure;
+pub mod cookie;
 pub mod r#enum;
+pub mod filter;
 pub mod json;
+pub mod math;
 pub mod random;
 pub mod spl;
 pub mod string;
@@ -31,6 +34,7 @@ impl Plugin for StdlibPlugin {
 
     fn register(&self, registry: &mut PluginRegistry) {
         registry.register_function_provider(string::StrlenProvider);
+        registry.register_function_provider(string::SprintfProvider);
         registry.register_function_provider(json::JsonEncodeProvider);
         registry.register_function_provider(random::RandProvider);
         registry.register_function_provider(random::RandomIntProvider);
@@ -38,9 +42,17 @@ impl Plugin for StdlibPlugin {
         registry.register_function_provider(spl::IteratorToArrayProvider);
         registry.register_function_provider(array::ArrayColumnProvider);
         registry.register_function_provider(array::ArrayFilterProvider);
+        registry.register_function_provider(array::ArrayMapProvider);
         registry.register_function_provider(array::ArrayMergeProvider);
         registry.register_function_provider(array::CompactProvider);
         registry.register_function_provider(url::ParseUrlProvider);
+        registry.register_function_provider(filter::FilterVarProvider);
+        registry.register_function_provider(filter::FilterInputProvider);
+        registry.register_function_provider(math::MinProvider);
+        registry.register_function_provider(math::MaxProvider);
+        registry.register_function_provider(math::AbsProvider);
+
+        registry.register_function_call_hook(cookie::SetCookieHook);
 
         registry.register_method_provider(closure::ClosureGetCurrentProvider);
         registry.register_method_provider(r#enum::EnumCasesProvider);

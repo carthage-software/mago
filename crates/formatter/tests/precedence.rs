@@ -129,4 +129,7 @@ mod precedence {
     test_expression_format!(complex_11_messy, "($a = (- ($b ** $c)))", "$a = -$b ** $c");
     test_expression_format!(error_control_include, "$a = (@include $b) === $c", "$a = (@include $b) === $c");
     test_expression_format!(error_control_new, "$a = (@(new Foo($x))) === $c", "$a = @new Foo($x) === $c");
+    test_expression_format!(nonassoc_identical_parens_left, "($a === 'b') === $c", "($a === 'b') === $c");
+    test_expression_format!(nonassoc_less_than_parens_left, "($a < $b) < $c", "($a < $b) < $c");
+    test_expression_format!(nonassoc_identical_parens_right, "$a === ($b === $c)", "$a === ($b === $c)");
 }

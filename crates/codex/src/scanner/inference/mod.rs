@@ -1,7 +1,10 @@
 use std::borrow::Cow;
 use std::collections::BTreeMap;
+use std::sync::Arc;
 use std::sync::LazyLock;
 
+use mago_atom::AtomMap;
+use mago_atom::ascii_lowercase_constant_name_atom;
 use mago_atom::atom;
 use mago_atom::concat_atom;
 use mago_names::ResolvedNames;
@@ -27,6 +30,7 @@ use mago_syntax::ast::UnaryPrefixOperator;
 
 use crate::flags::attribute::AttributeFlags;
 use crate::identifier::function_like::FunctionLikeIdentifier;
+use crate::metadata::constant::ConstantMetadata;
 use crate::scanner::Context;
 use crate::ttype::atomic::TAtomic;
 use crate::ttype::atomic::array::TArray;
@@ -40,7 +44,9 @@ use crate::ttype::atomic::scalar::class_like_string::TClassLikeString;
 use crate::ttype::atomic::scalar::float::TFloat;
 use crate::ttype::atomic::scalar::int::TInteger;
 use crate::ttype::atomic::scalar::string::TString;
+use crate::ttype::atomic::scalar::string::TStringCasing;
 use crate::ttype::atomic::scalar::string::TStringLiteral;
+use crate::ttype::get_arraykey;
 use crate::ttype::get_bool;
 use crate::ttype::get_empty_string;
 use crate::ttype::get_false;
@@ -49,6 +55,7 @@ use crate::ttype::get_int;
 use crate::ttype::get_int_or_float;
 use crate::ttype::get_literal_int;
 use crate::ttype::get_literal_string;
+use crate::ttype::get_mixed;
 use crate::ttype::get_mixed_keyed_array;
 use crate::ttype::get_never;
 use crate::ttype::get_non_empty_string;
@@ -64,11 +71,137 @@ use crate::ttype::union::TUnion;
 use crate::ttype::wrap_atomic;
 use crate::utils::str_is_numeric;
 
+/// Returns the type for a predefined literal constant, if known.
+///
+/// These constants (`true`, `false`, `null`) are parsed as `Literal` nodes when bare,
+/// but become `ConstantAccess` nodes when accessed via FQN (e.g. `\true`).
 #[inline]
-pub fn infer<'arena>(
+pub fn get_literal_constant_type(name: &str) -> Option<TUnion> {
+    let name = name.strip_prefix('\\').unwrap_or(name);
+
+    if name.eq_ignore_ascii_case("true") {
+        Some(get_true())
+    } else if name.eq_ignore_ascii_case("false") {
+        Some(get_false())
+    } else if name.eq_ignore_ascii_case("null") {
+        Some(get_null())
+    } else {
+        None
+    }
+}
+
+/// Returns the platform-aware type for a predefined constant, if known.
+///
+/// These constants have values that vary across platforms (e.g. 32-bit vs 64-bit),
+/// so their types should be ranges or unions rather than host-specific literals.
+#[inline]
+pub fn get_platform_constant_type(name: &str) -> Option<TUnion> {
+    static DIR_SEPARATOR_SLICE: LazyLock<[TAtomic; 2]> = LazyLock::new(|| {
+        [
+            TAtomic::Scalar(TScalar::String(TString {
+                literal: Some(TStringLiteral::Value(atom("/"))),
+                is_numeric: false,
+                is_truthy: true,
+                is_non_empty: true,
+                casing: TStringCasing::Lowercase,
+            })),
+            TAtomic::Scalar(TScalar::String(TString {
+                literal: Some(TStringLiteral::Value(atom("\\"))),
+                is_numeric: false,
+                is_truthy: true,
+                is_non_empty: true,
+                casing: TStringCasing::Lowercase,
+            })),
+        ]
+    });
+
+    const PHP_INT_MAX_SLICE: &[TAtomic] = &[
+        TAtomic::Scalar(TScalar::Integer(TInteger::Literal(9_223_372_036_854_775_807))),
+        TAtomic::Scalar(TScalar::Integer(TInteger::Literal(2_147_483_647))),
+    ];
+
+    const PHP_INT_MIN_SLICE: &[TAtomic] = &[
+        TAtomic::Scalar(TScalar::Integer(TInteger::Literal(-9_223_372_036_854_775_808))),
+        TAtomic::Scalar(TScalar::Integer(TInteger::Literal(-2_147_483_648))),
+    ];
+
+    const PHP_MAJOR_VERSION_ATOMIC: &TAtomic = &TAtomic::Scalar(TScalar::Integer(TInteger::Range(8, 9)));
+    const PHP_ZTS_ATOMIC: &TAtomic = &TAtomic::Scalar(TScalar::Integer(TInteger::Range(0, 1)));
+    const PHP_DEBUG_ATOMIC: &TAtomic = &TAtomic::Scalar(TScalar::Integer(TInteger::Range(0, 1)));
+    const PHP_INT_SIZE_ATOMIC: &TAtomic = &TAtomic::Scalar(TScalar::Integer(TInteger::Range(4, 8)));
+    const PHP_WINDOWS_VERSION_MAJOR_ATOMIC: &TAtomic = &TAtomic::Scalar(TScalar::Integer(TInteger::Range(4, 6)));
+    const PHP_WINDOWS_VERSION_MINOR_SLICE: &[TAtomic] = &[
+        TAtomic::Scalar(TScalar::Integer(TInteger::Literal(0))),
+        TAtomic::Scalar(TScalar::Integer(TInteger::Literal(1))),
+        TAtomic::Scalar(TScalar::Integer(TInteger::Literal(2))),
+        TAtomic::Scalar(TScalar::Integer(TInteger::Literal(10))),
+        TAtomic::Scalar(TScalar::Integer(TInteger::Literal(90))),
+    ];
+
+    let name = name.strip_prefix('\\').unwrap_or(name);
+
+    match name {
+        "PHP_MAXPATHLEN"
+        | "PHP_WINDOWS_VERSION_BUILD"
+        | "LIBXML_VERSION"
+        | "OPENSSL_VERSION_NUMBER"
+        | "PHP_FLOAT_DIG" => Some(get_int()),
+        "PHP_EXTRA_VERSION" => Some(get_string()),
+        "PHP_BUILD_DATE"
+        | "PEAR_EXTENSION_DIR"
+        | "PEAR_INSTALL_DIR"
+        | "PHP_BINARY"
+        | "PHP_BINDIR"
+        | "PHP_CONFIG_FILE_PATH"
+        | "PHP_CONFIG_FILE_SCAN_DIR"
+        | "PHP_DATADIR"
+        | "PHP_EXTENSION_DIR"
+        | "PHP_LIBDIR"
+        | "PHP_LOCALSTATEDIR"
+        | "PHP_MANDIR"
+        | "PHP_OS"
+        | "PHP_OS_FAMILY"
+        | "PHP_PREFIX"
+        | "PHP_EOL"
+        | "PATH_SEPARATOR"
+        | "PHP_VERSION"
+        | "PHP_SAPI"
+        | "PHP_SYSCONFDIR"
+        | "ICONV_IMPL"
+        | "LIBXML_DOTTED_VERSION"
+        | "PCRE_VERSION" => Some(get_non_empty_string()),
+        "STDIN" | "STDOUT" | "STDERR" => Some(get_open_resource()),
+        "NAN" | "PHP_FLOAT_EPSILON" | "INF" => Some(get_float()),
+        "PHP_VERSION_ID" => Some(get_positive_int()),
+        "PHP_RELEASE_VERSION" | "PHP_MINOR_VERSION" => Some(get_non_negative_int()),
+        "PHP_MAJOR_VERSION" => Some(TUnion::from_single(Cow::Borrowed(PHP_MAJOR_VERSION_ATOMIC))),
+        "PHP_ZTS" => Some(TUnion::from_single(Cow::Borrowed(PHP_ZTS_ATOMIC))),
+        "PHP_DEBUG" => Some(TUnion::from_single(Cow::Borrowed(PHP_DEBUG_ATOMIC))),
+        "PHP_INT_SIZE" => Some(TUnion::from_single(Cow::Borrowed(PHP_INT_SIZE_ATOMIC))),
+        "PHP_WINDOWS_VERSION_MAJOR" => Some(TUnion::from_single(Cow::Borrowed(PHP_WINDOWS_VERSION_MAJOR_ATOMIC))),
+        "DIRECTORY_SEPARATOR" => Some(TUnion::new(Cow::Borrowed(DIR_SEPARATOR_SLICE.as_slice()))),
+        "PHP_INT_MAX" => Some(TUnion::new(Cow::Borrowed(PHP_INT_MAX_SLICE))),
+        "PHP_INT_MIN" => Some(TUnion::new(Cow::Borrowed(PHP_INT_MIN_SLICE))),
+        "PHP_WINDOWS_VERSION_MINOR" => Some(TUnion::new(Cow::Borrowed(PHP_WINDOWS_VERSION_MINOR_SLICE))),
+        _ => None,
+    }
+}
+
+#[inline]
+pub(super) fn infer<'arena>(
     context: &Context<'_, 'arena>,
     scope: &NamespaceScope,
     expression: &'arena Expression<'arena>,
+) -> Option<TUnion> {
+    infer_with_constants(context, scope, expression, None)
+}
+
+#[inline]
+pub(super) fn infer_with_constants<'arena>(
+    context: &Context<'_, 'arena>,
+    scope: &NamespaceScope,
+    expression: &'arena Expression<'arena>,
+    constants: Option<&AtomMap<ConstantMetadata>>,
 ) -> Option<TUnion> {
     match expression {
         Expression::MagicConstant(magic_constant) => Some(match magic_constant {
@@ -114,7 +247,13 @@ pub fn infer<'arena>(
                                 str_is_numeric(value),
                                 true, // truthy
                                 true, // not empty
-                                value.chars().all(char::is_lowercase),
+                                if value.chars().all(char::is_lowercase) {
+                                    TStringCasing::Lowercase
+                                } else if value.chars().all(char::is_uppercase) {
+                                    TStringCasing::Uppercase
+                                } else {
+                                    TStringCasing::Unspecified
+                                },
                             ))))
                         }
                     }
@@ -144,7 +283,7 @@ pub fn infer<'arena>(
             if contains_content { Some(get_non_empty_string()) } else { Some(get_string()) }
         }
         Expression::UnaryPrefix(UnaryPrefix { operator, operand }) => {
-            let operand_type = infer(context, scope, operand)?;
+            let operand_type = infer_with_constants(context, scope, operand, constants)?;
 
             match operator {
                 UnaryPrefixOperator::Plus(_) => {
@@ -185,8 +324,12 @@ pub fn infer<'arena>(
             }
         }
         Expression::Binary(Binary { operator: BinaryOperator::StringConcat(_), lhs, rhs }) => {
-            let Some(lhs_type) = infer(context, scope, lhs) else { return Some(get_string()) };
-            let Some(rhs_type) = infer(context, scope, rhs) else { return Some(get_string()) };
+            let Some(lhs_type) = infer_with_constants(context, scope, lhs, constants) else {
+                return Some(get_string());
+            };
+            let Some(rhs_type) = infer_with_constants(context, scope, rhs, constants) else {
+                return Some(get_string());
+            };
 
             let lhs_string = match lhs_type.get_single_owned() {
                 TAtomic::Scalar(TScalar::String(s)) => s.clone(),
@@ -209,19 +352,23 @@ pub fn infer<'arena>(
             let is_non_empty = lhs_string.is_non_empty() || rhs_string.is_non_empty();
             let is_truthy = lhs_string.is_truthy() || rhs_string.is_truthy();
             let is_literal_origin = lhs_string.is_literal_origin() && rhs_string.is_literal_origin();
-            let is_lowercase = lhs_string.is_lowercase() && rhs_string.is_lowercase();
+            let casing = match (lhs_string.casing, rhs_string.casing) {
+                (TStringCasing::Lowercase, TStringCasing::Lowercase) => TStringCasing::Lowercase,
+                (TStringCasing::Uppercase, TStringCasing::Uppercase) => TStringCasing::Uppercase,
+                _ => TStringCasing::Unspecified,
+            };
 
             let final_string_type = if is_literal_origin {
-                TString::unspecified_literal_with_props(false, is_truthy, is_non_empty, is_lowercase)
+                TString::unspecified_literal_with_props(false, is_truthy, is_non_empty, casing)
             } else {
-                TString::general_with_props(false, is_truthy, is_non_empty, is_lowercase)
+                TString::general_with_props(false, is_truthy, is_non_empty, casing)
             };
 
             Some(wrap_atomic(TAtomic::Scalar(TScalar::String(final_string_type))))
         }
         Expression::Binary(Binary { operator, lhs, rhs }) if operator.is_bitwise() => {
-            let lhs = infer(context, scope, lhs);
-            let rhs = infer(context, scope, rhs);
+            let lhs = infer_with_constants(context, scope, lhs, constants);
+            let rhs = infer_with_constants(context, scope, rhs, constants);
 
             Some(wrap_atomic(
                 match (
@@ -233,8 +380,29 @@ pub fn infer<'arena>(
                             BinaryOperator::BitwiseAnd(_) => lhs & rhs,
                             BinaryOperator::BitwiseOr(_) => lhs | rhs,
                             BinaryOperator::BitwiseXor(_) => lhs ^ rhs,
-                            BinaryOperator::LeftShift(_) => lhs << rhs,
-                            BinaryOperator::RightShift(_) => lhs >> rhs,
+                            BinaryOperator::LeftShift(_) => {
+                                if rhs < 0 {
+                                    return Some(get_int());
+                                }
+
+                                u32::try_from(rhs).ok().and_then(|s| lhs.checked_shl(s)).unwrap_or_default()
+                            }
+                            BinaryOperator::RightShift(_) => {
+                                if rhs < 0 {
+                                    return Some(get_int());
+                                }
+
+                                match u32::try_from(rhs).ok().and_then(|s| lhs.checked_shr(s)) {
+                                    Some(v) => v,
+                                    None => {
+                                        if lhs >= 0 {
+                                            0
+                                        } else {
+                                            -1
+                                        }
+                                    }
+                                }
+                            }
                             _ => {
                                 unreachable!("unexpected bitwise operator: {:?}", operator);
                             }
@@ -247,8 +415,8 @@ pub fn infer<'arena>(
             ))
         }
         Expression::Binary(Binary { operator, lhs, rhs }) if operator.is_arithmetic() => {
-            let lhs = infer(context, scope, lhs);
-            let rhs = infer(context, scope, rhs);
+            let lhs = infer_with_constants(context, scope, lhs, constants);
+            let rhs = infer_with_constants(context, scope, rhs, constants);
 
             match (
                 lhs.and_then(|v| v.get_single_literal_int_value()),
@@ -282,7 +450,7 @@ pub fn infer<'arena>(
             Construct::Print(_) => Some(get_literal_int(1)),
             _ => None,
         },
-        Expression::ConstantAccess(access) => infer_constant(context.resolved_names, &access.name),
+        Expression::ConstantAccess(access) => infer_constant(context.resolved_names, &access.name, constants),
         Expression::Access(Access::ClassConstant(ClassConstantAccess {
             class,
             constant: ClassLikeConstantSelector::Identifier(identifier),
@@ -334,27 +502,40 @@ pub fn infer<'arena>(
                     return None;
                 };
 
-                entries.insert(i, (false, infer(context, scope, element.value)?));
+                let value_type =
+                    infer_with_constants(context, scope, element.value, constants).unwrap_or_else(get_mixed);
+
+                entries.insert(i, (false, value_type));
             }
 
             Some(wrap_atomic(TAtomic::Array(TArray::List(TList {
                 known_count: Some(entries.len()),
                 known_elements: Some(entries),
-                element_type: Box::new(get_never()),
-                non_empty: true,
+                element_type: Arc::new(get_never()),
+                non_empty: !elements.is_empty(),
             }))))
         }
         Expression::Array(Array { elements, .. }) | Expression::LegacyArray(LegacyArray { elements, .. })
             if is_keyed_array_expression(expression) =>
         {
             let mut known_items = BTreeMap::new();
+            let mut unknown_key_values = Vec::new();
             for element in elements {
                 let ArrayElement::KeyValue(element) = element else {
                     return None;
                 };
 
-                let key_type = infer(context, scope, element.key).and_then(|v| v.get_single_array_key())?;
-                known_items.insert(key_type, (false, infer(context, scope, element.value)?));
+                let value_type =
+                    infer_with_constants(context, scope, element.value, constants).unwrap_or_else(get_mixed);
+
+                let Some(key_type) =
+                    infer_with_constants(context, scope, element.key, constants).and_then(|v| v.get_single_array_key())
+                else {
+                    unknown_key_values.push(value_type);
+                    continue;
+                };
+
+                known_items.insert(key_type, (false, value_type));
 
                 if known_items.len() > 100 {
                     return None;
@@ -363,7 +544,19 @@ pub fn infer<'arena>(
 
             let mut keyed_array = TKeyedArray::new();
             keyed_array.non_empty = !known_items.is_empty();
-            keyed_array.known_items = Some(known_items);
+            if !known_items.is_empty() {
+                keyed_array.known_items = Some(known_items);
+            }
+
+            if !unknown_key_values.is_empty() {
+                let mut value_parameter_types = vec![];
+                for value_type in unknown_key_values {
+                    value_parameter_types.extend(value_type.types.into_owned());
+                }
+
+                keyed_array.parameters =
+                    Some((Arc::new(get_arraykey()), Arc::new(TUnion::from_vec(value_parameter_types))))
+            }
 
             Some(TUnion::from_single(Cow::Owned(TAtomic::Array(TArray::Keyed(keyed_array)))))
         }
@@ -391,50 +584,9 @@ pub fn infer<'arena>(
 fn infer_constant<'ctx, 'arena>(
     names: &'ctx ResolvedNames<'arena>,
     constant: &'ctx Identifier<'arena>,
+    constants_map: Option<&AtomMap<ConstantMetadata>>,
 ) -> Option<TUnion> {
-    static DIR_SEPARATOR_SLICE: LazyLock<[TAtomic; 2]> = LazyLock::new(|| {
-        [
-            TAtomic::Scalar(TScalar::String(TString {
-                literal: Some(TStringLiteral::Value(atom("/"))),
-                is_numeric: false,
-                is_truthy: true,
-                is_non_empty: true,
-                is_lowercase: true,
-            })),
-            TAtomic::Scalar(TScalar::String(TString {
-                literal: Some(TStringLiteral::Value(atom("\\"))),
-                is_numeric: false,
-                is_truthy: true,
-                is_non_empty: true,
-                is_lowercase: true,
-            })),
-        ]
-    });
-
-    const PHP_INT_MAX_SLICE: &[TAtomic] = &[
-        TAtomic::Scalar(TScalar::Integer(TInteger::Literal(9_223_372_036_854_775_807))),
-        TAtomic::Scalar(TScalar::Integer(TInteger::Literal(2_147_483_647))),
-    ];
-
-    const PHP_INT_MIN_SLICE: &[TAtomic] = &[
-        TAtomic::Scalar(TScalar::Integer(TInteger::Literal(-9_223_372_036_854_775_808))),
-        TAtomic::Scalar(TScalar::Integer(TInteger::Literal(-2_147_483_648))),
-    ];
-
-    const PHP_MAJOR_VERSION_ATOMIC: &TAtomic = &TAtomic::Scalar(TScalar::Integer(TInteger::Range(8, 9)));
-    const PHP_ZTS_ATOMIC: &TAtomic = &TAtomic::Scalar(TScalar::Integer(TInteger::Range(0, 1)));
-    const PHP_DEBUG_ATOMIC: &TAtomic = &TAtomic::Scalar(TScalar::Integer(TInteger::Range(0, 1)));
-    const PHP_INT_SIZE_ATOMIC: &TAtomic = &TAtomic::Scalar(TScalar::Integer(TInteger::Range(4, 8)));
-    const PHP_WINDOWS_VERSION_MAJOR_ATOMIC: &TAtomic = &TAtomic::Scalar(TScalar::Integer(TInteger::Range(4, 6)));
-    const PHP_WINDOWS_VERSION_MINOR_SLICE: &[TAtomic] = &[
-        TAtomic::Scalar(TScalar::Integer(TInteger::Literal(0))),
-        TAtomic::Scalar(TScalar::Integer(TInteger::Literal(1))),
-        TAtomic::Scalar(TScalar::Integer(TInteger::Literal(2))),
-        TAtomic::Scalar(TScalar::Integer(TInteger::Literal(10))),
-        TAtomic::Scalar(TScalar::Integer(TInteger::Literal(90))),
-    ];
-
-    let (short_name, _) = if names.is_imported(constant) {
+    let (short_name, fqn) = if names.is_imported(constant) {
         (names.get(constant), names.get(constant))
     } else if let Some(stripped) = constant.value().strip_prefix('\\') {
         (stripped, names.get(constant))
@@ -442,51 +594,25 @@ fn infer_constant<'ctx, 'arena>(
         (constant.value(), names.get(constant))
     };
 
-    Some(match short_name {
-        "PHP_MAXPATHLEN"
-        | "PHP_WINDOWS_VERSION_BUILD"
-        | "LIBXML_VERSION"
-        | "OPENSSL_VERSION_NUMBER"
-        | "PHP_FLOAT_DIG" => get_int(),
-        "PHP_EXTRA_VERSION" => get_string(),
-        "PHP_BUILD_DATE"
-        | "PEAR_EXTENSION_DIR"
-        | "PEAR_INSTALL_DIR"
-        | "PHP_BINARY"
-        | "PHP_BINDIR"
-        | "PHP_CONFIG_FILE_PATH"
-        | "PHP_CONFIG_FILE_SCAN_DIR"
-        | "PHP_DATADIR"
-        | "PHP_EXTENSION_DIR"
-        | "PHP_LIBDIR"
-        | "PHP_LOCALSTATEDIR"
-        | "PHP_MANDIR"
-        | "PHP_OS"
-        | "PHP_OS_FAMILY"
-        | "PHP_PREFIX"
-        | "PHP_EOL"
-        | "PATH_SEPARATOR"
-        | "PHP_VERSION"
-        | "PHP_SAPI"
-        | "PHP_SYSCONFDIR"
-        | "ICONV_IMPL"
-        | "LIBXML_DOTTED_VERSION"
-        | "PCRE_VERSION" => get_non_empty_string(),
-        "STDIN" | "STDOUT" | "STDERR" => get_open_resource(),
-        "NAN" | "PHP_FLOAT_EPSILON" | "INF" => get_float(),
-        "PHP_VERSION_ID" => get_positive_int(),
-        "PHP_RELEASE_VERSION" | "PHP_MINOR_VERSION" => get_non_negative_int(),
-        "PHP_MAJOR_VERSION" => TUnion::from_single(Cow::Borrowed(PHP_MAJOR_VERSION_ATOMIC)),
-        "PHP_ZTS" => TUnion::from_single(Cow::Borrowed(PHP_ZTS_ATOMIC)),
-        "PHP_DEBUG" => TUnion::from_single(Cow::Borrowed(PHP_DEBUG_ATOMIC)),
-        "PHP_INT_SIZE" => TUnion::from_single(Cow::Borrowed(PHP_INT_SIZE_ATOMIC)),
-        "PHP_WINDOWS_VERSION_MAJOR" => TUnion::from_single(Cow::Borrowed(PHP_WINDOWS_VERSION_MAJOR_ATOMIC)),
-        "DIRECTORY_SEPARATOR" => TUnion::new(Cow::Borrowed(DIR_SEPARATOR_SLICE.as_slice())),
-        "PHP_INT_MAX" => TUnion::new(Cow::Borrowed(PHP_INT_MAX_SLICE)),
-        "PHP_INT_MIN" => TUnion::new(Cow::Borrowed(PHP_INT_MIN_SLICE)),
-        "PHP_WINDOWS_VERSION_MINOR" => TUnion::new(Cow::Borrowed(PHP_WINDOWS_VERSION_MINOR_SLICE)),
-        _ => return None,
-    })
+    if let Some(t) = get_literal_constant_type(short_name) {
+        return Some(t);
+    }
+
+    if let Some(t) = get_platform_constant_type(short_name) {
+        return Some(t);
+    }
+
+    if let Some(constants) = constants_map {
+        let normalized_name = ascii_lowercase_constant_name_atom(fqn);
+
+        if let Some(constant_metadata) = constants.get(&normalized_name)
+            && let Some(inferred_type) = &constant_metadata.inferred_type
+        {
+            return Some(inferred_type.clone());
+        }
+    }
+
+    None
 }
 
 #[inline]

@@ -16,10 +16,12 @@ This document details the rules available in the `Redundancy` category.
 | No Empty Loop | [`no-empty-loop`](#no-empty-loop) |
 | No Noop | [`no-noop`](#no-noop) |
 | No Protected in Final | [`no-protected-in-final`](#no-protected-in-final) |
+| No Redundant Binary String Prefix | [`no-redundant-binary-string-prefix`](#no-redundant-binary-string-prefix) |
 | No Redundant Block | [`no-redundant-block`](#no-redundant-block) |
 | No Redundant Continue | [`no-redundant-continue`](#no-redundant-continue) |
 | No Redundant File | [`no-redundant-file`](#no-redundant-file) |
 | No Redundant Final | [`no-redundant-final`](#no-redundant-final) |
+| No Redundant Isset | [`no-redundant-isset`](#no-redundant-isset) |
 | No Redundant Label | [`no-redundant-label`](#no-redundant-label) |
 | No Redundant Literal Return | [`no-redundant-literal-return`](#no-redundant-literal-return) |
 | No Redundant Math | [`no-redundant-math`](#no-redundant-math) |
@@ -321,6 +323,41 @@ final class Foo {
 ```
 
 
+## <a id="no-redundant-binary-string-prefix"></a>`no-redundant-binary-string-prefix`
+
+Detects the redundant `b`/`B` prefix on string literals. The binary string prefix
+has no effect in PHP and can be safely removed.
+
+
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `true` |
+| `level` | `string` | `"help"` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+
+$foo = 'hello';
+$bar = "world";
+```
+
+#### Incorrect code
+
+```php
+<?php
+
+$foo = b'hello';
+$bar = b"world";
+```
+
+
 ## <a id="no-redundant-block"></a>`no-redundant-block`
 
 Detects redundant blocks around statements.
@@ -465,6 +502,46 @@ final class Foo {
     final public function bar(): void {
         // ...
     }
+}
+```
+
+
+## <a id="no-redundant-isset"></a>`no-redundant-isset`
+
+Detects redundant arguments in `isset()` calls where a nested access already implies the parent checks.
+
+For example, `isset($d, $d['first'], $d['first']['second'])` can be simplified to
+`isset($d['first']['second'])` because checking a nested array access or property access
+implicitly verifies that all parent levels exist.
+
+
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `true` |
+| `level` | `string` | `"help"` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+
+if (isset($d['first']['second'])) {
+    echo 'all present';
+}
+```
+
+#### Incorrect code
+
+```php
+<?php
+
+if (isset($d, $d['first'], $d['first']['second'])) {
+    echo 'all present';
 }
 ```
 
@@ -827,7 +904,8 @@ $foo = "Hello" . " World";
 
 ## <a id="no-redundant-use"></a>`no-redundant-use`
 
-Detects `use` statements that import items that are never used.
+Detects `use` statements that import items that are never used or are redundant
+because they import from the same namespace.
 
 
 

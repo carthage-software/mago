@@ -2,34 +2,33 @@ use crate::T;
 use crate::ast::ast::Break;
 use crate::ast::ast::Continue;
 use crate::error::ParseError;
-use crate::parser::internal::expression::parse_expression;
-use crate::parser::internal::terminator::parse_terminator;
-use crate::parser::internal::token_stream::TokenStream;
-use crate::parser::internal::utils;
+use crate::parser::Parser;
 
 pub mod do_while;
 pub mod r#for;
 pub mod foreach;
 pub mod r#while;
 
-pub fn parse_continue<'arena>(stream: &mut TokenStream<'_, 'arena>) -> Result<Continue<'arena>, ParseError> {
-    Ok(Continue {
-        r#continue: utils::expect_keyword(stream, T!["continue"])?,
-        level: match utils::peek(stream)?.kind {
-            T![";" | "?>"] => None,
-            _ => Some(parse_expression(stream)?),
-        },
-        terminator: parse_terminator(stream)?,
-    })
-}
+impl<'input, 'arena> Parser<'input, 'arena> {
+    pub(crate) fn parse_continue(&mut self) -> Result<Continue<'arena>, ParseError> {
+        Ok(Continue {
+            r#continue: self.expect_keyword(T!["continue"])?,
+            level: match self.stream.peek_kind(0)? {
+                Some(T![";" | "?>"]) => None,
+                _ => Some(self.parse_expression()?),
+            },
+            terminator: self.parse_terminator()?,
+        })
+    }
 
-pub fn parse_break<'arena>(stream: &mut TokenStream<'_, 'arena>) -> Result<Break<'arena>, ParseError> {
-    Ok(Break {
-        r#break: utils::expect_keyword(stream, T!["break"])?,
-        level: match utils::peek(stream)?.kind {
-            T![";" | "?>"] => None,
-            _ => Some(parse_expression(stream)?),
-        },
-        terminator: parse_terminator(stream)?,
-    })
+    pub(crate) fn parse_break(&mut self) -> Result<Break<'arena>, ParseError> {
+        Ok(Break {
+            r#break: self.expect_keyword(T!["break"])?,
+            level: match self.stream.peek_kind(0)? {
+                Some(T![";" | "?>"]) => None,
+                _ => Some(self.parse_expression()?),
+            },
+            terminator: self.parse_terminator()?,
+        })
+    }
 }

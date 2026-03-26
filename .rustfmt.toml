@@ -1,3 +1,4 @@
+edition = "2024"
 indent_style = "Block"
 reorder_imports = true
 imports_granularity = "Item"

@@ -74,6 +74,12 @@ impl<'arena> FormatterState<'_, 'arena> {
             return false;
         }
 
+        if matches!(node, Node::Binary(_) | Node::Conditional(_))
+            && matches!(self.parent_node(), Node::PropertyAccess(_) | Node::NullSafePropertyAccess(_))
+        {
+            return true;
+        }
+
         self.called_or_accessed_node_needs_parens(node)
             || self.conditional_needs_parens(node)
             || self.binary_node_needs_parens(node)
@@ -83,6 +89,7 @@ impl<'arena> FormatterState<'_, 'arena> {
             || self.pipe_node_needs_parens(node)
             || self.class_constant_access_needs_parens(node)
             || self.arrow_function_needs_parens(node)
+            || self.construct_needs_parens(node)
     }
 
     pub(crate) fn should_indent(&self, node: Node<'arena, 'arena>) -> bool {
@@ -206,6 +213,23 @@ impl<'arena> FormatterState<'_, 'arena> {
         matches!(self.nth_parent_kind(2), Some(Node::Pipe(_)))
     }
 
+    /// Unbounded constructs greedily consume everything to their right, so parentheses
+    /// are required when they appear as operands in binary, ternary, or pipe expressions.
+    ///
+    /// Example:
+    /// - `(include 'f.php') + $x` without parens becomes `include ('f.php' + $x)`
+    fn construct_needs_parens(&self, node: Node<'arena, 'arena>) -> bool {
+        let Node::Construct(construct) = node else {
+            return false;
+        };
+
+        if construct.has_bounds() {
+            return false;
+        }
+
+        matches!(self.nth_parent_kind(2), Some(Node::Binary(_) | Node::Conditional(_) | Node::Pipe(_)))
+    }
+
     /// Check if a class constant access needs parentheses based on its parent context.
     ///
     /// PHP grammar does not allow class constant access directly after `new` or `instanceof`:
@@ -297,6 +321,10 @@ impl<'arena> FormatterState<'_, 'arena> {
             }
             Some(Node::Assignment(_)) => Precedence::Assignment,
             _ => {
+                if matches!(self.nth_parent_kind(2), Some(Node::PropertyAccess(_) | Node::NullSafePropertyAccess(_))) {
+                    return true;
+                }
+
                 let grand_parent_node = self.nth_parent_kind(3);
 
                 if let Some(Node::Access(_)) = grand_parent_node {
@@ -324,10 +352,19 @@ impl<'arena> FormatterState<'_, 'arena> {
                 )
             );
 
-            if is_include_like && let Some(Node::Binary(parent_bin)) = self.nth_parent_kind(2) {
-                let is_lhs = node.end_position() < parent_bin.operator.start_position();
-                if is_lhs {
-                    return true;
+            if is_include_like {
+                if let Some(Node::Binary(parent_bin)) = self.nth_parent_kind(2) {
+                    let is_lhs = node.end_position() < parent_bin.operator.start_position();
+                    if is_lhs {
+                        return true;
+                    }
+                }
+
+                if let Some(Node::Conditional(parent_cond)) = self.nth_parent_kind(2) {
+                    let is_condition = node.end_position() < parent_cond.question_mark.start_position();
+                    if is_condition {
+                        return true;
+                    }
                 }
             }
         }
@@ -397,10 +434,6 @@ impl<'arena> FormatterState<'_, 'arena> {
                 return self.function_callee_expression_need_parenthesis(expression);
             }
 
-            if let Expression::Instantiation(instantiation) = expression {
-                return self.instantiation_needs_parens(instantiation);
-            }
-
             return self.callee_expression_need_parenthesis(expression, false);
         }
 
@@ -417,6 +450,15 @@ impl<'arena> FormatterState<'_, 'arena> {
         }
 
         if let Some(Node::Access(access)) = self.grandparent_node() {
+            if matches!(self.parent_node(), Node::PropertyAccess(_) | Node::NullSafePropertyAccess(_))
+                && matches!(expression, Expression::Binary(_) | Expression::Conditional(_))
+            {
+                // Binary expressions are handled by `binary_node_needs_parens` which
+                // already checks for PropertyAccess context. Only Conditional/elvis
+                // needs parens added here since no equivalent check exists for it.
+                return matches!(expression, Expression::Conditional(_));
+            }
+
             let offset = match access {
                 Access::Property(property_access) => property_access.arrow.start_offset(),
                 Access::NullSafeProperty(null_safe_property_access) => {
@@ -436,11 +478,15 @@ impl<'arena> FormatterState<'_, 'arena> {
         false
     }
 
-    const fn callee_expression_need_parenthesis(
+    pub(crate) fn callee_expression_need_parenthesis(
         &self,
         expression: &'arena Expression<'arena>,
         instantiation: bool,
     ) -> bool {
+        if !instantiation && let Expression::Instantiation(i) = expression {
+            return self.instantiation_needs_parens(i);
+        }
+
         if instantiation && matches!(expression, Expression::Call(_)) {
             return true;
         }

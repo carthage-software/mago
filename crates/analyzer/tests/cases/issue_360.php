@@ -108,7 +108,6 @@ class Data
     public function addItemstoParamsWithExtra(array $params): array
     {
         foreach ($this->items as $item) {
-            // @mago-expect analysis:undefined-string-array-index
             // @mago-expect analysis:mixed-array-assignment
             $params['items'][] = $item;
         }

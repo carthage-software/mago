@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -16,7 +18,7 @@ pub struct TGenericParameter {
     /// The name of the template parameter (e.g., `T` in `@template T`).
     pub parameter_name: Atom,
     /// The upper bound or constraint (`Bound` in `T of Bound`), represented as a type union.
-    pub constraint: Box<TUnion>,
+    pub constraint: Arc<TUnion>,
     /// The scope (class-like or function-like) where this template parameter was defined.
     pub defining_entity: GenericParent,
     /// Additional types intersected with this generic parameter (e.g., `&Other` in `T&Other`).
@@ -35,7 +37,7 @@ impl TGenericParameter {
     /// * `defining_entity`: The scope (`GenericParent`) where it was defined.
     #[inline]
     #[must_use]
-    pub fn new(parameter_name: Atom, constraint: Box<TUnion>, defining_entity: GenericParent) -> Self {
+    pub fn new(parameter_name: Atom, constraint: Arc<TUnion>, defining_entity: GenericParent) -> Self {
         Self { parameter_name, constraint, defining_entity, intersection_types: None }
     }
 
@@ -84,7 +86,7 @@ impl TGenericParameter {
     pub fn with_constraint(&self, constraint: TUnion) -> Self {
         Self {
             parameter_name: self.parameter_name,
-            constraint: Box::new(constraint),
+            constraint: Arc::new(constraint),
             defining_entity: self.defining_entity,
             intersection_types: self.intersection_types.clone(),
         }

@@ -22,14 +22,12 @@ mago-type-syntax = { workspace = true }
 mago-names = { workspace = true }
 mago-database = { workspace = true }
 mago-fingerprint = { workspace = true }
-ahash = { workspace = true }
+foldhash = { workspace = true }
 serde = { workspace = true }
 tracing = { workspace = true }
-derivative = { workspace = true }
 strum = { workspace = true }
 indexmap = { workspace = true }
 ordered-float = { workspace = true }
-bitflags = { workspace = true }
 bumpalo = { workspace = true }
 itertools = { workspace = true }
 

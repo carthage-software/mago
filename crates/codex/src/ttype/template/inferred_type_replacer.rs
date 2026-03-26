@@ -1,7 +1,7 @@
-use ahash::HashMap;
-use ahash::HashSet;
-use ahash::RandomState;
-use indexmap::IndexMap;
+use std::sync::Arc;
+
+use foldhash::HashMap;
+use foldhash::HashSet;
 
 use mago_atom::Atom;
 
@@ -72,19 +72,19 @@ pub fn replace(union: &TUnion, template_result: &TemplateResult, codebase: &Code
                 {
                     let template_type = get_most_specific_type_from_bounds(bounds, codebase);
 
-                    let mut class_template_type = None;
-
+                    let mut class_template_types = Vec::new();
                     for template_type_part in template_type.types.as_ref() {
                         if template_type_part.is_mixed() || matches!(template_type_part, TAtomic::Object(TObject::Any))
                         {
-                            class_template_type =
-                                Some(TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::Any { kind: *kind })));
+                            class_template_types
+                                .push(TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::Any { kind: *kind })));
                         } else if let TAtomic::Object(TObject::Named(_)) = template_type_part {
-                            class_template_type =
-                                Some(TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::OfType {
+                            class_template_types.push(TAtomic::Scalar(TScalar::ClassLikeString(
+                                TClassLikeString::OfType {
                                     kind: *kind,
-                                    constraint: Box::new(template_type_part.clone()),
-                                })));
+                                    constraint: Arc::new(template_type_part.clone()),
+                                },
+                            )));
                         } else if let TAtomic::GenericParameter(TGenericParameter {
                             constraint,
                             parameter_name,
@@ -94,19 +94,20 @@ pub fn replace(union: &TUnion, template_result: &TemplateResult, codebase: &Code
                         {
                             let first_atomic_type = constraint.get_single();
 
-                            class_template_type =
-                                Some(TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::Generic {
+                            class_template_types.push(TAtomic::Scalar(TScalar::ClassLikeString(
+                                TClassLikeString::Generic {
                                     kind: *kind,
                                     parameter_name: *parameter_name,
-                                    constraint: Box::new(first_atomic_type.clone()),
+                                    constraint: Arc::new(first_atomic_type.clone()),
                                     defining_entity: *defining_entity,
-                                })));
+                                },
+                            )));
                         }
                     }
 
-                    if let Some(class_template_type) = class_template_type {
+                    if !class_template_types.is_empty() {
                         keys_to_unset.insert(*parameter_name);
-                        new_types.push(class_template_type);
+                        new_types.extend(class_template_types);
                     } else {
                         new_types.push(atomic_type);
                     }
@@ -124,12 +125,12 @@ pub fn replace(union: &TUnion, template_result: &TemplateResult, codebase: &Code
         return get_never();
     }
 
-    union.clone_with_types(combiner::combine(new_types, codebase, false))
+    union.clone_with_types(combiner::combine(new_types, codebase, combiner::CombinerOptions::default()))
 }
 
 #[allow(clippy::too_many_arguments)]
 fn replace_template_parameter(
-    inferred_lower_bounds: &IndexMap<Atom, HashMap<GenericParent, Vec<TemplateBound>>, RandomState>,
+    inferred_lower_bounds: &HashMap<Atom, HashMap<GenericParent, Vec<TemplateBound>>>,
     parameter_name: Atom,
     defining_entity: &GenericParent,
     codebase: &CodebaseMetadata,
@@ -197,15 +198,15 @@ fn replace_template_parameter(
 
         template_type = Some(template_type_inner);
     } else {
-        for (_, template_type_map) in inferred_lower_bounds {
-            for map_defining_entity in template_type_map.keys() {
-                if let GenericParent::ClassLike(classlike_name) = map_defining_entity
+        for lower_bounds_by_source in inferred_lower_bounds.values() {
+            for defining_entity in lower_bounds_by_source.keys() {
+                if let GenericParent::ClassLike(classlike_name) = defining_entity
                     && let Some(metadata) = codebase.get_class_like(classlike_name)
                     && let Some(extended_parameter_map) = metadata.template_extended_parameters.get(&metadata.name)
                     && let Some(param) = extended_parameter_map.get(&key)
                     && let TAtomic::GenericParameter(TGenericParameter { parameter_name, .. }) = param.get_single()
                     && let Some(bounds_map) = inferred_lower_bounds.get(parameter_name)
-                    && let Some(bounds) = bounds_map.get(map_defining_entity)
+                    && let Some(bounds) = bounds_map.get(defining_entity)
                 {
                     template_type = Some(standin_type_replacer::get_most_specific_type_from_bounds(bounds, codebase));
                 }
@@ -219,14 +220,15 @@ fn replace_template_parameter(
 fn replace_atomic(mut atomic: TAtomic, template_result: &TemplateResult, codebase: &CodebaseMetadata) -> TAtomic {
     match &mut atomic {
         TAtomic::Conditional(conditional) => {
-            *conditional.subject = replace(&conditional.subject, template_result, codebase);
-            *conditional.target = replace(&conditional.target, template_result, codebase);
-            *conditional.then = replace(&conditional.then, template_result, codebase);
-            *conditional.otherwise = replace(&conditional.otherwise, template_result, codebase);
+            *Arc::make_mut(&mut conditional.subject) = replace(&conditional.subject, template_result, codebase);
+            *Arc::make_mut(&mut conditional.target) = replace(&conditional.target, template_result, codebase);
+            *Arc::make_mut(&mut conditional.then) = replace(&conditional.then, template_result, codebase);
+            *Arc::make_mut(&mut conditional.otherwise) = replace(&conditional.otherwise, template_result, codebase);
         }
         TAtomic::Array(array_type) => match array_type {
             TArray::List(list_data) => {
-                *list_data.element_type = replace(&list_data.element_type, template_result, codebase);
+                *Arc::make_mut(&mut list_data.element_type) =
+                    replace(&list_data.element_type, template_result, codebase);
 
                 if let Some(known_elements) = &mut list_data.known_elements {
                     for (_, element_type) in known_elements.values_mut() {
@@ -236,8 +238,8 @@ fn replace_atomic(mut atomic: TAtomic, template_result: &TemplateResult, codebas
             }
             TArray::Keyed(keyed_data) => {
                 if let Some((key_parameter, value_parameter)) = &mut keyed_data.parameters {
-                    **key_parameter = replace(key_parameter, template_result, codebase);
-                    **value_parameter = replace(value_parameter, template_result, codebase);
+                    *Arc::make_mut(key_parameter) = replace(key_parameter, template_result, codebase);
+                    *Arc::make_mut(value_parameter) = replace(value_parameter, template_result, codebase);
                 }
 
                 if let Some(known_items) = &mut keyed_data.known_items {

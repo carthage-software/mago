@@ -1,11 +1,9 @@
-use ahash::HashMap;
-use ahash::RandomState;
+use foldhash::HashMap;
 use indexmap::IndexMap;
 
 use mago_atom::Atom;
 use mago_atom::atom;
 use mago_atom::concat_atom;
-
 use mago_codex::identifier::method::MethodIdentifier;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_codex::misc::GenericParent;
@@ -13,6 +11,9 @@ use mago_codex::ttype::TType;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::generic::TGenericParameter;
 use mago_codex::ttype::atomic::object::TObject;
+use mago_codex::ttype::atomic::object::r#enum::TEnum;
+use mago_codex::ttype::atomic::object::named::TNamedObject;
+use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::expander::StaticClassType;
 use mago_codex::ttype::expander::TypeExpansionOptions;
 use mago_codex::ttype::expander::{self};
@@ -61,6 +62,10 @@ pub struct PropertyResolutionResult {
     pub encountered_null: bool,
     pub encountered_mixed: bool,
     pub has_possibly_defined_property: bool,
+    /// True if all resolved properties are non-nullable.
+    /// When combined with `encountered_null` and nullsafe access, indicates
+    /// the null in the result type came ONLY from nullsafe short-circuit.
+    pub all_properties_non_nullable: bool,
 }
 
 /// Resolves all possible instance properties from an object expression and a member selector.
@@ -76,10 +81,10 @@ pub fn resolve_instance_properties<'ctx, 'ast, 'arena>(
 ) -> Result<PropertyResolutionResult, AnalysisError> {
     let mut result = PropertyResolutionResult::default();
 
-    let was_inside_general_use = block_context.inside_general_use;
-    block_context.inside_general_use = true;
+    let was_inside_general_use = block_context.flags.inside_general_use();
+    block_context.flags.set_inside_general_use(true);
     object_expression.analyze(context, block_context, artifacts)?;
-    block_context.inside_general_use = was_inside_general_use;
+    block_context.flags.set_inside_general_use(was_inside_general_use);
 
     let selectors = resolve_member_selector(context, block_context, artifacts, property_selector)?;
 
@@ -87,10 +92,10 @@ pub fn resolve_instance_properties<'ctx, 'ast, 'arena>(
         return Ok(result);
     };
 
-    let is_nullable = object_type.is_nullable() || object_type.is_voidable() || object_type.possibly_undefined();
+    let is_nullable = object_type.can_be_null() || object_type.possibly_undefined();
     let is_all_null = object_type.is_null() || object_type.is_void();
 
-    if is_null_safe && !is_nullable {
+    if is_null_safe && !is_nullable && !is_all_null {
         report_redundant_nullsafe(context, operator_span, object_expression, &object_type);
     }
 
@@ -118,7 +123,7 @@ pub fn resolve_instance_properties<'ctx, 'ast, 'arena>(
         if object_atomic.is_null() || object_atomic.is_void() {
             result.encountered_null = true;
 
-            if !is_null_safe && !block_context.inside_nullsafe_chain {
+            if !is_null_safe && !object_type.has_nullsafe_null() {
                 report_access_on_null(
                     context,
                     block_context,
@@ -138,7 +143,7 @@ pub fn resolve_instance_properties<'ctx, 'ast, 'arena>(
                 result.encountered_mixed = true;
             }
 
-            if !block_context.inside_isset || !object_atomic.is_mixed() {
+            if !block_context.flags.inside_isset() || !object_atomic.is_mixed() {
                 report_access_on_non_object(context, object_atomic, property_selector, object_expression.span());
             }
 
@@ -149,7 +154,7 @@ pub fn resolve_instance_properties<'ctx, 'ast, 'arena>(
             TObject::Any => {
                 result.has_ambiguous_path = true;
 
-                if !block_context.inside_isset {
+                if !block_context.flags.inside_isset() {
                     report_ambiguous_access(context, property_selector, object_expression.span(), atom("object"));
                 }
 
@@ -173,7 +178,7 @@ pub fn resolve_instance_properties<'ctx, 'ast, 'arena>(
                     }
                 } else {
                     result.has_ambiguous_path = true;
-                    if !block_context.inside_isset {
+                    if !block_context.flags.inside_isset() {
                         report_ambiguous_access(
                             context,
                             property_selector,
@@ -188,7 +193,7 @@ pub fn resolve_instance_properties<'ctx, 'ast, 'arena>(
             TObject::HasProperty(has_property) => {
                 let all_properties_match = property_names.iter().all(|prop_name| {
                     let prop_name_without_dollar = atom(prop_name.trim_start_matches('$'));
-                    has_property.has_property(&prop_name_without_dollar)
+                    has_property.has_property(prop_name_without_dollar)
                         || type_has_property_assertion(
                             has_property.intersection_types.as_deref(),
                             prop_name_without_dollar,
@@ -207,7 +212,7 @@ pub fn resolve_instance_properties<'ctx, 'ast, 'arena>(
                     }
                 } else {
                     result.has_ambiguous_path = true;
-                    if !block_context.inside_isset {
+                    if !block_context.flags.inside_isset() {
                         report_ambiguous_access(
                             context,
                             property_selector,
@@ -240,7 +245,7 @@ pub fn resolve_instance_properties<'ctx, 'ast, 'arena>(
 
                         result.has_ambiguous_path = true;
 
-                        if !block_context.inside_isset {
+                        if !block_context.flags.inside_isset() {
                             report_ambiguous_access(
                                 context,
                                 property_selector,
@@ -256,7 +261,7 @@ pub fn resolve_instance_properties<'ctx, 'ast, 'arena>(
                     let mut property_type = value.1.clone();
 
                     if is_optional {
-                        if !block_context.inside_isset {
+                        if !block_context.flags.inside_isset() {
                             report_possibly_non_existent_property(
                                 context,
                                 &object_type,
@@ -287,11 +292,18 @@ pub fn resolve_instance_properties<'ctx, 'ast, 'arena>(
         };
 
         let magic_method_name = if for_assignment { "__set" } else { "__get" };
-        let mut magic_method_identifier = MethodIdentifier::new(atom(&classname), atom(magic_method_name));
+        let mut magic_method_identifier = MethodIdentifier::new(classname, atom(magic_method_name));
         magic_method_identifier = context.codebase.get_declaring_method_identifier(&magic_method_identifier);
         let magic_method = context.codebase.get_method_by_id(&magic_method_identifier);
 
         for prop_name in &property_names {
+            if let TObject::Enum(enum_type) = object
+                && let Some(resolved) = resolve_enum_builtin_property(context, enum_type, *prop_name)
+            {
+                result.properties.push(resolved);
+                continue;
+            }
+
             let resolved_property = find_property_in_class(
                 context,
                 block_context,
@@ -330,18 +342,89 @@ pub fn resolve_instance_properties<'ctx, 'ast, 'arena>(
             }
 
             if let Some(declaring_class_id) = resolved_property.declaring_class_id {
-                artifacts.symbol_references.add_reference_for_property_access(
-                    &block_context.scope,
-                    declaring_class_id,
-                    resolved_property.property_name,
-                );
+                if for_assignment {
+                    artifacts.symbol_references.add_reference_for_property_write(
+                        &block_context.scope,
+                        declaring_class_id,
+                        resolved_property.property_name,
+                    );
+                } else {
+                    artifacts.symbol_references.add_reference_for_property_read(
+                        &block_context.scope,
+                        declaring_class_id,
+                        resolved_property.property_name,
+                    );
+                }
             }
 
             result.properties.push(resolved_property);
         }
     }
 
+    result.all_properties_non_nullable =
+        !result.properties.is_empty() && result.properties.iter().all(|p| !p.property_type.is_nullable());
+
     Ok(result)
+}
+
+/// Resolves built-in enum properties (`name` and `value`) with literal types.
+///
+/// For a specific enum case like `Foo::Bar`, returns the literal type:
+/// - `name` returns `string('Bar')`
+/// - `value` returns `string('bar')` or `int(123)` for backed enums
+///
+/// For a general enum type like `Color $c`, returns a union of all case literals:
+/// - `name` returns `'Red'|'Green'|'Blue'`
+/// - `value` returns `'red'|'green'|'blue'`
+fn resolve_enum_builtin_property(context: &Context, enum_type: &TEnum, prop_name: Atom) -> Option<ResolvedProperty> {
+    let prop_str = prop_name.as_str().trim_start_matches('$');
+    if prop_str != "name" && prop_str != "value" {
+        return None;
+    }
+
+    let class_metadata = context.codebase.get_class_like(&enum_type.name)?;
+
+    // Determine which cases to process: Either it's a specific case, or all cases
+    let cases: Vec<_> = if let Some(case_name) = enum_type.case {
+        class_metadata.enum_cases.get(&case_name).into_iter().collect()
+    } else {
+        class_metadata.enum_cases.values().collect()
+    };
+
+    if prop_str == "name" {
+        let name_types: Vec<TAtomic> =
+            cases.iter().map(|case| TAtomic::Scalar(TScalar::literal_string(case.name))).collect();
+
+        if name_types.is_empty() {
+            return None;
+        }
+
+        Some(ResolvedProperty {
+            property_span: None,
+            property_name: prop_name,
+            declaring_class_id: Some(atom("UnitEnum")),
+            property_type: TUnion::from_vec(name_types),
+            is_magic: false,
+        })
+    } else if prop_str == "value" {
+        let value_types: Vec<TAtomic> = cases.iter().filter_map(|case| case.value_type.clone()).collect();
+
+        if value_types.is_empty() {
+            // Unit enum - value property doesn't exist, fall through to normal resolution
+            // which will report an appropriate error
+            return None;
+        }
+
+        Some(ResolvedProperty {
+            property_span: None,
+            property_name: prop_name,
+            declaring_class_id: Some(atom("BackedEnum")),
+            property_type: TUnion::from_vec(value_types),
+            is_magic: false,
+        })
+    } else {
+        None
+    }
 }
 
 /// Checks if this is a backing store access: `$this->prop` inside a hook for that property.
@@ -374,6 +457,84 @@ fn find_property_in_class<'ctx, 'ast, 'arena>(
     };
 
     let Some(property_metadata) = declaring_class_metadata.properties.get(&prop_name) else {
+        for required_class in
+            declaring_class_metadata.require_extends.iter().chain(declaring_class_metadata.require_implements.iter())
+        {
+            let Some(required_metadata) = context.codebase.get_class_like(required_class) else {
+                continue;
+            };
+
+            let required_declaring_class_id =
+                context.codebase.get_declaring_property_class(required_class, &prop_name).unwrap_or(*required_class);
+            let required_declaring_metadata =
+                context.codebase.get_class_like(&required_declaring_class_id).unwrap_or(required_metadata);
+
+            if let Some(prop_meta) = required_declaring_metadata.properties.get(&prop_name) {
+                let property_type = prop_meta
+                    .type_metadata
+                    .as_ref()
+                    .or(prop_meta.type_declaration_metadata.as_ref())
+                    .map(|type_metadata| type_metadata.type_union.clone())
+                    .unwrap_or_else(get_mixed);
+
+                return Some(ResolvedProperty {
+                    property_span: prop_meta.name_span.or(prop_meta.span),
+                    property_name: prop_name,
+                    declaring_class_id: Some(required_declaring_class_id),
+                    property_type,
+                    is_magic: false,
+                });
+            }
+        }
+
+        // Check mixins.
+        if !declaring_class_metadata.mixins.is_empty() {
+            // Try to find property in mixin types
+            if let Some(resolved) = find_property_in_mixins(
+                context,
+                declaring_class_metadata,
+                object,
+                &declaring_class_metadata.mixins,
+                prop_name,
+            ) {
+                if has_magic_method {
+                    return Some(resolved);
+                } else {
+                    let magic_method_name = if for_assignment { "__set" } else { "__get" };
+                    if declaring_class_metadata.flags.is_final() {
+                        report_non_existent_mixin_property(
+                            context,
+                            object_expr.span(),
+                            selector.span(),
+                            declaring_class_id,
+                            prop_name,
+                            resolved.declaring_class_id.unwrap_or(declaring_class_id),
+                            magic_method_name,
+                        );
+                        result.has_invalid_path = true;
+                    } else {
+                        report_possibly_non_existent_mixin_property(
+                            context,
+                            object_expr.span(),
+                            selector.span(),
+                            declaring_class_id,
+                            prop_name,
+                            resolved.declaring_class_id.unwrap_or(declaring_class_id),
+                            magic_method_name,
+                        );
+                    }
+
+                    return Some(resolved);
+                }
+            }
+        }
+
+        if let TObject::Named(named_object) = object
+            && let Some(resolved) = find_property_in_intersection_types(context, named_object, prop_name)
+        {
+            return Some(resolved);
+        }
+
         if has_magic_method {
             report_non_documented_property(
                 context,
@@ -476,6 +637,15 @@ fn find_property_in_class<'ctx, 'ast, 'arena>(
         );
     }
 
+    if !for_assignment
+        && property_metadata.type_declaration_metadata.is_some()
+        && !property_metadata.flags.has_default()
+        && !property_metadata.flags.is_promoted_property()
+        && !property_metadata.flags.is_virtual_property()
+    {
+        property_type.set_possibly_undefined(true, None);
+    }
+
     let is_visible = if for_assignment {
         check_property_write_visibility(
             context,
@@ -537,14 +707,14 @@ pub fn localize_property_type(
 
     inferred_type_replacer::replace(
         class_property_type,
-        &TemplateResult::new(IndexMap::default(), template_types),
+        &TemplateResult::new(Default::default(), template_types),
         context.codebase,
     )
 }
 
 fn update_template_types(
     context: &Context<'_, '_>,
-    template_types: &mut IndexMap<Atom, HashMap<GenericParent, TUnion>, RandomState>,
+    template_types: &mut HashMap<Atom, HashMap<GenericParent, TUnion>>,
     property_class_metadata: &ClassLikeMetadata,
     lhs_type_params: &[TUnion],
     property_declaring_class_metadata: &ClassLikeMetadata,
@@ -590,7 +760,7 @@ fn update_template_types(
                         .template_types
                         .iter()
                         .enumerate()
-                        .filter(|(_, (k, _))| k == parameter_name)
+                        .filter(|(_, (k, _))| *k == parameter_name)
                         .map(|(i, _)| i)
                         .next();
 
@@ -655,8 +825,8 @@ fn report_access_on_null<'ctx>(
             );
         }
         (false, false) => {
-            if !block_context.inside_isset {
-                if block_context.inside_assignment {
+            if !block_context.flags.inside_isset() {
+                if block_context.flags.inside_assignment() {
                     context.collector.report_with_code(
                         IssueCode::PossiblyNullPropertyAccess,
                         Issue::error("Attempting to access a property on a possibly `null` value.")
@@ -830,6 +1000,69 @@ pub(super) fn report_non_documented_property(
     );
 }
 
+/// Reports a warning when a property is found in a mixin but the target class lacks __get/__set.
+/// This is a warning because a subclass might implement __get/__set.
+fn report_possibly_non_existent_mixin_property(
+    context: &mut Context,
+    obj_span: Span,
+    selector_span: Span,
+    classname: Atom,
+    prop_name: Atom,
+    mixin_classname: Atom,
+    magic_method_name: &str,
+) {
+    context.collector.report_with_code(
+        IssueCode::PossiblyNonExistentProperty,
+        Issue::warning(format!(
+            "Property `{prop_name}` might not exist on type `{classname}` at runtime."
+        ))
+        .with_annotation(
+            Annotation::primary(selector_span).with_message("Property might not exist"),
+        )
+        .with_annotation(
+            Annotation::secondary(obj_span).with_message(format!("On an instance of `{classname}`")),
+        )
+        .with_note(format!(
+            "The property `{prop_name}` is defined in mixin class `{mixin_classname}`, but `{classname}` does not have a `{magic_method_name}` method to forward the access."
+        ))
+        .with_note(
+            "A subclass of this class could implement the magic method to handle this, so the access might succeed at runtime."
+        )
+        .with_help(format!(
+            "Add a `{magic_method_name}` method to `{classname}`, or make `{classname}` final if this should be an error."
+        )),
+    );
+}
+
+fn report_non_existent_mixin_property(
+    context: &mut Context,
+    obj_span: Span,
+    selector_span: Span,
+    classname: Atom,
+    prop_name: Atom,
+    mixin_classname: Atom,
+    magic_method_name: &str,
+) {
+    context.collector.report_with_code(
+        IssueCode::NonExistentProperty,
+        Issue::error(format!(
+            "Property `{prop_name}` does not exist on final type `{classname}`."
+        ))
+        .with_annotation(
+            Annotation::primary(selector_span).with_message("Property does not exist"),
+        )
+        .with_annotation(
+            Annotation::secondary(obj_span).with_message(format!("On an instance of final class `{classname}`")),
+        )
+        .with_note(format!(
+            "The property `{prop_name}` is defined in mixin class `{mixin_classname}`, but `{classname}` is final and does not have a `{magic_method_name}` method to forward the access."
+        ))
+        .with_help(format!(
+            "Add a `{magic_method_name}` method to `{classname}` to handle mixin property accesses."
+        )),
+    );
+}
+
 pub(super) fn report_magic_property_without_get_set_method(
     context: &mut Context,
     obj_span: Span,
@@ -866,7 +1099,7 @@ fn type_has_property_assertion(intersection_types: Option<&[TAtomic]>, property_
     intersection_types.is_some_and(|types| {
         types.iter().any(|atomic| match atomic {
             TAtomic::Object(TObject::HasProperty(has_property)) => {
-                has_property.has_property(&property_name)
+                has_property.has_property(property_name)
                     || type_has_property_assertion(has_property.intersection_types.as_deref(), property_name)
             }
             TAtomic::Object(TObject::HasMethod(has_method)) => {
@@ -875,4 +1108,204 @@ fn type_has_property_assertion(intersection_types: Option<&[TAtomic]>, property_
             _ => false,
         })
     })
+}
+
+/// Searches for a property in mixin types.
+/// Returns Some(ResolvedProperty) if the property is found in a mixin, None otherwise.
+/// When the mixin type is a generic parameter (e.g., `@mixin T`), tries to resolve it
+/// using the outer_object's type_parameters.
+fn find_property_in_mixins(
+    context: &mut Context,
+    class_metadata: &ClassLikeMetadata,
+    outer_object: &TObject,
+    mixins: &[TUnion],
+    prop_name: Atom,
+) -> Option<ResolvedProperty> {
+    for mixin_type in mixins {
+        for mixin_atomic in mixin_type.types.as_ref() {
+            match mixin_atomic {
+                TAtomic::Object(TObject::Named(named)) => {
+                    if let Some(result) = find_property_in_single_mixin(context, named.name, prop_name) {
+                        return Some(result);
+                    }
+                }
+                TAtomic::Object(TObject::Enum(enum_type)) => {
+                    if let Some(result) = find_property_in_single_mixin(context, enum_type.name, prop_name) {
+                        return Some(result);
+                    }
+                }
+                TAtomic::GenericParameter(TGenericParameter {
+                    parameter_name, constraint, defining_entity, ..
+                }) => {
+                    let mut resolved = false;
+
+                    if let TObject::Named(named_object) = outer_object
+                        && let Some(type_params) = named_object.get_type_parameters()
+                        && let GenericParent::ClassLike(defining_class) = defining_entity
+                        && named_object.name.eq_ignore_ascii_case(defining_class)
+                        && let Some(index) = class_metadata.get_template_index_for_name(*parameter_name)
+                        && let Some(concrete_type) = type_params.get(index)
+                    {
+                        for atomic in concrete_type.types.as_ref() {
+                            let class_name = match atomic {
+                                TAtomic::Object(TObject::Named(named)) => named.name,
+                                TAtomic::Object(TObject::Enum(enum_type)) => enum_type.name,
+                                _ => continue,
+                            };
+
+                            if let Some(result) = find_property_in_single_mixin(context, class_name, prop_name) {
+                                return Some(result);
+                            }
+                            resolved = true;
+                        }
+                    }
+
+                    // Fallback to constraint if we couldn't resolve
+                    if !resolved {
+                        for constraint_atomic in constraint.types.as_ref() {
+                            let constraint_class_name = match constraint_atomic {
+                                TAtomic::Object(TObject::Named(named)) => named.name,
+                                TAtomic::Object(TObject::Enum(enum_type)) => enum_type.name,
+                                _ => continue,
+                            };
+
+                            if let Some(result) =
+                                find_property_in_single_mixin(context, constraint_class_name, prop_name)
+                            {
+                                return Some(result);
+                            }
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+
+    None
+}
+
+/// Searches for a property in a single mixin class.
+fn find_property_in_single_mixin(
+    context: &mut Context,
+    mixin_class_name: Atom,
+    prop_name: Atom,
+) -> Option<ResolvedProperty> {
+    let mixin_metadata = context.codebase.get_class_like(&mixin_class_name)?;
+    let property_metadata = mixin_metadata.properties.get(&prop_name)?;
+
+    if !property_metadata.read_visibility.is_public() {
+        return None;
+    }
+
+    let property_type = property_metadata
+        .type_metadata
+        .as_ref()
+        .or(property_metadata.type_declaration_metadata.as_ref())
+        .map(|type_metadata| type_metadata.type_union.clone())
+        .unwrap_or_else(get_mixed);
+
+    Some(ResolvedProperty {
+        property_span: property_metadata.name_span.or(property_metadata.span),
+        property_name: prop_name,
+        declaring_class_id: Some(mixin_class_name),
+        property_type,
+        is_magic: false,
+    })
+}
+
+/// Searches for a property in intersection types of a named object.
+/// For example, if the type is `Foo&Baz`, this will look for the property on `Baz`.
+fn find_property_in_intersection_types(
+    context: &mut Context,
+    named_object: &TNamedObject,
+    prop_name: Atom,
+) -> Option<ResolvedProperty> {
+    let intersection_types = named_object.get_intersection_types()?;
+
+    for atomic in intersection_types {
+        match atomic {
+            TAtomic::Object(TObject::Named(named)) => {
+                let class_name = named.name;
+                let declaring_class_id =
+                    context.codebase.get_declaring_property_class(&class_name, &prop_name).unwrap_or(class_name);
+
+                let Some(class_metadata) = context.codebase.get_class_like(&declaring_class_id) else {
+                    continue;
+                };
+
+                let Some(property_metadata) = class_metadata.properties.get(&prop_name) else {
+                    continue;
+                };
+
+                if !property_metadata.read_visibility.is_public() {
+                    continue;
+                }
+
+                let property_type = property_metadata
+                    .type_metadata
+                    .as_ref()
+                    .or(property_metadata.type_declaration_metadata.as_ref())
+                    .map(|type_metadata| type_metadata.type_union.clone())
+                    .unwrap_or_else(get_mixed);
+
+                return Some(ResolvedProperty {
+                    property_span: property_metadata.name_span.or(property_metadata.span),
+                    property_name: prop_name,
+                    declaring_class_id: Some(declaring_class_id),
+                    property_type,
+                    is_magic: false,
+                });
+            }
+            TAtomic::Object(TObject::Enum(enum_type)) => {
+                let class_name = enum_type.name;
+                let declaring_class_id =
+                    context.codebase.get_declaring_property_class(&class_name, &prop_name).unwrap_or(class_name);
+
+                let Some(class_metadata) = context.codebase.get_class_like(&declaring_class_id) else {
+                    continue;
+                };
+
+                let Some(property_metadata) = class_metadata.properties.get(&prop_name) else {
+                    continue;
+                };
+
+                if !property_metadata.read_visibility.is_public() {
+                    continue;
+                }
+
+                let property_type = property_metadata
+                    .type_metadata
+                    .as_ref()
+                    .or(property_metadata.type_declaration_metadata.as_ref())
+                    .map(|type_metadata| type_metadata.type_union.clone())
+                    .unwrap_or_else(get_mixed);
+
+                return Some(ResolvedProperty {
+                    property_span: property_metadata.name_span.or(property_metadata.span),
+                    property_name: prop_name,
+                    declaring_class_id: Some(declaring_class_id),
+                    property_type,
+                    is_magic: false,
+                });
+            }
+            TAtomic::Object(TObject::WithProperties(shaped)) => {
+                let prop_str: &str = prop_name.as_ref();
+                let key = mago_atom::atom(prop_str.trim_start_matches('$'));
+
+                if let Some((_optional, property_type)) = shaped.known_properties.get(&key) {
+                    return Some(ResolvedProperty {
+                        property_span: None,
+                        property_name: prop_name,
+                        declaring_class_id: None,
+                        property_type: property_type.clone(),
+                        is_magic: false,
+                    });
+                }
+            }
+            _ => continue,
+        }
+    }
+
+    None
 }

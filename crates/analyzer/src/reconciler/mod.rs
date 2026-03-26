@@ -1,9 +1,10 @@
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::rc::Rc;
+use std::sync::Arc;
 use std::sync::LazyLock;
 
-use ahash::HashSet;
+use foldhash::HashSet;
 use indexmap::IndexMap;
 use regex::Regex;
 
@@ -14,6 +15,7 @@ use mago_atom::AtomSet;
 use mago_atom::atom;
 use mago_atom::concat_atom;
 use mago_codex::assertion::Assertion;
+use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::ttype::add_optional_union_type;
 use mago_codex::ttype::add_union_type;
 use mago_codex::ttype::atomic::TAtomic;
@@ -24,15 +26,18 @@ use mago_codex::ttype::atomic::array::list::TList;
 use mago_codex::ttype::atomic::generic::TGenericParameter;
 use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::atomic::scalar::TScalar;
+use mago_codex::ttype::combiner::CombinerOptions;
 use mago_codex::ttype::expander;
 use mago_codex::ttype::expander::StaticClassType;
 use mago_codex::ttype::expander::TypeExpansionOptions;
+use mago_codex::ttype::get_arraykey;
 use mago_codex::ttype::get_iterable_value_parameter;
 use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::get_mixed_maybe_from_loop;
 use mago_codex::ttype::get_never;
 use mago_codex::ttype::get_null;
 use mago_codex::ttype::get_string;
+use mago_codex::ttype::intersect_union_types;
 use mago_codex::ttype::union::TUnion;
 use mago_codex::ttype::wrap_atomic;
 use mago_reporting::Annotation;
@@ -96,7 +101,7 @@ pub fn reconcile_keyed_types<'ctx>(
         }
     }
 
-    let inside_loop = block_context.inside_loop;
+    let inside_loop = block_context.flags.inside_loop();
     let old_new_types = new_types.clone();
     let mut new_types = new_types.clone();
 
@@ -170,6 +175,7 @@ pub fn reconcile_keyed_types<'ctx>(
                     inside_loop,
                     Some(span),
                     can_report_issues
+                        && new_type_part_parts.len() == 1
                         && referenced_var_ids.contains(key)
                         && active_new_types.get(key).is_some_and(|active_new_type| active_new_type.contains(&i)),
                     negated,
@@ -190,7 +196,7 @@ pub fn reconcile_keyed_types<'ctx>(
             // Even when the type doesn't exist and result is never, we still need to
             // update parent array types for negated isset/key_exists to remove the key
             if key_str.ends_with(']') && (has_inverted_isset || has_inverted_key_exists) {
-                adjust_array_type_remove_key(key_parts.clone(), block_context, changed_var_ids);
+                adjust_array_type_remove_key(key_parts.clone(), block_context, changed_var_ids, context.codebase);
             }
 
             continue;
@@ -203,20 +209,23 @@ pub fn reconcile_keyed_types<'ctx>(
             changed_var_ids.insert(*key);
 
             if key_str.ends_with(']') && !has_inverted_isset && !has_inverted_key_exists && !has_empty && !is_equality {
-                adjust_array_type(key_parts.clone(), block_context, changed_var_ids, &result_type);
+                adjust_array_type(key_parts.clone(), block_context, changed_var_ids, &result_type, context.codebase);
             } else if key_str.ends_with(']') && (has_inverted_isset || has_inverted_key_exists) {
-                adjust_array_type_remove_key(key_parts.clone(), block_context, changed_var_ids);
+                adjust_array_type_remove_key(key_parts.clone(), block_context, changed_var_ids, context.codebase);
+            } else if key_str.contains("->") && !is_equality {
+                adjust_object_property_type(key_parts.clone(), block_context, changed_var_ids, &result_type, context);
             }
 
             if key_str != "$this" {
                 let mut removable_keys: Vec<Atom> = Vec::new();
-                for new_key in block_context.locals.keys() {
-                    if new_key == key {
+                let local_keys = block_context.locals.keys().copied().collect::<Vec<_>>();
+                for new_key in local_keys {
+                    if new_key == *key {
                         continue;
                     }
 
-                    if is_real && !new_types.contains_key(new_key) && var_has_root(*new_key, *key) {
-                        if let Some(references_map) = reference_graph.get(new_key) {
+                    if is_real && !new_types.contains_key(&new_key) && var_has_root(new_key, *key) {
+                        if let Some(references_map) = reference_graph.get(&new_key) {
                             let references_to_fix = references_map.iter().copied().collect::<Vec<_>>();
 
                             match references_to_fix.len() {
@@ -224,12 +233,15 @@ pub fn reconcile_keyed_types<'ctx>(
                                 1 => {
                                     let reference_to_fix = references_to_fix[0];
                                     reference_graph.remove(&reference_to_fix);
-                                    block_context.references_in_scope.remove(&reference_to_fix);
+                                    if block_context.references_in_scope.contains_key(&reference_to_fix) {
+                                        block_context.decrement_reference_count(reference_to_fix.as_str());
+                                        block_context.references_in_scope.remove(&reference_to_fix);
+                                    }
                                 }
                                 _ => {
                                     for reference in &references_to_fix {
                                         if let Some(inner_set) = reference_graph.get_mut(reference) {
-                                            inner_set.remove(new_key);
+                                            inner_set.remove(&new_key);
                                         }
                                     }
 
@@ -237,10 +249,13 @@ pub fn reconcile_keyed_types<'ctx>(
                                         .get(&references_to_fix[0])
                                         .and_then(|inner_set| inner_set.iter().next().copied())
                                     {
-                                        block_context.references_in_scope.remove(&new_primary_reference);
+                                        if block_context.references_in_scope.contains_key(&new_primary_reference) {
+                                            block_context.decrement_reference_count(new_primary_reference.as_str());
+                                            block_context.references_in_scope.remove(&new_primary_reference);
+                                        }
 
                                         for referenced_value in block_context.references_in_scope.values_mut() {
-                                            if *referenced_value == *new_key {
+                                            if *referenced_value == new_key {
                                                 *referenced_value = new_primary_reference;
                                             }
                                         }
@@ -249,9 +264,12 @@ pub fn reconcile_keyed_types<'ctx>(
                             }
                         }
 
-                        reference_graph.remove(new_key);
-                        removable_keys.push(*new_key);
-                        block_context.references_in_scope.remove(new_key);
+                        reference_graph.remove(&new_key);
+                        removable_keys.push(new_key);
+                        if block_context.references_in_scope.contains_key(&new_key) {
+                            block_context.decrement_reference_count(new_key.as_str());
+                            block_context.references_in_scope.remove(&new_key);
+                        }
                     }
                 }
 
@@ -288,6 +306,7 @@ fn adjust_array_type(
     context: &mut BlockContext<'_>,
     changed_var_ids: &mut AtomSet,
     result_type: &TUnion,
+    codebase: &CodebaseMetadata,
 ) {
     key_parts.pop();
     let Some(array_key) = key_parts.pop() else {
@@ -317,19 +336,34 @@ fn adjust_array_type(
         return;
     };
 
-    for base_atomic_type in existing_type.types.to_mut() {
-        match base_atomic_type {
+    let atomic_types = std::mem::take(existing_type.types.to_mut());
+    let mut compatible_types = Vec::with_capacity(atomic_types.len());
+
+    for mut base_atomic_type in atomic_types {
+        match &mut base_atomic_type {
             TAtomic::Array(TArray::Keyed(TKeyedArray { known_items, .. })) => {
                 let dictkey = if has_string_offset {
                     ArrayKey::String(atom(&arraykey_offset))
                 } else if let Ok(arraykey_value) = arraykey_offset.parse::<i64>() {
                     ArrayKey::Integer(arraykey_value)
                 } else {
+                    compatible_types.push(base_atomic_type);
                     continue;
                 };
 
                 if let Some(known_items) = known_items {
-                    known_items.insert(dictkey, (false, result_type.clone()));
+                    if let Some((_, existing_item_type)) = known_items.get(&dictkey) {
+                        match intersect_union_types(result_type, existing_item_type, codebase) {
+                            Some(intersected) if !intersected.is_never() => {
+                                known_items.insert(dictkey, (false, intersected));
+                            }
+                            _ => {
+                                continue;
+                            }
+                        }
+                    } else {
+                        known_items.insert(dictkey, (false, result_type.clone()));
+                    }
                 } else {
                     *known_items = Some(BTreeMap::from([(dictkey, (false, result_type.clone()))]));
                 }
@@ -337,13 +371,41 @@ fn adjust_array_type(
             TAtomic::Array(TArray::List(TList { known_elements, .. })) => {
                 if let Ok(arraykey_offset) = arraykey_offset.parse::<usize>() {
                     if let Some(known_elements) = known_elements {
-                        known_elements.insert(arraykey_offset, (false, result_type.clone()));
+                        if let Some((_, existing_item_type)) = known_elements.get(&arraykey_offset) {
+                            match intersect_union_types(result_type, existing_item_type, codebase) {
+                                Some(intersected) if !intersected.is_never() => {
+                                    known_elements.insert(arraykey_offset, (false, intersected));
+                                }
+                                _ => {
+                                    continue;
+                                }
+                            }
+                        } else {
+                            known_elements.insert(arraykey_offset, (false, result_type.clone()));
+                        }
                     } else {
                         *known_elements = Some(BTreeMap::from([(arraykey_offset, (false, result_type.clone()))]));
                     }
                 }
             }
+            TAtomic::Mixed(_) => {
+                let key = if has_string_offset {
+                    ArrayKey::String(atom(&arraykey_offset))
+                } else if let Ok(arraykey_value) = arraykey_offset.parse::<i64>() {
+                    ArrayKey::Integer(arraykey_value)
+                } else {
+                    compatible_types.push(base_atomic_type);
+                    continue;
+                };
+
+                base_atomic_type = TAtomic::Array(TArray::Keyed(TKeyedArray {
+                    known_items: Some(BTreeMap::from([(key, (false, result_type.clone()))])),
+                    parameters: Some((Arc::new(get_arraykey()), Arc::new(get_mixed()))),
+                    non_empty: true,
+                }));
+            }
             _ => {
+                compatible_types.push(base_atomic_type);
                 continue;
             }
         }
@@ -353,8 +415,20 @@ fn adjust_array_type(
         if let Some(last_part) = key_parts.last()
             && last_part == "]"
         {
-            adjust_array_type(key_parts.clone(), context, changed_var_ids, &wrap_atomic(base_atomic_type.clone()));
+            adjust_array_type(
+                key_parts.clone(),
+                context,
+                changed_var_ids,
+                &wrap_atomic(base_atomic_type.clone()),
+                codebase,
+            );
         }
+
+        compatible_types.push(base_atomic_type);
+    }
+
+    if !compatible_types.is_empty() {
+        *existing_type.types.to_mut() = compatible_types;
     }
 
     context.locals.insert(base_key_atom, Rc::new(existing_type));
@@ -364,6 +438,7 @@ fn adjust_array_type_remove_key(
     mut key_parts: Vec<String>,
     context: &mut BlockContext<'_>,
     changed_var_ids: &mut AtomSet,
+    codebase: &CodebaseMetadata,
 ) {
     key_parts.pop();
     let Some(array_key) = key_parts.pop() else {
@@ -426,11 +501,90 @@ fn adjust_array_type_remove_key(
         if let Some(last_part) = key_parts.last()
             && last_part == "]"
         {
-            adjust_array_type(key_parts.clone(), context, changed_var_ids, &wrap_atomic(base_atomic_type.clone()));
+            adjust_array_type(
+                key_parts.clone(),
+                context,
+                changed_var_ids,
+                &wrap_atomic(base_atomic_type.clone()),
+                codebase,
+            );
         }
     }
 
     context.locals.insert(base_key_atom, Rc::new(existing_type));
+}
+
+/// Filters a union of object types based on a narrowed property type.
+///
+/// When `$input->myProp` is narrowed (e.g., via `is_string()`), this function
+/// checks each object variant to see if its declared property type is compatible
+/// with the narrowed type, and removes incompatible variants.
+fn adjust_object_property_type(
+    mut key_parts: Vec<String>,
+    block_context: &mut BlockContext<'_>,
+    changed_var_ids: &mut AtomSet,
+    result_type: &TUnion,
+    context: &Context<'_, '_>,
+) {
+    let Some(property_name) = key_parts.pop() else {
+        return;
+    };
+
+    let Some(divider) = key_parts.pop() else {
+        return;
+    };
+
+    if divider != "->" {
+        return;
+    }
+
+    let base_key = key_parts.join("");
+    let base_key_atom = atom(&base_key);
+
+    let mut existing_type = if let Some(existing_type) = block_context.locals.get(&base_key_atom) {
+        (**existing_type).clone()
+    } else {
+        return;
+    };
+
+    let atomic_types = std::mem::take(existing_type.types.to_mut());
+    let original_len = atomic_types.len();
+    let mut compatible_types = Vec::with_capacity(original_len);
+
+    for base_atomic_type in atomic_types {
+        let should_check = match &base_atomic_type {
+            TAtomic::Object(TObject::Named(named)) => {
+                let fq_class_name = named.get_name();
+                if fq_class_name.eq_ignore_ascii_case("stdClass")
+                    || !context.codebase.class_or_interface_exists(&fq_class_name)
+                {
+                    None
+                } else {
+                    get_property_type(context, named.get_name(), &property_name)
+                }
+            }
+            _ => None,
+        };
+
+        if let Some(declared_property_type) = should_check {
+            match intersect_union_types(result_type, &declared_property_type, context.codebase) {
+                Some(intersected) if !intersected.is_never() => {
+                    compatible_types.push(base_atomic_type);
+                }
+                _ => {
+                    continue;
+                }
+            }
+        } else {
+            compatible_types.push(base_atomic_type);
+        }
+    }
+
+    if !compatible_types.is_empty() && compatible_types.len() < original_len {
+        *existing_type.types.to_mut() = compatible_types;
+        block_context.locals.insert(base_key_atom, Rc::new(existing_type));
+        changed_var_ids.insert(base_key_atom);
+    }
 }
 
 fn refine_array_key(key_type: &TUnion) -> TUnion {
@@ -563,11 +717,7 @@ fn add_nested_assertions(
                             }
                         }
                     } else {
-                        entry.push(vec![if array_key.contains('\'') {
-                            Assertion::HasStringArrayAccess
-                        } else {
-                            Assertion::HasIntOrStringArrayAccess
-                        }]);
+                        entry.push(vec![Assertion::HasIntOrStringArrayAccess]);
                     }
 
                     base_key = new_base_key;
@@ -633,12 +783,24 @@ pub fn break_up_path_into_parts(path: &str) -> Vec<String> {
             let mut token_found: Option<&'static str> = None;
             match c {
                 '[' => {
+                    if brackets == 0 {
+                        token_found = Some("[");
+                    } else {
+                        unsafe {
+                            parts.last_mut().unwrap_unchecked().push(c);
+                        }
+                    }
                     brackets += 1;
-                    token_found = Some("[");
                 }
                 ']' => {
                     brackets -= 1;
-                    token_found = Some("]");
+                    if brackets == 0 {
+                        token_found = Some("]");
+                    } else {
+                        unsafe {
+                            parts.last_mut().unwrap_unchecked().push(c);
+                        }
+                    }
                 }
                 '\'' | '"' => {
                     string_char = Some(c);
@@ -743,7 +905,7 @@ fn get_value_for_key(
     };
 
     let base_key_atom = atom(&base_key);
-    if let std::collections::btree_map::Entry::Vacant(e) = block_context.locals.entry(base_key_atom) {
+    if let std::collections::hash_map::Entry::Vacant(e) = block_context.locals.entry(base_key_atom) {
         if base_key.contains("::") {
             let base_key_parts = &base_key.split("::").collect::<Vec<&str>>();
             let fq_class_name = &base_key_parts[0];
@@ -803,7 +965,7 @@ fn get_value_for_key(
                 atomic_types.reverse();
                 while let Some(existing_key_type_part) = atomic_types.pop() {
                     if let TAtomic::GenericParameter(TGenericParameter { constraint, .. }) = existing_key_type_part {
-                        atomic_types.extend(constraint.types.into_owned());
+                        atomic_types.extend(Arc::unwrap_or_clone(constraint).types.into_owned());
                         continue;
                     }
 
@@ -850,8 +1012,12 @@ fn get_value_for_key(
                                 && new_assertions.contains_key(&new_base_key_atom)
                             {
                                 if has_inverted_isset && new_base_key_atom == key {
-                                    new_base_type_candidate =
-                                        add_union_type(new_base_type_candidate, &get_null(), context.codebase, false);
+                                    new_base_type_candidate = add_union_type(
+                                        new_base_type_candidate,
+                                        &get_null(),
+                                        context.codebase,
+                                        CombinerOptions::default(),
+                                    );
                                 }
 
                                 new_base_type_candidate.set_possibly_undefined(true, None);
@@ -884,8 +1050,12 @@ fn get_value_for_key(
                                 && new_assertions.contains_key(&new_base_key_atom)
                             {
                                 if has_inverted_isset && new_base_key_atom == key {
-                                    new_base_type_candidate =
-                                        add_union_type(new_base_type_candidate, &get_null(), context.codebase, false);
+                                    new_base_type_candidate = add_union_type(
+                                        new_base_type_candidate,
+                                        &get_null(),
+                                        context.codebase,
+                                        CombinerOptions::default(),
+                                    );
                                 }
 
                                 new_base_type_candidate.set_possibly_undefined(true, None);
@@ -909,7 +1079,12 @@ fn get_value_for_key(
                     }
 
                     let resulting_type = Rc::new(if let Some(new_base_type) = &new_base_type {
-                        add_union_type(new_base_type_candidate, new_base_type, context.codebase, false)
+                        add_union_type(
+                            new_base_type_candidate,
+                            new_base_type,
+                            context.codebase,
+                            CombinerOptions::default(),
+                        )
                     } else {
                         new_base_type_candidate.clone()
                     });
@@ -932,7 +1107,7 @@ fn get_value_for_key(
 
                 while let Some(existing_key_type_part) = atomic_types.pop() {
                     if let TAtomic::GenericParameter(TGenericParameter { constraint, .. }) = existing_key_type_part {
-                        atomic_types.extend(constraint.types.into_owned());
+                        atomic_types.extend(Arc::unwrap_or_clone(constraint).types.into_owned());
                         continue;
                     }
 
@@ -946,14 +1121,14 @@ fn get_value_for_key(
                     {
                         class_property_type = get_mixed();
                     } else if let TAtomic::Object(TObject::Named(named_object)) = existing_key_type_part {
-                        let fq_class_name = named_object.get_name_ref();
+                        let fq_class_name = named_object.get_name();
 
                         if fq_class_name.eq_ignore_ascii_case("stdClass")
-                            || !context.codebase.class_or_interface_exists(fq_class_name)
+                            || !context.codebase.class_or_interface_exists(&fq_class_name)
                         {
                             class_property_type = get_mixed();
                         } else {
-                            class_property_type = get_property_type(context, *fq_class_name, &property_name)?;
+                            class_property_type = get_property_type(context, fq_class_name, &property_name)?;
                         }
                     } else {
                         class_property_type = get_mixed();

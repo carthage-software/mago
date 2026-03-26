@@ -10,13 +10,10 @@ final class Issue166FirstCase
         null|int $optionalValue = null,
         #[ConsoleArgument(name: 'custom-flag')]
         bool $flag = false,
-    ): void {
-    }
+    ): void {}
 
     #[ConsoleCommand]
-    public function test2(#[ConsoleArgument] null|int $optionalValue = null): void
-    {
-    }
+    public function test2(#[ConsoleArgument] null|int $optionalValue = null): void {}
 }
 
 final class Issue166SecondCase
@@ -32,13 +29,11 @@ final class Issue166SecondCase
         null|int $optionalValue = null,
         #[ConsoleArgument(name: 'custom-flag')]
         bool $flag = false,
-    ): void {
-    }
+    ): void {}
 
     #[ConsoleCommand]
     public function test2(
         #[ConsoleArgument]
         null|int $optionalValue = null,
-    ): void {
-    }
+    ): void {}
 }

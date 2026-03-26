@@ -159,8 +159,8 @@ pub fn are_definitely_not_identical(
         return true;
     }
 
-    if (lhs.is_null() && (!rhs.is_null() && !rhs.is_nullable()))
-        || (rhs.is_null() && (!lhs.is_null() && !lhs.is_nullable()))
+    if (lhs.is_null() && (!rhs.is_null() && !rhs.can_be_null()))
+        || (rhs.is_null() && (!lhs.is_null() && !lhs.can_be_null()))
     {
         return true;
     }

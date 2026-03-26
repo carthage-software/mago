@@ -12,6 +12,7 @@ use mago_codex::ttype::atomic::object::named::TNamedObject;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::string::TString;
 use mago_codex::ttype::combiner;
+use mago_codex::ttype::combiner::CombinerOptions;
 use mago_codex::ttype::comparator::ComparisonResult;
 use mago_codex::ttype::comparator::atomic_comparator;
 use mago_codex::ttype::comparator::union_comparator;
@@ -126,6 +127,21 @@ fn subtract_complex_type(
             continue;
         }
 
+        if matches!(assertion_type, TAtomic::GenericParameter(_)) {
+            if atomic_comparator::is_contained_by(
+                context.codebase,
+                assertion_type,
+                &existing_atomic,
+                true,
+                &mut ComparisonResult::new(),
+            ) {
+                *can_be_disjunct = true;
+            }
+
+            acceptable_types.push(existing_atomic);
+            continue;
+        }
+
         if atomic_comparator::is_contained_by(
             context.codebase,
             &existing_atomic,
@@ -154,19 +170,19 @@ fn subtract_complex_type(
                 TAtomic::Object(TObject::Named(existing_named_object)),
                 TAtomic::Object(TObject::Named(assertion_named_object)),
             ) => {
-                let existing_classlike_name = existing_named_object.get_name_ref();
-                let assertion_classlike_name = assertion_named_object.get_name_ref();
+                let existing_classlike_name = existing_named_object.get_name();
+                let assertion_classlike_name = assertion_named_object.get_name();
 
-                if let Some(class_like_metadata) = context.codebase.get_class_like(existing_classlike_name) {
+                if let Some(class_like_metadata) = context.codebase.get_class_like(&existing_classlike_name) {
                     // handle __Sealed classes, negating where possible
                     if let Some(child_classlikes) = class_like_metadata.child_class_likes.as_ref()
-                        && child_classlikes.contains(assertion_classlike_name)
+                        && child_classlikes.contains(&assertion_classlike_name)
                     {
                         handle_negated_class(
                             context,
                             child_classlikes,
                             &existing_atomic,
-                            *assertion_classlike_name,
+                            assertion_classlike_name,
                             &mut acceptable_types,
                         );
 
@@ -176,8 +192,8 @@ fn subtract_complex_type(
                     }
                 }
 
-                if (context.codebase.interface_exists(assertion_classlike_name)
-                    || context.codebase.interface_exists(existing_classlike_name))
+                if (context.codebase.interface_exists(&assertion_classlike_name)
+                    || context.codebase.interface_exists(&existing_classlike_name))
                     && assertion_classlike_name != existing_classlike_name
                 {
                     *can_be_disjunct = true;
@@ -207,7 +223,7 @@ fn subtract_complex_type(
                     continue;
                 }
 
-                for (enum_case, _) in &enum_metadata.enum_cases {
+                for enum_case in enum_metadata.enum_cases.keys() {
                     if enum_case == assertion_case {
                         continue;
                     }
@@ -231,7 +247,7 @@ fn subtract_complex_type(
     if acceptable_types.is_empty() {
         acceptable_types.push(TAtomic::Never);
     } else if acceptable_types.len() > 1 && *can_be_disjunct {
-        acceptable_types = combiner::combine(acceptable_types, context.codebase, false);
+        acceptable_types = combiner::combine(acceptable_types, context.codebase, CombinerOptions::default());
     }
 
     existing_var_type.types = Cow::Owned(acceptable_types);
@@ -297,12 +313,8 @@ fn handle_literal_negated_equality(
                 }
 
                 match (existing_literal_string, assertion_literal_string) {
-                    (Some(existing_value), Some(assertion_value)) => {
-                        if existing_value == assertion_value {
-                            did_remove_type = true;
-                        } else {
-                            acceptable_types.push(existing_atomic_type);
-                        }
+                    (Some(existing_value), Some(assertion_value)) if existing_value == assertion_value => {
+                        did_remove_type = true;
                     }
                     (None, Some(assertion_value)) => {
                         did_remove_type = true;
@@ -312,7 +324,7 @@ fn handle_literal_negated_equality(
                                 existing_string.is_numeric,
                                 existing_string.is_truthy,
                                 true,
-                                existing_string.is_lowercase,
+                                existing_string.casing,
                             ))));
                         } else {
                             acceptable_types.push(existing_atomic_type);
@@ -348,12 +360,8 @@ fn handle_literal_negated_equality(
                 let assertion_value = assertion_type.get_literal_float_value();
 
                 match (existing_value, assertion_value) {
-                    (Some(existing_value), Some(assertion_value)) => {
-                        if existing_value == assertion_value {
-                            did_remove_type = true;
-                        } else {
-                            acceptable_types.push(existing_atomic_type);
-                        }
+                    (Some(existing_value), Some(assertion_value)) if existing_value == assertion_value => {
+                        did_remove_type = true;
                     }
                     (None, Some(_)) => {
                         did_remove_type = true;
@@ -378,12 +386,8 @@ fn handle_literal_negated_equality(
                 let assertion_value = assertion_type.get_class_string_value();
 
                 match (existing_classlike_string, assertion_value) {
-                    (Some(existing_value), Some(assertion_value)) => {
-                        if existing_value == assertion_value {
-                            did_remove_type = true;
-                        } else {
-                            acceptable_types.push(existing_atomic_type);
-                        }
+                    (Some(existing_value), Some(assertion_value)) if existing_value == assertion_value => {
+                        did_remove_type = true;
                     }
                     (None, Some(_)) => {
                         did_remove_type = true;

@@ -56,7 +56,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Use<'arena> {
 }
 
 fn check_class_like_import(context: &mut Context<'_, '_>, name: &Identifier<'_>, fqn: &str) {
-    if !context.codebase.class_like_exists(fqn) {
+    if !context.codebase.class_like_exists(fqn) && !context.codebase.namespace_exists(fqn) {
         report_non_existent_import(context, name.span(), fqn, "class, interface, trait, or enum");
     }
 }
@@ -94,7 +94,7 @@ fn check_maybe_typed_import(
             }
         }
         None => {
-            if !context.codebase.class_like_exists(fqn) {
+            if !context.codebase.class_like_exists(fqn) && !context.codebase.namespace_exists(fqn) {
                 report_non_existent_import(context, name.span(), fqn, "class, interface, trait, or enum");
             }
         }

@@ -40,7 +40,6 @@ use crate::metadata::CodebaseMetadata;
 use crate::metadata::flags::MetadataFlags;
 use crate::metadata::function_like::FunctionLikeKind;
 use crate::metadata::function_like::FunctionLikeMetadata;
-use crate::misc::GenericParent;
 use crate::scanner::class_like::register_anonymous_class;
 use crate::scanner::class_like::register_class;
 use crate::scanner::class_like::register_enum;
@@ -54,7 +53,7 @@ use crate::scanner::function_like::scan_function;
 use crate::scanner::function_like::scan_method;
 use crate::scanner::property::scan_promoted_property;
 use crate::ttype::resolution::TypeResolutionContext;
-use crate::ttype::union::TUnion;
+use crate::ttype::template::GenericTemplate;
 
 mod attribute;
 mod class_like;
@@ -63,7 +62,9 @@ mod constant;
 mod docblock;
 mod enum_case;
 mod function_like;
-mod inference;
+
+pub mod inference;
+
 mod parameter;
 mod property;
 mod ttype;
@@ -106,7 +107,7 @@ impl<'ctx, 'arena> Context<'ctx, 'arena> {
     }
 }
 
-type TemplateConstraint = (Atom, Vec<(GenericParent, TUnion)>);
+type TemplateConstraint = (Atom, GenericTemplate);
 type TemplateConstraintList = Vec<TemplateConstraint>;
 
 #[derive(Debug, Default)]
@@ -135,9 +136,9 @@ impl Scanner {
         }
 
         for template_constraint_list in self.template_constraints.iter().rev() {
-            for (name, constraints) in template_constraint_list {
-                if !context.has_template_definition(name) {
-                    context = context.with_template_definition(*name, constraints.clone());
+            for (name, constraint) in template_constraint_list {
+                if !context.has_template_definition(*name) {
+                    context = context.with_template_definition(*name, vec![constraint.clone()]);
                 }
             }
         }
@@ -171,8 +172,15 @@ impl<'ctx, 'arena> MutWalker<'arena, 'arena, Context<'ctx, 'arena>> for Scanner 
 
         let name = ascii_lowercase_atom(context.resolved_names.get(&function.name));
         let identifier = (empty_atom(), name);
-        let metadata =
-            scan_function(identifier, function, self.stack.last().copied(), context, &mut self.scope, type_context);
+        let metadata = scan_function(
+            identifier,
+            function,
+            self.stack.last().copied(),
+            context,
+            &mut self.scope,
+            type_context,
+            Some(&self.codebase.constants),
+        );
 
         self.template_constraints.push({
             let mut constraints: TemplateConstraintList = vec![];
@@ -183,7 +191,7 @@ impl<'ctx, 'arena> MutWalker<'arena, 'arena, Context<'ctx, 'arena>> for Scanner 
             constraints
         });
 
-        self.codebase.function_likes.insert(identifier, metadata);
+        self.codebase.function_likes.entry(identifier).or_insert(metadata);
     }
 
     #[inline]
@@ -218,7 +226,7 @@ impl<'ctx, 'arena> MutWalker<'arena, 'arena, Context<'ctx, 'arena>> for Scanner 
             constraints
         });
 
-        self.codebase.function_likes.insert(identifier, metadata);
+        self.codebase.function_likes.entry(identifier).or_insert(metadata);
     }
 
     #[inline]
@@ -257,7 +265,7 @@ impl<'ctx, 'arena> MutWalker<'arena, 'arena, Context<'ctx, 'arena>> for Scanner 
 
             constraints
         });
-        self.codebase.function_likes.insert(identifier, metadata);
+        self.codebase.function_likes.entry(identifier).or_insert(metadata);
     }
 
     #[inline]
@@ -275,7 +283,7 @@ impl<'ctx, 'arena> MutWalker<'arena, 'arena, Context<'ctx, 'arena>> for Scanner 
 
         for constant_metadata in constants {
             let constant_name = constant_metadata.name;
-            self.codebase.constants.insert(constant_name, constant_metadata);
+            self.codebase.constants.entry(constant_name).or_insert(constant_metadata);
         }
     }
 
@@ -291,7 +299,7 @@ impl<'ctx, 'arena> MutWalker<'arena, 'arena, Context<'ctx, 'arena>> for Scanner 
             return;
         };
 
-        self.codebase.constants.insert(constant_metadata.name, constant_metadata);
+        self.codebase.constants.entry(constant_metadata.name).or_insert(constant_metadata);
     }
 
     #[inline]
@@ -479,8 +487,8 @@ impl<'ctx, 'arena> MutWalker<'arena, 'arena, Context<'ctx, 'arena>> for Scanner 
             constraints
         });
 
-        self.codebase.class_likes.insert(current_class, class_like_metadata);
-        self.codebase.function_likes.insert(method_id, function_like_metadata);
+        self.codebase.class_likes.entry(current_class).or_insert(class_like_metadata);
+        self.codebase.function_likes.entry(method_id).or_insert(function_like_metadata);
     }
 
     #[inline]

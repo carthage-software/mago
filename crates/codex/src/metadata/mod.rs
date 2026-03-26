@@ -1,8 +1,8 @@
 use std::borrow::Cow;
 use std::collections::hash_map::Entry;
 
-use ahash::HashMap;
-use ahash::HashSet;
+use foldhash::HashMap;
+use foldhash::HashSet;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -18,15 +18,19 @@ use mago_atom::u64_atom;
 use mago_database::file::FileId;
 use mago_reporting::IssueCollection;
 use mago_span::Position;
+use mago_span::Span;
 
+use crate::diff::CodebaseDiff;
 use crate::identifier::method::MethodIdentifier;
 use crate::metadata::class_like::ClassLikeMetadata;
 use crate::metadata::class_like_constant::ClassLikeConstantMetadata;
 use crate::metadata::constant::ConstantMetadata;
 use crate::metadata::enum_case::EnumCaseMetadata;
+use crate::metadata::flags::MetadataFlags;
 use crate::metadata::function_like::FunctionLikeMetadata;
 use crate::metadata::property::PropertyMetadata;
 use crate::metadata::ttype::TypeMetadata;
+use crate::reference::SymbolReferences;
 use crate::signature::FileSignature;
 use crate::symbol::SymbolKind;
 use crate::symbol::Symbols;
@@ -47,12 +51,30 @@ pub mod property;
 pub mod property_hook;
 pub mod ttype;
 
+/// Lightweight set of keys extracted from a per-file [`CodebaseMetadata`].
+///
+/// Used by the incremental engine to efficiently remove a file's contributions from the
+/// merged codebase without keeping a full `CodebaseMetadata` clone per file.
+/// Created via [`CodebaseMetadata::extract_keys()`].
+#[derive(Debug, Clone)]
+pub struct CodebaseEntryKeys {
+    /// Class-like FQCN atoms (also used for symbol removal).
+    pub class_like_names: Vec<Atom>,
+    /// Function-like `(scope, name)` tuples.
+    pub function_like_keys: Vec<(Atom, Atom)>,
+    /// Constant FQN atoms.
+    pub constant_names: Vec<Atom>,
+    /// File IDs that had signatures in this metadata.
+    pub file_ids: Vec<FileId>,
+}
+
 /// Holds all analyzed information about the symbols, structures, and relationships within a codebase.
 ///
 /// This acts as the central repository for metadata gathered during static analysis,
 /// including details about classes, interfaces, traits, enums, functions, constants,
 /// their members, inheritance, dependencies, and associated types.
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
+#[non_exhaustive]
 pub struct CodebaseMetadata {
     /// Configuration flag: Should types be inferred based on usage patterns?
     pub infer_types_from_usage: bool,
@@ -79,15 +101,12 @@ pub struct CodebaseMetadata {
 }
 
 impl CodebaseMetadata {
-    // Construction
-
     /// Creates a new, empty `CodebaseMetadata` with default values.
     #[inline]
     #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
-    // Symbol Existence Checks
 
     /// Checks if a class exists in the codebase (case-insensitive).
     ///
@@ -101,7 +120,7 @@ impl CodebaseMetadata {
     #[must_use]
     pub fn class_exists(&self, name: &str) -> bool {
         let lowercase_name = ascii_lowercase_atom(name);
-        matches!(self.symbols.get_kind(&lowercase_name), Some(SymbolKind::Class))
+        matches!(self.symbols.get_kind(lowercase_name), Some(SymbolKind::Class))
     }
 
     /// Checks if an interface exists in the codebase (case-insensitive).
@@ -109,7 +128,7 @@ impl CodebaseMetadata {
     #[must_use]
     pub fn interface_exists(&self, name: &str) -> bool {
         let lowercase_name = ascii_lowercase_atom(name);
-        matches!(self.symbols.get_kind(&lowercase_name), Some(SymbolKind::Interface))
+        matches!(self.symbols.get_kind(lowercase_name), Some(SymbolKind::Interface))
     }
 
     /// Checks if a trait exists in the codebase (case-insensitive).
@@ -117,7 +136,7 @@ impl CodebaseMetadata {
     #[must_use]
     pub fn trait_exists(&self, name: &str) -> bool {
         let lowercase_name = ascii_lowercase_atom(name);
-        matches!(self.symbols.get_kind(&lowercase_name), Some(SymbolKind::Trait))
+        matches!(self.symbols.get_kind(lowercase_name), Some(SymbolKind::Trait))
     }
 
     /// Checks if an enum exists in the codebase (case-insensitive).
@@ -125,7 +144,7 @@ impl CodebaseMetadata {
     #[must_use]
     pub fn enum_exists(&self, name: &str) -> bool {
         let lowercase_name = ascii_lowercase_atom(name);
-        matches!(self.symbols.get_kind(&lowercase_name), Some(SymbolKind::Enum))
+        matches!(self.symbols.get_kind(lowercase_name), Some(SymbolKind::Enum))
     }
 
     /// Checks if a class-like (class, interface, trait, or enum) exists (case-insensitive).
@@ -133,7 +152,15 @@ impl CodebaseMetadata {
     #[must_use]
     pub fn class_like_exists(&self, name: &str) -> bool {
         let lowercase_name = ascii_lowercase_atom(name);
-        self.symbols.contains(&lowercase_name)
+        self.symbols.contains(lowercase_name)
+    }
+
+    /// Checks if a namespace exists (case-insensitive).
+    #[inline]
+    #[must_use]
+    pub fn namespace_exists(&self, name: &str) -> bool {
+        let lowercase_name = ascii_lowercase_atom(name);
+        self.symbols.contains_namespace(lowercase_name)
     }
 
     /// Checks if a class or trait exists in the codebase (case-insensitive).
@@ -141,7 +168,7 @@ impl CodebaseMetadata {
     #[must_use]
     pub fn class_or_trait_exists(&self, name: &str) -> bool {
         let lowercase_name = ascii_lowercase_atom(name);
-        matches!(self.symbols.get_kind(&lowercase_name), Some(SymbolKind::Class | SymbolKind::Trait))
+        matches!(self.symbols.get_kind(lowercase_name), Some(SymbolKind::Class | SymbolKind::Trait))
     }
 
     /// Checks if a class or interface exists in the codebase (case-insensitive).
@@ -149,15 +176,15 @@ impl CodebaseMetadata {
     #[must_use]
     pub fn class_or_interface_exists(&self, name: &str) -> bool {
         let lowercase_name = ascii_lowercase_atom(name);
-        matches!(self.symbols.get_kind(&lowercase_name), Some(SymbolKind::Class | SymbolKind::Interface))
+        matches!(self.symbols.get_kind(lowercase_name), Some(SymbolKind::Class | SymbolKind::Interface))
     }
 
     /// Checks if a method identifier exists in the codebase.
     #[inline]
     #[must_use]
     pub fn method_identifier_exists(&self, method_id: &MethodIdentifier) -> bool {
-        let lowercase_class = ascii_lowercase_atom(method_id.get_class_name());
-        let lowercase_method = ascii_lowercase_atom(method_id.get_method_name());
+        let lowercase_class = ascii_lowercase_atom(&method_id.get_class_name());
+        let lowercase_method = ascii_lowercase_atom(&method_id.get_method_name());
         let identifier = (lowercase_class, lowercase_method);
         self.function_likes.contains_key(&identifier)
     }
@@ -224,7 +251,7 @@ impl CodebaseMetadata {
         self.class_likes
             .get(&lowercase_class)
             .and_then(|meta| meta.declaring_method_ids.get(&lowercase_method))
-            .is_some_and(|method_id| method_id.get_class_name() == &lowercase_class)
+            .is_some_and(|method_id| method_id.get_class_name() == lowercase_class)
     }
 
     /// Checks if a property is declared directly in a class (not inherited).
@@ -235,7 +262,6 @@ impl CodebaseMetadata {
         let property_name = atom(property);
         self.class_likes.get(&lowercase_class).is_some_and(|meta| meta.properties.contains_key(&property_name))
     }
-    // Metadata Retrieval - Class-likes
 
     /// Retrieves metadata for a class (case-insensitive).
     /// Returns `None` if the name doesn't correspond to a class.
@@ -243,7 +269,7 @@ impl CodebaseMetadata {
     #[must_use]
     pub fn get_class(&self, name: &str) -> Option<&ClassLikeMetadata> {
         let lowercase_name = ascii_lowercase_atom(name);
-        if self.symbols.contains_class(&lowercase_name) { self.class_likes.get(&lowercase_name) } else { None }
+        if self.symbols.contains_class(lowercase_name) { self.class_likes.get(&lowercase_name) } else { None }
     }
 
     /// Retrieves metadata for an interface (case-insensitive).
@@ -251,7 +277,7 @@ impl CodebaseMetadata {
     #[must_use]
     pub fn get_interface(&self, name: &str) -> Option<&ClassLikeMetadata> {
         let lowercase_name = ascii_lowercase_atom(name);
-        if self.symbols.contains_interface(&lowercase_name) { self.class_likes.get(&lowercase_name) } else { None }
+        if self.symbols.contains_interface(lowercase_name) { self.class_likes.get(&lowercase_name) } else { None }
     }
 
     /// Retrieves metadata for a trait (case-insensitive).
@@ -259,7 +285,7 @@ impl CodebaseMetadata {
     #[must_use]
     pub fn get_trait(&self, name: &str) -> Option<&ClassLikeMetadata> {
         let lowercase_name = ascii_lowercase_atom(name);
-        if self.symbols.contains_trait(&lowercase_name) { self.class_likes.get(&lowercase_name) } else { None }
+        if self.symbols.contains_trait(lowercase_name) { self.class_likes.get(&lowercase_name) } else { None }
     }
 
     /// Retrieves metadata for an enum (case-insensitive).
@@ -267,7 +293,7 @@ impl CodebaseMetadata {
     #[must_use]
     pub fn get_enum(&self, name: &str) -> Option<&ClassLikeMetadata> {
         let lowercase_name = ascii_lowercase_atom(name);
-        if self.symbols.contains_enum(&lowercase_name) { self.class_likes.get(&lowercase_name) } else { None }
+        if self.symbols.contains_enum(lowercase_name) { self.class_likes.get(&lowercase_name) } else { None }
     }
 
     /// Retrieves metadata for any class-like structure (case-insensitive).
@@ -277,7 +303,6 @@ impl CodebaseMetadata {
         let lowercase_name = ascii_lowercase_atom(name);
         self.class_likes.get(&lowercase_name)
     }
-    // Metadata Retrieval - Functions & Methods
 
     /// Retrieves metadata for a global function (case-insensitive).
     #[inline]
@@ -312,8 +337,8 @@ impl CodebaseMetadata {
     #[inline]
     #[must_use]
     pub fn get_method_by_id(&self, method_id: &MethodIdentifier) -> Option<&FunctionLikeMetadata> {
-        let lowercase_class = ascii_lowercase_atom(method_id.get_class_name());
-        let lowercase_method = ascii_lowercase_atom(method_id.get_method_name());
+        let lowercase_class = ascii_lowercase_atom(&method_id.get_class_name());
+        let lowercase_method = ascii_lowercase_atom(&method_id.get_method_name());
         let identifier = (lowercase_class, lowercase_method);
         self.function_likes.get(&identifier)
     }
@@ -325,7 +350,7 @@ impl CodebaseMetadata {
     pub fn get_declaring_method(&self, class: &str, method: &str) -> Option<&FunctionLikeMetadata> {
         let method_id = MethodIdentifier::new(atom(class), atom(method));
         let declaring_method_id = self.get_declaring_method_identifier(&method_id);
-        self.get_method(declaring_method_id.get_class_name(), declaring_method_id.get_method_name())
+        self.get_method(&declaring_method_id.get_class_name(), &declaring_method_id.get_method_name())
     }
 
     /// Retrieves metadata for any function-like construct (function, method, or closure).
@@ -343,7 +368,6 @@ impl CodebaseMetadata {
             FunctionLikeIdentifier::Closure(file_id, position) => self.get_closure(file_id, position),
         }
     }
-    // Metadata Retrieval - Constants
 
     /// Retrieves metadata for a global constant.
     /// Namespace lookup is case-insensitive, constant name is case-sensitive.
@@ -372,7 +396,6 @@ impl CodebaseMetadata {
         let case_name = atom(case);
         self.class_likes.get(&lowercase_class).and_then(|meta| meta.enum_cases.get(&case_name))
     }
-    // Metadata Retrieval - Properties
 
     /// Retrieves metadata for a property directly from the class where it's declared.
     /// Class name is case-insensitive, property name is case-sensitive.
@@ -545,7 +568,7 @@ impl CodebaseMetadata {
     #[must_use]
     pub fn is_inheritable(&self, name: &str) -> bool {
         let lowercase_name = ascii_lowercase_atom(name);
-        match self.symbols.get_kind(&lowercase_name) {
+        match self.symbols.get_kind(lowercase_name) {
             Some(SymbolKind::Class) => self.class_likes.get(&lowercase_name).is_some_and(|meta| !meta.flags.is_final()),
             Some(SymbolKind::Enum) => false,
             Some(SymbolKind::Interface | SymbolKind::Trait) | None => true,
@@ -588,7 +611,6 @@ impl CodebaseMetadata {
         }
         ancestors
     }
-    // Method Resolution
 
     /// Gets the class where a method is declared (following inheritance).
     #[inline]
@@ -601,7 +623,7 @@ impl CodebaseMetadata {
             .get(&lowercase_class)?
             .declaring_method_ids
             .get(&lowercase_method)
-            .map(|method_id| *method_id.get_class_name())
+            .map(|method_id| method_id.get_class_name())
     }
 
     /// Gets the class where a method appears (could be the declaring class or child class).
@@ -614,14 +636,14 @@ impl CodebaseMetadata {
             .get(&lowercase_class)?
             .appearing_method_ids
             .get(&lowercase_method)
-            .map(|method_id| *method_id.get_class_name())
+            .map(|method_id| method_id.get_class_name())
     }
 
     /// Gets the declaring method identifier for a method.
     #[must_use]
     pub fn get_declaring_method_identifier(&self, method_id: &MethodIdentifier) -> MethodIdentifier {
-        let lowercase_class = ascii_lowercase_atom(method_id.get_class_name());
-        let lowercase_method = ascii_lowercase_atom(method_id.get_method_name());
+        let lowercase_class = ascii_lowercase_atom(&method_id.get_class_name());
+        let lowercase_method = ascii_lowercase_atom(&method_id.get_method_name());
 
         let Some(class_meta) = self.class_likes.get(&lowercase_class) else {
             return *method_id;
@@ -633,7 +655,7 @@ impl CodebaseMetadata {
 
         if class_meta.flags.is_abstract()
             && let Some(overridden_map) = class_meta.overridden_method_ids.get(&lowercase_method)
-            && let Some((_, first_method_id)) = overridden_map.iter().next()
+            && let Some((_, first_method_id)) = overridden_map.first()
         {
             return *first_method_id;
         }
@@ -744,11 +766,15 @@ impl CodebaseMetadata {
 
         if let Some(overridden_map) = class_like.overridden_method_ids.get(method_name) {
             for (parent_class_name, parent_method_id) in overridden_map {
+                if class_like.name.eq_ignore_ascii_case(parent_class_name) {
+                    continue; // Skip self-recursion if the method overrides itself
+                }
+
                 let Some(parent_class) = self.class_likes.get(parent_class_name) else {
                     continue;
                 };
 
-                let parent_method_key = (*parent_method_id.get_class_name(), *parent_method_id.get_method_name());
+                let parent_method_key = (parent_method_id.get_class_name(), parent_method_id.get_method_name());
                 if let Some(parent_method) = self.function_likes.get(&parent_method_key) {
                     let thrown = self.get_function_like_thrown_types(Some(parent_class), parent_method);
                     if !thrown.is_empty() {
@@ -760,7 +786,6 @@ impl CodebaseMetadata {
 
         &[]
     }
-    // Property Resolution
 
     /// Gets the class where a property is declared.
     #[inline]
@@ -872,71 +897,86 @@ impl CodebaseMetadata {
         self.file_signatures.remove(file_id)
     }
 
-    // Utility Methods
+    /// Marks safe symbols based on diff and invalidation cascade.
+    ///
+    /// After this function runs, `self.safe_symbols` and `self.safe_symbol_members`
+    /// will contain all symbols that can be safely skipped during analysis.
+    ///
+    /// # Arguments
+    ///
+    /// * `diff` - The computed diff between old and new code
+    /// * `references` - Symbol reference graph from previous run
+    ///
+    /// # Returns
+    ///
+    /// `true` if safe symbols were successfully marked, or `false` if the cascade was too large to compute.
+    pub fn mark_safe_symbols(&mut self, diff: &CodebaseDiff, references: &SymbolReferences) -> bool {
+        // Get invalid symbols with propagation through reference graph
+        let Some((invalid_symbols, partially_invalid)) = references.get_invalid_symbols(diff) else {
+            // Propagation too expensive (>5000 steps)
+            return false;
+        };
+
+        // Mark all symbols in 'keep' set as safe (unless invalidated by cascade)
+        for keep_symbol in diff.get_keep() {
+            if !invalid_symbols.contains(keep_symbol) {
+                if keep_symbol.1.is_empty() {
+                    // Top-level symbol (class, function, constant)
+                    if !partially_invalid.contains(&keep_symbol.0) {
+                        self.safe_symbols.insert(keep_symbol.0);
+                    }
+                } else {
+                    // Member (method, property, class constant)
+                    self.safe_symbol_members.insert(*keep_symbol);
+                }
+            }
+        }
+
+        true
+    }
 
     /// Merges information from another `CodebaseMetadata` into this one.
+    ///
+    /// When both metadata have the same priority, the one with the smaller span is kept
+    /// for deterministic results regardless of scan order.
     pub fn extend(&mut self, other: CodebaseMetadata) {
         for (k, v) in other.class_likes {
-            let metadata_to_keep = match self.class_likes.entry(k) {
-                Entry::Occupied(entry) => {
-                    let existing = entry.remove();
-                    if v.flags.is_user_defined() {
-                        v
-                    } else if existing.flags.is_user_defined() {
-                        existing
-                    } else if v.flags.is_built_in() {
-                        v
-                    } else if existing.flags.is_built_in() {
-                        existing
-                    } else {
-                        v
+            match self.class_likes.entry(k) {
+                Entry::Occupied(mut entry) => {
+                    if should_replace_metadata(entry.get().flags, entry.get().span, v.flags, v.span) {
+                        entry.insert(v);
                     }
                 }
-                Entry::Vacant(_) => v,
-            };
-            self.class_likes.insert(k, metadata_to_keep);
+                Entry::Vacant(entry) => {
+                    entry.insert(v);
+                }
+            }
         }
 
         for (k, v) in other.function_likes {
-            let metadata_to_keep = match self.function_likes.entry(k) {
-                Entry::Occupied(entry) => {
-                    let existing = entry.remove();
-                    if v.flags.is_user_defined() {
-                        v
-                    } else if existing.flags.is_user_defined() {
-                        existing
-                    } else if v.flags.is_built_in() {
-                        v
-                    } else if existing.flags.is_built_in() {
-                        existing
-                    } else {
-                        v
+            match self.function_likes.entry(k) {
+                Entry::Occupied(mut entry) => {
+                    if should_replace_metadata(entry.get().flags, entry.get().span, v.flags, v.span) {
+                        entry.insert(v);
                     }
                 }
-                Entry::Vacant(_) => v,
-            };
-            self.function_likes.insert(k, metadata_to_keep);
+                Entry::Vacant(entry) => {
+                    entry.insert(v);
+                }
+            }
         }
 
         for (k, v) in other.constants {
-            let metadata_to_keep = match self.constants.entry(k) {
-                Entry::Occupied(entry) => {
-                    let existing = entry.remove();
-                    if v.flags.is_user_defined() {
-                        v
-                    } else if existing.flags.is_user_defined() {
-                        existing
-                    } else if v.flags.is_built_in() {
-                        v
-                    } else if existing.flags.is_built_in() {
-                        existing
-                    } else {
-                        v
+            match self.constants.entry(k) {
+                Entry::Occupied(mut entry) => {
+                    if should_replace_metadata(entry.get().flags, entry.get().span, v.flags, v.span) {
+                        entry.insert(v);
                     }
                 }
-                Entry::Vacant(_) => v,
-            };
-            self.constants.insert(k, metadata_to_keep);
+                Entry::Vacant(entry) => {
+                    entry.insert(v);
+                }
+            }
         }
 
         self.symbols.extend(other.symbols);
@@ -949,9 +989,143 @@ impl CodebaseMetadata {
             self.direct_classlike_descendants.entry(k).or_default().extend(v);
         }
 
+        self.file_signatures.extend(other.file_signatures);
         self.safe_symbols.extend(other.safe_symbols);
         self.safe_symbol_members.extend(other.safe_symbol_members);
         self.infer_types_from_usage |= other.infer_types_from_usage;
+    }
+
+    /// Extends this codebase with another by reference, cloning only individual entries.
+    ///
+    /// This is more efficient than `extend(other.clone())` because it avoids allocating
+    /// a full clone of the source metadata's outer HashMap/AtomMap structures. Only
+    /// individual entries that need insertion are cloned.
+    pub fn extend_ref(&mut self, other: &CodebaseMetadata) {
+        for (k, v) in &other.class_likes {
+            match self.class_likes.entry(*k) {
+                Entry::Occupied(mut entry) => {
+                    if should_replace_metadata(entry.get().flags, entry.get().span, v.flags, v.span) {
+                        entry.insert(v.clone());
+                    }
+                }
+                Entry::Vacant(entry) => {
+                    entry.insert(v.clone());
+                }
+            }
+        }
+
+        for (k, v) in &other.function_likes {
+            match self.function_likes.entry(*k) {
+                Entry::Occupied(mut entry) => {
+                    if should_replace_metadata(entry.get().flags, entry.get().span, v.flags, v.span) {
+                        entry.insert(v.clone());
+                    }
+                }
+                Entry::Vacant(entry) => {
+                    entry.insert(v.clone());
+                }
+            }
+        }
+
+        for (k, v) in &other.constants {
+            match self.constants.entry(*k) {
+                Entry::Occupied(mut entry) => {
+                    if should_replace_metadata(entry.get().flags, entry.get().span, v.flags, v.span) {
+                        entry.insert(v.clone());
+                    }
+                }
+                Entry::Vacant(entry) => {
+                    entry.insert(v.clone());
+                }
+            }
+        }
+
+        self.symbols.extend_ref(&other.symbols);
+
+        for (k, v) in &other.all_class_like_descendants {
+            self.all_class_like_descendants.entry(*k).or_default().extend(v.iter().copied());
+        }
+
+        for (k, v) in &other.direct_classlike_descendants {
+            self.direct_classlike_descendants.entry(*k).or_default().extend(v.iter().copied());
+        }
+
+        for (k, v) in &other.file_signatures {
+            self.file_signatures.insert(*k, v.clone());
+        }
+        self.safe_symbols.extend(other.safe_symbols.iter().copied());
+        self.safe_symbol_members.extend(other.safe_symbol_members.iter().cloned());
+        self.infer_types_from_usage |= other.infer_types_from_usage;
+    }
+
+    /// Removes all entries that were contributed by the given per-file scan metadata.
+    ///
+    /// This is the inverse of [`extend_ref()`]: it removes class_likes, function_likes,
+    /// constants, symbols, and file_signatures whose keys match those in `file_metadata`.
+    ///
+    /// Used by the incremental engine to patch the codebase in-place when files change,
+    /// avoiding a full rebuild from base + all files.
+    ///
+    /// Note: This does NOT remove descendant map entries — those are rebuilt from scratch
+    /// by `populate_codebase()` on every run.
+    pub fn remove_entries_of(&mut self, file_metadata: &CodebaseMetadata) {
+        for k in file_metadata.class_likes.keys() {
+            self.class_likes.remove(k);
+        }
+
+        for k in file_metadata.function_likes.keys() {
+            self.function_likes.remove(k);
+        }
+
+        for k in file_metadata.constants.keys() {
+            self.constants.remove(k);
+        }
+
+        // Remove symbols that were contributed by this file.
+        // We can only remove class-like symbols (not namespaces, since they may be shared).
+        for k in file_metadata.class_likes.keys() {
+            self.symbols.remove(*k);
+        }
+
+        for k in file_metadata.file_signatures.keys() {
+            self.file_signatures.remove(k);
+        }
+    }
+
+    /// Extracts the set of keys from this metadata for use with [`remove_entries_by_keys()`].
+    ///
+    /// This is much cheaper than keeping a full `CodebaseMetadata` clone — it only stores
+    /// the keys needed to undo an `extend_ref()` operation.
+    pub fn extract_keys(&self) -> CodebaseEntryKeys {
+        CodebaseEntryKeys {
+            class_like_names: self.class_likes.keys().copied().collect(),
+            function_like_keys: self.function_likes.keys().copied().collect(),
+            constant_names: self.constants.keys().copied().collect(),
+            file_ids: self.file_signatures.keys().copied().collect(),
+        }
+    }
+
+    /// Removes entries whose keys match the given [`CodebaseEntryKeys`].
+    ///
+    /// This is the lightweight equivalent of [`remove_entries_of()`] — it performs the
+    /// same removals but from a compact key set instead of a full `CodebaseMetadata` reference.
+    pub fn remove_entries_by_keys(&mut self, keys: &CodebaseEntryKeys) {
+        for k in &keys.class_like_names {
+            self.class_likes.remove(k);
+            self.symbols.remove(*k);
+        }
+
+        for k in &keys.function_like_keys {
+            self.function_likes.remove(k);
+        }
+
+        for k in &keys.constant_names {
+            self.constants.remove(k);
+        }
+
+        for k in &keys.file_ids {
+            self.file_signatures.remove(k);
+        }
     }
 
     /// Takes all issues from the codebase metadata.
@@ -1007,4 +1181,31 @@ impl Default for CodebaseMetadata {
             file_signatures: HashMap::default(),
         }
     }
+}
+
+/// Determines which metadata value to keep when merging duplicates.
+///
+/// Priority: user-defined > built-in > other. Uses smaller span as tie-breaker.
+/// Returns `true` if the new value should replace the existing one.
+fn should_replace_metadata(
+    existing_flags: MetadataFlags,
+    existing_span: Span,
+    new_flags: MetadataFlags,
+    new_span: Span,
+) -> bool {
+    let new_is_user_defined = new_flags.is_user_defined();
+    let existing_is_user_defined = existing_flags.is_user_defined();
+
+    if new_is_user_defined != existing_is_user_defined {
+        return new_is_user_defined;
+    }
+
+    let new_is_built_in = new_flags.is_built_in();
+    let existing_is_built_in = existing_flags.is_built_in();
+
+    if new_is_built_in != existing_is_built_in {
+        return new_is_built_in;
+    }
+
+    new_span < existing_span
 }

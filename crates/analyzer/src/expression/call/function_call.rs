@@ -68,6 +68,8 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for FunctionCall<'arena> {
             encountered_invalid_targets,
             false,
             false,
+            false, // object_has_nullsafe_null - not applicable for function calls
+            false, // all_targets_non_nullable_return - not applicable for function calls
         )?;
 
         if context.plugin_registry.has_function_call_hooks() {
@@ -109,10 +111,10 @@ pub(super) fn resolve_targets<'ctx, 'arena>(
         return Ok(if let Some(t) = target { (vec![t], false) } else { (vec![], false) });
     }
 
-    let was_inside_call = block_context.inside_call;
-    block_context.inside_call = true;
+    let was_inside_call = block_context.flags.inside_call();
+    block_context.flags.set_inside_call(true);
     expression.analyze(context, block_context, artifacts)?;
-    block_context.inside_call = was_inside_call;
+    block_context.flags.set_inside_call(was_inside_call);
 
     let Some(expression_type) = artifacts.get_expression_type(expression) else {
         return Ok((vec![], false));
@@ -121,6 +123,12 @@ pub(super) fn resolve_targets<'ctx, 'arena>(
     let mut encountered_invalid_targets = false;
     let mut targets = vec![];
     for atomic in expression_type.types.as_ref() {
+        if (atomic.is_null() && expression_type.ignore_nullable_issues())
+            || (atomic.is_false() && expression_type.ignore_falsable_issues())
+        {
+            continue;
+        }
+
         if let Some(callable) = cast_atomic_to_callable(atomic, context.codebase, Some(template_result)) {
             match callable.as_ref() {
                 TCallable::Signature(callable_signature) => {

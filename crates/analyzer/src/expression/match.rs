@@ -74,10 +74,10 @@ impl<'anlyz, 'ctx, 'ast, 'arena> MatchAnalyzer<'anlyz, 'ctx, 'ast, 'arena> {
     }
 
     fn analyze(&mut self) -> Result<(), AnalysisError> {
-        let was_inside_conditional = self.block_context.inside_conditional;
-        self.block_context.inside_conditional = true;
+        let was_inside_conditional = self.block_context.flags.inside_conditional();
+        self.block_context.flags.set_inside_conditional(true);
         self.stmt.expression.analyze(self.context, self.block_context, self.artifacts)?;
-        self.block_context.inside_conditional = was_inside_conditional;
+        self.block_context.flags.set_inside_conditional(was_inside_conditional);
 
         let mut expression_arms = vec![];
         let mut first_default_arm = None;
@@ -224,7 +224,12 @@ impl<'anlyz, 'ctx, 'ast, 'arena> MatchAnalyzer<'anlyz, 'ctx, 'ast, 'arena> {
         }
 
         let final_type = arm_body_types.into_iter().reduce(|acc, item| {
-            Rc::new(combine_union_types(acc.as_ref(), item.as_ref(), self.context.codebase, false))
+            Rc::new(combine_union_types(
+                acc.as_ref(),
+                item.as_ref(),
+                self.context.codebase,
+                self.context.settings.combiner_options(),
+            ))
         });
 
         self.artifacts.set_rc_expression_type(self.stmt, final_type.unwrap_or_else(|| Rc::new(get_mixed())));
@@ -275,13 +280,13 @@ impl<'anlyz, 'ctx, 'ast, 'arena> MatchAnalyzer<'anlyz, 'ctx, 'ast, 'arena> {
             self.context.arena,
             subject_expr,
             expression_arm.conditions.get(0).unwrap(),
-            expression_arm.conditions.iter().skip(1).collect(),
+            expression_arm.conditions.iter().skip(1).copied().collect(),
         );
 
-        let was_inside_conditional = running_else_context.inside_conditional;
-        running_else_context.inside_conditional = true;
+        let was_inside_conditional = running_else_context.flags.inside_conditional();
+        running_else_context.flags.set_inside_conditional(true);
         arm_condition.analyze(self.context, running_else_context, self.artifacts)?;
-        running_else_context.inside_conditional = was_inside_conditional;
+        running_else_context.flags.set_inside_conditional(was_inside_conditional);
 
         let arm_status = if let Some(condition_type) = self.artifacts.get_rc_expression_type(&arm_condition).cloned() {
             if condition_type.is_always_truthy() {
@@ -423,15 +428,15 @@ impl<'anlyz, 'ctx, 'ast, 'arena> MatchAnalyzer<'anlyz, 'ctx, 'ast, 'arena> {
         block_context.possibly_thrown_exceptions.entry(atom("UnhandledMatchError")).or_default().insert(span);
 
         if always_throws {
-            block_context.has_returned = true;
+            block_context.flags.set_has_returned(true);
         }
     }
 
     fn merge_match_contexts(&mut self, arm_exit_contexts: &[BlockContext<'ctx>]) {
-        let reachable_contexts: Vec<_> = arm_exit_contexts.iter().filter(|c| !c.has_returned).collect();
+        let reachable_contexts: Vec<_> = arm_exit_contexts.iter().filter(|c| !c.flags.has_returned()).collect();
 
         if reachable_contexts.is_empty() {
-            self.block_context.has_returned = true;
+            self.block_context.flags.set_has_returned(true);
             return;
         }
 

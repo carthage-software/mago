@@ -1,4 +1,5 @@
 use mago_atom::Atom;
+use mago_atom::AtomMap;
 use mago_atom::ascii_lowercase_atom;
 use mago_atom::atom;
 use mago_docblock::tag::TypeString;
@@ -17,6 +18,7 @@ use mago_syntax::utils;
 use crate::assertion::Assertion;
 use crate::issue::ScanningIssueKind;
 use crate::metadata::class_like::ClassLikeMetadata;
+use crate::metadata::constant::ConstantMetadata;
 use crate::metadata::flags::MetadataFlags;
 use crate::metadata::function_like::FunctionLikeKind;
 use crate::metadata::function_like::FunctionLikeMetadata;
@@ -26,12 +28,14 @@ use crate::scanner::Context;
 use crate::scanner::attribute::scan_attribute_lists;
 use crate::scanner::docblock::FunctionLikeDocblockComment;
 use crate::scanner::parameter::scan_function_like_parameter;
+use crate::scanner::parameter::scan_function_like_parameter_with_constants;
 use crate::scanner::ttype::get_type_metadata_from_hint;
 use crate::scanner::ttype::get_type_metadata_from_type_string;
 use crate::scanner::ttype::merge_type_preserving_nullability;
 use crate::ttype::builder;
 use crate::ttype::get_mixed;
 use crate::ttype::resolution::TypeResolutionContext;
+use crate::ttype::template::GenericTemplate;
 use crate::visibility::Visibility;
 
 #[inline]
@@ -120,6 +124,7 @@ pub fn scan_function<'arena>(
     context: &mut Context<'_, 'arena>,
     scope: &mut NamespaceScope,
     type_resolution_context: TypeResolutionContext,
+    constants: Option<&AtomMap<ConstantMetadata>>,
 ) -> FunctionLikeMetadata {
     let mut flags = MetadataFlags::empty();
     if context.file.file_type.is_host() {
@@ -151,7 +156,7 @@ pub fn scan_function<'arena>(
         .parameter_list
         .parameters
         .iter()
-        .map(|p| scan_function_like_parameter(p, classname, context, scope))
+        .map(|p| scan_function_like_parameter_with_constants(p, classname, context, scope, constants))
         .collect();
 
     metadata.attributes = scan_attribute_lists(&function.attribute_lists, context);
@@ -323,6 +328,13 @@ fn scan_function_like_docblock(
         metadata.flags |= MetadataFlags::PURE;
     }
 
+    if docblock.is_mutation_free {
+        metadata.flags |= MetadataFlags::MUTATION_FREE;
+        metadata.flags |= MetadataFlags::EXTERNAL_MUTATION_FREE;
+    } else if docblock.is_external_mutation_free {
+        metadata.flags |= MetadataFlags::EXTERNAL_MUTATION_FREE;
+    }
+
     if docblock.ignore_falsable_return {
         metadata.flags |= MetadataFlags::IGNORE_FALSABLE_RETURN;
     }
@@ -367,10 +379,10 @@ fn scan_function_like_docblock(
             get_mixed()
         };
 
-        let definition = vec![(GenericParent::FunctionLike(functionlike_id), template_as_type)];
+        let definition = GenericTemplate::new(GenericParent::FunctionLike(functionlike_id), template_as_type);
 
-        metadata.add_template_type((template_name, definition.clone()));
-        type_context = type_context.with_template_definition(template_name, definition);
+        metadata.add_template_type(template_name, definition.clone());
+        type_context = type_context.with_template_definition(template_name, vec![definition]);
     }
 
     for parameter_tag in docblock.parameters {

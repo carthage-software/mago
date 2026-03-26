@@ -11,11 +11,16 @@ use mago_reporting::Level;
 use mago_span::HasSpan;
 use mago_syntax::ast::Argument;
 use mago_syntax::ast::Call;
+use mago_syntax::ast::ClassLikeMemberSelector;
+use mago_syntax::ast::Closure;
 use mago_syntax::ast::Expression;
+use mago_syntax::ast::FunctionCall;
 use mago_syntax::ast::FunctionLikeParameterList;
+use mago_syntax::ast::MethodCall;
 use mago_syntax::ast::Node;
 use mago_syntax::ast::NodeKind;
 use mago_syntax::ast::PositionalArgument;
+use mago_syntax::ast::StaticMethodCall;
 use mago_syntax::ast::Variable;
 use mago_text_edit::Safety;
 use mago_text_edit::TextEdit;
@@ -39,11 +44,12 @@ pub struct PreferFirstClassCallableRule {
 #[serde(default, rename_all = "kebab-case", deny_unknown_fields)]
 pub struct PreferFirstClassCallableConfig {
     pub level: Level,
+    pub check_functions: bool,
 }
 
 impl Default for PreferFirstClassCallableConfig {
     fn default() -> Self {
-        Self { level: Level::Warning }
+        Self { level: Level::Warning, check_functions: false }
     }
 }
 
@@ -66,18 +72,22 @@ impl LintRule for PreferFirstClassCallableRule {
                 This rule identifies closures and arrow functions that do nothing but forward their arguments to another function or method.
                 In such cases, the more concise and modern first-class callable syntax, introduced in PHP 8.1, can be used instead.
                 This improves readability by reducing boilerplate code.
+
+                By default, this rule only checks method and static method calls. Optionally, function calls can also
+                be checked by enabling `check-functions`, but this may produce false positives with internal PHP
+                functions that enforce strict argument counts.
             "},
             good_example: indoc! {r"
                 <?php
 
                 $names = ['Alice', 'Bob', 'Charlie'];
-                $uppercased_names = array_map(strtoupper(...), $names);
+                $uppercased_names = array_map($formatter->format(...), $names);
             "},
             bad_example: indoc! {r"
                 <?php
 
                 $names = ['Alice', 'Bob', 'Charlie'];
-                $uppercased_names = array_map(fn($name) => strtoupper($name), $names);
+                $uppercased_names = array_map(fn($name) => $formatter->format($name), $names);
             "},
             category: Category::BestPractices,
             requirements: RuleRequirements::PHPVersion(PHPVersionRange::from(PHPVersion::PHP81)),
@@ -101,7 +111,15 @@ impl LintRule for PreferFirstClassCallableRule {
                 return;
             };
 
+            if !self.cfg.check_functions && matches!(call, Call::Function(_)) {
+                return;
+            }
+
             if !is_call_forwarding(&arrow_function.parameter_list, call) {
+                return;
+            }
+
+            if !is_convertible_to_first_class_callable(call) {
                 return;
             }
 
@@ -139,7 +157,19 @@ impl LintRule for PreferFirstClassCallableRule {
                 return;
             };
 
+            if !self.cfg.check_functions && matches!(call, Call::Function(_)) {
+                return;
+            }
+
             if !is_call_forwarding(&closure.parameter_list, call) {
+                return;
+            }
+
+            if !is_convertible_to_first_class_callable(call) {
+                return;
+            }
+
+            if is_callee_reference_captured(call, closure) {
                 return;
             }
 
@@ -204,4 +234,221 @@ pub(super) fn is_call_forwarding<'ast, 'arena>(
     // Same number of parameters and arguments, and all arguments are direct references to the corresponding parameters
     // -> it's a call forwarding
     true
+}
+
+pub(super) fn is_convertible_to_first_class_callable<'ast, 'arena>(call: &'ast Call<'arena>) -> bool {
+    matches!(
+        call,
+        Call::Function(FunctionCall { function: Expression::Identifier(_) | Expression::Variable(_), .. })
+            | Call::Method(MethodCall {
+                object: Expression::Variable(_),
+                method: ClassLikeMemberSelector::Identifier(_),
+                ..
+            })
+            | Call::StaticMethod(StaticMethodCall {
+                class: Expression::Identifier(_) | Expression::Self_(_) | Expression::Static(_) | Expression::Parent(_),
+                method: ClassLikeMemberSelector::Identifier(_),
+                ..
+            })
+    )
+}
+
+fn is_callee_reference_captured<'ast, 'arena>(call: &'ast Call<'arena>, closure: &'ast Closure<'arena>) -> bool {
+    let callee_var_name = match call {
+        Call::Function(FunctionCall { function: Expression::Variable(Variable::Direct(var)), .. }) => var.name,
+        Call::Method(MethodCall { object: Expression::Variable(Variable::Direct(var)), .. }) => var.name,
+        _ => return false,
+    };
+
+    closure.use_clause.as_ref().is_some_and(|use_clause| {
+        use_clause.variables.iter().any(|v| v.ampersand.is_some() && v.variable.name == callee_var_name)
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use indoc::indoc;
+
+    use super::PreferFirstClassCallableRule;
+    use crate::test_lint_failure;
+    use crate::test_lint_success;
+
+    test_lint_success! {
+        name = method_on_function_result_with_no_arguments,
+        rule = PreferFirstClassCallableRule,
+        code = indoc! {r#"
+            <?php
+
+            function getSomeClass() { return new SomeClass(); }
+
+            run(fn() => getSomeClass()->method());
+        "#}
+    }
+
+    test_lint_success! {
+        name = method_on_function_result,
+        rule = PreferFirstClassCallableRule,
+        code = indoc! {r#"
+            <?php
+
+            function getSomeClass() { return new SomeClass(); }
+
+            run(fn($x) => getSomeClass()->method($x));
+        "#}
+    }
+
+    test_lint_success! {
+        name = null_safe_method_call,
+        rule = PreferFirstClassCallableRule,
+        code = indoc! {r#"
+            <?php
+
+            $someClass = new SomeClass();
+
+            run(fn($x) => $someClass?->method($x));
+        "#}
+    }
+
+    test_lint_success! {
+        name = dynamic_method_name,
+        rule = PreferFirstClassCallableRule,
+        code = indoc! {r#"
+            <?php
+
+            $someClass = new SomeClass();
+            $method = "method";
+
+            run(fn($x) => $someClass->$method($x));
+        "#}
+    }
+
+    test_lint_success! {
+        name = closure_method_on_function_result,
+        rule = PreferFirstClassCallableRule,
+        code = indoc! {r#"
+            <?php
+
+            function getSomeClass() { return new SomeClass(); }
+
+            run(function($x) { return getSomeClass()->method($x); });
+        "#}
+    }
+
+    test_lint_success! {
+        name = closure_with_reference_captured_callee,
+        rule = PreferFirstClassCallableRule,
+        code = indoc! {r#"
+            <?php
+
+            $callable = "strlen";
+
+            run(function($x) use (&$callable) { return $callable($x); });
+        "#}
+    }
+
+    test_lint_success! {
+        name = closure_with_reference_captured_method_object,
+        rule = PreferFirstClassCallableRule,
+        code = indoc! {r#"
+            <?php
+
+            $obj = new SomeClass();
+
+            run(function($x) use (&$obj) { return $obj->method($x); });
+        "#}
+    }
+
+    test_lint_success! {
+        name = simple_function_call,
+        rule = PreferFirstClassCallableRule,
+        code = indoc! {r#"
+            <?php
+
+            run(fn($x) => strlen($x));
+        "#}
+    }
+
+    test_lint_success! {
+        name = closure_with_function_call,
+        rule = PreferFirstClassCallableRule,
+        code = indoc! {r#"
+            <?php
+
+            $unused = null;
+
+            run(function($x) use (&$unused) { return strlen($x); });
+        "#}
+    }
+
+    test_lint_failure! {
+        name = simple_method_call,
+        rule = PreferFirstClassCallableRule,
+        code = indoc! {r#"
+            <?php
+
+            run(fn($x) => $this->method($x));
+        "#}
+    }
+
+    test_lint_failure! {
+        name = simple_static_method_call,
+        rule = PreferFirstClassCallableRule,
+        code = indoc! {r#"
+            <?php
+
+            run(fn($x) => SomeClass::method($x));
+        "#}
+    }
+
+    test_lint_failure! {
+        name = closure_method_call_with_non_callee_reference_capture,
+        rule = PreferFirstClassCallableRule,
+        code = indoc! {r#"
+            <?php
+
+            $unused = null;
+            $obj = new SomeClass();
+
+            run(function($x) use (&$unused, $obj) { return $obj->method($x); });
+        "#}
+    }
+
+    test_lint_failure! {
+        name = function_call_detected_when_check_functions_enabled,
+        rule = PreferFirstClassCallableRule,
+        settings = |s: &mut crate::settings::Settings| {
+            s.rules.prefer_first_class_callable.config.check_functions = true;
+        },
+        code = indoc! {r#"
+            <?php
+
+            run(fn($x) => strlen($x));
+        "#}
+    }
+
+    test_lint_failure! {
+        name = closure_function_call_detected_when_check_functions_enabled,
+        rule = PreferFirstClassCallableRule,
+        settings = |s: &mut crate::settings::Settings| {
+            s.rules.prefer_first_class_callable.config.check_functions = true;
+        },
+        code = indoc! {r#"
+            <?php
+
+            run(function($x) { return strlen($x); });
+        "#}
+    }
+
+    test_lint_failure! {
+        name = variable_function_call_detected_when_check_functions_enabled,
+        rule = PreferFirstClassCallableRule,
+        settings = |s: &mut crate::settings::Settings| {
+            s.rules.prefer_first_class_callable.config.check_functions = true;
+        },
+        code = indoc! {r#"
+            <?php
+
+            run(fn($x) => $callback($x));
+        "#}
+    }
 }

@@ -1479,4 +1479,16 @@ mod tests {
             res => panic!("Expected Ok(Type::Shape), got {res:?}"),
         }
     }
+
+    #[test]
+    fn test_parse_shape_key_overflow_unsigned() {
+        let result = do_parse("array{9223372036854775808: string}");
+        assert!(result.is_err(), "Expected parse error for shape key > i64::MAX, got: {result:?}");
+    }
+
+    #[test]
+    fn test_parse_shape_key_overflow_negated() {
+        let result = do_parse("array{-9223372036854775808: string}");
+        assert!(result.is_err(), "Expected parse error for negated shape key overflow, got: {result:?}");
+    }
 }

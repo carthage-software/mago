@@ -39,10 +39,10 @@ pub fn check_property_initialization<'ctx>(
         .declaring_property_ids
         .iter()
         .sorted_by_key(|(k, _)| *k)
-        .filter_map(|(name, declaring_class)| {
+        .filter_map(|(&name, declaring_class)| {
             let declaring_meta = context.codebase.get_class_like(declaring_class)?;
-            let prop = declaring_meta.properties.get(name)?;
-            if property_requires_initialization(*name, prop, class_like_metadata, declaring_meta, context) {
+            let prop = declaring_meta.properties.get(&name)?;
+            if property_requires_initialization(name, prop, class_like_metadata, declaring_meta, context) {
                 Some((name, prop))
             } else {
                 None
@@ -79,14 +79,14 @@ pub fn check_property_initialization<'ctx>(
         return;
     };
 
-    let constructor_declaring_class = *constructor_method_id.get_class_name();
+    let constructor_declaring_class = constructor_method_id.get_class_name();
     if constructor_declaring_class != class_like_metadata.name {
         let own_uninitialized: Vec<_> = uninitialized_properties
             .iter()
             .filter(|(prop_name, _)| {
                 class_like_metadata
                     .declaring_property_ids
-                    .get(*prop_name)
+                    .get(prop_name)
                     .is_some_and(|declaring_class| *declaring_class == class_like_metadata.name)
             })
             .copied()
@@ -97,7 +97,7 @@ pub fn check_property_initialization<'ctx>(
             .filter(|(prop_name, _)| {
                 class_like_metadata
                     .declaring_property_ids
-                    .get(*prop_name)
+                    .get(prop_name)
                     .is_some_and(|declaring_class| *declaring_class != class_like_metadata.name)
             })
             .copied()
@@ -143,7 +143,7 @@ pub fn check_property_initialization<'ctx>(
                     // that initializes $foo, Class C uses B. We can't verify cross-file trait behavior.
                     if constructor_is_from_trait
                         && let Some(prop_declaring_class) =
-                            class_like_metadata.declaring_property_ids.get(*prop_name).copied()
+                            class_like_metadata.declaring_property_ids.get(prop_name).copied()
                     {
                         let prop_is_from_trait =
                             context.codebase.get_class_like(&prop_declaring_class).is_some_and(|m| m.kind.is_trait());
@@ -178,7 +178,7 @@ pub fn check_property_initialization<'ctx>(
                 report_uninitialized_property(
                     context,
                     class_like_metadata,
-                    **prop_name,
+                    *prop_name,
                     prop_metadata.name_span,
                     name_span.unwrap_or(declaration_span),
                     declaring_class,
@@ -214,7 +214,7 @@ pub fn check_property_initialization<'ctx>(
             report_uninitialized_property(
                 context,
                 class_like_metadata,
-                **prop_name,
+                *prop_name,
                 prop_metadata.name_span,
                 name_span.unwrap_or(declaration_span),
                 declaring_class,
@@ -376,7 +376,7 @@ fn compute_transitive_initializations(
             && let Some(parent_meta) = context.codebase.get_class_like(parent_name)
             && let Some(method_id) = parent_meta.declaring_method_ids.get(parent_initializer_name)
         {
-            let declaring_class_name = *method_id.get_class_name();
+            let declaring_class_name = method_id.get_class_name();
             work_queue.push((
                 declaring_class_name,
                 *parent_initializer_name,
@@ -412,7 +412,7 @@ fn compute_class_initializer_initializations(
 
     for initializer_name in &context.settings.class_initializers {
         if let Some(method_id) = class_like_metadata.declaring_method_ids.get(initializer_name) {
-            let declaring_class_name = *method_id.get_class_name();
+            let declaring_class_name = method_id.get_class_name();
 
             let initialized = compute_transitive_initializations(
                 artifacts,
@@ -435,7 +435,7 @@ fn compute_class_initializer_initializations(
 
         for initializer_name in &context.settings.class_initializers {
             if let Some(method_id) = parent_meta.declaring_method_ids.get(initializer_name) {
-                let declaring_class_name = *method_id.get_class_name();
+                let declaring_class_name = method_id.get_class_name();
 
                 let initialized = compute_transitive_initializations(
                     artifacts,
@@ -556,7 +556,7 @@ fn check_parent_constructor_initializes(
     context: &Context<'_, '_>,
     artifacts: &AnalysisArtifacts,
     class_like_metadata: &ClassLikeMetadata,
-    uninitialized_properties: &[(&Atom, &PropertyMetadata)],
+    uninitialized_properties: &[(Atom, &PropertyMetadata)],
 ) -> bool {
     let mut current_class = class_like_metadata.direct_parent_class.as_ref();
 
@@ -570,18 +570,18 @@ fn check_parent_constructor_initializes(
             let constructor_initialized = artifacts.method_initialized_properties.get(&method_key);
 
             let all_initialized = uninitialized_properties.iter().all(|(prop_name, _)| {
-                if parent_meta.initialized_properties.contains(*prop_name) {
+                if parent_meta.initialized_properties.contains(prop_name) {
                     return true;
                 }
 
                 if let Some(init_props) = constructor_initialized
-                    && init_props.contains(*prop_name)
+                    && init_props.contains(prop_name)
                 {
                     return true;
                 }
 
                 if constructor_initialized.is_none() {
-                    let prop_declaring_class = class_like_metadata.declaring_property_ids.get(*prop_name).copied();
+                    let prop_declaring_class = class_like_metadata.declaring_property_ids.get(prop_name).copied();
                     if prop_declaring_class == Some(*parent_name) {
                         return true;
                     }
@@ -608,7 +608,7 @@ fn report_missing_constructor(
     class_like_metadata: &ClassLikeMetadata,
     declaration_span: Span,
     name_span: Option<Span>,
-    uninitialized_properties: &[(&Atom, &PropertyMetadata)],
+    uninitialized_properties: &[(Atom, &PropertyMetadata)],
 ) {
     let class_name = &class_like_metadata.original_name;
     let prop_names: Vec<_> = uninitialized_properties.iter().map(|(name, _)| name.to_string()).collect();

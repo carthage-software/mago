@@ -15,6 +15,7 @@ use crate::metadata::ttype::TypeMetadata;
 /// PHP 8.4 introduced property hooks, which allow defining custom get/set behavior
 /// for properties. This struct stores the metadata for a single hook.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct PropertyHookMetadata {
     /// The hook name ("get" or "set").
     pub name: Atom,

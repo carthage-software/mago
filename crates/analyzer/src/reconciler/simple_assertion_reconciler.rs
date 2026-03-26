@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
 use mago_atom::Atom;
 use mago_atom::atom;
@@ -19,9 +20,12 @@ use mago_codex::ttype::atomic::object::named::TNamedObject;
 use mago_codex::ttype::atomic::resource::TResource;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::bool::TBool;
+use mago_codex::ttype::atomic::scalar::class_like_string::TClassLikeString;
+use mago_codex::ttype::atomic::scalar::class_like_string::TClassLikeStringKind;
 use mago_codex::ttype::atomic::scalar::float::TFloat;
 use mago_codex::ttype::atomic::scalar::int::TInteger;
 use mago_codex::ttype::atomic::scalar::string::TString;
+use mago_codex::ttype::atomic::scalar::string::TStringCasing;
 use mago_codex::ttype::comparator::ComparisonResult;
 use mago_codex::ttype::comparator::atomic_comparator;
 use mago_codex::ttype::comparator::union_comparator;
@@ -138,18 +142,18 @@ pub(crate) fn reconcile(
                     span,
                 ));
             }
-            TAtomic::Iterable(TIterable { key_type, value_type, intersection_types: None }) => {
-                if (key_type.is_mixed() || key_type.is_array_key()) && value_type.is_mixed() {
-                    return Some(intersect_iterable(
-                        context,
-                        assertion,
-                        existing_var_type,
-                        key,
-                        negated,
-                        span,
-                        assertion.has_equality(),
-                    ));
-                }
+            TAtomic::Iterable(TIterable { key_type, value_type, intersection_types: None })
+                if (key_type.is_mixed() || key_type.is_array_key()) && value_type.is_mixed() =>
+            {
+                return Some(intersect_iterable(
+                    context,
+                    assertion,
+                    existing_var_type,
+                    key,
+                    negated,
+                    span,
+                    assertion.has_equality(),
+                ));
             }
             TAtomic::Array(TArray::List(TList { known_elements: None, non_empty, element_type, .. }))
                 if element_type.is_placeholder() || element_type.is_mixed() =>
@@ -165,20 +169,19 @@ pub(crate) fn reconcile(
                     *non_empty,
                 ));
             }
-            TAtomic::Array(TArray::Keyed(TKeyedArray { known_items: None, parameters: Some(parameters), .. })) => {
+            TAtomic::Array(TArray::Keyed(TKeyedArray { known_items: None, parameters: Some(parameters), .. }))
                 if (parameters.0.is_placeholder() || parameters.0.is_array_key())
-                    && (parameters.1.is_placeholder() || parameters.1.is_mixed())
-                {
-                    return Some(intersect_keyed_array(
-                        context,
-                        assertion,
-                        existing_var_type,
-                        key,
-                        negated,
-                        span,
-                        assertion.has_equality(),
-                    ));
-                }
+                    && (parameters.1.is_placeholder() || parameters.1.is_mixed()) =>
+            {
+                return Some(intersect_keyed_array(
+                    context,
+                    assertion,
+                    existing_var_type,
+                    key,
+                    negated,
+                    span,
+                    assertion.has_equality(),
+                ));
             }
             TAtomic::Scalar(TScalar::ArrayKey) => {
                 return Some(intersect_arraykey(
@@ -214,7 +217,7 @@ pub(crate) fn reconcile(
                     str.is_non_empty,
                     str.is_truthy,
                     str.is_numeric,
-                    str.is_lowercase,
+                    str.casing,
                 ));
             }
             TAtomic::Scalar(TScalar::Bool(bool)) => {
@@ -253,10 +256,10 @@ pub(crate) fn reconcile(
                     i,
                 ));
             }
-            TAtomic::Mixed(mixed) if mixed.is_vanilla() || mixed.is_isset_from_loop() => {
-                if existing_var_type.is_mixed() {
-                    return Some(existing_var_type.clone());
-                }
+            TAtomic::Mixed(mixed)
+                if (mixed.is_vanilla() || mixed.is_isset_from_loop()) && existing_var_type.is_mixed() =>
+            {
+                return Some(existing_var_type.clone());
             }
             _ => {}
         }
@@ -592,9 +595,9 @@ fn intersect_array_list(
 ) -> TUnion {
     if existing_var_type.is_mixed() {
         return wrap_atomic(if is_non_empty {
-            TAtomic::Array(TArray::List(TList::new_non_empty(Box::new(get_mixed()))))
+            TAtomic::Array(TArray::List(TList::new_non_empty(Arc::new(get_mixed()))))
         } else {
-            TAtomic::Array(TArray::List(TList::new(Box::new(get_mixed()))))
+            TAtomic::Array(TArray::List(TList::new(Arc::new(get_mixed()))))
         });
     }
 
@@ -621,7 +624,7 @@ fn intersect_array_list(
 
                     value_parameter.clone()
                 } else {
-                    Box::new(get_mixed())
+                    Arc::new(get_mixed())
                 };
 
                 did_remove_type = true;
@@ -638,9 +641,9 @@ fn intersect_array_list(
                 let element_type = iterable.get_value_type();
 
                 acceptable_types.push(if is_non_empty {
-                    TAtomic::Array(TArray::List(TList::new_non_empty(Box::new(element_type.clone()))))
+                    TAtomic::Array(TArray::List(TList::new_non_empty(Arc::new(element_type.clone()))))
                 } else {
-                    TAtomic::Array(TArray::List(TList::new(Box::new(element_type.clone()))))
+                    TAtomic::Array(TArray::List(TList::new(Arc::new(element_type.clone()))))
                 });
             }
             TAtomic::GenericParameter(generic_parameter) => {
@@ -751,8 +754,8 @@ fn intersect_keyed_array(
                 let value_type = iterable.get_value_type();
 
                 acceptable_types.push(TAtomic::Array(TArray::Keyed(TKeyedArray::new_with_parameters(
-                    Box::new(key_type),
-                    Box::new(value_type.clone()),
+                    Arc::new(key_type),
+                    Arc::new(value_type.clone()),
                 ))));
             }
             TAtomic::GenericParameter(generic_parameter) => {
@@ -987,7 +990,7 @@ fn intersect_string(
     is_non_empty: bool,
     is_truthy: bool,
     is_numeric: bool,
-    is_lowercase: bool,
+    casing: TStringCasing,
 ) -> TUnion {
     let mut acceptable_types = Vec::new();
     let mut did_remove_type = false;
@@ -995,12 +998,23 @@ fn intersect_string(
     for atomic in existing_var_type.types.as_ref() {
         match atomic {
             TAtomic::Scalar(TScalar::String(existing_string)) => {
+                if (is_numeric && !existing_string.is_numeric)
+                    || (is_truthy && !existing_string.is_truthy)
+                    || (is_non_empty && !existing_string.is_non_empty)
+                {
+                    did_remove_type = true;
+                }
+
                 acceptable_types.push(
                     get_string_with_props(
                         is_numeric || existing_string.is_numeric,
                         is_truthy || existing_string.is_truthy,
                         is_non_empty || existing_string.is_non_empty,
-                        is_lowercase || existing_string.is_lowercase,
+                        match (casing, existing_string.casing) {
+                            (TStringCasing::Lowercase, TStringCasing::Lowercase) => TStringCasing::Lowercase,
+                            (TStringCasing::Uppercase, TStringCasing::Uppercase) => TStringCasing::Uppercase,
+                            _ => TStringCasing::Unspecified,
+                        },
                     )
                     .get_single_owned(),
                 );
@@ -1009,14 +1023,14 @@ fn intersect_string(
                 acceptable_types.push(atomic.clone());
             }
             TAtomic::Mixed(_) | TAtomic::Scalar(TScalar::Generic | TScalar::ArrayKey) => {
-                return get_string_with_props(is_numeric, is_truthy, is_non_empty, is_lowercase);
+                return get_string_with_props(is_numeric, is_truthy, is_non_empty, casing);
             }
             TAtomic::GenericParameter(generic_parameter) => {
                 did_remove_type = true;
 
                 if let Some(atomic) = map_generic_constraint_or_else(
                     generic_parameter,
-                    || get_string_with_props(is_numeric, is_truthy, is_non_empty, is_lowercase),
+                    || get_string_with_props(is_numeric, is_truthy, is_non_empty, casing),
                     |constraint| {
                         intersect_string(
                             context,
@@ -1029,7 +1043,7 @@ fn intersect_string(
                             is_non_empty,
                             is_truthy,
                             is_numeric,
-                            is_lowercase,
+                            casing,
                         )
                     },
                 ) {
@@ -1047,7 +1061,7 @@ fn intersect_string(
                 if atomic_comparator::is_contained_by(
                     context.codebase,
                     atomic,
-                    get_string_with_props(is_numeric, is_truthy, is_non_empty, is_lowercase).get_single(),
+                    get_string_with_props(is_numeric, is_truthy, is_non_empty, casing).get_single(),
                     false,
                     &mut ComparisonResult::new(),
                 ) {
@@ -1319,7 +1333,7 @@ fn reconcile_truthy_or_non_empty(
     negated: bool,
     span: Option<&Span>,
 ) -> TUnion {
-    let mut did_remove_type = existing_var_type.possibly_undefined_from_try();
+    let mut did_remove_type = existing_var_type.possibly_undefined() || existing_var_type.possibly_undefined_from_try();
     let mut new_var_type = existing_var_type.clone();
     let mut acceptable_types = vec![];
 
@@ -1376,6 +1390,7 @@ fn reconcile_truthy_or_non_empty(
     }
 
     new_var_type.set_possibly_undefined_from_try(false);
+    new_var_type.set_possibly_undefined(false, None);
 
     get_acceptable_type(
         context,
@@ -1533,7 +1548,7 @@ fn reconcile_exactly_countable(
     for atomic in existing_var_types {
         if let TAtomic::Array(TArray::List(TList { non_empty, known_count, element_type, known_elements })) = atomic {
             let min_under_count = if let Some(known_count) = known_count { *known_count < count } else { false };
-            if !non_empty || min_under_count {
+            if !non_empty || min_under_count || known_count.is_none() {
                 existing_var_type.remove_type(atomic);
                 if !element_type.is_never() {
                     existing_var_type.types.to_mut().push(TAtomic::Array(TArray::List(TList {
@@ -1605,10 +1620,12 @@ fn reconcile_at_least_countable(
             if !non_empty || min_under_count {
                 existing_var_type.remove_type(atomic);
                 if !element_type.is_never() {
+                    let new_known_count = if known_count.is_some() { Some(count) } else { *known_count };
+
                     existing_var_type.types.to_mut().push(TAtomic::Array(TArray::List(TList {
                         element_type: element_type.clone(),
                         known_elements: known_elements.clone(),
-                        known_count: Some(count),
+                        known_count: new_known_count,
                         non_empty: true,
                     })));
                 }
@@ -1680,8 +1697,8 @@ fn reconcile_countable(
         } else if let TAtomic::Iterable(iterable) = atomic {
             if iterable.key_type.is_array_key() || iterable.key_type.is_int() || iterable.key_type.is_any_string() {
                 countable_types.push(TAtomic::Array(TArray::Keyed(TKeyedArray::new_with_parameters(
-                    Box::new(iterable.get_key_type().clone()),
-                    Box::new(iterable.get_value_type().clone()),
+                    Arc::new(iterable.get_key_type().clone()),
+                    Arc::new(iterable.get_value_type().clone()),
                 ))));
             }
 
@@ -2044,7 +2061,7 @@ fn reconcile_has_array_key(
                     acceptable_types.push(atomic);
                 } else {
                     let acceptable_atomic = TAtomic::GenericParameter(TGenericParameter {
-                        constraint: Box::new(reconcile_has_array_key(
+                        constraint: Arc::new(reconcile_has_array_key(
                             context, assertion, constraint, None, key_name, negated, None,
                         )),
                         parameter_name: *parameter_name,
@@ -2189,7 +2206,7 @@ fn reconcile_has_nonnull_entry_for_key(
                         *key_name,
                         (false, subtract_null(context, assertion, &get_mixed(), None, negated, None)),
                     )])),
-                    parameters: Some((Box::new(get_arraykey()), Box::new(get_mixed()))),
+                    parameters: Some((Arc::new(get_arraykey()), Arc::new(get_mixed()))),
                     non_empty: false,
                 }));
                 acceptable_types.extend(keyed_array.types.into_owned());
@@ -2287,6 +2304,13 @@ fn reconcile_has_method(
                     acceptable_types.push(atomic);
                 }
             }
+            TAtomic::Scalar(TScalar::String(_) | TScalar::ClassLikeString(_)) => {
+                acceptable_types.push(TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::Any {
+                    kind: TClassLikeStringKind::Class,
+                })));
+
+                did_remove_type = true;
+            }
             TAtomic::Variable { .. } => {
                 acceptable_types.push(atomic.clone());
                 did_remove_type = true;
@@ -2367,6 +2391,13 @@ fn reconcile_has_property(
                     acceptable_types.push(atomic);
                 }
             }
+            TAtomic::Scalar(TScalar::String(_) | TScalar::ClassLikeString(_)) => {
+                acceptable_types.push(TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::Any {
+                    kind: TClassLikeStringKind::Class,
+                })));
+
+                did_remove_type = true;
+            }
             TAtomic::Variable { .. } => {
                 acceptable_types.push(atomic.clone());
                 did_remove_type = true;
@@ -2422,5 +2453,9 @@ pub(crate) fn get_acceptable_type(
     }
 
     new_var_type.types = Cow::Owned(acceptable_types);
+    if new_var_type.has_nullsafe_null() && !new_var_type.is_nullable() {
+        new_var_type.set_nullsafe_null(false);
+    }
+
     new_var_type
 }

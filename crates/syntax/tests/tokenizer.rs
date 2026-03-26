@@ -1,4 +1,3 @@
-use bumpalo::Bump;
 use mago_database::file::FileId;
 use pretty_assertions::assert_eq;
 
@@ -6,6 +5,7 @@ use mago_syntax_core::input::Input;
 
 use mago_syntax::error::SyntaxError;
 use mago_syntax::lexer::Lexer;
+use mago_syntax::settings::LexerSettings;
 use mago_syntax::token::DocumentKind;
 use mago_syntax::token::TokenKind;
 
@@ -76,7 +76,7 @@ fn test_emoji_attribute() -> Result<(), SyntaxError> {
 
 #[test]
 fn test_casts() -> Result<(), SyntaxError> {
-    let code = b"hello <?= ( string ) + - / ??= ?-> ... ( int   ) (integer    ) (    double) &&  ?> world";
+    let code = b"hello <?= ( string ) + - / ??= ?-> ... ( int   ) (integer    ) (    double) ( void ) &&  ?> world";
     let expected = &[
         TokenKind::InlineText,
         TokenKind::EchoTag,
@@ -100,6 +100,8 @@ fn test_casts() -> Result<(), SyntaxError> {
         TokenKind::IntegerCast,
         TokenKind::Whitespace,
         TokenKind::DoubleCast,
+        TokenKind::Whitespace,
+        TokenKind::VoidCast,
         TokenKind::Whitespace,
         TokenKind::AmpersandAmpersand,
         TokenKind::Whitespace,
@@ -1033,6 +1035,56 @@ fn test_braced_string_interpolation() -> Result<(), SyntaxError> {
 }
 
 #[test]
+fn test_namespaced_constant_in_braced_string_interpolation() -> Result<(), SyntaxError> {
+    let code = r#"<?= "{$arr[A\B::VALUE]}";"#;
+    let expected = &[
+        TokenKind::EchoTag,
+        TokenKind::Whitespace,
+        TokenKind::DoubleQuote,
+        TokenKind::StringPart,
+        TokenKind::LeftBrace,
+        TokenKind::Variable,
+        TokenKind::LeftBracket,
+        TokenKind::QualifiedIdentifier,
+        TokenKind::ColonColon,
+        TokenKind::Identifier,
+        TokenKind::RightBracket,
+        TokenKind::RightBrace,
+        TokenKind::DoubleQuote,
+        TokenKind::Semicolon,
+    ];
+
+    test_lexer(code.as_bytes(), expected).map_err(|err| {
+        panic!("unexpected error: {err}");
+    })
+}
+
+#[test]
+fn test_fully_qualified_constant_in_braced_string_interpolation() -> Result<(), SyntaxError> {
+    let code = r#"<?= "{$arr[\Foo\Bar::VALUE]}";"#;
+    let expected = &[
+        TokenKind::EchoTag,
+        TokenKind::Whitespace,
+        TokenKind::DoubleQuote,
+        TokenKind::StringPart,
+        TokenKind::LeftBrace,
+        TokenKind::Variable,
+        TokenKind::LeftBracket,
+        TokenKind::FullyQualifiedIdentifier,
+        TokenKind::ColonColon,
+        TokenKind::Identifier,
+        TokenKind::RightBracket,
+        TokenKind::RightBrace,
+        TokenKind::DoubleQuote,
+        TokenKind::Semicolon,
+    ];
+
+    test_lexer(code.as_bytes(), expected).map_err(|err| {
+        panic!("unexpected error: {err}");
+    })
+}
+
+#[test]
 fn test_use_fully_qualified() -> Result<(), SyntaxError> {
     let code = r"<?php use \Foo\{Bar,Baz};";
     let expected = &[
@@ -1055,10 +1107,136 @@ fn test_use_fully_qualified() -> Result<(), SyntaxError> {
     })
 }
 
+#[test]
+fn test_binary_string_prefix_single_quoted() -> Result<(), SyntaxError> {
+    let code = b"<?php b'hello' B'world'";
+    let expected = &[
+        TokenKind::OpenTag,
+        TokenKind::Whitespace,
+        TokenKind::LiteralString,
+        TokenKind::Whitespace,
+        TokenKind::LiteralString,
+    ];
+
+    test_lexer(code, expected).map_err(|err| {
+        panic!("unexpected error: {err}");
+    })
+}
+
+#[test]
+fn test_binary_string_prefix_double_quoted_literal() -> Result<(), SyntaxError> {
+    let code = b"<?php b\"hello\" B\"world\"";
+    let expected = &[
+        TokenKind::OpenTag,
+        TokenKind::Whitespace,
+        TokenKind::LiteralString,
+        TokenKind::Whitespace,
+        TokenKind::LiteralString,
+    ];
+
+    test_lexer(code, expected).map_err(|err| {
+        panic!("unexpected error: {err}");
+    })
+}
+
+#[test]
+fn test_binary_string_prefix_double_quoted_interpolated() -> Result<(), SyntaxError> {
+    let code = b"<?php b\"hello $name\"";
+    let expected = &[
+        TokenKind::OpenTag,
+        TokenKind::Whitespace,
+        TokenKind::DoubleQuote,
+        TokenKind::StringPart,
+        TokenKind::Variable,
+        TokenKind::DoubleQuote,
+    ];
+
+    test_lexer(code, expected).map_err(|err| {
+        panic!("unexpected error: {err}");
+    })
+}
+
+#[test]
+fn test_binary_string_prefix_heredoc() -> Result<(), SyntaxError> {
+    let code = b"<?php b<<<EOT\nhello\nEOT;";
+    let expected = &[
+        TokenKind::OpenTag,
+        TokenKind::Whitespace,
+        TokenKind::DocumentStart(DocumentKind::Heredoc),
+        TokenKind::StringPart,
+        TokenKind::DocumentEnd,
+        TokenKind::Semicolon,
+    ];
+
+    test_lexer(code, expected).map_err(|err| {
+        panic!("unexpected error: {err}");
+    })
+}
+
+#[test]
+fn test_binary_string_prefix_nowdoc() -> Result<(), SyntaxError> {
+    let code = b"<?php b<<<'EOT'\nhello\nEOT;";
+    let expected = &[
+        TokenKind::OpenTag,
+        TokenKind::Whitespace,
+        TokenKind::DocumentStart(DocumentKind::Nowdoc),
+        TokenKind::StringPart,
+        TokenKind::DocumentEnd,
+        TokenKind::Semicolon,
+    ];
+
+    test_lexer(code, expected).map_err(|err| {
+        panic!("unexpected error: {err}");
+    })
+}
+
+#[test]
+fn test_binary_string_prefix_heredoc_double_quoted() -> Result<(), SyntaxError> {
+    let code = b"<?php b<<<\"EOT\"\nhello\nEOT;";
+    let expected = &[
+        TokenKind::OpenTag,
+        TokenKind::Whitespace,
+        TokenKind::DocumentStart(DocumentKind::Heredoc),
+        TokenKind::StringPart,
+        TokenKind::DocumentEnd,
+        TokenKind::Semicolon,
+    ];
+
+    test_lexer(code, expected).map_err(|err| {
+        panic!("unexpected error: {err}");
+    })
+}
+
+#[test]
+fn test_b_identifier_not_followed_by_string() -> Result<(), SyntaxError> {
+    // 'b' not followed by string delimiter should still be an identifier
+    let code = b"<?php b + 1";
+    let expected = &[
+        TokenKind::OpenTag,
+        TokenKind::Whitespace,
+        TokenKind::Identifier,
+        TokenKind::Whitespace,
+        TokenKind::Plus,
+        TokenKind::Whitespace,
+        TokenKind::LiteralInteger,
+    ];
+
+    test_lexer(code, expected).map_err(|err| {
+        panic!("unexpected error: {err}");
+    })
+}
+
 fn test_lexer(code: &[u8], expected_kinds: &[TokenKind]) -> Result<(), SyntaxError> {
-    let arena = Bump::new();
+    test_lexer_with_settings(code, expected_kinds, LexerSettings::default())
+}
+
+fn test_lexer_with_settings(
+    code: &[u8],
+    expected_kinds: &[TokenKind],
+    settings: LexerSettings,
+) -> Result<(), SyntaxError> {
     let input = Input::new(FileId::zero(), code);
-    let mut lexer = Lexer::new(&arena, input);
+    let mut lexer = Lexer::new(input, settings);
 
     let mut tokens = Vec::new();
     let mut error = None;
@@ -1082,15 +1260,389 @@ fn test_lexer(code: &[u8], expected_kinds: &[TokenKind]) -> Result<(), SyntaxErr
 
     let mut found = String::new();
     for token in &tokens {
-        let length = token.span.end.offset - token.span.start.offset;
-        assert_eq!(length as usize, token.value.len());
-
         found.push_str(token.value);
     }
 
     assert_eq!(code, found.as_bytes());
 
     Ok(())
+}
+
+#[test]
+fn test_short_tags_disabled_treats_short_open_tag_as_inline_text() -> Result<(), SyntaxError> {
+    let settings = LexerSettings { enable_short_tags: false };
+
+    // `<?` should be treated as inline text when short tags are disabled
+    // The lexer returns a single InlineText token containing everything
+    let code = b"hello <? world";
+    let expected = &[TokenKind::InlineText];
+    test_lexer_with_settings(code, expected, settings)?;
+
+    // `<?php` should still work
+    let code = b"hello <?php echo 1;";
+    let expected = &[
+        TokenKind::InlineText,
+        TokenKind::OpenTag,
+        TokenKind::Whitespace,
+        TokenKind::Echo,
+        TokenKind::Whitespace,
+        TokenKind::LiteralInteger,
+        TokenKind::Semicolon,
+    ];
+    test_lexer_with_settings(code, expected, settings)?;
+
+    // `<?=` should still work
+    let code = b"hello <?= $x ?> world";
+    let expected = &[
+        TokenKind::InlineText,
+        TokenKind::EchoTag,
+        TokenKind::Whitespace,
+        TokenKind::Variable,
+        TokenKind::Whitespace,
+        TokenKind::CloseTag,
+        TokenKind::InlineText,
+    ];
+    test_lexer_with_settings(code, expected, settings)?;
+
+    // XML declaration should be treated as inline text (multiple tokens)
+    // "<?xml version=\"1.0\"?>", then PHP code
+    let code = b"<?xml version=\"1.0\"?><?php echo 1;";
+    let expected = &[
+        TokenKind::InlineText, // <?xml version="1.0"?>
+        TokenKind::OpenTag,
+        TokenKind::Whitespace,
+        TokenKind::Echo,
+        TokenKind::Whitespace,
+        TokenKind::LiteralInteger,
+        TokenKind::Semicolon,
+    ];
+    test_lexer_with_settings(code, expected, settings)?;
+
+    Ok(())
+}
+
+#[test]
+fn test_short_tags_enabled_treats_short_open_tag_as_php() -> Result<(), SyntaxError> {
+    let settings = LexerSettings { enable_short_tags: true };
+
+    // `<?` should be treated as PHP open tag when short tags are enabled
+    let code = b"hello <? echo 1; ?> world";
+    let expected = &[
+        TokenKind::InlineText,
+        TokenKind::ShortOpenTag,
+        TokenKind::Whitespace,
+        TokenKind::Echo,
+        TokenKind::Whitespace,
+        TokenKind::LiteralInteger,
+        TokenKind::Semicolon,
+        TokenKind::Whitespace,
+        TokenKind::CloseTag,
+        TokenKind::InlineText,
+    ];
+    test_lexer_with_settings(code, expected, settings)?;
+
+    Ok(())
+}
+
+#[test]
+fn test_invalid_octal_literal_is_parse_error() {
+    let code = b"<?=08;";
+    let expected = &[TokenKind::EchoTag];
+
+    let Err(SyntaxError::UnexpectedToken(_, byte, position)) = test_lexer(code, expected) else {
+        panic!("expected SyntaxError::UnexpectedToken");
+    };
+
+    assert_eq!(byte, b'8');
+    assert_eq!(position.offset, 4);
+}
+
+#[test]
+fn test_double_quoted_escaped_backslash_before_braced_interpolation() -> Result<(), SyntaxError> {
+    let code = r#"<?= "\\{$string}";"#;
+    let expected = &[
+        TokenKind::EchoTag,
+        TokenKind::Whitespace,
+        TokenKind::DoubleQuote,
+        TokenKind::StringPart, // \\
+        TokenKind::LeftBrace,
+        TokenKind::Variable,
+        TokenKind::RightBrace,
+        TokenKind::DoubleQuote,
+        TokenKind::Semicolon,
+    ];
+
+    test_lexer(code.as_bytes(), expected).map_err(|err| {
+        panic!("unexpected error: {err}");
+    })
+}
+
+#[test]
+fn test_heredoc_escaped_backslash_before_braced_interpolation() -> Result<(), SyntaxError> {
+    let code = b"<?php $x = <<<EOF\n\\\\{$string}\nEOF;\n";
+    let expected = &[
+        TokenKind::OpenTag,
+        TokenKind::Whitespace,
+        TokenKind::Variable,
+        TokenKind::Whitespace,
+        TokenKind::Equal,
+        TokenKind::Whitespace,
+        TokenKind::DocumentStart(DocumentKind::Heredoc),
+        TokenKind::StringPart, // \\
+        TokenKind::LeftBrace,
+        TokenKind::Variable,
+        TokenKind::RightBrace,
+        TokenKind::StringPart, // \n
+        TokenKind::DocumentEnd,
+        TokenKind::Semicolon,
+        TokenKind::Whitespace,
+    ];
+
+    test_lexer(code, expected).map_err(|err| {
+        panic!("unexpected error: {err}");
+    })
+}
+
+#[test]
+fn test_shell_execute_escaped_backslash_before_braced_interpolation() -> Result<(), SyntaxError> {
+    let code = r#"<?= `\\{$string}`;"#;
+    let expected = &[
+        TokenKind::EchoTag,
+        TokenKind::Whitespace,
+        TokenKind::Backtick,
+        TokenKind::StringPart, // \\
+        TokenKind::LeftBrace,
+        TokenKind::Variable,
+        TokenKind::RightBrace,
+        TokenKind::Backtick,
+        TokenKind::Semicolon,
+    ];
+
+    test_lexer(code.as_bytes(), expected).map_err(|err| {
+        panic!("unexpected error: {err}");
+    })
+}
+
+#[test]
+fn test_heredoc_single_backslash_escapes_brace() -> Result<(), SyntaxError> {
+    let code = b"<?php $x = <<<EOF\n\\{$string}\nEOF;\n";
+    let expected = &[
+        TokenKind::OpenTag,
+        TokenKind::Whitespace,
+        TokenKind::Variable,
+        TokenKind::Whitespace,
+        TokenKind::Equal,
+        TokenKind::Whitespace,
+        TokenKind::DocumentStart(DocumentKind::Heredoc),
+        TokenKind::StringPart, // \{
+        TokenKind::Variable,   // $string
+        TokenKind::StringPart, // }
+        TokenKind::DocumentEnd,
+        TokenKind::Semicolon,
+        TokenKind::Whitespace,
+    ];
+
+    test_lexer(code, expected).map_err(|err| {
+        panic!("unexpected error: {err}");
+    })
+}
+
+#[test]
+fn test_shell_execute_single_backslash_escapes_brace() -> Result<(), SyntaxError> {
+    let code = r#"<?= `\{$string}`;"#;
+    let expected = &[
+        TokenKind::EchoTag,
+        TokenKind::Whitespace,
+        TokenKind::Backtick,
+        TokenKind::StringPart, // \{
+        TokenKind::Variable,   // $string
+        TokenKind::StringPart, // }
+        TokenKind::Backtick,
+        TokenKind::Semicolon,
+    ];
+
+    test_lexer(code.as_bytes(), expected).map_err(|err| {
+        panic!("unexpected error: {err}");
+    })
+}
+
+#[test]
+fn test_heredoc_triple_backslash_before_braced_interpolation() -> Result<(), SyntaxError> {
+    let code = b"<?php $x = <<<EOF\n\\\\\\{$string}\nEOF;\n";
+    let expected = &[
+        TokenKind::OpenTag,
+        TokenKind::Whitespace,
+        TokenKind::Variable,
+        TokenKind::Whitespace,
+        TokenKind::Equal,
+        TokenKind::Whitespace,
+        TokenKind::DocumentStart(DocumentKind::Heredoc),
+        TokenKind::StringPart, // \\\{
+        TokenKind::Variable,   // $string
+        TokenKind::StringPart, // }
+        TokenKind::DocumentEnd,
+        TokenKind::Semicolon,
+        TokenKind::Whitespace,
+    ];
+
+    test_lexer(code, expected).map_err(|err| {
+        panic!("unexpected error: {err}");
+    })
+}
+
+#[test]
+fn test_heredoc_quadruple_backslash_before_braced_interpolation() -> Result<(), SyntaxError> {
+    let code = b"<?php $x = <<<EOF\n\\\\\\\\{$string}\nEOF;\n";
+    let expected = &[
+        TokenKind::OpenTag,
+        TokenKind::Whitespace,
+        TokenKind::Variable,
+        TokenKind::Whitespace,
+        TokenKind::Equal,
+        TokenKind::Whitespace,
+        TokenKind::DocumentStart(DocumentKind::Heredoc),
+        TokenKind::StringPart, // \\\\
+        TokenKind::LeftBrace,
+        TokenKind::Variable,
+        TokenKind::RightBrace,
+        TokenKind::StringPart, // \n
+        TokenKind::DocumentEnd,
+        TokenKind::Semicolon,
+        TokenKind::Whitespace,
+    ];
+
+    test_lexer(code, expected).map_err(|err| {
+        panic!("unexpected error: {err}");
+    })
+}
+
+#[test]
+fn test_shell_execute_triple_backslash_before_braced_interpolation() -> Result<(), SyntaxError> {
+    let code = r#"<?= `\\\{$string}`;"#;
+    let expected = &[
+        TokenKind::EchoTag,
+        TokenKind::Whitespace,
+        TokenKind::Backtick,
+        TokenKind::StringPart, // \\\{
+        TokenKind::Variable,   // $string
+        TokenKind::StringPart, // }
+        TokenKind::Backtick,
+        TokenKind::Semicolon,
+    ];
+
+    test_lexer(code.as_bytes(), expected).map_err(|err| {
+        panic!("unexpected error: {err}");
+    })
+}
+
+#[test]
+fn test_shell_execute_quadruple_backslash_before_braced_interpolation() -> Result<(), SyntaxError> {
+    let code = r#"<?= `\\\\{$string}`;"#;
+    let expected = &[
+        TokenKind::EchoTag,
+        TokenKind::Whitespace,
+        TokenKind::Backtick,
+        TokenKind::StringPart, // \\\\
+        TokenKind::LeftBrace,
+        TokenKind::Variable,
+        TokenKind::RightBrace,
+        TokenKind::Backtick,
+        TokenKind::Semicolon,
+    ];
+
+    test_lexer(code.as_bytes(), expected).map_err(|err| {
+        panic!("unexpected error: {err}");
+    })
+}
+
+#[test]
+fn test_heredoc_escaped_backslash_before_dollar_interpolation() -> Result<(), SyntaxError> {
+    let code = b"<?php $x = <<<EOF\n\\\\$string\nEOF;\n";
+    let expected = &[
+        TokenKind::OpenTag,
+        TokenKind::Whitespace,
+        TokenKind::Variable,
+        TokenKind::Whitespace,
+        TokenKind::Equal,
+        TokenKind::Whitespace,
+        TokenKind::DocumentStart(DocumentKind::Heredoc),
+        TokenKind::StringPart, // \\
+        TokenKind::Variable,   // $string
+        TokenKind::StringPart, // \n
+        TokenKind::DocumentEnd,
+        TokenKind::Semicolon,
+        TokenKind::Whitespace,
+    ];
+
+    test_lexer(code, expected).map_err(|err| {
+        panic!("unexpected error: {err}");
+    })
+}
+
+#[test]
+fn test_shell_execute_escaped_backslash_before_dollar_interpolation() -> Result<(), SyntaxError> {
+    let code = r"<?= `\\$string`;";
+    let expected = &[
+        TokenKind::EchoTag,
+        TokenKind::Whitespace,
+        TokenKind::Backtick,
+        TokenKind::StringPart, // \\
+        TokenKind::Variable,   // $string
+        TokenKind::Backtick,
+        TokenKind::Semicolon,
+    ];
+
+    test_lexer(code.as_bytes(), expected).map_err(|err| {
+        panic!("unexpected error: {err}");
+    })
+}
+
+#[test]
+fn test_heredoc_no_interpolation_without_dollar() -> Result<(), SyntaxError> {
+    let code = b"<?php $x = <<<EOF\n\\\\{foo}\nEOF;\n";
+    let expected = &[
+        TokenKind::OpenTag,
+        TokenKind::Whitespace,
+        TokenKind::Variable,
+        TokenKind::Whitespace,
+        TokenKind::Equal,
+        TokenKind::Whitespace,
+        TokenKind::DocumentStart(DocumentKind::Heredoc),
+        TokenKind::StringPart, // \\{foo}\n
+        TokenKind::DocumentEnd,
+        TokenKind::Semicolon,
+        TokenKind::Whitespace,
+    ];
+
+    test_lexer(code, expected).map_err(|err| {
+        panic!("unexpected error: {err}");
+    })
+}
+
+#[test]
+fn test_heredoc_escaped_backslash_before_dollar_brace_interpolation() -> Result<(), SyntaxError> {
+    let code = b"<?php $x = <<<EOF\n\\\\${string}\nEOF;\n";
+    let expected = &[
+        TokenKind::OpenTag,
+        TokenKind::Whitespace,
+        TokenKind::Variable,
+        TokenKind::Whitespace,
+        TokenKind::Equal,
+        TokenKind::Whitespace,
+        TokenKind::DocumentStart(DocumentKind::Heredoc),
+        TokenKind::StringPart, // \\
+        TokenKind::DollarLeftBrace,
+        TokenKind::Identifier,
+        TokenKind::RightBrace,
+        TokenKind::StringPart, // \n
+        TokenKind::DocumentEnd,
+        TokenKind::Semicolon,
+        TokenKind::Whitespace,
+    ];
+
+    test_lexer(code, expected).map_err(|err| {
+        panic!("unexpected error: {err}");
+    })
 }
 
 pub const KEYWORD_TYPES: [(&[u8], TokenKind); 84] = [

@@ -64,8 +64,7 @@ function yaml_emit_file(
     $encoding = YAML_ANY_ENCODING,
     $linebreak = YAML_ANY_BREAK,
     array $callbacks = [],
-) {
-}
+) {}
 
 /**
  * @param mixed $data
@@ -74,33 +73,25 @@ function yaml_emit_file(
  *
  * @return string
  */
-function yaml_emit($data, $encoding = YAML_ANY_ENCODING, $linebreak = YAML_ANY_BREAK, array $callbacks = [])
-{
-}
+function yaml_emit($data, $encoding = YAML_ANY_ENCODING, $linebreak = YAML_ANY_BREAK, array $callbacks = []) {}
 
 /**
  * @param string $filename
  * @param int $pos
  * @param int $ndocs
  */
-function yaml_parse_file($filename, $pos = 0, &$ndocs = null, array $callbacks = [])
-{
-}
+function yaml_parse_file($filename, $pos = 0, &$ndocs = null, array $callbacks = []) {}
 
 /**
  * @param string $url
  * @param int $pos
  * @param int $ndocs
  */
-function yaml_parse_url($url, $pos = 0, &$ndocs = null, array $callbacks = [])
-{
-}
+function yaml_parse_url($url, $pos = 0, &$ndocs = null, array $callbacks = []) {}
 
 /**
  * @param string $input
  * @param int $pos
  * @param int $ndocs
  */
-function yaml_parse($input, $pos = 0, &$ndocs = null, array $callbacks = [])
-{
-}
+function yaml_parse($input, $pos = 0, &$ndocs = null, array $callbacks = []) {}

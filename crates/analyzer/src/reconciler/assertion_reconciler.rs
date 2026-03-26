@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
 use mago_atom::Atom;
 use mago_atom::atom;
@@ -21,6 +22,7 @@ use mago_codex::ttype::atomic::scalar::int::TInteger;
 use mago_codex::ttype::atomic::scalar::string::TString;
 use mago_codex::ttype::atomic::scalar::string::TStringLiteral;
 use mago_codex::ttype::combiner;
+use mago_codex::ttype::combiner::CombinerOptions;
 use mago_codex::ttype::comparator::ComparisonResult;
 use mago_codex::ttype::comparator::atomic_comparator;
 use mago_codex::ttype::comparator::atomic_comparator::is_contained_by;
@@ -29,6 +31,7 @@ use mago_codex::ttype::expander::TypeExpansionOptions;
 use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::get_mixed_maybe_from_loop;
 use mago_codex::ttype::get_never;
+use mago_codex::ttype::intersect_union_types;
 use mago_codex::ttype::union::TUnion;
 use mago_codex::ttype::wrap_atomic;
 use mago_span::Span;
@@ -156,15 +159,28 @@ pub(crate) fn refine_atomic_with_union(
 
             let mut new_known_items = existing_known_items.clone();
             let mut has_non_optional = false;
+            let mut variant_compatible = true;
             for (key, (new_is_optional, new_item_type)) in known_items {
                 if let Some((is_optional, existing_item_type)) = new_known_items.get_mut(key) {
-                    *is_optional = *new_is_optional;
-                    *existing_item_type = new_item_type.clone();
+                    match intersect_union_types(new_item_type, existing_item_type, context.codebase) {
+                        Some(intersected) if !intersected.is_never() => {
+                            *is_optional = *new_is_optional;
+                            *existing_item_type = intersected;
+                        }
+                        _ => {
+                            variant_compatible = false;
+                            break;
+                        }
+                    }
 
                     if !*new_is_optional {
                         has_non_optional = true;
                     }
                 }
+            }
+
+            if !variant_compatible {
+                continue;
             }
 
             acceptable_atomic_types.push(TAtomic::Array(TArray::Keyed(TKeyedArray {
@@ -202,15 +218,28 @@ pub(crate) fn refine_atomic_with_union(
 
             let mut new_known_elements = existing_known_elements.clone();
             let mut has_non_optional = false;
+            let mut variant_compatible = true;
             for (key, (new_is_optional, new_item_type)) in known_elements {
                 if let Some((is_optional, existing_item_type)) = new_known_elements.get_mut(key) {
-                    *is_optional = *new_is_optional;
-                    *existing_item_type = new_item_type.clone();
+                    match intersect_union_types(new_item_type, existing_item_type, context.codebase) {
+                        Some(intersected) if !intersected.is_never() => {
+                            *is_optional = *new_is_optional;
+                            *existing_item_type = intersected;
+                        }
+                        _ => {
+                            variant_compatible = false;
+                            break;
+                        }
+                    }
 
                     if !*new_is_optional {
                         has_non_optional = true;
                     }
                 }
+            }
+
+            if !variant_compatible {
+                continue;
             }
 
             acceptable_atomic_types.push(TAtomic::Array(TArray::List(TList {
@@ -254,7 +283,7 @@ fn intersect_union_with_atomic(
 
     if !acceptable_types.is_empty() {
         if acceptable_types.len() > 1 {
-            acceptable_types = combiner::combine(acceptable_types, context.codebase, false);
+            acceptable_types = combiner::combine(acceptable_types, context.codebase, CombinerOptions::default());
         }
 
         return Some(TUnion::from_vec(acceptable_types));
@@ -339,13 +368,13 @@ pub(crate) fn intersect_atomic_with_atomic(
             return None;
         }
         (TAtomic::Object(TObject::Named(first_object)), TAtomic::Object(TObject::Named(second_object))) => {
-            let first_object_name = first_object.get_name_ref();
-            let second_object_name = second_object.get_name_ref();
+            let first_object_name = first_object.get_name();
+            let second_object_name = second_object.get_name();
 
-            if (context.codebase.interface_exists(first_object_name)
-                && context.codebase.is_inheritable(second_object_name))
-                || (context.codebase.interface_exists(second_object_name)
-                    && context.codebase.is_inheritable(first_object_name))
+            if (context.codebase.interface_exists(&first_object_name)
+                && context.codebase.is_inheritable(&second_object_name))
+                || (context.codebase.interface_exists(&second_object_name)
+                    && context.codebase.is_inheritable(&first_object_name))
             {
                 let mut first_type = first_type.clone();
                 first_type.add_intersection_type(second_type.clone());
@@ -366,7 +395,7 @@ pub(crate) fn intersect_atomic_with_atomic(
                 let mut type_1_atomic = first_type.clone();
 
                 if let TAtomic::GenericParameter(TGenericParameter { constraint, .. }) = &mut type_1_atomic {
-                    **constraint = new_as;
+                    *Arc::make_mut(constraint) = new_as;
                 }
 
                 return Some(type_1_atomic);
@@ -379,7 +408,7 @@ pub(crate) fn intersect_atomic_with_atomic(
                 let mut type_2_atomic = second_type.clone();
 
                 if let TAtomic::GenericParameter(TGenericParameter { constraint, .. }) = &mut type_2_atomic {
-                    **constraint = new_as;
+                    *Arc::make_mut(constraint) = new_as;
                 }
 
                 return Some(type_2_atomic);
@@ -415,7 +444,7 @@ fn intersect_list_arrays(context: &mut Context<'_, '_>, first_list: &TList, seco
             if let Some(element_type) = element_type {
                 return Some(TAtomic::Array(TArray::List(TList {
                     known_elements: Some(second_list_known_elements),
-                    element_type: Box::new(element_type),
+                    element_type: Arc::new(element_type),
                     non_empty: true,
                     known_count: None,
                 })));
@@ -433,7 +462,7 @@ fn intersect_list_arrays(context: &mut Context<'_, '_>, first_list: &TList, seco
             if let Some(element_type) = element_type {
                 return Some(TAtomic::Array(TArray::List(TList {
                     known_elements: Some(second_known_elements),
-                    element_type: Box::new(element_type),
+                    element_type: Arc::new(element_type),
                     non_empty: false,
                     known_count: None,
                 })));
@@ -451,7 +480,7 @@ fn intersect_list_arrays(context: &mut Context<'_, '_>, first_list: &TList, seco
             if let Some(element_type) = element_type {
                 return Some(TAtomic::Array(TArray::List(TList {
                     known_elements: Some(first_known_elements),
-                    element_type: Box::new(element_type),
+                    element_type: Arc::new(element_type),
                     non_empty: false,
                     known_count: None,
                 })));
@@ -463,7 +492,7 @@ fn intersect_list_arrays(context: &mut Context<'_, '_>, first_list: &TList, seco
             if let Some(element_type) = element_type {
                 return Some(TAtomic::Array(TArray::List(TList {
                     known_elements: None,
-                    element_type: Box::new(element_type),
+                    element_type: Arc::new(element_type),
                     non_empty: true,
                     known_count: None,
                 })));
@@ -485,7 +514,7 @@ fn intersect_keyed_arrays(
             let value = intersect_union_with_union(context, &first_parameters.1, &second_parameters.1);
 
             if let (Some(key), Some(value)) = (key, value) {
-                Some((Box::new(key), Box::new(value)))
+                Some((Arc::new(key), Arc::new(value)))
             } else {
                 return None;
             }
@@ -583,7 +612,8 @@ pub(crate) fn intersect_union_with_union(
                     })
                     .collect::<Vec<_>>();
 
-                let combined_union = TUnion::from_vec(combiner::combine(new_types, context.codebase, false));
+                let combined_union =
+                    TUnion::from_vec(combiner::combine(new_types, context.codebase, CombinerOptions::default()));
 
                 if combined_union.is_never() { None } else { Some(combined_union) }
             }
@@ -632,6 +662,16 @@ fn intersect_contained_atomic_with_another(
         }
     }
 
+    if generic_coercion
+        && named_object.get_type_parameters().is_none()
+        && let TAtomic::Object(TObject::Named(super_named_object)) = super_atomic
+        && let Some(super_type_parameters) = super_named_object.get_type_parameters()
+    {
+        return Some(TAtomic::Object(TObject::Named(
+            TNamedObject::new(named_object.name).with_type_parameters(Some(super_type_parameters.to_vec())),
+        )));
+    }
+
     let mut first_type_atomic = super_atomic.clone();
     if let TAtomic::GenericParameter(TGenericParameter { constraint: first_type_constraint, .. }) =
         &mut first_type_atomic
@@ -640,7 +680,7 @@ fn intersect_contained_atomic_with_another(
         let first_type_as = intersect_union_with_atomic(context, first_type_constraint, sub_atomic);
 
         if let Some(first_type_as) = first_type_as {
-            **first_type_constraint = first_type_as;
+            *Arc::make_mut(first_type_constraint) = first_type_as;
         } else {
             return None;
         }
@@ -1013,7 +1053,11 @@ fn handle_literal_equality_with_class_string(
                         trigger_issue_for_impossible(context, old_var_type_atom, key, assertion, true, negated, span);
                     }
 
-                    return TUnion::from_atomic(asserted_atomic);
+                    return if matches!(class_like_string, TClassLikeString::Generic { .. }) {
+                        existing_var_type.clone()
+                    } else {
+                        TUnion::from_atomic(asserted_atomic)
+                    };
                 }
             }
             TAtomic::Scalar(TScalar::String(TString {
@@ -1066,42 +1110,30 @@ fn handle_literal_equality_with_float(
             TAtomic::Scalar(TScalar::Float(TFloat::Float)) => {
                 acceptable_types.push(literal_asserted_type.clone());
             }
-            TAtomic::Scalar(TScalar::Float(TFloat::Literal(existing_float))) => {
-                if (existing_float.0 - assertion_float_val).abs() < f64::EPSILON {
-                    if existing_var_type.is_single()
-                        && let Some(k_str) = &key
-                        && let Some(s_ref) = span
-                    {
-                        trigger_issue_for_impossible(
-                            context,
-                            old_var_type_atom,
-                            k_str,
-                            assertion,
-                            true,
-                            negated,
-                            s_ref,
-                        );
-                    }
-                    acceptable_types.push(literal_asserted_type.clone());
-                } else {
-                    did_remove_type = true;
+            TAtomic::Scalar(TScalar::Float(TFloat::Literal(existing_float)))
+                if (existing_float.0 - assertion_float_val).abs() < f64::EPSILON =>
+            {
+                if existing_var_type.is_single()
+                    && let Some(k_str) = &key
+                    && let Some(s_ref) = span
+                {
+                    trigger_issue_for_impossible(context, old_var_type_atom, k_str, assertion, true, negated, s_ref);
                 }
+                acceptable_types.push(literal_asserted_type.clone());
             }
-            TAtomic::Scalar(TScalar::Integer(TInteger::Literal(existing_int))) if is_loose_equality => {
-                if (*existing_int as f64 - assertion_float_val).abs() < f64::EPSILON {
-                    acceptable_types.push(existing_var_atomic_type.clone());
-                } else {
-                    did_remove_type = true;
-                }
+            TAtomic::Scalar(TScalar::Integer(TInteger::Literal(existing_int)))
+                if is_loose_equality && (*existing_int as f64 - assertion_float_val).abs() < f64::EPSILON =>
+            {
+                acceptable_types.push(existing_var_atomic_type.clone());
             }
             TAtomic::Scalar(TScalar::String(TString {
                 literal: Some(TStringLiteral::Value(string_value)), ..
-            })) if is_loose_equality => {
-                if string_value.parse::<f64>().is_ok_and(|f_val| (f_val - assertion_float_val).abs() < f64::EPSILON) {
-                    acceptable_types.push(existing_var_atomic_type.clone());
-                } else {
-                    did_remove_type = true;
-                }
+            })) if is_loose_equality
+                && string_value
+                    .parse::<f64>()
+                    .is_ok_and(|f_val| (f_val - assertion_float_val).abs() < f64::EPSILON) =>
+            {
+                acceptable_types.push(existing_var_atomic_type.clone());
             }
             TAtomic::Scalar(TScalar::Bool(TBool { value: Some(b_val), .. })) if is_loose_equality => {
                 let bool_as_f64 = if *b_val { 1.0 } else { 0.0 };
@@ -1111,12 +1143,8 @@ fn handle_literal_equality_with_float(
                     did_remove_type = true;
                 }
             }
-            TAtomic::Null if is_loose_equality => {
-                if (0.0 - assertion_float_val).abs() < f64::EPSILON {
-                    acceptable_types.push(existing_var_atomic_type.clone());
-                } else {
-                    did_remove_type = true;
-                }
+            TAtomic::Null if is_loose_equality && (0.0 - assertion_float_val).abs() < f64::EPSILON => {
+                acceptable_types.push(existing_var_atomic_type.clone());
             }
             TAtomic::Scalar(TScalar::Integer(TInteger::Unspecified)) if is_loose_equality => {
                 acceptable_types.push(existing_var_atomic_type.clone());
@@ -1192,27 +1220,17 @@ fn handle_literal_equality_with_bool(
             TAtomic::Scalar(TScalar::Bool(TBool { value: None, .. })) => {
                 acceptable_types.push(literal_asserted_type.clone());
             }
-            TAtomic::Scalar(TScalar::Bool(TBool { value: Some(existing_bool_val), .. })) => {
-                if *existing_bool_val == assertion_bool_val {
-                    if existing_var_type.is_single()
-                        && let Some(k_str) = &key
-                        && let Some(s_ref) = span
-                    {
-                        trigger_issue_for_impossible(
-                            context,
-                            old_var_type_atom,
-                            k_str,
-                            assertion,
-                            true,
-                            negated,
-                            s_ref,
-                        );
-                    }
-
-                    acceptable_types.push(literal_asserted_type.clone());
-                } else {
-                    did_remove_type = true;
+            TAtomic::Scalar(TScalar::Bool(TBool { value: Some(existing_bool_val), .. }))
+                if *existing_bool_val == assertion_bool_val =>
+            {
+                if existing_var_type.is_single()
+                    && let Some(k_str) = &key
+                    && let Some(s_ref) = span
+                {
+                    trigger_issue_for_impossible(context, old_var_type_atom, k_str, assertion, true, negated, s_ref);
                 }
+
+                acceptable_types.push(literal_asserted_type.clone());
             }
             TAtomic::Scalar(TScalar::Integer(TInteger::Literal(existing_int))) if is_loose_equality => {
                 let int_as_bool = *existing_int != 0;

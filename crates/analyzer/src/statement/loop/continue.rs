@@ -3,8 +3,8 @@ use std::rc::Rc;
 use mago_atom::AtomSet;
 
 use mago_codex::ttype::TType;
-use mago_codex::ttype::add_optional_union_type;
 use mago_codex::ttype::combine_union_types;
+use mago_codex::ttype::combiner::CombinerOptions;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
@@ -89,7 +89,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Continue<'arena> {
 
                 context.collector.report_with_code(IssueCode::InvalidContinue, issue);
 
-                block_context.has_returned = true;
+                block_context.flags.set_has_returned(true);
 
                 return Ok(());
             } else {
@@ -108,7 +108,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Continue<'arena> {
                 ),
             );
 
-            block_context.has_returned = true;
+            block_context.flags.set_has_returned(true);
 
             return Ok(());
         };
@@ -126,8 +126,12 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Continue<'arena> {
         loop_scope.redefined_loop_variables.retain(|redefined_var, current_redefined_type| {
             match redefined_vars.get(redefined_var) {
                 Some(outer_redefined_type) => {
-                    *current_redefined_type =
-                        combine_union_types(outer_redefined_type, current_redefined_type, context.codebase, false);
+                    *current_redefined_type = Rc::new(combine_union_types(
+                        outer_redefined_type,
+                        current_redefined_type,
+                        context.codebase,
+                        CombinerOptions::default(),
+                    ));
 
                     true
                 }
@@ -138,11 +142,15 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Continue<'arena> {
         for (var_id, var_type) in redefined_vars {
             loop_scope.possibly_redefined_loop_variables.insert(
                 var_id,
-                add_optional_union_type(
-                    var_type,
-                    loop_scope.possibly_redefined_loop_variables.get(&var_id),
-                    context.codebase,
-                ),
+                match loop_scope.possibly_redefined_loop_variables.get(&var_id) {
+                    Some(existing_type) => Rc::new(combine_union_types(
+                        existing_type,
+                        &var_type,
+                        context.codebase,
+                        CombinerOptions::default(),
+                    )),
+                    None => var_type.clone(),
+                },
             );
         }
 
@@ -150,14 +158,19 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Continue<'arena> {
             let mut finally_scope = (*finally_scope).borrow_mut();
             for (var_id, var_type) in &block_context.locals {
                 if let Some(finally_type) = finally_scope.locals.get_mut(var_id) {
-                    *finally_type = Rc::new(combine_union_types(finally_type, var_type, context.codebase, false));
+                    *finally_type = Rc::new(combine_union_types(
+                        finally_type,
+                        var_type,
+                        context.codebase,
+                        CombinerOptions::default(),
+                    ));
                 } else {
                     finally_scope.locals.insert(*var_id, var_type.clone());
                 }
             }
         }
 
-        block_context.has_returned = true;
+        block_context.flags.set_has_returned(true);
 
         Ok(())
     }

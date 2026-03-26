@@ -35,7 +35,6 @@ pub struct While<'arena> {
 /// Represents the body of a while statement.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
-#[repr(u8)]
 pub enum WhileBody<'arena> {
     Statement(&'arena Statement<'arena>),
     ColonDelimited(WhileColonDelimitedBody<'arena>),

@@ -1,52 +1,114 @@
 use serde::Deserialize;
 use serde::Serialize;
 
-bitflags::bitflags! {
-    /// Represents the flags defined in a PHP `#[Attribute]` declaration,
-    /// specifying the targets where the attribute can be applied and whether it's repeatable.
-    #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-    pub struct AttributeFlags: u8 {
-        /// Flag indicating the attribute can be applied to classes, interfaces, traits, and enums.
-        /// Corresponds to `Attribute::TARGET_CLASS`.
-        const TARGET_CLASS          = 1 << 0; //  1
+/// Represents the flags defined in a PHP `#[Attribute]` declaration,
+/// specifying the targets where the attribute can be applied and whether it's repeatable.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[repr(transparent)]
+pub struct AttributeFlags(u8);
 
-        /// Flag indicating the attribute can be applied to functions (including closures and arrow functions).
-        /// Corresponds to `Attribute::TARGET_FUNCTION`.
-        const TARGET_FUNCTION       = 1 << 1; //  2
+impl AttributeFlags {
+    /// Flag indicating the attribute can be applied to classes, interfaces, traits, and enums.
+    /// Corresponds to `Attribute::TARGET_CLASS`.
+    pub const TARGET_CLASS: AttributeFlags = AttributeFlags(1 << 0);
 
-        /// Flag indicating the attribute can be applied to methods.
-        /// Corresponds to `Attribute::TARGET_METHOD`.
-        const TARGET_METHOD         = 1 << 2; //  4
+    /// Flag indicating the attribute can be applied to functions (including closures and arrow functions).
+    /// Corresponds to `Attribute::TARGET_FUNCTION`.
+    pub const TARGET_FUNCTION: AttributeFlags = AttributeFlags(1 << 1);
 
-        /// Flag indicating the attribute can be applied to properties.
-        /// Corresponds to `Attribute::TARGET_PROPERTY`.
-        const TARGET_PROPERTY       = 1 << 3; //  8
+    /// Flag indicating the attribute can be applied to methods.
+    /// Corresponds to `Attribute::TARGET_METHOD`.
+    pub const TARGET_METHOD: AttributeFlags = AttributeFlags(1 << 2);
 
-        /// Flag indicating the attribute can be applied to class constants.
-        /// Corresponds to `Attribute::TARGET_CLASS_CONSTANT`.
-        const TARGET_CLASS_CONSTANT = 1 << 4; // 16
+    /// Flag indicating the attribute can be applied to properties.
+    /// Corresponds to `Attribute::TARGET_PROPERTY`.
+    pub const TARGET_PROPERTY: AttributeFlags = AttributeFlags(1 << 3);
 
-        /// Flag indicating the attribute can be applied to function or method parameters.
-        /// Corresponds to `Attribute::TARGET_PARAMETER`.
-        const TARGET_PARAMETER      = 1 << 5; // 32
+    /// Flag indicating the attribute can be applied to class constants.
+    /// Corresponds to `Attribute::TARGET_CLASS_CONSTANT`.
+    pub const TARGET_CLASS_CONSTANT: AttributeFlags = AttributeFlags(1 << 4);
 
-        /// Flag indicating the attribute can be applied to global constants (defined with `const`).
-        /// Corresponds to `Attribute::TARGET_CONSTANT`.
-        const TARGET_CONSTANT       = 1 << 6; // 64
+    /// Flag indicating the attribute can be applied to function or method parameters.
+    /// Corresponds to `Attribute::TARGET_PARAMETER`.
+    pub const TARGET_PARAMETER: AttributeFlags = AttributeFlags(1 << 5);
 
-        /// A combination of all `TARGET_*` flags, indicating the attribute can be applied anywhere.
-        /// Corresponds to `Attribute::TARGET_ALL`.
-        const TARGET_ALL = Self::TARGET_CLASS.bits()
-            | Self::TARGET_FUNCTION.bits()
-            | Self::TARGET_METHOD.bits()
-            | Self::TARGET_PROPERTY.bits()
-            | Self::TARGET_CLASS_CONSTANT.bits()
-            | Self::TARGET_PARAMETER.bits()
-            | Self::TARGET_CONSTANT.bits(); // 127
+    /// Flag indicating the attribute can be applied to global constants (defined with `const`).
+    /// Corresponds to `Attribute::TARGET_CONSTANT`.
+    pub const TARGET_CONSTANT: AttributeFlags = AttributeFlags(1 << 6);
 
-        /// Flag indicating the attribute can be repeated on the same declaration.
-        /// Corresponds to `Attribute::IS_REPEATABLE`.
-        const IS_REPEATABLE         = 1 << 7; // 128
+    /// A combination of all `TARGET_*` flags, indicating the attribute can be applied anywhere.
+    /// Corresponds to `Attribute::TARGET_ALL`.
+    pub const TARGET_ALL: AttributeFlags =
+        AttributeFlags((1 << 0) | (1 << 1) | (1 << 2) | (1 << 3) | (1 << 4) | (1 << 5) | (1 << 6));
+
+    /// Flag indicating the attribute can be repeated on the same declaration.
+    /// Corresponds to `Attribute::IS_REPEATABLE`.
+    pub const IS_REPEATABLE: AttributeFlags = AttributeFlags(1 << 7);
+}
+
+impl AttributeFlags {
+    #[inline]
+    #[must_use]
+    pub const fn empty() -> Self {
+        AttributeFlags(0)
+    }
+
+    #[inline]
+    #[must_use]
+    pub const fn from_bits(bits: u8) -> Self {
+        AttributeFlags(bits)
+    }
+
+    #[inline]
+    pub const fn insert(&mut self, other: AttributeFlags) {
+        self.0 |= other.0;
+    }
+
+    #[inline]
+    pub const fn set(&mut self, other: AttributeFlags, value: bool) {
+        if value {
+            self.insert(other);
+        } else {
+            self.0 &= !other.0;
+        }
+    }
+
+    #[inline]
+    pub const fn contains(self, other: AttributeFlags) -> bool {
+        (self.0 & other.0) == other.0
+    }
+
+    #[inline]
+    pub const fn remove(&mut self, other: AttributeFlags) {
+        self.0 &= !other.0;
+    }
+
+    #[inline]
+    pub const fn intersects(self, other: AttributeFlags) -> bool {
+        (self.0 & other.0) != 0
+    }
+
+    #[inline]
+    #[must_use]
+    pub const fn union(&self, other: AttributeFlags) -> AttributeFlags {
+        AttributeFlags(self.0 | other.0)
+    }
+
+    #[inline]
+    #[must_use]
+    pub const fn intersection(&self, other: AttributeFlags) -> AttributeFlags {
+        AttributeFlags(self.0 & other.0)
+    }
+
+    #[inline]
+    pub const fn bits(self) -> u8 {
+        self.0
+    }
+
+    #[inline]
+    #[must_use]
+    pub const fn all() -> Self {
+        Self(Self::TARGET_ALL.0 | Self::IS_REPEATABLE.0)
     }
 }
 
@@ -141,5 +203,62 @@ impl AttributeFlags {
         }
 
         targets
+    }
+}
+
+impl std::ops::BitOr for AttributeFlags {
+    type Output = Self;
+
+    #[inline]
+    fn bitor(self, rhs: Self) -> Self::Output {
+        AttributeFlags(self.0 | rhs.0)
+    }
+}
+
+impl std::ops::BitAnd for AttributeFlags {
+    type Output = Self;
+
+    #[inline]
+    fn bitand(self, rhs: Self) -> Self::Output {
+        AttributeFlags(self.0 & rhs.0)
+    }
+}
+
+impl std::ops::BitXor for AttributeFlags {
+    type Output = Self;
+
+    #[inline]
+    fn bitxor(self, rhs: Self) -> Self::Output {
+        AttributeFlags(self.0 ^ rhs.0)
+    }
+}
+
+impl std::ops::Not for AttributeFlags {
+    type Output = Self;
+
+    #[inline]
+    fn not(self) -> Self::Output {
+        AttributeFlags(!self.0)
+    }
+}
+
+impl std::ops::BitOrAssign for AttributeFlags {
+    #[inline]
+    fn bitor_assign(&mut self, rhs: Self) {
+        self.0 |= rhs.0;
+    }
+}
+
+impl std::ops::BitAndAssign for AttributeFlags {
+    #[inline]
+    fn bitand_assign(&mut self, rhs: Self) {
+        self.0 &= rhs.0;
+    }
+}
+
+impl std::ops::BitXorAssign for AttributeFlags {
+    #[inline]
+    fn bitxor_assign(&mut self, rhs: Self) {
+        self.0 ^= rhs.0;
     }
 }

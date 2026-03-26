@@ -14,6 +14,9 @@ jobs:
     name: Run against downstream projects
     runs-on: ubuntu-latest
 
+    permissions:
+      contents: read
+
     steps:
       - name: Checkout Mago
         uses: actions/checkout@v4

@@ -1,4 +1,5 @@
-use ahash::RandomState;
+use foldhash::HashMap;
+use foldhash::fast::RandomState;
 use indexmap::IndexMap;
 
 use mago_atom::AtomMap;
@@ -14,6 +15,7 @@ use mago_codex::ttype::atomic::object::named::TNamedObject;
 use mago_codex::ttype::expander::StaticClassType;
 use mago_codex::ttype::get_never;
 use mago_codex::ttype::get_object;
+use mago_codex::ttype::template::GenericTemplate;
 use mago_codex::ttype::template::TemplateResult;
 use mago_codex::ttype::template::standin_type_replacer::get_most_specific_type_from_bounds;
 use mago_codex::ttype::union::TUnion;
@@ -272,7 +274,7 @@ fn analyze_class_instantiation<'ctx, 'arena>(
 
     let mut type_parameters = None;
 
-    let constructor_id = MethodIdentifier::new(atom(&metadata.original_name), atom("__construct"));
+    let constructor_id = MethodIdentifier::new(metadata.original_name, atom("__construct"));
     let constructor_declraing_id = context.codebase.get_declaring_method_identifier(&constructor_id);
 
     artifacts.symbol_references.add_reference_for_method_call(&block_context.scope, &constructor_id);
@@ -281,12 +283,10 @@ fn analyze_class_instantiation<'ctx, 'arena>(
         !metadata.flags.is_final() && metadata.name_span.is_some() && !metadata.flags.has_consistent_constructor();
     let mut constructor_span = None;
 
-    let mut template_result = TemplateResult::new(
-        IndexMap::with_hasher(RandomState::default()),
-        IndexMap::with_hasher(RandomState::default()),
-    );
+    let mut template_result = TemplateResult::new(IndexMap::with_hasher(RandomState::default()), HashMap::default());
 
     let is_spl_object_storage = classname_str.eq_ignore_ascii_case("splobjectstorage");
+
     if let Some(constructor) = context.codebase.get_method_by_id(&constructor_declraing_id) {
         has_inconsistent_constructor =
             has_inconsistent_constructor && !constructor.method_metadata.as_ref().is_some_and(|meta| meta.is_final);
@@ -297,8 +297,8 @@ fn analyze_class_instantiation<'ctx, 'arena>(
         let constructor_call = Invocation {
             target: InvocationTarget::FunctionLike {
                 identifier: FunctionLikeIdentifier::Method(
-                    *constructor_declraing_id.get_class_name(),
-                    *constructor_declraing_id.get_method_name(),
+                    constructor_declraing_id.get_class_name(),
+                    constructor_declraing_id.get_method_name(),
                 ),
                 metadata: constructor,
                 inferred_return_type: None,
@@ -341,8 +341,8 @@ fn analyze_class_instantiation<'ctx, 'arena>(
         if !check_method_visibility(
             context,
             block_context,
-            constructor_declraing_id.get_class_name(),
-            constructor_declraing_id.get_method_name(),
+            &constructor_declraing_id.get_class_name(),
+            &constructor_declraing_id.get_method_name(),
             instantiation_span,
             None,
         ) {
@@ -350,9 +350,9 @@ fn analyze_class_instantiation<'ctx, 'arena>(
         }
 
         let mut resolved_template_types = vec![];
-        for (template_name, base_type) in &metadata.template_types {
+        for (template_name, _) in &metadata.template_types {
             let template_type = if let Some(lower_bounds) =
-                template_result.get_lower_bounds_for_class_like(template_name, &metadata.name)
+                template_result.get_lower_bounds_for_class_like(*template_name, metadata.name)
             {
                 get_most_specific_type_from_bounds(lower_bounds, context.codebase)
             } else if !metadata.template_extended_parameters.is_empty() && !template_result.lower_bounds.is_empty() {
@@ -365,7 +365,7 @@ fn analyze_class_instantiation<'ctx, 'arena>(
                             lower_bounds_map
                                 .iter()
                                 .map(|(generic_parent, lower_bounds)| {
-                                    (
+                                    GenericTemplate::new(
                                         *generic_parent,
                                         get_most_specific_type_from_bounds(lower_bounds, context.codebase),
                                     )
@@ -384,7 +384,7 @@ fn analyze_class_instantiation<'ctx, 'arena>(
             } else if is_spl_object_storage {
                 get_never()
             } else {
-                base_type.first().map(|(_, constraint)| constraint).cloned().unwrap_or_else(get_never)
+                wrap_atomic(TAtomic::Placeholder)
             };
 
             resolved_template_types.push(template_type);
@@ -415,13 +415,7 @@ fn analyze_class_instantiation<'ctx, 'arena>(
             metadata
                 .template_types
                 .iter()
-                .map(|(_, map)| {
-                    if is_spl_object_storage {
-                        get_never()
-                    } else {
-                        map.iter().next().map(|(_, i)| i).cloned().unwrap_or_else(get_never)
-                    }
-                })
+                .map(|(_, _)| if is_spl_object_storage { get_never() } else { wrap_atomic(TAtomic::Placeholder) })
                 .collect(),
         );
     }
@@ -470,7 +464,7 @@ fn analyze_class_instantiation<'ctx, 'arena>(
         for descendant_class in descendants {
             artifacts.symbol_references.add_reference_to_overridden_class_member(
                 &block_context.scope,
-                (descendant_class, *constructor_id.get_method_name()),
+                (descendant_class, constructor_id.get_method_name()),
             );
         }
     }
@@ -482,12 +476,97 @@ fn analyze_class_instantiation<'ctx, 'arena>(
     let result_type = wrap_atomic(TAtomic::Object(TObject::Named(TNamedObject {
         name: metadata.original_name,
         type_parameters,
-        is_this: classname.is_static() || (classname.is_self() && metadata.flags.is_final()),
+        is_static: classname.is_static() || (classname.is_self() && metadata.flags.is_final()),
+        is_this: false,
         intersection_types: None,
         remapped_parameters: false,
     })));
 
     Ok(result_type)
+}
+
+/// Analyzes the constructor invocation for an anonymous class.
+///
+/// This function validates that the arguments passed to an anonymous class instantiation
+/// match the constructor signature, similar to how regular class instantiation is validated.
+pub fn analyze_anonymous_class_constructor<'ctx, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    block_context: &mut BlockContext<'ctx>,
+    artifacts: &mut AnalysisArtifacts,
+    class_like_metadata: &'ctx mago_codex::metadata::class_like::ClassLikeMetadata,
+    argument_list: Option<&mago_syntax::ast::ArgumentList<'arena>>,
+    instantiation_span: Span,
+) -> Result<(), AnalysisError> {
+    let classlike_name = class_like_metadata.name;
+
+    let constructor_id = MethodIdentifier::new(classlike_name, atom("__construct"));
+    let constructor_declaring_id = context.codebase.get_declaring_method_identifier(&constructor_id);
+
+    artifacts.symbol_references.add_reference_for_method_call(&block_context.scope, &constructor_id);
+
+    if let Some(constructor) = context.codebase.get_method_by_id(&constructor_declaring_id) {
+        artifacts.symbol_references.add_reference_for_method_call(&block_context.scope, &constructor_declaring_id);
+
+        let constructor_call = Invocation {
+            target: InvocationTarget::FunctionLike {
+                identifier: FunctionLikeIdentifier::Method(
+                    constructor_declaring_id.get_class_name(),
+                    constructor_declaring_id.get_method_name(),
+                ),
+                metadata: constructor,
+                inferred_return_type: None,
+                method_context: Some(MethodTargetContext {
+                    declaring_method_id: Some(constructor_declaring_id),
+                    class_like_metadata,
+                    class_type: StaticClassType::None,
+                }),
+                span: instantiation_span,
+            },
+            arguments_source: match argument_list {
+                Some(arg_list) => InvocationArgumentsSource::ArgumentList(arg_list),
+                None => InvocationArgumentsSource::None(instantiation_span),
+            },
+            span: instantiation_span,
+        };
+
+        let mut template_result =
+            TemplateResult::new(IndexMap::with_hasher(RandomState::default()), HashMap::default());
+        let mut argument_types = AtomMap::default();
+
+        analyze_invocation(
+            context,
+            block_context,
+            artifacts,
+            &constructor_call,
+            Some((class_like_metadata.name, None)),
+            &mut template_result,
+            &mut argument_types,
+        )?;
+
+        post_invocation_process(
+            context,
+            block_context,
+            artifacts,
+            &constructor_call,
+            None,
+            &template_result,
+            &argument_types,
+            true,
+        )?;
+    } else if let Some(argument_list) = argument_list
+        && !argument_list.arguments.is_empty()
+    {
+        context.collector.report_with_code(
+            IssueCode::TooManyArguments,
+            Issue::error("Anonymous class has no `__construct` method, but arguments were provided.")
+                .with_annotation(Annotation::primary(argument_list.span()).with_message("Arguments provided here"))
+                .with_help("Remove the arguments, or define a `__construct` method in the anonymous class."),
+        );
+
+        argument_list.analyze(context, block_context, artifacts)?;
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -856,6 +935,9 @@ mod tests {
                 public function __construct(array $elements = []) {
                     $this->elements = $elements;
                 }
+
+                /** @return array<Tk, Tv> */
+                public function getElements(): array { return $this->elements; }
 
                 /**
                  * @return static

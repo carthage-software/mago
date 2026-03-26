@@ -4,6 +4,7 @@ use mago_span::HasSpan;
 use mago_syntax::ast::FunctionLikeParameter;
 use mago_syntax::ast::FunctionLikeParameterList;
 
+use crate::document::BreakMode;
 use crate::document::Document;
 use crate::document::Group;
 use crate::document::IfBreak;
@@ -28,16 +29,36 @@ pub(super) fn print_function_like_parameters<'arena>(
         return Document::Array(contents);
     }
 
-    let should_break = should_break_parameters(f, parameter_list);
+    let mut force_break = force_break_parameters(f, parameter_list);
+    let preserve_break = preserve_break_parameters(f, parameter_list);
+    let should_break = force_break || preserve_break;
 
-    let previous_break = f.parameter_state.force_break;
-    if should_break {
-        f.parameter_state.force_break = true;
-    }
+    let list_id = f.next_id();
+    let previous_list_group_id = f.parameter_state.list_group_id;
+    f.parameter_state.list_group_id = Some(list_id);
 
     let should_hug_the_parameters = !should_break && should_hug_the_only_parameter(f, parameter_list);
 
-    let mut parts = vec![in f.arena; Document::String("(")];
+    let left_parenthesis = {
+        let mut contents = vec![in f.arena; Document::String("(")];
+
+        if let Some(trailing_comment) = f.print_trailing_comments(parameter_list.left_parenthesis) {
+            contents.push(trailing_comment);
+            force_break = true;
+        }
+
+        if let Some(parameter) = parameter_list.parameters.first()
+            && let Some(trailing_comments) =
+                f.print_dangling_comments_between_nodes(parameter_list.left_parenthesis, parameter.span())
+        {
+            contents.push(trailing_comments);
+            force_break = true;
+        }
+
+        Document::Array(contents)
+    };
+
+    let mut parts = vec![in f.arena; left_parenthesis];
 
     let mut printed = vec![in f.arena; ];
     let len = parameter_list.parameters.len();
@@ -83,32 +104,36 @@ pub(super) fn print_function_like_parameters<'arena>(
 
     parts.push(Document::String(")"));
 
-    f.parameter_state.force_break = previous_break;
+    f.parameter_state.list_group_id = previous_list_group_id;
 
-    Document::Group(Group::new(parts).with_break(should_break))
+    Document::Group(Group::new(parts).with_id(list_id).with_break_mode(if force_break {
+        BreakMode::Force
+    } else if preserve_break {
+        BreakMode::Preserve
+    } else {
+        BreakMode::Auto
+    }))
 }
 
-pub(super) fn should_break_parameters<'arena>(
+pub(super) fn force_break_parameters<'arena>(
     f: &FormatterState<'_, 'arena>,
     parameter_list: &'arena FunctionLikeParameterList<'arena>,
 ) -> bool {
-    if f.settings.break_promoted_properties_list
+    f.settings.break_promoted_properties_list
         && parameter_list.parameters.iter().any(FunctionLikeParameter::is_promoted_property)
-    {
-        return true;
-    }
+}
 
-    if f.settings.preserve_breaking_parameter_list
+pub(super) fn preserve_break_parameters<'arena>(
+    f: &FormatterState<'_, 'arena>,
+    parameter_list: &'arena FunctionLikeParameterList<'arena>,
+) -> bool {
+    f.settings.preserve_breaking_parameter_list
+        && !parameter_list.parameters.is_empty()
         && misc::has_new_line_in_range(
             f.source_text,
             parameter_list.left_parenthesis.start.offset,
             parameter_list.parameters.as_slice()[0].span().start.offset,
         )
-    {
-        return true;
-    }
-
-    false
 }
 
 pub(super) fn should_hug_the_only_parameter<'arena>(

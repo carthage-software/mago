@@ -13,6 +13,8 @@ use mago_syntax::ast::Expression;
 use mago_syntax::ast::Literal;
 use mago_syntax::ast::Node;
 use mago_syntax::ast::NodeKind;
+use mago_text_edit::TextEdit;
+use mago_text_edit::TextRange;
 
 use crate::category::Category;
 use crate::context::LintContext;
@@ -119,7 +121,9 @@ impl LintRule for NoRedundantStringConcatRule {
                 ])
                 .with_help("Consider combining these strings into a single string.");
 
-            ctx.collector.report(issue);
+            ctx.collector.propose(issue, |edits| {
+                edits.push(TextEdit::delete(TextRange::new(left.end_offset() - 1, right.start_offset() + 1)));
+            });
         }
     }
 }

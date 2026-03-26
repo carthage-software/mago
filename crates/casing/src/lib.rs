@@ -76,11 +76,7 @@ pub fn to_class_case(non_class_case_string: &str) -> String {
     // character at the beginning of the string
     let mut characters = non_class_case_string.chars();
     let mut prefix_length = 0;
-    loop {
-        let Some(character) = characters.next() else {
-            break;
-        };
-
+    while let Some(character) = characters.next() {
         if character.is_uppercase() {
             prefix_length += 1;
             continue;
@@ -94,11 +90,7 @@ pub fn to_class_case(non_class_case_string: &str) -> String {
         if character.is_lowercase() && prefix_length > 0 {
             prefix_length += 1;
 
-            loop {
-                let Some(character) = characters.next() else {
-                    break;
-                };
-
+            for character in characters.by_ref() {
                 if character.is_lowercase() || character.is_numeric() {
                     prefix_length += 1;
                 } else {

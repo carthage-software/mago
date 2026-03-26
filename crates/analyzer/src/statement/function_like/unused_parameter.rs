@@ -106,7 +106,7 @@ fn report_parameter<'arena>(
 }
 
 pub mod utils {
-    use ahash::HashSet;
+    use foldhash::HashSet;
     use mago_syntax::ast::Expression;
     use mago_syntax::ast::Statement;
     use mago_syntax::walker::Walker;

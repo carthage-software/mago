@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -8,7 +10,7 @@ use crate::ttype::union::TUnion;
 pub struct TCallableParameter {
     /// The type hint for the parameter, if specified within the callable signature.
     /// `None` if no specific type is given (equivalent to `mixed`).
-    type_signature: Option<Box<TUnion>>,
+    type_signature: Option<Arc<TUnion>>,
     /// `true` if the parameter expects an argument passed by reference (signified by `&`).
     is_by_reference: bool,
     /// `true` if this parameter is variadic (`...`).
@@ -28,8 +30,8 @@ impl TCallableParameter {
     /// * `has_default`: Whether the parameter is optional (`=`).
     #[inline]
     #[must_use]
-    pub const fn new(
-        type_signature: Option<Box<TUnion>>,
+    pub fn new(
+        type_signature: Option<Arc<TUnion>>,
         is_by_reference: bool,
         is_variadic: bool,
         has_default: bool,
@@ -46,7 +48,7 @@ impl TCallableParameter {
 
     /// Returns a mutable reference to the parameter's type signature (`TUnion`), if specified.
     pub fn get_type_signature_mut(&mut self) -> Option<&mut TUnion> {
-        self.type_signature.as_deref_mut()
+        self.type_signature.as_mut().map(Arc::make_mut)
     }
 
     /// Checks if the parameter expects an argument passed by reference (`&`).

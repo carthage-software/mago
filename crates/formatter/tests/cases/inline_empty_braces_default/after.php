@@ -3,9 +3,7 @@
 if ($condition) {
 }
 
-function empty_function()
-{
-}
+function empty_function() {}
 
 $closure = function () {};
 
@@ -21,9 +19,7 @@ class Example
 {
     public function __construct() {}
 
-    public function emptyMethod()
-    {
-    }
+    public function emptyMethod() {}
 }
 
 $anon = new class {};

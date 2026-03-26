@@ -48,11 +48,11 @@ pub fn analyze_comparison_operation<'ctx, 'arena>(
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
 ) -> Result<(), AnalysisError> {
-    let was_inside_general_use = block_context.inside_general_use;
-    block_context.inside_general_use = true;
+    let was_inside_general_use = block_context.flags.inside_general_use();
+    block_context.flags.set_inside_general_use(true);
     binary.lhs.analyze(context, block_context, artifacts)?;
     binary.rhs.analyze(context, block_context, artifacts)?;
-    block_context.inside_general_use = was_inside_general_use;
+    block_context.flags.set_inside_general_use(was_inside_general_use);
 
     let fallback_type = Rc::new(get_mixed());
     let lhs_type = artifacts.get_rc_expression_type(&binary.lhs).unwrap_or(&fallback_type);
@@ -161,13 +161,13 @@ pub fn analyze_comparison_operation<'ctx, 'arena>(
         match binary.operator {
             BinaryOperator::LessThan(_) => {
                 if is_always_less_than(lhs_type, rhs_type) {
-                    if !block_context.inside_loop_expressions {
+                    if !block_context.flags.inside_loop_expressions() {
                         report_redundant_comparison(context, artifacts, binary, "always less than", "`true`");
                     }
 
                     get_true()
                 } else if is_always_greater_than_or_equal(lhs_type, rhs_type) {
-                    if !block_context.inside_loop_expressions {
+                    if !block_context.flags.inside_loop_expressions() {
                         report_redundant_comparison(context, artifacts, binary, "never less than", "`false`");
                     }
 
@@ -178,7 +178,7 @@ pub fn analyze_comparison_operation<'ctx, 'arena>(
             }
             BinaryOperator::LessThanOrEqual(_) => {
                 if is_always_less_than_or_equal(lhs_type, rhs_type) {
-                    if !block_context.inside_loop_expressions {
+                    if !block_context.flags.inside_loop_expressions() {
                         report_redundant_comparison(
                             context,
                             artifacts,
@@ -190,7 +190,7 @@ pub fn analyze_comparison_operation<'ctx, 'arena>(
 
                     get_true()
                 } else if is_always_greater_than(lhs_type, rhs_type) {
-                    if !block_context.inside_loop_expressions {
+                    if !block_context.flags.inside_loop_expressions() {
                         report_redundant_comparison(
                             context,
                             artifacts,
@@ -207,13 +207,13 @@ pub fn analyze_comparison_operation<'ctx, 'arena>(
             }
             BinaryOperator::GreaterThan(_) => {
                 if is_always_greater_than(lhs_type, rhs_type) {
-                    if !block_context.inside_loop_expressions {
+                    if !block_context.flags.inside_loop_expressions() {
                         report_redundant_comparison(context, artifacts, binary, "always greater than", "`true`");
                     }
 
                     get_true()
                 } else if is_always_less_than_or_equal(lhs_type, rhs_type) {
-                    if !block_context.inside_loop_expressions {
+                    if !block_context.flags.inside_loop_expressions() {
                         report_redundant_comparison(context, artifacts, binary, "never greater than", "`false`");
                     }
 
@@ -224,7 +224,7 @@ pub fn analyze_comparison_operation<'ctx, 'arena>(
             }
             BinaryOperator::GreaterThanOrEqual(_) => {
                 if is_always_greater_than_or_equal(lhs_type, rhs_type) {
-                    if !block_context.inside_loop_expressions {
+                    if !block_context.flags.inside_loop_expressions() {
                         report_redundant_comparison(
                             context,
                             artifacts,
@@ -236,7 +236,7 @@ pub fn analyze_comparison_operation<'ctx, 'arena>(
 
                     get_true()
                 } else if is_always_less_than(lhs_type, rhs_type) {
-                    if !block_context.inside_loop_expressions {
+                    if !block_context.flags.inside_loop_expressions() {
                         report_redundant_comparison(
                             context,
                             artifacts,
@@ -256,7 +256,7 @@ pub fn analyze_comparison_operation<'ctx, 'arena>(
                     || involves_static_variable(binary.rhs, block_context);
 
                 if is_always_identical_to(lhs_type, rhs_type) {
-                    if !block_context.inside_loop_expressions && !involves_static {
+                    if !block_context.flags.inside_loop_expressions() && !involves_static {
                         let (message_verb, result_value_str) = if matches!(binary.operator, BinaryOperator::Equal(_)) {
                             ("always equal to", "`true`")
                         } else {
@@ -282,7 +282,7 @@ pub fn analyze_comparison_operation<'ctx, 'arena>(
                     || involves_static_variable(binary.rhs, block_context);
 
                 if is_always_identical_to(lhs_type, rhs_type) {
-                    if !block_context.inside_loop_expressions && !involves_static {
+                    if !block_context.flags.inside_loop_expressions() && !involves_static {
                         report_redundant_comparison(
                             context,
                             artifacts,
@@ -298,31 +298,33 @@ pub fn analyze_comparison_operation<'ctx, 'arena>(
                 }
             }
             BinaryOperator::Identical(_) => {
+                let inside_loop = block_context.flags.inside_loop();
                 let involves_static = involves_static_variable(binary.lhs, block_context)
                     || involves_static_variable(binary.rhs, block_context);
 
                 if is_always_identical_to(lhs_type, rhs_type) {
-                    if !block_context.inside_loop_expressions && !involves_static {
+                    if !block_context.flags.inside_loop_expressions() && !inside_loop && !involves_static {
                         report_redundant_comparison(context, artifacts, binary, "always identical to", "`true`");
                     }
 
-                    if involves_static { get_bool() } else { get_true() }
+                    if involves_static || inside_loop { get_bool() } else { get_true() }
                 } else if are_definitely_not_identical(context.codebase, lhs_type, rhs_type, false) {
-                    if !block_context.inside_loop_expressions && !involves_static {
+                    if !block_context.flags.inside_loop_expressions() && !inside_loop && !involves_static {
                         report_redundant_comparison(context, artifacts, binary, "never identical to", "`false`");
                     }
 
-                    if involves_static { get_bool() } else { get_false() }
+                    if involves_static || inside_loop { get_bool() } else { get_false() }
                 } else {
                     get_bool()
                 }
             }
             BinaryOperator::NotIdentical(_) => {
+                let inside_loop = block_context.flags.inside_loop();
                 let involves_static = involves_static_variable(binary.lhs, block_context)
                     || involves_static_variable(binary.rhs, block_context);
 
                 if is_always_identical_to(lhs_type, rhs_type) {
-                    if !block_context.inside_loop_expressions && !involves_static {
+                    if !block_context.flags.inside_loop_expressions() && !inside_loop && !involves_static {
                         report_redundant_comparison(
                             context,
                             artifacts,
@@ -332,12 +334,13 @@ pub fn analyze_comparison_operation<'ctx, 'arena>(
                         );
                     }
 
-                    if involves_static { get_bool() } else { get_false() }
+                    if involves_static || inside_loop { get_bool() } else { get_false() }
                 } else if are_definitely_not_identical(context.codebase, lhs_type, rhs_type, false) {
-                    if !block_context.inside_loop_expressions && !involves_static {
+                    if !block_context.flags.inside_loop_expressions() && !inside_loop && !involves_static {
                         report_redundant_comparison(context, artifacts, binary, "always not identical to", "`true`");
                     }
-                    if involves_static { get_bool() } else { get_true() }
+
+                    if involves_static || inside_loop { get_bool() } else { get_true() }
                 } else {
                     get_bool()
                 }
@@ -390,7 +393,7 @@ fn check_comparison_operand<'ast, 'arena>(
             .with_note(format!("Comparing `null` with `{op_str}` can lead to unexpected results due to PHP's type coercion rules (e.g., `null == 0` is true)."))
             .with_help("Ensure this operand is non-null and has a comparable type. Explicitly check for `null` if it's an expected state."),
         );
-    } else if operand_type.is_nullable() && !operand_type.is_mixed() {
+    } else if operand_type.can_be_null() && !operand_type.is_mixed() {
         context.collector.report_with_code(
             IssueCode::PossiblyNullOperand,
             Issue::warning(format!(

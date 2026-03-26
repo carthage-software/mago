@@ -22,6 +22,4 @@
  *
  * @param string $f
  */
-function foo(string $f): void
-{
-}
+function foo(string $f): void {}

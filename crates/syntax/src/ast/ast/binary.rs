@@ -12,7 +12,6 @@ use crate::token::Precedence;
 /// Represents a PHP binary operator.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
-#[repr(u8)]
 pub enum BinaryOperator<'arena> {
     Addition(Span),              // `+`
     Subtraction(Span),           // `-`
@@ -320,6 +319,22 @@ impl HasSpan for BinaryOperator<'_> {
 
 impl HasSpan for Binary<'_> {
     fn span(&self) -> Span {
-        self.lhs.span().join(self.rhs.span())
+        fn left_edge_span(mut expression: &Expression<'_>) -> Span {
+            while let Expression::Binary(binary) = expression {
+                expression = binary.lhs;
+            }
+
+            expression.span()
+        }
+
+        fn right_edge_span(mut expression: &Expression<'_>) -> Span {
+            while let Expression::Binary(binary) = expression {
+                expression = binary.rhs;
+            }
+
+            expression.span()
+        }
+
+        left_edge_span(self.lhs).join(right_edge_span(self.rhs))
     }
 }

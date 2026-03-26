@@ -5,7 +5,6 @@ use serde::Serialize;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_reporting::Level;
-use mago_span::HasSpan;
 use mago_syntax::ast::Node;
 use mago_syntax::ast::NodeKind;
 
@@ -14,6 +13,7 @@ use crate::context::LintContext;
 use crate::requirements::RuleRequirements;
 use crate::rule::Config;
 use crate::rule::LintRule;
+use crate::rule::utils::misc::get_class_like_header_span;
 use crate::rule_meta::RuleMeta;
 use crate::settings::RuleSettings;
 
@@ -202,7 +202,7 @@ impl LintRule for KanDefectRule {
             ctx.collector.report(
                 Issue::new(self.cfg.level, format!("{kind} has a high kan defect score ({kan_defect})."))
                     .with_code(self.meta.code)
-                    .with_annotation(Annotation::primary(node.span()).with_message(format!(
+                    .with_annotation(Annotation::primary(get_class_like_header_span(node)).with_message(format!(
                         "{kind} has a kan defect score of {kan_defect}, which exceeds the threshold of {threshold}.",
                     )))
                     .with_note("Kan defect is a heuristic used by phpmetrics to estimate defect-proneness based on control-flow statements.")

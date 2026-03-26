@@ -14,7 +14,7 @@ final class Iterator
     /**
      * @var null|Generator<Tk, Tv, mixed, mixed>
      */
-    public null|Generator $generator;
+    public ?Generator $generator;
 
     /**
      * @var array<int, array{0: Tk, 1: Tv}>
@@ -36,7 +36,7 @@ final class Iterator
      *
      * @var null|int<0, max>
      */
-    public null|int $count = null;
+    public ?int $count = null;
 
     /**
      * @param Generator<Tk, Tv, mixed, mixed> $generator

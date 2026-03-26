@@ -8,9 +8,7 @@ class XXTEA
      *
      * @return string
      */
-    public static function encrypt($data, $key)
-    {
-    }
+    public static function encrypt($data, $key) {}
 
     /**
      * @param string $data
@@ -18,15 +16,9 @@ class XXTEA
      *
      * @return string|false
      */
-    public static function decrypt($data, $key)
-    {
-    }
+    public static function decrypt($data, $key) {}
 }
 
-function xxtea_encrypt(string $data, string $key): string
-{
-}
+function xxtea_encrypt(string $data, string $key): string {}
 
-function xxtea_decrypt(string $data, string $key): string|false
-{
-}
+function xxtea_decrypt(string $data, string $key): string|false {}

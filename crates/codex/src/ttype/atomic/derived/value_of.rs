@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use mago_atom::Atom;
 use mago_atom::atom;
 use mago_atom::concat_atom;
@@ -15,23 +17,23 @@ use crate::ttype::get_array_parameters;
 use crate::ttype::union::TUnion;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Eq, Hash, PartialOrd, Ord)]
-pub struct TValueOf(Box<TUnion>);
+pub struct TValueOf(Arc<TUnion>);
 
 impl TValueOf {
     #[must_use]
-    pub fn new(object: Box<TUnion>) -> Self {
+    pub fn new(object: Arc<TUnion>) -> Self {
         Self(object)
     }
 
     #[inline]
     #[must_use]
-    pub const fn get_target_type(&self) -> &TUnion {
+    pub fn get_target_type(&self) -> &TUnion {
         &self.0
     }
 
     #[inline]
-    pub const fn get_target_type_mut(&mut self) -> &mut TUnion {
-        &mut self.0
+    pub fn get_target_type_mut(&mut self) -> &mut TUnion {
+        Arc::make_mut(&mut self.0)
     }
 
     #[inline]
@@ -71,12 +73,12 @@ impl TValueOf {
                         continue;
                     };
 
-                    let Some(class_like_metadata) = codebase.get_class_like(name) else {
+                    let Some(class_like_metadata) = codebase.get_class_like(&name) else {
                         continue;
                     };
 
                     if class_like_metadata.kind.is_enum() {
-                        for (_, case_metadata) in &class_like_metadata.enum_cases {
+                        for case_metadata in class_like_metadata.enum_cases.values() {
                             if let Some(case_value_type) = case_metadata.value_type.as_ref() {
                                 value_types.push(case_value_type.clone());
                             }
@@ -96,12 +98,15 @@ impl TValueOf {
                         continue;
                     }
 
-                    if codebase.is_instance_of(&class_like_metadata.name, &atom("stringbackedenum")) {
+                    if codebase
+                        .is_instance_of(&class_like_metadata.name, &atom("__internal_do_not_use__stringbackedenum"))
+                    {
                         value_types.push(TAtomic::Scalar(TScalar::string()));
                         continue;
                     }
 
-                    if codebase.is_instance_of(&class_like_metadata.name, &atom("intbackedenum")) {
+                    if codebase.is_instance_of(&class_like_metadata.name, &atom("__internal_do_not_use__intbackedenum"))
+                    {
                         value_types.push(TAtomic::Scalar(TScalar::int()));
                         continue;
                     }

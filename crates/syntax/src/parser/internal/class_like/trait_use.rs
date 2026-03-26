@@ -11,145 +11,135 @@ use crate::ast::ast::TraitUseSpecification;
 use crate::ast::sequence::Sequence;
 use crate::ast::sequence::TokenSeparatedSequence;
 use crate::error::ParseError;
-use crate::parser::internal::identifier::parse_identifier;
-use crate::parser::internal::identifier::parse_local_identifier;
-use crate::parser::internal::modifier::parse_optional_read_visibility_modifier;
-use crate::parser::internal::terminator::parse_terminator;
-use crate::parser::internal::token_stream::TokenStream;
-use crate::parser::internal::utils;
+use crate::parser::Parser;
 
-pub fn parse_trait_use<'arena>(stream: &mut TokenStream<'_, 'arena>) -> Result<TraitUse<'arena>, ParseError> {
-    Ok(TraitUse {
-        r#use: utils::expect_keyword(stream, T!["use"])?,
-        trait_names: {
-            let mut traits = stream.new_vec();
-            let mut commas = stream.new_vec();
-            loop {
-                let next = utils::peek(stream)?;
-                if matches!(next.kind, T!["{" | ";" | "?>"]) {
-                    break;
-                }
-
-                traits.push(parse_identifier(stream)?);
-
-                match utils::peek(stream)?.kind {
-                    T![","] => {
-                        commas.push(utils::expect_any(stream)?);
-                    }
-                    _ => {
-                        break;
-                    }
-                }
-            }
-
-            TokenSeparatedSequence::new(traits, commas)
-        },
-        specification: parse_trait_use_specification(stream)?,
-    })
-}
-
-pub fn parse_trait_use_specification<'arena>(
-    stream: &mut TokenStream<'_, 'arena>,
-) -> Result<TraitUseSpecification<'arena>, ParseError> {
-    let next = utils::peek(stream)?;
-    Ok(match next.kind {
-        T![";" | "?>"] => TraitUseSpecification::Abstract(TraitUseAbstractSpecification(parse_terminator(stream)?)),
-        _ => TraitUseSpecification::Concrete(TraitUseConcreteSpecification {
-            left_brace: utils::expect_span(stream, T!["{"])?,
-            adaptations: {
-                let mut adaptations = stream.new_vec();
+impl<'input, 'arena> Parser<'input, 'arena> {
+    pub(crate) fn parse_trait_use(&mut self) -> Result<TraitUse<'arena>, ParseError> {
+        Ok(TraitUse {
+            r#use: self.expect_keyword(T!["use"])?,
+            trait_names: {
+                let mut traits = self.new_vec();
+                let mut commas = self.new_vec();
                 loop {
-                    let next = utils::peek(stream)?;
-                    if next.kind == T!["}"] {
+                    let next = self.stream.lookahead(0)?.ok_or_else(|| self.stream.unexpected(None, &[]))?;
+                    if matches!(next.kind, T!["{" | ";" | "?>"]) {
                         break;
                     }
 
-                    adaptations.push(parse_trait_use_adaptation(stream)?);
+                    traits.push(self.parse_identifier()?);
+
+                    match self.stream.peek_kind(0)? {
+                        Some(T![","]) => {
+                            commas.push(self.stream.consume()?);
+                        }
+                        _ => {
+                            break;
+                        }
+                    }
                 }
-                Sequence::new(adaptations)
+
+                TokenSeparatedSequence::new(traits, commas)
             },
-            right_brace: utils::expect_span(stream, T!["}"])?,
-        }),
-    })
-}
+            specification: self.parse_trait_use_specification()?,
+        })
+    }
 
-pub fn parse_trait_use_adaptation<'arena>(
-    stream: &mut TokenStream<'_, 'arena>,
-) -> Result<TraitUseAdaptation<'arena>, ParseError> {
-    Ok(match parse_trait_use_method_reference(stream)? {
-        TraitUseMethodReference::Absolute(reference) => {
-            let next = utils::peek(stream)?;
-            match next.kind {
-                T!["as"] => TraitUseAdaptation::Alias(TraitUseAliasAdaptation {
-                    method_reference: TraitUseMethodReference::Absolute(reference),
-                    r#as: utils::expect_keyword(stream, T!["as"])?,
-                    visibility: parse_optional_read_visibility_modifier(stream)?,
-                    alias: match utils::maybe_peek(stream)?.map(|t| t.kind) {
-                        Some(T![";" | "?>"]) => None,
-                        _ => Some(parse_local_identifier(stream)?),
-                    },
-                    terminator: parse_terminator(stream)?,
-                }),
-                T!["insteadof"] => TraitUseAdaptation::Precedence(TraitUsePrecedenceAdaptation {
-                    method_reference: reference,
-                    insteadof: utils::expect_any_keyword(stream)?,
-                    trait_names: {
-                        let mut items = stream.new_vec();
-                        let mut commas = stream.new_vec();
-                        loop {
-                            if matches!(utils::peek(stream)?.kind, T![";" | "?>"]) {
-                                break;
-                            }
-
-                            items.push(parse_identifier(stream)?);
-
-                            match utils::peek(stream)?.kind {
-                                T![","] => {
-                                    commas.push(utils::expect_any(stream)?);
-                                }
-                                _ => {
-                                    break;
-                                }
-                            }
+    fn parse_trait_use_specification(&mut self) -> Result<TraitUseSpecification<'arena>, ParseError> {
+        let next = self.stream.lookahead(0)?.ok_or_else(|| self.stream.unexpected(None, &[]))?;
+        Ok(match next.kind {
+            T![";" | "?>"] => TraitUseSpecification::Abstract(TraitUseAbstractSpecification(self.parse_terminator()?)),
+            _ => TraitUseSpecification::Concrete(TraitUseConcreteSpecification {
+                left_brace: self.stream.eat_span(T!["{"])?,
+                adaptations: {
+                    let mut adaptations = self.new_vec();
+                    loop {
+                        if matches!(self.stream.peek_kind(0)?, Some(T!["}"])) {
+                            break;
                         }
 
-                        TokenSeparatedSequence::new(items, commas)
-                    },
-                    terminator: parse_terminator(stream)?,
-                }),
-                _ => return Err(utils::unexpected(stream, Some(next), T!["as", "insteadof"])),
-            }
-        }
-        method_reference @ TraitUseMethodReference::Identifier(_) => {
-            TraitUseAdaptation::Alias(TraitUseAliasAdaptation {
-                method_reference,
-                r#as: utils::expect_keyword(stream, T!["as"])?,
-                visibility: parse_optional_read_visibility_modifier(stream)?,
-                alias: match utils::maybe_peek(stream)?.map(|t| t.kind) {
-                    Some(T![";" | "?>"]) => None,
-                    _ => Some(parse_local_identifier(stream)?),
+                        adaptations.push(self.parse_trait_use_adaptation()?);
+                    }
+                    Sequence::new(adaptations)
                 },
-                terminator: parse_terminator(stream)?,
-            })
-        }
-    })
-}
+                right_brace: self.stream.eat_span(T!["}"])?,
+            }),
+        })
+    }
 
-pub fn parse_trait_use_method_reference<'arena>(
-    stream: &mut TokenStream<'_, 'arena>,
-) -> Result<TraitUseMethodReference<'arena>, ParseError> {
-    Ok(match utils::maybe_peek_nth(stream, 1)?.map(|t| t.kind) {
-        Some(T!["::"]) => TraitUseMethodReference::Absolute(parse_trait_use_absolute_method_reference(stream)?),
-        _ => TraitUseMethodReference::Identifier(parse_local_identifier(stream)?),
-    })
-}
+    fn parse_trait_use_adaptation(&mut self) -> Result<TraitUseAdaptation<'arena>, ParseError> {
+        Ok(match self.parse_trait_use_method_reference()? {
+            TraitUseMethodReference::Absolute(reference) => {
+                let next = self.stream.lookahead(0)?.ok_or_else(|| self.stream.unexpected(None, &[]))?;
+                match next.kind {
+                    T!["as"] => TraitUseAdaptation::Alias(TraitUseAliasAdaptation {
+                        method_reference: TraitUseMethodReference::Absolute(reference),
+                        r#as: self.expect_keyword(T!["as"])?,
+                        visibility: self.parse_optional_read_visibility_modifier()?,
+                        alias: match self.stream.peek_kind(0)? {
+                            Some(T![";" | "?>"]) => None,
+                            _ => Some(self.parse_local_identifier()?),
+                        },
+                        terminator: self.parse_terminator()?,
+                    }),
+                    T!["insteadof"] => TraitUseAdaptation::Precedence(TraitUsePrecedenceAdaptation {
+                        method_reference: reference,
+                        insteadof: self.expect_any_keyword()?,
+                        trait_names: {
+                            let mut items = self.new_vec();
+                            let mut commas = self.new_vec();
+                            loop {
+                                if matches!(self.stream.peek_kind(0)?, Some(T![";" | "?>"])) {
+                                    break;
+                                }
 
-pub fn parse_trait_use_absolute_method_reference<'arena>(
-    stream: &mut TokenStream<'_, 'arena>,
-) -> Result<TraitUseAbsoluteMethodReference<'arena>, ParseError> {
-    Ok(TraitUseAbsoluteMethodReference {
-        trait_name: parse_identifier(stream)?,
-        double_colon: utils::expect_span(stream, T!["::"])?,
-        method_name: parse_local_identifier(stream)?,
-    })
+                                items.push(self.parse_identifier()?);
+
+                                match self.stream.peek_kind(0)? {
+                                    Some(T![","]) => {
+                                        commas.push(self.stream.consume()?);
+                                    }
+                                    _ => {
+                                        break;
+                                    }
+                                }
+                            }
+
+                            TokenSeparatedSequence::new(items, commas)
+                        },
+                        terminator: self.parse_terminator()?,
+                    }),
+                    _ => return Err(self.stream.unexpected(Some(next), T!["as", "insteadof"])),
+                }
+            }
+            method_reference @ TraitUseMethodReference::Identifier(_) => {
+                TraitUseAdaptation::Alias(TraitUseAliasAdaptation {
+                    method_reference,
+                    r#as: self.expect_keyword(T!["as"])?,
+                    visibility: self.parse_optional_read_visibility_modifier()?,
+                    alias: match self.stream.peek_kind(0)? {
+                        Some(T![";" | "?>"]) => None,
+                        _ => Some(self.parse_local_identifier()?),
+                    },
+                    terminator: self.parse_terminator()?,
+                })
+            }
+        })
+    }
+
+    fn parse_trait_use_method_reference(&mut self) -> Result<TraitUseMethodReference<'arena>, ParseError> {
+        Ok(match self.stream.peek_kind(1)? {
+            Some(T!["::"]) => TraitUseMethodReference::Absolute(self.parse_trait_use_absolute_method_reference()?),
+            _ => TraitUseMethodReference::Identifier(self.parse_local_identifier()?),
+        })
+    }
+
+    fn parse_trait_use_absolute_method_reference(
+        &mut self,
+    ) -> Result<TraitUseAbsoluteMethodReference<'arena>, ParseError> {
+        Ok(TraitUseAbsoluteMethodReference {
+            trait_name: self.parse_identifier()?,
+            double_colon: self.stream.eat_span(T!["::"])?,
+            method_name: self.parse_local_identifier()?,
+        })
+    }
 }

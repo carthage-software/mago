@@ -1,4 +1,5 @@
-use ahash::HashMap;
+use foldhash::HashMap;
+
 use mago_atom::Atom;
 use mago_atom::atom;
 
@@ -37,7 +38,7 @@ pub fn inherit_methods_from_parent(
         }
 
         for aliased_method_name in aliased_method_names {
-            if metadata.has_appearing_method(&aliased_method_name) {
+            if metadata.has_appearing_method(aliased_method_name) {
                 continue;
             }
 
@@ -56,7 +57,7 @@ pub fn inherit_methods_from_parent(
 
                 if codebase
                     .function_likes
-                    .get(&(*declaring_class, *method_name_lc))
+                    .get(&(declaring_class, *method_name_lc))
                     .and_then(|meta| meta.method_metadata.as_ref())
                     .is_some_and(|method| method.is_abstract)
                 {
@@ -86,8 +87,23 @@ pub fn inherit_methods_from_parent(
                 let implementing_class = implementing_method_id.get_class_name();
                 let implementing_method_name = implementing_method_id.get_method_name();
 
-                if !codebase.method_is_abstract(implementing_class, implementing_method_name) {
-                    continue;
+                let is_existing_pseudo_from_trait = !parent_is_trait
+                    && codebase.class_likes.get(&implementing_class).is_some_and(|c| c.kind.is_trait())
+                    && codebase
+                        .function_likes
+                        .get(&(implementing_class, implementing_method_name))
+                        .is_some_and(|m| m.flags.is_magic_method());
+
+                if !is_existing_pseudo_from_trait {
+                    // Don't overwrite if:
+                    // 1. The child has a concrete (non-abstract) method, OR
+                    // 2. The child declared its own version (even if abstract) - this preserves
+                    //    interface method overrides where a child interface narrows the return type
+                    if !codebase.method_is_abstract(&implementing_class, &implementing_method_name)
+                        || *implementing_class == class_like_name
+                    {
+                        continue;
+                    }
                 }
             }
 

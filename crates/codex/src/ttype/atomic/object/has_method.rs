@@ -31,8 +31,8 @@ impl TObjectHasMethod {
     /// Returns the method name.
     #[inline]
     #[must_use]
-    pub const fn get_method(&self) -> &Atom {
-        &self.method
+    pub const fn get_method(&self) -> Atom {
+        self.method
     }
 
     /// Checks if this method name matches the given name (case-insensitive).

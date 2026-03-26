@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
 use criterion::Criterion;
 use criterion::criterion_group;
@@ -203,8 +204,8 @@ fn bench_array_comparison(c: &mut Criterion) {
     let codebase = CodebaseMetadata::new();
 
     c.bench_function("is_contained_by_list_in_list", |b| {
-        let input = TUnion::from_atomic(TAtomic::Array(TArray::List(TList::new(Box::new(get_int())))));
-        let container = TUnion::from_atomic(TAtomic::Array(TArray::List(TList::new(Box::new(get_int())))));
+        let input = TUnion::from_atomic(TAtomic::Array(TArray::List(TList::new(Arc::new(get_int())))));
+        let container = TUnion::from_atomic(TAtomic::Array(TArray::List(TList::new(Arc::new(get_int())))));
         b.iter(|| {
             let mut result = ComparisonResult::new();
             std::hint::black_box(union_comparator::is_contained_by(
@@ -226,7 +227,7 @@ fn bench_array_comparison(c: &mut Criterion) {
                 (1, (false, get_int())),
                 (2, (false, get_int())),
             ])))));
-        let container = TUnion::from_atomic(TAtomic::Array(TArray::List(TList::new(Box::new(get_int())))));
+        let container = TUnion::from_atomic(TAtomic::Array(TArray::List(TList::new(Arc::new(get_int())))));
         b.iter(|| {
             let mut result = ComparisonResult::new();
             std::hint::black_box(union_comparator::is_contained_by(
@@ -372,7 +373,7 @@ fn bench_can_be_identical(c: &mut Criterion) {
             TAtomic::Scalar(TScalar::string()),
             TAtomic::Object(TObject::Named(TNamedObject::new(ascii_lowercase_atom("Foo")))),
             TAtomic::Scalar(TScalar::float()),
-            TAtomic::Array(TArray::List(TList::new(Box::new(get_int())))),
+            TAtomic::Array(TArray::List(TList::new(Arc::new(get_int())))),
             TAtomic::Null,
         ]);
         b.iter(|| {

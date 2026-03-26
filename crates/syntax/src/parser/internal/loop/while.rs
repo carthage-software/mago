@@ -4,55 +4,52 @@ use crate::ast::ast::WhileBody;
 use crate::ast::ast::WhileColonDelimitedBody;
 use crate::ast::sequence::Sequence;
 use crate::error::ParseError;
-use crate::parser::internal::expression::parse_expression;
-use crate::parser::internal::statement::parse_statement;
-use crate::parser::internal::terminator::parse_terminator;
-use crate::parser::internal::token_stream::TokenStream;
-use crate::parser::internal::utils;
+use crate::parser::Parser;
 
-pub fn parse_while<'arena>(stream: &mut TokenStream<'_, 'arena>) -> Result<While<'arena>, ParseError> {
-    Ok(While {
-        r#while: utils::expect_keyword(stream, T!["while"])?,
-        left_parenthesis: utils::expect_span(stream, T!["("])?,
-        condition: {
-            let expression = parse_expression(stream)?;
+impl<'input, 'arena> Parser<'input, 'arena> {
+    pub(crate) fn parse_while(&mut self) -> Result<While<'arena>, ParseError> {
+        Ok(While {
+            r#while: self.expect_keyword(T!["while"])?,
+            left_parenthesis: self.stream.eat_span(T!["("])?,
+            condition: self.arena.alloc(self.parse_expression()?),
+            right_parenthesis: self.stream.eat_span(T![")"])?,
+            body: self.parse_while_body()?,
+        })
+    }
 
-            stream.alloc(expression)
-        },
-        right_parenthesis: utils::expect_span(stream, T![")"])?,
-        body: parse_while_body(stream)?,
-    })
-}
+    fn parse_while_body(&mut self) -> Result<WhileBody<'arena>, ParseError> {
+        Ok(match self.stream.peek_kind(0)? {
+            Some(T![":"]) => WhileBody::ColonDelimited(self.parse_while_colon_delimited_body()?),
+            _ => WhileBody::Statement(self.arena.alloc(self.parse_statement()?)),
+        })
+    }
 
-pub fn parse_while_body<'arena>(stream: &mut TokenStream<'_, 'arena>) -> Result<WhileBody<'arena>, ParseError> {
-    Ok(match utils::peek(stream)?.kind {
-        T![":"] => WhileBody::ColonDelimited(parse_while_colon_delimited_body(stream)?),
-        _ => WhileBody::Statement({
-            let statement = parse_statement(stream)?;
+    fn parse_while_colon_delimited_body(&mut self) -> Result<WhileColonDelimitedBody<'arena>, ParseError> {
+        Ok(WhileColonDelimitedBody {
+            colon: self.stream.eat_span(T![":"])?,
+            statements: {
+                let mut statements = self.new_vec();
+                loop {
+                    if matches!(self.stream.peek_kind(0)?, Some(T!["endwhile"])) {
+                        break;
+                    }
 
-            stream.alloc(statement)
-        }),
-    })
-}
-
-pub fn parse_while_colon_delimited_body<'arena>(
-    stream: &mut TokenStream<'_, 'arena>,
-) -> Result<WhileColonDelimitedBody<'arena>, ParseError> {
-    Ok(WhileColonDelimitedBody {
-        colon: utils::expect_span(stream, T![":"])?,
-        statements: {
-            let mut statements = stream.new_vec();
-            loop {
-                if matches!(utils::peek(stream)?.kind, T!["endwhile"]) {
-                    break;
+                    let position_before = self.stream.current_position();
+                    statements.push(self.parse_statement()?);
+                    if self.stream.current_position() == position_before {
+                        if let Ok(Some(token)) = self.stream.lookahead(0) {
+                            self.errors.push(self.stream.unexpected(Some(token), &[]));
+                            let _ = self.stream.consume();
+                        } else {
+                            break;
+                        }
+                    }
                 }
 
-                statements.push(parse_statement(stream)?);
-            }
-
-            Sequence::new(statements)
-        },
-        end_while: utils::expect_keyword(stream, T!["endwhile"])?,
-        terminator: parse_terminator(stream)?,
-    })
+                Sequence::new(statements)
+            },
+            end_while: self.expect_keyword(T!["endwhile"])?,
+            terminator: self.parse_terminator()?,
+        })
+    }
 }

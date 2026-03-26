@@ -22,6 +22,9 @@ no-else-clause = { level = "warning" }
 
 # Configure a rule's specific options
 cyclomatic-complexity = { threshold = 20 }
+
+# Exclude specific paths from a rule
+prefer-static-closure = { exclude = ["tests/"] }
 ```
 
 ## `[linter]`
@@ -32,6 +35,7 @@ cyclomatic-complexity = { threshold = 20 }
 | `integrations`     | `string[]` | `[]`      | A list of framework integrations to enable (e.g., `"symfony"`, `"laravel"`). |
 | `baseline`         | `string`   | `null`    | Path to a baseline file to ignore listed issues. When specified, the linter will use this file as the default baseline, eliminating the need to pass `--baseline` on every run. Command-line `--baseline` arguments will override this setting. |
 | `baseline-variant` | `string`   | `"loose"` | The baseline format variant to use when generating new baselines. Options: `"loose"` (count-based, resilient to line changes) or `"strict"` (exact line matching). See [Baseline Variants](/fundamentals/baseline#baseline-variants) for details. |
+| `minimum-fail-level` | `string` | `"error"` | Set the minimum issue severity that causes the command to exit with a non-zero status. Options: `"note"`, `"help"`, `"warning"`, `"error"`. Can be overridden by the `--minimum-fail-level` CLI flag. |
 
 :::tip Tool-Specific Excludes
 The `excludes` option here is **additive** to the global `source.excludes` defined in the `[source]` section of your configuration. Files excluded globally will always be excluded from linting, and this option allows you to exclude additional files from the linter specifically.
@@ -52,10 +56,37 @@ This table allows you to configure individual lint rules. Each key is the rule's
 
 ### Common rule options
 
-All rules accept two common options:
+All rules accept these common options:
 
-- `enabled`: A boolean (`true` or `false`) to enable or disable the rule.
-- `level`: A string to set the issue severity. Options are `"error"`, `"warning"`, `"help"`, and `"note"`.
+| Option    | Type       | Default | Description                                                                 |
+| :-------- | :--------- | :------ | :-------------------------------------------------------------------------- |
+| `enabled` | `boolean`  | (varies) | Enable or disable the rule.                                                |
+| `level`   | `string`   | (varies) | Set the issue severity. Options: `"error"`, `"warning"`, `"help"`, `"note"`. |
+| `exclude` | `string[]` | `[]`    | A list of paths to exclude from this specific rule.                         |
+
+#### Per-rule path exclusions
+
+The `exclude` option allows you to skip a rule for specific files or directories. This is useful when a rule is generally valuable but not appropriate for certain parts of your codebase, such as test files or generated code.
+
+```toml
+[linter.rules]
+# Don't enforce static closures in test files
+prefer-static-closure = { enabled = true, exclude = ["tests/"] }
+
+# Disable goto checks only in legacy code
+no-goto = { exclude = ["src/Legacy/"] }
+
+# Exclude a specific file
+no-eval = { exclude = ["src/Templating/Compiler.php"] }
+```
+
+Paths are matched as prefixes against relative file paths from the project root. Both `"tests"` and `"tests/"` will exclude all files under the `tests` directory.
+
+:::tip
+Per-rule `exclude` is different from the top-level `[linter].excludes`:
+- `[linter].excludes` removes files from **all** lint rules.
+- A rule's `exclude` removes files from **that specific rule** only — other rules still apply to those files.
+:::
 
 ### Rule-specific options
 

@@ -12,7 +12,7 @@ use crate::ast::sequence::TokenSeparatedSequence;
 pub struct Unset<'arena> {
     pub unset: Keyword<'arena>,
     pub left_parenthesis: Span,
-    pub values: TokenSeparatedSequence<'arena, Expression<'arena>>,
+    pub values: TokenSeparatedSequence<'arena, &'arena Expression<'arena>>,
     pub right_parenthesis: Span,
     pub terminator: Terminator<'arena>,
 }

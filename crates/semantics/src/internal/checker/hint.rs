@@ -9,24 +9,21 @@ use crate::internal::context::Context;
 #[inline]
 pub fn check_hint(hint: &Hint, context: &mut Context<'_, '_, '_>) {
     match hint {
-        Hint::Parenthesized(parenthesized_hint) => {
-            if !parenthesized_hint.hint.is_parenthesizable() {
-                let val = context.get_code_snippet(parenthesized_hint.hint);
+        Hint::Parenthesized(parenthesized_hint) if !parenthesized_hint.hint.is_parenthesizable() => {
+            let val = context.get_code_snippet(parenthesized_hint.hint);
 
-                context.report(
-                    Issue::error(format!("Type `{val}` cannot be parenthesized."))
-                        .with_annotation(
-                            Annotation::primary(parenthesized_hint.hint.span())
-                                .with_message("Invalid parenthesized type."),
-                        )
-                        .with_annotation(
-                            Annotation::secondary(parenthesized_hint.span())
-                                .with_message("Parenthesized type defined here."),
-                        )
-                        .with_note("Only union or intersection types can be enclosed in parentheses.")
-                        .with_help("Remove the parentheses around the type."),
-                );
-            }
+            context.report(
+                Issue::error(format!("Type `{val}` cannot be parenthesized."))
+                    .with_annotation(
+                        Annotation::primary(parenthesized_hint.hint.span()).with_message("Invalid parenthesized type."),
+                    )
+                    .with_annotation(
+                        Annotation::secondary(parenthesized_hint.span())
+                            .with_message("Parenthesized type defined here."),
+                    )
+                    .with_note("Only union or intersection types can be enclosed in parentheses.")
+                    .with_help("Remove the parentheses around the type."),
+            );
         }
         Hint::Nullable(nullable_hint) => {
             if !context.version.is_supported(Feature::NullableTypeHint) {
