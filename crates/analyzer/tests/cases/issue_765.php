@@ -7,7 +7,7 @@ declare(strict_types=1);
  *
  * @throws RuntimeException
  *
- * @return array{'fragment'?: non-empty-string, 'host'?: non-empty-string, 'pass'?: non-empty-string, 'path': string, 'port'?: int<0, 65535>, 'query'?: non-empty-string, 'scheme'?: non-empty-string, 'user'?: non-empty-string}
+ * @return array{'fragment'?: non-empty-string, 'host'?: non-empty-string, 'pass'?: non-empty-string, 'path'?: non-empty-string, 'port'?: int<0, 65535>, 'query'?: non-empty-string, 'scheme'?: non-empty-string, 'user'?: non-empty-string}
  */
 function getFullResult(string $url): array
 {
@@ -25,7 +25,7 @@ function getFullResult(string $url): array
  *
  * @return non-empty-string|null
  */
-function getScheme(string $url): null|string
+function getScheme(string $url): ?string
 {
     return parse_url($url, PHP_URL_SCHEME);
 }
@@ -35,7 +35,7 @@ function getScheme(string $url): null|string
  *
  * @return non-empty-string|null
  */
-function getHost(string $url): null|string
+function getHost(string $url): ?string
 {
     return parse_url($url, PHP_URL_HOST);
 }
@@ -45,7 +45,7 @@ function getHost(string $url): null|string
  *
  * @return int<0, 65535>|null
  */
-function getPort(string $url): null|int
+function getPort(string $url): ?int
 {
     return parse_url($url, PHP_URL_PORT);
 }
@@ -55,7 +55,7 @@ function getPort(string $url): null|int
  *
  * @return non-empty-string|null
  */
-function getUser(string $url): null|string
+function getUser(string $url): ?string
 {
     return parse_url($url, PHP_URL_USER);
 }
@@ -65,7 +65,7 @@ function getUser(string $url): null|string
  *
  * @return non-empty-string|null
  */
-function getPass(string $url): null|string
+function getPass(string $url): ?string
 {
     return parse_url($url, PHP_URL_PASS);
 }
@@ -73,9 +73,9 @@ function getPass(string $url): null|string
 /**
  * @param string $url
  *
- * @return string|null
+ * @return non-empty-string|null
  */
-function getPath(string $url): null|string
+function getPath(string $url): ?string
 {
     return parse_url($url, PHP_URL_PATH);
 }
@@ -85,7 +85,7 @@ function getPath(string $url): null|string
  *
  * @return non-empty-string|null
  */
-function getQuery(string $url): null|string
+function getQuery(string $url): ?string
 {
     return parse_url($url, PHP_URL_QUERY);
 }
@@ -95,7 +95,7 @@ function getQuery(string $url): null|string
  *
  * @return non-empty-string|null
  */
-function getFragment(string $url): null|string
+function getFragment(string $url): ?string
 {
     return parse_url($url, PHP_URL_FRAGMENT);
 }
@@ -105,7 +105,7 @@ function getFragment(string $url): null|string
  *
  * @throws RuntimeException
  *
- * @return array{'fragment'?: non-empty-string, 'host'?: non-empty-string, 'pass'?: non-empty-string, 'path': string, 'port'?: int<0, 65535>, 'query'?: non-empty-string, 'scheme'?: non-empty-string, 'user'?: non-empty-string}
+ * @return array{'fragment'?: non-empty-string, 'host'?: non-empty-string, 'pass'?: non-empty-string, 'path'?: non-empty-string, 'port'?: int<0, 65535>, 'query'?: non-empty-string, 'scheme'?: non-empty-string, 'user'?: non-empty-string}
  */
 function getFullResultWithMinusOne(string $url): array
 {
@@ -126,7 +126,7 @@ function getFullResultWithMinusOne(string $url): array
  *
  * @return non-empty-string|null
  */
-function getSchemeOrHost(string $url, int $component): null|string
+function getSchemeOrHost(string $url, int $component): ?string
 {
     return parse_url($url, $component);
 }

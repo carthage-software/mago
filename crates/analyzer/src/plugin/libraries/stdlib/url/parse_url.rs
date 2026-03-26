@@ -13,7 +13,6 @@ use mago_codex::ttype::atomic::scalar::int::TInteger;
 use mago_codex::ttype::atomic::scalar::string::TString;
 use mago_codex::ttype::get_int_range;
 use mago_codex::ttype::get_non_empty_string;
-use mago_codex::ttype::get_string;
 use mago_codex::ttype::union::TUnion;
 
 use crate::plugin::context::InvocationInfo;
@@ -154,17 +153,14 @@ fn collect_component_values(component_type: &TUnion) -> Option<Vec<i64>> {
 /// Returns the type for a specific URL component.
 fn get_component_return_type(component: i64) -> TUnion {
     match component {
-        PHP_URL_SCHEME | PHP_URL_HOST | PHP_URL_USER | PHP_URL_PASS | PHP_URL_QUERY | PHP_URL_FRAGMENT => {
+        PHP_URL_SCHEME | PHP_URL_HOST | PHP_URL_USER | PHP_URL_PASS | PHP_URL_PATH | PHP_URL_QUERY
+        | PHP_URL_FRAGMENT => {
             // null|non-empty-string
             TUnion::from_vec(vec![TAtomic::Null, TAtomic::Scalar(TScalar::String(TString::non_empty()))])
         }
         PHP_URL_PORT => {
             // null|int<0, 65535>
             TUnion::from_vec(vec![TAtomic::Null, TAtomic::Scalar(TScalar::Integer(TInteger::Range(0, 65535)))])
-        }
-        PHP_URL_PATH => {
-            // null|string (path can be empty string)
-            TUnion::from_vec(vec![TAtomic::Null, TAtomic::Scalar(TScalar::String(TString::general()))])
         }
         -1 => {
             // -1 is equivalent to no component - return full array
@@ -190,13 +186,12 @@ fn get_all_components_return_type() -> TUnion {
 fn get_full_array_return_type() -> TUnion {
     let mut known_items: BTreeMap<ArrayKey, (bool, TUnion)> = BTreeMap::new();
 
-    let optional_string_fields = ["scheme", "user", "pass", "host", "query", "fragment"];
+    let optional_string_fields = ["scheme", "user", "pass", "host", "path", "query", "fragment"];
     for field in optional_string_fields {
         known_items.insert(ArrayKey::String(Atom::from(field)), (true, get_non_empty_string()));
     }
 
     known_items.insert(ArrayKey::String(Atom::from("port")), (true, get_int_range(Some(0), Some(65535))));
-    known_items.insert(ArrayKey::String(Atom::from("path")), (false, get_string()));
 
     let keyed_array = TKeyedArray::new().with_known_items(known_items);
 
