@@ -745,6 +745,13 @@ test_case!(issue_1499);
 test_case!(issue_1500);
 test_case!(issue_1501);
 test_case!(issue_1502);
+test_case!(psl_break_mixed);
+test_case!(psl_max_return_type);
+test_case!(psl_min_return_type);
+test_case!(psl_total_length_range);
+test_case!(psl_proc_open_pipes);
+test_case!(psl_array_filter_nullable);
+test_case!(psl_isset_optional_key);
 
 #[test]
 fn test_all_test_cases_are_ran() {

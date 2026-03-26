@@ -1837,9 +1837,9 @@ function shell_exec(string $command): string|false|null {}
  * } $options
  *
  * @param-out array{
- *   0: resource,
- *   1: resource,
- *   2: resource,
+ *   0?: resource,
+ *   1?: resource,
+ *   2?: resource,
  * } $pipes
  *
  * @return open-resource|false

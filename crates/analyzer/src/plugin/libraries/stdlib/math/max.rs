@@ -61,9 +61,9 @@ impl FunctionReturnTypeProvider for MaxProvider {
             ));
         }
 
-        if let Some(known_resulting_type) = &resulting_type {
-            let integers = collect_integers(known_resulting_type)?;
-
+        if let Some(known_resulting_type) = &resulting_type
+            && let Some(integers) = collect_integers(known_resulting_type)
+        {
             let mut max_lb = integers[0].get_minimum_value();
             let mut max_ub = integers[0].get_maximum_value();
             for t in integers.iter().skip(1) {

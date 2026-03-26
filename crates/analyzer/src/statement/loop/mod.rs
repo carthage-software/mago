@@ -23,6 +23,7 @@ use mago_codex::ttype::atomic::array::list::TList;
 use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::bool::TBool;
+use mago_codex::ttype::atomic::scalar::int::TInteger;
 use mago_codex::ttype::combine_union_types;
 use mago_codex::ttype::combiner::CombinerOptions;
 use mago_codex::ttype::get_array_parameters;
@@ -470,6 +471,82 @@ fn analyze<'ctx, 'ast, 'arena>(
 
         if !pre_conditions.is_empty() && loop_scope.truthy_pre_conditions {
             always_enters_loop.set(true);
+        }
+
+        for (variable_id, continue_type) in continue_context.locals.iter_mut() {
+            let Some(parent_type) = original_parent_context.locals.get(variable_id) else {
+                continue;
+            };
+
+            if !parent_type.is_single() {
+                continue;
+            }
+
+            let TAtomic::Scalar(TScalar::Integer(parent_int)) = parent_type.get_single() else {
+                continue;
+            };
+
+            let mut body_bounds: Option<(Option<i64>, Option<i64>)> = None;
+            let mut all_integers = true;
+            for atomic in continue_type.types.iter() {
+                let TAtomic::Scalar(TScalar::Integer(int)) = atomic else {
+                    all_integers = false;
+                    break;
+                };
+                let (lb, ub) = int.get_bounds();
+                body_bounds = Some(match body_bounds {
+                    None => (lb, ub),
+                    Some((prev_lb, prev_ub)) => (
+                        match (prev_lb, lb) {
+                            (Some(a), Some(b)) => Some(std::cmp::min(a, b)),
+                            _ => None,
+                        },
+                        match (prev_ub, ub) {
+                            (Some(a), Some(b)) => Some(std::cmp::max(a, b)),
+                            _ => None,
+                        },
+                    ),
+                });
+            }
+            if !all_integers {
+                continue;
+            }
+            let Some((body_lb, body_ub)) = body_bounds else {
+                continue;
+            };
+
+            let (parent_lb, parent_ub) = parent_int.get_bounds();
+
+            let lb_up = match (parent_lb, body_lb) {
+                (Some(p), Some(b)) => b >= p,
+                (None, Some(_)) => true,
+                (None, None) => true,
+                _ => false,
+            };
+            let ub_up = match (parent_ub, body_ub) {
+                (Some(p), Some(b)) => b > p,
+                _ => false,
+            };
+
+            let lb_down = match (parent_lb, body_lb) {
+                (Some(p), Some(b)) => b < p,
+                _ => false,
+            };
+            let ub_down = match (parent_ub, body_ub) {
+                (Some(p), Some(b)) => b <= p,
+                (None, Some(_)) => true,
+                (None, None) => true,
+                _ => false,
+            };
+
+            let new_ub = if lb_up && ub_up { None } else { body_ub };
+            let new_lb = if lb_down && ub_down { None } else { body_lb };
+
+            if new_ub != body_ub || new_lb != body_lb {
+                *continue_type = Rc::new(TUnion::from_atomic(TAtomic::Scalar(TScalar::Integer(
+                    TInteger::from_bounds(new_lb, new_ub),
+                ))));
+            }
         }
 
         let mut i = 0;
@@ -1075,16 +1152,16 @@ fn update_loop_scope_contexts<'ctx>(
                 );
             }
         }
-
-        for (variable_id, pre_type) in &pre_outer_context.locals {
-            if let Some(current_type) = continue_context.locals.get(variable_id)
-                && current_type.is_never()
-            {
-                continue_context.locals.insert(*variable_id, pre_type.clone());
-            }
-        }
     } else {
         loop_context.locals = pre_outer_context.locals.clone();
+    }
+
+    for (variable_id, pre_type) in &pre_outer_context.locals {
+        if let Some(current_type) = continue_context.locals.get(variable_id)
+            && current_type.is_never()
+        {
+            continue_context.locals.insert(*variable_id, pre_type.clone());
+        }
     }
 }
 

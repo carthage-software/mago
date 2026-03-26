@@ -33,13 +33,13 @@ function openssl_pkey_get_public(OpenSSLAsymmetricKey|OpenSSLCertificate|array|s
 
 /**
  * @return array{
- *  'bits': int,
- *  'key': string,
- *  'rsa': array,
- *  'dsa': array,
- *  'dh': array,
- *  'ec': array,
- *  'type': int,
+ *  'bits'?: int,
+ *  'key'?: string,
+ *  'rsa'?: array,
+ *  'dsa'?: array,
+ *  'dh'?: array,
+ *  'ec'?: array,
+ *  'type'?: int,
  * }|false
  */
 function openssl_pkey_get_details(OpenSSLAsymmetricKey $key): array|false {}

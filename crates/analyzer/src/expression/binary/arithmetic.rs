@@ -12,6 +12,7 @@ use mago_codex::ttype::combiner;
 use mago_codex::ttype::comparator::ComparisonResult;
 use mago_codex::ttype::comparator::atomic_comparator;
 use mago_codex::ttype::get_mixed;
+use mago_codex::ttype::get_never;
 use mago_codex::ttype::union::TUnion;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
@@ -43,6 +44,11 @@ pub fn analyze_arithmetic_operation<'ctx, 'arena>(
     let fallback = Rc::new(get_mixed());
     let left_type = artifacts.get_rc_expression_type(&binary.lhs).cloned().unwrap_or_else(|| fallback.clone());
     let right_type = artifacts.get_rc_expression_type(&binary.rhs).cloned().unwrap_or_else(|| fallback.clone());
+
+    if left_type.is_never() || right_type.is_never() {
+        assign_arithmetic_type(artifacts, get_never(), binary);
+        return Ok(());
+    }
 
     let mut final_result_type: Option<TUnion> = None;
 
