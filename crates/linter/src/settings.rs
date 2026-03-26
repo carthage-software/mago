@@ -61,6 +61,9 @@ use crate::rule::NoEmptyLoopConfig;
 use crate::rule::NoErrorControlOperatorConfig;
 use crate::rule::NoEvalConfig;
 use crate::rule::NoFfiConfig;
+use crate::rule::NoFullyQualifiedGlobalClassConfig;
+use crate::rule::NoFullyQualifiedGlobalConstantConfig;
+use crate::rule::NoFullyQualifiedGlobalFunctionConfig;
 use crate::rule::NoGlobalConfig;
 use crate::rule::NoGotoConfig;
 use crate::rule::NoHashCommentConfig;
@@ -260,6 +263,9 @@ pub struct RulesSettings {
     pub no_boolean_flag_parameter: RuleSettings<NoBooleanFlagParameterConfig>,
     pub no_assign_in_argument: RuleSettings<NoAssignInArgumentConfig>,
     pub no_assign_in_condition: RuleSettings<NoAssignInConditionConfig>,
+    pub no_fully_qualified_global_class: RuleSettings<NoFullyQualifiedGlobalClassConfig>,
+    pub no_fully_qualified_global_constant: RuleSettings<NoFullyQualifiedGlobalConstantConfig>,
+    pub no_fully_qualified_global_function: RuleSettings<NoFullyQualifiedGlobalFunctionConfig>,
     pub no_alias_function: RuleSettings<NoAliasFunctionConfig>,
     pub lowercase_type_hint: RuleSettings<LowercaseTypeHintConfig>,
     pub identity_comparison: RuleSettings<IdentityComparisonConfig>,
