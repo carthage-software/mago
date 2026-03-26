@@ -95,6 +95,7 @@ use crate::rule::NoSprintfConcatConfig;
 use crate::rule::NoTrailingSpaceConfig;
 use crate::rule::NoUnderscoreClassConfig;
 use crate::rule::NoUnescapedOutputConfig;
+use crate::rule::NoUnnecessaryDocblockTagConfig;
 use crate::rule::NoUnsafeFinallyConfig;
 use crate::rule::NoVariableVariableConfig;
 use crate::rule::NoVoidReferenceReturnConfig;
@@ -299,6 +300,7 @@ pub struct RulesSettings {
     pub no_db_schema_change: RuleSettings<NoDbSchemaChangeConfig>,
     pub no_unescaped_output: RuleSettings<NoUnescapedOutputConfig>,
     pub no_roles_as_capabilities: RuleSettings<NoRolesAsCapabilitiesConfig>,
+    pub no_unnecessary_docblock_tag: RuleSettings<NoUnnecessaryDocblockTagConfig>,
 }
 
 impl<C: Config> RuleSettings<C> {

@@ -21,6 +21,7 @@ pub mod no_redundant_use;
 pub mod no_redundant_write_visibility;
 pub mod no_redundant_yield_from;
 pub mod no_self_assignment;
+pub mod no_unnecessary_docblock_tag;
 
 pub use constant_condition::*;
 pub use inline_variable_return::*;
@@ -45,3 +46,4 @@ pub use no_redundant_use::*;
 pub use no_redundant_write_visibility::*;
 pub use no_redundant_yield_from::*;
 pub use no_self_assignment::*;
+pub use no_unnecessary_docblock_tag::*;
