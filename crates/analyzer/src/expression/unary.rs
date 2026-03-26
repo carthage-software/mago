@@ -605,6 +605,9 @@ fn increment_operand<'ctx, 'arena>(
                     possibilities.push(TAtomic::Mixed(TMixed::new()));
                 }
             }
+            TAtomic::Never => {
+                // never type is unreachable, don't produce mixed, just skip.
+            }
             _ => {
                 let type_name = operand_atomic_type.get_id();
                 context.collector.report_with_code(
@@ -617,7 +620,6 @@ fn increment_operand<'ctx, 'arena>(
                             TAtomic::Array(_) => "Incrementing an array results in a `TypeError` exception.",
                             TAtomic::Object(_) => "Incrementing an object without operator overloading support results in a `TypeError` exception.",
                             TAtomic::Resource(_) => "Incrementing a resource results in a `TypeError` exception.",
-                            TAtomic::Never => "An expression of type `never` does not produce a value to decrement.",
                             _ => "This type is not suitable for decrement operations."
                         })
                         .with_help("Ensure the operand is a number or a string suitable for incrementing."),
@@ -629,7 +631,7 @@ fn increment_operand<'ctx, 'arena>(
     }
 
     let resulting_type_union = if possibilities.is_empty() {
-        get_mixed()
+        if operand_type.is_never() { get_never() } else { get_mixed() }
     } else {
         TUnion::from_vec(combine(possibilities, context.codebase, context.settings.combiner_options()))
     };
@@ -837,6 +839,9 @@ fn decrement_operand<'ctx, 'arena>(
                     possibilities.push(TAtomic::Mixed(TMixed::new()));
                 }
             }
+            TAtomic::Never => {
+                // never type is unreachable, don't produce mixed, just skip.
+            }
             _ => {
                 let type_name = operand_atomic_type.get_id();
                 context.collector.report_with_code(
@@ -849,7 +854,6 @@ fn decrement_operand<'ctx, 'arena>(
                                 TAtomic::Array(_) => "Decrementing an array results in a `TypeError` exception.",
                                 TAtomic::Object(_) => "Decrementing an object without operator overloading support results in a `TypeError` exception.",
                                 TAtomic::Resource(_) => "Decrementing a resource results in a `TypeError` exception.",
-                                TAtomic::Never => "An expression of type `never` does not produce a value to decrement.",
                                 _ => "This type is not suitable for decrement operations."
                             })
                             .with_help("Ensure the operand is a number or a string suitable for decrementing."),
@@ -861,7 +865,7 @@ fn decrement_operand<'ctx, 'arena>(
     }
 
     let resulting_type_union = if possibilities.is_empty() {
-        get_mixed()
+        if operand_type.is_never() { get_never() } else { get_mixed() }
     } else {
         TUnion::from_vec(combine(possibilities, context.codebase, context.settings.combiner_options()))
     };
