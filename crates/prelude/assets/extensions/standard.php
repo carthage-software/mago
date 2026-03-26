@@ -2210,7 +2210,7 @@ function microtime(bool $as_float = false): string|float {}
 function gettimeofday(bool $as_float = false): array|float {}
 
 /**
- * @return array<string, scalar>|false
+ * @return array<string, int>|false
  */
 function getrusage(int $mode = 0): array|false {}
 
