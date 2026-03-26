@@ -340,7 +340,11 @@ fn add_parameter_types_to_context<'ctx, 'arena>(
             && let Some(inferred_type) = inferred_map.remove(&i)
             && !is_unresolved_template_with_mixed_bound(&inferred_type)
         {
-            inferred_type
+            if !declared_parameter_type.is_nullable() && inferred_type.is_nullable() {
+                inferred_type.to_non_nullable()
+            } else {
+                inferred_type
+            }
         } else {
             declared_parameter_type
         };
