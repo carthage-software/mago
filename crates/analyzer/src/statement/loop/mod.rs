@@ -871,22 +871,26 @@ fn can_condition_be_initially_false(pre_condition: &Expression<'_>, artifacts: &
     let (right_lb, right_ub) = right_int.get_bounds();
 
     match &binary.operator {
-        // $a < $b is false when $a >= $b. Possible when min($a) >= min($b).
-        BinaryOperator::LessThan(_) => {
-            matches!((left_lb, right_lb), (Some(a), Some(b)) if a >= b)
-        }
-        // $a <= $b is false when $a > $b. Possible when min($a) > min($b).
-        BinaryOperator::LessThanOrEqual(_) => {
-            matches!((left_lb, right_lb), (Some(a), Some(b)) if a > b)
-        }
-        // $a > $b is false when $a <= $b. Possible when max($a) <= max($b).
-        BinaryOperator::GreaterThan(_) => {
-            matches!((left_ub, right_ub), (Some(a), Some(b)) if a <= b)
-        }
-        // $a >= $b is false when $a < $b. Possible when max($a) < max($b).
-        BinaryOperator::GreaterThanOrEqual(_) => {
-            matches!((left_ub, right_ub), (Some(a), Some(b)) if a < b)
-        }
+        BinaryOperator::LessThan(_) => match (left_ub, right_lb) {
+            (None, _) => true,
+            (Some(a), Some(b)) => a >= b,
+            _ => false,
+        },
+        BinaryOperator::LessThanOrEqual(_) => match (left_ub, right_lb) {
+            (None, _) => true,
+            (Some(a), Some(b)) => a > b,
+            _ => false,
+        },
+        BinaryOperator::GreaterThan(_) => match (left_lb, right_ub) {
+            (_, None) => true,
+            (Some(a), Some(b)) => a <= b,
+            _ => false,
+        },
+        BinaryOperator::GreaterThanOrEqual(_) => match (left_lb, right_ub) {
+            (_, None) => true,
+            (Some(a), Some(b)) => a < b,
+            _ => false,
+        },
         _ => false,
     }
 }
