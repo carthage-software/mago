@@ -1,3 +1,4 @@
+pub mod ambiguous_constant_access;
 pub mod ambiguous_function_call;
 pub mod array_style;
 pub mod assertion_style;
@@ -20,6 +21,7 @@ pub mod property_name;
 pub mod trait_name;
 pub mod variable_name;
 
+pub use ambiguous_constant_access::*;
 pub use ambiguous_function_call::*;
 pub use array_style::*;
 pub use assertion_style::*;

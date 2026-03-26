@@ -6,6 +6,7 @@ use serde::de::DeserializeOwned;
 use mago_php_version::PHPVersion;
 
 use crate::integration::IntegrationSet;
+use crate::rule::AmbiguousConstantAccessConfig;
 use crate::rule::AmbiguousFunctionCallConfig;
 use crate::rule::ArrayStyleConfig;
 use crate::rule::AssertDescriptionConfig;
@@ -180,6 +181,7 @@ pub struct RuleSettings<C: Config> {
 #[derive(Debug, Clone, Serialize, Deserialize, Default, JsonSchema)]
 #[serde(default, rename_all = "kebab-case", deny_unknown_fields)]
 pub struct RulesSettings {
+    pub ambiguous_constant_access: RuleSettings<AmbiguousConstantAccessConfig>,
     pub ambiguous_function_call: RuleSettings<AmbiguousFunctionCallConfig>,
     pub use_dedicated_expectation: RuleSettings<UseDedicatedExpectationConfig>,
     pub use_simpler_expectation: RuleSettings<UseSimplerExpectationConfig>,

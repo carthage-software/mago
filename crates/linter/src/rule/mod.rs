@@ -177,6 +177,7 @@ macro_rules! define_rules {
 }
 
 define_rules! {
+    AmbiguousConstantAccess(ambiguous_constant_access @ AmbiguousConstantAccessRule),
     AmbiguousFunctionCall(ambiguous_function_call @ AmbiguousFunctionCallRule),
     UseDedicatedExpectation(use_dedicated_expectation @ UseDedicatedExpectationRule),
     UseSimplerExpectation(use_simpler_expectation @ UseSimplerExpectationRule),

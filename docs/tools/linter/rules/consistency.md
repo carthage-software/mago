@@ -9,6 +9,7 @@ This document details the rules available in the `Consistency` category.
 
 | Rule | Code |
 | :--- | :---------- |
+| Ambiguous Constant Access | [`ambiguous-constant-access`](#ambiguous-constant-access) |
 | Ambiguous Function Call | [`ambiguous-function-call`](#ambiguous-function-call) |
 | Array Style | [`array-style`](#array-style) |
 | Assertion Style | [`assertion-style`](#assertion-style) |
@@ -30,6 +31,56 @@ This document details the rules available in the `Consistency` category.
 | Property Name | [`property-name`](#property-name) |
 | Trait Name | [`trait-name`](#trait-name) |
 | Variable Name | [`variable-name`](#variable-name) |
+
+
+## <a id="ambiguous-constant-access"></a>`ambiguous-constant-access`
+
+Enforces that all constant references made from within a namespace are explicit.
+
+When an unqualified constant like `PHP_VERSION` is referenced from within a namespace,
+PHP performs a runtime fallback check (current namespace -> global namespace). This
+ambiguity can lead to unexpected behavior if a constant with the same name is later
+defined in the namespace.
+
+Making references explicit improves readability and prevents bugs.
+
+
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `false` |
+| `level` | `string` | `"help"` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+
+namespace App;
+
+use const PHP_VERSION;
+
+// OK: Explicitly imported
+$version1 = PHP_VERSION;
+
+// OK: Explicitly global
+$version2 = \PHP_VERSION;
+```
+
+#### Incorrect code
+
+```php
+<?php
+
+namespace App;
+
+// Ambiguous: could be App\PHP_VERSION or \PHP_VERSION
+$version = PHP_VERSION;
+```
 
 
 ## <a id="ambiguous-function-call"></a>`ambiguous-function-call`
