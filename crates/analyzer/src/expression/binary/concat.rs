@@ -176,6 +176,7 @@ fn analyze_string_concat_operand<'arena>(
             || operand_atomic_type.is_float()
             || operand_atomic_type.is_array_key()
             || operand_atomic_type.is_null()
+            || operand_atomic_type.is_numeric()
             || operand_atomic_type.is_false()
         {
             has_at_least_one_valid_operand_type = true;
@@ -191,6 +192,7 @@ fn analyze_string_concat_operand<'arena>(
                     || parameter.constraint.is_float()
                     || parameter.constraint.is_array_key()
                     || parameter.constraint.is_mixed()
+                    || parameter.constraint.is_numeric()
                 {
                     current_atomic_is_valid = true;
                 } else {
