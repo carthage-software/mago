@@ -461,6 +461,7 @@ impl<'arena> Printer<'arena> {
 
     fn fits(&self, next: &Command<'arena>, width: isize) -> bool {
         let mut remaining_width = width;
+        let mut has_line_suffix = false;
         // Use a Vec as a stack. Pre-allocating avoids reallocation churn.
         let mut stack: Vec<(Mode, &Document<'arena>)> = Vec::with_capacity_in(128, self.arena);
         let mut cmds = self.commands.iter().rev();
@@ -533,13 +534,12 @@ impl<'arena> Printer<'arena> {
                     }
                 }
                 Document::LineSuffix(_) => {
-                    break;
+                    has_line_suffix = true;
                 }
                 Document::LineSuffixBoundary => {
-                    if !self.line_suffix.is_empty() {
+                    if has_line_suffix || !self.line_suffix.is_empty() {
                         return false;
                     }
-                    break;
                 }
                 Document::BreakParent | Document::Trim(_) | Document::DoNotTrim => {}
             }
@@ -549,6 +549,7 @@ impl<'arena> Printer<'arena> {
             }
 
             if stack.is_empty()
+                && !has_line_suffix
                 && let Some(cmd) = cmds.next()
             {
                 stack.push((cmd.mode, &cmd.document));

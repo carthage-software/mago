@@ -257,6 +257,7 @@ test_case!(null_type_hint_null_pipe_last);
 test_case!(comment_placement_binary);
 test_case!(comment_placement_conditional);
 test_case!(comment_placement_conditional_preserve);
+test_case!(fits_line_suffix);
 
 // A special test case for regressions in the Psl codebase
 test_case!(psl_regressions);
