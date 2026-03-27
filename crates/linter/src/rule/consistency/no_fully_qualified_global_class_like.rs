@@ -60,13 +60,13 @@ impl NoFullyQualifiedGlobalClassLikeRule {
         let short_name = class_name.split('\\').next_back().unwrap_or(class_name);
 
         ctx.collector.report(
-            Issue::new(self.cfg.level, "Fully-qualified class reference detected.")
+            Issue::new(self.cfg.level, "Fully-qualified class-like reference detected.")
                 .with_code(self.meta.code)
                 .with_annotation(
                     Annotation::primary(identifier.span())
                         .with_message(format!("The reference to `\\{class_name}` uses a fully-qualified name")),
                 )
-                .with_note("Fully-qualified class references bypass the import system, making it harder to see which classes, interfaces, traits, and enums a file depends on.")
+                .with_note("Fully-qualified class-like references bypass the import system, making it harder to see which classes, interfaces, traits, and enums a file depends on.")
                 .with_help(format!("Add `use {class_name};` and reference `{short_name}` directly.")),
         );
     }
@@ -77,15 +77,14 @@ impl LintRule for NoFullyQualifiedGlobalClassLikeRule {
 
     fn meta() -> &'static RuleMeta {
         const META: RuleMeta = RuleMeta {
-            name: "No Fully Qualified Global Class",
+            name: "No Fully Qualified Global Class-Like",
             code: "no-fully-qualified-global-class-like",
             description: indoc! {"
-                Disallows fully-qualified class references within a namespace.
+                Disallows fully-qualified class-like references within a namespace.
 
                 Instead of using the backslash prefix (e.g., `new \\DateTime()` or `\\Exception`
-                in a type hint), prefer an explicit `use` import statement. This applies to all
-                class-like types — classes, interfaces, traits, and enums — and improves
-                readability by keeping imports centralized at the top of the file.
+                in a type hint), prefer an explicit `use` import statement. This improves
+                readability and keeps imports centralized at the top of the file.
             "},
             good_example: indoc! {r#"
                 <?php
