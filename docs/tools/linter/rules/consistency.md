@@ -25,6 +25,9 @@ This document details the rules available in the `Consistency` category.
 | Lowercase Type Hint | [`lowercase-type-hint`](#lowercase-type-hint) |
 | No Alias Function | [`no-alias-function`](#no-alias-function) |
 | No Alternative Syntax | [`no-alternative-syntax`](#no-alternative-syntax) |
+| No Fully Qualified Global Class-Like | [`no-fully-qualified-global-class-like`](#no-fully-qualified-global-class-like) |
+| No Fully Qualified Global Constant | [`no-fully-qualified-global-constant`](#no-fully-qualified-global-constant) |
+| No Fully Qualified Global Function | [`no-fully-qualified-global-function`](#no-fully-qualified-global-function) |
 | No Hash Comment | [`no-hash-comment`](#no-hash-comment) |
 | No Php Tag Terminator | [`no-php-tag-terminator`](#no-php-tag-terminator) |
 | No Trailing Space | [`no-trailing-space`](#no-trailing-space) |
@@ -708,6 +711,137 @@ if ($condition) {
 if ($condition):
     echo 'yes';
 endif;
+```
+
+
+## <a id="no-fully-qualified-global-class-like"></a>`no-fully-qualified-global-class-like`
+
+Disallows fully-qualified class-like references within a namespace.
+
+Instead of using the backslash prefix (e.g., `new \DateTime()` or `\Exception`
+in a type hint), prefer an explicit `use` import statement. This improves
+readability and keeps imports centralized at the top of the file.
+
+
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `false` |
+| `level` | `string` | `"help"` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+
+namespace App;
+
+use DateTime;
+use Exception;
+
+$dt = new DateTime();
+
+function foo(DateTime $dt): Exception {}
+```
+
+#### Incorrect code
+
+```php
+<?php
+
+namespace App;
+
+$dt = new \DateTime();
+
+function foo(\DateTime $dt): \Exception {}
+```
+
+
+## <a id="no-fully-qualified-global-constant"></a>`no-fully-qualified-global-constant`
+
+Disallows fully-qualified references to global constants within a namespace.
+
+Instead of using the backslash prefix (e.g., `\PHP_VERSION`),
+prefer an explicit `use const` import statement. This improves
+readability and keeps imports centralized at the top of the file.
+
+
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `false` |
+| `level` | `string` | `"help"` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+
+namespace App;
+
+use const PHP_VERSION;
+
+$version = PHP_VERSION;
+```
+
+#### Incorrect code
+
+```php
+<?php
+
+namespace App;
+
+$version = \PHP_VERSION;
+```
+
+
+## <a id="no-fully-qualified-global-function"></a>`no-fully-qualified-global-function`
+
+Disallows fully-qualified references to global functions within a namespace.
+
+Instead of using the backslash prefix (e.g., `\strlen()`),
+prefer an explicit `use function` import statement. This improves
+readability and keeps imports centralized at the top of the file.
+
+
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `false` |
+| `level` | `string` | `"help"` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+
+namespace App;
+
+use function strlen;
+
+$length = strlen("hello");
+```
+
+#### Incorrect code
+
+```php
+<?php
+
+namespace App;
+
+$length = \strlen("hello");
 ```
 
 
