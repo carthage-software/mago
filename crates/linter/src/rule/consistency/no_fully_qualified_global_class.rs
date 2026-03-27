@@ -7,8 +7,10 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_reporting::Level;
 use mago_span::HasSpan;
+use mago_syntax::ast::BinaryOperator;
 use mago_syntax::ast::Expression;
 use mago_syntax::ast::Hint;
+use mago_syntax::ast::Identifier;
 use mago_syntax::ast::Node;
 use mago_syntax::ast::NodeKind;
 
@@ -45,6 +47,28 @@ impl Config for NoFullyQualifiedGlobalClassConfig {
 
     fn level(&self) -> Level {
         self.level
+    }
+}
+
+impl NoFullyQualifiedGlobalClassRule {
+    fn report_if_fq<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, identifier: Identifier<'arena>) {
+        if !identifier.is_fully_qualified() {
+            return;
+        }
+
+        let class_name = identifier.value().trim_start_matches('\\');
+        let short_name = class_name.split('\\').next_back().unwrap_or(class_name);
+
+        ctx.collector.report(
+            Issue::new(self.cfg.level, "Fully-qualified class reference detected.")
+                .with_code(self.meta.code)
+                .with_annotation(
+                    Annotation::primary(identifier.span())
+                        .with_message(format!("The reference to `\\{class_name}` uses a fully-qualified name")),
+                )
+                .with_note("Fully-qualified class references bypass the import system, making it harder to see which classes a file depends on.")
+                .with_help(format!("Add `use {class_name};` and reference `{short_name}` directly.")),
+        );
     }
 }
 
@@ -91,8 +115,18 @@ impl LintRule for NoFullyQualifiedGlobalClassRule {
     }
 
     fn targets() -> &'static [NodeKind] {
-        const TARGETS: &[NodeKind] =
-            &[NodeKind::Instantiation, NodeKind::StaticMethodCall, NodeKind::ClassConstantAccess, NodeKind::Hint];
+        const TARGETS: &[NodeKind] = &[
+            NodeKind::Attribute,
+            NodeKind::Binary,
+            NodeKind::ClassConstantAccess,
+            NodeKind::Extends,
+            NodeKind::Hint,
+            NodeKind::Implements,
+            NodeKind::Instantiation,
+            NodeKind::StaticMethodCall,
+            NodeKind::StaticMethodPartialApplication,
+            NodeKind::StaticPropertyAccess,
+        ];
 
         TARGETS
     }
@@ -106,46 +140,64 @@ impl LintRule for NoFullyQualifiedGlobalClassRule {
             return;
         }
 
-        let identifier = match node {
+        match node {
+            Node::Attribute(attribute) => {
+                self.report_if_fq(ctx, attribute.name);
+            }
+            Node::Extends(extends) => {
+                for identifier in extends.types.iter() {
+                    self.report_if_fq(ctx, *identifier);
+                }
+            }
+            Node::Implements(implements) => {
+                for identifier in implements.types.iter() {
+                    self.report_if_fq(ctx, *identifier);
+                }
+            }
             Node::Instantiation(instantiation) => {
                 let Expression::Identifier(identifier) = instantiation.class else {
                     return;
                 };
-                identifier
+                self.report_if_fq(ctx, *identifier);
             }
             Node::StaticMethodCall(call) => {
                 let Expression::Identifier(identifier) = call.class else {
                     return;
                 };
-                identifier
+                self.report_if_fq(ctx, *identifier);
+            }
+            Node::StaticMethodPartialApplication(application) => {
+                let Expression::Identifier(identifier) = application.class else {
+                    return;
+                };
+                self.report_if_fq(ctx, *identifier);
+            }
+            Node::StaticPropertyAccess(access) => {
+                let Expression::Identifier(identifier) = access.class else {
+                    return;
+                };
+                self.report_if_fq(ctx, *identifier);
             }
             Node::ClassConstantAccess(access) => {
                 let Expression::Identifier(identifier) = access.class else {
                     return;
                 };
-                identifier
+                self.report_if_fq(ctx, *identifier);
             }
-            Node::Hint(Hint::Identifier(identifier)) => identifier,
-            _ => return,
-        };
-
-        if !identifier.is_fully_qualified() {
-            return;
+            Node::Binary(binary) => {
+                if !matches!(binary.operator, BinaryOperator::Instanceof(_)) {
+                    return;
+                }
+                let Expression::Identifier(identifier) = binary.rhs else {
+                    return;
+                };
+                self.report_if_fq(ctx, *identifier);
+            }
+            Node::Hint(Hint::Identifier(identifier)) => {
+                self.report_if_fq(ctx, *identifier);
+            }
+            _ => {}
         }
-
-        let class_name = identifier.value().trim_start_matches('\\');
-        let short_name = class_name.split('\\').next_back().unwrap_or(class_name);
-
-        ctx.collector.report(
-            Issue::new(self.cfg.level, "Fully-qualified class reference detected.")
-                .with_code(self.meta.code)
-                .with_annotation(
-                    Annotation::primary(identifier.span())
-                        .with_message(format!("The reference to `\\{class_name}` uses a fully-qualified name")),
-                )
-                .with_note("Fully-qualified class references bypass the import system, making it harder to see which classes a file depends on.")
-                .with_help(format!("Add `use {class_name};` and reference `{short_name}` directly.")),
-        );
     }
 }
 
@@ -226,6 +278,80 @@ mod tests {
             namespace App;
 
             function foo(\DateTime $dt): void {}
+        "#}
+    }
+
+    test_lint_failure! {
+        name = fq_static_property_access_in_namespace,
+        rule = NoFullyQualifiedGlobalClassRule,
+        code = indoc! {r#"
+            <?php
+
+            namespace App;
+
+            $x = \Foo::$bar;
+        "#}
+    }
+
+    test_lint_failure! {
+        name = fq_first_class_callable_in_namespace,
+        rule = NoFullyQualifiedGlobalClassRule,
+        code = indoc! {r#"
+            <?php
+
+            namespace App;
+
+            $x = \Foo::bar(...);
+        "#}
+    }
+
+    test_lint_failure! {
+        name = fq_instanceof_in_namespace,
+        rule = NoFullyQualifiedGlobalClassRule,
+        code = indoc! {r#"
+            <?php
+
+            namespace App;
+
+            $x instanceof \Foo;
+        "#}
+    }
+
+    test_lint_failure! {
+        name = fq_extends_in_namespace,
+        rule = NoFullyQualifiedGlobalClassRule,
+        code = indoc! {r#"
+            <?php
+
+            namespace App;
+
+            class Foo extends \Bar {}
+        "#}
+    }
+
+    test_lint_failure! {
+        name = fq_implements_in_namespace,
+        rule = NoFullyQualifiedGlobalClassRule,
+        count = 2,
+        code = indoc! {r#"
+            <?php
+
+            namespace App;
+
+            class Foo implements \Bar, \Baz {}
+        "#}
+    }
+
+    test_lint_failure! {
+        name = fq_attribute_in_namespace,
+        rule = NoFullyQualifiedGlobalClassRule,
+        code = indoc! {r#"
+            <?php
+
+            namespace App;
+
+            #[\SomeAttribute]
+            class Foo {}
         "#}
     }
 }
