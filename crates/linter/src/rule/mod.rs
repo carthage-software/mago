@@ -258,7 +258,7 @@ define_rules! {
     NoBooleanFlagParameter(no_boolean_flag_parameter @ NoBooleanFlagParameterRule),
     NoAssignInArgument(no_assign_in_argument @ NoAssignInArgumentRule),
     NoAssignInCondition(no_assign_in_condition @ NoAssignInConditionRule),
-    NoFullyQualifiedGlobalClass(no_fully_qualified_global_class @ NoFullyQualifiedGlobalClassRule),
+    NoFullyQualifiedGlobalClassLike(no_fully_qualified_global_class_like @ NoFullyQualifiedGlobalClassLikeRule),
     NoFullyQualifiedGlobalConstant(no_fully_qualified_global_constant @ NoFullyQualifiedGlobalConstantRule),
     NoFullyQualifiedGlobalFunction(no_fully_qualified_global_function @ NoFullyQualifiedGlobalFunctionRule),
     NoAliasFunction(no_alias_function @ NoAliasFunctionRule),

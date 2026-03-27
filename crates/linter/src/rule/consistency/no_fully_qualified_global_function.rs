@@ -85,7 +85,7 @@ impl LintRule for NoFullyQualifiedGlobalFunctionRule {
     }
 
     fn targets() -> &'static [NodeKind] {
-        const TARGETS: &[NodeKind] = &[NodeKind::FunctionCall];
+        const TARGETS: &[NodeKind] = &[NodeKind::FunctionCall, NodeKind::FunctionPartialApplication];
 
         TARGETS
     }
@@ -99,12 +99,20 @@ impl LintRule for NoFullyQualifiedGlobalFunctionRule {
             return;
         }
 
-        let Node::FunctionCall(call) = node else {
-            return;
-        };
-
-        let Expression::Identifier(identifier) = call.function else {
-            return;
+        let identifier = match node {
+            Node::FunctionCall(call) => {
+                let Expression::Identifier(identifier) = call.function else {
+                    return;
+                };
+                identifier
+            }
+            Node::FunctionPartialApplication(application) => {
+                let Expression::Identifier(identifier) = application.function else {
+                    return;
+                };
+                identifier
+            }
+            _ => return,
         };
 
         if !identifier.is_fully_qualified() {
@@ -179,6 +187,18 @@ mod tests {
             namespace App;
 
             $length = \strlen("hello");
+        "#}
+    }
+
+    test_lint_failure! {
+        name = fq_function_partial_application_in_namespace,
+        rule = NoFullyQualifiedGlobalFunctionRule,
+        code = indoc! {r#"
+            <?php
+
+            namespace App;
+
+            $fn = \strlen(...);
         "#}
     }
 }

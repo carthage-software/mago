@@ -24,7 +24,7 @@ This document details the rules available in the `Consistency` category.
 | Lowercase Type Hint | [`lowercase-type-hint`](#lowercase-type-hint) |
 | No Alias Function | [`no-alias-function`](#no-alias-function) |
 | No Alternative Syntax | [`no-alternative-syntax`](#no-alternative-syntax) |
-| No Fully Qualified Global Class | [`no-fully-qualified-global-class`](#no-fully-qualified-global-class) |
+| No Fully Qualified Global Class Like | [`no-fully-qualified-global-class-like`](#no-fully-qualified-global-class-like) |
 | No Fully Qualified Global Constant | [`no-fully-qualified-global-constant`](#no-fully-qualified-global-constant) |
 | No Fully Qualified Global Function | [`no-fully-qualified-global-function`](#no-fully-qualified-global-function) |
 | No Hash Comment | [`no-hash-comment`](#no-hash-comment) |
@@ -663,7 +663,7 @@ endif;
 ```
 
 
-## <a id="no-fully-qualified-global-class"></a>`no-fully-qualified-global-class`
+## <a id="no-fully-qualified-global-class-like"></a>`no-fully-qualified-global-class-like`
 
 Disallows fully-qualified class references within a namespace.
 

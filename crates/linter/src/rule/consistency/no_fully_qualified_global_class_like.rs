@@ -23,24 +23,24 @@ use crate::rule_meta::RuleMeta;
 use crate::settings::RuleSettings;
 
 #[derive(Debug, Clone)]
-pub struct NoFullyQualifiedGlobalClassRule {
+pub struct NoFullyQualifiedGlobalClassLikeRule {
     meta: &'static RuleMeta,
-    cfg: NoFullyQualifiedGlobalClassConfig,
+    cfg: NoFullyQualifiedGlobalClassLikeConfig,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, JsonSchema)]
 #[serde(default, rename_all = "kebab-case", deny_unknown_fields)]
-pub struct NoFullyQualifiedGlobalClassConfig {
+pub struct NoFullyQualifiedGlobalClassLikeConfig {
     pub level: Level,
 }
 
-impl Default for NoFullyQualifiedGlobalClassConfig {
+impl Default for NoFullyQualifiedGlobalClassLikeConfig {
     fn default() -> Self {
         Self { level: Level::Help }
     }
 }
 
-impl Config for NoFullyQualifiedGlobalClassConfig {
+impl Config for NoFullyQualifiedGlobalClassLikeConfig {
     fn default_enabled() -> bool {
         false
     }
@@ -50,7 +50,7 @@ impl Config for NoFullyQualifiedGlobalClassConfig {
     }
 }
 
-impl NoFullyQualifiedGlobalClassRule {
+impl NoFullyQualifiedGlobalClassLikeRule {
     fn report_if_fq<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, identifier: Identifier<'arena>) {
         if !identifier.is_fully_qualified() {
             return;
@@ -72,13 +72,13 @@ impl NoFullyQualifiedGlobalClassRule {
     }
 }
 
-impl LintRule for NoFullyQualifiedGlobalClassRule {
-    type Config = NoFullyQualifiedGlobalClassConfig;
+impl LintRule for NoFullyQualifiedGlobalClassLikeRule {
+    type Config = NoFullyQualifiedGlobalClassLikeConfig;
 
     fn meta() -> &'static RuleMeta {
         const META: RuleMeta = RuleMeta {
-            name: "No Fully Qualified Global Class",
-            code: "no-fully-qualified-global-class",
+            name: "No Fully Qualified Global Class Like",
+            code: "no-fully-qualified-global-class-like",
             description: indoc! {"
                 Disallows fully-qualified class references within a namespace.
 
@@ -211,13 +211,13 @@ impl LintRule for NoFullyQualifiedGlobalClassRule {
 mod tests {
     use indoc::indoc;
 
-    use super::NoFullyQualifiedGlobalClassRule;
+    use super::NoFullyQualifiedGlobalClassLikeRule;
     use crate::test_lint_failure;
     use crate::test_lint_success;
 
     test_lint_success! {
         name = imported_class_is_not_flagged,
-        rule = NoFullyQualifiedGlobalClassRule,
+        rule = NoFullyQualifiedGlobalClassLikeRule,
         code = indoc! {r#"
             <?php
 
@@ -231,7 +231,7 @@ mod tests {
 
     test_lint_success! {
         name = global_scope_fq_class_is_not_flagged,
-        rule = NoFullyQualifiedGlobalClassRule,
+        rule = NoFullyQualifiedGlobalClassLikeRule,
         code = indoc! {r#"
             <?php
 
@@ -241,7 +241,7 @@ mod tests {
 
     test_lint_failure! {
         name = fq_instantiation_in_namespace,
-        rule = NoFullyQualifiedGlobalClassRule,
+        rule = NoFullyQualifiedGlobalClassLikeRule,
         code = indoc! {r#"
             <?php
 
@@ -253,7 +253,7 @@ mod tests {
 
     test_lint_failure! {
         name = fq_static_method_call_in_namespace,
-        rule = NoFullyQualifiedGlobalClassRule,
+        rule = NoFullyQualifiedGlobalClassLikeRule,
         code = indoc! {r#"
             <?php
 
@@ -265,7 +265,7 @@ mod tests {
 
     test_lint_failure! {
         name = fq_class_constant_access_in_namespace,
-        rule = NoFullyQualifiedGlobalClassRule,
+        rule = NoFullyQualifiedGlobalClassLikeRule,
         code = indoc! {r#"
             <?php
 
@@ -277,7 +277,7 @@ mod tests {
 
     test_lint_failure! {
         name = fq_type_hint_in_namespace,
-        rule = NoFullyQualifiedGlobalClassRule,
+        rule = NoFullyQualifiedGlobalClassLikeRule,
         code = indoc! {r#"
             <?php
 
@@ -289,7 +289,7 @@ mod tests {
 
     test_lint_failure! {
         name = fq_static_property_access_in_namespace,
-        rule = NoFullyQualifiedGlobalClassRule,
+        rule = NoFullyQualifiedGlobalClassLikeRule,
         code = indoc! {r#"
             <?php
 
@@ -301,7 +301,7 @@ mod tests {
 
     test_lint_failure! {
         name = fq_first_class_callable_in_namespace,
-        rule = NoFullyQualifiedGlobalClassRule,
+        rule = NoFullyQualifiedGlobalClassLikeRule,
         code = indoc! {r#"
             <?php
 
@@ -313,7 +313,7 @@ mod tests {
 
     test_lint_failure! {
         name = fq_instanceof_in_namespace,
-        rule = NoFullyQualifiedGlobalClassRule,
+        rule = NoFullyQualifiedGlobalClassLikeRule,
         code = indoc! {r#"
             <?php
 
@@ -325,7 +325,7 @@ mod tests {
 
     test_lint_failure! {
         name = fq_extends_in_namespace,
-        rule = NoFullyQualifiedGlobalClassRule,
+        rule = NoFullyQualifiedGlobalClassLikeRule,
         code = indoc! {r#"
             <?php
 
@@ -337,7 +337,7 @@ mod tests {
 
     test_lint_failure! {
         name = fq_implements_in_namespace,
-        rule = NoFullyQualifiedGlobalClassRule,
+        rule = NoFullyQualifiedGlobalClassLikeRule,
         count = 2,
         code = indoc! {r#"
             <?php
@@ -350,7 +350,7 @@ mod tests {
 
     test_lint_failure! {
         name = fq_attribute_in_namespace,
-        rule = NoFullyQualifiedGlobalClassRule,
+        rule = NoFullyQualifiedGlobalClassLikeRule,
         code = indoc! {r#"
             <?php
 
@@ -363,7 +363,7 @@ mod tests {
 
     test_lint_failure! {
         name = fq_trait_use_in_namespace,
-        rule = NoFullyQualifiedGlobalClassRule,
+        rule = NoFullyQualifiedGlobalClassLikeRule,
         code = indoc! {r#"
             <?php
 
