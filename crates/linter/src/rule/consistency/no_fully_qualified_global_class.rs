@@ -126,6 +126,7 @@ impl LintRule for NoFullyQualifiedGlobalClassRule {
             NodeKind::StaticMethodCall,
             NodeKind::StaticMethodPartialApplication,
             NodeKind::StaticPropertyAccess,
+            NodeKind::TraitUse,
         ];
 
         TARGETS
@@ -195,6 +196,11 @@ impl LintRule for NoFullyQualifiedGlobalClassRule {
             }
             Node::Hint(Hint::Identifier(identifier)) => {
                 self.report_if_fq(ctx, *identifier);
+            }
+            Node::TraitUse(trait_use) => {
+                for identifier in trait_use.trait_names.iter() {
+                    self.report_if_fq(ctx, *identifier);
+                }
             }
             _ => {}
         }
@@ -352,6 +358,20 @@ mod tests {
 
             #[\SomeAttribute]
             class Foo {}
+        "#}
+    }
+
+    test_lint_failure! {
+        name = fq_trait_use_in_namespace,
+        rule = NoFullyQualifiedGlobalClassRule,
+        code = indoc! {r#"
+            <?php
+
+            namespace App;
+
+            class Foo {
+                use \SomeTrait;
+            }
         "#}
     }
 }
