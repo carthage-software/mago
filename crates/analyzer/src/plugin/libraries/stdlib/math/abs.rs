@@ -27,7 +27,7 @@ impl Provider for AbsProvider {
 
 impl FunctionReturnTypeProvider for AbsProvider {
     fn targets() -> FunctionTarget {
-        FunctionTarget::Exact("abs")
+        FunctionTarget::ExactMultiple(&["abs", "psl\\math\\abs"])
     }
 
     fn get_return_type(

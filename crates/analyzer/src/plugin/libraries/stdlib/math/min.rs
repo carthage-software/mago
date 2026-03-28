@@ -32,7 +32,7 @@ impl Provider for MinProvider {
 
 impl FunctionReturnTypeProvider for MinProvider {
     fn targets() -> FunctionTarget {
-        FunctionTarget::Exact("min")
+        FunctionTarget::ExactMultiple(&["min", "psl\\math\\min", "psl\\math\\minva"])
     }
 
     fn get_return_type(

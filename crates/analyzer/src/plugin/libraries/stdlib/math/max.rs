@@ -32,7 +32,7 @@ impl Provider for MaxProvider {
 
 impl FunctionReturnTypeProvider for MaxProvider {
     fn targets() -> FunctionTarget {
-        FunctionTarget::Exact("max")
+        FunctionTarget::ExactMultiple(&["max", "psl\\math\\max", "psl\\math\\maxva"])
     }
 
     fn get_return_type(
