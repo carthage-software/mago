@@ -2,6 +2,7 @@
 extend-exclude = [
     ".git/",
     "crates/formatter/tests/",
+    "crates/analyzer/tests/cases/",
     "crates/prelude/assets/extensions",
 ]
 ignore-hidden = false
