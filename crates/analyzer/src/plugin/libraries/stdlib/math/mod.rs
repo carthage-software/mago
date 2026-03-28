@@ -11,16 +11,37 @@ use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::int::TInteger;
 use mago_codex::ttype::union::TUnion;
 
-/// Extract a single `TInteger` from a union type, if the type is a single integer atomic.
+/// Extract a `TInteger` from a union type by computing the combined bounds of all integer atomics.
+/// Returns `None` if any atomic in the union is not an integer.
 fn get_integer_from_type(ty: &TUnion) -> Option<TInteger> {
-    if !ty.is_single() {
-        return None;
+    let mut result_lb: Option<Option<i64>> = None;
+    let mut result_ub: Option<Option<i64>> = None;
+
+    for atomic in ty.types.iter() {
+        let TAtomic::Scalar(TScalar::Integer(integer)) = atomic else {
+            return None;
+        };
+
+        let (lb, ub) = integer.get_bounds();
+
+        result_lb = Some(match result_lb {
+            None => lb,
+            Some(prev) => match (prev, lb) {
+                (Some(a), Some(b)) => Some(std::cmp::min(a, b)),
+                _ => None,
+            },
+        });
+
+        result_ub = Some(match result_ub {
+            None => ub,
+            Some(prev) => match (prev, ub) {
+                (Some(a), Some(b)) => Some(std::cmp::max(a, b)),
+                _ => None,
+            },
+        });
     }
 
-    match ty.get_single() {
-        TAtomic::Scalar(TScalar::Integer(integer)) => Some(*integer),
-        _ => None,
-    }
+    Some(TInteger::from_bounds(result_lb?, result_ub?))
 }
 
 /// Collect all integer atomics from a union type. Returns `None` if any atomic is not an integer.

@@ -754,6 +754,7 @@ test_case!(issue_1509);
 test_case!(issue_1522);
 test_case!(issue_1523);
 test_case!(issue_1524);
+test_case!(issue_1526);
 test_case!(issue_1527);
 test_case!(session_set_save_handler);
 test_case!(session_set_cookie_params);
