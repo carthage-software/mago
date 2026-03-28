@@ -1124,7 +1124,7 @@ function iptcparse(string $iptc_block): array|false {}
 function iptcembed(string $iptc_data, string $filename, int $spool = 0): string|bool {}
 
 /**
- * @param-out array $image_info
+ * @param-out ?array $image_info
  *
  * @return false|array{0: int, 1: int, 2: int, 3: string, bits: int, channels: int, mime: string}
  */
@@ -4408,6 +4408,8 @@ function closelog(): true {}
 function header_register_callback(callable $callback): bool {}
 
 /**
+ * @param-out ?array $image_info
+ *
  * @return false|array{
  *  0: int,
  *  1: int,
