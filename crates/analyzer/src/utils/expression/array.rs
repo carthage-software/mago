@@ -805,17 +805,22 @@ pub(crate) fn handle_array_access_on_keyed_array<'ctx>(
                 let should_report_error = if array_like_type.types.len() > 1 {
                     // This is a union type - check if any other atomic type has this key
                     !array_like_type.types.iter().any(|atomic_type| {
-                        if let TAtomic::Array(TArray::Keyed(other_keyed)) = atomic_type {
-                            // Array with generic parameters might have any key
-                            if other_keyed.get_generic_parameters().is_some() {
-                                true
-                            } else if let Some(other_known_items) = other_keyed.get_known_items() {
-                                other_known_items.contains_key(&array_key)
-                            } else {
-                                false
+                        match atomic_type {
+                            TAtomic::Array(TArray::Keyed(other_keyed)) => {
+                                // Array with generic parameters might have any key
+                                if other_keyed.get_generic_parameters().is_some() {
+                                    true
+                                } else if let Some(other_known_items) = other_keyed.get_known_items() {
+                                    other_known_items.contains_key(&array_key)
+                                } else {
+                                    false
+                                }
                             }
-                        } else {
-                            false
+                            TAtomic::Array(TArray::List(_)) => {
+                                // A list can have any non-negative integer key
+                                matches!(array_key, ArrayKey::Integer(i) if i >= 0)
+                            }
+                            _ => false,
                         }
                     })
                 } else {
@@ -904,7 +909,23 @@ pub(crate) fn handle_array_access_on_keyed_array<'ctx>(
 
         // }
         if has_value_parameter {
-            if !in_assignment {
+            // For non-empty arrays where the key type is fully contained by the access key type,
+            // the entry is guaranteed to exist.
+            let key_is_definitely_defined = keyed_array.non_empty && {
+                let array_key = get_arraykey();
+
+                is_contained_by(
+                    context.codebase,
+                    &key_parameter,
+                    if index_type.is_mixed() { &array_key } else { index_type },
+                    true,
+                    false,
+                    false,
+                    &mut ComparisonResult::new(),
+                )
+            };
+
+            if !in_assignment && !key_is_definitely_defined {
                 *has_possibly_undefined = true;
 
                 if !context.settings.allow_possibly_undefined_array_keys
