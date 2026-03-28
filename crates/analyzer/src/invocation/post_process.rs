@@ -316,6 +316,7 @@ fn update_by_reference_argument_types<'ctx, 'arena>(
                     false,
                 )?;
 
+                block_context.assigned_variable_ids.insert(argument_id, argument.start_offset());
                 block_context.by_reference_constraints.insert(
                     argument_id,
                     ReferenceConstraint::new(argument.span(), ReferenceConstraintSource::Argument, Some(new_type)),
@@ -337,6 +338,10 @@ fn update_by_reference_argument_types<'ctx, 'arena>(
                     new_type,
                     false,
                 )?;
+
+                if let Some(argument_id) = argument_id {
+                    block_context.assigned_variable_ids.insert(argument_id, argument.start_offset());
+                }
             }
         }
     }

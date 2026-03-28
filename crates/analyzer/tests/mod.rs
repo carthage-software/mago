@@ -751,6 +751,7 @@ test_case!(issue_1504);
 test_case!(issue_1505);
 test_case!(issue_1506);
 test_case!(issue_1509);
+test_case!(issue_1524);
 test_case!(session_set_save_handler);
 test_case!(session_set_cookie_params);
 test_case!(psl_break_mixed);
