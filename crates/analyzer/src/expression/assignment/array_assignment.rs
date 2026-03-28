@@ -369,12 +369,7 @@ fn update_array_assignment_child_type<'ctx>(
 
                         collection_types.push(TAtomic::Array(TArray::Keyed(TKeyedArray {
                             parameters: Some((Arc::new((*key_type).clone()), Arc::new(value_type.clone()))),
-                            known_items: keyed_array.get_known_items().map(|known_items| {
-                                known_items
-                                    .iter()
-                                    .map(|(k, v)| (*k, (v.0, value_type.clone())))
-                                    .collect::<BTreeMap<_, _>>()
-                            }),
+                            known_items: keyed_array.get_known_items().cloned(),
                             non_empty: true,
                         })));
                     }
