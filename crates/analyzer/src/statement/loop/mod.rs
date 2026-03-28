@@ -2,6 +2,7 @@ use std::cell::Cell;
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::rc::Rc;
+use std::sync::Arc;
 
 use foldhash::HashSet;
 use indexmap::IndexMap;
@@ -154,30 +155,7 @@ fn analyze_for_or_while_loop<'ctx, 'ast, 'arena>(
     if always_enters_loop && !infinite_loop {
         for (_, variable_type) in block_context.locals.iter_mut() {
             let mut union = (**variable_type).clone();
-            let mut changed = false;
-            for atomic in union.types.to_mut().iter_mut() {
-                match atomic {
-                    TAtomic::Array(TArray::Keyed(TKeyedArray { known_items: Some(items), .. })) => {
-                        for (optional, _) in items.values_mut() {
-                            if *optional {
-                                *optional = false;
-                                changed = true;
-                            }
-                        }
-                    }
-                    TAtomic::Array(TArray::List(TList { known_elements: Some(elements), .. })) => {
-                        for (optional, _) in elements.values_mut() {
-                            if *optional {
-                                *optional = false;
-                                changed = true;
-                            }
-                        }
-                    }
-                    _ => {}
-                }
-            }
-
-            if changed {
+            if mark_array_keys_definite(&mut union) {
                 *variable_type = Rc::new(union);
             }
         }
@@ -943,6 +921,64 @@ fn analyze<'ctx, 'ast, 'arena>(
     loop_parent_context.update_references_possibly_from_confusing_scope(&continue_context);
 
     Ok((continue_context, loop_scope))
+}
+
+/// Recursively marks all optional known items in array types as definite.
+///
+/// After a loop that always enters, keys added inside the loop body are guaranteed
+/// to exist. This applies at all nesting levels, both in known items' values and
+/// in generic parameter values.
+fn mark_array_keys_definite(union: &mut TUnion) -> bool {
+    let mut changed = false;
+    for atomic in union.types.to_mut().iter_mut() {
+        match atomic {
+            TAtomic::Array(TArray::Keyed(TKeyedArray { known_items: Some(items), parameters, .. })) => {
+                for (optional, value) in items.values_mut() {
+                    if *optional {
+                        *optional = false;
+                        changed = true;
+                    }
+
+                    if mark_array_keys_definite(value) {
+                        changed = true;
+                    }
+                }
+
+                if let Some((_, value_type)) = parameters {
+                    let value = Arc::make_mut(value_type);
+                    if mark_array_keys_definite(value) {
+                        changed = true;
+                    }
+                }
+            }
+            TAtomic::Array(TArray::List(TList { known_elements: Some(elements), element_type, .. })) => {
+                for (optional, value) in elements.values_mut() {
+                    if *optional {
+                        *optional = false;
+                        changed = true;
+                    }
+
+                    if mark_array_keys_definite(value) {
+                        changed = true;
+                    }
+                }
+
+                let el = Arc::make_mut(element_type);
+                if mark_array_keys_definite(el) {
+                    changed = true;
+                }
+            }
+            TAtomic::Array(TArray::Keyed(TKeyedArray { parameters: Some((_, value_type)), .. })) => {
+                let value = Arc::make_mut(value_type);
+                if mark_array_keys_definite(value) {
+                    changed = true;
+                }
+            }
+            _ => {}
+        }
+    }
+
+    changed
 }
 
 fn get_assignment_map_depth(first_variable_id: Atom, assignment_map: &mut BTreeMap<Atom, BTreeSet<Atom>>) -> usize {
