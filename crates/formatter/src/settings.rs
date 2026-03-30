@@ -413,6 +413,30 @@ generate_formatter_settings! {
     /// Default: false
     preserve_breaking_member_access_chain: bool => "default_false",
 
+    /// When preserving a broken object method chain, keep the first method call on the same line as the receiver.
+    ///
+    /// This only affects already-broken object chains preserved by
+    /// `preserve_breaking_member_access_chain`, and does not change the default
+    /// breaking style for newly broken chains.
+    ///
+    /// When enabled:
+    /// ```php
+    /// $object->method1()
+    ///     ->method2()
+    ///     ->method3();
+    /// ```
+    ///
+    /// When disabled:
+    /// ```php
+    /// $object
+    ///     ->method1()
+    ///     ->method2()
+    ///     ->method3();
+    /// ```
+    ///
+    /// Default: false
+    preserve_breaking_member_access_chain_first_method_on_same_line: bool => "default_false",
+
     /// Whether to preserve line breaks in argument lists, even if they could fit on a single line.
     ///
     /// Default: false

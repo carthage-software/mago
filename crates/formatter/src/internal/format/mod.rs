@@ -1253,7 +1253,24 @@ impl<'arena> Format<'arena> for Return<'arena> {
                 contents.push(format_return_value(f, value));
             }
 
-            contents.push(self.terminator.format(f));
+            let terminator = self.terminator.format(f);
+
+            if let Some(chain_group_id) = f.take_member_access_chain_group_id()
+                && f.settings.method_chain_semicolon_on_next_line
+            {
+                contents.push(Document::IfBreak(
+                    IfBreak::new(
+                        f.arena,
+                        Document::Array(vec![in f.arena; Document::Line(Line::hard()), Document::String(";")]),
+                        terminator,
+                    )
+                    .with_id(chain_group_id),
+                ));
+
+                return Document::Group(Group::new(contents).with_id(chain_group_id));
+            }
+
+            contents.push(terminator);
 
             Document::Group(Group::new(contents))
         })
