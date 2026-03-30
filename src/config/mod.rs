@@ -587,6 +587,19 @@ impl Configuration {
 
         self.source.normalize()?;
 
+        // Resolve relative baseline paths against the workspace so that baseline files
+        // are found regardless of the process's current working directory (e.g. when
+        // running with --config and --workspace from a different directory).
+        if let Some(b) = self.analyzer.baseline.take() {
+            self.analyzer.baseline = Some(if b.is_relative() { self.source.workspace.join(&b) } else { b });
+        }
+        if let Some(b) = self.linter.baseline.take() {
+            self.linter.baseline = Some(if b.is_relative() { self.source.workspace.join(&b) } else { b });
+        }
+        if let Some(b) = self.guard.baseline.take() {
+            self.guard.baseline = Some(if b.is_relative() { self.source.workspace.join(&b) } else { b });
+        }
+
         Ok(())
     }
 }
