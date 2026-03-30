@@ -20,6 +20,7 @@ use function escapeshellarg;
 use function escapeshellcmd;
 use function extension_loaded;
 use function fclose;
+use function flock;
 use function file_exists;
 use function file_get_contents;
 use function file_put_contents;
@@ -48,10 +49,44 @@ use const CURLOPT_FILE;
 use const CURLOPT_FOLLOWLOCATION;
 use const CURLOPT_NOPROGRESS;
 use const CURLOPT_PROGRESSFUNCTION;
+use const LOCK_EX;
+use const LOCK_UN;
 use const STDERR;
 
 // 10ms prevents spin-locking while keeping worst-case overhead under 10ms.
 const STATUS_CHECK_INTERVAL = 10_000;
+
+/**
+ * Execute a closure while holding an exclusive file lock.
+ *
+ * Blocks until the lock is acquired. The lock is always released when the
+ * closure returns or throws, even on fatal errors.
+ *
+ * @template T
+ *
+ * @param string $lockFile Path to the lock file (created if it does not exist).
+ * @param \Closure(): T $callback The work to perform while the lock is held.
+ *
+ * @throws RuntimeException If the lock file cannot be opened.
+ *
+ * @return T
+ */
+function locked(string $lockFile, \Closure $callback): mixed
+{
+    $handle = fopen($lockFile, 'c');
+    if ($handle === false) {
+        throw new RuntimeException("Unable to create lock file: {$lockFile}");
+    }
+
+    flock($handle, LOCK_EX);
+
+    try {
+        return $callback();
+    } finally {
+        flock($handle, LOCK_UN);
+        fclose($handle);
+    }
+}
 
 /**
  * Get the installed mago version from Composer metadata.
@@ -432,29 +467,47 @@ function ensure_binary(
         return $executablePath;
     }
 
-    $archiveFile = "{$releaseDir}/{$storageDir}{$archiveExtension}";
-    $url = namespace\build_download_url($version, $storageDir, $archiveExtension);
-
     if (!is_dir($releaseDir)) {
         mkdir($releaseDir, 0o755, true);
     }
 
-    fprintf(STDERR, "Downloading mago %s for %s...\n", $version, $triple);
-    namespace\download($url, $archiveFile);
-    fprintf(STDERR, "Downloaded.\n");
+    // Lock per version+triple so different targets don't block each other.
+    $lockFile = "{$releaseDir}/.mago-{$triple}.lock";
 
-    namespace\extract_archive($archiveFile, $releaseDir, $archiveExtension);
+    return namespace\locked($lockFile, static function () use (
+        $version,
+        $triple,
+        $executableExtension,
+        $archiveExtension,
+        $releaseDir,
+        $storageDir,
+        $executablePath,
+    ): string {
+        // Re-check after acquiring lock: another process may have completed the download. (double-checked locking)
+        if (file_exists($executablePath)) {
+            return $executablePath;
+        }
 
-    if (!file_exists($executablePath)) {
-        throw new RuntimeException("Expected binary not found after extraction at {$executablePath}");
-    }
+        $archiveFile = "{$releaseDir}/{$storageDir}{$archiveExtension}";
+        $url = namespace\build_download_url($version, $storageDir, $archiveExtension);
 
-    // Ensure binary is executable on Unix
-    if ($executableExtension === '') {
-        chmod($executablePath, 0o755);
-    }
+        fprintf(STDERR, "Downloading mago %s for %s...\n", $version, $triple);
+        namespace\download($url, $archiveFile);
+        fprintf(STDERR, "Downloaded.\n");
 
-    return $executablePath;
+        namespace\extract_archive($archiveFile, $releaseDir, $archiveExtension);
+
+        if (!file_exists($executablePath)) {
+            throw new RuntimeException("Expected binary not found after extraction at {$executablePath}");
+        }
+
+        // Ensure binary is executable on Unix
+        if ($executableExtension === '') {
+            chmod($executablePath, 0o755);
+        }
+
+        return $executablePath;
+    });
 }
 
 /**
