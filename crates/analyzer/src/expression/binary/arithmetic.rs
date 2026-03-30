@@ -7,6 +7,7 @@ use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::array::TArray;
 use mago_codex::ttype::atomic::mixed::TMixed;
 use mago_codex::ttype::atomic::scalar::TScalar;
+use mago_codex::ttype::atomic::scalar::float::TFloat;
 use mago_codex::ttype::atomic::scalar::int::TInteger;
 use mago_codex::ttype::combiner;
 use mago_codex::ttype::comparator::ComparisonResult;
@@ -557,13 +558,41 @@ fn determine_numeric_result(op: &BinaryOperator<'_>, left: &TAtomic, right: &TAt
                 }
             }
         }
-        (TAtomic::Scalar(TScalar::Float(_)), _) | (_, TAtomic::Scalar(TScalar::Float(_))) => {
-            // TODO(azjezz): handle literal floats?
-            match op {
-                BinaryOperator::Modulo(_) => vec![TAtomic::Scalar(TScalar::int())],
-                _ => vec![TAtomic::Scalar(TScalar::float())],
+        (TAtomic::Scalar(TScalar::Float(_)), _) | (_, TAtomic::Scalar(TScalar::Float(_))) => match op {
+            BinaryOperator::Modulo(_) => vec![TAtomic::Scalar(TScalar::int())],
+            _ => {
+                let left_f = match left {
+                    TAtomic::Scalar(TScalar::Float(TFloat::Literal(v))) => Some(v.into_inner()),
+                    TAtomic::Scalar(TScalar::Integer(i)) => i.get_literal_value().map(|v| v as f64),
+                    _ => None,
+                };
+
+                let right_f = match right {
+                    TAtomic::Scalar(TScalar::Float(TFloat::Literal(v))) => Some(v.into_inner()),
+                    TAtomic::Scalar(TScalar::Integer(i)) => i.get_literal_value().map(|v| v as f64),
+                    _ => None,
+                };
+
+                if let (Some(l), Some(r)) = (left_f, right_f) {
+                    let result = match op {
+                        BinaryOperator::Addition(_) => Some(l + r),
+                        BinaryOperator::Subtraction(_) => Some(l - r),
+                        BinaryOperator::Multiplication(_) => Some(l * r),
+                        BinaryOperator::Division(_) if r != 0.0 => Some(l / r),
+                        BinaryOperator::Exponentiation(_) => Some(l.powf(r)),
+                        _ => None,
+                    };
+
+                    if let Some(v) = result
+                        && v.is_finite()
+                    {
+                        return vec![TAtomic::Scalar(TScalar::literal_float(v))];
+                    }
+                }
+
+                vec![TAtomic::Scalar(TScalar::float())]
             }
-        }
+        },
         _ => match op {
             BinaryOperator::Modulo(_) => vec![TAtomic::Scalar(TScalar::int())],
             _ => {
