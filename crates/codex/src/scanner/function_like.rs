@@ -113,6 +113,10 @@ pub fn scan_method<'arena>(
 
     scan_function_like_docblock(span, functionlike_id, &mut metadata, Some(class_like_metadata.name), context, scope);
 
+    if metadata.attributes.iter().any(|attr| attr.name.eq_ignore_ascii_case("Deprecated")) {
+        metadata.flags |= MetadataFlags::DEPRECATED;
+    }
+
     metadata
 }
 
@@ -172,6 +176,10 @@ pub fn scan_function<'arena>(
     }
 
     scan_function_like_docblock(function.span(), functionlike_id, &mut metadata, classname, context, scope);
+
+    if metadata.attributes.iter().any(|attr| attr.name.eq_ignore_ascii_case("Deprecated")) {
+        metadata.flags |= MetadataFlags::DEPRECATED;
+    }
 
     metadata
 }

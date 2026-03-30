@@ -49,6 +49,10 @@ pub fn scan_constant<'arena>(
 
             process_constant_docblock(&mut metadata, &docblock, None, type_context, scope);
 
+            if metadata.attributes.iter().any(|attr| attr.name.eq_ignore_ascii_case("Deprecated")) {
+                metadata.flags |= MetadataFlags::DEPRECATED;
+            }
+
             metadata
         })
         .collect()

@@ -382,10 +382,6 @@ fn scan_class_like<'arena>(
             create_enum_methods(codebase, &mut class_like_metadata, span);
         }
         SymbolKind::Trait => {
-            if class_like_metadata.attributes.iter().any(|attr| attr.name.eq_ignore_ascii_case("Deprecated")) {
-                class_like_metadata.flags |= MetadataFlags::DEPRECATED;
-            }
-
             codebase.symbols.add_trait_name(name);
         }
         SymbolKind::Interface => {
@@ -1388,6 +1384,10 @@ fn scan_class_like<'arena>(
         if class_like_metadata.methods.contains(&to_string_method) {
             class_like_metadata.add_direct_parent_interface(atom("stringable"));
         }
+    }
+
+    if class_like_metadata.attributes.iter().any(|attr| attr.name.eq_ignore_ascii_case("Deprecated")) {
+        class_like_metadata.flags |= MetadataFlags::DEPRECATED;
     }
 
     Some(class_like_metadata)
