@@ -17,7 +17,6 @@ use function curl_getinfo;
 use function curl_init;
 use function curl_setopt;
 use function escapeshellarg;
-use function escapeshellcmd;
 use function extension_loaded;
 use function fclose;
 use function flock;
@@ -524,7 +523,7 @@ function ensure_binary(
  */
 function execute(string $executablePath, array $args): never
 {
-    $command = escapeshellcmd($executablePath);
+    $command = escapeshellarg($executablePath);
     if ($args !== []) {
         $command .= ' ' . implode(' ', array_map(escapeshellarg(...), $args));
     }
