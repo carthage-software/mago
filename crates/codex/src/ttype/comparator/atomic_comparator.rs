@@ -145,6 +145,14 @@ pub fn is_contained_by(
             return false;
         }
 
+        if matches!(container_type_part, TAtomic::Mixed(mixed) if mixed.is_truthy()) && input_type_part.is_falsy() {
+            return false;
+        }
+
+        if matches!(container_type_part, TAtomic::Mixed(mixed) if mixed.is_falsy()) && input_type_part.is_truthy() {
+            return false;
+        }
+
         return true;
     }
 

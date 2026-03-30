@@ -447,11 +447,12 @@ fn scrape_type_properties(
                 return;
             }
 
-            for existing_value_type in combination.value_types.values() {
-                if !existing_value_type.is_truthy() {
-                    combination.flags.insert(CombinationFlags::GENERIC_MIXED);
-                    return;
-                }
+            let has_non_truthy = combination.value_types.values().any(|v| !v.is_truthy())
+                || combination.literal_strings.iter().any(|s| s.is_empty() || s.as_str() == "0");
+
+            if has_non_truthy {
+                combination.flags.insert(CombinationFlags::GENERIC_MIXED);
+                return;
             }
 
             combination.flags.set_truthy_mixed(Some(true));
@@ -476,11 +477,12 @@ fn scrape_type_properties(
                 return;
             }
 
-            for existing_value_type in combination.value_types.values() {
-                if !existing_value_type.is_falsy() {
-                    combination.flags.insert(CombinationFlags::GENERIC_MIXED);
-                    return;
-                }
+            let has_non_falsy = combination.value_types.values().any(|v| !v.is_falsy())
+                || combination.literal_strings.iter().any(|s| !s.is_empty() && s.as_str() != "0");
+
+            if has_non_falsy {
+                combination.flags.insert(CombinationFlags::GENERIC_MIXED);
+                return;
             }
 
             combination.flags.set_falsy_mixed(Some(true));
