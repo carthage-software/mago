@@ -527,6 +527,29 @@ generate_formatter_settings! {
     /// Default: false
     always_break_attribute_named_argument_lists: bool => "default_false",
 
+    /// Whether to align named arguments in multiline argument lists.
+    ///
+    /// When enabled:
+    /// ```php
+    /// some_function(
+    ///     short:       1,
+    ///     longerName:  2,
+    ///     longestName: 3,
+    /// );
+    /// ```
+    ///
+    /// Single-line argument lists remain inline, and positional arguments are not aligned.
+    ///
+    /// Default: false
+    align_named_arguments: bool => "default_false",
+
+    /// Whether to align multiline function and method parameter lists by the variable column.
+    ///
+    /// This is especially useful for promoted constructor properties with visibility modifiers.
+    ///
+    /// Default: false
+    align_parameters: bool => "default_false",
+
     /// Whether to use table-style alignment for arrays.
     ///
     /// When enabled, array elements are aligned in a table-like format:
