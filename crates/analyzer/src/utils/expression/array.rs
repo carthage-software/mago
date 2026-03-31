@@ -1273,7 +1273,12 @@ pub(crate) fn handle_array_access_on_string(
         expected_index_types.push(valid_index_type);
     }
 
-    if non_empty { get_non_empty_string() } else { get_string() }
+    let mut result = if non_empty { get_non_empty_string() } else { get_string() };
+    if !non_empty {
+        result.set_possibly_undefined(true, None);
+    }
+
+    result
 }
 
 pub(crate) fn handle_array_access_on_mixed<'ctx>(
