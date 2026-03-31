@@ -361,13 +361,67 @@ fn clear_object_property_narrowings<'ctx, 'arena>(
     block_context: &mut BlockContext<'ctx>,
     invocation: &Invocation<'ctx, '_, 'arena>,
 ) {
-    if let Some(metadata) = invocation.target.get_function_like_metadata()
+    let metadata = invocation.target.get_function_like_metadata();
+
+    if let Some(metadata) = metadata
         && (metadata.flags.is_pure() || metadata.flags.is_mutation_free() || metadata.flags.is_external_mutation_free())
+        && !metadata.flags.suspends_fiber()
     {
         // Mutation free functions are guaranteed not to have side effects, so we can skip clearing property narrowings.
+        // Exception: @suspends-fiber functions can yield, allowing other fibers to modify properties.
         return;
     }
 
+    // When a function is marked @suspends-fiber, it can yield execution to other fibers
+    // that may modify any $this property. Always clear $this-> memoized properties.
+    let suspends_fiber = metadata.is_some_and(|m| m.flags.suspends_fiber());
+    if suspends_fiber && block_context.scope.get_class_like_name().is_some() {
+        let keys_to_remove: Vec<_> =
+            block_context.locals.keys().copied().filter(|var_id| var_id.as_str().starts_with("$this->")).collect();
+
+        for key in &keys_to_remove {
+            block_context.locals.remove(key);
+        }
+
+        block_context.clauses.retain(|clause| {
+            clause.wedge || !clause.possibilities.keys().copied().any(|k| k.as_str().starts_with("$this->"))
+        });
+
+        block_context.reconciled_expression_clauses.retain(|clause| {
+            clause.wedge || !clause.possibilities.keys().copied().any(|k| k.as_str().starts_with("$this->"))
+        });
+    }
+
+    // A non-pure self-method call ($this->method()) can mutate $this properties.
+    // Calls on other objects ($this->foo->method()) should NOT invalidate $this->foo
+    // since the method runs on the sub-object, not on $this.
+    let is_self_method_call =
+        if let Some(FunctionLikeIdentifier::Method(class_name, _)) = invocation.target.get_function_like_identifier() {
+            block_context
+                .scope
+                .get_class_like_name()
+                .is_some_and(|current_class| current_class.as_str().eq_ignore_ascii_case(class_name.as_str()))
+        } else {
+            false
+        };
+
+    if is_self_method_call {
+        let keys_to_remove: Vec<_> =
+            block_context.locals.keys().copied().filter(|var_id| var_id.as_str().starts_with("$this->")).collect();
+
+        for key in &keys_to_remove {
+            block_context.locals.remove(key);
+        }
+
+        block_context.clauses.retain(|clause| {
+            clause.wedge || !clause.possibilities.keys().copied().any(|k| k.as_str().starts_with("$this->"))
+        });
+        block_context.reconciled_expression_clauses.retain(|clause| {
+            clause.wedge || !clause.possibilities.keys().copied().any(|k| k.as_str().starts_with("$this->"))
+        });
+    }
+
+    // When an object is passed as an argument, properties on any object could be modified.
     let arguments = invocation.arguments_source.get_arguments();
 
     let has_object_argument = arguments.iter().any(|argument| {
@@ -391,6 +445,7 @@ fn clear_object_property_narrowings<'ctx, 'arena>(
         return;
     }
 
+    // Clear ALL property and index narrowings when objects are passed as arguments.
     let keys_to_remove: Vec<_> =
         block_context.locals.keys().copied().filter(|var_id| is_property_or_index_key(*var_id)).collect();
 
@@ -398,8 +453,6 @@ fn clear_object_property_narrowings<'ctx, 'arena>(
         block_context.locals.remove(key);
     }
 
-    // Also remove clauses that reference property accesses so stale narrowings
-    // don't influence subsequent assertion resolution.
     block_context
         .clauses
         .retain(|clause| clause.wedge || !clause.possibilities.keys().copied().any(is_property_or_index_key));

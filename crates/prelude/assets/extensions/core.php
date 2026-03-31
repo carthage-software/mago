@@ -623,6 +623,8 @@ final class Fiber
      *
      * @throws FiberError
      * @throws Throwable
+     *
+     * @suspends-fiber
      */
     public static function suspend(mixed $value = null): mixed {}
 }

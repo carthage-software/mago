@@ -71,6 +71,7 @@ pub struct FunctionLikeDocblockComment {
     pub is_pure: bool,
     pub is_external_mutation_free: bool,
     pub is_mutation_free: bool,
+    pub suspends_fiber: bool,
     pub ignore_nullable_return: bool,
     pub ignore_falsable_return: bool,
     pub inherits_docs: bool,
@@ -342,6 +343,7 @@ impl FunctionLikeDocblockComment {
         let mut is_pure = false;
         let mut is_external_mutation_free = false;
         let mut is_mutation_free = false;
+        let mut suspends_fiber = false;
         let mut ignore_nullable_return = false;
         let mut ignore_falsable_return = false;
         let mut inherits_docs = false;
@@ -483,6 +485,9 @@ impl FunctionLikeDocblockComment {
                 TagKind::ExternalMutationFree | TagKind::PsalmExternalMutationFree => {
                     is_external_mutation_free = true;
                 }
+                TagKind::SuspendsFiber => {
+                    suspends_fiber = true;
+                }
                 _ => {
                     // Ignore other tags
                 }
@@ -496,6 +501,7 @@ impl FunctionLikeDocblockComment {
             is_pure,
             is_external_mutation_free,
             is_mutation_free,
+            suspends_fiber,
             ignore_nullable_return,
             ignore_falsable_return,
             inherits_docs,

@@ -40,6 +40,7 @@ impl MetadataFlags {
     pub const API: MetadataFlags = MetadataFlags(1 << 36);
     pub const MUTATION_FREE: MetadataFlags = MetadataFlags(1 << 37);
     pub const EXTERNAL_MUTATION_FREE: MetadataFlags = MetadataFlags(1 << 38);
+    pub const SUSPENDS_FIBER: MetadataFlags = MetadataFlags(1 << 39);
 }
 
 impl MetadataFlags {
@@ -300,6 +301,12 @@ impl MetadataFlags {
     #[must_use]
     pub const fn is_external_mutation_free(self) -> bool {
         self.contains(Self::EXTERNAL_MUTATION_FREE)
+    }
+
+    #[inline]
+    #[must_use]
+    pub const fn suspends_fiber(self) -> bool {
+        self.contains(Self::SUSPENDS_FIBER)
     }
 }
 

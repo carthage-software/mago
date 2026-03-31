@@ -117,6 +117,13 @@ pub fn scan_method<'arena>(
         metadata.flags |= MetadataFlags::DEPRECATED;
     }
 
+    // Automatically mark known fiber-suspending methods.
+    if method.name.value.eq_ignore_ascii_case("suspend")
+        && class_like_metadata.name.as_str().eq_ignore_ascii_case("revolt\\eventloop\\suspension")
+    {
+        metadata.flags |= MetadataFlags::SUSPENDS_FIBER;
+    }
+
     metadata
 }
 
@@ -341,6 +348,10 @@ fn scan_function_like_docblock(
         metadata.flags |= MetadataFlags::EXTERNAL_MUTATION_FREE;
     } else if docblock.is_external_mutation_free {
         metadata.flags |= MetadataFlags::EXTERNAL_MUTATION_FREE;
+    }
+
+    if docblock.suspends_fiber {
+        metadata.flags |= MetadataFlags::SUSPENDS_FIBER;
     }
 
     if docblock.ignore_falsable_return {

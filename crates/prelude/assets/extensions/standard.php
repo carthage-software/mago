@@ -3288,6 +3288,8 @@ function pack(string $format, mixed ...$values): string {}
  * ))
  *
  * @pure
+ *
+ * @psalm-ignore-falsable-return
  */
 function unpack(string $format, string $string, int $offset = 0): array|false {}
 
