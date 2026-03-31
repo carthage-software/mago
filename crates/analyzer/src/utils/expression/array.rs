@@ -129,9 +129,8 @@ pub(crate) fn get_array_target_type_given_index<'ctx>(
         );
     }
 
-    if !block_context.flags.inside_isset() {
-        if index_type.is_nullable() && !index_type.ignore_nullable_issues() {
-            context.collector.report_with_code(
+    if !block_context.flags.inside_isset() && index_type.is_nullable() && !index_type.ignore_nullable_issues() {
+        context.collector.report_with_code(
                 IssueCode::PossiblyNullArrayIndex,
                 Issue::warning(format!(
                     "Possibly using `null` as an array index to access element{}.",
@@ -145,29 +144,6 @@ pub(crate) fn get_array_target_type_given_index<'ctx>(
                 .with_note("The analysis indicates this index could be `null` at runtime.")
                 .with_help("Ensure the index is always an integer or a string, potentially using checks or assertions before access."),
             );
-        }
-
-        if array_like_type.is_nullable()
-            && !array_like_type.ignore_nullable_issues()
-            && !in_assignment
-            && !is_array_like_nullsafe
-        {
-            context.collector.report_with_code(
-                IssueCode::PossiblyNullArrayAccess,
-                Issue::warning("Cannot perform array access on possibly `null` value.")
-                    .with_annotation(Annotation::primary(access_array_span).with_message("The expression might be `null` here."))
-                    .with_note("Attempting to read or write an array index on `null` will result in a runtime error.")
-                    .with_help("Ensure the variable holds an array before accessing it, possibly by checking with `is_array()` or initializing it."),
-            );
-        } else if array_like_type.is_null() && !in_assignment {
-            context.collector.report_with_code(
-                IssueCode::NullArrayAccess,
-                Issue::error("Cannot perform array access on `null`.")
-                    .with_annotation(Annotation::primary(access_array_span).with_message("The expression is `null` here."))
-                    .with_note("Attempting to read or write an array index on `null` will result in a runtime error.")
-                    .with_help("Ensure the variable holds an array before accessing it, possibly by checking with `is_array()` or initializing it."),
-            );
-        }
     }
 
     let mut array_atomic_types = array_like_type.types.iter().collect::<Vec<_>>();
@@ -275,9 +251,84 @@ pub(crate) fn get_array_target_type_given_index<'ctx>(
 
                 has_valid_expected_index = true;
             }
-            TAtomic::Null => {
+            TAtomic::Null | TAtomic::Void => {
                 if !array_like_type.ignore_nullable_issues() && !in_assignment {
                     value_type = Some(add_optional_union_type(get_null(), value_type.as_ref(), context.codebase));
+                }
+
+                if !in_assignment
+                    && !is_array_like_nullsafe
+                    && !block_context.flags.inside_isset()
+                    && !block_context.flags.inside_unset()
+                    && !array_like_type.ignore_nullable_issues()
+                {
+                    if array_like_type.is_nullable() {
+                        context.collector.report_with_code(
+                            IssueCode::PossiblyNullArrayAccess,
+                            Issue::warning("Cannot perform array access on possibly `null` value.")
+                                .with_annotation(
+                                    Annotation::primary(access_array_span)
+                                        .with_message("The expression might be `null` here."),
+                                )
+                                .with_note(
+                                    "Attempting to read an array index on `null` will result in a runtime error.",
+                                )
+                                .with_help(
+                                    "Ensure the variable holds an array before accessing it, possibly by checking with `is_array()` or initializing it.",
+                                ),
+                        );
+                    } else {
+                        context.collector.report_with_code(
+                            IssueCode::NullArrayAccess,
+                            Issue::error("Cannot perform array access on `null`.")
+                                .with_annotation(
+                                    Annotation::primary(access_array_span)
+                                        .with_message("The expression is `null` here."),
+                                )
+                                .with_note(
+                                    "Attempting to read an array index on `null` will result in a runtime error.",
+                                )
+                                .with_help("Ensure the variable holds an array before accessing it."),
+                        );
+                    }
+                }
+
+                has_valid_expected_index = true;
+            }
+            TAtomic::Scalar(TScalar::Bool(bool_scalar)) if bool_scalar.is_false() => {
+                if !block_context.flags.inside_isset()
+                    && !block_context.flags.inside_unset()
+                    && !array_like_type.ignore_falsable_issues()
+                {
+                    if array_like_type.is_falsable() {
+                        context.collector.report_with_code(
+                            IssueCode::PossiblyFalseArrayAccess,
+                            Issue::warning("Cannot perform array access on possibly `false` value.")
+                                .with_annotation(
+                                    Annotation::primary(access_array_span)
+                                        .with_message("The expression might be `false` here."),
+                                )
+                                .with_note(
+                                    "Attempting to read an array index on `false` will result in a runtime error.",
+                                )
+                                .with_help(
+                                    "Ensure the variable holds an array before accessing it, possibly by checking with `is_array()` or `!== false`.",
+                                ),
+                        );
+                    } else {
+                        context.collector.report_with_code(
+                            IssueCode::FalseArrayAccess,
+                            Issue::error("Cannot perform array access on `false`.")
+                                .with_annotation(
+                                    Annotation::primary(access_array_span)
+                                        .with_message("The expression is `false` here."),
+                                )
+                                .with_note(
+                                    "Attempting to read an array index on `false` will result in a runtime error.",
+                                )
+                                .with_help("Ensure the variable holds an array before accessing it."),
+                        );
+                    }
                 }
 
                 has_valid_expected_index = true;
@@ -296,6 +347,53 @@ pub(crate) fn get_array_target_type_given_index<'ctx>(
                 value_type = Some(add_optional_union_type(new_type, value_type.as_ref(), context.codebase));
             }
             _ => {
+                // String with int index assignment is valid (character replacement),
+                // and null-to-array auto-conversion is allowed in PHP.
+                let is_allowed_in_assignment =
+                    matches!(atomic_var_type, TAtomic::Scalar(TScalar::String(_)) | TAtomic::Null | TAtomic::Void);
+
+                if !(block_context.flags.inside_isset()
+                    || block_context.flags.inside_unset()
+                    || (in_assignment && is_allowed_in_assignment))
+                {
+                    let type_id = atomic_var_type.get_id();
+
+                    let has_array_accessible = array_like_type.types.iter().any(|t| {
+                        matches!(
+                            t,
+                            TAtomic::Array(_) | TAtomic::Object(_) | TAtomic::Mixed(_) | TAtomic::Null | TAtomic::Void
+                        )
+                    });
+
+                    if has_array_accessible {
+                        context.collector.report_with_code(
+                            IssueCode::PossiblyInvalidArrayAccess,
+                            Issue::warning(format!("Cannot perform array access on value of type `{type_id}`."))
+                                .with_annotation(
+                                    Annotation::primary(access_array_span)
+                                        .with_message(format!("The expression might be `{type_id}` here.")),
+                                )
+                                .with_note(
+                                    "Attempting to use a scalar value as an array will result in a runtime error.",
+                                )
+                                .with_help("Ensure the variable holds an array before accessing it."),
+                        );
+                    } else {
+                        context.collector.report_with_code(
+                            IssueCode::InvalidArrayAccess,
+                            Issue::error(format!("Cannot perform array access on value of type `{type_id}`."))
+                                .with_annotation(
+                                    Annotation::primary(access_array_span)
+                                        .with_message(format!("The expression is `{type_id}` here.")),
+                                )
+                                .with_note(
+                                    "Attempting to use a scalar value as an array will result in a runtime error.",
+                                )
+                                .with_help("Ensure the variable holds an array before accessing it."),
+                        );
+                    }
+                }
+
                 has_valid_expected_index = true;
             }
         }

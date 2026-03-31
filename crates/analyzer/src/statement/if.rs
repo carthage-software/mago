@@ -289,13 +289,13 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for If<'arena> {
                 if let Some(bracket_pos) = key_str.find('[') {
                     let base_var = &key_str[..bracket_pos];
                     let base_atom = mago_atom::atom(base_var);
-                    if let Some(var_type) = block_context.locals.get(&base_atom).cloned() {
-                        if var_type.types.iter().any(|t| matches!(t, TAtomic::Array(a) if a.is_empty())) {
-                            let mut narrowed = (*var_type).clone();
-                            narrowed.types.to_mut().retain(|t| !matches!(t, TAtomic::Array(a) if a.is_empty()));
-                            if !narrowed.types.is_empty() {
-                                block_context.locals.insert(base_atom, Rc::new(narrowed));
-                            }
+                    if let Some(var_type) = block_context.locals.get(&base_atom).cloned()
+                        && var_type.types.iter().any(|t| matches!(t, TAtomic::Array(a) if a.is_empty()))
+                    {
+                        let mut narrowed = (*var_type).clone();
+                        narrowed.types.to_mut().retain(|t| !matches!(t, TAtomic::Array(a) if a.is_empty()));
+                        if !narrowed.types.is_empty() {
+                            block_context.locals.insert(base_atom, Rc::new(narrowed));
                         }
                     }
                 }

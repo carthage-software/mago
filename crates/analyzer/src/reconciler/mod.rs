@@ -319,14 +319,14 @@ fn adjust_array_type(
     if array_key.starts_with('$') {
         // When the key is a variable, we can't narrow to a specific key,
         // but we CAN remove empty array variants since isset proves the array is non-empty.
-        if let Some(existing_type) = context.locals.get(&base_key_atom).cloned() {
-            if existing_type.types.iter().any(|t| matches!(t, TAtomic::Array(a) if a.is_empty())) {
-                let mut narrowed = (*existing_type).clone();
-                narrowed.types.to_mut().retain(|t| !matches!(t, TAtomic::Array(a) if a.is_empty()));
-                if !narrowed.types.is_empty() {
-                    context.locals.insert(base_key_atom, Rc::new(narrowed));
-                    changed_var_ids.insert(atom(&format!("{}[{}]", base_key, array_key)));
-                }
+        if let Some(existing_type) = context.locals.get(&base_key_atom).cloned()
+            && existing_type.types.iter().any(|t| matches!(t, TAtomic::Array(a) if a.is_empty()))
+        {
+            let mut narrowed = (*existing_type).clone();
+            narrowed.types.to_mut().retain(|t| !matches!(t, TAtomic::Array(a) if a.is_empty()));
+            if !narrowed.types.is_empty() {
+                context.locals.insert(base_key_atom, Rc::new(narrowed));
+                changed_var_ids.insert(atom(&format!("{}[{}]", base_key, array_key)));
             }
         }
         return;
