@@ -207,7 +207,6 @@ pub fn reconcile_keyed_types<'ctx>(
 
         if type_changed {
             changed_var_ids.insert(*key);
-
             if key_str.ends_with(']') && !has_inverted_isset && !has_inverted_key_exists && !has_empty && !is_equality {
                 adjust_array_type(key_parts.clone(), block_context, changed_var_ids, &result_type, context.codebase);
             } else if key_str.ends_with(']') && (has_inverted_isset || has_inverted_key_exists) {
@@ -314,7 +313,22 @@ fn adjust_array_type(
     };
     key_parts.pop();
 
+    let base_key = key_parts.join("");
+    let base_key_atom = atom(&base_key);
+
     if array_key.starts_with('$') {
+        // When the key is a variable, we can't narrow to a specific key,
+        // but we CAN remove empty array variants since isset proves the array is non-empty.
+        if let Some(existing_type) = context.locals.get(&base_key_atom).cloned() {
+            if existing_type.types.iter().any(|t| matches!(t, TAtomic::Array(a) if a.is_empty())) {
+                let mut narrowed = (*existing_type).clone();
+                narrowed.types.to_mut().retain(|t| !matches!(t, TAtomic::Array(a) if a.is_empty()));
+                if !narrowed.types.is_empty() {
+                    context.locals.insert(base_key_atom, Rc::new(narrowed));
+                    changed_var_ids.insert(atom(&format!("{}[{}]", base_key, array_key)));
+                }
+            }
+        }
         return;
     }
 
@@ -326,9 +340,6 @@ fn adjust_array_type(
     } else {
         array_key.clone()
     };
-
-    let base_key = key_parts.join("");
-    let base_key_atom = atom(&base_key);
 
     let mut existing_type = if let Some(existing_type) = context.locals.get(&base_key_atom) {
         (**existing_type).clone()

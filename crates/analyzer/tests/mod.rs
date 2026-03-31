@@ -751,6 +751,7 @@ test_case!(issue_1504);
 test_case!(issue_1505);
 test_case!(issue_1506);
 test_case!(issue_1509);
+test_case!(isset_after_loop_break);
 test_case!(issue_1512);
 test_case!(issue_1522);
 test_case!(issue_1523);

@@ -14,6 +14,7 @@ use mago_algebra::find_satisfying_assignments;
 use mago_algebra::negate_formula;
 use mago_algebra::saturate_clauses;
 use mago_codex::assertion::Assertion;
+use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::combine_union_types;
 use mago_codex::ttype::combiner::CombinerOptions;
 use mago_codex::ttype::union::TUnion;
@@ -279,6 +280,26 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for If<'arena> {
             }
 
             extract_function_constant_existence(self.condition, artifacts, block_context, true);
+
+            // When the if-body exits and the condition involved isset/empty checks on array keys,
+            // the post-if code knows the keys exist. Remove empty array variants from base variables
+            // since the array must be non-empty for the key to exist.
+            for changed_var_id in &if_scope.conditionally_changed_variable_ids {
+                let key_str = changed_var_id.as_str();
+                if let Some(bracket_pos) = key_str.find('[') {
+                    let base_var = &key_str[..bracket_pos];
+                    let base_atom = mago_atom::atom(base_var);
+                    if let Some(var_type) = block_context.locals.get(&base_atom).cloned() {
+                        if var_type.types.iter().any(|t| matches!(t, TAtomic::Array(a) if a.is_empty())) {
+                            let mut narrowed = (*var_type).clone();
+                            narrowed.types.to_mut().retain(|t| !matches!(t, TAtomic::Array(a) if a.is_empty()));
+                            if !narrowed.types.is_empty() {
+                                block_context.locals.insert(base_atom, Rc::new(narrowed));
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         if let Some(loop_scope) = artifacts.loop_scope.as_mut() {
