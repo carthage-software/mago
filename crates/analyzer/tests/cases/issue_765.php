@@ -23,81 +23,145 @@ function getFullResult(string $url): array
 /**
  * @param string $url
  *
+ * @throws RuntimeException
+ *
  * @return non-empty-string|null
  */
 function getScheme(string $url): ?string
 {
-    return parse_url($url, PHP_URL_SCHEME);
+    $result = parse_url($url, PHP_URL_SCHEME);
+
+    if ($result === false) {
+        throw new RuntimeException('Invalid URL');
+    }
+
+    return $result;
 }
 
 /**
  * @param string $url
+ *
+ * @throws RuntimeException
  *
  * @return non-empty-string|null
  */
 function getHost(string $url): ?string
 {
-    return parse_url($url, PHP_URL_HOST);
+    $result = parse_url($url, PHP_URL_HOST);
+
+    if ($result === false) {
+        throw new RuntimeException('Invalid URL');
+    }
+
+    return $result;
 }
 
 /**
  * @param string $url
+ *
+ * @throws RuntimeException
  *
  * @return int<0, 65535>|null
  */
 function getPort(string $url): ?int
 {
-    return parse_url($url, PHP_URL_PORT);
+    $result = parse_url($url, PHP_URL_PORT);
+
+    if ($result === false) {
+        throw new RuntimeException('Invalid URL');
+    }
+
+    return $result;
 }
 
 /**
  * @param string $url
+ *
+ * @throws RuntimeException
  *
  * @return non-empty-string|null
  */
 function getUser(string $url): ?string
 {
-    return parse_url($url, PHP_URL_USER);
+    $result = parse_url($url, PHP_URL_USER);
+
+    if ($result === false) {
+        throw new RuntimeException('Invalid URL');
+    }
+
+    return $result;
 }
 
 /**
  * @param string $url
+ *
+ * @throws RuntimeException
  *
  * @return non-empty-string|null
  */
 function getPass(string $url): ?string
 {
-    return parse_url($url, PHP_URL_PASS);
+    $result = parse_url($url, PHP_URL_PASS);
+
+    if ($result === false) {
+        throw new RuntimeException('Invalid URL');
+    }
+
+    return $result;
 }
 
 /**
  * @param string $url
+ *
+ * @throws RuntimeException
  *
  * @return non-empty-string|null
  */
 function getPath(string $url): ?string
 {
-    return parse_url($url, PHP_URL_PATH);
+    $result = parse_url($url, PHP_URL_PATH);
+
+    if ($result === false) {
+        throw new RuntimeException('Invalid URL');
+    }
+
+    return $result;
 }
 
 /**
  * @param string $url
+ *
+ * @throws RuntimeException
  *
  * @return non-empty-string|null
  */
 function getQuery(string $url): ?string
 {
-    return parse_url($url, PHP_URL_QUERY);
+    $result = parse_url($url, PHP_URL_QUERY);
+
+    if ($result === false) {
+        throw new RuntimeException('Invalid URL');
+    }
+
+    return $result;
 }
 
 /**
  * @param string $url
  *
+ * @throws RuntimeException
+ *
  * @return non-empty-string|null
  */
 function getFragment(string $url): ?string
 {
-    return parse_url($url, PHP_URL_FRAGMENT);
+    $result = parse_url($url, PHP_URL_FRAGMENT);
+
+    if ($result === false) {
+        throw new RuntimeException('Invalid URL');
+    }
+
+    return $result;
 }
 
 /**
@@ -116,28 +180,4 @@ function getFullResultWithMinusOne(string $url): array
     }
 
     return $result;
-}
-
-/**
- * Both return null|non-empty-string
- *
- * @param string $url
- * @param int<0, 1> $component (PHP_URL_SCHEME or PHP_URL_HOST)
- *
- * @return non-empty-string|null
- */
-function getSchemeOrHost(string $url, int $component): ?string
-{
-    return parse_url($url, $component);
-}
-
-/**
- * @param string $url
- * @param 0|2 $component (PHP_URL_SCHEME or PHP_URL_PORT)
- *
- * @return int<0, 65535>|non-empty-string|null
- */
-function getSchemeOrPort(string $url, int $component): int|string|null
-{
-    return parse_url($url, $component);
 }

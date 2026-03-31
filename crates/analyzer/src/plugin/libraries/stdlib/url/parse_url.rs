@@ -151,22 +151,31 @@ fn collect_component_values(component_type: &TUnion) -> Option<Vec<i64>> {
 }
 
 /// Returns the type for a specific URL component.
+/// All component types include `false` since `parse_url` returns `false` for seriously malformed URLs.
+///
+/// See: https://www.php.net/manual/en/function.parse-url.php
 fn get_component_return_type(component: i64) -> TUnion {
+    let false_type = TAtomic::Scalar(TScalar::Bool(TBool::r#false()));
+
     match component {
         PHP_URL_SCHEME | PHP_URL_HOST | PHP_URL_USER | PHP_URL_PASS | PHP_URL_PATH | PHP_URL_QUERY
         | PHP_URL_FRAGMENT => {
-            // null|non-empty-string
-            TUnion::from_vec(vec![TAtomic::Null, TAtomic::Scalar(TScalar::String(TString::non_empty()))])
+            // false|null|non-empty-string
+            TUnion::from_vec(vec![false_type, TAtomic::Null, TAtomic::Scalar(TScalar::String(TString::non_empty()))])
         }
         PHP_URL_PORT => {
-            // null|int<0, 65535>
-            TUnion::from_vec(vec![TAtomic::Null, TAtomic::Scalar(TScalar::Integer(TInteger::Range(0, 65535)))])
+            // false|null|int<0, 65535>
+            TUnion::from_vec(vec![
+                false_type,
+                TAtomic::Null,
+                TAtomic::Scalar(TScalar::Integer(TInteger::Range(0, 65535))),
+            ])
         }
         -1 => {
             // -1 is equivalent to no component - return full array
             get_full_array_return_type()
         }
-        _ => TUnion::from_vec(vec![TAtomic::Scalar(TScalar::Bool(TBool::r#false()))]),
+        _ => TUnion::from_vec(vec![false_type]),
     }
 }
 
