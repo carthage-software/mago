@@ -595,6 +595,7 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
             let leftover = std::mem::take(&mut self.leftover_statements);
             analyze_statements(&leftover, self.context, &mut case_block_context, self.artifacts)?;
 
+            case_block_context.flags.set_has_returned(false);
             for (var_id, original_type) in &original_block_context.locals {
                 if let Some(current_type) = case_block_context.locals.get(var_id)
                     && current_type != original_type
