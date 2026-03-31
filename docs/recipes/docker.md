@@ -22,8 +22,8 @@ Each release produces multiple tags for flexible version pinning:
 | Tag               | Example                                 | Description                                      |
 | :---------------- | :-------------------------------------- | :----------------------------------------------- |
 | `latest`          | `ghcr.io/carthage-software/mago:latest` | Always points to the newest release              |
-| `<version>`       | `ghcr.io/carthage-software/mago:1.16.0` | Pinned to an exact version                       |
-| `<major>.<minor>` | `ghcr.io/carthage-software/mago:1.16`   | Tracks the latest patch within a minor version   |
+| `<version>`       | `ghcr.io/carthage-software/mago:1.17.0` | Pinned to an exact version                       |
+| `<major>.<minor>` | `ghcr.io/carthage-software/mago:1.17`   | Tracks the latest patch within a minor version   |
 | `<major>`         | `ghcr.io/carthage-software/mago:1`      | Tracks the latest release within a major version |
 
 The image supports both `linux/amd64` and `linux/arm64` architectures. Docker will automatically pull the correct variant for your platform.
