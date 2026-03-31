@@ -732,6 +732,7 @@ fn analyze<'ctx, 'ast, 'arena>(
     let does_sometimes_break = loop_scope.final_actions.contains(ControlAction::Break);
     let does_always_break = does_sometimes_break && loop_scope.final_actions.len() == 1;
 
+    let can_overwrite_empty_array = always_enters_loop.get() && !does_sometimes_break;
     if does_sometimes_break {
         if let Some(mut inner_do_context_inner) = inner_do_context {
             for (variable_id, possibly_redefined_variable_type) in &loop_scope.possibly_redefined_loop_parent_variables
@@ -745,7 +746,7 @@ fn analyze<'ctx, 'ast, 'arena>(
                             do_context_type,
                             codebase,
                             CombinerOptions {
-                                overwrite_empty_array: always_enters_loop.get(),
+                                overwrite_empty_array: can_overwrite_empty_array,
                                 ..CombinerOptions::default()
                             },
                         ))
@@ -764,7 +765,7 @@ fn analyze<'ctx, 'ast, 'arena>(
                         loop_parent_context_type,
                         codebase,
                         CombinerOptions {
-                            overwrite_empty_array: always_enters_loop.get(),
+                            overwrite_empty_array: can_overwrite_empty_array,
                             ..CombinerOptions::default()
                         },
                     ));
@@ -785,7 +786,7 @@ fn analyze<'ctx, 'ast, 'arena>(
                         loop_context_type,
                         codebase,
                         CombinerOptions {
-                            overwrite_empty_array: always_enters_loop.get(),
+                            overwrite_empty_array: can_overwrite_empty_array,
                             ..CombinerOptions::default()
                         },
                     )),
@@ -816,7 +817,7 @@ fn analyze<'ctx, 'ast, 'arena>(
                             continue_context_type,
                             codebase,
                             CombinerOptions {
-                                overwrite_empty_array: always_enters_loop.get(),
+                                overwrite_empty_array: can_overwrite_empty_array,
                                 ..CombinerOptions::default()
                             },
                         )),
@@ -891,7 +892,10 @@ fn analyze<'ctx, 'ast, 'arena>(
                             variable_type,
                             possibly_defined_type,
                             codebase,
-                            CombinerOptions::default().with_overwrite_empty_array(),
+                            CombinerOptions {
+                                overwrite_empty_array: can_overwrite_empty_array,
+                                ..CombinerOptions::default()
+                            },
                         )),
                     );
                 } else if let Some(possibly_redefined_type) =
@@ -903,7 +907,10 @@ fn analyze<'ctx, 'ast, 'arena>(
                             variable_type,
                             possibly_redefined_type,
                             codebase,
-                            CombinerOptions::default().with_overwrite_empty_array(),
+                            CombinerOptions {
+                                overwrite_empty_array: can_overwrite_empty_array,
+                                ..CombinerOptions::default()
+                            },
                         )),
                     );
                 }
