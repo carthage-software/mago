@@ -759,6 +759,7 @@ test_case!(issue_1526);
 test_case!(issue_1527);
 test_case!(issue_1534);
 test_case!(issue_1535);
+test_case!(issue_1539);
 test_case!(issue_1540);
 test_case!(issue_1541);
 test_case!(session_set_save_handler);

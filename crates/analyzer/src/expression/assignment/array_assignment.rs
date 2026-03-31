@@ -27,10 +27,18 @@ use mago_span::HasSpan;
 use mago_syntax::ast::Access;
 use mago_syntax::ast::Expression;
 
+use mago_codex::ttype::TType;
+use mago_codex::ttype::comparator::ComparisonResult;
+use mago_codex::ttype::comparator::union_comparator;
+use mago_reporting::Annotation;
+use mago_reporting::Issue;
+
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
+use crate::code::IssueCode;
 use crate::context::Context;
 use crate::context::block::BlockContext;
+use crate::context::block::ReferenceConstraintSource;
 use crate::error::AnalysisError;
 use crate::expression::assignment::property_assignment;
 use crate::utils::expression::array::ArrayTarget;
@@ -134,6 +142,58 @@ pub(crate) fn analyze<'ctx, 'arena>(
     let root_array_type = Rc::new(root_array_type);
     if let Some(root_var_id) = &root_var_id {
         block_context.locals.insert(*root_var_id, root_array_type.clone());
+
+        if let Some(constraint) = block_context.by_reference_constraints.get(root_var_id)
+            && let Some(constraint_type) = constraint.constraint_type.as_ref()
+            && !union_comparator::is_contained_by(
+                context.codebase,
+                &root_array_type,
+                constraint_type,
+                root_array_type.ignore_nullable_issues(),
+                root_array_type.ignore_falsable_issues(),
+                false,
+                &mut ComparisonResult::default(),
+            )
+        {
+            let new_type_str = root_array_type.get_id();
+            let constraint_type_str = constraint_type.get_id();
+
+            let issue = match constraint.source {
+                ReferenceConstraintSource::Parameter => Issue::error(format!(
+                    "Invalid modification of by-reference parameter `{root_var_id}`.",
+                ))
+                .with_annotation(
+                    Annotation::primary(root_array_expression.span()).with_message(format!(
+                        "This results in type `{new_type_str}`, but the parameter expects `{constraint_type_str}`.",
+                    )),
+                )
+                .with_annotation(
+                    Annotation::secondary(constraint.constraint_span)
+                        .with_message("Parameter is defined with a by-reference type constraint here."),
+                )
+                .with_note(
+                    "Modifying a by-reference parameter to an incompatible type can cause unexpected `TypeError`s in the calling scope.",
+                )
+                .with_help(
+                    "If the parameter should have a different type on exit, declare it using a `@param-out` docblock tag.",
+                ),
+                _ => Issue::error(format!(
+                    "Potentially invalid modification of referenced variable `{root_var_id}`.",
+                ))
+                .with_annotation(
+                    Annotation::primary(root_array_expression.span()).with_message(format!(
+                        "This results in type `{new_type_str}`, which may violate a reference constraint.",
+                    )),
+                )
+                .with_annotation(
+                    Annotation::secondary(constraint.constraint_span).with_message(format!(
+                        "Variable was passed as a by-reference argument here, constraining it to type `{constraint_type_str}`.",
+                    )),
+                ),
+            };
+
+            context.collector.report_with_code(IssueCode::ReferenceConstraintViolation, issue);
+        }
     }
 
     artifacts.set_rc_expression_type(&root_array_expression, root_array_type);
