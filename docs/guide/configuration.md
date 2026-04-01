@@ -199,19 +199,42 @@ Mago can make file paths in diagnostic output clickable using [OSC 8 terminal hy
 
 This works in terminals that support OSC 8 hyperlinks, including iTerm2, Wezterm, Kitty, Windows Terminal, Ghostty, and others.
 
-### Configuration
+### Auto-Detection
 
-Set the `editor-url` option in your `mago.toml` with a URL template for your editor:
+Mago automatically detects your editor when running inside a supported terminal. On macOS, this uses the `__CFBundleIdentifier` environment variable set by the running application. On other platforms, the `TERM_PROGRAM` variable is checked.
+
+The following editors are automatically detected:
+
+- PhpStorm / IntelliJ IDEA / WebStorm
+- VS Code / VS Code Insiders
+- Zed
+- Sublime Text
+
+When auto-detection succeeds, clickable file paths work out of the box with no configuration needed.
+
+### Manual Configuration
+
+If auto-detection doesn't work for your setup, or you want to override it, you can set the editor URL explicitly.
+
+The `MAGO_EDITOR_URL` environment variable takes the highest precedence:
+
+```sh
+export MAGO_EDITOR_URL="vscode://file/%file%:%line%:%column%"
+```
+
+The `editor-url` option in `mago.toml` takes precedence over auto-detection but is overridden by the environment variable:
 
 ```toml
 editor-url = "phpstorm://open?file=%file%&line=%line%&column=%column%"
 ```
 
-Or use the `MAGO_EDITOR_URL` environment variable:
+### Precedence
 
-```sh
-export MAGO_EDITOR_URL="vscode://file/%file%:%line%:%column%"
-```
+The editor URL is resolved in the following order (first match wins):
+
+1. `MAGO_EDITOR_URL` environment variable
+2. `editor-url` in `mago.toml`
+3. Auto-detection from terminal environment
 
 ### Supported Placeholders
 

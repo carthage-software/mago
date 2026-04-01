@@ -79,8 +79,16 @@ Overrides the `threads` setting, allowing you to control the number of parallel 
 
 - **Example**: `MAGO_THREADS=4 mago lint`
 
+### `MAGO_EDITOR_URL`
+
+Overrides the `editor-url` setting and the auto-detected editor URL. This takes the highest precedence for determining clickable file path URLs in diagnostic output.
+
+See [Editor Integration](/guide/configuration#editor-integration) for supported URL templates.
+
+- **Example**: `MAGO_EDITOR_URL="phpstorm://open?file=%file%&line=%line%&column=%column%" mago lint`
+
 ### `MAGO_ALLOW_UNSUPPORTED_PHP_VERSION`
 
-Overrides the `allow_unsupported_php_version` setting. Set to `true` to allow Mago to run on unsupported PHP versions. This is not recommended and may lead to unexpected behavior.
+Overrides the `allow-unsupported-php-version` setting. Set to `true` to allow Mago to run on unsupported PHP versions. This is not recommended and may lead to unexpected behavior.
 
 - **Example**: `MAGO_ALLOW_UNSUPPORTED_PHP_VERSION=true mago lint`

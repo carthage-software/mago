@@ -373,6 +373,10 @@ impl Configuration {
             configuration.source.workspace = workspace;
         }
 
+        if configuration.editor_url.is_none() {
+            configuration.editor_url = detect_editor_url();
+        }
+
         configuration.normalize()?;
 
         Ok(configuration)
@@ -724,4 +728,47 @@ mod tests {
         fs::write(&config_path, config_content).unwrap();
         config_path
     }
+}
+
+/// Auto-detect the editor URL template from environment hints.
+///
+/// Checks terminal environment variables to determine which editor is running,
+/// and returns the appropriate URL template for clickable file paths.
+fn detect_editor_url() -> Option<String> {
+    if let Ok(bundle_id) = std::env::var("__CFBundleIdentifier") {
+        let url = match bundle_id.as_str() {
+            "com.jetbrains.PhpStorm" | "com.jetbrains.PhpStorm-EAP" => {
+                "phpstorm://open?file=%file%&line=%line%&column=%column%"
+            }
+            "com.jetbrains.intellij" | "com.jetbrains.intellij.ce" => {
+                "idea://open?file=%file%&line=%line%&column=%column%"
+            }
+            "com.jetbrains.WebStorm" | "com.jetbrains.WebStorm-EAP" => {
+                "webstorm://open?file=%file%&line=%line%&column=%column%"
+            }
+            "dev.zed.Zed" | "dev.zed.Zed-Preview" => "zed://file/%file%:%line%:%column%",
+            "com.microsoft.VSCode" => "vscode://file/%file%:%line%:%column%",
+            "com.microsoft.VSCodeInsiders" => "vscode-insiders://file/%file%:%line%:%column%",
+            "com.sublimetext.4" | "com.sublimetext.3" => "subl://open?url=file://%file%&line=%line%&column=%column%",
+            _ => return None,
+        };
+
+        tracing::debug!("Auto-detected editor URL from __CFBundleIdentifier={bundle_id}");
+
+        return Some(url.to_string());
+    }
+
+    if let Ok(term_program) = std::env::var("TERM_PROGRAM") {
+        let url = match term_program.as_str() {
+            "vscode" => "vscode://file/%file%:%line%:%column%",
+            "zed" => "zed://file/%file%:%line%:%column%",
+            _ => return None,
+        };
+
+        tracing::debug!("Auto-detected editor URL from TERM_PROGRAM={term_program}");
+
+        return Some(url.to_string());
+    }
+
+    None
 }
