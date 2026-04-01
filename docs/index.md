@@ -140,6 +140,7 @@ curl --proto '=https' --tlsv1.2 -sSf https://carthage.software/mago.sh | bash
   </div>
   <!-- SPONSORS_START -->
 <div class="sponsor-tier"><div class="sponsor-tier-grid"><a href="https://www.jetbrains.com/" title="JetBrains" target="_blank" rel="noopener" class="sponsor-card sponsor-gold"><img src="https://avatars.githubusercontent.com/u/60931315?u=f9b545e50cace9e9028f77eaf1e83104d18d4d48&v=4&s=128" alt="JetBrains"><span>JetBrains</span></a>
+<a href="https://github.com/zip-fa" title="zip-fa" target="_blank" rel="noopener" class="sponsor-card sponsor-gold"><img src="https://avatars.githubusercontent.com/u/61551308?v=4&s=128" alt="zip-fa"><span>zip-fa</span></a>
 </div></div>
 <div class="sponsor-tier"><div class="sponsor-tier-grid"><a href="https://github.com/jasonrm" title="Jason R. McNeil" target="_blank" rel="noopener" class="sponsor-card sponsor-silver"><img src="https://avatars.githubusercontent.com/u/39949?u=69c0e4fb08c439250978d41dbc3371d2f0609b98&v=4&s=80" alt="Jason R. McNeil"><span>Jason R. McNeil</span></a>
 <a href="https://ofcompute.rs/" title="Vincent Berset" target="_blank" rel="noopener" class="sponsor-card sponsor-silver"><img src="https://avatars.githubusercontent.com/u/5173120?u=95efc76cd8fc804536dc6dd25781a95b650bf902&v=4&s=80" alt="Vincent Berset"><span>Vincent Berset</span></a>
