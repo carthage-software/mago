@@ -24,6 +24,7 @@ pub fn lookup_keyword(bytes: &[u8]) -> Option<TypeTokenKind> {
         21 => lookup_len21(bytes),
         23 => lookup_len23(bytes),
         24 => lookup_len24(bytes),
+        25 => lookup_len25(bytes),
         26 => lookup_len26(bytes),
         _ => None,
     }
@@ -235,7 +236,15 @@ fn lookup_len14(bytes: &[u8]) -> Option<TypeTokenKind> {
 #[inline]
 fn lookup_len15(bytes: &[u8]) -> Option<TypeTokenKind> {
     match bytes[0] | 0x20 {
-        b'c' if eq(bytes, b"closed-resource") => Some(TypeTokenKind::ClosedResource),
+        b'c' => {
+            if eq(bytes, b"closed-resource") {
+                Some(TypeTokenKind::ClosedResource)
+            } else if eq(bytes, b"callable-string") {
+                Some(TypeTokenKind::CallableString)
+            } else {
+                None
+            }
+        }
         b'n' => {
             if eq(bytes, b"non-empty-array") {
                 Some(TypeTokenKind::NonEmptyArray)
@@ -299,6 +308,15 @@ fn lookup_len23(bytes: &[u8]) -> Option<TypeTokenKind> {
 #[inline]
 fn lookup_len24(bytes: &[u8]) -> Option<TypeTokenKind> {
     if eq(bytes, b"non-empty-literal-string") { Some(TypeTokenKind::NonEmptyUnspecifiedLiteralString) } else { None }
+}
+
+#[inline]
+fn lookup_len25(bytes: &[u8]) -> Option<TypeTokenKind> {
+    match bytes[0] | 0x20 {
+        b'l' if eq(bytes, b"lowercase-callable-string") => Some(TypeTokenKind::LowercaseCallableString),
+        b'u' if eq(bytes, b"uppercase-callable-string") => Some(TypeTokenKind::UppercaseCallableString),
+        _ => None,
+    }
 }
 
 #[inline]

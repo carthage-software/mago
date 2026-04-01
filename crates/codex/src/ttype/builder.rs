@@ -57,9 +57,11 @@ use crate::ttype::atomic::scalar::TScalar;
 use crate::ttype::atomic::scalar::class_like_string::TClassLikeString;
 use crate::ttype::atomic::scalar::class_like_string::TClassLikeStringKind;
 use crate::ttype::atomic::scalar::int::TInteger;
+use crate::ttype::atomic::scalar::string::TStringCasing;
 use crate::ttype::error::TypeError;
 use crate::ttype::get_arraykey;
 use crate::ttype::get_bool;
+use crate::ttype::get_callable_string;
 use crate::ttype::get_closed_resource;
 use crate::ttype::get_false;
 use crate::ttype::get_float;
@@ -90,6 +92,7 @@ use crate::ttype::get_positive_int;
 use crate::ttype::get_resource;
 use crate::ttype::get_scalar;
 use crate::ttype::get_string;
+use crate::ttype::get_string_with_props;
 use crate::ttype::get_true;
 use crate::ttype::get_truthy_mixed;
 use crate::ttype::get_truthy_string;
@@ -461,6 +464,9 @@ pub fn get_union_from_type_ast(
         Type::ArrayKey(_) => get_arraykey(),
         Type::Numeric(_) => get_numeric(),
         Type::Scalar(_) => get_scalar(),
+        Type::CallableString(_) => get_callable_string(),
+        Type::LowercaseCallableString(_) => get_string_with_props(false, false, false, true, TStringCasing::Lowercase),
+        Type::UppercaseCallableString(_) => get_string_with_props(false, false, false, true, TStringCasing::Uppercase),
         Type::NumericString(_) => get_numeric_string(),
         Type::NonEmptyString(_) => get_non_empty_string(),
         Type::TruthyString(_) | Type::NonFalsyString(_) => get_truthy_string(),

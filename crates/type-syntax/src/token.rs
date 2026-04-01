@@ -46,6 +46,9 @@ pub enum TypeTokenKind {
     Callable,
     Array,
     NonEmptyArray,
+    CallableString,
+    LowercaseCallableString,
+    UppercaseCallableString,
     NonEmptyString,
     NonEmptyLowercaseString,
     NonEmptyUppercaseString,
@@ -201,6 +204,9 @@ impl TypeTokenKind {
                 | Self::Callable
                 | Self::Array
                 | Self::NonEmptyArray
+                | Self::CallableString
+                | Self::LowercaseCallableString
+                | Self::UppercaseCallableString
                 | Self::NonEmptyString
                 | Self::NonEmptyLowercaseString
                 | Self::LowercaseString

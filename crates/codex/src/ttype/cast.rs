@@ -15,7 +15,9 @@ use crate::ttype::atomic::array::key::ArrayKey;
 use crate::ttype::atomic::array::keyed::TKeyedArray;
 use crate::ttype::atomic::array::list::TList;
 use crate::ttype::atomic::callable::TCallable;
+use crate::ttype::atomic::callable::TCallableSignature;
 use crate::ttype::atomic::object::TObject;
+use crate::ttype::atomic::scalar::TScalar;
 use crate::ttype::template::GenericTemplate;
 use crate::ttype::template::TemplateResult;
 use crate::ttype::union::TUnion;
@@ -54,6 +56,12 @@ pub fn cast_atomic_to_callable<'a>(
         }
 
         return Some(Cow::Owned(TCallable::Alias(FunctionLikeIdentifier::Function(atom(literal_string)))));
+    }
+
+    if let TAtomic::Scalar(TScalar::String(string_scalar)) = atomic
+        && string_scalar.is_callable
+    {
+        return Some(Cow::Owned(TCallable::Signature(TCallableSignature::new(false, false))));
     }
 
     if let TAtomic::Object(TObject::Named(named_object)) = atomic {

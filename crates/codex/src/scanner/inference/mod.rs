@@ -103,6 +103,7 @@ pub fn get_platform_constant_type(name: &str) -> Option<TUnion> {
                 is_numeric: false,
                 is_truthy: true,
                 is_non_empty: true,
+                is_callable: false,
                 casing: TStringCasing::Lowercase,
             })),
             TAtomic::Scalar(TScalar::String(TString {
@@ -110,6 +111,7 @@ pub fn get_platform_constant_type(name: &str) -> Option<TUnion> {
                 is_numeric: false,
                 is_truthy: true,
                 is_non_empty: true,
+                is_callable: false,
                 casing: TStringCasing::Lowercase,
             })),
         ]
@@ -332,12 +334,12 @@ pub(super) fn infer_with_constants<'arena>(
             };
 
             let lhs_string = match lhs_type.get_single_owned() {
-                TAtomic::Scalar(TScalar::String(s)) => s.clone(),
+                TAtomic::Scalar(TScalar::String(s)) => s,
                 _ => return Some(get_string()),
             };
 
             let rhs_string = match rhs_type.get_single_owned() {
-                TAtomic::Scalar(TScalar::String(s)) => s.clone(),
+                TAtomic::Scalar(TScalar::String(s)) => s,
                 _ => return Some(get_string()),
             };
 

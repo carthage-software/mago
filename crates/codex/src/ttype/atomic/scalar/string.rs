@@ -16,7 +16,7 @@ pub enum TStringCasing {
 }
 
 /// Represents the state of a string known to originate from a literal.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Serialize, Deserialize, Eq, PartialOrd, Ord, Hash)]
 pub enum TStringLiteral {
     /// The string originates from a literal, but its specific value isn't tracked here.
     Unspecified,
@@ -25,7 +25,7 @@ pub enum TStringLiteral {
 }
 
 /// Represents a PHP string type, tracking literal origin and guaranteed properties.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Serialize, Deserialize, Eq, PartialOrd, Ord, Hash)]
 pub struct TString {
     /// Describes the literal nature, if known. `None` means not known to be literal (general string).
     pub literal: Option<TStringLiteral>,
@@ -35,6 +35,8 @@ pub struct TString {
     pub is_truthy: bool,
     /// Is this string *guaranteed* (by analysis or literal value) to be non-empty?
     pub is_non_empty: bool,
+    /// Is this string known to be callable (a valid function/method name)?
+    pub is_callable: bool,
     /// What is the casing of this string? This is tracked separately from literal value to allow for non-literal strings that are known to be lowercase or uppercase.
     pub casing: TStringCasing,
 }
@@ -105,7 +107,7 @@ impl TString {
     ) -> Self {
         is_non_empty |= is_numeric || is_truthy;
 
-        Self { literal, is_numeric, is_truthy, is_non_empty, casing }
+        Self { literal, is_numeric, is_truthy, is_non_empty, is_callable: false, casing }
     }
 
     /// Creates an instance representing the general `string` type (not known literal, no guaranteed props).
@@ -162,6 +164,30 @@ impl TString {
     #[must_use]
     pub const fn truthy() -> Self {
         Self::new(None, false, true, true, TStringCasing::Unspecified)
+    }
+
+    /// Creates a callable-string instance (a string known to be a valid callable name).
+    #[inline]
+    #[must_use]
+    pub const fn callable() -> Self {
+        Self::callable_with_casing(TStringCasing::Unspecified)
+    }
+
+    /// Creates a callable-string instance with a specific casing.
+    #[inline]
+    #[must_use]
+    pub const fn callable_with_casing(casing: TStringCasing) -> Self {
+        Self { literal: None, is_numeric: false, is_truthy: true, is_non_empty: true, is_callable: true, casing }
+    }
+
+    /// Returns a copy with the `is_callable` flag set.
+    #[inline]
+    #[must_use]
+    pub fn as_callable(mut self) -> Self {
+        self.is_callable = true;
+        self.is_non_empty = true;
+        self.is_truthy = true;
+        self
     }
 
     /// Creates a general string instance with explicitly set guaranteed properties (from analysis).
@@ -383,10 +409,11 @@ impl TString {
     #[must_use]
     pub fn as_numeric(&self, retain_literal: bool) -> Self {
         Self {
-            literal: if retain_literal { self.literal.clone() } else { None },
+            literal: if retain_literal { self.literal } else { None },
             is_numeric: true,
             is_truthy: self.is_truthy,
             is_non_empty: true, // Numeric strings are always non-empty
+            is_callable: self.is_callable,
             casing: self.casing,
         }
     }
@@ -436,6 +463,14 @@ impl TType for TString {
                 }
             }
             None => {
+                if self.is_callable {
+                    return atom(match self.casing {
+                        TStringCasing::Lowercase => "lowercase-callable-string",
+                        TStringCasing::Uppercase => "uppercase-callable-string",
+                        TStringCasing::Unspecified => "callable-string",
+                    });
+                }
+
                 if self.is_truthy {
                     if self.is_numeric {
                         "truthy-numeric-string"

@@ -444,7 +444,8 @@ fn fold_concat_operands(operands: &[&Expression<'_>], artifacts: &AnalysisArtifa
             TStringCasing::Unspecified
         };
 
-        return get_string_with_props(false, is_truthy, is_non_empty, casing);
+        // lose the callable flag on concat.
+        return get_string_with_props(false, is_truthy, is_non_empty, false, casing);
     }
 
     TUnion::new(current_strings.into_iter().map(|string| TAtomic::Scalar(TScalar::String(string))).collect())
@@ -554,7 +555,7 @@ fn get_operand_strings(operand_type: &TUnion) -> Vec<TString> {
                 }
             }
             TScalar::String(operand_string) => {
-                operand_strings.push(operand_string.clone());
+                operand_strings.push(*operand_string);
             }
             TScalar::ClassLikeString(tclass_like_string) => {
                 if let Some(id) = tclass_like_string.literal_value() {

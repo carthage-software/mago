@@ -72,6 +72,11 @@ pub const TRUTHY_LOWERCASE_STRING_ATOMIC: &TAtomic =
 pub const TRUTHY_UPPERCASE_STRING_ATOMIC: &TAtomic =
     &TAtomic::Scalar(TScalar::String(TString::new(None, false, true, false, TStringCasing::Uppercase)));
 /// A static `TAtomic` for a `numeric-string`.
+pub const CALLABLE_STRING_ATOMIC: &TAtomic = &TAtomic::Scalar(TScalar::String(TString::callable()));
+pub const LOWERCASE_CALLABLE_STRING_ATOMIC: &TAtomic =
+    &TAtomic::Scalar(TScalar::String(TString::callable_with_casing(TStringCasing::Lowercase)));
+pub const UPPERCASE_CALLABLE_STRING_ATOMIC: &TAtomic =
+    &TAtomic::Scalar(TScalar::String(TString::callable_with_casing(TStringCasing::Uppercase)));
 pub const NUMERIC_STRING_ATOMIC: &TAtomic =
     &TAtomic::Scalar(TScalar::String(TString::new(None, true, false, false, TStringCasing::Unspecified)));
 /// A static `TAtomic` for a `numeric-string` that is also `truthy`.
@@ -132,6 +137,7 @@ pub static EMPTY_STRING_ATOMIC: LazyLock<TAtomic> = LazyLock::new(|| {
         is_numeric: false,
         is_truthy: false,
         is_non_empty: false,
+        is_callable: false,
         casing: TStringCasing::Unspecified,
     }))
 });

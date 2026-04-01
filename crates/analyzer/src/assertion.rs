@@ -14,6 +14,7 @@ use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::int::TInteger;
 use mago_codex::ttype::atomic::scalar::string::TString;
 use mago_codex::ttype::atomic::scalar::string::TStringCasing;
+use mago_codex::ttype::cast::cast_atomic_to_callable;
 use mago_codex::ttype::get_array_value_parameter;
 use mago_codex::ttype::get_iterable_value_parameter;
 use mago_span::HasSpan;
@@ -93,11 +94,41 @@ pub fn scrape_assertions(
                 _ => {}
             }
 
-            if let Call::Function(_) = call
-                && is_count_or_size_of_call(expression, assertion_context)
-                && let Some(array_variable_id) = get_first_argument_expression_id(assertion_context, expression)
+            if let Call::Function(FunctionCall { function: _, argument_list }) = call
+                && 1 == argument_list.arguments.len()
+                && let Some(first_argument) = argument_list.arguments.first()
+                && let Some(first_argument_expression_id) = get_expression_id(
+                    first_argument.value(),
+                    assertion_context.this_class_name,
+                    assertion_context.resolved_names,
+                    Some(assertion_context.codebase),
+                )
             {
-                if_types.insert(array_variable_id, vec![vec![Assertion::NonEmptyCountable(false)]]);
+                if is_count_or_size_of_call(expression, assertion_context) {
+                    if_types.insert(first_argument_expression_id, vec![vec![Assertion::NonEmptyCountable(false)]]);
+                } else if is_function_call_to(expression, assertion_context, "function_exists") {
+                    if_types.insert(
+                        first_argument_expression_id,
+                        vec![vec![Assertion::IsType(TAtomic::Scalar(TScalar::String(TString::callable())))]],
+                    );
+                } else if is_function_call_to(expression, assertion_context, "is_callable")
+                    && let Some(first_argument_type) = artifacts.get_expression_type(first_argument.value())
+                {
+                    let mut callables = vec![];
+                    for argument_type_atomic in first_argument_type.types.as_ref() {
+                        if let Some(callable) =
+                            cast_atomic_to_callable(argument_type_atomic, assertion_context.codebase, None)
+                        {
+                            callables.push(Assertion::IsType(TAtomic::Callable(callable.into_owned())));
+                        } else if let TAtomic::Scalar(TScalar::String(string)) = argument_type_atomic {
+                            callables.push(Assertion::IsType(TAtomic::Scalar(TScalar::String(string.as_callable()))));
+                        }
+                    }
+
+                    if !callables.is_empty() {
+                        if_types.insert(first_argument_expression_id, vec![callables]);
+                    }
+                }
             }
         }
         Expression::Construct(construct) => match construct {
@@ -336,6 +367,9 @@ fn scrape_special_function_call_assertions(
                 ))))],
             )),
             "count" => Some((0, vec![Assertion::HasAtLeastCount(1)])),
+            "function_exists" => {
+                Some((0, vec![Assertion::IsType(TAtomic::Scalar(TScalar::String(TString::callable())))]))
+            }
             "method_exists" if assertion_context.trust_existence_checks => {
                 let method_name = function_call
                     .argument_list
@@ -1556,6 +1590,23 @@ fn get_expression_array_key(artifacts: &AnalysisArtifacts, expression: &Expressi
 }
 
 fn is_count_or_size_of_call(expression: &Expression, assertion_context: AssertionContext<'_, '_>) -> bool {
+    is_function_call_to_one_of(expression, assertion_context, &["count", "sizeof", "Psl\\Iter\\count"])
+}
+
+fn is_function_call_to(
+    expression: &Expression,
+    assertion_context: AssertionContext<'_, '_>,
+    function_name: &str,
+) -> bool {
+    is_function_call_to_one_of(expression, assertion_context, &[function_name])
+}
+
+#[inline]
+fn is_function_call_to_one_of(
+    expression: &Expression,
+    assertion_context: AssertionContext<'_, '_>,
+    functions: &[&str],
+) -> bool {
     let Expression::Call(Call::Function(FunctionCall { function, argument_list })) = expression else {
         return false;
     };
@@ -1568,17 +1619,13 @@ fn is_count_or_size_of_call(expression: &Expression, assertion_context: Assertio
         return false;
     };
 
-    if function_identifier.value().eq_ignore_ascii_case("count")
-        || function_identifier.value().eq_ignore_ascii_case("sizeof")
-    {
+    if functions.iter().any(|name| function_identifier.value().eq_ignore_ascii_case(name)) {
         return true;
     }
 
     let resolved_function_name = assertion_context.resolved_names.get(function_identifier);
 
-    resolved_function_name.eq_ignore_ascii_case("count")
-        || resolved_function_name.eq_ignore_ascii_case("sizeof")
-        || resolved_function_name.eq_ignore_ascii_case("Psl\\Iter\\count")
+    functions.iter().any(|name| resolved_function_name.eq_ignore_ascii_case(name))
 }
 
 fn get_true_equality_assertions(

@@ -244,6 +244,13 @@ fn parse_primary_type<'input>(stream: &mut TypeTokenStream<'input>) -> Result<Ty
         TypeTokenKind::NonPositiveInt => Type::NonPositiveInt(Keyword::from_token(stream.consume()?, stream.file_id())),
         TypeTokenKind::NonNegativeInt => Type::NonNegativeInt(Keyword::from_token(stream.consume()?, stream.file_id())),
         TypeTokenKind::String => Type::String(Keyword::from_token(stream.consume()?, stream.file_id())),
+        TypeTokenKind::CallableString => Type::CallableString(Keyword::from_token(stream.consume()?, stream.file_id())),
+        TypeTokenKind::LowercaseCallableString => {
+            Type::LowercaseCallableString(Keyword::from_token(stream.consume()?, stream.file_id()))
+        }
+        TypeTokenKind::UppercaseCallableString => {
+            Type::UppercaseCallableString(Keyword::from_token(stream.consume()?, stream.file_id()))
+        }
         TypeTokenKind::NumericString => Type::NumericString(Keyword::from_token(stream.consume()?, stream.file_id())),
         TypeTokenKind::NonEmptyString => Type::NonEmptyString(Keyword::from_token(stream.consume()?, stream.file_id())),
         TypeTokenKind::NonEmptyLowercaseString => {

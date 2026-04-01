@@ -350,10 +350,18 @@ pub(crate) fn intersect_atomic_with_atomic(
     }
 
     if matches!(second_type, TAtomic::Callable(_)) && first_type.can_be_callable() {
+        if let TAtomic::Scalar(TScalar::String(string)) = first_type {
+            return Some(TAtomic::Scalar(TScalar::String(string.as_callable())));
+        }
+
         return Some(first_type.clone());
     }
 
     if matches!(first_type, TAtomic::Callable(_)) && second_type.can_be_callable() {
+        if let TAtomic::Scalar(TScalar::String(string)) = second_type {
+            return Some(TAtomic::Scalar(TScalar::String(string.as_callable())));
+        }
+
         return Some(second_type.clone());
     }
 

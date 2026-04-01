@@ -538,7 +538,7 @@ fn increment_operand<'ctx, 'arena>(
                         }
                     } else {
                         // Non-literal string: result is string, but value unknown.
-                        possibilities.push(TAtomic::Scalar(TScalar::String(string_scalar.clone())));
+                        possibilities.push(TAtomic::Scalar(TScalar::String(*string_scalar)));
                     }
                 }
                 TScalar::Bool(boolean_scalar) => {
@@ -740,7 +740,7 @@ fn decrement_operand<'ctx, 'arena>(
                                     .with_help("Decrementing a non-numeric string has no effects on the string value."),
                             );
 
-                            possibilities.push(TAtomic::Scalar(TScalar::String(string_scalar.clone())));
+                            possibilities.push(TAtomic::Scalar(TScalar::String(*string_scalar)));
                         } else if let Some(TStringLiteral::Value(string_val)) = &string_scalar.literal {
                             if string_val.is_empty() {
                                 possibilities.push(TAtomic::Scalar(TScalar::literal_int(-1)));
@@ -772,7 +772,7 @@ fn decrement_operand<'ctx, 'arena>(
                             }
                         } else {
                             // Non-literal string: result is string, but value unknown.
-                            possibilities.push(TAtomic::Scalar(TScalar::String(string_scalar.clone())));
+                            possibilities.push(TAtomic::Scalar(TScalar::String(*string_scalar)));
                         }
                     }
                     TScalar::Bool(boolean_scalar) => {
@@ -1447,7 +1447,7 @@ pub fn cast_type_to_string<'ctx>(
                     }
                 }
                 TScalar::Numeric => possibilities.push(TAtomic::Scalar(TScalar::numeric_string())),
-                TScalar::String(string) => possibilities.push(TAtomic::Scalar(TScalar::String(string.clone()))),
+                TScalar::String(string) => possibilities.push(TAtomic::Scalar(TScalar::String(*string))),
                 TScalar::ClassLikeString(class_string) => {
                     if let Some(value) = class_string.literal_value() {
                         possibilities.push(TAtomic::Scalar(TScalar::literal_string(value)));

@@ -1277,6 +1277,7 @@ fn combine_string_scalars(s1: &TString, s2: TString) -> TString {
         is_numeric: s1.is_numeric && s2.is_numeric,
         is_truthy: s1.is_truthy && s2.is_truthy,
         is_non_empty: s1.is_non_empty && s2.is_non_empty,
+        is_callable: s1.is_callable && s2.is_callable,
         casing: match (s1.casing, s2.casing) {
             (TStringCasing::Lowercase, TStringCasing::Lowercase) => TStringCasing::Lowercase,
             (TStringCasing::Uppercase, TStringCasing::Uppercase) => TStringCasing::Uppercase,

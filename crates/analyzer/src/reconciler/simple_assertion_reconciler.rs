@@ -217,6 +217,7 @@ pub(crate) fn reconcile(
                     str.is_non_empty,
                     str.is_truthy,
                     str.is_numeric,
+                    str.is_callable,
                     str.casing,
                 ));
             }
@@ -853,7 +854,7 @@ fn intersect_arraykey(
                 acceptable_types.push(TAtomic::Scalar(TScalar::Integer(*integer)));
             }
             TAtomic::Scalar(TScalar::String(string)) => {
-                acceptable_types.push(TAtomic::Scalar(TScalar::String(string.clone())));
+                acceptable_types.push(TAtomic::Scalar(TScalar::String(*string)));
             }
             TAtomic::Scalar(TScalar::ClassLikeString(class_like_string)) => {
                 acceptable_types.push(TAtomic::Scalar(TScalar::ClassLikeString(class_like_string.clone())));
@@ -990,6 +991,7 @@ fn intersect_string(
     is_non_empty: bool,
     is_truthy: bool,
     is_numeric: bool,
+    is_callable: bool,
     casing: TStringCasing,
 ) -> TUnion {
     let mut acceptable_types = Vec::new();
@@ -1010,6 +1012,7 @@ fn intersect_string(
                         is_numeric || existing_string.is_numeric,
                         is_truthy || existing_string.is_truthy,
                         is_non_empty || existing_string.is_non_empty,
+                        is_callable || existing_string.is_callable,
                         match (casing, existing_string.casing) {
                             (TStringCasing::Lowercase, TStringCasing::Lowercase) => TStringCasing::Lowercase,
                             (TStringCasing::Uppercase, TStringCasing::Uppercase) => TStringCasing::Uppercase,
@@ -1023,14 +1026,14 @@ fn intersect_string(
                 acceptable_types.push(atomic.clone());
             }
             TAtomic::Mixed(_) | TAtomic::Scalar(TScalar::Generic | TScalar::ArrayKey) => {
-                return get_string_with_props(is_numeric, is_truthy, is_non_empty, casing);
+                return get_string_with_props(is_numeric, is_truthy, is_non_empty, is_callable, casing);
             }
             TAtomic::GenericParameter(generic_parameter) => {
                 did_remove_type = true;
 
                 if let Some(atomic) = map_generic_constraint_or_else(
                     generic_parameter,
-                    || get_string_with_props(is_numeric, is_truthy, is_non_empty, casing),
+                    || get_string_with_props(is_numeric, is_truthy, is_non_empty, is_callable, casing),
                     |constraint| {
                         intersect_string(
                             context,
@@ -1043,6 +1046,7 @@ fn intersect_string(
                             is_non_empty,
                             is_truthy,
                             is_numeric,
+                            is_callable,
                             casing,
                         )
                     },
@@ -1062,7 +1066,7 @@ fn intersect_string(
                     || atomic_comparator::is_contained_by(
                         context.codebase,
                         atomic,
-                        get_string_with_props(is_numeric, is_truthy, is_non_empty, casing).get_single(),
+                        get_string_with_props(is_numeric, is_truthy, is_non_empty, is_callable, casing).get_single(),
                         false,
                         &mut ComparisonResult::new(),
                     )
