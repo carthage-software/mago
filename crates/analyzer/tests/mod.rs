@@ -768,6 +768,7 @@ test_case!(issue_1540);
 test_case!(issue_1541);
 test_case!(issue_1542);
 test_case!(issue_1546);
+test_case!(issue_1552);
 test_case!(session_set_save_handler);
 test_case!(session_set_cookie_params);
 test_case!(psl_math);

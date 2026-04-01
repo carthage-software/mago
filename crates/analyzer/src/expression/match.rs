@@ -284,9 +284,12 @@ impl<'anlyz, 'ctx, 'ast, 'arena> MatchAnalyzer<'anlyz, 'ctx, 'ast, 'arena> {
         );
 
         let was_inside_conditional = running_else_context.flags.inside_conditional();
+        let was_inside_loop = running_else_context.flags.inside_loop();
         running_else_context.flags.set_inside_conditional(true);
+        running_else_context.flags.set_inside_loop(false);
         arm_condition.analyze(self.context, running_else_context, self.artifacts)?;
         running_else_context.flags.set_inside_conditional(was_inside_conditional);
+        running_else_context.flags.set_inside_loop(was_inside_loop);
 
         let arm_status = if let Some(condition_type) = self.artifacts.get_rc_expression_type(&arm_condition).cloned() {
             if condition_type.is_always_truthy() {
