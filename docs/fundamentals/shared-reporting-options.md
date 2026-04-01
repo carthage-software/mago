@@ -27,7 +27,7 @@ These options customize how Mago reports the issues it finds.
 | :----------------------------------- | :------------------------------------------------------------------------------------------------------------------------------ |
 | `--sort`                             | Sort reported issues by level, code, and location.                                                                              |
 | `--reporting-target <TARGET>`        | Specify where to report results. Options: `stdout`, `stderr`. Default: `stdout`.                                                |
-| `--reporting-format <FORMAT>`        | Choose the output format. See below for options. Default: `rich`.                                                               |
+| `--reporting-format <FORMAT>`        | Choose the output format. See below for options. Default: auto-detected (see below).                                            |
 | `--minimum-fail-level <LEVEL>`, `-m` | Set the minimum issue level that will cause a failure exit code. Options: `note`, `help`, `warning`, `error`. Defaults to the value set in the configuration file, or `error` if not configured. |
 | `--minimum-report-level <LEVEL>`     | Set the minimum issue severity to include in the report. Issues below this level are filtered out.                              |
 | `--retain-code <CODE>`               | Retain only issues with the specified code(s). Can be specified multiple times. **This is a reporting filter only** - all rules/checks still run. See below for details. |
@@ -63,6 +63,23 @@ You can choose from several reporting formats with the `--reporting-format` flag
 - **Human-Readable:** `rich`, `medium`, `short`, `ariadne`, `emacs`
 - **CI/CD & Machine-Readable:** `github`, `gitlab`, `json`, `checkstyle`
 - **Summaries:** `count`, `code-count`
+
+### Auto-Detection
+
+When `--reporting-format` is not explicitly specified, Mago automatically selects the best format for your environment:
+
+| Environment          | Detected via                | Default Format |
+| :------------------- | :-------------------------- | :------------- |
+| GitHub Actions       | `GITHUB_ACTIONS` env var    | `github`       |
+| GitLab CI            | `GITLAB_CI` env var         | `gitlab`       |
+| AI coding agents     | `CLAUDECODE`, `GEMINI_CLI`, `CODEX_SANDBOX`, or `OPENCODE_CLIENT` env vars | `medium` |
+| Everything else      |                             | `rich`         |
+
+This means CI/CD pipelines get native annotations and AI agents get a token-efficient format out of the box, with no configuration needed. You can always override with an explicit `--reporting-format` flag.
+
+:::warning
+Auto-detection is available starting from Mago 1.18.0. If you are using Mago 1.17.0 or earlier, you must explicitly pass `--reporting-format=github` or `--reporting-format=gitlab` for CI/CD annotations.
+:::
 
 ## Baseline
 

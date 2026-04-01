@@ -131,7 +131,7 @@ pub struct ReportingArgs {
     /// Not available when using --fix mode.
     #[arg(
         long,
-        default_value_t,
+        default_value_t = default_reporting_format(),
         ignore_case = true,
         value_parser = enum_variants!(ReportingFormat),
         conflicts_with = "fix"
@@ -224,4 +224,35 @@ impl ReportingArgs {
             editor_url,
         }
     }
+}
+
+/// Returns the default reporting format based on the detected environment.
+fn default_reporting_format() -> ReportingFormat {
+    if is_github_actions() {
+        ReportingFormat::Github
+    } else if is_gitlab_ci() {
+        ReportingFormat::Gitlab
+    } else if is_slop_environment() {
+        ReportingFormat::Medium
+    } else {
+        ReportingFormat::default()
+    }
+}
+
+/// Detects whether Mago is running inside GitHub Actions.
+fn is_github_actions() -> bool {
+    std::env::var_os("GITHUB_ACTIONS").is_some()
+}
+
+/// Detects whether Mago is running inside GitLab CI.
+fn is_gitlab_ci() -> bool {
+    std::env::var_os("GITLAB_CI").is_some()
+}
+
+/// Detects whether Mago is contributing to slop.
+fn is_slop_environment() -> bool {
+    std::env::var_os("CLAUDECODE").is_some()
+        || std::env::var_os("GEMINI_CLI").is_some()
+        || std::env::var_os("CODEX_SANDBOX").is_some()
+        || std::env::var_os("OPENCODE_CLIENT").is_some()
 }

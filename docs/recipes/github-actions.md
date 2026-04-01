@@ -43,9 +43,17 @@ jobs:
       - name: Run Mago
         run: |
           mago format --dry-run
-          mago lint --reporting-format=github
-          mago analyze --reporting-format=github
+          mago lint
+          mago analyze
 ```
+
+:::tip
+Mago automatically detects GitHub Actions via the `GITHUB_ACTIONS` environment variable and defaults to `--reporting-format=github`, producing native PR annotations. No extra configuration needed.
+:::
+
+:::warning
+If you are using Mago 1.17.0 or earlier, you must explicitly pass `--reporting-format=github` to `mago lint` and `mago analyze` for GitHub Actions annotations. Auto-detection was introduced in a later release.
+:::
 
 ## Using the Docker image
 
@@ -72,10 +80,10 @@ jobs:
         run: mago fmt --check
 
       - name: Lint
-        run: mago lint --reporting-format=github
+        run: mago lint
 
       - name: Analyze
-        run: mago analyze --reporting-format=github
+        run: mago analyze
 ```
 
 :::warning
