@@ -29,19 +29,21 @@ pub fn inherit_properties_from_parent(metadata: &mut ClassLikeMetadata, parent_m
     }
 
     for (property_name, declaring_classlike) in &parent_metadata.declaring_property_ids {
+        // Check if the parent property is final (private) before doing anything else.
+        // Final properties cannot be inherited, so skip them entirely.
+        if !parent_is_trait
+            && let Some(parent_property_metadata) = parent_metadata.properties.get(property_name)
+            && parent_property_metadata.is_final()
+        {
+            continue;
+        }
+
         if metadata.declaring_property_ids.contains_key(property_name) {
             if !parent_is_trait && metadata.properties.get(property_name).is_some_and(|p| p.flags.is_magic_property()) {
                 metadata.properties.remove(property_name);
             } else {
                 continue;
             }
-        }
-
-        if !parent_is_trait
-            && let Some(parent_property_metadata) = parent_metadata.properties.get(property_name)
-            && parent_property_metadata.is_final()
-        {
-            continue;
         }
 
         metadata.declaring_property_ids.insert(*property_name, *declaring_classlike);
