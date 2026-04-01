@@ -2857,13 +2857,19 @@ function is_uploaded_file(string $filename): bool {}
 function move_uploaded_file(string $from, string $to): bool {}
 
 /**
- * @return false|array{
- *   'description': string,
- *   'mac': string,
- *   'mtu': int,
- *   'unicast': list<string>,
+ * @return false|array<non-empty-string, array{
+ *   'description'?: string,
+ *   'mac'?: string,
+ *   'mtu'?: int,
+ *   'unicast': list<array{
+ *     'flags': int,
+ *     'family': int,
+ *     'address'?: string,
+ *     'netmask'?: string,
+ *     'broadcast'?: string,
+ *   }>,
  *   'up': bool,
- * }
+ * }>
  */
 function net_get_interfaces(): array|false {}
 
