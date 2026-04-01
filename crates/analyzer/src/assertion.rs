@@ -44,10 +44,12 @@ pub enum OtherValuePosition {
 }
 
 pub fn scrape_assertions(
-    expression: &Expression,
+    mut expression: &Expression,
     artifacts: &AnalysisArtifacts,
     assertion_context: AssertionContext<'_, '_>,
 ) -> Vec<AtomMap<AssertionSet>> {
+    expression = unwrap_expression(expression);
+
     let mut if_types = AtomMap::default();
 
     if let Some(var_name) = get_expression_id(
@@ -59,7 +61,7 @@ pub fn scrape_assertions(
         if_types.insert(var_name, vec![vec![Assertion::Truthy]]);
     }
 
-    match unwrap_expression(expression) {
+    match expression {
         Expression::UnaryPrefix(UnaryPrefix { operator: UnaryPrefixOperator::Not(_), operand }) => {
             let assertions = scrape_assertions(operand, artifacts, assertion_context);
             let mut negated_assertions = AtomMap::default();
@@ -89,6 +91,13 @@ pub fn scrape_assertions(
                     ));
                 }
                 _ => {}
+            }
+
+            if let Call::Function(_) = call
+                && is_count_or_size_of_call(expression, assertion_context)
+                && let Some(array_variable_id) = get_first_argument_expression_id(assertion_context, expression)
+            {
+                if_types.insert(array_variable_id, vec![vec![Assertion::NonEmptyCountable(false)]]);
             }
         }
         Expression::Construct(construct) => match construct {
