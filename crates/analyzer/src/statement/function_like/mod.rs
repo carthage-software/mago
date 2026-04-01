@@ -486,7 +486,10 @@ pub(super) fn add_properties_to_context<'ctx>(
 
         let Some(property_metadata) = property_class_metadata.properties.get(property_name) else {
             return Err(AnalysisError::InternalError(
-                format!("Could not load property metadata for `{property_name}`."),
+                format!(
+                    "Could not load property metadata for `{property_name}` in class `{declaring_class}` (class-like: `{}`).",
+                    class_like_metadata.name,
+                ),
                 class_like_metadata.span,
             ));
         };
