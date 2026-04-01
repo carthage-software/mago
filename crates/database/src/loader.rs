@@ -188,7 +188,8 @@ impl<'a> DatabaseLoader<'a> {
                             match entry {
                                 Ok(path) => {
                                     if path.is_file() {
-                                        paths_to_process.push((path, specificity));
+                                        let normalized_path = path.canonicalize().unwrap_or(path);
+                                        paths_to_process.push((normalized_path, specificity));
                                     }
                                 }
                                 Err(e) => {
@@ -208,6 +209,7 @@ impl<'a> DatabaseLoader<'a> {
                 } else {
                     self.configuration.workspace.join(root.as_ref())
                 };
+                let dir_path = dir_path.canonicalize().unwrap_or(dir_path);
 
                 for entry in WalkDir::new(&dir_path).into_iter().filter_map(Result::ok) {
                     if entry.file_type().is_file() {
@@ -441,5 +443,25 @@ mod tests {
 
         let file = db.files().find(|f| f.name.contains("lib.php")).unwrap();
         assert_eq!(file.file_type, FileType::Vendored, "File only in includes should be Vendored");
+    }
+
+    #[test]
+    fn test_dot_prefixed_paths_respect_excludes() {
+        let temp_dir = TempDir::new().unwrap();
+
+        create_test_file(&temp_dir, "src/keep.php", "<?php");
+        create_test_file(&temp_dir, "src/excluded/skip.php", "<?php");
+
+        let mut config = create_test_config(&temp_dir, vec!["./src/**/*.php"], vec![]);
+        let excluded_dir = temp_dir.path().join("src/excluded").canonicalize().unwrap();
+        config.excludes = vec![Exclusion::Path(Cow::Owned(excluded_dir))];
+
+        let loader = DatabaseLoader::new(config);
+        let db = loader.load().unwrap();
+
+        assert_eq!(db.len(), 1, "Only non-excluded file should be loaded");
+
+        let file = db.files().next().unwrap();
+        assert!(Path::new(file.name.as_ref()).ends_with(Path::new("src").join("keep.php")));
     }
 }
