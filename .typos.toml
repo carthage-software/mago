@@ -25,6 +25,7 @@ extend-ignore-re = [
 "invokable" = "invokable"
 "encrypter" = "encrypter"
 "consts" = "consts"
+"writeable" = "writeable"
 
 [type.rust.extend-identifiers]
 "thr" = "thr"
