@@ -40,9 +40,20 @@ These flags override the `mode` setting in your `mago.toml` configuration. If yo
 
 ### Other Options
 
-| Flag         | Description                                                                                      |
-| :----------- | :----------------------------------------------------------------------------------------------- |
-| `--no-stubs` | Disable built-in PHP and library stubs. May result in more warnings when external symbols can't be resolved. |
+| Flag            | Description                                                                                                                                                                   |
+|:----------------|:------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `--no-stubs`    | Disable built-in PHP and library stubs. May result in more warnings when external symbols can't be resolved.                                                                  |
+| `--stdin-input` | Read file content from stdin and use the single path argument for baseline and reporting. Intended for editor integrations (e.g. unsaved buffers). Requires exactly one path. |
+
+### Reading from stdin (editor integration)
+
+When using an editor or IDE that can pipe unsaved buffer content, you can run the guard on that content while still using the real file path for baseline lookup and issue locations:
+
+```sh
+cat src/Example.php | mago guard --stdin-input src/Example.php
+```
+
+You must pass **exactly one path**; it is used as the logical file name (workspace-relative) for baseline matching and diagnostics. The path is normalized (e.g. `./src/Example.php` is treated like `src/Example.php`).
 
 ### Shared Reporting Options
 

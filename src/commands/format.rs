@@ -188,7 +188,7 @@ impl FormatCommand {
             return Ok(exit_code);
         }
 
-        let mut database = orchestrator.load_database(&configuration.source.workspace, false, None)?;
+        let mut database = orchestrator.load_database(&configuration.source.workspace, false, None, None)?;
         let service = orchestrator.get_format_service(database.read_only());
 
         let result = service.run()?;
@@ -265,7 +265,7 @@ impl FormatCommand {
         let mut orchestrator = create_orchestrator(&configuration, color_choice, false, true, false);
         orchestrator.add_exclude_patterns(configuration.formatter.excludes.iter());
 
-        let mut database = orchestrator.load_database(workspace, false, None)?;
+        let mut database = orchestrator.load_database(workspace, false, None, None)?;
 
         // Get staged files that are clean (no unstaged changes), resolved to file IDs
         let staged_file_ids = git::get_staged_clean_files(workspace, &database)?;

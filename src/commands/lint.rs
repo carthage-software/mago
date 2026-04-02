@@ -41,6 +41,7 @@ use mago_orchestrator::service::lint::LintMode;
 use mago_reporting::Level;
 
 use crate::commands::args::baseline_reporting::BaselineReportingArgs;
+use crate::commands::stdin_input;
 use crate::config::Configuration;
 use crate::error::Error;
 use crate::utils::create_orchestrator;
@@ -167,6 +168,12 @@ pub struct LintCommand {
     #[arg(long, conflicts_with_all = ["path", "list_rules", "explain"])]
     pub staged: bool,
 
+    /// Read the file content from stdin and use the given path for baseline and reporting.
+    ///
+    /// Intended for editor integrations: pipe unsaved buffer content and pass the real file path.
+    #[arg(long, conflicts_with_all = ["list_rules", "explain", "staged"])]
+    pub stdin_input: bool,
+
     #[clap(flatten)]
     pub baseline_reporting: BaselineReportingArgs,
 }
@@ -204,7 +211,15 @@ impl LintCommand {
         let editor_url = configuration.editor_url.take();
         let mut orchestrator = create_orchestrator(&configuration, color_choice, self.pedantic, true, false);
         orchestrator.add_exclude_patterns(configuration.linter.excludes.iter());
-        if self.staged {
+
+        let stdin_override = stdin_input::resolve_stdin_override(
+            self.stdin_input,
+            &self.path,
+            &configuration.source.workspace,
+            &mut orchestrator,
+        )?;
+
+        if !self.stdin_input && self.staged {
             let staged_paths = git::get_staged_file_paths(&configuration.source.workspace)?;
             if staged_paths.is_empty() {
                 tracing::info!("No staged files to lint.");
@@ -216,11 +231,11 @@ impl LintCommand {
             }
 
             orchestrator.set_source_paths(staged_paths.iter().map(|p| p.to_string_lossy().to_string()));
-        } else if !self.path.is_empty() {
-            orchestrator.set_source_paths(self.path.iter().map(|p| p.to_string_lossy().to_string()));
+        } else if !self.stdin_input && !self.path.is_empty() {
+            stdin_input::set_source_paths_from_paths(&mut orchestrator, &self.path);
         }
 
-        let mut database = orchestrator.load_database(&configuration.source.workspace, false, None)?;
+        let mut database = orchestrator.load_database(&configuration.source.workspace, false, None, stdin_override)?;
         let service = orchestrator.get_lint_service(database.read_only());
 
         if let Some(explain_code) = self.explain {
