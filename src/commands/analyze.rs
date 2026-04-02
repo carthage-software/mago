@@ -157,6 +157,10 @@ pub struct AnalyzeCommand {
     #[arg(long, conflicts_with_all = ["list_codes", "watch", "staged"])]
     pub stdin_input: bool,
 
+    /// Hidden flag to catch `--only` usage and show a helpful error.
+    #[arg(long, hide = true, num_args = 1..)]
+    pub only: Vec<String>,
+
     /// Arguments related to reporting issues with baseline support.
     #[clap(flatten)]
     pub baseline_reporting: BaselineReportingArgs,
@@ -196,6 +200,22 @@ impl AnalyzeCommand {
     /// Only host files are analyzed for issues; external files only contribute to
     /// the symbol table and type graph.
     pub fn execute(self, configuration: Configuration, color_choice: ColorChoice) -> Result<ExitCode, Error> {
+        if !self.only.is_empty() {
+            eprintln!("error: the `--only` flag is not available for the analyzer.");
+            eprintln!();
+            eprintln!("  Unlike the linter, the analyzer is not rule-based and does not support");
+            eprintln!("  selectively enabling individual checks.");
+            eprintln!();
+            eprintln!("  To filter the output to specific issue codes, use `--retain-code`:");
+            eprintln!();
+            eprintln!("    mago analyze --retain-code {}", self.only.join(" --retain-code "));
+            eprintln!();
+            eprintln!("  This runs the full analysis but only reports issues matching the given codes.");
+            eprintln!("  Use `mago analyze --list-codes` to see all available codes.");
+
+            return Ok(ExitCode::FAILURE);
+        }
+
         if self.list_codes {
             let codes: Vec<_> = IssueCode::all().iter().map(|c| c.as_str()).collect();
 
