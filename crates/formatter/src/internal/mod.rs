@@ -557,6 +557,16 @@ impl<'ctx, 'arena> FormatterState<'ctx, 'arena> {
         if let Some(marker) = self.ignore_next_markers.get(self.next_ignore_next_index) {
             // The marker should be before this statement
             if marker.comment_end < stmt_start {
+                // Verify the gap between the marker and the statement contains only
+                // insignificant characters (whitespace, `;`, `,`) and comments.
+                // If there's anything else, the marker was inside a sub-expression
+                // (e.g., match arm, array element) and should not be consumed here.
+                if !is_gap_insignificant(self.source_text, marker.comment_end, stmt_start) {
+                    // Skip this stale marker so it doesn't match future statements either.
+                    self.next_ignore_next_index += 1;
+                    return None;
+                }
+
                 self.next_ignore_next_index += 1;
                 return Some(marker.comment_start);
             }
@@ -574,6 +584,47 @@ impl HasFileId for FormatterState<'_, '_> {
 #[inline]
 const fn is_insignificant(c: u8) -> bool {
     matches!(c, b' ' | b'\t' | b';' | b',')
+}
+
+/// Checks that the source text between two offsets contains only whitespace,
+/// newlines, semicolons, commas, and comments. Returns `false` if there is
+/// any significant code in between, meaning the marker was inside a
+/// sub-expression and should not be consumed by an outer construct.
+fn is_gap_insignificant(source: &str, from: u32, to: u32) -> bool {
+    let bytes = source.as_bytes();
+    let mut i = from as usize;
+    let end = to as usize;
+    while i < end && i < bytes.len() {
+        let c = bytes[i];
+        if is_insignificant(c) || is_line_terminator_or_space(c) {
+            i += 1;
+            continue;
+        }
+
+        // Skip single-line comments (// ... or # ...)
+        if (c == b'/' && i + 1 < end && bytes[i + 1] == b'/') || (c == b'#' && !(i + 1 < end && bytes[i + 1] == b'[')) {
+            while i < end && i < bytes.len() && bytes[i] != b'\n' {
+                i += 1;
+            }
+
+            continue;
+        }
+
+        // Skip block comments (/* ... */)
+        if c == b'/' && i + 1 < end && bytes[i + 1] == b'*' {
+            i += 2;
+            while i + 1 < end && i + 1 < bytes.len() && !(bytes[i] == b'*' && bytes[i + 1] == b'/') {
+                i += 1;
+            }
+
+            i += 2; // skip */
+            continue;
+        }
+
+        return false;
+    }
+
+    true
 }
 
 #[inline]
