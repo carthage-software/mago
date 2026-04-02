@@ -1030,15 +1030,16 @@ impl Default for FormatSettings {
 
 /// Specifies the style of line endings.
 #[derive(Default, Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, JsonSchema)]
+#[serde(rename_all = "snake_case")]
 pub enum EndOfLine {
     #[default]
-    #[serde(alias = "auto")]
+    #[serde(alias = "Auto")]
     Auto,
-    #[serde(alias = "lf")]
+    #[serde(alias = "Lf")]
     Lf,
-    #[serde(alias = "crlf")]
+    #[serde(alias = "Crlf")]
     Crlf,
-    #[serde(alias = "cr")]
+    #[serde(alias = "Cr")]
     Cr,
 }
 
@@ -1050,21 +1051,23 @@ pub enum EndOfLine {
 /// - `AlwaysNextLine`: Opening brace always on the next line, regardless of
 ///   whether the signature breaks
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, JsonSchema)]
+#[serde(rename_all = "snake_case")]
 pub enum BraceStyle {
-    #[serde(alias = "same_line", alias = "same-line")]
+    #[serde(alias = "SameLine", alias = "same-line")]
     SameLine,
-    #[serde(alias = "next_line", alias = "next-line")]
+    #[serde(alias = "NextLine", alias = "next-line")]
     NextLine,
-    #[serde(alias = "always_next_line", alias = "always-next-line")]
+    #[serde(alias = "AlwaysNextLine", alias = "always-next-line")]
     AlwaysNextLine,
 }
 
 #[derive(Default, Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, JsonSchema)]
+#[serde(rename_all = "snake_case")]
 pub enum MethodChainBreakingStyle {
-    #[serde(alias = "same_line", alias = "same-line")]
+    #[serde(alias = "SameLine", alias = "same-line")]
     SameLine,
     #[default]
-    #[serde(alias = "next_line", alias = "next-line")]
+    #[serde(alias = "NextLine", alias = "next-line")]
     NextLine,
 }
 
@@ -1133,13 +1136,14 @@ impl FromStr for EndOfLine {
 
 /// Specifies null type hint style.
 #[derive(Default, Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, JsonSchema)]
+#[serde(rename_all = "snake_case")]
 pub enum NullTypeHint {
-    #[serde(alias = "null_pipe", alias = "pipe", alias = "long", alias = "|")]
+    #[serde(alias = "NullPipe", alias = "pipe", alias = "long", alias = "|")]
     NullPipe,
-    #[serde(alias = "null_pipe_last", alias = "pipe_last", alias = "long_last")]
+    #[serde(alias = "NullPipeLast", alias = "pipe_last", alias = "long_last")]
     NullPipeLast,
     #[default]
-    #[serde(alias = "question", alias = "short", alias = "?")]
+    #[serde(alias = "Question", alias = "short", alias = "?")]
     Question,
 }
 
