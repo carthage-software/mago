@@ -19,7 +19,6 @@ use mago_syntax::ast::FunctionLikeParameterList;
 use mago_syntax::ast::MethodCall;
 use mago_syntax::ast::Node;
 use mago_syntax::ast::NodeKind;
-use mago_syntax::ast::PositionalArgument;
 use mago_syntax::ast::StaticMethodCall;
 use mago_syntax::ast::Variable;
 use mago_text_edit::Safety;
@@ -218,9 +217,15 @@ pub(super) fn is_call_forwarding<'ast, 'arena>(
             return false;
         };
 
-        let Argument::Positional(PositionalArgument { value, .. }) = argument else {
+        let Argument::Positional(positional_argument) = argument else {
             return false;
         };
+
+        if positional_argument.ellipsis.is_some() && !parameter.is_variadic() {
+            return false;
+        }
+
+        let value = &positional_argument.value;
 
         let Expression::Variable(Variable::Direct(direct_variable)) = value else {
             return false;
@@ -449,6 +454,39 @@ mod tests {
             <?php
 
             run(fn($x) => $callback($x));
+        "#}
+    }
+
+    test_lint_success! {
+        name = spread_array_into_variadic_call,
+        rule = PreferFirstClassCallableRule,
+        code = indoc! {r#"
+            <?php
+
+            array_map(static fn(array $nums): int => Calculator::sum(...$nums), $groups);
+        "#}
+    }
+
+    test_lint_success! {
+        name = closure_spread_array_into_variadic_call,
+        rule = PreferFirstClassCallableRule,
+        code = indoc! {r#"
+            <?php
+
+            array_map(function(array $nums) { return Calculator::sum(...$nums); }, $groups);
+        "#}
+    }
+
+    test_lint_success! {
+        name = spread_array_into_function_call,
+        rule = PreferFirstClassCallableRule,
+        settings = |s: &mut crate::settings::Settings| {
+            s.rules.prefer_first_class_callable.config.check_functions = true;
+        },
+        code = indoc! {r#"
+            <?php
+
+            array_map(fn(array $args) => some_function(...$args), $groups);
         "#}
     }
 }
