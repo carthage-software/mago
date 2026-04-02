@@ -416,7 +416,14 @@ fn adjust_array_type(
                 }));
             }
             _ => {
-                compatible_types.push(base_atomic_type);
+                if base_atomic_type.is_object_type()
+                    || base_atomic_type.is_string()
+                    || base_atomic_type.is_generic_parameter()
+                    || matches!(base_atomic_type, TAtomic::Variable(_))
+                {
+                    compatible_types.push(base_atomic_type);
+                }
+
                 continue;
             }
         }
