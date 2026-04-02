@@ -189,41 +189,68 @@ impl LintRule for HalsteadRule {
 
         let halstead = gather_and_compute_halstead(node);
 
-        if halstead.volume > self.cfg.volume_threshold {
-            ctx.collector.report(
-                Issue::new(self.cfg.level, format!("{kind} has a high halstead volume"))
-                    .with_code(self.meta.code)
-                    .with_annotation(Annotation::primary(node.span()).with_message(format!(
-                        "{} has a halstead volume of {}, which exceeds the threshold of {}.",
-                        kind, halstead.volume, self.cfg.volume_threshold
-                    )))
-                    .with_note("Halstead volume estimates the code's overall size/complexity."),
-            );
+        let high_volume = halstead.volume > self.cfg.volume_threshold;
+        let high_difficulty = halstead.difficulty > self.cfg.difficulty_threshold;
+        let high_effort = halstead.effort > self.cfg.effort_threshold;
+
+        if !high_volume && !high_difficulty && !high_effort {
+            return;
         }
 
-        if halstead.difficulty > self.cfg.difficulty_threshold {
-            ctx.collector.report(
-                Issue::new(self.cfg.level, format!("{kind} has a high halstead difficulty"))
-                    .with_code(self.meta.code)
-                    .with_annotation(Annotation::primary(node.span()).with_message(format!(
-                        "{} has a halstead difficulty of {}, which exceeds the threshold of {}.",
-                        kind, halstead.difficulty, self.cfg.difficulty_threshold
-                    )))
-                    .with_note("Halstead difficulty reflects how hard the code is to write or understand."),
-            );
+        let mut metrics = Vec::new();
+        if high_volume {
+            metrics.push("volume");
         }
 
-        if halstead.effort > self.cfg.effort_threshold {
-            ctx.collector.report(
-                Issue::new(self.cfg.level, format!("{kind} has a high halstead effort"))
-                    .with_code(self.meta.code)
-                    .with_annotation(Annotation::primary(node.span()).with_message(format!(
-                        "{} has a halstead effort of {}, which exceeds the threshold of {}.",
-                        kind, halstead.effort, self.cfg.effort_threshold
-                    )))
-                    .with_note("Halstead effort estimates the mental effort required to develop/maintain the code."),
-            );
+        if high_difficulty {
+            metrics.push("difficulty");
         }
+
+        if high_effort {
+            metrics.push("effort");
+        }
+
+        let metrics_label = match metrics.len() {
+            1 => metrics[0].to_string(),
+            2 => format!("{} and {}", metrics[0], metrics[1]),
+            _ => {
+                let (last, rest) = metrics.split_last().unwrap();
+
+                format!("{}, and {last}", rest.join(", "))
+            }
+        };
+
+        let mut issue = Issue::new(self.cfg.level, format!("{kind} has a high halstead {metrics_label}"))
+            .with_code(self.meta.code)
+            .with_annotation(
+                Annotation::primary(node.span())
+                    .with_message(format!("{kind} exceeds halstead {metrics_label} threshold(s)",)),
+            );
+
+        if high_volume {
+            issue = issue.with_note(format!(
+                "Halstead volume is {} (threshold {}). Volume estimates the code's overall size/complexity.",
+                halstead.volume, self.cfg.volume_threshold,
+            ));
+        }
+
+        if high_difficulty {
+            issue = issue.with_note(format!(
+                "Halstead difficulty is {} (threshold {}). Difficulty reflects how hard the code is to write or understand.",
+                halstead.difficulty, self.cfg.difficulty_threshold,
+            ));
+        }
+
+        if high_effort {
+            issue = issue.with_note(format!(
+                "Halstead effort is {} (threshold {}). Effort estimates the mental effort required to develop/maintain the code.",
+                halstead.effort, self.cfg.effort_threshold,
+            ));
+        }
+
+        issue = issue.with_help("Consider breaking this into smaller, more focused functions.");
+
+        ctx.collector.report(issue);
     }
 }
 
