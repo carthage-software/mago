@@ -762,6 +762,7 @@ test_case!(issue_1526);
 test_case!(issue_1527);
 test_case!(issue_1531);
 test_case!(issue_1532);
+test_case!(issue_1517);
 test_case!(issue_1548);
 test_case!(issue_1555);
 test_case!(issue_1556);
