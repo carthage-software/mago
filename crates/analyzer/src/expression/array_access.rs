@@ -4,6 +4,7 @@ use mago_codex::ttype::get_arraykey;
 use mago_codex::ttype::get_mixed;
 use mago_span::HasSpan;
 use mago_syntax::ast::ArrayAccess;
+use mago_syntax::ast::Expression;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -36,6 +37,12 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ArrayAccess<'arena> {
             Some(context.codebase),
         );
 
+        let saved_narrowed_type = if matches!(self.index, Expression::UnaryPostfix(_)) {
+            keyed_array_var_id.as_ref().and_then(|k| block_context.locals.get(k).cloned())
+        } else {
+            None
+        };
+
         let was_inside_use = block_context.flags.inside_general_use();
         block_context.flags.set_inside_general_use(true);
         block_context.flags.set_inside_unset(false);
@@ -56,6 +63,15 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ArrayAccess<'arena> {
             let is_variable_key = keyed_array_var_id.contains("[$");
             if is_variable_key || !array_access_type.possibly_undefined() {
                 artifacts.set_rc_expression_type(self, array_access_type.clone());
+
+                return Ok(());
+            }
+        }
+
+        if let Some(saved_type) = saved_narrowed_type {
+            let is_variable_key = keyed_array_var_id.as_ref().is_some_and(|k| k.contains("[$"));
+            if is_variable_key || !saved_type.possibly_undefined() {
+                artifacts.set_rc_expression_type(self, saved_type);
 
                 return Ok(());
             }

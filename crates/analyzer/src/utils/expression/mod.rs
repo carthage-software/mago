@@ -293,6 +293,9 @@ pub fn get_index_id<'ast, 'arena>(
     Some(match expression {
         Expression::Literal(Literal::String(literal_string)) => atom(literal_string.raw),
         Expression::Literal(Literal::Integer(literal_integer)) => atom(literal_integer.raw),
+        Expression::UnaryPostfix(unary_postfix) => {
+            return get_index_id(unary_postfix.operand, this_class_name, resolved_names, codebase);
+        }
         _ => return get_expression_id(expression, this_class_name, resolved_names, codebase),
     })
 }
