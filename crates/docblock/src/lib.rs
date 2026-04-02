@@ -907,4 +907,158 @@ mod tests {
         };
         assert_eq!(code.content, "メールクリックがない");
     }
+
+    #[test]
+    fn test_multiline_inline_tag() {
+        let arena = Bump::new();
+        let phpdoc = r#"/**
+            * This method gets a count of the Foo.
+            * {@internal Developers should note that it silently
+            *            adds one extra Foo.}
+            *
+            * @return int
+            */"#;
+
+        let span = Span::new(FileId::zero(), Position::new(0), Position::new(phpdoc.len() as u32));
+        let document = parse_phpdoc_with_span(&arena, phpdoc, span).expect("Failed to parse PHPDoc");
+
+        let Element::Text(text) = &document.elements[0] else {
+            panic!("Expected Element::Text, got {:?}", document.elements[0]);
+        };
+
+        assert!(text.segments.len() >= 2, "Expected at least 2 segments, got {:?}", text.segments);
+
+        let has_inline_tag =
+            text.segments.iter().any(|seg| matches!(seg, TextSegment::InlineTag(tag) if tag.name == "internal"));
+
+        assert!(has_inline_tag, "Expected an InlineTag with name 'internal', got segments: {:?}", text.segments);
+    }
+
+    #[test]
+    fn test_multiline_inline_tag_with_nested() {
+        let arena = Bump::new();
+        let phpdoc = r#"/**
+            * {@internal Developers should note that it silently
+            *            adds one extra Foo (see {@link http://example.com}).}
+            */"#;
+
+        let span = Span::new(FileId::zero(), Position::new(0), Position::new(phpdoc.len() as u32));
+        let document = parse_phpdoc_with_span(&arena, phpdoc, span).expect("Failed to parse PHPDoc");
+
+        let Element::Text(text) = &document.elements[0] else {
+            panic!("Expected Element::Text, got {:?}", document.elements[0]);
+        };
+
+        let has_internal_tag =
+            text.segments.iter().any(|seg| matches!(seg, TextSegment::InlineTag(tag) if tag.name == "internal"));
+
+        assert!(has_internal_tag, "Expected an InlineTag with name 'internal', got segments: {:?}", text.segments);
+    }
+
+    #[test]
+    fn test_single_line_inline_tag_still_works() {
+        let arena = Bump::new();
+        let phpdoc = r#"/**
+            * See {@see \Some\Class} for details.
+            */"#;
+
+        let span = Span::new(FileId::zero(), Position::new(0), Position::new(phpdoc.len() as u32));
+        let document = parse_phpdoc_with_span(&arena, phpdoc, span).expect("Failed to parse PHPDoc");
+
+        let Element::Text(text) = &document.elements[0] else {
+            panic!("Expected Element::Text, got {:?}", document.elements[0]);
+        };
+
+        let has_see_tag =
+            text.segments.iter().any(|seg| matches!(seg, TextSegment::InlineTag(tag) if tag.name == "see"));
+
+        assert!(has_see_tag, "Expected an InlineTag with name 'see', got segments: {:?}", text.segments);
+    }
+
+    #[test]
+    fn test_multiline_inline_tag_chinese() {
+        let arena = Bump::new();
+        let phpdoc = r#"/**
+            * 获取用户数量的方法。
+            * {@internal 开发者请注意，此方法会静默地
+            *            添加一个额外的用户。}
+            *
+            * @return int
+            */"#;
+
+        let span = Span::new(FileId::zero(), Position::new(0), Position::new(phpdoc.len() as u32));
+        let document = parse_phpdoc_with_span(&arena, phpdoc, span).expect("Failed to parse Chinese PHPDoc");
+
+        let Element::Text(text) = &document.elements[0] else {
+            panic!("Expected Element::Text, got {:?}", document.elements[0]);
+        };
+
+        let has_internal =
+            text.segments.iter().any(|seg| matches!(seg, TextSegment::InlineTag(tag) if tag.name == "internal"));
+        assert!(has_internal, "Expected InlineTag 'internal' with Chinese content, got: {:?}", text.segments);
+    }
+
+    #[test]
+    fn test_multiline_inline_tag_japanese() {
+        let arena = Bump::new();
+        let phpdoc = r#"/**
+            * ユーザー数を取得するメソッド。
+            * {@see \App\Service\UserCounter このクラスは
+            *       ユーザーの数を数えます。}
+            */"#;
+
+        let span = Span::new(FileId::zero(), Position::new(0), Position::new(phpdoc.len() as u32));
+        let document = parse_phpdoc_with_span(&arena, phpdoc, span).expect("Failed to parse Japanese PHPDoc");
+
+        let Element::Text(text) = &document.elements[0] else {
+            panic!("Expected Element::Text, got {:?}", document.elements[0]);
+        };
+
+        let has_see = text.segments.iter().any(|seg| matches!(seg, TextSegment::InlineTag(tag) if tag.name == "see"));
+        assert!(has_see, "Expected InlineTag 'see' with Japanese content, got: {:?}", text.segments);
+    }
+
+    #[test]
+    fn test_multiline_inline_tag_arabic() {
+        let arena = Bump::new();
+        let phpdoc = r#"/**
+            * طريقة للحصول على عدد المستخدمين.
+            * {@internal يجب على المطورين ملاحظة أن هذه الطريقة
+            *            تضيف مستخدمًا إضافيًا بصمت.}
+            *
+            * @return int
+            */"#;
+
+        let span = Span::new(FileId::zero(), Position::new(0), Position::new(phpdoc.len() as u32));
+        let document = parse_phpdoc_with_span(&arena, phpdoc, span).expect("Failed to parse Arabic PHPDoc");
+
+        let Element::Text(text) = &document.elements[0] else {
+            panic!("Expected Element::Text, got {:?}", document.elements[0]);
+        };
+
+        let has_internal =
+            text.segments.iter().any(|seg| matches!(seg, TextSegment::InlineTag(tag) if tag.name == "internal"));
+        assert!(has_internal, "Expected InlineTag 'internal' with Arabic content, got: {:?}", text.segments);
+    }
+
+    #[test]
+    fn test_multiline_inline_tag_mixed_scripts() {
+        let arena = Bump::new();
+        let phpdoc = r#"/**
+            * Documentation with mixed scripts.
+            * {@internal 注意: This method は静かに adds один
+            *            дополнительный элемент 요소를 추가합니다.}
+            */"#;
+
+        let span = Span::new(FileId::zero(), Position::new(0), Position::new(phpdoc.len() as u32));
+        let document = parse_phpdoc_with_span(&arena, phpdoc, span).expect("Failed to parse mixed-script PHPDoc");
+
+        let Element::Text(text) = &document.elements[0] else {
+            panic!("Expected Element::Text, got {:?}", document.elements[0]);
+        };
+
+        let has_internal =
+            text.segments.iter().any(|seg| matches!(seg, TextSegment::InlineTag(tag) if tag.name == "internal"));
+        assert!(has_internal, "Expected InlineTag 'internal' with mixed-script content, got: {:?}", text.segments);
+    }
 }

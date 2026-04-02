@@ -272,27 +272,47 @@ fn parse_text<'arena>(
     let start_span = tokens[start_index].span();
 
     let mut end_span = start_span;
+    let mut open_braces: usize = 0;
 
     while i < tokens.len() {
         match &tokens[i] {
             Token::Line { content, span } => {
-                if content.is_empty()
-                    || content.trim().is_empty()
-                    || content.starts_with('@')
-                    || content.starts_with("```")
-                    || is_indented_line(content)
+                if open_braces == 0
+                    && (content.is_empty()
+                        || content.trim().is_empty()
+                        || content.starts_with('@')
+                        || content.starts_with("```")
+                        || is_indented_line(content))
                 {
                     break;
                 }
+
                 if !text_content.is_empty() {
                     text_content.push('\n');
                 }
+
                 text_content.push_str(content);
                 end_span = *span;
                 i += 1;
+
+                for ch in content.chars() {
+                    match ch {
+                        '{' => open_braces += 1,
+                        '}' => open_braces = open_braces.saturating_sub(1),
+                        _ => {}
+                    }
+                }
             }
             Token::EmptyLine { .. } => {
-                break;
+                if open_braces > 0 {
+                    if !text_content.is_empty() {
+                        text_content.push('\n');
+                    }
+                    end_span = tokens[i].span();
+                    i += 1;
+                } else {
+                    break;
+                }
             }
         }
     }
