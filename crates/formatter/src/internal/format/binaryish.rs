@@ -315,11 +315,19 @@ fn print_binaryish_expression_parts<'arena>(
 
     let mut right_document = vec![in f.arena];
 
-    right_document.push(if force_break || operator_has_leading_comments || (line_before_operator && !should_inline_this_level) {
-        Document::Line(if force_break { Line::hard() } else if has_space_around { Line::default() } else { Line::soft() })
-    } else {
-        Document::String(if has_space_around { " " } else { "" })
-    });
+    right_document.push(
+        if force_break || operator_has_leading_comments || (line_before_operator && !should_inline_this_level) {
+            Document::Line(if force_break {
+                Line::hard()
+            } else if has_space_around {
+                Line::default()
+            } else {
+                Line::soft()
+            })
+        } else {
+            Document::String(if has_space_around { " " } else { "" })
+        },
+    );
 
     right_document.push(format_token(f, operator.span(), operator.as_str()));
 
