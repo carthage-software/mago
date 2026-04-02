@@ -30,6 +30,7 @@ use crate::expression::binary::utils::is_always_greater_than_or_equal;
 use crate::expression::binary::utils::is_always_identical_to;
 use crate::expression::binary::utils::is_always_less_than;
 use crate::expression::binary::utils::is_always_less_than_or_equal;
+use crate::expression::binary::utils::types_share_category;
 use crate::utils::misc::unwrap_expression;
 
 /// Analyzes standard comparison operations (e.g., `==`, `===`, `<`, `<=`, `>`, `>=`).
@@ -309,11 +310,13 @@ pub fn analyze_comparison_operation<'ctx, 'arena>(
 
                     if involves_static || inside_loop { get_bool() } else { get_true() }
                 } else if are_definitely_not_identical(context.codebase, lhs_type, rhs_type, false) {
-                    if !block_context.flags.inside_loop_expressions() && !inside_loop && !involves_static {
+                    let categories_shared = types_share_category(lhs_type, rhs_type);
+                    let should_be_specific = !involves_static && (!inside_loop || !categories_shared);
+                    if !block_context.flags.inside_loop_expressions() && should_be_specific {
                         report_redundant_comparison(context, artifacts, binary, "never identical to", "`false`");
                     }
 
-                    if involves_static || inside_loop { get_bool() } else { get_false() }
+                    if !should_be_specific { get_bool() } else { get_false() }
                 } else {
                     get_bool()
                 }
@@ -336,11 +339,13 @@ pub fn analyze_comparison_operation<'ctx, 'arena>(
 
                     if involves_static || inside_loop { get_bool() } else { get_false() }
                 } else if are_definitely_not_identical(context.codebase, lhs_type, rhs_type, false) {
-                    if !block_context.flags.inside_loop_expressions() && !inside_loop && !involves_static {
+                    let categories_shared = types_share_category(lhs_type, rhs_type);
+                    let should_be_specific = !involves_static && (!inside_loop || !categories_shared);
+                    if !block_context.flags.inside_loop_expressions() && should_be_specific {
                         report_redundant_comparison(context, artifacts, binary, "always not identical to", "`true`");
                     }
 
-                    if involves_static || inside_loop { get_bool() } else { get_true() }
+                    if !should_be_specific { get_bool() } else { get_true() }
                 } else {
                     get_bool()
                 }
