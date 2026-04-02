@@ -1,5 +1,6 @@
 //! `array_merge()` return type provider.
 
+use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
@@ -70,15 +71,28 @@ impl FunctionReturnTypeProvider for ArrayMergeProvider {
         let mut all_lists_are_closed = true;
 
         for invocation_argument in arguments {
-            if invocation_argument.is_unpacked() {
-                return None;
-            }
-
             let argument_expr = invocation_argument.value()?;
             let argument_type = context.get_expression_type(argument_expr)?;
+
             if !argument_type.is_single() {
                 return None;
             }
+
+            let argument_type = if invocation_argument.is_unpacked() {
+                let inner = get_iterable_parameters(argument_type.get_single(), codebase);
+                let (_, value_type) = inner?;
+                if !value_type.is_single() {
+                    return None;
+                }
+
+                if argument_type.get_single().is_non_empty_list() || argument_type.get_single().is_non_empty_array() {
+                    any_argument_non_empty = true;
+                }
+
+                Cow::Owned(value_type)
+            } else {
+                Cow::Borrowed(argument_type)
+            };
 
             let iterable = argument_type.get_single();
 
