@@ -701,6 +701,7 @@ test_case!(issue_1230_simple, {
 });
 test_case!(issue_1242_reference_count_sync);
 test_case!(issue_1226);
+test_case!(issue_1357);
 test_case!(issue_1259);
 test_case!(issue_1262);
 test_case!(issue_1264);
