@@ -438,13 +438,13 @@ generate_formatter_settings! {
     /// Default: false
     preserve_breaking_conditional_expression: bool => "default_false",
 
-    /// Whether to preserve line breaks in condition statements (if, elseif, while, do-while, switch, match).
+    /// Whether to preserve line breaks in condition expressions (if, elseif, while, do-while, switch, match).
     ///
     /// When enabled, if the original source has conditions broken across multiple lines,
     /// the formatter maintains that layout using PER Coding Style 3.0 rules.
     ///
     /// Default: false
-    preserve_breaking_condition_statement: bool => "default_false",
+    preserve_breaking_condition_expression: bool => "default_false",
 
     /// Whether to break a parameter list with one or more promoted properties into multiple lines.
     ///

@@ -731,7 +731,7 @@ pub(super) fn print_condition<'arena>(
     let was_must_break_condition = f.must_break_condition;
     f.in_condition = true;
 
-    let must_break = f.settings.preserve_breaking_condition_statement
+    let must_break = f.settings.preserve_breaking_condition_expression
         && has_new_line_in_range(f.source_text, left_parenthesis.end.offset, condition.span().start.offset);
 
     f.must_break_condition = must_break;
