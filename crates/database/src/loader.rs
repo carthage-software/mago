@@ -169,8 +169,17 @@ impl<'a> DatabaseLoader<'a> {
         let mut paths_to_process: Vec<(std::path::PathBuf, usize)> = Vec::new();
 
         for root in roots {
-            // Check if this is a glob pattern (contains glob metacharacters)
-            let is_glob_pattern = root.contains('*') || root.contains('?') || root.contains('[') || root.contains('{');
+            // Check if this is a glob pattern (contains glob metacharacters).
+            // First check if it's an actual file/directory on disk. if so, treat it
+            // as a literal path even if the name contains glob metacharacters like `[]`.
+            let resolved_path = if Path::new(root.as_ref()).is_absolute() {
+                Path::new(root.as_ref()).to_path_buf()
+            } else {
+                self.configuration.workspace.join(root.as_ref())
+            };
+
+            let is_glob_pattern = !resolved_path.exists()
+                && (root.contains('*') || root.contains('?') || root.contains('[') || root.contains('{'));
 
             let specificity = Self::calculate_pattern_specificity(root.as_ref());
             if is_glob_pattern {
@@ -202,14 +211,7 @@ impl<'a> DatabaseLoader<'a> {
                     }
                 }
             } else {
-                // Handle as directory path (existing logic)
-                let dir_path = if Path::new(root.as_ref()).is_absolute() {
-                    Path::new(root.as_ref()).to_path_buf()
-                } else {
-                    self.configuration.workspace.join(root.as_ref())
-                };
-
-                for entry in WalkDir::new(&dir_path).into_iter().filter_map(Result::ok) {
+                for entry in WalkDir::new(&resolved_path).into_iter().filter_map(Result::ok) {
                     if entry.file_type().is_file() {
                         paths_to_process.push((entry.into_path(), specificity));
                     }
