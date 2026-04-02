@@ -4,6 +4,7 @@ use std::sync::LazyLock;
 use foldhash::HashSet;
 
 use mago_atom::Atom;
+use mago_atom::AtomSet;
 use mago_atom::atom;
 
 static ATOM_FALSE: LazyLock<Atom> = LazyLock::new(|| atom("false"));
@@ -1091,7 +1092,7 @@ fn scrape_type_properties(
             // When we have a constrained string type (like numeric-string) and literals,
             // we need to decide whether to merge them or keep them separate.
             // If the non-literal is numeric-string, keep non-numeric literals separate.
-            let mut literals_to_keep = Vec::new();
+            let mut literals_to_keep = AtomSet::default();
 
             if string_scalar.is_truthy
                 || string_scalar.is_non_empty
@@ -1110,7 +1111,7 @@ fn scrape_type_properties(
 
                     // If the string is numeric but the literal is not, keep the literal separate
                     if string_scalar.is_numeric && !str_is_numeric(value) {
-                        literals_to_keep.push(*value);
+                        literals_to_keep.insert(*value);
                     } else {
                         string_scalar.is_numeric = string_scalar.is_numeric && str_is_numeric(value);
                     }
@@ -1125,10 +1126,7 @@ fn scrape_type_properties(
 
             combination.value_types.insert(*ATOM_STRING, TAtomic::Scalar(TScalar::String(string_scalar)));
 
-            combination.literal_strings.clear();
-            for lit in literals_to_keep {
-                combination.literal_strings.insert(lit);
-            }
+            std::mem::swap(&mut combination.literal_strings, &mut literals_to_keep);
         }
 
         return;

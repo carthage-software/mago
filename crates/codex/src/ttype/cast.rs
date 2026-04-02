@@ -61,7 +61,7 @@ pub fn cast_atomic_to_callable<'a>(
     if let TAtomic::Scalar(TScalar::String(string_scalar)) = atomic
         && string_scalar.is_callable
     {
-        return Some(Cow::Owned(TCallable::Signature(TCallableSignature::new(false, false))));
+        return Some(Cow::Owned(TCallable::Signature(TCallableSignature::mixed(false))));
     }
 
     if let TAtomic::Object(TObject::Named(named_object)) = atomic {

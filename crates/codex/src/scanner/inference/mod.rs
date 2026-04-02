@@ -247,8 +247,9 @@ pub(super) fn infer_with_constants<'arena>(
                         } else {
                             wrap_atomic(TAtomic::Scalar(TScalar::String(TString::unspecified_literal_with_props(
                                 str_is_numeric(value),
-                                true, // truthy
-                                true, // not empty
+                                true,  // truthy
+                                true,  // not empty
+                                false, // callable, we can't tell here.
                                 if value.chars().all(char::is_lowercase) {
                                     TStringCasing::Lowercase
                                 } else if value.chars().all(char::is_uppercase) {
@@ -361,9 +362,9 @@ pub(super) fn infer_with_constants<'arena>(
             };
 
             let final_string_type = if is_literal_origin {
-                TString::unspecified_literal_with_props(false, is_truthy, is_non_empty, casing)
+                TString::unspecified_literal_with_props(false, is_truthy, is_non_empty, false, casing)
             } else {
-                TString::general_with_props(false, is_truthy, is_non_empty, casing)
+                TString::general_with_props(false, is_truthy, is_non_empty, false, casing)
             };
 
             Some(wrap_atomic(TAtomic::Scalar(TScalar::String(final_string_type))))

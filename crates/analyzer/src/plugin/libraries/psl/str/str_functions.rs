@@ -74,6 +74,7 @@ impl FunctionReturnTypeProvider for StrProvider {
                         false,
                         false,
                         false,
+                        false,
                         haystack_type.casing,
                     ))),
                 ]))
@@ -108,10 +109,12 @@ impl FunctionReturnTypeProvider for StrProvider {
                         false,
                         false,
                         false,
+                        false,
                         string_type.casing,
                     ))))
                 } else {
                     TUnion::from_atomic(TAtomic::Scalar(TScalar::String(TString::general_with_props(
+                        false,
                         false,
                         false,
                         false,
@@ -131,6 +134,7 @@ impl FunctionReturnTypeProvider for StrProvider {
                         false,
                         string_type.is_truthy || replacement_type.is_truthy,
                         string_type.is_non_empty || replacement_type.is_non_empty,
+                        false,
                         match (string_type.casing, replacement_type.casing) {
                             (TStringCasing::Lowercase, TStringCasing::Lowercase) => TStringCasing::Lowercase,
                             (TStringCasing::Uppercase, TStringCasing::Uppercase) => TStringCasing::Uppercase,
@@ -142,6 +146,7 @@ impl FunctionReturnTypeProvider for StrProvider {
                         false,
                         string_type.is_truthy || replacement_type.is_truthy,
                         string_type.is_non_empty || replacement_type.is_non_empty,
+                        false,
                         match (string_type.casing, replacement_type.casing) {
                             (TStringCasing::Lowercase, TStringCasing::Lowercase) => TStringCasing::Lowercase,
                             (TStringCasing::Uppercase, TStringCasing::Uppercase) => TStringCasing::Uppercase,
@@ -160,6 +165,7 @@ impl FunctionReturnTypeProvider for StrProvider {
                             string_type.is_numeric,
                             string_type.is_truthy,
                             string_type.is_non_empty,
+                            string_type.is_callable,
                             TStringCasing::Lowercase,
                         ))))
                     }
@@ -167,6 +173,7 @@ impl FunctionReturnTypeProvider for StrProvider {
                         string_type.is_numeric,
                         string_type.is_truthy,
                         string_type.is_non_empty,
+                        string_type.is_callable,
                         TStringCasing::Lowercase,
                     )))),
                 })
@@ -181,6 +188,7 @@ impl FunctionReturnTypeProvider for StrProvider {
                             string_type.is_numeric,
                             string_type.is_truthy,
                             string_type.is_non_empty,
+                            string_type.is_callable,
                             TStringCasing::Uppercase,
                         ))))
                     }
@@ -188,6 +196,7 @@ impl FunctionReturnTypeProvider for StrProvider {
                         string_type.is_numeric,
                         string_type.is_truthy,
                         string_type.is_non_empty,
+                        string_type.is_callable,
                         TStringCasing::Uppercase,
                     )))),
                 })

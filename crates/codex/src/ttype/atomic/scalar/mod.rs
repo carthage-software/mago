@@ -119,7 +119,7 @@ impl TScalar {
     #[inline]
     #[must_use]
     pub const fn numeric_string() -> Self {
-        TScalar::String(TString::general_with_props(true, false, false, TStringCasing::Unspecified))
+        TScalar::String(TString::general_with_props(true, false, false, false, TStringCasing::Unspecified))
     }
 
     /// Creates the general `string` type.

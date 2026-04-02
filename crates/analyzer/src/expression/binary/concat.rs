@@ -468,7 +468,7 @@ fn concat_string_lists(left_strings: Vec<TString>, right_strings: &[TString], th
             TStringCasing::Unspecified
         };
 
-        return vec![TString::general_with_props(false, is_truthy, is_non_empty, casing)];
+        return vec![TString::general_with_props(false, is_truthy, is_non_empty, false, casing)];
     }
 
     let mut result_strings = Vec::new();
@@ -516,7 +516,7 @@ fn get_operand_strings(operand_type: &TUnion) -> Vec<TString> {
                 continue;
             }
             TAtomic::Resource(_) => {
-                operand_strings.push(TString::general_with_props(false, true, true, TStringCasing::Unspecified));
+                operand_strings.push(TString::general_with_props(false, true, true, false, TStringCasing::Unspecified));
 
                 continue;
             }
@@ -524,7 +524,7 @@ fn get_operand_strings(operand_type: &TUnion) -> Vec<TString> {
         }
 
         let TAtomic::Scalar(operand_scalar) = operand_atomic_type else {
-            operand_strings.push(TString::general_with_props(false, false, false, TStringCasing::Unspecified));
+            operand_strings.push(TString::general_with_props(false, false, false, false, TStringCasing::Unspecified));
 
             continue;
         };
@@ -544,14 +544,26 @@ fn get_operand_strings(operand_type: &TUnion) -> Vec<TString> {
                 if let Some(v) = tint.get_literal_value() {
                     operand_strings.push(TString::known_literal(i64_atom(v)));
                 } else {
-                    operand_strings.push(TString::general_with_props(true, false, false, TStringCasing::Lowercase));
+                    operand_strings.push(TString::general_with_props(
+                        true,
+                        false,
+                        false,
+                        false,
+                        TStringCasing::Lowercase,
+                    ));
                 }
             }
             TScalar::Float(tfloat) => {
                 if let Some(v) = tfloat.get_literal_value() {
                     operand_strings.push(TString::known_literal(f64_atom(v)));
                 } else {
-                    operand_strings.push(TString::general_with_props(true, false, false, TStringCasing::Lowercase));
+                    operand_strings.push(TString::general_with_props(
+                        true,
+                        false,
+                        false,
+                        false,
+                        TStringCasing::Lowercase,
+                    ));
                 }
             }
             TScalar::String(operand_string) => {
@@ -561,7 +573,13 @@ fn get_operand_strings(operand_type: &TUnion) -> Vec<TString> {
                 if let Some(id) = tclass_like_string.literal_value() {
                     operand_strings.push(TString::known_literal(id));
                 } else {
-                    operand_strings.push(TString::general_with_props(false, true, true, TStringCasing::Unspecified));
+                    operand_strings.push(TString::general_with_props(
+                        false,
+                        true,
+                        true,
+                        false,
+                        TStringCasing::Unspecified,
+                    ));
                 }
             }
             _ => {

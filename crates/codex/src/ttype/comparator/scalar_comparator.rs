@@ -52,6 +52,22 @@ pub fn is_contained_by(
             return true;
         }
         (TAtomic::Scalar(TScalar::String(c)), TAtomic::Scalar(TScalar::String(i))) => {
+            if c.is_callable {
+                let is_input_callable = i.is_callable || {
+                    if let Some(literal) = i.get_known_literal_value() {
+                        // if it contains `::` - thats enough, no need to check class/method further
+                        // unless we need to at some point..
+                        literal.contains("::") || codebase.function_exists(literal)
+                    } else {
+                        false
+                    }
+                };
+
+                if !is_input_callable {
+                    return false;
+                }
+            }
+
             if c.is_truthy() && !i.is_truthy() {
                 return false;
             }

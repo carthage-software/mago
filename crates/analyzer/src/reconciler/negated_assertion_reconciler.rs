@@ -324,6 +324,7 @@ fn handle_literal_negated_equality(
                                 existing_string.is_numeric,
                                 existing_string.is_truthy,
                                 true,
+                                existing_string.is_callable,
                                 existing_string.casing,
                             ))));
                         } else {

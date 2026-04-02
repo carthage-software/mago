@@ -46,31 +46,31 @@ pub const NON_NEGATIVE_INT_ATOMIC: &TAtomic = &TAtomic::Scalar(TScalar::Integer(
 pub const UNSPECIFIED_LITERAL_INT_ATOMIC: &TAtomic = &TAtomic::Scalar(TScalar::Integer(TInteger::UnspecifiedLiteral));
 /// A static `TAtomic` for the general `string` type.
 pub const STRING_ATOMIC: &TAtomic =
-    &TAtomic::Scalar(TScalar::String(TString::new(None, false, false, false, TStringCasing::Unspecified)));
+    &TAtomic::Scalar(TScalar::String(TString::new(None, false, false, false, false, TStringCasing::Unspecified)));
 /// A static `TAtomic` for a `lowercase-string`.
 pub const LOWERCASE_STRING_ATOMIC: &TAtomic =
-    &TAtomic::Scalar(TScalar::String(TString::new(None, false, false, false, TStringCasing::Lowercase)));
+    &TAtomic::Scalar(TScalar::String(TString::new(None, false, false, false, false, TStringCasing::Lowercase)));
 /// A static `TAtomic` for a `uppercase-string`.
 pub const UPPERCASE_STRING_ATOMIC: &TAtomic =
-    &TAtomic::Scalar(TScalar::String(TString::new(None, false, false, false, TStringCasing::Uppercase)));
+    &TAtomic::Scalar(TScalar::String(TString::new(None, false, false, false, false, TStringCasing::Uppercase)));
 /// A static `TAtomic` for a `non-empty-string`.
 pub const NON_EMPTY_STRING_ATOMIC: &TAtomic =
-    &TAtomic::Scalar(TScalar::String(TString::new(None, false, false, true, TStringCasing::Unspecified)));
+    &TAtomic::Scalar(TScalar::String(TString::new(None, false, false, true, false, TStringCasing::Unspecified)));
 /// A static `TAtomic` for a `non-empty-lowercase-string`.
 pub const NON_EMPTY_LOWERCASE_STRING_ATOMIC: &TAtomic =
-    &TAtomic::Scalar(TScalar::String(TString::new(None, false, false, true, TStringCasing::Lowercase)));
+    &TAtomic::Scalar(TScalar::String(TString::new(None, false, false, true, false, TStringCasing::Lowercase)));
 /// A static `TAtomic` for a `non-empty-uppercase-string`.
 pub const NON_EMPTY_UPPERCASE_STRING_ATOMIC: &TAtomic =
-    &TAtomic::Scalar(TScalar::String(TString::new(None, false, false, true, TStringCasing::Uppercase)));
+    &TAtomic::Scalar(TScalar::String(TString::new(None, false, false, true, false, TStringCasing::Uppercase)));
 /// A static `TAtomic` for a `truthy-string`.
 pub const TRUTHY_STRING_ATOMIC: &TAtomic =
-    &TAtomic::Scalar(TScalar::String(TString::new(None, false, true, false, TStringCasing::Unspecified)));
+    &TAtomic::Scalar(TScalar::String(TString::new(None, false, true, false, false, TStringCasing::Unspecified)));
 /// A static `TAtomic` for a `truthy-lowercase-string`.
 pub const TRUTHY_LOWERCASE_STRING_ATOMIC: &TAtomic =
-    &TAtomic::Scalar(TScalar::String(TString::new(None, false, true, false, TStringCasing::Lowercase)));
+    &TAtomic::Scalar(TScalar::String(TString::new(None, false, true, false, false, TStringCasing::Lowercase)));
 /// A static `TAtomic` for a `truthy-uppercase-string`.
 pub const TRUTHY_UPPERCASE_STRING_ATOMIC: &TAtomic =
-    &TAtomic::Scalar(TScalar::String(TString::new(None, false, true, false, TStringCasing::Uppercase)));
+    &TAtomic::Scalar(TScalar::String(TString::new(None, false, true, false, false, TStringCasing::Uppercase)));
 /// A static `TAtomic` for a `numeric-string`.
 pub const CALLABLE_STRING_ATOMIC: &TAtomic = &TAtomic::Scalar(TScalar::String(TString::callable()));
 pub const LOWERCASE_CALLABLE_STRING_ATOMIC: &TAtomic =
@@ -78,10 +78,10 @@ pub const LOWERCASE_CALLABLE_STRING_ATOMIC: &TAtomic =
 pub const UPPERCASE_CALLABLE_STRING_ATOMIC: &TAtomic =
     &TAtomic::Scalar(TScalar::String(TString::callable_with_casing(TStringCasing::Uppercase)));
 pub const NUMERIC_STRING_ATOMIC: &TAtomic =
-    &TAtomic::Scalar(TScalar::String(TString::new(None, true, false, false, TStringCasing::Unspecified)));
+    &TAtomic::Scalar(TScalar::String(TString::new(None, true, false, false, false, TStringCasing::Unspecified)));
 /// A static `TAtomic` for a `numeric-string` that is also `truthy`.
 pub const NUMERIC_TRUTHY_STRING_ATOMIC: &TAtomic =
-    &TAtomic::Scalar(TScalar::String(TString::new(None, true, true, false, TStringCasing::Unspecified)));
+    &TAtomic::Scalar(TScalar::String(TString::new(None, true, true, false, false, TStringCasing::Unspecified)));
 /// A static `TAtomic` representing the `class-string` type.
 pub const CLASS_STRING_ATOMIC: &TAtomic = &TAtomic::Scalar(TScalar::class_string());
 /// A static `TAtomic` representing the `interface-string` type.

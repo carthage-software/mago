@@ -103,67 +103,68 @@ impl TString {
         is_numeric: bool,
         is_truthy: bool,
         mut is_non_empty: bool,
+        is_callable: bool,
         casing: TStringCasing,
     ) -> Self {
-        is_non_empty |= is_numeric || is_truthy;
+        is_non_empty |= is_numeric || is_truthy || is_callable;
 
-        Self { literal, is_numeric, is_truthy, is_non_empty, is_callable: false, casing }
+        Self { literal, is_numeric, is_truthy, is_non_empty, is_callable, casing }
     }
 
     /// Creates an instance representing the general `string` type (not known literal, no guaranteed props).
     #[inline]
     #[must_use]
     pub const fn general() -> Self {
-        Self::new(None, false, false, false, TStringCasing::Unspecified)
+        Self::new(None, false, false, false, false, TStringCasing::Unspecified)
     }
 
     /// Creates a non-empty string instance with no additional properties.
     #[inline]
     #[must_use]
     pub const fn non_empty() -> Self {
-        Self::new(None, false, false, true, TStringCasing::Unspecified)
+        Self::new(None, false, false, true, false, TStringCasing::Unspecified)
     }
 
     /// Creates a numeric string instance.
     #[inline]
     #[must_use]
     pub const fn numeric() -> Self {
-        Self::new(None, true, false, true, TStringCasing::Unspecified)
+        Self::new(None, true, false, true, false, TStringCasing::Unspecified)
     }
 
     /// Creates a lowercase string instance.
     #[inline]
     #[must_use]
     pub const fn lowercase() -> Self {
-        Self::new(None, false, false, false, TStringCasing::Lowercase)
+        Self::new(None, false, false, false, false, TStringCasing::Lowercase)
     }
 
     /// Creates a non-empty lowercase string instance.
     #[inline]
     #[must_use]
     pub const fn non_empty_lowercase() -> Self {
-        Self::new(None, false, false, true, TStringCasing::Lowercase)
+        Self::new(None, false, false, true, false, TStringCasing::Lowercase)
     }
 
     /// Creates a uppercase string instance.
     #[inline]
     #[must_use]
     pub const fn uppercase() -> Self {
-        Self::new(None, false, false, false, TStringCasing::Uppercase)
+        Self::new(None, false, false, false, false, TStringCasing::Uppercase)
     }
 
     /// Creates a non-empty uppercase string instance.
     #[inline]
     #[must_use]
     pub const fn non_empty_uppercase() -> Self {
-        Self::new(None, false, false, true, TStringCasing::Uppercase)
+        Self::new(None, false, false, true, false, TStringCasing::Uppercase)
     }
 
     /// Creates a truthy string instance.
     #[inline]
     #[must_use]
     pub const fn truthy() -> Self {
-        Self::new(None, false, true, true, TStringCasing::Unspecified)
+        Self::new(None, false, true, true, false, TStringCasing::Unspecified)
     }
 
     /// Creates a callable-string instance (a string known to be a valid callable name).
@@ -177,7 +178,7 @@ impl TString {
     #[inline]
     #[must_use]
     pub const fn callable_with_casing(casing: TStringCasing) -> Self {
-        Self { literal: None, is_numeric: false, is_truthy: true, is_non_empty: true, is_callable: true, casing }
+        Self::new(None, false, true, true, true, casing)
     }
 
     /// Returns a copy with the `is_callable` flag set.
@@ -197,9 +198,10 @@ impl TString {
         is_numeric: bool,
         is_truthy: bool,
         is_non_empty: bool,
+        is_callable: bool,
         casing: TStringCasing,
     ) -> Self {
-        Self::new(None, is_numeric, is_truthy, is_non_empty, casing)
+        Self::new(None, is_numeric, is_truthy, is_non_empty, is_callable, casing)
     }
 
     /// Creates an instance representing an unspecified literal string (origin known, value unknown).
@@ -207,7 +209,7 @@ impl TString {
     #[inline]
     #[must_use]
     pub const fn unspecified_literal(non_empty: bool) -> Self {
-        Self::new(Some(TStringLiteral::Unspecified), false, false, non_empty, TStringCasing::Unspecified)
+        Self::new(Some(TStringLiteral::Unspecified), false, false, non_empty, false, TStringCasing::Unspecified)
     }
 
     /// Creates an unspecified literal string instance with explicitly set guaranteed properties (from analysis).
@@ -217,9 +219,10 @@ impl TString {
         is_numeric: bool,
         is_truthy: bool,
         is_non_empty: bool,
+        is_callable: bool,
         casing: TStringCasing,
     ) -> Self {
-        Self::new(Some(TStringLiteral::Unspecified), is_numeric, is_truthy, is_non_empty, casing)
+        Self::new(Some(TStringLiteral::Unspecified), is_numeric, is_truthy, is_non_empty, is_callable, casing)
     }
 
     /// Creates an instance representing a known literal string type (e.g., `"hello"`).
@@ -240,7 +243,7 @@ impl TString {
             TStringCasing::Unspecified
         };
 
-        Self::new(Some(TStringLiteral::Value(value)), is_numeric, is_truthy, is_non_empty, casing)
+        Self::new(Some(TStringLiteral::Value(value)), is_numeric, is_truthy, is_non_empty, false, casing)
     }
 
     /// Checks if this represents a general `string` (origin not known to be literal).
