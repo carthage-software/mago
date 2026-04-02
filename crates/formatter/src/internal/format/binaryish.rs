@@ -167,7 +167,7 @@ pub(super) fn print_binaryish_expression<'arena>(
     if is_inside_parenthesis {
         let lhs_is_binary = left.is_binary();
         let rhs_is_binary = right.is_binary();
-        if !lhs_is_binary && !rhs_is_binary {
+        if (!lhs_is_binary && !rhs_is_binary) || !operator.is_logical() {
             return Document::Group(Group::new(parts));
         }
 
