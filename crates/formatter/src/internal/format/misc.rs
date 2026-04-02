@@ -776,7 +776,7 @@ pub(super) fn print_condition<'arena>(
                 format_token(f, right_parenthesis, ")"),
             ])
             .with_id(group_id)
-            .with_break(must_break),
+            .with_break_mode(if must_break { BreakMode::Force } else { BreakMode::Auto }),
         )
     };
 
