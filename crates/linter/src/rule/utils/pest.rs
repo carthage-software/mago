@@ -58,8 +58,12 @@ fn check_for_not_in_chain(expr: &Expression<'_>) -> bool {
             _ => false,
         },
         Expression::Call(call) => match call {
-            Call::Method(inner_method) => check_for_not_in_chain(inner_method.object),
-            Call::NullSafeMethod(inner_method) => check_for_not_in_chain(inner_method.object),
+            Call::Method(inner_method) if !is_and_method(&inner_method.method) => {
+                check_for_not_in_chain(inner_method.object)
+            }
+            Call::NullSafeMethod(inner_method) if !is_and_method(&inner_method.method) => {
+                check_for_not_in_chain(inner_method.object)
+            }
             _ => false,
         },
         _ => false,
@@ -113,6 +117,11 @@ pub fn get_first_argument<'a>(method_call: &'a MethodCall<'a>) -> Option<&'a Arg
     method_call.argument_list.arguments.first()
 }
 
+/// Checks if a method selector is `and`, which resets the negation context in Pest chains.
+fn is_and_method(method: &ClassLikeMemberSelector<'_>) -> bool {
+    matches!(method, ClassLikeMemberSelector::Identifier(ident) if ident.value == "and")
+}
+
 /// Finds the span covering `->not->method()` in a method call chain.
 ///
 /// For `expect($x)->not->toBeFalse()`, this returns the span from `->not` to `)`.
@@ -146,8 +155,12 @@ fn find_not_arrow_span(expr: &Expression<'_>) -> Option<Span> {
             _ => None,
         },
         Expression::Call(call) => match call {
-            Call::Method(inner_method) => find_not_arrow_span(inner_method.object),
-            Call::NullSafeMethod(inner_method) => find_not_arrow_span(inner_method.object),
+            Call::Method(inner_method) if !is_and_method(&inner_method.method) => {
+                find_not_arrow_span(inner_method.object)
+            }
+            Call::NullSafeMethod(inner_method) if !is_and_method(&inner_method.method) => {
+                find_not_arrow_span(inner_method.object)
+            }
             _ => None,
         },
         _ => None,

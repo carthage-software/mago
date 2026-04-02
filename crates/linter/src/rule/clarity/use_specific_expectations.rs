@@ -472,4 +472,152 @@ mod tests {
             expect($f)->not->toBeTrue();
         "#}
     }
+
+    test_lint_success! {
+        name = and_resets_not_context,
+        rule = UseSpecificExpectationsRule,
+        code = indoc! {r#"
+            <?php
+
+            expect($value)->not->toBeNull()->and($other)->toBeTrue();
+        "#}
+    }
+
+    test_lint_success! {
+        name = and_resets_not_context_to_be_false,
+        rule = UseSpecificExpectationsRule,
+        code = indoc! {r#"
+            <?php
+
+            expect($value)->not->toBeNull()->and($other)->toBeFalse();
+        "#}
+    }
+
+    test_lint_success! {
+        name = and_resets_not_context_multiple_and,
+        rule = UseSpecificExpectationsRule,
+        code = indoc! {r#"
+            <?php
+
+            expect($a)->not->toBeNull()->and($b)->toBeTrue()->and($c)->toBeFalse();
+        "#}
+    }
+
+    test_lint_success! {
+        name = and_with_not_after_and,
+        rule = UseSpecificExpectationsRule,
+        code = indoc! {r#"
+            <?php
+
+            expect($a)->not->toBeNull()->and($b)->not->toBeNull();
+        "#}
+    }
+
+    test_lint_success! {
+        name = chained_without_not,
+        rule = UseSpecificExpectationsRule,
+        code = indoc! {r#"
+            <?php
+
+            expect($a)->toBeTrue()->and($b)->toBeFalse()->and($c)->toBeNull();
+        "#}
+    }
+
+    test_lint_success! {
+        name = and_resets_not_context_to_be_empty,
+        rule = UseSpecificExpectationsRule,
+        code = indoc! {r#"
+            <?php
+
+            expect($value)->not->toBeEmpty()->and($other)->toBeEmpty();
+        "#}
+    }
+
+    test_lint_failure! {
+        name = not_to_be_true_before_and,
+        rule = UseSpecificExpectationsRule,
+        count = 1,
+        code = indoc! {r#"
+            <?php
+
+            expect($value)->not->toBeTrue()->and($other)->toBeNull();
+        "#}
+    }
+
+    test_lint_failure! {
+        name = not_to_be_false_before_and,
+        rule = UseSpecificExpectationsRule,
+        count = 1,
+        code = indoc! {r#"
+            <?php
+
+            expect($value)->not->toBeFalse()->and($other)->toBeNull();
+        "#}
+    }
+
+    test_lint_failure! {
+        name = not_after_and_is_still_flagged,
+        rule = UseSpecificExpectationsRule,
+        count = 1,
+        code = indoc! {r#"
+            <?php
+
+            expect($a)->toBeNull()->and($b)->not->toBeTrue();
+        "#}
+    }
+
+    test_lint_failure! {
+        name = violations_on_both_sides_of_and,
+        rule = UseSpecificExpectationsRule,
+        count = 2,
+        code = indoc! {r#"
+            <?php
+
+            expect($a)->not->toBeTrue()->and($b)->not->toBeFalse();
+        "#}
+    }
+
+    test_lint_failure! {
+        name = to_be_literal_after_and,
+        rule = UseSpecificExpectationsRule,
+        count = 1,
+        code = indoc! {r#"
+            <?php
+
+            expect($a)->toBeNull()->and($b)->toBe(true);
+        "#}
+    }
+
+    test_lint_failure! {
+        name = to_equal_null_after_and,
+        rule = UseSpecificExpectationsRule,
+        count = 1,
+        code = indoc! {r#"
+            <?php
+
+            expect($a)->toBeTrue()->and($b)->toEqual(null);
+        "#}
+    }
+
+    test_lint_failure! {
+        name = to_be_empty_array_after_and,
+        rule = UseSpecificExpectationsRule,
+        count = 1,
+        code = indoc! {r#"
+            <?php
+
+            expect($a)->toBeTrue()->and($b)->toBe([]);
+        "#}
+    }
+
+    test_lint_failure! {
+        name = to_be_empty_string_after_and,
+        rule = UseSpecificExpectationsRule,
+        count = 1,
+        code = indoc! {r#"
+            <?php
+
+            expect($a)->toBeTrue()->and($b)->toBe('');
+        "#}
+    }
 }
