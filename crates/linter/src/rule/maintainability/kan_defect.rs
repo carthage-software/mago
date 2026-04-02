@@ -200,7 +200,7 @@ impl LintRule for KanDefectRule {
 
         if kan_defect > threshold {
             ctx.collector.report(
-                Issue::new(self.cfg.level, format!("{kind} has a high kan defect score ({kan_defect})."))
+                Issue::new(self.cfg.level, format!("{kind} has a high kan defect score."))
                     .with_code(self.meta.code)
                     .with_annotation(Annotation::primary(get_class_like_header_span(node)).with_message(format!(
                         "{kind} has a kan defect score of {kan_defect}, which exceeds the threshold of {threshold}.",
