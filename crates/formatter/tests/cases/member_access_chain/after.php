@@ -61,10 +61,7 @@ class Example
 
     public function something(): void
     {
-        $attribute = $this->matchedRoute
-            ->route
-            ->handler
-            ->getAttribute(Allow::class);
+        $attribute = $this->matchedRoute->route->handler->getAttribute(Allow::class);
     }
 
     public function something(): void

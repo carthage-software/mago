@@ -388,7 +388,7 @@ impl<'arena> MemberAccessChain<'arena> {
 
     #[inline]
     fn must_break(&self, f: &FormatterState) -> bool {
-        if self.is_first_link_static_method_call() && self.accesses.len() > 3 {
+        if self.is_first_link_static_method_call() && self.accesses.len() > 5 {
             return true;
         }
 
@@ -420,7 +420,7 @@ impl<'arena> MemberAccessChain<'arena> {
                 })
             }
             Expression::Variable(Variable::Direct(variable)) => {
-                variable.name == "$this" && self.accesses.len() > 3
+                variable.name == "$this" && self.accesses.len() > 5
             }
             _ => false,
         };

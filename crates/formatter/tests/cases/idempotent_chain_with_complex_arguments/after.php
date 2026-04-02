@@ -26,10 +26,7 @@ $builder
     ->setBody(json_encode(['key' => 'value', 'nested' => ['a' => 1]]))
     ->send();
 
-TestCase::create()
-    ->expects($this->once())
-    ->method('handle')
-    ->willReturn(['status' => 'ok', 'code' => 200]);
+TestCase::create()->expects($this->once())->method('handle')->willReturn(['status' => 'ok', 'code' => 200]);
 
 $repository->findBy(function ($item) {
     return $item->isActive();
