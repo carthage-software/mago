@@ -48,6 +48,17 @@ fn mago_bin() -> PathBuf {
     PathBuf::from(path)
 }
 
+/// Returns true if the mago binary can actually execute on this host.
+/// This is false when cross-compiling (e.g., building aarch64 on x86_64).
+fn can_run_mago() -> bool {
+    Command::new(mago_bin())
+        .arg("--help")
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .is_ok_and(|s| s.success())
+}
+
 fn run_mago_stdin(
     subcommand: &str,
     workspace: &Path,
@@ -84,6 +95,10 @@ fn run_mago_stdin(
 
 #[test]
 fn test_analyze_stdin_input_uses_path_in_output() {
+    if !can_run_mago() {
+        return;
+    }
+
     let temp_dir = tempfile::tempdir().unwrap();
     let workspace = temp_dir.path();
 
@@ -115,6 +130,10 @@ function f(): int { return "not an int"; }
 
 #[test]
 fn test_lint_stdin_input_uses_path_in_output() {
+    if !can_run_mago() {
+        return;
+    }
+
     let temp_dir = tempfile::tempdir().unwrap();
     let workspace = temp_dir.path();
 
@@ -146,6 +165,10 @@ paths = ["src"]
 
 #[test]
 fn test_guard_stdin_input_uses_path_in_output() {
+    if !can_run_mago() {
+        return;
+    }
+
     let temp_dir = tempfile::tempdir().unwrap();
     let workspace = temp_dir.path();
 
@@ -182,6 +205,10 @@ $x = 1;
 /// (no "./") so baseline matching works the same as for disk-loaded files.
 #[test]
 fn test_analyze_stdin_input_normalizes_dot_slash_path() {
+    if !can_run_mago() {
+        return;
+    }
+
     let temp_dir = tempfile::tempdir().unwrap();
     let workspace = temp_dir.path();
 
@@ -224,6 +251,10 @@ function f(): int { return "not an int"; }
 /// so that baselines apply correctly when using --stdin-input (e.g. from the IDE).
 #[test]
 fn test_analyze_stdin_input_baseline_filters_same_as_file() {
+    if !can_run_mago() {
+        return;
+    }
+
     let temp_dir = tempfile::tempdir().unwrap();
     let workspace = temp_dir.path();
 
