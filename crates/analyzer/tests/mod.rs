@@ -775,6 +775,7 @@ test_case!(issue_1561_part_4);
 test_case!(issue_1565);
 test_case!(issue_1566);
 test_case!(issue_1567);
+test_case!(issue_1568);
 test_case!(issue_1534);
 test_case!(issue_1535);
 test_case!(issue_1536);

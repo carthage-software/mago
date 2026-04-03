@@ -355,7 +355,8 @@ pub fn analyze_arithmetic_operation<'ctx, 'arena>(
                 if numeric_results.iter().any(|a| matches!(a, TAtomic::Never)) {
                     invalid_pair = true;
                     if matches!(binary.operator, BinaryOperator::Division(_) | BinaryOperator::Modulo(_)) {
-                        let right_is_zero = matches!(right_atomic.get_literal_int_value(), Some(0));
+                        let right_is_zero = matches!(right_atomic.get_literal_int_value(), Some(0))
+                            || matches!(right_atomic.get_literal_float_value(), Some(0.0));
 
                         if right_is_zero {
                             invalid_right_messages.push(("Division or modulo by zero".to_string(), binary.rhs.span()));
@@ -559,7 +560,19 @@ fn determine_numeric_result(op: &BinaryOperator<'_>, left: &TAtomic, right: &TAt
             }
         }
         (TAtomic::Scalar(TScalar::Float(_)), _) | (_, TAtomic::Scalar(TScalar::Float(_))) => match op {
-            BinaryOperator::Modulo(_) => vec![TAtomic::Scalar(TScalar::int())],
+            BinaryOperator::Modulo(_) => {
+                let right_f = match right {
+                    TAtomic::Scalar(TScalar::Float(TFloat::Literal(v))) => Some(v.into_inner()),
+                    TAtomic::Scalar(TScalar::Integer(i)) => i.get_literal_value().map(|v| v as f64),
+                    _ => None,
+                };
+
+                if matches!(right_f, Some(v) if v == 0.0) {
+                    vec![TAtomic::Never]
+                } else {
+                    vec![TAtomic::Scalar(TScalar::int())]
+                }
+            }
             _ => {
                 let left_f = match left {
                     TAtomic::Scalar(TScalar::Float(TFloat::Literal(v))) => Some(v.into_inner()),
@@ -574,11 +587,15 @@ fn determine_numeric_result(op: &BinaryOperator<'_>, left: &TAtomic, right: &TAt
                 };
 
                 if let (Some(l), Some(r)) = (left_f, right_f) {
+                    if matches!(op, BinaryOperator::Division(_)) && r == 0.0 {
+                        return vec![TAtomic::Never];
+                    }
+
                     let result = match op {
                         BinaryOperator::Addition(_) => Some(l + r),
                         BinaryOperator::Subtraction(_) => Some(l - r),
                         BinaryOperator::Multiplication(_) => Some(l * r),
-                        BinaryOperator::Division(_) if r != 0.0 => Some(l / r),
+                        BinaryOperator::Division(_) => Some(l / r),
                         BinaryOperator::Exponentiation(_) => Some(l.powf(r)),
                         _ => None,
                     };
