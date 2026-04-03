@@ -8,6 +8,7 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_reporting::Level;
 use mago_span::HasSpan;
+use mago_span::Span;
 use mago_syntax::ast::ClassLikeMember;
 use mago_syntax::ast::Node;
 use mago_syntax::ast::NodeKind;
@@ -101,20 +102,128 @@ impl LintRule for NoRedundantReadonlyRule {
             if let ClassLikeMember::Property(property) = member
                 && let Some(readonly_modifier) = property.modifiers().get_readonly()
             {
-                let issue = Issue::new(
-                    self.cfg.level(),
-                    "The `readonly` modifier is redundant as the class is already readonly.",
-                )
+                self.report(ctx, readonly_modifier.span());
+            }
+
+            if let ClassLikeMember::Method(method) = member
+                && method.name.value.eq_ignore_ascii_case("__construct")
+            {
+                for param in method.parameter_list.parameters.iter() {
+                    if param.is_promoted_property()
+                        && let Some(readonly_modifier) = param.modifiers.get_readonly()
+                    {
+                        self.report(ctx, readonly_modifier.span());
+                    }
+                }
+            }
+        }
+    }
+}
+
+impl NoRedundantReadonlyRule {
+    fn report(&self, ctx: &mut LintContext<'_, '_>, readonly_span: Span) {
+        let issue =
+            Issue::new(self.cfg.level(), "The `readonly` modifier is redundant as the class is already readonly.")
                 .with_code(self.meta.code)
                 .with_annotation(
-                    Annotation::primary(readonly_modifier.span()).with_message("This `readonly` modifier is redundant"),
+                    Annotation::primary(readonly_span).with_message("This `readonly` modifier is redundant"),
                 )
                 .with_help("Remove the redundant `readonly` modifier.");
 
-                ctx.collector.propose(issue, |edits| {
-                    edits.push(TextEdit::delete(readonly_modifier.span()));
-                });
+        ctx.collector.propose(issue, |edits| {
+            edits.push(TextEdit::delete(readonly_span));
+        });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use indoc::indoc;
+
+    use super::NoRedundantReadonlyRule;
+    use crate::test_lint_failure;
+    use crate::test_lint_success;
+
+    test_lint_success! {
+        name = readonly_class_promoted_without_readonly,
+        rule = NoRedundantReadonlyRule,
+        code = indoc! {r"
+            <?php
+
+            readonly class Foo {
+                public function __construct(
+                    public string $bar,
+                ) {}
             }
-        }
+        "}
+    }
+
+    test_lint_success! {
+        name = non_readonly_class_with_readonly_promoted,
+        rule = NoRedundantReadonlyRule,
+        code = indoc! {r"
+            <?php
+
+            class Foo {
+                public function __construct(
+                    public readonly string $bar,
+                ) {}
+            }
+        "}
+    }
+
+    test_lint_success! {
+        name = non_readonly_class_with_readonly_property,
+        rule = NoRedundantReadonlyRule,
+        code = indoc! {r"
+            <?php
+
+            class Foo {
+                public readonly string $bar;
+            }
+        "}
+    }
+
+    test_lint_failure! {
+        name = readonly_class_with_readonly_promoted,
+        rule = NoRedundantReadonlyRule,
+        code = indoc! {r"
+            <?php
+
+            readonly class Foo {
+                public function __construct(
+                    public readonly string $bar,
+                ) {}
+            }
+        "}
+    }
+
+    test_lint_failure! {
+        name = readonly_class_with_readonly_property,
+        rule = NoRedundantReadonlyRule,
+        code = indoc! {r"
+            <?php
+
+            readonly class Foo {
+                public readonly string $bar;
+            }
+        "}
+    }
+
+    test_lint_failure! {
+        name = readonly_class_with_both_redundant,
+        rule = NoRedundantReadonlyRule,
+        count = 2,
+        code = indoc! {r"
+            <?php
+
+            readonly class Foo {
+                public readonly string $bar;
+
+                public function __construct(
+                    public readonly string $baz,
+                ) {}
+            }
+        "}
     }
 }
