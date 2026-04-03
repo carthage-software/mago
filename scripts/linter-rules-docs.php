@@ -99,7 +99,7 @@ function main(): void
     // Build the Mago executable first to ensure it's up-to-date.
     namespace\writeln('🏗️ ', 'Building Mago executable in release mode...');
     $build_result = -1;
-    passthru('cargo build --release', $build_result);
+    passthru('cargo build', $build_result);
     if (0 !== $build_result) {
         throw new RuntimeException('Failed to build Mago executable.');
     }

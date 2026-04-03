@@ -23,6 +23,7 @@ This document details the rules available in the `Consistency` category.
 | Interface Name | [`interface-name`](#interface-name) |
 | Lowercase Keyword | [`lowercase-keyword`](#lowercase-keyword) |
 | Lowercase Type Hint | [`lowercase-type-hint`](#lowercase-type-hint) |
+| Method Name | [`method-name`](#method-name) |
 | No Alias Function | [`no-alias-function`](#no-alias-function) |
 | No Alternative Syntax | [`no-alternative-syntax`](#no-alternative-syntax) |
 | No Fully Qualified Global Class-Like | [`no-fully-qualified-global-class-like`](#no-fully-qualified-global-class-like) |
@@ -634,6 +635,55 @@ function example(int $param): void {
 
 function example(Int $param): VOID {
     return;
+}
+```
+
+
+## <a id="method-name"></a>`method-name`
+
+Detects method declarations that do not follow the configured naming convention.
+
+By default, method names should be in camelCase. Magic methods (prefixed with `__`)
+are always excluded.
+
+The `use-snake-case-for-tests` option enforces snake_case for test methods
+(names starting with `test`), which is a common convention in PHPUnit.
+
+
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `false` |
+| `level` | `string` | `"help"` |
+| `camel` | `boolean` | `true` |
+| `either` | `boolean` | `false` |
+| `use-snake-case-for-tests` | `boolean` | `false` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+
+class Foo
+{
+    public function getName(): string {}
+    public function setName(string $name): void {}
+}
+```
+
+#### Incorrect code
+
+```php
+<?php
+
+class Foo
+{
+    public function GetName(): string {}
+    public function set_name(string $name): void {}
 }
 ```
 

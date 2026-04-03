@@ -202,6 +202,7 @@ define_rules! {
     LiteralNamedArgument(literal_named_argument @ LiteralNamedArgumentRule),
     LoopDoesNotIterate(loop_does_not_iterate @ LoopDoesNotIterateRule),
     LowercaseKeyword(lowercase_keyword @ LowercaseKeywordRule),
+    MethodName(method_name @ MethodNameRule),
     NoDebugSymbols(no_debug_symbols @ NoDebugSymbolsRule),
     NoRequestVariable(no_request_variable @ NoRequestVariableRule),
     NoShellExecuteString(no_shell_execute_string @ NoShellExecuteStringRule),

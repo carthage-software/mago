@@ -44,6 +44,7 @@ use crate::rule::LiteralNamedArgumentConfig;
 use crate::rule::LoopDoesNotIterateConfig;
 use crate::rule::LowercaseKeywordConfig;
 use crate::rule::LowercaseTypeHintConfig;
+use crate::rule::MethodNameConfig;
 use crate::rule::MiddlewareInRoutesConfig;
 use crate::rule::NoAliasFunctionConfig;
 use crate::rule::NoAlternativeSyntaxConfig;
@@ -210,6 +211,7 @@ pub struct RulesSettings {
     pub literal_named_argument: RuleSettings<LiteralNamedArgumentConfig>,
     pub loop_does_not_iterate: RuleSettings<LoopDoesNotIterateConfig>,
     pub lowercase_keyword: RuleSettings<LowercaseKeywordConfig>,
+    pub method_name: RuleSettings<MethodNameConfig>,
     pub no_debug_symbols: RuleSettings<NoDebugSymbolsConfig>,
     pub no_request_variable: RuleSettings<NoRequestVariableConfig>,
     pub no_shell_execute_string: RuleSettings<NoShellExecuteStringConfig>,
