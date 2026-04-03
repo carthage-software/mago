@@ -35,11 +35,18 @@ pub struct CyclomaticComplexityRule {
 pub struct CyclomaticComplexityConfig {
     pub level: Level,
     pub threshold: usize,
+    /// Maximum cyclomatic complexity allowed for a single method.
+    ///
+    /// When set, each method in a class-like is checked individually against this threshold,
+    /// in addition to the class-level `threshold` check.
+    ///
+    /// Default: `None` (methods are only checked as part of the class-level total).
+    pub method_threshold: Option<usize>,
 }
 
 impl Default for CyclomaticComplexityConfig {
     fn default() -> Self {
-        Self { level: Level::Error, threshold: 15 }
+        Self { level: Level::Error, threshold: 15, method_threshold: None }
     }
 }
 
@@ -221,6 +228,28 @@ impl CyclomaticComplexityRule {
 
             ctx.collector.report(issue);
         }
+
+        if let Some(method_threshold) = self.cfg.method_threshold {
+            for member in members {
+                let ClassLikeMember::Method(method) = member else {
+                    continue;
+                };
+
+                let Some(method_complexity) = get_cyclomatic_complexity_of_method(method) else {
+                    continue;
+                };
+
+                if method_complexity > method_threshold {
+                    let issue = Issue::new(self.cfg.level, format!("Method `{}` has high complexity.", method.name.value))
+                        .with_code(self.meta.code)
+                        .with_annotation(Annotation::primary(method.name.span()).with_message(format!(
+                            "Method has a cyclomatic complexity of {method_complexity}, which exceeds the threshold of {method_threshold}."
+                        )));
+
+                    ctx.collector.report(issue);
+                }
+            }
+        }
     }
 
     fn check_function_like<'arena>(
@@ -303,4 +332,147 @@ fn get_cyclomatic_complexity_of_node(node: Node<'_, '_>) -> usize {
     }
 
     number
+}
+
+#[cfg(test)]
+mod tests {
+    use indoc::indoc;
+
+    use super::CyclomaticComplexityRule;
+    use crate::test_lint_failure;
+    use crate::test_lint_success;
+
+    test_lint_success! {
+        name = simple_class,
+        rule = CyclomaticComplexityRule,
+        code = indoc! {r#"
+            <?php
+
+            class Foo {
+                public function bar(): void {
+                    if ($a) { echo "ok"; }
+                }
+            }
+        "#}
+    }
+
+    test_lint_failure! {
+        name = complex_class_exceeds_threshold,
+        rule = CyclomaticComplexityRule,
+        settings = |s: &mut crate::settings::Settings| s.rules.cyclomatic_complexity.config.threshold = 2,
+        code = indoc! {r#"
+            <?php
+
+            class Foo {
+                public function bar(): void {
+                    if ($a) { echo "1"; }
+                    if ($b) { echo "2"; }
+                    if ($c) { echo "3"; }
+                }
+            }
+        "#}
+    }
+
+    test_lint_success! {
+        name = simple_function,
+        rule = CyclomaticComplexityRule,
+        code = indoc! {r#"
+            <?php
+
+            function foo(): void {
+                if ($a) { echo "ok"; }
+            }
+        "#}
+    }
+
+    test_lint_failure! {
+        name = complex_function_exceeds_threshold,
+        rule = CyclomaticComplexityRule,
+        settings = |s: &mut crate::settings::Settings| s.rules.cyclomatic_complexity.config.threshold = 1,
+        code = indoc! {r#"
+            <?php
+
+            function foo(): void {
+                if ($a) { echo "1"; }
+                if ($b) { echo "2"; }
+            }
+        "#}
+    }
+
+    test_lint_failure! {
+        name = method_exceeds_method_threshold,
+        rule = CyclomaticComplexityRule,
+        settings = |s: &mut crate::settings::Settings| {
+            s.rules.cyclomatic_complexity.config.threshold = 100;
+            s.rules.cyclomatic_complexity.config.method_threshold = Some(2);
+        },
+        code = indoc! {r#"
+            <?php
+
+            class Foo {
+                public function complex(): void {
+                    if ($a) { echo "1"; }
+                    if ($b) { echo "2"; }
+                    if ($c) { echo "3"; }
+                }
+            }
+        "#}
+    }
+
+    test_lint_success! {
+        name = method_within_method_threshold,
+        rule = CyclomaticComplexityRule,
+        settings = |s: &mut crate::settings::Settings| {
+            s.rules.cyclomatic_complexity.config.threshold = 100;
+            s.rules.cyclomatic_complexity.config.method_threshold = Some(10);
+        },
+        code = indoc! {r#"
+            <?php
+
+            class Foo {
+                public function simple(): void {
+                    if ($a) { echo "ok"; }
+                }
+            }
+        "#}
+    }
+
+    test_lint_success! {
+        name = no_method_threshold_preserves_bc,
+        rule = CyclomaticComplexityRule,
+        code = indoc! {r#"
+            <?php
+
+            class Foo {
+                public function bar(): void {
+                    if ($a) { echo "1"; }
+                    if ($b) { echo "2"; }
+                }
+            }
+        "#}
+    }
+
+    test_lint_failure! {
+        name = both_class_and_method_thresholds,
+        rule = CyclomaticComplexityRule,
+        count = 2,
+        settings = |s: &mut crate::settings::Settings| {
+            s.rules.cyclomatic_complexity.config.threshold = 3;
+            s.rules.cyclomatic_complexity.config.method_threshold = Some(2);
+        },
+        code = indoc! {r#"
+            <?php
+
+            class Foo {
+                public function a(): void {
+                    if ($x) { echo "1"; }
+                    if ($y) { echo "2"; }
+                    if ($z) { echo "3"; }
+                }
+                public function b(): void {
+                    if ($w) { echo "4"; }
+                }
+            }
+        "#}
+    }
 }

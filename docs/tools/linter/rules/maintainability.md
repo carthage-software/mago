@@ -37,6 +37,7 @@ Cyclomatic complexity is a measure of the number of linearly independent paths t
 | `enabled` | `boolean` | `true` |
 | `level` | `string` | `"error"` |
 | `threshold` | `integer` | `15` |
+| `method-threshold` | `NULL` | `null` |
 
 ### Examples
 
@@ -155,6 +156,9 @@ Checks if the nesting level in any block exceeds a configurable threshold.
 Deeply nested code is harder to read, understand, and maintain.
 Consider refactoring to use early returns, helper methods, or clearer control flow.
 
+The `function-like-threshold` option allows setting a separate, typically lower,
+threshold for individual functions, methods, closures, and property hooks.
+
 
 
 ### Configuration
@@ -164,6 +168,7 @@ Consider refactoring to use early returns, helper methods, or clearer control fl
 | `enabled` | `boolean` | `true` |
 | `level` | `string` | `"warning"` |
 | `threshold` | `integer` | `7` |
+| `function-like-threshold` | `NULL` | `null` |
 
 ### Examples
 
