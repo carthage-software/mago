@@ -1417,8 +1417,8 @@ mod tests {
             }
         "},
         issues = [
-            IssueCode::PossiblyUndefinedArrayIndex,
-            IssueCode::PossiblyUndefinedArrayIndex,
+            IssueCode::PossiblyUndefinedIntArrayIndex,
+            IssueCode::PossiblyUndefinedIntArrayIndex,
         ]
     }
 

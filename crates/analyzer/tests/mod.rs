@@ -776,6 +776,16 @@ test_case!(issue_1565);
 test_case!(issue_1566);
 test_case!(issue_1567);
 test_case!(issue_1568);
+test_case!(issue_1569_allowed, {
+    let mut s = crate::framework::default_test_settings();
+    s.allow_possibly_undefined_array_keys = true;
+    s
+});
+test_case!(issue_1569_strict, {
+    let mut s = crate::framework::default_test_settings();
+    s.allow_possibly_undefined_array_keys = false;
+    s
+});
 test_case!(issue_1534);
 test_case!(issue_1535);
 test_case!(issue_1536);

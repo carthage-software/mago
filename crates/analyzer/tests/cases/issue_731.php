@@ -49,7 +49,7 @@ function get_test(): ?Test
 function weird(): void
 {
     assert(null === get_test()?->test()[0], description: 'expected null');
-    // @mago-expect analysis:possibly-undefined-array-index
+    // @mago-expect analysis:possibly-undefined-string-array-index
     assert(null === get_test()?->data['missing_key'], description: 'expected null');
     assert(null === get_test()?->x->name, description: 'expected null');
     assert(null === get_test()?->x->t::create()->x->name, description: 'expected null');

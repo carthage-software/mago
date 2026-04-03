@@ -1,3 +1,5 @@
+//! TODO(azjezz): this whole file needs a re-write. it is a mess (ref #1569)
+
 use std::borrow::Cow;
 
 use mago_atom::Atom;
@@ -783,7 +785,13 @@ pub(crate) fn handle_array_access_on_keyed_array<'ctx>(
                 if actual_possibly_undefined {
                     *has_possibly_undefined = true;
                     expression_type.set_possibly_undefined(true, None);
-                    if !in_assignment && !block_context.flags.inside_isset() && !block_context.flags.inside_unset() {
+                    let suppress_for_generic =
+                        context.settings.allow_possibly_undefined_array_keys && has_value_parameter;
+                    if !in_assignment
+                        && !block_context.flags.inside_isset()
+                        && !block_context.flags.inside_unset()
+                        && !suppress_for_generic
+                    {
                         context.collector.report_with_code(
                             match &array_key {
                                 ArrayKey::Integer(_) => IssueCode::PossiblyUndefinedIntArrayIndex,
@@ -834,14 +842,12 @@ pub(crate) fn handle_array_access_on_keyed_array<'ctx>(
                 // But NOT unsealed arrays with just `...` (which have mixed as value type)
                 value_parameter.into_owned()
             } else if !block_context.flags.inside_isset() {
+                let key_may_exist_in_generic_params = has_value_parameter;
                 // Check if we're in a union type and if ANY other member has this key
-                let key_exists_in_other_variant = if array_like_type.types.len() > 1 {
+                let key_exists_in_other_variant = key_may_exist_in_generic_params || {
                     array_like_type.types.iter().any(|atomic_type| {
                         if let TAtomic::Array(TArray::Keyed(other_keyed)) = atomic_type {
-                            // Array with generic parameters might have any key
-                            if context.settings.allow_possibly_undefined_array_keys
-                                && other_keyed.get_generic_parameters().is_some()
-                            {
+                            if other_keyed.get_generic_parameters().is_some() {
                                 true
                             } else if let Some(other_known_items) = other_keyed.get_known_items() {
                                 other_known_items.contains_key(&array_key)
@@ -852,15 +858,13 @@ pub(crate) fn handle_array_access_on_keyed_array<'ctx>(
                             false
                         }
                     })
-                } else {
-                    false
                 };
 
                 if key_exists_in_other_variant {
-                    // Key exists in some but not all variants - mark as possibly undefined
-                    // Don't report warning here - it will be reported at the union level to avoid duplicates
                     *has_possibly_undefined = true;
-                    *key_in_other_variant = true;
+                    if !key_may_exist_in_generic_params {
+                        *key_in_other_variant = true;
+                    }
                 } else {
                     // Key doesn't exist in any variant - report error (only once for union types)
                     if !in_assignment && !*reported_undefined_key {
@@ -889,7 +893,7 @@ pub(crate) fn handle_array_access_on_keyed_array<'ctx>(
                     }
                 }
 
-                if has_value_parameter { get_mixed() } else { get_null() }
+                if has_value_parameter { value_parameter.into_owned() } else { get_null() }
             } else if has_value_parameter {
                 // Inside isset() check on array with generic parameters - the key might exist at runtime
                 // Don't report impossible isset - just return the value type as possibly undefined
@@ -1016,7 +1020,7 @@ pub(crate) fn handle_array_access_on_keyed_array<'ctx>(
                     context.codebase,
                     &key_parameter,
                     if index_type.is_mixed() { &array_key } else { index_type },
-                    true,
+                    false,
                     false,
                     false,
                     &mut ComparisonResult::new(),
@@ -1029,12 +1033,17 @@ pub(crate) fn handle_array_access_on_keyed_array<'ctx>(
                 if !context.settings.allow_possibly_undefined_array_keys
                     && !block_context.flags.inside_isset()
                     && !block_context.flags.inside_unset()
-                    && index_type.get_single_array_key().is_some()
+                    && let Some(single_array_key) = index_type.get_single_array_key()
                 {
                     let index_type_str = index_type.get_id();
+                    let code = match single_array_key {
+                        ArrayKey::Integer(_) => IssueCode::PossiblyUndefinedIntArrayIndex,
+                        ArrayKey::String(_) => IssueCode::PossiblyUndefinedStringArrayIndex,
+                        ArrayKey::ClassLikeConstant { .. } => IssueCode::PossiblyUndefinedArrayIndex,
+                    };
 
                     context.collector.report_with_code(
-                        IssueCode::PossiblyUndefinedArrayIndex,
+                        code,
                         Issue::warning(format!(
                             "Possibly undefined array key `{index_type_str}` accessed on `{}`.",
                             keyed_array.get_id()

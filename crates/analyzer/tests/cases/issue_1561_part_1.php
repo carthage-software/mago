@@ -6,7 +6,7 @@ declare(strict_types=1);
 function kind_human_value(array $meta, mixed $value): string
 {
     /** @mago-expect analysis:mixed-assignment */
-    /** @mago-expect analysis:possibly-undefined-array-index */
+    /** @mago-expect analysis:possibly-undefined-string-array-index */
     $kind = $meta['kind'];
     $fn = "kind_human_value_{$kind}";
     if (!function_exists($fn)) {

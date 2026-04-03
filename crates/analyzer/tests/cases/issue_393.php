@@ -3,8 +3,6 @@
 /**
  * @param array<string, int> $asdf
  *
- * @mago-expect analysis:undefined-string-array-index
- * @mago-expect analysis:mixed-argument
  */
 function x(array $asdf): void
 {

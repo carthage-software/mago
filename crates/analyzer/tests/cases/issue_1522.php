@@ -16,7 +16,7 @@ for ($x = 0; $x < $target; ++$x) {
         if ($y) {
             $v += $work[$x][$y - 1];
         } else {
-            /** @mago-expect analysis:possibly-undefined-array-index */
+            /** @mago-expect analysis:possibly-undefined-int-array-index */
             $v += $work[$x][$y];
         }
     }
