@@ -37,6 +37,7 @@ title: Rules & categories
 ### PHPUnit
 
 - [`assertion-style`](./rules/consistency#assertion-style)
+- [`prefer-test-attribute`](./rules/best-practices#prefer-test-attribute)
 - [`strict-assertions`](./rules/correctness#strict-assertions)
 - [`use-specific-assertions`](./rules/correctness#use-specific-assertions)
 

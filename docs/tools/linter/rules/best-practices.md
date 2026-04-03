@@ -24,6 +24,7 @@ This document details the rules available in the `BestPractices` category.
 | Prefer Interface | [`prefer-interface`](#prefer-interface) |
 | Prefer Pre-Increment | [`prefer-pre-increment`](#prefer-pre-increment) |
 | Prefer Static Closure | [`prefer-static-closure`](#prefer-static-closure) |
+| Prefer Test Attribute | [`prefer-test-attribute`](#prefer-test-attribute) |
 | Prefer View Array | [`prefer-view-array`](#prefer-view-array) |
 | Prefer While Loop | [`prefer-while-loop`](#prefer-while-loop) |
 | Psl Array Functions | [`psl-array-functions`](#psl-array-functions) |
@@ -741,6 +742,56 @@ class Foo {
             return $x * 2;
         };
     }
+}
+```
+
+
+## <a id="prefer-test-attribute"></a>`prefer-test-attribute`
+
+Suggests using PHPUnit's `#[Test]` attribute instead of the `test` method name prefix.
+
+When a method name starts with `test`, it can be replaced with a `#[Test]` attribute
+and a shorter method name. This is the modern PHPUnit style (PHPUnit 10+).
+
+
+### Requirements
+
+- **Integration:** `PHPUnit`
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `false` |
+| `level` | `string` | `"warning"` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+
+use PHPUnit\Framework\TestCase;
+use PHPUnit\Framework\Attributes\Test;
+
+class UserTest extends TestCase
+{
+    #[Test]
+    public function itReturnsFullName(): void {}
+}
+```
+
+#### Incorrect code
+
+```php
+<?php
+
+use PHPUnit\Framework\TestCase;
+
+class UserTest extends TestCase
+{
+    public function testItReturnsFullName(): void {}
 }
 ```
 

@@ -120,6 +120,7 @@ use crate::rule::PreferFirstClassCallableConfig;
 use crate::rule::PreferInterfaceConfig;
 use crate::rule::PreferPreIncrementConfig;
 use crate::rule::PreferStaticClosureConfig;
+use crate::rule::PreferTestAttributeConfig;
 use crate::rule::PreferViewArrayConfig;
 use crate::rule::PreferWhileLoopConfig;
 use crate::rule::PropertyNameConfig;
@@ -285,6 +286,7 @@ pub struct RulesSettings {
     pub prefer_early_continue: RuleSettings<PreferEarlyContinueConfig>,
     pub prefer_interface: RuleSettings<PreferInterfaceConfig>,
     pub prefer_static_closure: RuleSettings<PreferStaticClosureConfig>,
+    pub prefer_test_attribute: RuleSettings<PreferTestAttributeConfig>,
     pub prefer_view_array: RuleSettings<PreferViewArrayConfig>,
     pub prefer_while_loop: RuleSettings<PreferWhileLoopConfig>,
     pub psl_array_functions: RuleSettings<PslArrayFunctionsConfig>,

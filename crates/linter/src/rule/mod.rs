@@ -279,6 +279,7 @@ define_rules! {
     PreferArrowFunction(prefer_arrow_function @ PreferArrowFunctionRule),
     PreferEarlyContinue(prefer_early_continue @ PreferEarlyContinueRule),
     PreferStaticClosure(prefer_static_closure @ PreferStaticClosureRule),
+    PreferTestAttribute(prefer_test_attribute @ PreferTestAttributeRule),
     PreferViewArray(prefer_view_array @ PreferViewArrayRule),
     PreferWhileLoop(prefer_while_loop @ PreferWhileLoopRule),
     PslArrayFunctions(psl_array_functions @ PslArrayFunctionsRule),
