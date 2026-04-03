@@ -14,6 +14,7 @@ This document details the rules available in the `Redundancy` category.
 | No Closing Tag | [`no-closing-tag`](#no-closing-tag) |
 | No Empty Comment | [`no-empty-comment`](#no-empty-comment) |
 | No Empty Loop | [`no-empty-loop`](#no-empty-loop) |
+| No Is Null | [`no-is-null`](#no-is-null) |
 | No Noop | [`no-noop`](#no-noop) |
 | No Protected in Final | [`no-protected-in-final`](#no-protected-in-final) |
 | No Redundant Binary String Prefix | [`no-redundant-binary-string-prefix`](#no-redundant-binary-string-prefix) |
@@ -239,6 +240,45 @@ foreach ($items as $item) {
 
 while (should_wait()) {
     // Empty loop body
+}
+```
+
+
+## <a id="no-is-null"></a>`no-is-null`
+
+Detects usage of the `is_null()` function and suggests using a strict `=== null` comparison instead.
+
+The `is_null()` function is redundant because `=== null` achieves the same result with clearer intent
+and without the overhead of a function call.
+
+
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `false` |
+| `level` | `string` | `"note"` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+
+if ($value === null) {
+    // ...
+}
+```
+
+#### Incorrect code
+
+```php
+<?php
+
+if (is_null($value)) {
+    // ...
 }
 ```
 

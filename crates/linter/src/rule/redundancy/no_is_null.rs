@@ -1,6 +1,4 @@
 use indoc::indoc;
-use mago_text_edit::Safety;
-use mago_text_edit::TextEdit;
 use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
@@ -12,6 +10,7 @@ use mago_span::HasSpan;
 use mago_syntax::ast::Argument;
 use mago_syntax::ast::Node;
 use mago_syntax::ast::NodeKind;
+use mago_text_edit::TextEdit;
 
 use crate::category::Category;
 use crate::context::LintContext;
@@ -41,6 +40,10 @@ impl Default for NoIsNullConfig {
 }
 
 impl Config for NoIsNullConfig {
+    fn default_enabled() -> bool {
+        false
+    }
+
     fn level(&self) -> Level {
         self.level
     }
@@ -99,53 +102,33 @@ impl LintRule for NoIsNullRule {
             return;
         }
 
-        // Only fix single-argument calls without spread.
-        let arguments = &function_call.argument_list.arguments;
-        if arguments.len() != 1 {
-            ctx.collector.report(
-                Issue::new(self.cfg.level(), "Use `=== null` instead of `is_null()`.")
-                    .with_code(self.meta.code)
-                    .with_annotation(Annotation::primary(function_call.span()).with_message("`is_null()` is redundant"))
-                    .with_help("Replace with a strict `=== null` comparison."),
-            );
-            return;
-        }
-
-        let arg = arguments.first().expect("checked len == 1");
-
-        // Don't auto-fix spread arguments like is_null(...$v).
-        let arg_value = match arg {
-            Argument::Positional(positional) => {
-                if positional.ellipsis.is_some() {
-                    ctx.collector.report(
-                        Issue::new(self.cfg.level(), "Use `=== null` instead of `is_null()`.")
-                            .with_code(self.meta.code)
-                            .with_annotation(
-                                Annotation::primary(function_call.span()).with_message("`is_null()` is redundant"),
-                            )
-                            .with_help("Replace with a strict `=== null` comparison."),
-                    );
-                    return;
-                }
-                positional.value
-            }
-            Argument::Named(named) => named.value,
-        };
-
         let issue = Issue::new(self.cfg.level(), "Use `=== null` instead of `is_null()`.")
             .with_code(self.meta.code)
             .with_annotation(Annotation::primary(function_call.span()).with_message("`is_null()` is redundant"))
             .with_help("Replace with a strict `=== null` comparison.");
 
-        ctx.collector.propose(issue, |edits| {
-            let source_code = ctx.source_file.contents.as_ref();
-            let arg_span = arg_value.span();
-            let arg_text = &source_code[arg_span.start_offset() as usize..arg_span.end_offset() as usize];
+        // Only fix single-argument calls without spread.
+        let arguments = &function_call.argument_list.arguments;
+        if arguments.len() != 1 {
+            ctx.collector.report(issue);
 
-            edits.push(
-                TextEdit::replace(function_call.span(), format!("null === {arg_text}"))
-                    .with_safety(Safety::PotentiallyUnsafe),
-            );
+            return;
+        }
+
+        // Don't auto-fix spread arguments like is_null(...$v).
+        if let Some(Argument::Positional(positional)) = arguments.first()
+            && positional.ellipsis.is_some()
+        {
+            ctx.collector.report(issue);
+
+            return;
+        }
+
+        ctx.collector.propose(issue, |edits| {
+            edits.push(TextEdit::replace(
+                function_call.start_offset()..function_call.argument_list.left_parenthesis.end_offset(),
+                "(null === ",
+            ));
         });
     }
 }
@@ -155,7 +138,9 @@ mod tests {
     use indoc::indoc;
 
     use super::NoIsNullRule;
-    use crate::{test_lint_failure, test_lint_fix, test_lint_success};
+    use crate::test_lint_failure;
+    use crate::test_lint_fix;
+    use crate::test_lint_success;
 
     test_lint_success! {
         name = null_comparison,
@@ -216,7 +201,30 @@ mod tests {
         fixed = indoc! {r#"
             <?php
 
-            if (null === $value) {
+            if ((null === $value)) {
+                // ...
+            }
+        "#}
+    }
+
+    test_lint_fix! {
+        name = fix_is_null_to_null_comparison_alias,
+        rule = NoIsNullRule,
+        code = indoc! {r#"
+            <?php
+
+            use function is_null as is_that_one_value;
+
+            if (is_that_one_value($value)) {
+                // ...
+            }
+        "#},
+        fixed = indoc! {r#"
+            <?php
+
+            use function is_null as is_that_one_value;
+
+            if ((null === $value)) {
                 // ...
             }
         "#}
