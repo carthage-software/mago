@@ -730,9 +730,10 @@ fn analyze<'ctx, 'ast, 'arena>(
     debug_assert!(pre_conditions_applied, "Pre-conditions should have been applied at least once.");
 
     let does_sometimes_break = loop_scope.final_actions.contains(ControlAction::Break);
+    let does_sometimes_continue = loop_scope.final_actions.contains(ControlAction::Continue);
     let does_always_break = does_sometimes_break && loop_scope.final_actions.len() == 1;
 
-    let can_overwrite_empty_array = always_enters_loop.get() && !does_sometimes_break;
+    let can_overwrite_empty_array = always_enters_loop.get() && !does_sometimes_break && !does_sometimes_continue;
     if does_sometimes_break {
         if let Some(mut inner_do_context_inner) = inner_do_context {
             for (variable_id, possibly_redefined_variable_type) in &loop_scope.possibly_redefined_loop_parent_variables
@@ -877,8 +878,6 @@ fn analyze<'ctx, 'ast, 'arena>(
     }
 
     if always_enters_loop.get() {
-        let does_sometimes_continue = loop_scope.final_actions.contains(ControlAction::Continue);
-
         for (variable_id, variable_type) in &continue_context.locals {
             // if there are break statements in the loop it's not certain
             // that the loop has finished executing, so the assertions at the end

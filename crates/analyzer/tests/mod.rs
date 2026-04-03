@@ -791,6 +791,7 @@ test_case!(issue_1569_strict, {
     s.allow_possibly_undefined_array_keys = false;
     s
 });
+test_case!(issue_1570);
 test_case!(issue_1534);
 test_case!(issue_1535);
 test_case!(issue_1536);
