@@ -11,7 +11,7 @@ use std::sync::mpsc::Receiver;
 use std::sync::mpsc::RecvTimeoutError;
 use std::time::Duration;
 
-use globset::Glob;
+use globset::GlobBuilder;
 use globset::GlobSet;
 use globset::GlobSetBuilder;
 use notify::Config;
@@ -93,12 +93,20 @@ impl<'a> DatabaseWatcher<'a> {
         all_exclusions.extend(config.excludes.iter().cloned());
         all_exclusions.extend(options.additional_excludes);
 
+        let glob_settings = &config.glob;
         let mut glob_builder = GlobSetBuilder::new();
         for ex in &all_exclusions {
             if let Exclusion::Pattern(pat) = ex {
-                glob_builder.add(Glob::new(pat)?);
+                let glob = GlobBuilder::new(pat)
+                    .case_insensitive(glob_settings.case_insensitive)
+                    .literal_separator(glob_settings.literal_separator)
+                    .backslash_escape(glob_settings.backslash_escape)
+                    .empty_alternates(glob_settings.empty_alternates)
+                    .build()?;
+                glob_builder.add(glob);
             }
         }
+
         let glob_excludes = glob_builder.build()?;
 
         let path_excludes: HashSet<PathBuf> = all_exclusions

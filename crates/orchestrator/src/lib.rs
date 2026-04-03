@@ -212,6 +212,7 @@ impl<'a> Orchestrator<'a> {
             includes,
             excludes: create_excludes_from_patterns(&self.config.excludes, workspace),
             extensions: self.config.extensions.iter().map(|s| Cow::Borrowed(*s)).collect(),
+            glob: self.config.glob,
         };
 
         let mut loader = DatabaseLoader::new(configuration);

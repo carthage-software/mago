@@ -94,6 +94,7 @@ pub(crate) fn create_orchestrator<'a>(
         excludes: configuration.source.excludes.iter().map(|p| p.as_ref()).collect(),
         extensions: configuration.source.extensions.iter().map(|e| e.as_ref()).collect(),
         includes: configuration.source.includes.clone(),
+        glob: configuration.source.glob.to_database_settings(),
     };
 
     Orchestrator::new(orchestrator_config)

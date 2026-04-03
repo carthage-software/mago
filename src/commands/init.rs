@@ -209,6 +209,9 @@ paths = [{paths}]
 includes = [{includes}]
 excludes = [{excludes}]
 
+[source.glob]
+literal-separator = true
+
 {formatter_config}
 
 [linter]

@@ -4,6 +4,7 @@
 //! needed by the orchestrator and its various services.
 
 use mago_analyzer::settings::Settings as AnalyzerSettings;
+use mago_database::GlobSettings;
 use mago_formatter::settings::FormatSettings;
 use mago_guard::settings::Settings as GuardSettings;
 use mago_linter::settings::Settings as LinterSettings;
@@ -77,6 +78,9 @@ pub struct OrchestratorConfiguration<'a> {
     /// Only files with these extensions will be processed. The default is typically
     /// just `["php"]`, but you can add others like `"phtml"`, `"php8"`, etc.
     pub extensions: Vec<&'a str>,
+
+    /// Settings for glob pattern matching behavior.
+    pub glob: GlobSettings,
 
     /// Settings for the parser.
     ///

@@ -105,6 +105,44 @@ pub struct DatabaseConfiguration<'a> {
     pub includes: Vec<Cow<'a, str>>,
     pub excludes: Vec<Exclusion<'a>>,
     pub extensions: Vec<Cow<'a, str>>,
+    /// Settings for glob pattern matching behavior.
+    pub glob: GlobSettings,
+}
+
+/// Settings for glob pattern matching behavior.
+///
+/// All defaults match the `globset` crate defaults for backwards compatibility.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub struct GlobSettings {
+    /// Match patterns case-insensitively.
+    ///
+    /// Default: `false`.
+    pub case_insensitive: bool,
+    /// When `true`, a single `*` does not match path separators (`/`).
+    /// This makes `src/*/Test` match only `src/foo/Test`, not `src/foo/bar/Test`.
+    /// Use `**` for recursive matching.
+    ///
+    /// Default: `false`.
+    pub literal_separator: bool,
+    /// Whether `\` escapes special characters in patterns.
+    ///
+    /// Default: `true`.
+    pub backslash_escape: bool,
+    /// Whether an empty case in alternates is allowed (e.g., `{,a}` matches `""` and `"a"`).
+    ///
+    /// Default: `false`.
+    pub empty_alternates: bool,
+}
+
+impl Default for GlobSettings {
+    fn default() -> Self {
+        Self {
+            case_insensitive: false,
+            literal_separator: false,
+            backslash_escape: !std::path::is_separator('\\'),
+            empty_alternates: false,
+        }
+    }
 }
 
 impl<'a> DatabaseConfiguration<'a> {
@@ -132,7 +170,14 @@ impl<'a> DatabaseConfiguration<'a> {
 
         let extensions = extensions.into_iter().map(Cow::Borrowed).collect();
 
-        Self { workspace: Cow::Borrowed(workspace), paths, includes, excludes, extensions }
+        Self {
+            workspace: Cow::Borrowed(workspace),
+            paths,
+            includes,
+            excludes,
+            extensions,
+            glob: GlobSettings::default(),
+        }
     }
 
     #[must_use]
@@ -150,6 +195,7 @@ impl<'a> DatabaseConfiguration<'a> {
                 })
                 .collect(),
             extensions: self.extensions.into_iter().map(|s| Cow::Owned(s.into_owned())).collect(),
+            glob: self.glob,
         }
     }
 }

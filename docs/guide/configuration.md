@@ -114,6 +114,37 @@ excludes = [
 | `excludes`   | `string[]` | `[]`      | Glob patterns or paths to **completely exclude** from all tools. These files won't be processed or parsed at all.                                                             |
 | `extensions` | `string[]` | `["php"]` | File extensions to treat as PHP files.                                                                                                                                         |
 
+### Glob Settings
+
+The `[source.glob]` section controls how glob patterns are matched. Available since Mago 1.19.0.
+
+```toml
+[source.glob]
+# When true, `*` does not match `/` in paths. Use `**` for recursive matching.
+# e.g., `src/*/Test` matches `src/foo/Test` but NOT `src/foo/bar/Test`.
+literal-separator = true
+
+# Match patterns case-insensitively.
+case-insensitive = false
+
+# Whether `\` escapes special characters in patterns.
+backslash-escape = true
+
+# Whether empty alternates are allowed, e.g., `{,a}` matches "" and "a".
+empty-alternates = false
+```
+
+| Option               | Type   | Default | Description                                                                                   |
+| :------------------- | :----- | :------ | :-------------------------------------------------------------------------------------------- |
+| `case-insensitive`   | `bool` | `false` | Match patterns case-insensitively.                                                            |
+| `literal-separator`  | `bool` | `false` | When `true`, `*` does not match path separators. Use `**` for recursive directory matching.   |
+| `backslash-escape`   | `bool` | `false` on Windows, `true` otherwise | Whether `\` escapes special characters in patterns.                                           |
+| `empty-alternates`   | `bool` | `false` | Whether empty alternates are allowed (e.g., `{,a}` matches `""` and `"a"`).                   |
+
+:::tip
+New projects created with `mago init` automatically set `literal-separator = true`, which is the recommended setting. It makes `*` behave like most users expect (matching a single directory level, like `.gitignore`).
+:::
+
 ### Tool-Specific Excludes
 
 In addition to the global `excludes` option, each tool (linter, formatter, analyzer, guard) has its own `excludes` option for tool-specific exclusions.

@@ -4,6 +4,8 @@ use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
 
+use mago_database::GlobSettings;
+
 use crate::config::CURRENT_DIR;
 use crate::consts::PHP_EXTENSION;
 use crate::error::Error;
@@ -45,6 +47,60 @@ pub struct SourceConfiguration {
     /// Defaults to `[".php"]`.
     #[serde(default = "default_extensions")]
     pub extensions: Vec<String>,
+
+    /// Settings for glob pattern matching behavior.
+    #[serde(default)]
+    pub glob: GlobConfiguration,
+}
+
+/// Configuration for glob pattern matching behavior.
+///
+/// These settings control how glob patterns in `paths`, `includes`, and `excludes` are interpreted.
+/// All defaults match standard glob behavior for backwards compatibility.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(default, rename_all = "kebab-case", deny_unknown_fields)]
+pub struct GlobConfiguration {
+    /// Match patterns case-insensitively.
+    ///
+    /// Default: `false`.
+    pub case_insensitive: bool,
+
+    /// When `true`, a single `*` does not match path separators (`/`).
+    ///
+    /// This makes `src/*/Test` match only `src/foo/Test`, not `src/foo/bar/Test`.
+    /// Use `**` for recursive matching across directories.
+    ///
+    /// Default: `false`.
+    pub literal_separator: bool,
+
+    /// Whether `\` escapes special characters in patterns.
+    ///
+    /// Default: `true`.
+    pub backslash_escape: bool,
+
+    /// Whether an empty case in alternates is allowed.
+    ///
+    /// When enabled, `{,a}` matches both `""` and `"a"`.
+    ///
+    /// Default: `false`.
+    pub empty_alternates: bool,
+}
+
+impl Default for GlobConfiguration {
+    fn default() -> Self {
+        Self { case_insensitive: false, literal_separator: false, backslash_escape: true, empty_alternates: false }
+    }
+}
+
+impl GlobConfiguration {
+    pub fn to_database_settings(&self) -> GlobSettings {
+        GlobSettings {
+            case_insensitive: self.case_insensitive,
+            literal_separator: self.literal_separator,
+            backslash_escape: self.backslash_escape,
+            empty_alternates: self.empty_alternates,
+        }
+    }
 }
 
 impl SourceConfiguration {
@@ -64,6 +120,7 @@ impl SourceConfiguration {
             includes: vec![],
             excludes: vec![],
             extensions: vec![PHP_EXTENSION.to_string()],
+            glob: GlobConfiguration::default(),
         }
     }
 }

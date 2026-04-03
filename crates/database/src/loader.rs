@@ -7,7 +7,7 @@ use std::path::Path;
 
 use foldhash::HashMap;
 use foldhash::HashSet;
-use globset::Glob;
+use globset::GlobBuilder;
 use globset::GlobSet;
 use globset::GlobSetBuilder;
 use rayon::prelude::*;
@@ -85,10 +85,18 @@ impl<'a> DatabaseLoader<'a> {
         let extensions_set: HashSet<OsString> =
             self.configuration.extensions.iter().map(|s| OsString::from(s.as_ref())).collect();
 
+        let glob_settings = &self.configuration.glob;
         let mut glob_builder = GlobSetBuilder::new();
         for ex in &self.configuration.excludes {
             if let Exclusion::Pattern(pat) = ex {
-                glob_builder.add(Glob::new(pat)?);
+                let glob = GlobBuilder::new(pat)
+                    .case_insensitive(glob_settings.case_insensitive)
+                    .literal_separator(glob_settings.literal_separator)
+                    .backslash_escape(glob_settings.backslash_escape)
+                    .empty_alternates(glob_settings.empty_alternates)
+                    .build()?;
+
+                glob_builder.add(glob);
             }
         }
 
@@ -331,6 +339,7 @@ impl<'a> DatabaseLoader<'a> {
 mod tests {
     use super::*;
     use crate::DatabaseReader;
+    use crate::GlobSettings;
     use std::borrow::Cow;
     use tempfile::TempDir;
 
@@ -344,6 +353,7 @@ mod tests {
             includes: includes.into_iter().map(|s| Cow::Owned(normalize(s))).collect(),
             excludes: vec![],
             extensions: vec![Cow::Borrowed("php")],
+            glob: GlobSettings::default(),
         }
     }
 

@@ -940,6 +940,7 @@ mod tests {
             includes: vec![],
             excludes: vec![],
             extensions: vec![Cow::Borrowed("php")],
+            glob: mago_database::GlobSettings::default(),
         };
 
         let mut db = Database::new(config);
