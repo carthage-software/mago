@@ -137,6 +137,7 @@ where the intent is often ambiguous without the parameter name.
 | `enabled` | `boolean` | `true` |
 | `level` | `string` | `"warning"` |
 | `check-first-argument` | `boolean` | `false` |
+| `threshold` | `integer` | `1` |
 
 ### Examples
 

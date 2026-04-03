@@ -37,11 +37,16 @@ pub struct LiteralNamedArgumentRule {
 pub struct LiteralNamedArgumentConfig {
     pub level: Level,
     pub check_first_argument: bool,
+    /// Minimum number of literal positional arguments in a single call before reporting.
+    ///
+    /// Default is `1`, meaning any literal positional argument triggers a warning.
+    /// Set higher (e.g., `3`) to only flag calls with many unnamed literals.
+    pub threshold: usize,
 }
 
 impl Default for LiteralNamedArgumentConfig {
     fn default() -> Self {
-        Self { level: Level::Warning, check_first_argument: false }
+        Self { level: Level::Warning, check_first_argument: false, threshold: 1 }
     }
 }
 
@@ -108,6 +113,8 @@ impl LintRule for LiteralNamedArgumentRule {
             return;
         }
 
+        let mut literal_args: Vec<(&Literal<'arena>, &'arena str)> = Vec::new();
+
         for (index, argument) in function_call.argument_list.arguments.iter().enumerate() {
             if index == 0 && !self.cfg.check_first_argument {
                 continue;
@@ -130,6 +137,14 @@ impl LintRule for LiteralNamedArgumentRule {
                 Literal::Null(_) => "null",
             };
 
+            literal_args.push((literal, literal_value));
+        }
+
+        if literal_args.len() < self.cfg.threshold {
+            return;
+        }
+
+        for (literal, literal_value) in literal_args {
             ctx.collector.report(
                 Issue::new(
                     self.cfg.level,
@@ -194,6 +209,61 @@ mod tests {
             <?php
 
             set_option(key: 'foo', value: true);
+        "}
+    }
+
+    test_lint_success! {
+        name = below_threshold_no_report,
+        rule = LiteralNamedArgumentRule,
+        settings = |s: &mut crate::settings::Settings| s.rules.literal_named_argument.config.threshold = 3,
+        code = indoc! {r"
+            <?php
+
+            foo('a', 'b');
+        "}
+    }
+
+    test_lint_failure! {
+        name = at_threshold_reports,
+        rule = LiteralNamedArgumentRule,
+        count = 2,
+        settings = |s: &mut crate::settings::Settings| {
+            s.rules.literal_named_argument.config.threshold = 2;
+            s.rules.literal_named_argument.config.check_first_argument = true;
+        },
+        code = indoc! {r"
+            <?php
+
+            foo('a', 'b');
+        "}
+    }
+
+    test_lint_failure! {
+        name = above_threshold_reports_all,
+        rule = LiteralNamedArgumentRule,
+        count = 3,
+        settings = |s: &mut crate::settings::Settings| {
+            s.rules.literal_named_argument.config.threshold = 2;
+            s.rules.literal_named_argument.config.check_first_argument = true;
+        },
+        code = indoc! {r"
+            <?php
+
+            foo('a', 'b', 'c');
+        "}
+    }
+
+    test_lint_success! {
+        name = threshold_with_first_arg_skipped,
+        rule = LiteralNamedArgumentRule,
+        settings = |s: &mut crate::settings::Settings| {
+            s.rules.literal_named_argument.config.threshold = 2;
+            s.rules.literal_named_argument.config.check_first_argument = false;
+        },
+        code = indoc! {r"
+            <?php
+
+            foo('a', 'b');
         "}
     }
 }

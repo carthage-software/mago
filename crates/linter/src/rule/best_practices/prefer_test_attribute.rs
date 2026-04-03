@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use indoc::indoc;
 use schemars::JsonSchema;
 use serde::Deserialize;
@@ -7,7 +9,6 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_reporting::Level;
 use mago_span::HasSpan;
-use mago_syntax::ast::Identifier;
 use mago_syntax::ast::Method;
 use mago_syntax::ast::Node;
 use mago_syntax::ast::NodeKind;
@@ -138,8 +139,9 @@ impl LintRule for PreferTestAttributeRule {
                 .with_help(format!("Rename to `{new_name}` and add `#[Test]` attribute."));
 
         let indent = get_method_indent(ctx, method);
+
         ctx.collector.propose(issue, |edits| {
-            edits.push(TextEdit::replace(method.name.span(), new_name.clone()).with_safety(Safety::PotentiallyUnsafe));
+            edits.push(TextEdit::replace(method.name.span(), new_name).with_safety(Safety::PotentiallyUnsafe));
 
             let attribute_text = format!("#[\\PHPUnit\\Framework\\Attributes\\Test]\n{indent}");
             edits.push(
@@ -162,25 +164,25 @@ fn has_test_attribute(ctx: &mut LintContext<'_, '_>, method: &Method<'_>) -> boo
     false
 }
 
-fn compute_new_name(name: &str) -> String {
+fn compute_new_name<'a>(name: &'a str) -> Cow<'a, str> {
     let prefix_was_lowercase = name.starts_with("test");
     let after_test = &name[4..];
 
     if after_test.is_empty() || after_test == "_" {
-        return name.to_string();
+        return Cow::Borrowed(name);
     }
 
-    if after_test.starts_with('_') {
+    if let Some(new_name) = after_test.strip_prefix('_') {
         // test_something_bad -> something_bad
-        after_test[1..].to_string()
+        Cow::Borrowed(new_name)
     } else if prefix_was_lowercase {
         // testSomethingBad -> somethingBad
         let mut chars = after_test.chars();
         let first = chars.next().unwrap();
-        format!("{}{}", first.to_ascii_lowercase(), chars.as_str())
+        Cow::Owned(format!("{}{}", first.to_ascii_lowercase(), chars.as_str()))
     } else {
         // TestSomethingBad -> SomethingBad
-        after_test.to_string()
+        Cow::Borrowed(after_test)
     }
 }
 
