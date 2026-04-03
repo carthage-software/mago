@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::sync::Arc;
 use std::sync::LazyLock;
 
@@ -46,6 +47,7 @@ use crate::ttype::combine_union_types;
 use crate::ttype::comparator::ComparisonResult;
 use crate::ttype::comparator::array_comparator::is_array_contained_by_array;
 use crate::ttype::comparator::object_comparator;
+use crate::ttype::comparator::union_comparator;
 use crate::ttype::template::variance::Variance;
 use crate::ttype::union::TUnion;
 use crate::utils::str_is_numeric;
@@ -699,6 +701,13 @@ fn scrape_type_properties(
                         let existing_is_sealed = combination.keyed_array_parameters.is_none();
 
                         if incoming_is_sealed && !existing_is_sealed && known_items.is_some() {
+                            let known_items = widen_known_items_with_params(
+                                known_items,
+                                &combination.keyed_array_parameters,
+                                codebase,
+                                options,
+                            );
+
                             combination.sealed_arrays.push(TArray::Keyed(TKeyedArray {
                                 known_items,
                                 parameters,
@@ -709,8 +718,21 @@ fn scrape_type_properties(
                         }
 
                         if !incoming_is_sealed && existing_is_sealed && !combination.keyed_array_entries.is_empty() {
+                            let mut frozen_entries = std::mem::take(&mut combination.keyed_array_entries);
+                            if let Some((ref key_param, ref value_param)) = parameters {
+                                for (key, (_, entry_type)) in frozen_entries.iter_mut() {
+                                    let key_type = TUnion::from_atomic(key.to_atomic());
+
+                                    if union_comparator::can_expression_types_be_identical(
+                                        codebase, &key_type, key_param, false, false,
+                                    ) {
+                                        *entry_type = combine_union_types(entry_type, value_param, codebase, options);
+                                    }
+                                }
+                            }
+
                             let frozen = TArray::Keyed(TKeyedArray {
-                                known_items: Some(std::mem::take(&mut combination.keyed_array_entries)),
+                                known_items: Some(frozen_entries),
                                 parameters: None,
                                 non_empty: combination.flags.contains(CombinationFlags::KEYED_ARRAY_SOMETIMES_FILLED),
                             });
@@ -1174,6 +1196,29 @@ fn scrape_type_properties(
     }
 
     combination.value_types.insert(atomic.get_id(), atomic);
+}
+
+/// Widens known items in a sealed array with the generic value type from parameters.
+/// This is needed when combining a sealed array with a parametric one, the parametric
+/// array's generic string keys could overwrite any of the sealed array's known keys.
+fn widen_known_items_with_params(
+    known_items: Option<BTreeMap<ArrayKey, (bool, TUnion)>>,
+    params: &Option<(TUnion, TUnion)>,
+    codebase: &CodebaseMetadata,
+    options: CombinerOptions,
+) -> Option<BTreeMap<ArrayKey, (bool, TUnion)>> {
+    let mut items = known_items?;
+
+    if let Some((key_param, value_param)) = params {
+        for (key, (_, entry_type)) in items.iter_mut() {
+            let key_type = TUnion::from_atomic(key.to_atomic());
+            if union_comparator::can_expression_types_be_identical(codebase, &key_type, key_param, false, true) {
+                *entry_type = combine_union_types(entry_type, value_param, codebase, options);
+            }
+        }
+    }
+
+    Some(items)
 }
 
 fn adjust_keyed_array_parameters(
