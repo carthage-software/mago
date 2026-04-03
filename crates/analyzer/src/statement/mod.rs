@@ -111,6 +111,9 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Statement<'arena> {
                 if context.settings.check_use_statements {
                     r#use.analyze(context, block_context, artifacts)?;
                 }
+                if context.settings.check_name_casing {
+                    crate::utils::casing::check_use_statement_casing(context, r#use);
+                }
 
                 Ok(())
             }

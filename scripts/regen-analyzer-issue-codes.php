@@ -323,6 +323,8 @@ final class AnalyzerCodeModuleGenerator
         'class-must-be-final',
         'missing-api-or-internal',
         'imprecise-type',
+        'incorrect-class-like-casing',
+        'incorrect-function-casing',
     ];
 
     /**

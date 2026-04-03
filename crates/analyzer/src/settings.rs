@@ -192,6 +192,16 @@ pub struct Settings {
     /// Defaults to `false`.
     pub check_use_statements: bool,
 
+    /// Check for incorrect casing when referencing classes, interfaces, traits, enums,
+    /// and functions.
+    ///
+    /// When enabled, the analyzer reports warnings when a symbol is referenced with
+    /// different casing than its definition (e.g., `new fooBar()` when defined as `FooBar`).
+    /// This helps prevent autoloading failures on case-sensitive file systems.
+    ///
+    /// Defaults to `false`.
+    pub check_name_casing: bool,
+
     // Performance tuning thresholds
     // Higher values allow deeper analysis at the cost of performance.
     // Lower values improve speed but may reduce precision on complex code.
@@ -302,6 +312,7 @@ impl Settings {
             class_initializers: AtomSet::default(),
             check_property_initialization: false,
             check_use_statements: false,
+            check_name_casing: false,
             saturation_complexity_threshold: default_thresholds.saturation_complexity,
             disjunction_complexity_threshold: default_thresholds.disjunction_complexity,
             negation_complexity_threshold: default_thresholds.negation_complexity,

@@ -107,6 +107,7 @@ These flags control specific, powerful analysis capabilities.
 | `trust-existence-checks`              | `true`  | When `true`, narrows types based on `method_exists()`, `property_exists()`, `function_exists()`, and `defined()` checks. |
 | `check-property-initialization`       | `false` | When `true`, checks that typed properties are initialized in constructors or class initializers.      |
 | `check-use-statements`                | `false` | When `true`, reports use statements that import non-existent classes, functions, or constants.        |
+| `check-name-casing`                  | `false` | When `true`, reports incorrect casing when referencing classes, functions, etc. (e.g., `new fooBar()` when defined as `FooBar`). Helps prevent autoloading failures on case-sensitive file systems. |
 | `enforce-class-finality`              | `false` | When `true`, reports classes that are not `final`, `abstract`, or annotated with `@api` and have no children. |
 | `require-api-or-internal`             | `false` | When `true`, requires abstract classes, interfaces, and traits to have `@api` or `@internal` annotations. |
 

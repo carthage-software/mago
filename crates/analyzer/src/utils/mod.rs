@@ -5,6 +5,7 @@ use mago_codex::ttype::union::TUnion;
 
 use crate::context::Context;
 
+pub mod casing;
 pub mod conditional;
 pub mod docblock;
 pub mod expression;

@@ -700,6 +700,11 @@ test_case!(issue_1230_simple, {
     s
 });
 test_case!(issue_1242_reference_count_sync);
+test_case!(issue_1048, {
+    let mut s = crate::framework::default_test_settings();
+    s.check_name_casing = true;
+    s
+});
 test_case!(issue_1226);
 test_case!(issue_1357);
 test_case!(issue_1510);

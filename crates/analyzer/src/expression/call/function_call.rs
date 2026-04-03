@@ -25,6 +25,7 @@ use crate::invocation::InvocationArgumentsSource;
 use crate::invocation::InvocationTarget;
 use crate::plugin::ExpressionHookResult;
 use crate::plugin::context::HookContext;
+use crate::utils::casing;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for FunctionCall<'arena> {
     fn analyze<'ctx>(
@@ -104,6 +105,8 @@ pub(super) fn resolve_targets<'ctx, 'arena>(
 
         let lowercased_name = ascii_lowercase_atom(&name);
         let skip_error = block_context.known_functions.contains(&lowercased_name);
+
+        casing::check_function_casing(context, name, function_name.span());
 
         let target =
             get_function_like_target_with_skip(context, identifier, alternative, expression.span(), None, skip_error);

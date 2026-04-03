@@ -222,6 +222,8 @@ pub fn resolve_classnames_from_expression<'ctx, 'arena>(
         Expression::Identifier(name_node) => {
             let fqcn = atom(context.resolved_names.get(name_node));
 
+            crate::utils::casing::check_class_like_casing(context, fqcn, name_node.span());
+
             possible_types.push(ResolvedClassname::new(
                 Some(fqcn),
                 ResolutionOrigin::Named { is_parent: false, is_self: false },
