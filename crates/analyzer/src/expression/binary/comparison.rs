@@ -1,5 +1,6 @@
 use std::rc::Rc;
 
+use mago_atom::atom;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::get_bool;
 use mago_codex::ttype::get_false;
@@ -253,11 +254,17 @@ pub fn analyze_comparison_operation<'ctx, 'arena>(
                 }
             }
             BinaryOperator::Equal(_) | BinaryOperator::AngledNotEqual(_) => {
-                let involves_static = involves_static_variable(binary.lhs, block_context)
-                    || involves_static_variable(binary.rhs, block_context);
+                let should_be_specific = should_use_specific_equality_inference(
+                    block_context,
+                    binary.lhs,
+                    lhs_type,
+                    binary.rhs,
+                    rhs_type,
+                    false,
+                );
 
-                if is_always_identical_to(lhs_type, rhs_type) {
-                    if !block_context.flags.inside_loop_expressions() && !involves_static {
+                if should_be_specific && is_always_identical_to(lhs_type, rhs_type) {
+                    if !block_context.flags.inside_loop_expressions() {
                         let (message_verb, result_value_str) = if matches!(binary.operator, BinaryOperator::Equal(_)) {
                             ("always equal to", "`true`")
                         } else {
@@ -267,23 +274,23 @@ pub fn analyze_comparison_operation<'ctx, 'arena>(
                         report_redundant_comparison(context, artifacts, binary, message_verb, result_value_str);
                     }
 
-                    if involves_static {
-                        get_bool()
-                    } else if matches!(binary.operator, BinaryOperator::Equal(_)) {
-                        get_true()
-                    } else {
-                        get_false()
-                    }
+                    if matches!(binary.operator, BinaryOperator::Equal(_)) { get_true() } else { get_false() }
                 } else {
                     get_bool()
                 }
             }
             BinaryOperator::NotEqual(_) => {
-                let involves_static = involves_static_variable(binary.lhs, block_context)
-                    || involves_static_variable(binary.rhs, block_context);
+                let should_be_specific = should_use_specific_equality_inference(
+                    block_context,
+                    binary.lhs,
+                    lhs_type,
+                    binary.rhs,
+                    rhs_type,
+                    false,
+                );
 
-                if is_always_identical_to(lhs_type, rhs_type) {
-                    if !block_context.flags.inside_loop_expressions() && !involves_static {
+                if should_be_specific && is_always_identical_to(lhs_type, rhs_type) {
+                    if !block_context.flags.inside_loop_expressions() {
                         report_redundant_comparison(
                             context,
                             artifacts,
@@ -293,41 +300,53 @@ pub fn analyze_comparison_operation<'ctx, 'arena>(
                         );
                     }
 
-                    if involves_static { get_bool() } else { get_false() }
+                    get_false()
                 } else {
                     get_bool()
                 }
             }
             BinaryOperator::Identical(_) => {
-                let inside_loop = block_context.flags.inside_loop();
-                let involves_static = involves_static_variable(binary.lhs, block_context)
-                    || involves_static_variable(binary.rhs, block_context);
+                let should_be_specific = should_use_specific_equality_inference(
+                    block_context,
+                    binary.lhs,
+                    lhs_type,
+                    binary.rhs,
+                    rhs_type,
+                    true,
+                );
 
-                if is_always_identical_to(lhs_type, rhs_type) {
-                    if !block_context.flags.inside_loop_expressions() && !inside_loop && !involves_static {
+                if !should_be_specific {
+                    get_bool()
+                } else if is_always_identical_to(lhs_type, rhs_type) {
+                    if !block_context.flags.inside_loop_expressions() {
                         report_redundant_comparison(context, artifacts, binary, "always identical to", "`true`");
                     }
 
-                    if involves_static || inside_loop { get_bool() } else { get_true() }
+                    get_true()
                 } else if are_definitely_not_identical(context.codebase, lhs_type, rhs_type, false) {
-                    let categories_shared = types_share_category(lhs_type, rhs_type);
-                    let should_be_specific = !involves_static && (!inside_loop || !categories_shared);
-                    if !block_context.flags.inside_loop_expressions() && should_be_specific {
+                    if !block_context.flags.inside_loop_expressions() {
                         report_redundant_comparison(context, artifacts, binary, "never identical to", "`false`");
                     }
 
-                    if !should_be_specific { get_bool() } else { get_false() }
+                    get_false()
                 } else {
                     get_bool()
                 }
             }
             BinaryOperator::NotIdentical(_) => {
-                let inside_loop = block_context.flags.inside_loop();
-                let involves_static = involves_static_variable(binary.lhs, block_context)
-                    || involves_static_variable(binary.rhs, block_context);
+                let should_be_specific = should_use_specific_equality_inference(
+                    block_context,
+                    binary.lhs,
+                    lhs_type,
+                    binary.rhs,
+                    rhs_type,
+                    true,
+                );
 
-                if is_always_identical_to(lhs_type, rhs_type) {
-                    if !block_context.flags.inside_loop_expressions() && !inside_loop && !involves_static {
+                if !should_be_specific {
+                    get_bool()
+                } else if is_always_identical_to(lhs_type, rhs_type) {
+                    if !block_context.flags.inside_loop_expressions() {
                         report_redundant_comparison(
                             context,
                             artifacts,
@@ -337,15 +356,13 @@ pub fn analyze_comparison_operation<'ctx, 'arena>(
                         );
                     }
 
-                    if involves_static || inside_loop { get_bool() } else { get_false() }
+                    get_false()
                 } else if are_definitely_not_identical(context.codebase, lhs_type, rhs_type, false) {
-                    let categories_shared = types_share_category(lhs_type, rhs_type);
-                    let should_be_specific = !involves_static && (!inside_loop || !categories_shared);
-                    if !block_context.flags.inside_loop_expressions() && should_be_specific {
+                    if !block_context.flags.inside_loop_expressions() {
                         report_redundant_comparison(context, artifacts, binary, "always not identical to", "`true`");
                     }
 
-                    if !should_be_specific { get_bool() } else { get_true() }
+                    get_true()
                 } else {
                     get_bool()
                 }
@@ -369,9 +386,37 @@ fn get_boolean_literal(expr: &Expression<'_>) -> Option<bool> {
     }
 }
 
+fn should_use_specific_equality_inference(
+    block_context: &BlockContext<'_>,
+    lhs: &Expression<'_>,
+    lhs_type: &TUnion,
+    rhs: &Expression<'_>,
+    rhs_type: &TUnion,
+    identity: bool,
+) -> bool {
+    if identity {
+        (!block_context.flags.inside_loop() || !types_share_category(lhs_type, rhs_type))
+            && !involves_external_reference(lhs, block_context)
+            && !involves_external_reference(rhs, block_context)
+            && !involves_static_variable(lhs, block_context)
+            && !involves_static_variable(rhs, block_context)
+    } else {
+        !block_context.flags.inside_loop()
+            && !involves_external_reference(lhs, block_context)
+            && !involves_external_reference(rhs, block_context)
+            && !involves_static_variable(lhs, block_context)
+            && !involves_static_variable(rhs, block_context)
+    }
+}
+
 /// Checks if an expression involves a static variable.
 fn involves_static_variable(expr: &Expression<'_>, block_context: &BlockContext<'_>) -> bool {
-    matches!(unwrap_expression(expr), Expression::Variable(Variable::Direct(var)) if block_context.static_locals.contains(&mago_atom::atom(var.name)))
+    matches!(unwrap_expression(expr), Expression::Variable(Variable::Direct(var)) if block_context.static_locals.contains(&atom(var.name)))
+}
+
+/// Checks if an expression involves a variable captured by reference from an outer scope.
+fn involves_external_reference(expr: &Expression<'_>, block_context: &BlockContext<'_>) -> bool {
+    matches!(unwrap_expression(expr), Expression::Variable(Variable::Direct(var)) if block_context.references_to_external_scope.contains(&atom(var.name)))
 }
 
 /// Checks a single operand of a comparison operation for problematic types.
