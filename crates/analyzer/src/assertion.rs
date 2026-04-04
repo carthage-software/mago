@@ -105,7 +105,7 @@ pub fn scrape_assertions(
                 )
             {
                 if is_count_or_size_of_call(expression, assertion_context) {
-                    if_types.insert(first_argument_expression_id, vec![vec![Assertion::NonEmptyCountable(false)]]);
+                    if_types.insert(first_argument_expression_id, vec![vec![Assertion::NonEmptyCountable(true)]]);
                 } else if is_function_call_to(expression, assertion_context, "function_exists") {
                     if_types.insert(
                         first_argument_expression_id,
