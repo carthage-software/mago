@@ -421,6 +421,19 @@ test_case!(allow_unknown_array_key_in_assignment);
 test_case!(psl_async_integration);
 test_case!(parent_static_call_template_resolution);
 test_case!(bitwise_shift_bounds);
+test_case!(isset_after_loop_break);
+test_case!(callable_string);
+test_case!(session_set_save_handler);
+test_case!(session_set_cookie_params);
+test_case!(psl_math);
+test_case!(psl_break_mixed);
+test_case!(psl_max_return_type);
+test_case!(psl_min_return_type);
+test_case!(psl_total_length_range);
+test_case!(psl_proc_open_pipes);
+test_case!(psl_array_filter_nullable);
+test_case!(psl_isset_optional_key);
+test_case!(wildcard_type);
 
 // Github Issues
 test_case!(issue_659);
@@ -621,9 +634,15 @@ test_case!(issue_1025);
 test_case!(issue_1026);
 test_case!(issue_1029);
 test_case!(issue_1030);
+test_case!(issue_1031);
 test_case!(issue_1038);
 test_case!(issue_1040);
 test_case!(issue_1045);
+test_case!(issue_1048, {
+    let mut s = crate::framework::default_test_settings();
+    s.check_name_casing = true;
+    s
+});
 test_case!(issue_1057);
 test_case!(issue_1064);
 test_case!(issue_1061);
@@ -637,7 +656,6 @@ test_case!(issue_1070);
 test_case!(issue_1071);
 test_case!(issue_1072);
 test_case!(issue_1074);
-test_case!(issue_1031);
 test_case!(issue_1081);
 test_case!(issue_1083);
 test_case!(issue_1084);
@@ -700,12 +718,12 @@ test_case!(issue_1230_simple, {
     s
 });
 test_case!(issue_1242_reference_count_sync);
-test_case!(issue_1048, {
+test_case!(issue_1226);
+test_case!(issue_1273, {
     let mut s = crate::framework::default_test_settings();
-    s.check_name_casing = true;
+    s.check_experimental = true;
     s
 });
-test_case!(issue_1226);
 test_case!(issue_1357);
 test_case!(issue_1510);
 test_case!(issue_1259);
@@ -759,11 +777,9 @@ test_case!(issue_1504);
 test_case!(issue_1505);
 test_case!(issue_1506);
 test_case!(issue_1509);
-test_case!(isset_after_loop_break);
 test_case!(issue_1512);
 test_case!(issue_1522);
 test_case!(issue_1523);
-test_case!(callable_string);
 test_case!(issue_1524);
 test_case!(issue_1526);
 test_case!(issue_1527);
@@ -803,21 +819,6 @@ test_case!(issue_1542);
 test_case!(issue_1546);
 test_case!(issue_1551);
 test_case!(issue_1552);
-test_case!(session_set_save_handler);
-test_case!(session_set_cookie_params);
-test_case!(psl_math);
-test_case!(psl_break_mixed);
-test_case!(psl_max_return_type);
-test_case!(psl_min_return_type);
-test_case!(psl_total_length_range);
-test_case!(psl_proc_open_pipes);
-test_case!(psl_array_filter_nullable);
-test_case!(psl_isset_optional_key);
-test_case!(issue_1273, {
-    let mut s = crate::framework::default_test_settings();
-    s.check_experimental = true;
-    s
-});
 
 #[test]
 fn test_all_test_cases_are_ran() {

@@ -41,6 +41,8 @@ use crate::ast::Type;
 use crate::ast::UnionType;
 use crate::ast::ValueOfType;
 use crate::ast::VariableType;
+use crate::ast::WildcardKind;
+use crate::ast::WildcardType;
 use crate::error::ParseError;
 use crate::parser::internal::array_like::parse_array_like_type;
 use crate::parser::internal::callable::parse_callable_type_specifications;
@@ -159,6 +161,11 @@ fn parse_primary_type<'input>(stream: &mut TypeTokenStream<'input>) -> Result<Ty
             inner: Box::new(parse_type(stream)?),
             right_parenthesis: stream.eat(TypeTokenKind::RightParenthesis)?.span_for(stream.file_id()),
         }),
+        TypeTokenKind::Asterisk => {
+            let token = stream.consume()?;
+
+            Type::Wildcard(WildcardType { span: token.span_for(stream.file_id()), kind: WildcardKind::Asterisk })
+        }
         TypeTokenKind::Mixed => Type::Mixed(Keyword::from_token(stream.consume()?, stream.file_id())),
         TypeTokenKind::NonEmptyMixed => Type::NonEmptyMixed(Keyword::from_token(stream.consume()?, stream.file_id())),
         TypeTokenKind::Null => Type::Null(Keyword::from_token(stream.consume()?, stream.file_id())),
@@ -438,6 +445,11 @@ fn parse_primary_type<'input>(stream: &mut TypeTokenStream<'input>) -> Result<Ty
             } else {
                 Type::Reference(ReferenceType { identifier, parameters: parse_generic_parameters_or_none(stream)? })
             }
+        }
+        TypeTokenKind::Identifier if next.value == "_" => {
+            let token = stream.consume()?;
+
+            Type::Wildcard(WildcardType { span: token.span_for(stream.file_id()), kind: WildcardKind::Underscore })
         }
         TypeTokenKind::Identifier => {
             if next.value.eq_ignore_ascii_case("Closure")

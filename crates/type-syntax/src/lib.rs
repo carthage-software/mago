@@ -1491,4 +1491,39 @@ mod tests {
         let result = do_parse("array{-9223372036854775808: string}");
         assert!(result.is_err(), "Expected parse error for negated shape key overflow, got: {result:?}");
     }
+
+    #[test]
+    fn test_parse_wildcard_asterisk() {
+        let result = do_parse("*");
+        assert!(result.is_ok(), "Expected successful parse for wildcard, got: {result:?}");
+        match result.unwrap() {
+            Type::Wildcard(w) => assert_eq!(w.kind, WildcardKind::Asterisk),
+            other => panic!("Expected Type::Wildcard, got: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_parse_wildcard_underscore() {
+        let result = do_parse("_");
+        assert!(result.is_ok(), "Expected successful parse for underscore wildcard, got: {result:?}");
+        match result.unwrap() {
+            Type::Wildcard(w) => assert_eq!(w.kind, WildcardKind::Underscore),
+            other => panic!("Expected Type::Wildcard, got: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_parse_wildcard_in_generic() {
+        let result = do_parse("array<string, *>");
+        assert!(result.is_ok(), "Expected successful parse for wildcard in generic, got: {result:?}");
+
+        let result = do_parse("array<string, _>");
+        assert!(result.is_ok(), "Expected successful parse for underscore wildcard in generic, got: {result:?}");
+    }
+
+    #[test]
+    fn test_parse_wildcard_display() {
+        assert_eq!(do_parse("*").unwrap().to_string(), "*");
+        assert_eq!(do_parse("_").unwrap().to_string(), "_");
+    }
 }

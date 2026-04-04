@@ -447,7 +447,7 @@ pub fn get_union_from_type_ast(
                 classname,
             )?)
         }
-        Type::Mixed(_) => get_mixed(),
+        Type::Mixed(_) | Type::Wildcard(_) => get_mixed(),
         Type::NonEmptyMixed(_) => get_truthy_mixed(),
         Type::Null(_) => get_null(),
         Type::Void(_) => get_void(),

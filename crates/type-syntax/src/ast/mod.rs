@@ -26,6 +26,7 @@ pub use crate::ast::slice::*;
 pub use crate::ast::unary::*;
 pub use crate::ast::value_of::*;
 pub use crate::ast::variable::*;
+pub use crate::ast::wildcard::*;
 
 pub mod alias_reference;
 pub mod array;
@@ -50,6 +51,7 @@ pub mod slice;
 pub mod unary;
 pub mod value_of;
 pub mod variable;
+pub mod wildcard;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 #[serde(tag = "type", content = "value")]
@@ -127,6 +129,7 @@ pub enum Type<'input> {
     IntRange(IntRangeType<'input>),
     PropertiesOf(PropertiesOfType<'input>),
     Slice(SliceType<'input>),
+    Wildcard(WildcardType),
 }
 
 impl HasSpan for Type<'_> {
@@ -204,6 +207,7 @@ impl HasSpan for Type<'_> {
             Type::IntRange(ty) => ty.span(),
             Type::PropertiesOf(ty) => ty.span(),
             Type::Slice(ty) => ty.span(),
+            Type::Wildcard(ty) => ty.span(),
         }
     }
 }
@@ -283,6 +287,7 @@ impl std::fmt::Display for Type<'_> {
             Type::IntRange(ty) => write!(f, "{ty}"),
             Type::PropertiesOf(ty) => write!(f, "{ty}"),
             Type::Slice(ty) => write!(f, "{ty}"),
+            Type::Wildcard(ty) => write!(f, "{ty}"),
         }
     }
 }
