@@ -83,6 +83,7 @@ test_case!(priority_queue_implementation);
 test_case!(psl_integration);
 test_case!(psl_int_range);
 test_case!(psr_container_get);
+test_case!(magento_plugin);
 test_case!(flow_php_integration);
 test_case!(reconcile_array_index_type);
 test_case!(reconcile_empty_string);
