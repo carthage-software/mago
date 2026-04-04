@@ -206,16 +206,52 @@ pub(super) fn print_binaryish_expression<'arena>(
     };
 
     let should_inline_logical_or_coalesce_rhs = should_inline_binary_rhs_expression(f, right, &operator);
-    if should_not_indent
-        || (should_inline_logical_or_coalesce_rhs && !same_precedence_sub_expression)
-        || (!should_inline_logical_or_coalesce_rhs && should_indent_if_inlining)
-    {
+
+    if should_not_indent {
+        return Document::Group(Group::new(parts));
+    }
+
+    // When indent_binary_expression_continuation is enabled in an assignment
+    // context, operators like ?? that would normally skip indentation (because
+    // their RHS is "inlined") should still get indented.
+    let indent_continuation = should_inline_logical_or_coalesce_rhs
+        && !same_precedence_sub_expression
+        && f.settings.indent_binary_expression_continuation
+        && (should_indent_if_inlining
+            || matches!(f.parent_node(), Node::Assignment(_) | Node::PropertyItem(_) | Node::ConstantItem(_)));
+
+    if should_inline_logical_or_coalesce_rhs && !same_precedence_sub_expression && !indent_continuation {
+        return Document::Group(Group::new(parts));
+    }
+
+    if !should_inline_logical_or_coalesce_rhs && should_indent_if_inlining {
+        if f.settings.indent_binary_expression_continuation
+            && (operator.is_null_coalesce() || operator.is_comparison() || operator.is_equality())
+        {
+            let split_index = 1.min(parts.len());
+            let mut head_parts = parts;
+            let tail_parts = head_parts.split_off(split_index);
+
+            head_parts.push(Document::Indent(tail_parts));
+
+            return Document::Group(Group::new(head_parts));
+        }
+
         return Document::Group(Group::new(parts));
     }
 
     let split_index = 1.min(parts.len());
     let mut head_parts = parts;
     let tail_parts = head_parts.split_off(split_index);
+
+    if indent_continuation {
+        // Use Indent directly rather than IndentIfBreak because the line
+        // break happens inside a nested group, not at the outer group level,
+        // so IndentIfBreak's group would not trigger.
+        head_parts.push(Document::Indent(tail_parts));
+
+        return Document::Group(Group::new(head_parts));
+    }
 
     let group_id = f.next_id();
 

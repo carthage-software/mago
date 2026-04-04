@@ -508,6 +508,24 @@ generate_formatter_settings! {
     /// Default: true
     line_before_binary_operator: bool => "default_true",
 
+    /// Whether to indent continuation lines of binary expressions.
+    ///
+    /// When enabled, if a binary expression breaks across lines, the continuation
+    /// is indented relative to the start of the expression:
+    /// ```php
+    /// $emailNotifications = $this->stringUtils->splitStringToArray($jobPosting->getVacancyEmailNotification())
+    ///     ?? [];
+    /// ```
+    ///
+    /// When disabled, the continuation aligns with the start of the assignment:
+    /// ```php
+    /// $emailNotifications = $this->stringUtils->splitStringToArray($jobPosting->getVacancyEmailNotification())
+    /// ?? [];
+    /// ```
+    ///
+    /// Default: false
+    indent_binary_expression_continuation: bool => "default_false",
+
     /// Whether to always break named argument lists into multiple lines.
     ///
     /// When enabled:

@@ -145,6 +145,7 @@ public function bar(
 | `break-promoted-properties-list` | `boolean` | `true` | Always break parameter lists with promoted properties. |
 | `parameter-attribute-on-new-line` | `boolean` | `true` | Place parameter attributes on their own line when the parameter list breaks ([PER-CS 12.2](https://www.php-fig.org/per/coding-style/#122-placement) compliant). |
 | `line-before-binary-operator` | `boolean` | `true` | Place the binary operator on the next line when breaking. |
+| `indent-binary-expression-continuation` | `boolean` | `false` | Indent continuation lines of binary expressions in assignments. Available since Mago 1.19.0. |
 | `always-break-named-arguments-list` | `boolean` | `false` | Always break named argument lists into multiple lines. |
 | `always-break-attribute-named-argument-lists` | `boolean` | `false` | Always break named argument lists in attributes. |
 | `array-table-style-alignment` | `boolean` | `true` | Use table-style alignment for arrays. |
