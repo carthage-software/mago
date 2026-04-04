@@ -74,6 +74,7 @@ use crate::rule::NoIniSetConfig;
 use crate::rule::NoInlineConfig;
 use crate::rule::NoInsecureComparisonConfig;
 use crate::rule::NoIsNullConfig;
+use crate::rule::NoIteratorToArrayInForeachConfig;
 use crate::rule::NoIssetConfig;
 use crate::rule::NoLiteralPasswordConfig;
 use crate::rule::NoMultiAssignmentsConfig;
@@ -261,6 +262,7 @@ pub struct RulesSettings {
     pub no_error_control_operator: RuleSettings<NoErrorControlOperatorConfig>,
     pub no_empty: RuleSettings<NoEmptyConfig>,
     pub no_is_null: RuleSettings<NoIsNullConfig>,
+    pub no_iterator_to_array_in_foreach: RuleSettings<NoIteratorToArrayInForeachConfig>,
     pub no_isset: RuleSettings<NoIssetConfig>,
     pub no_empty_loop: RuleSettings<NoEmptyLoopConfig>,
     pub no_empty_comment: RuleSettings<NoEmptyCommentConfig>,

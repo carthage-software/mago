@@ -252,6 +252,7 @@ define_rules! {
     NoErrorControlOperator(no_error_control_operator @ NoErrorControlOperatorRule),
     NoEmpty(no_empty @ NoEmptyRule),
     NoIsNull(no_is_null @ NoIsNullRule),
+    NoIteratorToArrayInForeach(no_iterator_to_array_in_foreach @ NoIteratorToArrayInForeachRule),
     NoIsset(no_isset @ NoIssetRule),
     NoEmptyLoop(no_empty_loop @ NoEmptyLoopRule),
     NoEmptyComment(no_empty_comment @ NoEmptyCommentRule),

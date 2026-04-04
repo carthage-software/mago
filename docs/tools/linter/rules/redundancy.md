@@ -15,6 +15,7 @@ This document details the rules available in the `Redundancy` category.
 | No Empty Comment | [`no-empty-comment`](#no-empty-comment) |
 | No Empty Loop | [`no-empty-loop`](#no-empty-loop) |
 | No Is Null | [`no-is-null`](#no-is-null) |
+| No Iterator To Array In Foreach | [`no-iterator-to-array-in-foreach`](#no-iterator-to-array-in-foreach) |
 | No Noop | [`no-noop`](#no-noop) |
 | No Protected in Final | [`no-protected-in-final`](#no-protected-in-final) |
 | No Redundant Binary String Prefix | [`no-redundant-binary-string-prefix`](#no-redundant-binary-string-prefix) |
@@ -278,6 +279,45 @@ if ($value === null) {
 <?php
 
 if (is_null($value)) {
+    // ...
+}
+```
+
+
+## <a id="no-iterator-to-array-in-foreach"></a>`no-iterator-to-array-in-foreach`
+
+Detects `iterator_to_array()` calls used directly as a `foreach` expression.
+
+Since `foreach` natively supports any `Traversable`, wrapping an iterator in
+`iterator_to_array()` is redundant and causes unnecessary memory allocation.
+
+
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `false` |
+| `level` | `string` | `"warning"` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+
+foreach ($iterator as $value) {
+    // ...
+}
+```
+
+#### Incorrect code
+
+```php
+<?php
+
+foreach (iterator_to_array($iterator) as $value) {
     // ...
 }
 ```
