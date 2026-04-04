@@ -112,6 +112,7 @@ use crate::rule::NoUnescapedOutputConfig;
 use crate::rule::NoUnsafeFinallyConfig;
 use crate::rule::NoVariableVariableConfig;
 use crate::rule::NoVoidReferenceReturnConfig;
+use crate::rule::NonceVerificationConfig;
 use crate::rule::OptionalParamOrderConfig;
 use crate::rule::PreferAnonymousMigrationConfig;
 use crate::rule::PreferArrowFunctionConfig;
@@ -123,6 +124,7 @@ use crate::rule::PreferStaticClosureConfig;
 use crate::rule::PreferTestAttributeConfig;
 use crate::rule::PreferViewArrayConfig;
 use crate::rule::PreferWhileLoopConfig;
+use crate::rule::PreparedSqlConfig;
 use crate::rule::PropertyNameConfig;
 use crate::rule::PslArrayFunctionsConfig;
 use crate::rule::PslDataStructuresConfig;
@@ -158,6 +160,7 @@ use crate::rule::UseSpecificAssertionsConfig;
 use crate::rule::UseSpecificExpectationsConfig;
 use crate::rule::UseWpFunctionsConfig;
 use crate::rule::ValidDocblockConfig;
+use crate::rule::ValidatedSanitizedInputConfig;
 use crate::rule::VariableNameConfig;
 use crate::rule::YodaConditionsConfig;
 
@@ -219,6 +222,7 @@ pub struct RulesSettings {
     pub deprecated_cast: RuleSettings<DeprecatedCastConfig>,
     pub deprecated_shell_execute_string: RuleSettings<DeprecatedShellExecuteStringConfig>,
     pub deprecated_switch_semicolon: RuleSettings<DeprecatedSwitchSemicolonConfig>,
+    pub prepared_sql: RuleSettings<PreparedSqlConfig>,
     pub prefer_anonymous_migration: RuleSettings<PreferAnonymousMigrationConfig>,
     pub prefer_first_class_callable: RuleSettings<PreferFirstClassCallableConfig>,
     pub no_void_reference_return: RuleSettings<NoVoidReferenceReturnConfig>,
@@ -244,6 +248,7 @@ pub struct RulesSettings {
     pub no_self_assignment: RuleSettings<NoSelfAssignmentConfig>,
     pub no_protected_in_final: RuleSettings<NoProtectedInFinalConfig>,
     pub no_php_tag_terminator: RuleSettings<NoPhpTagTerminatorConfig>,
+    pub nonce_verification: RuleSettings<NonceVerificationConfig>,
     pub no_noop: RuleSettings<NoNoopConfig>,
     pub no_only: RuleSettings<NoOnlyConfig>,
     pub no_multi_assignments: RuleSettings<NoMultiAssignmentsConfig>,
@@ -308,6 +313,7 @@ pub struct RulesSettings {
     pub too_many_methods: RuleSettings<TooManyMethodsConfig>,
     pub too_many_properties: RuleSettings<TooManyPropertiesConfig>,
     pub trait_name: RuleSettings<TraitNameConfig>,
+    pub validated_sanitized_input: RuleSettings<ValidatedSanitizedInputConfig>,
     pub valid_docblock: RuleSettings<ValidDocblockConfig>,
     pub variable_name: RuleSettings<VariableNameConfig>,
     pub constant_condition: RuleSettings<ConstantConditionConfig>,
