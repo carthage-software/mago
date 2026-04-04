@@ -328,6 +328,7 @@ define_rules! {
     NoDbSchemaChange(no_db_schema_change @ NoDbSchemaChangeRule),
     NoUnescapedOutput(no_unescaped_output @ NoUnescapedOutputRule),
     NoRolesAsCapabilities(no_roles_as_capabilities @ NoRolesAsCapabilitiesRule),
+    NoLiteralNamespaceString(no_literal_namespace_string @ NoLiteralNamespaceStringRule),
     NoShortBoolCast(no_short_bool_cast @ NoShortBoolCastRule),
     NoAlternativeSyntax(no_alternative_syntax @ NoAlternativeSyntaxRule),
     PreferPreIncrement(prefer_pre_increment @ PreferPreIncrementRule),

@@ -16,6 +16,7 @@ This document details the rules available in the `BestPractices` category.
 | No Direct Database Queries | [`no-direct-db-query`](#no-direct-db-query) |
 | No ini_set | [`no-ini-set`](#no-ini-set) |
 | No Inline | [`no-inline`](#no-inline) |
+| No Literal Namespace String | [`no-literal-namespace-string`](#no-literal-namespace-string) |
 | No Sprintf Concat | [`no-sprintf-concat`](#no-sprintf-concat) |
 | Prefer Anonymous Migration | [`prefer-anonymous-migration`](#prefer-anonymous-migration) |
 | Prefer Arrow Function | [`prefer-arrow-function`](#prefer-arrow-function) |
@@ -352,6 +353,39 @@ echo "Hello, world!";
 
 ?>
 Goodbye
+```
+
+
+## <a id="no-literal-namespace-string"></a>`no-literal-namespace-string`
+
+Flags hardcoded fully qualified class name strings. Use `::class` notation
+instead for better IDE support, refactoring safety, and static analysis.
+
+
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `false` |
+| `level` | `string` | `"warning"` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+
+$className = \App\Models\User::class;
+```
+
+#### Incorrect code
+
+```php
+<?php
+
+$className = 'App\Models\User';
 ```
 
 
