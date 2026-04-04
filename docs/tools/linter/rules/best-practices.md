@@ -40,6 +40,7 @@ This document details the rules available in the `BestPractices` category.
 | Psl String Functions | [`psl-string-functions`](#psl-string-functions) |
 | Require Namespace | [`require-namespace`](#require-namespace) |
 | Single Class Per File | [`single-class-per-file`](#single-class-per-file) |
+| Sorted Integer Keys | [`sorted-integer-keys`](#sorted-integer-keys) |
 | Use Compound Assignment | [`use-compound-assignment`](#use-compound-assignment) |
 | Use WordPress API Functions | [`use-wp-functions`](#use-wp-functions) |
 | Yoda Conditions | [`yoda-conditions`](#yoda-conditions) |
@@ -246,7 +247,7 @@ Collect items first and transform once after the loop instead.
 
 | Option | Type | Default |
 | :--- | :--- | :--- |
-| `enabled` | `boolean` | `true` |
+| `enabled` | `boolean` | `false` |
 | `level` | `string` | `"warning"` |
 
 ### Examples
@@ -1392,6 +1393,57 @@ class Foo
 class Bar
 {
 }
+```
+
+
+## <a id="sorted-integer-keys"></a>`sorted-integer-keys`
+
+Detects array literals with integer keys that are not in ascending order.
+
+PHP internally uses a "packed array" optimization for arrays with integer
+keys in natural ascending order, which consumes significantly less memory
+and is faster. When integer keys are out of order, PHP falls back to a
+regular hash table.
+
+
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `false` |
+| `level` | `string` | `"help"` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+
+$weights = [
+    2  => 0.06011,
+    3  => 0.506,
+    4  => 0.01233,
+    5  => 0.21246,
+    10 => 0.10823,
+    20 => 0.06206,
+];
+```
+
+#### Incorrect code
+
+```php
+<?php
+
+$weights = [
+    3  => 0.506,
+    5  => 0.21246,
+    10 => 0.10823,
+    20 => 0.06206,
+    2  => 0.06011,
+    4  => 0.01233,
+];
 ```
 
 

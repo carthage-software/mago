@@ -42,6 +42,10 @@ impl Default for NoArrayAccumulationInLoopConfig {
 }
 
 impl Config for NoArrayAccumulationInLoopConfig {
+    fn default_enabled() -> bool {
+        false
+    }
+
     fn level(&self) -> Level {
         self.level
     }

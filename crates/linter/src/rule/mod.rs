@@ -324,6 +324,7 @@ define_rules! {
     UseCompoundAssignment(use_compound_assignment @ UseCompoundAssignmentRule),
     RequirePregQuoteDelimiter(require_preg_quote_delimiter @ RequirePregQuoteDelimiterRule),
     RequireNamespace(require_namespace @ RequireNamespaceRule),
+    SortedIntegerKeys(sorted_integer_keys @ SortedIntegerKeysRule),
     SingleClassPerFile(single_class_per_file @ SingleClassPerFileRule),
     YodaConditions(yoda_conditions @ YodaConditionsRule),
     UseWpFunctions(use_wp_functions @ UseWpFunctionsRule),
