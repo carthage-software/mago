@@ -109,17 +109,18 @@ pub(super) fn resolve_targets<'ctx, 'arena>(
             get_function_like_target_with_skip(context, identifier, alternative, expression.span(), None, skip_error);
 
         if let Some(ref t) = target
-            && let Some(metadata) = t.get_function_like_metadata() {
-                let span = function_name.span();
-                crate::utils::casing::check_function_casing_with_metadata(context, metadata, name, span);
-                crate::utils::experimental::check_experimental_function_with_metadata(
-                    context,
-                    block_context,
-                    metadata,
-                    name,
-                    span,
-                );
-            }
+            && let Some(metadata) = t.get_function_like_metadata()
+        {
+            let span = function_name.span();
+            crate::utils::casing::check_function_casing_with_metadata(context, metadata, name, span);
+            crate::utils::experimental::check_experimental_function_with_metadata(
+                context,
+                block_context,
+                metadata,
+                name,
+                span,
+            );
+        }
 
         return Ok(if let Some(t) = target { (vec![t], false) } else { (vec![], false) });
     }
