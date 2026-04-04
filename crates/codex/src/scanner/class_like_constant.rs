@@ -81,6 +81,10 @@ pub fn scan_class_like_constants<'arena>(
                     meta.flags |= MetadataFlags::INTERNAL;
                 }
 
+                if docblock.is_experimental {
+                    meta.flags |= MetadataFlags::EXPERIMENTAL;
+                }
+
                 if docblock.is_final {
                     meta.flags |= MetadataFlags::FINAL;
                 }

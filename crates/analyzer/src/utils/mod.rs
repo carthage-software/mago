@@ -8,6 +8,7 @@ use crate::context::Context;
 pub mod casing;
 pub mod conditional;
 pub mod docblock;
+pub mod experimental;
 pub mod expression;
 pub mod misc;
 pub mod missing_type_hints;

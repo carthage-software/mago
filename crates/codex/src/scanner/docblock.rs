@@ -44,6 +44,7 @@ pub struct ClassLikeDocblockComment {
     pub is_final: bool,
     pub is_internal: bool,
     pub is_api: bool,
+    pub is_experimental: bool,
     pub is_enum_interface: bool,
     pub has_consistent_constructor: bool,
     pub has_consistent_templates: bool,
@@ -68,6 +69,7 @@ pub struct FunctionLikeDocblockComment {
     pub span: Span,
     pub is_deprecated: bool,
     pub is_internal: bool,
+    pub is_experimental: bool,
     pub is_pure: bool,
     pub is_external_mutation_free: bool,
     pub is_mutation_free: bool,
@@ -95,6 +97,7 @@ pub struct PropertyDocblockComment {
     pub type_string: Option<TypeString>,
     pub is_deprecated: bool,
     pub is_internal: bool,
+    pub is_experimental: bool,
     pub is_readonly: bool,
 }
 
@@ -104,6 +107,7 @@ pub struct ConstantDocblockComment {
     pub type_string: Option<TypeString>,
     pub is_deprecated: bool,
     pub is_internal: bool,
+    pub is_experimental: bool,
     pub is_final: bool,
 }
 
@@ -121,6 +125,7 @@ pub struct PropertyHookDocblockComment {
     pub return_type_string: Option<TypeString>,
     pub is_deprecated: bool,
     pub is_internal: bool,
+    pub is_experimental: bool,
 }
 
 impl ClassLikeDocblockComment {
@@ -136,6 +141,7 @@ impl ClassLikeDocblockComment {
         let mut is_final = false;
         let mut is_deprecated = false;
         let mut is_internal = false;
+        let mut is_experimental = false;
         let mut is_api = false;
         let mut has_consistent_constructor = false;
         let mut has_consistent_templates = false;
@@ -180,6 +186,9 @@ impl ClassLikeDocblockComment {
                 }
                 TagKind::PsalmInternal | TagKind::Internal => {
                     is_internal = true;
+                }
+                TagKind::Experimental => {
+                    is_experimental = true;
                 }
                 TagKind::Api | TagKind::PsalmApi => {
                     is_api = true;
@@ -306,6 +315,7 @@ impl ClassLikeDocblockComment {
             is_deprecated,
             is_final,
             is_internal,
+            is_experimental,
             is_api,
             is_enum_interface,
             has_sealed_properties,
@@ -340,6 +350,7 @@ impl FunctionLikeDocblockComment {
 
         let mut is_deprecated = false;
         let mut is_internal = false;
+        let mut is_experimental = false;
         let mut is_pure = false;
         let mut is_external_mutation_free = false;
         let mut is_mutation_free = false;
@@ -391,6 +402,9 @@ impl FunctionLikeDocblockComment {
                 }
                 TagKind::Internal | TagKind::PsalmInternal => {
                     is_internal = true;
+                }
+                TagKind::Experimental => {
+                    is_experimental = true;
                 }
                 TagKind::PhpstanParam | TagKind::PsalmParam | TagKind::Param => {
                     let param = parse_param_tag(tag.description, tag.description_span)?;
@@ -498,6 +512,7 @@ impl FunctionLikeDocblockComment {
             span: docblock.span,
             is_deprecated,
             is_internal,
+            is_experimental,
             is_pure,
             is_external_mutation_free,
             is_mutation_free,
@@ -532,6 +547,7 @@ impl PropertyDocblockComment {
 
         let mut is_deprecated = false;
         let mut is_internal = false;
+        let mut is_experimental = false;
         let mut is_readonly = false;
         let mut generic_type_string: Option<TypeString> = None;
         let mut phpstan_type_string: Option<TypeString> = None;
@@ -550,6 +566,9 @@ impl PropertyDocblockComment {
                 }
                 TagKind::Internal | TagKind::PsalmInternal => {
                     is_internal = true;
+                }
+                TagKind::Experimental => {
+                    is_experimental = true;
                 }
                 TagKind::PhpstanReadOnly | TagKind::PsalmReadOnly | TagKind::ReadOnly => {
                     is_readonly = true;
@@ -578,6 +597,7 @@ impl PropertyDocblockComment {
             type_string: psalm_type_string.or(phpstan_type_string).or(generic_type_string),
             is_deprecated,
             is_internal,
+            is_experimental,
             is_readonly,
         }))
     }
@@ -594,6 +614,7 @@ impl ConstantDocblockComment {
 
         let mut is_deprecated = false;
         let mut is_internal = false;
+        let mut is_experimental = false;
         let mut is_final = false;
 
         let mut generic_type_string: Option<TypeString> = None;
@@ -613,6 +634,9 @@ impl ConstantDocblockComment {
                 }
                 TagKind::Internal | TagKind::PsalmInternal => {
                     is_internal = true;
+                }
+                TagKind::Experimental => {
+                    is_experimental = true;
                 }
                 TagKind::Final => {
                     is_final = true;
@@ -640,6 +664,7 @@ impl ConstantDocblockComment {
             span: docblock.span,
             is_deprecated,
             is_internal,
+            is_experimental,
             is_final,
             type_string: psalm_type_string.or(phpstan_type_string).or(generic_type_string),
         }))
@@ -710,6 +735,7 @@ impl PropertyHookDocblockComment {
 
         let mut is_deprecated = false;
         let mut is_internal = false;
+        let mut is_experimental = false;
         let mut generic_return_type: Option<TypeString> = None;
         let mut psalm_return_type: Option<TypeString> = None;
         let mut phpstan_return_type: Option<TypeString> = None;
@@ -728,6 +754,9 @@ impl PropertyHookDocblockComment {
                 }
                 TagKind::Internal | TagKind::PsalmInternal => {
                     is_internal = true;
+                }
+                TagKind::Experimental => {
+                    is_experimental = true;
                 }
                 TagKind::PhpstanParam | TagKind::PsalmParam | TagKind::Param => {
                     let p = parse_param_tag(tag.description, tag.description_span)?;
@@ -758,6 +787,7 @@ impl PropertyHookDocblockComment {
             return_type_string: psalm_return_type.or(phpstan_return_type).or(generic_return_type),
             is_deprecated,
             is_internal,
+            is_experimental,
         }))
     }
 }

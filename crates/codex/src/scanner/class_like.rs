@@ -444,6 +444,10 @@ fn scan_class_like<'arena>(
             class_like_metadata.flags |= MetadataFlags::INTERNAL;
         }
 
+        if docblock.is_experimental {
+            class_like_metadata.flags |= MetadataFlags::EXPERIMENTAL;
+        }
+
         if docblock.is_api {
             class_like_metadata.flags |= MetadataFlags::API;
         }

@@ -524,6 +524,10 @@ fn update_property_metadata_from_docblock(
         property_metadata.flags |= MetadataFlags::INTERNAL;
     }
 
+    if docblock.is_experimental {
+        property_metadata.flags |= MetadataFlags::EXPERIMENTAL;
+    }
+
     if docblock.is_deprecated {
         property_metadata.flags |= MetadataFlags::DEPRECATED;
     }

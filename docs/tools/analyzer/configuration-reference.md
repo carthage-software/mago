@@ -110,6 +110,7 @@ These flags control specific, powerful analysis capabilities.
 | `check-name-casing`                  | `false` | When `true`, reports incorrect casing when referencing classes, functions, etc. (e.g., `new fooBar()` when defined as `FooBar`). Helps prevent autoloading failures on case-sensitive file systems. |
 | `enforce-class-finality`              | `false` | When `true`, reports classes that are not `final`, `abstract`, or annotated with `@api` and have no children. |
 | `require-api-or-internal`             | `false` | When `true`, requires abstract classes, interfaces, and traits to have `@api` or `@internal` annotations. |
+| `check-experimental`                  | `false` | When `true`, reports usage of classes, interfaces, traits, and functions marked with `@experimental` from non-experimental contexts. Available since Mago 1.19.0. |
 
 ## Property initialization
 
@@ -212,6 +213,70 @@ Use `unchecked-exceptions` when you want to ignore an entire category of excepti
 Use `unchecked-exception-classes` when you want to ignore a specific exception but still want to track its parent or sibling exceptions.
 :::
 
+## Experimental API detection
+
+When `check-experimental` is enabled, the analyzer reports warnings when code marked with `@experimental` is used from a non-experimental context. This helps teams manage unstable APIs that may change or be removed without notice. Available since Mago 1.19.0.
+
+### How it works
+
+Mark classes, interfaces, traits, or functions with the `@experimental` PHPDoc tag:
+
+```php
+/** @experimental */
+class UnstableApi {
+    public function doSomething(): void {}
+}
+
+/** @experimental */
+function beta_feature(): void {}
+```
+
+The analyzer will then warn when these symbols are used from non-experimental code:
+
+```php
+// Warning: Usage of experimental class-like `UnstableApi`.
+new UnstableApi();
+
+// Warning: Usage of experimental function `beta_feature`.
+beta_feature();
+
+// Warning: Usage of experimental class-like `UnstableApi`.
+class MyService extends UnstableApi {}
+```
+
+### Suppressing warnings
+
+Usage from an experimental context is allowed without warnings:
+
+```php
+/** @experimental */
+function also_experimental(): void {
+    // OK — both caller and callee are experimental
+    new UnstableApi();
+    beta_feature();
+}
+
+/** @experimental */
+class ExperimentalConsumer extends UnstableApi {
+    // OK — the class itself is experimental
+}
+
+class StableService {
+    /** @experimental */
+    public function experimentalMethod(): void {
+        // OK — the method is experimental
+        new UnstableApi();
+    }
+}
+```
+
+### Enabling experimental checks
+
+```toml
+[analyzer]
+check-experimental = true
+```
+
 ## Plugins
 
 Plugins extend the analyzer with specialized type information for libraries and frameworks. They provide accurate type inference for functions that would otherwise return generic types.
@@ -299,6 +364,7 @@ check-closure-missing-type-hints = true
 check-arrow-function-missing-type-hints = true
 enforce-class-finality = true
 require-api-or-internal = true
+check-experimental = true
 
 # Enable strict checks
 strict-list-index-checks = true
@@ -361,6 +427,7 @@ function process(object $obj): mixed
 | `no-boolean-literal-comparison` | `true` | Disallows comparisons like `$a === true` or `$b == false`. |
 | `enforce-class-finality` | `true` | Reports classes not declared `final`, `abstract`, or annotated with `@api`. |
 | `require-api-or-internal` | `true` | Requires abstract classes, interfaces, and traits to have `@api` or `@internal`. |
+| `check-experimental` | `true` | Reports usage of `@experimental` APIs from non-experimental contexts. |
 
 #### Exception handling
 

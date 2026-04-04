@@ -222,6 +222,10 @@ pub struct AnalyzerConfiguration {
     ///
     /// Defaults to `false`.
     #[serde(default)]
+    pub check_experimental: bool,
+
+    /// Defaults to `false`.
+    #[serde(default)]
     pub check_name_casing: bool,
 
     /// Enforce that concrete classes are declared `final`.
@@ -382,6 +386,7 @@ impl AnalyzerConfiguration {
             class_initializers: self.class_initializers.iter().map(|s| ascii_lowercase_atom(s.as_str())).collect(),
             check_property_initialization: self.check_property_initialization,
             check_use_statements: self.check_use_statements,
+            check_experimental: self.check_experimental,
             check_name_casing: self.check_name_casing,
             saturation_complexity_threshold: self.performance.saturation_complexity_threshold,
             disjunction_complexity_threshold: self.performance.disjunction_complexity_threshold,
@@ -429,6 +434,7 @@ impl Default for AnalyzerConfiguration {
             class_initializers: vec![],
             check_property_initialization: defaults.check_property_initialization,
             check_use_statements: defaults.check_use_statements,
+            check_experimental: defaults.check_experimental,
             check_name_casing: defaults.check_name_casing,
             perform_heuristic_checks: None,
             performance: PerformanceConfiguration::default(),

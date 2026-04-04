@@ -1138,6 +1138,22 @@ fn check_class_like_extends<'ctx, 'arena>(
             );
         }
 
+        if context.settings.check_experimental
+            && extended_class_metadata.flags.is_experimental()
+            && !class_like_metadata.flags.is_experimental()
+        {
+            context.collector.report_with_code(
+                IssueCode::ExperimentalUsage,
+                Issue::warning(format!("Usage of experimental class-like `{extended_name}`."))
+                    .with_annotation(
+                        Annotation::primary(extended_type.span())
+                            .with_message(format!("`{extended_name}` is marked as `@experimental`.")),
+                    )
+                    .with_note("Experimental APIs may change or be removed without notice.")
+                    .with_help("Mark the current class as `@experimental` to suppress this warning."),
+            );
+        }
+
         if class_like_metadata.kind.is_interface() {
             if !extended_class_metadata.kind.is_interface() {
                 context.collector.report_with_code(
@@ -1305,6 +1321,22 @@ fn check_class_like_implements<'ctx, 'arena>(
                 continue;
             }
 
+            if context.settings.check_experimental
+                && implemented_metadata.flags.is_experimental()
+                && !class_like_metadata.flags.is_experimental()
+            {
+                context.collector.report_with_code(
+                    IssueCode::ExperimentalUsage,
+                    Issue::warning(format!("Usage of experimental interface `{implemented_name}`."))
+                        .with_annotation(
+                            Annotation::primary(implemented_type.span())
+                                .with_message(format!("`{implemented_name}` is marked as `@experimental`.")),
+                        )
+                        .with_note("Experimental APIs may change or be removed without notice.")
+                        .with_help("Mark the current class as `@experimental` to suppress this warning."),
+                );
+            }
+
             if implemented_metadata.flags.is_enum_interface() && !class_like_metadata.kind.is_enum() {
                 context.collector.report_with_code(
                     IssueCode::InvalidImplement,
@@ -1413,6 +1445,22 @@ fn check_class_like_use<'ctx, 'arena>(
             );
 
             continue;
+        }
+
+        if context.settings.check_experimental
+            && used_trait_metadata.flags.is_experimental()
+            && !class_like_metadata.flags.is_experimental()
+        {
+            context.collector.report_with_code(
+                IssueCode::ExperimentalUsage,
+                Issue::warning(format!("Usage of experimental trait `{used_name}`."))
+                    .with_annotation(
+                        Annotation::primary(used_type.span())
+                            .with_message(format!("`{used_name}` is marked as `@experimental`.")),
+                    )
+                    .with_note("Experimental APIs may change or be removed without notice.")
+                    .with_help("Mark the current class as `@experimental` to suppress this warning."),
+            );
         }
 
         if used_trait_metadata.flags.is_deprecated() {

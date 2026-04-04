@@ -138,6 +138,10 @@ fn process_constant_docblock(
         metadata.flags |= MetadataFlags::INTERNAL;
     }
 
+    if docblock.is_experimental {
+        metadata.flags |= MetadataFlags::EXPERIMENTAL;
+    }
+
     if let Some(type_string) = &docblock.type_string {
         match get_type_metadata_from_type_string(type_string, classname, type_context, scope) {
             Ok(type_metadata) => {

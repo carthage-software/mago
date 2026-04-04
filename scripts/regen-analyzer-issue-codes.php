@@ -325,6 +325,7 @@ final class AnalyzerCodeModuleGenerator
         'imprecise-type',
         'incorrect-class-like-casing',
         'incorrect-function-casing',
+        'experimental-usage',
     ];
 
     /**

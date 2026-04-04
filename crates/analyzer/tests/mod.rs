@@ -813,6 +813,11 @@ test_case!(psl_total_length_range);
 test_case!(psl_proc_open_pipes);
 test_case!(psl_array_filter_nullable);
 test_case!(psl_isset_optional_key);
+test_case!(issue_1273, {
+    let mut s = crate::framework::default_test_settings();
+    s.check_experimental = true;
+    s
+});
 
 #[test]
 fn test_all_test_cases_are_ran() {

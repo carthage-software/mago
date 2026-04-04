@@ -335,6 +335,10 @@ fn scan_function_like_docblock(
         metadata.flags |= MetadataFlags::INTERNAL;
     }
 
+    if docblock.is_experimental {
+        metadata.flags |= MetadataFlags::EXPERIMENTAL;
+    }
+
     if docblock.must_use {
         metadata.flags |= MetadataFlags::MUST_USE;
     }

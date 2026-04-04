@@ -41,6 +41,7 @@ impl MetadataFlags {
     pub const MUTATION_FREE: MetadataFlags = MetadataFlags(1 << 37);
     pub const EXTERNAL_MUTATION_FREE: MetadataFlags = MetadataFlags(1 << 38);
     pub const SUSPENDS_FIBER: MetadataFlags = MetadataFlags(1 << 39);
+    pub const EXPERIMENTAL: MetadataFlags = MetadataFlags(1 << 40);
 }
 
 impl MetadataFlags {
@@ -289,6 +290,12 @@ impl MetadataFlags {
     #[must_use]
     pub const fn is_public_api(self) -> bool {
         self.contains(Self::API)
+    }
+
+    #[inline]
+    #[must_use]
+    pub const fn is_experimental(self) -> bool {
+        self.contains(Self::EXPERIMENTAL)
     }
 
     #[inline]

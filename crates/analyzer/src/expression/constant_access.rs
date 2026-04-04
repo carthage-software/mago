@@ -73,6 +73,14 @@ impl<'arena> Analyzable<'_, 'arena> for ConstantAccess<'arena> {
             );
         }
 
+        crate::utils::experimental::check_experimental_constant(
+            context,
+            block_context,
+            &constant_metadata.flags,
+            name,
+            self.span(),
+        );
+
         let mut constant_type = if let Some(t) = get_platform_constant_type(name) {
             t
         } else {

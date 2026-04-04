@@ -192,6 +192,14 @@ pub struct Settings {
     /// Defaults to `false`.
     pub check_use_statements: bool,
 
+    /// Check for usage of `@experimental` symbols from non-experimental contexts.
+    ///
+    /// When enabled, the analyzer reports warnings when a symbol marked `@experimental`
+    /// is used from a context that is not itself marked `@experimental`.
+    ///
+    /// Defaults to `false`.
+    pub check_experimental: bool,
+
     /// Check for incorrect casing when referencing classes, interfaces, traits, enums,
     /// and functions.
     ///
@@ -312,6 +320,7 @@ impl Settings {
             class_initializers: AtomSet::default(),
             check_property_initialization: false,
             check_use_statements: false,
+            check_experimental: false,
             check_name_casing: false,
             saturation_complexity_threshold: default_thresholds.saturation_complexity,
             disjunction_complexity_threshold: default_thresholds.disjunction_complexity,

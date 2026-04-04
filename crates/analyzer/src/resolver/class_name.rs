@@ -223,6 +223,7 @@ pub fn resolve_classnames_from_expression<'ctx, 'arena>(
             let fqcn = atom(context.resolved_names.get(name_node));
 
             crate::utils::casing::check_class_like_casing(context, fqcn, name_node.span());
+            crate::utils::experimental::check_experimental_class_like(context, block_context, fqcn, name_node.span());
 
             possible_types.push(ResolvedClassname::new(
                 Some(fqcn),

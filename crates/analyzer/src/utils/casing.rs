@@ -1,6 +1,7 @@
 use mago_atom::Atom;
 use mago_atom::atom;
 use mago_atom::concat_atom;
+use mago_codex::metadata::function_like::FunctionLikeMetadata;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
@@ -41,14 +42,15 @@ pub fn check_class_like_casing(context: &mut Context<'_, '_>, used_name: Atom, s
 }
 
 /// Checks if the used function name matches the canonical casing and reports if not.
-pub fn check_function_casing(context: &mut Context<'_, '_>, used_name: Atom, span: Span) {
+pub fn check_function_casing_with_metadata(
+    context: &mut Context<'_, '_>,
+    metadata: &FunctionLikeMetadata,
+    used_name: Atom,
+    span: Span,
+) {
     if !context.settings.check_name_casing {
         return;
     }
-
-    let Some(metadata) = context.codebase.get_function(&used_name) else {
-        return;
-    };
 
     let Some(canonical) = metadata.original_name else {
         return;
@@ -66,6 +68,19 @@ pub fn check_function_casing(context: &mut Context<'_, '_>, used_name: Atom, spa
             )
             .with_help(format!("Use the correct casing: `{canonical}`.")),
     );
+}
+
+/// Checks if the used function name matches the canonical casing and reports if not.
+fn check_function_casing(context: &mut Context<'_, '_>, used_name: Atom, span: Span) {
+    if !context.settings.check_name_casing {
+        return;
+    }
+
+    let Some(metadata) = context.codebase.get_function(&used_name) else {
+        return;
+    };
+
+    check_function_casing_with_metadata(context, metadata, used_name, span);
 }
 
 /// Checks casing of all names imported via `use` statements.
