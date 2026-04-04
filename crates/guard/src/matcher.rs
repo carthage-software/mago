@@ -25,6 +25,11 @@ pub const SEPARATOR: char = '\\';
 ///
 /// `true` if the `fqcn` matches the `pattern`, `false` otherwise.
 pub fn matches(fqcn: &str, pattern: &str, is_constant: bool, treat_as_namespace: bool) -> bool {
+    // If pattern contains brace expansion, expand and check each variant.
+    if pattern.contains('{') {
+        return expand_braces(pattern).iter().any(|p| matches(fqcn, p, is_constant, treat_as_namespace));
+    }
+
     if !pattern.contains('*') {
         let p = pattern.trim_matches(SEPARATOR);
         let f = fqcn.trim_matches(SEPARATOR);
@@ -179,6 +184,68 @@ fn find_ignore_ascii_case(haystack: &str, needle: &str) -> Option<usize> {
     haystack.as_bytes().windows(needle.len()).position(|window| window.eq_ignore_ascii_case(needle.as_bytes()))
 }
 
+/// Expands brace expressions in a pattern into all possible variants.
+///
+/// For example, `App\{Domain,Infrastructure}\*` expands to:
+/// - `App\Domain\*`
+/// - `App\Infrastructure\*`
+///
+/// Supports nested and multiple brace groups.
+fn expand_braces(pattern: &str) -> Vec<String> {
+    let Some(open) = pattern.find('{') else {
+        return vec![pattern.to_string()];
+    };
+
+    let mut depth = 0;
+    let mut close = None;
+    for (i, ch) in pattern[open..].char_indices() {
+        match ch {
+            '{' => depth += 1,
+            '}' => {
+                depth -= 1;
+                if depth == 0 {
+                    close = Some(open + i);
+                    break;
+                }
+            }
+            _ => {}
+        }
+    }
+
+    let Some(close) = close else {
+        return vec![pattern.to_string()];
+    };
+
+    let prefix = &pattern[..open];
+    let suffix = &pattern[close + 1..];
+    let alternatives = &pattern[open + 1..close];
+
+    let mut parts = Vec::new();
+    let mut depth = 0;
+    let mut start = 0;
+    for (i, ch) in alternatives.char_indices() {
+        match ch {
+            '{' => depth += 1,
+            '}' => depth -= 1,
+            ',' if depth == 0 => {
+                parts.push(&alternatives[start..i]);
+                start = i + 1;
+            }
+            _ => {}
+        }
+    }
+
+    parts.push(&alternatives[start..]);
+
+    let mut results = Vec::with_capacity(parts.len());
+    for part in parts {
+        let expanded = format!("{prefix}{part}{suffix}");
+        results.extend(expand_braces(&expanded));
+    }
+
+    results
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -288,5 +355,67 @@ mod tests {
         assert!(matches("App", "App\\", false, false));
         assert!(matches("App\\", "App\\", false, false));
         assert!(!matches("App", "Application\\", false, false));
+    }
+
+    #[test]
+    fn test_brace_expansion() {
+        assert!(matches("App\\Domain\\User", "App\\{Domain,Infrastructure}\\User", false, false));
+        assert!(matches("App\\Infrastructure\\User", "App\\{Domain,Infrastructure}\\User", false, false));
+        assert!(!matches("App\\Application\\User", "App\\{Domain,Infrastructure}\\User", false, false));
+    }
+
+    #[test]
+    fn test_brace_expansion_namespace() {
+        assert!(matches("App\\Gateway\\DTO\\Foo", "App\\Gateway\\{DTO,Doctrine}\\", false, false));
+        assert!(matches("App\\Gateway\\Doctrine\\Bar", "App\\Gateway\\{DTO,Doctrine}\\", false, false));
+        assert!(!matches("App\\Gateway\\Service\\Baz", "App\\Gateway\\{DTO,Doctrine}\\", false, false));
+    }
+
+    #[test]
+    fn test_brace_expansion_with_wildcards() {
+        assert!(matches("App\\Domain\\UserRepository", "App\\{Domain,Infrastructure}\\*Repository", false, false));
+        assert!(matches(
+            "App\\Infrastructure\\OrderRepository",
+            "App\\{Domain,Infrastructure}\\*Repository",
+            false,
+            false
+        ));
+        assert!(!matches(
+            "App\\Application\\UserRepository",
+            "App\\{Domain,Infrastructure}\\*Repository",
+            false,
+            false
+        ));
+    }
+
+    #[test]
+    fn test_brace_expansion_multiple_groups() {
+        assert!(matches("App\\Domain\\User\\Query", "App\\{Domain,Infrastructure}\\{User,Order}\\*", false, false));
+        assert!(matches(
+            "App\\Infrastructure\\Order\\Command",
+            "App\\{Domain,Infrastructure}\\{User,Order}\\*",
+            false,
+            false
+        ));
+        assert!(!matches("App\\Domain\\Product\\Query", "App\\{Domain,Infrastructure}\\{User,Order}\\*", false, false));
+    }
+
+    #[test]
+    fn test_brace_expansion_single_alternative() {
+        assert!(matches("App\\Domain\\User", "App\\{Domain}\\User", false, false));
+    }
+
+    #[test]
+    fn test_no_braces_unchanged() {
+        assert!(matches("App\\User", "App\\User", false, false));
+        assert!(matches("App\\User", "App\\*", false, false));
+    }
+
+    #[test]
+    fn test_expand_braces_fn() {
+        assert_eq!(expand_braces("A\\{B,C}\\D"), vec!["A\\B\\D", "A\\C\\D"]);
+        assert_eq!(expand_braces("no-braces"), vec!["no-braces"]);
+        assert_eq!(expand_braces("{A,B}"), vec!["A", "B"]);
+        assert_eq!(expand_braces("{A,B}\\{C,D}"), vec!["A\\C", "A\\D", "B\\C", "B\\D"]);
     }
 }
