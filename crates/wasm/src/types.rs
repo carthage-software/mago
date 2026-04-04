@@ -157,6 +157,9 @@ pub struct WasmAnalyzerSettings {
     pub class_initializers: Vec<String>,
     pub check_property_initialization: bool,
     pub check_use_statements: bool,
+    pub check_experimental: bool,
+    pub check_name_casing: bool,
+    pub require_api_or_internal: bool,
     /// Disable all default plugins (including stdlib).
     pub disable_default_plugins: bool,
     /// List of plugins to enable (by name or alias).
@@ -187,6 +190,9 @@ impl Default for WasmAnalyzerSettings {
             class_initializers: Vec::new(),
             check_property_initialization: false,
             check_use_statements: false,
+            check_experimental: false,
+            check_name_casing: false,
+            require_api_or_internal: false,
             disable_default_plugins: false,
             plugins: Vec::new(),
         }

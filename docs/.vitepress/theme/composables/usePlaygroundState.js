@@ -47,6 +47,10 @@ export function createPlaygroundState(initialCode = DEFAULT_CODE) {
         trustExistenceChecks: true,
         checkPropertyInitialization: false,
         checkUseStatements: false,
+        checkExperimental: false,
+        checkNameCasing: false,
+        enforceClassFinality: false,
+        requireApiOrInternal: false,
         disableDefaultPlugins: false,
         plugins: [],
       },
@@ -77,6 +81,14 @@ export function createPlaygroundState(initialCode = DEFAULT_CODE) {
     setAnalyzerSetting(key, value) {
       if (key in state.settings.analyzer) {
         state.settings.analyzer[key] = value;
+      }
+    },
+
+    setAnalyzerSettings(settings) {
+      for (const [key, value] of Object.entries(settings)) {
+        if (key in state.settings.analyzer) {
+          state.settings.analyzer[key] = value;
+        }
       }
     },
 

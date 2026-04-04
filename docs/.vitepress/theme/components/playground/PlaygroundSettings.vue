@@ -158,7 +158,22 @@ const analyzerOptions = [
     key: 'checkUseStatements',
     label: 'Check use statements',
     description: 'Report use statements that import non-existent classes, functions, or constants',
-  }
+  },
+  {
+    key: 'checkExperimental',
+    label: 'Check @experimental usage',
+    description: 'Report usage of @experimental APIs from non-experimental contexts',
+  },
+  {
+    key: 'checkNameCasing',
+    label: 'Check name casing',
+    description: 'Report incorrect casing when referencing classes, functions, etc.',
+  },
+  {
+    key: 'requireApiOrInternal',
+    label: 'Require @api or @internal',
+    description: 'Require abstract classes, interfaces, and traits to have @api or @internal',
+  },
 ];
 
 const rulesByCategory = computed(() => {

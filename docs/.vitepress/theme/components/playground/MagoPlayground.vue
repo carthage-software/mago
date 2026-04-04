@@ -73,7 +73,14 @@ watch(
   () => state.settings,
   () => {
     if (!wasmReady.value || !hasRunOnce.value) return;
-    runAnalysis();
+
+    if (debounceTimer) {
+      clearTimeout(debounceTimer);
+    }
+
+    debounceTimer = setTimeout(() => {
+      runAnalysis();
+    }, DEBOUNCE_MS);
   },
   { deep: true }
 );
@@ -142,9 +149,7 @@ function handleCodeChange(code) {
 
 function handleSettingsChange(settings) {
   store.setPhpVersion(settings.phpVersion);
-  Object.entries(settings.analyzer).forEach(([key, value]) => {
-    store.setAnalyzerSetting(key, value);
-  });
+  store.setAnalyzerSettings(settings.analyzer);
   if (settings.linter?.disabledRules) {
     store.setLinterDisabledRules(settings.linter.disabledRules);
   }

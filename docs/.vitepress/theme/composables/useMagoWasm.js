@@ -44,6 +44,7 @@ export function useMagoWasm() {
 
   async function analyze(code, settings) {
     const wasm = await loadWasm();
+    await new Promise((r) => setTimeout(r, 0));
     const startTime = performance.now();
     const issues = wasm.run(code, settings);
     const endTime = performance.now();

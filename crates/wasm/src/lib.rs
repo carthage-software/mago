@@ -128,6 +128,11 @@ pub fn run(code: String, settings_js: JsValue) -> Result<JsValue, JsValue> {
         trust_existence_checks: s.trust_existence_checks,
         class_initializers: s.class_initializers.iter().map(|s| ascii_lowercase_atom(s.as_str())).collect(),
         check_property_initialization: s.check_property_initialization,
+        check_use_statements: s.check_use_statements,
+        check_experimental: s.check_experimental,
+        check_name_casing: s.check_name_casing,
+        enforce_class_finality: s.enforce_class_finality,
+        require_api_or_internal: s.require_api_or_internal,
         ..Default::default()
     };
 
