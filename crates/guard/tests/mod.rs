@@ -541,3 +541,57 @@ pub fn test_ddd() {
 
     assert_eq!(result.boundary_breaches.len(), 0, "Expected no violations, found: {:#?}", result.boundary_breaches);
 }
+
+#[test]
+pub fn test_narrow_rule_not_widened_by_broad_catchall() {
+    let code = indoc! {r"
+        <?php
+        namespace App\Infrastructure { class Service {} }
+        namespace App\Domain {
+            use App\Infrastructure\Service;
+
+            class Model {
+                public function __construct() {
+                    new Service();
+                }
+            }
+        }
+    "};
+
+    let settings = Settings {
+        perimeter: PerimeterSettings {
+            rules: vec![
+                PerimeterRule {
+                    namespace: NamespacePath::Specific("App\\Domain\\".to_string()),
+                    permit: vec![
+                        PermittedDependency::Dependency(Path::Native),
+                        PermittedDependency::Dependency(Path::Selector(SymbolSelector::Namespace(
+                            NamespacePath::Specific("App\\Domain\\".to_string()),
+                        ))),
+                    ],
+                },
+                PerimeterRule {
+                    namespace: NamespacePath::Specific("App\\".to_string()),
+                    permit: vec![
+                        PermittedDependency::Dependency(Path::Native),
+                        PermittedDependency::Dependency(Path::Selector(SymbolSelector::Namespace(
+                            NamespacePath::Specific("App\\Domain\\".to_string()),
+                        ))),
+                        PermittedDependency::Dependency(Path::Selector(SymbolSelector::Namespace(
+                            NamespacePath::Specific("App\\Infrastructure\\".to_string()),
+                        ))),
+                    ],
+                },
+            ],
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+
+    let result = test_guard("narrow_rule_not_widened", code, settings);
+
+    assert!(
+        !result.boundary_breaches.is_empty(),
+        "Expected violations: Domain should not be allowed to use Infrastructure"
+    );
+}

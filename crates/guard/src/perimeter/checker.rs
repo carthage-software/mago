@@ -60,46 +60,47 @@ fn check_allowed(
     target_fqn: &str,
     dependency_kind: PermittedDependencyKind,
 ) -> Option<BreachReason> {
-    let rules: Vec<_> = ctx
+    let rule = ctx
         .settings
         .perimeter
         .rules
         .iter()
-        .filter(|rule| match &rule.namespace {
-            NamespacePath::Global => ctx.get_current_namespace().is_empty(),
-            NamespacePath::Specific(rule_namespace) => {
-                matcher::matches(ctx.get_current_namespace(), rule_namespace, false, true)
-            }
-        })
-        .collect();
+        .filter_map(|rule| {
+            let specificity = match &rule.namespace {
+                NamespacePath::Global if ctx.get_current_namespace().is_empty() => 0,
+                NamespacePath::Specific(rule_namespace)
+                    if matcher::matches(ctx.get_current_namespace(), rule_namespace, false, true) =>
+                {
+                    rule_namespace.len()
+                }
+                _ => return None,
+            };
 
-    if !rules.is_empty() {
-        for rule in &rules {
-            for allowed in &rule.permit {
-                match allowed {
-                    PermittedDependency::Dependency(path) => {
-                        if is_path_allowed(ctx.codebase, ctx.settings, path, ctx.get_current_namespace(), target_fqn) {
-                            return None;
-                        }
+            Some((rule, specificity))
+        })
+        .max_by_key(|(_, specificity)| *specificity)
+        .map(|(rule, _)| rule);
+
+    if let Some(rule) = rule {
+        for allowed in &rule.permit {
+            match allowed {
+                PermittedDependency::Dependency(path) => {
+                    if is_path_allowed(ctx.codebase, ctx.settings, path, ctx.get_current_namespace(), target_fqn) {
+                        return None;
                     }
-                    PermittedDependency::DependencyOfKind { path, kinds } => {
-                        if kinds.contains(&dependency_kind)
-                            && is_path_allowed(
-                                ctx.codebase,
-                                ctx.settings,
-                                path,
-                                ctx.get_current_namespace(),
-                                target_fqn,
-                            )
-                        {
-                            return None;
-                        }
+                }
+                PermittedDependency::DependencyOfKind { path, kinds } => {
+                    if kinds.contains(&dependency_kind)
+                        && is_path_allowed(ctx.codebase, ctx.settings, path, ctx.get_current_namespace(), target_fqn)
+                    {
+                        return None;
                     }
                 }
             }
         }
     }
 
+    let rules: Vec<_> = rule.into_iter().collect();
     if !ctx.settings.perimeter.layering.is_empty() {
         let source_layer_index = get_layer_index(ctx.get_current_namespace(), ctx.settings);
         let target_layer_index = get_layer_index(target_fqn, ctx.settings);
