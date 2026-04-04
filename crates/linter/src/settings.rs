@@ -75,6 +75,7 @@ use crate::rule::NoInlineConfig;
 use crate::rule::NoInsecureComparisonConfig;
 use crate::rule::NoIsNullConfig;
 use crate::rule::NoIteratorToArrayInForeachConfig;
+use crate::rule::NoParameterShadowingConfig;
 use crate::rule::NoIssetConfig;
 use crate::rule::NoLiteralPasswordConfig;
 use crate::rule::NoMultiAssignmentsConfig;
@@ -318,6 +319,7 @@ pub struct RulesSettings {
     pub variable_name: RuleSettings<VariableNameConfig>,
     pub constant_condition: RuleSettings<ConstantConditionConfig>,
     pub no_ini_set: RuleSettings<NoIniSetConfig>,
+    pub no_parameter_shadowing: RuleSettings<NoParameterShadowingConfig>,
     pub no_inline: RuleSettings<NoInlineConfig>,
     pub no_insecure_comparison: RuleSettings<NoInsecureComparisonConfig>,
     pub no_literal_password: RuleSettings<NoLiteralPasswordConfig>,
