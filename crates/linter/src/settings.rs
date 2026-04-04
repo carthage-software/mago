@@ -48,6 +48,7 @@ use crate::rule::MethodNameConfig;
 use crate::rule::MiddlewareInRoutesConfig;
 use crate::rule::NoAliasFunctionConfig;
 use crate::rule::NoAlternativeSyntaxConfig;
+use crate::rule::NoArrayAccumulationInLoopConfig;
 use crate::rule::NoAssignInArgumentConfig;
 use crate::rule::NoAssignInConditionConfig;
 use crate::rule::NoBooleanFlagParameterConfig;
@@ -74,14 +75,14 @@ use crate::rule::NoIniSetConfig;
 use crate::rule::NoInlineConfig;
 use crate::rule::NoInsecureComparisonConfig;
 use crate::rule::NoIsNullConfig;
-use crate::rule::NoIteratorToArrayInForeachConfig;
-use crate::rule::NoParameterShadowingConfig;
 use crate::rule::NoIssetConfig;
+use crate::rule::NoIteratorToArrayInForeachConfig;
 use crate::rule::NoLiteralPasswordConfig;
 use crate::rule::NoMultiAssignmentsConfig;
 use crate::rule::NoNestedTernaryConfig;
 use crate::rule::NoNoopConfig;
 use crate::rule::NoOnlyConfig;
+use crate::rule::NoParameterShadowingConfig;
 use crate::rule::NoPhpTagTerminatorConfig;
 use crate::rule::NoProtectedInFinalConfig;
 use crate::rule::NoRedundantBinaryStringPrefixConfig;
@@ -318,6 +319,7 @@ pub struct RulesSettings {
     pub valid_docblock: RuleSettings<ValidDocblockConfig>,
     pub variable_name: RuleSettings<VariableNameConfig>,
     pub constant_condition: RuleSettings<ConstantConditionConfig>,
+    pub no_array_accumulation_in_loop: RuleSettings<NoArrayAccumulationInLoopConfig>,
     pub no_ini_set: RuleSettings<NoIniSetConfig>,
     pub no_parameter_shadowing: RuleSettings<NoParameterShadowingConfig>,
     pub no_inline: RuleSettings<NoInlineConfig>,

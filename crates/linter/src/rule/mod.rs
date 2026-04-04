@@ -307,6 +307,7 @@ define_rules! {
     ValidDocblock(valid_docblock @ ValidDocblockRule),
     VariableName(variable_name @ VariableNameRule),
     ConstantCondition(constant_condition @ ConstantConditionRule),
+    NoArrayAccumulationInLoop(no_array_accumulation_in_loop @ NoArrayAccumulationInLoopRule),
     NoIniSet(no_ini_set @ NoIniSetRule),
     NoParameterShadowing(no_parameter_shadowing @ NoParameterShadowingRule),
     NoInline(no_inline @ NoInlineRule),

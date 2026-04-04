@@ -13,6 +13,7 @@ This document details the rules available in the `BestPractices` category.
 | Final Controller | [`final-controller`](#final-controller) |
 | Loop Does Not Iterate | [`loop-does-not-iterate`](#loop-does-not-iterate) |
 | Middleware In Routes | [`middleware-in-routes`](#middleware-in-routes) |
+| No Array Accumulation In Loop | [`no-array-accumulation-in-loop`](#no-array-accumulation-in-loop) |
 | No Direct Database Queries | [`no-direct-db-query`](#no-direct-db-query) |
 | No ini_set | [`no-ini-set`](#no-ini-set) |
 | No Inline | [`no-inline`](#no-inline) |
@@ -224,6 +225,52 @@ class UserController extends Controller
     {
         $this->middleware('auth');
     }
+}
+```
+
+
+## <a id="no-array-accumulation-in-loop"></a>`no-array-accumulation-in-loop`
+
+Detects O(n²) array accumulation patterns inside loops.
+
+Calling `array_merge()`, `array_merge_recursive()`, `array_unique()`, or
+`array_values()` on an accumulator inside a loop copies the entire array on
+every iteration. Similarly, using spread syntax (`[...$result, ...$item]`)
+in a reassignment has the same cost.
+
+Collect items first and transform once after the loop instead.
+
+
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `true` |
+| `level` | `string` | `"warning"` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+
+$chunks = [];
+foreach ($items as $item) {
+    $chunks[] = $item;
+}
+$result = array_merge(...$chunks);
+```
+
+#### Incorrect code
+
+```php
+<?php
+
+$result = [];
+foreach ($items as $item) {
+    $result = array_merge($result, $item);
 }
 ```
 
