@@ -11,8 +11,6 @@ pub enum ParseError {
     UnclosedInlineCode(Span),
     UnclosedCodeBlock(Span),
     InvalidTagName(Span),
-    InvalidAnnotationName(Span),
-    UnclosedAnnotationArguments(Span),
     MalformedCodeBlock(Span),
     InvalidComment(Span),
     ExpectedLine(Span),
@@ -38,8 +36,6 @@ impl HasSpan for ParseError {
             | ParseError::UnclosedInlineCode(span)
             | ParseError::UnclosedCodeBlock(span)
             | ParseError::InvalidTagName(span)
-            | ParseError::InvalidAnnotationName(span)
-            | ParseError::UnclosedAnnotationArguments(span)
             | ParseError::MalformedCodeBlock(span)
             | ParseError::InvalidComment(span)
             | ParseError::ExpectedLine(span)
@@ -71,8 +67,6 @@ impl std::fmt::Display for ParseError {
             ParseError::UnclosedInlineCode(_) => write!(f, "Unclosed inline code"),
             ParseError::UnclosedCodeBlock(_) => write!(f, "Unclosed code block"),
             ParseError::InvalidTagName(_) => write!(f, "Invalid tag name"),
-            ParseError::InvalidAnnotationName(_) => write!(f, "Invalid annotation name"),
-            ParseError::UnclosedAnnotationArguments(_) => write!(f, "Unclosed annotation arguments"),
             ParseError::MalformedCodeBlock(_) => write!(f, "Malformed code block"),
             ParseError::ExpectedLine(_) => write!(f, "Unexpected end of docblock"),
             ParseError::InvalidTypeTag(_, msg) => write!(f, "{msg}"),
@@ -108,13 +102,8 @@ impl ParseError {
                 "Multi-line code blocks must be terminated with a closing ```.".to_string()
             }
             ParseError::InvalidTagName(_) => {
-                "Docblock tags like `@param` must contain only letters, numbers, hyphens, and colons.".to_string()
-            }
-            ParseError::InvalidAnnotationName(_) => {
-                "Annotations must start with an uppercase letter, `_`, or `\\`.".to_string()
-            }
-            ParseError::UnclosedAnnotationArguments(_) => {
-                "Arguments for an annotation must be enclosed in parentheses `()`.".to_string()
+                "Docblock tag names must contain only letters, numbers, underscores, hyphens, colons, or backslashes."
+                    .to_string()
             }
             ParseError::MalformedCodeBlock(_) => {
                 "A code block must start with ``` optionally followed by a language identifier.".to_string()
@@ -153,12 +142,6 @@ impl ParseError {
             ParseError::UnclosedCodeBlock(_) => "Add a closing ``` to terminate the code block.".to_string(),
             ParseError::InvalidTagName(_) => {
                 "Correct the tag name to use only valid characters (e.g., `@my-custom-tag`).".to_string()
-            }
-            ParseError::InvalidAnnotationName(_) => {
-                "Correct the annotation name to follow PSR-5 standards.".to_string()
-            }
-            ParseError::UnclosedAnnotationArguments(_) => {
-                "Add a closing `)` to complete the annotation's argument list.".to_string()
             }
             ParseError::InvalidTypeTag(_, _) => {
                 "Add type definition after alias name (can span multiple lines)".to_string()

@@ -16,7 +16,6 @@ pub enum Element<'arena> {
     Code(Code<'arena>),
     Tag(Tag<'arena>),
     Line(Span),
-    Annotation(Annotation<'arena>),
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
@@ -40,17 +39,11 @@ pub enum TextSegment<'arena> {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
-pub struct Annotation<'arena> {
-    pub span: Span,
-    pub name: &'arena str,
-    pub arguments: Option<&'arena str>,
-}
-
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub struct Tag<'arena> {
     pub span: Span,
     pub name: &'arena str,
     pub kind: TagKind,
+    pub metadata: Option<&'arena str>,
     pub description: &'arena str,
     pub description_span: Span,
 }

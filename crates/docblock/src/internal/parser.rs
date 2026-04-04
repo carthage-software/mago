@@ -3,7 +3,6 @@ use bumpalo::collections::Vec;
 
 use mago_span::Span;
 
-use crate::document::Annotation;
 use crate::document::Code;
 use crate::document::Document;
 use crate::document::Element;
@@ -25,16 +24,10 @@ pub fn parse_document<'arena>(
     while i < tokens.len() {
         match &tokens[i] {
             Token::Line { content, .. } => {
-                if let Some(stripped) = content.strip_prefix('@') {
-                    if is_annotation_start(stripped) {
-                        let (annotation, new_i) = parse_annotation(tokens, i, arena)?;
-                        elements.push(Element::Annotation(annotation));
-                        i = new_i;
-                    } else {
-                        let (tag, new_i) = parse_tag(tokens, i, arena)?;
-                        elements.push(Element::Tag(tag));
-                        i = new_i;
-                    }
+                if content.starts_with('@') {
+                    let (tag, new_i) = parse_tag(tokens, i, arena)?;
+                    elements.push(Element::Tag(tag));
+                    i = new_i;
                 } else if content.starts_with("```") {
                     let (code, new_i) = parse_code_block(tokens, i, arena)?;
                     elements.push(Element::Code(code));
@@ -63,16 +56,6 @@ fn is_indented_line(content: &str) -> bool {
     content.starts_with(' ') || content.starts_with('\t')
 }
 
-fn is_annotation_start(s: &str) -> bool {
-    if s.starts_with('\\') {
-        true
-    } else if let Some(first_char) = s.chars().next() {
-        first_char.is_ascii_uppercase() || first_char == '_'
-    } else {
-        false
-    }
-}
-
 fn parse_tag<'arena>(
     tokens: &[Token<'arena>],
     start_index: usize,
@@ -83,36 +66,61 @@ fn parse_tag<'arena>(
         return Err(ParseError::ExpectedLine(tokens[i].span()));
     };
 
-    let mut next_whitespace_char_pos = None;
-    let mut next_whitespace_byte_pos = None;
+    let mut name_end = None;
     for (byte_pos, ch) in content[1..].char_indices() {
-        if ch.is_whitespace() {
-            next_whitespace_char_pos = Some(byte_pos);
-            next_whitespace_byte_pos = Some(1 + byte_pos);
+        if ch.is_whitespace() || ch == '(' {
+            name_end = Some(1 + byte_pos);
             break;
         }
     }
 
-    let tag_name;
-    let description_part;
-    let description_start;
-    if let (Some(char_pos), Some(byte_pos)) = (next_whitespace_char_pos, next_whitespace_byte_pos) {
-        tag_name = &content[1..=char_pos];
-        let Some(whitespace_char) = content[byte_pos..].chars().next() else {
-            return Err(ParseError::InvalidTagName(*span));
-        };
+    let tag_name = if let Some(end) = name_end { &content[1..end] } else { &content[1..] };
 
-        let after_whitespace_byte_pos = byte_pos + whitespace_char.len_utf8();
-        description_part = &content[after_whitespace_byte_pos..];
-        description_start = span.start.forward(after_whitespace_byte_pos as u32);
-    } else {
-        tag_name = &content[1..];
-        description_part = "";
-        description_start = span.start.forward(1 + tag_name.len() as u32);
+    if tag_name.is_empty()
+        || !tag_name
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-' || b == b':' || b == b'\\' || b >= 0x80)
+    {
+        return Err(ParseError::InvalidTagName(span.subspan(0, tag_name.len() as u32 + 1)));
     }
 
-    if tag_name.is_empty() || !tag_name.chars().all(|c| c.is_alphanumeric() || c == '-' || c == ':') {
-        return Err(ParseError::InvalidTagName(span.subspan(0, tag_name.len() as u32 + 1)));
+    let after_name = &content[1 + tag_name.len()..];
+
+    let mut metadata: Option<&'arena str> = None;
+    let mut after_metadata = after_name;
+    if after_name.starts_with('(') {
+        let mut depth: usize = 0;
+        let mut close_pos = None;
+        for (pos, ch) in after_name.char_indices() {
+            match ch {
+                '(' => depth += 1,
+                ')' => {
+                    depth -= 1;
+                    if depth == 0 {
+                        close_pos = Some(pos);
+                        break;
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        if let Some(close) = close_pos {
+            metadata = Some(arena.alloc_str(&after_name[..=close]));
+            after_metadata = &after_name[close + 1..];
+        }
+    }
+
+    let description_part;
+    let description_start;
+    let trimmed = after_metadata.trim_start();
+    if trimmed.is_empty() {
+        description_part = "";
+        description_start = span.start.forward(content.len() as u32);
+    } else {
+        let offset = content.len() - trimmed.len();
+        description_part = trimmed;
+        description_start = span.start.forward(offset as u32);
     }
 
     let mut description = String::from(description_part);
@@ -148,6 +156,7 @@ fn parse_tag<'arena>(
         span: tag_span,
         name: tag_name,
         kind,
+        metadata,
         description: arena.alloc_str(&description),
         description_span: Span::new(span.file_id, description_start, end_span.end),
     };
@@ -473,116 +482,8 @@ fn parse_inline_tag(tag_content: &str, span: Span) -> Tag<'_> {
         span,
         name,
         kind: name.into(),
+        metadata: None,
         description,
         description_span: Span::new(span.file_id, span.start.forward(name.len() as u32 + 1), span.end),
     }
-}
-
-fn parse_annotation<'arena>(
-    tokens: &[Token<'arena>],
-    start_index: usize,
-    arena: &'arena Bump,
-) -> Result<(Annotation<'arena>, usize), ParseError> {
-    let mut i = start_index;
-    let Token::Line { content, span } = &tokens[i] else {
-        return Err(ParseError::ExpectedLine(tokens[i].span()));
-    };
-
-    let content_after_at = &content[1..]; // Skip '@'
-
-    let (name, name_len) = parse_annotation_name(content_after_at, *span)?;
-
-    let content_rest = &content[1 + name_len..];
-    let mut arguments: Option<&'arena str> = None;
-    let mut end_span = *span;
-
-    if content_rest.trim_start().starts_with('(') {
-        let mut args = String::new();
-        let mut open_parens = 0;
-
-        let Some(paren_start_pos) = content_rest.find('(') else {
-            return Err(ParseError::UnclosedAnnotationArguments(*span));
-        };
-
-        let line_content = content_rest[paren_start_pos..].trim_end();
-
-        args.push_str(line_content);
-        open_parens += line_content.chars().filter(|&c| c == '(').count();
-        open_parens -= line_content.chars().filter(|&c| c == ')').count();
-
-        i += 1;
-        end_span = *span;
-
-        while open_parens > 0 && i < tokens.len() {
-            match &tokens[i] {
-                Token::Line { content, span } => {
-                    args.push('\n');
-                    args.push_str(content);
-                    end_span = *span;
-                    open_parens += content.chars().filter(|&c| c == '(').count();
-                    open_parens -= content.chars().filter(|&c| c == ')').count();
-                    i += 1;
-                }
-                Token::EmptyLine { .. } => {
-                    args.push('\n');
-                    i += 1;
-                }
-            }
-        }
-
-        if open_parens != 0 {
-            return Err(ParseError::UnclosedAnnotationArguments(Span::new(span.file_id, span.start, end_span.end)));
-        }
-
-        arguments = Some(arena.alloc_str(&args));
-    } else {
-        i += 1;
-    }
-
-    let annotation_span = Span::new(span.file_id, span.start, end_span.end);
-
-    let annotation = Annotation { span: annotation_span, name, arguments };
-
-    Ok((annotation, i))
-}
-
-/// Parses an annotation name from the beginning of a string slice.
-///
-/// This is a zero-allocation function. It returns a slice (`&'a str`) that
-/// points directly into the input `content` without creating a new String.
-///
-/// # Returns
-///
-/// A `Result` containing a tuple of the name slice and the number of bytes consumed,
-/// or a `ParseError` if the name is invalid.
-pub fn parse_annotation_name(content: &str, span: Span) -> Result<(&str, usize), ParseError> {
-    let mut chars = content.char_indices();
-    let mut last_valid_byte_index = 0;
-
-    if let Some((_, c)) = chars.next() {
-        if c == '\\' || c.is_ascii_uppercase() || c == '_' {
-            last_valid_byte_index += c.len_utf8();
-        } else {
-            // The first character is invalid.
-            return Err(ParseError::InvalidAnnotationName(span.subspan(1, 1)));
-        }
-    } else {
-        // The input string is empty.
-        return Err(ParseError::InvalidAnnotationName(span.subspan(1, 1)));
-    }
-
-    for (i, c) in chars {
-        if c.is_ascii_alphanumeric() || c == '_' || c == '\\' || c as u8 >= 0x80 {
-            // If the character is valid, update the index to the position *after* it.
-            last_valid_byte_index = i + c.len_utf8();
-        } else {
-            // Stop at the first invalid character.
-            break;
-        }
-    }
-
-    // Create a slice of the input string from the start to the last valid position.
-    let name_slice = &content[..last_valid_byte_index];
-
-    Ok((name_slice, last_valid_byte_index))
 }

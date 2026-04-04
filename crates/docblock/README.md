@@ -19,10 +19,8 @@ Given the lack of a strict standard for PHPDoc formatting, we've established our
     - [Indented Code Blocks](#indented-code-blocks)
   - [Tags](#tags)
     - [Tag Syntax](#tag-syntax)
+    - [Tag Metadata](#tag-metadata)
     - [Tag Parsing](#tag-parsing)
-  - [Annotations](#annotations)
-    - [Annotation Syntax](#annotation-syntax)
-    - [Argument List Parsing](#argument-list-parsing)
   - [Error Handling](#error-handling)
 - [Usage](#usage)
 - [Conclusion](#conclusion)
@@ -30,10 +28,10 @@ Given the lack of a strict standard for PHPDoc formatting, we've established our
 ## Features
 
 - Parses PHPDoc comments into a structured AST (Abstract Syntax Tree).
-- Supports text, code blocks, tags, annotations, inline code, and inline tags.
+- Supports text, code blocks, tags, inline code, and inline tags.
 - Enforces a consistent formatting standard for PHPDoc comments.
 - Provides detailed error handling with helpful messages and suggestions.
-- Supports custom annotations with optional argument lists.
+- Supports tag metadata in parentheses (e.g., `@todo(azjezz) fix this`).
 
 ## Standardization of PHPDoc Comments
 
@@ -139,7 +137,7 @@ Tags provide metadata and additional information about the code. They start with
 #### Tag Syntax
 
 - Begins with `@` followed by the tag name.
-- The tag name must only contain letters, numbers, hyphens, and colons.
+- The tag name can contain letters, numbers, underscores, hyphens, colons, and backslashes.
 - After the tag name, a description can follow, which can span multiple lines until an empty line or another tag/code block is encountered.
 
 ##### Example
@@ -158,30 +156,24 @@ Tags provide metadata and additional information about the code. They start with
 
 **Note**: This approach simplifies parsing and delegates the responsibility of interpreting tag descriptions to other tools if necessary.
 
-### Annotations
+#### Tag Metadata
 
-Annotations are similar to tags but have distinct syntax and usage.
+Tags can optionally have metadata enclosed in parentheses immediately after the tag name. This supports patterns like:
 
-#### Annotation Syntax
+- `@todo(azjezz) fix this` — metadata is `(azjezz)`
+- `@ORM\Entity(repositoryClass="UserRepository")` — metadata is `(repositoryClass="UserRepository")`
+- `@Route("/home", name="homepage")` — metadata is `("/home", name="homepage")`
 
-- Annotations start with `@` followed by a name that must start with an uppercase letter, underscore `_`, or backslash `\`.
-- The name can contain letters, numbers, underscores, backslashes, or Unicode characters.
-- Optionally, annotations can have an argument list enclosed in parentheses `(` and `)`.
-- The argument list can span multiple lines and can contain nested parentheses.
+The metadata is captured as a single string (including the parentheses) and is not further parsed. Nested parentheses are handled correctly. If no closing parenthesis is found on the same line, the `(` is treated as part of the description instead.
 
 ##### Example
 
 ```php
 /**
- * @Route("/home", name="homepage")
+ * @todo(azjezz) Fix the caching logic before release.
+ * @ORM\Entity(repositoryClass="App\Repository\UserRepository")
  */
 ```
-
-#### Argument List Parsing
-
-- The parser keeps track of opening and closing parentheses to handle nested or multi-line argument lists.
-- The argument list is captured as a single string and is not further parsed.
-- Unclosed parentheses will result in a parsing error.
 
 ### Error Handling
 
@@ -192,8 +184,6 @@ The parser provides detailed error messages and suggestions to help users correc
 - Unclosed Inline Code: Inline code is missing a closing backtick `` ` ``.
 - Unclosed Code Block: A code block is missing a closing delimiter ` ``` `.
 - Invalid Tag Name: The tag name contains invalid characters.
-- Invalid Annotation Name: The annotation name is invalid.
-- Unclosed Annotation Arguments: Annotation arguments are missing a closing `)`.
 
 Each error includes:
 

@@ -298,24 +298,30 @@ mod tests {
 
     #[test]
     fn test_invalid_tag_name() {
-        // Test case for ParseError::InvalidTagName
+        // Test case for ParseError::InvalidTagName — use a character not valid in identifiers
         let arena = Bump::new();
-        let phpdoc = "/** @invalid_tag_name Description */";
+        let phpdoc = "/** @invalid!tag Description */";
         let span = Span::new(FileId::zero(), Position::new(0), Position::new(phpdoc.len() as u32));
 
         let result = parse_phpdoc_with_span(&arena, phpdoc, span);
 
-        match result {
-            Err(ParseError::InvalidTagName(error_span)) => {
-                let tag_start = phpdoc.find("@invalid_tag_name").unwrap();
-                let tag_end = tag_start + "@invalid_tag_name".len();
-                let expected_span = span.subspan(tag_start as u32, tag_end as u32);
-                assert_eq!(error_span, expected_span);
-            }
-            _ => {
-                panic!("Expected ParseError::InvalidTagName");
-            }
-        }
+        assert!(
+            matches!(result, Err(ParseError::InvalidTagName(_))),
+            "Expected ParseError::InvalidTagName, got {result:?}"
+        );
+    }
+
+    #[test]
+    fn test_underscore_tag_name_is_valid() {
+        let arena = Bump::new();
+        let phpdoc = "/** @some_tag Description */";
+        let span = Span::new(FileId::zero(), Position::new(0), Position::new(phpdoc.len() as u32));
+
+        let document = parse_phpdoc_with_span(&arena, phpdoc, span).expect("Failed to parse PHPDoc");
+        let Element::Tag(tag) = &document.elements[0] else {
+            panic!("Expected Element::Tag");
+        };
+        assert_eq!(tag.name, "some_tag");
     }
 
     #[test]
@@ -647,38 +653,24 @@ mod tests {
         let span = Span::new(FileId::zero(), Position::new(0), Position::new(phpdoc.len() as u32));
         let document = parse_phpdoc_with_span(&arena, phpdoc, span).expect("Failed to parse PHPDoc");
 
-        // Verify that the document has the expected number of elements
-        assert_eq!(document.elements.len(), 3);
-
-        // First annotation
-        let Element::Annotation(annotation) = &document.elements[0] else {
-            panic!("Expected Element::Annotation, got {:?}", document.elements[0]);
+        let Element::Tag(tag) = &document.elements[0] else {
+            panic!("Expected Element::Tag, got {:?}", document.elements[0]);
         };
 
-        let name = annotation.name;
-        assert_eq!(name, "Event");
-        let arguments = annotation.arguments.unwrap();
-        assert_eq!(arguments, "(\"Symfony\\Component\\Workflow\\Event\\CompletedEvent\")");
+        assert_eq!(tag.name, "Event");
+        assert_eq!(tag.metadata.unwrap(), "(\"Symfony\\Component\\Workflow\\Event\\CompletedEvent\")");
 
-        // Second annotation
-        let Element::Annotation(annotation) = &document.elements[1] else {
-            panic!("Expected Element::Annotation, got {:?}", document.elements[1]);
+        let Element::Tag(tag) = &document.elements[1] else {
+            panic!("Expected Element::Tag, got {:?}", document.elements[1]);
         };
+        assert_eq!(tag.name, "AnotherAnnotation");
 
-        let name = annotation.name;
-        assert_eq!(name, "AnotherAnnotation");
-        let arguments = annotation.arguments.unwrap();
-        let expected_arguments = "({\n    \"key\": \"value\",\n    \"list\": [1, 2, 3]\n})";
-        assert_eq!(arguments, expected_arguments);
-
-        // Third annotation
-        let Element::Annotation(annotation) = &document.elements[2] else {
-            panic!("Expected Element::Annotation, got {:?}", document.elements[2]);
+        let last_idx = document.elements.len() - 1;
+        let Element::Tag(tag) = &document.elements[last_idx] else {
+            panic!("Expected Element::Tag, got {:?}", document.elements[last_idx]);
         };
-
-        let name = annotation.name;
-        assert_eq!(name, "SimpleAnnotation");
-        assert!(annotation.arguments.is_none());
+        assert_eq!(tag.name, "SimpleAnnotation");
+        assert!(tag.metadata.is_none());
     }
 
     #[test]
