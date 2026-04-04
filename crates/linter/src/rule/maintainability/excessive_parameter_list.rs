@@ -16,6 +16,7 @@ use crate::requirements::RuleRequirements;
 use crate::rule::Config;
 use crate::rule::LintRule;
 use crate::rule_meta::RuleMeta;
+use crate::scope::FunctionLikeScope;
 use crate::settings::RuleSettings;
 
 #[derive(Debug, Clone)]
@@ -29,11 +30,12 @@ pub struct ExcessiveParameterListRule {
 pub struct ExcessiveParameterListConfig {
     pub level: Level,
     pub threshold: u8,
+    pub constructor_threshold: Option<u8>,
 }
 
 impl Default for ExcessiveParameterListConfig {
     fn default() -> Self {
-        Self { level: Level::Error, threshold: 5 }
+        Self { level: Level::Error, threshold: 5, constructor_threshold: None }
     }
 }
 
@@ -91,7 +93,16 @@ impl LintRule for ExcessiveParameterListRule {
             return;
         };
 
-        let threshold = self.cfg.threshold;
+        let is_constructor = matches!(
+            ctx.scope.get_function_like_scope(),
+            Some(FunctionLikeScope::Method(name)) if name.eq_ignore_ascii_case("__construct")
+        );
+
+        let threshold = if is_constructor {
+            self.cfg.constructor_threshold.unwrap_or(self.cfg.threshold)
+        } else {
+            self.cfg.threshold
+        };
 
         if parameter_list.parameters.len() as u8 > threshold {
             let issue = Issue::new(self.cfg.level, "Parameter list is too long.".to_string())
@@ -106,5 +117,92 @@ impl LintRule for ExcessiveParameterListRule {
 
             ctx.collector.report(issue);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use indoc::indoc;
+
+    use super::ExcessiveParameterListRule;
+    use crate::test_lint_failure;
+    use crate::test_lint_success;
+
+    test_lint_success! {
+        name = constructor_within_constructor_threshold,
+        rule = ExcessiveParameterListRule,
+        settings = |s: &mut crate::settings::Settings| {
+            s.rules.excessive_parameter_list.config.threshold = 3;
+            s.rules.excessive_parameter_list.config.constructor_threshold = Some(8);
+        },
+        code = indoc! {r"
+            <?php
+
+            class User {
+                public function __construct($a, $b, $c, $d, $e, $f) {}
+            }
+        "}
+    }
+
+    test_lint_failure! {
+        name = constructor_exceeds_constructor_threshold,
+        rule = ExcessiveParameterListRule,
+        settings = |s: &mut crate::settings::Settings| {
+            s.rules.excessive_parameter_list.config.threshold = 3;
+            s.rules.excessive_parameter_list.config.constructor_threshold = Some(4);
+        },
+        code = indoc! {r"
+            <?php
+
+            class User {
+                public function __construct($a, $b, $c, $d, $e) {}
+            }
+        "}
+    }
+
+    test_lint_failure! {
+        name = method_still_uses_regular_threshold,
+        rule = ExcessiveParameterListRule,
+        settings = |s: &mut crate::settings::Settings| {
+            s.rules.excessive_parameter_list.config.threshold = 3;
+            s.rules.excessive_parameter_list.config.constructor_threshold = Some(8);
+        },
+        code = indoc! {r"
+            <?php
+
+            class User {
+                public function doSomething($a, $b, $c, $d) {}
+            }
+        "}
+    }
+
+    test_lint_success! {
+        name = constructor_falls_back_to_threshold_when_unset,
+        rule = ExcessiveParameterListRule,
+        settings = |s: &mut crate::settings::Settings| {
+            s.rules.excessive_parameter_list.config.threshold = 6;
+        },
+        code = indoc! {r"
+            <?php
+
+            class User {
+                public function __construct($a, $b, $c, $d, $e, $f) {}
+            }
+        "}
+    }
+
+    test_lint_failure! {
+        name = constructor_exceeds_fallback_threshold,
+        rule = ExcessiveParameterListRule,
+        settings = |s: &mut crate::settings::Settings| {
+            s.rules.excessive_parameter_list.config.threshold = 3;
+        },
+        code = indoc! {r"
+            <?php
+
+            class User {
+                public function __construct($a, $b, $c, $d) {}
+            }
+        "}
     }
 }

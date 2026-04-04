@@ -224,6 +224,7 @@ If the number of parameters exceeds a configurable threshold, an issue is report
 | `enabled` | `boolean` | `true` |
 | `level` | `string` | `"error"` |
 | `threshold` | `integer` | `5` |
+| `constructor-threshold` | `NULL` | `null` |
 
 ### Examples
 
