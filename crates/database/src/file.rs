@@ -257,23 +257,23 @@ pub(crate) fn line_starts(source: &str) -> Vec<u32> {
     let mut lines = Vec::with_capacity(bytes.len() / LINE_WIDTH_HEURISTIC);
     lines.push(0);
 
-    // Find all line terminators: \n, \r\n (as one), and bare \r.
-    let mut i = 0;
-    while i < bytes.len() {
-        if bytes[i] == b'\n' {
-            lines.push((i + 1) as u32);
-        } else if bytes[i] == b'\r' {
-            if bytes.get(i + 1) == Some(&b'\n') {
-                // \r\n — next line starts after the \n
-                lines.push((i + 2) as u32);
-                i += 1; // skip the \n
-            } else {
-                // bare \r — next line starts after the \r
-                lines.push((i + 1) as u32);
+    // Detect line ending style from the first \r or \n.  Real files use one
+    // convention throughout, so we never need to handle mixed \r\n / bare \r.
+    match memchr::memchr2(b'\r', b'\n', bytes) {
+        // No line endings: single-line file, nothing more to push.
+        None => {}
+        // Old Mac (\r only): first line-ending char is a bare \r.
+        Some(cr) if bytes[cr] == b'\r' && bytes.get(cr + 1) != Some(&b'\n') => {
+            for pos in memchr::memchr_iter(b'\r', bytes) {
+                lines.push((pos + 1) as u32);
             }
         }
-
-        i += 1;
+        // Unix (\n only) or Windows (\r\n): \n marks every line start.
+        _ => {
+            for pos in memchr::memchr_iter(b'\n', bytes) {
+                lines.push((pos + 1) as u32);
+            }
+        }
     }
 
     lines
