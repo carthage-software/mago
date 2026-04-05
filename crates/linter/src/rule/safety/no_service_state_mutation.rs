@@ -77,6 +77,25 @@ fn is_this_property_mutation<'arena>(expr: &Expression<'arena>) -> Option<Span> 
     }
 }
 
+/// Returns `Some(span)` if the expression is `self::$prop` or `static::$prop`,
+/// possibly through nested array access or array append operations.
+fn is_static_property_mutation<'arena>(expr: &Expression<'arena>) -> Option<Span> {
+    match expr {
+        Expression::Access(Access::StaticProperty(prop)) => match prop.class {
+            Expression::Self_(_) | Expression::Static(_) => Some(expr.span()),
+            _ => None,
+        },
+        Expression::ArrayAccess(access) => is_static_property_mutation(access.array),
+        Expression::ArrayAppend(append) => is_static_property_mutation(append.array),
+        _ => None,
+    }
+}
+
+/// Checks both `$this->prop` and `self::$prop` / `static::$prop` mutations.
+fn is_property_mutation<'arena>(expr: &Expression<'arena>) -> Option<Span> {
+    is_this_property_mutation(expr).or_else(|| is_static_property_mutation(expr))
+}
+
 /// Returns `true` if the expression is `$this`.
 fn is_this(expr: &Expression<'_>) -> bool {
     matches!(expr, Expression::Variable(Variable::Direct(var)) if var.name == "$this")
@@ -200,14 +219,14 @@ impl LintRule for NoServiceStateMutationRule {
         // Unset is handled separately because it can have multiple targets.
         if let Node::Unset(unset) = node {
             for value in unset.values.iter() {
-                if let Some(span) = is_this_property_mutation(value) {
+                if let Some(span) = is_property_mutation(value) {
                     let issue = Issue::new(self.cfg.level, "Service state mutation detected.")
                         .with_code(self.meta.code)
-                        .with_annotation(Annotation::primary(span).with_message("`$this->` property is mutated here"))
+                        .with_annotation(Annotation::primary(span).with_message("Service property is mutated here"))
                         .with_note(
                             "In worker-mode runtimes (FrankenPHP, RoadRunner, Swoole), services persist across requests.",
                         )
-                        .with_note("Mutating `$this->` properties causes shared state that leaks between requests.")
+                        .with_note("Mutating instance or static properties causes shared state that leaks between requests.")
                         .with_help("Use a local variable, a DTO, or a request-scoped service instead.");
 
                     ctx.collector.report(issue);
@@ -217,15 +236,15 @@ impl LintRule for NoServiceStateMutationRule {
         }
 
         let mutation_span = match node {
-            Node::Assignment(assignment) => is_this_property_mutation(assignment.lhs),
+            Node::Assignment(assignment) => is_property_mutation(assignment.lhs),
             Node::UnaryPrefix(prefix) => {
                 if prefix.operator.is_increment_or_decrement() {
-                    is_this_property_mutation(prefix.operand)
+                    is_property_mutation(prefix.operand)
                 } else {
                     None
                 }
             }
-            Node::UnaryPostfix(postfix) => is_this_property_mutation(postfix.operand),
+            Node::UnaryPostfix(postfix) => is_property_mutation(postfix.operand),
             _ => None,
         };
 
@@ -235,9 +254,9 @@ impl LintRule for NoServiceStateMutationRule {
 
         let issue = Issue::new(self.cfg.level, "Service state mutation detected.")
             .with_code(self.meta.code)
-            .with_annotation(Annotation::primary(span).with_message("`$this->` property is mutated here"))
+            .with_annotation(Annotation::primary(span).with_message("Service property is mutated here"))
             .with_note("In worker-mode runtimes (FrankenPHP, RoadRunner, Swoole), services persist across requests.")
-            .with_note("Mutating `$this->` properties causes shared state that leaks between requests.")
+            .with_note("Mutating instance or static properties causes shared state that leaks between requests.")
             .with_help("Use a local variable, a DTO, or a request-scoped service instead.");
 
         ctx.collector.report(issue);
@@ -608,6 +627,28 @@ mod tests {
                 public function clear(): void
                 {
                     unset($this->a, $this->b);
+                }
+            }
+        "#},
+    }
+
+    test_lint_failure! {
+        name = static_property_post_increment_self,
+        rule = NoServiceStateMutationRule,
+        count = 1,
+        settings = symfony_settings,
+        code = indoc! {r#"
+            <?php
+
+            namespace App\Service;
+
+            class CounterService
+            {
+                private static int $counter = 0;
+
+                public static function increment(): void
+                {
+                    self::$counter++;
                 }
             }
         "#},
