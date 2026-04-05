@@ -248,8 +248,10 @@ impl std::fmt::Display for FileId {
 /// Returns a vec over the starting byte offsets of each line in `source`.
 #[inline]
 pub(crate) fn line_starts(source: &str) -> Vec<u32> {
-    // Heuristic: Average line of code is ~40 bytes.
-    const LINE_WIDTH_HEURISTIC: usize = 40;
+    // Heuristic: On the test corpus, the mean length is about 30 bytes, the median is 23.
+    // Since the whole vec will be small, we prefer slight over-allocation to avoid re-allocations
+    // in the common case
+    const LINE_WIDTH_HEURISTIC: usize = 20;
 
     let bytes = source.as_bytes();
 
