@@ -747,4 +747,45 @@ mod tests {
             }
         "#},
     }
+
+    // ── Trait tests ───────────────────────────────────────────────────
+
+    test_lint_failure! {
+        name = mutation_in_trait_method,
+        rule = NoServiceStateMutationRule,
+        count = 1,
+        settings = symfony_settings,
+        code = indoc! {r#"
+            <?php
+
+            namespace App\Service;
+
+            trait CounterTrait
+            {
+                public function increment(): void
+                {
+                    $this->count++;
+                }
+            }
+        "#},
+    }
+
+    test_lint_success! {
+        name = trait_constructor_is_allowed,
+        rule = NoServiceStateMutationRule,
+        settings = symfony_settings,
+        code = indoc! {r#"
+            <?php
+
+            namespace App\Service;
+
+            trait Initializable
+            {
+                public function __construct()
+                {
+                    $this->items = [];
+                }
+            }
+        "#},
+    }
 }
