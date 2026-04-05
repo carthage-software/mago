@@ -140,6 +140,25 @@ pub fn is_always_identical_to(lhs: &TUnion, rhs: &TUnion) -> bool {
     false
 }
 
+/// Checks if two types are guaranteed to be non-equal under PHP's loose equality (`==`).
+///
+/// Loose equality performs type juggling that can make values of different types compare
+/// equal (e.g. `0 == "0"`, `0 == false`, `5 == 5.0`, `"10" == "1e1"`). This function is
+/// a safe approximation: it only returns `true` when both operands fall within a single
+/// primitive category where `==` is equivalent to `===`, and the strict-identity check
+/// rules out equality for all possible values.
+pub fn are_definitely_not_loosely_equal(codebase: &CodebaseMetadata, lhs: &TUnion, rhs: &TUnion) -> bool {
+    if (lhs.is_int() && rhs.is_int())
+        || (lhs.is_bool() && rhs.is_bool())
+        || (lhs.is_float() && rhs.is_float())
+        || (lhs.is_null() && rhs.is_null())
+    {
+        are_definitely_not_identical(codebase, lhs, rhs, false)
+    } else {
+        false
+    }
+}
+
 pub fn are_definitely_not_identical(
     codebase: &CodebaseMetadata,
     lhs: &TUnion,

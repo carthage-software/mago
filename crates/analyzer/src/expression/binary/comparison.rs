@@ -26,6 +26,7 @@ use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
 use crate::expression::binary::utils::are_definitely_not_identical;
+use crate::expression::binary::utils::are_definitely_not_loosely_equal;
 use crate::expression::binary::utils::is_always_greater_than;
 use crate::expression::binary::utils::is_always_greater_than_or_equal;
 use crate::expression::binary::utils::is_always_identical_to;
@@ -252,31 +253,35 @@ pub fn analyze_comparison_operation<'ctx, 'arena>(
                     get_bool()
                 }
             }
-            BinaryOperator::Equal(_) | BinaryOperator::AngledNotEqual(_) => {
+            BinaryOperator::Equal(_) => {
                 let should_be_specific =
                     should_use_specific_equality_inference(block_context, binary.lhs, binary.rhs, false);
 
-                if should_be_specific && is_always_identical_to(lhs_type, rhs_type) {
+                if !should_be_specific {
+                    get_bool()
+                } else if is_always_identical_to(lhs_type, rhs_type) {
                     if !block_context.flags.inside_loop_expressions() {
-                        let (message_verb, result_value_str) = if matches!(binary.operator, BinaryOperator::Equal(_)) {
-                            ("always equal to", "`true`")
-                        } else {
-                            ("never equal to (always not equal)", "`false`")
-                        };
-
-                        report_redundant_comparison(context, artifacts, binary, message_verb, result_value_str);
+                        report_redundant_comparison(context, artifacts, binary, "always equal to", "`true`");
                     }
 
-                    if matches!(binary.operator, BinaryOperator::Equal(_)) { get_true() } else { get_false() }
+                    get_true()
+                } else if are_definitely_not_loosely_equal(context.codebase, lhs_type, rhs_type) {
+                    if !block_context.flags.inside_loop_expressions() {
+                        report_redundant_comparison(context, artifacts, binary, "never equal to", "`false`");
+                    }
+
+                    get_false()
                 } else {
                     get_bool()
                 }
             }
-            BinaryOperator::NotEqual(_) => {
+            BinaryOperator::NotEqual(_) | BinaryOperator::AngledNotEqual(_) => {
                 let should_be_specific =
                     should_use_specific_equality_inference(block_context, binary.lhs, binary.rhs, false);
 
-                if should_be_specific && is_always_identical_to(lhs_type, rhs_type) {
+                if !should_be_specific {
+                    get_bool()
+                } else if is_always_identical_to(lhs_type, rhs_type) {
                     if !block_context.flags.inside_loop_expressions() {
                         report_redundant_comparison(
                             context,
@@ -288,6 +293,18 @@ pub fn analyze_comparison_operation<'ctx, 'arena>(
                     }
 
                     get_false()
+                } else if are_definitely_not_loosely_equal(context.codebase, lhs_type, rhs_type) {
+                    if !block_context.flags.inside_loop_expressions() {
+                        report_redundant_comparison(
+                            context,
+                            artifacts,
+                            binary,
+                            "always not equal to (always true for !=)",
+                            "`true`",
+                        );
+                    }
+
+                    get_true()
                 } else {
                     get_bool()
                 }
