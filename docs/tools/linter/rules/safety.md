@@ -15,6 +15,7 @@ This document details the rules available in the `Safety` category.
 | No Global | [`no-global`](#no-global) |
 | No Request All | [`no-request-all`](#no-request-all) |
 | No Request Variable | [`no-request-variable`](#no-request-variable) |
+| No Service State Mutation | [`no-service-state-mutation`](#no-service-state-mutation) |
 | No Shell Execute String | [`no-shell-execute-string`](#no-shell-execute-string) |
 | No Unsafe Finally | [`no-unsafe-finally`](#no-unsafe-finally) |
 
@@ -273,6 +274,78 @@ $identifier = $_GET['id'];
 <?php
 
 $identifier = $_REQUEST['id'];
+```
+
+
+## <a id="no-service-state-mutation"></a>`no-service-state-mutation`
+
+Detects mutations to `$this->property` inside service methods.
+
+In worker-mode PHP runtimes (FrankenPHP, RoadRunner, Swoole), services persist across
+requests. Mutating `$this->property` in a service method introduces shared mutable state
+that leaks between requests, leading to subtle and hard-to-reproduce bugs.
+
+Mutations include direct assignment (`$this->count = 0`), compound assignment
+(`$this->count += 1`), increment/decrement (`$this->count++`, `++$this->count`),
+array append (`$this->items[] = $item`), and `unset($this->cache)`.
+
+The `__construct` and `reset` methods are allowed by default.
+
+
+### Requirements
+
+- **Integration:** `Symfony`
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `false` |
+| `level` | `string` | `"warning"` |
+| `include-namespaces` | `array` | `["App\\"]` |
+| `exclude-namespaces` | `array` | `["App\\Entity\\","App\\DTO\\","App\\ValueObject\\"]` |
+| `allowed-methods` | `array` | `["__construct","reset"]` |
+| `reset-interfaces` | `array` | `["Symfony\\Contracts\\Service\\ResetInterface"]` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+
+namespace App\Service;
+
+final class InvoiceService
+{
+    public function __construct(
+        private readonly InvoiceRepository $repository,
+    ) {}
+
+    public function process(Invoice $invoice): void
+    {
+        $total = $invoice->getTotal();
+        $this->repository->save($invoice);
+    }
+}
+```
+
+#### Incorrect code
+
+```php
+<?php
+
+namespace App\Service;
+
+final class InvoiceService
+{
+    private int $processedCount = 0;
+
+    public function process(Invoice $invoice): void
+    {
+        $this->processedCount++;
+    }
+}
 ```
 
 
