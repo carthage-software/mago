@@ -295,8 +295,6 @@ mod tests {
         s.integrations.insert(Integration::Symfony);
     }
 
-    // ── Success cases ──────────────────────────────────────────────────
-
     test_lint_success! {
         name = assignment_in_constructor_is_allowed,
         rule = NoServiceStateMutationRule,
@@ -446,8 +444,6 @@ mod tests {
             }
         "#},
     }
-
-    // ── Failure cases ──────────────────────────────────────────────────
 
     test_lint_failure! {
         name = direct_assignment_in_method,
@@ -742,8 +738,6 @@ mod tests {
         "#},
     }
 
-    // ── Trait tests ───────────────────────────────────────────────────
-
     test_lint_failure! {
         name = mutation_in_trait_method,
         rule = NoServiceStateMutationRule,
@@ -782,8 +776,6 @@ mod tests {
             }
         "#},
     }
-
-    // ── Edge-case tests ───────────────────────────────────────────────
 
     test_lint_failure! {
         name = mutation_in_return_expression,
@@ -868,6 +860,28 @@ mod tests {
                 public static function next(): int
                 {
                     return ++self::$nextId;
+                }
+            }
+        "#},
+    }
+
+    test_lint_success! {
+        name = property_reads_in_array_literal_are_not_mutations,
+        rule = NoServiceStateMutationRule,
+        settings = symfony_settings,
+        code = indoc! {r#"
+            <?php
+
+            namespace App\Service;
+
+            class OrderService
+            {
+                public function toArray(): array
+                {
+                    return [
+                        'id' => $this->id,
+                        'name' => $this->name,
+                    ];
                 }
             }
         "#},
