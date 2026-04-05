@@ -200,7 +200,31 @@ impl<'a> DatabaseLoader<'a> {
         glob_excludes: &GlobSet,
         path_excludes: &HashSet<&Cow<'a, Path>>,
     ) -> Result<Vec<FileWithSpecificity>, DatabaseError> {
-        let mut paths_to_process: Vec<(std::path::PathBuf, usize)> = Vec::new();
+        // Canonicalize the workspace once.  All WalkDir roots are canonicalized
+        // before traversal so their paths inherit the canonical prefix without
+        // any per-file syscalls.
+        let canonical_workspace =
+            self.configuration.workspace.canonicalize().unwrap_or_else(|_| self.configuration.workspace.to_path_buf());
+
+        // Pre-canonicalize path excludes once as strings.  A plain byte-string
+        // prefix check is then sufficient in the parallel section, replacing the
+        // per-file canonicalize() + Path::starts_with (Components iteration).
+        let canonical_excludes: Vec<String> = path_excludes
+            .iter()
+            .filter_map(|ex| {
+                let p = if Path::new(ex.as_ref()).is_absolute() {
+                    ex.as_ref().to_path_buf()
+                } else {
+                    self.configuration.workspace.join(ex.as_ref())
+                };
+
+                p.canonicalize().ok()?.into_os_string().into_string().ok()
+            })
+            .collect();
+
+        // `bool` indicates whether the path is canonical (came from a WalkDir
+        // rooted at a canonicalized path) or possibly non-canonical (glob).
+        let mut paths_to_process: Vec<(std::path::PathBuf, usize, bool)> = Vec::new();
 
         for root in roots {
             // Check if this is a glob pattern (contains glob metacharacters).
@@ -231,7 +255,12 @@ impl<'a> DatabaseLoader<'a> {
                             match entry {
                                 Ok(path) => {
                                     if path.is_file() {
-                                        paths_to_process.push((path, specificity));
+                                        // Canonicalize so the path shares the same prefix as
+                                        // `canonical_workspace` (important on macOS where
+                                        // TempDir / glob return /var/… but canonicalize gives
+                                        // /private/var/…).  Fall back to the original on error.
+                                        let canonical = path.canonicalize().unwrap_or(path);
+                                        paths_to_process.push((canonical, specificity, true));
                                     }
                                 }
                                 Err(e) => {
@@ -245,18 +274,21 @@ impl<'a> DatabaseLoader<'a> {
                     }
                 }
             } else {
-                for entry in WalkDir::new(&resolved_path).into_iter().filter_map(Result::ok) {
+                // Canonicalize the root once.  WalkDir does not follow symlinks, so
+                // every path it yields under a canonical root is itself canonical.
+                let canonical_root = resolved_path.canonicalize().unwrap_or(resolved_path);
+                for entry in WalkDir::new(&canonical_root).into_iter().filter_map(Result::ok) {
                     if entry.file_type().is_file() {
-                        paths_to_process.push((entry.into_path(), specificity));
+                        paths_to_process.push((entry.into_path(), specificity, true));
                     }
                 }
             }
         }
 
-        let has_path_excludes = !path_excludes.is_empty();
+        let has_path_excludes = !canonical_excludes.is_empty();
         let files: Vec<FileWithSpecificity> = paths_to_process
             .into_par_iter()
-            .filter_map(|(path, specificity)| {
+            .filter_map(|(path, specificity, is_canonical)| {
                 if glob_excludes.is_match(&path) {
                     return None;
                 }
@@ -266,14 +298,33 @@ impl<'a> DatabaseLoader<'a> {
                     return None;
                 }
 
-                if has_path_excludes
-                    && let Ok(canonical_path) = path.canonicalize()
-                    && path_excludes.iter().any(|excluded| canonical_path.starts_with(excluded))
-                {
-                    return None;
+                if has_path_excludes {
+                    let excluded = if is_canonical {
+                        // Fast path: byte-string prefix check, no syscalls.
+                        path.to_str().is_some_and(|s| {
+                            canonical_excludes.iter().any(|excl| {
+                                s.starts_with(excl.as_str())
+                                    && matches!(s.as_bytes().get(excl.len()), None | Some(&b'/' | &b'\\'))
+                            })
+                        })
+                    } else {
+                        // Glob path: may contain symlinks, fall back to canonicalize.
+                        path.canonicalize().is_ok_and(|canonical| {
+                            canonical.to_str().is_some_and(|s| {
+                                canonical_excludes.iter().any(|excl| {
+                                    s.starts_with(excl.as_str())
+                                        && matches!(s.as_bytes().get(excl.len()), None | Some(&b'/' | &b'\\'))
+                                })
+                            })
+                        })
+                    };
+
+                    if excluded {
+                        return None;
+                    }
                 }
 
-                let workspace = self.configuration.workspace.as_ref();
+                let workspace = canonical_workspace.as_path();
                 #[cfg(windows)]
                 let logical_name = path
                     .strip_prefix(workspace)
