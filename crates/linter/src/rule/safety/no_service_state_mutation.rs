@@ -788,4 +788,94 @@ mod tests {
             }
         "#},
     }
+
+    // ── Edge-case tests ───────────────────────────────────────────────
+
+    test_lint_failure! {
+        name = mutation_in_return_expression,
+        rule = NoServiceStateMutationRule,
+        count = 1,
+        settings = symfony_settings,
+        code = indoc! {r#"
+            <?php
+
+            namespace App\Service;
+
+            class CounterService
+            {
+                private int $counter = 0;
+
+                public function getAndIncrement(): int
+                {
+                    return ++$this->counter;
+                }
+            }
+        "#},
+    }
+
+    test_lint_failure! {
+        name = mutation_via_null_coalescing_assignment,
+        rule = NoServiceStateMutationRule,
+        count = 1,
+        settings = symfony_settings,
+        code = indoc! {r#"
+            <?php
+
+            namespace App\Service;
+
+            class CacheService
+            {
+                private ?int $value = null;
+
+                public function getOrSet(int $default): int
+                {
+                    return $this->value ??= $default;
+                }
+            }
+        "#},
+    }
+
+    test_lint_failure! {
+        name = mutation_in_nested_array_key,
+        rule = NoServiceStateMutationRule,
+        count = 1,
+        settings = symfony_settings,
+        code = indoc! {r#"
+            <?php
+
+            namespace App\Service;
+
+            class RegistryService
+            {
+                private array $data = [];
+
+                public function set(string $group, string $key, mixed $value): void
+                {
+                    $this->data[$group][$key] = $value;
+                }
+            }
+        "#},
+    }
+
+    test_lint_failure! {
+        name = static_mutation_in_return,
+        rule = NoServiceStateMutationRule,
+        count = 1,
+        settings = symfony_settings,
+        code = indoc! {r#"
+            <?php
+
+            namespace App\Service;
+
+            class IdService
+            {
+                private static int $nextId = 0;
+
+                public static function next(): int
+                {
+                    return ++self::$nextId;
+                }
+            }
+        "#},
+    }
 }
