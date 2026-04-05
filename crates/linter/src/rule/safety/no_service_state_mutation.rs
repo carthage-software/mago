@@ -1,4 +1,5 @@
-use std::cell::Cell;
+use std::sync::atomic::AtomicBool;
+use std::sync::atomic::Ordering;
 
 use indoc::indoc;
 use schemars::JsonSchema;
@@ -26,11 +27,21 @@ use crate::rule_meta::RuleMeta;
 use crate::scope::FunctionLikeScope;
 use crate::settings::RuleSettings;
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct NoServiceStateMutationRule {
     meta: &'static RuleMeta,
     cfg: NoServiceStateMutationConfig,
-    in_reset_class: Cell<bool>,
+    in_reset_class: AtomicBool,
+}
+
+impl Clone for NoServiceStateMutationRule {
+    fn clone(&self) -> Self {
+        Self {
+            meta: self.meta,
+            cfg: self.cfg.clone(),
+            in_reset_class: AtomicBool::new(self.in_reset_class.load(Ordering::Relaxed)),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, JsonSchema)]
@@ -179,7 +190,7 @@ impl LintRule for NoServiceStateMutationRule {
     }
 
     fn build(settings: &RuleSettings<Self::Config>) -> Self {
-        Self { meta: Self::meta(), cfg: settings.config.clone(), in_reset_class: Cell::new(false) }
+        Self { meta: Self::meta(), cfg: settings.config.clone(), in_reset_class: AtomicBool::new(false) }
     }
 
     fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
@@ -192,12 +203,12 @@ impl LintRule for NoServiceStateMutationRule {
                 })
             });
 
-            self.in_reset_class.set(is_reset_class);
+            self.in_reset_class.store(is_reset_class, Ordering::Relaxed);
             return;
         }
 
         // Skip mutations in classes implementing a reset interface.
-        if self.in_reset_class.get() {
+        if self.in_reset_class.load(Ordering::Relaxed) {
             return;
         }
 
