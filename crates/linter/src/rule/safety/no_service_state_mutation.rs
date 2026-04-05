@@ -173,14 +173,21 @@ impl LintRule for NoServiceStateMutationRule {
         }
 
         // Check namespace filters.
+        // Patterns may end with a backslash (e.g. `App\Entity\`). A namespace like `App\Entity`
+        // should match `App\Entity\` because it is that namespace itself, not just a sub-namespace.
+        // We compare against both the raw namespace and namespace + `\` to cover both cases.
         let namespace = ctx.scope.get_namespace();
         if !namespace.is_empty() {
-            let in_include = self.cfg.include_namespaces.iter().any(|ns| namespace.starts_with(ns.as_str()));
+            let namespace_with_sep = format!("{namespace}\\");
+            let matches_pattern =
+                |ns: &str, pattern: &str| ns.starts_with(pattern) || namespace_with_sep.starts_with(pattern);
+
+            let in_include = self.cfg.include_namespaces.iter().any(|p| matches_pattern(namespace, p.as_str()));
             if !in_include {
                 return;
             }
 
-            let in_exclude = self.cfg.exclude_namespaces.iter().any(|ns| namespace.starts_with(ns.as_str()));
+            let in_exclude = self.cfg.exclude_namespaces.iter().any(|p| matches_pattern(namespace, p.as_str()));
             if in_exclude {
                 return;
             }
@@ -190,6 +197,25 @@ impl LintRule for NoServiceStateMutationRule {
         }
 
         // Extract the mutated expression and check if it involves `$this->property`.
+        // Unset is handled separately because it can have multiple targets.
+        if let Node::Unset(unset) = node {
+            for value in unset.values.iter() {
+                if let Some(span) = is_this_property_mutation(value) {
+                    let issue = Issue::new(self.cfg.level, "Service state mutation detected.")
+                        .with_code(self.meta.code)
+                        .with_annotation(Annotation::primary(span).with_message("`$this->` property is mutated here"))
+                        .with_note(
+                            "In worker-mode runtimes (FrankenPHP, RoadRunner, Swoole), services persist across requests.",
+                        )
+                        .with_note("Mutating `$this->` properties causes shared state that leaks between requests.")
+                        .with_help("Use a local variable, a DTO, or a request-scoped service instead.");
+
+                    ctx.collector.report(issue);
+                }
+            }
+            return;
+        }
+
         let mutation_span = match node {
             Node::Assignment(assignment) => is_this_property_mutation(assignment.lhs),
             Node::UnaryPrefix(prefix) => {
@@ -200,16 +226,6 @@ impl LintRule for NoServiceStateMutationRule {
                 }
             }
             Node::UnaryPostfix(postfix) => is_this_property_mutation(postfix.operand),
-            Node::Unset(unset) => {
-                let mut found = None;
-                for value in unset.values.iter() {
-                    if let Some(span) = is_this_property_mutation(value) {
-                        found = Some(span);
-                        break;
-                    }
-                }
-                found
-            }
             _ => None,
         };
 
@@ -225,5 +241,375 @@ impl LintRule for NoServiceStateMutationRule {
             .with_help("Use a local variable, a DTO, or a request-scoped service instead.");
 
         ctx.collector.report(issue);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use indoc::indoc;
+
+    use crate::integration::Integration;
+    use crate::rule::safety::no_service_state_mutation::NoServiceStateMutationRule;
+    use crate::settings::Settings;
+    use crate::test_lint_failure;
+    use crate::test_lint_success;
+
+    fn symfony_settings(s: &mut Settings) {
+        s.integrations.insert(Integration::Symfony);
+    }
+
+    // ── Success cases ──────────────────────────────────────────────────
+
+    test_lint_success! {
+        name = assignment_in_constructor_is_allowed,
+        rule = NoServiceStateMutationRule,
+        settings = symfony_settings,
+        code = indoc! {r#"
+            <?php
+
+            namespace App\Service;
+
+            class OrderService
+            {
+                public function __construct()
+                {
+                    $this->items = [];
+                }
+            }
+        "#},
+    }
+
+    test_lint_success! {
+        name = assignment_in_reset_method_is_allowed,
+        rule = NoServiceStateMutationRule,
+        settings = symfony_settings,
+        code = indoc! {r#"
+            <?php
+
+            namespace App\Service;
+
+            class OrderService
+            {
+                public function reset(): void
+                {
+                    $this->items = [];
+                }
+            }
+        "#},
+    }
+
+    test_lint_success! {
+        name = excluded_namespace_entity,
+        rule = NoServiceStateMutationRule,
+        settings = symfony_settings,
+        code = indoc! {r#"
+            <?php
+
+            namespace App\Entity;
+
+            class Order
+            {
+                public function setTotal(int $total): void
+                {
+                    $this->total = $total;
+                }
+            }
+        "#},
+    }
+
+    test_lint_success! {
+        name = excluded_namespace_dto,
+        rule = NoServiceStateMutationRule,
+        settings = symfony_settings,
+        code = indoc! {r#"
+            <?php
+
+            namespace App\DTO;
+
+            class OrderData
+            {
+                public function setTotal(int $total): void
+                {
+                    $this->total = $total;
+                }
+            }
+        "#},
+    }
+
+    test_lint_success! {
+        name = outside_included_namespace,
+        rule = NoServiceStateMutationRule,
+        settings = symfony_settings,
+        code = indoc! {r#"
+            <?php
+
+            namespace Vendor\Library;
+
+            class SomeClass
+            {
+                public function doSomething(): void
+                {
+                    $this->count = 0;
+                }
+            }
+        "#},
+    }
+
+    test_lint_success! {
+        name = local_variable_assignment_is_fine,
+        rule = NoServiceStateMutationRule,
+        settings = symfony_settings,
+        code = indoc! {r#"
+            <?php
+
+            namespace App\Service;
+
+            class OrderService
+            {
+                public function process(): void
+                {
+                    $count = 0;
+                }
+            }
+        "#},
+    }
+
+    test_lint_success! {
+        name = reading_property_is_fine,
+        rule = NoServiceStateMutationRule,
+        settings = symfony_settings,
+        code = indoc! {r#"
+            <?php
+
+            namespace App\Service;
+
+            class OrderService
+            {
+                public function findAll(): array
+                {
+                    return $this->repository->findAll();
+                }
+            }
+        "#},
+    }
+
+    test_lint_success! {
+        name = no_namespace_is_skipped,
+        rule = NoServiceStateMutationRule,
+        settings = symfony_settings,
+        code = indoc! {r#"
+            <?php
+
+            class OrderService
+            {
+                public function process(): void
+                {
+                    $this->count = 0;
+                }
+            }
+        "#},
+    }
+
+    // ── Failure cases ──────────────────────────────────────────────────
+
+    test_lint_failure! {
+        name = direct_assignment_in_method,
+        rule = NoServiceStateMutationRule,
+        count = 1,
+        settings = symfony_settings,
+        code = indoc! {r#"
+            <?php
+
+            namespace App\Service;
+
+            class OrderService
+            {
+                public function process(int $orderId): void
+                {
+                    $this->lastOrderId = $orderId;
+                }
+            }
+        "#},
+    }
+
+    test_lint_failure! {
+        name = compound_assignment_in_method,
+        rule = NoServiceStateMutationRule,
+        count = 1,
+        settings = symfony_settings,
+        code = indoc! {r#"
+            <?php
+
+            namespace App\Service;
+
+            class LogService
+            {
+                public function append(string $message): void
+                {
+                    $this->log .= $message;
+                }
+            }
+        "#},
+    }
+
+    test_lint_failure! {
+        name = post_increment_in_method,
+        rule = NoServiceStateMutationRule,
+        count = 1,
+        settings = symfony_settings,
+        code = indoc! {r#"
+            <?php
+
+            namespace App\Service;
+
+            class CounterService
+            {
+                public function increment(): void
+                {
+                    $this->count++;
+                }
+            }
+        "#},
+    }
+
+    test_lint_failure! {
+        name = pre_decrement_in_method,
+        rule = NoServiceStateMutationRule,
+        count = 1,
+        settings = symfony_settings,
+        code = indoc! {r#"
+            <?php
+
+            namespace App\Service;
+
+            class CounterService
+            {
+                public function decrement(): void
+                {
+                    --$this->count;
+                }
+            }
+        "#},
+    }
+
+    test_lint_failure! {
+        name = array_push_in_method,
+        rule = NoServiceStateMutationRule,
+        count = 1,
+        settings = symfony_settings,
+        code = indoc! {r#"
+            <?php
+
+            namespace App\Service;
+
+            class CollectorService
+            {
+                public function collect(mixed $item): void
+                {
+                    $this->items[] = $item;
+                }
+            }
+        "#},
+    }
+
+    test_lint_failure! {
+        name = unset_in_method,
+        rule = NoServiceStateMutationRule,
+        count = 1,
+        settings = symfony_settings,
+        code = indoc! {r#"
+            <?php
+
+            namespace App\Service;
+
+            class CacheService
+            {
+                public function remove(string $key): void
+                {
+                    unset($this->data[$key]);
+                }
+            }
+        "#},
+    }
+
+    test_lint_failure! {
+        name = multiple_mutations_in_method,
+        rule = NoServiceStateMutationRule,
+        count = 2,
+        settings = symfony_settings,
+        code = indoc! {r#"
+            <?php
+
+            namespace App\Service;
+
+            class OrderService
+            {
+                public function process(int $orderId): void
+                {
+                    $this->lastOrderId = $orderId;
+                    $this->count++;
+                }
+            }
+        "#},
+    }
+
+    test_lint_failure! {
+        name = array_key_assignment_in_method,
+        rule = NoServiceStateMutationRule,
+        count = 1,
+        settings = symfony_settings,
+        code = indoc! {r#"
+            <?php
+
+            namespace App\Service;
+
+            class RegistryService
+            {
+                public function register(string $key, mixed $value): void
+                {
+                    $this->items[$key] = $value;
+                }
+            }
+        "#},
+    }
+
+    test_lint_failure! {
+        name = addition_assignment_in_method,
+        rule = NoServiceStateMutationRule,
+        count = 1,
+        settings = symfony_settings,
+        code = indoc! {r#"
+            <?php
+
+            namespace App\Service;
+
+            class TotalService
+            {
+                public function add(float $amount): void
+                {
+                    $this->total += $amount;
+                }
+            }
+        "#},
+    }
+
+    test_lint_failure! {
+        name = multiple_unset_targets,
+        rule = NoServiceStateMutationRule,
+        count = 2,
+        settings = symfony_settings,
+        code = indoc! {r#"
+            <?php
+
+            namespace App\Service;
+
+            class CacheService
+            {
+                public function clear(): void
+                {
+                    unset($this->a, $this->b);
+                }
+            }
+        "#},
     }
 }
