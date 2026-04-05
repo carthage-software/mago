@@ -7,11 +7,11 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_reporting::Level;
 use mago_span::HasSpan;
+use mago_span::Span;
 use mago_syntax::ast::Expression;
 use mago_syntax::ast::Node;
 use mago_syntax::ast::NodeKind;
 use mago_syntax::ast::StringPart;
-use mago_syntax::ast::Variable;
 use mago_text_edit::TextEdit;
 
 use crate::category::Category;
@@ -98,23 +98,24 @@ impl LintRule for BracedStringInterpolationRule {
             return;
         };
 
-        let mut unbraced_expressions = vec![];
+        let mut unbraced_expressions: Vec<(Span, Option<Span>)> = vec![];
         for part in composite_string.parts() {
             let StringPart::Expression(expression) = part else {
                 continue;
             };
 
-            unbraced_expressions.push((
-                expression.span(),
-                !matches!(
-                    expression,
-                    Expression::Variable(Variable::Indirect(variable))
-                    if matches!(
-                        variable.expression,
-                        Expression::Identifier(_) | Expression::Variable(_)
-                    )
-                ),
-            ));
+            let bareword_key_span = match expression {
+                Expression::ArrayAccess(array_access) => {
+                    if let Expression::Identifier(identifier) = array_access.index {
+                        Some(identifier.span())
+                    } else {
+                        None
+                    }
+                }
+                _ => None,
+            };
+
+            unbraced_expressions.push((expression.span(), bareword_key_span));
         }
 
         if unbraced_expressions.is_empty() {
@@ -138,10 +139,240 @@ impl LintRule for BracedStringInterpolationRule {
             .with_help("Wrap the variable in curly braces, e.g., `{$variable}`.");
 
         ctx.collector.propose(issue, |edits| {
-            for (span, _) in &unbraced_expressions {
+            for (span, bareword_key_span) in &unbraced_expressions {
                 edits.push(TextEdit::insert(span.start_offset(), "{"));
+                if let Some(key_span) = bareword_key_span {
+                    edits.push(TextEdit::insert(key_span.start_offset(), "'"));
+                    edits.push(TextEdit::insert(key_span.end_offset(), "'"));
+                }
                 edits.push(TextEdit::insert(span.end_offset(), "}"));
             }
         });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use indoc::indoc;
+
+    use super::BracedStringInterpolationRule;
+    use crate::test_lint_failure;
+    use crate::test_lint_fix;
+    use crate::test_lint_success;
+
+    test_lint_success! {
+        name = already_braced_variable,
+        rule = BracedStringInterpolationRule,
+        code = indoc! {r#"
+            <?php
+
+            $name = 'world';
+            echo "Hello, {$name}!";
+        "#}
+    }
+
+    test_lint_success! {
+        name = already_braced_array_access,
+        rule = BracedStringInterpolationRule,
+        code = indoc! {r#"
+            <?php
+
+            $o = ['user_id' => 77];
+            echo "author-{$o['user_id']}";
+        "#}
+    }
+
+    test_lint_success! {
+        name = already_braced_property_access,
+        rule = BracedStringInterpolationRule,
+        code = indoc! {r#"
+            <?php
+
+            echo "value: {$obj->foo}";
+        "#}
+    }
+
+    test_lint_success! {
+        name = no_interpolation_literal_only,
+        rule = BracedStringInterpolationRule,
+        code = indoc! {r#"
+            <?php
+
+            echo "plain string with no interpolation";
+        "#}
+    }
+
+    test_lint_failure! {
+        name = unbraced_simple_variable,
+        rule = BracedStringInterpolationRule,
+        code = indoc! {r#"
+            <?php
+
+            $name = 'world';
+            echo "Hello, $name!";
+        "#}
+    }
+
+    test_lint_failure! {
+        name = unbraced_array_access_bareword,
+        rule = BracedStringInterpolationRule,
+        code = indoc! {r#"
+            <?php
+
+            $o = ['user_id' => 77];
+            echo "author-$o[user_id]";
+        "#}
+    }
+
+    test_lint_failure! {
+        name = unbraced_property_access,
+        rule = BracedStringInterpolationRule,
+        code = indoc! {r#"
+            <?php
+
+            echo "value: $obj->foo";
+        "#}
+    }
+
+    test_lint_fix! {
+        name = fix_bareword_array_key_is_quoted,
+        rule = BracedStringInterpolationRule,
+        code = indoc! {r#"
+            <?php
+
+            $o = ['user_id' => 77];
+            print "hasauthorinfo author-$o[user_id]\n";
+        "#},
+        fixed = indoc! {r#"
+            <?php
+
+            $o = ['user_id' => 77];
+            print "hasauthorinfo author-{$o['user_id']}\n";
+        "#}
+    }
+
+    test_lint_fix! {
+        name = fix_simple_variable,
+        rule = BracedStringInterpolationRule,
+        code = indoc! {r#"
+            <?php
+
+            $name = 'world';
+            echo "Hello, $name!";
+        "#},
+        fixed = indoc! {r#"
+            <?php
+
+            $name = 'world';
+            echo "Hello, {$name}!";
+        "#}
+    }
+
+    test_lint_fix! {
+        name = fix_array_access_with_numeric_index_is_not_quoted,
+        rule = BracedStringInterpolationRule,
+        code = indoc! {r#"
+            <?php
+
+            $o = [10, 20, 30];
+            echo "first-$o[0]";
+        "#},
+        fixed = indoc! {r#"
+            <?php
+
+            $o = [10, 20, 30];
+            echo "first-{$o[0]}";
+        "#}
+    }
+
+    test_lint_fix! {
+        name = fix_array_access_with_variable_index_is_not_quoted,
+        rule = BracedStringInterpolationRule,
+        code = indoc! {r#"
+            <?php
+
+            $o = [1 => 'a'];
+            $i = 1;
+            echo "val-$o[$i]";
+        "#},
+        fixed = indoc! {r#"
+            <?php
+
+            $o = [1 => 'a'];
+            $i = 1;
+            echo "val-{$o[$i]}";
+        "#}
+    }
+
+    test_lint_fix! {
+        name = fix_property_access,
+        rule = BracedStringInterpolationRule,
+        code = indoc! {r#"
+            <?php
+
+            echo "value: $obj->foo suffix";
+        "#},
+        fixed = indoc! {r#"
+            <?php
+
+            echo "value: {$obj->foo} suffix";
+        "#}
+    }
+
+    test_lint_fix! {
+        name = fix_multiple_interpolations_in_one_string,
+        rule = BracedStringInterpolationRule,
+        code = indoc! {r#"
+            <?php
+
+            $o = ['user_id' => 77];
+            $name = 'alice';
+            echo "user $name id $o[user_id] done";
+        "#},
+        fixed = indoc! {r#"
+            <?php
+
+            $o = ['user_id' => 77];
+            $name = 'alice';
+            echo "user {$name} id {$o['user_id']} done";
+        "#}
+    }
+
+    test_lint_fix! {
+        name = fix_bareword_key_in_heredoc,
+        rule = BracedStringInterpolationRule,
+        code = indoc! {r#"
+            <?php
+
+            $o = ['k' => 1];
+            echo <<<EOT
+            value $o[k] end
+            EOT;
+        "#},
+        fixed = indoc! {r#"
+            <?php
+
+            $o = ['k' => 1];
+            echo <<<EOT
+            value {$o['k']} end
+            EOT;
+        "#}
+    }
+
+    test_lint_fix! {
+        name = fix_back_to_back_interpolations,
+        rule = BracedStringInterpolationRule,
+        code = indoc! {r#"
+            <?php
+
+            $o = ['a' => 1, 'b' => 2];
+            echo "$o[a]$o[b]";
+        "#},
+        fixed = indoc! {r#"
+            <?php
+
+            $o = ['a' => 1, 'b' => 2];
+            echo "{$o['a']}{$o['b']}";
+        "#}
     }
 }
