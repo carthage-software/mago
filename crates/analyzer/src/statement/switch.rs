@@ -143,16 +143,11 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
             self.update_case_exit_map(case, *i);
         }
 
-        let mut all_options_returned = true;
         let mut previous_empty_cases = vec![];
 
         let mut previously_matching_case = None;
         for (i, case) in indexed_cases {
             let is_last = i == last_case_index;
-            let case_exit_type = &self.case_exit_types[&i];
-            if case_exit_type != &ControlAction::Return {
-                all_options_returned = false;
-            }
 
             if let SwitchCase::Expression(switch_case) = case
                 && case.statements().is_empty()
@@ -178,12 +173,13 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
             if let Some(true) = is_matching
                 && !case.is_default()
             {
-                previously_matching_case = Some((all_options_returned, case.span()));
+                previously_matching_case = Some(case.span());
             }
 
             previous_empty_cases = vec![];
         }
 
+        let all_options_returned = self.case_exit_types.values().all(|t| *t == ControlAction::Return);
         let is_exhaustive = self.has_default_case || {
             let mut final_else_context = original_context.clone();
             let final_else_clauses: Vec<_> =
@@ -262,7 +258,7 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
         original_block_context: &BlockContext<'ctx>,
         is_last: bool,
         case_index: usize,
-        previously_matching_case: Option<(bool, Span)>,
+        previously_matching_case: Option<Span>,
     ) -> Result<Option<bool>, AnalysisError> {
         if self.context.settings.version.is_deprecated(Feature::SwitchSemicolonSeparators)
             && matches!(switch_case.separator(), SwitchCaseSeparator::SemiColon(_))
@@ -279,7 +275,7 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
             );
         }
 
-        if let Some((_, previously_matching_case_span)) = previously_matching_case {
+        if let Some(previously_matching_case_span) = previously_matching_case {
             if switch_case.is_default() {
                 self.context.collector.report_with_code(
                     IssueCode::UnreachableSwitchDefault,
@@ -624,6 +620,14 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
         let new_expression_types = self.artifacts.expression_types.clone();
         old_expression_types.extend(new_expression_types);
         self.artifacts.expression_types = old_expression_types;
+
+        let case_exit_type = if case_block_context.control_actions.contains(ControlAction::End) {
+            self.case_exit_types.insert(case_index, ControlAction::Return);
+
+            ControlAction::Return
+        } else {
+            case_exit_type
+        };
 
         if !matches!(case_exit_type, ControlAction::Return) {
             self.handle_non_returning_case(&case_block_context, original_block_context, case_exit_type);
