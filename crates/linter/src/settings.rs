@@ -46,6 +46,7 @@ use crate::rule::LowercaseKeywordConfig;
 use crate::rule::LowercaseTypeHintConfig;
 use crate::rule::MethodNameConfig;
 use crate::rule::MiddlewareInRoutesConfig;
+use crate::rule::MissingDocsConfig;
 use crate::rule::NoAliasFunctionConfig;
 use crate::rule::NoAlternativeSyntaxConfig;
 use crate::rule::NoArrayAccumulationInLoopConfig;
@@ -350,6 +351,7 @@ pub struct RulesSettings {
     pub no_db_schema_change: RuleSettings<NoDbSchemaChangeConfig>,
     pub no_unescaped_output: RuleSettings<NoUnescapedOutputConfig>,
     pub no_roles_as_capabilities: RuleSettings<NoRolesAsCapabilitiesConfig>,
+    pub missing_docs: RuleSettings<MissingDocsConfig>,
 }
 
 impl<C: Config> RuleSettings<C> {

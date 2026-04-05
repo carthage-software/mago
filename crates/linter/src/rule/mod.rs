@@ -336,4 +336,5 @@ define_rules! {
     NoAlternativeSyntax(no_alternative_syntax @ NoAlternativeSyntaxRule),
     PreferPreIncrement(prefer_pre_increment @ PreferPreIncrementRule),
     SwitchContinueToBreak(switch_continue_to_break @ SwitchContinueToBreakRule),
+    MissingDocs(missing_docs @ MissingDocsRule),
 }

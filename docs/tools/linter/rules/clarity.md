@@ -12,6 +12,7 @@ This document details the rules available in the `Clarity` category.
 | Explicit Octal | [`explicit-octal`](#explicit-octal) |
 | Instanceof Stringable | [`instanceof-stringable`](#instanceof-stringable) |
 | Literal Named Argument | [`literal-named-argument`](#literal-named-argument) |
+| Missing Docs | [`missing-docs`](#missing-docs) |
 | No Empty | [`no-empty`](#no-empty) |
 | No Hash Emoji | [`no-hash-emoji`](#no-hash-emoji) |
 | No Isset | [`no-isset`](#no-isset) |
@@ -159,6 +160,58 @@ set_option(key: 'feature_x', enable_feature: true); // ✅ clear intent
 function set_option(string $key, bool $enable_feature) {}
 
 set_option('feature_x', true); // ❌ intent unclear
+```
+
+
+## <a id="missing-docs"></a>`missing-docs`
+
+Detects declarations that are missing a docblock.
+
+This rule can be configured to require documentation for functions,
+classes, interfaces, traits, enums, enum cases, constants, statics,
+methods, and properties.
+
+Documentation is useful when it explains intent, behaviour, usage,
+invariants, or other details that are not obvious from the code alone.
+
+
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `false` |
+| `level` | `string` | `"help"` |
+| `functions` | `boolean` | `true` |
+| `classes` | `boolean` | `false` |
+| `interfaces` | `boolean` | `false` |
+| `traits` | `boolean` | `false` |
+| `enums` | `boolean` | `false` |
+| `enum-cases` | `boolean` | `true` |
+| `constants` | `boolean` | `true` |
+| `statics` | `boolean` | `true` |
+| `methods` | `boolean` | `true` |
+| `properties` | `boolean` | `true` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+
+/**
+ * A helpful piece of documentation.
+ */
+function foo() {}
+```
+
+#### Incorrect code
+
+```php
+<?php
+
+function foo() {}
 ```
 
 
