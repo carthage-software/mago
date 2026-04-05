@@ -774,6 +774,17 @@ fn scrape_type_properties(
                         combination.flags.insert(CombinationFlags::KEYED_ARRAY_SOMETIMES_FILLED);
                     } else {
                         combination.flags.remove(CombinationFlags::KEYED_ARRAY_ALWAYS_FILLED);
+
+                        if parameters.is_none()
+                            && known_items.as_ref().is_none_or(|items| items.is_empty())
+                            && combination.list_array_parameter.is_some()
+                        {
+                            combination.flags.remove(CombinationFlags::LIST_ARRAY_ALWAYS_FILLED);
+                            had_previous_keyed_array = false;
+                            combination.flags.remove(CombinationFlags::HAS_KEYED_ARRAY);
+
+                            continue;
+                        }
                     }
 
                     if let Some(known_items) = known_items {

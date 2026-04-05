@@ -589,6 +589,26 @@ fn analyze<'ctx, 'ast, 'arena>(
                         // if there's a change, invalidate related clauses
                         pre_loop_context.remove_variable_from_conflicting_clauses(context, variable_id, None);
                     }
+
+                    if let Some(redefined_type) = loop_scope.possibly_redefined_loop_parent_variables.get(&variable_id)
+                    {
+                        let existing = continue_context.locals.get(&variable_id).cloned();
+                        let combined_with_redefined = match existing {
+                            Some(existing_type) if existing_type.as_ref() != redefined_type.as_ref() => {
+                                has_changes = true;
+                                simplify_generic_subset_arrays(combine_union_types(
+                                    &existing_type,
+                                    redefined_type,
+                                    codebase,
+                                    CombinerOptions::default(),
+                                ))
+                            }
+                            Some(existing_type) => (*existing_type).clone(),
+                            None => (**redefined_type).clone(),
+                        };
+
+                        continue_context.locals.insert(variable_id, Rc::new(combined_with_redefined));
+                    }
                 } else {
                     if !recorded_issues.is_empty() {
                         has_changes = true;

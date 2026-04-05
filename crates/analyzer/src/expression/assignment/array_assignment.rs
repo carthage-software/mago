@@ -536,12 +536,24 @@ fn update_array_assignment_child_type<'ctx>(
     let collection_type =
         TUnion::from_vec(combiner::combine(collection_types, context.codebase, context.settings.combiner_options()));
 
-    add_union_type(
+    let mut result = add_union_type(
         root_type,
         &collection_type,
         context.codebase,
         context.settings.combiner_options().with_overwrite_empty_array(),
-    )
+    );
+
+    if key_type.is_none() {
+        for atomic in result.types.to_mut().iter_mut() {
+            match atomic {
+                TAtomic::Array(TArray::List(list)) => list.non_empty = true,
+                TAtomic::Array(TArray::Keyed(keyed)) => keyed.non_empty = true,
+                _ => {}
+            }
+        }
+    }
+
+    result
 }
 
 pub(crate) fn analyze_nested_array_assignment<'ctx, 'ast, 'arena>(

@@ -437,6 +437,7 @@ test_case!(wildcard_type);
 
 // Github Issues
 test_case!(issue_1573);
+test_case!(issue_1574);
 test_case!(issue_659);
 test_case!(issue_660);
 test_case!(issue_663);

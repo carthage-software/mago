@@ -207,37 +207,3 @@ pub fn are_definitely_not_identical(
         false
     }
 }
-
-/// Checks if two types share any common type category, ignoring literal values.
-///
-/// This is useful inside loops where literal values may change across iterations
-/// but the type category stays the same. For example, `string('a')` and `string('b')`
-/// share the category `string`, but `int` and `bool` do not.
-pub fn types_share_category(lhs: &TUnion, rhs: &TUnion) -> bool {
-    lhs.types.iter().any(|l| rhs.types.iter().any(|r| atomics_share_category(l, r)))
-}
-
-#[inline]
-const fn atomics_share_category(a: &TAtomic, b: &TAtomic) -> bool {
-    matches!(
-        (a, b),
-        (TAtomic::Scalar(TScalar::Integer(_)), TAtomic::Scalar(TScalar::Integer(_)))
-            | (TAtomic::Scalar(TScalar::Float(_)), TAtomic::Scalar(TScalar::Float(_)))
-            | (TAtomic::Scalar(TScalar::String(_)), TAtomic::Scalar(TScalar::String(_)))
-            | (TAtomic::Scalar(TScalar::Bool(_)), TAtomic::Scalar(TScalar::Bool(_)))
-            | (TAtomic::Scalar(TScalar::String(_)), TAtomic::Scalar(TScalar::ClassLikeString(_)))
-            | (TAtomic::Scalar(TScalar::ClassLikeString(_)), TAtomic::Scalar(TScalar::String(_)))
-            | (TAtomic::Scalar(TScalar::ClassLikeString(_)), TAtomic::Scalar(TScalar::ClassLikeString(_)))
-            | (TAtomic::Null, _)
-            | (_, TAtomic::Null)
-            | (TAtomic::Array(_), TAtomic::Array(_))
-            | (TAtomic::Object(_), TAtomic::Object(_) | TAtomic::Callable(_))
-            | (TAtomic::Callable(_), TAtomic::Callable(_) | TAtomic::Object(_))
-            | (TAtomic::Mixed(_), _)
-            | (_, TAtomic::Mixed(_))
-            | (TAtomic::Variable(_), _)
-            | (_, TAtomic::Variable(_))
-            | (TAtomic::GenericParameter(_), _)
-            | (_, TAtomic::GenericParameter(_))
-    )
-}

@@ -31,7 +31,6 @@ use crate::expression::binary::utils::is_always_greater_than_or_equal;
 use crate::expression::binary::utils::is_always_identical_to;
 use crate::expression::binary::utils::is_always_less_than;
 use crate::expression::binary::utils::is_always_less_than_or_equal;
-use crate::expression::binary::utils::types_share_category;
 use crate::utils::misc::unwrap_expression;
 
 /// Analyzes standard comparison operations (e.g., `==`, `===`, `<`, `<=`, `>`, `>=`).
@@ -254,14 +253,8 @@ pub fn analyze_comparison_operation<'ctx, 'arena>(
                 }
             }
             BinaryOperator::Equal(_) | BinaryOperator::AngledNotEqual(_) => {
-                let should_be_specific = should_use_specific_equality_inference(
-                    block_context,
-                    binary.lhs,
-                    lhs_type,
-                    binary.rhs,
-                    rhs_type,
-                    false,
-                );
+                let should_be_specific =
+                    should_use_specific_equality_inference(block_context, binary.lhs, binary.rhs, false);
 
                 if should_be_specific && is_always_identical_to(lhs_type, rhs_type) {
                     if !block_context.flags.inside_loop_expressions() {
@@ -280,14 +273,8 @@ pub fn analyze_comparison_operation<'ctx, 'arena>(
                 }
             }
             BinaryOperator::NotEqual(_) => {
-                let should_be_specific = should_use_specific_equality_inference(
-                    block_context,
-                    binary.lhs,
-                    lhs_type,
-                    binary.rhs,
-                    rhs_type,
-                    false,
-                );
+                let should_be_specific =
+                    should_use_specific_equality_inference(block_context, binary.lhs, binary.rhs, false);
 
                 if should_be_specific && is_always_identical_to(lhs_type, rhs_type) {
                     if !block_context.flags.inside_loop_expressions() {
@@ -306,14 +293,8 @@ pub fn analyze_comparison_operation<'ctx, 'arena>(
                 }
             }
             BinaryOperator::Identical(_) => {
-                let should_be_specific = should_use_specific_equality_inference(
-                    block_context,
-                    binary.lhs,
-                    lhs_type,
-                    binary.rhs,
-                    rhs_type,
-                    true,
-                );
+                let should_be_specific =
+                    should_use_specific_equality_inference(block_context, binary.lhs, binary.rhs, true);
 
                 if !should_be_specific {
                     get_bool()
@@ -334,14 +315,8 @@ pub fn analyze_comparison_operation<'ctx, 'arena>(
                 }
             }
             BinaryOperator::NotIdentical(_) => {
-                let should_be_specific = should_use_specific_equality_inference(
-                    block_context,
-                    binary.lhs,
-                    lhs_type,
-                    binary.rhs,
-                    rhs_type,
-                    true,
-                );
+                let should_be_specific =
+                    should_use_specific_equality_inference(block_context, binary.lhs, binary.rhs, true);
 
                 if !should_be_specific {
                     get_bool()
@@ -389,14 +364,11 @@ fn get_boolean_literal(expr: &Expression<'_>) -> Option<bool> {
 fn should_use_specific_equality_inference(
     block_context: &BlockContext<'_>,
     lhs: &Expression<'_>,
-    lhs_type: &TUnion,
     rhs: &Expression<'_>,
-    rhs_type: &TUnion,
     identity: bool,
 ) -> bool {
     if identity {
-        (!block_context.flags.inside_loop() || !types_share_category(lhs_type, rhs_type))
-            && !involves_external_reference(lhs, block_context)
+        !involves_external_reference(lhs, block_context)
             && !involves_external_reference(rhs, block_context)
             && !involves_static_variable(lhs, block_context)
             && !involves_static_variable(rhs, block_context)

@@ -317,16 +317,28 @@ fn update_by_reference_argument_types<'ctx, 'arena>(
                 )?;
 
                 block_context.assigned_variable_ids.insert(argument_id, argument.start_offset());
+                // TODO(azjezz): we can eliminate `clone()` here, in `assign_to_expression` and
+                // in `record_by_reference_mutation_in_loop` by using an `Rc`, which won't be cloned
+                // in majority of cases, currently, in this path, the type gets cloned ~5 times on average
+                // can be 0.
                 block_context.by_reference_constraints.insert(
                     argument_id,
-                    ReferenceConstraint::new(argument.span(), ReferenceConstraintSource::Argument, Some(new_type)),
+                    ReferenceConstraint::new(
+                        argument.span(),
+                        ReferenceConstraintSource::Argument,
+                        Some(new_type.clone()),
+                    ),
                 );
+
+                record_by_reference_mutation_in_loop(artifacts, argument_id, &new_type);
             } else {
                 if let Some(argument_id) = &argument_id
                     && let Some(existing_type) = block_context.locals.get(argument_id).cloned()
                 {
                     block_context.remove_descendants(context, *argument_id, &existing_type, Some(&new_type));
                 }
+
+                let widened_type = new_type.clone();
 
                 assign_to_expression(
                     context,
@@ -341,12 +353,25 @@ fn update_by_reference_argument_types<'ctx, 'arena>(
 
                 if let Some(argument_id) = argument_id {
                     block_context.assigned_variable_ids.insert(argument_id, argument.start_offset());
+                    record_by_reference_mutation_in_loop(artifacts, argument_id, &widened_type);
                 }
             }
         }
     }
 
     Ok(())
+}
+
+/// Records a by-reference mutation in the enclosing loop scope so the multi-pass
+/// analysis widens the variable's type on the next pass.
+fn record_by_reference_mutation_in_loop(artifacts: &mut AnalysisArtifacts, variable_id: Atom, new_type: &TUnion) {
+    let Some(loop_scope) = artifacts.get_loop_scope_mut() else {
+        return;
+    };
+
+    if loop_scope.parent_context_variables.contains_key(&variable_id) {
+        loop_scope.possibly_redefined_loop_parent_variables.insert(variable_id, Rc::new(new_type.clone()));
+    }
 }
 
 /// Clears narrowed property types after an invocation.
