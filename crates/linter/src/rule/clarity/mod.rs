@@ -18,6 +18,7 @@ pub mod use_dedicated_expectation;
 pub mod use_simpler_expectation;
 pub mod use_specific_expectations;
 pub mod valid_docblock;
+pub mod missing_docs;
 
 pub use explicit_octal::*;
 pub use instanceof_stringable::*;
@@ -39,3 +40,4 @@ pub use use_dedicated_expectation::*;
 pub use use_simpler_expectation::*;
 pub use use_specific_expectations::*;
 pub use valid_docblock::*;
+pub use missing_docs::*;
