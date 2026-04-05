@@ -653,4 +653,48 @@ mod tests {
             }
         "#},
     }
+
+    test_lint_failure! {
+        name = static_property_assignment_via_static,
+        rule = NoServiceStateMutationRule,
+        count = 1,
+        settings = symfony_settings,
+        code = indoc! {r#"
+            <?php
+
+            namespace App\Service;
+
+            class CounterService
+            {
+                private static int $counter = 0;
+
+                public static function setCounter(int $value): void
+                {
+                    static::$counter = $value;
+                }
+            }
+        "#},
+    }
+
+    test_lint_failure! {
+        name = static_property_compound_assignment,
+        rule = NoServiceStateMutationRule,
+        count = 1,
+        settings = symfony_settings,
+        code = indoc! {r#"
+            <?php
+
+            namespace App\Service;
+
+            class LogService
+            {
+                private static string $log = '';
+
+                public static function append(string $msg): void
+                {
+                    self::$log .= $msg;
+                }
+            }
+        "#},
+    }
 }
