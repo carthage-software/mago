@@ -31,7 +31,6 @@ const DEFAULT_NONCE_FUNCTIONS: &[&str] = &["wp_verify_nonce", "check_admin_refer
 const NONCE_SUPERGLOBALS: &[&str] = &["$_POST", "$_GET", "$_REQUEST", "$_FILES"];
 
 const EXEMPT_FUNCTIONS: &[&str] = &[
-    // Type-test functions — these only inspect data, never process it
     "is_array",
     "is_string",
     "is_int",
@@ -46,11 +45,9 @@ const EXEMPT_FUNCTIONS: &[&str] = &[
     "is_object",
     "is_resource",
     "is_callable",
-    // Array comparison functions — read-only checks, no data processing
     "in_array",
     "array_search",
     "array_keys",
-    // Nonce verification functions themselves — the superglobal passed to these IS the check
     "wp_verify_nonce",
     "check_admin_referer",
     "check_ajax_referer",
@@ -77,6 +74,10 @@ impl Default for NonceVerificationConfig {
 }
 
 impl Config for NonceVerificationConfig {
+    fn default_enabled() -> bool {
+        false
+    }
+
     fn level(&self) -> Level {
         self.level
     }
@@ -178,12 +179,10 @@ impl LintRule for NonceVerificationRule {
     }
 }
 
-/// Check if a variable name is a superglobal we care about for nonce verification.
 fn is_nonce_superglobal(name: &str) -> bool {
     NONCE_SUPERGLOBALS.iter().any(|sg| name.eq_ignore_ascii_case(sg))
 }
 
-/// Check if an expression is a superglobal variable we track.
 fn is_superglobal_expr(expr: &Expression) -> bool {
     matches!(expr, Expression::Variable(Variable::Direct(var)) if is_nonce_superglobal(var.name))
 }

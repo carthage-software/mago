@@ -119,6 +119,8 @@ const TYPE_CHECK_FUNCTIONS: &[&str] = &[
 
 const ARRAY_COMPARISON_FUNCTIONS: &[&str] = &["in_array", "array_search", "array_keys"];
 
+const UNSLASHING_FUNCTIONS: &[&str] = &["wp_unslash", "stripslashes_deep", "stripslashes_from_strings_only"];
+
 #[derive(Debug, Clone)]
 pub struct ValidatedSanitizedInputRule {
     meta: &'static RuleMeta,
@@ -146,6 +148,10 @@ impl Default for ValidatedSanitizedInputConfig {
 }
 
 impl Config for ValidatedSanitizedInputConfig {
+    fn default_enabled() -> bool {
+        false
+    }
+
     fn level(&self) -> Level {
         self.level
     }
@@ -214,8 +220,6 @@ impl LintRule for ValidatedSanitizedInputRule {
             .chain(custom_unslash_refs.iter().copied())
             .collect();
 
-        let unslash_exempt: Vec<&str> = custom_unslash_refs.to_vec();
-
         let mut issues: Vec<Span> = Vec::new();
 
         match node {
@@ -224,7 +228,7 @@ impl LintRule for ValidatedSanitizedInputRule {
                     ctx,
                     Node::Expression(arrow.expression),
                     &all_sanitizers,
-                    &unslash_exempt,
+                    &custom_unslash_refs,
                     &mut issues,
                     false,
                 );
@@ -245,7 +249,7 @@ impl LintRule for ValidatedSanitizedInputRule {
                         ctx,
                         Node::Statement(stmt),
                         &all_sanitizers,
-                        &unslash_exempt,
+                        &custom_unslash_refs,
                         &mut issues,
                         false,
                     );
@@ -269,27 +273,22 @@ impl LintRule for ValidatedSanitizedInputRule {
     }
 }
 
-/// Check if a variable name is a superglobal we care about.
 fn is_input_superglobal(name: &str) -> bool {
     INPUT_SUPERGLOBALS.iter().any(|sg| name.eq_ignore_ascii_case(sg))
 }
 
-/// Check if an expression is a superglobal variable.
 fn is_superglobal_expr(expr: &Expression) -> bool {
     matches!(expr, Expression::Variable(Variable::Direct(var)) if is_input_superglobal(var.name))
 }
 
-/// Check if an expression is a `wp_unslash()` call.
 fn is_wp_unslash_call<'arena>(ctx: &LintContext<'_, 'arena>, expr: &Expression<'arena>) -> bool {
     if let Expression::Call(Call::Function(fc)) = expr {
-        function_call_matches_any(ctx, fc, &["wp_unslash", "stripslashes_deep", "stripslashes_from_strings_only"])
-            .is_some()
+        function_call_matches_any(ctx, fc, UNSLASHING_FUNCTIONS).is_some()
     } else {
         false
     }
 }
 
-/// Walk the node tree collecting unsanitized superglobal array accesses.
 /// `sanitized` tracks whether we're inside a sanitization function call.
 fn collect_unsanitized_accesses<'arena>(
     ctx: &LintContext<'_, 'arena>,
@@ -318,13 +317,7 @@ fn collect_unsanitized_accesses<'arena>(
     if let Node::FunctionCall(function_call) = node {
         // Unslashing functions are transparent — they only strip slashes, not sanitizers.
         // Pass through the current `sanitized` state to their arguments.
-        if function_call_matches_any(
-            ctx,
-            function_call,
-            &["wp_unslash", "stripslashes_deep", "stripslashes_from_strings_only"],
-        )
-        .is_some()
-        {
+        if function_call_matches_any(ctx, function_call, UNSLASHING_FUNCTIONS).is_some() {
             for arg in &function_call.argument_list.arguments {
                 collect_unsanitized_accesses(ctx, Node::Argument(arg), sanitizers, unslash_exempt, issues, sanitized);
             }

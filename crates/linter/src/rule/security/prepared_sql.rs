@@ -13,7 +13,6 @@ use mago_syntax::ast::BinaryOperator;
 use mago_syntax::ast::Call;
 use mago_syntax::ast::ClassLikeMemberSelector;
 use mago_syntax::ast::Expression;
-use mago_syntax::ast::Literal;
 use mago_syntax::ast::Node;
 use mago_syntax::ast::NodeKind;
 use mago_syntax::ast::StringPart;
@@ -56,6 +55,10 @@ impl Default for PreparedSqlConfig {
 }
 
 impl Config for PreparedSqlConfig {
+    fn default_enabled() -> bool {
+        false
+    }
+
     fn level(&self) -> Level {
         self.level
     }
@@ -119,7 +122,9 @@ impl LintRule for PreparedSqlRule {
         };
 
         // Get the SQL argument: prefer a named `query:` argument (PHP 8 named args can
-        // appear in any order), then fall back to the first positional/named argument.
+        // appear in any order), then fall back to the first positional argument.
+        // A named first argument that isn't `query:` refers to a different parameter,
+        // so we cannot assume it holds the SQL.
         let Some(sql_expr) = method_call
             .argument_list
             .arguments
@@ -129,9 +134,9 @@ impl LintRule for PreparedSqlRule {
                 _ => None,
             })
             .or_else(|| {
-                method_call.argument_list.arguments.first().map(|arg| match arg {
-                    Argument::Positional(arg) => arg.value,
-                    Argument::Named(arg) => arg.value,
+                method_call.argument_list.arguments.first().and_then(|arg| match arg {
+                    Argument::Positional(arg) => Some(arg.value),
+                    Argument::Named(_) => None,
                 })
             })
         else {
@@ -163,30 +168,24 @@ impl LintRule for PreparedSqlRule {
     }
 }
 
-/// Check if an expression is a reference to the $wpdb variable.
 fn is_wpdb_variable(expr: &Expression) -> bool {
     matches!(expr, Expression::Variable(Variable::Direct(var)) if var.name == "$wpdb")
 }
 
-/// Check if an expression is a call to `$wpdb->prepare(...)`.
 fn is_wpdb_prepare_call(expr: &Expression) -> bool {
     if let Expression::Call(Call::Method(method_call)) = expr
         && is_wpdb_variable(method_call.object)
         && let ClassLikeMemberSelector::Identifier(ident) = &method_call.method
     {
-        return ident.value.eq_ignore_ascii_case("prepare");
+        ident.value.eq_ignore_ascii_case("prepare")
+    } else {
+        false
     }
-
-    false
 }
 
-/// Check if an expression contains unsafe (non-$wpdb, non-escaped) variables.
 fn contains_unsafe_variables(ctx: &LintContext, expr: &Expression) -> bool {
     match expr {
-        // Single-quoted string literals have no interpolation — always safe
-        Expression::Literal(Literal::String(_)) => false,
-        // Numeric literals are safe
-        Expression::Literal(Literal::Integer(_) | Literal::Float(_)) => false,
+        Expression::Literal(_) => false,
         // Interpolated strings — check each part for non-$wpdb variables
         Expression::CompositeString(composite_string) => {
             for part in composite_string.parts() {
@@ -217,7 +216,7 @@ fn contains_unsafe_variables(ctx: &LintContext, expr: &Expression) -> bool {
         Expression::Call(Call::Function(function_call))
             if function_call_matches_any(ctx, function_call, FORMATTING_FUNCTIONS).is_some() =>
         {
-            for arg in function_call.argument_list.arguments.iter() {
+            for arg in &function_call.argument_list.arguments {
                 let arg_expr = match arg {
                     Argument::Positional(pos) => pos.value,
                     Argument::Named(named) => named.value,
@@ -247,24 +246,31 @@ fn contains_unsafe_variables(ctx: &LintContext, expr: &Expression) -> bool {
         {
             false
         }
+        // Error control (@) and reference (&) operators are transparent: defer to operand
+        Expression::UnaryPrefix(unary)
+            if matches!(unary.operator, UnaryPrefixOperator::ErrorControl(_) | UnaryPrefixOperator::Reference(_)) =>
+        {
+            contains_unsafe_variables(ctx, unary.operand)
+        }
         // Parenthesized expressions
         Expression::Parenthesized(paren) => contains_unsafe_variables(ctx, paren.expression),
         // A static `$wpdb->property` or `$wpdb?->property` access (e.g., `$wpdb->posts`) is safe,
         // but dynamic access like `$wpdb->$table_name` is not, as the property name could be user-controlled.
-        Expression::Access(Access::Property(property_access))
-            if is_wpdb_variable(property_access.object)
-                && matches!(property_access.property, ClassLikeMemberSelector::Identifier(_)) =>
-        {
-            false
-        }
-        Expression::Access(Access::NullSafeProperty(property_access))
-            if is_wpdb_variable(property_access.object)
-                && matches!(property_access.property, ClassLikeMemberSelector::Identifier(_)) =>
-        {
-            false
-        }
+        _ if is_static_wpdb_property(expr) => false,
         // Any other expression (variable, method call, etc.) is unsafe
         _ => true,
+    }
+}
+
+fn is_static_wpdb_property(expr: &Expression) -> bool {
+    match expr {
+        Expression::Access(Access::Property(pa)) => {
+            is_wpdb_variable(pa.object) && matches!(pa.property, ClassLikeMemberSelector::Identifier(_))
+        }
+        Expression::Access(Access::NullSafeProperty(pa)) => {
+            is_wpdb_variable(pa.object) && matches!(pa.property, ClassLikeMemberSelector::Identifier(_))
+        }
+        _ => false,
     }
 }
 
