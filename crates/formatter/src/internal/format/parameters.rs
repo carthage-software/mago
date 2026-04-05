@@ -1,3 +1,4 @@
+use bumpalo::collections::Vec;
 use bumpalo::vec;
 
 use mago_span::HasSpan;
@@ -13,6 +14,7 @@ use crate::internal::FormatterState;
 use crate::internal::comment::CommentFlags;
 use crate::internal::format::Format;
 use crate::internal::format::misc;
+use crate::internal::utils::string_width;
 
 pub(super) fn print_function_like_parameters<'arena>(
     f: &mut FormatterState<'_, 'arena>,
@@ -38,6 +40,14 @@ pub(super) fn print_function_like_parameters<'arena>(
     f.parameter_state.list_group_id = Some(list_id);
 
     let should_hug_the_parameters = !should_break && should_hug_the_only_parameter(f, parameter_list);
+    let parameter_variable_width = if should_align_parameters(f, parameter_list) {
+        Some(
+            get_max_parameter_prefix_width(parameter_list)
+                + usize::from(needs_promoted_parameter_type_gutter(parameter_list)),
+        )
+    } else {
+        None
+    };
 
     let left_parenthesis = {
         let mut contents = vec![in f.arena; Document::String("(")];
@@ -62,7 +72,16 @@ pub(super) fn print_function_like_parameters<'arena>(
 
     let mut printed = vec![in f.arena; ];
     let len = parameter_list.parameters.len();
+    let previous_variable_padding = f.parameter_state.variable_padding;
     for (i, parameter) in parameter_list.parameters.iter().enumerate() {
+        f.parameter_state.variable_padding = match parameter_variable_width {
+            Some(max_width) if can_align_parameter(f, parameter_list, i, parameter) => {
+                let padding = max_width.saturating_sub(get_parameter_prefix_width(parameter));
+                (padding > 0).then_some(padding)
+            }
+            _ => None,
+        };
+
         printed.push(parameter.format(f));
         if i == len - 1 {
             break;
@@ -76,6 +95,7 @@ pub(super) fn print_function_like_parameters<'arena>(
             printed.push(Document::Line(Line::hard()));
         }
     }
+    f.parameter_state.variable_padding = previous_variable_padding;
 
     if should_hug_the_parameters {
         parts.extend(printed);
@@ -166,4 +186,126 @@ pub(super) fn should_hug_the_only_parameter<'arena>(
     }
 
     true
+}
+
+fn should_align_parameters<'arena>(
+    f: &FormatterState<'_, 'arena>,
+    parameter_list: &'arena FunctionLikeParameterList<'arena>,
+) -> bool {
+    f.settings.align_parameters
+        && parameter_list.parameters.len() >= 2
+        && (force_break_parameters(f, parameter_list)
+            || preserve_break_parameters(f, parameter_list)
+            || parameter_list_exceeds_print_width(f, parameter_list))
+        && parameter_list
+            .parameters
+            .iter()
+            .enumerate()
+            .all(|(index, parameter)| can_align_parameter(f, parameter_list, index, parameter))
+}
+
+fn parameter_list_exceeds_print_width<'arena>(
+    f: &FormatterState<'_, 'arena>,
+    parameter_list: &'arena FunctionLikeParameterList<'arena>,
+) -> bool {
+    let start = parameter_list.left_parenthesis.start.offset;
+    let end = parameter_list.right_parenthesis.end.offset;
+
+    let source = &f.source_text[start as usize..end as usize];
+    let mut flattened = Vec::with_capacity_in(source.len(), f.arena);
+    let mut previous_was_whitespace = false;
+    for character in source.chars() {
+        if character.is_whitespace() {
+            if !previous_was_whitespace {
+                flattened.push(b' ');
+                previous_was_whitespace = true;
+            }
+        } else {
+            let mut buffer = [0; 4];
+            flattened.extend_from_slice(character.encode_utf8(&mut buffer).as_bytes());
+            previous_was_whitespace = false;
+        }
+    }
+
+    let flattened = unsafe { std::str::from_utf8_unchecked(flattened.into_bump_slice()) };
+
+    string_width(flattened.trim()) > f.settings.print_width
+}
+
+fn get_max_parameter_prefix_width<'arena>(parameter_list: &'arena FunctionLikeParameterList<'arena>) -> usize {
+    parameter_list.parameters.iter().map(get_parameter_prefix_width).max().unwrap_or(0)
+}
+
+fn needs_promoted_parameter_type_gutter<'arena>(parameter_list: &'arena FunctionLikeParameterList<'arena>) -> bool {
+    parameter_list.parameters.iter().any(|parameter| parameter.is_promoted_property() && parameter.hint.is_none())
+}
+
+fn get_parameter_prefix_width<'arena>(parameter: &'arena FunctionLikeParameter<'arena>) -> usize {
+    let mut width = 0;
+
+    let modifiers_width = get_modifier_sequence_width(&parameter.modifiers);
+    if modifiers_width > 0 {
+        width += modifiers_width;
+        width += 1;
+    }
+
+    if let Some(hint) = &parameter.hint {
+        width += hint.span().length() as usize;
+        width += 1;
+    }
+
+    if parameter.ampersand.is_some() {
+        width += string_width("&");
+    }
+
+    if parameter.ellipsis.is_some() {
+        width += string_width("...");
+    }
+
+    width
+}
+
+fn can_align_parameter<'arena>(
+    f: &FormatterState<'_, 'arena>,
+    parameter_list: &'arena FunctionLikeParameterList<'arena>,
+    index: usize,
+    parameter: &'arena FunctionLikeParameter<'arena>,
+) -> bool {
+    let gap_start = if index == 0 {
+        parameter_list.left_parenthesis.end.offset
+    } else {
+        parameter_list.parameters.as_slice()[index - 1].end_offset()
+    };
+
+    let gap_before_parameter = &f.source_text[gap_start as usize..parameter.start_offset() as usize];
+    let prefix_before_variable =
+        &f.source_text[parameter.start_offset() as usize..parameter.variable.start_offset() as usize];
+
+    !contains_comment_marker(gap_before_parameter) && !contains_comment_marker(prefix_before_variable)
+}
+
+fn contains_comment_marker(text: &str) -> bool {
+    text.contains("/*") || text.contains("//") || text.contains('#')
+}
+
+fn get_modifier_sequence_width(modifiers: &mago_syntax::ast::Sequence<'_, mago_syntax::ast::Modifier<'_>>) -> usize {
+    let ordered_modifiers = [
+        modifiers.get_final(),
+        modifiers.get_abstract(),
+        modifiers.get_first_read_visibility(),
+        modifiers.get_first_write_visibility(),
+        modifiers.get_static(),
+        modifiers.get_readonly(),
+    ];
+
+    let mut width = 0;
+    for (printed_count, modifier) in ordered_modifiers.into_iter().flatten().enumerate() {
+        if printed_count > 0 {
+            width += 1;
+        }
+
+        width += string_width(modifier.get_keyword().value);
+    }
+
+    width
 }
