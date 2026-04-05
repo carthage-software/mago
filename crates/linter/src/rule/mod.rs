@@ -320,6 +320,7 @@ define_rules! {
     StrictAssertions(strict_assertions @ StrictAssertionsRule),
     UseSpecificAssertions(use_specific_assertions @ UseSpecificAssertionsRule),
     NoRequestAll(no_request_all @ NoRequestAllRule),
+    NoServiceStateMutation(no_service_state_mutation @ NoServiceStateMutationRule),
     MiddlewareInRoutes(middleware_in_routes @ MiddlewareInRoutesRule),
     UseCompoundAssignment(use_compound_assignment @ UseCompoundAssignmentRule),
     RequirePregQuoteDelimiter(require_preg_quote_delimiter @ RequirePregQuoteDelimiterRule),
