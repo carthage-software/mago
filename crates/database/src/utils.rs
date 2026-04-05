@@ -1,17 +1,10 @@
 use std::borrow::Cow;
-use std::fs::File as StdFile;
-use std::io::Read;
+use std::fs::read;
 use std::path::Path;
 
 use crate::error::DatabaseError;
 use crate::file::File;
 use crate::file::FileType;
-
-/// The used hint for pre-allocating file content buffer.
-///
-/// File sizes larger than this will still be handled correctly,
-/// but usually files are smaller than this.
-const FILE_SIZE_HINT: usize = 12 * 1024;
 
 /// The maximum allowed file size (256 MiB).
 const MAXIMUM_FILE_SIZE: usize = 256 * 1024 * 1024;
@@ -33,9 +26,7 @@ const MAXIMUM_FILE_SIZE: usize = 256 * 1024 * 1024;
 ///
 /// Returns a [`DatabaseError::IOError`] if the file cannot be read from the filesystem.
 pub(crate) fn read_file(workspace: &Path, path: &Path, file_type: FileType) -> Result<File, DatabaseError> {
-    let mut bytes = Vec::with_capacity(FILE_SIZE_HINT);
-    let mut file = StdFile::open(path)?;
-    file.read_to_end(&mut bytes)?;
+    let bytes = read(path)?;
 
     if bytes.len() > MAXIMUM_FILE_SIZE {
         return Err(DatabaseError::FileTooLarge(path.to_path_buf(), bytes.len(), MAXIMUM_FILE_SIZE));
