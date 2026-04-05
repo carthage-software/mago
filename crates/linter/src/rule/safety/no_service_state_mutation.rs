@@ -199,9 +199,7 @@ impl LintRule for NoServiceStateMutationRule {
 
         let matches_pattern = |ns: &str, pattern: &str| {
             ns.starts_with(pattern)
-                || (ns.len() + 1 >= pattern.len()
-                    && pattern.ends_with('\\')
-                    && pattern[..pattern.len() - 1] == *ns)
+                || (ns.len() + 1 >= pattern.len() && pattern.ends_with('\\') && pattern[..pattern.len() - 1] == *ns)
         };
 
         let in_include = self.cfg.include_namespaces.iter().any(|p| matches_pattern(namespace, p.as_str()));
@@ -233,7 +231,9 @@ impl LintRule for NoServiceStateMutationRule {
                     .with_note(
                         "In worker-mode runtimes (FrankenPHP, RoadRunner, Swoole), services persist across requests.",
                     )
-                    .with_note("Mutating instance or static properties causes shared state that leaks between requests.")
+                    .with_note(
+                        "Mutating instance or static properties causes shared state that leaks between requests.",
+                    )
                     .with_help("Use a local variable, a DTO, or a request-scoped service instead.");
 
                 ctx.collector.report(issue);
@@ -254,10 +254,10 @@ impl<'ctx, 'arena> MutWalker<'_, 'arena, LintContext<'ctx, 'arena>> for Mutation
     }
 
     fn walk_in_unary_prefix(&mut self, prefix: &UnaryPrefix<'arena>, _ctx: &mut LintContext<'ctx, 'arena>) {
-        if prefix.operator.is_increment_or_decrement() {
-            if let Some(span) = is_property_mutation(prefix.operand) {
-                self.findings.push(span);
-            }
+        if prefix.operator.is_increment_or_decrement()
+            && let Some(span) = is_property_mutation(prefix.operand)
+        {
+            self.findings.push(span);
         }
     }
 
