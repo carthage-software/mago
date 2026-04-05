@@ -1,6 +1,3 @@
-use std::sync::atomic::AtomicBool;
-use std::sync::atomic::Ordering;
-
 use indoc::indoc;
 use schemars::JsonSchema;
 use serde::Deserialize;
@@ -11,11 +8,8 @@ use mago_reporting::Issue;
 use mago_reporting::Level;
 use mago_span::HasSpan;
 use mago_span::Span;
-use mago_syntax::ast::Access;
-use mago_syntax::ast::Expression;
-use mago_syntax::ast::Node;
-use mago_syntax::ast::NodeKind;
-use mago_syntax::ast::Variable;
+use mago_syntax::ast::*;
+use mago_syntax::walker::MutWalker;
 
 use crate::category::Category;
 use crate::context::LintContext;
@@ -24,28 +18,12 @@ use crate::requirements::RuleRequirements;
 use crate::rule::Config;
 use crate::rule::LintRule;
 use crate::rule_meta::RuleMeta;
-use crate::scope::FunctionLikeScope;
 use crate::settings::RuleSettings;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct NoServiceStateMutationRule {
     meta: &'static RuleMeta,
     cfg: NoServiceStateMutationConfig,
-    /// Tracks whether the class currently being visited implements a reset interface.
-    /// Uses `AtomicBool` because `check()` receives `&self` (not `&mut self`) and the
-    /// rule must be `Sync` for `Arc<RuleRegistry>`. Set when visiting `Node::Class`,
-    /// read when visiting mutation nodes within that class.
-    in_reset_class: AtomicBool,
-}
-
-impl Clone for NoServiceStateMutationRule {
-    fn clone(&self) -> Self {
-        Self {
-            meta: self.meta,
-            cfg: self.cfg.clone(),
-            in_reset_class: AtomicBool::new(self.in_reset_class.load(Ordering::Relaxed)),
-        }
-    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, JsonSchema)]
@@ -75,6 +53,10 @@ impl Default for NoServiceStateMutationConfig {
 }
 
 impl Config for NoServiceStateMutationConfig {
+    fn default_enabled() -> bool {
+        false
+    }
+
     fn level(&self) -> Level {
         self.level
     }
@@ -182,119 +164,121 @@ impl LintRule for NoServiceStateMutationRule {
     }
 
     fn targets() -> &'static [NodeKind] {
-        const TARGETS: &[NodeKind] =
-            &[NodeKind::Class, NodeKind::Assignment, NodeKind::UnaryPrefix, NodeKind::UnaryPostfix, NodeKind::Unset];
-
+        const TARGETS: &[NodeKind] = &[NodeKind::Class, NodeKind::Trait];
         TARGETS
     }
 
     fn build(settings: &RuleSettings<Self::Config>) -> Self {
-        Self { meta: Self::meta(), cfg: settings.config.clone(), in_reset_class: AtomicBool::new(false) }
+        Self { meta: Self::meta(), cfg: settings.config.clone() }
     }
 
     fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
-        // When entering a class, check if it implements a reset interface.
-        if let Node::Class(class) = node {
-            let is_reset_class = class.implements.as_ref().is_some_and(|implements| {
-                implements.types.iter().any(|iface| {
-                    let name = ctx.lookup_name(iface);
-                    self.cfg.reset_interfaces.iter().any(|ri| name == ri.as_str())
-                })
-            });
+        let members = match node {
+            Node::Class(class) => {
+                let is_reset_class = class.implements.as_ref().is_some_and(|implements| {
+                    implements.types.iter().any(|iface| {
+                        let name = ctx.lookup_name(iface);
+                        self.cfg.reset_interfaces.iter().any(|ri| name == ri.as_str())
+                    })
+                });
 
-            self.in_reset_class.store(is_reset_class, Ordering::Relaxed);
-            return;
-        }
+                if is_reset_class {
+                    return;
+                }
 
-        // Skip mutations in classes implementing a reset interface.
-        if self.in_reset_class.load(Ordering::Relaxed) {
-            return;
-        }
-
-        // Must be inside a method; skip allowed methods.
-        let Some(FunctionLikeScope::Method(method_name)) = ctx.scope.get_function_like_scope() else {
-            return;
+                &class.members
+            }
+            Node::Trait(r#trait) => &r#trait.members,
+            _ => return,
         };
 
-        if self.cfg.allowed_methods.iter().any(|m| m == method_name) {
-            return;
-        }
-
-        // Must be inside a class.
-        if ctx.scope.get_class_like_scope().is_none() {
-            return;
-        }
-
-        // Check namespace filters.
-        // Patterns may end with a backslash (e.g. `App\Entity\`). A namespace like `App\Entity`
-        // should match `App\Entity\` because it is that namespace itself, not just a sub-namespace.
-        // We compare against both the raw namespace and namespace + `\` to cover both cases.
         let namespace = ctx.scope.get_namespace();
-        if !namespace.is_empty() {
-            let namespace_with_sep = format!("{namespace}\\");
-            let matches_pattern =
-                |ns: &str, pattern: &str| ns.starts_with(pattern) || namespace_with_sep.starts_with(pattern);
-
-            let in_include = self.cfg.include_namespaces.iter().any(|p| matches_pattern(namespace, p.as_str()));
-            if !in_include {
-                return;
-            }
-
-            let in_exclude = self.cfg.exclude_namespaces.iter().any(|p| matches_pattern(namespace, p.as_str()));
-            if in_exclude {
-                return;
-            }
-        } else {
-            // No namespace means not in any included namespace.
+        if namespace.is_empty() {
             return;
         }
 
-        // Extract the mutated expression and check if it involves `$this->property`.
-        // Unset is handled separately because it can have multiple targets.
-        if let Node::Unset(unset) = node {
-            for value in unset.values.iter() {
-                if let Some(span) = is_property_mutation(value) {
-                    let issue = Issue::new(self.cfg.level, "Service state mutation detected.")
-                        .with_code(self.meta.code)
-                        .with_annotation(Annotation::primary(span).with_message("Service property is mutated here"))
-                        .with_note(
-                            "In worker-mode runtimes (FrankenPHP, RoadRunner, Swoole), services persist across requests.",
-                        )
-                        .with_note("Mutating instance or static properties causes shared state that leaks between requests.")
-                        .with_help("Use a local variable, a DTO, or a request-scoped service instead.");
+        let matches_pattern = |ns: &str, pattern: &str| {
+            ns.starts_with(pattern)
+                || (ns.len() + 1 >= pattern.len()
+                    && pattern.ends_with('\\')
+                    && pattern[..pattern.len() - 1] == *ns)
+        };
 
-                    ctx.collector.report(issue);
-                }
-            }
+        let in_include = self.cfg.include_namespaces.iter().any(|p| matches_pattern(namespace, p.as_str()));
+        if !in_include {
             return;
         }
 
-        let mutation_span = match node {
-            Node::Assignment(assignment) => is_property_mutation(assignment.lhs),
-            Node::UnaryPrefix(prefix) => {
-                if prefix.operator.is_increment_or_decrement() {
-                    is_property_mutation(prefix.operand)
-                } else {
-                    None
-                }
-            }
-            Node::UnaryPostfix(postfix) => is_property_mutation(postfix.operand),
-            _ => None,
-        };
-
-        let Some(span) = mutation_span else {
+        let in_exclude = self.cfg.exclude_namespaces.iter().any(|p| matches_pattern(namespace, p.as_str()));
+        if in_exclude {
             return;
-        };
+        }
 
-        let issue = Issue::new(self.cfg.level, "Service state mutation detected.")
-            .with_code(self.meta.code)
-            .with_annotation(Annotation::primary(span).with_message("Service property is mutated here"))
-            .with_note("In worker-mode runtimes (FrankenPHP, RoadRunner, Swoole), services persist across requests.")
-            .with_note("Mutating instance or static properties causes shared state that leaks between requests.")
-            .with_help("Use a local variable, a DTO, or a request-scoped service instead.");
+        for member in members.iter() {
+            let ClassLikeMember::Method(method) = member else {
+                continue;
+            };
 
-        ctx.collector.report(issue);
+            if self.cfg.allowed_methods.iter().any(|m| m == method.name.value) {
+                continue;
+            }
+
+            let mut collector = MutationCollector { findings: Vec::new() };
+            collector.walk_method(method, ctx);
+
+            for span in &collector.findings {
+                let issue = Issue::new(self.cfg.level, "Service state mutation detected.")
+                    .with_code(self.meta.code)
+                    .with_annotation(Annotation::primary(*span).with_message("Service property is mutated here"))
+                    .with_note(
+                        "In worker-mode runtimes (FrankenPHP, RoadRunner, Swoole), services persist across requests.",
+                    )
+                    .with_note("Mutating instance or static properties causes shared state that leaks between requests.")
+                    .with_help("Use a local variable, a DTO, or a request-scoped service instead.");
+
+                ctx.collector.report(issue);
+            }
+        }
     }
+}
+
+struct MutationCollector {
+    findings: Vec<Span>,
+}
+
+impl<'ctx, 'arena> MutWalker<'_, 'arena, LintContext<'ctx, 'arena>> for MutationCollector {
+    fn walk_in_assignment(&mut self, assignment: &Assignment<'arena>, _ctx: &mut LintContext<'ctx, 'arena>) {
+        if let Some(span) = is_property_mutation(assignment.lhs) {
+            self.findings.push(span);
+        }
+    }
+
+    fn walk_in_unary_prefix(&mut self, prefix: &UnaryPrefix<'arena>, _ctx: &mut LintContext<'ctx, 'arena>) {
+        if prefix.operator.is_increment_or_decrement() {
+            if let Some(span) = is_property_mutation(prefix.operand) {
+                self.findings.push(span);
+            }
+        }
+    }
+
+    fn walk_in_unary_postfix(&mut self, postfix: &UnaryPostfix<'arena>, _ctx: &mut LintContext<'ctx, 'arena>) {
+        if let Some(span) = is_property_mutation(postfix.operand) {
+            self.findings.push(span);
+        }
+    }
+
+    fn walk_in_unset(&mut self, unset: &Unset<'arena>, _ctx: &mut LintContext<'ctx, 'arena>) {
+        for value in unset.values.iter() {
+            if let Some(span) = is_property_mutation(value) {
+                self.findings.push(span);
+            }
+        }
+    }
+
+    // Don't descend into nested classes/functions — they have their own scope.
+    fn walk_anonymous_class(&mut self, _: &AnonymousClass<'arena>, _: &mut LintContext<'ctx, 'arena>) {}
+    fn walk_closure(&mut self, _: &Closure<'arena>, _: &mut LintContext<'ctx, 'arena>) {}
+    fn walk_arrow_function(&mut self, _: &ArrowFunction<'arena>, _: &mut LintContext<'ctx, 'arena>) {}
 }
 
 #[cfg(test)]
