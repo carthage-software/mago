@@ -3,9 +3,14 @@ use std::borrow::Cow;
 use std::fs;
 
 use mago_formatter::Formatter;
+use mago_formatter::settings::BlankLineBeforeStatement;
+use mago_formatter::settings::BlankLineBeforeStatements;
 use mago_formatter::settings::BraceStyle;
 use mago_formatter::settings::FormatSettings;
 use mago_formatter::settings::NullTypeHint;
+use mago_formatter::settings::UseImportType;
+use mago_formatter::settings::UseSortAlgorithm;
+use mago_formatter::settings::UseTypeOrder;
 use mago_php_version::PHPVersion;
 
 #[macro_export]
@@ -77,9 +82,12 @@ test_case!(use_sorting_with_expansion);
 test_case!(use_sorting_with_grouping);
 test_case!(use_sorting_with_grouping_and_separation);
 test_case!(use_sorting_separation_expansion);
+test_case!(ordered_imports);
+test_case!(ordered_imports_length);
 test_case!(use_no_change);
 test_case!(use_mixed_use_list);
 test_case!(use_mixed_use_list_expanded);
+test_case!(blank_line_before_statement);
 test_case!(docs_before_use_are_preserved);
 test_case!(mixed_expressions);
 test_case!(inline_html);
@@ -255,6 +263,7 @@ test_case!(match_idempotency);
 test_case!(heredoc_indentation);
 test_case!(heredoc_indentation_disabled);
 test_case!(drupal_preset);
+test_case!(symfony_preset);
 test_case!(redundant_grouping_parens);
 test_case!(null_type_hint_null_pipe_last);
 test_case!(comment_placement_binary);
