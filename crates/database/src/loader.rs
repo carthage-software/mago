@@ -167,6 +167,8 @@ impl<'a> DatabaseLoader<'a> {
             }
         }
 
+        db.reserve(file_decisions.len() + self.memory_sources.len());
+
         for (file_id, (final_type, _)) in file_decisions {
             if let Some(mut file) = all_files.remove(&file_id) {
                 file.file_type = final_type;

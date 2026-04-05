@@ -230,6 +230,12 @@ impl<'a> Database<'a> {
         db
     }
 
+    /// Reserves capacity for at least `additional` more files.
+    pub fn reserve(&mut self, additional: usize) {
+        self.files.reserve(additional);
+        self.id_to_name.reserve(additional);
+    }
+
     pub fn add(&mut self, file: File) -> FileId {
         let name = file.name.clone();
         let id = file.id;
