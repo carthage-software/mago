@@ -1,11 +1,27 @@
 //! `array_filter()` return type provider.
+//!
+//! Narrows the value type(s) of the input array based on the callback — or, with
+//! no callback, PHP's default truthy filter. When the input array has a known
+//! shape (`array{key: T, ...}`), the shape is preserved in the result but each
+//! entry is marked optional (since any entry may be dropped by the filter).
+
+use std::collections::BTreeMap;
+use std::sync::Arc;
 
 use mago_codex::assertion::Assertion;
-use mago_codex::ttype::add_optional_union_type;
+use mago_codex::metadata::CodebaseMetadata;
+use mago_codex::ttype::add_union_type;
 use mago_codex::ttype::atomic::TAtomic;
+use mago_codex::ttype::atomic::array::TArray;
+use mago_codex::ttype::atomic::array::key::ArrayKey;
+use mago_codex::ttype::atomic::array::keyed::TKeyedArray;
+use mago_codex::ttype::combiner::CombinerOptions;
+use mago_codex::ttype::comparator::ComparisonResult;
+use mago_codex::ttype::comparator::atomic_comparator;
 use mago_codex::ttype::get_array_parameters;
 use mago_codex::ttype::get_keyed_array;
 use mago_codex::ttype::union::TUnion;
+use mago_codex::ttype::wrap_atomic;
 
 use crate::plugin::context::InvocationInfo;
 use crate::plugin::context::ProviderContext;
@@ -46,77 +62,141 @@ impl FunctionReturnTypeProvider for ArrayFilterProvider {
 
         let codebase = context.codebase();
 
-        let mut key_type: Option<TUnion> = None;
-        let mut value_type: Option<TUnion> = None;
-        for atomic in array_type.types.as_ref() {
-            if let TAtomic::Array(array) = atomic {
-                let (k, v) = get_array_parameters(array, codebase);
-                key_type = Some(add_optional_union_type(k, key_type.as_ref(), codebase));
-                value_type = Some(add_optional_union_type(v, value_type.as_ref(), codebase));
-            } else {
-                // If it's not an array, we can't determine the return type
-                return None;
-            }
-        }
-
-        let key_type = key_type?;
-        let mut value_type = value_type?;
-
         if let Some(callback_arg) = callback_argument {
             let callback_type = context.get_expression_type(callback_arg)?;
+            if callback_type.is_null() {
+                return filter_arrays(array_type, codebase, filter_falsy_atomics);
+            }
 
-            if !callback_type.is_null() {
-                // Try to get metadata from closures OR first-class callables like is_string(...)
-                if let Some(callback_metadata) = context.get_callable_metadata(callback_arg)
-                    && !callback_metadata.if_true_assertions.is_empty()
-                    && let Some(first_param) = callback_metadata.parameters.first()
-                {
-                    let param_name = &first_param.get_name().0;
-
-                    if let Some(assertions) = callback_metadata.if_true_assertions.get(param_name) {
-                        for assertion in assertions {
-                            value_type = apply_assertion_to_narrow_type(value_type, assertion, codebase);
-                        }
-
-                        if value_type.types.is_empty() {
-                            return None;
-                        }
-
-                        return Some(get_keyed_array(key_type, value_type));
-                    }
-                }
-
+            let callback_metadata = context.get_callable_metadata(callback_arg)?;
+            if callback_metadata.if_true_assertions.is_empty() {
                 return None;
             }
+
+            let first_param = callback_metadata.parameters.first()?;
+            let param_name = first_param.get_name().0;
+            let assertions = callback_metadata.if_true_assertions.get(&param_name)?.clone();
+
+            return filter_arrays(array_type, codebase, |value_type| {
+                let mut narrowed = value_type;
+                for assertion in &assertions {
+                    narrowed = apply_assertion_to_narrow_type(narrowed, assertion, codebase);
+                }
+                if narrowed.types.is_empty() { FilterOutcome::Removed } else { FilterOutcome::KeptAsOptional(narrowed) }
+            });
         }
 
-        value_type.types.to_mut().retain(|atomic| !atomic.is_falsy());
-
-        if value_type.types.is_empty() {
-            return None;
-        }
-
-        Some(get_keyed_array(key_type, value_type))
+        filter_arrays(array_type, codebase, filter_falsy_atomics)
     }
 }
 
-fn apply_assertion_to_narrow_type(
-    original_type: TUnion,
-    assertion: &Assertion,
-    codebase: &mago_codex::metadata::CodebaseMetadata,
-) -> TUnion {
+/// Apply `filter` to every array atomic in `array_type`, unioning the results.
+fn filter_arrays<F>(array_type: &TUnion, codebase: &CodebaseMetadata, filter: F) -> Option<TUnion>
+where
+    F: Fn(TUnion) -> FilterOutcome,
+{
+    let mut result: Option<TUnion> = None;
+    for atomic in array_type.types.as_ref() {
+        let TAtomic::Array(array) = atomic else {
+            return None;
+        };
+
+        let filtered = filter_atomic_array(array, &filter, codebase)?;
+        result = Some(match result {
+            Some(acc) => add_union_type(acc, &filtered, codebase, CombinerOptions::default()),
+            None => filtered,
+        });
+    }
+
+    result
+}
+
+/// The outcome of filtering a single value type.
+enum FilterOutcome {
+    Removed,
+    KeptAsRequired(TUnion),
+    KeptAsOptional(TUnion),
+}
+
+fn filter_atomic_array<F>(array: &TArray, filter: &F, codebase: &CodebaseMetadata) -> Option<TUnion>
+where
+    F: Fn(TUnion) -> FilterOutcome,
+{
+    if let TArray::Keyed(keyed) = array
+        && keyed.known_items.is_some()
+    {
+        let items = keyed.known_items.as_ref()?;
+
+        let mut new_known_items: BTreeMap<ArrayKey, (bool, TUnion)> = BTreeMap::new();
+        for (key, (original_optional, value_type)) in items {
+            match filter(value_type.clone()) {
+                FilterOutcome::Removed => continue,
+                FilterOutcome::KeptAsRequired(filtered) => {
+                    new_known_items.insert(*key, (*original_optional, filtered));
+                }
+                FilterOutcome::KeptAsOptional(filtered) => {
+                    new_known_items.insert(*key, (true, filtered));
+                }
+            }
+        }
+
+        let mut parameters = None;
+        if let Some((key_param, value_param)) = &keyed.parameters {
+            match filter((**value_param).clone()) {
+                FilterOutcome::Removed => {}
+                FilterOutcome::KeptAsRequired(filtered_values) | FilterOutcome::KeptAsOptional(filtered_values) => {
+                    parameters = Some((Arc::clone(key_param), Arc::new(filtered_values)));
+                }
+            }
+        }
+
+        if new_known_items.is_empty() && parameters.is_none() {
+            return Some(wrap_atomic(TAtomic::Array(TArray::Keyed(TKeyedArray::new()))));
+        }
+
+        let mut result = TKeyedArray::new();
+        if !new_known_items.is_empty() {
+            result = result.with_known_items(new_known_items);
+        }
+
+        if let Some((k, v)) = parameters {
+            result = result.with_parameters(k, v);
+        }
+
+        return Some(wrap_atomic(TAtomic::Array(TArray::Keyed(result))));
+    }
+
+    let (key_type, value_type) = get_array_parameters(array, codebase);
+    let filtered_values = match filter(value_type) {
+        FilterOutcome::Removed => return None,
+        FilterOutcome::KeptAsRequired(v) | FilterOutcome::KeptAsOptional(v) => v,
+    };
+
+    Some(get_keyed_array(key_type, filtered_values))
+}
+
+fn filter_falsy_atomics(mut value_type: TUnion) -> FilterOutcome {
+    if value_type.is_always_truthy() {
+        return FilterOutcome::KeptAsRequired(value_type);
+    }
+
+    if value_type.is_always_falsy() {
+        return FilterOutcome::Removed;
+    }
+
+    value_type.types.to_mut().retain(|atomic| !atomic.is_falsy());
+
+    if value_type.types.is_empty() { FilterOutcome::Removed } else { FilterOutcome::KeptAsOptional(value_type) }
+}
+
+fn apply_assertion_to_narrow_type(original_type: TUnion, assertion: &Assertion, codebase: &CodebaseMetadata) -> TUnion {
     match assertion {
         Assertion::IsType(atomic) => {
             let mut result = original_type.clone();
             result.types.to_mut().retain(|t| {
-                mago_codex::ttype::comparator::atomic_comparator::is_contained_by(
-                    codebase,
-                    t,
-                    atomic,
-                    false,
-                    &mut mago_codex::ttype::comparator::ComparisonResult::default(),
-                )
+                atomic_comparator::is_contained_by(codebase, t, atomic, false, &mut ComparisonResult::default())
             });
+
             if result.types.is_empty() { original_type } else { result }
         }
         _ => original_type,
