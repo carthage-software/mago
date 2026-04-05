@@ -11,11 +11,11 @@ use mago_reporting::Issue;
 use mago_reporting::Level;
 use mago_span::HasSpan;
 use mago_span::Span;
+use mago_syntax::ast::Access;
+use mago_syntax::ast::Expression;
 use mago_syntax::ast::Node;
 use mago_syntax::ast::NodeKind;
-use mago_syntax::ast::ast::access::Access;
-use mago_syntax::ast::ast::expression::Expression;
-use mago_syntax::ast::ast::variable::Variable;
+use mago_syntax::ast::Variable;
 
 use crate::category::Category;
 use crate::context::LintContext;
@@ -31,6 +31,10 @@ use crate::settings::RuleSettings;
 pub struct NoServiceStateMutationRule {
     meta: &'static RuleMeta,
     cfg: NoServiceStateMutationConfig,
+    /// Tracks whether the class currently being visited implements a reset interface.
+    /// Uses `AtomicBool` because `check()` receives `&self` (not `&mut self`) and the
+    /// rule must be `Sync` for `Arc<RuleRegistry>`. Set when visiting `Node::Class`,
+    /// read when visiting mutation nodes within that class.
     in_reset_class: AtomicBool,
 }
 
@@ -178,13 +182,8 @@ impl LintRule for NoServiceStateMutationRule {
     }
 
     fn targets() -> &'static [NodeKind] {
-        const TARGETS: &[NodeKind] = &[
-            NodeKind::Class,
-            NodeKind::Assignment,
-            NodeKind::UnaryPrefix,
-            NodeKind::UnaryPostfix,
-            NodeKind::Unset,
-        ];
+        const TARGETS: &[NodeKind] =
+            &[NodeKind::Class, NodeKind::Assignment, NodeKind::UnaryPrefix, NodeKind::UnaryPostfix, NodeKind::Unset];
 
         TARGETS
     }
@@ -199,7 +198,7 @@ impl LintRule for NoServiceStateMutationRule {
             let is_reset_class = class.implements.as_ref().is_some_and(|implements| {
                 implements.types.iter().any(|iface| {
                     let name = ctx.lookup_name(iface);
-                    self.cfg.reset_interfaces.iter().any(|ri| name.ends_with(ri.as_str()))
+                    self.cfg.reset_interfaces.iter().any(|ri| name == ri.as_str())
                 })
             });
 
