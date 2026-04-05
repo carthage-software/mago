@@ -1,3 +1,5 @@
+use std::cell::Cell;
+
 use indoc::indoc;
 use schemars::JsonSchema;
 use serde::Deserialize;
@@ -28,6 +30,7 @@ use crate::settings::RuleSettings;
 pub struct NoServiceStateMutationRule {
     meta: &'static RuleMeta,
     cfg: NoServiceStateMutationConfig,
+    in_reset_class: Cell<bool>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, JsonSchema)]
@@ -37,6 +40,7 @@ pub struct NoServiceStateMutationConfig {
     pub include_namespaces: Vec<String>,
     pub exclude_namespaces: Vec<String>,
     pub allowed_methods: Vec<String>,
+    pub reset_interfaces: Vec<String>,
 }
 
 impl Default for NoServiceStateMutationConfig {
@@ -50,6 +54,7 @@ impl Default for NoServiceStateMutationConfig {
                 "App\\ValueObject\\".to_string(),
             ],
             allowed_methods: vec!["__construct".to_string(), "reset".to_string()],
+            reset_interfaces: vec!["Symfony\\Contracts\\Service\\ResetInterface".to_string()],
         }
     }
 }
@@ -163,6 +168,7 @@ impl LintRule for NoServiceStateMutationRule {
 
     fn targets() -> &'static [NodeKind] {
         const TARGETS: &[NodeKind] = &[
+            NodeKind::Class,
             NodeKind::Assignment,
             NodeKind::UnaryPrefix,
             NodeKind::UnaryPostfix,
@@ -173,10 +179,28 @@ impl LintRule for NoServiceStateMutationRule {
     }
 
     fn build(settings: &RuleSettings<Self::Config>) -> Self {
-        Self { meta: Self::meta(), cfg: settings.config.clone() }
+        Self { meta: Self::meta(), cfg: settings.config.clone(), in_reset_class: Cell::new(false) }
     }
 
     fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
+        // When entering a class, check if it implements a reset interface.
+        if let Node::Class(class) = node {
+            let is_reset_class = class.implements.as_ref().is_some_and(|implements| {
+                implements.types.iter().any(|iface| {
+                    let name = ctx.lookup_name(iface);
+                    self.cfg.reset_interfaces.iter().any(|ri| name.ends_with(ri.as_str()))
+                })
+            });
+
+            self.in_reset_class.set(is_reset_class);
+            return;
+        }
+
+        // Skip mutations in classes implementing a reset interface.
+        if self.in_reset_class.get() {
+            return;
+        }
+
         // Must be inside a method; skip allowed methods.
         let Some(FunctionLikeScope::Method(method_name)) = ctx.scope.get_function_like_scope() else {
             return;
@@ -671,6 +695,32 @@ mod tests {
                 public static function setCounter(int $value): void
                 {
                     static::$counter = $value;
+                }
+            }
+        "#},
+    }
+
+    test_lint_success! {
+        name = class_implementing_reset_interface_is_skipped,
+        rule = NoServiceStateMutationRule,
+        settings = symfony_settings,
+        code = indoc! {r#"
+            <?php
+
+            namespace App\Service;
+
+            use Symfony\Contracts\Service\ResetInterface;
+
+            class CacheService implements ResetInterface
+            {
+                public function warmUp(): void
+                {
+                    $this->data = [];
+                }
+
+                public function reset(): void
+                {
+                    $this->data = null;
                 }
             }
         "#},
