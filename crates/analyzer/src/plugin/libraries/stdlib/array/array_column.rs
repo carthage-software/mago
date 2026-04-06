@@ -121,7 +121,7 @@ fn try_resolve_from_keyed_array(
         element_type.clone()
     } else {
         let key_str = column_key_type.get_single_literal_string_value()?;
-        let (_, value_type) = known_items.get(&ArrayKey::String(atom(&key_str)))?;
+        let (_, value_type) = known_items.get(&ArrayKey::String(atom(key_str)))?;
         value_type.clone()
     };
 
@@ -130,7 +130,7 @@ fn try_resolve_from_keyed_array(
             None
         } else {
             let key_str = index_key_type.get_single_literal_string_value()?;
-            let (_, value_type) = known_items.get(&ArrayKey::String(atom(&key_str)))?;
+            let (_, value_type) = known_items.get(&ArrayKey::String(atom(key_str)))?;
             extract_scalar_for_key(value_type)
         }
     } else {
