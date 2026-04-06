@@ -207,6 +207,8 @@ pub fn analyze_logical_and_operation<'ctx, 'arena>(
         .conditionally_referenced_variable_ids
         .extend(right_block_context.conditionally_referenced_variable_ids);
 
+    let left_assigned_var_ids = left_block_context.assigned_variable_ids.clone();
+    let right_assigned_var_ids = right_block_context.assigned_variable_ids.clone();
     if block_context.flags.inside_conditional() {
         block_context.assigned_variable_ids = left_block_context.assigned_variable_ids;
         block_context.assigned_variable_ids.extend(right_block_context.assigned_variable_ids);
@@ -230,7 +232,17 @@ pub fn analyze_logical_and_operation<'ctx, 'arena>(
             if_body_context_inner.reconciled_expression_clauses.extend(partitioned_clauses.1);
         }
     } else {
-        block_context.locals = left_block_context.locals;
+        let left_locals = left_block_context.locals;
+        for (var_id, var_type) in &right_block_context.locals {
+            if right_assigned_var_ids.contains_key(var_id)
+                && !left_assigned_var_ids.contains_key(var_id)
+                && !left_locals.contains_key(var_id)
+            {
+                block_context.locals.insert(*var_id, var_type.clone());
+            }
+        }
+
+        block_context.locals.extend(left_locals);
     }
 
     Ok(())
