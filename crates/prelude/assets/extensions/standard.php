@@ -2751,6 +2751,8 @@ function highlight_string(string $string, bool $return = false): string|bool {}
  * @return ($as_number is true ? int|float|false : list{int, int}|false)
  *
  * @mutation-free
+ *
+ * @psalm-ignore-falsable-return
  */
 function hrtime(bool $as_number = false): array|int|float|false {}
 
