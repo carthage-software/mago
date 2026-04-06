@@ -222,9 +222,7 @@ impl<'a> DatabaseLoader<'a> {
             })
             .collect();
 
-        // `bool` indicates whether the path is canonical (came from a WalkDir
-        // rooted at a canonicalized path) or possibly non-canonical (glob).
-        let mut paths_to_process: Vec<(std::path::PathBuf, usize, bool)> = Vec::new();
+        let mut paths_to_process: Vec<(std::path::PathBuf, usize)> = Vec::new();
 
         for root in roots {
             // Check if this is a glob pattern (contains glob metacharacters).
@@ -260,7 +258,7 @@ impl<'a> DatabaseLoader<'a> {
                                         // TempDir / glob return /var/… but canonicalize gives
                                         // /private/var/…).  Fall back to the original on error.
                                         let canonical = path.canonicalize().unwrap_or(path);
-                                        paths_to_process.push((canonical, specificity, true));
+                                        paths_to_process.push((canonical, specificity));
                                     }
                                 }
                                 Err(e) => {
@@ -279,7 +277,7 @@ impl<'a> DatabaseLoader<'a> {
                 let canonical_root = resolved_path.canonicalize().unwrap_or(resolved_path);
                 for entry in WalkDir::new(&canonical_root).into_iter().filter_map(Result::ok) {
                     if entry.file_type().is_file() {
-                        paths_to_process.push((entry.into_path(), specificity, true));
+                        paths_to_process.push((entry.into_path(), specificity));
                     }
                 }
             }
@@ -288,7 +286,7 @@ impl<'a> DatabaseLoader<'a> {
         let has_path_excludes = !canonical_excludes.is_empty();
         let files: Vec<FileWithSpecificity> = paths_to_process
             .into_par_iter()
-            .filter_map(|(path, specificity, is_canonical)| {
+            .filter_map(|(path, specificity)| {
                 if glob_excludes.is_match(&path) {
                     return None;
                 }
@@ -299,25 +297,12 @@ impl<'a> DatabaseLoader<'a> {
                 }
 
                 if has_path_excludes {
-                    let excluded = if is_canonical {
-                        // Fast path: byte-string prefix check, no syscalls.
-                        path.to_str().is_some_and(|s| {
-                            canonical_excludes.iter().any(|excl| {
-                                s.starts_with(excl.as_str())
-                                    && matches!(s.as_bytes().get(excl.len()), None | Some(&b'/' | &b'\\'))
-                            })
+                    let excluded = path.to_str().is_some_and(|s| {
+                        canonical_excludes.iter().any(|excl| {
+                            s.starts_with(excl.as_str())
+                                && matches!(s.as_bytes().get(excl.len()), None | Some(&b'/' | &b'\\'))
                         })
-                    } else {
-                        // Glob path: may contain symlinks, fall back to canonicalize.
-                        path.canonicalize().is_ok_and(|canonical| {
-                            canonical.to_str().is_some_and(|s| {
-                                canonical_excludes.iter().any(|excl| {
-                                    s.starts_with(excl.as_str())
-                                        && matches!(s.as_bytes().get(excl.len()), None | Some(&b'/' | &b'\\'))
-                                })
-                            })
-                        })
-                    };
+                    });
 
                     if excluded {
                         return None;
