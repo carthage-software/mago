@@ -1144,6 +1144,8 @@ function phpinfo(int $flags = INFO_ALL): bool {}
 
 /**
  * @pure
+ *
+ * @return ($extension is null ? non-empty-string : non-empty-string|false)
  */
 function phpversion(?string $extension): string|false {}
 
