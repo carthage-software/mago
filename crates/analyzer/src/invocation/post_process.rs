@@ -298,6 +298,19 @@ fn update_by_reference_argument_types<'ctx, 'arena>(
                     resolve_invocation_type(context, invocation, template_result, parameters, new_type)
                 });
 
+            // If the argument's current type is `never`, this call is unreachable
+            // its by-reference effect cannot happen, so the variable's type must
+            // remain `never`. Without this guard, calling a template-generic
+            // function (e.g. `array_pop`) on a `never` argument resolves the
+            // templates to their constraints (e.g `mixed`), and that widened
+            // out-type leaks through loop widening into reachable iterations.
+            if let Some(argument_id) = &argument_id
+                && let Some(existing_type) = block_context.locals.get(argument_id)
+                && existing_type.is_never()
+            {
+                continue;
+            }
+
             new_type.set_by_reference(true);
 
             if constraint_type && let Some(argument_id) = argument_id {

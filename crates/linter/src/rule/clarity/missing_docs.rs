@@ -137,10 +137,8 @@ impl MissingDocsRule {
         stmt: &'a Statement<'arena>,
     ) {
         match stmt {
-            Statement::Function(func) => {
-                if self.cfg.functions {
-                    self.check_docs(ctx, program, func, "function");
-                }
+            Statement::Function(func) if self.cfg.functions => {
+                self.check_docs(ctx, program, func, "function");
             }
             Statement::Namespace(ns) => {
                 for inner_stmt in ns.statements() {
@@ -175,15 +173,11 @@ impl MissingDocsRule {
 
                 self.check_members(ctx, program, en.members.iter());
             }
-            Statement::Constant(constant) => {
-                if self.cfg.constants {
-                    self.check_docs(ctx, program, constant, "constant");
-                }
+            Statement::Constant(constant) if self.cfg.constants => {
+                self.check_docs(ctx, program, constant, "constant");
             }
-            Statement::Static(stat) => {
-                if self.cfg.statics {
-                    self.check_docs(ctx, program, stat, "static variable");
-                }
+            Statement::Static(stat) if self.cfg.statics => {
+                self.check_docs(ctx, program, stat, "static variable");
             }
             _ => {}
         }
@@ -197,25 +191,17 @@ impl MissingDocsRule {
     ) {
         for member in members {
             match member {
-                ClassLikeMember::Constant(constant) => {
-                    if self.cfg.constants {
-                        self.check_docs(ctx, program, constant, "class constant");
-                    }
+                ClassLikeMember::Constant(constant) if self.cfg.constants => {
+                    self.check_docs(ctx, program, constant, "class constant");
                 }
-                ClassLikeMember::EnumCase(enum_case) => {
-                    if self.cfg.enum_cases {
-                        self.check_docs(ctx, program, enum_case, "enum case");
-                    }
+                ClassLikeMember::EnumCase(enum_case) if self.cfg.enum_cases => {
+                    self.check_docs(ctx, program, enum_case, "enum case");
                 }
-                ClassLikeMember::Method(method) => {
-                    if self.cfg.methods {
-                        self.check_docs(ctx, program, method, "method");
-                    }
+                ClassLikeMember::Method(method) if self.cfg.methods => {
+                    self.check_docs(ctx, program, method, "method");
                 }
-                ClassLikeMember::Property(prop) => {
-                    if self.cfg.properties {
-                        self.check_docs(ctx, program, prop, "property");
-                    }
+                ClassLikeMember::Property(prop) if self.cfg.properties => {
+                    self.check_docs(ctx, program, prop, "property");
                 }
                 _ => {}
             }

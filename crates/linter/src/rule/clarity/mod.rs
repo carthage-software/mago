@@ -1,6 +1,7 @@
 pub mod explicit_octal;
 pub mod instanceof_stringable;
 pub mod literal_named_argument;
+pub mod missing_docs;
 pub mod no_empty;
 pub mod no_hash_emoji;
 pub mod no_isset;
@@ -18,11 +19,11 @@ pub mod use_dedicated_expectation;
 pub mod use_simpler_expectation;
 pub mod use_specific_expectations;
 pub mod valid_docblock;
-pub mod missing_docs;
 
 pub use explicit_octal::*;
 pub use instanceof_stringable::*;
 pub use literal_named_argument::*;
+pub use missing_docs::*;
 pub use no_empty::*;
 pub use no_hash_emoji::*;
 pub use no_isset::*;
@@ -40,4 +41,3 @@ pub use use_dedicated_expectation::*;
 pub use use_simpler_expectation::*;
 pub use use_specific_expectations::*;
 pub use valid_docblock::*;
-pub use missing_docs::*;

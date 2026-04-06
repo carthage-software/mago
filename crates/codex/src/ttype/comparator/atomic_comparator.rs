@@ -16,6 +16,9 @@ use crate::ttype::atomic::object::r#enum::TEnum;
 use crate::ttype::atomic::object::named::TNamedObject;
 use crate::ttype::atomic::reference::TReference;
 use crate::ttype::atomic::scalar::TScalar;
+use crate::ttype::atomic::scalar::string::TString;
+use crate::ttype::atomic::scalar::string::TStringCasing;
+use crate::ttype::atomic::scalar::string::TStringLiteral;
 use crate::ttype::comparator::ComparisonResult;
 use crate::ttype::comparator::array_comparator;
 use crate::ttype::comparator::callable_comparator;
@@ -727,6 +730,13 @@ pub(crate) fn can_be_identical<'a>(
         return true;
     }
 
+    if let (TAtomic::Scalar(TScalar::String(first_string)), TAtomic::Scalar(TScalar::String(second_string))) =
+        (first_part, second_part)
+        && strings_can_be_identical(first_string, second_string)
+    {
+        return true;
+    }
+
     let mut first_comparison_result = ComparisonResult::new();
     let mut second_comparison_result = ComparisonResult::new();
 
@@ -776,6 +786,41 @@ pub(crate) fn can_be_identical<'a>(
     }
 
     false
+}
+
+/// Checks whether two string types can share at least one concrete value.
+///
+/// PHP string flags (casing, non-emptiness, numeric-ness, callable-ness) live
+/// on independent dimensions, so types like `non-empty-string` and
+/// `lowercase-string` are not in a subtype relation yet still overlap
+/// (`"abc"` is both). Subtype-based comparison misses this; we enumerate the
+/// conflicts instead and return `true` whenever none apply.
+fn strings_can_be_identical(lhs: &TString, rhs: &TString) -> bool {
+    if let (Some(TStringLiteral::Value(l)), Some(TStringLiteral::Value(r))) = (&lhs.literal, &rhs.literal) {
+        return l == r;
+    }
+
+    let literal_value = match (&lhs.literal, &rhs.literal) {
+        (Some(TStringLiteral::Value(v)), _) => Some((v.as_str(), rhs)),
+        (_, Some(TStringLiteral::Value(v))) => Some((v.as_str(), lhs)),
+        _ => None,
+    };
+
+    if let Some((value, constraints)) = literal_value {
+        if constraints.is_non_empty && value.is_empty() {
+            return false;
+        }
+
+        match constraints.casing {
+            TStringCasing::Lowercase if value.chars().any(|c| c.is_ascii_uppercase()) => return false,
+            TStringCasing::Uppercase if value.chars().any(|c| c.is_ascii_lowercase()) => return false,
+            _ => {}
+        }
+
+        return true;
+    }
+
+    true
 }
 
 #[must_use]
