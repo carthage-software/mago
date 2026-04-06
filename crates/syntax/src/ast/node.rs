@@ -714,9 +714,7 @@ impl<'ast, 'arena> Node<'ast, 'arena> {
     where
         F: Fn(&Node<'ast, 'arena>) -> Option<T>,
     {
-        for child in self.children() {
-            child.filter_map_internal(f, result);
-        }
+        self.visit_children(|child| child.filter_map_internal(f, result));
 
         if let Some(item) = f(self) {
             result.push(item);
@@ -1009,488 +1007,518 @@ impl<'ast, 'arena> Node<'ast, 'arena> {
         }
     }
 
-    #[inline]
-    pub fn children(&self) -> Vec<Node<'ast, 'arena>> {
+    pub fn visit_children<F: FnMut(Node<'ast, 'arena>)>(&self, mut f: F) {
         match &self {
             Node::Program(node) => {
-                let mut children = vec![];
                 for node in node.statements.as_slice() {
-                    children.push(Node::Statement(node));
+                    f(Node::Statement(node));
                 }
-
-                children
             }
             Node::Access(node) => match &node {
-                Access::Property(node) => vec![Node::PropertyAccess(node)],
-                Access::NullSafeProperty(node) => vec![Node::NullSafePropertyAccess(node)],
-                Access::StaticProperty(node) => vec![Node::StaticPropertyAccess(node)],
-                Access::ClassConstant(node) => vec![Node::ClassConstantAccess(node)],
+                Access::Property(node) => f(Node::PropertyAccess(node)),
+                Access::NullSafeProperty(node) => f(Node::NullSafePropertyAccess(node)),
+                Access::StaticProperty(node) => f(Node::StaticPropertyAccess(node)),
+                Access::ClassConstant(node) => f(Node::ClassConstantAccess(node)),
             },
             Node::ConstantAccess(node) => {
-                vec![Node::Identifier(&node.name)]
+                f(Node::Identifier(&node.name));
             }
             Node::ClassConstantAccess(node) => {
-                vec![Node::Expression(node.class), Node::ClassLikeConstantSelector(&node.constant)]
+                f(Node::Expression(node.class));
+                f(Node::ClassLikeConstantSelector(&node.constant));
             }
             Node::NullSafePropertyAccess(node) => {
-                vec![Node::Expression(node.object), Node::ClassLikeMemberSelector(&node.property)]
+                f(Node::Expression(node.object));
+                f(Node::ClassLikeMemberSelector(&node.property));
             }
             Node::PropertyAccess(node) => {
-                vec![Node::Expression(node.object), Node::ClassLikeMemberSelector(&node.property)]
+                f(Node::Expression(node.object));
+                f(Node::ClassLikeMemberSelector(&node.property));
             }
             Node::StaticPropertyAccess(node) => {
-                vec![Node::Expression(node.class), Node::Variable(&node.property)]
+                f(Node::Expression(node.class));
+                f(Node::Variable(&node.property));
             }
             Node::Argument(node) => match &node {
-                Argument::Named(node) => vec![Node::NamedArgument(node)],
-                Argument::Positional(node) => vec![Node::PositionalArgument(node)],
+                Argument::Named(node) => f(Node::NamedArgument(node)),
+                Argument::Positional(node) => f(Node::PositionalArgument(node)),
             },
             Node::ArgumentList(node) => {
-                let mut children = vec![];
                 for node in node.arguments.as_slice() {
-                    children.push(Node::Argument(node));
+                    f(Node::Argument(node));
                 }
-
-                children
             }
             Node::PartialArgument(node) => match &node {
-                PartialArgument::Named(node) => vec![Node::NamedArgument(node)],
-                PartialArgument::NamedPlaceholder(node) => vec![Node::NamedPlaceholderArgument(node)],
-                PartialArgument::Placeholder(node) => vec![Node::PlaceholderArgument(node)],
-                PartialArgument::Positional(node) => vec![Node::PositionalArgument(node)],
-                PartialArgument::VariadicPlaceholder(node) => vec![Node::VariadicPlaceholderArgument(node)],
+                PartialArgument::Named(node) => f(Node::NamedArgument(node)),
+                PartialArgument::NamedPlaceholder(node) => f(Node::NamedPlaceholderArgument(node)),
+                PartialArgument::Placeholder(node) => f(Node::PlaceholderArgument(node)),
+                PartialArgument::Positional(node) => f(Node::PositionalArgument(node)),
+                PartialArgument::VariadicPlaceholder(node) => f(Node::VariadicPlaceholderArgument(node)),
             },
             Node::PartialArgumentList(node) => {
-                let mut children = vec![];
                 for node in node.arguments.as_slice() {
-                    children.push(Node::PartialArgument(node));
+                    f(Node::PartialArgument(node));
                 }
-
-                children
             }
             Node::NamedArgument(node) => {
-                vec![Node::LocalIdentifier(&node.name), Node::Expression(node.value)]
+                f(Node::LocalIdentifier(&node.name));
+                f(Node::Expression(node.value));
             }
             Node::NamedPlaceholderArgument(node) => {
-                vec![Node::LocalIdentifier(&node.name)]
+                f(Node::LocalIdentifier(&node.name));
             }
-            Node::PlaceholderArgument(_) => vec![],
-            Node::PositionalArgument(node) => vec![Node::Expression(node.value)],
-            Node::VariadicPlaceholderArgument(_) => vec![],
+            Node::PlaceholderArgument(_) => {}
+            Node::PositionalArgument(node) => f(Node::Expression(node.value)),
+            Node::VariadicPlaceholderArgument(_) => {}
             Node::Array(node) => {
-                let mut children = vec![];
                 for node in node.elements.as_slice() {
-                    children.push(Node::ArrayElement(node));
+                    f(Node::ArrayElement(node));
                 }
-
-                children
             }
             Node::ArrayAccess(node) => {
-                vec![Node::Expression(node.array), Node::Expression(node.index)]
+                f(Node::Expression(node.array));
+                f(Node::Expression(node.index));
             }
             Node::ArrayAppend(node) => {
-                vec![Node::Expression(node.array)]
+                f(Node::Expression(node.array));
             }
             Node::ArrayElement(node) => match &node {
-                ArrayElement::KeyValue(node) => vec![Node::KeyValueArrayElement(node)],
-                ArrayElement::Missing(node) => vec![Node::MissingArrayElement(node)],
-                ArrayElement::Value(node) => vec![Node::ValueArrayElement(node)],
-                ArrayElement::Variadic(node) => vec![Node::VariadicArrayElement(node)],
+                ArrayElement::KeyValue(node) => f(Node::KeyValueArrayElement(node)),
+                ArrayElement::Missing(node) => f(Node::MissingArrayElement(node)),
+                ArrayElement::Value(node) => f(Node::ValueArrayElement(node)),
+                ArrayElement::Variadic(node) => f(Node::VariadicArrayElement(node)),
             },
             Node::KeyValueArrayElement(node) => {
-                vec![Node::Expression(node.key), Node::Expression(node.value)]
+                f(Node::Expression(node.key));
+                f(Node::Expression(node.value));
             }
-            Node::LegacyArray(node) => node.elements.iter().map(Node::ArrayElement).collect(),
-            Node::List(node) => node.elements.iter().map(Node::ArrayElement).collect(),
-            Node::MissingArrayElement(_) => vec![],
-            Node::ValueArrayElement(node) => vec![Node::Expression(node.value)],
-            Node::VariadicArrayElement(node) => vec![Node::Expression(node.value)],
-            Node::Attribute(node) => {
-                let mut children = vec![Node::Identifier(&node.name)];
-                if let Some(arguments) = &node.argument_list {
-                    children.push(Node::ArgumentList(arguments));
+            Node::LegacyArray(node) => {
+                for item in node.elements.iter() {
+                    f(Node::ArrayElement(item));
                 }
-
-                children
             }
-            Node::AttributeList(node) => node.attributes.iter().map(Node::Attribute).collect(),
-            Node::Block(node) => node.statements.iter().map(Node::Statement).collect(),
+            Node::List(node) => {
+                for item in node.elements.iter() {
+                    f(Node::ArrayElement(item));
+                }
+            }
+            Node::MissingArrayElement(_) => {}
+            Node::ValueArrayElement(node) => f(Node::Expression(node.value)),
+            Node::VariadicArrayElement(node) => f(Node::Expression(node.value)),
+            Node::Attribute(node) => {
+                f(Node::Identifier(&node.name));
+                if let Some(arguments) = &node.argument_list {
+                    f(Node::ArgumentList(arguments));
+                }
+            }
+            Node::AttributeList(node) => {
+                for item in node.attributes.iter() {
+                    f(Node::Attribute(item));
+                }
+            }
+            Node::Block(node) => {
+                for item in node.statements.iter() {
+                    f(Node::Statement(item));
+                }
+            }
             Node::Call(node) => match node {
-                Call::Function(node) => vec![Node::FunctionCall(node)],
-                Call::Method(node) => vec![Node::MethodCall(node)],
-                Call::NullSafeMethod(node) => vec![Node::NullSafeMethodCall(node)],
-                Call::StaticMethod(node) => vec![Node::StaticMethodCall(node)],
+                Call::Function(node) => f(Node::FunctionCall(node)),
+                Call::Method(node) => f(Node::MethodCall(node)),
+                Call::NullSafeMethod(node) => f(Node::NullSafeMethodCall(node)),
+                Call::StaticMethod(node) => f(Node::StaticMethodCall(node)),
             },
             Node::FunctionCall(node) => {
-                vec![Node::Expression(node.function), Node::ArgumentList(&node.argument_list)]
+                f(Node::Expression(node.function));
+                f(Node::ArgumentList(&node.argument_list));
             }
             Node::MethodCall(node) => {
-                vec![
-                    Node::Expression(node.object),
-                    Node::ClassLikeMemberSelector(&node.method),
-                    Node::ArgumentList(&node.argument_list),
-                ]
+                f(Node::Expression(node.object));
+                f(Node::ClassLikeMemberSelector(&node.method));
+                f(Node::ArgumentList(&node.argument_list));
             }
             Node::NullSafeMethodCall(node) => {
-                vec![
-                    Node::Expression(node.object),
-                    Node::ClassLikeMemberSelector(&node.method),
-                    Node::ArgumentList(&node.argument_list),
-                ]
+                f(Node::Expression(node.object));
+                f(Node::ClassLikeMemberSelector(&node.method));
+                f(Node::ArgumentList(&node.argument_list));
             }
             Node::StaticMethodCall(node) => {
-                vec![
-                    Node::Expression(node.class),
-                    Node::ClassLikeMemberSelector(&node.method),
-                    Node::ArgumentList(&node.argument_list),
-                ]
+                f(Node::Expression(node.class));
+                f(Node::ClassLikeMemberSelector(&node.method));
+                f(Node::ArgumentList(&node.argument_list));
             }
             Node::PartialApplication(node) => match node {
-                PartialApplication::Function(node) => vec![Node::FunctionPartialApplication(node)],
-                PartialApplication::Method(node) => vec![Node::MethodPartialApplication(node)],
-                PartialApplication::StaticMethod(node) => vec![Node::StaticMethodPartialApplication(node)],
+                PartialApplication::Function(node) => f(Node::FunctionPartialApplication(node)),
+                PartialApplication::Method(node) => f(Node::MethodPartialApplication(node)),
+                PartialApplication::StaticMethod(node) => f(Node::StaticMethodPartialApplication(node)),
             },
             Node::FunctionPartialApplication(node) => {
-                vec![Node::Expression(node.function), Node::PartialArgumentList(&node.argument_list)]
+                f(Node::Expression(node.function));
+                f(Node::PartialArgumentList(&node.argument_list));
             }
             Node::MethodPartialApplication(node) => {
-                vec![
-                    Node::Expression(node.object),
-                    Node::ClassLikeMemberSelector(&node.method),
-                    Node::PartialArgumentList(&node.argument_list),
-                ]
+                f(Node::Expression(node.object));
+                f(Node::ClassLikeMemberSelector(&node.method));
+                f(Node::PartialArgumentList(&node.argument_list));
             }
             Node::StaticMethodPartialApplication(node) => {
-                vec![
-                    Node::Expression(node.class),
-                    Node::ClassLikeMemberSelector(&node.method),
-                    Node::PartialArgumentList(&node.argument_list),
-                ]
+                f(Node::Expression(node.class));
+                f(Node::ClassLikeMemberSelector(&node.method));
+                f(Node::PartialArgumentList(&node.argument_list));
             }
             Node::ClassLikeConstant(node) => {
-                let mut children = vec![];
                 for attr in &node.attribute_lists {
-                    children.push(Node::AttributeList(attr));
+                    f(Node::AttributeList(attr));
                 }
 
-                children.extend(node.modifiers.iter().map(Node::Modifier));
-                children.push(Node::Keyword(&node.r#const));
+                for item in node.modifiers.iter() {
+                    f(Node::Modifier(item));
+                }
+                f(Node::Keyword(&node.r#const));
                 if let Some(hint) = &node.hint {
-                    children.push(Node::Hint(hint));
+                    f(Node::Hint(hint));
                 }
 
-                children.extend(node.items.iter().map(Node::ClassLikeConstantItem));
-                children.push(Node::Terminator(&node.terminator));
-
-                children
+                for item in node.items.iter() {
+                    f(Node::ClassLikeConstantItem(item));
+                }
+                f(Node::Terminator(&node.terminator));
             }
             Node::ClassLikeConstantItem(node) => {
-                vec![Node::LocalIdentifier(&node.name), Node::Expression(node.value)]
+                f(Node::LocalIdentifier(&node.name));
+                f(Node::Expression(node.value));
             }
             Node::EnumCase(node) => {
-                let mut children = vec![];
                 for attr in &node.attribute_lists {
-                    children.push(Node::AttributeList(attr));
+                    f(Node::AttributeList(attr));
                 }
 
-                children.push(Node::Keyword(&node.case));
-                children.push(Node::EnumCaseItem(&node.item));
-                children.push(Node::Terminator(&node.terminator));
-
-                children
+                f(Node::Keyword(&node.case));
+                f(Node::EnumCaseItem(&node.item));
+                f(Node::Terminator(&node.terminator));
             }
             Node::EnumCaseBackedItem(node) => {
-                vec![Node::LocalIdentifier(&node.name), Node::Expression(node.value)]
+                f(Node::LocalIdentifier(&node.name));
+                f(Node::Expression(node.value));
             }
             Node::EnumCaseItem(node) => match &node {
-                EnumCaseItem::Backed(node) => vec![Node::EnumCaseBackedItem(node)],
-                EnumCaseItem::Unit(node) => vec![Node::EnumCaseUnitItem(node)],
+                EnumCaseItem::Backed(node) => f(Node::EnumCaseBackedItem(node)),
+                EnumCaseItem::Unit(node) => f(Node::EnumCaseUnitItem(node)),
             },
-            Node::EnumCaseUnitItem(node) => vec![Node::LocalIdentifier(&node.name)],
+            Node::EnumCaseUnitItem(node) => f(Node::LocalIdentifier(&node.name)),
             Node::Extends(node) => {
-                let mut children = vec![];
-
-                children.push(Node::Keyword(&node.extends));
-                children.extend(node.types.iter().map(Node::Identifier));
-
-                children
+                f(Node::Keyword(&node.extends));
+                for item in node.types.iter() {
+                    f(Node::Identifier(item));
+                }
             }
             Node::Implements(node) => {
-                let mut children = vec![];
-
-                children.push(Node::Keyword(&node.implements));
-                children.extend(node.types.iter().map(Node::Identifier));
-
-                children
+                f(Node::Keyword(&node.implements));
+                for item in node.types.iter() {
+                    f(Node::Identifier(item));
+                }
             }
             Node::ClassLikeConstantSelector(node) => match node {
-                ClassLikeConstantSelector::Identifier(node) => vec![Node::LocalIdentifier(node)],
+                ClassLikeConstantSelector::Identifier(node) => f(Node::LocalIdentifier(node)),
                 ClassLikeConstantSelector::Expression(node) => {
-                    vec![Node::ClassLikeMemberExpressionSelector(node)]
+                    f(Node::ClassLikeMemberExpressionSelector(node));
                 }
-                ClassLikeConstantSelector::Missing(span) => vec![Node::ClassLikeConstantMissingSelector(*span)],
+                ClassLikeConstantSelector::Missing(span) => f(Node::ClassLikeConstantMissingSelector(*span)),
             },
             Node::ClassLikeMember(node) => match node {
-                ClassLikeMember::TraitUse(node) => vec![Node::TraitUse(node)],
-                ClassLikeMember::Constant(node) => vec![Node::ClassLikeConstant(node)],
-                ClassLikeMember::Property(node) => vec![Node::Property(node)],
-                ClassLikeMember::EnumCase(node) => vec![Node::EnumCase(node)],
-                ClassLikeMember::Method(node) => vec![Node::Method(node)],
+                ClassLikeMember::TraitUse(node) => f(Node::TraitUse(node)),
+                ClassLikeMember::Constant(node) => f(Node::ClassLikeConstant(node)),
+                ClassLikeMember::Property(node) => f(Node::Property(node)),
+                ClassLikeMember::EnumCase(node) => f(Node::EnumCase(node)),
+                ClassLikeMember::Method(node) => f(Node::Method(node)),
             },
-            Node::ClassLikeMemberExpressionSelector(node) => vec![Node::Expression(node.expression)],
+            Node::ClassLikeMemberExpressionSelector(node) => f(Node::Expression(node.expression)),
             Node::ClassLikeMemberSelector(node) => match node {
-                ClassLikeMemberSelector::Identifier(node) => vec![Node::LocalIdentifier(node)],
-                ClassLikeMemberSelector::Variable(node) => vec![Node::Variable(node)],
+                ClassLikeMemberSelector::Identifier(node) => f(Node::LocalIdentifier(node)),
+                ClassLikeMemberSelector::Variable(node) => f(Node::Variable(node)),
                 ClassLikeMemberSelector::Expression(node) => {
-                    vec![Node::ClassLikeMemberExpressionSelector(node)]
+                    f(Node::ClassLikeMemberExpressionSelector(node));
                 }
-                ClassLikeMemberSelector::Missing(span) => vec![Node::ClassLikeMemberMissingSelector(*span)],
+                ClassLikeMemberSelector::Missing(span) => f(Node::ClassLikeMemberMissingSelector(*span)),
             },
             Node::Method(node) => {
-                let mut children: Vec<Node> = vec![];
-
-                children.extend(node.attribute_lists.iter().map(Node::AttributeList));
-                children.extend(node.modifiers.iter().map(Node::Modifier));
-                children.push(Node::Keyword(&node.function));
-                children.push(Node::LocalIdentifier(&node.name));
-                children.push(Node::FunctionLikeParameterList(&node.parameter_list));
-                children.extend(node.return_type_hint.iter().map(Node::FunctionLikeReturnTypeHint));
-                children.push(Node::MethodBody(&node.body));
-
-                children
+                for item in node.attribute_lists.iter() {
+                    f(Node::AttributeList(item));
+                }
+                for item in node.modifiers.iter() {
+                    f(Node::Modifier(item));
+                }
+                f(Node::Keyword(&node.function));
+                f(Node::LocalIdentifier(&node.name));
+                f(Node::FunctionLikeParameterList(&node.parameter_list));
+                for item in node.return_type_hint.iter() {
+                    f(Node::FunctionLikeReturnTypeHint(item));
+                }
+                f(Node::MethodBody(&node.body));
             }
-            Node::MethodAbstractBody(_) => vec![],
+            Node::MethodAbstractBody(_) => {}
             Node::MethodBody(node) => match node {
-                MethodBody::Abstract(node) => vec![Node::MethodAbstractBody(node)],
-                MethodBody::Concrete(node) => vec![Node::Block(node)],
+                MethodBody::Abstract(node) => f(Node::MethodAbstractBody(node)),
+                MethodBody::Concrete(node) => f(Node::Block(node)),
             },
             Node::HookedProperty(node) => {
-                let mut children: Vec<Node> = vec![];
-
-                children.extend(node.attribute_lists.iter().map(Node::AttributeList));
-                children.extend(node.var.iter().map(Node::Keyword));
-                children.extend(node.modifiers.iter().map(Node::Modifier));
-                children.extend(node.hint.iter().map(Node::Hint));
-                children.push(Node::PropertyItem(&node.item));
-                children.push(Node::PropertyHookList(&node.hook_list));
-
-                children
+                for item in node.attribute_lists.iter() {
+                    f(Node::AttributeList(item));
+                }
+                for item in node.var.iter() {
+                    f(Node::Keyword(item));
+                }
+                for item in node.modifiers.iter() {
+                    f(Node::Modifier(item));
+                }
+                for item in node.hint.iter() {
+                    f(Node::Hint(item));
+                }
+                f(Node::PropertyItem(&node.item));
+                f(Node::PropertyHookList(&node.hook_list));
             }
             Node::PlainProperty(node) => {
-                let mut children: Vec<Node> = vec![];
-
-                children.extend(node.attribute_lists.iter().map(Node::AttributeList));
-                children.extend(node.var.iter().map(Node::Keyword));
-                children.extend(node.modifiers.iter().map(Node::Modifier));
-                children.extend(node.hint.iter().map(Node::Hint));
-                children.extend(node.items.iter().map(Node::PropertyItem));
-
-                children
+                for item in node.attribute_lists.iter() {
+                    f(Node::AttributeList(item));
+                }
+                for item in node.var.iter() {
+                    f(Node::Keyword(item));
+                }
+                for item in node.modifiers.iter() {
+                    f(Node::Modifier(item));
+                }
+                for item in node.hint.iter() {
+                    f(Node::Hint(item));
+                }
+                for item in node.items.iter() {
+                    f(Node::PropertyItem(item));
+                }
             }
             Node::Property(node) => match node {
-                Property::Plain(node) => vec![Node::PlainProperty(node)],
-                Property::Hooked(node) => vec![Node::HookedProperty(node)],
+                Property::Plain(node) => f(Node::PlainProperty(node)),
+                Property::Hooked(node) => f(Node::HookedProperty(node)),
             },
             Node::PropertyAbstractItem(node) => {
-                vec![Node::DirectVariable(&node.variable)]
+                f(Node::DirectVariable(&node.variable));
             }
             Node::PropertyConcreteItem(node) => {
-                vec![Node::DirectVariable(&node.variable), Node::Expression(node.value)]
+                f(Node::DirectVariable(&node.variable));
+                f(Node::Expression(node.value));
             }
             Node::PropertyHook(node) => {
-                let mut children: Vec<Node> = vec![];
-
-                children.extend(node.attribute_lists.iter().map(Node::AttributeList));
-                children.extend(node.modifiers.iter().map(Node::Modifier));
-                children.push(Node::LocalIdentifier(&node.name));
-                children.extend(node.parameter_list.iter().map(Node::FunctionLikeParameterList));
-                children.push(Node::PropertyHookBody(&node.body));
-
-                children
+                for item in node.attribute_lists.iter() {
+                    f(Node::AttributeList(item));
+                }
+                for item in node.modifiers.iter() {
+                    f(Node::Modifier(item));
+                }
+                f(Node::LocalIdentifier(&node.name));
+                for item in node.parameter_list.iter() {
+                    f(Node::FunctionLikeParameterList(item));
+                }
+                f(Node::PropertyHookBody(&node.body));
             }
-            Node::PropertyHookAbstractBody(_) => {
-                vec![]
-            }
-            Node::PropertyHookBody(node) => vec![match node {
+            Node::PropertyHookAbstractBody(_) => {}
+            Node::PropertyHookBody(node) => f(match node {
                 PropertyHookBody::Abstract(node) => Node::PropertyHookAbstractBody(node),
                 PropertyHookBody::Concrete(node) => Node::PropertyHookConcreteBody(node),
-            }],
-            Node::PropertyHookConcreteBody(node) => vec![match node {
+            }),
+            Node::PropertyHookConcreteBody(node) => f(match node {
                 PropertyHookConcreteBody::Expression(node) => Node::PropertyHookConcreteExpressionBody(node),
                 PropertyHookConcreteBody::Block(node) => Node::Block(node),
-            }],
-            Node::PropertyHookConcreteExpressionBody(node) => vec![Node::Expression(node.expression)],
-            Node::PropertyHookList(node) => node.hooks.iter().map(Node::PropertyHook).collect(),
+            }),
+            Node::PropertyHookConcreteExpressionBody(node) => f(Node::Expression(node.expression)),
+            Node::PropertyHookList(node) => {
+                for item in node.hooks.iter() {
+                    f(Node::PropertyHook(item));
+                }
+            }
             Node::PropertyItem(node) => match node {
-                PropertyItem::Abstract(node) => vec![Node::PropertyAbstractItem(node)],
-                PropertyItem::Concrete(node) => vec![Node::PropertyConcreteItem(node)],
+                PropertyItem::Abstract(node) => f(Node::PropertyAbstractItem(node)),
+                PropertyItem::Concrete(node) => f(Node::PropertyConcreteItem(node)),
             },
             Node::TraitUse(node) => {
-                let mut children: Vec<Node> = vec![];
-
-                children.push(Node::Keyword(&node.r#use));
-                children.extend(node.trait_names.iter().map(Node::Identifier));
-                children.push(Node::TraitUseSpecification(&node.specification));
-
-                children
+                f(Node::Keyword(&node.r#use));
+                for item in node.trait_names.iter() {
+                    f(Node::Identifier(item));
+                }
+                f(Node::TraitUseSpecification(&node.specification));
             }
             Node::TraitUseAbsoluteMethodReference(node) => {
-                vec![Node::Identifier(&node.trait_name), Node::LocalIdentifier(&node.method_name)]
+                f(Node::Identifier(&node.trait_name));
+                f(Node::LocalIdentifier(&node.method_name));
             }
-            Node::TraitUseAbstractSpecification(node) => vec![Node::Terminator(&node.0)],
+            Node::TraitUseAbstractSpecification(node) => f(Node::Terminator(&node.0)),
             Node::TraitUseAdaptation(node) => match node {
                 TraitUseAdaptation::Precedence(adaptation) => {
-                    let mut children = vec![
-                        Node::TraitUseAbsoluteMethodReference(&adaptation.method_reference),
-                        Node::Keyword(&adaptation.insteadof),
-                    ];
+                    f(Node::TraitUseAbsoluteMethodReference(&adaptation.method_reference));
+                    f(Node::Keyword(&adaptation.insteadof));
 
-                    children.extend(adaptation.trait_names.iter().map(Node::Identifier));
-                    children.push(Node::Terminator(&adaptation.terminator));
-
-                    children
+                    for item in adaptation.trait_names.iter() {
+                        f(Node::Identifier(item));
+                    }
+                    f(Node::Terminator(&adaptation.terminator));
                 }
                 TraitUseAdaptation::Alias(adaptation) => {
-                    let mut children = vec![
-                        Node::TraitUseMethodReference(&adaptation.method_reference),
-                        Node::Keyword(&adaptation.r#as),
-                    ];
+                    f(Node::TraitUseMethodReference(&adaptation.method_reference));
+                    f(Node::Keyword(&adaptation.r#as));
 
                     if let Some(visibility) = &adaptation.visibility {
-                        children.push(Node::Modifier(visibility));
+                        f(Node::Modifier(visibility));
                     }
 
                     if let Some(alias) = &adaptation.alias {
-                        children.push(Node::LocalIdentifier(alias));
+                        f(Node::LocalIdentifier(alias));
                     }
 
-                    children.push(Node::Terminator(&adaptation.terminator));
-                    children
+                    f(Node::Terminator(&adaptation.terminator));
                 }
             },
             Node::TraitUseAliasAdaptation(node) => {
-                let mut children =
-                    vec![Node::TraitUseMethodReference(&node.method_reference), Node::Keyword(&node.r#as)];
+                f(Node::TraitUseMethodReference(&node.method_reference));
+                f(Node::Keyword(&node.r#as));
 
                 if let Some(visibility) = &node.visibility {
-                    children.push(Node::Modifier(visibility));
+                    f(Node::Modifier(visibility));
                 }
 
                 if let Some(alias) = &node.alias {
-                    children.push(Node::LocalIdentifier(alias));
+                    f(Node::LocalIdentifier(alias));
                 }
 
-                children.push(Node::Terminator(&node.terminator));
-                children
+                f(Node::Terminator(&node.terminator));
             }
             Node::TraitUseConcreteSpecification(node) => {
-                let mut children = vec![];
                 for adaptation in node.adaptations.as_slice() {
-                    children.push(Node::TraitUseAdaptation(adaptation));
+                    f(Node::TraitUseAdaptation(adaptation));
                 }
-
-                children
             }
             Node::TraitUseMethodReference(node) => match node {
                 TraitUseMethodReference::Identifier(identifier) => {
-                    vec![Node::LocalIdentifier(identifier)]
+                    f(Node::LocalIdentifier(identifier));
                 }
                 TraitUseMethodReference::Absolute(reference) => {
-                    vec![Node::TraitUseAbsoluteMethodReference(reference)]
+                    f(Node::TraitUseAbsoluteMethodReference(reference));
                 }
             },
             Node::TraitUsePrecedenceAdaptation(node) => {
-                let mut children =
-                    vec![Node::TraitUseAbsoluteMethodReference(&node.method_reference), Node::Keyword(&node.insteadof)];
+                f(Node::TraitUseAbsoluteMethodReference(&node.method_reference));
+                f(Node::Keyword(&node.insteadof));
 
-                children.extend(node.trait_names.iter().map(Node::Identifier));
-                children.push(Node::Terminator(&node.terminator));
-
-                children
+                for item in node.trait_names.iter() {
+                    f(Node::Identifier(item));
+                }
+                f(Node::Terminator(&node.terminator));
             }
             Node::TraitUseSpecification(node) => match node {
                 TraitUseSpecification::Abstract(specification) => {
-                    vec![Node::TraitUseAbstractSpecification(specification)]
+                    f(Node::TraitUseAbstractSpecification(specification));
                 }
                 TraitUseSpecification::Concrete(specification) => {
-                    vec![Node::TraitUseConcreteSpecification(specification)]
+                    f(Node::TraitUseConcreteSpecification(specification));
                 }
             },
             Node::AnonymousClass(node) => {
-                let mut children = vec![Node::Keyword(&node.new)];
-                children.extend(node.attribute_lists.iter().map(Node::AttributeList));
-                children.extend(node.modifiers.iter().map(Node::Modifier));
-                children.push(Node::Keyword(&node.class));
-                if let Some(argument_list) = &node.argument_list {
-                    children.push(Node::ArgumentList(argument_list));
+                f(Node::Keyword(&node.new));
+                for item in node.attribute_lists.iter() {
+                    f(Node::AttributeList(item));
                 }
-                children.extend(node.extends.iter().map(Node::Extends));
-                children.extend(node.implements.iter().map(Node::Implements));
-                children.extend(node.members.iter().map(Node::ClassLikeMember));
-
-                children
+                for item in node.modifiers.iter() {
+                    f(Node::Modifier(item));
+                }
+                f(Node::Keyword(&node.class));
+                if let Some(argument_list) = &node.argument_list {
+                    f(Node::ArgumentList(argument_list));
+                }
+                for item in node.extends.iter() {
+                    f(Node::Extends(item));
+                }
+                for item in node.implements.iter() {
+                    f(Node::Implements(item));
+                }
+                for item in node.members.iter() {
+                    f(Node::ClassLikeMember(item));
+                }
             }
             Node::Class(node) => {
-                let mut children = vec![];
-                children.extend(node.attribute_lists.iter().map(Node::AttributeList));
-                children.extend(node.modifiers.iter().map(Node::Modifier));
-                children.push(Node::Keyword(&node.class));
-                children.push(Node::LocalIdentifier(&node.name));
-                children.extend(node.extends.iter().map(Node::Extends));
-                children.extend(node.implements.iter().map(Node::Implements));
-                children.extend(node.members.iter().map(Node::ClassLikeMember));
-
-                children
+                for item in node.attribute_lists.iter() {
+                    f(Node::AttributeList(item));
+                }
+                for item in node.modifiers.iter() {
+                    f(Node::Modifier(item));
+                }
+                f(Node::Keyword(&node.class));
+                f(Node::LocalIdentifier(&node.name));
+                for item in node.extends.iter() {
+                    f(Node::Extends(item));
+                }
+                for item in node.implements.iter() {
+                    f(Node::Implements(item));
+                }
+                for item in node.members.iter() {
+                    f(Node::ClassLikeMember(item));
+                }
             }
             Node::Enum(node) => {
-                let mut children = vec![];
-                children.extend(node.attribute_lists.iter().map(Node::AttributeList));
-                children.push(Node::Keyword(&node.r#enum));
-                children.push(Node::LocalIdentifier(&node.name));
-                children.extend(node.backing_type_hint.iter().map(Node::EnumBackingTypeHint));
-                children.extend(node.implements.iter().map(Node::Implements));
-                children.extend(node.members.iter().map(Node::ClassLikeMember));
-
-                children
+                for item in node.attribute_lists.iter() {
+                    f(Node::AttributeList(item));
+                }
+                f(Node::Keyword(&node.r#enum));
+                f(Node::LocalIdentifier(&node.name));
+                for item in node.backing_type_hint.iter() {
+                    f(Node::EnumBackingTypeHint(item));
+                }
+                for item in node.implements.iter() {
+                    f(Node::Implements(item));
+                }
+                for item in node.members.iter() {
+                    f(Node::ClassLikeMember(item));
+                }
             }
             Node::EnumBackingTypeHint(node) => {
-                vec![Node::Hint(&node.hint)]
+                f(Node::Hint(&node.hint));
             }
             Node::Interface(node) => {
-                let mut children = vec![];
-                children.extend(node.attribute_lists.iter().map(Node::AttributeList));
-                children.push(Node::Keyword(&node.interface));
-                children.push(Node::LocalIdentifier(&node.name));
-                children.extend(node.extends.iter().map(Node::Extends));
-                children.extend(node.members.iter().map(Node::ClassLikeMember));
-
-                children
+                for item in node.attribute_lists.iter() {
+                    f(Node::AttributeList(item));
+                }
+                f(Node::Keyword(&node.interface));
+                f(Node::LocalIdentifier(&node.name));
+                for item in node.extends.iter() {
+                    f(Node::Extends(item));
+                }
+                for item in node.members.iter() {
+                    f(Node::ClassLikeMember(item));
+                }
             }
             Node::Trait(node) => {
-                let mut children = vec![];
-                children.extend(node.attribute_lists.iter().map(Node::AttributeList));
-                children.push(Node::Keyword(&node.r#trait));
-                children.push(Node::LocalIdentifier(&node.name));
-                children.extend(node.members.iter().map(Node::ClassLikeMember));
-
-                children
+                for item in node.attribute_lists.iter() {
+                    f(Node::AttributeList(item));
+                }
+                f(Node::Keyword(&node.r#trait));
+                f(Node::LocalIdentifier(&node.name));
+                for item in node.members.iter() {
+                    f(Node::ClassLikeMember(item));
+                }
             }
             Node::Clone(node) => {
-                vec![Node::Keyword(&node.clone), Node::Expression(node.object)]
+                f(Node::Keyword(&node.clone));
+                f(Node::Expression(node.object));
             }
             Node::Constant(node) => {
-                let mut children = vec![];
-                children.extend(node.attribute_lists.iter().map(Node::AttributeList));
-                children.push(Node::Keyword(&node.r#const));
-                children.extend(node.items.iter().map(Node::ConstantItem));
-                children.push(Node::Terminator(&node.terminator));
-
-                children
+                for item in node.attribute_lists.iter() {
+                    f(Node::AttributeList(item));
+                }
+                f(Node::Keyword(&node.r#const));
+                for item in node.items.iter() {
+                    f(Node::ConstantItem(item));
+                }
+                f(Node::Terminator(&node.terminator));
             }
             Node::ConstantItem(node) => {
-                vec![Node::LocalIdentifier(&node.name), Node::Expression(node.value)]
+                f(Node::LocalIdentifier(&node.name));
+                f(Node::Expression(node.value));
             }
-            Node::Construct(node) => vec![match node {
+            Node::Construct(node) => f(match node {
                 Construct::Isset(node) => Node::IssetConstruct(node),
                 Construct::Empty(node) => Node::EmptyConstruct(node),
                 Construct::Eval(node) => Node::EvalConstruct(node),
@@ -1501,416 +1529,426 @@ impl<'ast, 'arena> Node<'ast, 'arena> {
                 Construct::Print(node) => Node::PrintConstruct(node),
                 Construct::Exit(node) => Node::ExitConstruct(node),
                 Construct::Die(node) => Node::DieConstruct(node),
-            }],
+            }),
             Node::IssetConstruct(node) => {
-                let mut children = vec![Node::Keyword(&node.isset)];
-                children.extend(node.values.iter().map(|e| Node::Expression(e)));
-
-                children
+                f(Node::Keyword(&node.isset));
+                for e in node.values.iter() {
+                    f(Node::Expression(e));
+                }
             }
             Node::EmptyConstruct(node) => {
-                vec![Node::Keyword(&node.empty), Node::Expression(node.value)]
+                f(Node::Keyword(&node.empty));
+                f(Node::Expression(node.value));
             }
             Node::EvalConstruct(node) => {
-                vec![Node::Keyword(&node.eval), Node::Expression(node.value)]
+                f(Node::Keyword(&node.eval));
+                f(Node::Expression(node.value));
             }
             Node::IncludeConstruct(node) => {
-                vec![Node::Keyword(&node.include), Node::Expression(node.value)]
+                f(Node::Keyword(&node.include));
+                f(Node::Expression(node.value));
             }
             Node::IncludeOnceConstruct(node) => {
-                vec![Node::Keyword(&node.include_once), Node::Expression(node.value)]
+                f(Node::Keyword(&node.include_once));
+                f(Node::Expression(node.value));
             }
             Node::RequireConstruct(node) => {
-                vec![Node::Keyword(&node.require), Node::Expression(node.value)]
+                f(Node::Keyword(&node.require));
+                f(Node::Expression(node.value));
             }
             Node::RequireOnceConstruct(node) => {
-                vec![Node::Keyword(&node.require_once), Node::Expression(node.value)]
+                f(Node::Keyword(&node.require_once));
+                f(Node::Expression(node.value));
             }
             Node::PrintConstruct(node) => {
-                vec![Node::Keyword(&node.print), Node::Expression(node.value)]
+                f(Node::Keyword(&node.print));
+                f(Node::Expression(node.value));
             }
             Node::ExitConstruct(node) => {
-                let mut children = vec![Node::Keyword(&node.exit)];
+                f(Node::Keyword(&node.exit));
                 if let Some(arguments) = &node.arguments {
-                    children.push(Node::ArgumentList(arguments));
+                    f(Node::ArgumentList(arguments));
                 }
-                children
             }
             Node::DieConstruct(node) => {
-                let mut children = vec![Node::Keyword(&node.die)];
+                f(Node::Keyword(&node.die));
                 if let Some(arguments) = &node.arguments {
-                    children.push(Node::ArgumentList(arguments));
+                    f(Node::ArgumentList(arguments));
                 }
-                children
             }
             Node::If(node) => {
-                vec![Node::Keyword(&node.r#if), Node::Expression(node.condition), Node::IfBody(&node.body)]
+                f(Node::Keyword(&node.r#if));
+                f(Node::Expression(node.condition));
+                f(Node::IfBody(&node.body));
             }
             Node::IfBody(node) => match node {
-                IfBody::Statement(statement_body) => vec![Node::IfStatementBody(statement_body)],
-                IfBody::ColonDelimited(colon_body) => vec![Node::IfColonDelimitedBody(colon_body)],
+                IfBody::Statement(statement_body) => f(Node::IfStatementBody(statement_body)),
+                IfBody::ColonDelimited(colon_body) => f(Node::IfColonDelimitedBody(colon_body)),
             },
             Node::IfStatementBody(node) => {
-                let mut children = vec![Node::Statement(node.statement)];
+                f(Node::Statement(node.statement));
 
-                children.extend(node.else_if_clauses.iter().map(Node::IfStatementBodyElseIfClause));
-                if let Some(else_clause) = &node.else_clause {
-                    children.push(Node::IfStatementBodyElseClause(else_clause));
+                for item in node.else_if_clauses.iter() {
+                    f(Node::IfStatementBodyElseIfClause(item));
                 }
-
-                children
+                if let Some(else_clause) = &node.else_clause {
+                    f(Node::IfStatementBodyElseClause(else_clause));
+                }
             }
             Node::IfStatementBodyElseIfClause(node) => {
-                vec![Node::Keyword(&node.elseif), Node::Expression(node.condition), Node::Statement(node.statement)]
+                f(Node::Keyword(&node.elseif));
+                f(Node::Expression(node.condition));
+                f(Node::Statement(node.statement));
             }
             Node::IfStatementBodyElseClause(node) => {
-                vec![Node::Keyword(&node.r#else), Node::Statement(node.statement)]
+                f(Node::Keyword(&node.r#else));
+                f(Node::Statement(node.statement));
             }
             Node::IfColonDelimitedBody(node) => {
-                let mut children = vec![];
                 for stmt in node.statements.as_slice() {
-                    children.push(Node::Statement(stmt));
+                    f(Node::Statement(stmt));
                 }
 
-                children.extend(node.else_if_clauses.iter().map(Node::IfColonDelimitedBodyElseIfClause));
+                for item in node.else_if_clauses.iter() {
+                    f(Node::IfColonDelimitedBodyElseIfClause(item));
+                }
 
                 if let Some(else_clause) = &node.else_clause {
-                    children.push(Node::IfColonDelimitedBodyElseClause(else_clause));
+                    f(Node::IfColonDelimitedBodyElseClause(else_clause));
                 }
 
-                children.push(Node::Keyword(&node.endif));
-                children.push(Node::Terminator(&node.terminator));
-
-                children
+                f(Node::Keyword(&node.endif));
+                f(Node::Terminator(&node.terminator));
             }
             Node::IfColonDelimitedBodyElseIfClause(node) => {
-                let mut children = vec![Node::Keyword(&node.elseif), Node::Expression(node.condition)];
-                children.extend(node.statements.iter().map(Node::Statement));
-
-                children
+                f(Node::Keyword(&node.elseif));
+                f(Node::Expression(node.condition));
+                for item in node.statements.iter() {
+                    f(Node::Statement(item));
+                }
             }
             Node::IfColonDelimitedBodyElseClause(node) => {
-                let mut children = vec![Node::Keyword(&node.r#else)];
+                f(Node::Keyword(&node.r#else));
 
-                children.extend(node.statements.iter().map(Node::Statement));
-
-                children
+                for item in node.statements.iter() {
+                    f(Node::Statement(item));
+                }
             }
             Node::Match(node) => {
-                let mut children = vec![Node::Keyword(&node.r#match), Node::Expression(node.expression)];
-                children.extend(node.arms.iter().map(Node::MatchArm));
-
-                children
+                f(Node::Keyword(&node.r#match));
+                f(Node::Expression(node.expression));
+                for item in node.arms.iter() {
+                    f(Node::MatchArm(item));
+                }
             }
             Node::MatchArm(node) => match node {
-                MatchArm::Expression(expr_arm) => vec![Node::MatchExpressionArm(expr_arm)],
-                MatchArm::Default(default_arm) => vec![Node::MatchDefaultArm(default_arm)],
+                MatchArm::Expression(expr_arm) => f(Node::MatchExpressionArm(expr_arm)),
+                MatchArm::Default(default_arm) => f(Node::MatchDefaultArm(default_arm)),
             },
             Node::MatchExpressionArm(node) => {
-                let mut children = vec![];
-
-                children.extend(node.conditions.iter().map(|e| Node::Expression(e)));
-                children.push(Node::Expression(node.expression));
-
-                children
+                for e in node.conditions.iter() {
+                    f(Node::Expression(e));
+                }
+                f(Node::Expression(node.expression));
             }
             Node::MatchDefaultArm(node) => {
-                vec![Node::Keyword(&node.default), Node::Expression(node.expression)]
+                f(Node::Keyword(&node.default));
+                f(Node::Expression(node.expression));
             }
             Node::Switch(node) => {
-                vec![Node::Keyword(&node.switch), Node::Expression(node.expression), Node::SwitchBody(&node.body)]
+                f(Node::Keyword(&node.switch));
+                f(Node::Expression(node.expression));
+                f(Node::SwitchBody(&node.body));
             }
             Node::SwitchBody(node) => match node {
-                SwitchBody::BraceDelimited(body) => vec![Node::SwitchBraceDelimitedBody(body)],
-                SwitchBody::ColonDelimited(body) => vec![Node::SwitchColonDelimitedBody(body)],
+                SwitchBody::BraceDelimited(body) => f(Node::SwitchBraceDelimitedBody(body)),
+                SwitchBody::ColonDelimited(body) => f(Node::SwitchColonDelimitedBody(body)),
             },
             Node::SwitchBraceDelimitedBody(node) => {
-                let mut children = vec![];
-
                 if let Some(terminator) = &node.optional_terminator {
-                    children.push(Node::Terminator(terminator));
+                    f(Node::Terminator(terminator));
                 }
 
-                children.extend(node.cases.iter().map(Node::SwitchCase));
-
-                children
+                for item in node.cases.iter() {
+                    f(Node::SwitchCase(item));
+                }
             }
             Node::SwitchColonDelimitedBody(node) => {
-                let mut children = vec![];
-
                 if let Some(terminator) = &node.optional_terminator {
-                    children.push(Node::Terminator(terminator));
+                    f(Node::Terminator(terminator));
                 }
 
-                children.extend(node.cases.iter().map(Node::SwitchCase));
-                children.push(Node::Keyword(&node.end_switch));
-                children.push(Node::Terminator(&node.terminator));
-
-                children
+                for item in node.cases.iter() {
+                    f(Node::SwitchCase(item));
+                }
+                f(Node::Keyword(&node.end_switch));
+                f(Node::Terminator(&node.terminator));
             }
             Node::SwitchCase(node) => match node {
                 SwitchCase::Expression(expression_case) => {
-                    vec![Node::SwitchExpressionCase(expression_case)]
+                    f(Node::SwitchExpressionCase(expression_case));
                 }
-                SwitchCase::Default(default_case) => vec![Node::SwitchDefaultCase(default_case)],
+                SwitchCase::Default(default_case) => f(Node::SwitchDefaultCase(default_case)),
             },
             Node::SwitchExpressionCase(node) => {
-                let mut children = vec![
-                    Node::Keyword(&node.case),
-                    Node::Expression(node.expression),
-                    Node::SwitchCaseSeparator(&node.separator),
-                ];
+                f(Node::Keyword(&node.case));
+                f(Node::Expression(node.expression));
+                f(Node::SwitchCaseSeparator(&node.separator));
 
-                children.extend(node.statements.iter().map(Node::Statement));
-
-                children
+                for item in node.statements.iter() {
+                    f(Node::Statement(item));
+                }
             }
             Node::SwitchDefaultCase(node) => {
-                let mut children = vec![Node::Keyword(&node.default), Node::SwitchCaseSeparator(&node.separator)];
-                children.extend(node.statements.iter().map(Node::Statement));
-
-                children
+                f(Node::Keyword(&node.default));
+                f(Node::SwitchCaseSeparator(&node.separator));
+                for item in node.statements.iter() {
+                    f(Node::Statement(item));
+                }
             }
-            Node::SwitchCaseSeparator(_) => vec![],
+            Node::SwitchCaseSeparator(_) => {}
             Node::Declare(node) => {
-                let mut children = vec![Node::Keyword(&node.declare)];
+                f(Node::Keyword(&node.declare));
 
-                children.extend(node.items.iter().map(Node::DeclareItem));
-                children.push(Node::DeclareBody(&node.body));
-
-                children
+                for item in node.items.iter() {
+                    f(Node::DeclareItem(item));
+                }
+                f(Node::DeclareBody(&node.body));
             }
             Node::DeclareBody(node) => match node {
-                DeclareBody::Statement(statement) => vec![Node::Statement(statement)],
-                DeclareBody::ColonDelimited(body) => vec![Node::DeclareColonDelimitedBody(body)],
+                DeclareBody::Statement(statement) => f(Node::Statement(statement)),
+                DeclareBody::ColonDelimited(body) => f(Node::DeclareColonDelimitedBody(body)),
             },
             Node::DeclareColonDelimitedBody(node) => {
-                let mut children = node.statements.iter().map(Node::Statement).collect::<Vec<_>>();
+                for item in node.statements.iter() {
+                    f(Node::Statement(item));
+                }
 
-                children.push(Node::Keyword(&node.end_declare));
-                children.push(Node::Terminator(&node.terminator));
-
-                children
+                f(Node::Keyword(&node.end_declare));
+                f(Node::Terminator(&node.terminator));
             }
             Node::DeclareItem(node) => {
-                vec![Node::LocalIdentifier(&node.name), Node::Expression(node.value)]
+                f(Node::LocalIdentifier(&node.name));
+                f(Node::Expression(node.value));
             }
             Node::EchoTag(node) => {
-                let mut children = vec![];
-                children.extend(node.values.iter().map(|e| Node::Expression(e)));
-                children.push(Node::Terminator(&node.terminator));
-
-                children
+                for e in node.values.iter() {
+                    f(Node::Expression(e));
+                }
+                f(Node::Terminator(&node.terminator));
             }
             Node::Echo(node) => {
-                let mut children = vec![Node::Keyword(&node.echo)];
-                children.extend(node.values.iter().map(|e| Node::Expression(e)));
-                children.push(Node::Terminator(&node.terminator));
-
-                children
+                f(Node::Keyword(&node.echo));
+                for e in node.values.iter() {
+                    f(Node::Expression(e));
+                }
+                f(Node::Terminator(&node.terminator));
             }
-            Node::Parenthesized(node) => vec![Node::Expression(node.expression)],
-            Node::Expression(node) => vec![match node {
-                Expression::Binary(node) => Node::Binary(node),
-                Expression::UnaryPrefix(node) => Node::UnaryPrefix(node),
-                Expression::ConstantAccess(node) => Node::ConstantAccess(node),
-                Expression::UnaryPostfix(node) => Node::UnaryPostfix(node),
-                Expression::Parenthesized(node) => Node::Parenthesized(node),
-                Expression::Literal(node) => Node::Literal(node),
-                Expression::CompositeString(node) => Node::CompositeString(node),
-                Expression::Assignment(node) => Node::Assignment(node),
-                Expression::Conditional(node) => Node::Conditional(node),
-                Expression::Array(node) => Node::Array(node),
-                Expression::LegacyArray(node) => Node::LegacyArray(node),
-                Expression::List(node) => Node::List(node),
-                Expression::ArrayAccess(node) => Node::ArrayAccess(node),
-                Expression::ArrayAppend(node) => Node::ArrayAppend(node),
-                Expression::AnonymousClass(node) => Node::AnonymousClass(node),
-                Expression::Closure(node) => Node::Closure(node),
-                Expression::ArrowFunction(node) => Node::ArrowFunction(node),
-                Expression::Variable(node) => Node::Variable(node),
-                Expression::Identifier(node) => Node::Identifier(node),
-                Expression::Match(node) => Node::Match(node),
-                Expression::Yield(node) => Node::Yield(node),
-                Expression::Construct(node) => Node::Construct(node),
-                Expression::Throw(node) => Node::Throw(node),
-                Expression::Clone(node) => Node::Clone(node),
-                Expression::Call(node) => Node::Call(node),
-                Expression::PartialApplication(node) => Node::PartialApplication(node),
-                Expression::Access(node) => Node::Access(node),
-                Expression::Parent(node) => Node::Keyword(node),
-                Expression::Static(node) => Node::Keyword(node),
-                Expression::Self_(node) => Node::Keyword(node),
-                Expression::Instantiation(node) => Node::Instantiation(node),
-                Expression::MagicConstant(node) => Node::MagicConstant(node),
-                Expression::Pipe(node) => Node::Pipe(node),
-                Expression::Error(span) => return vec![Node::Error(*span)],
-            }],
+            Node::Parenthesized(node) => f(Node::Expression(node.expression)),
+            Node::Expression(node) => {
+                let child = match node {
+                    Expression::Binary(node) => Node::Binary(node),
+                    Expression::UnaryPrefix(node) => Node::UnaryPrefix(node),
+                    Expression::ConstantAccess(node) => Node::ConstantAccess(node),
+                    Expression::UnaryPostfix(node) => Node::UnaryPostfix(node),
+                    Expression::Parenthesized(node) => Node::Parenthesized(node),
+                    Expression::Literal(node) => Node::Literal(node),
+                    Expression::CompositeString(node) => Node::CompositeString(node),
+                    Expression::Assignment(node) => Node::Assignment(node),
+                    Expression::Conditional(node) => Node::Conditional(node),
+                    Expression::Array(node) => Node::Array(node),
+                    Expression::LegacyArray(node) => Node::LegacyArray(node),
+                    Expression::List(node) => Node::List(node),
+                    Expression::ArrayAccess(node) => Node::ArrayAccess(node),
+                    Expression::ArrayAppend(node) => Node::ArrayAppend(node),
+                    Expression::AnonymousClass(node) => Node::AnonymousClass(node),
+                    Expression::Closure(node) => Node::Closure(node),
+                    Expression::ArrowFunction(node) => Node::ArrowFunction(node),
+                    Expression::Variable(node) => Node::Variable(node),
+                    Expression::Identifier(node) => Node::Identifier(node),
+                    Expression::Match(node) => Node::Match(node),
+                    Expression::Yield(node) => Node::Yield(node),
+                    Expression::Construct(node) => Node::Construct(node),
+                    Expression::Throw(node) => Node::Throw(node),
+                    Expression::Clone(node) => Node::Clone(node),
+                    Expression::Call(node) => Node::Call(node),
+                    Expression::PartialApplication(node) => Node::PartialApplication(node),
+                    Expression::Access(node) => Node::Access(node),
+                    Expression::Parent(node) => Node::Keyword(node),
+                    Expression::Static(node) => Node::Keyword(node),
+                    Expression::Self_(node) => Node::Keyword(node),
+                    Expression::Instantiation(node) => Node::Instantiation(node),
+                    Expression::MagicConstant(node) => Node::MagicConstant(node),
+                    Expression::Pipe(node) => Node::Pipe(node),
+                    Expression::Error(span) => Node::Error(*span),
+                };
+                f(child);
+            }
             Node::Binary(node) => {
-                vec![Node::Expression(node.lhs), Node::BinaryOperator(&node.operator), Node::Expression(node.rhs)]
+                f(Node::Expression(node.lhs));
+                f(Node::BinaryOperator(&node.operator));
+                f(Node::Expression(node.rhs));
             }
             Node::BinaryOperator(operator) => match operator {
-                BinaryOperator::Addition(_) => vec![],
-                BinaryOperator::Subtraction(_) => vec![],
-                BinaryOperator::Multiplication(_) => vec![],
-                BinaryOperator::Division(_) => vec![],
-                BinaryOperator::Modulo(_) => vec![],
-                BinaryOperator::Exponentiation(_) => vec![],
-                BinaryOperator::BitwiseAnd(_) => vec![],
-                BinaryOperator::BitwiseOr(_) => vec![],
-                BinaryOperator::BitwiseXor(_) => vec![],
-                BinaryOperator::LeftShift(_) => vec![],
-                BinaryOperator::RightShift(_) => vec![],
-                BinaryOperator::NullCoalesce(_) => vec![],
-                BinaryOperator::Equal(_) => vec![],
-                BinaryOperator::NotEqual(_) => vec![],
-                BinaryOperator::Identical(_) => vec![],
-                BinaryOperator::NotIdentical(_) => vec![],
-                BinaryOperator::AngledNotEqual(_) => vec![],
-                BinaryOperator::LessThan(_) => vec![],
-                BinaryOperator::LessThanOrEqual(_) => vec![],
-                BinaryOperator::GreaterThan(_) => vec![],
-                BinaryOperator::GreaterThanOrEqual(_) => vec![],
-                BinaryOperator::Spaceship(_) => vec![],
-                BinaryOperator::StringConcat(_) => vec![],
-                BinaryOperator::And(_) => vec![],
-                BinaryOperator::Or(_) => vec![],
-                BinaryOperator::Instanceof(keyword) => vec![Node::Keyword(keyword)],
-                BinaryOperator::LowAnd(keyword) => vec![Node::Keyword(keyword)],
-                BinaryOperator::LowOr(keyword) => vec![Node::Keyword(keyword)],
-                BinaryOperator::LowXor(keyword) => vec![Node::Keyword(keyword)],
+                BinaryOperator::Addition(_) => {}
+                BinaryOperator::Subtraction(_) => {}
+                BinaryOperator::Multiplication(_) => {}
+                BinaryOperator::Division(_) => {}
+                BinaryOperator::Modulo(_) => {}
+                BinaryOperator::Exponentiation(_) => {}
+                BinaryOperator::BitwiseAnd(_) => {}
+                BinaryOperator::BitwiseOr(_) => {}
+                BinaryOperator::BitwiseXor(_) => {}
+                BinaryOperator::LeftShift(_) => {}
+                BinaryOperator::RightShift(_) => {}
+                BinaryOperator::NullCoalesce(_) => {}
+                BinaryOperator::Equal(_) => {}
+                BinaryOperator::NotEqual(_) => {}
+                BinaryOperator::Identical(_) => {}
+                BinaryOperator::NotIdentical(_) => {}
+                BinaryOperator::AngledNotEqual(_) => {}
+                BinaryOperator::LessThan(_) => {}
+                BinaryOperator::LessThanOrEqual(_) => {}
+                BinaryOperator::GreaterThan(_) => {}
+                BinaryOperator::GreaterThanOrEqual(_) => {}
+                BinaryOperator::Spaceship(_) => {}
+                BinaryOperator::StringConcat(_) => {}
+                BinaryOperator::And(_) => {}
+                BinaryOperator::Or(_) => {}
+                BinaryOperator::Instanceof(keyword) => f(Node::Keyword(keyword)),
+                BinaryOperator::LowAnd(keyword) => f(Node::Keyword(keyword)),
+                BinaryOperator::LowOr(keyword) => f(Node::Keyword(keyword)),
+                BinaryOperator::LowXor(keyword) => f(Node::Keyword(keyword)),
             },
             Node::UnaryPrefix(node) => {
-                vec![Node::UnaryPrefixOperator(&node.operator), Node::Expression(node.operand)]
+                f(Node::UnaryPrefixOperator(&node.operator));
+                f(Node::Expression(node.operand));
             }
             Node::UnaryPostfix(node) => {
-                vec![Node::Expression(node.operand), Node::UnaryPostfixOperator(&node.operator)]
+                f(Node::Expression(node.operand));
+                f(Node::UnaryPostfixOperator(&node.operator));
             }
-            Node::UnaryPrefixOperator(_) | Node::UnaryPostfixOperator(_) => vec![],
+            Node::UnaryPrefixOperator(_) | Node::UnaryPostfixOperator(_) => {}
             Node::ArrowFunction(node) => {
-                let mut children = vec![];
-
-                children.extend(node.attribute_lists.iter().map(Node::AttributeList));
+                for item in node.attribute_lists.iter() {
+                    f(Node::AttributeList(item));
+                }
                 if let Some(r#static) = &node.r#static {
-                    children.push(Node::Keyword(r#static));
+                    f(Node::Keyword(r#static));
                 }
-                children.push(Node::Keyword(&node.r#fn));
-                children.push(Node::FunctionLikeParameterList(&node.parameter_list));
+                f(Node::Keyword(&node.r#fn));
+                f(Node::FunctionLikeParameterList(&node.parameter_list));
                 if let Some(return_type_hint) = &node.return_type_hint {
-                    children.push(Node::FunctionLikeReturnTypeHint(return_type_hint));
+                    f(Node::FunctionLikeReturnTypeHint(return_type_hint));
                 }
-                children.push(Node::Expression(node.expression));
-
-                children
+                f(Node::Expression(node.expression));
             }
             Node::Closure(node) => {
-                let mut children = vec![];
-
-                children.extend(node.attribute_lists.iter().map(Node::AttributeList));
-                children.push(Node::Keyword(&node.function));
-                children.push(Node::FunctionLikeParameterList(&node.parameter_list));
+                for item in node.attribute_lists.iter() {
+                    f(Node::AttributeList(item));
+                }
+                f(Node::Keyword(&node.function));
+                f(Node::FunctionLikeParameterList(&node.parameter_list));
                 if let Some(use_clause) = &node.use_clause {
-                    children.push(Node::ClosureUseClause(use_clause));
+                    f(Node::ClosureUseClause(use_clause));
                 }
                 if let Some(return_type_hint) = &node.return_type_hint {
-                    children.push(Node::FunctionLikeReturnTypeHint(return_type_hint));
+                    f(Node::FunctionLikeReturnTypeHint(return_type_hint));
                 }
-                children.push(Node::Block(&node.body));
-
-                children
+                f(Node::Block(&node.body));
             }
             Node::ClosureUseClause(node) => {
-                let mut children = vec![Node::Keyword(&node.r#use)];
-                children.extend(node.variables.iter().map(Node::ClosureUseClauseVariable));
-
-                children
+                f(Node::Keyword(&node.r#use));
+                for item in node.variables.iter() {
+                    f(Node::ClosureUseClauseVariable(item));
+                }
             }
-            Node::ClosureUseClauseVariable(node) => vec![Node::DirectVariable(&node.variable)],
+            Node::ClosureUseClauseVariable(node) => f(Node::DirectVariable(&node.variable)),
             Node::Function(node) => {
-                let mut children = vec![];
-
-                children.extend(node.attribute_lists.iter().map(Node::AttributeList));
-                children.push(Node::Keyword(&node.function));
-                children.push(Node::LocalIdentifier(&node.name));
-                children.push(Node::FunctionLikeParameterList(&node.parameter_list));
+                for item in node.attribute_lists.iter() {
+                    f(Node::AttributeList(item));
+                }
+                f(Node::Keyword(&node.function));
+                f(Node::LocalIdentifier(&node.name));
+                f(Node::FunctionLikeParameterList(&node.parameter_list));
                 if let Some(return_type_hint) = &node.return_type_hint {
-                    children.push(Node::FunctionLikeReturnTypeHint(return_type_hint));
+                    f(Node::FunctionLikeReturnTypeHint(return_type_hint));
                 }
 
-                children.push(Node::Block(&node.body));
-
-                children
+                f(Node::Block(&node.body));
             }
-            Node::FunctionLikeParameterList(node) => node.parameters.iter().map(Node::FunctionLikeParameter).collect(),
-            Node::FunctionLikeParameter(node) => {
-                let mut children = vec![];
-
-                children.extend(node.attribute_lists.iter().map(Node::AttributeList));
-                children.extend(node.modifiers.iter().map(Node::Modifier));
-                if let Some(hint) = &node.hint {
-                    children.push(Node::Hint(hint));
+            Node::FunctionLikeParameterList(node) => {
+                for item in node.parameters.iter() {
+                    f(Node::FunctionLikeParameter(item));
                 }
-                children.push(Node::DirectVariable(&node.variable));
+            }
+            Node::FunctionLikeParameter(node) => {
+                for item in node.attribute_lists.iter() {
+                    f(Node::AttributeList(item));
+                }
+                for item in node.modifiers.iter() {
+                    f(Node::Modifier(item));
+                }
+                if let Some(hint) = &node.hint {
+                    f(Node::Hint(hint));
+                }
+                f(Node::DirectVariable(&node.variable));
                 if let Some(default_value) = &node.default_value {
-                    children.push(Node::FunctionLikeParameterDefaultValue(default_value));
+                    f(Node::FunctionLikeParameterDefaultValue(default_value));
                 }
 
                 if let Some(hooks) = &node.hooks {
-                    children.push(Node::PropertyHookList(hooks));
+                    f(Node::PropertyHookList(hooks));
                 }
-
-                children
             }
-            Node::FunctionLikeParameterDefaultValue(node) => vec![Node::Expression(node.value)],
-            Node::FunctionLikeReturnTypeHint(hint) => vec![Node::Hint(&hint.hint)],
+            Node::FunctionLikeParameterDefaultValue(node) => f(Node::Expression(node.value)),
+            Node::FunctionLikeReturnTypeHint(hint) => f(Node::Hint(&hint.hint)),
             Node::Global(node) => {
-                let mut children: Vec<Node> = vec![];
-
-                children.push(Node::Keyword(&node.r#global));
-                children.extend(node.variables.iter().map(Node::Variable));
-
-                children
+                f(Node::Keyword(&node.r#global));
+                for item in node.variables.iter() {
+                    f(Node::Variable(item));
+                }
             }
             Node::Goto(node) => {
-                vec![Node::Keyword(&node.r#goto), Node::LocalIdentifier(&node.label)]
+                f(Node::Keyword(&node.r#goto));
+                f(Node::LocalIdentifier(&node.label));
             }
             Node::Label(node) => {
-                vec![Node::LocalIdentifier(&node.name)]
+                f(Node::LocalIdentifier(&node.name));
             }
             Node::HaltCompiler(node) => {
-                vec![Node::Keyword(&node.halt_compiler)]
+                f(Node::Keyword(&node.halt_compiler));
             }
-            Node::FullyQualifiedIdentifier(_) => vec![],
-            Node::Identifier(node) => vec![match node {
+            Node::FullyQualifiedIdentifier(_) => {}
+            Node::Identifier(node) => f(match node {
                 Identifier::Local(node) => Node::LocalIdentifier(node),
                 Identifier::Qualified(node) => Node::QualifiedIdentifier(node),
                 Identifier::FullyQualified(node) => Node::FullyQualifiedIdentifier(node),
-            }],
-            Node::LocalIdentifier(_) => vec![],
-            Node::QualifiedIdentifier(_) => vec![],
-            Node::Inline(_) => vec![],
+            }),
+            Node::LocalIdentifier(_) => {}
+            Node::QualifiedIdentifier(_) => {}
+            Node::Inline(_) => {}
             Node::Instantiation(node) => {
-                let mut children = vec![Node::Keyword(&node.new), Node::Expression(node.class)];
+                f(Node::Keyword(&node.new));
+                f(Node::Expression(node.class));
 
                 if let Some(argument_list) = &node.argument_list {
-                    children.push(Node::ArgumentList(argument_list));
+                    f(Node::ArgumentList(argument_list));
                 }
-
-                children
             }
-            Node::Keyword(_) => vec![],
-            Node::Literal(node) => vec![match node {
+            Node::Keyword(_) => {}
+            Node::Literal(node) => f(match node {
                 Literal::Float(node) => Node::LiteralFloat(node),
                 Literal::Integer(node) => Node::LiteralInteger(node),
                 Literal::String(node) => Node::LiteralString(node),
                 Literal::True(node) => Node::Keyword(node),
                 Literal::False(node) => Node::Keyword(node),
                 Literal::Null(node) => Node::Keyword(node),
-            }],
-            Node::LiteralFloat(_) => vec![],
-            Node::LiteralInteger(_) => vec![],
-            Node::LiteralString(_) => vec![],
-            Node::MagicConstant(node) => vec![match node {
+            }),
+            Node::LiteralFloat(_) => {}
+            Node::LiteralInteger(_) => {}
+            Node::LiteralString(_) => {}
+            Node::MagicConstant(node) => f(match node {
                 MagicConstant::Class(node) => Node::LocalIdentifier(node),
                 MagicConstant::Directory(node) => Node::LocalIdentifier(node),
                 MagicConstant::File(node) => Node::LocalIdentifier(node),
@@ -1920,8 +1958,8 @@ impl<'ast, 'arena> Node<'ast, 'arena> {
                 MagicConstant::Namespace(node) => Node::LocalIdentifier(node),
                 MagicConstant::Trait(node) => Node::LocalIdentifier(node),
                 MagicConstant::Property(node) => Node::LocalIdentifier(node),
-            }],
-            Node::Modifier(node) => vec![match node {
+            }),
+            Node::Modifier(node) => f(match node {
                 Modifier::Abstract(node) => Node::Keyword(node),
                 Modifier::Final(node) => Node::Keyword(node),
                 Modifier::Private(node) => Node::Keyword(node),
@@ -1932,370 +1970,363 @@ impl<'ast, 'arena> Node<'ast, 'arena> {
                 Modifier::PrivateSet(node) => Node::Keyword(node),
                 Modifier::ProtectedSet(node) => Node::Keyword(node),
                 Modifier::PublicSet(node) => Node::Keyword(node),
-            }],
+            }),
             Node::Namespace(node) => {
-                let mut children = vec![Node::Keyword(&node.r#namespace)];
+                f(Node::Keyword(&node.r#namespace));
 
                 if let Some(name) = &node.name {
-                    children.push(Node::Identifier(name));
+                    f(Node::Identifier(name));
                 }
 
-                children.push(Node::NamespaceBody(&node.body));
-
-                children
+                f(Node::NamespaceBody(&node.body));
             }
             Node::NamespaceBody(node) => {
-                vec![match node {
+                f(match node {
                     NamespaceBody::BraceDelimited(node) => Node::Block(node),
                     NamespaceBody::Implicit(node) => Node::NamespaceImplicitBody(node),
-                }]
+                });
             }
             Node::NamespaceImplicitBody(node) => {
-                let mut children = vec![Node::Terminator(&node.terminator)];
+                f(Node::Terminator(&node.terminator));
 
-                children.extend(node.statements.iter().map(Node::Statement));
-
-                children
+                for item in node.statements.iter() {
+                    f(Node::Statement(item));
+                }
             }
             Node::Assignment(node) => {
-                vec![Node::Expression(node.lhs), Node::AssignmentOperator(&node.operator), Node::Expression(node.rhs)]
+                f(Node::Expression(node.lhs));
+                f(Node::AssignmentOperator(&node.operator));
+                f(Node::Expression(node.rhs));
             }
-            Node::AssignmentOperator(_) => vec![],
+            Node::AssignmentOperator(_) => {}
             Node::Conditional(node) => {
-                let mut children = vec![Node::Expression(node.condition)];
+                f(Node::Expression(node.condition));
 
                 if let Some(then) = &node.then {
-                    children.push(Node::Expression(then));
+                    f(Node::Expression(then));
                 }
 
-                children.push(Node::Expression(node.r#else));
-
-                children
+                f(Node::Expression(node.r#else));
             }
-            Node::DoWhile(node) => vec![
-                Node::Keyword(&node.r#do),
-                Node::Statement(node.statement),
-                Node::Keyword(&node.r#while),
-                Node::Expression(node.condition),
-                Node::Terminator(&node.terminator),
-            ],
-            Node::Foreach(node) => vec![
-                Node::Keyword(&node.r#foreach),
-                Node::Expression(node.expression),
-                Node::Keyword(&node.r#as),
-                Node::ForeachTarget(&node.target),
-                Node::ForeachBody(&node.body),
-            ],
-            Node::ForeachBody(node) => vec![match node {
+            Node::DoWhile(node) => {
+                f(Node::Keyword(&node.r#do));
+                f(Node::Statement(node.statement));
+                f(Node::Keyword(&node.r#while));
+                f(Node::Expression(node.condition));
+                f(Node::Terminator(&node.terminator));
+            }
+            Node::Foreach(node) => {
+                f(Node::Keyword(&node.r#foreach));
+                f(Node::Expression(node.expression));
+                f(Node::Keyword(&node.r#as));
+                f(Node::ForeachTarget(&node.target));
+                f(Node::ForeachBody(&node.body));
+            }
+            Node::ForeachBody(node) => f(match node {
                 ForeachBody::Statement(node) => Node::Statement(node),
                 ForeachBody::ColonDelimited(node) => Node::ForeachColonDelimitedBody(node),
-            }],
+            }),
             Node::ForeachColonDelimitedBody(node) => {
-                let mut children = node.statements.iter().map(Node::Statement).collect::<Vec<_>>();
+                for item in node.statements.iter() {
+                    f(Node::Statement(item));
+                }
 
-                children.push(Node::Keyword(&node.end_foreach));
-                children.push(Node::Terminator(&node.terminator));
-
-                children
+                f(Node::Keyword(&node.end_foreach));
+                f(Node::Terminator(&node.terminator));
             }
             Node::ForeachKeyValueTarget(node) => {
-                vec![Node::Expression(node.key), Node::Expression(node.value)]
+                f(Node::Expression(node.key));
+                f(Node::Expression(node.value));
             }
-            Node::ForeachTarget(node) => vec![match node {
+            Node::ForeachTarget(node) => f(match node {
                 ForeachTarget::KeyValue(node) => Node::ForeachKeyValueTarget(node),
                 ForeachTarget::Value(node) => Node::ForeachValueTarget(node),
-            }],
-            Node::ForeachValueTarget(node) => vec![Node::Expression(node.value)],
+            }),
+            Node::ForeachValueTarget(node) => f(Node::Expression(node.value)),
             Node::For(node) => {
-                let mut children = vec![Node::Keyword(&node.r#for)];
+                f(Node::Keyword(&node.r#for));
 
-                children.extend(node.initializations.iter().map(|e| Node::Expression(e)));
-                children.extend(node.conditions.iter().map(|e| Node::Expression(e)));
-                children.extend(node.increments.iter().map(|e| Node::Expression(e)));
-                children.push(Node::ForBody(&node.body));
-
-                children
+                for e in node.initializations.iter() {
+                    f(Node::Expression(e));
+                }
+                for e in node.conditions.iter() {
+                    f(Node::Expression(e));
+                }
+                for e in node.increments.iter() {
+                    f(Node::Expression(e));
+                }
+                f(Node::ForBody(&node.body));
             }
             Node::ForBody(node) => match node {
-                ForBody::Statement(statement) => vec![Node::Statement(statement)],
-                ForBody::ColonDelimited(body) => vec![Node::ForColonDelimitedBody(body)],
+                ForBody::Statement(statement) => f(Node::Statement(statement)),
+                ForBody::ColonDelimited(body) => f(Node::ForColonDelimitedBody(body)),
             },
             Node::ForColonDelimitedBody(node) => {
-                let mut children = vec![];
-
-                children.extend(node.statements.iter().map(Node::Statement));
-                children.push(Node::Keyword(&node.end_for));
-                children.push(Node::Terminator(&node.terminator));
-
-                children
+                for item in node.statements.iter() {
+                    f(Node::Statement(item));
+                }
+                f(Node::Keyword(&node.end_for));
+                f(Node::Terminator(&node.terminator));
             }
             Node::While(node) => {
-                vec![Node::Keyword(&node.r#while), Node::Expression(node.condition), Node::WhileBody(&node.body)]
+                f(Node::Keyword(&node.r#while));
+                f(Node::Expression(node.condition));
+                f(Node::WhileBody(&node.body));
             }
             Node::WhileBody(node) => match node {
-                WhileBody::Statement(statement) => vec![Node::Statement(statement)],
-                WhileBody::ColonDelimited(body) => vec![Node::WhileColonDelimitedBody(body)],
+                WhileBody::Statement(statement) => f(Node::Statement(statement)),
+                WhileBody::ColonDelimited(body) => f(Node::WhileColonDelimitedBody(body)),
             },
             Node::WhileColonDelimitedBody(node) => {
-                let mut children = vec![];
-
-                children.extend(node.statements.iter().map(Node::Statement));
-                children.push(Node::Keyword(&node.end_while));
-                children.push(Node::Terminator(&node.terminator));
-
-                children
+                for item in node.statements.iter() {
+                    f(Node::Statement(item));
+                }
+                f(Node::Keyword(&node.end_while));
+                f(Node::Terminator(&node.terminator));
             }
             Node::Break(node) => {
-                let mut children = vec![Node::Keyword(&node.r#break)];
+                f(Node::Keyword(&node.r#break));
 
                 if let Some(level) = &node.level {
-                    children.push(Node::Expression(level));
+                    f(Node::Expression(level));
                 }
 
-                children.push(Node::Terminator(&node.terminator));
-
-                children
+                f(Node::Terminator(&node.terminator));
             }
             Node::Continue(node) => {
-                let mut children = vec![Node::Keyword(&node.r#continue)];
+                f(Node::Keyword(&node.r#continue));
 
                 if let Some(level) = &node.level {
-                    children.push(Node::Expression(level));
+                    f(Node::Expression(level));
                 }
 
-                children.push(Node::Terminator(&node.terminator));
-
-                children
+                f(Node::Terminator(&node.terminator));
             }
             Node::Return(node) => {
-                let mut children = vec![Node::Keyword(&node.r#return)];
+                f(Node::Keyword(&node.r#return));
 
                 if let Some(value) = &node.value {
-                    children.push(Node::Expression(value));
+                    f(Node::Expression(value));
                 }
 
-                children.push(Node::Terminator(&node.terminator));
-
-                children
+                f(Node::Terminator(&node.terminator));
             }
             Node::Static(node) => {
-                let mut children = vec![Node::Keyword(&node.r#static)];
+                f(Node::Keyword(&node.r#static));
 
-                children.extend(node.items.iter().map(Node::StaticItem));
-                children.push(Node::Terminator(&node.terminator));
-
-                children
+                for item in node.items.iter() {
+                    f(Node::StaticItem(item));
+                }
+                f(Node::Terminator(&node.terminator));
             }
-            Node::StaticItem(node) => vec![match node {
+            Node::StaticItem(node) => f(match node {
                 StaticItem::Abstract(item) => Node::StaticAbstractItem(item),
                 StaticItem::Concrete(item) => Node::StaticConcreteItem(item),
-            }],
+            }),
             Node::StaticAbstractItem(node) => {
-                vec![Node::DirectVariable(&node.variable)]
+                f(Node::DirectVariable(&node.variable));
             }
             Node::StaticConcreteItem(node) => {
-                vec![Node::DirectVariable(&node.variable), Node::Expression(node.value)]
+                f(Node::DirectVariable(&node.variable));
+                f(Node::Expression(node.value));
             }
             Node::Try(node) => {
-                let mut children = vec![];
-
-                children.push(Node::Keyword(&node.r#try));
-                children.push(Node::Block(&node.block));
-                children.extend(node.catch_clauses.iter().map(Node::TryCatchClause));
-                if let Some(finally) = &node.finally_clause {
-                    children.push(Node::TryFinallyClause(finally));
+                f(Node::Keyword(&node.r#try));
+                f(Node::Block(&node.block));
+                for item in node.catch_clauses.iter() {
+                    f(Node::TryCatchClause(item));
                 }
-
-                children
+                if let Some(finally) = &node.finally_clause {
+                    f(Node::TryFinallyClause(finally));
+                }
             }
             Node::TryCatchClause(node) => {
-                let mut children = vec![Node::Keyword(&node.r#catch), Node::Hint(&node.hint)];
+                f(Node::Keyword(&node.r#catch));
+                f(Node::Hint(&node.hint));
                 if let Some(variable) = &node.variable {
-                    children.push(Node::DirectVariable(variable));
+                    f(Node::DirectVariable(variable));
                 }
-                children.push(Node::Block(&node.block));
-
-                children
+                f(Node::Block(&node.block));
             }
             Node::TryFinallyClause(node) => {
-                vec![Node::Keyword(&node.r#finally), Node::Block(&node.block)]
+                f(Node::Keyword(&node.r#finally));
+                f(Node::Block(&node.block));
             }
             Node::MaybeTypedUseItem(node) => {
-                let mut children = vec![];
                 if let Some(r#type) = &node.r#type {
-                    children.push(Node::UseType(r#type));
+                    f(Node::UseType(r#type));
                 }
 
-                children.push(Node::UseItem(&node.item));
-
-                children
+                f(Node::UseItem(&node.item));
             }
             Node::MixedUseItemList(node) => {
-                let mut children = vec![Node::Identifier(&node.namespace)];
+                f(Node::Identifier(&node.namespace));
 
-                children.extend(node.items.iter().map(Node::MaybeTypedUseItem));
-
-                children
+                for item in node.items.iter() {
+                    f(Node::MaybeTypedUseItem(item));
+                }
             }
             Node::TypedUseItemList(node) => {
-                let mut children = vec![Node::UseType(&node.r#type), Node::Identifier(&node.namespace)];
+                f(Node::UseType(&node.r#type));
+                f(Node::Identifier(&node.namespace));
 
-                children.extend(node.items.iter().map(Node::UseItem));
-
-                children
+                for item in node.items.iter() {
+                    f(Node::UseItem(item));
+                }
             }
             Node::TypedUseItemSequence(node) => {
-                let mut children = vec![Node::UseType(&node.r#type)];
+                f(Node::UseType(&node.r#type));
 
-                children.extend(node.items.iter().map(Node::UseItem));
-                children
+                for item in node.items.iter() {
+                    f(Node::UseItem(item));
+                }
             }
             Node::Use(node) => {
-                vec![Node::Keyword(&node.r#use), Node::UseItems(&node.items), Node::Terminator(&node.terminator)]
+                f(Node::Keyword(&node.r#use));
+                f(Node::UseItems(&node.items));
+                f(Node::Terminator(&node.terminator));
             }
             Node::UseItem(node) => {
-                let mut result = vec![Node::Identifier(&node.name)];
+                f(Node::Identifier(&node.name));
 
                 if let Some(alias) = &node.alias {
-                    result.push(Node::UseItemAlias(alias));
+                    f(Node::UseItemAlias(alias));
                 }
-
-                result
             }
             Node::UseItemAlias(node) => {
-                vec![Node::Keyword(&node.r#as), Node::LocalIdentifier(&node.identifier)]
+                f(Node::Keyword(&node.r#as));
+                f(Node::LocalIdentifier(&node.identifier));
             }
             Node::UseItemSequence(node) => {
-                let mut children = vec![];
                 for item in &node.items {
-                    children.push(Node::UseItem(item));
+                    f(Node::UseItem(item));
                 }
-
-                children
             }
-            Node::UseItems(node) => vec![match node {
+            Node::UseItems(node) => f(match node {
                 UseItems::Sequence(node) => Node::UseItemSequence(node),
                 UseItems::TypedList(node) => Node::TypedUseItemList(node),
                 UseItems::MixedList(node) => Node::MixedUseItemList(node),
                 UseItems::TypedSequence(node) => Node::TypedUseItemSequence(node),
-            }],
-            Node::UseType(node) => vec![match node {
+            }),
+            Node::UseType(node) => f(match node {
                 UseType::Const(node) => Node::Keyword(node),
                 UseType::Function(node) => Node::Keyword(node),
-            }],
-            Node::Yield(node) => vec![match node {
+            }),
+            Node::Yield(node) => f(match node {
                 Yield::Value(node) => Node::YieldValue(node),
                 Yield::Pair(node) => Node::YieldPair(node),
                 Yield::From(node) => Node::YieldFrom(node),
-            }],
+            }),
             Node::YieldFrom(node) => {
-                vec![Node::Keyword(&node.r#yield), Node::Keyword(&node.from), Node::Expression(node.iterator)]
+                f(Node::Keyword(&node.r#yield));
+                f(Node::Keyword(&node.from));
+                f(Node::Expression(node.iterator));
             }
             Node::YieldPair(node) => {
-                vec![Node::Keyword(&node.r#yield), Node::Expression(node.key), Node::Expression(node.value)]
+                f(Node::Keyword(&node.r#yield));
+                f(Node::Expression(node.key));
+                f(Node::Expression(node.value));
             }
-            Node::YieldValue(node) => match &node.value {
-                Some(value) => vec![Node::Keyword(&node.r#yield), Node::Expression(value)],
-                None => vec![Node::Keyword(&node.r#yield)],
-            },
+            Node::YieldValue(node) => {
+                f(Node::Keyword(&node.r#yield));
+                if let Some(value) = &node.value {
+                    f(Node::Expression(value));
+                }
+            }
             Node::Statement(node) => match &node {
-                Statement::OpeningTag(node) => vec![Node::OpeningTag(node)],
-                Statement::ClosingTag(node) => vec![Node::ClosingTag(node)],
-                Statement::Inline(node) => vec![Node::Inline(node)],
-                Statement::Namespace(node) => vec![Node::Namespace(node)],
-                Statement::Use(node) => vec![Node::Use(node)],
-                Statement::Class(node) => vec![Node::Class(node)],
-                Statement::Interface(node) => vec![Node::Interface(node)],
-                Statement::Trait(node) => vec![Node::Trait(node)],
-                Statement::Enum(node) => vec![Node::Enum(node)],
-                Statement::Block(node) => vec![Node::Block(node)],
-                Statement::Constant(node) => vec![Node::Constant(node)],
-                Statement::Function(node) => vec![Node::Function(node)],
-                Statement::Declare(node) => vec![Node::Declare(node)],
-                Statement::Goto(node) => vec![Node::Goto(node)],
-                Statement::Label(node) => vec![Node::Label(node)],
-                Statement::Try(node) => vec![Node::Try(node)],
-                Statement::Foreach(node) => vec![Node::Foreach(node)],
-                Statement::For(node) => vec![Node::For(node)],
-                Statement::While(node) => vec![Node::While(node)],
-                Statement::DoWhile(node) => vec![Node::DoWhile(node)],
-                Statement::Continue(node) => vec![Node::Continue(node)],
-                Statement::Break(node) => vec![Node::Break(node)],
-                Statement::Switch(node) => vec![Node::Switch(node)],
-                Statement::If(node) => vec![Node::If(node)],
-                Statement::Return(node) => vec![Node::Return(node)],
-                Statement::Expression(node) => vec![Node::ExpressionStatement(node)],
-                Statement::EchoTag(node) => vec![Node::EchoTag(node)],
-                Statement::Echo(node) => vec![Node::Echo(node)],
-                Statement::Global(node) => vec![Node::Global(node)],
-                Statement::Static(node) => vec![Node::Static(node)],
-                Statement::HaltCompiler(node) => vec![Node::HaltCompiler(node)],
-                Statement::Unset(node) => vec![Node::Unset(node)],
-                Statement::Noop(_) => vec![],
+                Statement::OpeningTag(node) => f(Node::OpeningTag(node)),
+                Statement::ClosingTag(node) => f(Node::ClosingTag(node)),
+                Statement::Inline(node) => f(Node::Inline(node)),
+                Statement::Namespace(node) => f(Node::Namespace(node)),
+                Statement::Use(node) => f(Node::Use(node)),
+                Statement::Class(node) => f(Node::Class(node)),
+                Statement::Interface(node) => f(Node::Interface(node)),
+                Statement::Trait(node) => f(Node::Trait(node)),
+                Statement::Enum(node) => f(Node::Enum(node)),
+                Statement::Block(node) => f(Node::Block(node)),
+                Statement::Constant(node) => f(Node::Constant(node)),
+                Statement::Function(node) => f(Node::Function(node)),
+                Statement::Declare(node) => f(Node::Declare(node)),
+                Statement::Goto(node) => f(Node::Goto(node)),
+                Statement::Label(node) => f(Node::Label(node)),
+                Statement::Try(node) => f(Node::Try(node)),
+                Statement::Foreach(node) => f(Node::Foreach(node)),
+                Statement::For(node) => f(Node::For(node)),
+                Statement::While(node) => f(Node::While(node)),
+                Statement::DoWhile(node) => f(Node::DoWhile(node)),
+                Statement::Continue(node) => f(Node::Continue(node)),
+                Statement::Break(node) => f(Node::Break(node)),
+                Statement::Switch(node) => f(Node::Switch(node)),
+                Statement::If(node) => f(Node::If(node)),
+                Statement::Return(node) => f(Node::Return(node)),
+                Statement::Expression(node) => f(Node::ExpressionStatement(node)),
+                Statement::EchoTag(node) => f(Node::EchoTag(node)),
+                Statement::Echo(node) => f(Node::Echo(node)),
+                Statement::Global(node) => f(Node::Global(node)),
+                Statement::Static(node) => f(Node::Static(node)),
+                Statement::HaltCompiler(node) => f(Node::HaltCompiler(node)),
+                Statement::Unset(node) => f(Node::Unset(node)),
+                Statement::Noop(_) => {}
             },
             Node::ExpressionStatement(node) => {
-                vec![Node::Expression(node.expression), Node::Terminator(&node.terminator)]
+                f(Node::Expression(node.expression));
+                f(Node::Terminator(&node.terminator));
             }
-            Node::BracedExpressionStringPart(node) => vec![Node::Expression(node.expression)],
+            Node::BracedExpressionStringPart(node) => f(Node::Expression(node.expression)),
             Node::DocumentString(node) => {
-                let mut children = vec![];
                 for part in node.parts.as_slice() {
-                    children.push(Node::StringPart(part));
+                    f(Node::StringPart(part));
                 }
-
-                children
             }
             Node::InterpolatedString(node) => {
-                let mut children = vec![];
                 for part in node.parts.as_slice() {
-                    children.push(Node::StringPart(part));
+                    f(Node::StringPart(part));
                 }
-
-                children
             }
-            Node::LiteralStringPart(_) => vec![],
+            Node::LiteralStringPart(_) => {}
             Node::ShellExecuteString(node) => {
-                let mut children = vec![];
                 for part in node.parts.as_slice() {
-                    children.push(Node::StringPart(part));
+                    f(Node::StringPart(part));
                 }
-
-                children
             }
-            Node::CompositeString(node) => vec![match node {
+            Node::CompositeString(node) => f(match node {
                 CompositeString::ShellExecute(node) => Node::ShellExecuteString(node),
                 CompositeString::Interpolated(node) => Node::InterpolatedString(node),
                 CompositeString::Document(node) => Node::DocumentString(node),
-            }],
-            Node::StringPart(node) => vec![match node {
+            }),
+            Node::StringPart(node) => f(match node {
                 StringPart::Literal(node) => Node::LiteralStringPart(node),
                 StringPart::Expression(node) => Node::Expression(node),
                 StringPart::BracedExpression(node) => Node::BracedExpressionStringPart(node),
-            }],
-            Node::ClosingTag(_) => vec![],
-            Node::FullOpeningTag(_) => vec![],
+            }),
+            Node::ClosingTag(_) => {}
+            Node::FullOpeningTag(_) => {}
             Node::OpeningTag(node) => match node {
-                OpeningTag::Full(node) => vec![Node::FullOpeningTag(node)],
-                OpeningTag::Short(node) => vec![Node::ShortOpeningTag(node)],
+                OpeningTag::Full(node) => f(Node::FullOpeningTag(node)),
+                OpeningTag::Short(node) => f(Node::ShortOpeningTag(node)),
             },
-            Node::ShortOpeningTag(_) => vec![],
+            Node::ShortOpeningTag(_) => {}
             Node::Terminator(node) => match node {
-                Terminator::Semicolon(_) => vec![],
-                Terminator::ClosingTag(closing_tag) => vec![Node::ClosingTag(closing_tag)],
+                Terminator::Semicolon(_) => {}
+                Terminator::ClosingTag(closing_tag) => f(Node::ClosingTag(closing_tag)),
                 Terminator::TagPair(closing_tag, opening_tag) => {
-                    vec![Node::ClosingTag(closing_tag), Node::OpeningTag(opening_tag)]
+                    f(Node::ClosingTag(closing_tag));
+                    f(Node::OpeningTag(opening_tag));
                 }
-                Terminator::Missing(span) => vec![Node::MissingTerminator(*span)],
+                Terminator::Missing(span) => f(Node::MissingTerminator(*span)),
             },
-            Node::Throw(node) => vec![Node::Keyword(&node.throw), Node::Expression(node.exception)],
+            Node::Throw(node) => {
+                f(Node::Keyword(&node.throw));
+                f(Node::Expression(node.exception));
+            }
             Node::Hint(node) => match &node {
-                Hint::Identifier(identifier) => vec![Node::Identifier(identifier)],
+                Hint::Identifier(identifier) => f(Node::Identifier(identifier)),
                 Hint::Parenthesized(parenthesized_hint) => {
-                    vec![Node::ParenthesizedHint(parenthesized_hint)]
+                    f(Node::ParenthesizedHint(parenthesized_hint));
                 }
-                Hint::Nullable(nullable_hint) => vec![Node::NullableHint(nullable_hint)],
-                Hint::Union(union_hint) => vec![Node::UnionHint(union_hint)],
-                Hint::Intersection(intersection_hint) => vec![Node::IntersectionHint(intersection_hint)],
+                Hint::Nullable(nullable_hint) => f(Node::NullableHint(nullable_hint)),
+                Hint::Union(union_hint) => f(Node::UnionHint(union_hint)),
+                Hint::Intersection(intersection_hint) => f(Node::IntersectionHint(intersection_hint)),
                 Hint::Null(keyword)
                 | Hint::True(keyword)
                 | Hint::False(keyword)
@@ -2303,7 +2334,7 @@ impl<'ast, 'arena> Node<'ast, 'arena> {
                 | Hint::Callable(keyword)
                 | Hint::Static(keyword)
                 | Hint::Self_(keyword)
-                | Hint::Parent(keyword) => vec![Node::Keyword(keyword)],
+                | Hint::Parent(keyword) => f(Node::Keyword(keyword)),
                 Hint::Void(local_identifier)
                 | Hint::Never(local_identifier)
                 | Hint::Float(local_identifier)
@@ -2312,37 +2343,55 @@ impl<'ast, 'arena> Node<'ast, 'arena> {
                 | Hint::String(local_identifier)
                 | Hint::Object(local_identifier)
                 | Hint::Mixed(local_identifier)
-                | Hint::Iterable(local_identifier) => vec![Node::LocalIdentifier(local_identifier)],
+                | Hint::Iterable(local_identifier) => f(Node::LocalIdentifier(local_identifier)),
             },
-            Node::IntersectionHint(node) => vec![Node::Hint(node.left), Node::Hint(node.right)],
-            Node::NullableHint(node) => vec![Node::Hint(node.hint)],
-            Node::ParenthesizedHint(node) => vec![Node::Hint(node.hint)],
-            Node::UnionHint(node) => vec![Node::Hint(node.left), Node::Hint(node.right)],
-            Node::Unset(node) => {
-                let mut children = vec![Node::Keyword(&node.unset)];
-                children.extend(node.values.iter().map(|e| Node::Expression(e)));
-                children.push(Node::Terminator(&node.terminator));
-
-                children
+            Node::IntersectionHint(node) => {
+                f(Node::Hint(node.left));
+                f(Node::Hint(node.right));
             }
-            Node::DirectVariable(_) => vec![],
-            Node::IndirectVariable(node) => vec![Node::Expression(node.expression)],
+            Node::NullableHint(node) => f(Node::Hint(node.hint)),
+            Node::ParenthesizedHint(node) => f(Node::Hint(node.hint)),
+            Node::UnionHint(node) => {
+                f(Node::Hint(node.left));
+                f(Node::Hint(node.right));
+            }
+            Node::Unset(node) => {
+                f(Node::Keyword(&node.unset));
+                for e in node.values.iter() {
+                    f(Node::Expression(e));
+                }
+                f(Node::Terminator(&node.terminator));
+            }
+            Node::DirectVariable(_) => {}
+            Node::IndirectVariable(node) => f(Node::Expression(node.expression)),
             Node::NestedVariable(node) => {
-                vec![Node::Variable(node.variable)]
+                f(Node::Variable(node.variable));
             }
             Node::Variable(node) => match node {
-                Variable::Direct(node) => vec![Node::DirectVariable(node)],
-                Variable::Indirect(node) => vec![Node::IndirectVariable(node)],
-                Variable::Nested(node) => vec![Node::NestedVariable(node)],
+                Variable::Direct(node) => f(Node::DirectVariable(node)),
+                Variable::Indirect(node) => f(Node::IndirectVariable(node)),
+                Variable::Nested(node) => f(Node::NestedVariable(node)),
             },
             Node::Pipe(pipe) => {
-                vec![Node::Expression(pipe.input), Node::Expression(pipe.callable)]
+                f(Node::Expression(pipe.input));
+                f(Node::Expression(pipe.callable));
             }
             Node::Error(_)
             | Node::MissingTerminator(_)
             | Node::ClassLikeMemberMissingSelector(_)
-            | Node::ClassLikeConstantMissingSelector(_) => vec![],
+            | Node::ClassLikeConstantMissingSelector(_) => {}
         }
+    }
+
+    /// Returns all direct children as an owned `Vec`.
+    ///
+    /// This allocates on every call. Prefer [`Self::visit_children`] when you don't need a
+    /// collected list — for example, when searching for a node or applying a transformation.
+    #[inline]
+    pub fn children(&self) -> Vec<Node<'ast, 'arena>> {
+        let mut children = vec![];
+        self.visit_children(|child| children.push(child));
+        children
     }
 }
 

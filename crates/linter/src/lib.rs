@@ -129,40 +129,54 @@ fn is_constant_expression_context(kind: NodeKind) -> bool {
     )
 }
 
-fn walk<'arena>(node: Node<'_, 'arena>, ctx: &mut LintContext<'_, 'arena>, excluded_rules: &HashSet<usize>) {
-    let mut in_scope = false;
-    if let Some(scope) = Scope::for_node(ctx, node) {
-        ctx.scope.push(scope);
-
-        in_scope = true;
+fn walk<'ast, 'arena>(root: Node<'ast, 'arena>, ctx: &mut LintContext<'_, 'arena>, excluded_rules: &HashSet<usize>) {
+    enum Op<'ast, 'arena> {
+        Enter(Node<'ast, 'arena>),
+        Exit { in_scope: bool, in_constant_expression: bool },
     }
 
-    let in_constant_expression = is_constant_expression_context(node.kind());
-    if in_constant_expression {
-        ctx.constant_expression_depth += 1;
-    }
+    let mut stack = vec![Op::Enter(root)];
 
-    let rules_to_run = ctx.registry.for_kind(node.kind());
+    while let Some(op) = stack.pop() {
+        match op {
+            Op::Enter(node) => {
+                let in_scope = if let Some(scope) = Scope::for_node(ctx, node) {
+                    ctx.scope.push(scope);
+                    true
+                } else {
+                    false
+                };
 
-    for &rule_index in rules_to_run {
-        if excluded_rules.contains(&rule_index) {
-            continue;
+                let in_constant_expression = is_constant_expression_context(node.kind());
+                if in_constant_expression {
+                    ctx.constant_expression_depth += 1;
+                }
+
+                let rules_to_run = ctx.registry.for_kind(node.kind());
+                for &rule_index in rules_to_run {
+                    if excluded_rules.contains(&rule_index) {
+                        continue;
+                    }
+                    let rule = ctx.registry.rule(rule_index);
+                    rule.check(ctx, node);
+                }
+
+                // Push exit before children so teardown happens after all descendants.
+                stack.push(Op::Exit { in_scope, in_constant_expression });
+
+                // Push children in reverse so they are processed left-to-right.
+                let start = stack.len();
+                node.visit_children(|child| stack.push(Op::Enter(child)));
+                stack[start..].reverse();
+            }
+            Op::Exit { in_scope, in_constant_expression } => {
+                if in_constant_expression {
+                    ctx.constant_expression_depth -= 1;
+                }
+                if in_scope {
+                    ctx.scope.pop();
+                }
+            }
         }
-
-        let rule = ctx.registry.rule(rule_index);
-
-        rule.check(ctx, node);
-    }
-
-    for child in node.children() {
-        walk(child, ctx, excluded_rules);
-    }
-
-    if in_constant_expression {
-        ctx.constant_expression_depth -= 1;
-    }
-
-    if in_scope {
-        ctx.scope.pop();
     }
 }

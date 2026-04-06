@@ -284,16 +284,12 @@ fn gather_operators_and_operands<'arena>(node: Node<'_, 'arena>) -> (Vec<Operato
             return;
         }
 
-        for child in n.children() {
-            recurse(child, ops, rands);
-        }
+        n.visit_children(|child| recurse(child, ops, rands));
 
         categorize_node(n, ops, rands);
     }
 
-    for child in node.children() {
-        recurse(child, &mut operators, &mut operands);
-    }
+    node.visit_children(|child| recurse(child, &mut operators, &mut operands));
 
     (operators, operands)
 }

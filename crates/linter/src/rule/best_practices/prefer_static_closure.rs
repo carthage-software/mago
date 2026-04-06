@@ -167,29 +167,28 @@ impl PreferStaticClosureRule {
     }
 }
 
-fn contains_this_reference(node: Node<'_, '_>) -> bool {
-    // Check current node
-    if let Node::Expression(Expression::Variable(Variable::Direct(var))) = node
-        && var.name == "$this"
-    {
-        return true;
-    }
+fn contains_this_reference(root: Node<'_, '_>) -> bool {
+    // Iterative traversal to avoid stack overflows on deeply nested ASTs.
+    let mut stack = vec![root];
 
-    // Don't recurse into anonymous classes or nested declarations (they have their own $this binding)
-    // Note: Non-static closures and arrow functions inherit $this from their parent scope, so we DO recurse into them
-    match node {
-        Node::Closure(closure) if closure.r#static.is_some() => return false,
-        Node::ArrowFunction(arrow_function) if arrow_function.r#static.is_some() => return false,
-        Node::AnonymousClass(_) => return false,
-        node if node.is_declaration() => return false,
-        _ => {}
-    }
-
-    // Recursively check children
-    for child in node.children() {
-        if contains_this_reference(child) {
+    while let Some(node) = stack.pop() {
+        if let Node::Expression(Expression::Variable(Variable::Direct(var))) = node
+            && var.name == "$this"
+        {
             return true;
         }
+
+        // Don't recurse into anonymous classes or nested declarations (they have their own $this binding).
+        // Note: Non-static closures and arrow functions inherit $this from their parent scope, so we DO recurse into them.
+        match node {
+            Node::Closure(closure) if closure.r#static.is_some() => continue,
+            Node::ArrowFunction(arrow_function) if arrow_function.r#static.is_some() => continue,
+            Node::AnonymousClass(_) => continue,
+            node if node.is_declaration() => continue,
+            _ => {}
+        }
+
+        node.visit_children(|child| stack.push(child));
     }
 
     false
