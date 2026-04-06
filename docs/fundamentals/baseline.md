@@ -117,6 +117,16 @@ The variant setting only affects **generation** of new baselines. When **reading
 
 Baseline files created with older versions of Mago (before variant support) don't have a `variant` header. When Mago encounters such a file, it assumes the **strict** variant and displays a warning recommending you regenerate the baseline to add the header.
 
+## JSON Schema for IDE Integration
+
+If you are building tooling or IDE integrations that need to parse or generate baseline files, you can retrieve the JSON schema for the baseline file format:
+
+```bash
+mago config --schema --show baseline
+```
+
+This outputs a JSON Schema (draft 2020-12) describing both baseline variants. The schema can be used for validation, autocompletion, and documentation generation in editors or plugins.
+
 ## Ignoring the Baseline
 
 If you want to temporarily see all issues — including those suppressed by the baseline — you can use the `--ignore-baseline` flag:

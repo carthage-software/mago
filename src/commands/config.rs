@@ -32,6 +32,8 @@ use clap::Parser;
 use clap::ValueEnum;
 use schemars::schema_for;
 
+use mago_reporting::baseline::Baseline;
+
 use crate::config::Configuration;
 use crate::config::analyzer::AnalyzerConfiguration;
 use crate::config::formatter::FormatterConfiguration;
@@ -53,6 +55,7 @@ enum ConfigSection {
     Formatter,
     Analyzer,
     Parser,
+    Baseline,
 }
 
 /// Display the final, merged configuration that Mago is using.
@@ -153,6 +156,10 @@ impl ConfigCommand {
                         let schema = schema_for!(ParserConfiguration);
                         serde_json::to_string_pretty(&schema)?
                     }
+                    ConfigSection::Baseline => {
+                        let schema = schema_for!(Baseline);
+                        serde_json::to_string_pretty(&schema)?
+                    }
                 }
             } else {
                 let schema = schema_for!(Configuration);
@@ -196,6 +203,12 @@ impl ConfigCommand {
                     } else {
                         serde_json::to_string_pretty(&configuration.parser)?
                     }
+                }
+                ConfigSection::Baseline => {
+                    tracing::error!("Baseline is not a configuration section.");
+                    tracing::error!("Use `--schema --show baseline` to get the baseline file schema.");
+
+                    return Ok(ExitCode::FAILURE);
                 }
             }
         } else if self.default {

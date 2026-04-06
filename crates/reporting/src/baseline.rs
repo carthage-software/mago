@@ -49,7 +49,7 @@ pub enum BaselineVariant {
 /// Represents a single issue in the strict baseline format.
 ///
 /// This is a simplified representation of an issue for storage in the baseline file.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone, PartialOrd, Ord)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone, PartialOrd, Ord, JsonSchema)]
 pub struct StrictBaselineIssue {
     pub code: String,
     pub start_line: u32,
@@ -57,7 +57,7 @@ pub struct StrictBaselineIssue {
 }
 
 /// Represents a collection of issues for a specific file path in the strict baseline.
-#[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq, JsonSchema)]
 pub struct StrictBaselineEntry {
     pub issues: Vec<StrictBaselineIssue>,
 }
@@ -66,7 +66,7 @@ pub struct StrictBaselineEntry {
 ///
 /// File paths are stored in a normalized format (using forward slashes)
 /// to ensure cross-platform compatibility.
-#[derive(Serialize, Deserialize, Debug, Default)]
+#[derive(Serialize, Deserialize, Debug, Default, JsonSchema)]
 pub struct StrictBaseline {
     /// The baseline variant marker. When present, indicates this is a strict baseline.
     /// When absent (for backward compatibility), the baseline is assumed to be strict.
@@ -79,7 +79,7 @@ pub struct StrictBaseline {
 /// Represents a single issue entry in the loose baseline format.
 ///
 /// Issues are grouped by (file, code, message) tuple with a count.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone, PartialOrd, Ord)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone, PartialOrd, Ord, JsonSchema)]
 pub struct LooseBaselineIssue {
     /// The normalized file path where the issues occur.
     pub file: String,
@@ -92,7 +92,7 @@ pub struct LooseBaselineIssue {
 }
 
 /// The loose baseline structure with count-based issue tracking.
-#[derive(Serialize, Deserialize, Debug, Default)]
+#[derive(Serialize, Deserialize, Debug, Default, JsonSchema)]
 pub struct LooseBaseline {
     /// The baseline variant marker.
     pub variant: BaselineVariant,
@@ -101,7 +101,8 @@ pub struct LooseBaseline {
 }
 
 /// A baseline that can be either strict or loose.
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(untagged)]
 pub enum Baseline {
     /// Strict baseline with exact line matching.
     Strict(StrictBaseline),
