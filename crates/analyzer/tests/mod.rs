@@ -443,6 +443,7 @@ test_case!(issue_1576);
 test_case!(issue_1578);
 test_case!(issue_1586);
 test_case!(issue_1590);
+test_case!(issue_1591);
 test_case!(issue_1593);
 test_case!(psl_regressions);
 test_case!(issue_659);
