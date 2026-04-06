@@ -577,10 +577,16 @@ pub(crate) fn analyze_nested_array_assignment<'ctx, 'ast, 'arena>(
         let mut array_target_index_type = None;
 
         if let Some(index) = array_target.get_index() {
-            let was_inside_general_use = block_context.flags.inside_general_use();
-            block_context.flags.set_inside_general_use(true);
-            index.analyze(context, block_context, artifacts)?;
-            block_context.flags.set_inside_general_use(was_inside_general_use);
+            // For compound assignments (`+=`, `.=`, etc.) the index was already
+            // analyzed during the synthetic binary evaluation. Skip re-analysis
+            // when the type is available to avoid duplicate issue reporting.
+            if artifacts.get_expression_type(&index).is_none() {
+                let was_inside_general_use = block_context.flags.inside_general_use();
+                block_context.flags.set_inside_general_use(true);
+                index.analyze(context, block_context, artifacts)?;
+                block_context.flags.set_inside_general_use(was_inside_general_use);
+            }
+
             let index_type = artifacts.get_rc_expression_type(&index).cloned();
 
             array_target_index_type =

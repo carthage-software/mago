@@ -43,11 +43,19 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ArrayAccess<'arena> {
             None
         };
 
-        let was_inside_use = block_context.flags.inside_general_use();
+        let was_inside_isset = block_context.flags.inside_isset();
+        let was_inside_general_use = block_context.flags.inside_general_use();
+        let was_inside_unset = block_context.flags.inside_unset();
+
+        block_context.flags.set_inside_isset(false);
         block_context.flags.set_inside_general_use(true);
         block_context.flags.set_inside_unset(false);
+
         self.index.analyze(context, block_context, artifacts)?;
-        block_context.flags.set_inside_general_use(was_inside_use);
+
+        block_context.flags.set_inside_isset(was_inside_isset);
+        block_context.flags.set_inside_unset(was_inside_unset);
+        block_context.flags.set_inside_general_use(was_inside_general_use);
 
         let index_type = artifacts.get_expression_type(&self.index).cloned().unwrap_or_else(get_arraykey);
 

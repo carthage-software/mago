@@ -3828,7 +3828,7 @@ function array_combine(array $keys, array $values): array {}
 /**
  * @pure
  */
-function array_key_exists(string|int|float|bool|null $key, array $array): bool {}
+function array_key_exists(string|int|float|bool $key, array $array): bool {}
 
 /**
  * @template K as array-key

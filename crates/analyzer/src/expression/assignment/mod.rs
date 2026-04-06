@@ -158,7 +158,9 @@ pub fn analyze_assignment<'ctx, 'ast, 'arena>(
                     None
                 };
 
-                artifacts.expression_types = previous_expression_types;
+                let new_expression_types =
+                    std::mem::replace(&mut artifacts.expression_types, previous_expression_types);
+                artifacts.expression_types.extend(new_expression_types);
                 if let Some(expression_type) = assignment_type {
                     artifacts.expression_types.insert(get_expression_range(source_expression), expression_type);
                 }

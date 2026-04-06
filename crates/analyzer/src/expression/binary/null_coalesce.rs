@@ -49,7 +49,10 @@ pub fn analyze_null_coalesce_operation<'ctx, 'arena>(
     artifacts: &mut AnalysisArtifacts,
 ) -> Result<(), AnalysisError> {
     let was_inside_isset = block_context.flags.inside_isset();
-    block_context.flags.set_inside_isset(true);
+    block_context.flags.set_inside_isset(matches!(
+        binary.lhs,
+        Expression::Variable(_) | Expression::Access(_) | Expression::ArrayAccess(_)
+    ));
     binary.lhs.analyze(context, block_context, artifacts)?;
     block_context.flags.set_inside_isset(was_inside_isset);
 

@@ -17,6 +17,7 @@ class Foo
 
     private function _bar(null|string $order, null|string $direction): void
     {
+        // @mago-expect analysis:possibly-null-array-index,possibly-null-array-index
         if (isset(self::ORDER_BY[$order], self::$DIRECTION[$direction])) {
             $order = self::ORDER_BY[$order];
             $direction = self::$DIRECTION[$direction];

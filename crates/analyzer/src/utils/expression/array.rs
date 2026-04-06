@@ -131,21 +131,21 @@ pub(crate) fn get_array_target_type_given_index<'ctx>(
         );
     }
 
-    if !block_context.flags.inside_isset() && index_type.is_nullable() && !index_type.ignore_nullable_issues() {
+    if index_type.is_nullable() && !index_type.ignore_nullable_issues() {
         context.collector.report_with_code(
-                IssueCode::PossiblyNullArrayIndex,
-                Issue::warning(format!(
-                    "Possibly using `null` as an array index to access element{}.",
-                    match extended_var_id {
-                        Some(var) => "of variable ".to_string() + var.as_str(),
-                        None => String::new(),
-                    }
-                ))
-                .with_annotation(Annotation::primary(access_index_span).with_message("Index might be `null` here."))
-                .with_note("Using `null` as an array key is equivalent to using an empty string `''`.")
-                .with_note("The analysis indicates this index could be `null` at runtime.")
-                .with_help("Ensure the index is always an integer or a string, potentially using checks or assertions before access."),
-            );
+            IssueCode::PossiblyNullArrayIndex,
+            Issue::warning(format!(
+                "Possibly using `null` as an array index to access element{}.",
+                match extended_var_id {
+                    Some(var) => "of variable ".to_string() + var.as_str(),
+                    None => String::new(),
+                }
+            ))
+            .with_annotation(Annotation::primary(access_index_span).with_message("Index might be `null` here."))
+            .with_note("Using `null` as an array key is equivalent to using an empty string `''`.")
+            .with_note("The analysis indicates this index could be `null` at runtime.")
+            .with_help("Ensure the index is always an integer or a string, potentially using checks or assertions before access."),
+        );
     }
 
     let mut array_atomic_types = array_like_type.types.iter().collect::<Vec<_>>();
@@ -298,6 +298,10 @@ pub(crate) fn get_array_target_type_given_index<'ctx>(
                 has_valid_expected_index = true;
             }
             TAtomic::Scalar(TScalar::Bool(bool_scalar)) if bool_scalar.is_false() => {
+                if !array_like_type.ignore_falsable_issues() && !in_assignment {
+                    value_type = Some(add_optional_union_type(get_null(), value_type.as_ref(), context.codebase));
+                }
+
                 if !block_context.flags.inside_isset()
                     && !block_context.flags.inside_unset()
                     && !array_like_type.ignore_falsable_issues()
