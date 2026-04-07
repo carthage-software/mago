@@ -704,24 +704,23 @@ impl<'ast, 'arena> Node<'ast, 'arena> {
     where
         F: Fn(&Node<'ast, 'arena>) -> Option<T>,
     {
-        self.filter_map_internal(&f)
+        let mut result = vec![];
+        self.filter_map_internal(&f, &mut result);
+        result
     }
 
     #[inline]
-    fn filter_map_internal<F, T: 'ast>(&self, f: &F) -> Vec<T>
+    fn filter_map_internal<F, T: 'ast>(&self, f: &F, result: &mut Vec<T>)
     where
         F: Fn(&Node<'ast, 'arena>) -> Option<T>,
     {
-        let mut result = vec![];
         for child in self.children() {
-            result.extend(child.filter_map_internal(f));
+            child.filter_map_internal(f, result);
         }
 
-        if let Some(child) = f(self) {
-            result.push(child);
+        if let Some(item) = f(self) {
+            result.push(item);
         }
-
-        result
     }
 
     #[inline]
