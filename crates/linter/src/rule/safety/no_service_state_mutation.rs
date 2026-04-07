@@ -279,6 +279,10 @@ impl<'ctx, 'arena> MutWalker<'_, 'arena, LintContext<'ctx, 'arena>> for Mutation
     fn walk_anonymous_class(&mut self, _: &AnonymousClass<'arena>, _: &mut LintContext<'ctx, 'arena>) {}
     fn walk_closure(&mut self, _: &Closure<'arena>, _: &mut LintContext<'ctx, 'arena>) {}
     fn walk_arrow_function(&mut self, _: &ArrowFunction<'arena>, _: &mut LintContext<'ctx, 'arena>) {}
+    fn walk_class(&mut self, _: &Class<'arena>, _: &mut LintContext<'ctx, 'arena>) {}
+    fn walk_trait(&mut self, _: &Trait<'arena>, _: &mut LintContext<'ctx, 'arena>) {}
+    fn walk_interface(&mut self, _: &Interface<'arena>, _: &mut LintContext<'ctx, 'arena>) {}
+    fn walk_enum(&mut self, _: &Enum<'arena>, _: &mut LintContext<'ctx, 'arena>) {}
 }
 
 #[cfg(test)]
@@ -440,6 +444,34 @@ mod tests {
                 public function process(): void
                 {
                     $this->count = 0;
+                }
+            }
+        "#},
+    }
+
+    test_lint_failure! {
+        name = mutation_in_nested_class_reported_once,
+        rule = NoServiceStateMutationRule,
+        count = 1,
+        settings = symfony_settings,
+        code = indoc! {r#"
+            <?php
+
+            namespace App\Service;
+
+            class OuterService
+            {
+                public function run(): void
+                {
+                    class InnerService
+                    {
+                        private string $x = '';
+
+                        public function doSomething(): void
+                        {
+                            $this->x .= 'a';
+                        }
+                    }
                 }
             }
         "#},
