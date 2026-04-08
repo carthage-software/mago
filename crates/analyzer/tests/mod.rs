@@ -446,6 +446,7 @@ test_case!(issue_1590);
 test_case!(issue_1591);
 test_case!(issue_1593);
 test_case!(issue_1594);
+test_case!(issue_1603);
 test_case!(psl_regressions);
 test_case!(issue_659);
 test_case!(issue_660);

@@ -122,19 +122,21 @@ fn read_variable<'ctx>(
         Some(variable_type) => variable_type.clone(),
         None => {
             if block_context.variables_possibly_in_scope.contains(&atom(variable_name)) {
-                context.collector.report_with_code(
-                    IssueCode::PossiblyUndefinedVariable,
-                    Issue::warning(format!(
-                        "Variable `{variable_name}` might not have been defined on all execution paths leading to this point.",
-                    ))
-                    .with_annotation(
-                        Annotation::primary(variable_span)
-                            .with_message(format!("`{variable_name}` might be undefined here")),
-                    )
-                    .with_note("This can happen if the variable is assigned within a conditional block and there's an execution path to this usage where that block is skipped.")
-                    .with_note("Accessing an undefined variable will result in an `E_WARNING` (PHP 8+) or `E_NOTICE` (PHP 7) and it will be treated as `null`.")
-                    .with_help(format!("Initialize `{variable_name}` before conditional paths, or use `isset()` to check its existence."))
-                );
+                if !block_context.flags.inside_isset() {
+                    context.collector.report_with_code(
+                        IssueCode::PossiblyUndefinedVariable,
+                        Issue::warning(format!(
+                            "Variable `{variable_name}` might not have been defined on all execution paths leading to this point.",
+                        ))
+                        .with_annotation(
+                            Annotation::primary(variable_span)
+                                .with_message(format!("`{variable_name}` might be undefined here")),
+                        )
+                        .with_note("This can happen if the variable is assigned within a conditional block and there's an execution path to this usage where that block is skipped.")
+                        .with_note("Accessing an undefined variable will result in an `E_WARNING` (PHP 8+) or `E_NOTICE` (PHP 7) and it will be treated as `null`.")
+                        .with_help(format!("Initialize `{variable_name}` before conditional paths, or use `isset()` to check its existence."))
+                    );
+                }
 
                 Rc::new(get_mixed())
             } else if block_context.flags.inside_variable_reference() {
