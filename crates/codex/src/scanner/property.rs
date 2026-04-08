@@ -193,7 +193,7 @@ pub fn scan_properties<'arena>(
             .items
             .iter()
             .map(|item| {
-                let (name, name_span, has_default, default_type) = scan_property_item(item, context, scope);
+                let (name, name_span, has_default, default_type) = scan_property_item(item, classname, context, scope);
 
                 let mut flags = flags;
 
@@ -263,7 +263,7 @@ pub fn scan_properties<'arena>(
             .collect(),
         Property::Hooked(hooked_property) => {
             let (name, name_span, has_default, default_type) =
-                scan_property_item(&hooked_property.item, context, scope);
+                scan_property_item(&hooked_property.item, classname, context, scope);
 
             let read_visibility = match hooked_property.modifiers.get_first_read_visibility() {
                 Some(visibility) => Visibility::try_from(visibility).unwrap_or(Visibility::Public),
@@ -485,6 +485,7 @@ fn create_implicit_value_parameter(property_metadata: &PropertyMetadata, span: S
 #[inline]
 pub fn scan_property_item<'arena>(
     property_item: &'arena PropertyItem<'arena>,
+    classname: Atom,
     context: &mut Context<'_, 'arena>,
     scope: &NamespaceScope,
 ) -> (VariableIdentifier, Span, bool, Option<TypeMetadata>) {
@@ -501,7 +502,7 @@ pub fn scan_property_item<'arena>(
             let name = VariableIdentifier(atom(property_concrete_item.variable.name));
             let name_span = property_concrete_item.variable.span;
             let has_default = true;
-            let default_type = infer(context, scope, property_concrete_item.value).map(|u| {
+            let default_type = infer(context, scope, property_concrete_item.value, Some(classname)).map(|u| {
                 let mut type_metadata = TypeMetadata::new(u, property_concrete_item.value.span());
                 type_metadata.inferred = true;
                 type_metadata

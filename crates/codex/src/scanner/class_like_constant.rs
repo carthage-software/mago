@@ -70,7 +70,7 @@ pub fn scan_class_like_constants<'arena>(
             }
 
             meta.attributes.clone_from(&attributes);
-            meta.inferred_type = infer(context, scope, item.value).map(TUnion::get_single_owned);
+            meta.inferred_type = infer(context, scope, item.value, classname).map(TUnion::get_single_owned);
 
             if let Some(ref docblock) = docblock {
                 if docblock.is_deprecated {

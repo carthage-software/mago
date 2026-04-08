@@ -329,7 +329,7 @@ fn scan_class_like<'arena>(
     };
 
     if kind.is_class() {
-        class_like_metadata.attribute_flags = get_attribute_flags(name, attribute_lists, context, scope);
+        class_like_metadata.attribute_flags = get_attribute_flags(name, attribute_lists, context, scope, Some(name));
     }
 
     class_like_metadata.kind = kind;
@@ -1088,7 +1088,7 @@ fn scan_class_like<'arena>(
                 }
             }
             ClassLikeMember::EnumCase(enum_case) => {
-                let case_metadata = scan_enum_case(enum_case, context, scope);
+                let case_metadata = scan_enum_case(name, enum_case, context, scope);
                 if class_like_metadata.constants.contains_key(&case_metadata.name) {
                     continue;
                 }

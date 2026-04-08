@@ -66,11 +66,12 @@ pub fn scan_function_like_parameter_with_constants<'arena>(
 
     if let Some(default_value) = &parameter.default_value {
         metadata.flags |= MetadataFlags::HAS_DEFAULT;
-        metadata.default_type = infer_with_constants(context, scope, default_value.value, constants).map(|u| {
-            let mut type_metadata = TypeMetadata::new(u, default_value.span());
-            type_metadata.inferred = true;
-            type_metadata
-        });
+        metadata.default_type =
+            infer_with_constants(context, scope, default_value.value, classname, constants).map(|u| {
+                let mut type_metadata = TypeMetadata::new(u, default_value.span());
+                type_metadata.inferred = true;
+                type_metadata
+            });
     }
 
     metadata

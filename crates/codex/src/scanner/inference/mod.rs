@@ -3,6 +3,7 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 use std::sync::LazyLock;
 
+use mago_atom::Atom;
 use mago_atom::AtomMap;
 use mago_atom::ascii_lowercase_constant_name_atom;
 use mago_atom::atom;
@@ -194,8 +195,9 @@ pub(super) fn infer<'arena>(
     context: &Context<'_, 'arena>,
     scope: &NamespaceScope,
     expression: &'arena Expression<'arena>,
+    enclosing_class: Option<Atom>,
 ) -> Option<TUnion> {
-    infer_with_constants(context, scope, expression, None)
+    infer_with_constants(context, scope, expression, enclosing_class, None)
 }
 
 #[inline]
@@ -203,6 +205,7 @@ pub(super) fn infer_with_constants<'arena>(
     context: &Context<'_, 'arena>,
     scope: &NamespaceScope,
     expression: &'arena Expression<'arena>,
+    enclosing_class: Option<Atom>,
     constants: Option<&AtomMap<ConstantMetadata>>,
 ) -> Option<TUnion> {
     match expression {
@@ -286,7 +289,7 @@ pub(super) fn infer_with_constants<'arena>(
             if contains_content { Some(get_non_empty_string()) } else { Some(get_string()) }
         }
         Expression::UnaryPrefix(UnaryPrefix { operator, operand }) => {
-            let operand_type = infer_with_constants(context, scope, operand, constants)?;
+            let operand_type = infer_with_constants(context, scope, operand, enclosing_class, constants)?;
 
             match operator {
                 UnaryPrefixOperator::Plus(_) => {
@@ -327,10 +330,10 @@ pub(super) fn infer_with_constants<'arena>(
             }
         }
         Expression::Binary(Binary { operator: BinaryOperator::StringConcat(_), lhs, rhs }) => {
-            let Some(lhs_type) = infer_with_constants(context, scope, lhs, constants) else {
+            let Some(lhs_type) = infer_with_constants(context, scope, lhs, enclosing_class, constants) else {
                 return Some(get_string());
             };
-            let Some(rhs_type) = infer_with_constants(context, scope, rhs, constants) else {
+            let Some(rhs_type) = infer_with_constants(context, scope, rhs, enclosing_class, constants) else {
                 return Some(get_string());
             };
 
@@ -370,8 +373,8 @@ pub(super) fn infer_with_constants<'arena>(
             Some(wrap_atomic(TAtomic::Scalar(TScalar::String(final_string_type))))
         }
         Expression::Binary(Binary { operator, lhs, rhs }) if operator.is_bitwise() => {
-            let lhs = infer_with_constants(context, scope, lhs, constants);
-            let rhs = infer_with_constants(context, scope, rhs, constants);
+            let lhs = infer_with_constants(context, scope, lhs, enclosing_class, constants);
+            let rhs = infer_with_constants(context, scope, rhs, enclosing_class, constants);
 
             Some(wrap_atomic(
                 match (
@@ -418,8 +421,8 @@ pub(super) fn infer_with_constants<'arena>(
             ))
         }
         Expression::Binary(Binary { operator, lhs, rhs }) if operator.is_arithmetic() => {
-            let lhs = infer_with_constants(context, scope, lhs, constants);
-            let rhs = infer_with_constants(context, scope, rhs, constants);
+            let lhs = infer_with_constants(context, scope, lhs, enclosing_class, constants);
+            let rhs = infer_with_constants(context, scope, rhs, enclosing_class, constants);
 
             match (
                 lhs.and_then(|v| v.get_single_literal_int_value()),
@@ -461,6 +464,8 @@ pub(super) fn infer_with_constants<'arena>(
         })) => {
             let class_name_str = if let Expression::Identifier(identifier) = class {
                 context.resolved_names.get(identifier)
+            } else if matches!(class, Expression::Self_(_) | Expression::Static(_)) {
+                enclosing_class.as_ref().map(Atom::as_str)?
             } else {
                 return None;
             };
@@ -505,8 +510,8 @@ pub(super) fn infer_with_constants<'arena>(
                     return None;
                 };
 
-                let value_type =
-                    infer_with_constants(context, scope, element.value, constants).unwrap_or_else(get_mixed);
+                let value_type = infer_with_constants(context, scope, element.value, enclosing_class, constants)
+                    .unwrap_or_else(get_mixed);
 
                 entries.insert(i, (false, value_type));
             }
@@ -528,11 +533,11 @@ pub(super) fn infer_with_constants<'arena>(
                     return None;
                 };
 
-                let value_type =
-                    infer_with_constants(context, scope, element.value, constants).unwrap_or_else(get_mixed);
+                let value_type = infer_with_constants(context, scope, element.value, enclosing_class, constants)
+                    .unwrap_or_else(get_mixed);
 
-                let Some(key_type) =
-                    infer_with_constants(context, scope, element.key, constants).and_then(|v| v.get_single_array_key())
+                let Some(key_type) = infer_with_constants(context, scope, element.key, enclosing_class, constants)
+                    .and_then(|v| v.get_single_array_key())
                 else {
                     unknown_key_values.push(value_type);
                     continue;

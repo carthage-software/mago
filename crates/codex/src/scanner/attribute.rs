@@ -35,6 +35,7 @@ pub fn get_attribute_flags<'arena>(
     attribute_lists: &'arena Sequence<'arena, AttributeList<'arena>>,
     context: &mut Context<'_, 'arena>,
     scope: &NamespaceScope,
+    classname: Option<Atom>,
 ) -> Option<AttributeFlags> {
     if class_like_name.eq_ignore_ascii_case("Attribute") {
         return Some(AttributeFlags::TARGET_CLASS);
@@ -53,7 +54,7 @@ pub fn get_attribute_flags<'arena>(
             return Some(AttributeFlags::TARGET_ALL);
         };
 
-        let inferred_type = infer(context, scope, first_argument.value());
+        let inferred_type = infer(context, scope, first_argument.value(), classname);
         let bits = inferred_type.and_then(|i| i.get_single_literal_int_value()).and_then(|value| {
             if !(0..=255).contains(&value) {
                 return None;
