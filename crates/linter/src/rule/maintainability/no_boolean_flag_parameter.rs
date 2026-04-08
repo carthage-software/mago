@@ -110,7 +110,7 @@ impl LintRule for NoBooleanFlagParameterRule {
             return;
         };
 
-        if let Some(FunctionLikeScope::Method(name)) = ctx.scope.get_function_like_scope() {
+        if let Some(FunctionLikeScope::Method(name, _)) = ctx.scope.get_function_like_scope() {
             if self.cfg.exclude_constructors && name.eq_ignore_ascii_case("__construct") {
                 return;
             }

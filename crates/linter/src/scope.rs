@@ -22,14 +22,14 @@ pub enum ClassLikeScope<'arena> {
 /// Represents a function-like lexical scope.
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum FunctionLikeScope<'arena> {
-    /// A `function` scope, containing the function name.
-    Function(&'arena str),
-    /// A `method` scope, containing the method name.
-    Method(&'arena str),
-    /// An `fn()` arrow function scope, containing its span.
-    ArrowFunction(Span),
-    /// A `function()` closure scope, containing its span.
-    Closure(Span),
+    /// A `function` scope, containing the function name, and if the function returns by-ref.
+    Function(&'arena str, bool),
+    /// A `method` scope, containing the method name, and if the method returns by-ref.
+    Method(&'arena str, bool),
+    /// An `fn()` arrow function scope, containing its span, and if it returns by-ref.
+    ArrowFunction(Span, bool),
+    /// A `function()` closure scope, containing its span, and if it returns by-ref.
+    Closure(Span, bool),
 }
 
 /// Represents a single level of lexical scope within the AST.
@@ -51,6 +51,17 @@ pub enum Scope<'arena> {
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct ScopeStack<'arena> {
     stack: Vec<Scope<'arena>>,
+}
+
+impl FunctionLikeScope<'_> {
+    pub const fn is_by_ref(&self) -> bool {
+        match self {
+            FunctionLikeScope::Function(_, by_ref)
+            | FunctionLikeScope::Method(_, by_ref)
+            | FunctionLikeScope::ArrowFunction(_, by_ref)
+            | FunctionLikeScope::Closure(_, by_ref) => *by_ref,
+        }
+    }
 }
 
 impl<'arena> Scope<'arena> {
@@ -92,18 +103,20 @@ impl<'arena> Scope<'arena> {
             Node::Function(function) => {
                 let function_name = ctx.lookup_name(&function.name);
 
-                Scope::FunctionLike(FunctionLikeScope::Function(function_name))
+                Scope::FunctionLike(FunctionLikeScope::Function(function_name, function.ampersand.is_some()))
             }
-            Node::Method(method) => Scope::FunctionLike(FunctionLikeScope::Method(method.name.value)),
+            Node::Method(method) => {
+                Scope::FunctionLike(FunctionLikeScope::Method(method.name.value, method.ampersand.is_some()))
+            }
             Node::Closure(closure) => {
                 let span = closure.span();
 
-                Scope::FunctionLike(FunctionLikeScope::Closure(span))
+                Scope::FunctionLike(FunctionLikeScope::Closure(span, closure.ampersand.is_some()))
             }
             Node::ArrowFunction(arrow_function) => {
                 let span = arrow_function.span();
 
-                Scope::FunctionLike(FunctionLikeScope::ArrowFunction(span))
+                Scope::FunctionLike(FunctionLikeScope::ArrowFunction(span, arrow_function.ampersand.is_some()))
             }
             _ => {
                 return None;

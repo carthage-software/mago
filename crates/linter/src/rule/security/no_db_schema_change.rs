@@ -122,7 +122,7 @@ impl LintRule for NoDbSchemaChangeRule {
             return;
         }
 
-        if let Some(FunctionLikeScope::Function(function_name)) = ctx.scope.get_function_like_scope()
+        if let Some(FunctionLikeScope::Function(function_name, _)) = ctx.scope.get_function_like_scope()
             && (function_name.ends_with("activate")
                 || function_name.ends_with("activation")
                 || function_name.ends_with("hook"))

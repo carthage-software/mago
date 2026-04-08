@@ -95,7 +95,7 @@ impl LintRule for ExcessiveParameterListRule {
 
         let is_constructor = matches!(
             ctx.scope.get_function_like_scope(),
-            Some(FunctionLikeScope::Method(name)) if name.eq_ignore_ascii_case("__construct")
+            Some(FunctionLikeScope::Method(name, _)) if name.eq_ignore_ascii_case("__construct")
         );
 
         let threshold = if is_constructor {
