@@ -361,7 +361,12 @@ class DateTime implements DateTimeInterface
     public static function createFromTimestamp(int|float $timestamp): static {}
 
     /**
-     * @return array<string, int|array>|false
+     * @return array{
+     *     warning_count: non-negative-int,
+     *     warnings: array<non-negative-int, non-empty-string>,
+     *     error_count: non-negative-int,
+     *     errors: array<non-negative-int, non-empty-string>,
+     * }|false
      */
     public static function getLastErrors(): array|false {}
 
@@ -422,7 +427,12 @@ class DateTimeImmutable implements DateTimeInterface
     public static function createFromTimestamp(int|float $timestamp): static {}
 
     /**
-     * @return array<string, int|array>|false
+     * @return array{
+     *     warning_count: non-negative-int,
+     *     warnings: array<non-negative-int, non-empty-string>,
+     *     error_count: non-negative-int,
+     *     errors: array<non-negative-int, non-empty-string>,
+     * }|false
      */
     public static function getLastErrors(): array|false {}
 
