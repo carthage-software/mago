@@ -89,7 +89,7 @@ pub(crate) fn create_orchestrator<'a>(
         disable_default_analyzer_plugins: configuration.analyzer.disable_default_plugins,
         analyzer_plugins: configuration.analyzer.plugins.clone(),
         use_progress_bars,
-        use_colors: color_choice != ColorChoice::Never,
+        use_colors: should_use_colors(color_choice),
         paths: configuration.source.paths.clone(),
         excludes: configuration.source.excludes.iter().map(|p| p.as_ref()).collect(),
         extensions: configuration.source.extensions.iter().map(|e| e.as_ref()).collect(),
