@@ -3515,10 +3515,13 @@ const ARRAY_FILTER_USE_KEY = 2;
 function array_merge_recursive(array ...$arrays) {}
 
 /**
- * @param array<array-key, mixed> $array
- * @param array<array-key, mixed> ...$replacements
+ * @template K of array-key
+ * @template V
  *
- * @return array<array-key, mixed>
+ * @param array<K, V> $array
+ * @param array<K, V> ...$replacements
+ *
+ * @return array<K, V>
  *
  * @no-named-arguments
  * @pure
@@ -3526,10 +3529,13 @@ function array_merge_recursive(array ...$arrays) {}
 function array_replace(array $array, array ...$replacements): array {}
 
 /**
- * @param array<array-key, mixed> $array
- * @param array<array-key, mixed> ...$replacements
+ * @template K of array-key
+ * @template V
  *
- * @return array<array-key, mixed>
+ * @param array<K, V> $array
+ * @param array<K, V> ...$replacements
+ *
+ * @return array<K, V>
  *
  * @no-named-arguments
  * @pure
