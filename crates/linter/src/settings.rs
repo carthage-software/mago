@@ -107,6 +107,7 @@ use crate::rule::NoRequestAllConfig;
 use crate::rule::NoRequestVariableConfig;
 use crate::rule::NoRolesAsCapabilitiesConfig;
 use crate::rule::NoSelfAssignmentConfig;
+use crate::rule::NoServiceStateMutationConfig;
 use crate::rule::NoShellExecuteStringConfig;
 use crate::rule::NoShortBoolCastConfig;
 use crate::rule::NoShortOpeningTagConfig;
@@ -334,6 +335,7 @@ pub struct RulesSettings {
     pub strict_assertions: RuleSettings<StrictAssertionsConfig>,
     pub use_specific_assertions: RuleSettings<UseSpecificAssertionsConfig>,
     pub no_request_all: RuleSettings<NoRequestAllConfig>,
+    pub no_service_state_mutation: RuleSettings<NoServiceStateMutationConfig>,
     pub middleware_in_routes: RuleSettings<MiddlewareInRoutesConfig>,
     pub use_compound_assignment: RuleSettings<UseCompoundAssignmentConfig>,
     pub require_preg_quote_delimiter: RuleSettings<RequirePregQuoteDelimiterConfig>,
