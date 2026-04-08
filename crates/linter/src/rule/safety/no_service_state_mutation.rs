@@ -178,7 +178,7 @@ impl LintRule for NoServiceStateMutationRule {
                 let is_reset_class = class.implements.as_ref().is_some_and(|implements| {
                     implements.types.iter().any(|iface| {
                         let name = ctx.lookup_name(iface);
-                        self.cfg.reset_interfaces.iter().any(|ri| name == ri.as_str())
+                        self.cfg.reset_interfaces.iter().any(|ri| name.eq_ignore_ascii_case(ri.as_str()))
                     })
                 });
 
