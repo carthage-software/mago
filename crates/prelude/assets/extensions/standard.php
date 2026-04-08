@@ -4205,7 +4205,7 @@ function next(object|array &$array): mixed {}
  * @template V
  *
  * @param object|array<K, V> $array
- * @param-out ($array is object ? object : ($array is list<V> ? list<V> : array<K, V>)) $array
+ * @param-out ($array is object ? object : ($array is list<V> ? ($array is non-empty-list<V> ? non-empty-list<V> : list<V>) : ($array is non-empty-array<K, V> ? non-empty-array<K,V> : array<K, V>))) $array
  *
  * @return ($array is non-empty-list ? V : ($array is non-empty-array ? V : V|false))
  */
