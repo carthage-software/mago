@@ -590,24 +590,27 @@ fn analyze<'ctx, 'ast, 'arena>(
                         pre_loop_context.remove_variable_from_conflicting_clauses(context, variable_id, None);
                     }
 
-                    if let Some(redefined_type) = loop_scope.possibly_redefined_loop_parent_variables.get(&variable_id)
-                    {
+                    // Include widened types from by-reference mutations so they
+                    // propagate to subsequent iterations. This uses a dedicated
+                    // field separate from `possibly_redefined_loop_parent_variables`
+                    // to avoid leaking break-path types into the continue context.
+                    if let Some(byref_type) = loop_scope.by_reference_loop_mutations.get(&variable_id) {
                         let existing = continue_context.locals.get(&variable_id).cloned();
-                        let combined_with_redefined = match existing {
-                            Some(existing_type) if existing_type.as_ref() != redefined_type.as_ref() => {
+                        let combined = match existing {
+                            Some(existing_type) if existing_type.as_ref() != byref_type.as_ref() => {
                                 has_changes = true;
                                 simplify_generic_subset_arrays(combine_union_types(
                                     &existing_type,
-                                    redefined_type,
+                                    byref_type,
                                     codebase,
                                     CombinerOptions::default(),
                                 ))
                             }
                             Some(existing_type) => (*existing_type).clone(),
-                            None => (**redefined_type).clone(),
+                            None => (**byref_type).clone(),
                         };
 
-                        continue_context.locals.insert(variable_id, Rc::new(combined_with_redefined));
+                        continue_context.locals.insert(variable_id, Rc::new(combined));
                     }
                 } else {
                     if !recorded_issues.is_empty() {

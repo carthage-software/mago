@@ -383,7 +383,9 @@ fn record_by_reference_mutation_in_loop(artifacts: &mut AnalysisArtifacts, varia
     };
 
     if loop_scope.parent_context_variables.contains_key(&variable_id) {
-        loop_scope.possibly_redefined_loop_parent_variables.insert(variable_id, Rc::new(new_type.clone()));
+        let new_type = Rc::new(new_type.clone());
+        loop_scope.possibly_redefined_loop_parent_variables.insert(variable_id, new_type.clone());
+        loop_scope.by_reference_loop_mutations.insert(variable_id, new_type);
     }
 }
 
