@@ -96,6 +96,25 @@ pub fn analyze_invocation<'ctx, 'arena>(
     template_result: &mut TemplateResult,
     parameter_types: &mut AtomMap<TUnion>,
 ) -> Result<(), AnalysisError> {
+    if !context.settings.allow_side_effects_in_conditions
+        && block_context.flags.inside_conditional()
+        && !invocation.target.is_pure_or_mutation_free()
+    {
+        context.collector.report_with_code(
+            IssueCode::SideEffectsInCondition,
+            Issue::warning("Impure function call inside condition.")
+                .with_annotation(
+                    Annotation::primary(invocation.span)
+                        .with_message("This call is not marked `@pure` or `@mutation-free` and may have side effects"),
+                )
+                .with_note("Side effects inside conditions can silently alter variables used elsewhere in the same expression.")
+                .with_note("PHP's evaluation order may not match reading order, leading to surprising behavior.")
+                .with_help(
+                    "Extract the call into a variable before the condition, or annotate the function with `@pure` or `@mutation-free` if it has no side effects.",
+                ),
+        );
+    }
+
     populate_template_result_from_invocation(context, invocation, template_result);
 
     let parameter_refs = invocation.target.get_parameters();

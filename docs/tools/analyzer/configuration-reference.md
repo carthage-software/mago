@@ -110,7 +110,8 @@ These flags control specific, powerful analysis capabilities.
 | `check-name-casing`                  | `false` | When `true`, reports incorrect casing when referencing classes, functions, etc. (e.g., `new fooBar()` when defined as `FooBar`). Helps prevent autoloading failures on case-sensitive file systems. |
 | `enforce-class-finality`              | `false` | When `true`, reports classes that are not `final`, `abstract`, or annotated with `@api` and have no children. |
 | `require-api-or-internal`             | `false` | When `true`, requires abstract classes, interfaces, and traits to have `@api` or `@internal` annotations. |
-| `check-experimental`                  | `false` | When `true`, reports usage of classes, interfaces, traits, and functions marked with `@experimental` from non-experimental contexts. Available since Mago 1.19.0. |
+| `check-experimental`                  | `false` | When `true`, reports usage of classes, interfaces, traits, and functions marked with `@experimental` from non-experimental contexts. |
+| `allow-side-effects-in-conditions`    | `true`  | When `false`, reports calls to impure functions (not marked `@pure` or `@mutation-free`) inside `if`, `while`, `for`, ternary, or `match` conditions. Helps catch surprising evaluation-order bugs. |
 
 ## Property initialization
 
@@ -428,6 +429,7 @@ function process(object $obj): mixed
 | `enforce-class-finality` | `true` | Reports classes not declared `final`, `abstract`, or annotated with `@api`. |
 | `require-api-or-internal` | `true` | Requires abstract classes, interfaces, and traits to have `@api` or `@internal`. |
 | `check-experimental` | `true` | Reports usage of `@experimental` APIs from non-experimental contexts. |
+| `allow-side-effects-in-conditions` | `false` | Reports impure function calls inside conditions. |
 
 #### Exception handling
 

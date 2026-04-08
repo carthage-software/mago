@@ -179,6 +179,17 @@ impl<'ctx> InvocationTarget<'ctx> {
         matches!(self.get_function_like_identifier(), Some(FunctionLikeIdentifier::Method(_, _)))
     }
 
+    pub const fn is_pure_or_mutation_free(&self) -> bool {
+        match self {
+            InvocationTarget::Callable { signature, .. } => signature.is_pure,
+            InvocationTarget::FunctionLike { metadata, .. } => {
+                metadata.flags.is_pure()
+                    || metadata.flags.is_mutation_free()
+                    || metadata.flags.is_external_mutation_free()
+            }
+        }
+    }
+
     /// Checks if the target is a dynamic callable that is not explicitly a closure type.
     /// This can be true for `callable` type hints or invocable objects that aren't closures.
     #[inline]

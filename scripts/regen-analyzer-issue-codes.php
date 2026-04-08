@@ -326,6 +326,7 @@ final class AnalyzerCodeModuleGenerator
         'incorrect-class-like-casing',
         'incorrect-function-casing',
         'experimental-usage',
+        'side-effects-in-condition',
     ];
 
     /**

@@ -210,6 +210,17 @@ pub struct Settings {
     /// Defaults to `false`.
     pub check_name_casing: bool,
 
+    /// Whether to allow calls to impure functions inside conditions.
+    ///
+    /// When set to `false`, any call to a function not marked `@pure` or
+    /// `@mutation-free` inside an `if`, `while`, `for`, ternary, or `match`
+    /// condition is reported. This helps catch surprising evaluation-order
+    /// bugs where a side effect in one part of a condition silently alters
+    /// a variable used in another part.
+    ///
+    /// Defaults to `true` (impure calls in conditions are allowed).
+    pub allow_side_effects_in_conditions: bool,
+
     // Performance tuning thresholds
     // Higher values allow deeper analysis at the cost of performance.
     // Lower values improve speed but may reduce precision on complex code.
@@ -322,6 +333,7 @@ impl Settings {
             check_use_statements: false,
             check_experimental: false,
             check_name_casing: false,
+            allow_side_effects_in_conditions: true,
             saturation_complexity_threshold: default_thresholds.saturation_complexity,
             disjunction_complexity_threshold: default_thresholds.disjunction_complexity,
             negation_complexity_threshold: default_thresholds.negation_complexity,

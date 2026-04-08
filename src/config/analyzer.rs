@@ -244,6 +244,17 @@ pub struct AnalyzerConfiguration {
     /// Defaults to `false`.
     pub require_api_or_internal: bool,
 
+    /// Whether to allow calls to impure functions inside conditions.
+    ///
+    /// When set to `false`, any call to a function not marked `@pure` or
+    /// `@mutation-free` inside an `if`, `while`, `for`, ternary, or `match`
+    /// condition is reported. This helps catch surprising evaluation-order
+    /// bugs where a side effect in one part of a condition silently alters
+    /// a variable used in another part.
+    ///
+    /// Defaults to `true` (impure calls in conditions are allowed).
+    pub allow_side_effects_in_conditions: bool,
+
     /// **Deprecated**: Use `check-missing-override` and `find-unused-parameters` instead.
     ///
     /// When set to `true`, enables both `check-missing-override` and `find-unused-parameters`.
@@ -388,6 +399,7 @@ impl AnalyzerConfiguration {
             check_use_statements: self.check_use_statements,
             check_experimental: self.check_experimental,
             check_name_casing: self.check_name_casing,
+            allow_side_effects_in_conditions: self.allow_side_effects_in_conditions,
             saturation_complexity_threshold: self.performance.saturation_complexity_threshold,
             disjunction_complexity_threshold: self.performance.disjunction_complexity_threshold,
             negation_complexity_threshold: self.performance.negation_complexity_threshold,
@@ -436,6 +448,7 @@ impl Default for AnalyzerConfiguration {
             check_use_statements: defaults.check_use_statements,
             check_experimental: defaults.check_experimental,
             check_name_casing: defaults.check_name_casing,
+            allow_side_effects_in_conditions: defaults.allow_side_effects_in_conditions,
             perform_heuristic_checks: None,
             performance: PerformanceConfiguration::default(),
         }

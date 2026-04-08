@@ -174,6 +174,11 @@ const analyzerOptions = [
     label: 'Require @api or @internal',
     description: 'Require abstract classes, interfaces, and traits to have @api or @internal',
   },
+  {
+    key: 'allowSideEffectsInConditions',
+    label: 'Allow side effects in conditions',
+    description: 'Allow impure function calls inside if/while/for/ternary conditions (disable to flag them)',
+  },
 ];
 
 const rulesByCategory = computed(() => {
