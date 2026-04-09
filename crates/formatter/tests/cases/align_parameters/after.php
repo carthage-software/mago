@@ -36,7 +36,7 @@ final readonly class PlaygroundConstructorExamples
         #[Autowire(service: 'api_platform.graphql.schema_builder')]
         private readonly object $schemaBuilder,
         private readonly string $projectDir,
-        ?ClockInterface $clock = null,
+        ?ClockInterface         $clock = null,
     ) {}
 
     public function auditLogUpload(

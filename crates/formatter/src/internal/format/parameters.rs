@@ -4,6 +4,8 @@ use bumpalo::vec;
 use mago_span::HasSpan;
 use mago_syntax::ast::FunctionLikeParameter;
 use mago_syntax::ast::FunctionLikeParameterList;
+use mago_syntax::ast::Modifier;
+use mago_syntax::ast::Sequence;
 
 use crate::document::BreakMode;
 use crate::document::Document;
@@ -277,18 +279,22 @@ fn can_align_parameter<'arena>(
         parameter_list.parameters.as_slice()[index - 1].end_offset()
     };
 
-    let gap_before_parameter = &f.source_text[gap_start as usize..parameter.start_offset() as usize];
-    let prefix_before_variable =
-        &f.source_text[parameter.start_offset() as usize..parameter.variable.start_offset() as usize];
-
-    !contains_comment_marker(gap_before_parameter) && !contains_comment_marker(prefix_before_variable)
+    !has_comment_trivia_in_range(f, gap_start, parameter.start_offset())
+        && !has_comment_trivia_in_range(f, parameter.start_offset(), parameter.variable.start_offset())
 }
 
-fn contains_comment_marker(text: &str) -> bool {
-    text.contains("/*") || text.contains("//") || text.contains('#')
+fn has_comment_trivia_in_range(f: &FormatterState<'_, '_>, start: u32, end: u32) -> bool {
+    if start >= end {
+        return false;
+    }
+
+    f.all_comments().iter().any(|comment| {
+        let comment_span = comment.span;
+        comment_span.start.offset < end && comment_span.end.offset > start
+    })
 }
 
-fn get_modifier_sequence_width(modifiers: &mago_syntax::ast::Sequence<'_, mago_syntax::ast::Modifier<'_>>) -> usize {
+fn get_modifier_sequence_width(modifiers: &Sequence<'_, Modifier<'_>>) -> usize {
     let ordered_modifiers = [
         modifiers.get_final(),
         modifiers.get_abstract(),
