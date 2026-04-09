@@ -306,9 +306,7 @@ fn get_cyclomatic_complexity_of_method(method: &Method<'_>) -> Option<usize> {
 fn get_cyclomatic_complexity_of_node(node: Node<'_, '_>) -> usize {
     let mut number = 0;
 
-    for child in node.children() {
-        number += get_cyclomatic_complexity_of_node(child);
-    }
+    node.visit_children(|child| number += get_cyclomatic_complexity_of_node(child));
 
     match node {
         Node::If(_)

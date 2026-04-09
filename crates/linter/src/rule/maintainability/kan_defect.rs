@@ -231,12 +231,12 @@ fn collect_defect_factors(node: Node<'_, '_>) -> (usize, usize, usize) {
     let mut while_count = 0;
     let mut if_count = 0;
 
-    for child in node.children() {
+    node.visit_children(|child| {
         let (s, w, i) = collect_defect_factors(child);
         select_count += s;
         while_count += w;
         if_count += i;
-    }
+    });
 
     match node {
         Node::Switch(_) | Node::Match(_) => select_count += 1,
