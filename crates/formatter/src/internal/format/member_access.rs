@@ -329,6 +329,32 @@ impl<'arena> MemberAccessChain<'arena> {
         false
     }
 
+    fn has_line_break_before_statement_terminator(&self, f: &FormatterState) -> bool {
+        let Some(last_access) = self.accesses.last() else {
+            return false;
+        };
+
+        let chain_end = match last_access.get_arguments_list() {
+            Some(argument_list) => argument_list.span().end.offset,
+            None => last_access.get_selector().span().end.offset,
+        };
+
+        let terminator_start = match f.parent_node() {
+            Node::ExpressionStatement(statement) => statement.terminator.span().start.offset,
+            Node::Return(r#return) => r#return.terminator.span().start.offset,
+            Node::Assignment(_) => match (f.grandparent_node(), f.great_grandparent_node()) {
+                (Some(Node::Expression(_)), Some(Node::ExpressionStatement(statement))) => {
+                    statement.terminator.span().start.offset
+                }
+                (Some(Node::Expression(_)), Some(Node::Return(r#return))) => r#return.terminator.span().start.offset,
+                _ => return false,
+            },
+            _ => return false,
+        };
+
+        misc::has_new_line_in_range(f.source_text, chain_end, terminator_start)
+    }
+
     fn get_flat_width(&self) -> Option<usize> {
         let mut width = get_flat_expression_width(self.base)?;
         for access in &self.accesses {
@@ -455,6 +481,10 @@ impl<'arena> MemberAccessChain<'arena> {
 
     #[inline]
     fn must_break(&self, f: &FormatterState) -> bool {
+        if f.settings.preserve_breaking_member_access_chain && self.has_line_break_before_statement_terminator(f) {
+            return true;
+        }
+
         if self.is_first_link_static_method_call() && self.accesses.len() > 5 {
             return true;
         }
