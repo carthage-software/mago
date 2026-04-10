@@ -243,7 +243,7 @@ export default defineConfig({
       { icon: "discord", link: "https://discord.gg/mwyyjr27eu" },
     ],
     footer: {
-      message: `Released under the MIT and/or Apache-2.0 License.<br/>Available for high-performance PHP consulting via <a href="https://carthage.software" target="_blank" rel="noopener noreferrer">carthage.software</a>.`,
+      message: `Released under the MIT and/or Apache-2.0 License.`,
       copyright: `Copyright © 2024-present <a href="https://carthage.software">carthage.software</a>`,
     },
     editLink: {

@@ -102,37 +102,6 @@ curl --proto '=https' --tlsv1.2 -sSf https://carthage.software/mago.sh | bash
   </div>
 </div>
 
----
-
-<div class="consulting-section">
-  <div class="consulting-badge">From the creators of Mago</div>
-  <h2>Carthage Software</h2>
-  <p class="consulting-lead">
-    We're a PHP & Rust consultancy that helps teams build faster, more reliable software.
-  </p>
-  <div class="consulting-services">
-    <div class="service-item">
-      <strong>Performance & Scaling ⚡</strong>
-      <p>Optimize slow applications and prepare for growth</p>
-    </div>
-    <div class="service-item">
-      <strong>PHP Modernization 🔄</strong>
-      <p>Migrate legacy code to modern PHP 8.x standards</p>
-    </div>
-    <div class="service-item">
-      <strong>Rust Development 🦀</strong>
-      <p>High-performance tools and PHP extensions in Rust</p>
-    </div>
-    <div class="service-item">
-      <strong>Code Quality ✨</strong>
-      <p>Audits, reviews, and best practices implementation</p>
-    </div>
-  </div>
-  <a href="https://carthage.software/en/#contact" class="consulting-cta" rel="noopener">
-    Let's talk about your project →
-  </a>
-</div>
-
 <div class="sponsors-section" id="our-sponsors">
   <div class="sponsors-header">
     <h2>Our Sponsors</h2>
@@ -323,78 +292,6 @@ curl --proto '=https' --tlsv1.2 -sSf https://carthage.software/mago.sh | bash
   padding: 0.15rem 0.4rem;
   border-radius: 4px;
   font-size: 0.9rem;
-}
-
-.consulting-section {
-  max-width: 800px;
-  margin: 4rem auto;
-  background: var(--vp-c-bg-soft);
-  border: 1px solid var(--vp-c-divider);
-  border-radius: 16px;
-  padding: 2.5rem;
-  text-align: center;
-}
-
-.consulting-badge {
-  display: inline-block;
-  padding: 0.35rem 1rem;
-  background: var(--vp-c-brand-soft);
-  color: var(--vp-c-brand-1);
-  font-size: 0.8rem;
-  font-weight: 600;
-  border-radius: 20px;
-  margin-bottom: 0.5rem;
-}
-
-.consulting-section h2 {
-  font-size: 1.75rem;
-  margin: 1.5rem 0 1.5rem 0;
-  color: var(--vp-c-text-1);
-}
-
-.consulting-lead {
-  color: var(--vp-c-text-2);
-  font-size: 1.1rem;
-  max-width: 400px;
-  margin: 1.5rem auto 2.5rem auto !important;
-  text-align: center;
-}
-
-.consulting-services {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 1.25rem;
-  text-align: left;
-  margin-bottom: 2rem;
-}
-
-.service-item strong {
-  display: block;
-  font-size: 0.95rem;
-  margin-bottom: 0.25rem;
-}
-
-.service-item p {
-  margin: 0;
-  font-size: 0.85rem;
-  color: var(--vp-c-text-2);
-}
-
-.consulting-cta {
-  display: inline-block;
-  padding: 0.875rem 2rem;
-  background: var(--vp-c-brand-1);
-  color: white !important;
-  font-weight: 600;
-  font-size: 1rem;
-  text-decoration: none;
-  border-radius: 8px;
-  transition: all 0.2s;
-}
-
-.consulting-cta:hover {
-  background: var(--vp-c-brand-2);
-  transform: translateY(-2px);
 }
 
 .sponsors-section {
