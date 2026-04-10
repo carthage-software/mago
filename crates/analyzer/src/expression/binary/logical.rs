@@ -45,8 +45,10 @@ pub fn analyze_logical_and_operation<'ctx, 'arena>(
     let mut left_block_context = block_context.clone();
     let pre_referenced_var_ids = left_block_context.conditionally_referenced_variable_ids.clone();
     let pre_assigned_var_ids = left_block_context.assigned_variable_ids.clone();
+    let pre_conflicting_clause_vars = left_block_context.parent_conflicting_clause_variables.clone();
     left_block_context.conditionally_referenced_variable_ids.clear();
     left_block_context.assigned_variable_ids.clear();
+    left_block_context.parent_conflicting_clause_variables.clear();
     left_block_context.reconciled_expression_clauses = Vec::new();
 
     let left_was_inside_general_use = left_block_context.flags.inside_general_use();
@@ -101,11 +103,15 @@ pub fn analyze_logical_and_operation<'ctx, 'arena>(
     }
 
     let simplified_clauses = saturate_clauses(context_clauses, &context.settings.algebra_thresholds());
-    let (left_assertions, active_left_assertions) = find_satisfying_assignments(
+    let (mut left_assertions, active_left_assertions) = find_satisfying_assignments(
         simplified_clauses.as_slice(),
         Some(binary.lhs.span()),
         &mut left_referenced_var_ids,
     );
+
+    if !left_block_context.parent_conflicting_clause_variables.is_empty() {
+        left_assertions.retain(|var_id, _| !left_block_context.parent_conflicting_clause_variables.contains(var_id));
+    }
 
     let mut changed_var_ids = AtomSet::default();
     let mut right_block_context;
@@ -213,6 +219,16 @@ pub fn analyze_logical_and_operation<'ctx, 'arena>(
         block_context.assigned_variable_ids = left_block_context.assigned_variable_ids;
         block_context.assigned_variable_ids.extend(right_block_context.assigned_variable_ids);
     }
+
+    // Propagate clause invalidations from both sides, plus restore pre-existing
+    // ones, so parent expressions know which variables had their narrowing voided.
+    block_context.parent_conflicting_clause_variables.extend(pre_conflicting_clause_vars);
+    block_context
+        .parent_conflicting_clause_variables
+        .extend(left_block_context.parent_conflicting_clause_variables.iter().copied());
+    block_context
+        .parent_conflicting_clause_variables
+        .extend(right_block_context.parent_conflicting_clause_variables.iter().copied());
 
     if let Some(if_body_context) = &block_context.if_body_context {
         let mut if_body_context_inner = if_body_context.borrow_mut();

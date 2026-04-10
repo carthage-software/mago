@@ -318,6 +318,8 @@ fn update_by_reference_argument_types<'ctx, 'arena>(
                     block_context.remove_descendants(context, argument_id, &existing_type, Some(&new_type));
                 }
 
+                block_context.remove_variable_from_conflicting_clauses(context, argument_id, None);
+
                 assign_to_expression(
                     context,
                     block_context,
@@ -349,6 +351,7 @@ fn update_by_reference_argument_types<'ctx, 'arena>(
                     && let Some(existing_type) = block_context.locals.get(argument_id).cloned()
                 {
                     block_context.remove_descendants(context, *argument_id, &existing_type, Some(&new_type));
+                    block_context.remove_variable_from_conflicting_clauses(context, *argument_id, None);
                 }
 
                 let widened_type = new_type.clone();
