@@ -452,6 +452,8 @@ test_case!(issue_1603);
 test_case!(psl_regressions);
 test_case!(issue_1605);
 test_case!(issue_1608);
+test_case!(issue_1610);
+test_case!(issue_1610_huffman);
 test_case!(issue_1615);
 test_case!(side_effects_in_condition, {
     let mut s = crate::framework::default_test_settings();

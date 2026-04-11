@@ -695,8 +695,19 @@ fn scrape_type_properties(
                 }
                 TArray::Keyed(TKeyedArray { parameters, known_items, non_empty, .. }) => {
                     let mut had_previous_keyed_array = combination.flags.contains(CombinationFlags::HAS_KEYED_ARRAY);
+                    let sealed_budget_available = !combination.sealed_keyed_budget_exhausted
+                        && combination.sealed_arrays.len() < options.array_combination_threshold as usize;
 
-                    if had_previous_keyed_array {
+                    if !sealed_budget_available
+                        && !combination.sealed_keyed_budget_exhausted
+                        && !combination.sealed_arrays.is_empty()
+                    {
+                        flush_sealed_keyed_arrays_into_combination(combination, codebase, options);
+                        combination.sealed_keyed_budget_exhausted = true;
+                        had_previous_keyed_array = combination.flags.contains(CombinationFlags::HAS_KEYED_ARRAY);
+                    }
+
+                    if had_previous_keyed_array && sealed_budget_available {
                         let incoming_is_sealed = parameters.is_none();
                         let existing_is_sealed = combination.keyed_array_parameters.is_none();
 
@@ -748,6 +759,7 @@ fn scrape_type_properties(
                             && !combination.keyed_array_entries.is_empty()
                             && let Some(known_items_inner) = known_items.as_ref()
                             && !known_items_inner.keys().any(|k| combination.keyed_array_entries.contains_key(k))
+                            && combination.sealed_arrays.len() + 1 < options.array_combination_threshold as usize
                         {
                             let frozen = TArray::Keyed(TKeyedArray {
                                 known_items: Some(std::mem::take(&mut combination.keyed_array_entries)),
@@ -1221,11 +1233,57 @@ fn widen_known_items_with_params(
     let mut items = known_items?;
 
     if let Some((key_param, value_param)) = params {
-        for (key, (_, entry_type)) in items.iter_mut() {
-            let key_type = TUnion::from_atomic(key.to_atomic());
-            if union_comparator::can_expression_types_be_identical(codebase, &key_type, key_param, false, false) {
-                *entry_type = combine_union_types(entry_type, value_param, codebase, options);
+        let key_param_accepts_int;
+        let key_param_accepts_string;
+        if key_param.has_mixed() || key_param.has_mixed_template() {
+            key_param_accepts_int = true;
+            key_param_accepts_string = true;
+        } else {
+            let mut accepts_int = false;
+            let mut accepts_string = false;
+            for part in key_param.types.as_ref() {
+                if accepts_int && accepts_string {
+                    break;
+                }
+
+                match part {
+                    TAtomic::Scalar(TScalar::ArrayKey) => {
+                        accepts_int = true;
+                        accepts_string = true;
+                    }
+                    TAtomic::Scalar(TScalar::Integer(_)) => accepts_int = true,
+                    TAtomic::Scalar(TScalar::String(_)) => accepts_string = true,
+                    _ => {
+                        accepts_int = true;
+                        accepts_string = true;
+                    }
+                }
             }
+
+            key_param_accepts_int = accepts_int;
+            key_param_accepts_string = accepts_string;
+        }
+
+        if !key_param_accepts_int && !key_param_accepts_string {
+            return Some(items);
+        }
+
+        for (key, (_, entry_type)) in items.iter_mut() {
+            if entry_type == value_param {
+                continue;
+            }
+
+            let key_compatible = match key {
+                ArrayKey::Integer(_) => key_param_accepts_int,
+                ArrayKey::String(_) => key_param_accepts_string,
+                ArrayKey::ClassLikeConstant { .. } => key_param_accepts_int || key_param_accepts_string,
+            };
+
+            if !key_compatible {
+                continue;
+            }
+
+            *entry_type = combine_union_types(entry_type, value_param, codebase, options);
         }
     }
 
@@ -1243,6 +1301,83 @@ fn adjust_keyed_array_parameters(
     *existing_value_param = combine_union_types(existing_value_param, entry_type, codebase, options);
     let new_key_type = key.to_union();
     *existing_key_param = combine_union_types(existing_key_param, &new_key_type, codebase, options);
+}
+
+fn flush_sealed_keyed_arrays_into_combination(
+    combination: &mut TypeCombination,
+    codebase: &CodebaseMetadata,
+    options: CombinerOptions,
+) {
+    let sealed = std::mem::take(&mut combination.sealed_arrays);
+    let mut any_keyed = false;
+    let mut put_back = Vec::new();
+
+    for array in sealed {
+        let TArray::Keyed(keyed) = array else {
+            put_back.push(array);
+            continue;
+        };
+
+        any_keyed = true;
+        let TKeyedArray { known_items, parameters, non_empty } = keyed;
+
+        if non_empty {
+            combination.flags.insert(CombinationFlags::KEYED_ARRAY_SOMETIMES_FILLED);
+        } else {
+            combination.flags.remove(CombinationFlags::KEYED_ARRAY_ALWAYS_FILLED);
+        }
+
+        if let Some(known_items) = known_items {
+            for (candidate_item_name, (candidate_optional, candidate_item_type)) in known_items {
+                if let Some((existing_optional, existing_type)) =
+                    combination.keyed_array_entries.get_mut(&candidate_item_name)
+                {
+                    if candidate_optional {
+                        *existing_optional = true;
+                    }
+                    if &candidate_item_type != existing_type {
+                        *existing_type = combine_union_types(existing_type, &candidate_item_type, codebase, options);
+                    }
+                } else {
+                    let inserted = if let Some((ref mut existing_key_param, ref mut existing_value_param)) =
+                        combination.keyed_array_parameters
+                    {
+                        adjust_keyed_array_parameters(
+                            existing_value_param,
+                            &candidate_item_type,
+                            codebase,
+                            options,
+                            &candidate_item_name,
+                            existing_key_param,
+                        );
+                        None
+                    } else {
+                        Some((true, candidate_item_type.clone()))
+                    };
+
+                    if let Some(entry) = inserted {
+                        combination.keyed_array_entries.insert(candidate_item_name, entry);
+                    }
+                }
+            }
+        }
+
+        combination.keyed_array_parameters = match (combination.keyed_array_parameters.take(), parameters) {
+            (None, None) => None,
+            (Some(existing_types), None) => Some(existing_types),
+            (None, Some(params)) => Some(((*params.0).clone(), (*params.1).clone())),
+            (Some(existing_types), Some(params)) => Some((
+                combine_union_types(&existing_types.0, &params.0, codebase, options),
+                combine_union_types(&existing_types.1, &params.1, codebase, options),
+            )),
+        };
+    }
+
+    if any_keyed {
+        combination.flags.insert(CombinationFlags::HAS_KEYED_ARRAY);
+    }
+
+    combination.sealed_arrays = put_back;
 }
 
 const COMBINER_KEY_STACK_BUF: usize = 256;
