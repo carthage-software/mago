@@ -24,8 +24,10 @@ pub mod version;
 ///
 /// This function considers:
 /// - The explicit color choice (Always/Never/Auto)
-/// - The FORCE_COLOR environment variable (if Auto) - forces colors when set to non-empty value
-/// - The NO_COLOR environment variable (if Auto) - disables colors when set
+/// - The FORCE_COLOR environment variable (if Auto) — any non-empty value forces
+///   colors, except `FORCE_COLOR=0` which explicitly disables them.
+/// - The NO_COLOR environment variable (if Auto) — any non-empty value (including
+///   `"0"`) disables colors. An empty value has no effect.
 /// - Whether stdout is a terminal (if Auto)
 ///
 /// Priority (for Auto mode): FORCE_COLOR > NO_COLOR > TTY check
@@ -37,13 +39,19 @@ pub fn should_use_colors(color_choice: ColorChoice) -> bool {
         ColorChoice::Always => true,
         ColorChoice::Never => false,
         ColorChoice::Auto => {
-            // FORCE_COLOR takes precedence - any non-empty value forces colors
-            if let Some(force_color) = std::env::var_os("FORCE_COLOR") {
-                return !force_color.is_empty();
+            // FORCE_COLOR takes precedence.
+            if let Some(force_color) = std::env::var_os("FORCE_COLOR")
+                && !force_color.is_empty()
+            {
+                return force_color != "0";
             }
 
-            // Then check NO_COLOR and TTY
-            std::io::stdout().is_terminal() && std::env::var_os("NO_COLOR").is_none()
+            // Then NO_COLOR: any non-empty value disables colors.
+            if std::env::var_os("NO_COLOR").is_some_and(|value| !value.is_empty()) {
+                return false;
+            }
+
+            std::io::stdout().is_terminal()
         }
     }
 }

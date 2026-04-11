@@ -22,15 +22,17 @@ impl ColorChoice {
     /// `true` if colors should be used, `false` otherwise
     #[must_use]
     pub fn should_use_colors(self, is_tty: bool) -> bool {
-        // Respect FORCE_COLOR environment variable (https://no-color.org/)
-        // If FORCE_COLOR exists and is not "0", force colors
-        if std::env::var_os("FORCE_COLOR").is_some_and(|value| value != "0") {
-            return true;
+        // FORCE_COLOR takes precedence (https://force-color.org/).
+        // Any non-empty value forces colors, except "0" which explicitly disables them.
+        if let Some(value) = std::env::var_os("FORCE_COLOR")
+            && !value.is_empty()
+        {
+            return value != "0";
         }
 
-        // Respect NO_COLOR environment variable (https://no-color.org/)
-        // If NO_COLOR exists and is not "0", disable colors
-        if std::env::var_os("NO_COLOR").is_some_and(|value| value != "0") {
+        // NO_COLOR (https://no-color.org/): when set to any non-empty value,
+        // colors must be suppressed. An empty value has no effect.
+        if std::env::var_os("NO_COLOR").is_some_and(|value| !value.is_empty()) {
             return false;
         }
 
