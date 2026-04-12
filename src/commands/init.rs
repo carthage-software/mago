@@ -205,6 +205,7 @@ version = "1"
 php-version = "{php_version}"
 
 [source]
+workspace = "."
 paths = [{paths}]
 includes = [{includes}]
 excludes = [{excludes}]
