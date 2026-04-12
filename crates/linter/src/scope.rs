@@ -1,3 +1,6 @@
+use bumpalo::Bump;
+use bumpalo::collections::Vec;
+
 use mago_span::HasSpan;
 use mago_span::Span;
 use mago_syntax::ast::Node;
@@ -50,7 +53,7 @@ pub enum Scope<'arena> {
 /// scope off. This allows rules to query the current context at any point.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct ScopeStack<'arena> {
-    stack: Vec<Scope<'arena>>,
+    stack: Vec<'arena, Scope<'arena>>,
 }
 
 impl FunctionLikeScope<'_> {
@@ -128,8 +131,8 @@ impl<'arena> Scope<'arena> {
 impl<'arena> ScopeStack<'arena> {
     /// Creates a new, empty scope stack.
     #[must_use]
-    pub fn new() -> Self {
-        Self { stack: Vec::new() }
+    pub fn new_in(arena: &'arena Bump) -> Self {
+        Self { stack: Vec::with_capacity_in(4, arena) }
     }
 
     /// Pushes a new scope onto the stack.
@@ -177,11 +180,5 @@ impl<'arena> ScopeStack<'arena> {
             Scope::FunctionLike(function_like) => Some(*function_like),
             _ => None,
         })
-    }
-}
-
-impl Default for ScopeStack<'_> {
-    fn default() -> Self {
-        Self::new()
     }
 }

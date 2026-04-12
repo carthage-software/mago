@@ -22,6 +22,7 @@ pub mod no_hash_comment;
 pub mod no_php_tag_terminator;
 pub mod no_trailing_space;
 pub mod property_name;
+pub mod string_style;
 pub mod trait_name;
 pub mod variable_name;
 
@@ -49,5 +50,6 @@ pub use no_hash_comment::*;
 pub use no_php_tag_terminator::*;
 pub use no_trailing_space::*;
 pub use property_name::*;
+pub use string_style::*;
 pub use trait_name::*;
 pub use variable_name::*;

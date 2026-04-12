@@ -326,6 +326,7 @@ define_rules! {
     RequirePregQuoteDelimiter(require_preg_quote_delimiter @ RequirePregQuoteDelimiterRule),
     RequireNamespace(require_namespace @ RequireNamespaceRule),
     SortedIntegerKeys(sorted_integer_keys @ SortedIntegerKeysRule),
+    StringStyle(string_style @ StringStyleRule),
     SingleClassPerFile(single_class_per_file @ SingleClassPerFileRule),
     YodaConditions(yoda_conditions @ YodaConditionsRule),
     UseWpFunctions(use_wp_functions @ UseWpFunctionsRule),

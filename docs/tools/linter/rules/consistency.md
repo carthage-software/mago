@@ -33,6 +33,7 @@ This document details the rules available in the `Consistency` category.
 | No Php Tag Terminator | [`no-php-tag-terminator`](#no-php-tag-terminator) |
 | No Trailing Space | [`no-trailing-space`](#no-trailing-space) |
 | Property Name | [`property-name`](#property-name) |
+| String Style | [`string-style`](#string-style) |
 | Trait Name | [`trait-name`](#trait-name) |
 | Variable Name | [`variable-name`](#variable-name) |
 
@@ -1039,6 +1040,59 @@ final class Foo {
         public int $My_Promoted_Property,
     ) {}
 }
+```
+
+
+## <a id="string-style"></a>`string-style`
+
+Enforces a consistent string style: either prefer string interpolation
+over concatenation, or prefer concatenation over interpolation.
+
+With `style: interpolation` (default), flags concatenation like
+`"foo" . $a . "bar"` and suggests `"foo{$a}bar"` instead.
+
+With `style: concatenation`, flags interpolation like `"foo{$a}bar"`
+and suggests `"foo" . $a . "bar"` instead.
+
+Only simple, interpolable expressions are considered: variables,
+property accesses, array accesses, and method calls. Concatenation
+involving function calls, static access, or complex expressions is
+never flagged.
+
+
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `false` |
+| `level` | `string` | `"note"` |
+| `style` | `string` | `"interpolation"` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+
+// With the default `style: interpolation`:
+$a = "Hello, {$name}!";
+$b = "value: {$obj->name}";
+
+// Complex expressions stay as concatenation (never flagged):
+$c = "result: " . strtolower($input);
+$d = "class: " . Foo::class;
+```
+
+#### Incorrect code
+
+```php
+<?php
+
+// With the default `style: interpolation`:
+$a = "Hello, " . $name . "!";
+$b = "value: " . $obj->name;
 ```
 
 

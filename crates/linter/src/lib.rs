@@ -129,9 +129,9 @@ fn is_constant_expression_context(kind: NodeKind) -> bool {
     )
 }
 
-fn walk<'ast, 'arena>(root: Node<'ast, 'arena>, ctx: &mut LintContext<'_, 'arena>, excluded_rules: &HashSet<usize>) {
-    enum Op<'ast, 'arena> {
-        Enter(Node<'ast, 'arena>),
+fn walk<'ctx, 'arena>(root: Node<'ctx, 'arena>, ctx: &mut LintContext<'ctx, 'arena>, excluded_rules: &HashSet<usize>) {
+    enum Op<'ctx, 'arena> {
+        Enter(Node<'ctx, 'arena>),
         Exit { in_scope: bool, in_constant_expression: bool },
     }
 
@@ -140,6 +140,8 @@ fn walk<'ast, 'arena>(root: Node<'ast, 'arena>, ctx: &mut LintContext<'_, 'arena
     while let Some(op) = stack.pop() {
         match op {
             Op::Enter(node) => {
+                ctx.push_ancestor(node);
+
                 let in_scope = if let Some(scope) = Scope::for_node(ctx, node) {
                     ctx.scope.push(scope);
                     true
@@ -157,6 +159,7 @@ fn walk<'ast, 'arena>(root: Node<'ast, 'arena>, ctx: &mut LintContext<'_, 'arena
                     if excluded_rules.contains(&rule_index) {
                         continue;
                     }
+
                     let rule = ctx.registry.rule(rule_index);
                     rule.check(ctx, node);
                 }
@@ -176,6 +179,7 @@ fn walk<'ast, 'arena>(root: Node<'ast, 'arena>, ctx: &mut LintContext<'_, 'arena
                 if in_scope {
                     ctx.scope.pop();
                 }
+                ctx.pop_ancestor();
             }
         }
     }

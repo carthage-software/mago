@@ -151,6 +151,7 @@ use crate::rule::StrStartsWithConfig;
 use crate::rule::StrictAssertionsConfig;
 use crate::rule::StrictBehaviorConfig;
 use crate::rule::StrictTypesConfig;
+use crate::rule::StringStyleConfig;
 use crate::rule::SwitchContinueToBreakConfig;
 use crate::rule::TaggedFixmeConfig;
 use crate::rule::TaggedTodoConfig;
@@ -341,6 +342,7 @@ pub struct RulesSettings {
     pub require_preg_quote_delimiter: RuleSettings<RequirePregQuoteDelimiterConfig>,
     pub require_namespace: RuleSettings<RequireNamespaceConfig>,
     pub sorted_integer_keys: RuleSettings<SortedIntegerKeysConfig>,
+    pub string_style: RuleSettings<StringStyleConfig>,
     pub single_class_per_file: RuleSettings<SingleClassPerFileConfig>,
     pub readable_literal: RuleSettings<ReadableLiteralConfig>,
     pub yoda_conditions: RuleSettings<YodaConditionsConfig>,
