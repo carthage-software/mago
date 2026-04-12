@@ -290,8 +290,16 @@ impl<'arena> FormatterState<'_, 'arena> {
                     }
                 }
 
-                if (operator.is_arithmetic() && !e.operator.is_arithmetic())
-                    || (operator.is_multiplicative() || e.operator.is_multiplicative())
+                let parent_omits_redundant_arithmetic_parentheses =
+                    self.settings.omit_redundant_arithmetic_binary_expression_parentheses
+                        && (e.operator.is_comparison() || e.operator.is_null_coalesce());
+
+                if (operator.is_arithmetic()
+                    && !e.operator.is_arithmetic()
+                    && !parent_omits_redundant_arithmetic_parentheses)
+                    || (operator.is_arithmetic()
+                        && e.operator.is_arithmetic()
+                        && (operator.is_multiplicative() || e.operator.is_multiplicative()))
                     || (operator.is_bit_shift() && !e.operator.is_bit_shift())
                     || (operator.is_bitwise() && e.operator.is_bitwise() && !e.operator.is_same_as(operator))
                 {

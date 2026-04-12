@@ -65,6 +65,8 @@ test_case!(logical_operations_within_parens);
 test_case!(simple_binaryish_operators);
 test_case!(multiple_concat_operations_in_array);
 test_case!(binary_operand_needs_parens);
+test_case!(binary_precedence_parens_noise);
+test_case!(binary_precedence_parens_noise_disabled);
 test_case!(binary_ops_wrapping);
 test_case!(parens_around_constructs);
 test_case!(interpolated_strings_vars);

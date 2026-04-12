@@ -550,6 +550,23 @@ generate_formatter_settings! {
     /// Default: false
     indent_binary_expression_continuation: bool => "default_false",
 
+    /// Whether to omit redundant parentheses around arithmetic binary expressions under comparison and null coalesce expressions.
+    ///
+    /// When enabled, parentheses are omitted where PHP precedence already preserves meaning:
+    /// ```php
+    /// if ($i === $retries - 1) {
+    /// }
+    /// ```
+    ///
+    /// When disabled, arithmetic binary expressions keep Mago's default grouping style:
+    /// ```php
+    /// if ($i === ($retries - 1)) {
+    /// }
+    /// ```
+    ///
+    /// Default: false
+    omit_redundant_arithmetic_binary_expression_parentheses: bool => "default_false",
+
     /// Whether to always break named argument lists into multiple lines.
     ///
     /// When enabled:
