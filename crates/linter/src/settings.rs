@@ -112,6 +112,7 @@ use crate::rule::NoShellExecuteStringConfig;
 use crate::rule::NoShortBoolCastConfig;
 use crate::rule::NoShortOpeningTagConfig;
 use crate::rule::NoShorthandTernaryConfig;
+use crate::rule::NoSideEffectsWithDeclarationsConfig;
 use crate::rule::NoSprintfConcatConfig;
 use crate::rule::NoTrailingSpaceConfig;
 use crate::rule::NoUnderscoreClassConfig;
@@ -327,6 +328,7 @@ pub struct RulesSettings {
     pub no_ini_set: RuleSettings<NoIniSetConfig>,
     pub no_parameter_shadowing: RuleSettings<NoParameterShadowingConfig>,
     pub no_inline: RuleSettings<NoInlineConfig>,
+    pub no_side_effects_with_declarations: RuleSettings<NoSideEffectsWithDeclarationsConfig>,
     pub no_insecure_comparison: RuleSettings<NoInsecureComparisonConfig>,
     pub no_literal_password: RuleSettings<NoLiteralPasswordConfig>,
     pub tainted_data_to_sink: RuleSettings<TaintedDataToSinkConfig>,

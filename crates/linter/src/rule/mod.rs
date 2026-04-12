@@ -311,6 +311,7 @@ define_rules! {
     NoIniSet(no_ini_set @ NoIniSetRule),
     NoParameterShadowing(no_parameter_shadowing @ NoParameterShadowingRule),
     NoInline(no_inline @ NoInlineRule),
+    NoSideEffectsWithDeclarations(no_side_effects_with_declarations @ NoSideEffectsWithDeclarationsRule),
     NoInsecureComparison(no_insecure_comparison @ NoInsecureComparisonRule),
     NoLiteralPassword(no_literal_password @ NoLiteralPasswordRule),
     TaintedDataToSink(tainted_data_to_sink @ TaintedDataToSinkRule),

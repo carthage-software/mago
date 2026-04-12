@@ -18,6 +18,7 @@ This document details the rules available in the `BestPractices` category.
 | No ini_set | [`no-ini-set`](#no-ini-set) |
 | No Inline | [`no-inline`](#no-inline) |
 | No Parameter Shadowing | [`no-parameter-shadowing`](#no-parameter-shadowing) |
+| No Mixed Declarations And Side Effects | [`no-side-effects-with-declarations`](#no-side-effects-with-declarations) |
 | No Sprintf Concat | [`no-sprintf-concat`](#no-sprintf-concat) |
 | Prefer Anonymous Migration | [`prefer-anonymous-migration`](#prefer-anonymous-migration) |
 | Prefer Arrow Function | [`prefer-arrow-function`](#prefer-arrow-function) |
@@ -446,6 +447,66 @@ function read(array $domains, array $locales): void
 
     foreach ($translations as $namespace => $locales) {
         // $locales now refers to the loop value, original argument is lost
+    }
+}
+```
+
+
+## <a id="no-side-effects-with-declarations"></a>`no-side-effects-with-declarations`
+
+Enforces that a PHP file either declares symbols (classes, functions,
+constants, interfaces, traits, enums) or causes side-effects, but not
+both.
+
+Side-effects include `echo`, `print`, top-level function calls,
+assignments, `include`/`require` statements, and any other executable
+code outside of a symbol declaration.
+
+This follows the PSR-1 basic coding standard: files SHOULD either
+declare symbols or execute logic, but SHOULD NOT do both.
+
+
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `false` |
+| `level` | `string` | `"warning"` |
+| `allow-conditional-declarations` | `boolean` | `true` |
+| `allow-class-alias` | `boolean` | `true` |
+| `allow-class-exists` | `boolean` | `true` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+
+namespace App;
+
+class UserManager
+{
+    public function find(int $id): ?User
+    {
+        return null;
+    }
+}
+```
+
+#### Incorrect code
+
+```php
+<?php
+
+echo 'Loading utility file...';
+
+class StringHelper
+{
+    public static function slugify(string $input): string
+    {
+        return '';
     }
 }
 ```
