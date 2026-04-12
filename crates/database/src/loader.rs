@@ -7,9 +7,7 @@ use std::path::Path;
 
 use foldhash::HashMap;
 use foldhash::HashSet;
-use globset::GlobBuilder;
 use globset::GlobSet;
-use globset::GlobSetBuilder;
 use rayon::prelude::*;
 use walkdir::WalkDir;
 
@@ -20,6 +18,7 @@ use crate::exclusion::Exclusion;
 use crate::file::File;
 use crate::file::FileId;
 use crate::file::FileType;
+use crate::matcher::build_glob_set;
 use crate::utils::read_file;
 
 /// Holds a file along with the specificity of the pattern that matched it.
@@ -85,22 +84,13 @@ impl<'a> DatabaseLoader<'a> {
         let extensions_set: HashSet<OsString> =
             self.configuration.extensions.iter().map(|s| OsString::from(s.as_ref())).collect();
 
-        let glob_settings = &self.configuration.glob;
-        let mut glob_builder = GlobSetBuilder::new();
-        for ex in &self.configuration.excludes {
-            if let Exclusion::Pattern(pat) = ex {
-                let glob = GlobBuilder::new(pat)
-                    .case_insensitive(glob_settings.case_insensitive)
-                    .literal_separator(glob_settings.literal_separator)
-                    .backslash_escape(glob_settings.backslash_escape)
-                    .empty_alternates(glob_settings.empty_alternates)
-                    .build()?;
-
-                glob_builder.add(glob);
-            }
-        }
-
-        let glob_excludes = glob_builder.build()?;
+        let glob_excludes = build_glob_set(
+            self.configuration.excludes.iter().filter_map(|ex| match ex {
+                Exclusion::Pattern(pat) => Some(pat.as_ref()),
+                Exclusion::Path(_) => None,
+            }),
+            self.configuration.glob,
+        )?;
 
         let path_excludes: HashSet<_> = self
             .configuration

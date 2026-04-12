@@ -73,17 +73,20 @@ pub(crate) fn create_orchestrator<'a>(
     use_progress_bars: bool,
     enable_diff: bool,
 ) -> Orchestrator<'a> {
+    let glob = configuration.source.glob.to_database_settings();
     let linter_settings = if pedantic_linter {
         Settings {
             php_version: configuration.php_version,
             integrations: IntegrationSet::all(),
             rules: RulesSettings::default(),
+            glob,
         }
     } else {
         Settings {
             php_version: configuration.php_version,
             integrations: IntegrationSet::from_slice(&configuration.linter.integrations),
             rules: configuration.linter.rules.clone(),
+            glob,
         }
     };
 
@@ -102,7 +105,7 @@ pub(crate) fn create_orchestrator<'a>(
         excludes: configuration.source.excludes.iter().map(|p| p.as_ref()).collect(),
         extensions: configuration.source.extensions.iter().map(|e| e.as_ref()).collect(),
         includes: configuration.source.includes.clone(),
-        glob: configuration.source.glob.to_database_settings(),
+        glob,
     };
 
     Orchestrator::new(orchestrator_config)

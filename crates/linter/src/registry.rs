@@ -1,3 +1,4 @@
+use mago_database::matcher::ExclusionMatcher;
 use mago_syntax::ast::NodeKind;
 
 use crate::integration::Integration;
@@ -10,7 +11,7 @@ pub struct RuleRegistry {
     pub(crate) only: Option<Vec<String>>,
     integrations: IntegrationSet,
     rules: Vec<AnyRule>,
-    rule_excludes: Vec<Vec<String>>,
+    rule_excludes: Vec<ExclusionMatcher<String>>,
     by_kind: Vec<Box<[usize]>>,
 }
 
@@ -31,7 +32,23 @@ impl RuleRegistry {
             tracing::warn!("No rules found for the specified 'only' filter: {:?}", only);
         }
 
-        let (rules, rule_excludes): (Vec<AnyRule>, Vec<Vec<String>>) = rules_with_excludes.into_iter().unzip();
+        let (rules, rule_exclude_patterns): (Vec<AnyRule>, Vec<Vec<String>>) = rules_with_excludes.into_iter().unzip();
+
+        let rule_excludes: Vec<ExclusionMatcher<String>> = rule_exclude_patterns
+            .into_iter()
+            .enumerate()
+            .filter_map(|(idx, patterns)| match ExclusionMatcher::compile(patterns, settings.glob) {
+                Ok(matcher) => Some(matcher),
+                Err(err) => {
+                    tracing::error!(
+                        "Failed to compile exclude patterns for rule `{}`: {err}. Patterns will be ignored.",
+                        rules[idx].code()
+                    );
+
+                    None
+                }
+            })
+            .collect();
 
         let max_kind = u8::MAX as usize + 1;
         let mut temp: Vec<Vec<usize>> = vec![Vec::new(); max_kind];
@@ -98,7 +115,7 @@ impl RuleRegistry {
 
     #[inline]
     #[must_use]
-    pub fn excludes_for(&self, idx: usize) -> &[String] {
+    pub fn excludes_for(&self, idx: usize) -> &ExclusionMatcher<String> {
         &self.rule_excludes[idx]
     }
 }

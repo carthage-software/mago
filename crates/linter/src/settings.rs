@@ -3,6 +3,7 @@ use serde::Deserialize;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 
+use mago_database::GlobSettings;
 use mago_php_version::PHPVersion;
 
 use crate::integration::IntegrationSet;
@@ -177,6 +178,8 @@ pub struct Settings {
     pub php_version: PHPVersion,
     pub integrations: IntegrationSet,
     pub rules: RulesSettings,
+    #[schemars(skip)]
+    pub glob: GlobSettings,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
@@ -373,7 +376,12 @@ impl<C: Config> RuleSettings<C> {
 
 impl Default for Settings {
     fn default() -> Self {
-        Self { php_version: PHPVersion::PHP80, integrations: IntegrationSet::empty(), rules: RulesSettings::default() }
+        Self {
+            php_version: PHPVersion::PHP80,
+            integrations: IntegrationSet::empty(),
+            rules: RulesSettings::default(),
+            glob: GlobSettings::default(),
+        }
     }
 }
 

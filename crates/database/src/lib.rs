@@ -89,6 +89,7 @@ pub mod error;
 pub mod exclusion;
 pub mod file;
 pub mod loader;
+pub mod matcher;
 pub mod watcher;
 
 mod operation;

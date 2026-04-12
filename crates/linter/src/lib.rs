@@ -92,8 +92,8 @@ impl<'arena> Linter<'arena> {
             .iter()
             .enumerate()
             .filter(|(idx, _)| {
-                let excludes = self.registry.excludes_for(*idx);
-                !excludes.is_empty() && is_file_excluded(file_name, excludes)
+                let matcher = self.registry.excludes_for(*idx);
+                !matcher.is_empty() && matcher.is_match(file_name)
             })
             .map(|(idx, _)| idx)
             .collect();
@@ -105,17 +105,6 @@ impl<'arena> Linter<'arena> {
 
         context.collector.finish()
     }
-}
-
-fn is_file_excluded(file_name: &str, patterns: &[String]) -> bool {
-    patterns.iter().any(|pattern| {
-        if pattern.ends_with('/') {
-            file_name.starts_with(pattern.as_str())
-        } else {
-            let dir_prefix = format!("{pattern}/");
-            file_name.starts_with(&dir_prefix) || file_name == pattern
-        }
-    })
 }
 
 fn is_constant_expression_context(kind: NodeKind) -> bool {

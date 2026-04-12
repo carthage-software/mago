@@ -62,7 +62,7 @@ All rules accept these common options:
 | :-------- | :--------- | :------ | :-------------------------------------------------------------------------- |
 | `enabled` | `boolean`  | (varies) | Enable or disable the rule.                                                |
 | `level`   | `string`   | (varies) | Set the issue severity. Options: `"error"`, `"warning"`, `"help"`, `"note"`. |
-| `exclude` | `string[]` | `[]`    | A list of paths to exclude from this specific rule.                         |
+| `exclude` | `string[]` | `[]`    | A list of paths or glob patterns to exclude from this specific rule.        |
 
 #### Per-rule path exclusions
 
@@ -78,9 +78,19 @@ no-goto = { exclude = ["src/Legacy/"] }
 
 # Exclude a specific file
 no-eval = { exclude = ["src/Templating/Compiler.php"] }
+
+# Exclude every test file anywhere in the project
+no-global = { exclude = ["**/*Test.php"] }
 ```
 
-Paths are matched as prefixes against relative file paths from the project root. Both `"tests"` and `"tests/"` will exclude all files under the `tests` directory.
+Each entry can be either a **plain path** or a **glob pattern**:
+
+- Plain paths (e.g. `"tests"`, `"tests/"`, `"src/Foo.php"`) are matched as prefixes against relative file paths from the project root. Both `"tests"` and `"tests/"` will exclude all files under the `tests` directory.
+- Glob patterns — any entry containing `*`, `?`, `[`, or `{` — are matched against the full relative file path using the same glob engine and `[source.glob]` settings used by `source.excludes`. For example, `"src/**/*.php"` matches every PHP file under `src`, and `"**/*Test.php"` matches test files in any directory.
+
+::: info Availability
+Glob patterns in per-rule `exclude` are available starting with **Mago 1.20.0**. Older releases only support plain prefix paths.
+:::
 
 :::tip
 Per-rule `exclude` is different from the top-level `[linter].excludes`:
