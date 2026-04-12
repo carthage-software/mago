@@ -24,6 +24,7 @@ The first file found wins. This allows you to have a global configuration in `~/
 These options are set at the root of your `mago.toml` file.
 
 ```toml
+version = "1"
 php-version = "8.2"
 threads = 8
 stack-size = 8388608 # 8 MB
@@ -32,11 +33,39 @@ editor-url = "phpstorm://open?file=%file%&line=%line%&column=%column%"
 
 | Option                          | Type      | Default        | Description                                                                                           |
 | :------------------------------ | :-------- | :------------- | :---------------------------------------------------------------------------------------------------- |
+| `version`                       | `string`  | (none)         | Pins the Mago version this project is tested against. Accepts `"1"` (major), `"1.19"` (minor), or `"1.19.3"` (exact). Minor/patch drift warns; a major-version mismatch is a hard error. See [Version pinning](#version-pinning) below. |
 | `php-version`                   | `string`  | Latest stable  | The version of PHP to use for parsing and analysis. Defaults to the latest stable PHP version supported by your Mago release. Use `mago init` to auto-detect from `composer.json`. |
 | `allow-unsupported-php-version` | `boolean` | `false`        | Allow Mago to run on unsupported PHP versions. Not recommended.                                       |
+| `no-version-check`              | `boolean` | `false`        | Silences the warning emitted when the installed Mago binary drifts from the pinned `version`. Does **not** affect major-version drift; that is always fatal. |
 | `threads`                       | `integer` | (logical CPUs) | The number of threads to use for parallel tasks.                                                      |
 | `stack-size`                    | `integer` | (see below)    | The stack size in bytes for each thread. Defaults to 2MB, with a minimum of 2MB and a maximum of 8MB. |
 | `editor-url`                    | `string`  | (none)         | Editor URL template for clickable file paths in terminal output. See [Editor Integration](#editor-integration) below. |
+
+### Version pinning
+
+:::info Available in Mago 1.20.0+
+The `version` field, the `--no-version-check` flag, the `MAGO_NO_VERSION_CHECK` environment variable, `no-version-check = true`, and `mago self-update --to-project-version` are all new in **Mago 1.20.0**. On 1.19.x and earlier, `version` in `mago.toml` is ignored and these flags do not exist.
+:::
+
+Setting `version` in `mago.toml` pins the project to a specific Mago release line so that drift between the installed binary and the project's expectations is surfaced early instead of silently producing different output.
+
+Three pin levels are supported:
+
+- **Major pin** (`version = "1"`): any `1.x.y` satisfies the pin. A bump to `2.x` is a **hard error** because a new major may ship with incompatible defaults, schema changes, or rule behaviour that would silently reinterpret your config. This is the default emitted by `mago init`.
+- **Minor pin** (`version = "1.19"`): any `1.19.y` satisfies the pin. Drift to another minor (`1.18.x` or `1.20.x`) produces a warning; drift across majors is still a hard error.
+- **Exact pin** (`version = "1.19.3"`): any drift (patch or higher) produces a warning; drift across majors is still a hard error.
+
+The warning can be silenced with `--no-version-check`, the `MAGO_NO_VERSION_CHECK` environment variable, or `no-version-check = true` in `mago.toml`. **None of these affect major-version drift**; that is always fatal, which is the entire point of pinning.
+
+To sync the installed binary to the project's pin, run:
+
+```bash
+mago self-update --to-project-version
+```
+
+For exact pins (`version = "1.19.3"`) this resolves directly to that release tag. For major or minor pins, Mago scans the recent GitHub releases and installs the highest one that satisfies the pin. So if you pinned `version = "1"` and 2.0 has shipped, `--to-project-version` will still install the latest 1.x release without dragging you forward to 2.0. The same holds for a minor pin: `version = "1.14"` with 1.15.x out in the wild installs the latest 1.14.x, not 1.15. The command only fails if no published release at all satisfies the pin.
+
+`version` is currently optional; a future Mago release may start warning when it is missing, to prepare projects for the eventual 2.0 upgrade.
 
 ## `[source]` Section
 

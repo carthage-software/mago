@@ -201,10 +201,10 @@ impl AnalyzerStrictnessPreset {
 /// - Analyzer features and options
 const CONFIGURATION_TEMPLATE: &str = r#"# Welcome to Mago!
 # For full documentation, see https://mago.carthage.software/tools/overview
+version = "1"
 php-version = "{php_version}"
 
 [source]
-workspace = "."
 paths = [{paths}]
 includes = [{includes}]
 excludes = [{excludes}]

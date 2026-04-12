@@ -51,9 +51,12 @@ use crate::commands::MagoCommand;
 use crate::config::Configuration;
 use crate::consts::MAXIMUM_PHP_VERSION;
 use crate::consts::MINIMUM_PHP_VERSION;
+use crate::consts::VERSION;
 use crate::error::Error;
 use crate::utils::configure_colors;
 use crate::utils::logger::initialize_logger;
+use crate::version_check::VersionCheck;
+use crate::version_check::VersionPin;
 
 mod baseline;
 mod commands;
@@ -64,6 +67,7 @@ mod macros;
 mod service;
 mod updater;
 mod utils;
+mod version_check;
 
 #[cfg(all(
     not(feature = "dhat-heap"),
@@ -150,16 +154,25 @@ pub fn run() -> Result<ExitCode, Error> {
         arguments.colors,
     );
 
-    if let MagoCommand::SelfUpdate(cmd) = arguments.command {
-        return commands::self_update::execute(cmd);
-    }
-
     let php_version = arguments.get_php_version()?;
-    let CliArguments { workspace, config, threads, allow_unsupported_php_version, command, .. } = arguments;
+    let CliArguments { workspace, config, threads, allow_unsupported_php_version, no_version_check, command, .. } =
+        arguments;
 
     // Load the configuration.
-    let configuration =
-        Configuration::load(workspace, config.as_deref(), php_version, threads, allow_unsupported_php_version)?;
+    let configuration = Configuration::load(
+        workspace,
+        config.as_deref(),
+        php_version,
+        threads,
+        allow_unsupported_php_version,
+        no_version_check,
+    )?;
+
+    if let MagoCommand::SelfUpdate(cmd) = command {
+        return commands::self_update::execute(cmd, configuration.version);
+    }
+
+    check_project_version(&configuration)?;
 
     if !configuration.allow_unsupported_php_version {
         if configuration.php_version < MINIMUM_PHP_VERSION {
@@ -188,6 +201,41 @@ pub fn run() -> Result<ExitCode, Error> {
         MagoCommand::GenerateCompletions(cmd) => cmd.execute(),
         MagoCommand::SelfUpdate(_) => {
             unreachable!("The self-update command should have been handled before this point.")
+        }
+    }
+}
+
+/// Verifies that the installed mago binary satisfies the `version` pin in
+/// `mago.toml`, if one is set.
+fn check_project_version(configuration: &Configuration) -> Result<(), Error> {
+    let Some(pin_string) = configuration.version.as_deref() else {
+        // TODO(azjezz): we should start emitting a warning here when nearing version 2.0
+        return Ok(());
+    };
+
+    let pin = VersionPin::parse(pin_string)?;
+    let result = pin.check(VERSION)?;
+
+    match result {
+        VersionCheck::Match => Ok(()),
+        VersionCheck::MajorDrift => {
+            let installed_major = VERSION.split('.').next().unwrap_or(VERSION);
+            tracing::error!("Major versions may have incompatible config schemas; refusing to run.");
+            tracing::error!("Run `mago self-update --to-project-version` to sync to the pinned major.");
+            tracing::error!(
+                "Or reinstall the matching binary, or bump `version` in mago.toml to `{installed_major}` once you have reviewed the changelog."
+            );
+
+            Err(Error::ProjectMajorVersionMismatch(pin.to_string(), VERSION.to_string()))
+        }
+        VersionCheck::MinorDrift | VersionCheck::PatchDrift => {
+            if !configuration.no_version_check {
+                tracing::warn!("mago.toml is pinned to `{pin}` but the installed mago binary is `{VERSION}`.");
+                tracing::warn!("Run `mago self-update --to-project-version` to sync.");
+                tracing::warn!("Pass `--no-version-check` or set `MAGO_NO_VERSION_CHECK=1` to silence this warning.");
+            }
+
+            Ok(())
         }
     }
 }

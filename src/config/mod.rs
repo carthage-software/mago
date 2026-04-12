@@ -118,6 +118,37 @@ fn default_source_configuration() -> SourceConfiguration {
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct Configuration {
+    /// The mago version this project is pinned to.
+    ///
+    /// Accepts three pin levels:
+    ///
+    /// - `"1"`: major pin; any `1.x.y` satisfies it. `mago init` emits this
+    ///   by default. Minor/patch drift within major 1 is a warning; a bump to
+    ///   `2.x` is a hard error.
+    /// - `"1.19"`: minor pin; any `1.19.y` satisfies it.
+    /// - `"1.19.3"`: exact pin; any drift is a warning, and this is the only
+    ///   form that `mago self-update --to-project-version` can target without
+    ///   ambiguity.
+    ///
+    /// Empty / missing is currently a no-op; a future mago release is likely
+    /// to start warning when the pin is absent, to prepare projects for 2.0.
+    ///
+    /// # Compatibility invariant (**do not break**)
+    ///
+    /// This field's location (top-level) and type (string) are a load-bearing
+    /// contract for cross-major config compatibility: a future mago 2.x must
+    /// be able to read a mago 1.x `mago.toml` via a permissive top-level TOML
+    /// pass, find this field, and refuse to run with
+    /// "this config is pinned to mago 1" *before* it ever hits its own strict
+    /// schema. That means:
+    ///
+    /// - never move this field into a `[metadata]` section,
+    /// - never rename it,
+    /// - never change it from a string,
+    /// - never change the pin grammar from `major[.minor[.patch]]`.
+    #[serde(default)]
+    pub version: Option<String>,
+
     /// Number of worker threads for parallel processing.
     ///
     /// Controls the thread pool size used by Rayon for parallel operations.
@@ -151,6 +182,18 @@ pub struct Configuration {
     /// or `--allow-unsupported-php-version` CLI flag.
     #[serde(default)]
     pub allow_unsupported_php_version: bool,
+
+    /// Whether to silence the project version drift warning.
+    ///
+    /// Affects only the minor / patch drift warning emitted when the installed
+    /// mago binary does not match the `version` pinned in `mago.toml`. A major
+    /// drift is always fatal and is *not* affected by this flag; the whole
+    /// point of a major pin is to stop runs across incompatible config schemas.
+    ///
+    /// Can be enabled via `MAGO_NO_VERSION_CHECK` environment variable or
+    /// `--no-version-check` CLI flag.
+    #[serde(default)]
+    pub no_version_check: bool,
 
     /// Source discovery and workspace configuration.
     ///
@@ -285,6 +328,9 @@ impl Configuration {
     /// * `threads` - Optional thread count override. Takes precedence over all config sources.
     /// * `allow_unsupported_php_version` - If `true`, enables support for PHP versions outside
     ///   the officially supported range. Only overrides the config if `true`.
+    /// * `no_version_check` - If `true`, silences the project version drift warning emitted
+    ///   on minor/patch mismatch against the `version` pin in `mago.toml`. Only overrides
+    ///   the config if `true`. Does not affect the fatal behaviour on major-version drift.
     ///
     /// # Returns
     ///
@@ -306,6 +352,7 @@ impl Configuration {
         php_version: Option<PHPVersion>,
         threads: Option<usize>,
         allow_unsupported_php_version: bool,
+        no_version_check: bool,
     ) -> Result<Configuration, Error> {
         let workspace_dir = workspace.clone().unwrap_or_else(|| CURRENT_DIR.to_path_buf());
 
@@ -353,6 +400,12 @@ impl Configuration {
             tracing::warn!("Allowing unsupported PHP versions.");
 
             configuration.allow_unsupported_php_version = true;
+        }
+
+        if no_version_check && !configuration.no_version_check {
+            tracing::info!("Silencing project version drift warning.");
+
+            configuration.no_version_check = true;
         }
 
         if let Some(php_version) = php_version {
@@ -474,10 +527,12 @@ impl Configuration {
     /// A new `Configuration` instance with default values and the specified workspace.
     pub fn from_workspace(workspace: PathBuf) -> Self {
         Self {
+            version: None,
             threads: *LOGICAL_CPUS,
             stack_size: DEFAULT_STACK_SIZE,
             php_version: DEFAULT_PHP_VERSION,
             allow_unsupported_php_version: false,
+            no_version_check: false,
             source: SourceConfiguration::from_workspace(workspace),
             linter: LinterConfiguration::default(),
             parser: ParserConfiguration::default(),
@@ -500,10 +555,12 @@ impl Configuration {
     #[must_use]
     pub fn to_filtered_value(&self) -> serde_json::Value {
         serde_json::json!({
+            "version": self.version,
             "threads": self.threads,
             "stack-size": self.stack_size,
             "php-version": self.php_version,
             "allow-unsupported-php-version": self.allow_unsupported_php_version,
+            "no-version-check": self.no_version_check,
             "source": self.source,
             "linter": self.linter.to_filtered_value(self.php_version),
             "parser": self.parser,
@@ -617,7 +674,7 @@ mod tests {
                 ("MAGO_PHP_VERSION", None),
                 ("MAGO_ALLOW_UNSUPPORTED_PHP_VERSION", None),
             ],
-            || Configuration::load(Some(workspace_path), None, None, None, false).unwrap(),
+            || Configuration::load(Some(workspace_path), None, None, None, false, false).unwrap(),
         );
 
         assert_eq!(config.threads, *LOGICAL_CPUS)
@@ -632,7 +689,7 @@ mod tests {
         create_tmp_file("threads: 2\nphp-version: \"7.4.0\"", &workspace_path, "yaml");
         create_tmp_file("{\"threads\": 1,\"php-version\":\"8.1.0\"}", &workspace_path, "json");
 
-        let config = Configuration::load(Some(workspace_path), None, None, None, false).unwrap();
+        let config = Configuration::load(Some(workspace_path), None, None, None, false, false).unwrap();
 
         assert_eq!(config.threads, 3);
         assert_eq!(config.php_version.to_string(), DEFAULT_PHP_VERSION.to_string())
@@ -656,7 +713,7 @@ mod tests {
                 ("MAGO_PHP_VERSION", None),
                 ("MAGO_ALLOW_UNSUPPORTED_PHP_VERSION", None),
             ],
-            || Configuration::load(Some(workspace_path), Some(&config_file_path), None, None, false).unwrap(),
+            || Configuration::load(Some(workspace_path), Some(&config_file_path), None, None, false, false).unwrap(),
         );
 
         assert_eq!(config.threads, 3);
@@ -680,7 +737,7 @@ mod tests {
                 ("MAGO_PHP_VERSION", None),
                 ("MAGO_ALLOW_UNSUPPORTED_PHP_VERSION", None),
             ],
-            || Configuration::load(Some(workspace_path), Some(&config_file_path), None, None, false).unwrap(),
+            || Configuration::load(Some(workspace_path), Some(&config_file_path), None, None, false, false).unwrap(),
         );
 
         assert_eq!(config.threads, 1);
@@ -714,7 +771,7 @@ mod tests {
                 ("MAGO_PHP_VERSION", None),
                 ("MAGO_ALLOW_UNSUPPORTED_PHP_VERSION", None),
             ],
-            || Configuration::load(Some(workspace_path.clone()), None, None, None, false).unwrap(),
+            || Configuration::load(Some(workspace_path.clone()), None, None, None, false, false).unwrap(),
         );
 
         assert_eq!(config.threads, 2);

@@ -40,6 +40,8 @@ use mago_php_version::error::ParsingError;
 use mago_reporting::error::ReportingError;
 use rayon::ThreadPoolBuildError;
 
+use crate::version_check::VersionPinParseError;
+
 /// The main error type for all Mago CLI operations.
 ///
 /// This enum encompasses all possible errors that can occur during command execution,
@@ -230,6 +232,29 @@ pub enum Error {
 
     /// An unknown formatter preset was requested.
     UnknownFormatterPreset(String),
+
+    /// The `version` pin in `mago.toml` could not be parsed, or the
+    /// installed mago binary's own version string could not be parsed.
+    /// The wrapped error carries both the offending string and the reason.
+    InvalidProjectVersionPin(VersionPinParseError),
+
+    /// The installed mago binary is on a different major version than the
+    /// `version` pinned in `mago.toml`. Always fatal: a major bump may have
+    /// changed the config schema, so continuing would risk silently
+    /// misinterpreting the project's configuration.
+    ///
+    /// Fields are: pinned version string, installed version string.
+    ProjectMajorVersionMismatch(String, String),
+
+    /// The `self-update --to-project-version` flag was used, but the current
+    /// `mago.toml` does not set a `version` pin.
+    NoPinnedProjectVersion,
+
+    /// The `self-update --to-project-version` flag was used with a non-exact
+    /// pin (e.g. `"1"` or `"1.19"`), and the latest available release does
+    /// not satisfy it. The first field is the pin; the second is the latest
+    /// release version we found.
+    LatestReleaseDoesNotSatisfyPin(String, String),
 }
 
 /// Formats the error for user-friendly display.
@@ -276,6 +301,22 @@ impl std::fmt::Display for Error {
             Self::UnknownFormatterPreset(preset) => {
                 write!(f, "Unknown formatter preset: `{preset}`. Available presets are: laravel, psr12, default")
             }
+            Self::InvalidProjectVersionPin(error) => write!(f, "{error}"),
+            Self::ProjectMajorVersionMismatch(pinned, installed) => {
+                write!(
+                    f,
+                    "mago.toml is pinned to major version `{pinned}`, but the installed mago binary is `{installed}`"
+                )
+            }
+            Self::NoPinnedProjectVersion => {
+                write!(f, "`self-update --to-project-version` requires a `version` pin in mago.toml")
+            }
+            Self::LatestReleaseDoesNotSatisfyPin(pinned, latest) => {
+                write!(
+                    f,
+                    "No published mago release satisfies the `version` pin `{pinned}` in mago.toml (most recent: `{latest}`)"
+                )
+            }
         }
     }
 }
@@ -314,6 +355,7 @@ impl std::error::Error for Error {
             Self::Analysis(error) => Some(error),
             Self::ThreadPoolBuildError(error) => Some(error),
             Self::Orchestrator(error) => Some(error),
+            Self::InvalidProjectVersionPin(error) => Some(error),
             _ => None,
         }
     }
@@ -426,5 +468,13 @@ impl From<ThreadPoolBuildError> for Error {
 impl From<OrchestratorError> for Error {
     fn from(error: OrchestratorError) -> Self {
         Self::Orchestrator(error)
+    }
+}
+
+/// Converts [`VersionPinParseError`] into CLI errors, enabling `?`-based
+/// propagation through `VersionPin::parse` / `VersionPin::check`.
+impl From<VersionPinParseError> for Error {
+    fn from(error: VersionPinParseError) -> Self {
+        Self::InvalidProjectVersionPin(error)
     }
 }

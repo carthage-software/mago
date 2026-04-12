@@ -50,6 +50,21 @@ pub fn get_release_version(owner: &str, repo: &str, tag: &str) -> Result<Release
     parse_release(&json)
 }
 
+/// Fetches one page of non-draft releases (newest first) from the GitHub
+/// Releases API.
+pub fn list_releases(owner: &str, repo: &str, page: u32) -> Result<Vec<Release>, UpdateError> {
+    let url = format!("https://api.github.com/repos/{owner}/{repo}/releases?per_page=100&page={page}");
+
+    let json: Value = github_api_request(&url, "application/vnd.github.v3+json").call()?.body_mut().read_json()?;
+
+    json.as_array()
+        .ok_or_else(|| UpdateError::Release("releases endpoint did not return an array".into()))?
+        .iter()
+        .filter(|entry| !entry["draft"].as_bool().unwrap_or(false))
+        .map(parse_release)
+        .collect()
+}
+
 pub fn download_asset(asset: &ReleaseAsset, dest: &mut impl Write) -> Result<(), UpdateError> {
     let response = github_api_request(&asset.download_url, "application/octet-stream").call()?;
 

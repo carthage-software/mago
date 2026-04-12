@@ -341,6 +341,7 @@ impl AnalyzeCommand {
                         Some(configuration.php_version),
                         Some(configuration.threads),
                         configuration.allow_unsupported_php_version,
+                        configuration.no_version_check,
                     ) {
                         Ok(new_config) => {
                             configuration = new_config;

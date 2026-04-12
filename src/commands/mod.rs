@@ -316,6 +316,18 @@ pub struct CliArguments {
     #[arg(long, default_value_t = false)]
     pub allow_unsupported_php_version: bool,
 
+    /// Silence the project version drift warning.
+    ///
+    /// Suppresses the warning emitted when the installed mago binary differs from the
+    /// `version` pinned in `mago.toml`, as long as the drift is within the same major version.
+    /// A major-version mismatch is *always* fatal and is not affected by this flag;
+    /// the whole point of a major pin is to stop runs across incompatible config schemas.
+    ///
+    /// Can also be set via the `MAGO_NO_VERSION_CHECK` environment variable or
+    /// `no-version-check = true` in `mago.toml`.
+    #[arg(long, default_value_t = false)]
+    pub no_version_check: bool,
+
     /// When to use colored output. Can be "auto", "always", or "never".
     ///
     /// - "auto": Use colors if the output is a terminal (default).

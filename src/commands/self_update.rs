@@ -17,6 +17,8 @@ use crate::updater::github::Release;
 use crate::updater::github::ReleaseAsset;
 use crate::updater::version::is_version_compatible;
 use crate::updater::version::is_version_newer;
+use crate::version_check::VersionCheck;
+use crate::version_check::VersionPin;
 
 #[derive(Parser, Debug)]
 #[command(
@@ -48,36 +50,80 @@ pub struct SelfUpdateCommand {
     /// This option allows you to specify a particular version of Mago to update to, rather than the latest version.
     /// The version tag should match the format used in the release tags (e.g., `1.0.0-beta.10`).
     /// If the specified version is not found, an error will be returned.
-    #[arg(long, value_name = "VERSION_TAG")]
+    #[arg(long, value_name = "VERSION_TAG", conflicts_with = "to_project_version")]
     pub tag: Option<String>,
+
+    /// Update to whatever version the project's `mago.toml` pins.
+    ///
+    /// Reads the `version` field from `mago.toml` and installs the matching release.
+    /// Fails if `mago.toml` has no `version` pin; add one (e.g. `version = "1"`) or
+    /// use `--tag` explicitly.
+    ///
+    /// For exact pins (`version = "1.19.3"`) this resolves to that exact release tag.
+    /// For non-exact pins (`version = "1"` or `version = "1.19"`) this installs the
+    /// latest published release that satisfies the pin, or fails with a clear error
+    /// if the latest release is on a different major/minor line.
+    #[arg(long, conflicts_with = "tag")]
+    pub to_project_version: bool,
 }
 
-pub fn execute(command: SelfUpdateCommand) -> Result<ExitCode, Error> {
+pub fn execute(command: SelfUpdateCommand, project_version_pin: Option<String>) -> Result<ExitCode, Error> {
     debug!("OS: {}", std::env::consts::OS);
     debug!("ARCH: {}", std::env::consts::ARCH);
     debug!("TARGET: {}", TARGET);
     debug!("BIN: {}", BIN);
     debug!("ARCHIVE_EXTENSION: {}", ARCHIVE_EXTENSION);
 
-    let release = match &command.tag {
-        Some(tag) => {
-            info!("Checking version {}... ", tag);
-            github::get_release_version(REPO_OWNER, REPO_NAME, tag)?
+    let mut resolved_exact_tag = false;
+    let release = if command.to_project_version {
+        let pin_string = match project_version_pin.as_deref() {
+            Some(pin) => pin,
+            None => {
+                tracing::error!(
+                    "Add a pin to `mago.toml` (e.g. `version = \"1\"` at the top of the file), or pass `--tag <VERSION>` instead."
+                );
+
+                return Err(Error::NoPinnedProjectVersion);
+            }
+        };
+
+        let pin = VersionPin::parse(pin_string)?;
+
+        if pin.is_exact() {
+            resolved_exact_tag = true;
+
+            info!("Fetching project version {}... ", pin);
+
+            github::get_release_version(REPO_OWNER, REPO_NAME, pin_string)?
+        } else {
+            info!("Resolving latest release satisfying project pin `{pin}`...");
+
+            find_latest_release_satisfying(&pin)?
         }
-        None => {
-            info!("Checking latest released version... ");
-            github::get_latest_release(REPO_OWNER, REPO_NAME)?
+    } else {
+        match command.tag {
+            Some(tag) => {
+                resolved_exact_tag = true;
+
+                info!("Fetching version {}... ", tag);
+
+                github::get_release_version(REPO_OWNER, REPO_NAME, &tag)?
+            }
+            None => {
+                info!("Checking latest released version... ");
+                github::get_latest_release(REPO_OWNER, REPO_NAME)?
+            }
         }
     };
 
     info!("Release found: {} ({})", release.name, release.version);
 
-    if command.tag.is_some() && release.version == VERSION {
+    if resolved_exact_tag && release.version == VERSION {
         info!("Already up-to-date with version `{}`", VERSION);
         return Ok(ExitCode::SUCCESS);
     }
 
-    if command.tag.is_none() {
+    if !resolved_exact_tag {
         if !is_version_newer(VERSION, &release.version)? {
             info!("Already up-to-date with the latest version `{}`", VERSION);
             return Ok(ExitCode::SUCCESS);
@@ -155,38 +201,119 @@ fn confirm_prompt(msg: &str) -> Result<(), UpdateError> {
     Ok(())
 }
 
-fn get_target_asset_from_release(release: &Release) -> Result<&ReleaseAsset, UpdateError> {
-    release
-        .assets
-        .iter()
-        .find(|asset| asset.name.contains(TARGET) && asset.name.ends_with(ARCHIVE_EXTENSION))
-        .ok_or_else(|| {
-            let binary_asset_count =
-                release.assets.iter().filter(|a| SUPPORTED_TARGETS.iter().any(|t| a.name.contains(t))).count();
+/// Scans recent releases and returns the version string of the highest one
+/// that satisfies `pin`.
+fn find_latest_release_satisfying(pin: &VersionPin) -> Result<Release, Error> {
+    const MAX_PAGES: u32 = 10;
 
-            let message = if !SUPPORTED_TARGETS.contains(&TARGET) {
-                format!(
-                    "No pre-built binary is available for your platform `{TARGET}`. \
-                     You can compile Mago from source by cloning the repository and running `cargo install --path .`.",
-                )
-            } else if binary_asset_count == 0 {
-                format!(
-                    "No binaries are available for release `{}` yet. \
-                     The release was just published and binaries are still being built by CI. \
-                     This typically takes 30-40 minutes. Please try again shortly.",
-                    release.version,
-                )
-            } else {
-                format!(
-                    "The binary for your platform `{TARGET}` is not available in release `{}` yet. \
-                     The release has {}/{} platform builds ready. \
-                     The remaining builds are likely still in progress - please try again in a few minutes.",
-                    release.version,
-                    binary_asset_count,
-                    SUPPORTED_TARGETS.len(),
-                )
+    let pin_major = parse_version_components(&pin.to_string()).map(|(m, _, _)| m).unwrap_or(0);
+
+    let mut best: Option<(Release, (u64, u64, u64))> = None;
+    let mut latest_seen: Option<String> = None;
+
+    for page in 1..=MAX_PAGES {
+        let releases = github::list_releases(REPO_OWNER, REPO_NAME, page).map_err(Error::SelfUpdate)?;
+
+        if releases.is_empty() {
+            break;
+        }
+
+        if latest_seen.is_none() {
+            latest_seen = Some(releases[0].version.clone());
+        }
+
+        let mut page_touched_pin_era = false;
+
+        for release in releases {
+            let Ok(components) = parse_version_components(&release.version) else {
+                continue;
             };
 
-            UpdateError::Release(message)
-        })
+            if components.0 >= pin_major {
+                page_touched_pin_era = true;
+            }
+
+            if !matches!(pin.check(&release.version), Ok(VersionCheck::Match)) {
+                continue;
+            }
+
+            if best.as_ref().is_none_or(|(_, best_components)| components > *best_components) {
+                best = Some((release, components));
+            }
+        }
+
+        if !page_touched_pin_era {
+            break;
+        }
+    }
+
+    if let Some((version, _)) = best {
+        Ok(version)
+    } else {
+        let latest = latest_seen.unwrap_or_else(|| "unknown".to_owned());
+        tracing::error!(
+            "Scanned the most recent releases on GitHub but none matched `{pin}`; the most recent one was `{latest}`."
+        );
+        tracing::error!(
+            "If a matching release exists further back in history, pass `--tag <VERSION>` explicitly to install it."
+        );
+        Err(Error::LatestReleaseDoesNotSatisfyPin(pin.to_string(), latest))
+    }
+}
+
+/// Parses a `major.minor.patch` string (with optional `-pre`/`+build`
+/// suffix) into a `(u64, u64, u64)` tuple suitable for lexicographic
+/// ordering of release versions.
+fn parse_version_components(version: &str) -> Result<(u64, u64, u64), UpdateError> {
+    let core = version.split(['-', '+']).next().unwrap_or(version).trim();
+    let mut parts = core.split('.');
+
+    let parse_part = |p: Option<&str>| -> Result<u64, UpdateError> {
+        p.ok_or_else(|| UpdateError::Release(format!("release version `{version}` is missing a component")))?
+            .parse::<u64>()
+            .map_err(|_| UpdateError::Release(format!("release version `{version}` has a non-numeric component")))
+    };
+
+    let major = parse_part(parts.next())?;
+    let minor = parse_part(parts.next())?;
+    let patch = parse_part(parts.next()).unwrap_or(0);
+
+    Ok((major, minor, patch))
+}
+
+fn get_target_asset_from_release(release: &Release) -> Result<&ReleaseAsset, UpdateError> {
+    if let Some(asset) =
+        release.assets.iter().find(|asset| asset.name.contains(TARGET) && asset.name.ends_with(ARCHIVE_EXTENSION))
+    {
+        return Ok(asset);
+    }
+
+    // Emit human-readable guidance via tracing, return a terse summary as
+    // the error. Three distinct failure shapes: unsupported target,
+    // release with no binaries at all, or release with some binaries but
+    // not ours.
+    let binary_asset_count =
+        release.assets.iter().filter(|a| SUPPORTED_TARGETS.iter().any(|t| a.name.contains(t))).count();
+
+    if !SUPPORTED_TARGETS.contains(&TARGET) {
+        tracing::error!("Your platform `{TARGET}` is not in Mago's list of pre-built binary targets.");
+        tracing::error!("Compile from source: clone the repository and run `cargo install --path .`.");
+        Err(UpdateError::Release(format!("no pre-built binary available for platform `{TARGET}`")))
+    } else if binary_asset_count == 0 {
+        tracing::error!(
+            "Release `{}` was just published and its binaries are still being built by CI.",
+            release.version
+        );
+        tracing::error!("This typically takes 30-40 minutes. Please try again shortly.");
+        Err(UpdateError::Release(format!("no binaries published yet for release `{}`", release.version)))
+    } else {
+        tracing::error!(
+            "Release `{}` has {}/{} platform builds ready; the `{TARGET}` build is still in progress.",
+            release.version,
+            binary_asset_count,
+            SUPPORTED_TARGETS.len(),
+        );
+        tracing::error!("Please try again in a few minutes.");
+        Err(UpdateError::Release(format!("binary for `{TARGET}` not yet available in release `{}`", release.version)))
+    }
 }

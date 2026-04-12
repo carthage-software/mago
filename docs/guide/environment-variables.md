@@ -92,3 +92,11 @@ See [Editor Integration](/guide/configuration#editor-integration) for supported 
 Overrides the `allow-unsupported-php-version` setting. Set to `true` to allow Mago to run on unsupported PHP versions. This is not recommended and may lead to unexpected behavior.
 
 - **Example**: `MAGO_ALLOW_UNSUPPORTED_PHP_VERSION=true mago lint`
+
+### `MAGO_NO_VERSION_CHECK`
+
+*Available in Mago 1.20.0+.* Has no effect on 1.19.x and earlier.
+
+Overrides the `no-version-check` setting. Set to `true` to silence the warning emitted when the installed Mago binary drifts from the `version` pinned in `mago.toml`. Major-version drift is **always fatal** and is not affected by this variable; the whole point of a major pin is to stop runs across incompatible config schemas.
+
+- **Example**: `MAGO_NO_VERSION_CHECK=true mago lint`

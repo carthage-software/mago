@@ -29,6 +29,7 @@ These options can be used with the main `mago` command and any of its subcommand
 | `--php-version <VERSION>`         | Overrides the PHP version (e.g., `8.2`) specified in the configuration file.                                    |
 | `--threads <NUMBER>`              | Overrides the number of threads Mago will use. Defaults to the number of available logical CPUs.                |
 | `--allow-unsupported-php-version` | Allows Mago to run against a PHP version that is not officially supported. Use with caution.                    |
+| `--no-version-check`              | *Mago 1.20.0+.* Silences the warning emitted on minor/patch drift from the `version` pinned in `mago.toml`. Major-version drift remains fatal. See [Version pinning](/guide/configuration#version-pinning). |
 | `--colors <WHEN>`                 | Controls when to use colors in the output. Options: `always`, `never`, `auto` (default).                        |
 | `-h`, `--help`                    | Print help information.                                                                                         |
 | `-V`, `--version`                 | Print version information.                                                                                      |
