@@ -263,6 +263,15 @@ fn add_parameter_types_to_context<'ctx, 'arena>(
     parameter_list: &FunctionLikeParameterList<'arena>,
     mut inferred_parameter_types: Option<HashMap<usize, TUnion>>,
 ) -> Result<(), AnalysisError> {
+    let is_overriding_method = if function_like_metadata.kind.is_method()
+        && let Some(class_name) = block_context.scope.get_class_like_name()
+        && let Some(method_name) = function_like_metadata.name
+    {
+        context.codebase.method_is_overriding(class_name.as_str(), method_name.as_str())
+    } else {
+        false
+    };
+
     for (i, parameter_metadata) in function_like_metadata.parameters.iter().enumerate() {
         let parameter_variable_str = parameter_metadata.get_name().0;
 
@@ -319,7 +328,10 @@ fn add_parameter_types_to_context<'ctx, 'arena>(
                     ));
 
                     context.collector.report_with_code(IssueCode::DocblockTypeMismatch, issue);
-                } else if !effective_type.has_template_types() && !expanded_native.has_template_types() {
+                } else if !is_overriding_method
+                    && !effective_type.has_template_types()
+                    && !expanded_native.has_template_types()
+                {
                     let dropped: Vec<&TAtomic> = expanded_native
                         .types
                         .iter()

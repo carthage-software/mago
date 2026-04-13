@@ -210,3 +210,24 @@ class Collection
         echo "$key: " . count($values);
     }
 }
+
+/**
+ * @template Tk of array-key
+ */
+interface KeyedCollection
+{
+    /** @param Tk $k */
+    public function at(int|string $k): string;
+}
+
+/**
+ * @implements KeyedCollection<int<0, max>>
+ */
+class NonNegativeIntVector implements KeyedCollection
+{
+    /** @param int<0, max> $k */
+    public function at(int|string $k): string
+    {
+        return (string) $k;
+    }
+}
