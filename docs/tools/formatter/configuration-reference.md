@@ -148,6 +148,7 @@ public function bar(
 | `line-before-binary-operator` | `boolean` | `true` | Place the binary operator on the next line when breaking. |
 | `indent-binary-expression-continuation` | `boolean` | `false` | Indent continuation lines of binary expressions in assignments. Available since Mago 1.19.0. |
 | `omit-redundant-arithmetic-binary-expression-parentheses` | `boolean` | `false` | Omit redundant parentheses around arithmetic binary expressions under comparison and null coalesce expressions when PHP precedence already preserves meaning. |
+| `omit-redundant-bitwise-binary-expression-parentheses` | `boolean` | `false` | Omit redundant parentheses around bitwise binary child expressions when PHP precedence and associativity already preserve meaning. |
 | `always-break-named-arguments-list` | `boolean` | `false` | Always break named argument lists into multiple lines. |
 | `always-break-attribute-named-argument-lists` | `boolean` | `false` | Always break named argument lists in attributes. |
 | `align-parameters` | `boolean` | `false` | Align multiline function and method parameter lists by the variable column. This is especially useful for promoted constructor properties with visibility modifiers. |

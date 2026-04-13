@@ -567,6 +567,24 @@ generate_formatter_settings! {
     /// Default: false
     omit_redundant_arithmetic_binary_expression_parentheses: bool => "default_false",
 
+    /// Whether to omit redundant parentheses around bitwise binary child expressions.
+    ///
+    /// When enabled, parentheses are omitted around bitwise binary child expressions where PHP precedence and
+    /// associativity already preserve meaning:
+    /// ```php
+    /// if ($mask === $flags << 1) {
+    /// }
+    /// ```
+    ///
+    /// When disabled, bitwise binary child expressions keep Mago's default grouping style:
+    /// ```php
+    /// if ($mask === ($flags << 1)) {
+    /// }
+    /// ```
+    ///
+    /// Default: false
+    omit_redundant_bitwise_binary_expression_parentheses: bool => "default_false",
+
     /// Whether to always break named argument lists into multiple lines.
     ///
     /// When enabled:

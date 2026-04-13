@@ -315,4 +315,14 @@ mod tests {
         let config: FormatterConfiguration = toml::from_str(toml).unwrap();
         assert!(config.settings.omit_redundant_arithmetic_binary_expression_parentheses);
     }
+
+    #[test]
+    fn test_deserialize_omit_redundant_bitwise_binary_expression_parentheses() {
+        let toml = r#"
+            omit-redundant-bitwise-binary-expression-parentheses = true
+        "#;
+
+        let config: FormatterConfiguration = toml::from_str(toml).unwrap();
+        assert!(config.settings.omit_redundant_bitwise_binary_expression_parentheses);
+    }
 }
