@@ -193,6 +193,7 @@ define_rules! {
     ConstantName(constant_name @ ConstantNameRule),
     CyclomaticComplexity(cyclomatic_complexity @ CyclomaticComplexityRule),
     DisallowedFunctions(disallowed_functions @ DisallowedFunctionsRule),
+    DisallowedTypeInstantiation(disallowed_type_instantiation @ DisallowedTypeInstantiationRule),
     EnumName(enum_name @ EnumNameRule),
     ExcessiveNesting(excessive_nesting @ ExcessiveNestingRule),
     ExcessiveParameterList(excessive_parameter_list @ ExcessiveParameterListRule),

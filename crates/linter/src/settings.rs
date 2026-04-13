@@ -24,6 +24,7 @@ use crate::rule::DeprecatedCastConfig;
 use crate::rule::DeprecatedShellExecuteStringConfig;
 use crate::rule::DeprecatedSwitchSemicolonConfig;
 use crate::rule::DisallowedFunctionsConfig;
+use crate::rule::DisallowedTypeInstantiationConfig;
 use crate::rule::EnumNameConfig;
 use crate::rule::ExcessiveNestingConfig;
 use crate::rule::ExcessiveParameterListConfig;
@@ -213,6 +214,7 @@ pub struct RulesSettings {
     pub constant_name: RuleSettings<ConstantNameConfig>,
     pub cyclomatic_complexity: RuleSettings<CyclomaticComplexityConfig>,
     pub disallowed_functions: RuleSettings<DisallowedFunctionsConfig>,
+    pub disallowed_type_instantiation: RuleSettings<DisallowedTypeInstantiationConfig>,
     pub enum_name: RuleSettings<EnumNameConfig>,
     pub excessive_nesting: RuleSettings<ExcessiveNestingConfig>,
     pub excessive_parameter_list: RuleSettings<ExcessiveParameterListConfig>,
