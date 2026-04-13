@@ -84,13 +84,30 @@ impl<'a> DatabaseLoader<'a> {
         let extensions_set: HashSet<OsString> =
             self.configuration.extensions.iter().map(|s| OsString::from(s.as_ref())).collect();
 
-        let glob_excludes = build_glob_set(
-            self.configuration.excludes.iter().filter_map(|ex| match ex {
+        let glob_exclude_patterns: Vec<&str> = self
+            .configuration
+            .excludes
+            .iter()
+            .filter_map(|ex| match ex {
                 Exclusion::Pattern(pat) => Some(pat.as_ref()),
                 Exclusion::Path(_) => None,
-            }),
-            self.configuration.glob,
-        )?;
+            })
+            .collect();
+
+        let glob_excludes = build_glob_set(glob_exclude_patterns.iter().copied(), self.configuration.glob)?;
+        let dir_prune_patterns: Vec<&str> = glob_exclude_patterns
+            .iter()
+            .filter_map(|pat| {
+                let stripped =
+                    pat.strip_suffix("/**/*").or_else(|| pat.strip_suffix("/**")).or_else(|| pat.strip_suffix("/*"))?;
+                if stripped.is_empty() || stripped == "*" || stripped == "**" {
+                    return None;
+                }
+                Some(stripped)
+            })
+            .collect();
+
+        let dir_prune_globs = build_glob_set(dir_prune_patterns.iter().copied(), self.configuration.glob)?;
 
         let path_excludes: HashSet<_> = self
             .configuration
@@ -107,13 +124,16 @@ impl<'a> DatabaseLoader<'a> {
             FileType::Host,
             &extensions_set,
             &glob_excludes,
+            &dir_prune_globs,
             &path_excludes,
         )?;
+
         let vendored_files_with_spec = self.load_paths(
             &self.configuration.includes,
             FileType::Vendored,
             &extensions_set,
             &glob_excludes,
+            &dir_prune_globs,
             &path_excludes,
         )?;
 
@@ -188,6 +208,7 @@ impl<'a> DatabaseLoader<'a> {
         file_type: FileType,
         extensions: &HashSet<OsString>,
         glob_excludes: &GlobSet,
+        dir_prune_globs: &GlobSet,
         path_excludes: &HashSet<&Cow<'a, Path>>,
     ) -> Result<Vec<FileWithSpecificity>, DatabaseError> {
         // Canonicalize the workspace once.  All WalkDir roots are canonicalized
@@ -262,10 +283,34 @@ impl<'a> DatabaseLoader<'a> {
                     }
                 }
             } else {
-                // Canonicalize the root once.  WalkDir does not follow symlinks, so
-                // every path it yields under a canonical root is itself canonical.
                 let canonical_root = resolved_path.canonicalize().unwrap_or(resolved_path);
-                for entry in WalkDir::new(&canonical_root).into_iter().filter_map(Result::ok) {
+                let has_dir_prunes = !dir_prune_globs.is_empty();
+                let has_path_prunes = !canonical_excludes.is_empty();
+                let walker = WalkDir::new(&canonical_root).into_iter().filter_entry(|entry| {
+                    if entry.depth() == 0 || !entry.file_type().is_dir() {
+                        return true;
+                    }
+
+                    let path = entry.path();
+
+                    if has_path_prunes
+                        && let Some(p) = path.to_str()
+                        && canonical_excludes.iter().any(|excl| {
+                            p.starts_with(excl.as_str())
+                                && matches!(p.as_bytes().get(excl.len()), None | Some(&b'/' | &b'\\'))
+                        })
+                    {
+                        return false;
+                    }
+
+                    if has_dir_prunes && dir_prune_globs.is_match(path) {
+                        return false;
+                    }
+
+                    true
+                });
+
+                for entry in walker.filter_map(Result::ok) {
                     if entry.file_type().is_file() {
                         paths_to_process.push((entry.into_path(), specificity));
                     }
