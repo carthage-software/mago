@@ -246,6 +246,7 @@ pub fn analyze_function_like<'ctx, 'ast, 'arena>(
         );
     }
 
+    check_return_type_width(context, block_context, &mut artifacts, function_like_metadata);
     check_thrown_types(context, block_context, &mut artifacts, function_like_metadata);
 
     std::mem::swap(&mut context.type_resolution_context, &mut previous_type_resolution_context);
@@ -372,9 +373,12 @@ fn add_parameter_types_to_context<'ctx, 'arena>(
                                 Annotation::secondary(parameter_type.span)
                                     .with_message(format!("...but docblock only covers `{docblock_type_str}`")),
                             )
-                            .with_note("Callers can still pass values of the excluded native branches, but the docblock tells the analyzer those branches are impossible.")
-                            .with_note("Type narrowing checks might collapse to `never`, producing confusing unreachable-code errors in the function body.")
-                            .with_help(format!("Widen the docblock to cover every native branch (e.g. `{native_type_str}`), or tighten the native type so it matches `{docblock_type_str}`."))
+                            .with_note("Callers can still pass values of the excluded branches.")
+                            .with_note("The docblock tells the analyzer those branches are impossible.")
+                            .with_note("Narrowing checks can then collapse to `never` in the body.")
+                            .with_help(format!(
+                                "Widen the docblock to `{native_type_str}`, or tighten the native type."
+                            ))
                         ;
 
                         context.collector.report_with_code(IssueCode::DocblockParameterNarrowing, issue);
@@ -747,6 +751,141 @@ fn add_symbol_references(
             }
         }
     }
+}
+
+/// Flags declared return types that are strictly wider than the union of every
+/// value the body actually returns.
+fn check_return_type_width<'ctx>(
+    context: &mut Context<'ctx, '_>,
+    block_context: &mut BlockContext<'ctx>,
+    artifacts: &mut AnalysisArtifacts,
+    function_like_metadata: &'ctx FunctionLikeMetadata,
+) {
+    if !context.settings.find_overly_wide_return_types {
+        return;
+    }
+
+    if function_like_metadata.flags.has_yield()
+        || function_like_metadata.flags.is_abstract()
+        || function_like_metadata.flags.is_unchecked()
+    {
+        return;
+    }
+
+    let Some(return_type_metadata) = function_like_metadata.return_type_metadata.as_ref() else {
+        return;
+    };
+
+    let declared = &return_type_metadata.type_union;
+    if declared.is_mixed()
+        || declared.is_void()
+        || declared.is_never()
+        || declared.has_template_types()
+        || declared.is_generic_parameter()
+    {
+        return;
+    }
+
+    let is_overriding_method = if function_like_metadata.kind.is_method()
+        && let Some(class_name) = block_context.scope.get_class_like_name()
+        && let Some(method_name) = function_like_metadata.name
+    {
+        context.codebase.method_is_overriding(class_name.as_str(), method_name.as_str())
+    } else {
+        false
+    };
+
+    if is_overriding_method {
+        return;
+    }
+
+    if artifacts.inferred_return_types.is_empty() {
+        return;
+    }
+
+    let any_return_is_uninformative = artifacts.inferred_return_types.iter().any(|ret| {
+        ret.is_mixed() || ret.is_never() || ret.is_void() || ret.has_template_types() || ret.is_generic_parameter()
+    });
+
+    if any_return_is_uninformative {
+        return;
+    }
+
+    let expanded_declared =
+        expand_type_metadata(context, block_context, artifacts, function_like_metadata, return_type_metadata);
+
+    let any_inferred_matches = |declared_atomic: &TAtomic| -> bool {
+        artifacts.inferred_return_types.iter().any(|ret| {
+            ret.types.iter().any(|inferred_atomic| {
+                atomic_comparator::is_contained_by(
+                    context.codebase,
+                    inferred_atomic,
+                    declared_atomic,
+                    false,
+                    &mut ComparisonResult::default(),
+                ) || atomic_comparator::is_contained_by(
+                    context.codebase,
+                    declared_atomic,
+                    inferred_atomic,
+                    false,
+                    &mut ComparisonResult::default(),
+                )
+            })
+        })
+    };
+
+    let inferred_fully_in_declared = artifacts.inferred_return_types.iter().all(|ret| {
+        ret.types.iter().all(|inferred_atomic| {
+            expanded_declared.types.iter().any(|declared_atomic| {
+                atomic_comparator::is_contained_by(
+                    context.codebase,
+                    inferred_atomic,
+                    declared_atomic,
+                    false,
+                    &mut ComparisonResult::default(),
+                )
+            })
+        })
+    });
+
+    if !inferred_fully_in_declared {
+        return;
+    }
+
+    let has_unused = expanded_declared.types.iter().any(|declared_atomic| !any_inferred_matches(declared_atomic));
+    if !has_unused {
+        return;
+    }
+
+    let unused_list = expanded_declared
+        .types
+        .iter()
+        .filter(|declared_atomic| !any_inferred_matches(declared_atomic))
+        .map(|a| a.get_id().to_string())
+        .collect::<Vec<_>>()
+        .join("`, `");
+
+    let declared_str = expanded_declared.get_id();
+    let return_span = return_type_metadata.span;
+    let function_label = function_like_metadata.name.unwrap_or_else(|| atom("closure"));
+
+    let issue = Issue::help(format!(
+        "Declared return type `{declared_str}` for `{function_label}` has unused branches: `{unused_list}`."
+    ))
+    .with_annotation(
+        Annotation::primary(return_span)
+            .with_message(format!("Declared as `{declared_str}`, but `{unused_list}` is never returned.")),
+    )
+    .with_annotation(
+        Annotation::secondary(function_like_metadata.name_span.unwrap_or(function_like_metadata.span))
+            .with_message("No path in this body produces that value."),
+    )
+    .with_note("A return type wider than the body produces is misleading.")
+    .with_note("Callers must handle branches the function never actually returns.")
+    .with_note("It can hide dead code paths meant to produce the missing variant.")
+    .with_help(format!("Remove `{unused_list}` from the return type, or add a branch that returns it."));
+
+    context.collector.report_with_code(IssueCode::OverlyWideReturnType, issue);
 }
 
 fn check_thrown_types<'ctx>(

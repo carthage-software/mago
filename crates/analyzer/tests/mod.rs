@@ -455,6 +455,11 @@ test_case!(issue_1608);
 test_case!(issue_1610);
 test_case!(issue_1487);
 test_case!(docblock_parameter_narrowing);
+test_case!(overly_wide_return_type, {
+    let mut s = crate::framework::default_test_settings();
+    s.find_overly_wide_return_types = true;
+    s
+});
 test_case!(issue_1610_huffman);
 test_case!(issue_1615);
 test_case!(side_effects_in_condition, {

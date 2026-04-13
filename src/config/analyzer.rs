@@ -84,6 +84,10 @@ pub struct AnalyzerConfiguration {
     /// Whether to find unused definitions.
     pub find_unused_definitions: bool,
 
+    /// Whether to warn when a function's declared return type contains a branch the body never
+    /// actually returns (e.g. `: string|false` on a function that always returns a string).
+    pub find_overly_wide_return_types: bool,
+
     /// Whether to analyze dead code.
     pub analyze_dead_code: bool,
 
@@ -375,6 +379,7 @@ impl AnalyzerConfiguration {
             version: php_version,
             analyze_dead_code: self.analyze_dead_code,
             find_unused_definitions: self.find_unused_definitions,
+            find_overly_wide_return_types: self.find_overly_wide_return_types,
             find_unused_expressions: self.find_unused_expressions,
             memoize_properties: self.memoize_properties,
             allow_possibly_undefined_array_keys: self.allow_possibly_undefined_array_keys,
@@ -426,6 +431,7 @@ impl Default for AnalyzerConfiguration {
             minimum_fail_level: Level::Error,
             find_unused_expressions: defaults.find_unused_expressions,
             find_unused_definitions: defaults.find_unused_definitions,
+            find_overly_wide_return_types: defaults.find_overly_wide_return_types,
             analyze_dead_code: defaults.analyze_dead_code,
             memoize_properties: defaults.memoize_properties,
             allow_possibly_undefined_array_keys: defaults.allow_possibly_undefined_array_keys,

@@ -92,6 +92,7 @@ These flags control specific, powerful analysis capabilities.
 | :------------------------------------ | :------ | :--------------------------------------------------------------------------------------------------- |
 | `find-unused-expressions`             | `true`  | Find and report expressions whose results are not used (e.g., `$a + $b;`).                           |
 | `find-unused-definitions`             | `true`  | Find and report unused definitions (e.g., private methods that are never called).                    |
+| `find-overly-wide-return-types`       | `false` | Warn when a function's declared return type contains a branch the body never actually returns (e.g. `: string\|false` on a function that always returns a string). Available since Mago 1.20.0. |
 | `analyze-dead-code`                   | `false` | Analyze code that appears to be unreachable.                                                         |
 | `memoize-properties`                  | `true`  | Track the literal values of class properties. Improves type inference but may increase memory usage. |
 | `allow-possibly-undefined-array-keys` | `true`  | Allow accessing array keys that may not be defined without reporting an issue.                       |
@@ -356,6 +357,7 @@ For the strictest possible analysis, use the following configuration:
 # Enable all checks
 find-unused-expressions = true
 find-unused-definitions = true
+find-overly-wide-return-types = true
 analyze-dead-code = true
 check-throws = true
 check-missing-override = true
@@ -422,6 +424,7 @@ function process(object $obj): mixed
 | :----- | :----------- | :----- |
 | `find-unused-expressions` | `true` | Reports expressions whose results are discarded (e.g., `$a + $b;`). |
 | `find-unused-definitions` | `true` | Reports unused private methods, variables, and other definitions. |
+| `find-overly-wide-return-types` | `true` | Reports functions whose declared return type advertises branches the body never produces (e.g. `: string\|false` on a function that always returns a string). Available since Mago 1.20.0. |
 | `analyze-dead-code` | `true` | Analyzes and reports on unreachable code paths. |
 | `check-missing-override` | `true` | Reports missing `#[Override]` attributes on overriding methods (PHP 8.3+). |
 | `find-unused-parameters` | `true` | Reports unused function/method parameters. |

@@ -21,6 +21,10 @@ pub struct Settings {
     /// Find and report unused definitions (e.g., private methods that are never called). Defaults to `false`.
     pub find_unused_definitions: bool,
 
+    /// Warn when a function's declared return type contains a branch the body never actually returns
+    /// (e.g. `: string|false` on a function that always returns a string). Defaults to `false`.
+    pub find_overly_wide_return_types: bool,
+
     /// Analyze code that appears to be unreachable. Defaults to `false`.
     pub analyze_dead_code: bool,
 
@@ -309,6 +313,7 @@ impl Settings {
             version,
             find_unused_expressions: true,
             find_unused_definitions: true,
+            find_overly_wide_return_types: false,
             analyze_dead_code: false,
             memoize_properties: true,
             allow_possibly_undefined_array_keys: true,

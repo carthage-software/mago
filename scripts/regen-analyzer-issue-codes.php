@@ -226,6 +226,7 @@ final class AnalyzerCodeModuleGenerator
         'impure-construct',
         'docblock-type-mismatch',
         'docblock-parameter-narrowing',
+        'overly-wide-return-type',
         'invalid-destructuring-source',
         'mixed-destructuring-shape',
         'skip-in-keyed-destructuring',
