@@ -463,6 +463,7 @@ test_case!(overly_wide_return_type, {
 });
 test_case!(issue_1610_huffman);
 test_case!(issue_1615);
+test_case!(issue_1624);
 test_case!(side_effects_in_condition, {
     let mut s = crate::framework::default_test_settings();
     s.allow_side_effects_in_conditions = false;

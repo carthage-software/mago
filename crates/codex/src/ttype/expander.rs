@@ -48,6 +48,11 @@ thread_local! {
 
     /// Thread-local set for tracking objects whose type parameters are being expanded (cycle detection).
     static EXPANDING_OBJECT_PARAMS: RefCell<HashSet<Atom, FixedState>> = const { RefCell::new(HashSet::with_hasher(FixedState::with_seed(0))) };
+
+    /// Thread-local set for tracking class constants whose inferred initializer is currently
+    /// being expanded. Used to break cycles like `const int b = self::b;` where the inferred
+    /// type of a constant is a reference to itself.
+    static EXPANDING_CONSTANTS: RefCell<HashSet<(Atom, Atom), FixedState>> = const { RefCell::new(HashSet::with_hasher(FixedState::with_seed(0))) };
 }
 
 /// Resets the thread-local alias expansion state.
@@ -58,6 +63,7 @@ thread_local! {
 pub fn reset_expansion_state() {
     EXPANDING_ALIASES.with(|set| set.borrow_mut().clear());
     EXPANDING_OBJECT_PARAMS.with(|set| set.borrow_mut().clear());
+    EXPANDING_CONSTANTS.with(|set| set.borrow_mut().clear());
 }
 
 /// RAII guard to ensure alias expansion state is properly cleaned up.
@@ -102,6 +108,37 @@ impl ObjectParamsExpansionGuard {
 impl Drop for ObjectParamsExpansionGuard {
     fn drop(&mut self) {
         EXPANDING_OBJECT_PARAMS.with(|set| set.borrow_mut().remove(&self.object_name));
+    }
+}
+
+/// RAII guard for class constant inferred-initializer expansion cycle detection.
+///
+/// A constant whose initializer references itself (directly via `self::FOO` or
+/// transitively via another constant) would otherwise drive `expand_member_reference`
+/// into infinite recursion. The guard tracks `(class_name, constant_name)` pairs that
+/// are currently being expanded and refuses re-entry.
+struct ConstantExpansionGuard {
+    class_name: Atom,
+    constant_name: Atom,
+}
+
+impl ConstantExpansionGuard {
+    fn try_new(class_name: Atom, constant_name: Atom) -> Option<Self> {
+        EXPANDING_CONSTANTS.with(|set| {
+            let mut set = set.borrow_mut();
+            if set.contains(&(class_name, constant_name)) {
+                None
+            } else {
+                set.insert((class_name, constant_name));
+                Some(Self { class_name, constant_name })
+            }
+        })
+    }
+}
+
+impl Drop for ConstantExpansionGuard {
+    fn drop(&mut self) {
+        EXPANDING_CONSTANTS.with(|set| set.borrow_mut().remove(&(self.class_name, self.constant_name)));
     }
 }
 
@@ -423,6 +460,11 @@ fn expand_member_reference(
         }
 
         if let Some(inferred_type) = constant.inferred_type.as_ref() {
+            let Some(_guard) = ConstantExpansionGuard::try_new(class_like_name, *constant_name) else {
+                new_return_type_parts.push(TAtomic::Never);
+                continue;
+            };
+
             let mut inferred_type = inferred_type.clone();
             let mut skip_inferred_type = false;
             expand_atomic(&mut inferred_type, codebase, options, &mut skip_inferred_type, new_return_type_parts);

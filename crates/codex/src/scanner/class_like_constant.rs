@@ -17,6 +17,9 @@ use crate::scanner::inference::infer;
 use crate::scanner::ttype::get_type_metadata_from_hint;
 use crate::scanner::ttype::get_type_metadata_from_type_string;
 use crate::scanner::ttype::merge_type_preserving_nullability;
+use crate::ttype::atomic::TAtomic;
+use crate::ttype::atomic::reference::TReference;
+use crate::ttype::atomic::reference::TReferenceMemberSelector;
 use crate::ttype::resolution::TypeResolutionContext;
 use crate::visibility::Visibility;
 
@@ -71,6 +74,16 @@ pub fn scan_class_like_constants<'arena>(
 
             meta.attributes.clone_from(&attributes);
             meta.inferred_type = infer(context, scope, item.value, classname).map(TUnion::get_single_owned);
+
+            if let Some(TAtomic::Reference(TReference::Member {
+                class_like_name,
+                member_selector: TReferenceMemberSelector::Identifier(member_name),
+            })) = meta.inferred_type.as_ref()
+                && classname.is_some_and(|c| c.eq_ignore_ascii_case(class_like_name))
+                && member_name.eq(item.name.value)
+            {
+                meta.inferred_type = Some(TAtomic::Never);
+            }
 
             if let Some(ref docblock) = docblock {
                 if docblock.is_deprecated {

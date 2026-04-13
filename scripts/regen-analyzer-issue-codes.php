@@ -329,6 +329,7 @@ final class AnalyzerCodeModuleGenerator
         'incorrect-function-casing',
         'experimental-usage',
         'side-effects-in-condition',
+        'unresolvable-class-constant',
     ];
 
     /**
