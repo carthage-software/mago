@@ -70,12 +70,13 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Static<'arena> {
             let variable_name_atom = Atom::from(variable.name);
             let variable_type = match (inferred_type, docblock_type) {
                 (Some(inferred_type), Some((docblock_type, docblock_type_span))) => {
+                    let docblock_type = Rc::new(docblock_type);
                     block_context.by_reference_constraints.insert(
                         variable_name_atom,
                         ReferenceConstraint::new(
                             docblock_type_span,
                             ReferenceConstraintSource::Static,
-                            Some(docblock_type.clone()),
+                            Some(Rc::clone(&docblock_type)),
                         ),
                     );
 
@@ -89,19 +90,20 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Static<'arena> {
                         initial_value,
                     );
 
-                    Rc::new(docblock_type)
+                    docblock_type
                 }
                 (None, Some((docblock_type, docblock_type_span))) => {
+                    let docblock_type = Rc::new(docblock_type);
                     block_context.by_reference_constraints.insert(
                         variable_name_atom,
                         ReferenceConstraint::new(
                             docblock_type_span,
                             ReferenceConstraintSource::Static,
-                            Some(docblock_type.clone()),
+                            Some(Rc::clone(&docblock_type)),
                         ),
                     );
 
-                    Rc::new(docblock_type)
+                    docblock_type
                 }
                 (Some(inferred_type), None) => inferred_type,
                 (None, None) => Rc::new(get_mixed()),

@@ -313,6 +313,7 @@ fn update_by_reference_argument_types<'ctx, 'arena>(
 
             new_type.set_by_reference(true);
 
+            let new_type = Rc::new(new_type);
             if constraint_type && let Some(argument_id) = argument_id {
                 if let Some(existing_type) = block_context.locals.get(&argument_id).cloned() {
                     block_context.remove_descendants(context, argument_id, &existing_type, Some(&new_type));
@@ -327,25 +328,21 @@ fn update_by_reference_argument_types<'ctx, 'arena>(
                     argument,
                     Some(argument_id),
                     Some(argument),
-                    new_type.clone(),
+                    Rc::clone(&new_type),
                     false,
                 )?;
 
                 block_context.assigned_variable_ids.insert(argument_id, argument.start_offset());
-                // TODO(azjezz): we can eliminate `clone()` here, in `assign_to_expression` and
-                // in `record_by_reference_mutation_in_loop` by using an `Rc`, which won't be cloned
-                // in majority of cases, currently, in this path, the type gets cloned ~5 times on average
-                // can be 0.
                 block_context.by_reference_constraints.insert(
                     argument_id,
                     ReferenceConstraint::new(
                         argument.span(),
                         ReferenceConstraintSource::Argument,
-                        Some(new_type.clone()),
+                        Some(Rc::clone(&new_type)),
                     ),
                 );
 
-                record_by_reference_mutation_in_loop(artifacts, argument_id, &new_type);
+                record_by_reference_mutation_in_loop(artifacts, argument_id, new_type);
             } else {
                 if let Some(argument_id) = &argument_id
                     && let Some(existing_type) = block_context.locals.get(argument_id).cloned()
@@ -354,8 +351,6 @@ fn update_by_reference_argument_types<'ctx, 'arena>(
                     block_context.remove_variable_from_conflicting_clauses(context, *argument_id, None);
                 }
 
-                let widened_type = new_type.clone();
-
                 assign_to_expression(
                     context,
                     block_context,
@@ -363,13 +358,13 @@ fn update_by_reference_argument_types<'ctx, 'arena>(
                     argument,
                     argument_id,
                     Some(argument),
-                    new_type,
+                    Rc::clone(&new_type),
                     false,
                 )?;
 
                 if let Some(argument_id) = argument_id {
                     block_context.assigned_variable_ids.insert(argument_id, argument.start_offset());
-                    record_by_reference_mutation_in_loop(artifacts, argument_id, &widened_type);
+                    record_by_reference_mutation_in_loop(artifacts, argument_id, new_type);
                 }
             }
         }
@@ -380,14 +375,13 @@ fn update_by_reference_argument_types<'ctx, 'arena>(
 
 /// Records a by-reference mutation in the enclosing loop scope so the multi-pass
 /// analysis widens the variable's type on the next pass.
-fn record_by_reference_mutation_in_loop(artifacts: &mut AnalysisArtifacts, variable_id: Atom, new_type: &TUnion) {
+fn record_by_reference_mutation_in_loop(artifacts: &mut AnalysisArtifacts, variable_id: Atom, new_type: Rc<TUnion>) {
     let Some(loop_scope) = artifacts.get_loop_scope_mut() else {
         return;
     };
 
     if loop_scope.parent_context_variables.contains_key(&variable_id) {
-        let new_type = Rc::new(new_type.clone());
-        loop_scope.possibly_redefined_loop_parent_variables.insert(variable_id, new_type.clone());
+        loop_scope.possibly_redefined_loop_parent_variables.insert(variable_id, Rc::clone(&new_type));
         loop_scope.by_reference_loop_mutations.insert(variable_id, new_type);
     }
 }

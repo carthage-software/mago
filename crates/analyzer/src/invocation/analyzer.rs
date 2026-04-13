@@ -314,10 +314,6 @@ pub fn analyze_invocation<'ctx, 'arena>(
 
         let parameter_ref = get_parameter_of_argument(&parameter_refs, argument, *argument_offset);
         if let Some((parameter_offset, parameter_ref)) = parameter_ref {
-            if let Some(parameter_name) = parameter_ref.get_name() {
-                parameter_types.insert(parameter_name.0, argument_value_type.clone());
-            }
-
             if let Some(named_argument) = argument.get_named_argument() {
                 if let Some(previous_span) = assigned_parameters_by_name.get(&named_argument.name.value) {
                     context.collector.report_with_code(
@@ -409,6 +405,10 @@ pub fn analyze_invocation<'ctx, 'arena>(
                 argument_expression,
                 &invocation.target,
             );
+
+            if let Some(parameter_name) = parameter_ref.get_name() {
+                parameter_types.insert(parameter_name.0, argument_value_type);
+            }
         } else if let Some(named_argument) = argument.get_named_argument() {
             let argument_name = named_argument.name.value;
 

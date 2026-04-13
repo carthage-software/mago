@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use foldhash::HashSet;
 
 use mago_atom::Atom;
@@ -83,7 +85,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Foreach<'arena> {
                 key_expression,
                 key_expression_id,
                 None,
-                key_type,
+                Rc::new(key_type),
                 false,
             )?;
 
@@ -128,7 +130,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Foreach<'arena> {
             value_expression,
             value_expression_id,
             None,
-            value_type,
+            Rc::new(value_type),
             false,
         )?;
 

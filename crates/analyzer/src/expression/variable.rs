@@ -167,7 +167,7 @@ fn read_variable<'ctx>(
                     artifacts,
                     variable_span,
                     None,
-                    get_null(),
+                    Rc::new(get_null()),
                     variable_atom,
                     false,
                 );

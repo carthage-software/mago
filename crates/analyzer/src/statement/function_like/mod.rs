@@ -433,7 +433,7 @@ fn add_parameter_types_to_context<'ctx, 'arena>(
                 ReferenceConstraint::new(
                     parameter_metadata.span,
                     ReferenceConstraintSource::Parameter,
-                    Some(constraint_type),
+                    Some(Rc::new(constraint_type)),
                 ),
             );
         }

@@ -84,7 +84,7 @@ pub fn analyze_assignment<'ctx, 'ast, 'arena>(
     target_expression: &'ast Expression<'arena>,
     mut assignment_operator: Option<&AssignmentOperator>,
     source_expression: Option<&'ast Expression<'arena>>,
-    source_type: Option<&TUnion>,
+    source_type: Option<TUnion>,
 ) -> Result<(), AnalysisError> {
     if let Some(AssignmentOperator::Assign(_)) = assignment_operator {
         assignment_operator = None;
@@ -174,16 +174,16 @@ pub fn analyze_assignment<'ctx, 'ast, 'arena>(
         block_context.flags.set_inside_general_use(was_inside_general_use);
     }
 
-    let source_type = if let Some(source_type) = source_type {
-        source_type.clone()
+    let source_type: Rc<TUnion> = if let Some(source_type) = source_type {
+        Rc::new(source_type)
     } else if let Some(source_expression) = source_expression {
-        if let Some(source_type) = artifacts.get_expression_type(&source_expression) {
-            source_type.clone()
+        if let Some(source_type) = artifacts.get_rc_expression_type(&source_expression) {
+            Rc::clone(source_type)
         } else {
-            get_mixed()
+            Rc::new(get_mixed())
         }
     } else {
-        get_mixed()
+        Rc::new(get_mixed())
     };
 
     if let (Some(target_variable_id), None) = (&target_variable_id, assignment_operator)
@@ -235,7 +235,7 @@ pub fn analyze_assignment<'ctx, 'ast, 'arena>(
         target_expression,
         target_variable_id,
         source_expression,
-        source_type.clone(),
+        Rc::clone(&source_type),
         false,
     )?;
 
@@ -273,7 +273,7 @@ pub fn analyze_assignment<'ctx, 'ast, 'arena>(
     }
 
     if let Some(assignment_span) = assignment_span {
-        artifacts.set_expression_type(&assignment_span, source_type);
+        artifacts.set_rc_expression_type(&assignment_span, source_type);
     }
 
     Ok(())
@@ -286,11 +286,13 @@ pub(crate) fn assign_to_expression<'ctx, 'ast, 'arena>(
     target_expression: &'ast Expression<'arena>,
     target_expression_id: Option<Atom>,
     source_expression: Option<&'ast Expression<'arena>>,
-    mut source_type: TUnion,
+    mut source_type: Rc<TUnion>,
     destructuring: bool,
 ) -> Result<bool, AnalysisError> {
     if let Some(source_expression) = source_expression {
-        source_type.set_by_reference(source_expression.is_reference());
+        if source_expression.is_reference() != source_type.by_reference() {
+            Rc::make_mut(&mut source_type).set_by_reference(source_expression.is_reference());
+        }
 
         analyze_reference_assignment(context, block_context, target_expression, source_expression);
     }
@@ -415,7 +417,7 @@ pub fn analyze_assignment_to_variable<'ctx, 'arena>(
     artifacts: &mut AnalysisArtifacts,
     variable_span: Span,
     source_expression: Option<&Expression<'arena>>,
-    mut assigned_type: TUnion,
+    mut assigned_type: Rc<TUnion>,
     variable_id: Atom,
     destructuring: bool,
 ) {
@@ -509,7 +511,9 @@ pub fn analyze_assignment_to_variable<'ctx, 'arena>(
             context.collector.report_with_code(IssueCode::ReferenceConstraintViolation, issue);
         }
 
-        assigned_type.set_by_reference(true);
+        if !assigned_type.by_reference() {
+            Rc::make_mut(&mut assigned_type).set_by_reference(true);
+        }
     }
 
     if block_context.references_possibly_from_confusing_scope.contains(&variable_id) {
@@ -579,7 +583,7 @@ pub fn analyze_assignment_to_variable<'ctx, 'arena>(
             source_expression,
         );
 
-        assigned_type = variable_type;
+        assigned_type = Rc::new(variable_type);
         from_docblock = true;
     }
 
@@ -624,7 +628,7 @@ pub fn analyze_assignment_to_variable<'ctx, 'arena>(
 
     block_context.locals.retain(|var_id, _| !var_references_dynamic(*var_id, variable_id));
 
-    block_context.locals.insert(variable_id, Rc::new(assigned_type));
+    block_context.locals.insert(variable_id, assigned_type);
 }
 
 fn analyze_destructuring<'ctx, 'ast, 'arena>(
@@ -799,7 +803,7 @@ fn analyze_destructuring<'ctx, 'ast, 'arena>(
                     key_value_element.value,
                     None,
                     Some(key_value_element.key),
-                    Some(&access_type),
+                    Some(access_type),
                 )?;
             }
             ArrayElement::Value(value_element) => {
@@ -835,7 +839,7 @@ fn analyze_destructuring<'ctx, 'ast, 'arena>(
                     value_element.value,
                     None,
                     None,
-                    Some(&access_type),
+                    Some(access_type),
                 )?;
             }
             ArrayElement::Variadic(variadic_element) => {
@@ -855,7 +859,7 @@ fn analyze_destructuring<'ctx, 'ast, 'arena>(
                     variadic_element.value,
                     None,
                     None,
-                    Some(&get_never()),
+                    Some(get_never()),
                 )?;
 
                 continue;

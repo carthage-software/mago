@@ -49,7 +49,7 @@ pub enum ReferenceConstraintSource {
 pub struct ReferenceConstraint {
     pub constraint_span: Span,
     pub source: ReferenceConstraintSource,
-    pub constraint_type: Option<TUnion>,
+    pub constraint_type: Option<Rc<TUnion>>,
 }
 
 #[derive(Clone, Debug)]
@@ -136,25 +136,29 @@ impl BreakContext {
 }
 
 impl ReferenceConstraint {
-    pub fn new(constraint_span: Span, source: ReferenceConstraintSource, constraint_type: Option<TUnion>) -> Self {
-        let constraint_type = match constraint_type {
-            Some(mut constraint_type) => {
-                if constraint_type.has_literal_string() {
-                    constraint_type.types.to_mut().push(TAtomic::Scalar(TScalar::string()));
+    pub fn new(constraint_span: Span, source: ReferenceConstraintSource, constraint_type: Option<Rc<TUnion>>) -> Self {
+        let constraint_type = constraint_type.map(|mut constraint_type| {
+            if constraint_type.has_literal_string()
+                || constraint_type.has_literal_int()
+                || constraint_type.has_literal_float()
+            {
+                let union = Rc::make_mut(&mut constraint_type);
+
+                if union.has_literal_string() {
+                    union.types.to_mut().push(TAtomic::Scalar(TScalar::string()));
                 }
 
-                if constraint_type.has_literal_int() {
-                    constraint_type.types.to_mut().push(TAtomic::Scalar(TScalar::int()));
+                if union.has_literal_int() {
+                    union.types.to_mut().push(TAtomic::Scalar(TScalar::int()));
                 }
 
-                if constraint_type.has_literal_float() {
-                    constraint_type.types.to_mut().push(TAtomic::Scalar(TScalar::float()));
+                if union.has_literal_float() {
+                    union.types.to_mut().push(TAtomic::Scalar(TScalar::float()));
                 }
-
-                Some(constraint_type)
             }
-            None => None,
-        };
+
+            constraint_type
+        });
 
         Self { constraint_span, source, constraint_type }
     }

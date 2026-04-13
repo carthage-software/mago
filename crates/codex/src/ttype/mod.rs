@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::rc::Rc;
 use std::sync::Arc;
 
 use mago_atom::Atom;
@@ -866,6 +867,21 @@ pub fn add_optional_union_type(base_type: TUnion, maybe_type: Option<&TUnion>, c
     }
 }
 
+/// Reference-counted variant of [`add_optional_union_type`].
+#[must_use]
+pub fn add_optional_union_type_rc(
+    base_type: &Rc<TUnion>,
+    maybe_type: Option<&TUnion>,
+    codebase: &CodebaseMetadata,
+) -> Rc<TUnion> {
+    match maybe_type {
+        Some(type_2) => {
+            Rc::new(add_union_type((**base_type).clone(), type_2, codebase, combiner::CombinerOptions::default()))
+        }
+        None => Rc::clone(base_type),
+    }
+}
+
 #[inline]
 #[must_use]
 pub fn combine_optional_union_types(
@@ -881,6 +897,22 @@ pub fn combine_optional_union_types(
         (None, Some(type_2)) => type_2.clone(),
         (None, None) => get_mixed(),
     }
+}
+
+/// Reference-counted variant of [`combine_union_types`].
+#[inline]
+#[must_use]
+pub fn combine_union_types_rc(
+    type_1: &Rc<TUnion>,
+    type_2: &Rc<TUnion>,
+    codebase: &CodebaseMetadata,
+    options: combiner::CombinerOptions,
+) -> Rc<TUnion> {
+    if Rc::ptr_eq(type_1, type_2) {
+        return Rc::clone(type_1);
+    }
+
+    Rc::new(combine_union_types(type_1, type_2, codebase, options))
 }
 
 #[inline]

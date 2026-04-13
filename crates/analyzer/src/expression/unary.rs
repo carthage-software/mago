@@ -274,11 +274,11 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for UnaryPrefix<'arena> {
             }
             UnaryPrefixOperator::PreIncrement(_) => {
                 let resulting_type = increment_operand(context, block_context, artifacts, self.operand, self.span())?;
-                artifacts.set_expression_type(self, resulting_type);
+                artifacts.set_rc_expression_type(self, resulting_type);
             }
             UnaryPrefixOperator::PreDecrement(_) => {
                 let resulting_type = decrement_operand(context, block_context, artifacts, self.operand, self.span())?;
-                artifacts.set_expression_type(self, resulting_type);
+                artifacts.set_rc_expression_type(self, resulting_type);
             }
             UnaryPrefixOperator::IntCast(_, _) | UnaryPrefixOperator::IntegerCast(_, _) => {
                 let resulting_type = match operand_type {
@@ -466,9 +466,9 @@ fn increment_operand<'ctx, 'arena>(
     artifacts: &mut AnalysisArtifacts,
     operand: &Expression<'arena>,
     operation_span: Span,
-) -> Result<TUnion, AnalysisError> {
+) -> Result<Rc<TUnion>, AnalysisError> {
     let Some(operand_type) = artifacts.get_expression_type(operand) else {
-        return Ok(get_mixed());
+        return Ok(Rc::new(get_mixed()));
     };
 
     let mut possibilities = vec![];
@@ -630,11 +630,11 @@ fn increment_operand<'ctx, 'arena>(
         }
     }
 
-    let resulting_type_union = if possibilities.is_empty() {
+    let resulting_type_union = Rc::new(if possibilities.is_empty() {
         if operand_type.is_never() { get_never() } else { get_mixed() }
     } else {
         TUnion::from_vec(combine(possibilities, context.codebase, context.settings.combiner_options()))
-    };
+    });
 
     let operand_id = get_expression_id(
         operand,
@@ -650,7 +650,7 @@ fn increment_operand<'ctx, 'arena>(
         operand,
         operand_id,
         None,
-        resulting_type_union.clone(),
+        Rc::clone(&resulting_type_union),
         false,
     )?;
 
@@ -692,10 +692,10 @@ fn decrement_operand<'ctx, 'arena>(
     artifacts: &mut AnalysisArtifacts,
     operand: &Expression<'arena>,
     operation_span: Span,
-) -> Result<TUnion, AnalysisError> {
+) -> Result<Rc<TUnion>, AnalysisError> {
     // Changed return to Result for consistency
     let Some(operand_type) = artifacts.get_expression_type(operand) else {
-        return Ok(get_mixed());
+        return Ok(Rc::new(get_mixed()));
     };
 
     let mut possibilities = vec![];
@@ -864,11 +864,11 @@ fn decrement_operand<'ctx, 'arena>(
         }
     }
 
-    let resulting_type_union = if possibilities.is_empty() {
+    let resulting_type_union = Rc::new(if possibilities.is_empty() {
         if operand_type.is_never() { get_never() } else { get_mixed() }
     } else {
         TUnion::from_vec(combine(possibilities, context.codebase, context.settings.combiner_options()))
-    };
+    });
 
     let operand_id = get_expression_id(
         operand,
@@ -884,7 +884,7 @@ fn decrement_operand<'ctx, 'arena>(
         operand,
         operand_id,
         None,
-        resulting_type_union.clone(),
+        Rc::clone(&resulting_type_union),
         false,
     )?;
 

@@ -3,7 +3,7 @@ use std::rc::Rc;
 use mago_atom::AtomSet;
 
 use mago_codex::ttype::TType;
-use mago_codex::ttype::add_optional_union_type;
+use mago_codex::ttype::add_optional_union_type_rc;
 use mago_codex::ttype::combine_union_types;
 use mago_codex::ttype::combiner::CombinerOptions;
 use mago_reporting::Annotation;
@@ -144,14 +144,13 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Continue<'arena> {
             if !redefined_vars.contains_key(var_id)
                 && let Some(current_type) = block_context.locals.get(var_id)
             {
-                loop_scope.possibly_redefined_loop_variables.insert(
-                    *var_id,
-                    Rc::new(add_optional_union_type(
-                        (**current_type).clone(),
-                        loop_scope.possibly_redefined_loop_variables.get(var_id).map(std::convert::AsRef::as_ref),
-                        context.codebase,
-                    )),
+                let combined = add_optional_union_type_rc(
+                    current_type,
+                    loop_scope.possibly_redefined_loop_variables.get(var_id).map(std::convert::AsRef::as_ref),
+                    context.codebase,
                 );
+
+                loop_scope.possibly_redefined_loop_variables.insert(*var_id, combined);
             }
         }
 

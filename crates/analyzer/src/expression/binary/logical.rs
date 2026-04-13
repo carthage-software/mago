@@ -7,6 +7,7 @@ use mago_algebra::find_satisfying_assignments;
 use mago_algebra::saturate_clauses;
 use mago_atom::AtomSet;
 use mago_codex::ttype::combine_union_types;
+use mago_codex::ttype::combine_union_types_rc;
 use mago_codex::ttype::get_bool;
 use mago_codex::ttype::get_false;
 use mago_codex::ttype::get_mixed;
@@ -548,22 +549,17 @@ pub fn analyze_logical_or_operation<'ctx, 'arena>(
             if let Some(if_type) = if_vars.get(&var_id) {
                 if_body_context_inner.locals.insert(
                     var_id,
-                    Rc::new(combine_union_types(
-                        &right_type,
-                        if_type,
-                        context.codebase,
-                        context.settings.combiner_options(),
-                    )),
+                    combine_union_types_rc(&right_type, if_type, context.codebase, context.settings.combiner_options()),
                 );
             } else if let Some(left_type) = left_vars.get(&var_id) {
                 if_body_context_inner.locals.insert(
                     var_id,
-                    Rc::new(combine_union_types(
+                    combine_union_types_rc(
                         &right_type,
                         left_type,
                         context.codebase,
                         context.settings.combiner_options(),
-                    )),
+                    ),
                 );
             }
         }
