@@ -63,7 +63,7 @@ pub fn post_invocation_process<'ctx, 'arena>(
     apply_assertions: bool,
 ) -> Result<(), AnalysisError> {
     update_by_reference_argument_types(context, block_context, artifacts, invoication, template_result, parameters)?;
-    clear_object_property_narrowings(context, block_context, invoication);
+    clear_object_property_narrowings(context, block_context, invoication, this_variable);
 
     let Some(identifier) = invoication.target.get_function_like_identifier() else {
         return Ok(());
@@ -397,6 +397,7 @@ fn clear_object_property_narrowings<'ctx, 'arena>(
     context: &Context<'ctx, 'arena>,
     block_context: &mut BlockContext<'ctx>,
     invocation: &Invocation<'ctx, '_, 'arena>,
+    receiver_variable: Option<&str>,
 ) {
     let metadata = invocation.target.get_function_like_metadata();
 
@@ -409,52 +410,108 @@ fn clear_object_property_narrowings<'ctx, 'arena>(
         return;
     }
 
+    let this_property_is_readonly = |property_name: &str| -> bool {
+        let Some(class_metadata) = block_context.scope.get_class_like() else {
+            return false;
+        };
+
+        if class_metadata.flags.is_readonly() {
+            return true;
+        }
+
+        let Some(property_metadata) = class_metadata.properties.get(&Atom::from(property_name)) else {
+            return false;
+        };
+
+        property_metadata.flags.is_readonly()
+    };
+
+    let preserves_this_property = |var_id: Atom| -> bool {
+        let s = var_id.as_str();
+        let Some(rest) = s.strip_prefix("$this->") else {
+            return false;
+        };
+
+        if rest.contains("->") || rest.contains('[') {
+            return false;
+        }
+
+        this_property_is_readonly(rest)
+    };
+
     // When a function is marked @suspends-fiber, it can yield execution to other fibers
-    // that may modify any $this property. Always clear $this-> memoized properties.
+    // that may modify any $this property. Always clear $this-> memoized properties,
+    // except for readonly ones, readonly properties can never be reassigned by
+    // any concurrently running fiber either.
     let suspends_fiber = metadata.is_some_and(|m| m.flags.suspends_fiber());
     if suspends_fiber && block_context.scope.get_class_like_name().is_some() {
-        let keys_to_remove: Vec<_> =
-            block_context.locals.keys().copied().filter(|var_id| var_id.as_str().starts_with("$this->")).collect();
+        let keys_to_remove: Vec<_> = block_context
+            .locals
+            .keys()
+            .copied()
+            .filter(|var_id| var_id.as_str().starts_with("$this->") && !preserves_this_property(*var_id))
+            .collect();
 
         for key in &keys_to_remove {
             block_context.locals.remove(key);
         }
 
         block_context.clauses.retain(|clause| {
-            clause.wedge || !clause.possibilities.keys().copied().any(|k| k.as_str().starts_with("$this->"))
+            clause.wedge
+                || !clause
+                    .possibilities
+                    .keys()
+                    .copied()
+                    .any(|k| k.as_str().starts_with("$this->") && !preserves_this_property(k))
         });
 
         block_context.reconciled_expression_clauses.retain(|clause| {
-            clause.wedge || !clause.possibilities.keys().copied().any(|k| k.as_str().starts_with("$this->"))
+            clause.wedge
+                || !clause
+                    .possibilities
+                    .keys()
+                    .copied()
+                    .any(|k| k.as_str().starts_with("$this->") && !preserves_this_property(k))
         });
     }
 
-    // A non-pure self-method call ($this->method()) can mutate $this properties.
-    // Calls on other objects ($this->foo->method()) should NOT invalidate $this->foo
-    // since the method runs on the sub-object, not on $this.
-    let is_self_method_call =
-        if let Some(FunctionLikeIdentifier::Method(class_name, _)) = invocation.target.get_function_like_identifier() {
-            block_context
+    let is_self_method_call = matches!(receiver_variable, Some("$this"))
+        && match invocation.target.get_function_like_identifier() {
+            Some(FunctionLikeIdentifier::Method(class_name, _)) => block_context
                 .scope
                 .get_class_like_name()
-                .is_some_and(|current_class| current_class.as_str().eq_ignore_ascii_case(class_name.as_str()))
-        } else {
-            false
+                .is_some_and(|current_class| current_class.as_str().eq_ignore_ascii_case(class_name.as_str())),
+            _ => false,
         };
 
     if is_self_method_call {
-        let keys_to_remove: Vec<_> =
-            block_context.locals.keys().copied().filter(|var_id| var_id.as_str().starts_with("$this->")).collect();
+        let keys_to_remove: Vec<_> = block_context
+            .locals
+            .keys()
+            .copied()
+            .filter(|var_id| var_id.as_str().starts_with("$this->") && !preserves_this_property(*var_id))
+            .collect();
 
         for key in &keys_to_remove {
             block_context.locals.remove(key);
         }
 
         block_context.clauses.retain(|clause| {
-            clause.wedge || !clause.possibilities.keys().copied().any(|k| k.as_str().starts_with("$this->"))
+            clause.wedge
+                || !clause
+                    .possibilities
+                    .keys()
+                    .copied()
+                    .any(|k| k.as_str().starts_with("$this->") && !preserves_this_property(k))
         });
+
         block_context.reconciled_expression_clauses.retain(|clause| {
-            clause.wedge || !clause.possibilities.keys().copied().any(|k| k.as_str().starts_with("$this->"))
+            clause.wedge
+                || !clause
+                    .possibilities
+                    .keys()
+                    .copied()
+                    .any(|k| k.as_str().starts_with("$this->") && !preserves_this_property(k))
         });
     }
 
