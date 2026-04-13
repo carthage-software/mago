@@ -183,7 +183,7 @@ pub fn verify_argument_type<'arena>(
                     .with_message("This argument expression results in type `never`")
             )
             .with_note(
-                "The `never` type indicates this expression will not complete to produce a value."
+                "The `never` type means no value can reach this point at runtime - this code path is unreachable."
             )
             .with_note(
                 "This often occurs in unreachable code, due to impossible conditional logic, or if an expression always exits (e.g., `throw`, `exit()`)."

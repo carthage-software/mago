@@ -903,8 +903,9 @@ test('generic comparisons', function () {
 
 ## <a id="valid-docblock"></a>`valid-docblock`
 
-Checks for syntax errors in docblock comments. This rule is disabled by default because
-it can be noisy and may not be relevant to all codebases.
+Checks for syntax errors in docblock comments, such as malformed `{@see}` or
+`{@link}` annotations. It does not enforce the presence of docblocks or verify
+that declared types match the native declaration.
 
 
 

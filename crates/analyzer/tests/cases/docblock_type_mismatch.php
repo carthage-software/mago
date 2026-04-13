@@ -17,7 +17,7 @@ function return_mismatch(): string // @mago-expect analysis:docblock-type-mismat
 }
 
 /** @param int $x */
-function param_ok(int|string $x): void
+function param_drops_native_string(int|string $x): void // @mago-expect analysis:docblock-parameter-narrowing
 {
     echo $x;
 }

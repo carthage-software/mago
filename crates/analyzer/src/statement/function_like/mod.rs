@@ -24,6 +24,7 @@ use mago_codex::ttype::atomic::reference::TReference;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::class_like_string::TClassLikeString;
 use mago_codex::ttype::comparator::ComparisonResult;
+use mago_codex::ttype::comparator::atomic_comparator;
 use mago_codex::ttype::comparator::union_comparator;
 use mago_codex::ttype::expander;
 use mago_codex::ttype::expander::StaticClassType;
@@ -318,6 +319,54 @@ fn add_parameter_types_to_context<'ctx, 'arena>(
                     ));
 
                     context.collector.report_with_code(IssueCode::DocblockTypeMismatch, issue);
+                } else if !effective_type.has_template_types() && !expanded_native.has_template_types() {
+                    let dropped: Vec<&TAtomic> = expanded_native
+                        .types
+                        .iter()
+                        .filter(|native_atomic| {
+                            !effective_type.types.iter().any(|docblock_atomic| {
+                                atomic_comparator::is_contained_by(
+                                    context.codebase,
+                                    native_atomic,
+                                    docblock_atomic,
+                                    false,
+                                    &mut ComparisonResult::default(),
+                                ) || atomic_comparator::is_contained_by(
+                                    context.codebase,
+                                    docblock_atomic,
+                                    native_atomic,
+                                    false,
+                                    &mut ComparisonResult::default(),
+                                )
+                            })
+                        })
+                        .collect();
+
+                    if !dropped.is_empty() {
+                        let docblock_type_str = effective_type.get_id();
+                        let native_type_str = expanded_native.get_id();
+                        let param_name = parameter_metadata.name.0;
+                        let dropped_list =
+                            dropped.iter().map(|a| a.get_id().to_string()).collect::<Vec<_>>().join("`, `");
+
+                        let issue = Issue::error(format!(
+                            "Docblock type `{docblock_type_str}` for parameter `{param_name}` drops part of native type `{native_type_str}`."
+                        ))
+                            .with_annotation(
+                                Annotation::primary(native_type.span)
+                                    .with_message(format!("Native type accepts `{native_type_str}`, including `{dropped_list}`...")),
+                            )
+                            .with_annotation(
+                                Annotation::secondary(parameter_type.span)
+                                    .with_message(format!("...but docblock only covers `{docblock_type_str}`")),
+                            )
+                            .with_note("Callers can still pass values of the excluded native branches, but the docblock tells the analyzer those branches are impossible.")
+                            .with_note("Type narrowing checks might collapse to `never`, producing confusing unreachable-code errors in the function body.")
+                            .with_help(format!("Widen the docblock to cover every native branch (e.g. `{native_type_str}`), or tighten the native type so it matches `{docblock_type_str}`."))
+                        ;
+
+                        context.collector.report_with_code(IssueCode::DocblockParameterNarrowing, issue);
+                    }
                 }
             }
 

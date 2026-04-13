@@ -225,6 +225,7 @@ final class AnalyzerCodeModuleGenerator
         'ambiguous-object-method-access',
         'impure-construct',
         'docblock-type-mismatch',
+        'docblock-parameter-narrowing',
         'invalid-destructuring-source',
         'mixed-destructuring-shape',
         'skip-in-keyed-destructuring',
