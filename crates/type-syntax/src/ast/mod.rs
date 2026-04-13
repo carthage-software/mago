@@ -18,11 +18,13 @@ pub use crate::ast::iterable::*;
 pub use crate::ast::key_of::*;
 pub use crate::ast::keyword::*;
 pub use crate::ast::literal::*;
+pub use crate::ast::new::*;
 use crate::ast::object::ObjectType;
 pub use crate::ast::properties_of::*;
 pub use crate::ast::reference::*;
 pub use crate::ast::shape::*;
 pub use crate::ast::slice::*;
+pub use crate::ast::template_type::*;
 pub use crate::ast::unary::*;
 pub use crate::ast::value_of::*;
 pub use crate::ast::variable::*;
@@ -43,11 +45,13 @@ pub mod iterable;
 pub mod key_of;
 pub mod keyword;
 pub mod literal;
+pub mod new;
 pub mod object;
 pub mod properties_of;
 pub mod reference;
 pub mod shape;
 pub mod slice;
+pub mod template_type;
 pub mod unary;
 pub mod value_of;
 pub mod variable;
@@ -123,6 +127,8 @@ pub enum Type<'input> {
     ValueOf(ValueOfType<'input>),
     IntMask(IntMaskType<'input>),
     IntMaskOf(IntMaskOfType<'input>),
+    New(NewType<'input>),
+    TemplateType(TemplateTypeType<'input>),
     IndexAccess(IndexAccessType<'input>),
     Negated(NegatedType<'input>),
     Posited(PositedType<'input>),
@@ -201,6 +207,8 @@ impl HasSpan for Type<'_> {
             Type::ValueOf(ty) => ty.span(),
             Type::IntMask(ty) => ty.span(),
             Type::IntMaskOf(ty) => ty.span(),
+            Type::New(ty) => ty.span(),
+            Type::TemplateType(ty) => ty.span(),
             Type::IndexAccess(ty) => ty.span(),
             Type::Negated(ty) => ty.span(),
             Type::Posited(ty) => ty.span(),
@@ -281,6 +289,8 @@ impl std::fmt::Display for Type<'_> {
             Type::ValueOf(ty) => write!(f, "{ty}"),
             Type::IntMask(ty) => write!(f, "{ty}"),
             Type::IntMaskOf(ty) => write!(f, "{ty}"),
+            Type::New(ty) => write!(f, "{ty}"),
+            Type::TemplateType(ty) => write!(f, "{ty}"),
             Type::IndexAccess(ty) => write!(f, "{ty}"),
             Type::Negated(ty) => write!(f, "{ty}"),
             Type::Posited(ty) => write!(f, "{ty}"),

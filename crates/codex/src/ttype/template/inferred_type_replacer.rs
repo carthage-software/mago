@@ -318,6 +318,20 @@ fn replace_atomic(mut atomic: TAtomic, template_result: &TemplateResult, codebas
                 let replaced_target_type = replace(int_mask_of.get_target_type(), template_result, codebase);
                 *int_mask_of.get_target_type_mut() = replaced_target_type;
             }
+            TDerived::New(new_type) => {
+                let replaced_target_type = replace(new_type.get_target_type(), template_result, codebase);
+                *new_type.get_target_type_mut() = replaced_target_type;
+            }
+            TDerived::TemplateType(template_type) => {
+                let replaced_object = replace(template_type.get_object(), template_result, codebase);
+                *template_type.get_object_mut() = replaced_object;
+
+                let replaced_class_name = replace(template_type.get_class_name(), template_result, codebase);
+                *template_type.get_class_name_mut() = replaced_class_name;
+
+                let replaced_template_name = replace(template_type.get_template_name(), template_result, codebase);
+                *template_type.get_template_name_mut() = replaced_template_name;
+            }
         },
         _ => (),
     }

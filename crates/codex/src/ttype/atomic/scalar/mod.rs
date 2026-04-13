@@ -146,7 +146,7 @@ impl TScalar {
     /// Creates a literal `class-string` type with a known value (e.g., `"MyClass"`).
     #[inline]
     #[must_use]
-    pub fn literal_class_string(value: Atom) -> Self {
+    pub const fn literal_class_string(value: Atom) -> Self {
         TScalar::ClassLikeString(TClassLikeString::literal(value))
     }
 

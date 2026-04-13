@@ -8,7 +8,9 @@ use crate::ttype::atomic::derived::index_access::TIndexAccess;
 use crate::ttype::atomic::derived::int_mask::TIntMask;
 use crate::ttype::atomic::derived::int_mask_of::TIntMaskOf;
 use crate::ttype::atomic::derived::key_of::TKeyOf;
+use crate::ttype::atomic::derived::new::TNew;
 use crate::ttype::atomic::derived::properties_of::TPropertiesOf;
+use crate::ttype::atomic::derived::template_type::TTemplateType;
 use crate::ttype::atomic::derived::value_of::TValueOf;
 use crate::ttype::union::TUnion;
 
@@ -16,7 +18,9 @@ pub mod index_access;
 pub mod int_mask;
 pub mod int_mask_of;
 pub mod key_of;
+pub mod new;
 pub mod properties_of;
+pub mod template_type;
 pub mod value_of;
 
 /// Represents derived/utility types that extract information from other types.
@@ -41,6 +45,11 @@ pub enum TDerived {
     PropertiesOf(TPropertiesOf),
     /// Represents `T[K]` indexed access type
     IndexAccess(TIndexAccess),
+    /// Represents the `new<T>` utility type (converts a class-string to an object).
+    New(TNew),
+    /// Represents the `template-type<Object, ClassName, Name>` utility type
+    /// (extracts a concrete `@template` parameter from a passed object).
+    TemplateType(TTemplateType),
 }
 
 impl TDerived {
@@ -58,6 +67,8 @@ impl TDerived {
             TDerived::IntMaskOf(int_mask_of) => Some(int_mask_of.get_target_type()),
             TDerived::PropertiesOf(properties_of) => Some(properties_of.get_target_type()),
             TDerived::IndexAccess(index_access) => Some(index_access.get_target_type()),
+            TDerived::New(new_type) => Some(new_type.get_target_type()),
+            TDerived::TemplateType(_) => None,
         }
     }
 
@@ -74,6 +85,8 @@ impl TDerived {
             TDerived::IntMaskOf(int_mask_of) => Some(int_mask_of.get_target_type_mut()),
             TDerived::PropertiesOf(properties_of) => Some(properties_of.get_target_type_mut()),
             TDerived::IndexAccess(index_access) => Some(index_access.get_target_type_mut()),
+            TDerived::New(new_type) => Some(new_type.get_target_type_mut()),
+            TDerived::TemplateType(_) => None,
         }
     }
 }
@@ -87,6 +100,8 @@ impl TType for TDerived {
             TDerived::IntMaskOf(ttype) => ttype.get_child_nodes(),
             TDerived::PropertiesOf(ttype) => ttype.get_child_nodes(),
             TDerived::IndexAccess(ttype) => ttype.get_child_nodes(),
+            TDerived::New(ttype) => ttype.get_child_nodes(),
+            TDerived::TemplateType(ttype) => ttype.get_child_nodes(),
         }
     }
 
@@ -98,6 +113,8 @@ impl TType for TDerived {
             TDerived::IntMaskOf(ttype) => ttype.needs_population(),
             TDerived::PropertiesOf(ttype) => ttype.needs_population(),
             TDerived::IndexAccess(ttype) => ttype.needs_population(),
+            TDerived::New(ttype) => ttype.needs_population(),
+            TDerived::TemplateType(ttype) => ttype.needs_population(),
         }
     }
 
@@ -109,6 +126,8 @@ impl TType for TDerived {
             TDerived::IntMaskOf(ttype) => ttype.is_expandable(),
             TDerived::PropertiesOf(ttype) => ttype.is_expandable(),
             TDerived::IndexAccess(ttype) => ttype.is_expandable(),
+            TDerived::New(ttype) => ttype.is_expandable(),
+            TDerived::TemplateType(ttype) => ttype.is_expandable(),
         }
     }
 
@@ -124,6 +143,8 @@ impl TType for TDerived {
             TDerived::IntMaskOf(int_mask_of) => int_mask_of.get_id(),
             TDerived::PropertiesOf(properties_of) => properties_of.get_id(),
             TDerived::IndexAccess(index_access) => index_access.get_id(),
+            TDerived::New(new_type) => new_type.get_id(),
+            TDerived::TemplateType(template_type) => template_type.get_id(),
         }
     }
 

@@ -29,6 +29,7 @@ use crate::ast::LiteralStringType;
 use crate::ast::MemberReferenceSelector;
 use crate::ast::MemberReferenceType;
 use crate::ast::NegatedType;
+use crate::ast::NewType;
 use crate::ast::NullableType;
 use crate::ast::ParenthesizedType;
 use crate::ast::PositedType;
@@ -36,6 +37,7 @@ use crate::ast::PropertiesOfFilter;
 use crate::ast::PropertiesOfType;
 use crate::ast::ReferenceType;
 use crate::ast::SliceType;
+use crate::ast::TemplateTypeType;
 use crate::ast::TraitStringType;
 use crate::ast::Type;
 use crate::ast::UnionType;
@@ -293,6 +295,14 @@ fn parse_primary_type<'input>(stream: &mut TypeTokenStream<'input>) -> Result<Ty
         TypeTokenKind::IntMaskOf => Type::IntMaskOf(IntMaskOfType {
             keyword: Keyword::from_token(stream.consume()?, stream.file_id()),
             parameter: parse_single_generic_parameter(stream)?,
+        }),
+        TypeTokenKind::New => Type::New(NewType {
+            keyword: Keyword::from_token(stream.consume()?, stream.file_id()),
+            parameter: parse_single_generic_parameter(stream)?,
+        }),
+        TypeTokenKind::TemplateType => Type::TemplateType(TemplateTypeType {
+            keyword: Keyword::from_token(stream.consume()?, stream.file_id()),
+            parameters: parse_generic_parameters(stream)?,
         }),
         TypeTokenKind::Scalar => Type::Scalar(Keyword::from_token(stream.consume()?, stream.file_id())),
         TypeTokenKind::Numeric => Type::Numeric(Keyword::from_token(stream.consume()?, stream.file_id())),

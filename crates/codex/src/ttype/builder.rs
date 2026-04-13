@@ -45,7 +45,9 @@ use crate::ttype::atomic::derived::index_access::TIndexAccess;
 use crate::ttype::atomic::derived::int_mask::TIntMask;
 use crate::ttype::atomic::derived::int_mask_of::TIntMaskOf;
 use crate::ttype::atomic::derived::key_of::TKeyOf;
+use crate::ttype::atomic::derived::new::TNew;
 use crate::ttype::atomic::derived::properties_of::TPropertiesOf;
+use crate::ttype::atomic::derived::template_type::TTemplateType;
 use crate::ttype::atomic::derived::value_of::TValueOf;
 use crate::ttype::atomic::generic::TGenericParameter;
 use crate::ttype::atomic::iterable::TIterable;
@@ -570,6 +572,32 @@ pub fn get_union_from_type_ast(
             TUnion::from_atomic(TAtomic::Derived(TDerived::IntMaskOf(TIntMaskOf::new(Arc::new(
                 get_union_from_type_ast(&int_mask_of_type.parameter.entry.inner, scope, type_context, classname)?,
             )))))
+        }
+        Type::New(new_type) => TUnion::from_atomic(TAtomic::Derived(TDerived::New(TNew::new(Arc::new(
+            get_union_from_type_ast(&new_type.parameter.entry.inner, scope, type_context, classname)?,
+        ))))),
+        Type::TemplateType(template_type_type) => {
+            let entries = &template_type_type.parameters.entries;
+            if entries.len() != 3 {
+                return Err(TypeError::InvalidType(
+                    template_type_type.to_string(),
+                    format!(
+                        "`template-type<O, C, T>` expects exactly 3 parameters (object, class-name, template-name), got {}",
+                        entries.len()
+                    ),
+                    template_type_type.span(),
+                ));
+            }
+
+            let object = Arc::new(get_union_from_type_ast(&entries[0].inner, scope, type_context, classname)?);
+            let class_name = Arc::new(get_union_from_type_ast(&entries[1].inner, scope, type_context, classname)?);
+            let template_name = Arc::new(get_union_from_type_ast(&entries[2].inner, scope, type_context, classname)?);
+
+            TUnion::from_atomic(TAtomic::Derived(TDerived::TemplateType(TTemplateType::new(
+                object,
+                class_name,
+                template_name,
+            ))))
         }
         Type::PropertiesOf(properties_of_type) => {
             TUnion::from_atomic(TAtomic::Derived(TDerived::PropertiesOf(match properties_of_type.filter {

@@ -114,13 +114,16 @@ fn resolve_union<'ctx, 'arena>(
     resulting_union.types = Cow::Owned(resulting_atomics);
 
     if !template_result.lower_bounds.is_empty() || resulting_union.has_template_types() {
+        // Replace templates first so derived types (e.g. `template-type<T, ...>`)
+        // see concrete object/target types before expansion runs their resolution logic.
+        // Running expansion first would eagerly walk the abstract `T`'s constraint and lose the substitution site.
+        resulting_union = inferred_type_replacer::replace(&resulting_union, template_result, context.codebase);
+
         expander::expand_union(
             context.codebase,
             &mut resulting_union,
             &TypeExpansionOptions { expand_templates: false, ..Default::default() },
         );
-
-        resulting_union = inferred_type_replacer::replace(&resulting_union, template_result, context.codebase);
     }
 
     let static_class_type;

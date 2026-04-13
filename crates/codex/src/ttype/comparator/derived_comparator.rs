@@ -3,6 +3,7 @@ use crate::ttype::atomic::TAtomic;
 use crate::ttype::atomic::derived::TDerived;
 use crate::ttype::atomic::derived::index_access::TIndexAccess;
 use crate::ttype::atomic::derived::key_of::TKeyOf;
+use crate::ttype::atomic::derived::new::TNew;
 use crate::ttype::atomic::derived::value_of::TValueOf;
 use crate::ttype::comparator::ComparisonResult;
 use crate::ttype::comparator::atomic_comparator;
@@ -17,6 +18,20 @@ pub fn is_contained_by(
 ) -> bool {
     if let TAtomic::Derived(derived_container) = container_type_part {
         let TAtomic::Derived(derived_input) = input_type_part else {
+            if let TDerived::TemplateType(template_type) = derived_container
+                && let Some(resolved_container) = template_type.resolve(codebase)
+            {
+                return resolved_container.types.iter().any(|resolved_atomic| {
+                    atomic_comparator::is_contained_by(
+                        codebase,
+                        input_type_part,
+                        resolved_atomic,
+                        inside_assertion,
+                        atomic_comparison_result,
+                    )
+                });
+            }
+
             return false;
         };
 
@@ -70,6 +85,7 @@ pub fn is_contained_by(
                                     break;
                                 }
                             }
+
                             if !found {
                                 return false;
                             }
@@ -108,6 +124,8 @@ pub fn is_contained_by(
             &index_access.get_index_type().types,
             false,
         ),
+        TDerived::New(new_type) => TNew::get_new_targets(&new_type.get_target_type().types, codebase),
+        TDerived::TemplateType(template_type) => template_type.resolve(codebase),
         TDerived::PropertiesOf(_) | TDerived::IntMask(_) | TDerived::IntMaskOf(_) => {
             return false;
         }

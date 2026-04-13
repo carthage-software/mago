@@ -91,6 +91,8 @@ pub enum TypeTokenKind {
     ValueOf,
     IntMask,
     IntMaskOf,
+    New,
+    TemplateType,
     Min,
     Max,
     PropertiesOf,
@@ -251,6 +253,8 @@ impl TypeTokenKind {
                 | Self::ValueOf
                 | Self::IntMask
                 | Self::IntMaskOf
+                | Self::New
+                | Self::TemplateType
                 | Self::Min
                 | Self::Max
                 | Self::UnspecifiedLiteralInt

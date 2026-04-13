@@ -57,7 +57,15 @@ fn lookup_len3(bytes: &[u8]) -> Option<TypeTokenKind> {
                 None
             }
         }
-        b'n' if eq(bytes, b"not") => Some(TypeTokenKind::Not),
+        b'n' => {
+            if eq(bytes, b"not") {
+                Some(TypeTokenKind::Not)
+            } else if eq(bytes, b"new") {
+                Some(TypeTokenKind::New)
+            } else {
+                None
+            }
+        }
         _ => None,
     }
 }
@@ -211,7 +219,15 @@ fn lookup_len13(bytes: &[u8]) -> Option<TypeTokenKind> {
                 None
             }
         }
-        b't' if eq(bytes, b"truthy-string") => Some(TypeTokenKind::TruthyString),
+        b't' => {
+            if eq(bytes, b"truthy-string") {
+                Some(TypeTokenKind::TruthyString)
+            } else if eq(bytes, b"template-type") {
+                Some(TypeTokenKind::TemplateType)
+            } else {
+                None
+            }
+        }
         _ => None,
     }
 }

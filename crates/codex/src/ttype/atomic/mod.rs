@@ -1389,8 +1389,34 @@ pub fn populate_atomic_type(
                     symbol_references,
                     force,
                 );
+
                 populate_union_type(
                     index_access.get_index_type_mut(),
+                    codebase_symbols,
+                    reference_source,
+                    symbol_references,
+                    force,
+                );
+            }
+            TDerived::TemplateType(template_type) => {
+                populate_union_type(
+                    template_type.get_object_mut(),
+                    codebase_symbols,
+                    reference_source,
+                    symbol_references,
+                    force,
+                );
+
+                populate_union_type(
+                    template_type.get_class_name_mut(),
+                    codebase_symbols,
+                    reference_source,
+                    symbol_references,
+                    force,
+                );
+
+                populate_union_type(
+                    template_type.get_template_name_mut(),
                     codebase_symbols,
                     reference_source,
                     symbol_references,

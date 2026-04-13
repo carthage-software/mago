@@ -24,7 +24,9 @@ use crate::ttype::atomic::derived::index_access::TIndexAccess;
 use crate::ttype::atomic::derived::int_mask::TIntMask;
 use crate::ttype::atomic::derived::int_mask_of::TIntMaskOf;
 use crate::ttype::atomic::derived::key_of::TKeyOf;
+use crate::ttype::atomic::derived::new::TNew;
 use crate::ttype::atomic::derived::properties_of::TPropertiesOf;
+use crate::ttype::atomic::derived::template_type::TTemplateType;
 use crate::ttype::atomic::derived::value_of::TValueOf;
 use crate::ttype::atomic::mixed::TMixed;
 use crate::ttype::atomic::object::TObject;
@@ -303,6 +305,14 @@ pub(crate) fn expand_atomic(
                 *skip_key = true;
                 new_return_type_parts.extend(expand_properties_of(properties_of, codebase, options));
             }
+            TDerived::New(new_type) => {
+                *skip_key = true;
+                new_return_type_parts.extend(expand_new(new_type, codebase, options));
+            }
+            TDerived::TemplateType(template_type) => {
+                *skip_key = true;
+                new_return_type_parts.extend(expand_template_type(template_type, codebase, options));
+            }
         },
         TAtomic::Iterable(iterable) => {
             expand_union(codebase, Arc::make_mut(&mut iterable.key_type), options);
@@ -395,6 +405,13 @@ fn expand_member_reference(
     options: &TypeExpansionOptions,
     new_return_type_parts: &mut Vec<TAtomic>,
 ) {
+    if let TReferenceMemberSelector::Identifier(member_name) = member_selector
+        && member_name.eq_ignore_ascii_case("class")
+    {
+        new_return_type_parts.push(TAtomic::Scalar(TScalar::literal_class_string(class_like_name)));
+        return;
+    }
+
     let Some(class_like) = codebase.get_class_like(&class_like_name) else {
         new_return_type_parts.push(TAtomic::Mixed(TMixed::new()));
         return;
@@ -768,6 +785,36 @@ fn expand_index_access(
     };
 
     new_return_types.types.into_owned()
+}
+
+#[cold]
+fn expand_new(new_type: &TNew, codebase: &CodebaseMetadata, options: &TypeExpansionOptions) -> Vec<TAtomic> {
+    let mut target_type = new_type.get_target_type().clone();
+    expand_union(codebase, &mut target_type, options);
+
+    let Some(new_return_types) = TNew::get_new_targets(&target_type.types, codebase) else {
+        return vec![TAtomic::Derived(TDerived::New(new_type.clone()))];
+    };
+
+    new_return_types.types.into_owned()
+}
+
+#[cold]
+fn expand_template_type(
+    template_type: &TTemplateType,
+    codebase: &CodebaseMetadata,
+    options: &TypeExpansionOptions,
+) -> Vec<TAtomic> {
+    let mut expanded = template_type.clone();
+    expand_union(codebase, expanded.get_object_mut(), options);
+    expand_union(codebase, expanded.get_class_name_mut(), options);
+    expand_union(codebase, expanded.get_template_name_mut(), options);
+
+    let Some(resolved) = expanded.resolve(codebase) else {
+        return vec![TAtomic::Mixed(TMixed::new())];
+    };
+
+    resolved.types.into_owned()
 }
 
 #[cold]
