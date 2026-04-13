@@ -1,6 +1,7 @@
 use std::ops::Deref;
 use std::rc::Rc;
 
+use mago_algebra::clause::Clause;
 use mago_algebra::saturate_clauses;
 use mago_atom::Atom;
 use mago_atom::AtomSet;
@@ -140,7 +141,7 @@ impl<'anlyz, 'ctx, 'ast, 'arena> MatchAnalyzer<'anlyz, 'ctx, 'ast, 'arena> {
             };
 
             let is_last_arm = i == last_expression_arm_index && first_default_arm.is_none();
-            let arm_status = self.analyze_expression_arm(
+            let (arm_status, new_else_clauses) = self.analyze_expression_arm(
                 &subject_for_conditions,
                 expression_arm,
                 &mut running_else_context,
@@ -162,25 +163,31 @@ impl<'anlyz, 'ctx, 'ast, 'arena> MatchAnalyzer<'anlyz, 'ctx, 'ast, 'arena> {
                 }
             }
 
-            let mut else_referenced_ids = AtomSet::default();
-            let (reconcilable_else_types, _) = mago_algebra::find_satisfying_assignments(
-                &running_else_context.clauses.iter().map(|c| (**c).clone()).collect::<Vec<_>>(),
-                None,
-                &mut else_referenced_ids,
-            );
+            // Apply only the assertions newly introduced by THIS arm. Previous
+            // arms' assertions have already been reconciled into
+            // `running_else_context.locals` in earlier iterations, and
+            // reconcile_keyed_types intersects new assertions with whatever
+            // is already there. The cumulative state is identical to running
+            // the full clause set every iteration — but the per-iteration
+            // cost stops being O(K) in arm count.
+            if !new_else_clauses.is_empty() {
+                let mut else_referenced_ids = AtomSet::default();
+                let (reconcilable_else_types, _) =
+                    mago_algebra::find_satisfying_assignments(&new_else_clauses, None, &mut else_referenced_ids);
 
-            if !reconcilable_else_types.is_empty() {
-                reconcile_keyed_types(
-                    self.context,
-                    &reconcilable_else_types,
-                    Default::default(),
-                    &mut running_else_context,
-                    &mut changed_variables,
-                    &else_referenced_ids,
-                    &expression_arm.span(),
-                    false,
-                    false,
-                );
+                if !reconcilable_else_types.is_empty() {
+                    reconcile_keyed_types(
+                        self.context,
+                        &reconcilable_else_types,
+                        Default::default(),
+                        &mut running_else_context,
+                        &mut changed_variables,
+                        &else_referenced_ids,
+                        &expression_arm.span(),
+                        false,
+                        false,
+                    );
+                }
             }
         }
 
@@ -266,14 +273,14 @@ impl<'anlyz, 'ctx, 'ast, 'arena> MatchAnalyzer<'anlyz, 'ctx, 'ast, 'arena> {
         arm_exit_contexts: &mut Vec<BlockContext<'ctx>>,
         is_last: bool,
         is_exhaustive: bool,
-    ) -> Result<ArmExecutionStatus, AnalysisError> {
+    ) -> Result<(ArmExecutionStatus, Vec<Clause>), AnalysisError> {
         if is_exhaustive {
             self.report_unreachable_arm(
                 expression_arm,
                 "All possible types for the subject have been handled by previous arms.",
             );
 
-            return Ok(ArmExecutionStatus::Never);
+            return Ok((ArmExecutionStatus::Never, Vec::new()));
         }
 
         let arm_condition = new_synthetic_disjunctive_identity(
@@ -308,7 +315,7 @@ impl<'anlyz, 'ctx, 'ast, 'arena> MatchAnalyzer<'anlyz, 'ctx, 'ast, 'arena> {
         };
 
         if arm_status == ArmExecutionStatus::Never {
-            return Ok(ArmExecutionStatus::Never);
+            return Ok((ArmExecutionStatus::Never, Vec::new()));
         }
 
         let mut arm_body_context = running_else_context.clone();
@@ -384,7 +391,7 @@ impl<'anlyz, 'ctx, 'ast, 'arena> MatchAnalyzer<'anlyz, 'ctx, 'ast, 'arena> {
         .map(Rc::new)
         .collect();
 
-        Ok(arm_status)
+        Ok((arm_status, negated_arm_clauses))
     }
 
     fn analyze_default_arm(
