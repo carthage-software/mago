@@ -126,6 +126,25 @@ pub fn saturate_clauses<'a>(
         let mut removed_indices: HashSet<usize> = HashSet::default();
         let mut added_clauses: Vec<Clause> = Vec::new();
 
+        // Pre-built index of every (var, possibility-hash) pair that appears
+        // anywhere in the input clauses. Unit propagation needs to know
+        // whether *any* clause contains the negation of a simple clause's
+        // literal; without this index that check is an O(N) scan repeated
+        // for every simple clause, which is the dominant O(N^2) cost on big
+        // match expressions where every arm condition contributes a unit
+        // clause that has no negation in the set.
+        let mut literal_index: HashSet<(Atom, u64)> = HashSet::with_capacity(unique_clauses_len * 2);
+        for clause in &unique_clauses {
+            if !clause.reconcilable || clause.wedge {
+                continue;
+            }
+            for (var_id, possibilities) in &clause.possibilities {
+                for hash in possibilities.keys() {
+                    literal_index.insert((*var_id, *hash));
+                }
+            }
+        }
+
         // Main simplification loop for resolution and unit propagation.
         'outer: for (clause_a_idx, clause_a) in unique_clauses.iter().enumerate() {
             if !clause_a.reconcilable || clause_a.wedge {
@@ -142,6 +161,14 @@ pub fn saturate_clauses<'a>(
                 let only_type = var_possibilities.values().next().unwrap();
                 let negated_clause_type = only_type.get_negation();
                 let negated_hash = negated_clause_type.to_hash();
+
+                // Fast path: if no clause anywhere in the set contains the
+                // negation of this literal, the inner scan can't possibly do
+                // anything. This collapses the dominant O(N^2) cost to O(N)
+                // when most simple clauses have no contradicting partner.
+                if !literal_index.contains(&(clause_var, negated_hash)) {
+                    continue;
+                }
 
                 // Simple O(N) scan - fast for typical small N
                 for (clause_b_idx, clause_b) in unique_clauses.iter().enumerate() {
@@ -261,46 +288,66 @@ pub fn saturate_clauses<'a>(
 
         // Absorption rule: remove redundant clauses. e.g., (A | B) is redundant if A exists.
         // A clause `a` is redundant if a smaller clause `b` exists that is a subset of `a`.
+        //
+        // Fast path: when every clause has exactly one variable in its possibilities map,
+        // no clause can be a strict subset of another (the strict-subset check requires
+        // `b.size < a.size`, which is impossible when both sizes equal 1). Skipping the
+        // O(N²) outer/inner walk is what brings exhaustive `match` analysis down from
+        // cubic to linear in the arm count.
+        let all_combined_size_one =
+            combined_clauses.iter().all(|c| c.wedge || !c.reconcilable || c.possibilities.len() == 1);
+
         let mut simplified_clauses: Vec<Clause> = Vec::with_capacity(combined_clauses.len());
 
-        for clause_a in &combined_clauses {
-            if clause_a.wedge {
-                simplified_clauses.push(clause_a.clone());
-                continue;
-            }
-
-            let mut is_redundant = false;
-
-            // Check if any smaller clause is a subset of clause_a
-            for clause_b in &combined_clauses {
-                if std::ptr::eq(clause_a, clause_b) {
+        if all_combined_size_one {
+            simplified_clauses.extend(combined_clauses.iter().cloned());
+        } else {
+            for clause_a in &combined_clauses {
+                if clause_a.wedge {
+                    simplified_clauses.push(clause_a.clone());
                     continue;
                 }
 
-                if !clause_b.reconcilable || clause_b.wedge {
-                    continue;
+                let mut is_redundant = false;
+
+                // Check if any smaller clause is a subset of clause_a
+                for clause_b in &combined_clauses {
+                    if std::ptr::eq(clause_a, clause_b) {
+                        continue;
+                    }
+
+                    if !clause_b.reconcilable || clause_b.wedge {
+                        continue;
+                    }
+
+                    // Only check if clause_b is strictly smaller
+                    if clause_b.possibilities.len() >= clause_a.possibilities.len() {
+                        continue;
+                    }
+
+                    if clause_a.contains(clause_b) {
+                        is_redundant = true;
+                        break;
+                    }
                 }
 
-                // Only check if clause_b is strictly smaller
-                if clause_b.possibilities.len() >= clause_a.possibilities.len() {
-                    continue;
+                if !is_redundant {
+                    simplified_clauses.push(clause_a.clone());
                 }
-
-                if clause_a.contains(clause_b) {
-                    is_redundant = true;
-                    break;
-                }
-            }
-
-            if !is_redundant {
-                simplified_clauses.push(clause_a.clone());
             }
         }
 
         // Consensus rule: remove redundant consensus clauses.
         // (A | X) & (!A | Y) implies (X | Y). If (X | Y) already exists, it is redundant.
+        //
+        // Fast path: when every clause has exactly one variable, the only way the rule
+        // can fire is on a directly contradictory pair `(A)` and `(!A)`. Such a pair
+        // would already have been resolved away during unit propagation above, so by
+        // the time we reach here in the all-size-one case there is nothing left to do.
         let simplified_clauses_len = simplified_clauses.len();
-        if simplified_clauses_len > 2 && simplified_clauses_len < consensus_limit {
+        let all_simplified_size_one = all_combined_size_one
+            && simplified_clauses.iter().all(|c| c.wedge || !c.reconcilable || c.possibilities.len() == 1);
+        if !all_simplified_size_one && simplified_clauses_len > 2 && simplified_clauses_len < consensus_limit {
             let mut compared_clauses: HashSet<(u32, u32)> = HashSet::default();
             let mut removed_hashes: HashSet<u32> = HashSet::default();
 
