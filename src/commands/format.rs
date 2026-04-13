@@ -58,6 +58,8 @@ use crate::error::Error;
 use crate::utils;
 use crate::utils::create_orchestrator;
 use crate::utils::git;
+use crate::utils::git::get_staged_file;
+use crate::utils::git::update_staged_file;
 
 /// Command for formatting PHP source files according to style rules.
 ///
@@ -110,12 +112,11 @@ pub struct FormatCommand {
     ///
     /// This flag is designed for git pre-commit hooks. It will:
     /// 1. Find all PHP files currently staged for commit
-    /// 2. Format those files
-    /// 3. Re-stage them so the formatted version is committed
+    /// 2. Format those staged files in memory
+    /// 3. Update the staged files so the formatted version is committed
     ///
     /// Fails if:
     /// - Not in a git repository
-    /// - A staged file has unstaged changes (would cause data loss)
     #[arg(long, short = 's', conflicts_with_all = ["dry_run", "check", "stdin_input", "path"])]
     pub staged: bool,
 }
@@ -245,9 +246,8 @@ impl FormatCommand {
     ///
     /// 1. Verifies we're in a git repository
     /// 2. Gets the list of staged PHP files
-    /// 3. Checks that no staged files have unstaged changes
-    /// 4. Formats the staged files
-    /// 5. Re-stages the formatted files
+    /// 3. Formats the staged files in memory
+    /// 4. Updates the staged file with its formatted version
     ///
     /// # Arguments
     ///
@@ -258,42 +258,46 @@ impl FormatCommand {
     ///
     /// - `Ok(ExitCode::SUCCESS)` if formatting succeeded
     /// - `Err(Error::NotAGitRepository)` if not in a git repository
-    /// - `Err(Error::StagedFileHasUnstagedChanges)` if a file has partial staging
     fn execute_staged(self, configuration: Configuration, color_choice: ColorChoice) -> Result<ExitCode, Error> {
         let workspace = &configuration.source.workspace;
 
         let mut orchestrator = create_orchestrator(&configuration, color_choice, false, true, false);
         orchestrator.add_exclude_patterns(configuration.formatter.excludes.iter());
 
-        let mut database = orchestrator.load_database(workspace, false, None, None)?;
+        let database = orchestrator.load_database(workspace, false, None, None)?;
 
-        // Get staged files that are clean (no unstaged changes), resolved to file IDs
-        let staged_file_ids = git::get_staged_clean_files(workspace, &database)?;
-        if staged_file_ids.is_empty() {
+        // Get staged files resolved to file IDs
+        let staged_file_paths = git::get_staged_file_paths(workspace)?;
+        if staged_file_paths.is_empty() {
             tracing::info!("No staged files to format.");
             return Ok(ExitCode::SUCCESS);
         }
 
-        let service = orchestrator.get_format_service(database.read_only());
-        let result = service.run_on_files(staged_file_ids)?;
+        let mut changed_files_count = 0;
+        for path in staged_file_paths {
+            let absolute_path = workspace.join(&path);
+            let canonical_path = absolute_path.canonicalize().unwrap_or(absolute_path);
 
-        for (file_id, parse_error) in result.parse_errors() {
-            let file = database.get_ref(file_id)?;
-            tracing::error!("Failed to parse file '{}': {parse_error}", file.name);
+            if database.get_by_path(&canonical_path).is_err() {
+                continue;
+            }
+            let staged_file = get_staged_file(workspace, &path)?;
+            match orchestrator.format_file(&staged_file)? {
+                FileFormatStatus::Unchanged => continue,
+                FileFormatStatus::Changed(new_content) => {
+                    update_staged_file(workspace, &path, new_content)?;
+                    changed_files_count += 1;
+                }
+                FileFormatStatus::FailedToParse(parse_error) => {
+                    tracing::error!("Failed to parse staged file '{}': {}", path.display(), parse_error);
+                }
+            };
         }
-
-        let changed_files_count = result.changed_files_count();
 
         if changed_files_count == 0 {
             tracing::info!("All staged files are already formatted.");
             return Ok(ExitCode::SUCCESS);
         }
-
-        let change_log = to_change_log(&database, &result, false, color_choice)?;
-        let changed_file_ids = change_log.changed_file_ids()?;
-        database.commit(change_log, true)?;
-
-        git::stage_files(workspace, &database, changed_file_ids)?;
 
         tracing::info!("Formatted and re-staged {changed_files_count} file(s).");
 
