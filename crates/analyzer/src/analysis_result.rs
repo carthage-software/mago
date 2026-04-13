@@ -1,3 +1,4 @@
+#[cfg(not(target_arch = "wasm32"))]
 use std::time::Duration;
 
 use mago_codex::reference::SymbolReferences;

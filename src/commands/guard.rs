@@ -40,6 +40,7 @@
 
 use std::path::PathBuf;
 use std::process::ExitCode;
+use std::time::Instant;
 
 use clap::ColorChoice;
 use clap::Parser;
@@ -147,11 +148,16 @@ impl GuardCommand {
     /// are allowed between different namespaces or layers. Violations are reported
     /// as issues with details about the forbidden dependency.
     pub fn execute(self, mut configuration: Configuration, color_choice: ColorChoice) -> Result<ExitCode, Error> {
+        let trace_enabled = tracing::enabled!(tracing::Level::TRACE);
+        let command_start = trace_enabled.then(Instant::now);
+
+        let prelude_start = trace_enabled.then(Instant::now);
         let Prelude { database, metadata, .. } = if self.no_stubs {
             Prelude::default()
         } else {
             Prelude::decode(PRELUDE_BYTES).expect("Failed to decode embedded prelude")
         };
+        let prelude_duration = prelude_start.map(|s| s.elapsed());
 
         // Determine requested mode from CLI flags
         let cli_mode = if self.structural {
@@ -182,6 +188,8 @@ impl GuardCommand {
         }
 
         let editor_url = configuration.editor_url.take();
+
+        let orchestrator_init_start = trace_enabled.then(Instant::now);
         let mut orchestrator = create_orchestrator(&configuration, color_choice, false, true, false);
         orchestrator.add_exclude_patterns(configuration.guard.excludes.iter());
 
@@ -195,9 +203,12 @@ impl GuardCommand {
         if !self.stdin_input && !self.path.is_empty() {
             stdin_input::set_source_paths_from_paths(&mut orchestrator, &self.path);
         }
+        let orchestrator_init_duration = orchestrator_init_start.map(|s| s.elapsed());
 
+        let load_database_start = trace_enabled.then(Instant::now);
         let mut database =
             orchestrator.load_database(&configuration.source.workspace, true, Some(database), stdin_override)?;
+        let load_database_duration = load_database_start.map(|s| s.elapsed());
 
         if !database.files().any(|f| f.file_type == FileType::Host) {
             tracing::warn!("No files found to check with guard.");
@@ -205,8 +216,10 @@ impl GuardCommand {
             return Ok(ExitCode::SUCCESS);
         }
 
+        let guard_run_start = trace_enabled.then(Instant::now);
         let service = orchestrator.get_guard_service(database.read_only(), metadata);
         let result = service.run()?;
+        let guard_run_duration = guard_run_start.map(|s| s.elapsed());
 
         // Emit warnings for skipped guards
         if result.missing_perimeter_configuration {
@@ -219,6 +232,7 @@ impl GuardCommand {
             tracing::warn!("Please review your mago.toml guard settings to enable structural checks.");
         }
 
+        let report_start = trace_enabled.then(Instant::now);
         let baseline = configuration.guard.baseline.as_deref();
         let baseline_variant = configuration.guard.baseline_variant;
         let processor = self.baseline_reporting.get_processor(
@@ -230,6 +244,26 @@ impl GuardCommand {
         );
 
         let (exit_code, _) = processor.process_issues(&orchestrator, &mut database, result.issues)?;
+        let report_duration = report_start.map(|s| s.elapsed());
+
+        let drop_database_start = trace_enabled.then(Instant::now);
+        drop(database);
+        let drop_database_duration = drop_database_start.map(|s| s.elapsed());
+
+        let drop_orchestrator_start = trace_enabled.then(Instant::now);
+        drop(orchestrator);
+        let drop_orchestrator_duration = drop_orchestrator_start.map(|s| s.elapsed());
+
+        if let Some(start) = command_start {
+            tracing::trace!("Prelude decoded in {:?}.", prelude_duration.unwrap_or_default());
+            tracing::trace!("Orchestrator initialized in {:?}.", orchestrator_init_duration.unwrap_or_default());
+            tracing::trace!("Database loaded in {:?}.", load_database_duration.unwrap_or_default());
+            tracing::trace!("Guard service ran in {:?}.", guard_run_duration.unwrap_or_default());
+            tracing::trace!("Issues filtered and reported in {:?}.", report_duration.unwrap_or_default());
+            tracing::trace!("Database dropped in {:?}.", drop_database_duration.unwrap_or_default());
+            tracing::trace!("Orchestrator dropped in {:?}.", drop_orchestrator_duration.unwrap_or_default());
+            tracing::trace!("Guard command finished in {:?}.", start.elapsed());
+        }
 
         Ok(exit_code)
     }

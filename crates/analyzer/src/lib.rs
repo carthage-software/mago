@@ -26,6 +26,8 @@ pub mod code;
 pub mod error;
 pub mod plugin;
 pub mod settings;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod telemetry;
 
 mod analyzable;
 mod artifacts;
@@ -82,8 +84,13 @@ impl<'ctx, 'ast, 'arena> Analyzer<'ctx, 'ast, 'arena> {
             return Ok(());
         }
 
+        #[cfg(not(target_arch = "wasm32"))]
+        let trace_enabled = tracing::enabled!(tracing::Level::TRACE);
+
         let statements = program.statements.as_slice();
 
+        #[cfg(not(target_arch = "wasm32"))]
+        let setup_start = trace_enabled.then(std::time::Instant::now);
         let mut collector = Collector::new(self.arena, self.source_file, program, COLLECTOR_CATEGORIES);
         if self.settings.diff {
             collector.set_skip_unfulfilled_expect(true);
@@ -103,6 +110,10 @@ impl<'ctx, 'ast, 'arena> Analyzer<'ctx, 'ast, 'arena> {
 
         let mut block_context = BlockContext::new(ScopeContext::new(), context.settings.register_super_globals);
         let mut artifacts = AnalysisArtifacts::new();
+        #[cfg(not(target_arch = "wasm32"))]
+        if let Some(start) = setup_start {
+            telemetry::record_setup(start.elapsed());
+        }
 
         if self.plugin_registry.has_program_hooks() {
             let mut hook_context = HookContext::new(context.codebase, &mut block_context, &mut artifacts);
@@ -129,7 +140,13 @@ impl<'ctx, 'ast, 'arena> Analyzer<'ctx, 'ast, 'arena> {
             }
         }
 
+        #[cfg(not(target_arch = "wasm32"))]
+        let statements_start = trace_enabled.then(std::time::Instant::now);
         analyze_statements(statements, &mut context, &mut block_context, &mut artifacts)?;
+        #[cfg(not(target_arch = "wasm32"))]
+        if let Some(start) = statements_start {
+            telemetry::record_statements(start.elapsed());
+        }
 
         // Call after_program hooks
         if self.plugin_registry.has_program_hooks() {
@@ -140,13 +157,22 @@ impl<'ctx, 'ast, 'arena> Analyzer<'ctx, 'ast, 'arena> {
             }
         }
 
+        #[cfg(not(target_arch = "wasm32"))]
+        let finish_start = trace_enabled.then(std::time::Instant::now);
         context.finish(artifacts, analysis_result);
+        #[cfg(not(target_arch = "wasm32"))]
+        if let Some(start) = finish_start {
+            telemetry::record_finish(start.elapsed());
+        }
 
         // Filter issues through registered issue filter hooks
         if self.plugin_registry.has_issue_filter_hooks() {
             analysis_result.issues =
                 self.plugin_registry.filter_issues(self.source_file, std::mem::take(&mut analysis_result.issues));
         }
+
+        #[cfg(not(target_arch = "wasm32"))]
+        telemetry::record_file();
 
         #[cfg(not(target_arch = "wasm32"))]
         {

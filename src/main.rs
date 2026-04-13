@@ -42,9 +42,14 @@
 //! exit codes. All errors are logged using the [`tracing`] framework before exiting.
 
 use std::process::ExitCode;
+use std::time::Duration;
+use std::time::Instant;
 
 use clap::Parser;
+use tracing::Level;
+use tracing::enabled;
 use tracing::level_filters::LevelFilter;
+use tracing::trace;
 
 use crate::commands::CliArguments;
 use crate::commands::MagoCommand;
@@ -102,15 +107,30 @@ const EXIT_CODE_ERROR: u8 = 2;
 /// All errors are logged using the [`tracing`] framework with full error context before
 /// exiting with exit code 2.
 pub fn main() -> ExitCode {
+    // Captured before anything else so the elapsed counter spans the whole
+    // process lifetime. The logger isn't initialized yet, so the eventual
+    // trace event is emitted from inside `run` once tracing is wired up;
+    // telemetry in this function only matters when `MAGO_LOG=trace`.
+    let main_start = Instant::now();
+
     #[cfg(feature = "dhat-heap")]
     let _profiler = dhat::Profiler::new_heap();
 
-    run().unwrap_or_else(|error| {
+    let code = run(main_start).unwrap_or_else(|error| {
         tracing::error!("{}", error);
         tracing::trace!("Exiting with error code due to: {:#?}", error);
 
         ExitCode::from(EXIT_CODE_ERROR)
-    })
+    });
+
+    // Note: this trace event may not actually emit because destructors of the
+    // tracing subscriber run at process exit. It's still useful when the
+    // subscriber is configured to flush eagerly.
+    if enabled!(Level::TRACE) {
+        trace!("total process time: {:?}", main_start.elapsed());
+    }
+
+    code
 }
 
 /// Core application logic for the Mago CLI.
@@ -140,25 +160,40 @@ pub fn main() -> ExitCode {
 /// - Thread pool initialization failure
 /// - Command execution errors
 #[inline(always)]
-pub fn run() -> Result<ExitCode, Error> {
+pub fn run(main_start: Instant) -> Result<ExitCode, Error> {
+    // The tracing subscriber isn't set up until `initialize_logger` runs, so
+    // any `enabled!(Level::TRACE)` checks *before* that point resolve against
+    // the default (off) subscriber and elide their work as intended. Once the
+    // logger is configured, subsequent checks in this function correctly
+    // reflect the user's `MAGO_LOG` setting.
+
+    let clap_start = Instant::now();
     let arguments = CliArguments::parse();
+    let clap_duration = clap_start.elapsed();
 
     // Configure global color settings based on the color choice.
     // This must be done before initializing the logger or any other
     // component that uses colors.
     configure_colors(arguments.colors);
 
+    let logger_start = Instant::now();
     initialize_logger(
         if cfg!(debug_assertions) { LevelFilter::DEBUG } else { LevelFilter::INFO },
         "MAGO_LOG",
         arguments.colors,
     );
+    let logger_duration = logger_start.elapsed();
+
+    // From here on `enabled!(Level::TRACE)` reflects the real subscriber.
+    let trace_enabled = enabled!(Level::TRACE);
+    let pre_logger_elapsed =
+        if trace_enabled { main_start.elapsed() - clap_duration - logger_duration } else { Duration::ZERO };
 
     let php_version = arguments.get_php_version()?;
     let CliArguments { workspace, config, threads, allow_unsupported_php_version, no_version_check, command, .. } =
         arguments;
 
-    // Load the configuration.
+    let config_load_start = trace_enabled.then(Instant::now);
     let configuration = Configuration::load(
         workspace,
         config.as_deref(),
@@ -167,6 +202,7 @@ pub fn run() -> Result<ExitCode, Error> {
         allow_unsupported_php_version,
         no_version_check,
     )?;
+    let config_load_duration = config_load_start.map(|s| s.elapsed()).unwrap_or_default();
 
     if let MagoCommand::SelfUpdate(cmd) = command {
         return commands::self_update::execute(cmd, configuration.version);
@@ -184,12 +220,24 @@ pub fn run() -> Result<ExitCode, Error> {
         }
     }
 
+    let rayon_init_start = trace_enabled.then(Instant::now);
     rayon::ThreadPoolBuilder::new()
         .num_threads(configuration.threads)
         .stack_size(configuration.stack_size)
         .build_global()?;
+    let rayon_init_duration = rayon_init_start.map(|s| s.elapsed()).unwrap_or_default();
 
-    match command {
+    if trace_enabled {
+        trace!("Process startup (dyld and runtime init) took {:?}.", pre_logger_elapsed);
+        trace!("CLI arguments parsed in {:?}.", clap_duration);
+        trace!("Logger initialized in {:?}.", logger_duration);
+        trace!("Configuration loaded in {:?}.", config_load_duration);
+        trace!("Rayon thread pool built in {:?}.", rayon_init_duration);
+        trace!("Ready to dispatch command after {:?}.", main_start.elapsed());
+    }
+
+    let command_start = trace_enabled.then(Instant::now);
+    let result = match command {
         MagoCommand::Init(cmd) => cmd.execute(configuration, None),
         MagoCommand::Config(cmd) => cmd.execute(configuration),
         MagoCommand::ListFiles(cmd) => cmd.execute(configuration, arguments.colors),
@@ -202,7 +250,14 @@ pub fn run() -> Result<ExitCode, Error> {
         MagoCommand::SelfUpdate(_) => {
             unreachable!("The self-update command should have been handled before this point.")
         }
+    };
+
+    if let Some(start) = command_start {
+        trace!("Command finished in {:?}.", start.elapsed());
+        trace!("Total time spent inside main so far: {:?}.", main_start.elapsed());
     }
+
+    result
 }
 
 /// Verifies that the installed mago binary satisfies the `version` pin in

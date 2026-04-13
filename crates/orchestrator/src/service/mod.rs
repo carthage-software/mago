@@ -26,6 +26,8 @@
 //! methods rather than being instantiated directly.
 
 mod pipeline;
+#[cfg(not(target_arch = "wasm32"))]
+mod telemetry;
 
 pub mod analysis;
 pub mod format;

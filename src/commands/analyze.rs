@@ -38,6 +38,7 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 use std::sync::mpsc;
 use std::time::Duration;
+use std::time::Instant;
 
 use clap::ColorChoice;
 use clap::Parser;
@@ -229,13 +230,19 @@ impl AnalyzeCommand {
             return self.run_watch_loop(configuration, color_choice);
         }
 
-        // 1. Establish the base prelude data.
+        let trace_enabled = tracing::enabled!(tracing::Level::TRACE);
+        let command_start = trace_enabled.then(Instant::now);
+
+        let prelude_start = trace_enabled.then(Instant::now);
         let Prelude { database, metadata, symbol_references } = if self.no_stubs {
             Prelude::default()
         } else {
             Prelude::decode(PRELUDE_BYTES).expect("Failed to decode embedded prelude")
         };
 
+        let prelude_duration = prelude_start.map(|s| s.elapsed());
+
+        let orchestrator_init_start = trace_enabled.then(Instant::now);
         let mut orchestrator = create_orchestrator(&configuration, color_choice, false, true, false);
         orchestrator.add_exclude_patterns(configuration.analyzer.excludes.iter());
 
@@ -261,9 +268,12 @@ impl AnalyzeCommand {
         } else if !self.stdin_input && !self.path.is_empty() {
             stdin_input::set_source_paths_from_paths(&mut orchestrator, &self.path);
         }
+        let orchestrator_init_duration = orchestrator_init_start.map(|s| s.elapsed());
 
+        let load_database_start = trace_enabled.then(Instant::now);
         let mut database =
             orchestrator.load_database(&configuration.source.workspace, true, Some(database), stdin_override)?;
+        let load_database_duration = load_database_start.map(|s| s.elapsed());
 
         if !database.files().any(|f| f.file_type == FileType::Host) {
             tracing::warn!("No files found to analyze.");
@@ -271,9 +281,12 @@ impl AnalyzeCommand {
             return Ok(ExitCode::SUCCESS);
         }
 
+        let service_run_start = trace_enabled.then(Instant::now);
         let service = orchestrator.get_analysis_service(database.read_only(), metadata, symbol_references);
         let analysis_result = service.run()?;
+        let service_run_duration = service_run_start.map(|s| s.elapsed());
 
+        let report_start = trace_enabled.then(Instant::now);
         let mut issues = analysis_result.issues;
         let read_db = database.read_only();
         issues.filter_out_ignored(&configuration.analyzer.ignore, |file_id| {
@@ -291,9 +304,29 @@ impl AnalyzeCommand {
         );
 
         let (exit_code, changed_file_ids) = processor.process_issues(&orchestrator, &mut database, issues)?;
+        let report_duration = report_start.map(|s| s.elapsed());
 
         if self.staged && !changed_file_ids.is_empty() {
             git::stage_files(&configuration.source.workspace, &database, changed_file_ids)?;
+        }
+
+        let drop_database_start = trace_enabled.then(Instant::now);
+        drop(database);
+        let drop_database_duration = drop_database_start.map(|s| s.elapsed());
+
+        let drop_orchestrator_start = trace_enabled.then(Instant::now);
+        drop(orchestrator);
+        let drop_orchestrator_duration = drop_orchestrator_start.map(|s| s.elapsed());
+
+        if let Some(start) = command_start {
+            tracing::trace!("Prelude decoded in {:?}.", prelude_duration.unwrap_or_default());
+            tracing::trace!("Orchestrator initialized in {:?}.", orchestrator_init_duration.unwrap_or_default());
+            tracing::trace!("Database loaded in {:?}.", load_database_duration.unwrap_or_default());
+            tracing::trace!("Analysis service ran in {:?}.", service_run_duration.unwrap_or_default());
+            tracing::trace!("Issues filtered and reported in {:?}.", report_duration.unwrap_or_default());
+            tracing::trace!("Database dropped in {:?}.", drop_database_duration.unwrap_or_default());
+            tracing::trace!("Orchestrator dropped in {:?}.", drop_orchestrator_duration.unwrap_or_default());
+            tracing::trace!("Analyze command finished in {:?}.", start.elapsed());
         }
 
         Ok(exit_code)

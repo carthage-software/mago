@@ -1,6 +1,10 @@
 use std::sync::Arc;
 #[cfg(not(target_arch = "wasm32"))]
+use std::sync::atomic::Ordering::Relaxed;
+#[cfg(not(target_arch = "wasm32"))]
 use std::time::Duration;
+#[cfg(not(target_arch = "wasm32"))]
+use std::time::Instant;
 
 use bumpalo::Bump;
 use foldhash::HashSet;
@@ -9,6 +13,8 @@ use mago_analyzer::Analyzer;
 use mago_analyzer::analysis_result::AnalysisResult;
 use mago_analyzer::plugin::PluginRegistry;
 use mago_analyzer::settings::Settings;
+#[cfg(not(target_arch = "wasm32"))]
+use mago_analyzer::telemetry as analyzer_telemetry;
 use mago_atom::AtomSet;
 use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::populator::populate_codebase;
@@ -27,6 +33,8 @@ use mago_syntax::settings::ParserSettings;
 use crate::error::OrchestratorError;
 use crate::service::pipeline::ParallelPipeline;
 use crate::service::pipeline::Reducer;
+#[cfg(not(target_arch = "wasm32"))]
+use crate::service::telemetry::AnalysisPhaseTelemetry;
 
 pub struct AnalysisService {
     database: ReadDatabase,
@@ -145,21 +153,69 @@ impl AnalysisService {
 
         let plugin_registry = Arc::clone(&self.plugin_registry);
 
-        pipeline.run(move |(settings, parser_settings), arena, source_file, codebase| {
+        #[cfg(not(target_arch = "wasm32"))]
+        let trace_enabled = tracing::enabled!(tracing::Level::TRACE);
+        #[cfg(not(target_arch = "wasm32"))]
+        let telemetry = Arc::new(AnalysisPhaseTelemetry::default());
+        #[cfg(not(target_arch = "wasm32"))]
+        let telemetry_for_closure = Arc::clone(&telemetry);
+
+        let result = pipeline.run(move |(settings, parser_settings), arena, source_file, codebase| {
+            #[cfg(not(target_arch = "wasm32"))]
+            let per_file_start = trace_enabled.then(Instant::now);
             let mut analysis_result = AnalysisResult::new(SymbolReferences::new());
 
+            #[cfg(not(target_arch = "wasm32"))]
+            let parse_start = trace_enabled.then(Instant::now);
             let program = parse_file_with_settings(arena, &source_file, parser_settings);
+            #[cfg(not(target_arch = "wasm32"))]
+            if let Some(start) = parse_start {
+                telemetry_for_closure.parse_ns.fetch_add(start.elapsed().as_nanos() as u64, Relaxed);
+            }
+
+            #[cfg(not(target_arch = "wasm32"))]
+            let resolve_start = trace_enabled.then(Instant::now);
             let resolved_names = NameResolver::new(arena).resolve(program);
+            #[cfg(not(target_arch = "wasm32"))]
+            if let Some(start) = resolve_start {
+                telemetry_for_closure.resolve_ns.fetch_add(start.elapsed().as_nanos() as u64, Relaxed);
+            }
 
             if program.has_errors() {
                 analysis_result.issues.extend(program.errors.iter().map(Issue::from));
             }
 
             let semantics_checker = SemanticsChecker::new(settings.version);
-            let analyzer = Analyzer::new(arena, &source_file, &resolved_names, &codebase, &plugin_registry, settings);
 
+            #[cfg(not(target_arch = "wasm32"))]
+            let analyzer_new_start = trace_enabled.then(Instant::now);
+            let analyzer = Analyzer::new(arena, &source_file, &resolved_names, &codebase, &plugin_registry, settings);
+            #[cfg(not(target_arch = "wasm32"))]
+            if let Some(start) = analyzer_new_start {
+                telemetry_for_closure.analyzer_new_ns.fetch_add(start.elapsed().as_nanos() as u64, Relaxed);
+            }
+
+            #[cfg(not(target_arch = "wasm32"))]
+            let semantics_start = trace_enabled.then(Instant::now);
             analysis_result.issues.extend(semantics_checker.check(&source_file, program, &resolved_names));
+            #[cfg(not(target_arch = "wasm32"))]
+            if let Some(start) = semantics_start {
+                telemetry_for_closure.semantics_ns.fetch_add(start.elapsed().as_nanos() as u64, Relaxed);
+            }
+
+            #[cfg(not(target_arch = "wasm32"))]
+            let analyze_start = trace_enabled.then(Instant::now);
             analyzer.analyze(program, &mut analysis_result)?;
+            #[cfg(not(target_arch = "wasm32"))]
+            if let Some(start) = analyze_start {
+                telemetry_for_closure.analyze_ns.fetch_add(start.elapsed().as_nanos() as u64, Relaxed);
+            }
+
+            #[cfg(not(target_arch = "wasm32"))]
+            if let Some(start) = per_file_start {
+                telemetry_for_closure.per_file_total_ns.fetch_add(start.elapsed().as_nanos() as u64, Relaxed);
+                telemetry_for_closure.files.fetch_add(1, Relaxed);
+            }
 
             #[cfg(not(target_arch = "wasm32"))]
             if analysis_result.time_in_analysis > ANALYSIS_DURATION_THRESHOLD {
@@ -172,7 +228,15 @@ impl AnalysisService {
             }
 
             Ok(analysis_result)
-        })
+        });
+
+        #[cfg(not(target_arch = "wasm32"))]
+        if trace_enabled {
+            telemetry.dump();
+            analyzer_telemetry::dump_and_reset();
+        }
+
+        result
     }
 }
 

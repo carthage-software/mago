@@ -28,6 +28,7 @@
 
 use std::path::PathBuf;
 use std::process::ExitCode;
+use std::time::Instant;
 
 use clap::ColorChoice;
 use clap::Parser;
@@ -208,7 +209,12 @@ impl LintCommand {
     /// - **List Mode** (`--list-rules`): Shows all enabled rules and exits
     /// - **Empty Database**: Logs a message and exits successfully if no files found
     pub fn execute(self, mut configuration: Configuration, color_choice: ColorChoice) -> Result<ExitCode, Error> {
+        let trace_enabled = tracing::enabled!(tracing::Level::TRACE);
+        let command_start = trace_enabled.then(Instant::now);
+
         let editor_url = configuration.editor_url.take();
+
+        let orchestrator_init_start = trace_enabled.then(Instant::now);
         let mut orchestrator = create_orchestrator(&configuration, color_choice, self.pedantic, true, false);
         orchestrator.add_exclude_patterns(configuration.linter.excludes.iter());
 
@@ -234,8 +240,12 @@ impl LintCommand {
         } else if !self.stdin_input && !self.path.is_empty() {
             stdin_input::set_source_paths_from_paths(&mut orchestrator, &self.path);
         }
+        let orchestrator_init_duration = orchestrator_init_start.map(|s| s.elapsed());
 
+        let load_database_start = trace_enabled.then(Instant::now);
         let mut database = orchestrator.load_database(&configuration.source.workspace, false, None, stdin_override)?;
+        let load_database_duration = load_database_start.map(|s| s.elapsed());
+
         let service = orchestrator.get_lint_service(database.read_only());
 
         if let Some(explain_code) = self.explain {
@@ -262,11 +272,14 @@ impl LintCommand {
             return Ok(ExitCode::SUCCESS);
         }
 
+        let lint_run_start = trace_enabled.then(Instant::now);
         let issues = service.lint(
             if self.semantics { LintMode::SemanticsOnly } else { LintMode::Full },
             if self.only.is_empty() { None } else { Some(self.only.as_slice()) },
         )?;
+        let lint_run_duration = lint_run_start.map(|s| s.elapsed());
 
+        let report_start = trace_enabled.then(Instant::now);
         let baseline = configuration.linter.baseline.as_deref();
         let baseline_variant = configuration.linter.baseline_variant;
         let processor = self.baseline_reporting.get_processor(
@@ -278,9 +291,28 @@ impl LintCommand {
         );
 
         let (exit_code, changed_file_ids) = processor.process_issues(&orchestrator, &mut database, issues)?;
+        let report_duration = report_start.map(|s| s.elapsed());
 
         if self.staged && !changed_file_ids.is_empty() {
             git::stage_files(&configuration.source.workspace, &database, changed_file_ids)?;
+        }
+
+        let drop_database_start = trace_enabled.then(Instant::now);
+        drop(database);
+        let drop_database_duration = drop_database_start.map(|s| s.elapsed());
+
+        let drop_orchestrator_start = trace_enabled.then(Instant::now);
+        drop(orchestrator);
+        let drop_orchestrator_duration = drop_orchestrator_start.map(|s| s.elapsed());
+
+        if let Some(start) = command_start {
+            tracing::trace!("Orchestrator initialized in {:?}.", orchestrator_init_duration.unwrap_or_default());
+            tracing::trace!("Database loaded in {:?}.", load_database_duration.unwrap_or_default());
+            tracing::trace!("Lint service ran in {:?}.", lint_run_duration.unwrap_or_default());
+            tracing::trace!("Issues filtered and reported in {:?}.", report_duration.unwrap_or_default());
+            tracing::trace!("Database dropped in {:?}.", drop_database_duration.unwrap_or_default());
+            tracing::trace!("Orchestrator dropped in {:?}.", drop_orchestrator_duration.unwrap_or_default());
+            tracing::trace!("Lint command finished in {:?}.", start.elapsed());
         }
 
         Ok(exit_code)
