@@ -12,7 +12,7 @@ use crate::error::Error;
 
 /// Configuration options for source discovery.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+#[serde(default, rename_all = "kebab-case", deny_unknown_fields)]
 pub struct SourceConfiguration {
     /// The workspace directory from which to start scanning.
     ///
@@ -100,6 +100,12 @@ impl GlobConfiguration {
             backslash_escape: self.backslash_escape,
             empty_alternates: self.empty_alternates,
         }
+    }
+}
+
+impl Default for SourceConfiguration {
+    fn default() -> Self {
+        Self::from_workspace(CURRENT_DIR.clone())
     }
 }
 

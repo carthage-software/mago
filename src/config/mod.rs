@@ -356,8 +356,7 @@ impl Configuration {
     ) -> Result<Configuration, Error> {
         let workspace_dir = workspace.clone().unwrap_or_else(|| CURRENT_DIR.to_path_buf());
 
-        let mut configuration = Configuration::from_workspace(workspace_dir.clone());
-        let mut builder = Config::builder().add_source(Config::try_from(&configuration)?);
+        let mut builder = Config::builder();
 
         let resolved_config_file;
         let config_file_is_explicit;
@@ -388,7 +387,7 @@ impl Configuration {
             config_file_is_explicit = false;
         }
 
-        configuration = builder
+        let mut configuration: Configuration = builder
             .add_source(Environment::with_prefix(ENVIRONMENT_PREFIX).convert_case(Case::Kebab))
             .build()?
             .try_deserialize::<Configuration>()?;
