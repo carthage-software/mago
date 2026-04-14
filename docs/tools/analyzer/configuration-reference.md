@@ -82,7 +82,19 @@ ignore = [
 ]
 ```
 
-Paths are matched as prefixes against relative file paths from the project root. Both `"tests"` and `"tests/"` will match all files under the `tests` directory.
+Each entry in `in` is either a plain directory/file prefix or a glob pattern — any value containing `*`, `?`, `[`, or `{` is treated as a glob and matched against the full relative path, everything else is matched as a prefix. Both `"tests"` and `"tests/"` match all files under the `tests` directory, and you can freely mix the two styles:
+
+```toml
+ignore = [
+  { code = "mixed-assignment", in = [
+    "tests/",
+    "src/Legacy/**/*.php",
+    "modules/*/Generated/*.php",
+  ] },
+]
+```
+
+Glob matching honours the project-wide settings under `[source.glob]` (see the source configuration), so toggles like `literal-separator` and `case-insensitive` apply here as well.
 
 :::tip
 Path-scoped ignoring is different from `excludes`:

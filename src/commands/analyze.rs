@@ -289,9 +289,11 @@ impl AnalyzeCommand {
         let report_start = trace_enabled.then(Instant::now);
         let mut issues = analysis_result.issues;
         let read_db = database.read_only();
-        issues.filter_out_ignored(&configuration.analyzer.ignore, |file_id| {
-            read_db.get_ref(&file_id).ok().map(|f| f.name.to_string())
-        });
+        issues.filter_out_ignored(
+            &configuration.analyzer.ignore,
+            configuration.source.glob.to_database_settings(),
+            |file_id| read_db.get_ref(&file_id).ok().map(|f| f.name.to_string()),
+        );
 
         let baseline = configuration.analyzer.baseline.as_deref();
         let baseline_variant = configuration.analyzer.baseline_variant;
@@ -424,9 +426,12 @@ impl AnalyzeCommand {
 
         let mut issues = analysis_result.issues;
         let read_db = watcher.read_only_database();
-        issues.filter_out_ignored(&configuration.analyzer.ignore, |file_id| {
-            read_db.get_ref(&file_id).ok().map(|f| f.name.to_string())
-        });
+        issues.filter_out_ignored(
+            &configuration.analyzer.ignore,
+            configuration.source.glob.to_database_settings(),
+            |file_id| read_db.get_ref(&file_id).ok().map(|f| f.name.to_string()),
+        );
+
         let baseline = configuration.analyzer.baseline.as_deref();
         let baseline_variant = configuration.analyzer.baseline_variant;
 
@@ -463,9 +468,11 @@ impl AnalyzeCommand {
 
             let mut issues = analysis_result.issues;
             let read_db = watcher.read_only_database();
-            issues.filter_out_ignored(&configuration.analyzer.ignore, |file_id| {
-                read_db.get_ref(&file_id).ok().map(|f| f.name.to_string())
-            });
+            issues.filter_out_ignored(
+                &configuration.analyzer.ignore,
+                configuration.source.glob.to_database_settings(),
+                |file_id| read_db.get_ref(&file_id).ok().map(|f| f.name.to_string()),
+            );
 
             watcher.with_database_mut(|database| {
                 processor.process_issues(&orchestrator, database, issues).map(|(code, _)| code)
