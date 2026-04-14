@@ -468,7 +468,7 @@ fn scrape_special_function_call_assertions(
 
                 let mut value_assertions = vec![];
                 for atomic in value_types?.types.into_owned() {
-                    value_assertions.push(Assertion::IsEqual(atomic));
+                    value_assertions.push(Assertion::IsIdentical(atomic));
                 }
 
                 Some((0, value_assertions))

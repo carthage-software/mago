@@ -4258,9 +4258,10 @@ function min(mixed $value, mixed ...$values): mixed {}
 function max(mixed $value, mixed ...$values): mixed {}
 
 /**
+ * @template T
  * @template V
  *
- * @param V $needle
+ * @param T $needle
  * @param array<V> $haystack
  *
  * @pure
