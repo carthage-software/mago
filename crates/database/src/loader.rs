@@ -233,6 +233,19 @@ impl<'a> DatabaseLoader<'a> {
             })
             .collect();
 
+        let workspace_relative_str = |path: &Path| -> String {
+            let rel = path.strip_prefix(canonical_workspace.as_path()).unwrap_or(path);
+            let s = rel.to_string_lossy();
+            #[cfg(windows)]
+            {
+                s.replace('\\', "/")
+            }
+            #[cfg(not(windows))]
+            {
+                s.into_owned()
+            }
+        };
+
         let mut paths_to_process: Vec<(std::path::PathBuf, usize)> = Vec::new();
 
         for root in roots {
@@ -303,7 +316,7 @@ impl<'a> DatabaseLoader<'a> {
                         return false;
                     }
 
-                    if has_dir_prunes && dir_prune_globs.is_match(path) {
+                    if has_dir_prunes && dir_prune_globs.is_match(workspace_relative_str(path)) {
                         return false;
                     }
 
@@ -319,10 +332,11 @@ impl<'a> DatabaseLoader<'a> {
         }
 
         let has_path_excludes = !canonical_excludes.is_empty();
+        let has_glob_excludes = !glob_excludes.is_empty();
         let files: Vec<FileWithSpecificity> = paths_to_process
             .into_par_iter()
             .filter_map(|(path, specificity)| {
-                if glob_excludes.is_match(&path) {
+                if has_glob_excludes && glob_excludes.is_match(workspace_relative_str(&path)) {
                     return None;
                 }
 
@@ -594,9 +608,57 @@ mod tests {
     }
 
     #[test]
+    fn test_glob_excludes_match_workspace_relative_paths() {
+        let temp_dir = TempDir::new().unwrap();
+
+        create_test_file(&temp_dir, "src/Absences/Foo/Foo.php", "<?php");
+        create_test_file(&temp_dir, "src/Absences/Test/Faker/Provider/AbsencesProvider.php", "<?php");
+        create_test_file(&temp_dir, "src/Calendar/Test/Helper.php", "<?php");
+
+        let mut config = create_test_config(&temp_dir, vec!["src"], vec![]);
+        config.excludes = vec![Exclusion::Pattern(Cow::Borrowed("src/*/Test/**"))];
+
+        let loader = DatabaseLoader::new(config);
+        let db = loader.load().unwrap();
+
+        let names: Vec<String> = db.files().map(|f| f.name.to_string()).collect();
+        assert!(names.iter().any(|n| n.ends_with("src/Absences/Foo/Foo.php")), "non-Test file should be loaded");
+        assert!(
+            !names.iter().any(|n| n.contains("src/Absences/Test/")),
+            "files under src/*/Test/** should be excluded, got {names:?}"
+        );
+        assert!(
+            !names.iter().any(|n| n.contains("src/Calendar/Test/")),
+            "files under src/*/Test/** should be excluded, got {names:?}"
+        );
+    }
+
+    #[test]
+    fn test_glob_dir_prune_skips_relative_directories() {
+        let temp_dir = TempDir::new().unwrap();
+
+        create_test_file(&temp_dir, "vendor/slevomat/coding-standard/main.php", "<?php");
+        create_test_file(&temp_dir, "vendor/slevomat/coding-standard/tests/Sniffs/Foo.php", "<?php");
+        create_test_file(&temp_dir, "vendor/another/lib.php", "<?php");
+
+        let mut config = create_test_config(&temp_dir, vec![], vec!["vendor"]);
+        config.excludes = vec![Exclusion::Pattern(Cow::Borrowed("vendor/**/tests/**"))];
+
+        let loader = DatabaseLoader::new(config);
+        let db = loader.load().unwrap();
+
+        let names: Vec<String> = db.files().map(|f| f.name.to_string()).collect();
+        assert!(names.iter().any(|n| n.ends_with("vendor/slevomat/coding-standard/main.php")));
+        assert!(names.iter().any(|n| n.ends_with("vendor/another/lib.php")));
+        assert!(
+            !names.iter().any(|n| n.contains("/tests/")),
+            "files under vendor/**/tests/** should be pruned, got {names:?}"
+        );
+    }
+
+    #[test]
     fn test_stdin_override_adds_file_when_not_on_disk() {
         let temp_dir = TempDir::new().unwrap();
-        // Do not create src/foo.php on disk
         create_test_file(&temp_dir, "src/.gitkeep", "");
 
         let config = create_test_config(&temp_dir, vec!["src/"], vec![]);
