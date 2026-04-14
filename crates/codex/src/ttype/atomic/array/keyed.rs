@@ -16,7 +16,8 @@ use crate::ttype::union::TUnion;
 /// Metadata for a PHP array analyzed as a keyed array (map/dictionary-like).
 ///
 /// Corresponds to `array<TKey, TValue>` or `array{'key': TVal, 1: TVal2 ...}` shape.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Eq, Hash, PartialOrd, Ord, Default)]
+#[allow(clippy::derived_hash_with_manual_eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, Hash, PartialOrd, Ord, Default)]
 pub struct TKeyedArray {
     /// Specific types known for certain keys (`ArrayKey`). The bool indicates if the element is optional.
     pub known_items: Option<BTreeMap<ArrayKey, (bool, TUnion)>>,
@@ -25,6 +26,36 @@ pub struct TKeyedArray {
     pub parameters: Option<(Arc<TUnion>, Arc<TUnion>)>,
     /// Flag indicating if the array is known to contain at least one element.
     pub non_empty: bool,
+}
+
+impl PartialEq for TKeyedArray {
+    #[inline]
+    fn eq(&self, other: &Self) -> bool {
+        if std::ptr::eq(self, other) {
+            return true;
+        }
+
+        if self.non_empty != other.non_empty {
+            return false;
+        }
+
+        if !params_eq(&self.parameters, &other.parameters) {
+            return false;
+        }
+
+        self.known_items == other.known_items
+    }
+}
+
+#[inline]
+fn params_eq(a: &Option<(Arc<TUnion>, Arc<TUnion>)>, b: &Option<(Arc<TUnion>, Arc<TUnion>)>) -> bool {
+    match (a, b) {
+        (None, None) => true,
+        (Some((ak, av)), Some((bk, bv))) => {
+            (Arc::ptr_eq(ak, bk) || **ak == **bk) && (Arc::ptr_eq(av, bv) || **av == **bv)
+        }
+        _ => false,
+    }
 }
 
 impl TKeyedArray {

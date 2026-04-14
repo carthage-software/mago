@@ -52,7 +52,8 @@ pub mod reference;
 pub mod resource;
 pub mod scalar;
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Eq, Hash, PartialOrd, Ord)]
+#[allow(clippy::derived_hash_with_manual_eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, Hash, PartialOrd, Ord)]
 pub enum TAtomic {
     Scalar(TScalar),
     Callable(TCallable),
@@ -71,6 +72,36 @@ pub enum TAtomic {
     Null,
     Void,
     Placeholder,
+}
+
+impl PartialEq for TAtomic {
+    #[inline]
+    fn eq(&self, other: &Self) -> bool {
+        if std::ptr::eq(self, other) {
+            return true;
+        }
+
+        match (self, other) {
+            (TAtomic::Scalar(a), TAtomic::Scalar(b)) => a == b,
+            (TAtomic::Callable(a), TAtomic::Callable(b)) => a == b,
+            (TAtomic::Mixed(a), TAtomic::Mixed(b)) => a == b,
+            (TAtomic::Object(a), TAtomic::Object(b)) => a == b,
+            (TAtomic::Array(a), TAtomic::Array(b)) => a == b,
+            (TAtomic::Iterable(a), TAtomic::Iterable(b)) => a == b,
+            (TAtomic::Resource(a), TAtomic::Resource(b)) => a == b,
+            (TAtomic::Reference(a), TAtomic::Reference(b)) => a == b,
+            (TAtomic::GenericParameter(a), TAtomic::GenericParameter(b)) => a == b,
+            (TAtomic::Variable(a), TAtomic::Variable(b)) => a == b,
+            (TAtomic::Conditional(a), TAtomic::Conditional(b)) => a == b,
+            (TAtomic::Derived(a), TAtomic::Derived(b)) => a == b,
+            (TAtomic::Alias(a), TAtomic::Alias(b)) => a == b,
+            (TAtomic::Never, TAtomic::Never)
+            | (TAtomic::Null, TAtomic::Null)
+            | (TAtomic::Void, TAtomic::Void)
+            | (TAtomic::Placeholder, TAtomic::Placeholder) => true,
+            _ => false,
+        }
+    }
 }
 
 impl TAtomic {

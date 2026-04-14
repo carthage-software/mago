@@ -20,12 +20,28 @@ pub mod keyed;
 pub mod list;
 
 /// Represents the type of a PHP array, distinguishing between list-like and keyed/associative usage.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Eq, Hash, PartialOrd, Ord)]
+#[allow(clippy::derived_hash_with_manual_eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, Hash, PartialOrd, Ord)]
 pub enum TArray {
     /// Represents an array used as a list (sequential, zero-based integer keys). `list<T>`.
     List(TList),
     /// Represents an array used as a map (string keys or non-standard integer keys). `array<Tk, Tv>`.
     Keyed(TKeyedArray),
+}
+
+impl PartialEq for TArray {
+    #[inline]
+    fn eq(&self, other: &Self) -> bool {
+        if std::ptr::eq(self, other) {
+            return true;
+        }
+
+        match (self, other) {
+            (TArray::List(a), TArray::List(b)) => a == b,
+            (TArray::Keyed(a), TArray::Keyed(b)) => a == b,
+            _ => false,
+        }
+    }
 }
 
 impl TArray {

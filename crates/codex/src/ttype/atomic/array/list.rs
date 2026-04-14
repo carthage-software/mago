@@ -15,7 +15,8 @@ use crate::ttype::union::TUnion;
 
 /// Metadata for a PHP array analyzed as a list (vector-like).
 /// Corresponds to `list<TValue>` or `array{T0, T1, ...}` list-shape.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Eq, Hash, PartialOrd, Ord)]
+#[allow(clippy::derived_hash_with_manual_eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, Hash, PartialOrd, Ord)]
 pub struct TList {
     /// The general type of elements in the list (`TValue` in `list<TValue>`).
     pub element_type: Arc<TUnion>,
@@ -25,6 +26,29 @@ pub struct TList {
     pub known_count: Option<usize>,
     /// Flag indicating if the list is known to contain at least one element.
     pub non_empty: bool,
+}
+
+impl PartialEq for TList {
+    #[inline]
+    fn eq(&self, other: &Self) -> bool {
+        if std::ptr::eq(self, other) {
+            return true;
+        }
+
+        if self.non_empty != other.non_empty {
+            return false;
+        }
+
+        if self.known_count != other.known_count {
+            return false;
+        }
+
+        if !(Arc::ptr_eq(&self.element_type, &other.element_type) || *self.element_type == *other.element_type) {
+            return false;
+        }
+
+        self.known_elements == other.known_elements
+    }
 }
 
 impl TList {
