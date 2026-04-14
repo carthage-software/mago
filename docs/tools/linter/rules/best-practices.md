@@ -17,6 +17,7 @@ This document details the rules available in the `BestPractices` category.
 | No Direct Database Queries | [`no-direct-db-query`](#no-direct-db-query) |
 | No ini_set | [`no-ini-set`](#no-ini-set) |
 | No Inline | [`no-inline`](#no-inline) |
+| No Literal Namespace String | [`no-literal-namespace-string`](#no-literal-namespace-string) |
 | No Parameter Shadowing | [`no-parameter-shadowing`](#no-parameter-shadowing) |
 | No Mixed Declarations And Side Effects | [`no-side-effects-with-declarations`](#no-side-effects-with-declarations) |
 | No Sprintf Concat | [`no-sprintf-concat`](#no-sprintf-concat) |
@@ -402,6 +403,39 @@ echo "Hello, world!";
 
 ?>
 Goodbye
+```
+
+
+## <a id="no-literal-namespace-string"></a>`no-literal-namespace-string`
+
+Flags hardcoded fully qualified class name strings. Use `::class` notation
+instead for better IDE support, refactoring safety, and static analysis.
+
+
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `false` |
+| `level` | `string` | `"warning"` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+
+$className = \App\Models\User::class;
+```
+
+#### Incorrect code
+
+```php
+<?php
+
+$className = 'App\Models\User';
 ```
 
 
