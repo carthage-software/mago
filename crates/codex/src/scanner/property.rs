@@ -5,16 +5,7 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_span::Span;
-use mago_syntax::ast::ClassLikeMemberSelector;
-use mago_syntax::ast::Expression;
-use mago_syntax::ast::FunctionLikeParameter;
-use mago_syntax::ast::NullSafePropertyAccess;
-use mago_syntax::ast::Property;
-use mago_syntax::ast::PropertyAccess;
-use mago_syntax::ast::PropertyHook;
-use mago_syntax::ast::PropertyHookBody;
-use mago_syntax::ast::PropertyItem;
-use mago_syntax::ast::Variable;
+use mago_syntax::ast::*;
 use mago_syntax::walker::MutWalker;
 
 use crate::issue::ScanningIssueKind;
@@ -556,7 +547,10 @@ fn update_property_metadata_from_docblock(
     }
 }
 
-/// Checks if any hook references `$this->propertyName` (indicating a backed property).
+/// Checks if any hook references the property's backing store, either by
+/// explicitly writing or reading `$this->propertyName`, or implicitly via the
+/// `set => expr` shorthand desugaring (which expands to `set { $this->propertyName = expr; }`
+/// when the shorthand body does not itself contain any assignment).
 fn hooks_reference_backing_store<'arena>(
     hooks: impl IntoIterator<Item = &'arena PropertyHook<'arena>>,
     property_name: &str,
@@ -564,11 +558,12 @@ fn hooks_reference_backing_store<'arena>(
     struct Walker<'arena> {
         property_name: &'arena str,
         found: bool,
+        assignment_seen: bool,
     }
 
     impl<'arena> Walker<'arena> {
         fn new(property_name: &'arena str) -> Self {
-            Self { property_name, found: false }
+            Self { property_name, found: false, assignment_seen: false }
         }
 
         fn check_access<'ast>(
@@ -606,12 +601,25 @@ fn hooks_reference_backing_store<'arena>(
         fn walk_in_null_safe_property_access(&mut self, access: &'ast NullSafePropertyAccess<'arena>, _: &mut ()) {
             self.check_access(access.object, &access.property);
         }
+
+        fn walk_in_assignment(&mut self, _: &'ast Assignment<'arena>, _: &mut ()) {
+            self.assignment_seen = true;
+        }
     }
 
     let mut walker = Walker::new(property_name);
     for hook in hooks {
+        walker.assignment_seen = false;
+
         walker.walk_property_hook_body(&hook.body, &mut ());
         if walker.found {
+            return true;
+        }
+
+        if hook.name.value == "set"
+            && matches!(hook.body, PropertyHookBody::Concrete(PropertyHookConcreteBody::Expression(_)))
+            && !walker.assignment_seen
+        {
             return true;
         }
     }
