@@ -647,6 +647,18 @@ impl Configuration {
 
         self.source.normalize()?;
 
+        if let Some(b) = self.analyzer.baseline.take() {
+            self.analyzer.baseline = Some(if b.is_relative() { self.source.workspace.join(&b) } else { b });
+        }
+
+        if let Some(b) = self.linter.baseline.take() {
+            self.linter.baseline = Some(if b.is_relative() { self.source.workspace.join(&b) } else { b });
+        }
+
+        if let Some(b) = self.guard.baseline.take() {
+            self.guard.baseline = Some(if b.is_relative() { self.source.workspace.join(&b) } else { b });
+        }
+
         Ok(())
     }
 }
