@@ -172,6 +172,7 @@ test_case!(properties_of_visibility);
 test_case!(assert_or_type);
 test_case!(impossible_assertion);
 test_case!(negation_operand);
+test_case!(mixed_operand_increment);
 test_case!(infere_closure_parameter_type);
 test_case!(negated_union_type);
 test_case!(reference_constraint_violation);
