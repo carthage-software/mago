@@ -567,3 +567,23 @@ loop-assignment-depth-threshold = 4
 :::warning Performance impact
 Increasing these thresholds can significantly impact analysis time on codebases with complex conditional logic or files with thousands of array operations. Test on your codebase before deploying to CI.
 :::
+
+### Diagnosing slow runs
+
+If Mago feels slow on your project, it is very likely a bug in Mago rather than normal behaviour. For reference, on an Apple M1 Pro Mago analyzes all of [`WordPress/wordpress-develop`](https://github.com/WordPress/wordpress-develop) in under 2 seconds and [`php-standard-library/php-standard-library`](https://github.com/php-standard-library/php-standard-library) in under 200 ms. Actual numbers depend on your hardware and project size, but as a rough threshold: **if Mago takes more than 30 seconds to analyze your entire project, something is wrong**; either in Mago or in a pathological input it is tripping over.
+
+The same applies to a performance regression you notice between releases: if a previously fast analysis suddenly becomes slow, that is worth investigating.
+
+When you hit this, re-run the command with `MAGO_LOG=trace` to get a full pipeline trace:
+
+```bash
+MAGO_LOG=trace mago analyze
+```
+
+With tracing enabled, Mago will:
+
+- Start a **hang watcher** that notifies you whenever an individual file has been analyzing for more than a few seconds; extremely useful for catching the specific file that sends the analyzer into a long or infinite loop.
+- Print the **slowest files** seen during the parallel analyze phase, so you can see which inputs dominated total analysis time.
+- Emit **per-phase durations** (source discovery, compilation, codebase merge, metadata population, parallel analyze, reduce, ...) so you can tell which stage of the pipeline is actually responsible for the slowdown.
+
+Please include the full trace output when reporting a slowness or regression issue, along with the file the hang watcher points at (anonymized if it comes from a private codebase: renaming identifiers and scrubbing sensitive literals is enough for us to reproduce). That is usually all we need to track the problem down.

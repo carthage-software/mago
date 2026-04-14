@@ -32,6 +32,8 @@ use crate::progress::ProgressBarTheme;
 use crate::progress::create_progress_bar;
 use crate::progress::remove_progress_bar;
 #[cfg(not(target_arch = "wasm32"))]
+use crate::service::telemetry::HangWatcher;
+#[cfg(not(target_arch = "wasm32"))]
 use crate::service::telemetry::SlowestFiles;
 #[cfg(not(target_arch = "wasm32"))]
 use crate::service::telemetry::measure;
@@ -186,7 +188,7 @@ where
         #[cfg(not(target_arch = "wasm32"))]
         let pipeline_start = trace_enabled.then(Instant::now);
         #[cfg(not(target_arch = "wasm32"))]
-        let slowest_files = Arc::new(SlowestFiles::new());
+        let slowest_files = trace_enabled.then(|| Arc::new(SlowestFiles::new()));
 
         let mut source_discover_duration = Duration::ZERO;
         let source_files: Vec<_> = measure!(
@@ -289,7 +291,10 @@ where
         };
 
         #[cfg(not(target_arch = "wasm32"))]
-        let slowest_files_for_closure = Arc::clone(&slowest_files);
+        let slowest_files_for_closure = slowest_files.as_ref().map(Arc::clone);
+
+        #[cfg(not(target_arch = "wasm32"))]
+        let hang_watcher = trace_enabled.then(|| HangWatcher::spawn(rayon::current_num_threads()));
 
         let mut analyze_parallel_duration = Duration::ZERO;
         let results: Vec<I> = measure!(
@@ -306,11 +311,16 @@ where
                     #[cfg(not(target_arch = "wasm32"))]
                     let file_start = trace_enabled.then(Instant::now);
 
+                    #[cfg(not(target_arch = "wasm32"))]
+                    let _hang_guard = hang_watcher.as_ref().map(|w| w.track(Arc::clone(&file)));
+
                     let result = map_function(context, arena, file, codebase);
 
                     #[cfg(not(target_arch = "wasm32"))]
-                    if let (Some(start), Some(recorded_file)) = (file_start, file_for_record) {
-                        slowest_files_for_closure.record(start.elapsed(), recorded_file);
+                    if let (Some(sink), Some(start), Some(recorded_file)) =
+                        (slowest_files_for_closure.as_ref(), file_start, file_for_record)
+                    {
+                        sink.record(start.elapsed(), recorded_file);
                     }
 
                     arena.reset();
@@ -322,6 +332,9 @@ where
                 })
                 .collect::<Result<Vec<I>, OrchestratorError>>()?
         );
+
+        #[cfg(not(target_arch = "wasm32"))]
+        drop(hang_watcher);
 
         if let Some(main_task_bar) = main_task_bar {
             remove_progress_bar(&main_task_bar);
@@ -351,7 +364,9 @@ where
             tracing::trace!("Reduced analysis results in {reduce_duration:?}.");
             tracing::trace!("Pipeline finished in {:?}.", start.elapsed());
 
-            slowest_files.emit_slowest(20, "the analysis phase");
+            if let Some(slowest) = slowest_files.as_ref() {
+                slowest.emit_slowest(20, "the analysis phase");
+            }
         }
 
         result
@@ -387,7 +402,7 @@ where
         #[cfg(not(target_arch = "wasm32"))]
         let pipeline_start = trace_enabled.then(Instant::now);
         #[cfg(not(target_arch = "wasm32"))]
-        let slowest_files = Arc::new(SlowestFiles::new());
+        let slowest_files = trace_enabled.then(|| Arc::new(SlowestFiles::new()));
 
         let mut host_discover_duration = Duration::ZERO;
         let host_files: Vec<Arc<File>> = measure!(
@@ -412,7 +427,7 @@ where
             .then(|| create_progress_bar(host_files.len(), self.task_name, ProgressBarTheme::Magenta));
 
         #[cfg(not(target_arch = "wasm32"))]
-        let slowest_files_for_closure = Arc::clone(&slowest_files);
+        let slowest_files_for_closure = slowest_files.as_ref().map(Arc::clone);
 
         let mut map_duration = Duration::ZERO;
         let results: Vec<I> = measure!(
@@ -431,8 +446,10 @@ where
                     let result = map_function(context, arena, file)?;
 
                     #[cfg(not(target_arch = "wasm32"))]
-                    if let (Some(start), Some(recorded_file)) = (file_start, file_for_record) {
-                        slowest_files_for_closure.record(start.elapsed(), recorded_file);
+                    if let (Some(sink), Some(start), Some(recorded_file)) =
+                        (slowest_files_for_closure.as_ref(), file_start, file_for_record)
+                    {
+                        sink.record(start.elapsed(), recorded_file);
                     }
 
                     arena.reset();
@@ -463,8 +480,10 @@ where
             tracing::trace!("Reduced results in {reduce_duration:?}.");
             tracing::trace!("Pipeline finished in {:?}.", start.elapsed());
 
-            let phase_label = format!("the {} phase", self.task_name);
-            slowest_files.emit_slowest(20, &phase_label);
+            if let Some(slowest) = slowest_files.as_ref() {
+                let phase_label = format!("the {} phase", self.task_name);
+                slowest.emit_slowest(20, &phase_label);
+            }
         }
 
         reduced
@@ -493,7 +512,7 @@ where
         #[cfg(not(target_arch = "wasm32"))]
         let pipeline_start = trace_enabled.then(Instant::now);
         #[cfg(not(target_arch = "wasm32"))]
-        let slowest_files = Arc::new(SlowestFiles::new());
+        let slowest_files = trace_enabled.then(|| Arc::new(SlowestFiles::new()));
 
         let mut lookup_duration = Duration::ZERO;
         let files: Vec<Arc<File>> = measure!(
@@ -514,7 +533,7 @@ where
             .then(|| create_progress_bar(files.len(), self.task_name, ProgressBarTheme::Magenta));
 
         #[cfg(not(target_arch = "wasm32"))]
-        let slowest_files_for_closure = Arc::clone(&slowest_files);
+        let slowest_files_for_closure = slowest_files.as_ref().map(Arc::clone);
 
         let mut map_duration = Duration::ZERO;
         let results: Vec<I> = measure!(
@@ -533,8 +552,10 @@ where
                     let result = map_function(context, arena, file)?;
 
                     #[cfg(not(target_arch = "wasm32"))]
-                    if let (Some(start), Some(recorded_file)) = (file_start, file_for_record) {
-                        slowest_files_for_closure.record(start.elapsed(), recorded_file);
+                    if let (Some(sink), Some(start), Some(recorded_file)) =
+                        (slowest_files_for_closure.as_ref(), file_start, file_for_record)
+                    {
+                        sink.record(start.elapsed(), recorded_file);
                     }
 
                     arena.reset();
@@ -565,8 +586,10 @@ where
             tracing::trace!("Reduced results in {reduce_duration:?}.");
             tracing::trace!("Pipeline finished in {:?}.", start.elapsed());
 
-            let phase_label = format!("the {} phase", self.task_name);
-            slowest_files.emit_slowest(20, &phase_label);
+            if let Some(slowest) = slowest_files.as_ref() {
+                let phase_label = format!("the {} phase", self.task_name);
+                slowest.emit_slowest(20, &phase_label);
+            }
         }
 
         reduced

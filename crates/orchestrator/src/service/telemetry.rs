@@ -1,10 +1,14 @@
 //! Pipeline telemetry helpers gated on the `TRACE` log level.
 
 use std::sync::Arc;
+use std::sync::Condvar;
 use std::sync::Mutex;
+use std::sync::atomic::AtomicBool;
 use std::sync::atomic::AtomicU64;
 use std::sync::atomic::Ordering::Relaxed;
+use std::thread::JoinHandle;
 use std::time::Duration;
+use std::time::Instant;
 
 use mago_database::file::File;
 
@@ -122,6 +126,148 @@ impl SlowestFiles {
         tracing::trace!("Slowest {} of {} files during {}:", shown, guard.len(), phase);
         for (rank, (duration, file)) in guard.iter().take(shown).enumerate() {
             tracing::trace!("  {:>2}. {} took {:?}.", rank + 1, file.name, duration);
+        }
+    }
+}
+
+const HANG_INITIAL_THRESHOLD: Duration = Duration::from_millis(5000);
+const HANG_POLL_INTERVAL: Duration = Duration::from_secs(2);
+
+struct InflightEntry {
+    file: Arc<File>,
+    started_at: Instant,
+    next_report_at: Instant,
+    reported: bool,
+}
+
+/// Watches in-flight analyzer workers and emits a trace when a file has been
+/// analyzing for longer than a threshold.
+///
+/// Intended for diagnosing pathological inputs that put the analyzer in a long
+/// or infinite loop; without this, the only trace we emit for a file is after
+/// it finishes, which never happens for a hang.
+pub(crate) struct HangWatcher {
+    slots: Arc<Vec<Mutex<Option<InflightEntry>>>>,
+    shutdown: Arc<AtomicBool>,
+    cv: Arc<(Mutex<()>, Condvar)>,
+    handle: Mutex<Option<JoinHandle<()>>>,
+}
+
+impl HangWatcher {
+    pub(crate) fn spawn(num_slots: usize) -> Arc<Self> {
+        let slots: Arc<Vec<Mutex<Option<InflightEntry>>>> =
+            Arc::new((0..num_slots.max(1)).map(|_| Mutex::new(None)).collect());
+        let shutdown = Arc::new(AtomicBool::new(false));
+        let cv = Arc::new((Mutex::new(()), Condvar::new()));
+
+        let watcher_slots = Arc::clone(&slots);
+        let watcher_shutdown = Arc::clone(&shutdown);
+        let watcher_cv = Arc::clone(&cv);
+        let handle = std::thread::Builder::new()
+            .name("mago-hang-watcher".into())
+            .spawn(move || Self::run(watcher_slots, watcher_shutdown, watcher_cv))
+            .expect("failed to spawn hang watcher thread");
+
+        Arc::new(Self { slots, shutdown, cv, handle: Mutex::new(Some(handle)) })
+    }
+
+    fn run(slots: Arc<Vec<Mutex<Option<InflightEntry>>>>, shutdown: Arc<AtomicBool>, cv: Arc<(Mutex<()>, Condvar)>) {
+        let (lock, cvar) = &*cv;
+        loop {
+            if shutdown.load(Relaxed) {
+                return;
+            }
+
+            let guard = lock.lock().unwrap();
+            let (_guard, _) = cvar.wait_timeout(guard, HANG_POLL_INTERVAL).unwrap();
+
+            if shutdown.load(Relaxed) {
+                return;
+            }
+
+            let now = Instant::now();
+            for slot in slots.iter() {
+                let Ok(mut entry_guard) = slot.lock() else {
+                    continue;
+                };
+
+                let Some(entry) = entry_guard.as_mut() else {
+                    continue;
+                };
+
+                if now < entry.next_report_at {
+                    continue;
+                }
+
+                let elapsed = now - entry.started_at;
+                let secs = elapsed.as_secs();
+
+                if entry.reported {
+                    tracing::trace!("{} is still being analyzed after {secs}s.", entry.file.name);
+                } else {
+                    tracing::trace!("{} has been analyzing for {secs}s and has not finished.", entry.file.name);
+                    tracing::trace!(
+                        "No file should take this long to analyze. This is almost certainly a bug in mago."
+                    );
+                    tracing::trace!(
+                        "Please report it at https://github.com/carthage-software/mago/issues/new and attach {} if you can share it.",
+                        entry.file.name,
+                    );
+                    tracing::trace!(
+                        "If the file is private, anonymize it (rename identifiers, remove sensitive literals) before attaching."
+                    );
+                    entry.reported = true;
+                }
+
+                entry.next_report_at = now + elapsed.max(HANG_INITIAL_THRESHOLD);
+            }
+        }
+    }
+
+    /// Records that the current rayon worker has started analyzing `file` and
+    /// returns a guard that clears the entry when dropped.
+    pub(crate) fn track(self: &Arc<Self>, file: Arc<File>) -> HangGuard {
+        let idx = rayon::current_thread_index().unwrap_or(0);
+        if idx < self.slots.len()
+            && let Ok(mut slot) = self.slots[idx].lock()
+        {
+            let now = Instant::now();
+            *slot = Some(InflightEntry {
+                file,
+                started_at: now,
+                next_report_at: now + HANG_INITIAL_THRESHOLD,
+                reported: false,
+            });
+        }
+
+        HangGuard { slots: Arc::clone(&self.slots), idx }
+    }
+}
+
+impl Drop for HangWatcher {
+    fn drop(&mut self) {
+        self.shutdown.store(true, Relaxed);
+        let (_, cvar) = &*self.cv;
+        cvar.notify_all();
+        if let Ok(mut handle_guard) = self.handle.lock()
+            && let Some(handle) = handle_guard.take()
+        {
+            let _ = handle.join();
+        }
+    }
+}
+
+pub(crate) struct HangGuard {
+    slots: Arc<Vec<Mutex<Option<InflightEntry>>>>,
+    idx: usize,
+}
+
+impl Drop for HangGuard {
+    fn drop(&mut self) {
+        if self.idx < self.slots.len()
+            && let Ok(mut slot) = self.slots[self.idx].lock()
+        {
+            *slot = None;
         }
     }
 }
