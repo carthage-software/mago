@@ -17,6 +17,7 @@ This document details the rules available in the `Redundancy` category.
 | No Is Null | [`no-is-null`](#no-is-null) |
 | No Iterator To Array In Foreach | [`no-iterator-to-array-in-foreach`](#no-iterator-to-array-in-foreach) |
 | No Noop | [`no-noop`](#no-noop) |
+| No Null Property Initialization | [`no-null-property-init`](#no-null-property-init) |
 | No Protected in Final | [`no-protected-in-final`](#no-protected-in-final) |
 | No Redundant Binary String Prefix | [`no-redundant-binary-string-prefix`](#no-redundant-binary-string-prefix) |
 | No Redundant Block | [`no-redundant-block`](#no-redundant-block) |
@@ -352,6 +353,45 @@ echo "Hello, world!";
 <?php
 
 ;
+```
+
+
+## <a id="no-null-property-init"></a>`no-null-property-init`
+
+Detects redundant `= null` initialization on untyped properties.
+
+Untyped properties already default to `null`, making an explicit
+`= null` initializer unnecessary.
+
+
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `false` |
+| `level` | `string` | `"help"` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+
+class Foo {
+    public $name;
+}
+```
+
+#### Incorrect code
+
+```php
+<?php
+
+class Foo {
+    public $name = null;
+}
 ```
 
 
