@@ -1,4 +1,5 @@
 pub mod disallowed_functions;
+pub mod disallowed_type_instantiation;
 pub mod no_db_schema_change;
 pub mod no_debug_symbols;
 pub mod no_insecure_comparison;
@@ -11,6 +12,7 @@ pub mod sensitive_parameter;
 pub mod tainted_data_to_sink;
 
 pub use disallowed_functions::*;
+pub use disallowed_type_instantiation::*;
 pub use no_db_schema_change::*;
 pub use no_debug_symbols::*;
 pub use no_insecure_comparison::*;

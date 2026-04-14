@@ -8,6 +8,8 @@ use mago_linter::integration::IntegrationSet;
 use mago_linter::registry::RuleRegistry;
 use mago_linter::rule::DisallowedEntry;
 use mago_linter::rule::DisallowedFunctionsConfig;
+use mago_linter::rule::DisallowedTypeEntry;
+use mago_linter::rule::DisallowedTypeInstantiationConfig;
 use mago_linter::settings::RuleSettings;
 use mago_linter::settings::RulesSettings;
 use mago_linter::settings::Settings;
@@ -60,6 +62,16 @@ fn test_code_snippet(rule_code: &str, code: &str, should_have_issues: bool) -> R
             disallowed_functions: RuleSettings {
                 config: DisallowedFunctionsConfig {
                     extensions: vec![DisallowedEntry::Simple("curl".to_string())],
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+            disallowed_type_instantiation: RuleSettings {
+                config: DisallowedTypeInstantiationConfig {
+                    types: vec![
+                        DisallowedTypeEntry::Simple("HttpService\\Client".to_string()),
+                        DisallowedTypeEntry::Simple("DatabaseConnection".to_string()),
+                    ],
                     ..Default::default()
                 },
                 ..Default::default()

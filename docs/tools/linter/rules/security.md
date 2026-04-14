@@ -10,6 +10,7 @@ This document details the rules available in the `Security` category.
 | Rule | Code |
 | :--- | :---------- |
 | Disallowed Functions | [`disallowed-functions`](#disallowed-functions) |
+| Disallowed Type Instantiation | [`disallowed-type-instantiation`](#disallowed-type-instantiation) |
 | No Database Schema Changes | [`no-db-schema-change`](#no-db-schema-change) |
 | No Debug Symbols | [`no-debug-symbols`](#no-debug-symbols) |
 | No Insecure Comparison | [`no-insecure-comparison`](#no-insecure-comparison) |
@@ -70,6 +71,61 @@ allowed_function(); // Not flagged
 <?php
 
 curl_init(); // Error: part of a disallowed extension
+```
+
+
+## <a id="disallowed-type-instantiation"></a>`disallowed-type-instantiation`
+
+Flags direct instantiation of specific types that are disallowed via rule configuration.
+
+This rule helps enforce architectural patterns such as factory methods or provider patterns
+by preventing direct instantiation of specific classes. This is useful for ensuring consistent
+configuration, centralizing object creation, and maintaining architectural boundaries.
+
+Each entry can be a simple string or an object with `name` and optional `help`:
+
+```toml
+[linter.rules]
+disallowed-type-instantiation = {
+    enabled = true,
+    types = [
+        'HttpService\\Client',
+        { name = 'DatabaseConnection', help = 'Use DatabaseFactory::create() instead' },
+    ]
+}
+```
+
+
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `false` |
+| `level` | `string` | `"warning"` |
+| `types` | `array` | `[]` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+
+// Using factory pattern instead of direct instantiation
+$client = ClientProvider::getClient();
+```
+
+#### Incorrect code
+
+```php
+<?php
+
+// Direct instantiation of disallowed type
+$client = new HttpService\Client();
+
+// Another disallowed instantiation
+$db = new DatabaseConnection('localhost', 'user', 'pass');
 ```
 
 
