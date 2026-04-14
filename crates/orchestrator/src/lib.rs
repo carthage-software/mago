@@ -206,11 +206,17 @@ impl<'a> Orchestrator<'a> {
             Vec::new()
         };
 
+        let mut excludes = create_excludes_from_patterns(&self.config.excludes, workspace);
+        if !include_externals {
+            let include_strs: Vec<&str> = self.config.includes.iter().map(|s| s.as_ref()).collect();
+            excludes.extend(create_excludes_from_patterns(&include_strs, workspace));
+        }
+
         let configuration: DatabaseConfiguration<'a> = DatabaseConfiguration {
             workspace: Cow::Borrowed(workspace),
             paths: self.config.paths.iter().map(|s| Cow::Borrowed(s.as_ref())).collect(),
             includes,
-            excludes: create_excludes_from_patterns(&self.config.excludes, workspace),
+            excludes,
             extensions: self.config.extensions.iter().map(|s| Cow::Borrowed(*s)).collect(),
             glob: self.config.glob,
         };
