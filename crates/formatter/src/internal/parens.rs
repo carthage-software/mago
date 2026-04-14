@@ -268,41 +268,13 @@ impl<'arena> FormatterState<'_, 'arena> {
         };
 
         let precedence = operator.precedence();
-        let parent_precedence = match self.nth_parent_kind(2) {
-            Some(Node::Clone(_) | Node::ArrayAppend(_) | Node::VariadicArrayElement(_) | Node::UnaryPostfix(_)) => {
-                return true;
-            }
-            Some(Node::UnaryPrefix(u)) => u.operator.precedence(),
-            Some(Node::Binary(e)) => {
-                let parent_precedence = e.operator.precedence();
-
-                if parent_precedence == precedence {
-                    if parent_precedence.is_non_associative() {
-                        return true;
-                    }
-
-                    if parent_precedence.is_right_associative() && node.end_position() < e.operator.start_position() {
-                        return true;
-                    }
-
-                    if parent_precedence.is_left_associative() && node.start_position() > e.operator.end_position() {
-                        return true;
-                    }
-                }
-
-                if (operator.is_arithmetic() && !e.operator.is_arithmetic())
-                    || (operator.is_multiplicative() || e.operator.is_multiplicative())
-                    || (operator.is_bit_shift() && !e.operator.is_bit_shift())
-                    || (operator.is_bitwise() && e.operator.is_bitwise() && !e.operator.is_same_as(operator))
-                {
-                    return true;
-                }
-
-                parent_precedence
-            }
-            Some(Node::Pipe(_)) => Precedence::Pipe,
-            Some(Node::ArrowFunction(_)) => return false,
-            Some(Node::Conditional(_)) => Precedence::ElvisOrConditional,
+        match self.nth_parent_kind(2) {
+            Some(Node::Clone(_) | Node::ArrayAppend(_) | Node::VariadicArrayElement(_) | Node::UnaryPostfix(_)) => true,
+            Some(Node::UnaryPrefix(u)) => precedence < u.operator.precedence(),
+            Some(Node::Binary(e)) => self.binary_child_needs_parens(node, operator, &e.operator),
+            Some(Node::Pipe(_)) => precedence < Precedence::Pipe,
+            Some(Node::ArrowFunction(_)) => false,
+            Some(Node::Conditional(_)) => precedence < Precedence::ElvisOrConditional,
             Some(Node::ArrayAccess(access)) => {
                 // we add parentheses if the parent is an array access and the child is a binaryish node
                 //
@@ -317,9 +289,9 @@ impl<'arena> FormatterState<'_, 'arena> {
                 // ```php
                 // $foo ?? ($bar[$baz]);
                 // ```
-                return access.left_bracket.start > node.span().start;
+                access.left_bracket.start > node.span().start
             }
-            Some(Node::Assignment(_)) => Precedence::Assignment,
+            Some(Node::Assignment(_)) => precedence < Precedence::Assignment,
             _ => {
                 if matches!(self.nth_parent_kind(2), Some(Node::PropertyAccess(_) | Node::NullSafePropertyAccess(_))) {
                     return true;
@@ -331,11 +303,79 @@ impl<'arena> FormatterState<'_, 'arena> {
                     return true;
                 }
 
-                return false;
+                false
             }
-        };
+        }
+    }
 
-        precedence < parent_precedence
+    fn binary_child_needs_parens(
+        &self,
+        node: Node<'arena, 'arena>,
+        operator: &BinaryOperator<'arena>,
+        parent_operator: &BinaryOperator<'arena>,
+    ) -> bool {
+        let precedence = operator.precedence();
+        let parent_precedence = parent_operator.precedence();
+
+        if parent_precedence == precedence {
+            if parent_precedence.is_non_associative() {
+                return true;
+            }
+
+            if parent_precedence.is_right_associative() && node.end_position() < parent_operator.start_position() {
+                return true;
+            }
+
+            if parent_precedence.is_left_associative() && node.start_position() > parent_operator.end_position() {
+                return true;
+            }
+        }
+
+        if precedence < parent_precedence {
+            return true;
+        }
+
+        self.binary_style_grouping_needs_parens(operator, parent_operator)
+    }
+
+    fn binary_style_grouping_needs_parens(
+        &self,
+        operator: &BinaryOperator<'arena>,
+        parent_operator: &BinaryOperator<'arena>,
+    ) -> bool {
+        self.arithmetic_style_grouping_needs_parens(operator, parent_operator)
+            || self.bitwise_style_grouping_needs_parens(operator, parent_operator)
+    }
+
+    fn arithmetic_style_grouping_needs_parens(
+        &self,
+        operator: &BinaryOperator<'arena>,
+        parent_operator: &BinaryOperator<'arena>,
+    ) -> bool {
+        let parent_omits_redundant_arithmetic_parentheses =
+            self.settings.omit_redundant_arithmetic_binary_expression_parentheses
+                && (parent_operator.is_comparison() || parent_operator.is_null_coalesce());
+
+        if operator.is_arithmetic() && !parent_operator.is_arithmetic() {
+            return !parent_omits_redundant_arithmetic_parentheses;
+        }
+
+        operator.is_arithmetic()
+            && parent_operator.is_arithmetic()
+            && (operator.is_multiplicative() || parent_operator.is_multiplicative())
+    }
+
+    fn bitwise_style_grouping_needs_parens(
+        &self,
+        operator: &BinaryOperator<'arena>,
+        parent_operator: &BinaryOperator<'arena>,
+    ) -> bool {
+        if self.settings.omit_redundant_bitwise_binary_expression_parentheses {
+            return false;
+        }
+
+        (operator.is_bit_shift() && !parent_operator.is_bit_shift())
+            || (operator.is_bitwise() && parent_operator.is_bitwise() && !parent_operator.is_same_as(operator))
     }
 
     fn unary_node_needs_parens(&self, node: Node<'arena, 'arena>) -> bool {
