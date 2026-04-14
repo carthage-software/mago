@@ -2,7 +2,9 @@ use std::rc::Rc;
 
 use mago_atom::Atom;
 use mago_atom::concat_atom;
+use mago_codex::assertion::Assertion;
 use mago_codex::ttype::add_optional_union_type;
+use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::expander::StaticClassType;
 use mago_codex::ttype::expander::TypeExpansionOptions;
 use mago_codex::ttype::expander::expand_union;
@@ -132,7 +134,22 @@ fn analyze_property_access<'ctx, 'ast, 'arena>(
         }
     }
 
-    let mut resulting_type = resulting_expression_type.unwrap_or_else(get_never);
+    let narrowed_from_non_nullsafe = if is_null_safe
+        && let Some(object_type) = artifacts.get_rc_expression_type(object)
+        && !object_type.can_be_null()
+        && !object_type.possibly_undefined()
+        && let Some(non_nullsafe_id) = get_property_access_expression_id(
+            object,
+            property_selector,
+            false,
+            block_context.scope.get_class_like_name(),
+            context.resolved_names,
+            Some(context.codebase),
+        ) {
+        block_context.locals.get(&non_nullsafe_id).cloned()
+    } else {
+        None
+    };
 
     if is_null_safe
         && let Some(var_id) = get_expression_id(
@@ -148,9 +165,19 @@ fn analyze_property_access<'ctx, 'ast, 'arena>(
             .or_default()
             .entry(var_id)
             .or_default()
-            .push(vec![mago_codex::assertion::Assertion::IsNotType(mago_codex::ttype::atomic::TAtomic::Null)]);
+            .push(vec![Assertion::IsNotType(TAtomic::Null)]);
     }
 
+    if let Some(narrowed_rc) = narrowed_from_non_nullsafe {
+        if let Some(property_access_id) = property_access_id {
+            block_context.locals.insert(property_access_id, narrowed_rc.clone());
+        }
+
+        artifacts.set_rc_expression_type(&span, narrowed_rc);
+        return Ok(());
+    }
+
+    let mut resulting_type = resulting_expression_type.unwrap_or_else(get_never);
     let object_has_nullsafe_null = artifacts.get_expression_type(object).is_some_and(|t| t.has_nullsafe_null());
     if resolution_result.all_properties_non_nullable
         && ((is_null_safe && resolution_result.encountered_null) || object_has_nullsafe_null)

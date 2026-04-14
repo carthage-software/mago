@@ -167,6 +167,32 @@ pub fn reconcile_keyed_types<'ctx>(
             let mut orred_type: Option<TUnion> = None;
 
             for assertion in new_type_part_parts {
+                let mut report_this_assertion = can_report_issues
+                    && new_type_part_parts.len() == 1
+                    && referenced_var_ids.contains(key)
+                    && active_new_types.get(key).is_some_and(|active_new_type| active_new_type.contains(&i));
+
+                if report_this_assertion
+                    && i > 0
+                    && let Some(original) = before_adjustment.as_ref()
+                    && result_type.as_ref().is_some_and(|current| current != original)
+                {
+                    let probe_on_original = assertion_reconciler::reconcile(
+                        context,
+                        assertion,
+                        Some(original),
+                        Some(key_str),
+                        inside_loop,
+                        Some(span),
+                        false,
+                        negated,
+                    );
+
+                    if &probe_on_original != original {
+                        report_this_assertion = false;
+                    }
+                }
+
                 let result_type_candidate = assertion_reconciler::reconcile(
                     context,
                     assertion,
@@ -174,10 +200,7 @@ pub fn reconcile_keyed_types<'ctx>(
                     Some(key_str),
                     inside_loop,
                     Some(span),
-                    can_report_issues
-                        && new_type_part_parts.len() == 1
-                        && referenced_var_ids.contains(key)
-                        && active_new_types.get(key).is_some_and(|active_new_type| active_new_type.contains(&i)),
+                    report_this_assertion,
                     negated,
                 );
 
