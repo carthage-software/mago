@@ -316,7 +316,9 @@ impl<'a> DatabaseLoader<'a> {
                         return false;
                     }
 
-                    if has_dir_prunes && dir_prune_globs.is_match(workspace_relative_str(path)) {
+                    if has_dir_prunes
+                        && (dir_prune_globs.is_match(path) || dir_prune_globs.is_match(workspace_relative_str(path)))
+                    {
                         return false;
                     }
 
@@ -336,7 +338,9 @@ impl<'a> DatabaseLoader<'a> {
         let files: Vec<FileWithSpecificity> = paths_to_process
             .into_par_iter()
             .filter_map(|(path, specificity)| {
-                if has_glob_excludes && glob_excludes.is_match(workspace_relative_str(&path)) {
+                if has_glob_excludes
+                    && (glob_excludes.is_match(&path) || glob_excludes.is_match(workspace_relative_str(&path)))
+                {
                     return None;
                 }
 
@@ -630,6 +634,27 @@ mod tests {
         assert!(
             !names.iter().any(|n| n.contains("src/Calendar/Test/")),
             "files under src/*/Test/** should be excluded, got {names:?}"
+        );
+    }
+
+    #[test]
+    fn test_glob_excludes_match_legacy_absolute_prefix_patterns() {
+        let temp_dir = TempDir::new().unwrap();
+
+        create_test_file(&temp_dir, "packages/foo/src/main.php", "<?php");
+        create_test_file(&temp_dir, "packages/foo/vendor/lib.php", "<?php");
+
+        let mut config = create_test_config(&temp_dir, vec!["packages"], vec![]);
+        config.excludes = vec![Exclusion::Pattern(Cow::Borrowed("*/packages/**/vendor/*"))];
+
+        let loader = DatabaseLoader::new(config);
+        let db = loader.load().unwrap();
+
+        let names: Vec<String> = db.files().map(|f| f.name.to_string()).collect();
+        assert!(names.iter().any(|n| n.ends_with("packages/foo/src/main.php")));
+        assert!(
+            !names.iter().any(|n| n.contains("/vendor/")),
+            "legacy `*/packages/**/vendor/*` style should still exclude vendor files, got {names:?}"
         );
     }
 
