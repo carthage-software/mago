@@ -215,11 +215,20 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for UnaryPrefix<'arena> {
                             invalid_operand_messages.push(("Cannot negate `resource`".to_string(), operand_span));
                         }
                         TAtomic::Mixed(_) => {
-                            // Could be anything - possibly invalid
-                            invalid_operand_messages.push((
-                                "Cannot reliably negate `mixed`; it may contain non-numeric types".to_string(),
-                                operand_span,
-                            ));
+                            context.collector.report_with_code(
+                                IssueCode::MixedOperand,
+                                Issue::error("Cannot reliably negate a `mixed` operand.")
+                                    .with_annotation(
+                                        Annotation::primary(operand_span)
+                                            .with_message("Operand is `mixed`."),
+                                    )
+                                    .with_note(
+                                        "Negating `mixed` is unsafe as the actual runtime type is unknown.",
+                                    )
+                                    .with_help(
+                                        "Ensure the operand has a known type (e.g., `int`, `float`) using type hints, assertions, or checks.",
+                                    ),
+                            );
                             resulting_types.push(TAtomic::Scalar(TScalar::int()));
                             resulting_types.push(TAtomic::Scalar(TScalar::float()));
                         }
@@ -608,6 +617,23 @@ fn increment_operand<'ctx, 'arena>(
             TAtomic::Never => {
                 // never type is unreachable, don't produce mixed, just skip.
             }
+            TAtomic::Mixed(_) => {
+                context.collector.report_with_code(
+                    IssueCode::MixedOperand,
+                    Issue::error("Cannot reliably increment a `mixed` operand.")
+                        .with_annotation(
+                            Annotation::primary(operand.span()).with_message("Operand is `mixed`."),
+                        )
+                        .with_note(
+                            "Incrementing `mixed` is unsafe as the actual runtime type is unknown.",
+                        )
+                        .with_help(
+                            "Ensure the operand has a known type (e.g., `int`, `float`, `string`) using type hints, assertions, or checks.",
+                        ),
+                );
+
+                possibilities.push(TAtomic::Mixed(TMixed::new()));
+            }
             _ => {
                 let type_name = operand_atomic_type.get_id();
                 context.collector.report_with_code(
@@ -841,6 +867,23 @@ fn decrement_operand<'ctx, 'arena>(
             }
             TAtomic::Never => {
                 // never type is unreachable, don't produce mixed, just skip.
+            }
+            TAtomic::Mixed(_) => {
+                context.collector.report_with_code(
+                    IssueCode::MixedOperand,
+                    Issue::error("Cannot reliably decrement a `mixed` operand.")
+                        .with_annotation(
+                            Annotation::primary(operand.span()).with_message("Operand is `mixed`."),
+                        )
+                        .with_note(
+                            "Decrementing `mixed` is unsafe as the actual runtime type is unknown.",
+                        )
+                        .with_help(
+                            "Ensure the operand has a known type (e.g., `int`, `float`, `string`) using type hints, assertions, or checks.",
+                        ),
+                );
+
+                possibilities.push(TAtomic::Mixed(TMixed::new()));
             }
             _ => {
                 let type_name = operand_atomic_type.get_id();

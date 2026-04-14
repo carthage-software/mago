@@ -33,7 +33,7 @@ function test_general_string(string $s): int|float {
     return -$s; // possibly invalid - could be numeric at runtime
 }
 
-// @mago-expect analysis:possibly-invalid-operand
+// @mago-expect analysis:mixed-operand
 function test_mixed(mixed $m): int|float {
-    return -$m; // possibly invalid - mixed could be anything
+    return -$m; // mixed - type is unknown at compile time
 }
