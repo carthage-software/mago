@@ -6,6 +6,7 @@ use mago_algebra::DEFAULT_DISJUNCTION_COMPLEXITY;
 use mago_algebra::DEFAULT_NEGATION_COMPLEXITY;
 use mago_algebra::DEFAULT_SATURATION_COMPLEXITY;
 use mago_analyzer::settings::DEFAULT_FORMULA_SIZE_THRESHOLD;
+use mago_analyzer::settings::DEFAULT_LOOP_ASSIGNMENT_DEPTH_THRESHOLD;
 use mago_analyzer::settings::Settings;
 use mago_atom::ascii_lowercase_atom;
 use mago_atom::atom;
@@ -350,8 +351,29 @@ pub struct PerformanceConfiguration {
     /// to a simpler array type. This prevents memory explosion on files with
     /// thousands of array pushes.
     ///
-    /// Defaults to `128`.
+    /// Defaults to `32`.
     pub array_combination_threshold: u16,
+
+    /// Maximum depth of the loop assignment dependency graph that the
+    /// fixed-point analyzer will explore when re-analysing loop bodies.
+    ///
+    /// The analyzer uses fixed-point iteration to propagate widened types
+    /// along loop-carried dependency chains. A chain of length `N` can
+    /// require up to `N` extra passes for the type at the end of the chain
+    /// to fully stabilise, and each pass re-analyses the entire loop body.
+    /// On large, complex loops the per-pass cost dominates file analysis
+    /// time.
+    ///
+    /// The default of `1` means each loop body is re-analysed at most once
+    /// after the initial pass; enough to stabilise virtually all real-world
+    /// code while keeping analysis cost bounded. Projects that require
+    /// maximally precise narrowing of long loop-carried chains can raise
+    /// this value (typically to `2` or `3`) at the cost of significantly
+    /// slower analysis on complex files. Setting this to `0` disables
+    /// fixed-point iteration entirely.
+    ///
+    /// Defaults to `1`.
+    pub loop_assignment_depth_threshold: u8,
 }
 
 impl Default for PerformanceConfiguration {
@@ -365,6 +387,7 @@ impl Default for PerformanceConfiguration {
             string_combination_threshold: DEFAULT_STRING_COMBINATION_THRESHOLD,
             integer_combination_threshold: DEFAULT_INTEGER_COMBINATION_THRESHOLD,
             array_combination_threshold: DEFAULT_ARRAY_COMBINATION_THRESHOLD,
+            loop_assignment_depth_threshold: DEFAULT_LOOP_ASSIGNMENT_DEPTH_THRESHOLD,
         }
     }
 }
@@ -413,6 +436,7 @@ impl AnalyzerConfiguration {
             string_combination_threshold: self.performance.string_combination_threshold,
             integer_combination_threshold: self.performance.integer_combination_threshold,
             array_combination_threshold: self.performance.array_combination_threshold,
+            loop_assignment_depth_threshold: self.performance.loop_assignment_depth_threshold,
         }
     }
 }

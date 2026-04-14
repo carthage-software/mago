@@ -23,18 +23,19 @@ baseline = "analyzer-baseline.toml"
 
 ## General options
 
-| Option             | Type       | Default   | Description                                                |
-| :----------------- | :--------- | :-------- | :--------------------------------------------------------- |
-| `excludes`         | `string[]` | `[]`      | A list of paths or glob patterns to exclude from analysis. |
-| `ignore`           | `(string \| object)[]` | `[]` | Issue codes to ignore, optionally scoped to specific paths. See [Path-scoped ignoring](#path-scoped-ignoring). |
-| `baseline`         | `string`   | `null`    | Path to a baseline file to ignore listed issues. When specified, the analyzer will use this file as the default baseline, eliminating the need to pass `--baseline` on every run. Command-line `--baseline` arguments will override this setting. |
-| `baseline-variant` | `string`   | `"loose"` | The baseline format variant to use when generating new baselines. Options: `"loose"` (count-based, resilient to line changes) or `"strict"` (exact line matching). See [Baseline Variants](/fundamentals/baseline#baseline-variants) for details. |
-| `minimum-fail-level` | `string` | `"error"` | Set the minimum issue severity that causes the command to exit with a non-zero status. Options: `"note"`, `"help"`, `"warning"`, `"error"`. Can be overridden by the `--minimum-fail-level` CLI flag. |
+| Option               | Type                   | Default   | Description                                                                                                                                                                                                                                       |
+| :------------------- | :--------------------- | :-------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `excludes`           | `string[]`             | `[]`      | A list of paths or glob patterns to exclude from analysis.                                                                                                                                                                                        |
+| `ignore`             | `(string \| object)[]` | `[]`      | Issue codes to ignore, optionally scoped to specific paths. See [Path-scoped ignoring](#path-scoped-ignoring).                                                                                                                                    |
+| `baseline`           | `string`               | `null`    | Path to a baseline file to ignore listed issues. When specified, the analyzer will use this file as the default baseline, eliminating the need to pass `--baseline` on every run. Command-line `--baseline` arguments will override this setting. |
+| `baseline-variant`   | `string`               | `"loose"` | The baseline format variant to use when generating new baselines. Options: `"loose"` (count-based, resilient to line changes) or `"strict"` (exact line matching). See [Baseline Variants](/fundamentals/baseline#baseline-variants) for details. |
+| `minimum-fail-level` | `string`               | `"error"` | Set the minimum issue severity that causes the command to exit with a non-zero status. Options: `"note"`, `"help"`, `"warning"`, `"error"`. Can be overridden by the `--minimum-fail-level` CLI flag.                                             |
 
 :::tip Tool-Specific Excludes
 The `excludes` option here is **additive** to the global `source.excludes` defined in the `[source]` section of your configuration. Files excluded globally will always be excluded from analysis, and this option allows you to exclude additional files from the analyzer specifically.
 
 For example:
+
 ```toml
 [source]
 excludes = ["cache/**"]  # Excluded from ALL tools
@@ -42,6 +43,7 @@ excludes = ["cache/**"]  # Excluded from ALL tools
 [analyzer]
 excludes = ["tests/**/*.php"]  # Additionally excluded from analyzer only
 ```
+
 :::
 
 ### Path-scoped ignoring
@@ -49,11 +51,13 @@ excludes = ["tests/**/*.php"]  # Additionally excluded from analyzer only
 The `ignore` option accepts three formats:
 
 **Plain string** — ignore a code everywhere:
+
 ```toml
 ignore = ["missing-return-type"]
 ```
 
 **Object with single path** — ignore a code only in a specific directory or file:
+
 ```toml
 ignore = [
   { code = "missing-return-type", in = "tests/" },
@@ -61,6 +65,7 @@ ignore = [
 ```
 
 **Object with multiple paths** — ignore a code in several locations:
+
 ```toml
 ignore = [
   { code = "missing-return-type", in = ["tests/", "src/Legacy/"] },
@@ -68,6 +73,7 @@ ignore = [
 ```
 
 All three formats can be mixed in the same `ignore` list:
+
 ```toml
 ignore = [
   "mixed-argument",
@@ -80,56 +86,59 @@ Paths are matched as prefixes against relative file paths from the project root.
 
 :::tip
 Path-scoped ignoring is different from `excludes`:
+
 - `excludes` removes files from analysis entirely — they won't be parsed for type information.
 - `ignore` with `in` still analyzes the files but suppresses specific issue codes in the output.
-:::
+  :::
 
 ## Feature flags
 
 These flags control specific, powerful analysis capabilities.
 
-| Option                                | Default | Description                                                                                          |
-| :------------------------------------ | :------ | :--------------------------------------------------------------------------------------------------- |
-| `find-unused-expressions`             | `true`  | Find and report expressions whose results are not used (e.g., `$a + $b;`).                           |
-| `find-unused-definitions`             | `true`  | Find and report unused definitions (e.g., private methods that are never called).                    |
-| `find-overly-wide-return-types`       | `false` | Warn when a function's declared return type contains a branch the body never actually returns (e.g. `: string\|false` on a function that always returns a string). Available since Mago 1.20.0. |
-| `analyze-dead-code`                   | `false` | Analyze code that appears to be unreachable.                                                         |
-| `memoize-properties`                  | `true`  | Track the literal values of class properties. Improves type inference but may increase memory usage. |
-| `allow-possibly-undefined-array-keys` | `true`  | Allow accessing array keys that may not be defined without reporting an issue.                       |
-| `check-throws`                        | `false` | Check for unhandled thrown exceptions that are not caught or documented with `@throws`.              |
-| `check-missing-override`              | `false` | Check for missing `#[Override]` attributes on overriding methods (PHP 8.3+).                         |
-| `find-unused-parameters`              | `false` | Find and report unused function/method parameters.                                                   |
-| `strict-list-index-checks`            | `false` | When `true`, requires any integer used as a `list` index to be provably non-negative.                |
-| `no-boolean-literal-comparison`       | `false` | When `true`, disallows direct comparison to boolean literals (e.g., `$a === true`).                  |
-| `check-missing-type-hints`            | `false` | When `true`, reports missing type hints on parameters, properties, and return types.                 |
-| `check-closure-missing-type-hints`    | `false` | When `true`, checks closures for missing type hints when `check-missing-type-hints` is enabled.      |
-| `check-arrow-function-missing-type-hints` | `false` | When `true`, checks arrow functions for missing type hints when `check-missing-type-hints` is enabled. |
-| `register-super-globals`              | `true`  | Automatically register PHP superglobals (e.g., `$_GET`, `$_POST`) for analysis.                      |
-| `trust-existence-checks`              | `true`  | When `true`, narrows types based on `method_exists()`, `property_exists()`, `function_exists()`, and `defined()` checks. |
-| `check-property-initialization`       | `false` | When `true`, checks that typed properties are initialized in constructors or class initializers.      |
-| `check-use-statements`                | `false` | When `true`, reports use statements that import non-existent classes, functions, or constants.        |
-| `check-name-casing`                  | `false` | When `true`, reports incorrect casing when referencing classes, functions, etc. (e.g., `new fooBar()` when defined as `FooBar`). Helps prevent autoloading failures on case-sensitive file systems. |
-| `enforce-class-finality`              | `false` | When `true`, reports classes that are not `final`, `abstract`, or annotated with `@api` and have no children. |
-| `require-api-or-internal`             | `false` | When `true`, requires abstract classes, interfaces, and traits to have `@api` or `@internal` annotations. |
-| `check-experimental`                  | `false` | When `true`, reports usage of classes, interfaces, traits, and functions marked with `@experimental` from non-experimental contexts. |
-| `allow-side-effects-in-conditions`    | `true`  | When `false`, reports calls to impure functions (not marked `@pure` or `@mutation-free`) inside `if`, `while`, `for`, ternary, or `match` conditions. Helps catch surprising evaluation-order bugs. |
+| Option                                    | Default | Description                                                                                                                                                                                         |
+| :---------------------------------------- | :------ | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `find-unused-expressions`                 | `true`  | Find and report expressions whose results are not used (e.g., `$a + $b;`).                                                                                                                          |
+| `find-unused-definitions`                 | `true`  | Find and report unused definitions (e.g., private methods that are never called).                                                                                                                   |
+| `find-overly-wide-return-types`           | `false` | Warn when a function's declared return type contains a branch the body never actually returns (e.g. `: string\|false` on a function that always returns a string). Available since Mago 1.20.0.     |
+| `analyze-dead-code`                       | `false` | Analyze code that appears to be unreachable.                                                                                                                                                        |
+| `memoize-properties`                      | `true`  | Track the literal values of class properties. Improves type inference but may increase memory usage.                                                                                                |
+| `allow-possibly-undefined-array-keys`     | `true`  | Allow accessing array keys that may not be defined without reporting an issue.                                                                                                                      |
+| `check-throws`                            | `false` | Check for unhandled thrown exceptions that are not caught or documented with `@throws`.                                                                                                             |
+| `check-missing-override`                  | `false` | Check for missing `#[Override]` attributes on overriding methods (PHP 8.3+).                                                                                                                        |
+| `find-unused-parameters`                  | `false` | Find and report unused function/method parameters.                                                                                                                                                  |
+| `strict-list-index-checks`                | `false` | When `true`, requires any integer used as a `list` index to be provably non-negative.                                                                                                               |
+| `no-boolean-literal-comparison`           | `false` | When `true`, disallows direct comparison to boolean literals (e.g., `$a === true`).                                                                                                                 |
+| `check-missing-type-hints`                | `false` | When `true`, reports missing type hints on parameters, properties, and return types.                                                                                                                |
+| `check-closure-missing-type-hints`        | `false` | When `true`, checks closures for missing type hints when `check-missing-type-hints` is enabled.                                                                                                     |
+| `check-arrow-function-missing-type-hints` | `false` | When `true`, checks arrow functions for missing type hints when `check-missing-type-hints` is enabled.                                                                                              |
+| `register-super-globals`                  | `true`  | Automatically register PHP superglobals (e.g., `$_GET`, `$_POST`) for analysis.                                                                                                                     |
+| `trust-existence-checks`                  | `true`  | When `true`, narrows types based on `method_exists()`, `property_exists()`, `function_exists()`, and `defined()` checks.                                                                            |
+| `check-property-initialization`           | `false` | When `true`, checks that typed properties are initialized in constructors or class initializers.                                                                                                    |
+| `check-use-statements`                    | `false` | When `true`, reports use statements that import non-existent classes, functions, or constants.                                                                                                      |
+| `check-name-casing`                       | `false` | When `true`, reports incorrect casing when referencing classes, functions, etc. (e.g., `new fooBar()` when defined as `FooBar`). Helps prevent autoloading failures on case-sensitive file systems. |
+| `enforce-class-finality`                  | `false` | When `true`, reports classes that are not `final`, `abstract`, or annotated with `@api` and have no children.                                                                                       |
+| `require-api-or-internal`                 | `false` | When `true`, requires abstract classes, interfaces, and traits to have `@api` or `@internal` annotations.                                                                                           |
+| `check-experimental`                      | `false` | When `true`, reports usage of classes, interfaces, traits, and functions marked with `@experimental` from non-experimental contexts.                                                                |
+| `allow-side-effects-in-conditions`        | `true`  | When `false`, reports calls to impure functions (not marked `@pure` or `@mutation-free`) inside `if`, `while`, `for`, ternary, or `match` conditions. Helps catch surprising evaluation-order bugs. |
 
 ## Property initialization
 
 These options control how the analyzer checks property initialization.
 
-| Option                           | Type       | Default | Description                                                                          |
-| :------------------------------- | :--------- | :------ | :----------------------------------------------------------------------------------- |
-| `check-property-initialization`  | `bool`     | `false` | Enable/disable property initialization checking entirely.                            |
-| `class-initializers`             | `string[]` | `[]`    | Method names treated as class initializers (like `__construct`).                     |
+| Option                          | Type       | Default | Description                                                      |
+| :------------------------------ | :--------- | :------ | :--------------------------------------------------------------- |
+| `check-property-initialization` | `bool`     | `false` | Enable/disable property initialization checking entirely.        |
+| `class-initializers`            | `string[]` | `[]`    | Method names treated as class initializers (like `__construct`). |
 
 ### How it works
 
 When `check-property-initialization` is enabled, the analyzer reports:
+
 - **`missing-constructor`**: Classes with typed properties that have no constructor to initialize them
 - **`uninitialized-property`**: Typed properties not initialized in the constructor
 
 The `class-initializers` setting allows you to specify additional methods that should be treated as initializers. Properties initialized in these methods count as "definitely initialized", just like in `__construct`. This is useful for frameworks that use lifecycle methods like:
+
 - PHPUnit's `setUp()` method for test classes
 - Framework-specific `boot()` or `initialize()` methods
 
@@ -171,10 +180,10 @@ This enables both `missing-constructor` and `uninitialized-property` issues.
 
 When `check-throws` is enabled, you can fine-tune which exceptions should be ignored using these options:
 
-| Option                       | Type       | Default | Description                                                                                      |
-| :--------------------------- | :--------- | :------ | :----------------------------------------------------------------------------------------------- |
-| `unchecked-exceptions`       | `string[]` | `[]`    | Exceptions to ignore **including all their subclasses** (hierarchy-aware).                       |
-| `unchecked-exception-classes`| `string[]` | `[]`    | Exceptions to ignore **only as exact class matches** (not subclasses or parent classes).         |
+| Option                        | Type       | Default | Description                                                                              |
+| :---------------------------- | :--------- | :------ | :--------------------------------------------------------------------------------------- |
+| `unchecked-exceptions`        | `string[]` | `[]`    | Exceptions to ignore **including all their subclasses** (hierarchy-aware).               |
+| `unchecked-exception-classes` | `string[]` | `[]`    | Exceptions to ignore **only as exact class matches** (not subclasses or parent classes). |
 
 ### How it works
 
@@ -205,6 +214,7 @@ unchecked-exception-classes = [
 ```
 
 In this example:
+
 - Any unhandled `LogicException` or its subclasses (like `InvalidArgumentException`) won't be reported
 - Any class implementing `Psl\Type\Exception\ExceptionInterface` won't be reported
 - Only the exact `Psl\File\Exception\FileNotFoundException` is ignored, but other file exceptions would still be reported
@@ -283,19 +293,19 @@ check-experimental = true
 
 Plugins extend the analyzer with specialized type information for libraries and frameworks. They provide accurate type inference for functions that would otherwise return generic types.
 
-| Option                   | Type       | Default | Description                                                              |
-| :----------------------- | :--------- | :------ | :----------------------------------------------------------------------- |
-| `disable-default-plugins`| `bool`     | `false` | Disable all default plugins. Only explicitly listed plugins will be used.|
-| `plugins`                | `string[]` | `[]`    | List of plugins to enable (by name or alias).                            |
+| Option                    | Type       | Default | Description                                                               |
+| :------------------------ | :--------- | :------ | :------------------------------------------------------------------------ |
+| `disable-default-plugins` | `bool`     | `false` | Disable all default plugins. Only explicitly listed plugins will be used. |
+| `plugins`                 | `string[]` | `[]`    | List of plugins to enable (by name or alias).                             |
 
 ### Available plugins
 
-| Plugin ID       | Aliases                                    | Default  | Description                                                                      |
-| :-------------- | :----------------------------------------- | :------- | :------------------------------------------------------------------------------- |
-| `stdlib`        | `standard`, `std`, `php-stdlib`            | Enabled  | Type providers for PHP built-in functions (`strlen`, `array_*`, `json_*`, etc.)  |
-| `psl`           | `php-standard-library`, `azjezz-psl`       | Disabled | Type providers for [php-standard-library](https://github.com/php-standard-library/php-standard-library) package           |
-| `flow-php`      | `flow`, `flow-etl`                         | Disabled | Type providers for [flow-php/etl](https://github.com/flow-php/etl) package       |
-| `psr-container` | `psr-11`                                   | Disabled | Type providers for [psr/container](https://github.com/php-fig/container) package |
+| Plugin ID       | Aliases                              | Default  | Description                                                                                                     |
+| :-------------- | :----------------------------------- | :------- | :-------------------------------------------------------------------------------------------------------------- |
+| `stdlib`        | `standard`, `std`, `php-stdlib`      | Enabled  | Type providers for PHP built-in functions (`strlen`, `array_*`, `json_*`, etc.)                                 |
+| `psl`           | `php-standard-library`, `azjezz-psl` | Disabled | Type providers for [php-standard-library](https://github.com/php-standard-library/php-standard-library) package |
+| `flow-php`      | `flow`, `flow-etl`                   | Disabled | Type providers for [flow-php/etl](https://github.com/flow-php/etl) package                                      |
+| `psr-container` | `psr-11`                             | Disabled | Type providers for [psr/container](https://github.com/php-fig/container) package                                |
 
 ### How plugins work
 
@@ -382,24 +392,24 @@ trust-existence-checks = false
 
 #### Type hint enforcement
 
-| Option | Strict Value | Effect |
-| :----- | :----------- | :----- |
-| `check-missing-type-hints` | `true` | Reports missing type hints on function parameters, return types, and class properties. |
-| `check-closure-missing-type-hints` | `true` | Also checks closures for missing type hints (requires `check-missing-type-hints`). |
-| `check-arrow-function-missing-type-hints` | `true` | Also checks arrow functions for missing type hints (requires `check-missing-type-hints`). |
+| Option                                    | Strict Value | Effect                                                                                    |
+| :---------------------------------------- | :----------- | :---------------------------------------------------------------------------------------- |
+| `check-missing-type-hints`                | `true`       | Reports missing type hints on function parameters, return types, and class properties.    |
+| `check-closure-missing-type-hints`        | `true`       | Also checks closures for missing type hints (requires `check-missing-type-hints`).        |
+| `check-arrow-function-missing-type-hints` | `true`       | Also checks arrow functions for missing type hints (requires `check-missing-type-hints`). |
 
 #### Array access strictness
 
-| Option | Strict Value | Effect |
-| :----- | :----------- | :----- |
-| `allow-possibly-undefined-array-keys` | `false` | Reports errors when accessing array keys that may not exist. |
-| `strict-list-index-checks` | `true` | Requires list indices to be provably non-negative (`int<0, max>`). |
+| Option                                | Strict Value | Effect                                                             |
+| :------------------------------------ | :----------- | :----------------------------------------------------------------- |
+| `allow-possibly-undefined-array-keys` | `false`      | Reports errors when accessing array keys that may not exist.       |
+| `strict-list-index-checks`            | `true`       | Requires list indices to be provably non-negative (`int<0, max>`). |
 
 #### Runtime check behavior
 
-| Option | Strict Value | Effect |
-| :----- | :----------- | :----- |
-| `trust-existence-checks` | `false` | Ignores `method_exists()`, `property_exists()` checks; requires explicit type hints. |
+| Option                   | Strict Value | Effect                                                                               |
+| :----------------------- | :----------- | :----------------------------------------------------------------------------------- |
+| `trust-existence-checks` | `false`      | Ignores `method_exists()`, `property_exists()` checks; requires explicit type hints. |
 
 When `trust-existence-checks` is enabled (the default), the analyzer narrows types based on runtime existence checks:
 
@@ -420,25 +430,25 @@ function process(object $obj): mixed
 
 #### Code quality checks
 
-| Option | Strict Value | Effect |
-| :----- | :----------- | :----- |
-| `find-unused-expressions` | `true` | Reports expressions whose results are discarded (e.g., `$a + $b;`). |
-| `find-unused-definitions` | `true` | Reports unused private methods, variables, and other definitions. |
-| `find-overly-wide-return-types` | `true` | Reports functions whose declared return type advertises branches the body never produces (e.g. `: string\|false` on a function that always returns a string). Available since Mago 1.20.0. |
-| `analyze-dead-code` | `true` | Analyzes and reports on unreachable code paths. |
-| `check-missing-override` | `true` | Reports missing `#[Override]` attributes on overriding methods (PHP 8.3+). |
-| `find-unused-parameters` | `true` | Reports unused function/method parameters. |
-| `no-boolean-literal-comparison` | `true` | Disallows comparisons like `$a === true` or `$b == false`. |
-| `enforce-class-finality` | `true` | Reports classes not declared `final`, `abstract`, or annotated with `@api`. |
-| `require-api-or-internal` | `true` | Requires abstract classes, interfaces, and traits to have `@api` or `@internal`. |
-| `check-experimental` | `true` | Reports usage of `@experimental` APIs from non-experimental contexts. |
-| `allow-side-effects-in-conditions` | `false` | Reports impure function calls inside conditions. |
+| Option                             | Strict Value | Effect                                                                                                                                                                                     |
+| :--------------------------------- | :----------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `find-unused-expressions`          | `true`       | Reports expressions whose results are discarded (e.g., `$a + $b;`).                                                                                                                        |
+| `find-unused-definitions`          | `true`       | Reports unused private methods, variables, and other definitions.                                                                                                                          |
+| `find-overly-wide-return-types`    | `true`       | Reports functions whose declared return type advertises branches the body never produces (e.g. `: string\|false` on a function that always returns a string). Available since Mago 1.20.0. |
+| `analyze-dead-code`                | `true`       | Analyzes and reports on unreachable code paths.                                                                                                                                            |
+| `check-missing-override`           | `true`       | Reports missing `#[Override]` attributes on overriding methods (PHP 8.3+).                                                                                                                 |
+| `find-unused-parameters`           | `true`       | Reports unused function/method parameters.                                                                                                                                                 |
+| `no-boolean-literal-comparison`    | `true`       | Disallows comparisons like `$a === true` or `$b == false`.                                                                                                                                 |
+| `enforce-class-finality`           | `true`       | Reports classes not declared `final`, `abstract`, or annotated with `@api`.                                                                                                                |
+| `require-api-or-internal`          | `true`       | Requires abstract classes, interfaces, and traits to have `@api` or `@internal`.                                                                                                           |
+| `check-experimental`               | `true`       | Reports usage of `@experimental` APIs from non-experimental contexts.                                                                                                                      |
+| `allow-side-effects-in-conditions` | `false`      | Reports impure function calls inside conditions.                                                                                                                                           |
 
 #### Exception handling
 
-| Option | Strict Value | Effect |
-| :----- | :----------- | :----- |
-| `check-throws` | `true` | Reports unhandled exceptions not caught or documented with `@throws`. |
+| Option         | Strict Value | Effect                                                                |
+| :------------- | :----------- | :-------------------------------------------------------------------- |
+| `check-throws` | `true`       | Reports unhandled exceptions not caught or documented with `@throws`. |
 
 ### Lenient mode
 
@@ -469,16 +479,17 @@ When introducing Mago to an existing codebase, start with lenient settings and a
 
 The analyzer uses internal thresholds to balance analysis depth against performance. These thresholds control how deeply the type inference engine explores complex logical formulas. All settings go under `[analyzer.performance]` in your `mago.toml` file.
 
-| Option                                | Type  | Default | Description                                                              |
-| :------------------------------------ | :---- | :------ | :----------------------------------------------------------------------- |
-| `saturation-complexity-threshold`     | `u16` | `8192`  | Maximum clauses during CNF saturation.                                   |
-| `disjunction-complexity-threshold`    | `u16` | `4096`  | Maximum clauses per side in OR operations.                               |
-| `negation-complexity-threshold`       | `u16` | `4096`  | Maximum cumulative complexity when negating formulas.                    |
-| `consensus-limit-threshold`           | `u16` | `256`   | Upper limit for consensus optimization passes.                           |
-| `formula-size-threshold`              | `u16` | `512`   | Maximum logical formula size before simplification is skipped.           |
-| `string-combination-threshold`        | `u16` | `128`   | Maximum literal strings to track before generalizing to `string`.        |
-| `integer-combination-threshold`       | `u16` | `128`   | Maximum literal integers to track before generalizing to `int`.          |
-| `array-combination-threshold`         | `u16` | `128`   | Maximum array elements to track individually before generalizing.        |
+| Option                             | Type  | Default | Description                                                          |
+| :--------------------------------- | :---- | :------ | :------------------------------------------------------------------- |
+| `saturation-complexity-threshold`  | `u16` | `8192`  | Maximum clauses during CNF saturation.                               |
+| `disjunction-complexity-threshold` | `u16` | `4096`  | Maximum clauses per side in OR operations.                           |
+| `negation-complexity-threshold`    | `u16` | `4096`  | Maximum cumulative complexity when negating formulas.                |
+| `consensus-limit-threshold`        | `u16` | `256`   | Upper limit for consensus optimization passes.                       |
+| `formula-size-threshold`           | `u16` | `512`   | Maximum logical formula size before simplification is skipped.       |
+| `string-combination-threshold`     | `u16` | `128`   | Maximum literal strings to track before generalizing to `string`.    |
+| `integer-combination-threshold`    | `u16` | `128`   | Maximum literal integers to track before generalizing to `int`.      |
+| `array-combination-threshold`      | `u16` | `32`    | Maximum array shapes to track individually before generalizing.      |
+| `loop-assignment-depth-threshold`  | `u8`  | `1`     | Maximum loop fixed-point iteration depth. `0` disables re-iteration. |
 
 :::tip Backward compatibility
 The `string-concat-combination-threshold` option is still supported as an alias for `string-combination-threshold`.
@@ -502,7 +513,8 @@ The analyzer converts type constraints into CNF (Conjunctive Normal Form) logica
 - **Formula size**: Overall limit on formula complexity before the analyzer falls back to simpler inference.
 - **String combination**: Limits the number of literal string values tracked during type combination. When combining many different string literals (e.g., in large arrays or switch statements), the analyzer generalizes to `string` after this threshold to prevent O(n²) complexity.
 - **Integer combination**: Limits the number of literal integer values tracked during type combination. When exceeded, the analyzer generalizes to `int`.
-- **Array combination**: Limits the number of array elements tracked individually. When building array types through repeated push operations (`$arr[] = ...`), elements beyond this threshold are generalized to prevent memory explosion.
+- **Array combination**: Limits the number of distinct sealed keyed-array shapes tracked individually during type combination. When large, procedural code accumulates many slightly different shapes for the same variable across branches, the combiner keeps each one separate until this threshold is hit and then merges them into a single generalized shape. The default of `32` keeps worst-case combine cost bounded on messy real-world code; increase it for projects that rely on very precise per-key array narrowing.
+- **Loop assignment depth**: Caps how many fixed-point iterations the loop analyzer runs over each loop body. With a chain of `N` loop-carried dependencies, up to `N` extra passes may be needed for types at the end of the chain to fully stabilize, and each pass re-analyses the entire loop body. The default of `1` is enough to stabilise virtually all real-world code and keeps large loops from dominating analysis time; raise it to `2` or `3` for projects that need maximally precise narrowing of deep loop-carried chains. Setting it to `0` disables fixed-point re-iteration entirely; fastest, but some types that depend on themselves across iterations may stay wider than necessary.
 
 ### Example configurations
 
@@ -519,7 +531,8 @@ consensus-limit-threshold = 64
 formula-size-threshold = 128
 string-combination-threshold = 64
 integer-combination-threshold = 64
-array-combination-threshold = 64
+array-combination-threshold = 16
+loop-assignment-depth-threshold = 1
 ```
 
 #### Deep analysis (slower, more precise)
@@ -536,6 +549,7 @@ formula-size-threshold = 1024
 string-combination-threshold = 256
 integer-combination-threshold = 256
 array-combination-threshold = 256
+loop-assignment-depth-threshold = 4
 ```
 
 :::warning Performance impact

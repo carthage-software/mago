@@ -58,7 +58,7 @@ use crate::utils::str_is_numeric;
 /// are accumulated for later comparison. If the number of sealed arrays exceeds
 /// this threshold, they are immediately generalized to prevent O(n²) complexity
 /// in `finalize_sealed_arrays` and excessive memory usage.
-pub const DEFAULT_ARRAY_COMBINATION_THRESHOLD: u16 = 128;
+pub const DEFAULT_ARRAY_COMBINATION_THRESHOLD: u16 = 32;
 
 /// Default maximum number of literal strings to track before generalizing to string.
 ///

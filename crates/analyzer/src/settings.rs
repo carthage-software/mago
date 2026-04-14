@@ -6,6 +6,16 @@ use mago_php_version::PHPVersion;
 /// Default maximum logical formula size during conditional analysis.
 pub const DEFAULT_FORMULA_SIZE_THRESHOLD: u16 = 512;
 
+/// Default cap on the loop assignment-graph depth that the analyzer will
+/// explore when running fixed-point iteration over loop bodies.
+///
+/// The default of `1` means each loop body is re-analyzed at most once after
+/// the initial pass, which is sufficient to stabilise the vast majority of
+/// real-world code and keeps per-file cost bounded. Projects that care about
+/// maximally precise narrowing of long loop-carried dependency chains can
+/// raise this in their config at the cost of analysis time.
+pub const DEFAULT_LOOP_ASSIGNMENT_DEPTH_THRESHOLD: u8 = 1;
+
 /// Configuration settings that control the behavior of the Mago analyzer.
 ///
 /// This struct allows you to enable/disable specific checks, suppress categories of issues,
@@ -295,6 +305,30 @@ pub struct Settings {
     ///
     /// Defaults to `128`.
     pub array_combination_threshold: u16,
+
+    /// Maximum depth of the loop assignment dependency graph that the fixed-point
+    /// analyzer will explore when re-analysing loop bodies.
+    ///
+    /// The analyzer uses fixed-point iteration to propagate widened types along
+    /// loop-carried dependency chains. A chain of length `N` can require up to
+    /// `N` extra passes for the type at the end of the chain to fully stabilise,
+    /// and each pass re-analyses the entire loop body. On large, complex loops
+    /// (think thousand-line procedural functions with deeply nested conditionals)
+    /// the per-pass cost dominates file analysis time.
+    ///
+    /// The default of `1` means each loop body is re-analysed at most once after
+    /// the initial pass; enough to stabilise virtually all real-world code while
+    /// keeping analysis cost bounded. Projects that require maximally precise
+    /// narrowing of long loop-carried chains can raise this value (typically to
+    /// `2` or `3`) at the cost of significantly slower analysis on complex files.
+    ///
+    /// Setting this to `0` disables fixed-point iteration entirely and analyses
+    /// each loop body exactly once. This is the fastest option but may produce
+    /// less precise types for variables that depend on themselves across
+    /// iterations.
+    ///
+    /// Defaults to `1`.
+    pub loop_assignment_depth_threshold: u8,
 }
 
 impl Default for Settings {
@@ -347,6 +381,7 @@ impl Settings {
             string_combination_threshold: default_combiner_options.string_combination_threshold,
             integer_combination_threshold: default_combiner_options.integer_combination_threshold,
             array_combination_threshold: default_combiner_options.array_combination_threshold,
+            loop_assignment_depth_threshold: DEFAULT_LOOP_ASSIGNMENT_DEPTH_THRESHOLD,
         }
     }
 

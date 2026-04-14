@@ -240,8 +240,9 @@ fn analyze<'ctx, 'ast, 'arena>(
     let always_enters_loop = Cell::new(always_enters_loop);
 
     let (assignment_map, first_variable_id) = get_assignment_map(pre_conditions, &post_expressions, statements);
+    let assignment_depth_limit = context.settings.loop_assignment_depth_threshold as usize;
     let assignment_depth = if let Some(first_variable_id) = first_variable_id {
-        get_assignment_map_depth(first_variable_id, &mut assignment_map.clone())
+        get_assignment_map_depth(first_variable_id, &mut assignment_map.clone(), assignment_depth_limit)
     } else {
         0
     };
@@ -1009,7 +1010,19 @@ fn mark_array_keys_definite(union: &mut TUnion) -> bool {
     changed
 }
 
-fn get_assignment_map_depth(first_variable_id: Atom, assignment_map: &mut BTreeMap<Atom, BTreeSet<Atom>>) -> usize {
+/// Compute the depth of the loop's assignment dependency graph, clamped to `maximum`.
+///
+/// The walk short-circuits as soon as `maximum` is reached, so deep graphs
+/// cost O(maximum) work instead of traversing every chain down to the leaves.
+fn get_assignment_map_depth(
+    first_variable_id: Atom,
+    assignment_map: &mut BTreeMap<Atom, BTreeSet<Atom>>,
+    maximum: usize,
+) -> usize {
+    if maximum == 0 {
+        return 0;
+    }
+
     let Some(assignment_variable_ids) = assignment_map.remove(&first_variable_id) else {
         return 0;
     };
@@ -1018,12 +1031,15 @@ fn get_assignment_map_depth(first_variable_id: Atom, assignment_map: &mut BTreeM
     for assignment_variable_id in assignment_variable_ids {
         let mut depth = 1;
 
-        if assignment_map.contains_key(&assignment_variable_id) {
-            depth += get_assignment_map_depth(assignment_variable_id, assignment_map);
+        if depth < maximum && assignment_map.contains_key(&assignment_variable_id) {
+            depth += get_assignment_map_depth(assignment_variable_id, assignment_map, maximum - 1);
         }
 
         if depth > max_depth {
             max_depth = depth;
+            if max_depth >= maximum {
+                return maximum;
+            }
         }
     }
 
