@@ -4,14 +4,19 @@
 //! specifically for the `--staged` formatting feature that allows formatting
 //! staged files in pre-commit hooks.
 
+use std::borrow::Cow;
 use std::collections::HashSet;
+use std::ffi::OsString;
+use std::io::Write as _;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
+use std::process::Stdio;
 
 use mago_database::Database;
 use mago_database::DatabaseReader;
 use mago_database::error::DatabaseError;
+use mago_database::file::File;
 use mago_database::file::FileId;
 
 use crate::error::Error;
@@ -37,61 +42,56 @@ pub fn get_staged_file_paths(workspace: &Path) -> Result<Vec<PathBuf>, Error> {
     get_staged_files(workspace)
 }
 
-/// Get staged files that are clean (no unstaged changes) as file IDs.
-///
-/// This function combines multiple git operations and database lookups into
-/// a single convenient function for the `--staged` formatting feature:
-///
-/// 1. Checks if we're in a git repository
-/// 2. Gets all staged files
-/// 3. Gets files with unstaged changes
-/// 4. For each staged file, checks it doesn't have unstaged changes
-/// 5. Resolves each staged file path to a database FileId
+/// Creates an ephemeral file with the contents of a staged file
 ///
 /// # Arguments
 ///
 /// * `workspace` - The git repository root directory
-/// * `database` - The loaded database to look up file IDs
+/// * `path` - The path for which to get the file
 ///
 /// # Returns
 ///
-/// A vector of FileIds for staged files that have no unstaged changes,
-/// or an error if:
-/// - Not in a git repository
-/// - A staged file has unstaged changes (partial staging)
+/// An ephemeral file with the contents of the staged file
+pub fn get_staged_file(workspace: &Path, path: &Path) -> Result<File, Error> {
+    let mut index_path = OsString::from(":");
+    index_path.push(path);
+
+    let output = Command::new("git")
+        .args(["cat-file", "-p"])
+        .arg(index_path)
+        .current_dir(workspace)
+        .output()
+        .map_err(|e| Error::Database(DatabaseError::IOError(e)))?;
+
+    Ok(File::ephemeral(Cow::Borrowed("<stdin>"), Cow::Owned(String::from_utf8_lossy(&output.stdout).into_owned())))
+}
+
+/// Updates the contents of the staged file
 ///
-/// # Errors
+/// # Arguments
 ///
-/// Returns `Error::NotAGitRepository` if not in a git repository.
-/// Returns `Error::StagedFileHasUnstagedChanges` if any staged file
-/// has unstaged modifications (which would cause data loss).
-pub fn get_staged_clean_files(workspace: &Path, database: &Database) -> Result<Vec<FileId>, Error> {
-    if !is_git_repository(workspace) {
-        return Err(Error::NotAGitRepository);
-    }
+/// * `workspace` - The git repository root directory
+/// * `path` - The path for which to get the file
+/// * `new_content` - The new content for the staged file
+pub fn update_staged_file(workspace: &Path, path: &Path, new_content: String) -> Result<(), Error> {
+    let blob_id = create_blob(workspace, path, new_content)?;
+    let mode = get_mode(workspace, path)?;
 
-    let staged_files = get_staged_files(workspace)?;
-    if staged_files.is_empty() {
-        return Ok(Vec::new());
-    }
+    let mut cacheinfo = OsString::new();
+    cacheinfo.push(&mode);
+    cacheinfo.push(",");
+    cacheinfo.push(&blob_id);
+    cacheinfo.push(",");
+    cacheinfo.push(path.as_os_str());
 
-    let files_with_unstaged = get_files_with_unstaged_changes(workspace)?;
+    Command::new("git")
+        .args(["update-index", "--cacheinfo"])
+        .arg(cacheinfo)
+        .current_dir(workspace)
+        .status()
+        .map_err(|e| Error::Database(DatabaseError::IOError(e)))?;
 
-    let mut file_ids = Vec::with_capacity(staged_files.len());
-    for staged_file in staged_files {
-        if files_with_unstaged.contains(&staged_file) {
-            return Err(Error::StagedFileHasUnstagedChanges(staged_file.display().to_string()));
-        }
-
-        let absolute_path = workspace.join(&staged_file);
-        let canonical_path = absolute_path.canonicalize().unwrap_or(absolute_path);
-
-        if let Ok(file) = database.get_by_path(&canonical_path) {
-            file_ids.push(file.id);
-        }
-    }
-
-    Ok(file_ids)
+    Ok(())
 }
 
 /// Verify that none of the given staged files have unstaged changes.
@@ -231,4 +231,56 @@ fn get_files_with_unstaged_changes(workspace: &Path) -> Result<HashSet<PathBuf>,
         .map_err(|e| Error::Database(DatabaseError::IOError(e)))?;
 
     Ok(String::from_utf8_lossy(&output.stdout).lines().filter(|l| !l.is_empty()).map(PathBuf::from).collect())
+}
+
+/// Creates a new blob in the git object store for the given contents
+///
+/// # Arguments
+///
+/// * `workspace` - The git repository root directory
+/// * `path` - The path of the file for which the contents are meant, used to apply git filters
+/// * `content` - The contents for the blob object
+///
+/// # Returns
+///
+/// A string containing the id of the newly created blob
+fn create_blob(workspace: &Path, path: &Path, content: String) -> Result<String, Error> {
+    let mut child = Command::new("git")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .args(["hash-object", "-w", "--stdin", "--path"])
+        .arg(path)
+        .current_dir(workspace)
+        .spawn()
+        .map_err(|e| Error::Database(DatabaseError::IOError(e)))?;
+
+    let mut stdin = child.stdin.take().expect("failed to get stdin");
+    std::thread::spawn(move || {
+        stdin.write_all(content.as_bytes()).expect("failed to write to stdin");
+    });
+
+    let output = child.wait_with_output().map_err(|e| Error::Database(DatabaseError::IOError(e)))?;
+
+    Ok(String::from_utf8_lossy(&output.stdout).trim().to_owned())
+}
+
+/// Gets the object mode for the given path in the git index
+///
+/// # Arguments
+///
+/// * `workspace` - The git repository root directory
+/// * `path` - The path for which the object mode is requested
+///
+/// # Returns
+///
+/// A string containing the object mode for the path
+fn get_mode(workspace: &Path, path: &Path) -> Result<String, Error> {
+    let output = Command::new("git")
+        .args(["ls-files", "--format=%(objectmode)"])
+        .arg(path)
+        .current_dir(workspace)
+        .output()
+        .map_err(|e| Error::Database(DatabaseError::IOError(e)))?;
+
+    Ok(String::from_utf8_lossy(&output.stdout).trim().to_owned())
 }

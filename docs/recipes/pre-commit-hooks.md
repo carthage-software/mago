@@ -56,10 +56,6 @@ The `--staged` flag on all three commands:
 - For `fmt --staged`, automatically re-stages formatted files
 - For `lint --staged` and `analyze --staged`, when combined with `--fix`, automatically re-stages fixed files
 
-:::warning
-The `fmt --staged` flag will fail if a staged file also has unstaged changes. This prevents accidentally including unintended changes in your commit. Either stage all changes or stash the unstaged ones before committing.
-:::
-
 ### Option 2: Auto-fix and auto-format staged files
 
 This approach automatically fixes linting issues in staged files, then formats them. Fixed and formatted files are re-staged automatically.
@@ -190,9 +186,9 @@ Or if you prefer the check-only approach:
 
 ## Comparison: `--staged` vs `--check`
 
-| Aspect               | `--staged`                                         | `--check`                                     |
-| -------------------- | -------------------------------------------------- | --------------------------------------------- |
-| **Behavior**         | Auto-formats staged files and re-stages them       | Checks if files are formatted, fails if not   |
-| **Developer action** | None required                                      | Must run `mago fmt` manually if check fails   |
-| **Best for**         | Teams that want seamless formatting                | Teams that want explicit control over changes |
-| **Partial staging**  | Fails if file has both staged and unstaged changes | Works regardless of staging state             |
+| Aspect               | `--staged`                                        | `--check`                                     |
+| -------------------- | ------------------------------------------------- | --------------------------------------------- |
+| **Behavior**         | Auto-formats staged files and re-stages them      | Checks if files are formatted, fails if not   |
+| **Developer action** | None required                                     | Must run `mago fmt` manually if check fails   |
+| **Best for**         | Teams that want seamless formatting               | Teams that want explicit control over changes |
+| **Partial staging**  | Formats the staged files, skips the working tree  | Works regardless of staging state             |
