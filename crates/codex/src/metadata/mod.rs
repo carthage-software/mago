@@ -1105,6 +1105,49 @@ impl CodebaseMetadata {
         }
     }
 
+    /// Extracts only the keys that this per-file metadata currently "owns" in the given
+    /// merged codebase; i.e. keys whose span in `merged` matches this metadata's span.
+    ///
+    /// This is what you want for incremental fingerprints. [`extract_keys`](Self::extract_keys)
+    /// captures *every* key the scan produced, including ones that lost the tiebreak in
+    /// [`extend`](Self::extend) / [`extend_ref`](Self::extend_ref) when another file defined
+    /// the same FQN. Using `extract_keys` as a removal fingerprint then causes a nasty
+    /// cross-file bug: touching file *B* can remove an entry that file *A* actually owns,
+    /// because [`remove_entries_by_keys`](Self::remove_entries_by_keys) deletes by FQN
+    /// without checking who the current owner is. The analyzer then reports a spurious
+    /// "duplicate definition" when it walks *A* and finds *B*'s span in the codebase.
+    ///
+    /// By only recording the keys whose spans still match *this* metadata, removing the
+    /// fingerprint later becomes a safe no-op when another file won the merge. The
+    /// removal only drops the entries this file genuinely put into the merged codebase.
+    pub fn extract_owned_keys(&self, merged: &CodebaseMetadata) -> CodebaseEntryKeys {
+        let class_like_names = self
+            .class_likes
+            .iter()
+            .filter(|(name, meta)| merged.class_likes.get(*name).is_some_and(|m| m.span == meta.span))
+            .map(|(name, _)| *name)
+            .collect();
+
+        let function_like_keys = self
+            .function_likes
+            .iter()
+            .filter(|(key, meta)| merged.function_likes.get(*key).is_some_and(|m| m.span == meta.span))
+            .map(|(key, _)| *key)
+            .collect();
+
+        let constant_names = self
+            .constants
+            .iter()
+            .filter(|(name, meta)| merged.constants.get(*name).is_some_and(|m| m.span == meta.span))
+            .map(|(name, _)| *name)
+            .collect();
+
+        // A file signature is always owned by its file (there is at most one per file).
+        let file_ids = self.file_signatures.keys().copied().collect();
+
+        CodebaseEntryKeys { class_like_names, function_like_keys, constant_names, file_ids }
+    }
+
     /// Removes entries whose keys match the given [`CodebaseEntryKeys`].
     ///
     /// This is the lightweight equivalent of [`remove_entries_of()`] — it performs the
