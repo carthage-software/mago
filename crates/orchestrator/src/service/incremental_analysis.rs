@@ -273,11 +273,22 @@ impl IncrementalAnalysisService {
             .collect();
 
         let mut merged_codebase = (*self.base_codebase).clone();
-        let mut file_states = HashMap::default();
 
-        for (file_id, content_hash, metadata) in per_file_results {
-            let entry_keys = metadata.extract_keys();
-            merged_codebase.extend(metadata);
+        let staged: Vec<(FileId, u64, CodebaseMetadata)> = per_file_results
+            .into_iter()
+            .map(|(file_id, content_hash, metadata)| {
+                let clone_for_ownership = metadata.clone();
+                merged_codebase.extend(metadata);
+                (file_id, content_hash, clone_for_ownership)
+            })
+            .collect();
+
+        let mut symbol_references = (*self.base_symbol_references).clone();
+        populate_codebase(&mut merged_codebase, &mut symbol_references, AtomSet::default(), HashSet::default());
+
+        let mut file_states: HashMap<FileId, FileState> = HashMap::default();
+        for (file_id, content_hash, metadata) in staged {
+            let entry_keys = metadata.extract_owned_keys(&merged_codebase);
             file_states.insert(
                 file_id,
                 FileState {
@@ -288,9 +299,6 @@ impl IncrementalAnalysisService {
                 },
             );
         }
-
-        let mut symbol_references = (*self.base_symbol_references).clone();
-        populate_codebase(&mut merged_codebase, &mut symbol_references, AtomSet::default(), HashSet::default());
 
         let (mut analysis_result, per_file_issues) =
             self.run_analyzer_selective(&merged_codebase, symbol_references, &self.settings, &HashSet::default())?;
@@ -582,7 +590,9 @@ impl IncrementalAnalysisService {
             for (file_id, metadata) in new_file_scans {
                 let content_hash = file_hashes[&file_id];
                 let analysis_issues = per_file_issues.remove(&file_id).unwrap_or_default();
-                let entry_keys = metadata.extract_keys();
+                // Owned keys (spans match merged) so a future touch of this file does
+                // not clobber a rival file that won the tiebreak over this one.
+                let entry_keys = metadata.extract_owned_keys(&merged_codebase);
                 let codebase_issues =
                     self.file_states.get(&file_id).map(|s| s.codebase_issues.clone()).unwrap_or_default();
                 self.file_states
@@ -789,7 +799,9 @@ impl IncrementalAnalysisService {
         for (file_id, metadata) in new_file_scans {
             let content_hash = file_hashes[&file_id];
             let analysis_issues = per_file_issues.remove(&file_id).unwrap_or_default();
-            let entry_keys = metadata.extract_keys();
+            // Owned keys (spans match merged) so a future touch of this file does
+            // not clobber a rival file that won the tiebreak over this one.
+            let entry_keys = metadata.extract_owned_keys(&merged_codebase);
             let codebase_issues = self.file_states.get(&file_id).map(|s| s.codebase_issues.clone()).unwrap_or_default();
             self.file_states.insert(file_id, FileState { content_hash, entry_keys, analysis_issues, codebase_issues });
         }
