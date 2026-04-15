@@ -122,7 +122,6 @@ watch(
           ref="editorRef"
           class="editor"
           spellcheck="false"
-          :contenteditable="!disabled"
         ></div>
       </div>
     </div>
