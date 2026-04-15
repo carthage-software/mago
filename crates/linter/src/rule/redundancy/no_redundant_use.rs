@@ -469,7 +469,7 @@ mod utils {
     }
 
     pub(super) fn build_used_fqn_set(ctx: &LintContext<'_, '_>) -> AtomSet {
-        ctx.resolved_names.all().iter().map(|(_, (fqn, _))| atom(fqn)).collect()
+        ctx.resolved_names.iter().map(|(_, _, fqn, _)| atom(fqn)).collect()
     }
 
     pub(super) fn get_alias(item: &UseItem) -> Atom {
