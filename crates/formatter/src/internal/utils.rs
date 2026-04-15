@@ -5,6 +5,7 @@ use mago_syntax::ast::ArgumentList;
 use mago_syntax::ast::ClassConstantAccess;
 use mago_syntax::ast::ClassLikeConstantSelector;
 use mago_syntax::ast::ClassLikeMemberSelector;
+use mago_syntax::ast::CompositeString;
 use mago_syntax::ast::ConstantAccess;
 use mago_syntax::ast::FunctionCall;
 use mago_syntax::ast::Identifier;
@@ -349,6 +350,7 @@ pub fn get_expression_width(element: &Expression<'_>) -> Option<usize> {
             Literal::False(_) => 5,
             Literal::Null(_) => 4,
         },
+        Expression::CompositeString(composite_string) => get_composite_string_width(composite_string)?,
         Expression::MagicConstant(magic_constant) => string_width(magic_constant.value().value),
         Expression::ConstantAccess(ConstantAccess { name: Identifier::Local(local) })
         | Expression::Identifier(Identifier::Local(local)) => string_width(local.value),
@@ -382,6 +384,32 @@ pub fn get_expression_width(element: &Expression<'_>) -> Option<usize> {
             return None;
         }
     })
+}
+
+fn get_composite_string_width(composite_string: &CompositeString<'_>) -> Option<usize> {
+    let mut width = match composite_string {
+        CompositeString::Interpolated(interpolated) => {
+            interpolated.prefix.map_or(0, |prefix| string_width(prefix.value)) + 2
+        }
+        CompositeString::ShellExecute(_) => 2,
+        CompositeString::Document(_) => return None,
+    };
+
+    for part in composite_string.parts() {
+        width += match part {
+            StringPart::Literal(literal) => {
+                if literal.value.contains(['\n', '\r']) {
+                    return None;
+                }
+
+                string_width(literal.value)
+            }
+            StringPart::Expression(expression) => get_expression_width(expression)?,
+            StringPart::BracedExpression(braced) => get_expression_width(braced.expression)? + 2,
+        };
+    }
+
+    Some(width)
 }
 
 #[inline]

@@ -33,6 +33,11 @@ TestCase::create()
 
 $repository->findBy(function ($item) { return $item->isActive(); })->sortBy('name');
 
+$cache->expects($this->once())->method('get')->willReturn("e:$token");
+$cache->expects($this->once())->method('get')->willReturn('e:$token');
+$cache->expects($this->once())->method('get')->willReturn("prefix:{$token}");
+$cache->expects($this->once())->method('get')->willReturn('prefix:{$token}');
+
 class IdempotencyTest
 {
     public function testChainWithExpandedArray()
