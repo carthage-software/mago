@@ -442,17 +442,14 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
         case_stmts.extend(switch_case.statements().iter().cloned());
 
         if !has_leaving_statements && !is_last {
-            let case_equality_expression = unsafe {
-                // SAFETY: this is safe for non-defaults, and defaults are always last
-                case_equality_expression.unwrap_unchecked()
-            };
-
-            self.leftover_case_equality_expression =
-                Some(if let Some(leftover_case_equality_expr) = &self.leftover_case_equality_expression {
-                    new_synthetic_or(self.context.arena, leftover_case_equality_expr, &case_equality_expression)
-                } else {
-                    case_equality_expression
-                });
+            if let Some(case_equality_expression) = case_equality_expression {
+                self.leftover_case_equality_expression =
+                    Some(if let Some(leftover_case_equality_expr) = &self.leftover_case_equality_expression {
+                        new_synthetic_or(self.context.arena, leftover_case_equality_expr, &case_equality_expression)
+                    } else {
+                        case_equality_expression
+                    });
+            }
 
             self.has_fallthrough = true;
             self.leftover_statements = case_stmts;
