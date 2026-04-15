@@ -113,7 +113,7 @@ pub fn is_contained_by(
             return true;
         }
         (TAtomic::Scalar(TScalar::String(c)), TAtomic::Scalar(TScalar::ClassLikeString(_)))
-            if !c.is_unspecified_literal() && !c.is_numeric =>
+            if !c.is_literal_origin() && !c.is_numeric =>
         {
             return true;
         }
@@ -162,4 +162,67 @@ pub fn is_contained_by(
     }
 
     false
+}
+
+#[cfg(test)]
+mod tests {
+    use mago_atom::atom;
+
+    use crate::ttype::atomic::TAtomic;
+    use crate::ttype::atomic::scalar::TScalar;
+    use crate::ttype::atomic::scalar::class_like_string::TClassLikeString;
+    use crate::ttype::atomic::scalar::class_like_string::TClassLikeStringKind;
+    use crate::ttype::atomic::scalar::string::TString;
+    use crate::ttype::comparator::ComparisonResult;
+    use crate::ttype::comparator::tests::create_test_codebase;
+
+    use super::is_contained_by;
+
+    fn class_string_literal(name: &str) -> TAtomic {
+        TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::literal(atom(name))))
+    }
+
+    fn string_literal(value: &str) -> TAtomic {
+        TAtomic::Scalar(TScalar::String(TString::known_literal(atom(value))))
+    }
+
+    #[test]
+    fn class_string_is_contained_by_string() {
+        let codebase = create_test_codebase("<?php");
+        let input = class_string_literal("Foo");
+        let container = TAtomic::Scalar(TScalar::String(TString::general()));
+        let mut result = ComparisonResult::new();
+
+        assert!(is_contained_by(&codebase, &input, &container, false, &mut result));
+    }
+
+    #[test]
+    fn class_string_is_contained_by_non_empty_string() {
+        let codebase = create_test_codebase("<?php");
+        let input = class_string_literal("Foo");
+        let container = TAtomic::Scalar(TScalar::String(TString::non_empty()));
+        let mut result = ComparisonResult::new();
+
+        assert!(is_contained_by(&codebase, &input, &container, false, &mut result));
+    }
+
+    #[test]
+    fn class_string_is_not_contained_by_literal_string() {
+        let codebase = create_test_codebase("<?php");
+        let input = class_string_literal("Foo");
+        let container = string_literal("bar");
+        let mut result = ComparisonResult::new();
+
+        assert!(!is_contained_by(&codebase, &input, &container, false, &mut result));
+    }
+
+    #[test]
+    fn class_string_any_is_not_contained_by_literal_string() {
+        let codebase = create_test_codebase("<?php");
+        let input = TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::any(TClassLikeStringKind::Class)));
+        let container = string_literal("bar");
+        let mut result = ComparisonResult::new();
+
+        assert!(!is_contained_by(&codebase, &input, &container, false, &mut result));
+    }
 }
