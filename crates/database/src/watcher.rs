@@ -140,7 +140,11 @@ impl<'a> DatabaseWatcher<'a> {
             unique_watch_paths.insert(absolute_path);
         }
 
-        let explicit_watch_paths: Vec<PathBuf> = unique_watch_paths.iter().cloned().collect();
+        let explicit_watch_paths: Vec<PathBuf> = unique_watch_paths
+            .iter()
+            .filter(|wp| glob_excludes.is_match(wp.as_path()) || path_excludes.contains(wp.as_path()))
+            .cloned()
+            .collect();
 
         let mut watcher = RecommendedWatcher::new(
             move |res: Result<Event, notify::Error>| {
