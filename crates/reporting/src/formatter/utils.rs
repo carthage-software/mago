@@ -1,4 +1,101 @@
+use std::cmp::Ordering;
+
 use crate::Issue;
+use crate::IssueCollection;
+use crate::Level;
+use crate::formatter::FormatterConfig;
+
+pub struct LazyFilteredIssues<'a> {
+    iter: std::slice::Iter<'a, Issue>,
+    min_level: Option<Level>,
+    filter_fixable: bool,
+}
+
+pub enum FilteredIssues<'a> {
+    Lazy(LazyFilteredIssues<'a>),
+    Sorted(std::vec::IntoIter<&'a Issue>),
+}
+
+impl<'a> Iterator for LazyFilteredIssues<'a> {
+    type Item = &'a Issue;
+
+    #[inline]
+    fn next(&mut self) -> Option<&'a Issue> {
+        for issue in self.iter.by_ref() {
+            if let Some(min) = self.min_level
+                && issue.level < min
+            {
+                continue;
+            }
+
+            if self.filter_fixable && issue.edits.is_empty() {
+                continue;
+            }
+
+            return Some(issue);
+        }
+
+        None
+    }
+}
+
+impl<'a> Iterator for FilteredIssues<'a> {
+    type Item = &'a Issue;
+
+    #[inline]
+    fn next(&mut self) -> Option<&'a Issue> {
+        match self {
+            Self::Lazy(it) => it.next(),
+            Self::Sorted(it) => it.next(),
+        }
+    }
+}
+
+/// Returns a borrowing iterator over the issues that pass the formatter's
+/// minimum-level and fixable-only filters.
+///
+/// The `sortable` argument tells this helper whether sorting is *meaningful*
+/// for the calling formatter:
+///
+/// * Pass `true` for human-readable formats (rich, ariadne, json, …) where
+///   `--sort` should produce a stable, severity-ordered view of issues.
+/// * Pass `false` for formats that already aggregate (`count`, `code-count`)
+///   or whose consumers do their own ordering (`github`, `gitlab`, `sarif`,
+///   `checkstyle`, `emacs`). For these, even if the user passed `--sort`,
+///   sorting is wasted work.
+#[inline]
+pub fn filter_issues<'a>(issues: &'a IssueCollection, config: &FormatterConfig, sortable: bool) -> FilteredIssues<'a> {
+    let min_level = config.minimum_level;
+    let filter_fixable = config.filter_fixable;
+
+    let lazy = LazyFilteredIssues { iter: issues.issues.iter(), min_level, filter_fixable };
+
+    if sortable && config.sort {
+        let mut refs: Vec<&Issue> = lazy.collect();
+        refs.sort_by(compare_issues);
+        FilteredIssues::Sorted(refs.into_iter())
+    } else {
+        FilteredIssues::Lazy(lazy)
+    }
+}
+
+#[inline]
+fn compare_issues(a: &&Issue, b: &&Issue) -> Ordering {
+    match a.level.cmp(&b.level) {
+        Ordering::Less => Ordering::Less,
+        Ordering::Greater => Ordering::Greater,
+        Ordering::Equal => match a.code.as_deref().cmp(&b.code.as_deref()) {
+            Ordering::Less => Ordering::Less,
+            Ordering::Greater => Ordering::Greater,
+            Ordering::Equal => match (a.primary_span(), b.primary_span()) {
+                (Some(a_span), Some(b_span)) => a_span.cmp(&b_span),
+                (Some(_), None) => Ordering::Less,
+                (None, Some(_)) => Ordering::Greater,
+                (None, None) => Ordering::Equal,
+            },
+        },
+    }
+}
 
 /// XML-encode a string by escaping special characters.
 pub fn xml_encode(input: impl AsRef<str>) -> String {

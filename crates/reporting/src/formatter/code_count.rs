@@ -23,35 +23,25 @@ impl Formatter for CodeCountFormatter {
         _database: &ReadDatabase,
         config: &FormatterConfig,
     ) -> Result<(), ReportingError> {
-        // Apply filters
-        let issues = apply_filters(issues, config);
-
-        // Count occurrences per issue code
-        let mut counts: HashMap<String, (usize, Level)> = HashMap::default();
-
-        for issue in issues.iter() {
-            let code = issue.code.clone().unwrap_or_else(|| "<unknown>".to_string());
-
+        let mut counts: HashMap<&str, (usize, Level)> = HashMap::default();
+        for issue in crate::formatter::utils::filter_issues(issues, config, false) {
+            let code = issue.code.as_deref().unwrap_or("<unknown>");
             let entry = counts.entry(code).or_insert((0, issue.level));
             entry.0 += 1;
 
-            // update to highest level if needed
             if issue.level > entry.1 {
                 entry.1 = issue.level;
             }
         }
 
-        // Sort by descending count, then by code
         let mut counts_vec: Vec<_> = counts.into_iter().collect();
         counts_vec.sort_by(|(code_a, (count_a, _)), (code_b, (count_b, _))| match count_b.cmp(count_a) {
             Ordering::Equal => code_a.cmp(code_b),
             other => other,
         });
 
-        // Determine if we should use colors
         let use_colors = config.color_choice.should_use_colors(std::io::stdout().is_terminal());
 
-        // Write results
         for (code, (count, level)) in counts_vec {
             if use_colors {
                 let ansi_code = level_ansi_code(level);
@@ -63,24 +53,6 @@ impl Formatter for CodeCountFormatter {
 
         Ok(())
     }
-}
-
-fn apply_filters(issues: &IssueCollection, config: &FormatterConfig) -> IssueCollection {
-    let mut filtered = issues.clone();
-
-    if let Some(min_level) = config.minimum_level {
-        filtered = filtered.with_minimum_level(min_level);
-    }
-
-    if config.filter_fixable {
-        filtered = filtered.with_edits();
-    }
-
-    if config.sort {
-        filtered = filtered.sorted();
-    }
-
-    filtered
 }
 
 fn level_ansi_code(level: Level) -> &'static str {

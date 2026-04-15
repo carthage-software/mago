@@ -44,11 +44,7 @@ impl Formatter for GitlabFormatter {
         database: &ReadDatabase,
         config: &FormatterConfig,
     ) -> Result<(), ReportingError> {
-        // Apply filters
-        let issues = apply_filters(issues, config);
-
-        let code_quality_issues = issues
-            .iter()
+        let code_quality_issues = crate::formatter::utils::filter_issues(issues, config, false)
             .map(|issue| {
                 let severity = match &issue.level {
                     Level::Note | Level::Help => "info",
@@ -93,22 +89,4 @@ impl Formatter for GitlabFormatter {
 
         Ok(())
     }
-}
-
-fn apply_filters(issues: &IssueCollection, config: &FormatterConfig) -> IssueCollection {
-    let mut filtered = issues.clone();
-
-    if let Some(min_level) = config.minimum_level {
-        filtered = filtered.with_minimum_level(min_level);
-    }
-
-    if config.filter_fixable {
-        filtered = filtered.with_edits();
-    }
-
-    if config.sort {
-        filtered = filtered.sorted();
-    }
-
-    filtered
 }

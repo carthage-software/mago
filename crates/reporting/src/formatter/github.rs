@@ -22,10 +22,7 @@ impl Formatter for GithubFormatter {
         database: &ReadDatabase,
         config: &FormatterConfig,
     ) -> Result<(), ReportingError> {
-        // Apply filters
-        let issues = apply_filters(issues, config);
-
-        for issue in issues.iter() {
+        for issue in crate::formatter::utils::filter_issues(issues, config, false) {
             let level = match &issue.level {
                 Level::Note => "notice",
                 Level::Help => "notice",
@@ -72,22 +69,4 @@ impl Formatter for GithubFormatter {
 
         Ok(())
     }
-}
-
-fn apply_filters(issues: &IssueCollection, config: &FormatterConfig) -> IssueCollection {
-    let mut filtered = issues.clone();
-
-    if let Some(min_level) = config.minimum_level {
-        filtered = filtered.with_minimum_level(min_level);
-    }
-
-    if config.filter_fixable {
-        filtered = filtered.with_edits();
-    }
-
-    if config.sort {
-        filtered = filtered.sorted();
-    }
-
-    filtered
 }

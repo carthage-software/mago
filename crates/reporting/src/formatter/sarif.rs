@@ -39,33 +39,18 @@ impl Formatter for SarifFormatter {
         database: &ReadDatabase,
         config: &FormatterConfig,
     ) -> Result<(), ReportingError> {
-        let issues = apply_filters(issues, config);
-        let sarif_log = build_sarif_log(&issues, database)?;
+        let sarif_log = build_sarif_log(issues, config, database)?;
         serde_json::to_writer_pretty(writer, &sarif_log)?;
 
         Ok(())
     }
 }
 
-fn apply_filters(issues: &IssueCollection, config: &FormatterConfig) -> IssueCollection {
-    let mut filtered = issues.clone();
-
-    if let Some(min_level) = config.minimum_level {
-        filtered = filtered.with_minimum_level(min_level);
-    }
-
-    if config.filter_fixable {
-        filtered = filtered.with_edits();
-    }
-
-    if config.sort {
-        filtered = filtered.sorted();
-    }
-
-    filtered
-}
-
-fn build_sarif_log(issues: &IssueCollection, database: &ReadDatabase) -> Result<Sarif, ReportingError> {
+fn build_sarif_log(
+    issues: &IssueCollection,
+    config: &FormatterConfig,
+    database: &ReadDatabase,
+) -> Result<Sarif, ReportingError> {
     let tool = Tool::builder()
         .driver(
             ToolComponent::builder()
@@ -77,7 +62,7 @@ fn build_sarif_log(issues: &IssueCollection, database: &ReadDatabase) -> Result<
         .build();
 
     let mut results = Vec::new();
-    for issue in &issues.issues {
+    for issue in crate::formatter::utils::filter_issues(issues, config, false) {
         let sarif_result = convert_issue_to_result(issue, database)?;
         results.push(sarif_result);
     }

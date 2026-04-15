@@ -23,13 +23,10 @@ impl Formatter for EmacsFormatter {
         database: &ReadDatabase,
         config: &FormatterConfig,
     ) -> Result<(), ReportingError> {
-        // Apply filters
-        let issues = apply_filters(issues, config);
-
         let use_colors = config.color_choice.should_use_colors(std::io::stdout().is_terminal());
         let editor_url = if use_colors { config.editor_url.as_deref() } else { None };
 
-        for issue in issues.iter() {
+        for issue in crate::formatter::utils::filter_issues(issues, config, false) {
             let (file_display, line, column) = match issue.primary_annotation() {
                 Some(annotation) => {
                     let file = database.get(&annotation.span.file_id())?;
@@ -66,22 +63,4 @@ impl Formatter for EmacsFormatter {
 
         Ok(())
     }
-}
-
-fn apply_filters(issues: &IssueCollection, config: &FormatterConfig) -> IssueCollection {
-    let mut filtered = issues.clone();
-
-    if let Some(min_level) = config.minimum_level {
-        filtered = filtered.with_minimum_level(min_level);
-    }
-
-    if config.filter_fixable {
-        filtered = filtered.with_edits();
-    }
-
-    if config.sort {
-        filtered = filtered.sorted();
-    }
-
-    filtered
 }

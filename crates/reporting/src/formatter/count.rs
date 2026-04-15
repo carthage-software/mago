@@ -23,14 +23,10 @@ impl Formatter for CountFormatter {
         _database: &ReadDatabase,
         config: &FormatterConfig,
     ) -> Result<(), ReportingError> {
-        // Apply filters
-        let issues = apply_filters(issues, config);
-
-        // Count occurrences of each issue level
-        let mut counts = HashMap::default();
-        issues.iter().for_each(|issue| {
+        let mut counts: HashMap<Level, usize> = HashMap::default();
+        for issue in crate::formatter::utils::filter_issues(issues, config, false) {
             *counts.entry(issue.level).or_insert(0) += 1;
-        });
+        }
 
         let mut counts_vec: Vec<_> = counts.into_iter().collect();
         counts_vec.sort_by(|(level_a, count_a), (level_b, count_b)| match count_b.cmp(count_a) {
@@ -38,10 +34,8 @@ impl Formatter for CountFormatter {
             other => other,
         });
 
-        // Determine if we should use colors
         let use_colors = config.color_choice.should_use_colors(std::io::stdout().is_terminal());
 
-        // Write counts to the writer
         for (level, count) in counts_vec {
             if use_colors {
                 let ansi_code = level_ansi_code(level);
@@ -53,24 +47,6 @@ impl Formatter for CountFormatter {
 
         Ok(())
     }
-}
-
-fn apply_filters(issues: &IssueCollection, config: &FormatterConfig) -> IssueCollection {
-    let mut filtered = issues.clone();
-
-    if let Some(min_level) = config.minimum_level {
-        filtered = filtered.with_minimum_level(min_level);
-    }
-
-    if config.filter_fixable {
-        filtered = filtered.with_edits();
-    }
-
-    if config.sort {
-        filtered = filtered.sorted();
-    }
-
-    filtered
 }
 
 fn level_ansi_code(level: Level) -> &'static str {

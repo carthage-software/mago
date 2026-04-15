@@ -28,13 +28,9 @@ impl Formatter for AriadneFormatter {
         database: &ReadDatabase,
         config: &FormatterConfig,
     ) -> Result<(), ReportingError> {
-        // Apply filters
-        let issues = apply_filters(issues, config);
-
-        // Determine if we should use colors
         let use_colors = config.color_choice.should_use_colors(std::io::stdout().is_terminal());
 
-        for issue in issues {
+        for issue in crate::formatter::utils::filter_issues(issues, config, true) {
             let kind = match issue.level {
                 Level::Help | Level::Note => ReportKind::Advice,
                 Level::Warning => ReportKind::Warning,
@@ -59,27 +55,26 @@ impl Formatter for AriadneFormatter {
                 None => ("<unknown>".to_owned(), 0..0),
             };
 
-            let mut report = Report::build(kind, (file_path, range)).with_message(issue.message);
+            let mut report = Report::build(kind, (file_path, range)).with_message(issue.message.clone());
 
-            if let Some(code) = issue.code {
-                report = report.with_code(code);
+            if let Some(code) = &issue.code {
+                report = report.with_code(code.clone());
             }
 
-            for note in issue.notes {
-                report = report.with_note(note);
+            for note in &issue.notes {
+                report = report.with_note(note.clone());
             }
 
-            if let Some(link) = issue.link {
-                // Since ariadne doesn't support links, we can just set it as a note
+            if let Some(link) = &issue.link {
                 report = report.with_note(format!("For more information, see: {link}"));
             }
 
-            if let Some(help) = issue.help {
-                report = report.with_help(help);
+            if let Some(help) = &issue.help {
+                report = report.with_help(help.clone());
             }
 
             let mut relevant_sources = vec![];
-            for annotation in issue.annotations {
+            for annotation in &issue.annotations {
                 let file = database.get(&annotation.span.file_id())?;
                 let range = annotation.span.start.offset as usize..annotation.span.end.offset as usize;
 
@@ -88,8 +83,8 @@ impl Formatter for AriadneFormatter {
                     label = label.with_color(color).with_priority(1);
                 }
 
-                if let Some(message) = annotation.message {
-                    report = report.with_label(label.with_message(message));
+                if let Some(message) = &annotation.message {
+                    report = report.with_label(label.with_message(message.clone()));
                 } else {
                     report = report.with_label(label);
                 }
@@ -112,22 +107,4 @@ impl Formatter for AriadneFormatter {
 
         Ok(())
     }
-}
-
-fn apply_filters(issues: &IssueCollection, config: &FormatterConfig) -> IssueCollection {
-    let mut filtered = issues.clone();
-
-    if let Some(min_level) = config.minimum_level {
-        filtered = filtered.with_minimum_level(min_level);
-    }
-
-    if config.filter_fixable {
-        filtered = filtered.with_edits();
-    }
-
-    if config.sort {
-        filtered = filtered.sorted();
-    }
-
-    filtered
 }

@@ -77,6 +77,12 @@ pub struct ExpandedIssueCollection {
     issues: Vec<ExpandedIssue>,
 }
 
+impl ExpandedIssueCollection {
+    pub fn from_iter(issues: impl IntoIterator<Item = ExpandedIssue>) -> Self {
+        Self { issues: issues.into_iter().collect() }
+    }
+}
+
 pub trait Expandable<T> {
     fn expand(&self, database: &ReadDatabase) -> Result<T, DatabaseError>;
 }

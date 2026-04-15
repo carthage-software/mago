@@ -58,46 +58,33 @@ pub(super) fn codespan_format_with_config(
     config: &FormatterConfig,
     codespan_config: &Config,
 ) -> Result<(), ReportingError> {
-    // Apply filters
-    let issues = apply_filters(issues, config);
-
-    // Determine if we should use colors
     let use_colors = config.color_choice.should_use_colors(std::io::stdout().is_terminal());
-
-    // Create a buffer for codespan (it requires WriteColor)
     let mut buffer = if use_colors { Buffer::ansi() } else { Buffer::no_color() };
 
     let editor_url = if use_colors { config.editor_url.as_deref() } else { None };
     let files = DatabaseFiles { database, editor_url, line_hint: Cell::new(None), column_hint: Cell::new(None) };
 
-    let highest_level = issues.get_highest_level();
+    let mut highest_level: Option<Level> = None;
     let mut errors = 0;
     let mut warnings = 0;
     let mut notes = 0;
     let mut help = 0;
     let mut suggestions = 0;
 
-    for issue in issues {
-        match &issue.level {
-            Level::Note => {
-                notes += 1;
-            }
-            Level::Help => {
-                help += 1;
-            }
-            Level::Warning => {
-                warnings += 1;
-            }
-            Level::Error => {
-                errors += 1;
-            }
+    for issue in crate::formatter::utils::filter_issues(issues, config, true) {
+        match issue.level {
+            Level::Note => notes += 1,
+            Level::Help => help += 1,
+            Level::Warning => warnings += 1,
+            Level::Error => errors += 1,
         }
+
+        highest_level = Some(highest_level.map_or(issue.level, |cur| cur.max(issue.level)));
 
         if !issue.edits.is_empty() {
             suggestions += 1;
         }
 
-        // Set line/column hints from the primary annotation for OSC 8 hyperlinks
         if editor_url.is_some() {
             if let Some(annotation) = issue.annotations.iter().find(|a| a.is_primary()) {
                 if let Ok(file) = database.get_ref(&annotation.span.file_id) {
@@ -153,24 +140,6 @@ pub(super) fn codespan_format_with_config(
     writer.write_all(buffer.as_slice())?;
 
     Ok(())
-}
-
-fn apply_filters(issues: &IssueCollection, config: &FormatterConfig) -> IssueCollection {
-    let mut filtered = issues.clone();
-
-    if let Some(min_level) = config.minimum_level {
-        filtered = filtered.with_minimum_level(min_level);
-    }
-
-    if config.filter_fixable {
-        filtered = filtered.with_edits();
-    }
-
-    if config.sort {
-        filtered = filtered.sorted();
-    }
-
-    filtered
 }
 
 struct DatabaseFiles<'a> {
@@ -255,6 +224,18 @@ impl From<Annotation> for Label<FileId> {
     }
 }
 
+impl From<&Annotation> for Label<FileId> {
+    fn from(annotation: &Annotation) -> Label<FileId> {
+        let mut label = Label::new(annotation.kind.into(), annotation.span.file_id, annotation.span);
+
+        if let Some(message) = &annotation.message {
+            label.message = message.clone();
+        }
+
+        label
+    }
+}
+
 impl From<Level> for Severity {
     fn from(level: Level) -> Severity {
         match level {
@@ -287,6 +268,34 @@ impl From<Issue> for Diagnostic<FileId> {
         }
 
         if let Some(link) = issue.link {
+            diagnostic.notes.push(format!("See: {link}"));
+        }
+
+        diagnostic
+    }
+}
+
+impl From<&Issue> for Diagnostic<FileId> {
+    fn from(issue: &Issue) -> Diagnostic<FileId> {
+        let mut diagnostic = Diagnostic::new(issue.level.into()).with_message(issue.message.clone());
+
+        if let Some(code) = &issue.code {
+            diagnostic.code = Some(code.clone());
+        }
+
+        for annotation in &issue.annotations {
+            diagnostic.labels.push(annotation.into());
+        }
+
+        for note in &issue.notes {
+            diagnostic.notes.push(note.clone());
+        }
+
+        if let Some(help) = &issue.help {
+            diagnostic.notes.push(format!("Help: {help}"));
+        }
+
+        if let Some(link) = &issue.link {
             diagnostic.notes.push(format!("See: {link}"));
         }
 
