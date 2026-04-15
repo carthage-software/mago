@@ -63,3 +63,23 @@ return parent::configureAssets()
     ->addJsFile('build/tinymce/tinymce.min.js')
     ->addWebpackEncoreEntry(Asset::new('admin'))
 ;
+
+$cache
+    ->expects($this->once())
+    ->method('get')
+    ->willReturn("cache-entry:$token")
+    ->withTag('notifications')
+    ->withTtl(3600)
+    ->withLock('cache-lock-key-for-current-user')
+    ->send()
+;
+
+$cache
+    ->expects($this->once())
+    ->method('get')
+    ->willReturn('cache-entry:$token')
+    ->withTag('notifications')
+    ->withTtl(3600)
+    ->withLock('cache-lock-key-for-current-user')
+    ->send()
+;

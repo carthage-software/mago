@@ -9,6 +9,7 @@ use mago_syntax::ast::ArrayAccess;
 use mago_syntax::ast::ArrayElement;
 use mago_syntax::ast::AttributeList;
 use mago_syntax::ast::Call;
+use mago_syntax::ast::CompositeString;
 use mago_syntax::ast::ConstantAccess;
 use mago_syntax::ast::Expression;
 use mago_syntax::ast::Identifier;
@@ -19,6 +20,7 @@ use mago_syntax::ast::Modifier;
 use mago_syntax::ast::Node;
 use mago_syntax::ast::Sequence;
 use mago_syntax::ast::Statement;
+use mago_syntax::ast::StringPart;
 use mago_syntax::ast::Terminator;
 use mago_syntax::ast::UnaryPrefixOperator;
 use mago_syntax::ast::Variable;
@@ -478,6 +480,7 @@ pub(super) fn is_simple_call_argument<'arena>(node: &'arena Expression<'arena>, 
         }
         Expression::Array(array) => array.elements.iter().all(is_simple_element),
         Expression::LegacyArray(array) => array.elements.iter().all(is_simple_element),
+        Expression::CompositeString(composite_string) => is_simple_composite_string_argument(composite_string, depth),
         Expression::Call(call) => {
             let argument_list = match call {
                 Call::Function(function_call) => {
@@ -537,6 +540,18 @@ pub(super) fn is_simple_call_argument<'arena>(node: &'arena Expression<'arena>, 
         }
         _ => false,
     }
+}
+
+fn is_simple_composite_string_argument(composite_string: &CompositeString<'_>, depth: usize) -> bool {
+    if matches!(composite_string, CompositeString::Document(_)) {
+        return false;
+    }
+
+    composite_string.parts().iter().all(|part| match part {
+        StringPart::Literal(literal) => !literal.value.contains(['\n', '\r']),
+        StringPart::Expression(expression) => is_simple_call_argument(expression, depth),
+        StringPart::BracedExpression(braced) => is_simple_call_argument(braced.expression, depth),
+    })
 }
 
 pub(super) fn print_colon_delimited_body<'arena>(
