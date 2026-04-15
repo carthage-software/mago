@@ -118,7 +118,10 @@ pub(super) fn print_assignment_with_alignment<'arena>(
     alignment: Option<AssignmentAlignment>,
 ) -> Document<'arena> {
     if let Some(align) = alignment {
+        let outer_alignment = f.alignment_context();
+        f.set_alignment_context(None);
         let rhs = rhs_expression.format(f);
+        f.set_alignment_context(outer_alignment);
 
         let padding = if align.name_padding > 0 {
             let mut spaces = Vec::with_capacity_in(align.name_padding, f.arena);

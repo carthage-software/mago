@@ -154,7 +154,7 @@ public function bar(
 | `align-parameters` | `boolean` | `false` | Align multiline function and method parameter lists by the variable column. This is especially useful for promoted constructor properties with visibility modifiers. |
 | `align-named-arguments` | `boolean` | `false` | Align named arguments in multiline call and attribute argument lists. Single-line calls remain inline. |
 | `array-table-style-alignment` | `boolean` | `true` | Use table-style alignment for arrays. |
-| `align-assignment-like` | `boolean` | `false` | Align consecutive assignment-like constructs (variable assignments, multiline or width-broken array key-value pairs, class properties, constants, enum cases) in columns. Compact inline arrays stay unaligned. |
+| `align-assignment-like` | `boolean` | `false` | Align consecutive assignment-like constructs (variable assignments, multiline or width-broken array key-value pairs, class properties, constants, enum cases, match arms) in columns. Compact inline arrays stay unaligned. |
 | `sort-uses` | `boolean` | `true` | Sort `use` statements alphabetically. |
 | `sort-class-methods` | `boolean` | `false` | Sort class methods by visibility and type (constructor first, then static methods, then instance methods by visibility, destructor last). |
 | `separate-use-types` | `boolean` | `true` | Insert a blank line between different types of `use` statements. |
