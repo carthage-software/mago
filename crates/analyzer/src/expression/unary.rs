@@ -18,6 +18,7 @@ use mago_codex::ttype::atomic::array::list::TList;
 use mago_codex::ttype::atomic::callable::TCallableSignature;
 use mago_codex::ttype::atomic::mixed::TMixed;
 use mago_codex::ttype::atomic::object::TObject;
+use mago_codex::ttype::atomic::object::named::TNamedObject;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::float::TFloat;
 use mago_codex::ttype::atomic::scalar::int::TInteger;
@@ -1433,10 +1434,16 @@ fn cast_type_to_object<'arena>(
                         known_properties.insert(property_name, item.clone());
                     }
 
-                    possibilities.push(TAtomic::Object(TObject::new_with_properties(
+                    // Casting an array to an object produces a `stdClass` instance in PHP,
+                    // so intersect the shape with `stdClass` to preserve both the shape
+                    // information and the nominal `stdClass` type.
+                    let mut named = TNamedObject::new(atom("stdClass"));
+                    named.intersection_types = Some(vec![TAtomic::Object(TObject::new_with_properties(
                         keyed_array.parameters.is_none(),
                         known_properties,
-                    )));
+                    ))]);
+
+                    possibilities.push(TAtomic::Object(TObject::Named(named)));
                 }
             }
             _ => {}
