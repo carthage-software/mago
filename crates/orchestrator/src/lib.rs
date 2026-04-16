@@ -83,6 +83,11 @@ pub struct Orchestrator<'a> {
     pub config: OrchestratorConfiguration<'a>,
     /// Plugin registry for the analyzer, lazily initialized.
     plugin_registry: OnceLock<Arc<PluginRegistry>>,
+    /// Original source paths moved aside by [`set_source_paths`](Self::set_source_paths).
+    ///
+    /// These are included as context during analysis but never converted to excludes,
+    /// since they represent the user's own code, not external dependencies.
+    context_paths: Vec<String>,
 }
 
 impl<'a> Orchestrator<'a> {
@@ -93,7 +98,7 @@ impl<'a> Orchestrator<'a> {
     /// * `config` - The configuration specifying PHP version, paths, tool settings, etc.
     #[must_use]
     pub fn new(config: OrchestratorConfiguration<'a>) -> Self {
-        Self { config, plugin_registry: OnceLock::new() }
+        Self { config, plugin_registry: OnceLock::new(), context_paths: Vec::new() }
     }
 
     /// Gets the analyzer plugin registry, initializing it if necessary.
@@ -129,11 +134,11 @@ impl<'a> Orchestrator<'a> {
         self.config.excludes.extend(patterns.map(std::convert::AsRef::as_ref));
     }
 
-    /// Sets new source paths and moves the old paths to the includes list.
+    /// Sets new source paths, keeping the old ones as context for analysis.
     ///
-    /// This method replaces the current source paths with the provided paths and moves
-    /// the old source paths to the includes list. This is useful when you want to change
-    /// the primary analysis targets while keeping the old paths as context providers.
+    /// This method replaces the current source paths with the provided paths. The old
+    /// source paths are stored internally so they can provide context during analysis
+    /// (e.g., type resolution) without being excluded during lint/format.
     ///
     /// # Arguments
     ///
@@ -142,7 +147,7 @@ impl<'a> Orchestrator<'a> {
         let old_paths = std::mem::take(&mut self.config.paths);
 
         self.config.paths = paths.into_iter().map(|p| p.as_ref().to_string()).collect();
-        self.config.includes.extend(old_paths);
+        self.context_paths.extend(old_paths);
     }
 
     /// Loads the database by scanning the file system according to the configuration.
@@ -201,7 +206,12 @@ impl<'a> Orchestrator<'a> {
         }
 
         let includes = if include_externals {
-            self.config.includes.iter().map(|s| Cow::Borrowed(s.as_ref())).collect::<Vec<Cow<'a, str>>>()
+            self.config
+                .includes
+                .iter()
+                .chain(self.context_paths.iter())
+                .map(|s| Cow::Borrowed(s.as_ref()))
+                .collect::<Vec<Cow<'a, str>>>()
         } else {
             Vec::new()
         };
