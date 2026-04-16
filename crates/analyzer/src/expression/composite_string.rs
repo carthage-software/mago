@@ -9,6 +9,7 @@ use mago_codex::ttype::get_non_empty_string;
 use mago_codex::ttype::get_non_empty_unspecified_literal_string;
 use mago_codex::ttype::get_string;
 use mago_codex::ttype::get_unspecified_literal_string;
+use mago_codex::ttype::union::TUnion;
 use mago_span::HasSpan;
 use mago_syntax::ast::CompositeString;
 use mago_syntax::ast::StringPart;
@@ -30,15 +31,17 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for CompositeString<'arena> {
     ) -> Result<(), AnalysisError> {
         let mut non_empty = false;
         let mut all_literals = true;
-        let mut resulting_string = Some(String::new());
+        let mut resulting_strings: Option<Vec<String>> = Some(vec![String::new()]);
         let mut impossible = false;
 
         for part in self.parts().as_slice() {
             let (part_type, part_expression_id) = match part {
                 StringPart::Literal(literal_string_part) => {
                     non_empty = non_empty || !literal_string_part.value.is_empty();
-                    if let Some(resulting_string) = resulting_string.as_mut() {
-                        resulting_string.push_str(literal_string_part.value);
+                    if let Some(strings) = resulting_strings.as_mut() {
+                        for s in strings.iter_mut() {
+                            s.push_str(literal_string_part.value);
+                        }
                     }
 
                     continue;
@@ -79,7 +82,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for CompositeString<'arena> {
 
             let Some(part_type) = part_type else {
                 all_literals = false;
-                resulting_string = None;
+                resulting_strings = None;
 
                 // TODO: maybe it is worth reporting an issue here?
                 continue;
@@ -102,8 +105,8 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for CompositeString<'arena> {
 
             let mut is_non_empty_part = true;
             let mut part_is_all_literals = true;
-            let mut part_literal_string: Option<&str> = None;
-            let mut could_specify_literals = true;
+            let mut has_unspecified_literal = false;
+            let mut part_literal_values: Vec<&str> = Vec::new();
 
             for cast_part_atomic in casted_part_type.types.as_ref() {
                 is_non_empty_part = is_non_empty_part && cast_part_atomic.is_non_empty_string();
@@ -120,31 +123,11 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for CompositeString<'arena> {
 
                 match literal {
                     TStringLiteral::Unspecified => {
-                        resulting_string = None;
-                        part_literal_string = None;
-                        could_specify_literals = false;
+                        has_unspecified_literal = true;
                     }
                     TStringLiteral::Value(literal_string) => {
-                        if !could_specify_literals {
-                            // We can't specify literals for this part, as
-                            // one or more parts contain specified literal strings
-                            // that are not identical.
-                            continue;
-                        }
-
-                        match part_literal_string {
-                            None => {
-                                part_literal_string = Some(literal_string);
-                            }
-                            Some(previous_part_string) if !previous_part_string.eq(literal_string) => {
-                                // This part of the string type contain a specified literal string
-                                // that is different from a previous part.
-                                part_literal_string = None;
-                                could_specify_literals = false;
-                            }
-                            _ => {
-                                // This part literal is equal to the previous one
-                            }
+                        if !part_literal_values.contains(&literal_string.as_str()) {
+                            part_literal_values.push(literal_string);
                         }
                     }
                 }
@@ -153,20 +136,48 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for CompositeString<'arena> {
             non_empty = non_empty || is_non_empty_part;
             all_literals = all_literals && part_is_all_literals;
 
-            if !part_is_all_literals {
-                resulting_string = None;
-            } else if could_specify_literals
-                && let Some(part_literal_string) = part_literal_string
-                && let Some(resulting_string) = resulting_string.as_mut()
+            if !part_is_all_literals || has_unspecified_literal {
+                resulting_strings = None;
+            } else if let Some(strings) = resulting_strings.as_mut() {
+                if part_literal_values.len() == 1 {
+                    for s in strings.iter_mut() {
+                        s.push_str(part_literal_values[0]);
+                    }
+                } else {
+                    let mut new_strings = Vec::with_capacity(strings.len() * part_literal_values.len());
+                    for s in strings.iter() {
+                        for val in &part_literal_values {
+                            let mut fork = s.clone();
+                            fork.push_str(val);
+                            new_strings.push(fork);
+                        }
+                    }
+
+                    *strings = new_strings;
+                }
+            }
+
+            if resulting_strings
+                .as_ref()
+                .is_some_and(|s| s.len() > context.settings.string_combination_threshold as usize)
             {
-                resulting_string.push_str(part_literal_string);
+                resulting_strings = None;
             }
         }
 
         let resulting_type = if impossible {
             get_never()
-        } else if let Some(literal_string) = resulting_string {
-            get_literal_string(atom(literal_string.as_ref()))
+        } else if let Some(literal_strings) = resulting_strings {
+            if literal_strings.len() == 1 {
+                get_literal_string(atom(literal_strings[0].as_ref()))
+            } else {
+                TUnion::from_vec(
+                    literal_strings
+                        .iter()
+                        .map(|s| TAtomic::Scalar(TScalar::literal_string(atom(s.as_ref()))))
+                        .collect(),
+                )
+            }
         } else if non_empty {
             if all_literals { get_non_empty_unspecified_literal_string() } else { get_non_empty_string() }
         } else if all_literals {
@@ -455,6 +466,21 @@ mod tests {
              */
             function combine_literals(string $s1, string $s2): string {
                 return "$s1-$s2";
+            }
+        "#}
+    }
+
+    test_analysis! {
+        name = composite_string_union_of_different_literals,
+        code = indoc! {r#"
+            <?php
+
+            /**
+             * @param 'red'|'v' $c
+             * @return 'hist8_red'|'hist8_v'
+             */
+            function build_key(string $c): string {
+                return "hist8_{$c}";
             }
         "#}
     }
