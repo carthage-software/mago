@@ -10,6 +10,7 @@ use mago_atom::concat_atom;
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_codex::metadata::function_like::FunctionLikeMetadata;
+use mago_codex::metadata::parameter::FunctionLikeParameterMetadata;
 use mago_codex::metadata::ttype::TypeMetadata;
 use mago_codex::misc::GenericParent;
 use mago_codex::ttype::TType;
@@ -456,6 +457,27 @@ fn add_parameter_types_to_context<'ctx, 'arena>(
 
         if let Some(default_value) = parameter_node.default_value.as_ref() {
             default_value.value.analyze(context, block_context, artifacts)?;
+
+            if !parameter_metadata.flags.is_variadic()
+                && let Some(parameter_type_metadata) = parameter_metadata.get_type_metadata()
+                && !parameter_type_metadata.type_union.is_mixed()
+            {
+                let expected_type = expand_type_metadata(
+                    context,
+                    block_context,
+                    artifacts,
+                    function_like_metadata,
+                    parameter_type_metadata,
+                );
+
+                check_parameter_default_value(
+                    context,
+                    parameter_metadata,
+                    &expected_type,
+                    default_value.value,
+                    artifacts,
+                );
+            }
         }
 
         let final_parameter_type = if parameter_metadata.flags.is_variadic() {
@@ -1121,6 +1143,62 @@ pub fn check_unused_function_template_parameters<'ctx>(
             )),
         );
     }
+}
+
+/// Verifies that a parameter's default value is assignable to the parameter's declared type.
+fn check_parameter_default_value<'ctx, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    parameter_metadata: &'ctx FunctionLikeParameterMetadata,
+    declared_type: &TUnion,
+    default_expression: &Expression<'arena>,
+    artifacts: &AnalysisArtifacts,
+) {
+    if declared_type.is_mixed() || declared_type.has_template_types() || declared_type.is_generic_parameter() {
+        return;
+    }
+
+    let Some(default_type) = artifacts.get_expression_type(default_expression) else {
+        return;
+    };
+
+    if default_type.is_never() {
+        return;
+    }
+
+    let mut comparison_result = ComparisonResult::new();
+    if union_comparator::is_contained_by(
+        context.codebase,
+        default_type,
+        declared_type,
+        true,
+        true,
+        false,
+        &mut comparison_result,
+    ) {
+        return;
+    }
+
+    let default_type_str = default_type.get_id();
+    let declared_type_str = declared_type.get_id();
+    let param_name = parameter_metadata.name.0;
+
+    let issue = Issue::error(format!(
+        "Default value for parameter `{param_name}` is not assignable to its declared type."
+    ))
+    .with_annotation(
+        Annotation::primary(default_expression.span())
+            .with_message(format!("This default value has type `{default_type_str}`")),
+    )
+    .with_annotation(
+        Annotation::secondary(parameter_metadata.span)
+            .with_message(format!("Parameter `{param_name}` is declared with type `{declared_type_str}`")),
+    )
+    .with_note("A parameter's default value must be assignable to the parameter's declared type.")
+    .with_help(
+        "Change the default value to match the declared type, or widen the parameter type to accept the default.",
+    );
+
+    context.collector.report_with_code(IssueCode::InvalidParameterDefaultValue, issue);
 }
 
 /// Reports errors for any undefined type references in the given type metadata.

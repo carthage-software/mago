@@ -396,6 +396,7 @@ test_case!(anonymous_class_constructor_args);
 test_case!(undefined_type_reference);
 test_case!(duplicate_definition);
 test_case!(method_call_assertions);
+test_case!(invalid_default_values);
 test_case!(class_must_be_final, {
     let mut s = crate::framework::default_test_settings();
     s.enforce_class_finality = true;
@@ -436,26 +437,7 @@ test_case!(psl_proc_open_pipes);
 test_case!(psl_array_filter_nullable);
 test_case!(psl_isset_optional_key);
 test_case!(wildcard_type);
-
-// Github Issues
-test_case!(issue_1573);
-test_case!(issue_1574);
-test_case!(issue_1575);
-test_case!(issue_1576);
-test_case!(issue_1578);
-test_case!(issue_1586);
-test_case!(issue_1590);
-test_case!(issue_1591);
-test_case!(issue_1593);
-test_case!(issue_1594);
-test_case!(issue_1587);
-test_case!(issue_1602);
-test_case!(issue_1603);
 test_case!(psl_regressions);
-test_case!(issue_1605);
-test_case!(issue_1608);
-test_case!(issue_1610);
-test_case!(issue_1487);
 test_case!(docblock_parameter_narrowing);
 test_case!(new_and_template_type_utilities);
 test_case!(overly_wide_return_type, {
@@ -463,20 +445,13 @@ test_case!(overly_wide_return_type, {
     s.find_overly_wide_return_types = true;
     s
 });
-test_case!(issue_1610_huffman);
-test_case!(issue_1615);
-test_case!(issue_1624);
-test_case!(issue_1625);
-test_case!(issue_1627);
-test_case!(issue_1628);
-test_case!(issue_1632);
-test_case!(issue_1639);
-test_case!(issue_1651);
 test_case!(side_effects_in_condition, {
     let mut s = crate::framework::default_test_settings();
     s.allow_side_effects_in_conditions = false;
     s
 });
+
+// Github Issues
 test_case!(issue_659);
 test_case!(issue_660);
 test_case!(issue_663);
@@ -860,6 +835,32 @@ test_case!(issue_1542);
 test_case!(issue_1546);
 test_case!(issue_1551);
 test_case!(issue_1552);
+test_case!(issue_1573);
+test_case!(issue_1574);
+test_case!(issue_1575);
+test_case!(issue_1576);
+test_case!(issue_1578);
+test_case!(issue_1586);
+test_case!(issue_1590);
+test_case!(issue_1591);
+test_case!(issue_1593);
+test_case!(issue_1594);
+test_case!(issue_1587);
+test_case!(issue_1602);
+test_case!(issue_1603);
+test_case!(issue_1605);
+test_case!(issue_1608);
+test_case!(issue_1610);
+test_case!(issue_1487);
+test_case!(issue_1610_huffman);
+test_case!(issue_1615);
+test_case!(issue_1624);
+test_case!(issue_1625);
+test_case!(issue_1627);
+test_case!(issue_1628);
+test_case!(issue_1632);
+test_case!(issue_1639);
+test_case!(issue_1651);
 
 #[test]
 fn test_all_test_cases_are_ran() {

@@ -1858,7 +1858,7 @@ mod tests {
              * @param non-empty-list<non-empty-string> $args
              * @param non-empty-string $cwd
              */
-            function shell_execute(string $command, array $args, string $cwd = ''): void {
+            function shell_execute(string $command, array $args, string $cwd = '.'): void {
                 echo "Executing command: $command [" . $args[0] . ", ..] in directory: $cwd\n";
             }
 

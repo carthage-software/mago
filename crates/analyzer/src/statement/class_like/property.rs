@@ -3,9 +3,14 @@ use std::rc::Rc;
 use mago_atom::Atom;
 use mago_atom::atom;
 use mago_codex::context::ScopeContext;
+use mago_codex::ttype::TType;
 use mago_codex::ttype::atomic::TAtomic;
+use mago_codex::ttype::comparator::ComparisonResult;
+use mago_codex::ttype::comparator::union_comparator;
 use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::wrap_atomic;
+use mago_reporting::Annotation;
+use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_syntax::ast::HookedProperty;
 use mago_syntax::ast::PlainProperty;
@@ -18,6 +23,7 @@ use mago_syntax::ast::PropertyItem;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
+use crate::code::IssueCode;
 use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
@@ -88,7 +94,53 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for PropertyConcreteItem<'arena> {
         block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
-        self.value.analyze(context, block_context, artifacts)
+        self.value.analyze(context, block_context, artifacts)?;
+
+        if let Some(class_metadata) = block_context.scope.get_class_like()
+            && let Some(property_metadata) = class_metadata.properties.get(&atom(self.variable.name))
+            && let Some(declared_type_metadata) = property_metadata.type_metadata.as_ref()
+            && !declared_type_metadata.type_union.is_mixed()
+            && !declared_type_metadata.type_union.has_template_types()
+            && !declared_type_metadata.type_union.is_generic_parameter()
+            && let Some(value_type) = artifacts.get_expression_type(&self.value)
+            && !value_type.is_never()
+        {
+            let declared_type = &declared_type_metadata.type_union;
+
+            let mut comparison_result = ComparisonResult::new();
+            if !union_comparator::is_contained_by(
+                context.codebase,
+                value_type,
+                declared_type,
+                true,
+                true,
+                false,
+                &mut comparison_result,
+            ) {
+                let value_type_str = value_type.get_id();
+                let declared_type_str = declared_type.get_id();
+                let class_name = class_metadata.original_name;
+                let property_name = self.variable.name;
+
+                let issue = Issue::error(format!(
+                    "Default value for property `{class_name}::{property_name}` is not assignable to its declared type."
+                ))
+                .with_annotation(
+                    Annotation::primary(self.value.span())
+                        .with_message(format!("This default value has type `{value_type_str}`")),
+                )
+                .with_annotation(
+                    Annotation::secondary(declared_type_metadata.span)
+                        .with_message(format!("Property is declared with type `{declared_type_str}`")),
+                )
+                .with_note("A property's default value must be assignable to the property's declared type.")
+                .with_help("Change the default value to match the declared type, or update the property type to accept the default.");
+
+                context.collector.report_with_code(IssueCode::InvalidPropertyDefaultValue, issue);
+            }
+        }
+
+        Ok(())
     }
 }
 

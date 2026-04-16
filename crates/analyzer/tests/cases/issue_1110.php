@@ -5,7 +5,10 @@ class Test
     public const ONE = 'one';
     public const TWO = 'two';
 
-    /** @var array<string, array{one?: int, two: int}> */
+    /**
+     * @var array<string, array{one?: int, two: int}>
+     * @mago-expect analysis:invalid-constant-value
+     */
     public const DATA = [
         'key1' => [
             self::ONE => null,

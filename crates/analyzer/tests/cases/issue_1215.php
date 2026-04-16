@@ -12,7 +12,10 @@ class Test
         'slug' => 'default',
     ];
 
-    /** @var array<string, TestType> */
+    /**
+     * @var array<string, TestType>
+     * @mago-expect analysis:invalid-constant-value
+     */
     public const array TEST1 = [
         'test1' => [
             ...self::DEFAULT_CONFIG,
@@ -21,7 +24,10 @@ class Test
         ],
     ];
 
-    /** @var array<string, TestType> */
+    /**
+     * @var array<string, TestType>
+     * @mago-expect analysis:invalid-constant-value
+     */
     public const array TEST2 = [
         'test2' => [
             ...self::DEFAULT_CONFIG,
