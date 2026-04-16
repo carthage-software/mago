@@ -754,10 +754,21 @@ pub(crate) fn handle_array_access_on_keyed_array<'ctx>(
 
     let key_parameter = if in_assignment || block_context.flags.inside_isset() {
         Cow::Owned(get_arraykey())
-    } else if let Some(parameters) = keyed_array.get_generic_parameters() {
-        Cow::Borrowed(parameters.0)
     } else {
-        Cow::Owned(get_never())
+        let mut key_union = None;
+        if let Some(known_items) = keyed_array.get_known_items()
+            && !known_items.is_empty()
+        {
+            for array_key in known_items.keys() {
+                key_union = Some(add_optional_union_type(array_key.to_union(), key_union.as_ref(), context.codebase));
+            }
+        }
+
+        if let Some(parameters) = keyed_array.get_generic_parameters() {
+            key_union = Some(add_optional_union_type(parameters.0.clone(), key_union.as_ref(), context.codebase));
+        }
+
+        Cow::Owned(key_union.unwrap_or(get_never()))
     };
 
     let mut has_value_parameter = false;

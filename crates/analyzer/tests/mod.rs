@@ -470,6 +470,7 @@ test_case!(issue_1625);
 test_case!(issue_1627);
 test_case!(issue_1628);
 test_case!(issue_1632);
+test_case!(issue_1639);
 test_case!(side_effects_in_condition, {
     let mut s = crate::framework::default_test_settings();
     s.allow_side_effects_in_conditions = false;

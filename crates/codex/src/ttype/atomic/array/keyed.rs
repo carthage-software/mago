@@ -166,6 +166,18 @@ impl TKeyedArray {
     pub fn as_non_empty_array(&self, non_empty: bool) -> Self {
         Self { non_empty, ..self.clone() }
     }
+
+    /// Returns `true` if this array is known to have exclusively string keys.
+    ///
+    /// Checks both generic parameters and known items. Returns `false` for
+    /// arrays with no key information at all (empty untyped arrays).
+    pub fn has_exclusively_string_keys(&self) -> bool {
+        let has_key_info = self.parameters.is_some() || self.known_items.as_ref().is_some_and(|i| !i.is_empty());
+
+        has_key_info
+            && self.parameters.as_ref().is_none_or(|(k, _)| k.is_any_string())
+            && self.known_items.as_ref().is_none_or(|i| i.keys().all(|k| matches!(k, ArrayKey::String(_))))
+    }
 }
 
 impl TType for TKeyedArray {

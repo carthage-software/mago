@@ -481,6 +481,7 @@ fn increment_operand<'ctx, 'arena>(
     };
 
     let mut possibilities = vec![];
+    let mut reported_invalid = false;
     for operand_atomic_type in operand_type.types.as_ref() {
         match operand_atomic_type {
             TAtomic::Scalar(scalar) => match scalar {
@@ -635,8 +636,10 @@ fn increment_operand<'ctx, 'arena>(
                 possibilities.push(TAtomic::Mixed(TMixed::new()));
             }
             _ => {
-                let type_name = operand_atomic_type.get_id();
-                context.collector.report_with_code(
+                if !reported_invalid {
+                    reported_invalid = true;
+                    let type_name = operand_type.get_id();
+                    context.collector.report_with_code(
                         IssueCode::InvalidOperand,
                         Issue::error(format!(
                             "Cannot increment value of type `{type_name}`."
@@ -646,10 +649,11 @@ fn increment_operand<'ctx, 'arena>(
                             TAtomic::Array(_) => "Incrementing an array results in a `TypeError` exception.",
                             TAtomic::Object(_) => "Incrementing an object without operator overloading support results in a `TypeError` exception.",
                             TAtomic::Resource(_) => "Incrementing a resource results in a `TypeError` exception.",
-                            _ => "This type is not suitable for decrement operations."
+                            _ => "This type is not suitable for increment operations."
                         })
                         .with_help("Ensure the operand is a number or a string suitable for incrementing."),
                     );
+                }
 
                 possibilities.push(TAtomic::Mixed(TMixed::new()));
             }

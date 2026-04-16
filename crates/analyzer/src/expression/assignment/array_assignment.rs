@@ -261,6 +261,21 @@ fn update_atomic_given_key(
             return atomic_type;
         };
 
+        let block_widening = if let TArray::Keyed(keyed_array) = &*array
+            && keyed_array.has_exclusively_string_keys()
+            && let Some(k) = key_type
+        {
+            k.has_int() && !(k.has_string() || k.has_nullish())
+        } else {
+            false
+        };
+
+        if block_widening {
+            // Don't widen key or value. The array keeps its declared type.
+            // The mismatch is reported by the array access analysis.
+            return atomic_type;
+        }
+
         let combined_value_type =
             add_union_type(array_value_type, current_type, context.codebase, context.settings.combiner_options());
 
@@ -281,18 +296,30 @@ fn update_atomic_given_key(
                     list.non_empty = true;
                 }
                 TArray::Keyed(keyed_array) => {
-                    keyed_array.parameters = Some((
-                        Arc::new(add_union_type(
-                            array_key_type,
-                            &key_type.as_ref().map_or_else(get_int, |rc| (**rc).clone()),
-                            context.codebase,
-                            context.settings.combiner_options(),
-                        )),
-                        Arc::new(combined_value_type),
-                    ));
+                    if key_type.is_none()
+                        && keyed_array.parameters.is_none()
+                        && let Some(known_items) = keyed_array.known_items.as_mut()
+                    {
+                        let max_int_key =
+                            known_items.keys().filter_map(ArrayKey::get_integer).filter(|&k| k >= 0).max();
+                        let next_key = max_int_key.map_or(0, |m| m + 1);
 
-                    keyed_array.known_items = None;
-                    keyed_array.non_empty = true;
+                        known_items.insert(ArrayKey::Integer(next_key), (false, current_type.clone()));
+                        keyed_array.non_empty = true;
+                    } else {
+                        keyed_array.parameters = Some((
+                            Arc::new(add_union_type(
+                                array_key_type,
+                                &key_type.as_ref().map_or_else(get_int, |rc| (**rc).clone()),
+                                context.codebase,
+                                context.settings.combiner_options(),
+                            )),
+                            Arc::new(combined_value_type),
+                        ));
+
+                        keyed_array.known_items = None;
+                        keyed_array.non_empty = true;
+                    }
                 }
             }
         }
@@ -387,6 +414,7 @@ fn update_array_assignment_child_type<'ctx>(
     mut root_type: TUnion,
 ) -> TUnion {
     let mut collection_types = Vec::new();
+    let mut extended_shape = false;
 
     if let Some(key_type) = &key_type {
         // PHP coerces null to empty string '' when used as array key.
@@ -476,35 +504,24 @@ fn update_array_assignment_child_type<'ctx>(
                         }
                     }
                     TArray::Keyed(existing_array) => {
-                        let next_index = if array.is_empty() {
-                            None
-                        } else if existing_array.parameters.is_none() {
-                            if let Some(known_items) = existing_array.known_items.as_ref() {
-                                let indices = known_items
-                                    .keys()
-                                    .map(mago_codex::ttype::atomic::array::key::ArrayKey::get_integer)
-                                    .collect::<Option<Vec<_>>>()
-                                    .unwrap_or_default();
+                        if !block_context.flags.inside_loop()
+                            && existing_array.parameters.is_none()
+                            && let Some(known_items) = existing_array.known_items.as_ref()
+                        {
+                            let max_int_key =
+                                known_items.keys().filter_map(ArrayKey::get_integer).filter(|&k| k >= 0).max();
+                            let next_key = max_int_key.map_or(0, |m| m + 1);
 
-                                if indices.is_empty() || indices.iter().any(|&i| i >= 0) {
-                                    indices.last().copied()
-                                } else {
-                                    None
-                                }
-                            } else {
-                                None
-                            }
-                        } else {
-                            None
-                        };
+                            let mut new_items = known_items.clone();
+                            new_items.insert(ArrayKey::Integer(next_key), (false, value_type.clone()));
 
-                        if let Some(index) = next_index.filter(|index| *index > 0) {
-                            collection_types.push(TAtomic::Array(TArray::List(TList {
-                                element_type: Arc::new(value_type.clone()),
-                                known_elements: Some(BTreeMap::from([(index as usize, (false, value_type.clone()))])),
-                                known_count: None,
+                            collection_types.push(TAtomic::Array(TArray::Keyed(TKeyedArray {
+                                known_items: Some(new_items),
+                                parameters: None,
                                 non_empty: true,
                             })));
+
+                            extended_shape = true;
                         } else {
                             collection_types.push(TAtomic::Array(TArray::List(TList {
                                 element_type: Arc::new(value_type.clone()),
@@ -529,6 +546,10 @@ fn update_array_assignment_child_type<'ctx>(
     }
 
     root_type.types.to_mut().retain(|t| !t.is_null() && !t.is_void());
+    if extended_shape {
+        root_type.types.to_mut().retain(|t| !matches!(t, TAtomic::Array(TArray::Keyed(_))));
+    }
+
     if collection_types.is_empty() {
         return root_type;
     }
