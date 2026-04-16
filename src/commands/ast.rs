@@ -260,9 +260,9 @@ fn print_names<'arena>(arena: &'arena Bump, program: &Program<'arena>) -> Result
     println!("  {: <10} {: <50} {}", "Offset".bold(), "Name".bold(), "Imported".bold());
     println!("  {0:─<10} {0:─<50} {0:─<10}", "");
 
-    for (position, (name, is_imported)) in names.all() {
-        let imported_str = if *is_imported { "✅".green() } else { "❌".red() };
-        println!("  {: <10} {: <50} {}", format!("@{}", position).dimmed(), name.cyan(), imported_str);
+    for (start, end, name, is_imported) in names.iter() {
+        let imported_str = if is_imported { "✅".green() } else { "❌".red() };
+        println!("  {: <10} {: <50} {}", format!("@{start}..{end}").dimmed(), name.cyan(), imported_str);
     }
     println!();
     Ok(())
