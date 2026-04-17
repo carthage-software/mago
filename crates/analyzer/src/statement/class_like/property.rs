@@ -7,6 +7,9 @@ use mago_codex::ttype::TType;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::comparator::ComparisonResult;
 use mago_codex::ttype::comparator::union_comparator;
+use mago_codex::ttype::expander::StaticClassType;
+use mago_codex::ttype::expander::TypeExpansionOptions;
+use mago_codex::ttype::expander::expand_union;
 use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::wrap_atomic;
 use mago_reporting::Annotation;
@@ -105,13 +108,26 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for PropertyConcreteItem<'arena> {
             && let Some(value_type) = artifacts.get_expression_type(&self.value)
             && !value_type.is_never()
         {
-            let declared_type = &declared_type_metadata.type_union;
+            let mut declared_type = declared_type_metadata.type_union.clone();
+            expand_union(
+                context.codebase,
+                &mut declared_type,
+                &TypeExpansionOptions {
+                    self_class: Some(class_metadata.original_name),
+                    static_class_type: StaticClassType::Name(class_metadata.original_name),
+                    evaluate_class_constants: true,
+                    evaluate_conditional_types: true,
+                    expand_generic: true,
+                    expand_templates: true,
+                    ..Default::default()
+                },
+            );
 
             let mut comparison_result = ComparisonResult::new();
             if !union_comparator::is_contained_by(
                 context.codebase,
                 value_type,
-                declared_type,
+                &declared_type,
                 true,
                 true,
                 false,
