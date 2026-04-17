@@ -24,6 +24,7 @@ This document details the rules available in the `BestPractices` category.
 | Prefer Anonymous Migration | [`prefer-anonymous-migration`](#prefer-anonymous-migration) |
 | Prefer Arrow Function | [`prefer-arrow-function`](#prefer-arrow-function) |
 | Prefer Early Continue | [`prefer-early-continue`](#prefer-early-continue) |
+| Prefer Explode Over Preg Split | [`prefer-explode-over-preg-split`](#prefer-explode-over-preg-split) |
 | Prefer First Class Callable | [`prefer-first-class-callable`](#prefer-first-class-callable) |
 | Prefer Interface | [`prefer-interface`](#prefer-interface) |
 | Prefer Pre-Increment | [`prefer-pre-increment`](#prefer-pre-increment) |
@@ -739,6 +740,50 @@ for ($i = 0; $i < 10; $i++) {
         doSomething();
     }
 }
+```
+
+
+## <a id="prefer-explode-over-preg-split"></a>`prefer-explode-over-preg-split`
+
+Detects calls to `preg_split()` whose pattern has no regex meta-characters and no
+modifiers, which means the split could be done with `explode()` and no regex engine
+at all.
+
+`explode()` is faster (no compilation step), easier to read, and expresses the
+intent more directly when the separator is a plain string.
+
+The rule only fires when:
+
+- the pattern argument is a string literal,
+- the pattern has no flags after the closing delimiter,
+- the content between the delimiters contains no regex meta-characters,
+- and the `flags` argument (if present) is literal `0`.
+
+
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `false` |
+| `level` | `string` | `"warning"` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+
+$parts = explode(', ', $csv);
+```
+
+#### Incorrect code
+
+```php
+<?php
+
+$parts = preg_split('/, /', $csv);
 ```
 
 

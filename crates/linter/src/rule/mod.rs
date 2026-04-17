@@ -343,4 +343,5 @@ define_rules! {
     SwitchContinueToBreak(switch_continue_to_break @ SwitchContinueToBreakRule),
     MissingDocs(missing_docs @ MissingDocsRule),
     NoNullPropertyInit(no_null_property_init @ NoNullPropertyInitRule),
+    PreferExplodeOverPregSplit(prefer_explode_over_preg_split @ PreferExplodeOverPregSplitRule),
 }

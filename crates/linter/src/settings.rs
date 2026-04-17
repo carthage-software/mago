@@ -128,6 +128,7 @@ use crate::rule::OptionalParamOrderConfig;
 use crate::rule::PreferAnonymousMigrationConfig;
 use crate::rule::PreferArrowFunctionConfig;
 use crate::rule::PreferEarlyContinueConfig;
+use crate::rule::PreferExplodeOverPregSplitConfig;
 use crate::rule::PreferFirstClassCallableConfig;
 use crate::rule::PreferInterfaceConfig;
 use crate::rule::PreferPreIncrementConfig;
@@ -238,6 +239,7 @@ pub struct RulesSettings {
     pub deprecated_shell_execute_string: RuleSettings<DeprecatedShellExecuteStringConfig>,
     pub deprecated_switch_semicolon: RuleSettings<DeprecatedSwitchSemicolonConfig>,
     pub prefer_anonymous_migration: RuleSettings<PreferAnonymousMigrationConfig>,
+    pub prefer_explode_over_preg_split: RuleSettings<PreferExplodeOverPregSplitConfig>,
     pub prefer_first_class_callable: RuleSettings<PreferFirstClassCallableConfig>,
     pub no_void_reference_return: RuleSettings<NoVoidReferenceReturnConfig>,
     pub no_underscore_class: RuleSettings<NoUnderscoreClassConfig>,
