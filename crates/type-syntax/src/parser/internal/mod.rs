@@ -88,9 +88,7 @@ pub(crate) fn is_at_member_identifier_at<'input>(
 ) -> Result<bool, ParseError> {
     match stream.lookahead(offset)?.map(|t| t.kind) {
         Some(TypeTokenKind::Identifier) => Ok(true),
-        Some(TypeTokenKind::New) => {
-            Ok(!stream.lookahead(offset + 1)?.is_some_and(|t| t.kind == TypeTokenKind::LessThan))
-        }
+        Some(TypeTokenKind::New) => Ok(stream.lookahead(offset + 1)?.is_none_or(|t| t.kind != TypeTokenKind::LessThan)),
         _ => Ok(false),
     }
 }
