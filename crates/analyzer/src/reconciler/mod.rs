@@ -1103,7 +1103,7 @@ fn get_value_for_key(
                             }
                         }
                     } else if matches!(existing_key_type_part, TAtomic::Scalar(TScalar::String(_))) {
-                        return Some(get_string());
+                        new_base_type_candidate = get_string();
                     } else if existing_key_type_part.is_never() || existing_key_type_part.is_mixed_isset_from_loop() {
                         return Some(get_mixed_maybe_from_loop(inside_loop));
                     } else if let TAtomic::Object(TObject::Named(_named_object)) = &existing_key_type_part {
@@ -1114,9 +1114,9 @@ fn get_value_for_key(
                             return None;
                         }
 
-                        return Some(get_mixed());
+                        new_base_type_candidate = get_mixed();
                     } else {
-                        return Some(get_mixed());
+                        continue;
                     }
 
                     let resulting_type = Rc::new(if let Some(new_base_type) = &new_base_type {
