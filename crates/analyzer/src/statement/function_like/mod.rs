@@ -405,6 +405,16 @@ fn add_parameter_types_to_context<'ctx, 'arena>(
         } else if let Some(inferred_map) = inferred_parameter_types.as_mut()
             && let Some(inferred_type) = inferred_map.remove(&i)
             && !is_unresolved_template_with_mixed_bound(&inferred_type)
+            && (parameter_metadata.get_type_metadata().is_none()
+                || union_comparator::is_contained_by(
+                    context.codebase,
+                    &inferred_type,
+                    &declared_parameter_type,
+                    true,
+                    true,
+                    false,
+                    &mut ComparisonResult::default(),
+                ))
         {
             if parameter_metadata.get_type_metadata().is_some()
                 && !declared_parameter_type.is_nullable()
