@@ -401,6 +401,9 @@ test_case!(issue_1350);
 test_case!(issue_1451);
 test_case!(issue_1460);
 test_case!(issue_1513);
+test_case!(issue_1623);
+test_case!(issue_1623_within_width);
+test_case!(member_access_chain_keeps_breaks_with_comments);
 test_case!(issue_1562);
 test_case!(bare_cr_line_endings);
 

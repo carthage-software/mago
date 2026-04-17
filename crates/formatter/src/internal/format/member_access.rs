@@ -485,6 +485,10 @@ impl<'arena> MemberAccessChain<'arena> {
             return true;
         }
 
+        if self.has_comments_in_chain(f) && self.is_already_broken(f) {
+            return true;
+        }
+
         if self.is_first_link_static_method_call() && self.accesses.len() > 5 {
             return true;
         }
@@ -538,6 +542,7 @@ impl<'arena> MemberAccessChain<'arena> {
 
         let mut i = 0;
         let mut pattern_start_index = None;
+        let mut first_pattern_method_count = 0usize;
         let mut patterns_count = 0;
 
         // Iterate through all accesses
@@ -574,6 +579,7 @@ impl<'arena> MemberAccessChain<'arena> {
             if property_count > 0 && method_count > 0 {
                 if pattern_start_index.is_none() {
                     pattern_start_index = Some(property_start);
+                    first_pattern_method_count = method_count;
                 }
 
                 patterns_count += 1;
@@ -582,7 +588,8 @@ impl<'arena> MemberAccessChain<'arena> {
 
         match pattern_start_index {
             Some(0) if patterns_count > 1 => Some(0),
-            Some(start) if start > 0 => Some(start),
+            Some(start) if start > 0 && patterns_count > 1 => Some(start),
+            Some(start) if start > 0 && patterns_count == 1 && first_pattern_method_count <= 1 => Some(start),
             _ => None,
         }
     }
