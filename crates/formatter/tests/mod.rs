@@ -270,6 +270,8 @@ test_case!(heredoc_indentation);
 test_case!(heredoc_indentation_disabled);
 test_case!(drupal_preset);
 test_case!(redundant_grouping_parens);
+test_case!(preserve_logical_grouping_parens);
+test_case!(preserve_logical_grouping_parens_disabled);
 test_case!(null_type_hint_null_pipe_last);
 test_case!(comment_placement_binary);
 test_case!(comment_placement_conditional);

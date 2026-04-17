@@ -3,6 +3,7 @@ use bumpalo::vec;
 use mago_php_version::feature::Feature;
 use mago_span::HasSpan;
 use mago_syntax::ast::Access;
+use mago_syntax::ast::Binary;
 use mago_syntax::ast::BinaryOperator;
 use mago_syntax::ast::Call;
 use mago_syntax::ast::Construct;
@@ -271,7 +272,10 @@ impl<'arena> FormatterState<'_, 'arena> {
         match self.nth_parent_kind(2) {
             Some(Node::Clone(_) | Node::ArrayAppend(_) | Node::VariadicArrayElement(_) | Node::UnaryPostfix(_)) => true,
             Some(Node::UnaryPrefix(u)) => precedence < u.operator.precedence(),
-            Some(Node::Binary(e)) => self.binary_child_needs_parens(node, operator, &e.operator),
+            Some(Node::Binary(e)) => {
+                self.binary_child_needs_parens(node, operator, &e.operator)
+                    || self.logical_grouping_should_be_preserved(node, operator, e)
+            }
             Some(Node::Pipe(_)) => precedence < Precedence::Pipe,
             Some(Node::ArrowFunction(_)) => false,
             Some(Node::Conditional(_)) => precedence < Precedence::ElvisOrConditional,
@@ -306,6 +310,32 @@ impl<'arena> FormatterState<'_, 'arena> {
                 false
             }
         }
+    }
+
+    /// Returns `true` if the author-written parentheses around this logical binary child
+    /// should be preserved even though PHP's operator precedence makes them redundant.
+    fn logical_grouping_should_be_preserved(
+        &self,
+        node: Node<'arena, 'arena>,
+        operator: &BinaryOperator<'arena>,
+        parent: &'arena Binary<'arena>,
+    ) -> bool {
+        if !self.settings.preserve_redundant_logical_binary_expression_parentheses {
+            return false;
+        }
+
+        if !operator.is_logical() || !parent.operator.is_logical() {
+            return false;
+        }
+
+        let Node::Binary(target) = node else {
+            return false;
+        };
+
+        let child_is_lhs = target.operator.start_position() < parent.operator.start_position();
+        let parent_side = if child_is_lhs { parent.lhs } else { parent.rhs };
+
+        binary_has_explicit_wrapping_parens(target, parent_side)
     }
 
     fn binary_child_needs_parens(
@@ -606,5 +636,30 @@ impl<'arena> FormatterState<'_, 'arena> {
 
     const fn is_ternary_conditional(&self, node: Node<'arena, 'arena>) -> bool {
         if let Node::Conditional(op) = node { op.then.is_some() } else { false }
+    }
+}
+
+fn binary_has_explicit_wrapping_parens<'arena>(
+    target: &'arena Binary<'arena>,
+    expr: &'arena Expression<'arena>,
+) -> bool {
+    match expr {
+        Expression::Parenthesized(parenthesized) => {
+            let inner = unwrap_parenthesized(parenthesized.expression);
+            match inner {
+                Expression::Binary(binary) if std::ptr::eq(binary as *const _, target as *const _) => true,
+                Expression::Binary(binary) => {
+                    binary_has_explicit_wrapping_parens(target, binary.lhs)
+                        || binary_has_explicit_wrapping_parens(target, binary.rhs)
+                }
+                _ => false,
+            }
+        }
+        Expression::Binary(binary) if std::ptr::eq(binary as *const _, target as *const _) => false,
+        Expression::Binary(binary) => {
+            binary_has_explicit_wrapping_parens(target, binary.lhs)
+                || binary_has_explicit_wrapping_parens(target, binary.rhs)
+        }
+        _ => false,
     }
 }

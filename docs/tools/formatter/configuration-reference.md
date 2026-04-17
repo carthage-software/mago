@@ -149,6 +149,7 @@ public function bar(
 | `indent-binary-expression-continuation` | `boolean` | `false` | Indent continuation lines of binary expressions in assignments. Available since Mago 1.19.0. |
 | `omit-redundant-arithmetic-binary-expression-parentheses` | `boolean` | `false` | Omit redundant parentheses around arithmetic binary expressions under comparison and null coalesce expressions when PHP precedence already preserves meaning. |
 | `omit-redundant-bitwise-binary-expression-parentheses` | `boolean` | `false` | Omit redundant parentheses around bitwise binary child expressions when PHP precedence and associativity already preserve meaning. |
+| `preserve-redundant-logical-binary-expression-parentheses` | `boolean` | `false` | Preserve author-written parentheses around a logical binary sub-expression when its enclosing binary is also logical, even if PHP's operator precedence makes them redundant. Only applies to logical operators (`&&`, `\|\|`, `and`, `or`, `xor`). For example, with this enabled, `($a && $b) \|\| $c` is kept as written instead of being reformatted to `$a && $b \|\| $c`. |
 | `always-break-named-arguments-list` | `boolean` | `false` | Always break named argument lists into multiple lines. |
 | `always-break-attribute-named-argument-lists` | `boolean` | `false` | Always break named argument lists in attributes. |
 | `align-parameters` | `boolean` | `false` | Align multiline function and method parameter lists by the variable column. This is especially useful for promoted constructor properties with visibility modifiers. |

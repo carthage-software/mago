@@ -585,6 +585,28 @@ generate_formatter_settings! {
     /// Default: false
     omit_redundant_bitwise_binary_expression_parentheses: bool => "default_false",
 
+    /// Whether to preserve author-written parentheses around logical binary sub-expressions
+    /// even when PHP's operator precedence makes them redundant.
+    ///
+    /// When enabled, explicit grouping parentheses that an author added for clarity are kept:
+    /// ```php
+    /// if (($var1 > 200 && $var2 < 1) || ($var1 <= 200 && $var2 < 3)) {
+    /// }
+    /// ```
+    ///
+    /// When disabled (the default), the formatter removes parentheses that the precedence rules
+    /// already imply:
+    /// ```php
+    /// if ($var1 > 200 && $var2 < 1 || $var1 <= 200 && $var2 < 3) {
+    /// }
+    /// ```
+    ///
+    /// This only applies to logical operators (`&&`, `||`, `and`, `or`, `xor`): parentheses
+    /// that group a logical sub-expression inside another logical expression.
+    ///
+    /// Default: false
+    preserve_redundant_logical_binary_expression_parentheses: bool => "default_false",
+
     /// Whether to always break named argument lists into multiple lines.
     ///
     /// When enabled:
