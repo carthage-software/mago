@@ -154,8 +154,7 @@ impl LintRule for PreferExplodeOverPregSplitRule {
             )
             .with_help("Replace the `preg_split` call with `explode` and unwrap the pattern delimiters.");
 
-        // Rewrite the pattern to a single-quoted string literal holding the plain separator.
-        let rewritten_separator = quote_as_single(separator);
+        let rewritten_separator = quote_separator(separator);
 
         ctx.collector.propose(issue, |edits| {
             let has_namespace = !ctx.scope.get_namespace().is_empty();
@@ -237,6 +236,18 @@ fn try_extract_plain_separator(pattern: &str) -> Option<&str> {
     Some(inner)
 }
 
+/// Wraps `content` in a PHP string literal. Uses single quotes for printable content, and
+/// falls back to double quotes with escape sequences when the separator contains ASCII
+/// control bytes (newlines, tabs, etc.) so the emitted source doesn't get split across lines.
+fn quote_separator(content: &str) -> String {
+    if content.bytes().any(is_ascii_control_byte) { quote_as_double(content) } else { quote_as_single(content) }
+}
+
+#[inline]
+const fn is_ascii_control_byte(byte: u8) -> bool {
+    byte < 0x20 || byte == 0x7F
+}
+
 /// Wraps `content` in single quotes, escaping any characters that single-quoted PHP strings
 /// require escaping (`\` and `'`).
 fn quote_as_single(content: &str) -> String {
@@ -253,6 +264,33 @@ fn quote_as_single(content: &str) -> String {
     }
 
     out.push('\'');
+    out
+}
+
+/// Wraps `content` in double quotes, emitting PHP escape sequences for ASCII control bytes,
+/// backslashes, and characters that are special inside double-quoted strings (`"`, `$`).
+fn quote_as_double(content: &str) -> String {
+    let mut out = String::with_capacity(content.len() + 2);
+    out.push('"');
+    for c in content.chars() {
+        match c {
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            '\t' => out.push_str("\\t"),
+            '\x0b' => out.push_str("\\v"),
+            '\x0c' => out.push_str("\\f"),
+            '\x1b' => out.push_str("\\e"),
+            '\\' => out.push_str("\\\\"),
+            '"' => out.push_str("\\\""),
+            '$' => out.push_str("\\$"),
+            c if (c as u32) < 0x80 && is_ascii_control_byte(c as u8) => {
+                use std::fmt::Write as _;
+                let _ = write!(out, "\\x{:02x}", c as u32);
+            }
+            _ => out.push(c),
+        }
+    }
+    out.push('"');
     out
 }
 
@@ -421,6 +459,66 @@ mod tests {
             namespace App;
 
             $parts = \explode('abc', $s);
+        "#}
+    }
+
+    test_lint_fix! {
+        name = fix_separator_with_newline_escapes_to_double_quoted,
+        rule = PreferExplodeOverPregSplitRule,
+        code = indoc! {r#"
+            <?php
+
+            $parts = preg_split("/\n\n/", $s);
+        "#},
+        fixed = indoc! {r#"
+            <?php
+
+            $parts = explode("\n\n", $s);
+        "#}
+    }
+
+    test_lint_fix! {
+        name = fix_separator_with_tab_escapes_to_double_quoted,
+        rule = PreferExplodeOverPregSplitRule,
+        code = indoc! {r#"
+            <?php
+
+            $parts = preg_split("/\t/", $s);
+        "#},
+        fixed = indoc! {r#"
+            <?php
+
+            $parts = explode("\t", $s);
+        "#}
+    }
+
+    test_lint_fix! {
+        name = fix_separator_with_crlf_escapes_to_double_quoted,
+        rule = PreferExplodeOverPregSplitRule,
+        code = indoc! {r#"
+            <?php
+
+            $parts = preg_split("/\r\n/", $s);
+        "#},
+        fixed = indoc! {r#"
+            <?php
+
+            $parts = explode("\r\n", $s);
+        "#}
+    }
+
+    test_lint_fix! {
+        name = fix_separator_with_arbitrary_control_byte_uses_hex_escape,
+        rule = PreferExplodeOverPregSplitRule,
+        code = indoc! {r#"
+            <?php
+
+            $parts = preg_split("/\x01/", $s);
+        "#},
+        fixed = indoc! {r#"
+            <?php
+
+            $parts = explode("\x01", $s);
         "#}
     }
 }
