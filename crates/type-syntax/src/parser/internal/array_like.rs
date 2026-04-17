@@ -18,7 +18,9 @@ use crate::ast::ShapeType;
 use crate::ast::ShapeTypeKind;
 use crate::ast::Type;
 use crate::error::ParseError;
+use crate::parser::internal::eat_member_identifier;
 use crate::parser::internal::generic::parse_generic_parameters_or_none;
+use crate::parser::internal::is_at_member_identifier_at;
 use crate::parser::internal::parse_type;
 use crate::parser::internal::stream::TypeTokenStream;
 use crate::token::TypeTokenKind;
@@ -268,12 +270,12 @@ pub fn parse_shape_field_key<'input>(stream: &mut TypeTokenStream<'input>) -> Re
         || stream.is_at(TypeTokenKind::QualifiedIdentifier)?
         || stream.is_at(TypeTokenKind::FullyQualifiedIdentifier)?)
         && stream.lookahead(1)?.is_some_and(|t| t.kind == TypeTokenKind::ColonColon)
-        && stream.lookahead(2)?.is_some_and(|t| t.kind == TypeTokenKind::Identifier)
+        && is_at_member_identifier_at(stream, 2)?
     {
         let class_token = stream.consume()?;
         let class_name = Identifier::from_token(class_token, stream.file_id());
         let double_colon = stream.eat(TypeTokenKind::ColonColon)?.span_for(stream.file_id());
-        let constant_token = stream.eat(TypeTokenKind::Identifier)?;
+        let constant_token = eat_member_identifier(stream)?;
         let constant_name = Identifier::from_token(constant_token, stream.file_id());
         let span = class_name.span.join(constant_name.span);
 

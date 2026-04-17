@@ -489,6 +489,99 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_member_ref_named_new() {
+        match do_parse("Action::NEW") {
+            Ok(Type::MemberReference(m)) => {
+                assert_eq!(m.class.value, "Action");
+                assert_eq!(m.member.to_string(), "NEW");
+            }
+            res => panic!("Expected Ok(Type::MemberReference) for Action::NEW, got {res:?}"),
+        }
+
+        match do_parse("Action::new") {
+            Ok(Type::MemberReference(m)) => {
+                assert_eq!(m.class.value, "Action");
+                assert_eq!(m.member.to_string(), "new");
+            }
+            res => panic!("Expected Ok(Type::MemberReference) for Action::new, got {res:?}"),
+        }
+
+        match do_parse("Action::DELETE|Action::NEW") {
+            Ok(Type::Union(u)) => match (&*u.left, &*u.right) {
+                (Type::MemberReference(lhs), Type::MemberReference(rhs)) => {
+                    assert_eq!(lhs.member.to_string(), "DELETE");
+                    assert_eq!(rhs.member.to_string(), "NEW");
+                }
+                other => panic!("Expected two member references, got {other:?}"),
+            },
+            res => panic!("Expected Ok(Type::Union), got {res:?}"),
+        }
+
+        match do_parse("\\App\\Action::NEW") {
+            Ok(Type::MemberReference(m)) => {
+                assert_eq!(m.member.to_string(), "NEW");
+            }
+            res => panic!("Expected Ok(Type::MemberReference), got {res:?}"),
+        }
+
+        match do_parse("App\\Action::NEW") {
+            Ok(Type::MemberReference(m)) => {
+                assert_eq!(m.member.to_string(), "NEW");
+            }
+            res => panic!("Expected Ok(Type::MemberReference), got {res:?}"),
+        }
+
+        match do_parse("Action::new*") {
+            Ok(Type::MemberReference(m)) => {
+                assert_eq!(m.class.value, "Action");
+                assert!(matches!(m.member, MemberReferenceSelector::StartsWith(..)));
+            }
+            res => panic!("Expected Ok(Type::MemberReference) for Action::new*, got {res:?}"),
+        }
+
+        match do_parse("Action::*new") {
+            Ok(Type::MemberReference(m)) => {
+                assert_eq!(m.class.value, "Action");
+                assert!(matches!(m.member, MemberReferenceSelector::EndsWith(..)));
+            }
+            res => panic!("Expected Ok(Type::MemberReference) for Action::*new, got {res:?}"),
+        }
+
+        match do_parse("new<Foo>") {
+            Ok(Type::New(_)) => {}
+            res => panic!("Expected Ok(Type::New), got {res:?}"),
+        }
+    }
+
+    #[test]
+    fn test_parse_new_in_other_identifier_contexts() {
+        match do_parse("array{new: int}") {
+            Ok(Type::Shape(_)) => {}
+            res => panic!("Expected Ok(Type::Shape) for array{{new: int}}, got {res:?}"),
+        }
+
+        match do_parse("array{new?: int}") {
+            Ok(Type::Shape(_)) => {}
+            res => panic!("Expected Ok(Type::Shape) for array{{new?: int}}, got {res:?}"),
+        }
+
+        match do_parse("array{Foo::NEW: int}") {
+            Ok(Type::Shape(_)) => {}
+            res => panic!("Expected Ok(Type::Shape) for array{{Foo::NEW: int}}, got {res:?}"),
+        }
+
+        match do_parse("object{new: int}") {
+            Ok(Type::Object(_)) => {}
+            res => panic!("Expected Ok(Type::Object) for object{{new: int}}, got {res:?}"),
+        }
+
+        match do_parse("!Foo::new") {
+            Ok(Type::AliasReference(_)) => {}
+            res => panic!("Expected Ok(Type::AliasReference) for !Foo::new, got {res:?}"),
+        }
+    }
+
+    #[test]
     fn test_parse_iterable() {
         match do_parse("iterable<int, string>") {
             Ok(Type::Iterable(i)) => {

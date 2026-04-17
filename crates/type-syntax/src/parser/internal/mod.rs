@@ -56,6 +56,7 @@ use crate::parser::internal::generic::parse_single_generic_parameter_or_none;
 use crate::parser::internal::object::parse_object_type;
 use crate::parser::internal::stream::TypeTokenStream;
 use crate::token::TypePrecedence;
+use crate::token::TypeToken;
 use crate::token::TypeTokenKind;
 
 pub mod array_like;
@@ -68,6 +69,39 @@ pub mod stream;
 #[inline]
 pub fn parse_type<'input>(stream: &mut TypeTokenStream<'input>) -> Result<Type<'input>, ParseError> {
     parse_type_with_precedence(stream, TypePrecedence::Lowest)
+}
+
+/// Returns `true` when the current token can act as a member-name identifier.
+///
+/// Accepts plain `Identifier` tokens, and also the `new` keyword when it is *not* followed
+/// by `<`, this lets class constants and enum cases named `new` (e.g. `Action::NEW`) parse
+/// despite `new` being reserved by the `new<T>` type construct.
+pub(crate) fn is_at_member_identifier<'input>(stream: &mut TypeTokenStream<'input>) -> Result<bool, ParseError> {
+    is_at_member_identifier_at(stream, 0)
+}
+
+/// Like [`is_at_member_identifier`] but peeks `offset` tokens ahead instead of at the current
+/// position. `offset == 0` is equivalent to [`is_at_member_identifier`].
+pub(crate) fn is_at_member_identifier_at<'input>(
+    stream: &mut TypeTokenStream<'input>,
+    offset: usize,
+) -> Result<bool, ParseError> {
+    match stream.lookahead(offset)?.map(|t| t.kind) {
+        Some(TypeTokenKind::Identifier) => Ok(true),
+        Some(TypeTokenKind::New) => {
+            Ok(!stream.lookahead(offset + 1)?.is_some_and(|t| t.kind == TypeTokenKind::LessThan))
+        }
+        _ => Ok(false),
+    }
+}
+
+/// Consumes the next token as a member-name identifier. Accepts `Identifier`, or the `new`
+/// keyword when it is not followed by `<`. Errors with `UnexpectedToken` expecting `Identifier`
+/// otherwise, so the diagnostic matches the traditional call site.
+pub(crate) fn eat_member_identifier<'input>(
+    stream: &mut TypeTokenStream<'input>,
+) -> Result<TypeToken<'input>, ParseError> {
+    if is_at_member_identifier(stream)? { stream.consume() } else { stream.eat(TypeTokenKind::Identifier) }
 }
 
 /// Parses a type expression with the given minimum precedence.
@@ -427,17 +461,17 @@ fn parse_primary_type<'input>(stream: &mut TypeTokenStream<'input>) -> Result<Ty
                     Type::MemberReference(MemberReferenceType {
                         class: identifier,
                         double_colon,
-                        member: if stream.is_at(TypeTokenKind::Identifier)? {
+                        member: if is_at_member_identifier(stream)? {
                             MemberReferenceSelector::EndsWith(
                                 asterisk,
-                                Identifier::from_token(stream.eat(TypeTokenKind::Identifier)?, stream.file_id()),
+                                Identifier::from_token(eat_member_identifier(stream)?, stream.file_id()),
                             )
                         } else {
                             MemberReferenceSelector::Wildcard(asterisk)
                         },
                     })
                 } else {
-                    let identifier = Identifier::from_token(stream.eat(TypeTokenKind::Identifier)?, stream.file_id());
+                    let identifier = Identifier::from_token(eat_member_identifier(stream)?, stream.file_id());
 
                     Type::MemberReference(MemberReferenceType {
                         class: identifier,
@@ -481,10 +515,10 @@ fn parse_primary_type<'input>(stream: &mut TypeTokenStream<'input>) -> Result<Ty
                         Type::MemberReference(MemberReferenceType {
                             class: identifier,
                             double_colon,
-                            member: if stream.is_at(TypeTokenKind::Identifier)? {
+                            member: if is_at_member_identifier(stream)? {
                                 MemberReferenceSelector::EndsWith(
                                     asterisk,
-                                    Identifier::from_token(stream.eat(TypeTokenKind::Identifier)?, stream.file_id()),
+                                    Identifier::from_token(eat_member_identifier(stream)?, stream.file_id()),
                                 )
                             } else {
                                 MemberReferenceSelector::Wildcard(asterisk)
@@ -492,7 +526,7 @@ fn parse_primary_type<'input>(stream: &mut TypeTokenStream<'input>) -> Result<Ty
                         })
                     } else {
                         let member_identifier =
-                            Identifier::from_token(stream.eat(TypeTokenKind::Identifier)?, stream.file_id());
+                            Identifier::from_token(eat_member_identifier(stream)?, stream.file_id());
 
                         Type::MemberReference(MemberReferenceType {
                             class: identifier,
@@ -533,17 +567,16 @@ fn parse_primary_type<'input>(stream: &mut TypeTokenStream<'input>) -> Result<Ty
                         member: if stream.is_at(TypeTokenKind::Asterisk)? {
                             let asterisk = stream.consume()?.span_for(stream.file_id());
 
-                            if stream.is_at(TypeTokenKind::Identifier)? {
+                            if is_at_member_identifier(stream)? {
                                 MemberReferenceSelector::EndsWith(
                                     asterisk,
-                                    Identifier::from_token(stream.eat(TypeTokenKind::Identifier)?, stream.file_id()),
+                                    Identifier::from_token(eat_member_identifier(stream)?, stream.file_id()),
                                 )
                             } else {
                                 MemberReferenceSelector::Wildcard(asterisk)
                             }
                         } else {
-                            let identifier =
-                                Identifier::from_token(stream.eat(TypeTokenKind::Identifier)?, stream.file_id());
+                            let identifier = Identifier::from_token(eat_member_identifier(stream)?, stream.file_id());
 
                             if stream.is_at(TypeTokenKind::Asterisk)? {
                                 MemberReferenceSelector::StartsWith(
