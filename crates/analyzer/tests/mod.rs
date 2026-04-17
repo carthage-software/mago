@@ -860,6 +860,7 @@ test_case!(issue_1627);
 test_case!(issue_1628);
 test_case!(issue_1632);
 test_case!(issue_1639);
+test_case!(issue_1633);
 test_case!(issue_1641);
 test_case!(issue_1651);
 test_case!(issue_1653);

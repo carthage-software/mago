@@ -351,7 +351,6 @@ final class Summary
         if ($st->acces) {
             $accesToText = static function (int $v): string {
                 $conv = ['', '', 'Texte integral', 'Resume', 'Sommaire', 'Indexation'];
-                // @mago-expect analysis:mismatched-array-index
                 return $conv[$v] ?? '';
             };
             $sum['Acces'] = join(' OU ', array_map($accesToText, $st->acces));

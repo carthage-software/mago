@@ -14,7 +14,6 @@ final class Picker
      */
     public static function pickCase(array $choices, int $identifier): mixed
     {
-        // @mago-expect analysis:mismatched-array-index
         return $choices[$identifier % count($choices)] ?? null;
     }
 }
@@ -29,7 +28,6 @@ final class Picker
  */
 function pickCase(array $choices, int $identifier): mixed
 {
-    // @mago-expect analysis:mismatched-array-index
     return $choices[$identifier % count($choices)] ?? null;
 }
 

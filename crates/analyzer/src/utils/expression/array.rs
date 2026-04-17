@@ -595,7 +595,22 @@ pub(crate) fn handle_array_access_on_list<'ctx>(
         &mut union_comparison_result,
     );
 
-    if index_type_contained_by_expected {
+    // Accept a wider index type (e.g., `array<1, T>` indexed by `int`) as long as the key type
+    // is contained by the index type — the access is type-valid, even if the specific key may
+    // not be present at runtime.
+    let expected_contained_by_index = !index_type_contained_by_expected
+        && !expected_key_type.is_never()
+        && is_contained_by(
+            context.codebase,
+            &expected_key_type,
+            dim_type,
+            true,
+            false,
+            false,
+            &mut ComparisonResult::new(),
+        );
+
+    if index_type_contained_by_expected || expected_contained_by_index {
         *has_valid_expected_index = true;
     } else {
         expected_index_types.push(expected_key_type);
@@ -784,7 +799,26 @@ pub(crate) fn handle_array_access_on_keyed_array<'ctx>(
     let index_type_contained_by_expected =
         is_contained_by(context.codebase, index_type, &key_parameter, true, false, false, &mut union_comparison_result);
 
-    if index_type_contained_by_expected {
+    // Also accept when the expected key type is contained by the provided index type, i.e., the
+    // index is a wider superset of the possible keys (e.g., `array<1, T>` indexed by `int`).
+    // Such an access is not a type error — it may simply fail to find the key at runtime, which
+    // is a separate concern (handled via the known-items / undefined-key path below).
+    // Skip the lenient branch when the expected key type is `never` (empty array): `never` is
+    // trivially contained by anything, so allowing it would silently accept indexing an empty
+    // array like `[]` with any key.
+    let expected_contained_by_index = !index_type_contained_by_expected
+        && !key_parameter.is_never()
+        && is_contained_by(
+            context.codebase,
+            &key_parameter,
+            index_type,
+            true,
+            false,
+            false,
+            &mut ComparisonResult::new(),
+        );
+
+    if index_type_contained_by_expected || expected_contained_by_index {
         *has_valid_expected_index = true;
     } else {
         expected_index_types.push(key_parameter.clone().into_owned());
