@@ -81,10 +81,14 @@ self::assertSame(
 
 // Same expression, single-line array
 self::assertSame(
-    trim(Neon::encode(['parameters' => ['ignoreErrors' => [[
-        'message' => "#^Escape Regex with file \\# ~ ' \\(\\)$#",
-        'count' => 1,
-        'path' => 'Testfile',
-    ]]]], Neon::BLOCK)),
+    trim(Neon::encode([
+        'parameters' => [
+            'ignoreErrors' => [[
+                'message' => "#^Escape Regex with file \\# ~ ' \\(\\)$#",
+                'count' => 1,
+                'path' => 'Testfile',
+            ]],
+        ],
+    ], Neon::BLOCK)),
     trim($this->getOutputContent()),
 );

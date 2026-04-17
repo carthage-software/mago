@@ -29,6 +29,7 @@ use crate::internal::format::misc::get_document_width;
 use crate::internal::format::misc::is_expandable_expression;
 use crate::internal::format::misc::is_string_word_type;
 use crate::internal::utils::get_expression_width;
+use crate::internal::utils::string_width;
 
 #[derive(Debug, Clone, Copy)]
 pub enum ArrayLike<'arena> {
@@ -273,7 +274,22 @@ fn inline_single_element<'arena>(
             if (element.key.is_literal() || is_string_word_type(element.key))
                 && is_expandable_expression(element.value, true)
             {
-                Some(element.format(f))
+                let line_start =
+                    f.file.get_line_start_offset(f.file.line_number(array_like.span().start.offset)).unwrap_or(0)
+                        as usize;
+                let current_column = string_width(&f.source_text[line_start..array_like.span().start.offset as usize]);
+
+                if has_nested_array_like_value(element.value) {
+                    return None;
+                }
+
+                let element = element.format(f);
+
+                if current_column + get_document_width(&element) > f.settings.print_width {
+                    return None;
+                }
+
+                Some(element)
             } else {
                 None
             }
@@ -293,6 +309,28 @@ fn inline_single_element<'arena>(
             }
         }
         ArrayElement::Missing(_) => None,
+    }
+}
+
+#[inline]
+fn has_nested_array_like_value<'arena>(expression: &'arena Expression<'arena>) -> bool {
+    fn element_contains_array_like<'arena>(element: &ArrayElement<'arena>) -> bool {
+        let value = match element {
+            ArrayElement::KeyValue(key_value) => key_value.value,
+            ArrayElement::Value(value) => value.value,
+            ArrayElement::Variadic(value) => value.value,
+            ArrayElement::Missing(_) => return false,
+        };
+
+        matches!(value, Expression::Array(_) | Expression::LegacyArray(_) | Expression::List(_))
+            || has_nested_array_like_value(value)
+    }
+
+    match expression {
+        Expression::Array(array) => array.elements.iter().any(element_contains_array_like),
+        Expression::LegacyArray(array) => array.elements.iter().any(element_contains_array_like),
+        Expression::List(list) => list.elements.iter().any(element_contains_array_like),
+        _ => false,
     }
 }
 
@@ -346,16 +384,16 @@ fn extract_array_elements<'arena>(
 
     for doc in contents {
         match doc {
-            delimiter @ Document::Array(arr) => {
+            Document::Array(arr) => {
                 // Check if this array contains the left delimiter
                 for item in arr {
                     if let Document::String(s) = item {
                         if *s == "[" || *s == "(" {
-                            opening_delimiter = Some(clone_in_arena(f.arena, delimiter));
+                            opening_delimiter = Some(clone_in_arena(f.arena, doc));
                             in_elements = true;
                             break;
                         } else if !in_elements && *s == "]" || *s == ")" {
-                            closing_delimiter = Some(clone_in_arena(f.arena, delimiter));
+                            closing_delimiter = Some(clone_in_arena(f.arena, doc));
                             break;
                         }
                     }

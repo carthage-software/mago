@@ -300,8 +300,9 @@ $derivatives["entity:$entity_type_id"] =
       'entity' => ContextDefinition::create("entity:$entity_type_id")
         ->setLabel($entity_type->getLabel())
         ->setRequired(TRUE)
-        ->setDescription(t('The @entity_type for which to create a path alias.', ['@entity_type' =>
-          $entity_type->getLowercaseLabel()])),
+        ->setDescription(t('The @entity_type for which to create a path alias.', [
+          '@entity_type' => $entity_type->getLowercaseLabel(),
+        ])),
       'alias' => ContextDefinition::create('string')
         ->setLabel(t('Path alias'))
         ->setRequired(TRUE)
@@ -321,8 +322,9 @@ $derivatives["entity:$entity_type_id"] =
       'entity' => ContextDefinition::create("entity:$entity_type_id")
         ->setLabel($entity_type->getLabel())
         ->setRequired(TRUE)
-        ->setDescription(t('The @entity_type for which to create a path alias.', ['@entity_type' =>
-          $entity_type->getLowercaseLabel()])),
+        ->setDescription(t('The @entity_type for which to create a path alias.', [
+          '@entity_type' => $entity_type->getLowercaseLabel(),
+        ])),
       'alias' => ContextDefinition::create('string')
         ->setLabel(t('Path alias'))
         ->setRequired(TRUE)
