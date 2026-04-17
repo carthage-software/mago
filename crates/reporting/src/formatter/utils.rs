@@ -168,9 +168,57 @@ pub fn long_message(issue: &Issue, include_annotations: bool) -> String {
 /// in `template` with the provided values.
 pub fn osc8_hyperlink(template: &str, abs_path: &str, line: u32, column: u32, display_text: &str) -> String {
     let url = template
-        .replace("%file%", abs_path)
+        .replace("%file%", &strip_windows_verbatim_prefix(abs_path))
         .replace("%line%", &line.to_string())
         .replace("%column%", &column.to_string());
 
     format!("\x1b]8;;{url}\x1b\\{display_text}\x1b]8;;\x1b\\")
+}
+
+/// Strips the Win32 verbatim (`\\?\`) prefix that `std::fs::canonicalize` adds to absolute
+/// paths on Windows. The prefix is required by some low-level Win32 APIs but isn't accepted
+/// by editors, shells, or `file://` URL handlers, so paths surfaced to users (OSC 8 hyperlinks,
+/// editor-url templates) must have it removed.
+///
+/// * `\\?\C:\dir\file` -> `C:\dir\file`
+/// * `\\?\UNC\server\share` -> `\\server\share`
+/// * any other path is returned unchanged.
+fn strip_windows_verbatim_prefix(path: &str) -> std::borrow::Cow<'_, str> {
+    if let Some(rest) = path.strip_prefix(r"\\?\UNC\") {
+        std::borrow::Cow::Owned(format!(r"\\{rest}"))
+    } else if let Some(rest) = path.strip_prefix(r"\\?\") {
+        std::borrow::Cow::Borrowed(rest)
+    } else {
+        std::borrow::Cow::Borrowed(path)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::strip_windows_verbatim_prefix;
+
+    #[test]
+    fn strips_verbatim_drive_prefix() {
+        assert_eq!(strip_windows_verbatim_prefix(r"\\?\C:\Users\foo\bar.php"), r"C:\Users\foo\bar.php");
+    }
+
+    #[test]
+    fn strips_verbatim_unc_prefix() {
+        assert_eq!(strip_windows_verbatim_prefix(r"\\?\UNC\server\share\file.php"), r"\\server\share\file.php");
+    }
+
+    #[test]
+    fn leaves_plain_windows_paths_unchanged() {
+        assert_eq!(strip_windows_verbatim_prefix(r"C:\Users\foo\bar.php"), r"C:\Users\foo\bar.php");
+    }
+
+    #[test]
+    fn leaves_unix_paths_unchanged() {
+        assert_eq!(strip_windows_verbatim_prefix("/home/foo/bar.php"), "/home/foo/bar.php");
+    }
+
+    #[test]
+    fn leaves_unc_without_verbatim_unchanged() {
+        assert_eq!(strip_windows_verbatim_prefix(r"\\server\share\file.php"), r"\\server\share\file.php");
+    }
 }
