@@ -353,15 +353,15 @@ impl<'ctx, 'arena> Collector<'ctx, 'arena> {
         let mut directive_has_used: HashMap<Span, bool> = HashMap::default();
         let mut trivia_has_used: HashMap<Span, bool> = HashMap::default();
         for pragma in self.pragmas.iter() {
-            let effectively_used = pragma.used || self.is_pragma_skipped(pragma);
+            let has_match = pragma.matches > 0 || self.is_pragma_skipped(pragma);
 
             let entry = directive_has_used.entry(pragma.span).or_insert(false);
-            if effectively_used {
+            if has_match {
                 *entry = true;
             }
 
             let entry = trivia_has_used.entry(pragma.trivia_span).or_insert(false);
-            if effectively_used {
+            if has_match {
                 *entry = true;
             }
         }
@@ -371,16 +371,33 @@ impl<'ctx, 'arena> Collector<'ctx, 'arena> {
 
         let pragmas = std::mem::replace(&mut self.pragmas, Vec::new_in(self.arena));
         for pragma in pragmas {
-            if pragma.used || self.is_pragma_skipped(&pragma) {
+            if pragma.is_fulfilled() || self.is_pragma_skipped(&pragma) {
                 continue;
             }
 
             let has_used_sibling_codes = directive_has_used.get(&pragma.span).copied().unwrap_or(false);
             let has_used_sibling_pragmas = trivia_has_used.get(&pragma.trivia_span).copied().unwrap_or(false);
 
-            let edit = if has_used_sibling_codes {
+            let partial_count_edit = if pragma.matches > 0
+                && pragma.expected_matches > 1
+                && let Some(count_span) = pragma.count_span
+            {
+                Some(TextEdit::replace(
+                    TextRange::new(count_span.start.offset, count_span.end.offset),
+                    if pragma.matches == 1 { String::new() } else { format!("({})", pragma.matches) },
+                ))
+            } else {
+                None
+            };
+
+            let edit = if let Some(partial) = partial_count_edit {
+                Some(partial)
+            } else if has_used_sibling_codes {
                 Some(self.compute_code_deletion(&pragma))
-            } else if !has_used_sibling_pragmas && !handled_trivias.contains(&pragma.trivia_span) {
+            } else if !has_used_sibling_pragmas
+                && !handled_trivias.contains(&pragma.trivia_span)
+                && !self.trivia_has_non_pragma_content(&pragma)
+            {
                 handled_trivias.insert(pragma.trivia_span);
                 handled_directives.insert(pragma.span);
                 Some(self.compute_comment_deletion(&pragma))
@@ -391,22 +408,36 @@ impl<'ctx, 'arena> Collector<'ctx, 'arena> {
                 None
             };
 
+            let primary_message = if pragma.expected_matches > 1 {
+                format!("This expect pragma was fulfilled {} of {} times.", pragma.matches, pragma.expected_matches,)
+            } else {
+                match pragma.kind {
+                    PragmaKind::Ignore => "This ignore pragma does not match any reported issue.".to_string(),
+                    PragmaKind::Expect => "This expect pragma was not fulfilled.".to_string(),
+                }
+            };
+
             let mut issue = match pragma.kind {
                 PragmaKind::Ignore => Issue::note("This pragma was not used and may be removed.")
                     .with_code("unused-pragma")
-                    .with_annotation(
-                        Annotation::primary(pragma.span)
-                            .with_message("This ignore pragma does not match any reported issue."),
-                    )
+                    .with_annotation(Annotation::primary(pragma.span).with_message(primary_message))
                     .with_annotation(Annotation::secondary(pragma.code_span).with_message("...for this code"))
                     .with_annotation(Annotation::secondary(pragma.trivia_span).with_message("...within this comment.")),
-                PragmaKind::Expect => Issue::warning("This pragma was not used and may be removed.")
-                    .with_code("unfulfilled-expect")
-                    .with_annotation(
-                        Annotation::primary(pragma.span).with_message("This expect pragma was not fulfilled."),
-                    )
-                    .with_annotation(Annotation::secondary(pragma.code_span).with_message("...for this code"))
-                    .with_annotation(Annotation::secondary(pragma.trivia_span).with_message("...within this comment.")),
+                PragmaKind::Expect => {
+                    let title = if pragma.expected_matches > 1 {
+                        "This expect pragma was only partially fulfilled."
+                    } else {
+                        "This pragma was not used and may be removed."
+                    };
+
+                    Issue::warning(title)
+                        .with_code("unfulfilled-expect")
+                        .with_annotation(Annotation::primary(pragma.span).with_message(primary_message))
+                        .with_annotation(Annotation::secondary(pragma.code_span).with_message("...for this code"))
+                        .with_annotation(
+                            Annotation::secondary(pragma.trivia_span).with_message("...within this comment."),
+                        )
+                }
             };
 
             if let Some(edit) = edit {
@@ -489,6 +520,42 @@ impl<'ctx, 'arena> Collector<'ctx, 'arena> {
         }
     }
 
+    /// Returns `true` if the trivia containing `pragma` has any content beyond pragma directives
+    /// and PHPDoc structural markers.
+    ///
+    /// Used to decide whether an unfulfilled pragma's auto-fix should delete the whole comment
+    /// (safe when the comment exists only for the pragma) or just the pragma's line (needed when
+    /// the comment also carries documentation or other tags).
+    fn trivia_has_non_pragma_content(&self, pragma: &Pragma<'arena>) -> bool {
+        let trivia_text =
+            &self.file.contents[pragma.trivia_span.start.offset as usize..pragma.trivia_span.end.offset as usize];
+
+        let inner = trivia_text
+            .strip_prefix("/**")
+            .or_else(|| trivia_text.strip_prefix("/*"))
+            .or_else(|| trivia_text.strip_prefix("//"))
+            .or_else(|| trivia_text.strip_prefix('#'))
+            .unwrap_or(trivia_text);
+
+        let inner = inner.strip_suffix("*/").unwrap_or(inner);
+
+        for line in inner.lines() {
+            let trimmed = line.trim();
+            let without_marker = trimmed.trim_start_matches('*').trim();
+            if without_marker.is_empty() {
+                continue;
+            }
+
+            if without_marker.starts_with("@mago-ignore") || without_marker.starts_with("@mago-expect") {
+                continue;
+            }
+
+            return true;
+        }
+
+        false
+    }
+
     /// Computes a `TextEdit` to delete a single pragma directive line from within a multi-line comment.
     fn compute_directive_deletion(&self, pragma: &Pragma<'arena>) -> TextEdit {
         let pragma_line = self.file.line_number(pragma.span.start.offset);
@@ -500,11 +567,11 @@ impl<'ctx, 'arena> Collector<'ctx, 'arena> {
 
     /// Checks if an issue is suppressed by an `@mago-ignore` pragma.
     ///
-    /// Finds the nearest applicable pragma and marks it as used.
+    /// Finds the nearest applicable pragma and increments its match counter.
     #[inline]
     fn is_ignored(&mut self, issue_span: Span, issue_code: &str) -> bool {
         if let Some(pragma) = self.find_best_applicable_pragma_mut(issue_span, PragmaKind::Ignore, issue_code) {
-            pragma.used = true;
+            pragma.matches = pragma.matches.saturating_add(1);
             return true;
         }
         false
@@ -512,11 +579,11 @@ impl<'ctx, 'arena> Collector<'ctx, 'arena> {
 
     /// Checks if an issue is suppressed by an `@mago-expect` pragma.
     ///
-    /// Finds the nearest applicable pragma and marks it as used.
+    /// Finds the nearest applicable pragma and increments its match counter.
     #[inline]
     fn is_expected(&mut self, issue_span: Span, issue_code: &str) -> bool {
         if let Some(pragma) = self.find_best_applicable_pragma_mut(issue_span, PragmaKind::Expect, issue_code) {
-            pragma.used = true;
+            pragma.matches = pragma.matches.saturating_add(1);
             return true;
         }
 
@@ -552,10 +619,10 @@ impl<'ctx, 'arena> Collector<'ctx, 'arena> {
                 continue;
             }
 
-            let is_applicable = if let Some(scope_span) = pragma.scope_span {
-                scope_span.contains(&issue_span) || issue_span.contains(&scope_span)
-            } else if pragma.used && resolved_pragma_code != "all" {
+            let is_applicable = if pragma.is_consumed() && resolved_pragma_code != "all" {
                 false
+            } else if let Some(scope_span) = pragma.scope_span {
+                scope_span.contains(&issue_span) || issue_span.contains(&scope_span)
             } else if pragma.trivia_span.contains(&issue_span) || issue_span.contains(&pragma.trivia_span) {
                 // The issue is inside the same comment as the pragma!
                 true

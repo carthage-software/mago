@@ -38,12 +38,41 @@ pub struct Pragma<'a> {
     pub category: &'a str,
     /// The code specification.
     pub code: &'a str,
-    /// The span of the code within the pragma.
+    /// The span of the code (including any `(N)` count suffix) within the pragma.
     pub code_span: Span,
+    /// The span of the parenthesized count suffix, if present (e.g., `(3)`).
+    pub count_span: Option<Span>,
+    /// The number of issues this pragma is expected to suppress.
+    pub expected_matches: u16,
+    /// The number of issues this pragma has actually matched.
+    pub matches: u16,
     /// An optional description explaining why this pragma is present.
     pub description: &'a str,
-    /// Indicates whether the pragma is used to suppress an issue.
-    pub used: bool,
+}
+
+impl<'a> Pragma<'a> {
+    /// Returns `true` if this pragma has matched at least as many issues as it expected.
+    #[inline]
+    #[must_use]
+    pub fn is_fulfilled(&self) -> bool {
+        self.matches >= self.expected_matches
+    }
+
+    /// Returns `true` if this pragma has absorbed its maximum allowed issues and should no
+    /// longer match new ones.
+    ///
+    /// Line-level pragmas and scoped pragmas with an explicit `(N)` count are capped at
+    /// `expected_matches`. Scoped pragmas without an explicit count retain the original
+    /// "unlimited within scope" semantics so pre-existing code keeps working.
+    #[inline]
+    #[must_use]
+    pub fn is_consumed(&self) -> bool {
+        if self.scope_span.is_some() && self.count_span.is_none() {
+            return false;
+        }
+
+        self.matches >= self.expected_matches
+    }
 }
 
 impl PragmaKind {
@@ -162,6 +191,9 @@ fn parse_pragmas_in_trivia<'arena>(
                 span,
                 trivia_span: trivia.span,
                 code_span,
+                count_span: None,
+                expected_matches: 1,
+                matches: 0,
                 start_line,
                 end_line,
                 own_line,
@@ -169,7 +201,6 @@ fn parse_pragmas_in_trivia<'arena>(
                 code,
                 description,
                 scope_span: None,
-                used: false,
             });
 
             continue;
@@ -201,7 +232,7 @@ fn parse_pragmas_in_trivia<'arena>(
                 continue; // Skip empty codes
             }
 
-            // Calculate the precise span for this individual code
+            // Calculate the precise span for this individual code (including any count suffix)
             let code_start_in_codes_part = if code_index == 0 {
                 0
             } else {
@@ -212,6 +243,17 @@ fn parse_pragmas_in_trivia<'arena>(
 
             let code_start_offset = codes_start_offset + code_start_in_codes_part as u32;
             let code_span = Span::new(file.id, code_start_offset, code_start_offset + code.len() as u32);
+
+            // Parse an optional `(N)` count suffix. `code(3)` means "suppress up to 3 issues".
+            // A missing or malformed suffix defaults to 1.
+            let (base_code, expected_matches, count_span) = match parse_count_suffix(code) {
+                Some((base, count, count_start_in_code)) => {
+                    let count_start = code_start_offset + count_start_in_code as u32;
+                    let count_end = code_start_offset + code.len() as u32;
+                    (base, count, Some(Span::new(file.id, count_start, count_end)))
+                }
+                None => (code, 1u16, None),
+            };
 
             let pragma_end_offset = pragma_start_offset + prefix.len() as u32 + content_with_leading_space.len() as u32;
             let span = Span::new(file.id, pragma_start_offset, pragma_end_offset);
@@ -229,17 +271,52 @@ fn parse_pragmas_in_trivia<'arena>(
                 span,
                 trivia_span: trivia.span,
                 code_span,
+                count_span,
+                expected_matches,
+                matches: 0,
                 start_line,
                 end_line,
                 own_line,
                 category,
-                code,
+                code: base_code,
                 description,
                 scope_span: None,
-                used: false,
             });
         }
     }
 
     pragmas
+}
+
+/// Parses the optional `(N)` count suffix from a pragma code.
+///
+/// Returns `Some((base_code, count, count_start_offset_in_code))` when the code ends with a
+/// well-formed `(N)` suffix where `N` is a non-zero positive integer. Returns `None` otherwise,
+/// meaning the caller should treat the entire string as a plain code with an implicit count of 1.
+///
+/// Malformed suffixes (`(0)`, `(abc)`, `(-1)`, unbalanced parentheses, etc.) are ignored so the
+/// code is matched as-is — it will then fail the "is this a known code?" check downstream and
+/// be reported as an unfulfilled pragma, which gives a clearer error than silently dropping it.
+fn parse_count_suffix(code: &str) -> Option<(&str, u16, usize)> {
+    if !code.ends_with(')') {
+        return None;
+    }
+
+    let paren_start = code.rfind('(')?;
+    if paren_start == 0 {
+        return None;
+    }
+
+    let base = code[..paren_start].trim_end();
+    if base.is_empty() {
+        return None;
+    }
+
+    let count_str = code[paren_start + 1..code.len() - 1].trim();
+    let count: u16 = count_str.parse().ok()?;
+    if count == 0 {
+        return None;
+    }
+
+    Some((base, count, paren_start))
 }

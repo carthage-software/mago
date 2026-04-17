@@ -4,6 +4,8 @@ While it's best to fix all issues that Mago reports, there are cases where you m
 
 Both pragmas require you to specify the issue(s) you intend to suppress, using the format `[category]:[code]`. You can also suppress multiple issues at once by providing a comma-separated list of codes: `[category]:[code1,code2,code3]`.
 
+To suppress multiple occurrences of the same code on a single line or within the same block, you can either repeat the code, or use the `[code](N)` count shorthand to suppress up to `N` occurrences. See [Suppressing Multiple Occurrences](#suppressing-multiple-occurrences-n) below.
+
 ## Categories
 
 There are three issue categories available:
@@ -78,6 +80,49 @@ function foo(): string {
 }
 ```
 
+## Suppressing Multiple Occurrences (`(N)`)
+
+When a single line, or a block covered by a scoped pragma, triggers the same issue code more than once, repeating the code becomes tedious:
+
+```php
+// @mago-expect analysis:mixed-operand,mixed-operand,mixed-operand
+return $a . $b . $c;
+```
+
+Mago supports a `(N)` shorthand to express the same thing more concisely:
+
+```php
+// @mago-expect analysis:mixed-operand(3)
+return $a . $b . $c;
+```
+
+`N` must be a positive integer. `code(1)` is equivalent to a plain `code`, and malformed suffixes (`(0)`, `(abc)`, unbalanced parentheses) are treated as part of the code name and will fail to match.
+
+The count can be mixed with ordinary comma-separated codes:
+
+```php
+// @mago-expect analysis:mixed-operand(2),unused-variable
+```
+
+### Unfulfilled counts
+
+If the actual number of matching issues is **fewer** than the expected count, Mago reports an `unfulfilled-expect` warning and the auto-fix suggests reducing the count (or dropping the suffix entirely when it falls to 1) rather than deleting the whole directive, which would re-enable the issues that _did_ match:
+
+```php
+// Before the fix: 3 matches expected, only 2 happened.
+// @mago-expect analysis:mixed-operand(3)
+return $a . $b;
+
+// Auto-fix reduces the count so the 2 real matches stay suppressed:
+// @mago-expect analysis:mixed-operand(2)
+return $a . $b;
+```
+
+### Scoped vs. line-level counts
+
+- For **line-level** pragmas, a bare code implicitly means "suppress up to 1 occurrence". Adding `(N)` raises the cap to `N`.
+- For **scoped** (block-level) pragmas, a bare code retains its traditional behavior and suppresses _every_ matching occurrence in the block. Adding `(N)` caps the block-level suppression at `N` matches, so the `N+1`-th occurrence is reported normally. This is useful when you want to make sure no more issues than expected creep in.
+
 ## Suppressing All Issues (`all`)
 
 You can use the special `all` code to suppress all issues at once, rather than listing individual codes. This is useful when working with legacy code that triggers many diagnostics.
@@ -149,6 +194,10 @@ function complexFunction(): string {
 
     // No return statement here
 }
+
+// Suppress three occurrences of the same code on the next line
+// @mago-expect analysis:mixed-operand(3)
+return $a . $b . $c;
 
 // Suppress all lint issues on one line
 // @mago-ignore lint:all
