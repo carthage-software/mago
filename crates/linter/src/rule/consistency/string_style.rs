@@ -154,7 +154,7 @@ impl StringStyleRule {
 
         let all_fixable = parts
             .iter()
-            .all(|p| matches!(p, ConcatPart::Literal { is_double_quoted: true, .. } | ConcatPart::Interpolable { .. }));
+            .all(|p| matches!(p, ConcatPart::Literal { safe_to_double_quote: true, .. } | ConcatPart::Interpolable { .. }));
 
         if !all_fixable {
             ctx.collector.report(issue);
@@ -162,17 +162,22 @@ impl StringStyleRule {
         }
 
         ctx.collector.propose(issue, |edits| {
-            // Handle the start boundary: if the first part is an expression, it needs an
-            // opening `"{` so the interpolation becomes a valid double-quoted string.
-            if let Some(ConcatPart::Interpolable { span }) = parts.first() {
-                edits.push(TextEdit::insert(span.start_offset(), "\"{"));
-            }
+            // Handle the start boundary: Make sure we have a double quoted string. If the first
+            // part is an expression, it needs an opening `"{` so the interpolation becomes a valid
+            // double-quoted string.
+            match parts.first() {
+                Some(ConcatPart::Interpolable { span }) => edits.push(TextEdit::insert(span.start_offset(), "\"{")),
+                Some(ConcatPart::Literal { span, .. }) => edits.push(TextEdit::replace(span.start_offset()..span.start_offset()+1, "\"")),
+                _ => {}
+            };
 
-            // Handle the end boundary: if the last part is an expression, it needs a
-            // closing `}"`.
-            if let Some(ConcatPart::Interpolable { span }) = parts.last() {
-                edits.push(TextEdit::insert(span.end_offset(), "}\""));
-            }
+            // Handle the end boundary: Make sure we have a double quoted string. If the last part
+            // is an expression, it needs a closing `}"`.
+            match parts.last() {
+                Some(ConcatPart::Interpolable { span }) => edits.push(TextEdit::insert(span.end_offset(), "}\"")),
+                Some(ConcatPart::Literal { span, .. }) => edits.push(TextEdit::replace(span.end_offset()-1..span.end_offset(), "\"")),
+                _ => {}
+            };
 
             // Handle each boundary between two consecutive parts. The "gap" between them in
             // source code covers the closing quote (if the left side is a literal), the ` . `
@@ -267,7 +272,7 @@ impl StringStyleRule {
 }
 
 enum ConcatPart {
-    Literal { span: Span, is_double_quoted: bool },
+    Literal { span: Span, safe_to_double_quote: bool },
     Interpolable { span: Span },
     Other,
 }
@@ -286,8 +291,8 @@ fn collect_concat_side<'arena>(expr: &Expression<'arena>, parts: &mut Vec<Concat
             collect_concat_side(binary.rhs, parts);
         }
         Expression::Literal(Literal::String(literal)) => {
-            let is_double_quoted = matches!(literal.kind, Some(LiteralStringKind::DoubleQuoted));
-            parts.push(ConcatPart::Literal { span: literal.span, is_double_quoted });
+            let safe_to_double_quote = matches!(literal.kind, Some(LiteralStringKind::DoubleQuoted)) || !literal.raw.contains(['\\', '$', '"']);
+            parts.push(ConcatPart::Literal { span: literal.span, safe_to_double_quote });
         }
         expr if is_interpolable(expr) => {
             parts.push(ConcatPart::Interpolable { span: expr.span() });
@@ -808,14 +813,84 @@ mod tests {
         "#}
     }
 
-    test_lint_failure! {
-        name = single_quoted_literal_reported_but_not_fixed,
+    test_lint_fix! {
+        name = fix_single_quoted_no_unsafe_chars,
         rule = StringStyleRule,
         settings = prefer_interpolation,
         code = indoc! {r#"
             <?php
 
-            echo 'Hello, ' . $name;
+            echo 'Hello, ' . $name . '!';
+        "#},
+        fixed = indoc! {r#"
+            <?php
+
+            echo "Hello, {$name}!";
+        "#}
+    }
+
+    test_lint_fix! {
+        name = fix_single_quoted_only_prefix,
+        rule = StringStyleRule,
+        settings = prefer_interpolation,
+        code = indoc! {r#"
+            <?php
+
+            echo 'prefix: ' . $value;
+        "#},
+        fixed = indoc! {r#"
+            <?php
+
+            echo "prefix: {$value}";
+        "#}
+    }
+
+    test_lint_fix! {
+        name = fix_single_quoted_only_suffix,
+        rule = StringStyleRule,
+        settings = prefer_interpolation,
+        code = indoc! {r#"
+            <?php
+
+            echo $name . ' is here';
+        "#},
+        fixed = indoc! {r#"
+            <?php
+
+            echo "{$name} is here";
+        "#}
+    }
+
+    test_lint_failure! {
+        name = single_quoted_with_backslash_not_fixable,
+        rule = StringStyleRule,
+        settings = prefer_interpolation,
+        code = indoc! {r#"
+            <?php
+
+            echo 'Hello\n' . $name;
+        "#}
+    }
+
+    test_lint_failure! {
+        name = single_quoted_with_dollar_sign_not_fixable,
+        rule = StringStyleRule,
+        settings = prefer_interpolation,
+        code = indoc! {r#"
+            <?php
+
+            echo '$foo ' . $name;
+        "#}
+    }
+
+    test_lint_failure! {
+        name = single_quoted_with_double_quote_not_fixable,
+        rule = StringStyleRule,
+        settings = prefer_interpolation,
+        code = indoc! {r#"
+            <?php
+
+            echo 'say "hi" to ' . $name;
         "#}
     }
 
