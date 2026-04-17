@@ -39,6 +39,7 @@ use std::sync::Arc;
 use std::sync::OnceLock;
 
 use bumpalo::Bump;
+use foldhash::HashSet;
 use mago_analyzer::plugin::PluginRegistry;
 use mago_analyzer::plugin::create_registry_with_plugins;
 use mago_codex::metadata::CodebaseMetadata;
@@ -206,11 +207,14 @@ impl<'a> Orchestrator<'a> {
         }
 
         let includes = if include_externals {
+            let active_paths: HashSet<&str> = self.config.paths.iter().map(std::string::String::as_str).collect();
+
             self.config
                 .includes
                 .iter()
-                .chain(self.context_paths.iter())
-                .map(|s| Cow::Borrowed(s.as_ref()))
+                .map(std::string::String::as_str)
+                .chain(self.context_paths.iter().map(std::string::String::as_str).filter(|p| !active_paths.contains(p)))
+                .map(Cow::Borrowed)
                 .collect::<Vec<Cow<'a, str>>>()
         } else {
             Vec::new()
