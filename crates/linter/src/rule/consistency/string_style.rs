@@ -301,13 +301,11 @@ fn collect_concat_side<'arena>(expr: &Expression<'arena>, parts: &mut Vec<Concat
 fn is_interpolable(expr: &Expression) -> bool {
     match expr {
         Expression::Variable(_) => true,
-        Expression::Access(access) => {
-            matches!(access, Access::Property(_) | Access::NullSafeProperty(_))
-        }
-        Expression::ArrayAccess(_) => true,
-        Expression::Call(call) => {
-            matches!(call, Call::Method(_))
-        }
+        Expression::Access(Access::Property(access)) => is_interpolable(access.object),
+        Expression::Access(Access::NullSafeProperty(access)) => is_interpolable(access.object),
+        Expression::ArrayAccess(access) => is_interpolable(access.array),
+        Expression::Call(Call::Method(call)) => is_interpolable(call.object),
+        Expression::Call(Call::NullSafeMethod(call)) => is_interpolable(call.object),
         _ => false,
     }
 }
@@ -475,6 +473,61 @@ mod tests {
     }
 
     test_lint_success! {
+        name = concat_with_enum_case_property_not_interpolable,
+        rule = StringStyleRule,
+        settings = prefer_interpolation,
+        code = indoc! {r#"
+            <?php
+
+            echo "Hello " . SomeEnum::World->value;
+        "#}
+    }
+
+    test_lint_success! {
+        name = concat_with_class_constant_property_not_interpolable,
+        rule = StringStyleRule,
+        settings = prefer_interpolation,
+        code = indoc! {r#"
+            <?php
+
+            echo "greeting: " . Foo::BAR->name;
+        "#}
+    }
+
+    test_lint_success! {
+        name = concat_with_static_method_call_not_interpolable,
+        rule = StringStyleRule,
+        settings = prefer_interpolation,
+        code = indoc! {r#"
+            <?php
+
+            echo "result: " . Foo::bar();
+        "#}
+    }
+
+    test_lint_success! {
+        name = concat_with_function_call_not_interpolable,
+        rule = StringStyleRule,
+        settings = prefer_interpolation,
+        code = indoc! {r#"
+            <?php
+
+            echo "result: " . strtolower($x);
+        "#}
+    }
+
+    test_lint_success! {
+        name = concat_with_static_property_access_not_interpolable,
+        rule = StringStyleRule,
+        settings = prefer_interpolation,
+        code = indoc! {r#"
+            <?php
+
+            echo "value: " . Foo::$bar;
+        "#}
+    }
+
+    test_lint_success! {
         name = concat_already_used,
         rule = StringStyleRule,
         settings = prefer_concatenation,
@@ -595,6 +648,38 @@ mod tests {
             <?php
 
             echo "result: {$obj->getName()}.";
+        "#}
+    }
+
+    test_lint_fix! {
+        name = fix_nested_property_chain,
+        rule = StringStyleRule,
+        settings = prefer_interpolation,
+        code = indoc! {r#"
+            <?php
+
+            echo "deep: " . $a->b->c->d;
+        "#},
+        fixed = indoc! {r#"
+            <?php
+
+            echo "deep: {$a->b->c->d}";
+        "#}
+    }
+
+    test_lint_fix! {
+        name = fix_null_safe_property_chain,
+        rule = StringStyleRule,
+        settings = prefer_interpolation,
+        code = indoc! {r#"
+            <?php
+
+            echo "maybe: " . $obj?->inner?->name;
+        "#},
+        fixed = indoc! {r#"
+            <?php
+
+            echo "maybe: {$obj?->inner?->name}";
         "#}
     }
 
