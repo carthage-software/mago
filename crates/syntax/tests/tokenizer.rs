@@ -256,6 +256,62 @@ echo $a;
 }
 
 #[test]
+fn test_heredoc_with_label_prefix_identifier_inside() -> Result<(), SyntaxError> {
+    let code = b"<?php
+
+$a = <<<PHP
+    PHP_MAJOR_VERSION == 5;
+    PHPx_FOO
+    PHP
+";
+    let expected = &[
+        TokenKind::OpenTag,
+        TokenKind::Whitespace,
+        TokenKind::Variable,
+        TokenKind::Whitespace,
+        TokenKind::Equal,
+        TokenKind::Whitespace,
+        TokenKind::DocumentStart(DocumentKind::Heredoc),
+        TokenKind::StringPart,
+        TokenKind::StringPart,
+        TokenKind::DocumentEnd,
+        TokenKind::Whitespace,
+    ];
+
+    test_lexer(code, expected).map_err(|err| {
+        panic!("unexpected error: {err}");
+    })
+}
+
+#[test]
+fn test_nowdoc_with_label_prefix_identifier_inside() -> Result<(), SyntaxError> {
+    let code = b"<?php
+
+$a = <<<'PHP'
+    PHP_MAJOR_VERSION == 5;
+    PHPx_FOO
+    PHP
+";
+    let expected = &[
+        TokenKind::OpenTag,
+        TokenKind::Whitespace,
+        TokenKind::Variable,
+        TokenKind::Whitespace,
+        TokenKind::Equal,
+        TokenKind::Whitespace,
+        TokenKind::DocumentStart(DocumentKind::Nowdoc),
+        TokenKind::StringPart,
+        TokenKind::StringPart,
+        TokenKind::DocumentEnd,
+        TokenKind::Whitespace,
+    ];
+
+    test_lexer(code, expected).map_err(|err| {
+        panic!("unexpected error: {err}");
+    })
+}
+
+#[test]
 fn test_nowdoc_with_label_name_inside() -> Result<(), SyntaxError> {
     let code = b"<?php
 

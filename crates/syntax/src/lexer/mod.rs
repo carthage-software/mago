@@ -864,7 +864,7 @@ impl<'input> Lexer<'input> {
                                             .input
                                             .peek(length + label.len(), 1)
                                             .first()
-                                            .is_none_or(|c| !c.is_ascii_alphanumeric())
+                                            .is_none_or(|c| !is_part_of_identifier(c))
                                     {
                                         length += label.len();
                                         token_kind = TokenKind::DocumentEnd;
@@ -927,7 +927,7 @@ impl<'input> Lexer<'input> {
                                         .input
                                         .peek(length + label.len(), 1)
                                         .first()
-                                        .is_none_or(|c| !c.is_ascii_alphanumeric())
+                                        .is_none_or(|c| !is_part_of_identifier(c))
                                 {
                                     length += label.len();
                                     terminated = true;
