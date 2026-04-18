@@ -1370,6 +1370,10 @@ pub fn get_array_parameters(array_type: &TArray, codebase: &CodebaseMetadata) ->
                 }
             }
 
+            if key_types.is_empty() {
+                key_types.push(TAtomic::Never);
+            }
+
             let combined_key_types = combiner::combine(key_types, codebase, combiner::CombinerOptions::default());
             let key_param_union = TUnion::from_vec(combined_key_types);
 
