@@ -35,6 +35,31 @@ impl TReferenceMemberSelector {
     }
 }
 
+/// Selector variants usable for global-constant references. Unlike class members,
+/// a bare `*` already resolves to `Type::Wildcard` (an alias for `mixed`), so the
+/// global-reference form only expresses prefix or suffix matches. Bare identifiers
+/// in type positions remain class-like references — PHPDoc does not treat them as
+/// constant references.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+pub enum TGlobalReferenceSelector {
+    /// A global constant whose name starts with a given prefix, e.g. `FILTER_FLAG_*`.
+    StartsWith(Atom),
+    /// A global constant whose name ends with a given suffix, e.g. `*_SUFFIX`.
+    EndsWith(Atom),
+}
+
+impl TGlobalReferenceSelector {
+    /// Returns true if this selector matches the given constant name.
+    #[inline]
+    #[must_use]
+    pub fn matches(&self, name: Atom) -> bool {
+        match self {
+            Self::StartsWith(prefix) => name.starts_with(prefix.as_str()),
+            Self::EndsWith(suffix) => name.ends_with(suffix.as_str()),
+        }
+    }
+}
+
 /// Represents an unresolved reference to a symbol or a class-like member.
 /// These require context (e.g., symbol tables, codebase analysis) to be resolved
 /// into a concrete type (`TObject`, `TEnum`, constant type, etc.).
@@ -60,6 +85,13 @@ pub enum TReference {
         /// The name of the member being referenced (constant name, case name).
         member_selector: TReferenceMemberSelector,
     },
+    /// A wildcard reference over global constants, e.g. `FILTER_FLAG_*` or `*_SUFFIX`.
+    /// Resolved at expansion time by iterating the codebase's global constants and
+    /// collecting those whose name satisfies the selector.
+    Global {
+        /// The prefix/suffix selector used to match global constant names.
+        selector: TGlobalReferenceSelector,
+    },
 }
 
 impl TReference {
@@ -82,6 +114,13 @@ impl TReference {
     #[must_use]
     pub fn new_member(class_like_name: Atom, member_selector: TReferenceMemberSelector) -> Self {
         TReference::Member { class_like_name, member_selector }
+    }
+
+    /// Creates a global-constant wildcard reference.
+    #[inline]
+    #[must_use]
+    pub fn new_global(selector: TGlobalReferenceSelector) -> Self {
+        TReference::Global { selector }
     }
 
     /// Checks if this is a reference to a symbol name.
@@ -213,6 +252,14 @@ impl TType for TReference {
                 }
                 TReferenceMemberSelector::EndsWith(member_name) => {
                     concat_atom!("unknown-ref(", class_like_name, "::*", member_name, ")")
+                }
+            },
+            TReference::Global { selector } => match selector {
+                TGlobalReferenceSelector::StartsWith(name) => {
+                    concat_atom!("unknown-global-ref(", name, "*)")
+                }
+                TGlobalReferenceSelector::EndsWith(name) => {
+                    concat_atom!("unknown-global-ref(*", name, ")")
                 }
             },
         }

@@ -11,6 +11,8 @@ use crate::ast::CallableTypeKind;
 use crate::ast::ClassStringType;
 use crate::ast::ConditionalType;
 use crate::ast::EnumStringType;
+use crate::ast::GlobalWildcardSelector;
+use crate::ast::GlobalWildcardType;
 use crate::ast::Identifier;
 use crate::ast::IndexAccessType;
 use crate::ast::IntMaskOfType;
@@ -38,6 +40,7 @@ use crate::ast::PropertiesOfType;
 use crate::ast::ReferenceType;
 use crate::ast::SliceType;
 use crate::ast::TemplateTypeType;
+use crate::ast::TrailingPipeType;
 use crate::ast::TraitStringType;
 use crate::ast::Type;
 use crate::ast::UnionType;
@@ -73,9 +76,8 @@ pub fn parse_type<'input>(stream: &mut TypeTokenStream<'input>) -> Result<Type<'
 
 /// Returns `true` when the current token can act as a member-name identifier.
 ///
-/// Accepts plain `Identifier` tokens, and also the `new` keyword when it is *not* followed
-/// by `<`, this lets class constants and enum cases named `new` (e.g. `Action::NEW`) parse
-/// despite `new` being reserved by the `new<T>` type construct.
+/// Accepts plain `Identifier` tokens, the `new` keyword when it is *not* followed by `<`, and
+/// any single-word reserved keyword whose source text has no hyphen.
 pub(crate) fn is_at_member_identifier<'input>(stream: &mut TypeTokenStream<'input>) -> Result<bool, ParseError> {
     is_at_member_identifier_at(stream, 0)
 }
@@ -86,20 +88,46 @@ pub(crate) fn is_at_member_identifier_at<'input>(
     stream: &mut TypeTokenStream<'input>,
     offset: usize,
 ) -> Result<bool, ParseError> {
-    match stream.lookahead(offset)?.map(|t| t.kind) {
-        Some(TypeTokenKind::Identifier) => Ok(true),
-        Some(TypeTokenKind::New) => Ok(stream.lookahead(offset + 1)?.is_none_or(|t| t.kind != TypeTokenKind::LessThan)),
+    let Some(token) = stream.lookahead(offset)? else {
+        return Ok(false);
+    };
+
+    match token.kind {
+        TypeTokenKind::Identifier => Ok(true),
+        TypeTokenKind::New => Ok(stream.lookahead(offset + 1)?.is_none_or(|t| t.kind != TypeTokenKind::LessThan)),
+        kind if kind.is_keyword() && !token.value.as_bytes().contains(&b'-') => Ok(true),
         _ => Ok(false),
     }
 }
 
-/// Consumes the next token as a member-name identifier. Accepts `Identifier`, or the `new`
-/// keyword when it is not followed by `<`. Errors with `UnexpectedToken` expecting `Identifier`
-/// otherwise, so the diagnostic matches the traditional call site.
+/// Consumes the next token as a member-name identifier. Accepts `Identifier`, the `new`
+/// keyword when it is not followed by `<`, or any non-hyphenated reserved keyword. Errors
+/// with `UnexpectedToken` expecting `Identifier` otherwise, so the diagnostic matches the
+/// traditional call site.
 pub(crate) fn eat_member_identifier<'input>(
     stream: &mut TypeTokenStream<'input>,
 ) -> Result<TypeToken<'input>, ParseError> {
     if is_at_member_identifier(stream)? { stream.consume() } else { stream.eat(TypeTokenKind::Identifier) }
+}
+
+/// Returns `true` when the current token would legitimately close an enclosing construct
+/// (e.g. `,`, `)`, `>`, `}`, `]`, `:`, `;`, `=`, EOF). Used to detect a trailing `|` in a
+/// union, so that `int|string|` or `array{0: int|string|}` parses leniently rather than
+/// erroring on the empty right-hand operand.
+fn is_at_union_closing_token<'input>(stream: &mut TypeTokenStream<'input>) -> Result<bool, ParseError> {
+    Ok(match stream.lookahead(0)?.map(|t| t.kind) {
+        None => true,
+        Some(kind) => matches!(
+            kind,
+            TypeTokenKind::Comma
+                | TypeTokenKind::RightParenthesis
+                | TypeTokenKind::GreaterThan
+                | TypeTokenKind::RightBrace
+                | TypeTokenKind::RightBracket
+                | TypeTokenKind::Colon
+                | TypeTokenKind::Equals
+        ),
+    })
 }
 
 /// Parses a type expression with the given minimum precedence.
@@ -121,13 +149,23 @@ pub fn parse_type_with_precedence<'input>(
         let is_inner_nullable = matches!(inner, Type::Nullable(_));
 
         inner = match stream.lookahead(0)?.map(|t| t.kind) {
-            // Union types: T|U
+            // Union types: T|U (and `T|` with a trailing pipe).
             Some(TypeTokenKind::Pipe) if !is_inner_nullable && min_precedence <= TypePrecedence::Union => {
-                Type::Union(UnionType {
-                    left: Box::new(inner),
-                    pipe: stream.consume()?.span_for(stream.file_id()),
-                    right: Box::new(parse_type_with_precedence(stream, TypePrecedence::Union)?),
-                })
+                let pipe = stream.consume()?.span_for(stream.file_id());
+
+                if is_at_union_closing_token(stream)? {
+                    return Ok(Type::TrailingPipe(TrailingPipeType { inner: Box::new(inner), pipe }));
+                }
+
+                let right = parse_type_with_precedence(stream, TypePrecedence::Union)?;
+                if let Type::TrailingPipe(trailing) = right {
+                    return Ok(Type::TrailingPipe(TrailingPipeType {
+                        inner: Box::new(Type::Union(UnionType { left: Box::new(inner), pipe, right: trailing.inner })),
+                        pipe: trailing.pipe,
+                    }));
+                }
+
+                Type::Union(UnionType { left: Box::new(inner), pipe, right: Box::new(right) })
             }
             // Intersection types: T&U
             Some(TypeTokenKind::Ampersand) if !is_inner_nullable && min_precedence <= TypePrecedence::Intersection => {
@@ -197,8 +235,16 @@ fn parse_primary_type<'input>(stream: &mut TypeTokenStream<'input>) -> Result<Ty
         }),
         TypeTokenKind::Asterisk => {
             let token = stream.consume()?;
+            let asterisk_span = token.span_for(stream.file_id());
 
-            Type::Wildcard(WildcardType { span: token.span_for(stream.file_id()), kind: WildcardKind::Asterisk })
+            if is_at_member_identifier(stream)? {
+                let identifier = Identifier::from_token(eat_member_identifier(stream)?, stream.file_id());
+                Type::GlobalWildcardReference(GlobalWildcardType {
+                    selector: GlobalWildcardSelector::EndsWith(asterisk_span, identifier),
+                })
+            } else {
+                Type::Wildcard(WildcardType { span: asterisk_span, kind: WildcardKind::Asterisk })
+            }
         }
         TypeTokenKind::Mixed => Type::Mixed(Keyword::from_token(stream.consume()?, stream.file_id())),
         TypeTokenKind::NonEmptyMixed => Type::NonEmptyMixed(Keyword::from_token(stream.consume()?, stream.file_id())),
@@ -245,6 +291,8 @@ fn parse_primary_type<'input>(stream: &mut TypeTokenStream<'input>) -> Result<Ty
                             value,
                             raw: token.value,
                         })
+                    } else if stream.is_at(TypeTokenKind::Int)? || stream.is_at(TypeTokenKind::Integer)? {
+                        IntOrKeyword::Keyword(Keyword::from_token(stream.consume()?, stream.file_id()))
                     } else {
                         IntOrKeyword::Keyword(Keyword::from_token(stream.eat(TypeTokenKind::Min)?, stream.file_id()))
                     },
@@ -271,6 +319,8 @@ fn parse_primary_type<'input>(stream: &mut TypeTokenStream<'input>) -> Result<Ty
                             value,
                             raw: token.value,
                         })
+                    } else if stream.is_at(TypeTokenKind::Int)? || stream.is_at(TypeTokenKind::Integer)? {
+                        IntOrKeyword::Keyword(Keyword::from_token(stream.consume()?, stream.file_id()))
                     } else {
                         IntOrKeyword::Keyword(Keyword::from_token(stream.eat(TypeTokenKind::Max)?, stream.file_id()))
                     },
@@ -284,6 +334,7 @@ fn parse_primary_type<'input>(stream: &mut TypeTokenStream<'input>) -> Result<Ty
         TypeTokenKind::NegativeInt => Type::NegativeInt(Keyword::from_token(stream.consume()?, stream.file_id())),
         TypeTokenKind::NonPositiveInt => Type::NonPositiveInt(Keyword::from_token(stream.consume()?, stream.file_id())),
         TypeTokenKind::NonNegativeInt => Type::NonNegativeInt(Keyword::from_token(stream.consume()?, stream.file_id())),
+        TypeTokenKind::NonZeroInt => Type::NonZeroInt(Keyword::from_token(stream.consume()?, stream.file_id())),
         TypeTokenKind::String => Type::String(Keyword::from_token(stream.consume()?, stream.file_id())),
         TypeTokenKind::CallableString => Type::CallableString(Keyword::from_token(stream.consume()?, stream.file_id())),
         TypeTokenKind::LowercaseCallableString => {
@@ -539,6 +590,11 @@ fn parse_primary_type<'input>(stream: &mut TypeTokenStream<'input>) -> Result<Ty
                             },
                         })
                     }
+                } else if stream.is_at(TypeTokenKind::Asterisk)? {
+                    let asterisk_span = stream.consume()?.span_for(stream.file_id());
+                    Type::GlobalWildcardReference(GlobalWildcardType {
+                        selector: GlobalWildcardSelector::StartsWith(identifier, asterisk_span),
+                    })
                 } else {
                     Type::Reference(ReferenceType { identifier, parameters: parse_generic_parameters_or_none(stream)? })
                 }

@@ -340,6 +340,15 @@ pub fn get_non_negative_int() -> TUnion {
 
 #[inline]
 #[must_use]
+pub fn get_non_zero_int() -> TUnion {
+    TUnion::from_vec(vec![
+        TAtomic::Scalar(TScalar::Integer(TInteger::negative())),
+        TAtomic::Scalar(TScalar::Integer(TInteger::positive())),
+    ])
+}
+
+#[inline]
+#[must_use]
 pub fn get_unspecified_literal_int() -> TUnion {
     TUnion::from_single(Cow::Borrowed(UNSPECIFIED_LITERAL_INT_ATOMIC))
 }

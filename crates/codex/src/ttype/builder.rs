@@ -17,6 +17,7 @@ use mago_type_syntax::ast::ArrayType;
 use mago_type_syntax::ast::AssociativeArrayType;
 use mago_type_syntax::ast::CallableType;
 use mago_type_syntax::ast::GenericParameters;
+use mago_type_syntax::ast::GlobalWildcardSelector;
 use mago_type_syntax::ast::Identifier;
 use mago_type_syntax::ast::IntOrKeyword;
 use mago_type_syntax::ast::LiteralIntOrFloatType;
@@ -53,6 +54,7 @@ use crate::ttype::atomic::generic::TGenericParameter;
 use crate::ttype::atomic::iterable::TIterable;
 use crate::ttype::atomic::object::TObject;
 use crate::ttype::atomic::object::named::TNamedObject;
+use crate::ttype::atomic::reference::TGlobalReferenceSelector;
 use crate::ttype::atomic::reference::TReference;
 use crate::ttype::atomic::reference::TReferenceMemberSelector;
 use crate::ttype::atomic::scalar::TScalar;
@@ -81,6 +83,7 @@ use crate::ttype::get_non_empty_unspecified_literal_string;
 use crate::ttype::get_non_empty_uppercase_string;
 use crate::ttype::get_non_negative_int;
 use crate::ttype::get_non_positive_int;
+use crate::ttype::get_non_zero_int;
 use crate::ttype::get_null;
 use crate::ttype::get_nullable_float;
 use crate::ttype::get_nullable_int;
@@ -393,6 +396,18 @@ pub fn get_union_from_type_ast(
 
             wrap_atomic(TAtomic::Reference(TReference::Member { class_like_name, member_selector }))
         }
+        Type::GlobalWildcardReference(global_wildcard) => {
+            let selector = match global_wildcard.selector {
+                GlobalWildcardSelector::StartsWith(identifier, _) => {
+                    TGlobalReferenceSelector::StartsWith(atom(identifier.value))
+                }
+                GlobalWildcardSelector::EndsWith(_, identifier) => {
+                    TGlobalReferenceSelector::EndsWith(atom(identifier.value))
+                }
+            };
+
+            wrap_atomic(TAtomic::Reference(TReference::Global { selector }))
+        }
         Type::AliasReference(alias_reference) => {
             let class_like_name = if alias_reference.class.value.eq_ignore_ascii_case("self")
                 || alias_reference.class.value.eq_ignore_ascii_case("static")
@@ -516,6 +531,8 @@ pub fn get_union_from_type_ast(
         Type::NegativeInt(_) => get_negative_int(),
         Type::NonPositiveInt(_) => get_non_positive_int(),
         Type::NonNegativeInt(_) => get_non_negative_int(),
+        Type::NonZeroInt(_) => get_non_zero_int(),
+        Type::TrailingPipe(trailing) => get_union_from_type_ast(&trailing.inner, scope, type_context, classname)?,
         Type::IntRange(range) => {
             let min = match range.min {
                 IntOrKeyword::NegativeInt { int, .. } => Some(-(int.value as i64)),

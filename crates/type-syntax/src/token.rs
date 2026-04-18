@@ -103,6 +103,7 @@ pub enum TypeTokenKind {
     NegativeInt,
     NonPositiveInt,
     NonNegativeInt,
+    NonZeroInt,
     As,
     Is,
     Not,
@@ -266,6 +267,7 @@ impl TypeTokenKind {
                 | Self::NegativeInt
                 | Self::NonPositiveInt
                 | Self::NonNegativeInt
+                | Self::NonZeroInt
         )
     }
 

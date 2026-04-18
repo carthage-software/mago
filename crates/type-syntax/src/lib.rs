@@ -1619,4 +1619,203 @@ mod tests {
         assert_eq!(do_parse("*").unwrap().to_string(), "*");
         assert_eq!(do_parse("_").unwrap().to_string(), "_");
     }
+
+    #[test]
+    fn test_parse_non_zero_int() {
+        match do_parse("non-zero-int") {
+            Ok(Type::NonZeroInt(k)) => assert_eq!(k.value, "non-zero-int"),
+            other => panic!("Expected Type::NonZeroInt, got: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_parse_int_range_int_keyword_max() {
+        match do_parse("int<0, int>") {
+            Ok(Type::IntRange(range)) => {
+                assert!(matches!(range.min, IntOrKeyword::Int(LiteralIntType { value: 0, .. })));
+                match range.max {
+                    IntOrKeyword::Keyword(ref keyword) => assert!(keyword.value.eq_ignore_ascii_case("int")),
+                    other => panic!("Expected IntOrKeyword::Keyword, got: {other:?}"),
+                }
+            }
+            other => panic!("Expected Type::IntRange, got: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_parse_int_range_int_keyword_min() {
+        match do_parse("int<int, 0>") {
+            Ok(Type::IntRange(range)) => {
+                match range.min {
+                    IntOrKeyword::Keyword(ref keyword) => assert!(keyword.value.eq_ignore_ascii_case("int")),
+                    other => panic!("Expected IntOrKeyword::Keyword, got: {other:?}"),
+                }
+                assert!(matches!(range.max, IntOrKeyword::Int(LiteralIntType { value: 0, .. })));
+            }
+            other => panic!("Expected Type::IntRange, got: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_parse_member_reference_reserved_keywords() {
+        for name in [
+            "NULL", "ARRAY", "INT", "STRING", "FLOAT", "TRUE", "FALSE", "MIXED", "CALLABLE", "ITERABLE", "RESOURCE",
+            "BOOL", "OBJECT", "NEVER", "VOID", "NUMERIC", "SCALAR",
+        ] {
+            let input = format!("TypeIdentifier::{name}");
+            match do_parse(&input) {
+                Ok(Type::MemberReference(r)) => match r.member {
+                    MemberReferenceSelector::Identifier(ident) => {
+                        assert!(
+                            ident.value.eq_ignore_ascii_case(name),
+                            "Expected member name {name}, got {}",
+                            ident.value,
+                        );
+                    }
+                    other => panic!("Expected Identifier selector for {input}, got {other:?}"),
+                },
+                other => panic!("Expected Type::MemberReference for {input}, got: {other:?}"),
+            }
+        }
+    }
+
+    #[test]
+    fn test_parse_member_reference_reserved_prefix_wildcard() {
+        match do_parse("Foo::INT*") {
+            Ok(Type::MemberReference(r)) => match r.member {
+                MemberReferenceSelector::StartsWith(ident, _) => {
+                    assert!(ident.value.eq_ignore_ascii_case("INT"), "expected INT prefix, got {}", ident.value);
+                }
+                other => panic!("Expected StartsWith selector, got {other:?}"),
+            },
+            other => panic!("Expected Type::MemberReference, got: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_parse_nested_generic_with_reserved_const() {
+        match do_parse("UnionType<T|Foo::NULL>") {
+            Ok(Type::Reference(r)) => {
+                let params = r.parameters.expect("Expected generic parameters");
+                assert_eq!(params.entries.len(), 1);
+                match &params.entries[0].inner {
+                    Type::Union(u) => {
+                        assert!(matches!(*u.left, Type::Reference(_)));
+                        assert!(matches!(*u.right, Type::MemberReference(_)));
+                    }
+                    other => panic!("Expected inner Union, got {other:?}"),
+                }
+            }
+            other => panic!("Expected Type::Reference, got: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_parse_builtin_type_identifier_union() {
+        let input = "BuiltinType<TypeIdentifier::ARRAY>|BuiltinType<TypeIdentifier::ITERABLE>|ObjectType|GenericType";
+        assert!(do_parse(input).is_ok(), "expected successful parse for {input}");
+    }
+
+    #[test]
+    fn test_parse_collection_type_with_reserved_identifier() {
+        let input = "CollectionType<BuiltinType<TypeIdentifier::ITERABLE>>";
+        assert!(do_parse(input).is_ok(), "expected successful parse for {input}");
+    }
+
+    #[test]
+    fn test_parse_trailing_pipe() {
+        match do_parse("int|string|") {
+            Ok(Type::TrailingPipe(trailing)) => assert!(matches!(*trailing.inner, Type::Union(_))),
+            other => panic!("Expected Type::TrailingPipe, got: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_parse_trailing_pipe_single() {
+        match do_parse("int|") {
+            Ok(Type::TrailingPipe(trailing)) => assert!(matches!(*trailing.inner, Type::Int(_))),
+            other => panic!("Expected Type::TrailingPipe, got: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_parse_trailing_pipe_in_shape_value() {
+        match do_parse("array{0: int|string|}") {
+            Ok(Type::Shape(shape)) => {
+                assert_eq!(shape.fields.len(), 1);
+                assert!(matches!(shape.fields[0].value.as_ref(), Type::TrailingPipe(_)));
+            }
+            other => panic!("Expected Type::Shape, got: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_parse_trailing_pipe_in_generic_shape_value() {
+        let input = "iterable<array{0: int|array<string, mixed>|}>";
+        match do_parse(input) {
+            Ok(Type::Iterable(iter)) => {
+                let params = iter.parameters.expect("expected generic parameters");
+                assert_eq!(params.entries.len(), 1);
+                match &params.entries[0].inner {
+                    Type::Shape(shape) => {
+                        assert_eq!(shape.fields.len(), 1);
+                        assert!(matches!(shape.fields[0].value.as_ref(), Type::TrailingPipe(_)));
+                    }
+                    other => panic!("Expected Type::Shape, got {other:?}"),
+                }
+            }
+            other => panic!("Expected Type::Iterable, got: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_parse_global_wildcard_starts_with() {
+        match do_parse("FILTER_FLAG_*") {
+            Ok(Type::GlobalWildcardReference(g)) => match g.selector {
+                GlobalWildcardSelector::StartsWith(identifier, _) => {
+                    assert_eq!(identifier.value, "FILTER_FLAG_");
+                }
+                other => panic!("Expected StartsWith selector, got {other:?}"),
+            },
+            other => panic!("Expected Type::GlobalWildcardReference, got: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_parse_global_wildcard_ends_with() {
+        match do_parse("*_SUFFIX") {
+            Ok(Type::GlobalWildcardReference(g)) => match g.selector {
+                GlobalWildcardSelector::EndsWith(_, identifier) => {
+                    assert_eq!(identifier.value, "_SUFFIX");
+                }
+                other => panic!("Expected EndsWith selector, got {other:?}"),
+            },
+            other => panic!("Expected Type::GlobalWildcardReference, got: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_parse_global_wildcard_in_int_mask_of() {
+        let input = "int-mask-of<FILTER_FLAG_*>";
+        match do_parse(input) {
+            Ok(Type::IntMaskOf(mask)) => {
+                assert!(matches!(mask.parameter.entry.inner, Type::GlobalWildcardReference(_)));
+            }
+            other => panic!("Expected Type::IntMaskOf, got: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_parse_int_mask_of_class_wildcard_regression() {
+        let input = "int-mask-of<Ulid::FORMAT_*>";
+        match do_parse(input) {
+            Ok(Type::IntMaskOf(mask)) => match &mask.parameter.entry.inner {
+                Type::MemberReference(r) => {
+                    assert!(matches!(r.member, MemberReferenceSelector::StartsWith(_, _)));
+                }
+                other => panic!("Expected MemberReference, got {other:?}"),
+            },
+            other => panic!("Expected Type::IntMaskOf, got: {other:?}"),
+        }
+    }
 }

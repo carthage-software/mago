@@ -27,6 +27,17 @@ pub struct MemberReferenceType<'input> {
     pub member: MemberReferenceSelector<'input>,
 }
 
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct GlobalWildcardType<'input> {
+    pub selector: GlobalWildcardSelector<'input>,
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub enum GlobalWildcardSelector<'input> {
+    StartsWith(Identifier<'input>, Span),
+    EndsWith(Span, Identifier<'input>),
+}
+
 impl HasSpan for ReferenceType<'_> {
     fn span(&self) -> Span {
         match &self.parameters {
@@ -50,6 +61,21 @@ impl HasSpan for MemberReferenceSelector<'_> {
 impl HasSpan for MemberReferenceType<'_> {
     fn span(&self) -> Span {
         self.class.span.join(self.member.span())
+    }
+}
+
+impl HasSpan for GlobalWildcardSelector<'_> {
+    fn span(&self) -> Span {
+        match self {
+            GlobalWildcardSelector::StartsWith(identifier, span) => identifier.span.join(*span),
+            GlobalWildcardSelector::EndsWith(span, identifier) => span.join(identifier.span),
+        }
+    }
+}
+
+impl HasSpan for GlobalWildcardType<'_> {
+    fn span(&self) -> Span {
+        self.selector.span()
     }
 }
 
@@ -77,5 +103,20 @@ impl std::fmt::Display for MemberReferenceSelector<'_> {
 impl std::fmt::Display for MemberReferenceType<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}::{}", self.class, self.member)
+    }
+}
+
+impl std::fmt::Display for GlobalWildcardSelector<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            GlobalWildcardSelector::StartsWith(identifier, _) => write!(f, "{identifier}*"),
+            GlobalWildcardSelector::EndsWith(_, identifier) => write!(f, "*{identifier}"),
+        }
+    }
+}
+
+impl std::fmt::Display for GlobalWildcardType<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.selector)
     }
 }

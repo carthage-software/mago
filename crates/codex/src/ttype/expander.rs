@@ -31,6 +31,7 @@ use crate::ttype::atomic::derived::value_of::TValueOf;
 use crate::ttype::atomic::mixed::TMixed;
 use crate::ttype::atomic::object::TObject;
 use crate::ttype::atomic::object::named::TNamedObject;
+use crate::ttype::atomic::reference::TGlobalReferenceSelector;
 use crate::ttype::atomic::reference::TReference;
 use crate::ttype::atomic::reference::TReferenceMemberSelector;
 use crate::ttype::atomic::scalar::TScalar;
@@ -295,6 +296,10 @@ pub(crate) fn expand_atomic(
             *skip_key = true;
             expand_member_reference(*class_like_name, member_selector, codebase, options, new_return_type_parts);
         }
+        TAtomic::Reference(TReference::Global { selector }) => {
+            *skip_key = true;
+            expand_global_reference(selector, codebase, options, new_return_type_parts);
+        }
         TAtomic::Callable(TCallable::Alias(id)) => {
             if let Some(value) = get_atomic_of_function_like_identifier(id, codebase) {
                 *skip_key = true;
@@ -494,6 +499,35 @@ fn expand_member_reference(
         let mut alias_type = type_alias.type_union.clone();
         expand_union(codebase, &mut alias_type, options);
         new_return_type_parts.extend(alias_type.types.into_owned());
+    }
+
+    if new_return_type_parts.is_empty() {
+        new_return_type_parts.push(TAtomic::Mixed(TMixed::new()));
+    }
+}
+
+fn expand_global_reference(
+    selector: &TGlobalReferenceSelector,
+    codebase: &CodebaseMetadata,
+    options: &TypeExpansionOptions,
+    new_return_type_parts: &mut Vec<TAtomic>,
+) {
+    for (constant_name, constant) in &codebase.constants {
+        if !selector.matches(*constant_name) {
+            continue;
+        }
+
+        if let Some(inferred_type) = constant.inferred_type.as_ref() {
+            let mut inferred_type = inferred_type.clone();
+            expand_union(codebase, &mut inferred_type, options);
+            new_return_type_parts.extend(inferred_type.types.into_owned());
+        } else if let Some(type_metadata) = constant.type_metadata.as_ref() {
+            let mut constant_type = type_metadata.type_union.clone();
+            expand_union(codebase, &mut constant_type, options);
+            new_return_type_parts.extend(constant_type.types.into_owned());
+        } else {
+            new_return_type_parts.push(TAtomic::Mixed(TMixed::new()));
+        }
     }
 
     if new_return_type_parts.is_empty() {

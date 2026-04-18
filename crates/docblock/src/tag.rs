@@ -916,13 +916,38 @@ pub fn split_tag_content(content: &str, input_span: Span) -> Option<(TypeString,
         // whitespaces, and continue processing
         // This allows union/intersection types like `int | string` or `Foo & Bar`
         // as well as callable return types like `callable(): int`
+        //
+        // Exception: when the operator is followed (optionally via whitespace) by `$` or
+        // EOF it is a trailing/dangling operator. In that case we split right
+        // after the operator so the type slice keeps the `|` and the variable/description
+        // lands in `rest_slice`.
         if char == ':' || char == '|' || char == '&' {
             last_char_was_significant = true;
-            while let Some(&(_, next_char)) = iter.peek() {
+
+            let mut peek_iter = iter.clone();
+            let mut has_whitespace_after = false;
+            while let Some(&(_, next_char)) = peek_iter.peek() {
                 if next_char.is_whitespace() {
-                    iter.next();
+                    peek_iter.next();
+                    has_whitespace_after = true;
                 } else {
                     break;
+                }
+            }
+            let next_non_ws = peek_iter.peek().map(|&(_, c)| c);
+
+            if matches!(next_non_ws, None | Some('$')) {
+                split_point_rel = Some(i + char.len_utf8());
+                break;
+            }
+
+            if has_whitespace_after {
+                while let Some(&(_, next_char)) = iter.peek() {
+                    if next_char.is_whitespace() {
+                        iter.next();
+                    } else {
+                        break;
+                    }
                 }
             }
 

@@ -186,6 +186,8 @@ fn lookup_len12(bytes: &[u8]) -> Option<TypeTokenKind> {
                 Some(TypeTokenKind::NeverReturn)
             } else if eq(bytes, b"negative-int") {
                 Some(TypeTokenKind::NegativeInt)
+            } else if eq(bytes, b"non-zero-int") {
+                Some(TypeTokenKind::NonZeroInt)
             } else {
                 None
             }

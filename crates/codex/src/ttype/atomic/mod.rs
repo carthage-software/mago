@@ -1340,6 +1340,9 @@ pub fn populate_atomic_type(
                     }
                 }
             }
+            TReference::Global { .. } => {
+                // Global-constant wildcards are resolved at expansion time; nothing to populate.
+            }
         },
         TAtomic::GenericParameter(TGenericParameter { constraint, intersection_types, .. }) => {
             populate_union_type(

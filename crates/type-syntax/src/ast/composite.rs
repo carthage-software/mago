@@ -32,6 +32,12 @@ pub struct NullableType<'input> {
     pub inner: Box<Type<'input>>,
 }
 
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct TrailingPipeType<'input> {
+    pub inner: Box<Type<'input>>,
+    pub pipe: Span,
+}
+
 impl HasSpan for ParenthesizedType<'_> {
     fn span(&self) -> Span {
         self.left_parenthesis.join(self.right_parenthesis)
@@ -56,6 +62,12 @@ impl HasSpan for NullableType<'_> {
     }
 }
 
+impl HasSpan for TrailingPipeType<'_> {
+    fn span(&self) -> Span {
+        self.inner.span().join(self.pipe)
+    }
+}
+
 impl std::fmt::Display for ParenthesizedType<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "({})", self.inner)
@@ -77,5 +89,11 @@ impl std::fmt::Display for IntersectionType<'_> {
 impl std::fmt::Display for NullableType<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "?{}", self.inner)
+    }
+}
+
+impl std::fmt::Display for TrailingPipeType<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}|", self.inner)
     }
 }

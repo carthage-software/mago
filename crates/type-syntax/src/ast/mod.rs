@@ -93,6 +93,7 @@ pub enum Type<'input> {
     NegativeInt(Keyword<'input>),
     NonPositiveInt(Keyword<'input>),
     NonNegativeInt(Keyword<'input>),
+    NonZeroInt(Keyword<'input>),
     String(Keyword<'input>),
     StringableObject(Keyword<'input>),
     ArrayKey(Keyword<'input>),
@@ -136,6 +137,8 @@ pub enum Type<'input> {
     PropertiesOf(PropertiesOfType<'input>),
     Slice(SliceType<'input>),
     Wildcard(WildcardType),
+    TrailingPipe(TrailingPipeType<'input>),
+    GlobalWildcardReference(GlobalWildcardType<'input>),
 }
 
 impl HasSpan for Type<'_> {
@@ -173,6 +176,7 @@ impl HasSpan for Type<'_> {
             Type::NegativeInt(ty) => ty.span(),
             Type::NonPositiveInt(ty) => ty.span(),
             Type::NonNegativeInt(ty) => ty.span(),
+            Type::NonZeroInt(ty) => ty.span(),
             Type::String(ty) => ty.span(),
             Type::ArrayKey(ty) => ty.span(),
             Type::Scalar(ty) => ty.span(),
@@ -216,6 +220,8 @@ impl HasSpan for Type<'_> {
             Type::PropertiesOf(ty) => ty.span(),
             Type::Slice(ty) => ty.span(),
             Type::Wildcard(ty) => ty.span(),
+            Type::TrailingPipe(ty) => ty.span(),
+            Type::GlobalWildcardReference(ty) => ty.span(),
         }
     }
 }
@@ -255,6 +261,7 @@ impl std::fmt::Display for Type<'_> {
             Type::NegativeInt(ty) => write!(f, "{ty}"),
             Type::NonPositiveInt(ty) => write!(f, "{ty}"),
             Type::NonNegativeInt(ty) => write!(f, "{ty}"),
+            Type::NonZeroInt(ty) => write!(f, "{ty}"),
             Type::String(ty) => write!(f, "{ty}"),
             Type::ArrayKey(ty) => write!(f, "{ty}"),
             Type::Scalar(ty) => write!(f, "{ty}"),
@@ -298,6 +305,8 @@ impl std::fmt::Display for Type<'_> {
             Type::PropertiesOf(ty) => write!(f, "{ty}"),
             Type::Slice(ty) => write!(f, "{ty}"),
             Type::Wildcard(ty) => write!(f, "{ty}"),
+            Type::TrailingPipe(ty) => write!(f, "{ty}"),
+            Type::GlobalWildcardReference(ty) => write!(f, "{ty}"),
         }
     }
 }
