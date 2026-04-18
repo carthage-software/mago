@@ -296,7 +296,7 @@ pub fn analyze_invocation<'ctx, 'arena>(
     let mut assigned_parameters_by_position = HashMap::default();
 
     let target_kind_str = invocation.target.guess_kind();
-    let target_name_str = invocation.target.guess_name();
+    let target_name_str = invocation.target.guess_name(context);
     let mut has_too_many_arguments = false;
     let mut last_argument_offset: isize = -1;
     let all_arguments =
@@ -731,7 +731,7 @@ pub fn analyze_invocation<'ctx, 'arena>(
                 Issue::error(format!(
                     "Cannot unpack arguments into {} `{}` which expects no arguments.",
                     invocation.target.guess_kind(),
-                    invocation.target.guess_name()
+                    invocation.target.guess_name(context)
                 ))
                 .with_annotation(
                     Annotation::primary(unpacked_arguments[0].span()).with_message("Unexpected argument unpacking"),

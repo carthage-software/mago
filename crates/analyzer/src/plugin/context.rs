@@ -369,7 +369,15 @@ impl<'ctx, 'ast, 'arena> InvocationInfo<'ctx, 'ast, 'arena> {
     #[inline]
     #[must_use]
     pub fn function_name(&self) -> String {
-        self.invocation.target.guess_name()
+        self.invocation.target.get_function_like_identifier().map(|identifier| identifier.as_string()).unwrap_or_else(
+            || {
+                if self.invocation.target.is_non_closure_callable() {
+                    "callable".to_string()
+                } else {
+                    "Closure".to_string()
+                }
+            },
+        )
     }
 }
 

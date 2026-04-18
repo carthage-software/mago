@@ -129,7 +129,7 @@ pub fn analyze_and_store_argument_type<'ctx, 'arena>(
 
     if referenced_parameter && !is_argument_referenceable(argument_expression, &argument_type) {
         let target_kind_str = invocation_target.guess_kind();
-        let target_name_str = invocation_target.guess_name();
+        let target_name_str = invocation_target.guess_name(context);
 
         context.collector.report_with_code(
             IssueCode::InvalidPassByReference,
@@ -167,7 +167,7 @@ pub fn verify_argument_type<'arena>(
     invocation_target: &InvocationTarget<'_>,
 ) {
     let target_kind_str = invocation_target.guess_kind();
-    let target_name_str = invocation_target.guess_name();
+    let target_name_str = invocation_target.guess_name(context);
 
     if input_type.is_never() {
         context.collector.report_with_code(

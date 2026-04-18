@@ -35,6 +35,8 @@ use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
 use crate::resolver::class_name::report_non_existent_class_like;
 use crate::resolver::selector::resolve_member_selector;
+use crate::utils::names::display_class_like_name;
+use crate::utils::names::display_method_name;
 use crate::visibility::check_method_visibility;
 
 #[derive(Debug)]
@@ -677,6 +679,8 @@ pub(super) fn report_non_existent_method(
     classname: Atom,
     method_name: Atom,
 ) {
+    let classname = display_class_like_name(context, classname);
+    let method_name = display_method_name(context, classname, method_name);
     context.collector.report_with_code(
         IssueCode::NonExistentMethod,
         Issue::error(format!("Method `{method_name}` does not exist on type `{classname}`."))
@@ -695,6 +699,8 @@ pub(super) fn report_non_documented_method(
     classname: Atom,
     method_name: Atom,
 ) {
+    let classname = display_class_like_name(context, classname);
+    let method_name = display_method_name(context, classname, method_name);
     context.collector.report_with_code(
         IssueCode::NonDocumentedMethod,
         Issue::warning(format!(
@@ -725,6 +731,9 @@ fn report_possibly_non_existent_mixin_method(
     method_name: Atom,
     mixin_classname: Atom,
 ) {
+    let mixin_classname = display_class_like_name(context, mixin_classname);
+    let method_name = display_method_name(context, classname, method_name);
+    let classname = display_class_like_name(context, classname);
     context.collector.report_with_code(
         IssueCode::PossiblyNonExistentMethod,
         Issue::warning(format!(
@@ -758,6 +767,9 @@ fn report_non_existent_mixin_method(
     method_name: Atom,
     mixin_classname: Atom,
 ) {
+    let mixin_classname = display_class_like_name(context, mixin_classname);
+    let method_name = display_method_name(context, classname, method_name);
+    let classname = display_class_like_name(context, classname);
     context.collector.report_with_code(
         IssueCode::NonExistentMethod,
         Issue::error(format!(
@@ -787,6 +799,8 @@ pub(super) fn report_magic_call_without_call_method(
     is_static: bool,
 ) {
     let magic_method_name = if is_static { "__callStatic" } else { "__call" };
+    let classname = display_class_like_name(context, classname);
+    let method_name = display_method_name(context, classname, method_name);
 
     context.collector.report_with_code(
         IssueCode::MissingMagicMethod,
@@ -817,6 +831,8 @@ pub(super) fn report_dynamic_static_method_call(
     method_name: Atom,
     has_magic_call: bool,
 ) {
+    let classname = display_class_like_name(context, classname);
+    let method_name = display_method_name(context, classname, method_name);
     let mut issue =
         Issue::error(format!("Cannot call magic static method `{classname}::{method_name}` on an instance."))
             .with_annotation(

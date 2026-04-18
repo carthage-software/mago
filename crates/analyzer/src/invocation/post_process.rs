@@ -74,8 +74,18 @@ pub fn post_invocation_process<'ctx, 'arena>(
     };
 
     let (callable_kind_str, full_callable_name) = match identifier {
-        FunctionLikeIdentifier::Function(name) => ("function", format!("`{name}`")),
-        FunctionLikeIdentifier::Method(class_name, method_name) => ("method", format!("`{class_name}::{method_name}`")),
+        FunctionLikeIdentifier::Function(name) => {
+            let display = metadata.original_name.unwrap_or(*name);
+
+            ("function", format!("`{display}`"))
+        }
+        FunctionLikeIdentifier::Method(class_name, method_name) => {
+            let class_display =
+                context.codebase.get_class_like(class_name).map(|m| m.original_name).unwrap_or(*class_name);
+            let method_display = metadata.original_name.unwrap_or(*method_name);
+
+            ("method", format!("`{class_display}::{method_display}`"))
+        }
         FunctionLikeIdentifier::Closure(file_id, position) => (
             "closure",
             format!(

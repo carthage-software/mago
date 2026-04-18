@@ -26,6 +26,8 @@ use mago_syntax::ast::PlaceholderArgument;
 use mago_syntax::ast::PositionalArgument;
 use mago_syntax::ast::VariadicPlaceholderArgument;
 
+use crate::context::Context;
+
 mod resolver;
 mod template_inference;
 
@@ -147,9 +149,9 @@ impl<'ctx> InvocationTarget<'ctx> {
     ///
     /// Returns the name of a function/method if statically known,
     /// or "Closure" or "callable" for dynamic callables.
-    pub fn guess_name(&self) -> String {
+    pub fn guess_name(&self, context: &Context<'_, '_>) -> String {
         self.get_function_like_identifier()
-            .map(mago_codex::identifier::function_like::FunctionLikeIdentifier::as_string)
+            .map(|identifier| crate::utils::names::display_function_like_identifier(context, identifier))
             .unwrap_or_else(
                 || {
                     if self.is_non_closure_callable() { "callable".to_string() } else { "Closure".to_string() }

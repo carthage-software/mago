@@ -35,6 +35,7 @@ use crate::error::AnalysisError;
 use crate::utils::docblock::check_docblock_type_incompatibility;
 use crate::utils::docblock::get_type_from_var_docblock;
 use crate::utils::get_type_diff;
+use crate::utils::names::display_function_like_identifier;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for Return<'arena> {
     fn analyze<'ctx>(
@@ -183,7 +184,7 @@ pub fn handle_return_value<'ctx>(
         inferred_return_type = Rc::new(inner_union);
     }
 
-    let function_name = function_like_identifier.as_string();
+    let function_name = display_function_like_identifier(context, &function_like_identifier);
 
     if let Some(return_value) = return_value
         && function_like_metadata.flags.is_by_reference()
@@ -570,7 +571,7 @@ fn handle_property_hook_return<'ctx>(
         return;
     }
 
-    let hook_name = concat_atom!(class_like.name, "::", property_name, "::get");
+    let hook_name = concat_atom!(class_like.original_name, "::", property_name, "::get");
 
     if inferred_return_type.is_mixed() {
         context.collector.report_with_code(

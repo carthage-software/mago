@@ -26,6 +26,7 @@ use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
 use crate::utils::expression::expression_is_nullsafe;
+use crate::utils::names::display_class_like_name;
 
 /// Describes the origin and nature of a class name resolution.
 ///
@@ -549,6 +550,7 @@ fn get_intersections_from_metadata(context: &Context<'_, '_>, metadata: &ClassLi
 }
 
 pub fn report_non_existent_class_like(context: &mut Context, span: Span, classname: Atom) {
+    let classname = display_class_like_name(context, classname);
     context.collector.report_with_code(
         IssueCode::NonExistentClassLike,
         Issue::error(format!("Class, Interface, or Trait `{classname}` does not exist."))

@@ -12,6 +12,7 @@ pub mod experimental;
 pub mod expression;
 pub mod misc;
 pub mod missing_type_hints;
+pub mod names;
 pub mod php_emulation;
 pub mod symbol_existence;
 pub mod template;

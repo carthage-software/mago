@@ -38,6 +38,7 @@ use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
 use crate::resolver::class_name::report_non_existent_class_like;
 use crate::resolver::selector::resolve_member_selector;
+use crate::utils::names::display_class_like_name;
 use crate::utils::template::get_template_types_for_class_member;
 use crate::visibility::check_property_read_visibility;
 use crate::visibility::check_property_write_visibility;
@@ -947,6 +948,7 @@ fn report_non_existent_property(
     is_sealed_object: bool, // `true` if we are accessing undefined prop on `object{foo: string}` type, not an actual class
 ) {
     let class_kind_str = context.codebase.get_class_like(&classname).map_or("class", |m| m.kind.as_str());
+    let classname = display_class_like_name(context, classname);
 
     context.collector.report_with_code(
         IssueCode::NonExistentProperty,
@@ -981,6 +983,7 @@ pub(super) fn report_non_documented_property(
 
     let magic_method = if for_assignment { "__set" } else { "__get" };
     let access_type = if for_assignment { "write to" } else { "read from" };
+    let classname = display_class_like_name(context, classname);
 
     context.collector.report_with_code(
         IssueCode::NonDocumentedProperty,
@@ -1011,6 +1014,8 @@ fn report_possibly_non_existent_mixin_property(
     mixin_classname: Atom,
     magic_method_name: &str,
 ) {
+    let mixin_classname = display_class_like_name(context, mixin_classname);
+    let classname = display_class_like_name(context, classname);
     context.collector.report_with_code(
         IssueCode::PossiblyNonExistentProperty,
         Issue::warning(format!(
@@ -1043,6 +1048,8 @@ fn report_non_existent_mixin_property(
     mixin_classname: Atom,
     magic_method_name: &str,
 ) {
+    let mixin_classname = display_class_like_name(context, mixin_classname);
+    let classname = display_class_like_name(context, classname);
     context.collector.report_with_code(
         IssueCode::NonExistentProperty,
         Issue::error(format!(
@@ -1073,6 +1080,7 @@ pub(super) fn report_magic_property_without_get_set_method(
 ) {
     let magic_method_name = if for_assignment { "__set" } else { "__get" };
     let access_type = if for_assignment { "write to" } else { "read from" };
+    let classname = display_class_like_name(context, classname);
 
     context.collector.report_with_code(
         IssueCode::MissingMagicMethod,

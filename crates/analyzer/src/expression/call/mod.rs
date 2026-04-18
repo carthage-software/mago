@@ -35,6 +35,7 @@ use crate::invocation::analyzer::analyze_invocation;
 use crate::invocation::post_process::post_invocation_process;
 use crate::invocation::return_type_fetcher::fetch_invocation_return_type;
 use crate::reconciler::assertion_reconciler;
+use crate::utils::names::display_function_like_identifier;
 
 pub mod function_call;
 pub mod method_call;
@@ -358,10 +359,10 @@ fn get_function_like_target_inner<'ctx>(
         if !skip_error_on_not_found {
             let title_str = function_like.title_kind_str();
             let kind_str = function_like.kind_str();
-            let name_str = function_like.as_string();
+            let name_str = display_function_like_identifier(context, &function_like);
 
             let issue = if let Some(alt_id) = alternative {
-                let alt_name_str = alt_id.as_string();
+                let alt_name_str = display_function_like_identifier(context, &alt_id);
 
                 Issue::error(format!(
                     "Could not find definition for {kind_str} `{name_str}` (also tried as `{alt_name_str}` in a broader scope)."

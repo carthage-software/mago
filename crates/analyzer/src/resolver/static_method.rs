@@ -36,6 +36,8 @@ use crate::resolver::method::report_magic_call_without_call_method;
 use crate::resolver::method::report_non_documented_method;
 use crate::resolver::method::report_non_existent_method;
 use crate::resolver::selector::resolve_member_selector;
+use crate::utils::names::display_class_like_name;
+use crate::utils::names::display_method_name;
 use crate::visibility::check_method_visibility;
 
 /// Resolves all possible static method targets from a class expression and a member selector.
@@ -521,8 +523,10 @@ fn get_metadata_object<'ctx>(
 }
 
 fn report_non_static_access(context: &mut Context, method_id: &MethodIdentifier, span: Span) {
-    let method_name = method_id.get_method_name();
-    let class_name = method_id.get_class_name();
+    let class_lower = method_id.get_class_name();
+    let method_lower = method_id.get_method_name();
+    let class_name = display_class_like_name(context, class_lower);
+    let method_name = display_method_name(context, class_lower, method_lower);
 
     context.collector.report_with_code(
         IssueCode::InvalidStaticMethodAccess,
@@ -533,6 +537,7 @@ fn report_non_static_access(context: &mut Context, method_id: &MethodIdentifier,
 }
 
 fn report_static_call_on_interface(context: &mut Context, name: Atom, span: Span, from_class_string: bool) {
+    let name = display_class_like_name(context, name);
     if from_class_string {
         context.collector.report_with_code(
             IssueCode::PossiblyStaticAccessOnInterface,
@@ -560,6 +565,7 @@ fn report_static_call_on_interface(context: &mut Context, name: Atom, span: Span
 }
 
 fn report_deprecated_static_access_on_trait(context: &mut Context, name: Atom, span: Span) {
+    let name = display_class_like_name(context, name);
     context.collector.report_with_code(
         IssueCode::DeprecatedFeature,
         Issue::warning(format!("Calling static methods directly on traits (`{name}`) is deprecated."))
@@ -578,6 +584,9 @@ fn report_possibly_non_existent_mixin_static_method(
     method_name: Atom,
     mixin_classname: Atom,
 ) {
+    let mixin_classname = display_class_like_name(context, mixin_classname);
+    let method_name = display_method_name(context, classname, method_name);
+    let classname = display_class_like_name(context, classname);
     context.collector.report_with_code(
         IssueCode::PossiblyNonExistentMethod,
         Issue::warning(format!(
@@ -611,6 +620,9 @@ fn report_non_existent_mixin_static_method(
     method_name: Atom,
     mixin_classname: Atom,
 ) {
+    let mixin_classname = display_class_like_name(context, mixin_classname);
+    let method_name = display_method_name(context, classname, method_name);
+    let classname = display_class_like_name(context, classname);
     context.collector.report_with_code(
         IssueCode::NonExistentMethod,
         Issue::error(format!(

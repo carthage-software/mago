@@ -32,6 +32,7 @@ use crate::resolver::class_name::ResolvedClassname;
 use crate::resolver::class_name::resolve_classnames_from_expression;
 use crate::resolver::selector::ResolvedSelector;
 use crate::resolver::selector::resolve_constant_selector;
+use crate::utils::names::display_class_like_name;
 
 /// Represents a successfully resolved class constant or enum case.
 #[derive(Debug)]
@@ -350,6 +351,8 @@ fn find_constant_in_class<'ctx>(
 
 /// Reports an error for a class-like that cannot be found in the codebase.
 fn report_non_existent_class(context: &mut Context<'_, '_>, classname: Atom, class_span: Span) {
+    let classname = display_class_like_name(context, classname);
+
     context.collector.report_with_code(
         IssueCode::NonExistentClassLike,
         Issue::error(format!("Class, interface, enum, or trait `{classname}` not found."))
