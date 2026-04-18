@@ -14,6 +14,8 @@ use mago_syntax::ast::Expression;
 use mago_syntax::ast::Literal;
 use mago_syntax::ast::Node;
 use mago_syntax::ast::NodeKind;
+use mago_text_edit::Safety;
+use mago_text_edit::TextEdit;
 
 use crate::category::Category;
 use crate::context::LintContext;
@@ -156,6 +158,172 @@ impl LintRule for StrictBehaviorRule {
             );
         }
 
-        ctx.collector.report(issue);
+        if found || self.cfg.allow_loose_behavior {
+            ctx.collector.report(issue);
+            return;
+        }
+
+        let trailing_comma = call.argument_list.arguments.has_trailing_token();
+        let has_any_arguments = !call.argument_list.arguments.is_empty();
+        let insertion = if !has_any_arguments {
+            "strict: true"
+        } else if trailing_comma {
+            " strict: true,"
+        } else {
+            ", strict: true"
+        };
+
+        ctx.collector.propose(issue, |edits| {
+            edits.push(
+                TextEdit::insert(call.argument_list.right_parenthesis.start_offset(), insertion)
+                    .with_safety(Safety::PotentiallyUnsafe),
+            );
+        });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use indoc::indoc;
+
+    use super::StrictBehaviorRule;
+    use crate::test_lint_failure;
+    use crate::test_lint_fix;
+    use crate::test_lint_success;
+
+    test_lint_success! {
+        name = in_array_with_strict_true_positional,
+        rule = StrictBehaviorRule,
+        code = indoc! {r#"
+            <?php
+
+            in_array(1, [1, 2, 3], true);
+        "#}
+    }
+
+    test_lint_success! {
+        name = in_array_with_strict_true_named,
+        rule = StrictBehaviorRule,
+        code = indoc! {r#"
+            <?php
+
+            in_array(1, [1, 2, 3], strict: true);
+        "#}
+    }
+
+    test_lint_failure! {
+        name = in_array_without_strict_is_flagged,
+        rule = StrictBehaviorRule,
+        code = indoc! {r#"
+            <?php
+
+            in_array(1, ['foo', 'bar', 'baz']);
+        "#}
+    }
+
+    test_lint_fix! {
+        name = fix_in_array_appends_named_argument,
+        rule = StrictBehaviorRule,
+        code = indoc! {r#"
+            <?php
+
+            in_array(1, ['foo', 'bar', 'baz']);
+        "#},
+        fixed = indoc! {r#"
+            <?php
+
+            in_array(1, ['foo', 'bar', 'baz'], strict: true);
+        "#}
+    }
+
+    test_lint_fix! {
+        name = fix_array_search_appends_named_argument,
+        rule = StrictBehaviorRule,
+        code = indoc! {r#"
+            <?php
+
+            array_search('x', $values);
+        "#},
+        fixed = indoc! {r#"
+            <?php
+
+            array_search('x', $values, strict: true);
+        "#}
+    }
+
+    test_lint_fix! {
+        name = fix_base64_decode_appends_named_argument,
+        rule = StrictBehaviorRule,
+        code = indoc! {r#"
+            <?php
+
+            base64_decode($input);
+        "#},
+        fixed = indoc! {r#"
+            <?php
+
+            base64_decode($input, strict: true);
+        "#}
+    }
+
+    test_lint_fix! {
+        name = fix_array_keys_with_search_value_appends_named_argument,
+        rule = StrictBehaviorRule,
+        code = indoc! {r#"
+            <?php
+
+            array_keys($values, 'needle');
+        "#},
+        fixed = indoc! {r#"
+            <?php
+
+            array_keys($values, 'needle', strict: true);
+        "#}
+    }
+
+    test_lint_fix! {
+        name = fix_reuses_trailing_comma,
+        rule = StrictBehaviorRule,
+        code = indoc! {r#"
+            <?php
+
+            in_array(1, ['foo', 'bar', 'baz'],);
+        "#},
+        fixed = indoc! {r#"
+            <?php
+
+            in_array(1, ['foo', 'bar', 'baz'], strict: true);
+        "#}
+    }
+
+    test_lint_fix! {
+        name = fix_preserves_multiline_call,
+        rule = StrictBehaviorRule,
+        code = indoc! {r#"
+            <?php
+
+            in_array(
+                $needle,
+                $haystack,
+            );
+        "#},
+        fixed = indoc! {r#"
+            <?php
+
+            in_array(
+                $needle,
+                $haystack,
+             strict: true);
+        "#}
+    }
+
+    test_lint_success! {
+        name = array_keys_without_search_value_is_not_flagged,
+        rule = StrictBehaviorRule,
+        code = indoc! {r#"
+            <?php
+
+            array_keys($values);
+        "#}
     }
 }
