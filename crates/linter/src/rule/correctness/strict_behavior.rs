@@ -292,7 +292,7 @@ mod tests {
         fixed = indoc! {r#"
             <?php
 
-            in_array(1, ['foo', 'bar', 'baz'], strict: true);
+            in_array(1, ['foo', 'bar', 'baz'], strict: true,);
         "#}
     }
 
@@ -313,7 +313,7 @@ mod tests {
             in_array(
                 $needle,
                 $haystack,
-             strict: true);
+             strict: true,);
         "#}
     }
 
