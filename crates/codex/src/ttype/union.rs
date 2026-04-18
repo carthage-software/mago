@@ -245,17 +245,20 @@ impl TUnion {
     /// Creates a new `TUnion` with the same properties as the original, but with a new set of types.
     #[must_use]
     pub fn clone_with_types(&self, types: Vec<TAtomic>) -> TUnion {
-        TUnion { types: Cow::Owned(types), flags: self.flags }
+        TUnion { types: Cow::Owned(ensure_non_empty_types(types)), flags: self.flags }
     }
 
     #[must_use]
     pub fn to_non_nullable(&self) -> TUnion {
-        TUnion { types: Cow::Owned(self.get_non_nullable_types()), flags: self.flags & !UnionFlags::NULLSAFE_NULL }
+        TUnion {
+            types: Cow::Owned(ensure_non_empty_types(self.get_non_nullable_types())),
+            flags: self.flags & !UnionFlags::NULLSAFE_NULL,
+        }
     }
 
     #[must_use]
     pub fn to_truthy(&self) -> TUnion {
-        TUnion { types: Cow::Owned(self.get_truthy_types()), flags: self.flags }
+        TUnion { types: Cow::Owned(ensure_non_empty_types(self.get_truthy_types())), flags: self.flags }
     }
 
     #[must_use]
@@ -1449,6 +1452,16 @@ impl PartialEq for TUnion {
 
         true
     }
+}
+
+/// Coerces an atomic Vec to be non-empty by inserting `Never` when empty.
+#[inline]
+fn ensure_non_empty_types(mut types: Vec<TAtomic>) -> Vec<TAtomic> {
+    if types.is_empty() {
+        types.push(TAtomic::Never);
+    }
+
+    types
 }
 
 pub fn populate_union_type(

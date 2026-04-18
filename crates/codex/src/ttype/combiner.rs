@@ -133,6 +133,12 @@ impl CombinerOptions {
 }
 
 pub fn combine(types: Vec<TAtomic>, codebase: &CodebaseMetadata, options: CombinerOptions) -> Vec<TAtomic> {
+    if types.is_empty() {
+        debug_assert!(false, "combine() received an empty Vec; this is a caller bug");
+
+        return vec![TAtomic::Never];
+    }
+
     if types.len() == 1 {
         return types;
     }
@@ -340,9 +346,7 @@ pub fn combine(types: Vec<TAtomic>, codebase: &CodebaseMetadata, options: Combin
     }
 
     if new_types.is_empty() {
-        if !has_never {
-            unreachable!("No types to return, but no 'never' type found in combination.");
-        }
+        debug_assert!(has_never, "combine(): empty result without a `never` atomic in the combination");
 
         return vec![TAtomic::Never];
     }
