@@ -461,9 +461,11 @@ impl IssueProcessor {
         let reporter = Reporter::new(read_database, reporter_configuration);
         let status = reporter.report(issues_to_report, baseline)?;
 
-        if status.baseline_dead_issues {
+        if status.baseline_dead_issues > 0 {
+            let dead = status.baseline_dead_issues;
+            let noun = if dead == 1 { "entry" } else { "entries" };
             tracing::warn!(
-                "Your baseline file contains entries for issues that no longer exist. Consider regenerating it with `--generate-baseline`."
+                "Your baseline file contains {dead} {noun} for issues that no longer exist. Consider regenerating it with `--generate-baseline`."
             );
 
             if fail_on_out_of_sync_baseline {
