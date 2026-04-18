@@ -50,6 +50,7 @@ use mago_database::ReadDatabase;
 use mago_database::exclusion::Exclusion;
 use mago_database::file::File;
 use mago_database::loader::DatabaseLoader;
+use mago_pattern::CompiledPattern;
 
 use crate::service::analysis::AnalysisService;
 use crate::service::format::FileFormatStatus;
@@ -57,6 +58,7 @@ use crate::service::format::FormatService;
 use crate::service::guard::GuardService;
 use crate::service::incremental_analysis::IncrementalAnalysisService;
 use crate::service::lint::LintService;
+use crate::service::query::QueryService;
 
 pub use config::OrchestratorConfiguration;
 pub use error::OrchestratorError;
@@ -379,6 +381,19 @@ impl<'a> Orchestrator<'a> {
             self.config.parser_settings,
             self.config.use_progress_bars,
         )
+    }
+
+    /// Creates a query service with the current configuration.
+    ///
+    /// The query service runs a pre-compiled [`mago_pattern::CompiledPattern`] across the
+    /// database in parallel, producing matches and rewrites.
+    ///
+    /// # Arguments
+    ///
+    /// * `database` - A read-only database handle containing the PHP files to query
+    /// * `pattern` - A pre-compiled pattern shared across workers
+    pub fn get_query_service(&self, database: ReadDatabase, pattern: Arc<CompiledPattern>) -> QueryService {
+        QueryService::new(database, pattern, self.config.parser_settings, self.config.use_progress_bars)
     }
 
     /// Formats a single file according to the configured style settings.

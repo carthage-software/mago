@@ -52,6 +52,7 @@ mago-collector = { path = "crates/collector", version = "1.21.1" }
 mago-database = { path = "crates/database", version = "1.21.1" }
 mago-guard = { path = "crates/guard", version = "1.21.1" }
 mago-orchestrator = { path = "crates/orchestrator", version = "1.21.1" }
+mago-pattern = { path = "crates/pattern", version = "1.21.1" }
 tracing = { version = "0.1.40" }
 foldhash = "0.2"
 serde_json = { version = "1.0.138" }
@@ -64,6 +65,9 @@ tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 config = { version = "0.15.4", features = ["toml", "yaml", "json"] }
 toml = "1.0.3"
 regex = "1.11.0"
+grit-pattern-matcher = "0.5"
+grit-util = "0.5"
+anyhow = "1"
 cruet = "0.15.0"
 indicatif = { version = "0.18.0" }
 paste = "1.0.15"
@@ -115,6 +119,7 @@ simdutf8 = { version = "0.1.5" }
 mago-atom = { workspace = true }
 mago-syntax = { workspace = true }
 mago-syntax-core = { workspace = true }
+mago-span = { workspace = true }
 mago-reporting = { workspace = true }
 mago-database = { workspace = true }
 mago-linter = { workspace = true }
@@ -129,6 +134,7 @@ mago-algebra = { workspace = true }
 mago-codex = { workspace = true }
 mago-guard = { workspace = true }
 mago-orchestrator = { workspace = true }
+mago-pattern = { workspace = true }
 serde = { workspace = true }
 clap = { workspace = true }
 clap_complete = { workspace = true }

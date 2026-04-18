@@ -25,6 +25,7 @@ mago-semantics = { workspace = true }
 mago-codex = { workspace = true }
 mago-analyzer = { workspace = true }
 mago-guard = { workspace = true }
+mago-pattern = { workspace = true }
 foldhash = { workspace = true }
 tracing = { workspace = true }
 indicatif = { workspace = true }

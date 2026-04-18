@@ -28,3 +28,7 @@ The **architectural guard** is a powerful architectural validation utility for e
 ### [Lexer & parser](/tools/lexer-parser/overview.md)
 
 At the heart of Mago lies its high-performance Lexer and Parser. These components turn your raw PHP source code into a structured Abstract Syntax Tree (AST). The `mago ast` command provides a powerful way to inspect this structure for debugging and learning.
+
+### [Query (experimental)](/tools/query/overview.md)
+
+The **query engine** is an experimental structural search-and-rewrite tool. Write a GritQL-style pattern describing the AST shape you want to find, and `mago query` walks every file in the workspace in parallel to produce matches and optional rewrites.
