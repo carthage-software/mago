@@ -219,6 +219,17 @@ export default defineConfig({
               },
             ],
           },
+          {
+            text: "Query (experimental)",
+            collapsed: true,
+            items: [
+              { text: "Overview", link: "/tools/query/overview" },
+              {
+                text: "Command reference",
+                link: "/tools/query/command-reference",
+              },
+            ],
+          },
         ],
       },
       {

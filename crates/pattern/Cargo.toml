@@ -1,0 +1,31 @@
+[package]
+name = "mago-pattern"
+description = "GritQL-compatible pattern-matching query engine for Mago's PHP AST."
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+mago-syntax = { workspace = true }
+mago-syntax-core = { workspace = true }
+mago-span = { workspace = true }
+mago-database = { workspace = true }
+mago-atom = { workspace = true }
+mago-text-edit = { workspace = true }
+bumpalo = { workspace = true }
+foldhash = { workspace = true }
+grit-pattern-matcher = { workspace = true }
+grit-util = { workspace = true }
+anyhow = { workspace = true }
+itertools = { workspace = true }
+regex = { workspace = true }
+
+[dev-dependencies]
+indoc = { workspace = true }

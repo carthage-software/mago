@@ -4,7 +4,7 @@ title: Shared Reporting and Fixing Options
 
 # Shared Reporting and Fixing Options
 
-The `mago lint`, `mago analyze`, and `mago ast` commands share a common set of options for reporting issues, applying fixes, and managing baselines.
+The `mago lint`, `mago analyze`, `mago guard`, `mago ast`, and `mago query` commands share a common set of options for reporting issues, applying fixes, and managing baselines.
 
 ## Auto-Fixing
 

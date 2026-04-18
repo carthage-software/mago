@@ -65,6 +65,7 @@ use crate::commands::guard::GuardCommand;
 use crate::commands::init::InitCommand;
 use crate::commands::lint::LintCommand;
 use crate::commands::list_files::ListFilesCommand;
+use crate::commands::query::QueryCommand;
 use crate::commands::self_update::SelfUpdateCommand;
 use crate::error::Error;
 
@@ -79,6 +80,7 @@ pub mod guard;
 pub mod init;
 pub mod lint;
 pub mod list_files;
+pub mod query;
 pub mod self_update;
 pub mod stdin_input;
 
@@ -209,6 +211,15 @@ pub enum MagoCommand {
     /// **Usage**: `mago format [OPTIONS]`
     #[command(name = "format")]
     Format(FormatCommand),
+
+    /// Run a GritQL-style pattern against a PHP file.
+    ///
+    /// Match a `mago-pattern` against the AST of a PHP file and print every matching node.
+    /// Metavariables use the `^name` sigil.
+    ///
+    /// **Usage**: `mago query PATTERN FILE`
+    #[command(name = "query")]
+    Query(QueryCommand),
 
     /// Update Mago to the latest version.
     ///
