@@ -917,6 +917,8 @@ fn build_analyzer_settings_string(settings: &InitializationAnalyzerSettings) -> 
     lines.push(format!("memoize-properties = {}", settings.memoize_properties));
     lines.push(format!("allow-possibly-undefined-array-keys = {}", settings.allow_possibly_undefined_array_keys));
     lines.push(format!("check-throws = {}", settings.check_throws));
+    lines.push("unchecked-exceptions = [\"Error\", \"LogicException\"]".to_string());
+    lines.push("unchecked-exception-classes = []".to_string());
     lines.push(format!("check-missing-override = {}", settings.check_missing_override));
     lines.push(format!("find-unused-parameters = {}", settings.find_unused_parameters));
     lines.push(format!("strict-list-index-checks = {}", settings.strict_list_index_checks));
@@ -1056,6 +1058,8 @@ mod tests {
         assert!(output.contains("memoize-properties = true"));
         assert!(output.contains("allow-possibly-undefined-array-keys = true"));
         assert!(output.contains("check-throws = false"));
+        assert!(output.contains("unchecked-exceptions = [\"Error\", \"LogicException\"]"));
+        assert!(output.contains("unchecked-exception-classes = []"));
         assert!(output.contains("check-missing-override = false"));
         assert!(output.contains("find-unused-parameters = false"));
         assert!(output.contains("strict-list-index-checks = false"));
