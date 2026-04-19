@@ -346,7 +346,10 @@ pub fn detect_statement_ref_alignment_runs<'arena>(
                 if let Expression::Assignment(assign) = &expr_stmt.expression {
                     if matches!(
                         assign.lhs,
-                        Expression::Variable(_) | Expression::Access(_) | Expression::ArrayAccess(_)
+                        Expression::Variable(_)
+                            | Expression::Access(_)
+                            | Expression::ArrayAccess(_)
+                            | Expression::ArrayAppend(_)
                     ) {
                         Some(AlignableKind::VariableAssignment)
                     } else {
@@ -369,6 +372,10 @@ pub fn detect_statement_ref_alignment_runs<'arena>(
                 let prev_span = statements[i - 1].span();
                 let curr_span = stmt.span();
                 if has_blank_line_between(f, prev_span, curr_span) || has_comment_between(f, prev_span, curr_span) {
+                    return true;
+                }
+
+                if statement_breaks_alignment_run_after(f, statements[i - 1]) {
                     return true;
                 }
             }
@@ -444,4 +451,19 @@ fn calculate_statement_ref_widths(
     }
 
     AlignmentWidths::new(max_name_width)
+}
+
+/// Check whether a statement should be the last item in its alignment run.
+fn statement_breaks_alignment_run_after(f: &FormatterState<'_, '_>, stmt: &Statement<'_>) -> bool {
+    match stmt {
+        Statement::Expression(expr_stmt) => {
+            let Expression::Assignment(assign) = &expr_stmt.expression else {
+                return false;
+            };
+
+            let rhs_span = assign.rhs.span();
+            has_new_line_in_range(f.source_text, rhs_span.start_offset(), rhs_span.end_offset())
+        }
+        _ => false,
+    }
 }
