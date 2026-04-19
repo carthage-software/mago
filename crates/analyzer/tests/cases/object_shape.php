@@ -70,3 +70,9 @@ function y(): object {
 }
 
 take_one(y()->{'1'});
+
+function take_stdclass(stdClass $o): void {}
+
+// The result of casting an array to an object is a `stdClass`, so it must be
+// assignable to a `stdClass` parameter.
+take_stdclass((object) ['a' => 1]);
