@@ -16,6 +16,7 @@ use crate::ttype::atomic::object::r#enum::TEnum;
 use crate::ttype::atomic::object::named::TNamedObject;
 use crate::ttype::atomic::reference::TReference;
 use crate::ttype::atomic::scalar::TScalar;
+use crate::ttype::atomic::scalar::class_like_string::TClassLikeString;
 use crate::ttype::atomic::scalar::string::TString;
 use crate::ttype::atomic::scalar::string::TStringCasing;
 use crate::ttype::atomic::scalar::string::TStringLiteral;
@@ -558,14 +559,8 @@ pub(crate) fn can_be_identical<'a>(
             | (_, TAtomic::Variable(_) | TAtomic::Mixed(_))
             | (TAtomic::Iterable(_), TAtomic::Iterable(_) | TAtomic::Array(_) | TAtomic::Object(_))
             | (TAtomic::Array(_) | TAtomic::Object(_), TAtomic::Iterable(_))
-            | (
-                TAtomic::Scalar(TScalar::Numeric | TScalar::ArrayKey | TScalar::ClassLikeString(_)),
-                TAtomic::Scalar(TScalar::String(_))
-            )
-            | (
-                TAtomic::Scalar(TScalar::String(_)),
-                TAtomic::Scalar(TScalar::Numeric | TScalar::ArrayKey | TScalar::ClassLikeString(_))
-            )
+            | (TAtomic::Scalar(TScalar::Numeric | TScalar::ArrayKey), TAtomic::Scalar(TScalar::String(_)))
+            | (TAtomic::Scalar(TScalar::String(_)), TAtomic::Scalar(TScalar::Numeric | TScalar::ArrayKey))
             | (
                 TAtomic::Scalar(TScalar::Integer(_) | TScalar::Float(_) | TScalar::ArrayKey),
                 TAtomic::Scalar(TScalar::Numeric)
@@ -576,6 +571,18 @@ pub(crate) fn can_be_identical<'a>(
             )
     ) {
         return true;
+    }
+
+    // (class-string, string) overlap: when both sides are literal, the exact
+    // class name must equal the exact string; otherwise they can overlap.
+    if let (TAtomic::Scalar(TScalar::ClassLikeString(class_string)), TAtomic::Scalar(TScalar::String(string)))
+    | (TAtomic::Scalar(TScalar::String(string)), TAtomic::Scalar(TScalar::ClassLikeString(class_string))) =
+        (first_part, second_part)
+    {
+        return match (class_string, string.get_known_literal_value()) {
+            (TClassLikeString::Literal { value }, Some(str_value)) => value.eq_ignore_ascii_case(str_value),
+            _ => true,
+        };
     }
 
     if matches!(first_part, TAtomic::Callable(_))
@@ -965,5 +972,85 @@ fn keyed_arrays_can_be_identical(
                 false,
             )
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use mago_atom::atom;
+
+    use crate::ttype::atomic::TAtomic;
+    use crate::ttype::atomic::scalar::TScalar;
+    use crate::ttype::atomic::scalar::class_like_string::TClassLikeString;
+    use crate::ttype::atomic::scalar::class_like_string::TClassLikeStringKind;
+    use crate::ttype::atomic::scalar::string::TString;
+    use crate::ttype::comparator::tests::create_test_codebase;
+
+    use super::can_be_identical;
+
+    fn class_string_literal(name: &str) -> TAtomic {
+        TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::literal(atom(name))))
+    }
+
+    fn class_string_any() -> TAtomic {
+        TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::any(TClassLikeStringKind::Class)))
+    }
+
+    fn string_literal(value: &str) -> TAtomic {
+        TAtomic::Scalar(TScalar::String(TString::known_literal(atom(value))))
+    }
+
+    fn general_string() -> TAtomic {
+        TAtomic::Scalar(TScalar::String(TString::general()))
+    }
+
+    #[test]
+    fn literal_class_string_and_mismatching_literal_string_cannot_be_identical() {
+        let codebase = create_test_codebase("<?php");
+        let class_string = class_string_literal("Baz");
+        let string = string_literal("foo");
+
+        assert!(!can_be_identical(&codebase, &class_string, &string, false, false));
+        assert!(!can_be_identical(&codebase, &string, &class_string, false, false));
+    }
+
+    #[test]
+    fn literal_class_string_and_matching_literal_string_can_be_identical() {
+        let codebase = create_test_codebase("<?php");
+        let class_string = class_string_literal("Baz");
+        let string = string_literal("Baz");
+
+        assert!(can_be_identical(&codebase, &class_string, &string, false, false));
+        assert!(can_be_identical(&codebase, &string, &class_string, false, false));
+    }
+
+    #[test]
+    fn literal_class_string_and_literal_string_match_case_insensitively() {
+        let codebase = create_test_codebase("<?php");
+        let class_string = class_string_literal("Baz");
+        let string = string_literal("bAZ");
+
+        assert!(can_be_identical(&codebase, &class_string, &string, false, false));
+        assert!(can_be_identical(&codebase, &string, &class_string, false, false));
+    }
+
+    #[test]
+    fn literal_class_string_and_general_string_can_be_identical() {
+        let codebase = create_test_codebase("<?php");
+        let class_string = class_string_literal("Baz");
+        let string = general_string();
+
+        assert!(can_be_identical(&codebase, &class_string, &string, false, false));
+        assert!(can_be_identical(&codebase, &string, &class_string, false, false));
+    }
+
+    #[test]
+    fn any_class_string_and_literal_string_can_be_identical() {
+        let codebase = create_test_codebase("<?php");
+        let class_string = class_string_any();
+        let string = string_literal("foo");
+
+        assert!(can_be_identical(&codebase, &class_string, &string, false, false));
+        assert!(can_be_identical(&codebase, &string, &class_string, false, false));
     }
 }
