@@ -27,10 +27,12 @@ use function flock;
 use function fopen;
 use function fprintf;
 use function fwrite;
+use function getenv;
 use function implode;
 use function ini_get;
 use function is_dir;
 use function is_resource;
+use function is_string;
 use function mkdir;
 use function number_format;
 use function php_uname;
@@ -39,6 +41,7 @@ use function proc_get_status;
 use function proc_open;
 use function shell_exec;
 use function str_contains;
+use function stream_context_create;
 use function strtolower;
 use function trim;
 use function unlink;
@@ -47,8 +50,10 @@ use function usleep;
 use const CURLINFO_HTTP_CODE;
 use const CURLOPT_FILE;
 use const CURLOPT_FOLLOWLOCATION;
+use const CURLOPT_HTTPHEADER;
 use const CURLOPT_NOPROGRESS;
 use const CURLOPT_PROGRESSFUNCTION;
+use const CURLOPT_USERAGENT;
 use const LOCK_EX;
 use const LOCK_UN;
 use const STDERR;
@@ -328,6 +333,27 @@ function build_download_url(string $version, string $storageDir, string $archive
 }
 
 /**
+ * Read a GitHub API token from the environment.
+ *
+ * Mirrors `mago self-update`: checks `GITHUB_TOKEN` first, then `GH_TOKEN`, returning the
+ * first non-empty value. Sending this token with download requests avoids GitHub's anonymous
+ * rate limits in CI or developer environments that are already authenticated.
+ *
+ * @return null|non-empty-string The token, or null when neither variable is set.
+ */
+function get_github_token(): ?string
+{
+    foreach (['GITHUB_TOKEN', 'GH_TOKEN'] as $variable) {
+        $value = getenv($variable);
+        if (is_string($value) && $value !== '') {
+            return $value;
+        }
+    }
+
+    return null;
+}
+
+/**
  * Download a file from a URL using the best available method.
  *
  * Prefers the curl extension (with progress display) and falls back to
@@ -366,6 +392,13 @@ function download_with_curl(string $url, string $destination): void
     curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
     curl_setopt($ch, CURLOPT_FILE, $fh);
     curl_setopt($ch, CURLOPT_NOPROGRESS, false);
+    curl_setopt($ch, CURLOPT_USERAGENT, 'mago-composer/' . namespace\get_version());
+
+    $token = namespace\get_github_token();
+    if ($token !== null) {
+        curl_setopt($ch, CURLOPT_HTTPHEADER, ['Authorization: Bearer ' . $token]);
+    }
+
     curl_setopt($ch, CURLOPT_PROGRESSFUNCTION, function (mixed $_resource, int $dlSize, int $dlNow): int {
         if ($dlSize > 0) {
             $pct = (int) (($dlNow / $dlSize) * 100);
@@ -399,7 +432,23 @@ function download_with_curl(string $url, string $destination): void
  */
 function download_with_fopen(string $url, string $destination): void
 {
-    $contents = file_get_contents($url);
+    $headers = ['User-Agent: mago-composer/' . namespace\get_version()];
+
+    $token = namespace\get_github_token();
+    if ($token !== null) {
+        $headers[] = 'Authorization: Bearer ' . $token;
+    }
+
+    $context = stream_context_create([
+        'http' => [
+            'method' => 'GET',
+            'header' => implode("\r\n", $headers),
+            'follow_location' => 1,
+            'max_redirects' => 20,
+        ],
+    ]);
+
+    $contents = file_get_contents($url, false, $context);
     if ($contents === false) {
         throw new RuntimeException("Failed to download mago binary.\nURL: {$url}");
     }

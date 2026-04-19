@@ -70,6 +70,19 @@ To add Mago as a development dependency to your PHP project via Composer:
 composer require --dev "carthage-software/mago:^1.22.0"
 ```
 
+The Composer package is a thin wrapper: the first `vendor/bin/mago` invocation downloads the matching pre-built binary from the GitHub release and caches it; later calls reuse the cache and make no HTTP requests.
+
+:::tip
+If GitHub's anonymous rate limit blocks the download (common on shared CI runners), set `GITHUB_TOKEN` or `GH_TOKEN` on the **first** `mago` call and the wrapper will use it for that request. In GitHub Actions the token isn't exported automatically, so pass it explicitly:
+
+```yaml
+- run: mago lint
+  env:
+    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+```
+
+:::
+
 ### Homebrew (macOS)
 
 :::warning
