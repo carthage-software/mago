@@ -867,6 +867,31 @@ pub(crate) fn handle_array_access_on_keyed_array<'ctx>(
 
                         expression_type = expression_type.as_nullable();
                     }
+                } else if array_like_type.types.len() > 1 {
+                    let sibling_list_may_lack_key = array_like_type.types.iter().any(|atomic_type| {
+                        if let TAtomic::Array(TArray::List(other_list)) = atomic_type
+                            && let ArrayKey::Integer(k) = &array_key
+                            && *k >= 0
+                        {
+                            let idx = *k as usize;
+                            let known_has_required = other_list
+                                .known_elements
+                                .as_ref()
+                                .and_then(|elems| elems.get(&idx))
+                                .is_some_and(|(optional, _)| !*optional);
+                            let is_index_zero_on_non_empty = idx == 0 && other_list.non_empty;
+
+                            !(known_has_required || is_index_zero_on_non_empty)
+                        } else {
+                            false
+                        }
+                    });
+
+                    if sibling_list_may_lack_key {
+                        *has_possibly_undefined = true;
+                        *key_in_other_variant = true;
+                        expression_type.set_possibly_undefined(true, None);
+                    }
                 }
 
                 return expression_type;
@@ -894,8 +919,8 @@ pub(crate) fn handle_array_access_on_keyed_array<'ctx>(
                 let key_may_exist_in_generic_params = has_value_parameter;
                 // Check if we're in a union type and if ANY other member has this key
                 let key_exists_in_other_variant = key_may_exist_in_generic_params || {
-                    array_like_type.types.iter().any(|atomic_type| {
-                        if let TAtomic::Array(TArray::Keyed(other_keyed)) = atomic_type {
+                    array_like_type.types.iter().any(|atomic_type| match atomic_type {
+                        TAtomic::Array(TArray::Keyed(other_keyed)) => {
                             if other_keyed.get_generic_parameters().is_some() {
                                 true
                             } else if let Some(other_known_items) = other_keyed.get_known_items() {
@@ -903,9 +928,21 @@ pub(crate) fn handle_array_access_on_keyed_array<'ctx>(
                             } else {
                                 false
                             }
-                        } else {
-                            false
                         }
+                        TAtomic::Array(TArray::List(other_list)) => {
+                            if let ArrayKey::Integer(k) = &array_key {
+                                if !other_list.element_type.is_never() {
+                                    true
+                                } else if let Some(elems) = other_list.known_elements.as_ref() {
+                                    *k >= 0 && elems.contains_key(&(*k as usize))
+                                } else {
+                                    false
+                                }
+                            } else {
+                                false
+                            }
+                        }
+                        _ => false,
                     })
                 };
 
