@@ -468,10 +468,11 @@ fn adjust_array_type(
         compatible_types.push(base_atomic_type);
     }
 
-    if !compatible_types.is_empty() {
-        *existing_type.types.to_mut() = compatible_types;
+    if compatible_types.is_empty() {
+        return;
     }
 
+    *existing_type.types.to_mut() = compatible_types;
     context.locals.insert(base_key_atom, Rc::new(existing_type));
 }
 
@@ -958,15 +959,14 @@ fn get_value_for_key(
 
             let class_constant = context.codebase.get_class_constant_type(fq_class_name, const_name);
 
-            if let Some(class_constant) = class_constant {
+            {
+                let class_constant = class_constant?;
                 let class_constant = Rc::new(match class_constant {
                     Cow::Borrowed(t) => t.clone(),
                     Cow::Owned(t) => t,
                 });
 
                 e.insert(class_constant);
-            } else {
-                return None;
             }
         } else {
             return None;
