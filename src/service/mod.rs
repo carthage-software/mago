@@ -542,7 +542,6 @@ impl IssueProcessor {
             .map_init(Bump::new, |arena, (file_id, batches)| {
                 let file = read_database.get_ref(&file_id)?;
                 let mut editor = TextEditor::with_safety(&file.contents, safety_threshold);
-                let checker = |code: &str| check_php_code(arena, file_id, code, parser_settings);
 
                 let mut skipped_unsafe = 0usize;
                 let mut skipped_potentially_unsafe = 0usize;
@@ -551,7 +550,9 @@ impl IssueProcessor {
                 // Each batch contains all edits from a single issue - they must be applied together
                 for (rule_code, edits) in batches {
                     let rule_code = rule_code.as_deref().unwrap_or("unknown");
-                    let result = editor.apply_batch(edits, Some(checker));
+                    let result = editor.apply_batch(edits, Some(|code: &str| check_php_code(arena, file_id, code, parser_settings)));
+                    arena.reset();
+
                     match result {
                         ApplyResult::Applied => {
                             // Successfully applied
