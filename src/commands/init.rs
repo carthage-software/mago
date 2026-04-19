@@ -513,7 +513,7 @@ fn setup_formatter(theme: &ColorfulTheme) -> Result<String, Error> {
     println!("  │  {}", "This ends debates about spacing and helps you focus on the code.".bright_black());
     println!("  │");
 
-    if Confirm::with_theme(theme)
+    let base_config = if Confirm::with_theme(theme)
         .with_prompt(" │  Do you want to use a preset formatter configuration?")
         .default(false)
         .interact()?
@@ -529,9 +529,8 @@ fn setup_formatter(theme: &ColorfulTheme) -> Result<String, Error> {
 
         println!("  │");
         println!("  │  {}", format!("Selected preset: {}", preset_items[selection]).green());
-        println!("  ╰─");
 
-        Ok(format!("[formatter]\npreset = \"{}\"", selected_preset))
+        format!("[formatter]\npreset = \"{}\"", selected_preset)
     } else {
         let defaults = (120, 4, false);
 
@@ -552,22 +551,40 @@ fn setup_formatter(theme: &ColorfulTheme) -> Result<String, Error> {
                 "  │  {}",
                 "ℹ️  The formatter has many more options. Check the docs to customize it further.".blue()
             );
-            println!("  ╰─");
-            Ok(format!(
-                "[formatter]\nprint-width = {}\ntab-width = {}\nuse-tabs = {}",
-                print_width, tab_width, use_tabs
-            ))
+            format!("[formatter]\nprint-width = {}\ntab-width = {}\nuse-tabs = {}", print_width, tab_width, use_tabs)
         } else {
             println!("  │");
             println!("  │  {}", "Great choice! Sticking to the defaults is highly recommended.".green());
-            println!("  ╰─");
-            Ok(format!(
-                "[formatter]\nprint-width = {}\ntab-width = {}\nuse-tabs = {}",
-                defaults.0, defaults.1, defaults.2
-            ))
+            format!("[formatter]\nprint-width = {}\ntab-width = {}\nuse-tabs = {}", defaults.0, defaults.1, defaults.2)
         }
-    }
+    };
+
+    println!("  │");
+    let minimal_diff = Confirm::with_theme(theme)
+        .with_prompt(" │  Opt into the smallest possible diff when formatting? (keeps your line breaks intact — let Mago decide if unsure)")
+        .default(false)
+        .interact()?;
+
+    let config = if minimal_diff {
+        println!("  │  {}", "Enabled preserve-* options to minimize reformatting churn.".green());
+        format!("{}\n{}", base_config, PRESERVE_ALL_FORMATTER_BLOCK)
+    } else {
+        base_config
+    };
+
+    println!("  ╰─");
+    Ok(config)
 }
+
+const PRESERVE_ALL_FORMATTER_BLOCK: &str = "preserve-breaking-member-access-chain = true
+preserve-breaking-member-access-chain-first-method-on-same-line = true
+preserve-breaking-argument-list = true
+preserve-breaking-array-like = true
+preserve-breaking-parameter-list = true
+preserve-breaking-attribute-list = true
+preserve-breaking-conditional-expression = true
+preserve-breaking-condition-expression = true
+preserve-redundant-logical-binary-expression-parentheses = true";
 
 fn setup_analyzer(theme: &ColorfulTheme) -> Result<InitializationAnalyzerSettings, Error> {
     print_step_header(4, "Analyzer Configuration");
@@ -995,6 +1012,28 @@ mod tests {
 
         let result: Result<Configuration, _> = toml::from_str(&content);
         assert!(result.is_ok(), "Generated config should parse. Error: {:?}\n\nConfig:\n{}", result.err(), content);
+    }
+
+    #[test]
+    fn test_generated_config_parses_with_minimal_diff_preserve_block() {
+        let formatter_config = format!(
+            "[formatter]\nprint-width = {}\ntab-width = {}\nuse-tabs = {}\n{}",
+            120, 4, false, PRESERVE_ALL_FORMATTER_BLOCK
+        );
+        let content = generate_config_content(
+            "8.2",
+            &["src".to_string()],
+            &["vendor".to_string()],
+            &[],
+            &[],
+            &formatter_config,
+            &create_default_analyzer_settings(),
+        );
+
+        let result: Result<Configuration, _> = toml::from_str(&content);
+        assert!(result.is_ok(), "Generated config should parse. Error: {:?}\n\nConfig:\n{}", result.err(), content);
+        assert!(content.contains("preserve-breaking-member-access-chain = true"));
+        assert!(content.contains("preserve-redundant-logical-binary-expression-parentheses = true"));
     }
 
     #[test]
