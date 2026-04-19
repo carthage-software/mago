@@ -118,11 +118,8 @@ fn extract_closure_return_type(union: &TUnion) -> Option<TUnion> {
     for atomic in union.types.as_ref() {
         match atomic {
             TAtomic::Callable(TCallable::Signature(sig)) => {
-                if let Some(return_type) = sig.get_return_type() {
-                    result_types.extend(return_type.types.iter().cloned());
-                } else {
-                    return None;
-                }
+                let return_type = sig.get_return_type()?;
+                result_types.extend(return_type.types.iter().cloned());
             }
             _ => {
                 return None;

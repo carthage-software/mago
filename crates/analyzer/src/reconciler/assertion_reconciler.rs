@@ -687,10 +687,9 @@ fn intersect_contained_atomic_with_another(
     {
         let first_type_as = intersect_union_with_atomic(context, first_type_constraint, sub_atomic);
 
-        if let Some(first_type_as) = first_type_as {
+        {
+            let first_type_as = first_type_as?;
             *Arc::make_mut(first_type_constraint) = first_type_as;
-        } else {
-            return None;
         }
 
         return Some(first_type_atomic);

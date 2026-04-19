@@ -289,10 +289,9 @@ fn parse_var_ident(raw: &str, allow_property_access: bool) -> Option<Variable> {
         // accept "$name" or "...$name"
         let (prefix_len, rest, is_variadic) = if let Some(r) = raw.strip_prefix("...$") {
             (4usize, r, true)
-        } else if let Some(r) = raw.strip_prefix('$') {
-            (1usize, r, false)
         } else {
-            return None;
+            let r = raw.strip_prefix('$')?;
+            (1usize, r, false)
         };
         // PHP identifier rules (ASCII + underscore): [_A-Za-z][_A-Za-z0-9]*
         let bytes = rest.as_bytes();
