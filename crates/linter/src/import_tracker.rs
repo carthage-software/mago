@@ -5,6 +5,7 @@ use foldhash::HashSet;
 
 use mago_atom::Atom;
 use mago_atom::ascii_lowercase_atom;
+use mago_atom::ascii_lowercase_constant_name_atom;
 use mago_atom::atom;
 use mago_span::HasSpan;
 use mago_syntax::ast::Constant;
@@ -322,7 +323,7 @@ impl ImportTracker {
             }
             ImportKind::Constant => {
                 self.scope.constant_imports.insert(local, fqn);
-                self.scope.constant_fqn_to_local.insert(constant_fqn_key(fqn.as_str()), local);
+                self.scope.constant_fqn_to_local.insert(ascii_lowercase_constant_name_atom(fqn.as_str()), local);
             }
         }
     }
@@ -343,7 +344,7 @@ impl ImportTracker {
         let existing_reverse = match kind {
             ImportKind::Name => self.scope.class_fqn_to_local.get(&ascii_lowercase_atom(full.as_str())).copied(),
             ImportKind::Function => self.scope.function_fqn_to_local.get(&ascii_lowercase_atom(full.as_str())).copied(),
-            ImportKind::Constant => self.scope.constant_fqn_to_local.get(&constant_fqn_key(full.as_str())).copied(),
+            ImportKind::Constant => self.scope.constant_fqn_to_local.get(&ascii_lowercase_constant_name_atom(full.as_str())).copied(),
         };
 
         if let Some(local) = existing_reverse {
@@ -399,7 +400,7 @@ impl ImportTracker {
             }
             ImportKind::Constant => {
                 self.scope.constant_imports.insert(short_atom, full);
-                self.scope.constant_fqn_to_local.insert(constant_fqn_key(full.as_str()), short_atom);
+                self.scope.constant_fqn_to_local.insert(ascii_lowercase_constant_name_atom(full.as_str()), short_atom);
             }
         }
 
@@ -412,19 +413,6 @@ fn render_use_statement(kind: ImportKind, fqn: &str) -> String {
         ImportKind::Name => format!("use {}", fqn),
         ImportKind::Function => format!("use function {}", fqn),
         ImportKind::Constant => format!("use const {}", fqn),
-    }
-}
-
-/// Build a lookup key for `constant_fqn_to_local`.
-///
-/// PHP namespaces are case-insensitive, but constant short names are
-/// case-sensitive. Asking to import `App\FOO` and then `APP\FOO` refers to the
-/// same constant; lowercasing only the namespace part lets both calls hit the
-/// same map entry.
-fn constant_fqn_key(fqn: &str) -> Atom {
-    match fqn.rsplit_once('\\') {
-        Some((ns, short)) => atom(&format!("{}\\{}", ns.to_ascii_lowercase(), short)),
-        None => atom(fqn),
     }
 }
 
@@ -619,7 +607,7 @@ mod tests {
     fn constant_imports_are_case_sensitive() {
         let mut tracker = tracker_with_anchor(Some("App"), 10);
         tracker.scope.constant_imports.insert(atom("FOO"), atom("Other\\FOO"));
-        tracker.scope.constant_fqn_to_local.insert(constant_fqn_key("Other\\FOO"), atom("FOO"));
+        tracker.scope.constant_fqn_to_local.insert(ascii_lowercase_constant_name_atom("Other\\FOO"), atom("FOO"));
         let resolution = tracker.import("Other\\foo", ImportKind::Constant).unwrap();
         assert_eq!(resolution.local_name.as_str(), "foo");
         assert!(resolution.use_statement_edit.is_some());
@@ -1461,10 +1449,4 @@ mod tests {
         assert_ne!(a.local_name, b.local_name);
     }
 
-    #[test]
-    fn constant_fqn_key_normalises_namespace_only() {
-        assert_eq!(constant_fqn_key("App\\FOO").as_str(), "app\\FOO");
-        assert_eq!(constant_fqn_key("APP\\bar\\FOO").as_str(), "app\\bar\\FOO");
-        assert_eq!(constant_fqn_key("FOO").as_str(), "FOO");
-    }
 }
