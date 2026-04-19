@@ -282,7 +282,7 @@ mod tests {
     }
 
     test_lint_fix! {
-        name = fix_three_fq_functions_stagger_in_one_pass,
+        name = fix_three_fq_functions_in_one_pass,
         rule = NoFullyQualifiedGlobalFunctionRule,
         code = indoc! {r#"
             <?php
@@ -299,8 +299,12 @@ mod tests {
             namespace App;
 
             use function strlen;
+
             use function strtoupper;
-            use function trim;$a = strlen("a");
+
+            use function trim;
+
+            $a = strlen("a");
             $b = strtoupper("b");
             $c = trim("c");
         "#}

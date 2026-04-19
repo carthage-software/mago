@@ -550,7 +550,7 @@ mod tests {
     }
 
     test_lint_fix! {
-        name = fix_two_distinct_fqns_in_one_pass_via_stagger,
+        name = fix_two_distinct_fqns_in_one_pass,
         rule = NoFullyQualifiedGlobalClassLikeRule,
         code = indoc! {r#"
             <?php
@@ -566,14 +566,16 @@ mod tests {
             namespace App;
 
             use DateTime;
+
             use Exception;
+
             $a = new DateTime();
             $b = new Exception();
         "#}
     }
 
     test_lint_fix! {
-        name = fix_three_fqns_stagger_in_one_pass,
+        name = fix_three_fqns_in_one_pass,
         rule = NoFullyQualifiedGlobalClassLikeRule,
         code = indoc! {r#"
             <?php
@@ -590,8 +592,12 @@ mod tests {
             namespace App;
 
             use Foo\A;
+
             use Foo\B;
-            use Foo\C;$a = A::class;
+
+            use Foo\C;
+
+            $a = A::class;
             $b = B::class;
             $c = C::class;
         "#}

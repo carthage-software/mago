@@ -80,11 +80,13 @@ impl InsertionAnchor {
         }
     }
 
-    /// Leading whitespace prepended to the first `use` inserted at this anchor
-    /// (stagger index 0). Subsequent staggered inserts land inside the
-    /// whitespace run that follows (or precedes) the anchor, so they need no
-    /// leading whitespace of their own; the source byte that ends up
-    /// adjacent to the insert is already whitespace.
+    /// Leading whitespace prepended to each `use` emitted at this anchor.
+    ///
+    /// Multiple imports at the same anchor all land at the same offset; the
+    /// relaxed `TextRange::overlaps` in `mago_text_edit` lets empty ranges
+    /// at the same offset stack in insertion order. Every stacked `use` gets
+    /// the full leading, so the formatter only has to squash repeated blank
+    /// lines, not fabricate them.
     #[inline]
     fn leading(self) -> &'static str {
         match self {
@@ -92,15 +94,6 @@ impl InsertionAnchor {
             InsertionAnchor::AfterPreamble { .. } => "\n\n",
             InsertionAnchor::BeforeEchoTag { .. } => "",
         }
-    }
-
-    /// Stagger direction: `AfterXxx` anchors stagger forward through the
-    /// whitespace after the anchor; `BeforeEchoTag` staggers backward through
-    /// the whitespace preceding the tag (because the echo tag itself is not a
-    /// whitespace run we can slide into).
-    #[inline]
-    fn staggers_backward(self) -> bool {
-        matches!(self, InsertionAnchor::BeforeEchoTag { .. })
     }
 
     /// True when the text must be wrapped in a self-contained `<?php ... ?>`
@@ -142,28 +135,19 @@ struct ScopeState {
     local_classes: HashSet<Atom>,
     local_functions: HashSet<Atom>,
     local_constants: HashSet<Atom>,
-    /// Number of `use` inserts already emitted at the current anchor during
-    /// this lint pass. Used to stagger each subsequent insert by one byte into
-    /// the whitespace run that follows the anchor so multiple imports can land
-    /// in a single fix run without tripping the fixer's overlap detector.
-    /// Reset every time the anchor moves.
-    pending_at_anchor: u32,
 }
 
 impl ScopeState {
     fn record_anchor_after_preamble(&mut self, offset: u32) {
         self.anchor = Some(InsertionAnchor::AfterPreamble { offset });
-        self.pending_at_anchor = 0;
     }
 
     fn record_anchor_after_use(&mut self, offset: u32) {
         self.anchor = Some(InsertionAnchor::AfterUse { offset });
-        self.pending_at_anchor = 0;
     }
 
     fn record_anchor_before_echo_tag(&mut self, offset: u32) {
         self.anchor = Some(InsertionAnchor::BeforeEchoTag { offset });
-        self.pending_at_anchor = 0;
     }
 }
 
@@ -173,19 +157,10 @@ pub struct ImportTracker {
     /// Whether we've seen a `<?php` tag yet. Before the first open tag there's
     /// no valid place to insert a `use`.
     in_php: bool,
-    /// Whether we've already recorded an anchor for the current preamble (to
-    /// avoid regressing the anchor when entering nested nodes that happen to
-    /// share a kind with a preamble statement, like a Use statement inside a
-    /// method body via attributes; there aren't any right now, but future-
-    /// proof).
-    preamble_initialised: bool,
     /// Currently-active scope state. Reset whenever a namespace is entered or
     /// exited; in a "between braced namespaces" limbo the anchor inside this
     /// struct is `None`.
     scope: ScopeState,
-    /// How many braced-namespace blocks we're currently inside. PHP disallows
-    /// nesting these but we defensively model it with a counter anyway.
-    braced_namespace_depth: u32,
 }
 
 impl ImportTracker {
@@ -199,7 +174,6 @@ impl ImportTracker {
             Node::FullOpeningTag(_) | Node::ShortOpeningTag(_) | Node::OpeningTag(_) if !self.in_php => {
                 self.in_php = true;
                 self.scope = ScopeState::default();
-                self.preamble_initialised = true;
                 self.scope.record_anchor_after_preamble(node.end_offset());
             }
             Node::EchoTag(echo_tag) => self.enter_echo_tag(echo_tag),
@@ -239,7 +213,6 @@ impl ImportTracker {
 
         self.in_php = true;
         self.scope = ScopeState::default();
-        self.preamble_initialised = true;
         self.scope.record_anchor_before_echo_tag(echo_tag.tag.start.offset);
     }
 
@@ -254,7 +227,6 @@ impl ImportTracker {
                 self.scope.record_anchor_after_preamble(body.terminator.end_offset());
             }
             NamespaceBody::BraceDelimited(block) => {
-                self.braced_namespace_depth = self.braced_namespace_depth.saturating_add(1);
                 self.scope.record_anchor_after_preamble(block.left_brace.end.offset);
             }
         }
@@ -262,7 +234,6 @@ impl ImportTracker {
 
     fn exit_namespace(&mut self, namespace: &Namespace<'_>) {
         if matches!(namespace.body, NamespaceBody::BraceDelimited(_)) {
-            self.braced_namespace_depth = self.braced_namespace_depth.saturating_sub(1);
             self.scope = ScopeState::default();
         }
     }
@@ -351,12 +322,12 @@ impl ImportTracker {
             }
             ImportKind::Constant => {
                 self.scope.constant_imports.insert(local, fqn);
-                self.scope.constant_fqn_to_local.insert(fqn, local);
+                self.scope.constant_fqn_to_local.insert(constant_fqn_key(fqn.as_str()), local);
             }
         }
     }
 
-    pub fn import(&mut self, fqn: &str, kind: ImportKind, source: &str) -> Option<ImportResolution> {
+    pub fn import(&mut self, fqn: &str, kind: ImportKind) -> Option<ImportResolution> {
         let (namespace_part, short_part) = split_fqn(fqn)?;
         if is_reserved_type_name(short_part, kind) {
             return None;
@@ -372,8 +343,9 @@ impl ImportTracker {
         let existing_reverse = match kind {
             ImportKind::Name => self.scope.class_fqn_to_local.get(&ascii_lowercase_atom(full.as_str())).copied(),
             ImportKind::Function => self.scope.function_fqn_to_local.get(&ascii_lowercase_atom(full.as_str())).copied(),
-            ImportKind::Constant => self.scope.constant_fqn_to_local.get(&full).copied(),
+            ImportKind::Constant => self.scope.constant_fqn_to_local.get(&constant_fqn_key(full.as_str())).copied(),
         };
+
         if let Some(local) = existing_reverse {
             return Some(ImportResolution { local_name: local, use_statement_edit: None });
         }
@@ -408,29 +380,13 @@ impl ImportTracker {
         }
 
         let anchor = self.scope.anchor?;
-        let base = anchor.offset();
-        let max_stagger = if anchor.staggers_backward() {
-            safe_stagger_range_backward(source, base)
-        } else {
-            safe_stagger_range(source, base)
-        };
-        let stagger = self.scope.pending_at_anchor;
-        let (offset, leading) = if stagger == 0 {
-            (base, anchor.leading())
-        } else if stagger <= max_stagger {
-            let offset = if anchor.staggers_backward() { base - stagger } else { base + stagger };
-            (offset, "")
-        } else {
-            (base, anchor.leading())
-        };
-
+        let offset = anchor.offset();
+        let leading = anchor.leading();
         let text = if anchor.wraps_in_php_block() {
             format!("{leading}<?php {}; ?>", render_use_statement(kind, full.as_str()))
         } else {
             format!("{leading}{};", render_use_statement(kind, full.as_str()))
         };
-
-        self.scope.pending_at_anchor = self.scope.pending_at_anchor.saturating_add(1);
 
         match kind {
             ImportKind::Name => {
@@ -443,7 +399,7 @@ impl ImportTracker {
             }
             ImportKind::Constant => {
                 self.scope.constant_imports.insert(short_atom, full);
-                self.scope.constant_fqn_to_local.insert(full, short_atom);
+                self.scope.constant_fqn_to_local.insert(constant_fqn_key(full.as_str()), short_atom);
             }
         }
 
@@ -451,35 +407,24 @@ impl ImportTracker {
     }
 }
 
-/// Count consecutive ASCII-whitespace bytes starting at `offset`.
-///
-/// Used by the stagger logic: each stagger position lands one byte deeper into
-/// this run, which guarantees the insert doesn't split a multi-byte token.
-/// Bytes-level scanning is safe for UTF-8 because ASCII whitespace bytes are
-/// all single-byte and never appear as UTF-8 continuation bytes.
-fn safe_stagger_range(source: &str, offset: u32) -> u32 {
-    let start = offset as usize;
-    source
-        .as_bytes()
-        .get(start..)
-        .map(|slice| slice.iter().take_while(|b| b.is_ascii_whitespace()).count() as u32)
-        .unwrap_or(0)
-}
-
-/// Count consecutive ASCII-whitespace bytes immediately *preceding* `offset`.
-///
-/// Mirrors [`safe_stagger_range`] but in the opposite direction, used by
-/// anchors that stagger backwards (see [`InsertionAnchor::BeforeEchoTag`]).
-fn safe_stagger_range_backward(source: &str, offset: u32) -> u32 {
-    let end = (offset as usize).min(source.len());
-    source.as_bytes()[..end].iter().rev().take_while(|b| b.is_ascii_whitespace()).count() as u32
-}
-
 fn render_use_statement(kind: ImportKind, fqn: &str) -> String {
     match kind {
         ImportKind::Name => format!("use {}", fqn),
         ImportKind::Function => format!("use function {}", fqn),
         ImportKind::Constant => format!("use const {}", fqn),
+    }
+}
+
+/// Build a lookup key for `constant_fqn_to_local`.
+///
+/// PHP namespaces are case-insensitive, but constant short names are
+/// case-sensitive. Asking to import `App\FOO` and then `APP\FOO` refers to the
+/// same constant; lowercasing only the namespace part lets both calls hit the
+/// same map entry.
+fn constant_fqn_key(fqn: &str) -> Atom {
+    match fqn.rsplit_once('\\') {
+        Some((ns, short)) => atom(&format!("{}\\{}", ns.to_ascii_lowercase(), short)),
+        None => atom(fqn),
     }
 }
 
@@ -576,7 +521,7 @@ mod tests {
     }
 
     fn do_import(tracker: &mut ImportTracker, fqn: &str, kind: ImportKind) -> Option<ImportResolution> {
-        tracker.import(fqn, kind, "")
+        tracker.import(fqn, kind)
     }
 
     #[test]
@@ -588,7 +533,7 @@ mod tests {
     #[test]
     fn import_adds_use_and_rewrites_short() {
         let mut tracker = tracker_with_anchor(Some("App"), 42);
-        let resolution = tracker.import("Other\\Thing", ImportKind::Name, "").expect("should import");
+        let resolution = tracker.import("Other\\Thing", ImportKind::Name).expect("should import");
         assert_eq!(resolution.local_name.as_str(), "Thing");
         let edit = resolution.use_statement_edit.expect("edit");
         assert!(edit.new_text.contains("use Other\\Thing;"));
@@ -597,8 +542,8 @@ mod tests {
     #[test]
     fn import_same_fqn_twice_only_emits_one_edit() {
         let mut tracker = tracker_with_anchor(Some("App"), 42);
-        let first = tracker.import("Other\\Thing", ImportKind::Name, "").unwrap();
-        let second = tracker.import("Other\\Thing", ImportKind::Name, "").unwrap();
+        let first = tracker.import("Other\\Thing", ImportKind::Name).unwrap();
+        let second = tracker.import("Other\\Thing", ImportKind::Name).unwrap();
         assert!(first.use_statement_edit.is_some());
         assert!(second.use_statement_edit.is_none());
         assert_eq!(first.local_name, second.local_name);
@@ -607,7 +552,7 @@ mod tests {
     #[test]
     fn import_fqn_in_current_namespace_no_edit() {
         let mut tracker = tracker_with_anchor(Some("App"), 42);
-        let resolution = tracker.import("App\\User", ImportKind::Name, "").unwrap();
+        let resolution = tracker.import("App\\User", ImportKind::Name).unwrap();
         assert_eq!(resolution.local_name.as_str(), "User");
         assert!(resolution.use_statement_edit.is_none());
     }
@@ -615,7 +560,7 @@ mod tests {
     #[test]
     fn import_single_segment_in_global_no_edit() {
         let mut tracker = tracker_with_anchor(None, 10);
-        let resolution = tracker.import("Foo", ImportKind::Name, "").unwrap();
+        let resolution = tracker.import("Foo", ImportKind::Name).unwrap();
         assert!(resolution.use_statement_edit.is_none());
         assert_eq!(resolution.local_name.as_str(), "Foo");
     }
@@ -623,7 +568,7 @@ mod tests {
     #[test]
     fn import_single_segment_in_namespace_still_imports() {
         let mut tracker = tracker_with_anchor(Some("App"), 10);
-        let resolution = tracker.import("Foo", ImportKind::Name, "").unwrap();
+        let resolution = tracker.import("Foo", ImportKind::Name).unwrap();
         assert!(resolution.use_statement_edit.is_some());
         assert_eq!(resolution.local_name.as_str(), "Foo");
     }
@@ -633,14 +578,14 @@ mod tests {
         let mut tracker = tracker_with_anchor(Some("App"), 10);
         tracker.scope.class_imports.insert(ascii_lowercase_atom("User"), atom("Other\\User"));
         tracker.scope.class_fqn_to_local.insert(ascii_lowercase_atom("Other\\User"), atom("User"));
-        assert!(tracker.import("App\\User", ImportKind::Name, "").is_none());
+        assert!(tracker.import("App\\User", ImportKind::Name).is_none());
     }
 
     #[test]
     fn short_name_conflict_with_local_class_returns_none() {
         let mut tracker = tracker_with_anchor(Some("App"), 10);
         tracker.scope.local_classes.insert(ascii_lowercase_atom("User"));
-        assert!(tracker.import("Other\\User", ImportKind::Name, "").is_none());
+        assert!(tracker.import("Other\\User", ImportKind::Name).is_none());
     }
 
     #[test]
@@ -648,7 +593,7 @@ mod tests {
         let mut tracker = tracker_with_anchor(Some("App"), 10);
         tracker.scope.class_imports.insert(ascii_lowercase_atom("Baz"), atom("Foo\\Bar"));
         tracker.scope.class_fqn_to_local.insert(ascii_lowercase_atom("Foo\\Bar"), atom("Baz"));
-        let resolution = tracker.import("Foo\\Bar", ImportKind::Name, "").unwrap();
+        let resolution = tracker.import("Foo\\Bar", ImportKind::Name).unwrap();
         assert_eq!(resolution.local_name.as_str(), "Baz");
         assert!(resolution.use_statement_edit.is_none());
     }
@@ -656,8 +601,8 @@ mod tests {
     #[test]
     fn reserved_type_name_not_importable() {
         let mut tracker = tracker_with_anchor(Some("App"), 10);
-        assert!(tracker.import("\\int", ImportKind::Name, "").is_none());
-        assert!(tracker.import("\\self", ImportKind::Name, "").is_none());
+        assert!(tracker.import("\\int", ImportKind::Name).is_none());
+        assert!(tracker.import("\\self", ImportKind::Name).is_none());
     }
 
     #[test]
@@ -665,7 +610,7 @@ mod tests {
         let mut tracker = tracker_with_anchor(Some("App"), 10);
         tracker.scope.class_imports.insert(ascii_lowercase_atom("foo"), atom("Other\\foo"));
         tracker.scope.class_fqn_to_local.insert(ascii_lowercase_atom("Other\\foo"), atom("foo"));
-        let resolution = tracker.import("App\\Util\\foo", ImportKind::Function, "").expect("import");
+        let resolution = tracker.import("App\\Util\\foo", ImportKind::Function).expect("import");
         assert_eq!(resolution.local_name.as_str(), "foo");
         assert!(resolution.use_statement_edit.is_some());
     }
@@ -674,8 +619,8 @@ mod tests {
     fn constant_imports_are_case_sensitive() {
         let mut tracker = tracker_with_anchor(Some("App"), 10);
         tracker.scope.constant_imports.insert(atom("FOO"), atom("Other\\FOO"));
-        tracker.scope.constant_fqn_to_local.insert(atom("Other\\FOO"), atom("FOO"));
-        let resolution = tracker.import("Other\\foo", ImportKind::Constant, "").unwrap();
+        tracker.scope.constant_fqn_to_local.insert(constant_fqn_key("Other\\FOO"), atom("FOO"));
+        let resolution = tracker.import("Other\\foo", ImportKind::Constant).unwrap();
         assert_eq!(resolution.local_name.as_str(), "foo");
         assert!(resolution.use_statement_edit.is_some());
     }
@@ -685,7 +630,7 @@ mod tests {
         let mut tracker = tracker_with_anchor(Some("App"), 10);
         tracker.scope.class_imports.insert(ascii_lowercase_atom("User"), atom("Other\\User"));
         tracker.scope.class_fqn_to_local.insert(ascii_lowercase_atom("Other\\User"), atom("User"));
-        assert!(tracker.import("App\\user", ImportKind::Name, "").is_none());
+        assert!(tracker.import("App\\user", ImportKind::Name).is_none());
     }
 
     #[test]
@@ -693,73 +638,45 @@ mod tests {
         let mut tracker = ImportTracker::new();
         tracker.in_php = true;
         tracker.scope = ScopeState { namespace: Some(atom("App")), anchor: None, ..ScopeState::default() };
-        assert!(tracker.import("Other\\Thing", ImportKind::Name, "").is_none());
+        assert!(tracker.import("Other\\Thing", ImportKind::Name).is_none());
     }
 
     #[test]
     fn edit_text_leading_depends_on_anchor_kind() {
         let mut t1 = tracker_with_anchor(Some("App"), 10);
         t1.scope.anchor = Some(InsertionAnchor::AfterPreamble { offset: 10 });
-        let r1 = t1.import("X\\Y", ImportKind::Name, "").unwrap();
+        let r1 = t1.import("X\\Y", ImportKind::Name).unwrap();
         assert!(r1.use_statement_edit.unwrap().new_text.starts_with("\n\n"));
 
         let mut t2 = tracker_with_anchor(Some("App"), 10);
         t2.scope.anchor = Some(InsertionAnchor::AfterUse { offset: 10 });
-        let r2 = t2.import("X\\Y", ImportKind::Name, "").unwrap();
+        let r2 = t2.import("X\\Y", ImportKind::Name).unwrap();
         assert!(r2.use_statement_edit.unwrap().new_text.starts_with("\nuse"));
     }
 
-    //
-
     #[test]
-    fn safe_stagger_range_counts_contiguous_ascii_whitespace() {
-        assert_eq!(safe_stagger_range("<?php\n\n$a", 5), 2);
-        assert_eq!(safe_stagger_range("<?php    $a", 5), 4);
-        assert_eq!(safe_stagger_range("<?php$a", 5), 0);
-        assert_eq!(safe_stagger_range("<?php", 5), 0); // EOF
-        assert_eq!(safe_stagger_range("<?php", 99), 0); // offset past EOF
+    fn multiple_imports_all_land_at_the_same_anchor_offset() {
+        let mut tracker = tracker_with_anchor(Some("App"), 5);
+        let r0 = tracker.import("A\\A", ImportKind::Name).unwrap();
+        let r1 = tracker.import("B\\B", ImportKind::Name).unwrap();
+        let r2 = tracker.import("C\\C", ImportKind::Name).unwrap();
+
+        assert_eq!(r0.use_statement_edit.unwrap().range.start, 5);
+        assert_eq!(r1.use_statement_edit.unwrap().range.start, 5);
+        assert_eq!(r2.use_statement_edit.unwrap().range.start, 5);
     }
 
     #[test]
-    fn stagger_uses_distinct_offsets_when_whitespace_allows() {
+    fn stitched_multi_import_contains_all_uses_and_preserves_body() {
         let src = "<?php\n\n$x = 1;";
         let mut tracker = tracker_with_anchor(Some("App"), 5);
-        let r0 = tracker.import("A\\A", ImportKind::Name, src).unwrap();
-        let r1 = tracker.import("B\\B", ImportKind::Name, src).unwrap();
-        let r2 = tracker.import("C\\C", ImportKind::Name, src).unwrap();
-
-        let e0 = r0.use_statement_edit.unwrap();
-        let e1 = r1.use_statement_edit.unwrap();
-        let e2 = r2.use_statement_edit.unwrap();
-
-        assert_eq!(e0.range.start, 5);
-        assert_eq!(e1.range.start, 6);
-        assert_eq!(e2.range.start, 7);
-        assert!(!e0.range.overlaps(&e1.range));
-        assert!(!e1.range.overlaps(&e2.range));
-        assert!(!e0.range.overlaps(&e2.range));
-    }
-
-    #[test]
-    fn stagger_stitches_to_valid_php_when_applied_together() {
-        let src = "<?php\n\n$x = 1;";
-        let mut tracker = tracker_with_anchor(Some("App"), 5);
-        let r0 = tracker.import("A\\A", ImportKind::Name, src).unwrap();
-        let r1 = tracker.import("B\\B", ImportKind::Name, src).unwrap();
-        let r2 = tracker.import("C\\C", ImportKind::Name, src).unwrap();
+        let r0 = tracker.import("A\\A", ImportKind::Name).unwrap();
+        let r1 = tracker.import("B\\B", ImportKind::Name).unwrap();
+        let r2 = tracker.import("C\\C", ImportKind::Name).unwrap();
 
         let mut edits =
             vec![r0.use_statement_edit.unwrap(), r1.use_statement_edit.unwrap(), r2.use_statement_edit.unwrap()];
-        edits.sort_by_key(|e| e.range.start);
-
-        let mut output = String::new();
-        let mut cursor: u32 = 0;
-        for edit in &edits {
-            output.push_str(&src[cursor as usize..edit.range.start as usize]);
-            output.push_str(&edit.new_text);
-            cursor = edit.range.end;
-        }
-        output.push_str(&src[cursor as usize..]);
+        let output = stitch(src, &mut edits);
 
         assert!(output.contains("use A\\A;"));
         assert!(output.contains("use B\\B;"));
@@ -769,67 +686,39 @@ mod tests {
     }
 
     #[test]
-    fn stagger_falls_back_to_base_when_whitespace_exhausted() {
-        let src = "<?php\n$x = 1;";
+    fn new_anchor_replaces_old_anchor_offset() {
         let mut tracker = tracker_with_anchor(Some("App"), 5);
-        let r0 = tracker.import("A\\A", ImportKind::Name, src).unwrap();
-        let r1 = tracker.import("B\\B", ImportKind::Name, src).unwrap();
-        let r2 = tracker.import("C\\C", ImportKind::Name, src).unwrap();
-
-        assert_eq!(r0.use_statement_edit.unwrap().range.start, 5);
-        assert_eq!(r1.use_statement_edit.unwrap().range.start, 6);
-        assert_eq!(r2.use_statement_edit.unwrap().range.start, 5);
-    }
-
-    #[test]
-    fn stagger_resets_when_anchor_moves() {
-        let src = "<?php\n\nuse X;\n\n$x = 1;";
-        let mut tracker = tracker_with_anchor(Some("App"), 5);
-        let r0 = tracker.import("A\\A", ImportKind::Name, src).unwrap();
+        let r0 = tracker.import("A\\A", ImportKind::Name).unwrap();
         assert_eq!(r0.use_statement_edit.unwrap().range.start, 5);
 
         tracker.scope.record_anchor_after_use(13);
-        let r1 = tracker.import("B\\B", ImportKind::Name, src).unwrap();
+        let r1 = tracker.import("B\\B", ImportKind::Name).unwrap();
         assert_eq!(r1.use_statement_edit.unwrap().range.start, 13);
     }
 
     #[test]
-    fn stagger_forty_imports_all_coexist_when_whitespace_allows() {
-        let leading = "\n".repeat(60);
-        let src = format!("<?php{leading}$x = 1;");
+    fn forty_imports_all_stack_at_base_offset() {
+        let src = "<?php\n\n$x = 1;";
         let mut tracker = tracker_with_anchor(Some("App"), 5);
         let mut edits = Vec::new();
         for i in 0..40 {
             let fqn = format!("Pkg\\T{:02}", i);
-            let r = tracker.import(&fqn, ImportKind::Name, &src).unwrap();
+            let r = tracker.import(&fqn, ImportKind::Name).unwrap();
             edits.push(r.use_statement_edit.unwrap());
         }
-        let mut offsets: Vec<u32> = edits.iter().map(|e| e.range.start).collect();
-        offsets.sort();
-        offsets.dedup();
-        assert_eq!(offsets.len(), 40);
-        assert_eq!(*offsets.first().unwrap(), 5);
-        assert_eq!(*offsets.last().unwrap(), 44);
 
-        let out = stitch(&src, &mut edits);
+        assert!(edits.iter().all(|e| e.range.start == 5));
+        let out = stitch(src, &mut edits);
         for i in 0..40 {
             let expected = format!("use Pkg\\T{:02};", i);
             assert!(out.contains(&expected), "missing `{expected}`");
         }
+
         assert!(out.contains("$x = 1;"));
     }
 
     #[test]
-    fn backward_stagger_counts_preceding_whitespace() {
-        assert_eq!(safe_stagger_range_backward("hello\n\n<?= ?>", 7), 2);
-        assert_eq!(safe_stagger_range_backward("<?= ?>", 0), 0);
-        assert_eq!(safe_stagger_range_backward("hello<?= ?>", 5), 0);
-        assert_eq!(safe_stagger_range_backward("   <?= ?>", 3), 3);
-    }
-
-    #[test]
     fn echo_tag_anchor_wraps_first_import_in_php_block() {
-        let src = "hello <?= $x ?>";
         let mut tracker = ImportTracker::new();
         tracker.in_php = true;
         tracker.scope = ScopeState {
@@ -837,15 +726,14 @@ mod tests {
             anchor: Some(InsertionAnchor::BeforeEchoTag { offset: 6 }),
             ..ScopeState::default()
         };
-        let r = tracker.import("Foo\\Bar", ImportKind::Name, src).unwrap();
+        let r = tracker.import("Foo\\Bar", ImportKind::Name).unwrap();
         let edit = r.use_statement_edit.unwrap();
         assert_eq!(edit.range.start, 6);
         assert_eq!(edit.new_text, "<?php use Foo\\Bar; ?>");
     }
 
     #[test]
-    fn echo_tag_backward_stagger_keeps_offsets_distinct() {
-        let src = "hello\n\n<?= $x ?>";
+    fn echo_tag_multiple_imports_stack_at_tag_offset() {
         let mut tracker = ImportTracker::new();
         tracker.in_php = true;
         tracker.scope = ScopeState {
@@ -853,12 +741,12 @@ mod tests {
             anchor: Some(InsertionAnchor::BeforeEchoTag { offset: 7 }),
             ..ScopeState::default()
         };
-        let r0 = tracker.import("A\\A", ImportKind::Name, src).unwrap();
-        let r1 = tracker.import("B\\B", ImportKind::Name, src).unwrap();
-        let r2 = tracker.import("C\\C", ImportKind::Name, src).unwrap();
+        let r0 = tracker.import("A\\A", ImportKind::Name).unwrap();
+        let r1 = tracker.import("B\\B", ImportKind::Name).unwrap();
+        let r2 = tracker.import("C\\C", ImportKind::Name).unwrap();
         assert_eq!(r0.use_statement_edit.as_ref().unwrap().range.start, 7);
-        assert_eq!(r1.use_statement_edit.as_ref().unwrap().range.start, 6);
-        assert_eq!(r2.use_statement_edit.as_ref().unwrap().range.start, 5);
+        assert_eq!(r1.use_statement_edit.as_ref().unwrap().range.start, 7);
+        assert_eq!(r2.use_statement_edit.as_ref().unwrap().range.start, 7);
     }
 
     #[test]
@@ -871,8 +759,8 @@ mod tests {
             anchor: Some(InsertionAnchor::BeforeEchoTag { offset: 7 }),
             ..ScopeState::default()
         };
-        let r0 = tracker.import("A\\A", ImportKind::Name, src).unwrap();
-        let r1 = tracker.import("B\\B", ImportKind::Name, src).unwrap();
+        let r0 = tracker.import("A\\A", ImportKind::Name).unwrap();
+        let r1 = tracker.import("B\\B", ImportKind::Name).unwrap();
         let mut edits = vec![r0.use_statement_edit.unwrap(), r1.use_statement_edit.unwrap()];
         let out = stitch(src, &mut edits);
         assert!(out.contains("<?php use A\\A; ?>"));
@@ -881,8 +769,7 @@ mod tests {
     }
 
     #[test]
-    fn echo_tag_only_first_import_fits_when_no_preceding_whitespace() {
-        let src = "<?= $x ?>";
+    fn echo_tag_imports_with_no_preceding_whitespace_stack_at_zero() {
         let mut tracker = ImportTracker::new();
         tracker.in_php = true;
         tracker.scope = ScopeState {
@@ -890,8 +777,8 @@ mod tests {
             anchor: Some(InsertionAnchor::BeforeEchoTag { offset: 0 }),
             ..ScopeState::default()
         };
-        let r0 = tracker.import("A\\A", ImportKind::Name, src).unwrap();
-        let r1 = tracker.import("B\\B", ImportKind::Name, src).unwrap();
+        let r0 = tracker.import("A\\A", ImportKind::Name).unwrap();
+        let r1 = tracker.import("B\\B", ImportKind::Name).unwrap();
         assert_eq!(r0.use_statement_edit.unwrap().range.start, 0);
         assert_eq!(r1.use_statement_edit.unwrap().range.start, 0);
     }
@@ -906,7 +793,7 @@ mod tests {
             ..ScopeState::default()
         };
         let anchor_before = tracker.scope.anchor;
-        let r = tracker.import("Foo\\Bar", ImportKind::Name, "<?php\n\n$x = 1;").unwrap();
+        let r = tracker.import("Foo\\Bar", ImportKind::Name).unwrap();
         assert!(r.use_statement_edit.is_some());
         assert_eq!(
             tracker.scope.anchor.map(|a| std::mem::discriminant(&a)),
@@ -928,25 +815,11 @@ mod tests {
     }
 
     #[test]
-    fn stagger_counts_tabs_and_spaces_as_whitespace() {
-        assert_eq!(safe_stagger_range("<?php\t\t\t$a", 5), 3);
-        assert_eq!(safe_stagger_range("<?php   $a", 5), 3);
-        assert_eq!(safe_stagger_range("<?php\r\n\r\n$a", 5), 4);
-        assert_eq!(safe_stagger_range("<?php\t \t $a", 5), 4);
-    }
-
-    #[test]
-    fn stagger_stops_at_non_ascii_byte_boundary() {
-        let src = "<?php\n\u{00E9}x";
-        assert_eq!(safe_stagger_range(src, 5), 1);
-    }
-
-    #[test]
-    fn stagger_stitches_valid_utf8_output() {
+    fn stitched_output_preserves_unicode_body() {
         let src = "<?php\n\n// héllo\n$x;";
         let mut tracker = tracker_with_anchor(Some("App"), 5);
-        let r0 = tracker.import("A\\A", ImportKind::Name, src).unwrap();
-        let r1 = tracker.import("B\\B", ImportKind::Name, src).unwrap();
+        let r0 = tracker.import("A\\A", ImportKind::Name).unwrap();
+        let r1 = tracker.import("B\\B", ImportKind::Name).unwrap();
         let e0 = r0.use_statement_edit.unwrap();
         let e1 = r1.use_statement_edit.unwrap();
         assert!(src.is_char_boundary(e0.range.start as usize));
@@ -963,24 +836,24 @@ mod tests {
     fn local_class_does_not_block_function_or_constant_imports() {
         let mut tracker = tracker_with_anchor(Some("App"), 10);
         tracker.scope.local_classes.insert(ascii_lowercase_atom("Foo"));
-        assert!(tracker.import("Other\\foo", ImportKind::Function, "").is_some());
-        assert!(tracker.import("Other\\FOO", ImportKind::Constant, "").is_some());
+        assert!(tracker.import("Other\\foo", ImportKind::Function).is_some());
+        assert!(tracker.import("Other\\FOO", ImportKind::Constant).is_some());
     }
 
     #[test]
     fn local_function_does_not_block_class_or_constant_imports() {
         let mut tracker = tracker_with_anchor(Some("App"), 10);
         tracker.scope.local_functions.insert(ascii_lowercase_atom("foo"));
-        assert!(tracker.import("Other\\Foo", ImportKind::Name, "").is_some());
-        assert!(tracker.import("Other\\FOO", ImportKind::Constant, "").is_some());
+        assert!(tracker.import("Other\\Foo", ImportKind::Name).is_some());
+        assert!(tracker.import("Other\\FOO", ImportKind::Constant).is_some());
     }
 
     #[test]
     fn local_constant_does_not_block_class_or_function_imports() {
         let mut tracker = tracker_with_anchor(Some("App"), 10);
         tracker.scope.local_constants.insert(atom("FOO"));
-        assert!(tracker.import("Other\\Foo", ImportKind::Name, "").is_some());
-        assert!(tracker.import("Other\\foo", ImportKind::Function, "").is_some());
+        assert!(tracker.import("Other\\Foo", ImportKind::Name).is_some());
+        assert!(tracker.import("Other\\foo", ImportKind::Function).is_some());
     }
 
     #[test]
@@ -1000,7 +873,7 @@ mod tests {
         tracker.scope.class_imports.insert(ascii_lowercase_atom("Bar"), atom("Foo\\Bar"));
         tracker.scope.class_fqn_to_local.insert(ascii_lowercase_atom("Foo\\Bar"), atom("Bar"));
 
-        let r = tracker.import("\\Foo\\Bar", ImportKind::Name, "").unwrap();
+        let r = tracker.import("\\Foo\\Bar", ImportKind::Name).unwrap();
         assert!(r.is_already_available());
         assert_eq!(r.local_name.as_str(), "Bar");
     }
@@ -1008,32 +881,28 @@ mod tests {
     #[test]
     fn fqn_with_multiple_segments_shortens_to_last() {
         let mut tracker = tracker_with_anchor(Some("App"), 10);
-        let r = tracker.import("A\\B\\C\\D\\E", ImportKind::Name, "").unwrap();
+        let r = tracker.import("A\\B\\C\\D\\E", ImportKind::Name).unwrap();
         assert_eq!(r.local_name.as_str(), "E");
         assert!(r.use_statement_edit.as_ref().unwrap().new_text.contains("use A\\B\\C\\D\\E;"));
     }
 
     #[test]
-    fn forty_imports_coexist_via_stagger_producing_valid_header() {
-        let runway = "\n".repeat(60);
-        let src = format!("<?php{runway}$x = 1;");
+    fn forty_imports_stitch_cleanly_at_shared_offset() {
+        let src = "<?php\n\n$x = 1;";
         let mut tracker = tracker_with_anchor(Some("App"), 5);
 
         let mut edits: Vec<TextEdit> = Vec::new();
         let mut names: Vec<String> = Vec::new();
         for i in 0..40 {
             let fqn = format!("Pkg\\Class{:02}", i);
-            let r = tracker.import(&fqn, ImportKind::Name, &src).unwrap();
+            let r = tracker.import(&fqn, ImportKind::Name).unwrap();
             edits.push(r.use_statement_edit.unwrap());
             names.push(format!("use Pkg\\Class{:02};", i));
         }
 
-        let mut offsets: Vec<u32> = edits.iter().map(|e| e.range.start).collect();
-        offsets.sort();
-        offsets.dedup();
-        assert_eq!(offsets.len(), 40);
+        assert!(edits.iter().all(|e| e.range.start == 5));
 
-        let out = stitch(&src, &mut edits);
+        let out = stitch(src, &mut edits);
         for name in &names {
             assert!(out.contains(name), "missing `{name}` in stitched output");
         }
@@ -1041,29 +910,19 @@ mod tests {
     }
 
     #[test]
-    fn forty_one_imports_the_last_one_falls_back_to_base_and_conflicts() {
-        let runway = "\n".repeat(39);
-        let src = format!("<?php{runway}$x = 1;");
+    fn forty_one_imports_all_land_at_base() {
         let mut tracker = tracker_with_anchor(Some("App"), 5);
-
-        let mut offsets = Vec::new();
         for i in 0..41 {
             let fqn = format!("Pkg\\T{:02}", i);
-            let r = tracker.import(&fqn, ImportKind::Name, &src).unwrap();
-            offsets.push(r.use_statement_edit.unwrap().range.start);
+            let r = tracker.import(&fqn, ImportKind::Name).unwrap();
+            assert_eq!(r.use_statement_edit.unwrap().range.start, 5);
         }
-
-        for (i, offset) in offsets.iter().enumerate().take(40) {
-            assert_eq!(*offset, 5 + i as u32);
-        }
-
-        assert_eq!(offsets[40], 5);
     }
 
     #[test]
     fn function_import_emits_use_function_keyword() {
         let mut tracker = tracker_with_anchor(Some("App"), 10);
-        let r = tracker.import("Other\\strlen", ImportKind::Function, "").unwrap();
+        let r = tracker.import("Other\\strlen", ImportKind::Function).unwrap();
         let text = r.use_statement_edit.unwrap().new_text;
         assert!(text.contains("use function Other\\strlen;"), "got `{text}`");
         assert!(!text.contains("use const"));
@@ -1072,7 +931,7 @@ mod tests {
     #[test]
     fn constant_import_emits_use_const_keyword() {
         let mut tracker = tracker_with_anchor(Some("App"), 10);
-        let r = tracker.import("Other\\PHP_EOL", ImportKind::Constant, "").unwrap();
+        let r = tracker.import("Other\\PHP_EOL", ImportKind::Constant).unwrap();
         let text = r.use_statement_edit.unwrap().new_text;
         assert!(text.contains("use const Other\\PHP_EOL;"), "got `{text}`");
         assert!(!text.contains("use function"));
@@ -1080,7 +939,6 @@ mod tests {
 
     #[test]
     fn echo_tag_wraps_function_import_in_php_block() {
-        let src = "<?= $x ?>";
         let mut tracker = ImportTracker::new();
         tracker.in_php = true;
         tracker.scope = ScopeState {
@@ -1088,14 +946,13 @@ mod tests {
             anchor: Some(InsertionAnchor::BeforeEchoTag { offset: 0 }),
             ..ScopeState::default()
         };
-        let r = tracker.import("Other\\strlen", ImportKind::Function, src).unwrap();
+        let r = tracker.import("Other\\strlen", ImportKind::Function).unwrap();
         let text = r.use_statement_edit.unwrap().new_text;
         assert_eq!(text, "<?php use function Other\\strlen; ?>");
     }
 
     #[test]
     fn echo_tag_wraps_constant_import_in_php_block() {
-        let src = "<?= $x ?>";
         let mut tracker = ImportTracker::new();
         tracker.in_php = true;
         tracker.scope = ScopeState {
@@ -1103,7 +960,7 @@ mod tests {
             anchor: Some(InsertionAnchor::BeforeEchoTag { offset: 0 }),
             ..ScopeState::default()
         };
-        let r = tracker.import("Other\\PHP_EOL", ImportKind::Constant, src).unwrap();
+        let r = tracker.import("Other\\PHP_EOL", ImportKind::Constant).unwrap();
         let text = r.use_statement_edit.unwrap().new_text;
         assert_eq!(text, "<?php use const Other\\PHP_EOL; ?>");
     }
@@ -1111,8 +968,8 @@ mod tests {
     #[test]
     fn two_constant_imports_with_different_cases_coexist() {
         let mut tracker = tracker_with_anchor(Some("App"), 10);
-        let a = tracker.import("Other\\FOO", ImportKind::Constant, "").unwrap();
-        let b = tracker.import("Other\\foo", ImportKind::Constant, "").unwrap();
+        let a = tracker.import("Other\\FOO", ImportKind::Constant).unwrap();
+        let b = tracker.import("Other\\foo", ImportKind::Constant).unwrap();
         assert!(a.use_statement_edit.is_some());
         assert!(b.use_statement_edit.is_some());
         assert_ne!(a.local_name.as_str(), b.local_name.as_str());
@@ -1122,28 +979,27 @@ mod tests {
     fn anchor_after_use_is_where_next_import_lands() {
         let mut tracker = tracker_with_anchor(Some("App"), 5);
         tracker.scope.record_anchor_after_use(30);
-        let r = tracker.import("X\\Y", ImportKind::Name, "").unwrap();
+        let r = tracker.import("X\\Y", ImportKind::Name).unwrap();
         let edit = r.use_statement_edit.unwrap();
         assert_eq!(edit.range.start, 30);
         assert!(edit.new_text.starts_with("\nuse "));
     }
 
     #[test]
-    fn second_import_at_after_use_anchor_staggers() {
-        let src = "<?php\nuse X;\n\n$x;";
+    fn second_import_at_after_use_anchor_stacks_at_same_offset() {
         let mut tracker = tracker_with_anchor(Some("App"), 5);
         tracker.scope.record_anchor_after_use(12);
-        let r0 = tracker.import("A\\A", ImportKind::Name, src).unwrap();
-        let r1 = tracker.import("B\\B", ImportKind::Name, src).unwrap();
+        let r0 = tracker.import("A\\A", ImportKind::Name).unwrap();
+        let r1 = tracker.import("B\\B", ImportKind::Name).unwrap();
         assert_eq!(r0.use_statement_edit.unwrap().range.start, 12);
-        assert_eq!(r1.use_statement_edit.unwrap().range.start, 13);
+        assert_eq!(r1.use_statement_edit.unwrap().range.start, 12);
     }
 
     #[test]
     fn very_long_fqn_preserves_full_path_in_use_text() {
         let mut tracker = tracker_with_anchor(Some("App"), 10);
         let fqn = "A\\B\\C\\D\\E\\F\\G\\H\\I\\J\\K\\Target";
-        let r = tracker.import(fqn, ImportKind::Name, "").unwrap();
+        let r = tracker.import(fqn, ImportKind::Name).unwrap();
         assert_eq!(r.local_name.as_str(), "Target");
         assert!(r.use_statement_edit.unwrap().new_text.contains("use A\\B\\C\\D\\E\\F\\G\\H\\I\\J\\K\\Target;"));
     }
@@ -1157,7 +1013,7 @@ mod tests {
             anchor: Some(InsertionAnchor::AfterPreamble { offset: 50 }),
             ..ScopeState::default()
         };
-        let r = tracker.import("Other\\Foo", ImportKind::Name, "").unwrap();
+        let r = tracker.import("Other\\Foo", ImportKind::Name).unwrap();
         assert!(r.use_statement_edit.is_some());
     }
 
@@ -1177,41 +1033,16 @@ mod tests {
     #[test]
     fn import_empty_fqn_returns_none() {
         let mut tracker = tracker_with_anchor(Some("App"), 10);
-        assert!(tracker.import("", ImportKind::Name, "").is_none());
-        assert!(tracker.import("\\", ImportKind::Name, "").is_none());
-        assert!(tracker.import("Foo\\", ImportKind::Name, "").is_none());
+        assert!(tracker.import("", ImportKind::Name).is_none());
+        assert!(tracker.import("\\", ImportKind::Name).is_none());
+        assert!(tracker.import("Foo\\", ImportKind::Name).is_none());
     }
 
     #[test]
     fn anchor_offset_past_source_end_does_not_panic() {
         let mut tracker = tracker_with_anchor(Some("App"), 9999);
-        let r = tracker.import("Other\\Thing", ImportKind::Name, "<?php").unwrap();
+        let r = tracker.import("Other\\Thing", ImportKind::Name).unwrap();
         assert_eq!(r.use_statement_edit.unwrap().range.start, 9999);
-    }
-
-    #[test]
-    fn stagger_at_eof_is_zero() {
-        assert_eq!(safe_stagger_range("<?php\n", 6), 0);
-        assert_eq!(safe_stagger_range("<?php", 5), 0);
-        assert_eq!(safe_stagger_range("<?php", 500), 0);
-    }
-
-    #[test]
-    fn backward_stagger_clamps_offset_to_source_len() {
-        assert_eq!(safe_stagger_range_backward("", 999), 0);
-        assert_eq!(safe_stagger_range_backward(" ", 999), 1);
-        assert_eq!(safe_stagger_range_backward("   ", 0), 0);
-    }
-
-    #[test]
-    fn backward_stagger_counts_all_ascii_whitespace_kinds() {
-        assert_eq!(safe_stagger_range_backward("a\t \r\n<?= ?>", 5), 4);
-        assert_eq!(safe_stagger_range_backward("a\n\n\n<?=", 4), 3);
-    }
-
-    #[test]
-    fn backward_stagger_from_leading_whitespace_returns_full_run() {
-        assert_eq!(safe_stagger_range_backward("\t\t\t\t<?= $x ?>", 4), 4);
     }
 
     #[test]
@@ -1226,7 +1057,7 @@ mod tests {
         let segments: Vec<String> = (0..100).map(|i| format!("N{:03}", i)).collect();
         let fqn = segments.join("\\") + "\\Target";
         let mut tracker = tracker_with_anchor(Some("App"), 10);
-        let r = tracker.import(&fqn, ImportKind::Name, "").unwrap();
+        let r = tracker.import(&fqn, ImportKind::Name).unwrap();
         assert_eq!(r.local_name.as_str(), "Target");
         let text = r.use_statement_edit.unwrap().new_text;
         assert!(text.contains("N000\\"));
@@ -1236,7 +1067,7 @@ mod tests {
     #[test]
     fn short_name_matching_current_namespace_is_just_a_short_name() {
         let mut tracker = tracker_with_anchor(Some("Foo"), 10);
-        let r = tracker.import("Other\\Foo", ImportKind::Name, "").unwrap();
+        let r = tracker.import("Other\\Foo", ImportKind::Name).unwrap();
         assert!(r.use_statement_edit.is_some());
         assert_eq!(r.local_name.as_str(), "Foo");
     }
@@ -1244,7 +1075,7 @@ mod tests {
     #[test]
     fn self_namespace_import_is_already_available() {
         let mut tracker = tracker_with_anchor(Some("App\\Sub"), 10);
-        let r = tracker.import("App\\Sub\\Thing", ImportKind::Name, "").unwrap();
+        let r = tracker.import("App\\Sub\\Thing", ImportKind::Name).unwrap();
         assert!(r.is_already_available());
         assert_eq!(r.local_name.as_str(), "Thing");
     }
@@ -1252,7 +1083,7 @@ mod tests {
     #[test]
     fn sub_namespace_of_current_still_needs_use() {
         let mut tracker = tracker_with_anchor(Some("App"), 10);
-        let r = tracker.import("App\\Sub\\Thing", ImportKind::Name, "").unwrap();
+        let r = tracker.import("App\\Sub\\Thing", ImportKind::Name).unwrap();
         assert!(r.use_statement_edit.is_some());
         assert_eq!(r.local_name.as_str(), "Thing");
     }
@@ -1260,7 +1091,7 @@ mod tests {
     #[test]
     fn parent_namespace_import_requires_use() {
         let mut tracker = tracker_with_anchor(Some("App\\Sub"), 10);
-        let r = tracker.import("App\\Thing", ImportKind::Name, "").unwrap();
+        let r = tracker.import("App\\Thing", ImportKind::Name).unwrap();
         assert!(r.use_statement_edit.is_some());
         assert_eq!(r.local_name.as_str(), "Thing");
     }
@@ -1268,9 +1099,9 @@ mod tests {
     #[test]
     fn same_fqn_three_kinds_three_edits() {
         let mut tracker = tracker_with_anchor(Some("App"), 10);
-        let a = tracker.import("Other\\foo", ImportKind::Name, "").unwrap();
-        let b = tracker.import("Other\\foo", ImportKind::Function, "").unwrap();
-        let c = tracker.import("Other\\foo", ImportKind::Constant, "").unwrap();
+        let a = tracker.import("Other\\foo", ImportKind::Name).unwrap();
+        let b = tracker.import("Other\\foo", ImportKind::Function).unwrap();
+        let c = tracker.import("Other\\foo", ImportKind::Constant).unwrap();
         assert!(a.use_statement_edit.is_some());
         assert!(b.use_statement_edit.is_some());
         assert!(c.use_statement_edit.is_some());
@@ -1279,8 +1110,8 @@ mod tests {
     #[test]
     fn case_variant_of_same_class_fqn_deduplicates() {
         let mut tracker = tracker_with_anchor(Some("App"), 10);
-        let a = tracker.import("foo\\bar", ImportKind::Name, "").unwrap();
-        let b = tracker.import("Foo\\Bar", ImportKind::Name, "").unwrap();
+        let a = tracker.import("foo\\bar", ImportKind::Name).unwrap();
+        let b = tracker.import("Foo\\Bar", ImportKind::Name).unwrap();
         assert!(a.use_statement_edit.is_some());
         assert!(b.use_statement_edit.is_none());
     }
@@ -1290,7 +1121,7 @@ mod tests {
         let mut tracker = tracker_with_anchor(Some("App"), 10);
         tracker.scope.class_imports.insert(ascii_lowercase_atom("Foo"), atom("X\\Y"));
         tracker.scope.class_fqn_to_local.insert(ascii_lowercase_atom("X\\Y"), atom("Foo"));
-        assert!(tracker.import("Other\\Foo", ImportKind::Name, "").is_none());
+        assert!(tracker.import("Other\\Foo", ImportKind::Name).is_none());
     }
 
     #[test]
@@ -1298,23 +1129,22 @@ mod tests {
         let mut tracker = tracker_with_anchor(Some("App"), 10);
         tracker.scope.class_imports.insert(ascii_lowercase_atom("Bar"), atom("X\\Y\\Z"));
         tracker.scope.class_fqn_to_local.insert(ascii_lowercase_atom("X\\Y\\Z"), atom("Bar"));
-        assert!(tracker.import("Other\\Bar", ImportKind::Name, "").is_none());
-        assert!(tracker.import("Other\\Baz", ImportKind::Name, "").is_some());
+        assert!(tracker.import("Other\\Bar", ImportKind::Name).is_none());
+        assert!(tracker.import("Other\\Baz", ImportKind::Name).is_some());
     }
 
     #[test]
-    fn stagger_restarts_when_anchor_switches_kind() {
-        let src = "<?php\n\n\n\nuse X;\n\n$x;";
+    fn imports_follow_anchor_as_it_moves_between_kinds() {
         let mut tracker = tracker_with_anchor(Some("App"), 5);
-        let a = tracker.import("A\\A", ImportKind::Name, src).unwrap();
-        let b = tracker.import("B\\B", ImportKind::Name, src).unwrap();
+        let a = tracker.import("A\\A", ImportKind::Name).unwrap();
+        let b = tracker.import("B\\B", ImportKind::Name).unwrap();
         assert_eq!(a.use_statement_edit.unwrap().range.start, 5);
-        assert_eq!(b.use_statement_edit.unwrap().range.start, 6);
+        assert_eq!(b.use_statement_edit.unwrap().range.start, 5);
         tracker.scope.record_anchor_after_use(15);
-        let c = tracker.import("C\\C", ImportKind::Name, src).unwrap();
-        let d = tracker.import("D\\D", ImportKind::Name, src).unwrap();
+        let c = tracker.import("C\\C", ImportKind::Name).unwrap();
+        let d = tracker.import("D\\D", ImportKind::Name).unwrap();
         assert_eq!(c.use_statement_edit.unwrap().range.start, 15);
-        assert_eq!(d.use_statement_edit.unwrap().range.start, 16);
+        assert_eq!(d.use_statement_edit.unwrap().range.start, 15);
     }
 
     #[test]
@@ -1322,7 +1152,7 @@ mod tests {
         let mut tracker = tracker_with_anchor(Some("App"), 10);
         tracker.scope.class_imports.insert(ascii_lowercase_atom("User"), atom("Other\\User"));
         tracker.scope.class_fqn_to_local.insert(ascii_lowercase_atom("Other\\User"), atom("User"));
-        assert!(tracker.import("App\\User", ImportKind::Name, "").is_none());
+        assert!(tracker.import("App\\User", ImportKind::Name).is_none());
     }
 
     #[test]
@@ -1330,7 +1160,7 @@ mod tests {
         let mut tracker = tracker_with_anchor(None, 10);
         tracker.scope.class_imports.insert(ascii_lowercase_atom("Bar"), atom("Foo\\Bar"));
         tracker.scope.class_fqn_to_local.insert(ascii_lowercase_atom("Foo\\Bar"), atom("Bar"));
-        assert!(tracker.import("Bar", ImportKind::Name, "").is_none());
+        assert!(tracker.import("Bar", ImportKind::Name).is_none());
     }
 
     #[test]
@@ -1339,7 +1169,7 @@ mod tests {
         tracker.scope.class_imports.insert(ascii_lowercase_atom("Baz"), atom("Foo\\Bar"));
         tracker.scope.class_fqn_to_local.insert(ascii_lowercase_atom("Foo\\Bar"), atom("Baz"));
         for _ in 0..5 {
-            let r = tracker.import("Foo\\Bar", ImportKind::Name, "").unwrap();
+            let r = tracker.import("Foo\\Bar", ImportKind::Name).unwrap();
             assert_eq!(r.local_name.as_str(), "Baz");
             assert!(r.use_statement_edit.is_none());
         }
@@ -1350,24 +1180,24 @@ mod tests {
         let mut tracker = tracker_with_anchor(Some("App"), 10);
         tracker.scope.function_imports.insert(ascii_lowercase_atom("strlen"), atom("Other\\strlen"));
         tracker.scope.function_fqn_to_local.insert(ascii_lowercase_atom("Other\\strlen"), atom("strlen"));
-        assert!(tracker.import("Third\\strlen", ImportKind::Function, "").is_none());
-        assert!(tracker.import("Third\\Strlen", ImportKind::Name, "").is_some());
+        assert!(tracker.import("Third\\strlen", ImportKind::Function).is_none());
+        assert!(tracker.import("Third\\Strlen", ImportKind::Name).is_some());
     }
 
     #[test]
     fn reserved_names_do_not_block_function_imports() {
         let mut tracker = tracker_with_anchor(Some("App"), 10);
-        assert!(tracker.import("Other\\int", ImportKind::Function, "").is_some());
-        assert!(tracker.import("Other\\void", ImportKind::Function, "").is_some());
+        assert!(tracker.import("Other\\int", ImportKind::Function).is_some());
+        assert!(tracker.import("Other\\void", ImportKind::Function).is_some());
     }
 
     #[test]
     fn reserved_constant_names_only_cover_scalar_literals() {
         let mut tracker = tracker_with_anchor(Some("App"), 10);
-        assert!(tracker.import("Other\\int", ImportKind::Constant, "").is_some());
-        assert!(tracker.import("Other\\void", ImportKind::Constant, "").is_some());
-        assert!(tracker.import("Other\\TRUE", ImportKind::Constant, "").is_none());
-        assert!(tracker.import("Other\\False", ImportKind::Constant, "").is_none());
+        assert!(tracker.import("Other\\int", ImportKind::Constant).is_some());
+        assert!(tracker.import("Other\\void", ImportKind::Constant).is_some());
+        assert!(tracker.import("Other\\TRUE", ImportKind::Constant).is_none());
+        assert!(tracker.import("Other\\False", ImportKind::Constant).is_none());
     }
 
     #[test]
@@ -1376,18 +1206,12 @@ mod tests {
         tracker.in_php = true;
         tracker.scope = ScopeState { anchor: None, ..ScopeState::default() };
         for kind in [ImportKind::Name, ImportKind::Function, ImportKind::Constant] {
-            assert!(tracker.import("X\\Y", kind, "").is_none());
+            assert!(tracker.import("X\\Y", kind).is_none());
         }
     }
 
     #[test]
-    fn stagger_before_non_whitespace_is_zero() {
-        assert_eq!(safe_stagger_range("<?php/*c*/", 5), 0);
-    }
-
-    #[test]
     fn echo_tag_no_preceding_whitespace_inserts_at_zero() {
-        let src = "<?= $x ?>";
         let mut tracker = ImportTracker::new();
         tracker.in_php = true;
         tracker.scope = ScopeState {
@@ -1395,14 +1219,14 @@ mod tests {
             anchor: Some(InsertionAnchor::BeforeEchoTag { offset: 0 }),
             ..ScopeState::default()
         };
-        let r = tracker.import("Foo\\Bar", ImportKind::Name, src).unwrap();
+        let r = tracker.import("Foo\\Bar", ImportKind::Name).unwrap();
         let edit = r.use_statement_edit.unwrap();
         assert_eq!(edit.range.start, 0);
         assert_eq!(edit.new_text, "<?php use Foo\\Bar; ?>");
     }
 
     #[test]
-    fn echo_tag_after_html_text_staggers_backward() {
+    fn echo_tag_after_html_text_stacks_both_imports_at_tag_offset() {
         let src = "<p>Hello world</p>\n<?= $x ?>";
         let tag_offset = src.find("<?=").unwrap() as u32;
         let mut tracker = ImportTracker::new();
@@ -1412,12 +1236,12 @@ mod tests {
             anchor: Some(InsertionAnchor::BeforeEchoTag { offset: tag_offset }),
             ..ScopeState::default()
         };
-        let a = tracker.import("Foo\\Bar", ImportKind::Name, src).unwrap();
-        let b = tracker.import("Baz\\Qux", ImportKind::Name, src).unwrap();
+        let a = tracker.import("Foo\\Bar", ImportKind::Name).unwrap();
+        let b = tracker.import("Baz\\Qux", ImportKind::Name).unwrap();
         let e_a = a.use_statement_edit.unwrap();
         let e_b = b.use_statement_edit.unwrap();
         assert_eq!(e_a.range.start, tag_offset);
-        assert_eq!(e_b.range.start, tag_offset - 1);
+        assert_eq!(e_b.range.start, tag_offset);
 
         let mut edits = vec![e_a, e_b];
         let out = stitch(src, &mut edits);
@@ -1428,7 +1252,7 @@ mod tests {
     }
 
     #[test]
-    fn echo_tag_five_imports_with_runway_stitch() {
+    fn echo_tag_five_imports_all_land_at_tag_offset() {
         let src = "<!DOCTYPE html>\n<html>\n<body>\n<h1>Hi</h1>\n\n\n\n\n<?= 'x' ?>";
         let tag_offset = src.find("<?=").unwrap() as u32;
         let mut tracker = ImportTracker::new();
@@ -1441,13 +1265,10 @@ mod tests {
         let mut edits = Vec::new();
         for i in 0..5 {
             let fqn = format!("Pkg\\Class{}", i);
-            let r = tracker.import(&fqn, ImportKind::Name, src).unwrap();
+            let r = tracker.import(&fqn, ImportKind::Name).unwrap();
             edits.push(r.use_statement_edit.unwrap());
         }
-        let mut offsets: Vec<u32> = edits.iter().map(|e| e.range.start).collect();
-        offsets.sort();
-        offsets.dedup();
-        assert_eq!(offsets.len(), 5);
+        assert!(edits.iter().all(|e| e.range.start == tag_offset));
 
         let out = stitch(src, &mut edits);
         for i in 0..5 {
@@ -1469,55 +1290,27 @@ mod tests {
         assert!(s.local_classes.is_empty());
         assert!(s.local_functions.is_empty());
         assert!(s.local_constants.is_empty());
-        assert_eq!(s.pending_at_anchor, 0);
     }
 
     #[test]
     fn fresh_tracker_is_not_in_php() {
         let tracker = ImportTracker::new();
         assert!(!tracker.in_php);
-        assert_eq!(tracker.braced_namespace_depth, 0);
-    }
-
-    #[test]
-    fn stagger_never_lands_on_non_whitespace_byte() {
-        let src = "<?php\n\n\n\n$x;";
-        let base = 5u32;
-        let max = safe_stagger_range(src, base);
-        for i in 0..=max {
-            let pos = base + i;
-            if let Some(&byte) = src.as_bytes().get(pos as usize) {
-                assert!(byte.is_ascii_whitespace() || i == max, "non-ws byte at stagger {i}, pos {pos}, byte {byte:?}");
-            }
-        }
     }
 
     #[test]
     fn use_statement_text_has_trailing_semicolon() {
         let mut tracker = tracker_with_anchor(Some("App"), 10);
-        let r = tracker.import("X\\Y", ImportKind::Name, "").unwrap();
+        let r = tracker.import("X\\Y", ImportKind::Name).unwrap();
         let text = r.use_statement_edit.unwrap().new_text;
         assert!(text.trim_end().ends_with(';'), "got `{text}`");
     }
 
     #[test]
-    fn backward_stagger_stops_at_first_non_ws_char() {
-        let src = "hello world\n<?= $x ?>";
-        let tag_offset = src.find("<?=").unwrap() as u32;
-        assert_eq!(safe_stagger_range_backward(src, tag_offset), 1);
-    }
-
-    #[test]
-    fn all_whitespace_source_is_all_staggerable() {
-        assert_eq!(safe_stagger_range("     ", 0), 5);
-        assert_eq!(safe_stagger_range("\t\n\r ", 0), 4);
-    }
-
-    #[test]
     fn class_and_function_with_same_short_both_succeed() {
         let mut tracker = tracker_with_anchor(Some("App"), 10);
-        let a = tracker.import("Foo\\Bar", ImportKind::Name, "").unwrap();
-        let b = tracker.import("Foo\\bar", ImportKind::Function, "").unwrap();
+        let a = tracker.import("Foo\\Bar", ImportKind::Name).unwrap();
+        let b = tracker.import("Foo\\bar", ImportKind::Function).unwrap();
         assert!(a.use_statement_edit.is_some());
         assert!(b.use_statement_edit.is_some());
     }
@@ -1527,44 +1320,34 @@ mod tests {
         let mut tracker = tracker_with_anchor(Some("App"), 10);
         tracker.scope.class_imports.insert(ascii_lowercase_atom("X"), atom("X"));
         tracker.scope.class_fqn_to_local.insert(ascii_lowercase_atom("X"), atom("X"));
-        let r = tracker.import("\\X", ImportKind::Name, "").unwrap();
+        let r = tracker.import("\\X", ImportKind::Name).unwrap();
         assert!(r.is_already_available());
         assert_eq!(r.local_name.as_str(), "X");
     }
 
     #[test]
-    fn idempotent_import_does_not_advance_stagger_counter() {
-        let src = "<?php\n\n\n\n$x;";
+    fn idempotent_import_does_not_emit_a_second_edit() {
         let mut tracker = tracker_with_anchor(Some("App"), 5);
-        tracker.import("A\\A", ImportKind::Name, src).unwrap();
-        tracker.import("A\\A", ImportKind::Name, src).unwrap();
-        let r = tracker.import("B\\B", ImportKind::Name, src).unwrap();
-        assert_eq!(r.use_statement_edit.unwrap().range.start, 6);
+        let first = tracker.import("A\\A", ImportKind::Name).unwrap();
+        let second = tracker.import("A\\A", ImportKind::Name).unwrap();
+        assert!(first.use_statement_edit.is_some());
+        assert!(second.use_statement_edit.is_none());
     }
 
     #[test]
-    fn hundred_distinct_imports_with_tiny_runway_most_collide() {
-        let src = "<?php\n\n\n$x;";
+    fn hundred_distinct_imports_all_land_at_same_offset_and_stack() {
         let mut tracker = tracker_with_anchor(Some("App"), 5);
-        let mut offsets = Vec::new();
         for i in 0..100 {
             let fqn = format!("Pkg\\T{:03}", i);
-            let r = tracker.import(&fqn, ImportKind::Name, src).unwrap();
-            offsets.push(r.use_statement_edit.unwrap().range.start);
-        }
-        let mut head: Vec<u32> = offsets[..4].to_vec();
-        head.sort();
-        head.dedup();
-        assert_eq!(head, vec![5, 6, 7, 8]);
-        for &o in &offsets[4..] {
-            assert_eq!(o, 5);
+            let r = tracker.import(&fqn, ImportKind::Name).unwrap();
+            assert_eq!(r.use_statement_edit.unwrap().range.start, 5);
         }
     }
 
     #[test]
     fn global_single_segment_fqn_no_edit() {
         let mut tracker = tracker_with_anchor(None, 10);
-        let r = tracker.import("\\Foo", ImportKind::Name, "").unwrap();
+        let r = tracker.import("\\Foo", ImportKind::Name).unwrap();
         assert!(r.is_already_available());
         assert_eq!(r.local_name.as_str(), "Foo");
     }
@@ -1572,31 +1355,26 @@ mod tests {
     #[test]
     fn mixed_case_current_namespace_matches_import_case_insensitively() {
         let mut tracker = tracker_with_anchor(Some("APP"), 10);
-        let r = tracker.import("app\\User", ImportKind::Name, "").unwrap();
+        let r = tracker.import("app\\User", ImportKind::Name).unwrap();
         assert!(r.is_already_available());
         assert_eq!(r.local_name.as_str(), "User");
     }
 
     #[test]
-    fn three_kinds_share_the_same_anchor_stagger() {
-        let src = "<?php\n\n\n\n\n\n\n\n$x;";
+    fn three_kinds_share_the_same_anchor_offset() {
         let mut tracker = tracker_with_anchor(Some("App"), 5);
-        let a = tracker.import("Pkg\\Foo", ImportKind::Name, src).unwrap();
-        let b = tracker.import("Pkg\\foo", ImportKind::Function, src).unwrap();
-        let c = tracker.import("Pkg\\FOO", ImportKind::Constant, src).unwrap();
-        let mut offsets = [
-            a.use_statement_edit.unwrap().range.start,
-            b.use_statement_edit.unwrap().range.start,
-            c.use_statement_edit.unwrap().range.start,
-        ];
-        offsets.sort();
-        assert_eq!(offsets, [5, 6, 7]);
+        let a = tracker.import("Pkg\\Foo", ImportKind::Name).unwrap();
+        let b = tracker.import("Pkg\\foo", ImportKind::Function).unwrap();
+        let c = tracker.import("Pkg\\FOO", ImportKind::Constant).unwrap();
+        assert_eq!(a.use_statement_edit.unwrap().range.start, 5);
+        assert_eq!(b.use_statement_edit.unwrap().range.start, 5);
+        assert_eq!(c.use_statement_edit.unwrap().range.start, 5);
     }
 
     #[test]
     fn global_after_preamble_uses_double_newline_leading() {
         let mut tracker = tracker_with_anchor(None, 5);
-        let r = tracker.import("Pkg\\Thing", ImportKind::Name, "").unwrap();
+        let r = tracker.import("Pkg\\Thing", ImportKind::Name).unwrap();
         let text = r.use_statement_edit.unwrap().new_text;
         assert!(text.starts_with("\n\n"));
         assert!(text.contains("use Pkg\\Thing;"));
@@ -1607,7 +1385,7 @@ mod tests {
         let mut tracker = tracker_with_anchor(Some("App"), 10);
         tracker.scope.class_imports.insert(ascii_lowercase_atom("Alias1"), atom("Foo\\Bar"));
         tracker.scope.class_fqn_to_local.insert(ascii_lowercase_atom("Foo\\Bar"), atom("Alias1"));
-        let r = tracker.import("Foo\\Bar", ImportKind::Name, "").unwrap();
+        let r = tracker.import("Foo\\Bar", ImportKind::Name).unwrap();
         assert_eq!(r.local_name.as_str(), "Alias1");
         assert_ne!(r.local_name.as_str(), "Bar");
     }
@@ -1616,14 +1394,7 @@ mod tests {
     fn unrelated_local_function_does_not_block_import() {
         let mut tracker = tracker_with_anchor(Some("App"), 10);
         tracker.scope.local_functions.insert(ascii_lowercase_atom("helper"));
-        assert!(tracker.import("Other\\unrelated", ImportKind::Function, "").is_some());
-    }
-
-    #[test]
-    fn backward_stagger_with_tab_and_space_mix() {
-        let src = "<h1>Title</h1>\t\t \n  <?= $x ?>";
-        let tag = src.find("<?=").unwrap() as u32;
-        assert_eq!(safe_stagger_range_backward(src, tag), 6);
+        assert!(tracker.import("Other\\unrelated", ImportKind::Function).is_some());
     }
 
     #[test]
@@ -1646,7 +1417,7 @@ mod tests {
     #[test]
     fn import_with_leading_slash_and_current_namespace_is_not_same_ns() {
         let mut tracker = tracker_with_anchor(Some("Foo"), 10);
-        let r = tracker.import("\\Foo\\Bar", ImportKind::Name, "").unwrap();
+        let r = tracker.import("\\Foo\\Bar", ImportKind::Name).unwrap();
         assert!(r.is_already_available());
         assert_eq!(r.local_name.as_str(), "Bar");
     }
@@ -1654,7 +1425,7 @@ mod tests {
     #[test]
     fn deeply_identical_namespace_and_fqn_aliases_correctly() {
         let mut tracker = tracker_with_anchor(Some("Foo\\Bar\\Baz"), 10);
-        let r = tracker.import("Foo\\Bar\\Baz\\Qux", ImportKind::Name, "").unwrap();
+        let r = tracker.import("Foo\\Bar\\Baz\\Qux", ImportKind::Name).unwrap();
         assert!(r.is_already_available());
         assert_eq!(r.local_name.as_str(), "Qux");
     }
@@ -1662,8 +1433,38 @@ mod tests {
     #[test]
     fn near_miss_namespace_still_requires_use() {
         let mut tracker = tracker_with_anchor(Some("Foo\\Bar"), 10);
-        let r = tracker.import("Foo\\BarX\\Thing", ImportKind::Name, "").unwrap();
+        let r = tracker.import("Foo\\BarX\\Thing", ImportKind::Name).unwrap();
         assert!(r.use_statement_edit.is_some());
         assert_eq!(r.local_name.as_str(), "Thing");
+    }
+
+    #[test]
+    fn constant_fqn_lookup_is_namespace_case_insensitive() {
+        let mut tracker = tracker_with_anchor(Some("App"), 10);
+        let a = tracker.import("App\\Other\\FOO", ImportKind::Constant).unwrap();
+        let b = tracker.import("app\\OTHER\\FOO", ImportKind::Constant).unwrap();
+        let c = tracker.import("APP\\other\\FOO", ImportKind::Constant).unwrap();
+        assert!(a.use_statement_edit.is_some());
+        assert!(b.use_statement_edit.is_none());
+        assert!(c.use_statement_edit.is_none());
+        assert_eq!(a.local_name, b.local_name);
+        assert_eq!(a.local_name, c.local_name);
+    }
+
+    #[test]
+    fn constant_fqn_lookup_still_respects_short_name_case() {
+        let mut tracker = tracker_with_anchor(Some("App"), 10);
+        let a = tracker.import("Pkg\\FOO", ImportKind::Constant).unwrap();
+        let b = tracker.import("Pkg\\foo", ImportKind::Constant).unwrap();
+        assert!(a.use_statement_edit.is_some());
+        assert!(b.use_statement_edit.is_some());
+        assert_ne!(a.local_name, b.local_name);
+    }
+
+    #[test]
+    fn constant_fqn_key_normalises_namespace_only() {
+        assert_eq!(constant_fqn_key("App\\FOO").as_str(), "app\\FOO");
+        assert_eq!(constant_fqn_key("APP\\bar\\FOO").as_str(), "app\\bar\\FOO");
+        assert_eq!(constant_fqn_key("FOO").as_str(), "FOO");
     }
 }

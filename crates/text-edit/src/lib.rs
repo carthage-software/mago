@@ -275,8 +275,7 @@ impl<'a> TextEditor<'a> {
             }
         }
 
-        new_edits
-            .sort_unstable_by(|a, b| a.range.start.cmp(&b.range.start).then_with(|| a.range.end.cmp(&b.range.end)));
+        new_edits.sort_by(|a, b| a.range.start.cmp(&b.range.start).then_with(|| a.range.end.cmp(&b.range.end)));
 
         for i in 0..new_edits.len() {
             let edit = &new_edits[i];
@@ -395,7 +394,7 @@ fn stitch_merged(original: &str, old_edits: &[TextEdit], new_edits: &[TextEdit])
     loop {
         let next_edit = match (next_old, next_new) {
             (Some(o), Some(n)) => {
-                if (o.range.start, o.range.end) < (n.range.start, n.range.end) {
+                if (o.range.start, o.range.end) <= (n.range.start, n.range.end) {
                     next_old = old_iter.next();
                     o
                 } else {
@@ -667,6 +666,25 @@ mod tests {
         let res = editor.apply_batch(batch, None::<fn(&str) -> bool>);
         assert_eq!(res, ApplyResult::Applied);
         assert_eq!(editor.finish(), "static fn ($v) { return $v; }");
+    }
+
+    #[test]
+    fn test_checker_simulation_matches_final_output_for_stacked_inserts() {
+        let mut editor = TextEditor::new("ABC");
+        editor.apply(TextEdit::insert(0, "X"), None::<fn(&str) -> bool>);
+
+        let simulated: std::cell::RefCell<Option<String>> = std::cell::RefCell::new(None);
+        let checker = |s: &str| {
+            *simulated.borrow_mut() = Some(s.to_owned());
+            true
+        };
+        let batch = vec![TextEdit::insert(0, "Y")];
+        assert_eq!(editor.apply_batch(batch, Some(checker)), ApplyResult::Applied);
+
+        let simulated = simulated.borrow().clone().expect("checker called");
+        let final_str = editor.finish();
+        assert_eq!(simulated, final_str, "checker saw `{simulated}` but final output is `{final_str}`");
+        assert_eq!(final_str, "XYABC");
     }
 
     #[test]

@@ -247,7 +247,7 @@ mod tests {
     }
 
     test_lint_fix! {
-        name = fix_three_fq_constants_stagger_in_one_pass,
+        name = fix_three_fq_constants_in_one_pass,
         rule = NoFullyQualifiedGlobalConstantRule,
         code = indoc! {r#"
             <?php
@@ -264,8 +264,12 @@ mod tests {
             namespace App;
 
             use const PHP_VERSION;
+
             use const PHP_EOL;
-            use const PHP_INT_MAX;$a = PHP_VERSION;
+
+            use const PHP_INT_MAX;
+
+            $a = PHP_VERSION;
             $b = PHP_EOL;
             $c = PHP_INT_MAX;
         "#}
