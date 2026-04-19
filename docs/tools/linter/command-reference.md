@@ -33,6 +33,7 @@ Optional. A list of specific files or directories to lint. If you provide paths 
 | `--semantics`, `-s`        | Perform only the parsing and basic semantic checks without running any lint rules.                                                                                                     |
 | `--staged`                 | Only lint files that are staged in git. Designed for pre-commit hooks. Fails if not in a git repository.                                                                               |
 | `--stdin-input`            | Read file content from stdin and use the single path argument for baseline and reporting. Intended for editor integrations (e.g. unsaved buffers). Requires exactly one path.          |
+| `--substitute <ORIG=TEMP>` | Replace a host file with another file for this invocation. Intended for mutation-testing frameworks. Can be repeated. See [Substituting files](#substituting-files) below.             |
 | `--help`, `-h`             | Print the help summary for the command.                                                                                                                                                |
 
 ### Reading from stdin (editor integration)
@@ -44,6 +45,23 @@ cat src/Example.php | mago lint --stdin-input src/Example.php
 ```
 
 You must pass **exactly one path**; it is used as the logical file name (workspace-relative) for baseline matching and diagnostics. The path is normalized (e.g. `./src/Example.php` is treated like `src/Example.php`). This mode conflicts with `--staged`.
+
+### Substituting files
+
+`--substitute ORIG=TEMP` replaces one host file in the project with another file for the duration of a single invocation, without modifying anything on disk. It is primarily designed for mutation-testing frameworks (such as Infection) that generate a mutated copy of a source file and want the linter to evaluate the mutation against the rest of the project. If the linter already reports a new issue on the mutated file, the mutation can be marked as killed without running the unit tests.
+
+```sh
+mago lint --substitute /abs/path/to/src/Foo.php=/tmp/mutation-42.php
+```
+
+Rules:
+
+- Both `ORIG` and `TEMP` must be absolute paths and both files must exist.
+- `ORIG` must be a host file in the project (under one of your configured `paths`). Vendored or excluded files cannot be substituted.
+- The flag can be given multiple times in a single invocation to substitute several files at once.
+- Conflicts with `--stdin-input` and `--staged`.
+
+Under the hood, `TEMP` is added to the host paths and `ORIG` is added to the excludes for this run. The rest of the project is scanned as usual, so rules that require cross-file context continue to see the mutation. Reported issues and baseline entries reference the `TEMP` path, not `ORIG`; mutation-testing tools typically parse the diff of issue counts between a clean run and the substituted run, so this does not affect the workflow.
 
 ### Shared Reporting and Fixing Options
 

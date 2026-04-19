@@ -60,6 +60,7 @@ use mago_orchestrator::Orchestrator;
 use mago_prelude::Prelude;
 
 use crate::commands::args::baseline_reporting::BaselineReportingArgs;
+use crate::commands::args::substitution::SubstitutionArgs;
 use crate::commands::stdin_input;
 use crate::config::Configuration;
 use crate::consts::PRELUDE_BYTES;
@@ -132,7 +133,7 @@ pub struct AnalyzeCommand {
     /// with the updated configuration.
     ///
     /// Press Ctrl+C to stop watching.
-    #[arg(long, default_value_t = false)]
+    #[arg(long, default_value_t = false, conflicts_with = "substitutions")]
     pub watch: bool,
 
     /// List all available analyzer issue codes in JSON format.
@@ -148,7 +149,7 @@ pub struct AnalyzeCommand {
     /// currently staged for commit and analyze only those files.
     ///
     /// Fails if not in a git repository.
-    #[arg(long, conflicts_with_all = ["path", "list_codes", "watch"])]
+    #[arg(long, conflicts_with_all = ["path", "list_codes", "watch", "substitutions"])]
     pub staged: bool,
 
     /// Read the file content from stdin and use the given path for baseline and reporting.
@@ -165,6 +166,10 @@ pub struct AnalyzeCommand {
     /// Arguments related to reporting issues with baseline support.
     #[clap(flatten)]
     pub baseline_reporting: BaselineReportingArgs,
+
+    /// File-content substitutions (`--substitute ORIG=TEMP`).
+    #[clap(flatten)]
+    pub substitution: SubstitutionArgs,
 }
 
 impl AnalyzeCommand {
@@ -243,8 +248,16 @@ impl AnalyzeCommand {
         let prelude_duration = prelude_start.map(|s| s.elapsed());
 
         let orchestrator_init_start = trace_enabled.then(Instant::now);
+        let substitutions = self.substitution.resolve()?;
+        let substitution_excludes: Vec<String> =
+            substitutions.iter().map(|s| s.original.to_string_lossy().into_owned()).collect();
+
         let mut orchestrator = create_orchestrator(&configuration, color_choice, false, true, false);
         orchestrator.add_exclude_patterns(configuration.analyzer.excludes.iter());
+        orchestrator.add_exclude_patterns(substitution_excludes.iter());
+        for substitution in &substitutions {
+            orchestrator.config.paths.push(substitution.temporary.to_string_lossy().into_owned());
+        }
 
         let stdin_override = stdin_input::resolve_stdin_override(
             self.stdin_input,

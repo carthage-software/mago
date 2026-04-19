@@ -42,6 +42,7 @@ use mago_orchestrator::service::lint::LintMode;
 use mago_reporting::Level;
 
 use crate::commands::args::baseline_reporting::BaselineReportingArgs;
+use crate::commands::args::substitution::SubstitutionArgs;
 use crate::commands::stdin_input;
 use crate::config::Configuration;
 use crate::error::Error;
@@ -166,7 +167,7 @@ pub struct LintCommand {
     /// currently staged for commit and lint only those files.
     ///
     /// Fails if not in a git repository.
-    #[arg(long, conflicts_with_all = ["path", "list_rules", "explain"])]
+    #[arg(long, conflicts_with_all = ["path", "list_rules", "explain", "substitutions"])]
     pub staged: bool,
 
     /// Read the file content from stdin and use the given path for baseline and reporting.
@@ -177,6 +178,10 @@ pub struct LintCommand {
 
     #[clap(flatten)]
     pub baseline_reporting: BaselineReportingArgs,
+
+    /// File-content substitutions (`--substitute ORIG=TEMP`).
+    #[clap(flatten)]
+    pub substitution: SubstitutionArgs,
 }
 
 impl LintCommand {
@@ -215,8 +220,16 @@ impl LintCommand {
         let editor_url = configuration.editor_url.take();
 
         let orchestrator_init_start = trace_enabled.then(Instant::now);
+        let substitutions = self.substitution.resolve()?;
+        let substitution_excludes: Vec<String> =
+            substitutions.iter().map(|s| s.original.to_string_lossy().into_owned()).collect();
+
         let mut orchestrator = create_orchestrator(&configuration, color_choice, self.pedantic, true, false);
         orchestrator.add_exclude_patterns(configuration.linter.excludes.iter());
+        orchestrator.add_exclude_patterns(substitution_excludes.iter());
+        for substitution in &substitutions {
+            orchestrator.config.paths.push(substitution.temporary.to_string_lossy().into_owned());
+        }
 
         let stdin_override = stdin_input::resolve_stdin_override(
             self.stdin_input,

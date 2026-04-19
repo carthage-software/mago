@@ -255,6 +255,13 @@ pub enum Error {
     /// not satisfy it. The first field is the pin; the second is the latest
     /// release version we found.
     LatestReleaseDoesNotSatisfyPin(String, String),
+
+    /// A command-line argument failed surface-level validation (shape or content).
+    ///
+    /// Used for flags whose values are not a clap-level enum or type and need bespoke parsing,
+    /// such as `--substitute ORIG=TEMP`. Semantic validation that depends on filesystem state
+    /// or orchestrator context surfaces through [`Orchestrator`](Self::Orchestrator) instead.
+    InvalidArgument(String),
 }
 
 /// Formats the error for user-friendly display.
@@ -301,6 +308,7 @@ impl std::fmt::Display for Error {
             Self::UnknownFormatterPreset(preset) => {
                 write!(f, "Unknown formatter preset: `{preset}`. Available presets are: laravel, psr12, default")
             }
+            Self::InvalidArgument(message) => write!(f, "{message}"),
             Self::InvalidProjectVersionPin(error) => write!(f, "{error}"),
             Self::ProjectMajorVersionMismatch(pinned, installed) => {
                 write!(
