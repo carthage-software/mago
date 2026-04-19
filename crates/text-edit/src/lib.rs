@@ -47,19 +47,30 @@ impl TextRange {
 
     /// Checks if this range overlaps with another.
     ///
-    /// Two non-empty ranges overlap only when they share byte positions.
-    /// Adjacent ranges (e.g. `0..5` and `5..10`) do NOT overlap since they
-    /// replace different bytes and the result is unambiguous.
+    /// Two ranges conflict only when they share byte positions; i.e. when
+    /// applying both would write the same byte twice or write into bytes the
+    /// other is deleting. Adjacency at a boundary is fine:
     ///
-    /// Zero-length ranges (insertions) use inclusive boundary checks because
-    /// the ordering of an insertion relative to an adjacent edit is ambiguous
-    /// (e.g. should `insert(5)` go before or after `replace(5..10)`?).
+    /// - Adjacent non-empty ranges (e.g. `0..5` and `5..10`) do not overlap;
+    ///   they replace different bytes.
+    /// - Two empty ranges at the same offset stack in insertion order; they
+    ///   each write their own bytes without touching the other's.
+    /// - An empty range at the exact boundary of a non-empty one (e.g. an
+    ///   insert at `5` with a replace of `5..10`, or an insert at `10` with
+    ///   a replace of `5..10`) does not overlap; the stitcher resolves the
+    ///   order deterministically (insert-at-start goes before replacement;
+    ///   insert-at-end goes after).
+    ///
+    /// Only *interior* containment of an empty range inside a non-empty one
+    /// is treated as overlap, as is any interior overlap between two
+    /// non-empty ranges.
     #[inline(always)]
     pub fn overlaps(&self, other: &TextRange) -> bool {
-        if self.is_empty() || other.is_empty() {
-            self.start <= other.end && other.start <= self.end
-        } else {
-            self.start < other.end && other.start < self.end
+        match (self.is_empty(), other.is_empty()) {
+            (true, true) => false,
+            (true, false) => self.start > other.start && self.start < other.end,
+            (false, true) => other.start > self.start && other.start < self.end,
+            (false, false) => self.start < other.end && other.start < self.end,
         }
     }
 
@@ -306,7 +317,7 @@ impl<'a> TextEditor<'a> {
 
         self.edits.reserve(new_edits.len());
         self.edits.extend(new_edits);
-        self.edits.sort_by_key(|a| a.range.start);
+        self.edits.sort_by(|a, b| a.range.start.cmp(&b.range.start).then_with(|| a.range.end.cmp(&b.range.end)));
 
         ApplyResult::Applied
     }
@@ -384,7 +395,7 @@ fn stitch_merged(original: &str, old_edits: &[TextEdit], new_edits: &[TextEdit])
     loop {
         let next_edit = match (next_old, next_new) {
             (Some(o), Some(n)) => {
-                if o.range.start < n.range.start {
+                if (o.range.start, o.range.end) < (n.range.start, n.range.end) {
                     next_old = old_iter.next();
                     o
                 } else {
@@ -568,16 +579,16 @@ mod tests {
     }
 
     #[test]
-    fn test_insert_at_same_offset_overlaps_replace() {
+    fn test_insert_at_start_of_replace_applies_before_replacement() {
         let mut editor = TextEditor::new("0123456789");
 
         let res = editor.apply(TextEdit::replace(2..8, "replaced"), None::<fn(&str) -> bool>);
         assert_eq!(res, ApplyResult::Applied);
 
         let res = editor.apply(TextEdit::insert(2, "inserted"), None::<fn(&str) -> bool>);
-        assert_eq!(res, ApplyResult::Overlap);
+        assert_eq!(res, ApplyResult::Applied);
 
-        assert_eq!(editor.finish(), "01replaced89");
+        assert_eq!(editor.finish(), "01insertedreplaced89");
     }
 
     #[test]
@@ -594,22 +605,20 @@ mod tests {
     }
 
     #[test]
-    fn test_insert_at_start_of_replace_overlaps() {
-        // Regression test for issue #828:
-        // An insert at the start of a replace should overlap
+    fn test_insert_at_start_of_replace_coexists() {
         let mut editor = TextEditor::new("0123456789");
 
         let res = editor.apply(TextEdit::replace(2..5, "ABC"), None::<fn(&str) -> bool>);
         assert_eq!(res, ApplyResult::Applied);
 
         let res = editor.apply(TextEdit::insert(2, "X"), None::<fn(&str) -> bool>);
-        assert_eq!(res, ApplyResult::Overlap);
+        assert_eq!(res, ApplyResult::Applied);
 
-        assert_eq!(editor.finish(), "01ABC56789");
+        assert_eq!(editor.finish(), "01XABC56789");
     }
 
     #[test]
-    fn test_batch_insert_and_replace_at_same_offset_overlap() {
+    fn test_batch_insert_and_replace_at_same_offset_coexist() {
         let mut editor = TextEditor::new("0123456789");
 
         let batch = vec![
@@ -618,9 +627,46 @@ mod tests {
         ];
 
         let res = editor.apply_batch(batch, None::<fn(&str) -> bool>);
-        assert_eq!(res, ApplyResult::Overlap);
+        assert_eq!(res, ApplyResult::Applied);
 
-        assert_eq!(editor.finish(), "0123456789");
+        assert_eq!(editor.finish(), "01insertedABC56789");
+    }
+
+    #[test]
+    fn test_multiple_inserts_at_same_offset_stack_in_insertion_order() {
+        let mut editor = TextEditor::new("ABC");
+        let batch = vec![TextEdit::insert(0, "X"), TextEdit::insert(0, "Y"), TextEdit::insert(0, "Z")];
+        let res = editor.apply_batch(batch, None::<fn(&str) -> bool>);
+        assert_eq!(res, ApplyResult::Applied);
+        assert_eq!(editor.finish(), "XYZABC");
+    }
+
+    #[test]
+    fn test_insert_at_end_of_replace_applies_after_replacement() {
+        let mut editor = TextEditor::new("0123456789");
+        let res = editor.apply(TextEdit::replace(2..5, "ABC"), None::<fn(&str) -> bool>);
+        assert_eq!(res, ApplyResult::Applied);
+        let res = editor.apply(TextEdit::insert(5, "X"), None::<fn(&str) -> bool>);
+        assert_eq!(res, ApplyResult::Applied);
+        assert_eq!(editor.finish(), "01ABCX56789");
+    }
+
+    #[test]
+    fn test_insert_inside_replace_overlaps() {
+        let mut editor = TextEditor::new("0123456789");
+        let res = editor.apply(TextEdit::replace(2..8, "ABCDEF"), None::<fn(&str) -> bool>);
+        assert_eq!(res, ApplyResult::Applied);
+        let res = editor.apply(TextEdit::insert(5, "X"), None::<fn(&str) -> bool>);
+        assert_eq!(res, ApplyResult::Overlap);
+    }
+
+    #[test]
+    fn test_issue_828_regression_both_edits_apply_correctly() {
+        let mut editor = TextEditor::new("function ($v) { return $v; }");
+        let batch = vec![TextEdit::insert(0, "static "), TextEdit::replace(0..8, "fn")];
+        let res = editor.apply_batch(batch, None::<fn(&str) -> bool>);
+        assert_eq!(res, ApplyResult::Applied);
+        assert_eq!(editor.finish(), "static fn ($v) { return $v; }");
     }
 
     #[test]
@@ -632,10 +678,29 @@ mod tests {
     }
 
     #[test]
-    fn test_insert_range_overlaps_with_adjacent_range() {
-        let insert_range = TextRange::new(5, 5);
+    fn test_insert_at_boundary_of_replace_does_not_overlap() {
+        let insert_at_start = TextRange::new(5, 5);
+        let insert_at_end = TextRange::new(10, 10);
         let replace_range = TextRange::new(5, 10);
-        assert!(insert_range.overlaps(&replace_range));
-        assert!(replace_range.overlaps(&insert_range));
+        assert!(!insert_at_start.overlaps(&replace_range));
+        assert!(!replace_range.overlaps(&insert_at_start));
+        assert!(!insert_at_end.overlaps(&replace_range));
+        assert!(!replace_range.overlaps(&insert_at_end));
+    }
+
+    #[test]
+    fn test_insert_inside_non_empty_range_overlaps() {
+        let insert = TextRange::new(7, 7);
+        let replace = TextRange::new(5, 10);
+        assert!(insert.overlaps(&replace));
+        assert!(replace.overlaps(&insert));
+    }
+
+    #[test]
+    fn test_two_empty_ranges_at_same_offset_do_not_overlap() {
+        let a = TextRange::new(5, 5);
+        let b = TextRange::new(5, 5);
+        assert!(!a.overlaps(&b));
+        assert!(!b.overlaps(&a));
     }
 }

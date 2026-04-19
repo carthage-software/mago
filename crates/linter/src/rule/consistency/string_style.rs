@@ -130,7 +130,7 @@ impl StringStyleRule {
             return;
         }
 
-        if let Some(Node::Binary(parent_binary)) = ctx.get_parent()
+        if let Some(Node::Binary(parent_binary)) = ctx.get_nth_parent(1)
             && parent_binary.operator.is_concatenation()
         {
             return;

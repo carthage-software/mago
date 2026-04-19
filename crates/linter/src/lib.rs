@@ -19,6 +19,7 @@ use crate::settings::Settings;
 
 pub mod category;
 pub mod context;
+pub mod import_tracker;
 pub mod integration;
 pub mod registry;
 pub mod requirements;
@@ -165,9 +166,11 @@ fn walk<'ctx, 'arena>(root: Node<'ctx, 'arena>, ctx: &mut LintContext<'ctx, 'are
                 if in_constant_expression {
                     ctx.constant_expression_depth -= 1;
                 }
+
                 if in_scope {
                     ctx.scope.pop();
                 }
+
                 ctx.pop_ancestor();
             }
         }

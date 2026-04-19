@@ -9,6 +9,8 @@ use mago_reporting::Level;
 use mago_span::HasSpan;
 use mago_syntax::ast::Node;
 use mago_syntax::ast::NodeKind;
+use mago_text_edit::Safety;
+use mago_text_edit::TextEdit;
 
 use crate::category::Category;
 use crate::context::LintContext;
@@ -116,16 +118,51 @@ impl LintRule for NoFullyQualifiedGlobalConstantRule {
             return;
         }
 
-        ctx.collector.report(
-            Issue::new(self.cfg.level, "Fully-qualified constant access detected.")
-                .with_code(self.meta.code)
-                .with_annotation(
-                    Annotation::primary(identifier.span())
-                        .with_message(format!("The constant `\\{constant_name}` uses a fully-qualified name")),
-                )
-                .with_note("Fully-qualified constant access bypasses the import system, making it harder to see which global constants a file depends on.")
-                .with_help(format!("Add `use const {constant_name};` and reference `{constant_name}` directly.")),
-        );
+        let short_name = constant_name.rsplit('\\').next().unwrap_or(constant_name);
+        let fqn_span = identifier.span();
+
+        let resolution = ctx.import_constant(constant_name);
+
+        let (title, help) = match &resolution {
+            Some(res) if res.is_already_available() && res.local_name.as_str() != short_name => (
+                "Fully-qualified constant access can be replaced with an existing alias.",
+                format!(
+                    "`{constant_name}` is already imported as `{}`; replace the reference with it.",
+                    res.local_name
+                ),
+            ),
+            Some(res) if res.is_already_available() => (
+                "Fully-qualified constant access is already in scope.",
+                format!("`{constant_name}` is already reachable as `{}`; drop the leading `\\`.", res.local_name),
+            ),
+            Some(_) | None => (
+                "Fully-qualified constant access detected.",
+                format!("Add `use const {constant_name};` and reference `{short_name}` directly."),
+            ),
+        };
+
+        let issue = Issue::new(self.cfg.level, title)
+            .with_code(self.meta.code)
+            .with_annotation(
+                Annotation::primary(fqn_span)
+                    .with_message(format!("The constant `\\{constant_name}` uses a fully-qualified name")),
+            )
+            .with_note("Fully-qualified constant access bypasses the import system, making it harder to see which global constants a file depends on.")
+            .with_help(help);
+
+        match resolution {
+            Some(resolution) => {
+                ctx.collector.propose(issue, |edits| {
+                    edits.push(TextEdit::replace(fqn_span, resolution.local_name.as_str()));
+                    if let Some(use_edit) = resolution.use_statement_edit {
+                        edits.push(use_edit.with_safety(Safety::Safe));
+                    }
+                });
+            }
+            None => {
+                ctx.collector.report(issue);
+            }
+        }
     }
 }
 
@@ -135,6 +172,7 @@ mod tests {
 
     use super::NoFullyQualifiedGlobalConstantRule;
     use crate::test_lint_failure;
+    use crate::test_lint_fix;
     use crate::test_lint_success;
 
     test_lint_success! {
@@ -184,6 +222,242 @@ mod tests {
             namespace App;
 
             $version = \PHP_VERSION;
+        "#}
+    }
+
+    test_lint_fix! {
+        name = fix_fq_constant_adds_use_const,
+        rule = NoFullyQualifiedGlobalConstantRule,
+        code = indoc! {r#"
+            <?php
+
+            namespace App;
+
+            $version = \PHP_VERSION;
+        "#},
+        fixed = indoc! {r#"
+            <?php
+
+            namespace App;
+
+            use const PHP_VERSION;
+
+            $version = PHP_VERSION;
+        "#}
+    }
+
+    test_lint_fix! {
+        name = fix_three_fq_constants_stagger_in_one_pass,
+        rule = NoFullyQualifiedGlobalConstantRule,
+        code = indoc! {r#"
+            <?php
+
+            namespace App;
+
+            $a = \PHP_VERSION;
+            $b = \PHP_EOL;
+            $c = \PHP_INT_MAX;
+        "#},
+        fixed = indoc! {r#"
+            <?php
+
+            namespace App;
+
+            use const PHP_VERSION;
+            use const PHP_EOL;
+            use const PHP_INT_MAX;$a = PHP_VERSION;
+            $b = PHP_EOL;
+            $c = PHP_INT_MAX;
+        "#}
+    }
+
+    test_lint_fix! {
+        name = fix_many_references_to_same_fq_constant_one_use,
+        rule = NoFullyQualifiedGlobalConstantRule,
+        code = indoc! {r#"
+            <?php
+
+            namespace App;
+
+            $a = \PHP_EOL;
+            $b = \PHP_EOL;
+            $c = \PHP_EOL;
+            $d = \PHP_EOL;
+        "#},
+        fixed = indoc! {r#"
+            <?php
+
+            namespace App;
+
+            use const PHP_EOL;
+
+            $a = PHP_EOL;
+            $b = PHP_EOL;
+            $c = PHP_EOL;
+            $d = PHP_EOL;
+        "#}
+    }
+
+    test_lint_fix! {
+        name = fix_fq_constant_appends_after_existing_use_const,
+        rule = NoFullyQualifiedGlobalConstantRule,
+        code = indoc! {r#"
+            <?php
+
+            namespace App;
+
+            use const PHP_EOL;
+
+            $version = \PHP_VERSION;
+        "#},
+        fixed = indoc! {r#"
+            <?php
+
+            namespace App;
+
+            use const PHP_EOL;
+            use const PHP_VERSION;
+
+            $version = PHP_VERSION;
+        "#}
+    }
+
+    test_lint_fix! {
+        name = fix_fq_constant_appends_after_last_of_several_existing_uses,
+        rule = NoFullyQualifiedGlobalConstantRule,
+        code = indoc! {r#"
+            <?php
+
+            namespace App;
+
+            use const PHP_EOL;
+            use const PHP_INT_MAX;
+            use const PHP_INT_MIN;
+
+            $version = \PHP_VERSION;
+        "#},
+        fixed = indoc! {r#"
+            <?php
+
+            namespace App;
+
+            use const PHP_EOL;
+            use const PHP_INT_MAX;
+            use const PHP_INT_MIN;
+            use const PHP_VERSION;
+
+            $version = PHP_VERSION;
+        "#}
+    }
+
+    test_lint_failure! {
+        name = fix_declined_when_short_name_conflicts_with_local_constant,
+        rule = NoFullyQualifiedGlobalConstantRule,
+        code = indoc! {r#"
+            <?php
+
+            namespace App;
+
+            const PHP_VERSION = "9.0";
+
+            $v = \PHP_VERSION;
+        "#}
+    }
+
+    test_lint_failure! {
+        name = fix_declined_when_short_name_conflicts_with_existing_use_const,
+        rule = NoFullyQualifiedGlobalConstantRule,
+        code = indoc! {r#"
+            <?php
+
+            namespace App;
+
+            use const Other\PHP_VERSION;
+
+            $v = \PHP_VERSION;
+        "#}
+    }
+
+    test_lint_fix! {
+        name = fix_fq_constants_in_multiple_braced_namespaces_independent,
+        rule = NoFullyQualifiedGlobalConstantRule,
+        code = indoc! {r#"
+            <?php
+
+            namespace A {
+                $x = \PHP_EOL;
+            }
+
+            namespace B {
+                $y = \PHP_EOL;
+            }
+        "#},
+        fixed = indoc! {r#"
+            <?php
+
+            namespace A {
+
+            use const PHP_EOL;
+                $x = PHP_EOL;
+            }
+
+            namespace B {
+
+            use const PHP_EOL;
+                $y = PHP_EOL;
+            }
+        "#}
+    }
+
+    test_lint_success! {
+        name = fq_constant_via_existing_aliased_use_const_not_flagged_after_rewrite,
+        rule = NoFullyQualifiedGlobalConstantRule,
+        code = indoc! {r#"
+            <?php
+
+            namespace App;
+
+            use const PHP_VERSION as VERSION;
+
+            $v = VERSION;
+        "#}
+    }
+
+    test_lint_success! {
+        name = short_reference_in_global_is_not_flagged,
+        rule = NoFullyQualifiedGlobalConstantRule,
+        code = indoc! {r#"
+            <?php
+
+            $v = PHP_VERSION;
+        "#}
+    }
+
+    test_lint_success! {
+        name = lowercase_true_false_null_in_namespace_not_flagged,
+        rule = NoFullyQualifiedGlobalConstantRule,
+        code = indoc! {r#"
+            <?php
+
+            namespace App;
+
+            $a = \True;
+            $b = \FALSE;
+            $c = \Null;
+        "#}
+    }
+
+    test_lint_success! {
+        name = fq_constant_in_nested_sub_namespace_unrelated_aliased_use,
+        rule = NoFullyQualifiedGlobalConstantRule,
+        code = indoc! {r#"
+            <?php
+
+            namespace App\Sub;
+
+            use const Other\HELPER;
+
+            $x = HELPER;
         "#}
     }
 }

@@ -13,6 +13,8 @@ use mago_syntax::ast::Hint;
 use mago_syntax::ast::Identifier;
 use mago_syntax::ast::Node;
 use mago_syntax::ast::NodeKind;
+use mago_text_edit::Safety;
+use mago_text_edit::TextEdit;
 
 use crate::category::Category;
 use crate::context::LintContext;
@@ -58,17 +60,52 @@ impl NoFullyQualifiedGlobalClassLikeRule {
 
         let class_name = identifier.value().trim_start_matches('\\');
         let short_name = class_name.split('\\').next_back().unwrap_or(class_name);
+        let fqn_span = identifier.span();
 
-        ctx.collector.report(
-            Issue::new(self.cfg.level, "Fully-qualified class-like reference detected.")
-                .with_code(self.meta.code)
-                .with_annotation(
-                    Annotation::primary(identifier.span())
-                        .with_message(format!("The reference to `\\{class_name}` uses a fully-qualified name")),
-                )
-                .with_note("Fully-qualified class-like references bypass the import system, making it harder to see which classes, interfaces, traits, and enums a file depends on.")
-                .with_help(format!("Add `use {class_name};` and reference `{short_name}` directly.")),
-        );
+        let resolution = ctx.import_name(class_name);
+
+        let (title, help) = match &resolution {
+            Some(res) if res.is_already_available() && res.local_name.as_str() != short_name => (
+                "Fully-qualified class-like reference can be replaced with an existing alias.",
+                format!("`{class_name}` is already imported as `{}`; replace the reference with it.", res.local_name),
+            ),
+            Some(res) if res.is_already_available() => (
+                "Fully-qualified class-like reference is already in scope.",
+                format!("`{class_name}` is already reachable as `{}`; drop the leading `\\`.", res.local_name),
+            ),
+            Some(_) => (
+                "Fully-qualified class-like reference detected.",
+                format!("Add `use {class_name};` and reference `{short_name}` directly."),
+            ),
+            None => (
+                "Fully-qualified class-like reference detected.",
+                format!("Add `use {class_name};` and reference `{short_name}` directly."),
+            ),
+        };
+
+        let issue = Issue::new(self.cfg.level, title)
+            .with_code(self.meta.code)
+            .with_annotation(
+                Annotation::primary(fqn_span)
+                    .with_message(format!("The reference to `\\{class_name}` uses a fully-qualified name")),
+            )
+            .with_note("Fully-qualified class-like references bypass the import system, making it harder to see which classes, interfaces, traits, and enums a file depends on.")
+            .with_help(help);
+
+        match resolution {
+            Some(resolution) => {
+                ctx.collector.propose(issue, |edits| {
+                    edits.push(TextEdit::replace(fqn_span, resolution.local_name.as_str()));
+
+                    if let Some(use_edit) = resolution.use_statement_edit {
+                        edits.push(use_edit.with_safety(Safety::Safe));
+                    }
+                });
+            }
+            None => {
+                ctx.collector.report(issue);
+            }
+        }
     }
 }
 
@@ -213,6 +250,7 @@ mod tests {
 
     use super::NoFullyQualifiedGlobalClassLikeRule;
     use crate::test_lint_failure;
+    use crate::test_lint_fix;
     use crate::test_lint_success;
 
     test_lint_success! {
@@ -371,6 +409,341 @@ mod tests {
 
             class Foo {
                 use \SomeTrait;
+            }
+        "#}
+    }
+
+    test_lint_fix! {
+        name = fix_single_fq_adds_use_after_namespace,
+        rule = NoFullyQualifiedGlobalClassLikeRule,
+        code = indoc! {r#"
+            <?php
+
+            namespace App;
+
+            $dt = new \DateTime();
+        "#},
+        fixed = indoc! {r#"
+            <?php
+
+            namespace App;
+
+            use DateTime;
+
+            $dt = new DateTime();
+        "#}
+    }
+
+    test_lint_fix! {
+        name = fix_single_fq_appends_after_existing_use,
+        rule = NoFullyQualifiedGlobalClassLikeRule,
+        code = indoc! {r#"
+            <?php
+
+            namespace App;
+
+            use Foo\Bar;
+
+            $dt = new \DateTime();
+        "#},
+        fixed = indoc! {r#"
+            <?php
+
+            namespace App;
+
+            use Foo\Bar;
+            use DateTime;
+
+            $dt = new DateTime();
+        "#}
+    }
+
+    test_lint_fix! {
+        name = fix_uses_existing_alias_when_available,
+        rule = NoFullyQualifiedGlobalClassLikeRule,
+        code = indoc! {r#"
+            <?php
+
+            namespace App;
+
+            use Foo\Bar as Baz;
+
+            $thing = new \Foo\Bar();
+        "#},
+        fixed = indoc! {r#"
+            <?php
+
+            namespace App;
+
+            use Foo\Bar as Baz;
+
+            $thing = new Baz();
+        "#}
+    }
+
+    test_lint_fix! {
+        name = fix_strips_leading_slash_when_already_in_namespace,
+        rule = NoFullyQualifiedGlobalClassLikeRule,
+        code = indoc! {r#"
+            <?php
+
+            namespace App;
+
+            $thing = new \App\Thing();
+        "#},
+        fixed = indoc! {r#"
+            <?php
+
+            namespace App;
+
+            $thing = new Thing();
+        "#}
+    }
+
+    test_lint_failure! {
+        name = fix_declined_when_short_name_conflicts_with_existing_import,
+        rule = NoFullyQualifiedGlobalClassLikeRule,
+        code = indoc! {r#"
+            <?php
+
+            namespace App;
+
+            use Other\User;
+
+            class Admin extends \Shop\User {}
+        "#}
+    }
+
+    test_lint_failure! {
+        name = fix_declined_when_short_name_conflicts_with_local_class,
+        rule = NoFullyQualifiedGlobalClassLikeRule,
+        code = indoc! {r#"
+            <?php
+
+            namespace App;
+
+            class User {}
+
+            class Admin extends \Shop\User {}
+        "#}
+    }
+
+    test_lint_fix! {
+        name = fix_reuses_anchor_inside_braced_namespace,
+        rule = NoFullyQualifiedGlobalClassLikeRule,
+        code = indoc! {r#"
+            <?php
+
+            namespace App {
+                $dt = new \DateTime();
+            }
+        "#},
+        fixed = indoc! {r#"
+            <?php
+
+            namespace App {
+
+            use DateTime;
+                $dt = new DateTime();
+            }
+        "#}
+    }
+
+    test_lint_fix! {
+        name = fix_two_distinct_fqns_in_one_pass_via_stagger,
+        rule = NoFullyQualifiedGlobalClassLikeRule,
+        code = indoc! {r#"
+            <?php
+
+            namespace App;
+
+            $a = new \DateTime();
+            $b = new \Exception();
+        "#},
+        fixed = indoc! {r#"
+            <?php
+
+            namespace App;
+
+            use DateTime;
+            use Exception;
+            $a = new DateTime();
+            $b = new Exception();
+        "#}
+    }
+
+    test_lint_fix! {
+        name = fix_three_fqns_stagger_in_one_pass,
+        rule = NoFullyQualifiedGlobalClassLikeRule,
+        code = indoc! {r#"
+            <?php
+
+            namespace App;
+
+            $a = \Foo\A::class;
+            $b = \Foo\B::class;
+            $c = \Foo\C::class;
+        "#},
+        fixed = indoc! {r#"
+            <?php
+
+            namespace App;
+
+            use Foo\A;
+            use Foo\B;
+            use Foo\C;$a = A::class;
+            $b = B::class;
+            $c = C::class;
+        "#}
+    }
+
+    test_lint_fix! {
+        name = fix_many_references_to_same_fqn_one_use,
+        rule = NoFullyQualifiedGlobalClassLikeRule,
+        code = indoc! {r#"
+            <?php
+
+            namespace App;
+
+            $a = new \Foo\Bar();
+            $b = new \Foo\Bar();
+            $c = new \Foo\Bar();
+            $d = new \Foo\Bar();
+        "#},
+        fixed = indoc! {r#"
+            <?php
+
+            namespace App;
+
+            use Foo\Bar;
+
+            $a = new Bar();
+            $b = new Bar();
+            $c = new Bar();
+            $d = new Bar();
+        "#}
+    }
+
+    test_lint_fix! {
+        name = fix_appends_after_last_of_several_existing_uses,
+        rule = NoFullyQualifiedGlobalClassLikeRule,
+        code = indoc! {r#"
+            <?php
+
+            namespace App;
+
+            use Foo\Alpha;
+            use Foo\Beta;
+            use Foo\Gamma;
+
+            $x = new \DateTime();
+        "#},
+        fixed = indoc! {r#"
+            <?php
+
+            namespace App;
+
+            use Foo\Alpha;
+            use Foo\Beta;
+            use Foo\Gamma;
+            use DateTime;
+
+            $x = new DateTime();
+        "#}
+    }
+
+    test_lint_success! {
+        name = global_scope_single_segment_fq_not_flagged,
+        rule = NoFullyQualifiedGlobalClassLikeRule,
+        code = indoc! {r#"
+            <?php
+
+            $dt = new \DateTime();
+        "#}
+    }
+
+    test_lint_fix! {
+        name = fix_multiple_braced_namespaces_independent_imports,
+        rule = NoFullyQualifiedGlobalClassLikeRule,
+        code = indoc! {r#"
+            <?php
+
+            namespace A {
+                $x = new \Foo\Bar();
+            }
+
+            namespace B {
+                $y = new \Foo\Bar();
+            }
+        "#},
+        fixed = indoc! {r#"
+            <?php
+
+            namespace A {
+
+            use Foo\Bar;
+                $x = new Bar();
+            }
+
+            namespace B {
+
+            use Foo\Bar;
+                $y = new Bar();
+            }
+        "#}
+    }
+
+    test_lint_fix! {
+        name = fix_fq_trait_use_in_namespace,
+        rule = NoFullyQualifiedGlobalClassLikeRule,
+        code = indoc! {r#"
+            <?php
+
+            namespace App;
+
+            class Foo {
+                use \SomeTrait;
+            }
+        "#},
+        fixed = indoc! {r#"
+            <?php
+
+            namespace App;
+
+            use SomeTrait;
+
+            class Foo {
+                use SomeTrait;
+            }
+        "#}
+    }
+
+    test_lint_failure! {
+        name = fix_declined_when_short_name_conflicts_with_local_interface,
+        rule = NoFullyQualifiedGlobalClassLikeRule,
+        code = indoc! {r#"
+            <?php
+
+            namespace App;
+
+            interface User {}
+
+            class Admin extends \Shop\User {}
+        "#}
+    }
+
+    test_lint_failure! {
+        name = fix_declined_when_short_name_conflicts_with_local_trait,
+        rule = NoFullyQualifiedGlobalClassLikeRule,
+        code = indoc! {r#"
+            <?php
+
+            namespace App;
+
+            trait Shop {}
+
+            class Admin {
+                use \Other\Shop;
             }
         "#}
     }

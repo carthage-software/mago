@@ -9,6 +9,9 @@ use mago_span::HasPosition;
 use mago_syntax::ast::Node;
 use mago_syntax::ast::NodeKind;
 
+use crate::import_tracker::ImportKind;
+use crate::import_tracker::ImportResolution;
+use crate::import_tracker::ImportTracker;
 use crate::registry::RuleRegistry;
 use crate::scope::ScopeStack;
 
@@ -22,6 +25,7 @@ pub struct LintContext<'ctx, 'arena> {
     pub collector: Collector<'ctx, 'arena>,
     pub scope: ScopeStack<'arena>,
     pub constant_expression_depth: usize,
+    imports: ImportTracker,
     ancestors: Vec<'arena, Node<'ctx, 'arena>>,
 }
 
@@ -43,8 +47,44 @@ impl<'ctx, 'arena> LintContext<'ctx, 'arena> {
             collector,
             scope: ScopeStack::new_in(arena),
             constant_expression_depth: 0,
+            imports: ImportTracker::new(),
             ancestors: Vec::with_capacity_in(32, arena),
         }
+    }
+
+    /// Ask the context to synthesise a `use` statement for a class-like FQN.
+    ///
+    /// Returns `None` when no fix should be offered (we can't import here; no
+    /// `<?php` seen yet, we're between braced namespaces, the short name is
+    /// already bound to a different symbol in this scope, or the FQN is a
+    /// reserved type keyword).
+    ///
+    /// Returns `Some(resolution)` otherwise. If `resolution.use_statement_edit`
+    /// is `None`, the name is already reachable (already imported, possibly
+    /// under an alias in `resolution.local_name`, or the FQN is inside the
+    /// current namespace) and the caller should just replace the FQN with
+    /// `resolution.local_name`.
+    ///
+    /// # Staggering lets multiple imports land in a single run
+    ///
+    /// Each subsequent insert at the same anchor is offset by one byte into
+    /// the run of whitespace that follows the anchor. Two zero-width inserts
+    /// at different offsets don't overlap, so the fixer can apply all of them
+    /// in a single pass. When the whitespace run is exhausted later imports
+    /// fall back to the base offset and conflict with the first.
+    pub fn import_name(&mut self, fqn: &str) -> Option<ImportResolution> {
+        self.imports.import(fqn, ImportKind::Name, self.source_file.contents.as_ref())
+    }
+
+    /// Same as [`import_name`](Self::import_name) but emits `use function ...;`.
+    pub fn import_function(&mut self, fqn: &str) -> Option<ImportResolution> {
+        self.imports.import(fqn, ImportKind::Function, self.source_file.contents.as_ref())
+    }
+
+    /// Same as [`import_name`](Self::import_name) but emits `use const ...;`.
+    /// Constant short names are matched case-sensitively (PHP semantics).
+    pub fn import_constant(&mut self, fqn: &str) -> Option<ImportResolution> {
+        self.imports.import(fqn, ImportKind::Constant, self.source_file.contents.as_ref())
     }
 
     /// Checks if we are currently inside a constant expression context.
@@ -73,12 +113,15 @@ impl<'ctx, 'arena> LintContext<'ctx, 'arena> {
     #[doc(hidden)]
     pub(crate) fn push_ancestor(&mut self, node: Node<'ctx, 'arena>) {
         self.ancestors.push(node);
+        self.imports.enter_node(node);
     }
 
     /// Called by the walker on node exit. Rules must not call this.
     #[doc(hidden)]
     pub(crate) fn pop_ancestor(&mut self) {
-        self.ancestors.pop();
+        if let Some(node) = self.ancestors.pop() {
+            self.imports.exit_node(node);
+        }
     }
 
     /// Returns the immediate parent node, or `None` if the current node is
