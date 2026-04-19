@@ -39,7 +39,7 @@ pub(super) fn print_uppercase_keyword<'arena>(f: &FormatterState<'_, 'arena>, ke
 
 pub(super) fn print_string<'arena>(
     f: &FormatterState<'_, 'arena>,
-    kind: Option<LiteralStringKind>,
+    kind: LiteralStringKind,
     text: &'arena str,
 ) -> &'arena str {
     // Strip binary string prefix (b/B) if present
@@ -51,9 +51,8 @@ pub(super) fn print_string<'arena>(
     let enclosing_quote = get_preferred_quote(raw_text, quote, f.settings.single_quote);
 
     match kind {
-        None => text,
-        Some(LiteralStringKind::SingleQuoted) if enclosing_quote == '\'' => text,
-        Some(LiteralStringKind::DoubleQuoted) if enclosing_quote == '"' => text,
+        LiteralStringKind::SingleQuoted if enclosing_quote == '\'' => text,
+        LiteralStringKind::DoubleQuoted if enclosing_quote == '"' => text,
         _ if prefix.is_empty() => make_string_in(f.arena, raw_text, enclosing_quote),
         _ => {
             let inner = make_string_in(f.arena, raw_text, enclosing_quote);

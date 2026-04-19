@@ -152,9 +152,9 @@ impl StringStyleRule {
             )
             .with_help("Use a double-quoted string with `{$variable}` syntax instead of concatenation.");
 
-        let all_fixable = parts
-            .iter()
-            .all(|p| matches!(p, ConcatPart::Literal { safe_to_double_quote: true, .. } | ConcatPart::Interpolable { .. }));
+        let all_fixable = parts.iter().all(|p| {
+            matches!(p, ConcatPart::Literal { safe_to_double_quote: true, .. } | ConcatPart::Interpolable { .. })
+        });
 
         if !all_fixable {
             ctx.collector.report(issue);
@@ -167,7 +167,9 @@ impl StringStyleRule {
             // double-quoted string.
             match parts.first() {
                 Some(ConcatPart::Interpolable { span }) => edits.push(TextEdit::insert(span.start_offset(), "\"{")),
-                Some(ConcatPart::Literal { span, .. }) => edits.push(TextEdit::replace(span.start_offset()..span.start_offset()+1, "\"")),
+                Some(ConcatPart::Literal { span, .. }) => {
+                    edits.push(TextEdit::replace(span.start_offset()..span.start_offset() + 1, "\""))
+                }
                 _ => {}
             };
 
@@ -175,7 +177,9 @@ impl StringStyleRule {
             // is an expression, it needs a closing `}"`.
             match parts.last() {
                 Some(ConcatPart::Interpolable { span }) => edits.push(TextEdit::insert(span.end_offset(), "}\"")),
-                Some(ConcatPart::Literal { span, .. }) => edits.push(TextEdit::replace(span.end_offset()-1..span.end_offset(), "\"")),
+                Some(ConcatPart::Literal { span, .. }) => {
+                    edits.push(TextEdit::replace(span.end_offset() - 1..span.end_offset(), "\""))
+                }
                 _ => {}
             };
 
@@ -291,7 +295,8 @@ fn collect_concat_side<'arena>(expr: &Expression<'arena>, parts: &mut Vec<Concat
             collect_concat_side(binary.rhs, parts);
         }
         Expression::Literal(Literal::String(literal)) => {
-            let safe_to_double_quote = matches!(literal.kind, Some(LiteralStringKind::DoubleQuoted)) || !literal.raw.contains(['\\', '$', '"']);
+            let safe_to_double_quote =
+                matches!(literal.kind, LiteralStringKind::DoubleQuoted) || !literal.raw.contains(['\\', '$', '"']);
             parts.push(ConcatPart::Literal { span: literal.span, safe_to_double_quote });
         }
         expr if is_interpolable(expr) => {

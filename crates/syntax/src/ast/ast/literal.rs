@@ -27,7 +27,7 @@ pub enum LiteralStringKind {
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub struct LiteralString<'arena> {
-    pub kind: Option<LiteralStringKind>,
+    pub kind: LiteralStringKind,
     pub span: Span,
     pub raw: &'arena str,
     pub value: Option<&'arena str>,

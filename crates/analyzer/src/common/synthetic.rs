@@ -23,7 +23,7 @@ use mago_syntax::ast::sequence::TokenSeparatedSequence;
 pub fn new_synthetic_call<'arena>(arena: &'arena Bump, f: &str, expression: Expression<'arena>) -> Expression<'arena> {
     Expression::Call(Call::Function(FunctionCall {
         function: arena.alloc(Expression::Literal(Literal::String(LiteralString {
-            kind: Some(LiteralStringKind::SingleQuoted),
+            kind: LiteralStringKind::SingleQuoted,
             span: Span::zero(),
             raw: arena.alloc_str(&format!("'{f}'")),
             value: Some(arena.alloc_str(f)),
