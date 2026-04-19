@@ -1,5 +1,5 @@
 {
-  description = "Mago - devshell using rustup (stable 1.94.0 + nightly) and php 8.4 + composer";
+  description = "Mago - devshell using rustup (stable 1.95.0 + nightly) and php 8.4 + composer";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -43,9 +43,9 @@
           shellHook = ''
             export PATH="$HOME/.cargo/bin:$PATH"
             if ! command -v rustc >/dev/null 2>&1; then
-              rustup toolchain install 1.94.0 --profile minimal
+              rustup toolchain install 1.95.0 --profile minimal
               rustup toolchain install nightly --profile minimal
-              rustup default 1.94.0
+              rustup default 1.95.0
             fi
             echo "[mago] rustc:     $(rustc --version)"
             echo "[mago] nightly:   $(rustup run nightly rustc --version)"
