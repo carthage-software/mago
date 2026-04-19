@@ -7,6 +7,7 @@ use foldhash::HashMap;
 use foldhash::HashSet;
 use mago_atom::Atom;
 
+use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_codex::metadata::function_like::MethodMetadata;
 use mago_codex::misc::GenericParent;
@@ -27,6 +28,8 @@ use mago_codex::ttype::combiner::CombinerOptions;
 use mago_codex::ttype::comparator::ComparisonResult;
 use mago_codex::ttype::comparator::atomic_comparator;
 use mago_codex::ttype::comparator::union_comparator;
+use mago_codex::ttype::expander::TypeExpansionOptions;
+use mago_codex::ttype::expander::expand_union;
 use mago_codex::ttype::expander::get_signature_of_function_like_identifier;
 use mago_codex::ttype::get_array_parameters;
 use mago_codex::ttype::get_array_value_parameter;
@@ -58,6 +61,28 @@ pub struct TemplateInferenceViolation {
     pub template_name: Atom,
     pub inferred_bound: TUnion,
     pub constraint: TUnion,
+}
+
+fn resolve_self_class(defining_entity: &GenericParent) -> Option<Atom> {
+    match defining_entity {
+        GenericParent::ClassLike(name) => Some(*name),
+        GenericParent::FunctionLike((class_name, method_name)) if !method_name.is_empty() => Some(*class_name),
+        GenericParent::FunctionLike(_) => None,
+    }
+}
+
+fn expand_template_constraint<'a>(
+    codebase: &CodebaseMetadata,
+    constraint: &'a TUnion,
+    self_class: Option<Atom>,
+) -> Cow<'a, TUnion> {
+    if !constraint.is_expandable() {
+        return Cow::Borrowed(constraint);
+    }
+
+    let mut expanded = constraint.clone();
+    expand_union(codebase, &mut expanded, &TypeExpansionOptions { self_class, ..Default::default() });
+    Cow::Owned(expanded)
 }
 
 fn infer_templates_from_input_and_container_types(
@@ -638,10 +663,16 @@ fn infer_templates_from_input_and_container_types(
                                 input_meta,
                                 input_obj.get_type_parameters(),
                             ) {
+                                let constraint = expand_template_constraint(
+                                    context.codebase,
+                                    &generic_parameter.constraint,
+                                    resolve_self_class(&generic_parameter.defining_entity),
+                                );
+
                                 if !union_comparator::is_contained_by(
                                     context.codebase,
                                     &inferred_bound,
-                                    &generic_parameter.constraint,
+                                    &constraint,
                                     false,
                                     false,
                                     false,
@@ -650,7 +681,7 @@ fn infer_templates_from_input_and_container_types(
                                     violations.push(TemplateInferenceViolation {
                                         template_name: *template_name,
                                         inferred_bound: inferred_bound.clone(),
-                                        constraint: generic_parameter.constraint.as_ref().clone(),
+                                        constraint: constraint.into_owned(),
                                     });
                                 }
 
@@ -790,11 +821,17 @@ fn infer_templates_from_input_and_container_types(
             continue;
         }
 
-        if !container_generic.constraint.has_template_types()
+        let expanded_constraint = expand_template_constraint(
+            context.codebase,
+            &container_generic.constraint,
+            resolve_self_class(&container_generic.defining_entity),
+        );
+
+        if !expanded_constraint.has_template_types()
             && !union_comparator::is_contained_by(
                 context.codebase,
                 &residual_input_type,
-                &container_generic.constraint,
+                &expanded_constraint,
                 false,
                 false,
                 false,
@@ -809,13 +846,13 @@ fn infer_templates_from_input_and_container_types(
             // - the constraint is mixed (accepts anything)
             // - the input is a generic parameter (constraint will be checked at the call site)
             if generic_container_parts_len == 1
-                && !container_generic.constraint.is_mixed()
+                && !expanded_constraint.is_mixed()
                 && !residual_input_type.is_generic_parameter()
             {
                 violations.push(TemplateInferenceViolation {
                     template_name: *template_parameter_name,
                     inferred_bound: residual_input_type.clone(),
-                    constraint: container_generic.constraint.as_ref().clone(),
+                    constraint: expanded_constraint.into_owned(),
                 });
             }
 
@@ -827,13 +864,19 @@ fn infer_templates_from_input_and_container_types(
 
         if let Some(template_types) = template_result.template_types.get(template_parameter_name) {
             for template in template_types {
-                let resolved_template_type =
+                let replaced_template_type =
                     inferred_type_replacer::replace(&template.constraint, template_result, context.codebase);
 
-                if resolved_template_type.has_template_types() {
+                if replaced_template_type.has_template_types() {
                     constraint_has_unresolved_templates = true;
                     continue;
                 }
+
+                let resolved_template_type = expand_template_constraint(
+                    context.codebase,
+                    &replaced_template_type,
+                    resolve_self_class(&template.defining_entity),
+                );
 
                 if !union_comparator::is_contained_by(
                     context.codebase,
@@ -847,7 +890,11 @@ fn infer_templates_from_input_and_container_types(
                     potential_template_violations
                         .entry((*template_parameter_name, container_generic.defining_entity))
                         .or_insert_with(|| {
-                            (residual_input_type.clone(), resolved_template_type.clone(), container_generic.clone())
+                            (
+                                residual_input_type.clone(),
+                                resolved_template_type.into_owned(),
+                                container_generic.clone(),
+                            )
                         });
 
                     has_violation = true;
