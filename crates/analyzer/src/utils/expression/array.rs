@@ -919,8 +919,13 @@ pub(crate) fn handle_array_access_on_keyed_array<'ctx>(
                     if !in_assignment && !*reported_undefined_key {
                         *reported_undefined_key = true;
 
+                        let (issue_code, key_kind) = match &array_key {
+                            ArrayKey::Integer(_) => (IssueCode::UndefinedIntArrayIndex, "integer"),
+                            _ => (IssueCode::UndefinedStringArrayIndex, "string"),
+                        };
+
                         context.collector.report_with_code(
-                            IssueCode::UndefinedStringArrayIndex,
+                            issue_code,
                             Issue::error(format!(
                                 "Undefined array key {} accessed on `{}`.",
                                 array_key,
@@ -930,9 +935,9 @@ pub(crate) fn handle_array_access_on_keyed_array<'ctx>(
                                 Annotation::primary(span)
                                     .with_message(format!("Key {array_key} does not exist."))
                             )
-                            .with_note(
-                                "Attempting to access a non-existent string key will raise a warning/notice at runtime."
-                            )
+                            .with_note(format!(
+                                "Attempting to access a non-existent {key_kind} key will raise a warning/notice at runtime."
+                            ))
                             .with_help(
                                 format!(
                                     "Ensure the key {array_key} exists before accessing it, or use `isset()` or the null coalesce operator (`??`) to handle potential missing keys."

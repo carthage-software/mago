@@ -79,11 +79,9 @@ fn extract_minimum_bound(union: &TUnion) -> Option<i64> {
             return None;
         };
 
-        match integer.get_minimum_value() {
-            Some(val) => {
-                result = Some(result.map_or(val, |current: i64| current.min(val)));
-            }
-            None => return None,
+        {
+            let val = integer.get_minimum_value()?;
+            result = Some(result.map_or(val, |current: i64| current.min(val)));
         }
     }
 
@@ -101,11 +99,9 @@ fn extract_maximum_bound(union: &TUnion) -> Option<i64> {
             return None;
         };
 
-        match integer.get_maximum_value() {
-            Some(val) => {
-                result = Some(result.map_or(val, |current: i64| current.max(val)));
-            }
-            None => return None,
+        {
+            let val = integer.get_maximum_value()?;
+            result = Some(result.map_or(val, |current: i64| current.max(val)));
         }
     }
 

@@ -535,17 +535,15 @@ impl TUnion {
     pub fn effective_int_or_float(&self) -> Option<bool> {
         let mut result: Option<bool> = None;
         for atomic in self.types.as_ref() {
-            match atomic.effective_int_or_float() {
-                Some(is_int) => {
-                    if let Some(prev) = result {
-                        if prev != is_int {
-                            return None;
-                        }
-                    } else {
-                        result = Some(is_int);
+            {
+                let is_int = atomic.effective_int_or_float()?;
+                if let Some(prev) = result {
+                    if prev != is_int {
+                        return None;
                     }
+                } else {
+                    result = Some(is_int);
                 }
-                None => return None,
             }
         }
 

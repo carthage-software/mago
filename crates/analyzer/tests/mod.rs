@@ -866,6 +866,7 @@ test_case!(issue_1641);
 test_case!(issue_1651);
 test_case!(issue_1653);
 test_case!(issue_1657);
+test_case!(issue_1669);
 test_case!(relax_class_constant_reserved_name);
 test_case!(relax_int_mask_of_global_wildcard);
 test_case!(relax_int_mask_of_ulid_format_wildcard);

@@ -220,16 +220,14 @@ impl<'input, 'arena> TokenStream<'input, 'arena> {
     fn fill_buffer_slow(&mut self, n: usize) -> Result<Option<usize>, SyntaxError> {
         while self.buffer.len() < n {
             match self.lexer.advance() {
-                Some(result) => match result {
-                    Ok(token) => {
-                        if token.kind.is_trivia() {
-                            self.trivia.push(token);
-                            continue;
-                        }
-                        self.buffer.push_back(token);
+                Some(result) => {
+                    let token = result?;
+                    if token.kind.is_trivia() {
+                        self.trivia.push(token);
+                        continue;
                     }
-                    Err(error) => return Err(error),
-                },
+                    self.buffer.push_back(token);
+                }
                 None => return Ok(None),
             }
         }
