@@ -139,13 +139,25 @@ impl LintRule for BracedStringInterpolationRule {
             .with_help("Wrap the variable in curly braces, e.g., `{$variable}`.");
 
         ctx.collector.propose(issue, |edits| {
-            for (span, bareword_key_span) in &unbraced_expressions {
-                edits.push(TextEdit::insert(span.start_offset(), "{"));
+            for (index, (span, bareword_key_span)) in unbraced_expressions.iter().enumerate() {
+                let adjacent = unbraced_expressions
+                    .get(index + 1)
+                    .is_some_and(|(next, _)| next.start_offset() == span.end_offset());
+                let prev_adjacent = index > 0
+                    && unbraced_expressions
+                        .get(index - 1)
+                        .is_some_and(|(prev, _)| prev.end_offset() == span.start_offset());
+
+                if !prev_adjacent {
+                    edits.push(TextEdit::insert(span.start_offset(), "{"));
+                }
+
                 if let Some(key_span) = bareword_key_span {
                     edits.push(TextEdit::insert(key_span.start_offset(), "'"));
                     edits.push(TextEdit::insert(key_span.end_offset(), "'"));
                 }
-                edits.push(TextEdit::insert(span.end_offset(), "}"));
+
+                edits.push(TextEdit::insert(span.end_offset(), if adjacent { "}{" } else { "}" }));
             }
         });
     }
@@ -373,6 +385,25 @@ mod tests {
 
             $o = ['a' => 1, 'b' => 2];
             echo "{$o['a']}{$o['b']}";
+        "#}
+    }
+
+    test_lint_fix! {
+        name = fix_back_to_back_simple_variables,
+        rule = BracedStringInterpolationRule,
+        code = indoc! {r#"
+            <?php
+
+            $comma = ",";
+            $y = 55;
+            print "$comma$y by guests";
+        "#},
+        fixed = indoc! {r#"
+            <?php
+
+            $comma = ",";
+            $y = 55;
+            print "{$comma}{$y} by guests";
         "#}
     }
 }
