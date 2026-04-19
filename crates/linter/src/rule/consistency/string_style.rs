@@ -295,8 +295,8 @@ fn collect_concat_side<'arena>(expr: &Expression<'arena>, parts: &mut Vec<Concat
             collect_concat_side(binary.rhs, parts);
         }
         Expression::Literal(Literal::String(literal)) => {
-            let safe_to_double_quote = matches!(literal.kind, Some(LiteralStringKind::DoubleQuoted))
-                || !literal.raw.contains(['\\', '$', '"']);
+            let safe_to_double_quote =
+                matches!(literal.kind, LiteralStringKind::DoubleQuoted) || !literal.raw.contains(['\\', '$', '"']);
             parts.push(ConcatPart::Literal { span: literal.span, safe_to_double_quote });
         }
         expr if is_interpolable(expr) => {
