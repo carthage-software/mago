@@ -359,6 +359,7 @@ test_case!(instanceof_assertion);
 test_case!(instanceof_unresolved_class);
 test_case!(type_narrowing_external);
 test_case!(traversable_array_iterable_compare);
+test_case!(pseudo_method_on_interface);
 test_case!(post_narrowing_check);
 test_case!(data_transformer_type);
 test_case!(symbol_existence_assertions);

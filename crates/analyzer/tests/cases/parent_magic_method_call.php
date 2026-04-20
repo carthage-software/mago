@@ -7,9 +7,7 @@ declare(strict_types=1);
  */
 class ParentWithCall
 {
-    public function __call(string $method, array $args): void
-    {
-    }
+    public function __call(string $method, array $args): void {}
 }
 
 class ChildWithCall extends ParentWithCall
@@ -39,9 +37,7 @@ class ChildCallingParentReal extends ParentWithRealMethod
 
 class GrandParent
 {
-    public function inheritedMethod(): void
-    {
-    }
+    public function inheritedMethod(): void {}
 }
 
 class ParentClass extends GrandParent
@@ -82,13 +78,9 @@ class ChildWithProtected extends ParentWithProtected
 
 class ParentWithBoth
 {
-    public function __call(string $method, array $args): void
-    {
-    }
+    public function __call(string $method, array $args): void {}
 
-    public function realMethod(): void
-    {
-    }
+    public function realMethod(): void {}
 }
 
 class ChildCallingBoth extends ParentWithBoth
@@ -109,8 +101,18 @@ class ChildCallingWithoutCall extends ParentWithoutCall
 {
     public function pseudoWithoutMagic(): void
     {
-        parent::pseudoWithoutMagic(); // @mago-expect analysis:missing-magic-method
+        parent::pseudoWithoutMagic(); // @mago-expect analysis:possibly-non-existent-method
     }
+}
+
+/**
+ * @method void pseudoWithoutMagic()
+ */
+final class FinalParentWithoutCall {}
+
+function callFinalPseudo(FinalParentWithoutCall $p): void
+{
+    $p->pseudoWithoutMagic(); // @mago-expect analysis:missing-magic-method
 }
 
 class ParentEmpty {}
@@ -126,11 +128,9 @@ class ChildCallingNonExistent extends ParentEmpty
 /**
  * @method static void staticPseudo()
  */
-class WithStaticPseudoOnly
+final class WithStaticPseudoOnly
 {
-    public function __call(string $method, array $args): void
-    {
-    }
+    public function __call(string $method, array $args): void {}
 
     // Missing __callStatic!
 }

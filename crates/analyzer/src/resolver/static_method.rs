@@ -35,6 +35,7 @@ use crate::resolver::method::ResolvedMethod;
 use crate::resolver::method::report_magic_call_without_call_method;
 use crate::resolver::method::report_non_documented_method;
 use crate::resolver::method::report_non_existent_method;
+use crate::resolver::method::report_possibly_missing_magic_call;
 use crate::resolver::selector::resolve_member_selector;
 use crate::utils::names::display_class_like_name;
 use crate::utils::names::display_method_name;
@@ -385,17 +386,28 @@ fn resolve_method_from_metadata<'ctx, 'arena>(
         result.has_invalid_target = true;
     }
 
-    if function_like.flags.is_magic_method() && !has_magic_static_call {
+    if function_like.flags.is_magic_method() && !has_magic_static_call && !defining_class_metadata.kind.is_interface() {
         let is_static = !classname.is_parent();
 
-        report_magic_call_without_call_method(
-            context,
-            class_span,
-            selector.span(),
-            method_id.get_class_name(),
-            method_name,
-            is_static,
-        );
+        if defining_class_metadata.flags.is_final() && !defining_class_metadata.flags.is_abstract() {
+            report_magic_call_without_call_method(
+                context,
+                class_span,
+                selector.span(),
+                method_id.get_class_name(),
+                method_name,
+                is_static,
+            );
+        } else {
+            report_possibly_missing_magic_call(
+                context,
+                class_span,
+                selector.span(),
+                method_id.get_class_name(),
+                method_name,
+                is_static,
+            );
+        }
     }
 
     let static_class_type = if let Some(current_class_metadata) = current_class_metadata

@@ -41,7 +41,7 @@ class ExampleWithMagicMethods
  * @method void foo()
  * @method static void bar()
  */
-class ExampleWithMagicTags
+final class ExampleWithMagicTags
 {
 }
 

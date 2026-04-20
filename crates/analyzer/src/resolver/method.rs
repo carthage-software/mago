@@ -447,15 +447,26 @@ pub fn get_method_ids_from_object<'ctx, 'ast, 'arena, 'object>(
                     method_name,
                     has_magic_call,
                 );
-            } else if !has_magic_call && !is_inherited {
-                report_magic_call_without_call_method(
-                    context,
-                    object.span(),
-                    selector.span(),
-                    class_metadata.original_name,
-                    method_name,
-                    false,
-                );
+            } else if !has_magic_call && !is_inherited && !class_metadata.kind.is_interface() {
+                if class_metadata.flags.is_final() && !class_metadata.flags.is_abstract() {
+                    report_magic_call_without_call_method(
+                        context,
+                        object.span(),
+                        selector.span(),
+                        class_metadata.original_name,
+                        method_name,
+                        false,
+                    );
+                } else {
+                    report_possibly_missing_magic_call(
+                        context,
+                        object.span(),
+                        selector.span(),
+                        class_metadata.original_name,
+                        method_name,
+                        false,
+                    );
+                }
             }
         }
 
@@ -786,6 +797,39 @@ fn report_non_existent_mixin_method(
         ))
         .with_help(format!(
             "Add a `__call` method to `{classname}` to handle mixin method calls."
+        )),
+    );
+}
+
+pub(super) fn report_possibly_missing_magic_call(
+    context: &mut Context,
+    obj_span: Span,
+    selector_span: Span,
+    classname: Atom,
+    method_name: Atom,
+    is_static: bool,
+) {
+    let magic_method_name = if is_static { "__callStatic" } else { "__call" };
+    let classname = display_class_like_name(context, classname);
+    let method_name = display_method_name(context, classname, method_name);
+
+    context.collector.report_with_code(
+        IssueCode::PossiblyNonExistentMethod,
+        Issue::warning(format!(
+            "Call to documented magic method `{method_name}()` on a class that may not handle it."
+        ))
+        .with_annotation(
+            Annotation::primary(selector_span).with_message("This magic method is documented but may not be callable"),
+        )
+        .with_annotation(
+            Annotation::secondary(obj_span)
+                .with_message(format!("Class `{classname}` is missing the `{magic_method_name}` method")),
+        )
+        .with_note(format!(
+            "The class `{classname}` has a `@method` tag for `{method_name}` but does not have a `{magic_method_name}` method to handle the call. A subclass could provide `{magic_method_name}` at runtime, so this is only a warning; if `{classname}` were final, this would be a hard error."
+        ))
+        .with_help(format!(
+            "Add a `{magic_method_name}` method to `{classname}`, or make `{classname}` final if calls to `{method_name}` should be rejected outright."
         )),
     );
 }
