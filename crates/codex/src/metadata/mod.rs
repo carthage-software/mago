@@ -1228,7 +1228,13 @@ impl Default for CodebaseMetadata {
 
 /// Determines which metadata value to keep when merging duplicates.
 ///
-/// Priority: user-defined > built-in > other. Uses smaller span as tie-breaker.
+/// Priority:
+///   1. non-polyfill > polyfill — tools like rector/phpstan/psalm ship
+///      skeleton stubs gated by `if (!class_exists('X'))` that should never
+///      shadow a concrete definition.
+///   2. user-defined > built-in > other.
+///   3. smaller span wins as a deterministic tie-breaker.
+///
 /// Returns `true` if the new value should replace the existing one.
 fn should_replace_metadata(
     existing_flags: MetadataFlags,
@@ -1236,6 +1242,13 @@ fn should_replace_metadata(
     new_flags: MetadataFlags,
     new_span: Span,
 ) -> bool {
+    let new_is_polyfill = new_flags.is_polyfill();
+    let existing_is_polyfill = existing_flags.is_polyfill();
+
+    if new_is_polyfill != existing_is_polyfill {
+        return !new_is_polyfill;
+    }
+
     let new_is_user_defined = new_flags.is_user_defined();
     let existing_is_user_defined = existing_flags.is_user_defined();
 
@@ -1251,4 +1264,47 @@ fn should_replace_metadata(
     }
 
     new_span < existing_span
+}
+
+#[cfg(test)]
+mod should_replace_metadata_tests {
+    use super::*;
+
+    #[test]
+    fn non_polyfill_replaces_polyfill() {
+        let polyfill = MetadataFlags::POLYFILL;
+        let real = MetadataFlags::empty();
+        assert!(should_replace_metadata(polyfill, Span::dummy(0, 100), real, Span::dummy(0, 100)));
+        assert!(!should_replace_metadata(real, Span::dummy(0, 100), polyfill, Span::dummy(0, 100)));
+    }
+
+    #[test]
+    fn polyfill_does_not_replace_non_polyfill_even_with_smaller_span() {
+        let real = MetadataFlags::empty();
+        let polyfill = MetadataFlags::POLYFILL;
+        assert!(!should_replace_metadata(real, Span::dummy(500, 600), polyfill, Span::dummy(0, 10)));
+    }
+
+    #[test]
+    fn polyfill_flag_checked_before_user_defined() {
+        let polyfill_user = MetadataFlags::POLYFILL | MetadataFlags::USER_DEFINED;
+        let plain = MetadataFlags::empty();
+        assert!(should_replace_metadata(polyfill_user, Span::dummy(0, 10), plain, Span::dummy(0, 10)));
+    }
+
+    #[test]
+    fn two_polyfills_fall_through_to_priority_rules() {
+        let a = MetadataFlags::POLYFILL | MetadataFlags::USER_DEFINED;
+        let b = MetadataFlags::POLYFILL;
+        assert!(!should_replace_metadata(a, Span::dummy(0, 10), b, Span::dummy(0, 10)));
+        assert!(should_replace_metadata(b, Span::dummy(0, 10), a, Span::dummy(0, 10)));
+    }
+
+    #[test]
+    fn two_non_polyfills_fall_through_to_priority_rules() {
+        let user = MetadataFlags::USER_DEFINED;
+        let builtin = MetadataFlags::BUILTIN;
+        assert!(!should_replace_metadata(user, Span::dummy(0, 10), builtin, Span::dummy(0, 10)));
+        assert!(should_replace_metadata(builtin, Span::dummy(0, 10), user, Span::dummy(0, 10)));
+    }
 }

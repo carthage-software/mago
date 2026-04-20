@@ -42,6 +42,7 @@ impl MetadataFlags {
     pub const EXTERNAL_MUTATION_FREE: MetadataFlags = MetadataFlags(1 << 38);
     pub const SUSPENDS_FIBER: MetadataFlags = MetadataFlags(1 << 39);
     pub const EXPERIMENTAL: MetadataFlags = MetadataFlags(1 << 40);
+    pub const POLYFILL: MetadataFlags = MetadataFlags(1 << 41);
 }
 
 impl MetadataFlags {
@@ -314,6 +315,12 @@ impl MetadataFlags {
     #[must_use]
     pub const fn suspends_fiber(self) -> bool {
         self.contains(Self::SUSPENDS_FIBER)
+    }
+
+    #[inline]
+    #[must_use]
+    pub const fn is_polyfill(self) -> bool {
+        self.contains(Self::POLYFILL)
     }
 }
 

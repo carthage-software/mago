@@ -14,18 +14,24 @@ use mago_names::scope::NamespaceScope;
 use mago_span::HasSpan;
 use mago_syntax::ast::AnonymousClass;
 use mago_syntax::ast::ArrowFunction;
+use mago_syntax::ast::Call;
 use mago_syntax::ast::Class;
 use mago_syntax::ast::Closure;
 use mago_syntax::ast::Constant;
 use mago_syntax::ast::Enum;
+use mago_syntax::ast::Expression;
 use mago_syntax::ast::Function;
 use mago_syntax::ast::FunctionCall;
+use mago_syntax::ast::If;
+use mago_syntax::ast::IfBody;
 use mago_syntax::ast::Interface;
 use mago_syntax::ast::Method;
 use mago_syntax::ast::Namespace;
 use mago_syntax::ast::Program;
 use mago_syntax::ast::Trait;
 use mago_syntax::ast::Trivia;
+use mago_syntax::ast::UnaryPrefix;
+use mago_syntax::ast::UnaryPrefixOperator;
 use mago_syntax::ast::Use;
 use mago_syntax::comments::docblock::get_docblock_for_node;
 use mago_syntax::walker::MutWalker;
@@ -119,6 +125,47 @@ struct Scanner {
     has_constructor: bool,
     file_type_aliases: AtomSet,
     file_imported_aliases: AtomMap<(Atom, Atom)>,
+    polyfill_depth: u32,
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+enum PolyfillGuardBranch {
+    Then,
+    Else,
+    None,
+}
+
+const POLYFILL_GUARD_FUNCTIONS: &[&str] =
+    &["class_exists", "interface_exists", "trait_exists", "enum_exists", "function_exists", "defined"];
+
+fn classify_polyfill_guard(cond: &Expression<'_>) -> PolyfillGuardBranch {
+    let cond = cond.unparenthesized();
+
+    if is_polyfill_existence_check(cond) {
+        return PolyfillGuardBranch::Else;
+    }
+
+    if let Expression::UnaryPrefix(UnaryPrefix { operator: UnaryPrefixOperator::Not(_), operand }) = cond
+        && is_polyfill_existence_check(operand.unparenthesized())
+    {
+        return PolyfillGuardBranch::Then;
+    }
+
+    PolyfillGuardBranch::None
+}
+
+/// Returns true if `expr` is a call to one of the recognized existence-check
+/// functions (regardless of whether it's written as `class_exists` or
+/// `\class_exists` — we just look at the trailing segment).
+fn is_polyfill_existence_check(expr: &Expression<'_>) -> bool {
+    let Expression::Call(Call::Function(FunctionCall { function, .. })) = expr.unparenthesized() else {
+        return false;
+    };
+    let Expression::Identifier(identifier) = function.unparenthesized() else {
+        return false;
+    };
+    let last = identifier.last_segment();
+    POLYFILL_GUARD_FUNCTIONS.iter().any(|name| last.eq_ignore_ascii_case(name))
 }
 
 impl Scanner {
@@ -130,7 +177,6 @@ impl Scanner {
         let mut context = TypeResolutionContext::new();
         context = context.with_type_aliases(self.file_type_aliases.clone());
 
-        // Add imported aliases
         for (local_name, (source_class, original_name)) in &self.file_imported_aliases {
             context = context.with_imported_type_alias(*local_name, *source_class, *original_name);
         }
@@ -144,6 +190,16 @@ impl Scanner {
         }
 
         context
+    }
+
+    fn apply_polyfill_flag_to_class_like(&mut self, id: Atom) {
+        if self.polyfill_depth == 0 {
+            return;
+        }
+
+        if let Some(metadata) = self.codebase.class_likes.get_mut(&id) {
+            metadata.flags |= MetadataFlags::POLYFILL;
+        }
     }
 }
 
@@ -166,13 +222,78 @@ impl<'ctx, 'arena> MutWalker<'arena, 'arena, Context<'ctx, 'arena>> for Scanner 
         self.scope.populate_from_use(r#use);
     }
 
+    fn walk_if(&mut self, r#if: &'arena If<'arena>, context: &mut Context<'ctx, 'arena>) {
+        self.walk_keyword(&r#if.r#if, context);
+        self.walk_expression(r#if.condition, context);
+
+        let guard = classify_polyfill_guard(r#if.condition);
+
+        match &r#if.body {
+            IfBody::Statement(body) => {
+                let then_polyfill = matches!(guard, PolyfillGuardBranch::Then);
+                if then_polyfill {
+                    self.polyfill_depth = self.polyfill_depth.saturating_add(1);
+                }
+                self.walk_statement(body.statement, context);
+                if then_polyfill {
+                    self.polyfill_depth = self.polyfill_depth.saturating_sub(1);
+                }
+
+                for else_if_clause in &body.else_if_clauses {
+                    self.walk_if_statement_body_else_if_clause(else_if_clause, context);
+                }
+
+                if let Some(else_clause) = &body.else_clause {
+                    let else_polyfill = matches!(guard, PolyfillGuardBranch::Else);
+                    if else_polyfill {
+                        self.polyfill_depth = self.polyfill_depth.saturating_add(1);
+                    }
+                    self.walk_if_statement_body_else_clause(else_clause, context);
+                    if else_polyfill {
+                        self.polyfill_depth = self.polyfill_depth.saturating_sub(1);
+                    }
+                }
+            }
+            IfBody::ColonDelimited(body) => {
+                let then_polyfill = matches!(guard, PolyfillGuardBranch::Then);
+                if then_polyfill {
+                    self.polyfill_depth = self.polyfill_depth.saturating_add(1);
+                }
+                for statement in &body.statements {
+                    self.walk_statement(statement, context);
+                }
+                if then_polyfill {
+                    self.polyfill_depth = self.polyfill_depth.saturating_sub(1);
+                }
+
+                for else_if_clause in &body.else_if_clauses {
+                    self.walk_if_colon_delimited_body_else_if_clause(else_if_clause, context);
+                }
+
+                if let Some(else_clause) = &body.else_clause {
+                    let else_polyfill = matches!(guard, PolyfillGuardBranch::Else);
+                    if else_polyfill {
+                        self.polyfill_depth = self.polyfill_depth.saturating_add(1);
+                    }
+                    self.walk_if_colon_delimited_body_else_clause(else_clause, context);
+                    if else_polyfill {
+                        self.polyfill_depth = self.polyfill_depth.saturating_sub(1);
+                    }
+                }
+
+                self.walk_keyword(&body.endif, context);
+                self.walk_terminator(&body.terminator, context);
+            }
+        }
+    }
+
     #[inline]
     fn walk_in_function(&mut self, function: &'arena Function<'arena>, context: &mut Context<'ctx, 'arena>) {
         let type_context = self.get_current_type_resolution_context();
 
         let name = ascii_lowercase_atom(context.resolved_names.get(&function.name));
         let identifier = (empty_atom(), name);
-        let metadata = scan_function(
+        let mut metadata = scan_function(
             identifier,
             function,
             self.stack.last().copied(),
@@ -190,6 +311,10 @@ impl<'ctx, 'arena> MutWalker<'arena, 'arena, Context<'ctx, 'arena>> for Scanner 
 
             constraints
         });
+
+        if self.polyfill_depth > 0 {
+            metadata.flags |= MetadataFlags::POLYFILL;
+        }
 
         self.codebase.function_likes.entry(identifier).or_insert(metadata);
     }
@@ -281,7 +406,10 @@ impl<'ctx, 'arena> MutWalker<'arena, 'arena, Context<'ctx, 'arena>> for Scanner 
     fn walk_in_constant(&mut self, constant: &'arena Constant<'arena>, context: &mut Context<'ctx, 'arena>) {
         let constants = scan_constant(constant, context, &self.get_current_type_resolution_context(), &self.scope);
 
-        for constant_metadata in constants {
+        for mut constant_metadata in constants {
+            if self.polyfill_depth > 0 {
+                constant_metadata.flags |= MetadataFlags::POLYFILL;
+            }
             let constant_name = constant_metadata.name;
             self.codebase.constants.entry(constant_name).or_insert(constant_metadata);
         }
@@ -293,11 +421,15 @@ impl<'ctx, 'arena> MutWalker<'arena, 'arena, Context<'ctx, 'arena>> for Scanner 
         function_call: &'arena FunctionCall<'arena>,
         context: &mut Context<'ctx, 'arena>,
     ) {
-        let Some(constant_metadata) =
+        let Some(mut constant_metadata) =
             scan_defined_constant(function_call, context, &self.get_current_type_resolution_context(), &self.scope)
         else {
             return;
         };
+
+        if self.polyfill_depth > 0 {
+            constant_metadata.flags |= MetadataFlags::POLYFILL;
+        }
 
         self.codebase.constants.entry(constant_metadata.name).or_insert(constant_metadata);
     }
@@ -311,6 +443,7 @@ impl<'ctx, 'arena> MutWalker<'arena, 'arena, Context<'ctx, 'arena>> for Scanner 
         if let Some((id, template_definition, type_aliases, imported_aliases)) =
             register_anonymous_class(&mut self.codebase, anonymous_class, context, &mut self.scope)
         {
+            self.apply_polyfill_flag_to_class_like(id);
             self.file_type_aliases.extend(type_aliases);
             self.file_imported_aliases.extend(imported_aliases);
             self.stack.push(id);
@@ -318,7 +451,6 @@ impl<'ctx, 'arena> MutWalker<'arena, 'arena, Context<'ctx, 'arena>> for Scanner 
 
             walk_anonymous_class_mut(self, anonymous_class, context);
         } else {
-            // We don't need to walk the anonymous class if it's already been registered
         }
     }
 
@@ -327,6 +459,7 @@ impl<'ctx, 'arena> MutWalker<'arena, 'arena, Context<'ctx, 'arena>> for Scanner 
         if let Some((id, templates, type_aliases, imported_aliases)) =
             register_class(&mut self.codebase, class, context, &mut self.scope)
         {
+            self.apply_polyfill_flag_to_class_like(id);
             self.file_type_aliases.extend(type_aliases);
             self.file_imported_aliases.extend(imported_aliases);
             self.stack.push(id);
@@ -334,7 +467,6 @@ impl<'ctx, 'arena> MutWalker<'arena, 'arena, Context<'ctx, 'arena>> for Scanner 
 
             walk_class_mut(self, class, context);
         } else {
-            // We don't need to walk the class if it's already been registered
         }
     }
 
@@ -343,6 +475,7 @@ impl<'ctx, 'arena> MutWalker<'arena, 'arena, Context<'ctx, 'arena>> for Scanner 
         if let Some((id, templates, type_aliases, imported_aliases)) =
             register_trait(&mut self.codebase, r#trait, context, &mut self.scope)
         {
+            self.apply_polyfill_flag_to_class_like(id);
             self.file_type_aliases.extend(type_aliases);
             self.file_imported_aliases.extend(imported_aliases);
             self.stack.push(id);
@@ -350,7 +483,6 @@ impl<'ctx, 'arena> MutWalker<'arena, 'arena, Context<'ctx, 'arena>> for Scanner 
 
             walk_trait_mut(self, r#trait, context);
         } else {
-            // We don't need to walk the trait if it's already been registered
         }
     }
 
@@ -359,6 +491,7 @@ impl<'ctx, 'arena> MutWalker<'arena, 'arena, Context<'ctx, 'arena>> for Scanner 
         if let Some((id, templates, type_aliases, imported_aliases)) =
             register_enum(&mut self.codebase, r#enum, context, &mut self.scope)
         {
+            self.apply_polyfill_flag_to_class_like(id);
             self.file_type_aliases.extend(type_aliases);
             self.file_imported_aliases.extend(imported_aliases);
             self.stack.push(id);
@@ -366,7 +499,6 @@ impl<'ctx, 'arena> MutWalker<'arena, 'arena, Context<'ctx, 'arena>> for Scanner 
 
             walk_enum_mut(self, r#enum, context);
         } else {
-            // We don't need to walk the enum if it's already been registered
         }
     }
 
@@ -375,6 +507,7 @@ impl<'ctx, 'arena> MutWalker<'arena, 'arena, Context<'ctx, 'arena>> for Scanner 
         if let Some((id, templates, type_aliases, imported_aliases)) =
             register_interface(&mut self.codebase, interface, context, &mut self.scope)
         {
+            self.apply_polyfill_flag_to_class_like(id);
             self.file_type_aliases.extend(type_aliases);
             self.file_imported_aliases.extend(imported_aliases);
             self.stack.push(id);
@@ -564,4 +697,423 @@ fn finalize_class_like(scanner: &mut Scanner, context: &mut Context<'_, '_>) {
     }
 
     scanner.codebase.class_likes.insert(class_like_id, class_like_metadata);
+}
+
+#[cfg(test)]
+mod polyfill_tests {
+    use std::borrow::Cow;
+
+    use bumpalo::Bump;
+
+    use mago_atom::ascii_lowercase_atom;
+    use mago_atom::atom;
+    use mago_atom::empty_atom;
+    use mago_database::Database;
+    use mago_database::DatabaseConfiguration;
+    use mago_database::DatabaseReader;
+    use mago_database::file::File;
+    use mago_names::resolver::NameResolver;
+    use mago_syntax::parser::parse_file;
+
+    use crate::metadata::CodebaseMetadata;
+    use crate::metadata::flags::MetadataFlags;
+    use crate::scanner::scan_program;
+
+    fn scan(code: &'static str) -> CodebaseMetadata {
+        let file = File::ephemeral(Cow::Borrowed("code.php"), Cow::Borrowed(code));
+        let config =
+            DatabaseConfiguration::new(std::path::Path::new("/"), vec![], vec![], vec![], vec![]).into_static();
+        let database = Database::single(file, config);
+
+        let mut codebase = CodebaseMetadata::new();
+        let arena = Bump::new();
+        for file in database.files() {
+            let program = parse_file(&arena, &file);
+            assert!(!program.has_errors(), "parse failed: {:?}", program.errors);
+            let resolved_names = NameResolver::new(&arena).resolve(program);
+            codebase.extend(scan_program(&arena, &file, program, &resolved_names));
+        }
+        codebase
+    }
+
+    fn class_flags(codebase: &CodebaseMetadata, name: &str) -> MetadataFlags {
+        codebase
+            .class_likes
+            .get(&ascii_lowercase_atom(name))
+            .unwrap_or_else(|| panic!("class-like `{name}` not found; have {:?}", codebase.class_likes.keys()))
+            .flags
+    }
+
+    fn function_flags(codebase: &CodebaseMetadata, name: &str) -> MetadataFlags {
+        codebase
+            .function_likes
+            .get(&(empty_atom(), ascii_lowercase_atom(name)))
+            .unwrap_or_else(|| panic!("function `{name}` not found"))
+            .flags
+    }
+
+    fn constant_flags(codebase: &CodebaseMetadata, name: &str) -> MetadataFlags {
+        codebase.constants.get(&atom(name)).unwrap_or_else(|| panic!("constant `{name}` not found")).flags
+    }
+
+    #[test]
+    fn class_in_not_class_exists_is_polyfill() {
+        let code = r#"<?php
+            if (!class_exists('Foo')) {
+                class Foo {}
+            }
+        "#;
+        assert!(class_flags(&scan(code), "Foo").is_polyfill());
+    }
+
+    #[test]
+    fn interface_in_not_interface_exists_is_polyfill() {
+        let code = r#"<?php
+            if (!interface_exists('Bar')) {
+                interface Bar {}
+            }
+        "#;
+        assert!(class_flags(&scan(code), "Bar").is_polyfill());
+    }
+
+    #[test]
+    fn trait_in_not_trait_exists_is_polyfill() {
+        let code = r#"<?php
+            if (!trait_exists('Mix')) {
+                trait Mix {}
+            }
+        "#;
+        assert!(class_flags(&scan(code), "Mix").is_polyfill());
+    }
+
+    #[test]
+    fn enum_in_not_enum_exists_is_polyfill() {
+        let code = r#"<?php
+            if (!enum_exists('Kind')) {
+                enum Kind { case A; }
+            }
+        "#;
+        assert!(class_flags(&scan(code), "Kind").is_polyfill());
+    }
+
+    #[test]
+    fn function_in_not_function_exists_is_polyfill() {
+        let code = r#"<?php
+            if (!function_exists('foo')) {
+                function foo(): void {}
+            }
+        "#;
+        assert!(function_flags(&scan(code), "foo").is_polyfill());
+    }
+
+    #[test]
+    fn const_in_not_defined_is_polyfill() {
+        let code = r#"<?php
+            if (!defined('FOO')) {
+                const FOO = 1;
+            }
+        "#;
+        assert!(constant_flags(&scan(code), "FOO").is_polyfill());
+    }
+
+    #[test]
+    fn define_call_in_not_defined_is_polyfill() {
+        let code = r#"<?php
+            if (!defined('BAR')) {
+                define('BAR', 1);
+            }
+        "#;
+        assert!(constant_flags(&scan(code), "BAR").is_polyfill());
+    }
+
+    #[test]
+    fn class_in_else_branch_of_positive_check_is_polyfill() {
+        let code = r#"<?php
+            if (class_exists('Foo')) {
+            } else {
+                class Foo {}
+            }
+        "#;
+        assert!(class_flags(&scan(code), "Foo").is_polyfill());
+    }
+
+    #[test]
+    fn class_in_then_branch_of_positive_check_is_not_polyfill() {
+        let code = r#"<?php
+            if (class_exists('Foo')) {
+                class Bar {}
+            }
+        "#;
+        assert!(!class_flags(&scan(code), "Bar").is_polyfill());
+    }
+
+    #[test]
+    fn top_level_class_is_not_polyfill() {
+        let code = "<?php class Plain {}";
+        assert!(!class_flags(&scan(code), "Plain").is_polyfill());
+    }
+
+    #[test]
+    fn class_inside_unrelated_if_is_not_polyfill() {
+        let code = r#"<?php
+            if (PHP_VERSION_ID > 80000) {
+                class Modern {}
+            }
+        "#;
+        assert!(!class_flags(&scan(code), "Modern").is_polyfill());
+    }
+
+    #[test]
+    fn class_in_then_branch_when_condition_is_not_exists_check_is_not_polyfill() {
+        let code = r#"<?php
+            if (!some_other_check()) {
+                class Other {}
+            }
+        "#;
+        assert!(!class_flags(&scan(code), "Other").is_polyfill());
+    }
+
+    #[test]
+    fn polyfill_flag_does_not_leak_to_siblings() {
+        let code = r#"<?php
+            if (!class_exists('Polyfilled')) {
+                class Polyfilled {}
+            }
+
+            class Real {}
+        "#;
+        let codebase = scan(code);
+        assert!(class_flags(&codebase, "Polyfilled").is_polyfill());
+        assert!(!class_flags(&codebase, "Real").is_polyfill());
+    }
+
+    #[test]
+    fn class_inside_else_does_not_leak_to_preceding_sibling() {
+        let code = r#"<?php
+            if (class_exists('Gate')) {
+                class Sibling {}
+            } else {
+                class Gate {}
+            }
+        "#;
+        let codebase = scan(code);
+        assert!(!class_flags(&codebase, "Sibling").is_polyfill());
+        assert!(class_flags(&codebase, "Gate").is_polyfill());
+    }
+
+    #[test]
+    fn class_nested_inside_polyfill_guard_is_still_polyfill() {
+        let code = r#"<?php
+            if (!class_exists('Wrapper')) {
+                if (PHP_VERSION_ID >= 80000) {
+                    class Wrapper {}
+                }
+            }
+        "#;
+        assert!(class_flags(&scan(code), "Wrapper").is_polyfill());
+    }
+
+    #[test]
+    fn nested_polyfill_guards_unwind_correctly() {
+        let code = r#"<?php
+            if (!class_exists('A')) {
+                class A {}
+            }
+            class B {}
+            if (!class_exists('C')) {
+                class C {}
+            }
+            class D {}
+        "#;
+        let codebase = scan(code);
+        assert!(class_flags(&codebase, "A").is_polyfill());
+        assert!(!class_flags(&codebase, "B").is_polyfill());
+        assert!(class_flags(&codebase, "C").is_polyfill());
+        assert!(!class_flags(&codebase, "D").is_polyfill());
+    }
+
+    #[test]
+    fn polyfill_within_namespace_gets_full_fqn_flagged() {
+        let code = r#"<?php
+            namespace Pkg;
+            if (!class_exists('Pkg\\Stub')) {
+                class Stub {}
+            }
+        "#;
+        assert!(class_flags(&scan(code), "Pkg\\Stub").is_polyfill());
+    }
+
+    #[test]
+    fn class_in_alternative_syntax_then_branch_is_polyfill() {
+        let code = r#"<?php
+            if (!class_exists('Alt')):
+                class Alt {}
+            endif;
+        "#;
+        assert!(class_flags(&scan(code), "Alt").is_polyfill());
+    }
+
+    #[test]
+    fn class_in_alternative_syntax_else_branch_is_polyfill() {
+        let code = r#"<?php
+            if (class_exists('AltElse')):
+            else:
+                class AltElse {}
+            endif;
+        "#;
+        assert!(class_flags(&scan(code), "AltElse").is_polyfill());
+    }
+
+    #[test]
+    fn leading_backslash_on_guard_function_is_recognized() {
+        let code = r#"<?php
+            if (!\class_exists('Qualified')) {
+                class Qualified {}
+            }
+        "#;
+        assert!(class_flags(&scan(code), "Qualified").is_polyfill());
+    }
+
+    #[test]
+    fn guard_function_case_insensitive() {
+        let code = r#"<?php
+            if (!CLASS_EXISTS('Uppercase')) {
+                class Uppercase {}
+            }
+        "#;
+        assert!(class_flags(&scan(code), "Uppercase").is_polyfill());
+    }
+
+    #[test]
+    fn parenthesized_guard_expression_is_recognized() {
+        let code = r#"<?php
+            if (!(class_exists('Parenned'))) {
+                class Parenned {}
+            }
+        "#;
+        assert!(class_flags(&scan(code), "Parenned").is_polyfill());
+    }
+
+    #[test]
+    fn doubly_parenthesized_guard_is_recognized() {
+        let code = r#"<?php
+            if ((!((class_exists('DoubleParen'))))) {
+                class DoubleParen {}
+            }
+        "#;
+        assert!(class_flags(&scan(code), "DoubleParen").is_polyfill());
+    }
+
+    #[test]
+    fn class_in_elseif_branch_is_not_polyfill() {
+        let code = r#"<?php
+            if (false) {
+            } elseif (!class_exists('Never')) {
+                class Never {}
+            }
+        "#;
+        assert!(!class_flags(&scan(code), "Never").is_polyfill());
+    }
+
+    #[test]
+    fn merge_non_polyfill_overrides_polyfill() {
+        let mut stub = scan(
+            r#"<?php
+            if (!class_exists('Shared')) {
+                class Shared {}
+            }
+        "#,
+        );
+        let real = scan("<?php class Shared { public int $x = 1; }");
+        stub.extend(real);
+        let flags = class_flags(&stub, "Shared");
+        assert!(!flags.is_polyfill(), "polyfill should have been replaced by real: flags = {flags:?}");
+    }
+
+    #[test]
+    fn merge_polyfill_does_not_override_non_polyfill() {
+        let mut real = scan("<?php class Shared { public int $x = 1; }");
+        let stub = scan(
+            r#"<?php
+            if (!class_exists('Shared')) {
+                class Shared {}
+            }
+        "#,
+        );
+        real.extend(stub);
+        assert!(!class_flags(&real, "Shared").is_polyfill());
+    }
+
+    #[test]
+    fn merge_only_polyfill_is_kept() {
+        let codebase = scan(
+            r#"<?php
+            if (!class_exists('OnlyStub')) {
+                class OnlyStub {}
+            }
+        "#,
+        );
+        assert!(class_flags(&codebase, "OnlyStub").is_polyfill());
+    }
+
+    #[test]
+    fn merge_function_non_polyfill_overrides_polyfill() {
+        let mut stub = scan(
+            r#"<?php
+            if (!function_exists('array_is_list')) {
+                function array_is_list(array $arr): bool { return true; }
+            }
+        "#,
+        );
+        let real = scan("<?php function array_is_list(array $arr): bool { return false; }");
+        stub.extend(real);
+        assert!(!function_flags(&stub, "array_is_list").is_polyfill());
+    }
+
+    #[test]
+    fn merge_constant_non_polyfill_overrides_polyfill() {
+        let mut stub = scan(
+            r#"<?php
+            if (!defined('MY_CONST')) {
+                const MY_CONST = 1;
+            }
+        "#,
+        );
+        let real = scan("<?php const MY_CONST = 2;");
+        stub.extend(real);
+        assert!(!constant_flags(&stub, "MY_CONST").is_polyfill());
+    }
+
+    #[test]
+    fn phpunit_test_case_stub_scenario_prefers_real() {
+        let mut codebase = scan(
+            r#"<?php
+            namespace PHPUnit\Framework;
+
+            if (!class_exists('PHPUnit\\Framework\\TestCase')) {
+                abstract class TestCase {}
+            }
+        "#,
+        );
+        let real = scan(
+            r#"<?php
+            namespace PHPUnit\Framework {
+                abstract class Assert {}
+                abstract class TestCase extends Assert {}
+            }
+        "#,
+        );
+        codebase.extend(real);
+
+        let tc = codebase
+            .class_likes
+            .get(&ascii_lowercase_atom("PHPUnit\\Framework\\TestCase"))
+            .expect("TestCase should be present in merged codebase");
+
+        assert!(!tc.flags.is_polyfill(), "merged TestCase should be the real definition");
+        assert_eq!(
+            tc.direct_parent_class.map(|p| p.to_string()),
+            Some("PHPUnit\\Framework\\Assert".to_ascii_lowercase()),
+        );
+    }
 }
