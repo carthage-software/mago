@@ -562,9 +562,10 @@ namespace {
     /**
      * @template-covariant TNode of DOMNode|DOMNameSpaceNode
      *
-     * @implements IteratorAggregate<int, TNode>
+     * @template-implements IteratorAggregate<int, TNode>
+     * @template-implements ArrayAccess<int, TNode>
      */
-    class DOMNodeList implements IteratorAggregate, Countable
+    class DOMNodeList implements IteratorAggregate, Countable, ArrayAccess
     {
         /**
          * @readonly
@@ -582,6 +583,35 @@ namespace {
          * @return TNode|null
          */
         public function item(int $index) {}
+
+        /**
+         * @param int $offset
+         *
+         * @return bool
+         */
+        public function offsetExists($offset) {}
+
+        /**
+         * @param int $offset
+         *
+         * @return TNode|null
+         */
+        public function offsetGet($offset) {}
+
+        /**
+         * @param int $offset
+         * @param TNode $value
+         *
+         * @return void
+         */
+        public function offsetSet($offset, $value) {}
+
+        /**
+         * @param int $offset
+         *
+         * @return void
+         */
+        public function offsetUnset($offset) {}
     }
 
     class DOMCharacterData extends DOMNode implements DOMChildNode
