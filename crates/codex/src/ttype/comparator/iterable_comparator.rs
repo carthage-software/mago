@@ -3,6 +3,7 @@ use crate::ttype::atomic::TAtomic;
 use crate::ttype::comparator::ComparisonResult;
 use crate::ttype::comparator::generic_comparator::update_failed_result_from_nested;
 use crate::ttype::comparator::union_comparator;
+use crate::ttype::get_arraykey;
 use crate::ttype::get_iterable_parameters;
 
 pub fn is_contained_by(
@@ -16,9 +17,18 @@ pub fn is_contained_by(
         return false;
     };
 
-    let Some((input_k, input_v)) = get_iterable_parameters(input_type_part, codebase) else {
+    let Some((mut input_k, input_v)) = get_iterable_parameters(input_type_part, codebase) else {
         return false;
     };
+
+    // `iterable<V>` desugars to `iterable<mixed, V>` whose *array* arm is
+    // `array<array-key, V>` (PHP arrays can only hold array-key keys).
+    if matches!(input_type_part, TAtomic::Iterable(_))
+        && matches!(container_type_part, TAtomic::Array(_))
+        && input_k.is_mixed()
+    {
+        input_k = get_arraykey();
+    }
 
     let mut all_types_contain = true;
 
