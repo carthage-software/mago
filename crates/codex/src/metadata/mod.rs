@@ -1286,18 +1286,19 @@ mod should_replace_metadata_tests {
     }
 
     #[test]
-    fn polyfill_flag_checked_before_user_defined() {
+    fn user_defined_beats_polyfill_flag() {
         let polyfill_user = MetadataFlags::POLYFILL | MetadataFlags::USER_DEFINED;
         let plain = MetadataFlags::empty();
-        assert!(should_replace_metadata(polyfill_user, Span::dummy(0, 10), plain, Span::dummy(0, 10)));
+        assert!(!should_replace_metadata(polyfill_user, Span::dummy(0, 10), plain, Span::dummy(0, 10)));
+        assert!(should_replace_metadata(plain, Span::dummy(0, 10), polyfill_user, Span::dummy(0, 10)));
     }
 
     #[test]
-    fn two_polyfills_fall_through_to_priority_rules() {
+    fn two_user_defined_fall_through_to_polyfill_check() {
         let a = MetadataFlags::POLYFILL | MetadataFlags::USER_DEFINED;
-        let b = MetadataFlags::POLYFILL;
-        assert!(!should_replace_metadata(a, Span::dummy(0, 10), b, Span::dummy(0, 10)));
-        assert!(should_replace_metadata(b, Span::dummy(0, 10), a, Span::dummy(0, 10)));
+        let b = MetadataFlags::USER_DEFINED;
+        assert!(should_replace_metadata(a, Span::dummy(0, 10), b, Span::dummy(0, 10)));
+        assert!(!should_replace_metadata(b, Span::dummy(0, 10), a, Span::dummy(0, 10)));
     }
 
     #[test]
