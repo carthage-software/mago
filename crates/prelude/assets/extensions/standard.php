@@ -901,9 +901,9 @@ function sapi_windows_generate_ctrl_event(int $event, int $pid = 0): bool {}
  * @template TSend
  * @template-covariant TReturn
  *
- * @template-implements Traversable<TKey, TValue>
+ * @template-implements Iterator<TKey, TValue>
  */
-class Generator implements Traversable
+class Generator implements Iterator
 {
     /**
      * @return ?TValue
