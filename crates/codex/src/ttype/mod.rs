@@ -1191,6 +1191,13 @@ fn intersect_atomic_types(
         return Some(result);
     }
 
+    if let (TAtomic::Scalar(TScalar::String(s)), TAtomic::Scalar(TScalar::Numeric))
+    | (TAtomic::Scalar(TScalar::Numeric), TAtomic::Scalar(TScalar::String(s))) = (type_1, type_2)
+    {
+        *intersection_performed = true;
+        return Some(TAtomic::Scalar(TScalar::String(s.as_numeric(true))));
+    }
+
     if let (TAtomic::Scalar(TScalar::String(s1)), TAtomic::Scalar(TScalar::String(s2))) = (type_1, type_2) {
         if let (Some(v1), Some(v2)) = (&s1.get_known_literal_value(), &s2.get_known_literal_value())
             && v1 != v2

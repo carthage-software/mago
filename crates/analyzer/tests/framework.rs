@@ -59,6 +59,20 @@ pub fn default_test_settings() -> Settings {
     }
 }
 
+#[must_use]
+pub fn infection_like_settings() -> Settings {
+    Settings {
+        find_unused_expressions: true,
+        find_unused_definitions: true,
+        find_unused_parameters: true,
+        check_throws: true,
+        analyze_dead_code: true,
+        memoize_properties: true,
+        allow_possibly_undefined_array_keys: true,
+        ..Default::default()
+    }
+}
+
 fn run_test_case_inner(config: TestCase) {
     let Prelude { mut database, mut metadata, mut symbol_references } = PRELUDE.clone();
 

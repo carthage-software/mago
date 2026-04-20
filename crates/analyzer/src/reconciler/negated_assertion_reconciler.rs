@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::sync::Arc;
 
 use mago_atom::Atom;
 use mago_atom::AtomSet;
@@ -6,6 +7,8 @@ use mago_codex::assertion::Assertion;
 use mago_codex::consts::MAX_ENUM_CASES_FOR_ANALYSIS;
 
 use mago_codex::ttype::atomic::TAtomic;
+use mago_codex::ttype::atomic::array::TArray;
+use mago_codex::ttype::atomic::array::keyed::TKeyedArray;
 use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::atomic::object::r#enum::TEnum;
 use mago_codex::ttype::atomic::object::named::TNamedObject;
@@ -16,6 +19,7 @@ use mago_codex::ttype::combiner::CombinerOptions;
 use mago_codex::ttype::comparator::ComparisonResult;
 use mago_codex::ttype::comparator::atomic_comparator;
 use mago_codex::ttype::comparator::union_comparator;
+use mago_codex::ttype::get_arraykey;
 use mago_codex::ttype::get_never;
 use mago_codex::ttype::get_placeholder;
 use mago_codex::ttype::union::TUnion;
@@ -237,6 +241,24 @@ fn subtract_complex_type(
             (TAtomic::Object(TObject::Enum(_)), TAtomic::Object(TObject::Enum(_))) => {
                 *can_be_disjunct = true;
                 acceptable_types.push(existing_atomic);
+            }
+            (TAtomic::Iterable(iterable), TAtomic::Object(TObject::Named(assertion_named)))
+                if assertion_named.name.eq_ignore_ascii_case("Traversable") =>
+            {
+                *can_be_disjunct = true;
+
+                let key_type = if iterable.key_type.is_always_array_key(false) {
+                    iterable.key_type.clone()
+                } else {
+                    Arc::new(get_arraykey())
+                };
+
+                acceptable_types.push(TAtomic::Array(TArray::Keyed(TKeyedArray::new_with_parameters(
+                    key_type,
+                    iterable.value_type.clone(),
+                ))));
+
+                continue;
             }
             _ => {
                 acceptable_types.push(existing_atomic);

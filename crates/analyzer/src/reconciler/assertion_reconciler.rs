@@ -422,6 +422,49 @@ pub(crate) fn intersect_atomic_with_atomic(
                 return Some(type_2_atomic);
             }
         }
+        (TAtomic::Iterable(iterable), object @ TAtomic::Object(TObject::Named(named_object)))
+        | (object @ TAtomic::Object(TObject::Named(named_object)), TAtomic::Iterable(iterable))
+            if object.is_traversable(context.codebase)
+                && (named_object.name.eq_ignore_ascii_case("Iterator")
+                    || named_object.name.eq_ignore_ascii_case("IteratorAggregate")
+                    || named_object.name.eq_ignore_ascii_case("Traversable")) =>
+        {
+            let mut object = named_object.clone();
+            if object.get_type_parameters().is_none() {
+                object = object.with_type_parameters(Some(vec![
+                    iterable.get_key_type().clone(),
+                    iterable.get_value_type().clone(),
+                ]));
+            }
+
+            return Some(TAtomic::Object(TObject::Named(object)));
+        }
+        (TAtomic::Array(array), TAtomic::Iterable(iterable)) | (TAtomic::Iterable(iterable), TAtomic::Array(array)) => {
+            let iter_key = iterable.get_key_type();
+            let iter_value = iterable.get_value_type();
+
+            return Some(match array {
+                TArray::List(list) => {
+                    let narrowed_value = intersect_union_types(&list.element_type, iter_value, context.codebase)?;
+                    let mut new_list = list.clone();
+                    new_list.element_type = Arc::new(narrowed_value);
+                    TAtomic::Array(TArray::List(new_list))
+                }
+                TArray::Keyed(keyed) => {
+                    let default_key = mago_codex::ttype::get_arraykey();
+                    let default_value = get_mixed();
+                    let (array_key, array_value) = match keyed.parameters.as_ref() {
+                        Some((k, v)) => (k.as_ref(), v.as_ref()),
+                        None => (&default_key, &default_value),
+                    };
+                    let narrowed_key = intersect_union_types(array_key, iter_key, context.codebase)?;
+                    let narrowed_value = intersect_union_types(array_value, iter_value, context.codebase)?;
+                    let mut new_keyed = keyed.clone();
+                    new_keyed.parameters = Some((Arc::new(narrowed_key), Arc::new(narrowed_value)));
+                    TAtomic::Array(TArray::Keyed(new_keyed))
+                }
+            });
+        }
         _ => (),
     }
 
@@ -642,6 +685,19 @@ fn intersect_contained_atomic_with_another(
     let TAtomic::Object(TObject::Named(named_object)) = sub_atomic else {
         return Some(sub_atomic.clone());
     };
+
+    if let TAtomic::Iterable(iterable) = super_atomic
+        && named_object.get_type_parameters().is_none()
+        && (named_object.name.eq_ignore_ascii_case("Iterator")
+            || named_object.name.eq_ignore_ascii_case("IteratorAggregate")
+            || named_object.name.eq_ignore_ascii_case("Traversable"))
+    {
+        return Some(TAtomic::Object(TObject::Named(
+            named_object
+                .clone()
+                .with_type_parameters(Some(vec![iterable.get_key_type().clone(), iterable.get_value_type().clone()])),
+        )));
+    }
 
     if let TAtomic::Object(TObject::Named(super_named_object)) = super_atomic
         && super_named_object.get_name() == named_object.get_name()
