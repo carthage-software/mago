@@ -1229,10 +1229,10 @@ impl Default for CodebaseMetadata {
 /// Determines which metadata value to keep when merging duplicates.
 ///
 /// Priority:
-///   1. non-polyfill > polyfill — tools like rector/phpstan/psalm ship
+///   1. user-defined > built-in > other.
+///   2. non-polyfill > polyfill — tools like rector/phpstan/psalm ship
 ///      skeleton stubs gated by `if (!class_exists('X'))` that should never
 ///      shadow a concrete definition.
-///   2. user-defined > built-in > other.
 ///   3. smaller span wins as a deterministic tie-breaker.
 ///
 /// Returns `true` if the new value should replace the existing one.
@@ -1242,13 +1242,6 @@ fn should_replace_metadata(
     new_flags: MetadataFlags,
     new_span: Span,
 ) -> bool {
-    let new_is_polyfill = new_flags.is_polyfill();
-    let existing_is_polyfill = existing_flags.is_polyfill();
-
-    if new_is_polyfill != existing_is_polyfill {
-        return !new_is_polyfill;
-    }
-
     let new_is_user_defined = new_flags.is_user_defined();
     let existing_is_user_defined = existing_flags.is_user_defined();
 
@@ -1261,6 +1254,13 @@ fn should_replace_metadata(
 
     if new_is_built_in != existing_is_built_in {
         return new_is_built_in;
+    }
+
+    let new_is_polyfill = new_flags.is_polyfill();
+    let existing_is_polyfill = existing_flags.is_polyfill();
+
+    if new_is_polyfill != existing_is_polyfill {
+        return !new_is_polyfill;
     }
 
     new_span < existing_span
