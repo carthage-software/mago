@@ -450,7 +450,6 @@ impl<'ctx, 'arena> MutWalker<'arena, 'arena, Context<'ctx, 'arena>> for Scanner 
             self.template_constraints.push(template_definition);
 
             walk_anonymous_class_mut(self, anonymous_class, context);
-        } else {
         }
     }
 
@@ -466,7 +465,6 @@ impl<'ctx, 'arena> MutWalker<'arena, 'arena, Context<'ctx, 'arena>> for Scanner 
             self.template_constraints.push(templates);
 
             walk_class_mut(self, class, context);
-        } else {
         }
     }
 
@@ -482,7 +480,6 @@ impl<'ctx, 'arena> MutWalker<'arena, 'arena, Context<'ctx, 'arena>> for Scanner 
             self.template_constraints.push(templates);
 
             walk_trait_mut(self, r#trait, context);
-        } else {
         }
     }
 
@@ -498,7 +495,6 @@ impl<'ctx, 'arena> MutWalker<'arena, 'arena, Context<'ctx, 'arena>> for Scanner 
             self.template_constraints.push(templates);
 
             walk_enum_mut(self, r#enum, context);
-        } else {
         }
     }
 
