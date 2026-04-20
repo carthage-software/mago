@@ -344,7 +344,9 @@ impl ImportTracker {
         let existing_reverse = match kind {
             ImportKind::Name => self.scope.class_fqn_to_local.get(&ascii_lowercase_atom(full.as_str())).copied(),
             ImportKind::Function => self.scope.function_fqn_to_local.get(&ascii_lowercase_atom(full.as_str())).copied(),
-            ImportKind::Constant => self.scope.constant_fqn_to_local.get(&ascii_lowercase_constant_name_atom(full.as_str())).copied(),
+            ImportKind::Constant => {
+                self.scope.constant_fqn_to_local.get(&ascii_lowercase_constant_name_atom(full.as_str())).copied()
+            }
         };
 
         if let Some(local) = existing_reverse {
@@ -1448,5 +1450,4 @@ mod tests {
         assert!(b.use_statement_edit.is_some());
         assert_ne!(a.local_name, b.local_name);
     }
-
 }
