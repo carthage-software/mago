@@ -1,3 +1,4 @@
+use mago_span::HasSpan;
 use mago_syntax::ast::Class;
 use mago_syntax::ast::ClassLikeMember;
 use mago_syntax::ast::Constant;
@@ -7,6 +8,7 @@ use mago_syntax::ast::Interface;
 use mago_syntax::ast::Namespace;
 use mago_syntax::ast::Trait;
 use mago_syntax::walker::MutWalker;
+use mago_text_edit::TextEdit;
 
 use crate::context::GuardContext;
 use crate::matcher;
@@ -18,6 +20,36 @@ use crate::settings::StructuralSymbolKind;
 
 #[derive(Debug, Clone, Copy)]
 pub struct StructuralGuardWalker;
+
+fn compute_missing_fqns<'a>(
+    current: &[impl AsRef<str>],
+    constraint: &'a StructuralInheritanceConstraint,
+) -> Vec<&'a str> {
+    match constraint {
+        StructuralInheritanceConstraint::Single(fqn) => {
+            if current.iter().any(|c| c.as_ref().eq_ignore_ascii_case(fqn)) {
+                vec![]
+            } else {
+                vec![fqn.as_str()]
+            }
+        }
+        StructuralInheritanceConstraint::AllOf(fqns) => {
+            fqns.iter()
+                .filter(|fqn| !current.iter().any(|c| c.as_ref().eq_ignore_ascii_case(fqn)))
+                .map(|s| s.as_str())
+                .collect()
+        }
+        _ => vec![],
+    }
+}
+
+fn format_fqn(fqn: &str) -> String {
+    if fqn.starts_with('\\') {
+        fqn.to_string()
+    } else {
+        format!("\\{fqn}")
+    }
+}
 
 impl StructuralGuardWalker {
     fn get_structural_rules<'ctx, 'arena>(
@@ -104,6 +136,7 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
                     span: class.name.span,
                     kind: FlawKind::MustBeNamed { pattern: must_be_named.clone() },
                     reason: structural_rule.reason.clone(),
+                    edits: vec![],
                 });
             }
 
@@ -116,6 +149,7 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
                     span: class.name.span,
                     kind: FlawKind::MustBe { allowed: allowed_kinds.clone() },
                     reason: structural_rule.reason.clone(),
+                    edits: vec![],
                 });
             }
 
@@ -130,6 +164,14 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
                             span: class.name.span,
                             kind: FlawKind::MustBeFinal,
                             reason: structural_rule.reason.clone(),
+                            edits: {
+                                let offset = class
+                                    .modifiers
+                                    .first()
+                                    .map(|m| m.span().start.offset)
+                                    .unwrap_or_else(|| class.class.span().start.offset);
+                                vec![TextEdit::insert(offset, "final ")]
+                            },
                         });
                     }
                     (false, true) => {
@@ -139,6 +181,10 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
                             span: class.name.span,
                             kind: FlawKind::MustNotBeFinal,
                             reason: structural_rule.reason.clone(),
+                            edits: match class.modifiers.get_final() {
+                                Some(m) => vec![TextEdit::delete(m.span())],
+                                None => vec![],
+                            },
                         });
                     }
                     _ => {}
@@ -156,6 +202,7 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
                             span: class.name.span,
                             kind: FlawKind::MustBeAbstract,
                             reason: structural_rule.reason.clone(),
+                            edits: vec![],
                         });
                     }
                     (false, true) => {
@@ -165,6 +212,10 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
                             span: class.name.span,
                             kind: FlawKind::MustNotBeAbstract,
                             reason: structural_rule.reason.clone(),
+                            edits: match class.modifiers.get_abstract() {
+                                Some(m) => vec![TextEdit::delete(m.span())],
+                                None => vec![],
+                            },
                         });
                     }
                     _ => {}
@@ -182,6 +233,10 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
                             span: class.name.span,
                             kind: FlawKind::MustBeReadonly,
                             reason: structural_rule.reason.clone(),
+                            edits: {
+                                let offset = class.class.span().start.offset;
+                                vec![TextEdit::insert(offset, "readonly ")]
+                            },
                         });
                     }
                     (false, true) => {
@@ -191,6 +246,10 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
                             span: class.name.span,
                             kind: FlawKind::MustNotBeReadonly,
                             reason: structural_rule.reason.clone(),
+                            edits: match class.modifiers.get_readonly() {
+                                Some(m) => vec![TextEdit::delete(m.span())],
+                                None => vec![],
+                            },
                         });
                     }
                     _ => {}
@@ -216,6 +275,23 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
                         span: class.name.span,
                         kind: FlawKind::MustExtend { expected: must_extends.clone() },
                         reason: structural_rule.reason.clone(),
+                        edits: {
+                            if class.extends.is_none() {
+                                if let StructuralInheritanceConstraint::Single(fqn) = must_extends {
+                                    let insert_before = class
+                                        .implements
+                                        .as_ref()
+                                        .map(|i| i.implements.span().start.offset)
+                                        .unwrap_or(class.left_brace.start.offset);
+                                    let text = format!(" extends {}", format_fqn(fqn));
+                                    vec![TextEdit::insert(insert_before, text)]
+                                } else {
+                                    vec![]
+                                }
+                            } else {
+                                vec![]
+                            }
+                        },
                     });
                 }
             }
@@ -239,6 +315,27 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
                         span: class.name.span,
                         kind: FlawKind::MustImplement { expected: must_implement.clone() },
                         reason: structural_rule.reason.clone(),
+                        edits: {
+                            let missing = compute_missing_fqns(&implemented_fqns, must_implement);
+                            if missing.is_empty() {
+                                vec![]
+                            } else if let Some(implements) = &class.implements {
+                                let last = implements.types.nodes.last().unwrap();
+                                let text: String =
+                                    missing.iter().map(|f| format!(", {}", format_fqn(f))).collect();
+                                vec![TextEdit::insert(last.span().end.offset, text)]
+                            } else {
+                                let text = format!(
+                                    " implements {}",
+                                    missing
+                                        .iter()
+                                        .map(|f| format_fqn(f))
+                                        .collect::<Vec<_>>()
+                                        .join(", ")
+                                );
+                                vec![TextEdit::insert(class.left_brace.start.offset, text)]
+                            }
+                        },
                     });
                 }
             }
@@ -265,6 +362,19 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
                         span: class.name.span,
                         kind: FlawKind::MustUseTrait { expected: must_use_traits.clone() },
                         reason: structural_rule.reason.clone(),
+                        edits: {
+                            let missing = compute_missing_fqns(&used_fqns, must_use_traits);
+                            if missing.is_empty() {
+                                vec![]
+                            } else {
+                                let text = missing
+                                    .iter()
+                                    .map(|f| format!("\n    use {};", format_fqn(f)))
+                                    .collect::<Vec<_>>()
+                                    .join("");
+                                vec![TextEdit::insert(class.left_brace.end.offset, text)]
+                            }
+                        },
                     });
                 }
             }
@@ -287,6 +397,7 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
                         span: class.name.span,
                         kind: FlawKind::MustUseAttribute { expected: must_use_attributes.clone() },
                         reason: structural_rule.reason.clone(),
+                        edits: vec![],
                     });
                 }
             }
@@ -310,6 +421,7 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
                     span: interface.name.span,
                     kind: FlawKind::MustBeNamed { pattern: must_be_named.clone() },
                     reason: structural_rule.reason.clone(),
+                    edits: vec![],
                 });
             }
 
@@ -322,6 +434,7 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
                     span: interface.name.span,
                     kind: FlawKind::MustBe { allowed: allowed_kinds.clone() },
                     reason: structural_rule.reason.clone(),
+                    edits: vec![],
                 });
             }
 
@@ -344,6 +457,7 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
                         span: interface.name.span,
                         kind: FlawKind::MustExtend { expected: must_extends.clone() },
                         reason: structural_rule.reason.clone(),
+                        edits: vec![],
                     });
                 }
             }
@@ -366,6 +480,7 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
                         span: interface.name.span,
                         kind: FlawKind::MustUseAttribute { expected: must_use_attributes.clone() },
                         reason: structural_rule.reason.clone(),
+                        edits: vec![],
                     });
                 }
             }
@@ -387,6 +502,7 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
                     span: r#enum.name.span,
                     kind: FlawKind::MustBeNamed { pattern: must_be_named.clone() },
                     reason: structural_rule.reason.clone(),
+                    edits: vec![],
                 });
             }
 
@@ -399,6 +515,7 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
                     span: r#enum.name.span,
                     kind: FlawKind::MustBe { allowed: allowed_kinds.clone() },
                     reason: structural_rule.reason.clone(),
+                    edits: vec![],
                 });
             }
 
@@ -421,6 +538,27 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
                         span: r#enum.name.span,
                         kind: FlawKind::MustImplement { expected: must_implement.clone() },
                         reason: structural_rule.reason.clone(),
+                        edits: {
+                            let missing = compute_missing_fqns(&implemented_fqns, must_implement);
+                            if missing.is_empty() {
+                                vec![]
+                            } else if let Some(implements) = &r#enum.implements {
+                                let last = implements.types.nodes.last().unwrap();
+                                let text: String =
+                                    missing.iter().map(|f| format!(", {}", format_fqn(f))).collect();
+                                vec![TextEdit::insert(last.span().end.offset, text)]
+                            } else {
+                                let text = format!(
+                                    " implements {}",
+                                    missing
+                                        .iter()
+                                        .map(|f| format_fqn(f))
+                                        .collect::<Vec<_>>()
+                                        .join(", ")
+                                );
+                                vec![TextEdit::insert(r#enum.left_brace.start.offset, text)]
+                            }
+                        },
                     });
                 }
             }
@@ -443,6 +581,7 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
                         span: r#enum.name.span,
                         kind: FlawKind::MustUseAttribute { expected: must_use_attributes.clone() },
                         reason: structural_rule.reason.clone(),
+                        edits: vec![],
                     });
                 }
             }
@@ -466,6 +605,7 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
                     span: r#trait.name.span,
                     kind: FlawKind::MustBeNamed { pattern: must_be_named.clone() },
                     reason: structural_rule.reason.clone(),
+                    edits: vec![],
                 });
             }
 
@@ -478,6 +618,7 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
                     span: r#trait.name.span,
                     kind: FlawKind::MustBe { allowed: allowed_kinds.clone() },
                     reason: structural_rule.reason.clone(),
+                    edits: vec![],
                 });
             }
 
@@ -503,6 +644,7 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
                         span: r#trait.name.span,
                         kind: FlawKind::MustUseTrait { expected: must_use_traits.clone() },
                         reason: structural_rule.reason.clone(),
+                        edits: vec![],
                     });
                 }
             }
@@ -525,6 +667,7 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
                         span: r#trait.name.span,
                         kind: FlawKind::MustUseAttribute { expected: must_use_attributes.clone() },
                         reason: structural_rule.reason.clone(),
+                        edits: vec![],
                     });
                 }
             }
@@ -548,6 +691,7 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
                     span: function.name.span,
                     kind: FlawKind::MustBeNamed { pattern: must_be_named.clone() },
                     reason: structural_rule.reason.clone(),
+                    edits: vec![],
                 });
             }
 
@@ -560,6 +704,7 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
                     span: function.name.span,
                     kind: FlawKind::MustBe { allowed: allowed_kinds.clone() },
                     reason: structural_rule.reason.clone(),
+                    edits: vec![],
                 });
             }
 
@@ -581,6 +726,7 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
                         span: function.name.span,
                         kind: FlawKind::MustUseAttribute { expected: must_use_attribute.clone() },
                         reason: structural_rule.reason.clone(),
+                        edits: vec![],
                     });
                 }
             }
@@ -605,6 +751,7 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
                         span: constant_item.name.span,
                         kind: FlawKind::MustBeNamed { pattern: must_be_named.clone() },
                         reason: structural_rule.reason.clone(),
+                        edits: vec![],
                     });
                 }
 
@@ -617,6 +764,7 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
                         span: constant_item.name.span,
                         kind: FlawKind::MustBe { allowed: allowed_kinds.clone() },
                         reason: structural_rule.reason.clone(),
+                        edits: vec![],
                     });
                 }
 
@@ -638,6 +786,7 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
                             span: constant_item.name.span,
                             kind: FlawKind::MustUseAttribute { expected: must_use_attributes.clone() },
                             reason: structural_rule.reason.clone(),
+                            edits: vec![],
                         });
                     }
                 }

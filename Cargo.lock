@@ -1529,6 +1529,7 @@ dependencies = [
  "mago-span",
  "mago-syntax",
  "mago-syntax-core",
+ "mago-text-edit",
  "schemars",
  "serde",
  "toml",

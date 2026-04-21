@@ -3,6 +3,7 @@ use std::fmt;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::Span;
+use mago_text_edit::TextEdit;
 
 use crate::settings::StructuralInheritanceConstraint;
 use crate::settings::StructuralSymbolKind;
@@ -20,6 +21,8 @@ pub struct StructuralFlaw {
     pub kind: FlawKind,
     /// An optional human-readable explanation for the flaw.
     pub reason: Option<String>,
+    /// Suggested text edits to fix this flaw. Empty if auto-fix is not available.
+    pub edits: Vec<TextEdit>,
 }
 
 /// Describes the specific kind of structural flaw.
@@ -42,6 +45,9 @@ pub enum FlawKind {
 impl From<StructuralFlaw> for Issue {
     /// Converts a `StructuralFlaw` into a rich, user-friendly `Issue`.
     fn from(flaw: StructuralFlaw) -> Self {
+        let file_id = flaw.span.file_id;
+        let edits = flaw.edits;
+
         let mut issue = Issue::error(format!("Structural flaw in `{}`", flaw.symbol_fqn))
             .with_annotation(Annotation::primary(flaw.span).with_message(flaw.kind.to_string()));
 
@@ -74,7 +80,13 @@ impl From<StructuralFlaw> for Issue {
             }
         };
 
-        issue.with_help(help)
+        issue = issue.with_help(help);
+
+        if !edits.is_empty() {
+            issue = issue.with_file_edits(file_id, edits);
+        }
+
+        issue
     }
 }
 

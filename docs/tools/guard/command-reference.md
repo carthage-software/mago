@@ -73,15 +73,36 @@ Rules:
 
 Under the hood, `TEMP` is added to the host paths and `ORIG` is added to the excludes for this run. The rest of the project is scanned as usual, so layer and namespace checks continue to see the mutation. Reported issues reference the `TEMP` path rather than `ORIG`; mutation-testing tools typically parse the diff of issue counts between a clean run and the substituted run, so this does not affect the workflow.
 
+### Auto-Fix Options
+
+The `guard` command can automatically fix structural violations for rules that support it (modifier constraints, interface/trait/extends additions). The `--fix` flag works the same way as in `mago lint`.
+
+| Flag                   | Description                                                                                        |
+|:-----------------------|:---------------------------------------------------------------------------------------------------|
+| `--fix`                | Automatically apply fixes for fixable structural violations.                                       |
+| `--dry-run`            | Preview what would be changed without writing any files. Shows a unified diff per file.            |
+| `--format-after-fix`   | Run the formatter on every file changed by `--fix` to clean up whitespace and style.              |
+
+```sh
+# Preview fixes without writing files
+mago guard --fix --dry-run
+
+# Apply fixes automatically
+mago guard --fix
+
+# Apply fixes then format changed files
+mago guard --fix --format-after-fix
+```
+
+:::tip
+Not all structural violations can be auto-fixed. Flaws that require human judgment (renaming, changing class kind, adding abstract) are always reported but never auto-applied. See [Using the Guard — Auto-Fix](./usage.md#auto-fixing-structural-flaws) for the full list.
+:::
+
 ### Shared Reporting Options
 
 The `guard` command uses a shared set of options for reporting the issues it finds.
 
 [**See the Shared Reporting and Fixing Options documentation.**](/fundamentals/shared-reporting-options.md)
-
-:::info
-Auto-fixing and baseline features are not applicable to the `guard` command.
-:::
 
 ### Help
 
