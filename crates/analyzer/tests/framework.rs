@@ -83,6 +83,11 @@ pub fn php_90_settings() -> Settings {
     Settings::new(mago_php_version::PHPVersion::new(9, 0, 0))
 }
 
+#[must_use]
+pub fn check_name_casing_settings() -> Settings {
+    Settings { check_name_casing: true, ..Default::default() }
+}
+
 fn run_test_case_inner(config: TestCase) {
     let Prelude { mut database, mut metadata, mut symbol_references } = PRELUDE.clone();
 

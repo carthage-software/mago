@@ -60,6 +60,15 @@ pub fn check_function_casing_with_metadata(
         return;
     }
 
+    let canonical_str = canonical.as_str();
+    let used_str = used_name.as_str();
+    if !canonical_str.contains('\\')
+        && let Some(used_basename) = used_str.rsplit('\\').next()
+        && used_basename == canonical_str
+    {
+        return;
+    }
+
     context.collector.report_with_code(
         IssueCode::IncorrectFunctionCasing,
         Issue::warning(format!("Incorrect casing for function `{used_name}`."))
