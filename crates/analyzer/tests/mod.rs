@@ -365,6 +365,7 @@ test_case!(iterable_instanceof_traversable_narrow, crate::framework::infection_l
 test_case!(generator_is_iterator_subtype, crate::framework::infection_like_settings());
 test_case!(explode_then_assert_count, crate::framework::infection_like_settings());
 test_case!(iterable_not_iterator_keeps_aggregate, crate::framework::infection_like_settings());
+test_case!(issue_1681, crate::framework::no_boolean_literal_comparison_settings());
 test_case!(post_narrowing_check);
 test_case!(data_transformer_type);
 test_case!(symbol_existence_assertions);

@@ -73,6 +73,11 @@ pub fn infection_like_settings() -> Settings {
     }
 }
 
+#[must_use]
+pub fn no_boolean_literal_comparison_settings() -> Settings {
+    Settings { no_boolean_literal_comparison: true, ..Default::default() }
+}
+
 fn run_test_case_inner(config: TestCase) {
     let Prelude { mut database, mut metadata, mut symbol_references } = PRELUDE.clone();
 

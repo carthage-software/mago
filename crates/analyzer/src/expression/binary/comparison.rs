@@ -66,6 +66,9 @@ pub fn analyze_comparison_operation<'ctx, 'arena>(
     if context.settings.no_boolean_literal_comparison
         // Only consider equality/inequality operators.
         && binary.operator.is_equality()
+        // Skip synthetic comparisons (e.g., those fabricated for match-arm analysis),
+        // whose operator carries `Span::zero()` and cannot be safely rewritten.
+        && !binary.operator.span().file_id.is_zero()
         // Identify if one side is a boolean literal and the other side's type is `bool`.
         && let Some((variable_expr, literal_expr, literal_value)) =
             if let Some(literal_value) = get_boolean_literal(binary.rhs) {
