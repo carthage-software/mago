@@ -25,6 +25,7 @@ large_enum_variant = { level = "allow" }
 print_stdout = { level = "forbid" }
 print_stderr = { level = "forbid" }
 dbg_macro = { level = "forbid" }
+let_underscore_lock = { level = "forbid" }
 
 [workspace.dependencies]
 mago-syntax-core = { path = "crates/syntax-core", version = "1.23.1" }

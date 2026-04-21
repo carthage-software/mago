@@ -75,6 +75,7 @@ struct AliasExpansionGuard {
 }
 
 impl AliasExpansionGuard {
+    #[must_use]
     fn new(class_name: Atom, alias_name: Atom) -> Self {
         EXPANDING_ALIASES.with(|set| set.borrow_mut().insert((class_name, alias_name)));
         Self { class_name, alias_name }
@@ -93,6 +94,7 @@ struct ObjectParamsExpansionGuard {
 }
 
 impl ObjectParamsExpansionGuard {
+    #[must_use]
     fn try_new(object_name: Atom) -> Option<Self> {
         EXPANDING_OBJECT_PARAMS.with(|set| {
             let mut set = set.borrow_mut();
@@ -124,6 +126,7 @@ struct ConstantExpansionGuard {
 }
 
 impl ConstantExpansionGuard {
+    #[must_use]
     fn try_new(class_name: Atom, constant_name: Atom) -> Option<Self> {
         EXPANDING_CONSTANTS.with(|set| {
             let mut set = set.borrow_mut();
@@ -972,7 +975,7 @@ fn expand_alias(alias: &TAlias, codebase: &CodebaseMetadata, options: &TypeExpan
         return vec![TAtomic::Alias(alias.clone())];
     };
 
-    let _ = AliasExpansionGuard::new(class_name, alias_name);
+    let _guard = AliasExpansionGuard::new(class_name, alias_name);
 
     expand_union(codebase, &mut expanded_union, options);
 
@@ -2167,9 +2170,13 @@ mod tests {
 
     #[test]
     fn test_expand_alias_cycle_detection() {
-        let codebase = CodebaseMetadata::new();
+        let code = r"<?php
+            /** @phpstan-type SelfRef = int|array<int, SelfRef> */
+            class Foo {}
+        ";
+        let codebase = create_test_codebase(code);
 
-        let alias = TAlias::new(atom("Foo"), atom("SelfRef"));
+        let alias = TAlias::new(ascii_lowercase_atom("foo"), atom("SelfRef"));
         let input = TUnion::from_atomic(TAtomic::Alias(alias.clone()));
 
         let mut actual = input.clone();
