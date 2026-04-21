@@ -1,4 +1,5 @@
 use mago_codex::ttype::get_bool;
+use mago_codex::ttype::get_false;
 use mago_codex::ttype::get_true;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
@@ -21,6 +22,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for IssetConstruct<'arena> {
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
         let mut all_definitely_set = true;
+        let mut any_definitely_unset = false;
         for value in &self.values {
             if !is_valid_isset_expression(value) {
                 context.collector.report_with_code(
@@ -39,11 +41,12 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for IssetConstruct<'arena> {
             value.analyze(context, block_context, artifacts)?;
             block_context.flags.set_inside_isset(was_inside_isset);
 
-            if !all_definitely_set {
-                continue;
-            }
-
             if let Some(value_type) = artifacts.get_expression_type(value) {
+                if value_type.is_never() || value_type.is_null() {
+                    any_definitely_unset = true;
+                    continue;
+                }
+
                 if value_type.possibly_undefined() || value_type.has_null() || value_type.has_nullable_mixed() {
                     all_definitely_set = false;
                 }
@@ -52,7 +55,13 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for IssetConstruct<'arena> {
             }
         }
 
-        let result_type = if all_definitely_set { get_true() } else { get_bool() };
+        let result_type = if any_definitely_unset {
+            get_false()
+        } else if all_definitely_set {
+            get_true()
+        } else {
+            get_bool()
+        };
 
         artifacts.set_expression_type(self, result_type);
 
