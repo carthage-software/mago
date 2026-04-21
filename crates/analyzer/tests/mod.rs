@@ -367,6 +367,8 @@ test_case!(explode_then_assert_count, crate::framework::infection_like_settings(
 test_case!(iterable_not_iterator_keeps_aggregate, crate::framework::infection_like_settings());
 test_case!(issue_1681, crate::framework::no_boolean_literal_comparison_settings());
 test_case!(issue_1679);
+test_case!(issue_1682);
+test_case!(issue_1682_php90, crate::framework::php_90_settings());
 test_case!(post_narrowing_check);
 test_case!(data_transformer_type);
 test_case!(symbol_existence_assertions);

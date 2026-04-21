@@ -78,6 +78,11 @@ pub fn no_boolean_literal_comparison_settings() -> Settings {
     Settings { no_boolean_literal_comparison: true, ..Default::default() }
 }
 
+#[must_use]
+pub fn php_90_settings() -> Settings {
+    Settings::new(mago_php_version::PHPVersion::new(9, 0, 0))
+}
+
 fn run_test_case_inner(config: TestCase) {
     let Prelude { mut database, mut metadata, mut symbol_references } = PRELUDE.clone();
 

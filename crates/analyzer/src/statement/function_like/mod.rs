@@ -36,6 +36,7 @@ use mago_codex::ttype::get_list;
 use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::union::TUnion;
 use mago_codex::ttype::wrap_atomic;
+use mago_php_version::feature::Feature;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
@@ -1175,13 +1176,16 @@ fn check_parameter_default_value<'ctx, 'arena>(
         return;
     }
 
+    let allow_implicit_null_default =
+        default_type.is_null() && context.settings.version.is_supported(Feature::ImplicitlyNullableParameterTypes);
+
     let mut comparison_result = ComparisonResult::new();
     if union_comparator::is_contained_by(
         context.codebase,
         default_type,
         declared_type,
-        true,
-        true,
+        allow_implicit_null_default,
+        false,
         false,
         &mut comparison_result,
     ) {
