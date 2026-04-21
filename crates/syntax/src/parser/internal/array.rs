@@ -3,14 +3,18 @@ use mago_database::file::HasFileId;
 use crate::T;
 use crate::ast::ast::Array;
 use crate::ast::ast::ArrayElement;
+use crate::ast::ast::Expression;
 use crate::ast::ast::KeyValueArrayElement;
 use crate::ast::ast::LegacyArray;
 use crate::ast::ast::List;
 use crate::ast::ast::MissingArrayElement;
+use crate::ast::ast::UnaryPrefix;
+use crate::ast::ast::UnaryPrefixOperator;
 use crate::ast::ast::ValueArrayElement;
 use crate::ast::ast::VariadicArrayElement;
 use crate::error::ParseError;
 use crate::parser::Parser;
+use crate::token::Precedence;
 
 impl<'input, 'arena> Parser<'input, 'arena> {
     pub(crate) fn parse_array(&mut self) -> Result<Array<'arena>, ParseError> {
@@ -51,6 +55,16 @@ impl<'input, 'arena> Parser<'input, 'arena> {
                 let next = self.stream.lookahead(0)?.ok_or_else(|| self.stream.unexpected(None, &[]))?;
                 ArrayElement::Missing(MissingArrayElement { comma: next.span_for(self.stream.file_id()) })
             }
+            Some(T!["&"]) => {
+                let ampersand_span = self.stream.eat_span(T!["&"])?;
+                let referenced_expr = self.parse_expression_with_precedence(Precedence::Reference)?;
+                let value = self.arena.alloc(Expression::UnaryPrefix(UnaryPrefix {
+                    operator: UnaryPrefixOperator::Reference(ampersand_span),
+                    operand: referenced_expr,
+                }));
+
+                ArrayElement::Value(ValueArrayElement { value })
+            }
             _ => {
                 let expr = self.arena.alloc(self.parse_expression()?);
 
@@ -60,7 +74,7 @@ impl<'input, 'arena> Parser<'input, 'arena> {
                         ArrayElement::KeyValue(KeyValueArrayElement {
                             key: expr,
                             double_arrow,
-                            value: self.arena.alloc(self.parse_expression()?),
+                            value: self.parse_possibly_referenced_expression()?,
                         })
                     }
                     _ => ArrayElement::Value(ValueArrayElement { value: expr }),

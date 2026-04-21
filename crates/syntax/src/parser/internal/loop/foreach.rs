@@ -23,13 +23,13 @@ impl<'input, 'arena> Parser<'input, 'arena> {
     }
 
     fn parse_foreach_target(&mut self) -> Result<ForeachTarget<'arena>, ParseError> {
-        let key_or_value = self.arena.alloc(self.parse_expression()?);
+        let key_or_value = self.parse_possibly_referenced_expression()?;
 
         Ok(match self.stream.peek_kind(0)? {
             Some(T!["=>"]) => ForeachTarget::KeyValue(ForeachKeyValueTarget {
                 key: key_or_value,
                 double_arrow: self.stream.consume_span()?,
-                value: self.arena.alloc(self.parse_expression()?),
+                value: self.parse_possibly_referenced_expression()?,
             }),
             _ => ForeachTarget::Value(ForeachValueTarget { value: key_or_value }),
         })

@@ -1,4 +1,7 @@
 use crate::T;
+use crate::ast::ast::Expression;
+use crate::ast::ast::UnaryPrefix;
+use crate::ast::ast::UnaryPrefixOperator;
 use crate::ast::ast::Yield;
 use crate::ast::ast::YieldFrom;
 use crate::ast::ast::YieldPair;
@@ -19,6 +22,16 @@ impl<'input, 'arena> Parser<'input, 'arena> {
                 from: self.expect_keyword(T!["from"])?,
                 iterator: self.arena.alloc(self.parse_expression_with_precedence(Precedence::YieldFrom)?),
             }),
+            T!["&"] => {
+                let ampersand_span = self.stream.eat_span(T!["&"])?;
+                let referenced_expr = self.parse_expression_with_precedence(Precedence::Reference)?;
+                let value = self.arena.alloc(Expression::UnaryPrefix(UnaryPrefix {
+                    operator: UnaryPrefixOperator::Reference(ampersand_span),
+                    operand: referenced_expr,
+                }));
+
+                Yield::Value(YieldValue { r#yield, value: Some(value) })
+            }
             _ => {
                 let key_or_value = self.parse_expression_with_precedence(Precedence::Yield)?;
 

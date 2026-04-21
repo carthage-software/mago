@@ -32,7 +32,6 @@ impl<'input, 'arena> Parser<'input, 'arena> {
             T!["+"] => UnaryPrefixOperator::Plus(token.span_for(self.stream.file_id())),
             T!["++"] => UnaryPrefixOperator::PreIncrement(token.span_for(self.stream.file_id())),
             T!["--"] => UnaryPrefixOperator::PreDecrement(token.span_for(self.stream.file_id())),
-            T!["&"] => UnaryPrefixOperator::Reference(token.span_for(self.stream.file_id())),
             _ => {
                 return Err(self.stream.unexpected(
                     Some(token),
@@ -55,8 +54,7 @@ impl<'input, 'arena> Parser<'input, 'arena> {
                         "-",
                         "+",
                         "++",
-                        "--",
-                        "&"
+                        "--"
                     ],
                 ));
             }

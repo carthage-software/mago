@@ -727,7 +727,7 @@ impl TokenKind {
             return true;
         }
 
-        matches!(self, T!["@" | "!" | "~" | "-" | "+" | "++" | "--" | "&"])
+        matches!(self, T!["@" | "!" | "~" | "-" | "+" | "++" | "--"])
     }
 
     #[inline]

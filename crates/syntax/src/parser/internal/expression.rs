@@ -46,6 +46,24 @@ impl<'input, 'arena> Parser<'input, 'arena> {
         self.parse_expression_with_precedence(Precedence::Lowest)
     }
 
+    /// Parses an expression optionally prefixed with `&` (reference), for positions where
+    /// a by-reference value is legal (array element value, yield value, `list(&$x)` destructuring).
+    /// `&` outside such positions must remain a syntax error, so callers in those positions
+    /// should use this helper instead of `parse_expression`.
+    pub(crate) fn parse_possibly_referenced_expression(&mut self) -> Result<&'arena Expression<'arena>, ParseError> {
+        if matches!(self.stream.peek_kind(0)?, Some(T!["&"])) {
+            let ampersand_span = self.stream.eat_span(T!["&"])?;
+            let referenced_expr = self.parse_expression_with_precedence(Precedence::Reference)?;
+
+            return Ok(self.arena.alloc(Expression::UnaryPrefix(UnaryPrefix {
+                operator: UnaryPrefixOperator::Reference(ampersand_span),
+                operand: referenced_expr,
+            })));
+        }
+
+        self.parse_expression()
+    }
+
     /// Internal expression parsing that uses arena-allocated references to reduce stack usage.
     /// Returns `&'arena Expression<'arena>` (8 bytes) instead of `Expression<'arena>` (488 bytes).
     pub(crate) fn parse_expression_with_precedence(

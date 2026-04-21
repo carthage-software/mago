@@ -17,6 +17,15 @@ mod runner {
         }
     }
 
+    pub fn parse_error_test(name: &'static str, code: &'static str) {
+        let arena = Bump::new();
+        let file = File::ephemeral(Cow::Borrowed(name), Cow::Borrowed(code));
+        let program = parse_file(&arena, &file);
+        if program.errors.is_empty() {
+            panic!("Test case '{name}' parsed without errors, but a parse error was expected.");
+        }
+    }
+
     pub fn run_expression_test(name: &'static str, expression: &'static str, expected: &'static str) {
         fn format_variable(var: &Variable<'_>) -> String {
             match var {
@@ -240,6 +249,44 @@ mod parser {
             }
         };
     }
+
+    macro_rules! parse_error_test {
+        ($name:ident, $code:expr) => {
+            #[test]
+            fn $name() {
+                crate::runner::parse_error_test(stringify!($name), $code);
+            }
+        };
+    }
+
+    // Reference `&` is only valid in specific positions (assignment RHS after `=`,
+    // array element value, yield value, `foreach ... as &$v`). It must be rejected
+    // elsewhere, matching PHP's parser.
+    parse_error_test!(reference_after_int_cast, "<?php $x = (int) &$b;");
+    parse_error_test!(reference_after_string_cast, "<?php $x = (string) &$b;");
+    parse_error_test!(reference_after_unary_minus, "<?php $x = -&$b;");
+    parse_error_test!(reference_after_error_control, "<?php $x = @&$b;");
+    parse_error_test!(reference_after_not, "<?php $x = !&$b;");
+    parse_error_test!(reference_after_binary_plus, "<?php $x = $a + &$b;");
+    parse_error_test!(reference_after_binary_mul, "<?php $x = $a * &$b;");
+    parse_error_test!(reference_after_echo, "<?php echo &$b;");
+    parse_error_test!(reference_after_print, "<?php print &$b;");
+    parse_error_test!(reference_after_return, "<?php function f() { return &$b; }");
+    parse_error_test!(reference_in_compound_assign_add, "<?php $a += &$b;");
+    parse_error_test!(reference_in_function_call_arg, "<?php f(&$b);");
+    parse_error_test!(reference_in_array_index, "<?php $x = $a[&$b];");
+    parse_error_test!(reference_in_yield_pair_value_after_key, "<?php function f() { yield $k => &$v; }");
+
+    // Positive cases — these positions ARE valid and must continue to parse.
+    smoke_test!(reference_in_assignment_rhs, "<?php $a = &$b;");
+    smoke_test!(reference_in_array_literal, "<?php $x = [&$b];");
+    smoke_test!(reference_in_array_value_after_key, "<?php $x = ['k' => &$b];");
+    smoke_test!(reference_in_foreach_value, "<?php foreach ($a as &$v) {}");
+    smoke_test!(reference_in_foreach_key_value, "<?php foreach ($a as $k => &$v) {}");
+    smoke_test!(reference_in_yield_value, "<?php function f() { yield &$b; }");
+    smoke_test!(reference_in_list_destructuring, "<?php list(&$a) = $b;");
+    smoke_test!(reference_in_short_list_destructuring, "<?php [&$a] = $b;");
+    smoke_test!(reference_in_array_append, "<?php $a[] = &$b;");
 
     test_expression!(assign_ref_static_call, "$a = &B::c()", "($a = (& (B::c())))");
     test_expression!(assign_ref_func_call, "$a = &b()", "($a = (& (b())))");

@@ -382,18 +382,6 @@ mod tests {
     }
 
     test_lint_success! {
-        name = valid_by_ref,
-        rule = InlineVariableReturnRule,
-        code = indoc! {r"
-            <?php
-
-            function &get_category_by_path(string $path): ?array {
-                return &find_node();
-            }
-        "}
-    }
-
-    test_lint_success! {
         name = valid_by_ref_function_with_variable_return,
         rule = InlineVariableReturnRule,
         code = indoc! {r"
