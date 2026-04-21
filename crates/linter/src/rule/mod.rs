@@ -340,6 +340,7 @@ define_rules! {
     NoShortBoolCast(no_short_bool_cast @ NoShortBoolCastRule),
     NoAlternativeSyntax(no_alternative_syntax @ NoAlternativeSyntaxRule),
     PreferPreIncrement(prefer_pre_increment @ PreferPreIncrementRule),
+    PreferSelfReturnType(prefer_self_return_type @ PreferSelfReturnTypeRule),
     SwitchContinueToBreak(switch_continue_to_break @ SwitchContinueToBreakRule),
     MissingDocs(missing_docs @ MissingDocsRule),
     NoNullPropertyInit(no_null_property_init @ NoNullPropertyInitRule),

@@ -132,6 +132,7 @@ use crate::rule::PreferExplodeOverPregSplitConfig;
 use crate::rule::PreferFirstClassCallableConfig;
 use crate::rule::PreferInterfaceConfig;
 use crate::rule::PreferPreIncrementConfig;
+use crate::rule::PreferSelfReturnTypeConfig;
 use crate::rule::PreferStaticClosureConfig;
 use crate::rule::PreferTestAttributeConfig;
 use crate::rule::PreferViewArrayConfig;
@@ -360,6 +361,7 @@ pub struct RulesSettings {
     pub no_short_bool_cast: RuleSettings<NoShortBoolCastConfig>,
     pub no_alternative_syntax: RuleSettings<NoAlternativeSyntaxConfig>,
     pub prefer_pre_increment: RuleSettings<PreferPreIncrementConfig>,
+    pub prefer_self_return_type: RuleSettings<PreferSelfReturnTypeConfig>,
     pub switch_continue_to_break: RuleSettings<SwitchContinueToBreakConfig>,
     pub no_null_property_init: RuleSettings<NoNullPropertyInitConfig>,
     pub use_wp_functions: RuleSettings<UseWpFunctionsConfig>,

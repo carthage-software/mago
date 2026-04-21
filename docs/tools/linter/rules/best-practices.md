@@ -28,6 +28,7 @@ This document details the rules available in the `BestPractices` category.
 | Prefer First Class Callable | [`prefer-first-class-callable`](#prefer-first-class-callable) |
 | Prefer Interface | [`prefer-interface`](#prefer-interface) |
 | Prefer Pre-Increment | [`prefer-pre-increment`](#prefer-pre-increment) |
+| Prefer Self Return Type | [`prefer-self-return-type`](#prefer-self-return-type) |
 | Prefer Static Closure | [`prefer-static-closure`](#prefer-static-closure) |
 | Prefer Test Attribute | [`prefer-test-attribute`](#prefer-test-attribute) |
 | Prefer View Array | [`prefer-view-array`](#prefer-view-array) |
@@ -922,6 +923,59 @@ the Symfony coding standards.
 
 $i++;
 $count--;
+```
+
+
+## <a id="prefer-self-return-type"></a>`prefer-self-return-type`
+
+Suggests using `self` when a method's return type refers to its own enclosing
+class by name.
+
+Using `self` decouples the signature from the class name, so renaming the class
+doesn't require updating return types. It also communicates intent more clearly:
+'this returns an instance of the same class'.
+
+Note: this rule does not apply to traits, because `self` inside a trait resolves
+to the using class, not the trait itself. If you want to return a subclass in
+inheritance-aware factory patterns, use `static` instead of `self`.
+
+
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `false` |
+| `level` | `string` | `"help"` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+
+final class Box
+{
+    public static function create(): self
+    {
+        return new self();
+    }
+}
+```
+
+#### Incorrect code
+
+```php
+<?php
+
+final class Box
+{
+    public static function create(): Box
+    {
+        return new Box();
+    }
+}
 ```
 
 
