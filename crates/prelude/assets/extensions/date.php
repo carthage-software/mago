@@ -323,7 +323,7 @@ interface DateTimeInterface
 
     public function format(string $format): string;
 
-    public function getTimezone(): DateTimeZone|false;
+    public function getTimezone(): DateTimeZone;
 
     public function getOffset(): int;
 
@@ -383,7 +383,7 @@ class DateTime implements DateTimeInterface
 
     public function sub(DateInterval $interval): DateTime {}
 
-    public function getTimezone(): DateTimeZone|false {}
+    public function getTimezone(): DateTimeZone {}
 
     public function setTimezone(DateTimeZone $timezone): DateTime {}
 
@@ -455,7 +455,7 @@ class DateTimeImmutable implements DateTimeInterface
      *
      * @psalm-ignore-falsable-return
      */
-    public function getTimezone(): DateTimeZone|false {}
+    public function getTimezone(): DateTimeZone {}
 
     /**
      * @psalm-mutation-free
