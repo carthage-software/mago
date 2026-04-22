@@ -31,6 +31,7 @@ let_underscore_lock = { level = "forbid" }
 mago-syntax-core = { path = "crates/syntax-core", version = "1.23.1" }
 mago-syntax = { path = "crates/syntax", version = "1.23.1" }
 mago-type-syntax = { path = "crates/type-syntax", version = "1.23.1" }
+mago-twig-syntax = { path = "crates/twig-syntax", version = "1.23.1" }
 mago-casing = { path = "crates/casing", version = "1.23.1" }
 mago-composer = { path = "crates/composer", version = "1.23.1" }
 mago-docblock = { path = "crates/docblock", version = "1.23.1" }

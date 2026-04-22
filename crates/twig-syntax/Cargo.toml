@@ -1,0 +1,32 @@
+[package]
+name = "mago-twig-syntax"
+description = "A lossless lexer, AST, and parser for Twig templates, targeting Twig 3 syntactic compatibility."
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+bumpalo = { workspace = true }
+foldhash = { workspace = true }
+mago-database = { workspace = true }
+mago-span = { workspace = true }
+mago-syntax-core = { workspace = true }
+memchr = { workspace = true }
+paste = { workspace = true }
+serde = { workspace = true }
+strum = { workspace = true }
+
+[dev-dependencies]
+criterion = { workspace = true }
+indoc = { workspace = true }
+
+[[bench]]
+name = "parser"
+harness = false

@@ -1700,6 +1700,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "mago-twig-syntax"
+version = "1.23.1"
+dependencies = [
+ "bumpalo",
+ "criterion",
+ "foldhash 0.2.0",
+ "indoc",
+ "mago-database",
+ "mago-span",
+ "mago-syntax-core",
+ "memchr",
+ "paste",
+ "serde",
+ "strum 0.28.0",
+]
+
+[[package]]
 name = "mago-type-syntax"
 version = "1.23.1"
 dependencies = [

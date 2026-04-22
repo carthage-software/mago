@@ -62,6 +62,7 @@ publish:
     cargo publish -p mago-syntax
     cargo publish -p mago-collector
     cargo publish -p mago-type-syntax
+    cargo publish -p mago-twig-syntax
     cargo publish -p mago-composer
     cargo publish -p mago-docblock
     cargo publish -p mago-formatter

@@ -1,0 +1,593 @@
+{# vim: set ft=html.twig : #}
+{% extends "layout/base.html.twig" %}
+
+{% block title %}Dashboard - {{ parent() }}{% endblock %}
+
+{% block head %}
+  {{ parent() }}
+  <link rel="stylesheet" href="{{ asset('css/dashboard.css') }}">
+  <link rel="stylesheet" href="{{ asset('css/charts.css') }}">
+  <script src="{{ asset('js/dashboard.js') }}" defer></script>
+  <meta name="csrf-token" content="{{ csrf_token('dashboard') }}">
+{% endblock %}
+
+{% macro money(amount, currency = 'USD') %}
+  <span class="money money--{{ currency|lower }}" data-amount="{{ amount }}">
+    {{ amount|number_format(2, '.', ',') }} {{ currency }}
+  </span>
+{% endmacro %}
+
+{% macro badge(label, kind = 'neutral') %}
+  <span class="badge badge--{{ kind }}">{{ label|e }}</span>
+{% endmacro %}
+
+{% macro avatar(user, size = 32) %}
+  {% if user.avatar_url %}
+    <img class="avatar" src="{{ user.avatar_url }}" width="{{ size }}" height="{{ size }}" alt="{{ user.name|e }}">
+  {% else %}
+    <span class="avatar avatar--initials" style="width: {{ size }}px; height: {{ size }}px;">
+      {{ user.name|first|upper }}
+    </span>
+  {% endif %}
+{% endmacro %}
+
+{% macro column(label, field, current) %}
+  <th>
+    <a href="?sort={{ field }}&dir={{ current == field ? 'desc' : 'asc' }}">
+      {{ label|e }}
+      {% if current == field %}
+        <span class="sort-indicator"></span>
+      {% endif %}
+    </a>
+  </th>
+{% endmacro %}
+
+{% macro pagination(page, pages, query = {}) %}
+  <nav class="pagination" aria-label="Pagination">
+    {% if page > 1 %}
+      <a class="pagination__prev" href="?{{ query|merge({page: page - 1})|url_encode }}">Prev</a>
+    {% endif %}
+    {% for p in 1..pages %}
+      {% if p == page %}
+        <strong class="pagination__current">{{ p }}</strong>
+      {% elseif p == 1 or p == pages or (p >= page - 2 and p <= page + 2) %}
+        <a class="pagination__link" href="?{{ query|merge({page: p})|url_encode }}">{{ p }}</a>
+      {% elseif p == 2 or p == pages - 1 %}
+        <span class="pagination__gap">...</span>
+      {% endif %}
+    {% endfor %}
+    {% if page < pages %}
+      <a class="pagination__next" href="?{{ query|merge({page: page + 1})|url_encode }}">Next</a>
+    {% endif %}
+  </nav>
+{% endmacro %}
+
+{% from _self import money, badge, avatar, column, pagination %}
+
+{% block body %}
+  <section class="dashboard">
+    <header class="dashboard__header">
+      <div class="dashboard__title">
+        <h1>{{ 'Welcome back, %name%'|trans({'%name%': current_user.first_name|e}) }}</h1>
+        <p class="muted">{{ 'now'|date('l, F j, Y') }} - {{ greeting_for(now) }}</p>
+      </div>
+
+      <div class="dashboard__quick-actions">
+        {% for action in quick_actions if action.visible_to(current_user) %}
+          <a class="quick-action quick-action--{{ action.style }}" href="{{ path(action.route, action.params|default({})) }}">
+            <span class="quick-action__icon">{{ icon(action.icon) }}</span>
+            <span class="quick-action__label">{{ action.label|trans }}</span>
+            {% if action.badge_count is defined and action.badge_count > 0 %}
+              {{ badge(action.badge_count, 'attention') }}
+            {% endif %}
+          </a>
+        {% else %}
+          <p class="muted">{{ 'No quick actions available.'|trans }}</p>
+        {% endfor %}
+      </div>
+    </header>
+
+    <section class="kpis">
+      {% for kpi in [
+          {label: 'Revenue', value: stats.revenue, change: stats.revenue_delta, currency: 'USD', icon: 'currency-dollar'},
+          {label: 'Orders', value: stats.orders, change: stats.orders_delta, icon: 'shopping-cart'},
+          {label: 'Customers', value: stats.customers, change: stats.customers_delta, icon: 'users'},
+          {label: 'Refunds', value: stats.refunds, change: stats.refunds_delta, currency: 'USD', icon: 'arrow-uturn-left'}
+      ] %}
+        <article class="kpi {{ kpi.change >= 0 ? 'kpi--up' : 'kpi--down' }}">
+          <header class="kpi__header">
+            <span class="kpi__icon">{{ icon(kpi.icon) }}</span>
+            <h2 class="kpi__label">{{ kpi.label|trans }}</h2>
+          </header>
+          <div class="kpi__value">
+            {% if kpi.currency is defined %}
+              {{ money(kpi.value, kpi.currency) }}
+            {% else %}
+              {{ kpi.value|number_format }}
+            {% endif %}
+          </div>
+          <footer class="kpi__delta">
+            <span class="kpi__delta-arrow">{{ kpi.change >= 0 ? 'up' : 'down' }}</span>
+            <span>{{ (kpi.change|abs)|number_format(1) }}%</span>
+            <span class="muted">{{ 'vs. last period'|trans }}</span>
+          </footer>
+        </article>
+      {% endfor %}
+    </section>
+
+    <section class="charts">
+      <article class="chart chart--revenue" data-chart="revenue">
+        <header>
+          <h2>{{ 'Revenue (last 30 days)'|trans }}</h2>
+          <div class="chart__filters">
+            {% for window in ['7d', '30d', '90d', '1y'] %}
+              <a class="chart__filter {{ window == active_window ? 'is-active' : '' }}"
+                 href="?{{ {window: window}|url_encode }}">{{ window }}</a>
+            {% endfor %}
+          </div>
+        </header>
+        <div class="chart__canvas" data-points="{{ revenue_series|json_encode|e('html_attr') }}"></div>
+        <footer class="chart__summary">
+          <dl>
+            <dt>{{ 'Total'|trans }}</dt><dd>{{ money(revenue_series|sum) }}</dd>
+            <dt>{{ 'Average'|trans }}</dt><dd>{{ money(revenue_series|sum / revenue_series|length) }}</dd>
+            <dt>{{ 'Peak day'|trans }}</dt><dd>{{ money(revenue_series|sort|reverse|first) }}</dd>
+          </dl>
+        </footer>
+      </article>
+
+      <article class="chart chart--orders" data-chart="orders-by-status">
+        <header>
+          <h2>{{ 'Orders by status'|trans }}</h2>
+        </header>
+        <ul class="chart__legend">
+          {% for status, count in orders_by_status %}
+            <li class="legend-item legend-item--{{ status }}">
+              <span class="legend-item__swatch"></span>
+              <span class="legend-item__label">{{ status|capitalize }}</span>
+              <span class="legend-item__value">{{ count }}</span>
+            </li>
+          {% endfor %}
+        </ul>
+      </article>
+
+      <article class="chart chart--funnel" data-chart="funnel">
+        <header>
+          <h2>{{ 'Conversion funnel'|trans }}</h2>
+        </header>
+        <ol class="funnel">
+          {% for stage in funnel %}
+            <li class="funnel__stage" style="--width: {{ stage.percent }}%;">
+              <strong>{{ stage.label|trans }}</strong>
+              <span class="funnel__count">{{ stage.count|number_format }}</span>
+              <span class="funnel__rate">{{ stage.percent|number_format(1) }}%</span>
+            </li>
+          {% endfor %}
+        </ol>
+      </article>
+    </section>
+
+    <section class="recent-orders">
+      <header>
+        <h2>{{ 'Recent orders'|trans }}</h2>
+        <a href="{{ path('orders.index') }}" class="link-arrow">{{ 'View all'|trans }} -></a>
+      </header>
+
+      <form method="get" class="filters" action="{{ path('dashboard') }}">
+        <label class="filter">
+          <span>{{ 'Status'|trans }}</span>
+          <select name="status">
+            <option value="">{{ 'Any'|trans }}</option>
+            {% for status in statuses %}
+              <option value="{{ status.code }}" {{ status.code == filters.status ? 'selected' : '' }}>
+                {{ status.label|trans }}
+              </option>
+            {% endfor %}
+          </select>
+        </label>
+
+        <label class="filter">
+          <span>{{ 'From'|trans }}</span>
+          <input type="date" name="from" value="{{ filters.from|date('Y-m-d') }}">
+        </label>
+
+        <label class="filter">
+          <span>{{ 'To'|trans }}</span>
+          <input type="date" name="to" value="{{ filters.to|date('Y-m-d') }}">
+        </label>
+
+        <label class="filter">
+          <span>{{ 'Search'|trans }}</span>
+          <input type="search" name="q" value="{{ filters.q|default('') }}" placeholder="{{ 'Order ID, customer, email'|trans }}">
+        </label>
+
+        <button type="submit">{{ 'Apply'|trans }}</button>
+        {% if filters|length > 0 %}
+          <a class="link-muted" href="{{ path('dashboard') }}">{{ 'Reset'|trans }}</a>
+        {% endif %}
+      </form>
+
+      <table class="table table--striped">
+        <thead>
+          <tr>
+            {{ column('Order'|trans, 'id', sort) }}
+            {{ column('Customer'|trans, 'customer', sort) }}
+            {{ column('Total'|trans, 'total', sort) }}
+            {{ column('Status'|trans, 'status', sort) }}
+            {{ column('Placed'|trans, 'placed_at', sort) }}
+            <th class="table__actions">{{ 'Actions'|trans }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for order in orders %}
+            <tr data-order-id="{{ order.id }}" class="{{ order.is_flagged ? 'is-flagged' : '' }}">
+              <td>
+                <a class="order-id" href="{{ path('orders.show', {id: order.id}) }}">
+                  #{{ order.id|format('%06d') }}
+                </a>
+                {% if order.notes|length > 0 %}
+                  <span class="order-id__notes" title="{{ 'Has internal notes'|trans }}">notes</span>
+                {% endif %}
+              </td>
+              <td>
+                <div class="customer">
+                  {{ avatar(order.customer, 28) }}
+                  <div>
+                    <a href="{{ path('customers.show', {id: order.customer.id}) }}">
+                      {{ order.customer.name|e }}
+                    </a>
+                    <small class="muted">{{ order.customer.email|e }}</small>
+                  </div>
+                </div>
+              </td>
+              <td>{{ money(order.total, order.currency) }}</td>
+              <td>
+                {% set kind = {
+                    'pending': 'warning',
+                    'paid': 'success',
+                    'shipped': 'info',
+                    'delivered': 'success',
+                    'cancelled': 'neutral',
+                    'refunded': 'attention'
+                  }[order.status]|default('neutral') %}
+                {{ badge(order.status|trans, kind) }}
+              </td>
+              <td>
+                <time datetime="{{ order.placed_at|date('c') }}" title="{{ order.placed_at|date('l, F j, Y H:i') }}">
+                  {{ order.placed_at|date_modify('+0 days')|format_datetime('medium', 'short') }}
+                </time>
+              </td>
+              <td class="table__actions">
+                <details class="dropdown">
+                  <summary>...</summary>
+                  <ul>
+                    <li><a href="{{ path('orders.show', {id: order.id}) }}">{{ 'View'|trans }}</a></li>
+                    {% if order.status == 'pending' %}
+                      <li>
+                        <form method="post" action="{{ path('orders.mark_paid', {id: order.id}) }}">
+                          <input type="hidden" name="_token" value="{{ csrf_token('orders.mark_paid') }}">
+                          <button type="submit">{{ 'Mark as paid'|trans }}</button>
+                        </form>
+                      </li>
+                    {% endif %}
+                    {% if order.status in ['paid', 'shipped'] %}
+                      <li><a href="{{ path('orders.refund', {id: order.id}) }}">{{ 'Refund'|trans }}</a></li>
+                    {% endif %}
+                    {% if not order.is_archived %}
+                      <li>
+                        <form method="post" action="{{ path('orders.archive', {id: order.id}) }}">
+                          <input type="hidden" name="_token" value="{{ csrf_token('orders.archive') }}">
+                          <button type="submit" class="button--danger">{{ 'Archive'|trans }}</button>
+                        </form>
+                      </li>
+                    {% endif %}
+                  </ul>
+                </details>
+              </td>
+            </tr>
+          {% else %}
+            <tr>
+              <td colspan="6" class="table__empty">
+                <p>{{ 'No orders match the current filters.'|trans }}</p>
+                {% if filters|length > 0 %}
+                  <a class="button button--secondary" href="{{ path('dashboard') }}">{{ 'Clear filters'|trans }}</a>
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      {{ pagination(page, pages, filters) }}
+    </section>
+
+    <section class="side-by-side">
+      <aside class="side-by-side__aside">
+        <h2>{{ 'Top customers'|trans }}</h2>
+        <ol class="leaderboard">
+          {% for entry in top_customers|slice(0, 10) %}
+            <li class="leaderboard__entry">
+              <span class="leaderboard__rank">{{ loop.index }}</span>
+              {{ avatar(entry.customer, 24) }}
+              <div class="leaderboard__body">
+                <a href="{{ path('customers.show', {id: entry.customer.id}) }}">
+                  {{ entry.customer.name|e }}
+                </a>
+                <small class="muted">
+                  {{ entry.orders_count }} {{ entry.orders_count == 1 ? 'order' : 'orders' }} -
+                  {{ money(entry.lifetime_value) }}
+                </small>
+              </div>
+              {% if entry.is_vip %}
+                {{ badge('VIP'|trans, 'attention') }}
+              {% endif %}
+            </li>
+          {% endfor %}
+        </ol>
+      </aside>
+
+      <aside class="side-by-side__aside">
+        <h2>{{ 'Activity'|trans }}</h2>
+        <ul class="activity">
+          {% for event in activity_log|slice(0, 25) %}
+            <li class="activity__item activity__item--{{ event.kind }}">
+              <span class="activity__time" title="{{ event.at|date('c') }}">
+                {{ event.at|ago }}
+              </span>
+              <div class="activity__body">
+                {% if event.kind == 'order.placed' %}
+                  <strong>{{ event.customer.name|e }}</strong>
+                  {{ 'placed order #%id%'|trans({'%id%': event.order_id}) }}
+                  ({{ money(event.amount, event.currency) }})
+                {% elseif event.kind == 'order.refunded' %}
+                  {{ 'Order #%id% refunded by %who%'|trans({
+                      '%id%': event.order_id,
+                      '%who%': event.actor.name
+                  }) }}
+                {% elseif event.kind == 'product.low_stock' %}
+                  {{ 'Low stock'|trans }}:
+                  <a href="{{ path('products.show', {id: event.product.id}) }}">{{ event.product.name|e }}</a>
+                  ({{ event.remaining }} {{ 'left'|trans }})
+                {% elseif event.kind == 'user.signed_up' %}
+                  {{ 'New customer:'|trans }}
+                  <strong>{{ event.user.name|e }}</strong>
+                {% else %}
+                  {{ event.message|default('Untracked event'|trans)|e }}
+                {% endif %}
+              </div>
+            </li>
+          {% else %}
+            <li class="activity__empty">{{ 'Nothing here yet - go ship something!'|trans }}</li>
+          {% endfor %}
+        </ul>
+      </aside>
+    </section>
+
+    <section class="settings">
+      <h2>{{ 'Workspace settings'|trans }}</h2>
+      <form method="post" action="{{ path('dashboard.settings') }}" class="settings__form">
+        <input type="hidden" name="_token" value="{{ csrf_token('dashboard.settings') }}">
+
+        <fieldset>
+          <legend>{{ 'Notifications'|trans }}</legend>
+          {% for channel in ['email', 'sms', 'webhook'] %}
+            <label class="toggle">
+              <input type="checkbox" name="notify[{{ channel }}]" value="1"
+                     {{ settings.notify[channel] ?? false ? 'checked' : '' }}>
+              <span>{{ ('notify.' ~ channel)|trans }}</span>
+            </label>
+          {% endfor %}
+        </fieldset>
+
+        <fieldset>
+          <legend>{{ 'Display'|trans }}</legend>
+          <label>
+            <span>{{ 'Default currency'|trans }}</span>
+            <select name="default_currency">
+              {% for code, label in currencies %}
+                <option value="{{ code }}" {{ code == settings.default_currency ? 'selected' : '' }}>
+                  {{ code }} - {{ label|e }}
+                </option>
+              {% endfor %}
+            </select>
+          </label>
+
+          <label>
+            <span>{{ 'Time zone'|trans }}</span>
+            <select name="time_zone">
+              {% for tz in time_zones %}
+                <option value="{{ tz }}" {{ tz == settings.time_zone ? 'selected' : '' }}>{{ tz }}</option>
+              {% endfor %}
+            </select>
+          </label>
+
+          <label>
+            <span>{{ 'Theme'|trans }}</span>
+            <select name="theme">
+              {% for theme in ['system', 'light', 'dark', 'high-contrast'] %}
+                <option value="{{ theme }}" {{ theme == settings.theme ? 'selected' : '' }}>
+                  {{ ('theme.' ~ theme)|trans }}
+                </option>
+              {% endfor %}
+            </select>
+          </label>
+        </fieldset>
+
+        <button type="submit" class="button button--primary">{{ 'Save changes'|trans }}</button>
+      </form>
+    </section>
+
+    {% if announcements|length > 0 %}
+      <section class="announcements">
+        <h2>{{ 'Announcements'|trans }}</h2>
+        {% for announcement in announcements if not announcement.is_dismissed_by(current_user) %}
+          <article class="announcement announcement--{{ announcement.severity }}">
+            <header>
+              <h3>{{ announcement.title|e }}</h3>
+              <time>{{ announcement.published_at|date('M j, Y') }}</time>
+            </header>
+            <div class="announcement__body">
+              {{ announcement.body|markdown_to_html|raw }}
+            </div>
+            {% if announcement.actions|default([])|length > 0 %}
+              <footer class="announcement__actions">
+                {% for action in announcement.actions %}
+                  <a class="button button--ghost" href="{{ action.url }}">{{ action.label|e }}</a>
+                {% endfor %}
+              </footer>
+            {% endif %}
+            <form method="post" action="{{ path('announcements.dismiss', {id: announcement.id}) }}" class="announcement__dismiss">
+              <input type="hidden" name="_token" value="{{ csrf_token('announcements.dismiss') }}">
+              <button type="submit" aria-label="{{ 'Dismiss'|trans }}">x</button>
+            </form>
+          </article>
+        {% endfor %}
+      </section>
+    {% endif %}
+
+    <section class="reports">
+      <h2>{{ 'Saved reports'|trans }}</h2>
+      <div class="reports__grid">
+        {% for report in reports %}
+          <article class="report-card">
+            <header>
+              <h3>{{ report.name|e }}</h3>
+              {% if report.shared %}
+                {{ badge('Shared'|trans, 'info') }}
+              {% endif %}
+            </header>
+            <p class="muted">{{ report.description|default('No description')|e }}</p>
+            <dl class="report-card__meta">
+              <dt>{{ 'Source'|trans }}</dt><dd>{{ report.source|e }}</dd>
+              <dt>{{ 'Schedule'|trans }}</dt><dd>{{ report.schedule|default('On demand'|trans)|e }}</dd>
+              <dt>{{ 'Last run'|trans }}</dt><dd>
+                {% if report.last_run_at %}
+                  <time datetime="{{ report.last_run_at|date('c') }}">{{ report.last_run_at|ago }}</time>
+                {% else %}
+                  {{ 'Never'|trans }}
+                {% endif %}
+              </dd>
+            </dl>
+            <footer class="report-card__actions">
+              <a class="button" href="{{ path('reports.run', {id: report.id}) }}">{{ 'Run'|trans }}</a>
+              <a class="button button--secondary" href="{{ path('reports.edit', {id: report.id}) }}">{{ 'Edit'|trans }}</a>
+              <a class="button button--ghost" href="{{ path('reports.export', {id: report.id, format: 'csv'}) }}">CSV</a>
+              <a class="button button--ghost" href="{{ path('reports.export', {id: report.id, format: 'json'}) }}">JSON</a>
+            </footer>
+          </article>
+        {% else %}
+          <p class="muted">{{ 'No saved reports yet.'|trans }}</p>
+        {% endfor %}
+      </div>
+    </section>
+
+    <section class="api-keys">
+      <h2>{{ 'API keys'|trans }}</h2>
+      <table class="table">
+        <thead>
+          <tr>
+            <th>{{ 'Label'|trans }}</th>
+            <th>{{ 'Prefix'|trans }}</th>
+            <th>{{ 'Scopes'|trans }}</th>
+            <th>{{ 'Last used'|trans }}</th>
+            <th>{{ 'Created'|trans }}</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for key in api_keys %}
+            <tr class="{{ key.revoked_at ? 'is-revoked' : '' }}">
+              <td>{{ key.label|e }}</td>
+              <td><code>{{ key.prefix|e }}{{ '...' }}</code></td>
+              <td>
+                {% for scope in key.scopes %}
+                  <code class="scope">{{ scope|e }}</code>
+                {% endfor %}
+              </td>
+              <td>{{ key.last_used_at ? key.last_used_at|ago : 'Never'|trans }}</td>
+              <td>{{ key.created_at|date('Y-m-d') }}</td>
+              <td>
+                {% if not key.revoked_at %}
+                  <form method="post" action="{{ path('api_keys.revoke', {id: key.id}) }}">
+                    <input type="hidden" name="_token" value="{{ csrf_token('api_keys.revoke') }}">
+                    <button type="submit" class="button--danger">{{ 'Revoke'|trans }}</button>
+                  </form>
+                {% else %}
+                  {{ badge('Revoked'|trans, 'attention') }}
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <a class="button button--primary" href="{{ path('api_keys.new') }}">{{ 'Create new key'|trans }}</a>
+    </section>
+
+    <section class="audit">
+      <h2>{{ 'Recent audit log'|trans }}</h2>
+      <table class="table table--compact">
+        <thead>
+          <tr>
+            <th>{{ 'When'|trans }}</th>
+            <th>{{ 'Actor'|trans }}</th>
+            <th>{{ 'Action'|trans }}</th>
+            <th>{{ 'Subject'|trans }}</th>
+            <th>{{ 'IP'|trans }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for entry in audit_log %}
+            <tr>
+              <td>
+                <time datetime="{{ entry.at|date('c') }}" title="{{ entry.at|date('Y-m-d H:i:s') }}">
+                  {{ entry.at|ago }}
+                </time>
+              </td>
+              <td>
+                {% if entry.actor %}
+                  {{ avatar(entry.actor, 20) }}
+                  {{ entry.actor.name|e }}
+                {% else %}
+                  <em>{{ 'system'|trans }}</em>
+                {% endif %}
+              </td>
+              <td><code>{{ entry.action|e }}</code></td>
+              <td>
+                {% if entry.subject_url %}
+                  <a href="{{ entry.subject_url }}">{{ entry.subject_label|e }}</a>
+                {% else %}
+                  {{ entry.subject_label|e }}
+                {% endif %}
+              </td>
+              <td><code class="ip">{{ entry.ip|e }}</code></td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+  </section>
+{% endblock %}
+
+{% block scripts %}
+  {{ parent() }}
+  <script>
+    window.dashboardConfig = {
+      stats: {{ stats|json_encode|raw }},
+      revenueSeries: {{ revenue_series|json_encode|raw }},
+      ordersByStatus: {{ orders_by_status|json_encode|raw }},
+      filters: {{ filters|json_encode|raw }},
+      currentUser: {
+        id: {{ current_user.id|json_encode|raw }},
+        name: {{ current_user.name|json_encode|raw }},
+        timezone: {{ settings.time_zone|json_encode|raw }}
+      }
+    };
+  </script>
+{% endblock %}
+
+{% block footer %}
+  {{ parent() }}
+  <p class="footer__build">
+    {{ 'Build:'|trans }} {{ build_info.version }} ({{ build_info.commit|slice(0, 8) }})
+  </p>
+{% endblock %}

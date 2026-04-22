@@ -1,0 +1,24 @@
+--TEST--
+Twig compile numbers literals with underscores correctly
+--TEMPLATE--
+{{ 0_0 is same as 0 ? 'ok' : 'ko' }}
+{{ 1_23 is same as 123 ? 'ok' : 'ko' }}
+{{ 12_3 is same as 123 ? 'ok' : 'ko' }}
+{{ 1_2_3 is same as 123 ? 'ok' : 'ko' }}
+{{ -1_2 is same as -12 ? 'ok' : 'ko' }}
+{{ 1_2.3_4 is same as 12.34 ? 'ok' : 'ko' }}
+{{ -1_2.3_4 is same as -12.34 ? 'ok' : 'ko' }}
+{{ 1.2_3e-4 is same as 1.23e-4 ? 'ok' : 'ko' }}
+{{ -1.2_3e+4 is same as -1.23e+4 ? 'ok' : 'ko' }}
+--DATA--
+return []
+--EXPECT--
+ok
+ok
+ok
+ok
+ok
+ok
+ok
+ok
+ok

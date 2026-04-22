@@ -1,0 +1,2147 @@
+{# vim: set ft=html.twig : #}
+{#
+  Stress-test fixture: a single template that exercises virtually every
+  Twig construct - extends, embed, use, blocks, macros, imports, sets,
+  conditionals, loops, arrow functions, filter pipelines, tests,
+  interpolated strings, named arguments, slices, ranges, hash literals,
+  spread, deeply-nested expressions, autoescape, sandbox, apply, with,
+  guard, cache, types, deprecated, do, flush.
+#}
+{% extends "@admin/layouts/shell.html.twig" %}
+
+{% use "@admin/partials/_card.html.twig" with card as base_card %}
+{% use "@admin/partials/_form.html.twig" %}
+
+{% from "@admin/macros/widgets.html.twig" import button, icon, input, select, textarea, switch, datepicker, file_picker %}
+{% from "@admin/macros/charts.html.twig" import line_chart, bar_chart, pie_chart, sparkline, heatmap %}
+{% from "@admin/macros/tables.html.twig" import data_table, sort_header, paginator, filters_panel, bulk_actions %}
+{% import "@admin/macros/format.html.twig" as fmt %}
+{% import "@admin/macros/perm.html.twig" as perm %}
+
+{% set page = {
+    id: 'analytics-overview',
+    title: 'Analytics Overview',
+    breadcrumbs: [
+        {label: 'Home', url: path('home')},
+        {label: 'Analytics', url: path('analytics.index')},
+        {label: 'Overview'}
+    ],
+    actions: [
+        {label: 'Export CSV', icon: 'download', url: path('analytics.export', {format: 'csv'}), kind: 'secondary'},
+        {label: 'Export JSON', icon: 'download', url: path('analytics.export', {format: 'json'}), kind: 'secondary'},
+        {label: 'Schedule report', icon: 'calendar', url: path('reports.new'), kind: 'primary'}
+    ],
+    sidebar: 'analytics'
+} %}
+
+{% block title %}{{ page.title }} - {{ parent() }}{% endblock %}
+
+{% block meta %}
+  {{ parent() }}
+  <meta name="description" content="{{ ('analytics.overview.description'|trans)|e('html_attr') }}">
+  <meta property="og:title" content="{{ page.title|e('html_attr') }}">
+  <meta property="og:type" content="website">
+  <meta property="og:image" content="{{ absolute_url(asset('img/og/analytics.png')) }}">
+{% endblock %}
+
+{% block head %}
+  {{ parent() }}
+  <link rel="stylesheet" href="{{ asset('css/analytics.css') }}">
+  <link rel="stylesheet" href="{{ asset('css/charts.css') }}">
+  <link rel="preload" href="{{ asset('fonts/inter-var.woff2') }}" as="font" type="font/woff2" crossorigin>
+  <script type="module" src="{{ asset('js/analytics.mjs') }}"></script>
+  {% if feature_enabled('analytics.realtime') %}
+    <link rel="preconnect" href="{{ realtime_endpoint }}">
+  {% endif %}
+{% endblock %}
+
+{% macro stat_tile(label, value, change = null, format = 'number', currency = 'USD') %}
+  {% set tone = change is null ? 'neutral' : (change >= 0 ? 'positive' : 'negative') %}
+  <article class="tile tile--{{ tone }}">
+    <header>
+      <h3>{{ label|trans }}</h3>
+    </header>
+    <div class="tile__value">
+      {% if format == 'currency' %}
+        {{ value|number_format(2, '.', ',') }} {{ currency }}
+      {% elseif format == 'percent' %}
+        {{ value|number_format(1) }}%
+      {% elseif format == 'duration' %}
+        {{ value|format_duration }}
+      {% else %}
+        {{ value|number_format }}
+      {% endif %}
+    </div>
+    {% if change is not null %}
+      <footer class="tile__change">
+        <span>{{ (change|abs)|number_format(1) }}%</span>
+        <small class="muted">{{ 'vs. last period'|trans }}</small>
+      </footer>
+    {% endif %}
+  </article>
+{% endmacro %}
+
+{% macro segment_filter(name, options, current) %}
+  <div class="segment-filter" role="tablist" aria-label="{{ name|trans }}">
+    {% for option in options %}
+      <button type="button"
+              role="tab"
+              data-segment="{{ name }}"
+              data-value="{{ option.value }}"
+              class="{{ option.value == current ? 'is-active' : '' }}">
+        {{ option.label|trans }}
+        {% if option.count is defined %}
+          <span class="muted">({{ option.count }})</span>
+        {% endif %}
+      </button>
+    {% endfor %}
+  </div>
+{% endmacro %}
+
+{% macro tag_pill(label, color = 'neutral') %}
+  <span class="pill pill--{{ color }}">{{ label|e }}</span>
+{% endmacro %}
+
+{% macro avatar_stack(users, max = 5) %}
+  <div class="avatar-stack" data-count="{{ users|length }}">
+    {% for user in users|slice(0, max) %}
+      <span class="avatar-stack__item" title="{{ user.name|e }}">
+        {% if user.avatar_url %}
+          <img src="{{ user.avatar_url }}" alt="{{ user.name|e }}">
+        {% else %}
+          {{ user.name|first|upper }}
+        {% endif %}
+      </span>
+    {% endfor %}
+    {% if users|length > max %}
+      <span class="avatar-stack__overflow">+{{ users|length - max }}</span>
+    {% endif %}
+  </div>
+{% endmacro %}
+
+{% macro section_header(title, subtitle = null, actions = []) %}
+  <header class="section-header">
+    <div>
+      <h2>{{ title|trans }}</h2>
+      {% if subtitle %}
+        <p class="muted">{{ subtitle|trans }}</p>
+      {% endif %}
+    </div>
+    {% if actions|length > 0 %}
+      <div class="section-header__actions">
+        {% for action in actions %}
+          <a class="button button--{{ action.kind|default('secondary') }}" href="{{ action.url }}">
+            {% if action.icon is defined %}{{ icon(action.icon) }}{% endif %}
+            {{ action.label|trans }}
+          </a>
+        {% endfor %}
+      </div>
+    {% endif %}
+  </header>
+{% endmacro %}
+
+{% from _self import stat_tile, segment_filter, tag_pill, avatar_stack, section_header %}
+
+{% block sidebar_nav %}
+  <nav class="side-nav" aria-label="{{ 'Analytics navigation'|trans }}">
+    <ul>
+      {% set nav_items = [
+          {key: 'overview', label: 'Overview', route: 'analytics.overview', icon: 'chart-pie'},
+          {key: 'audience', label: 'Audience', route: 'analytics.audience', icon: 'users'},
+          {key: 'acquisition', label: 'Acquisition', route: 'analytics.acquisition', icon: 'flag'},
+          {key: 'behaviour', label: 'Behaviour', route: 'analytics.behaviour', icon: 'cursor'},
+          {key: 'conversion', label: 'Conversion', route: 'analytics.conversion', icon: 'check-circle'},
+          {key: 'revenue', label: 'Revenue', route: 'analytics.revenue', icon: 'currency-dollar'},
+          {key: 'cohorts', label: 'Cohorts', route: 'analytics.cohorts', icon: 'grid'},
+          {key: 'funnels', label: 'Funnels', route: 'analytics.funnels', icon: 'filter'},
+          {key: 'reports', label: 'Reports', route: 'analytics.reports', icon: 'document-text'}
+      ] %}
+      {% for item in nav_items %}
+        <li class="{{ item.key == active_nav ? 'is-active' : '' }}">
+          <a href="{{ path(item.route) }}">
+            <span class="side-nav__icon">{{ icon(item.icon) }}</span>
+            <span class="side-nav__label">{{ item.label|trans }}</span>
+            {% if item.badge is defined and item.badge %}
+              {{ tag_pill(item.badge, 'info') }}
+            {% endif %}
+          </a>
+        </li>
+      {% endfor %}
+    </ul>
+
+    {% if perm.can(current_user, 'analytics.admin') %}
+      <hr>
+      <h3 class="side-nav__section-title">{{ 'Admin'|trans }}</h3>
+      <ul>
+        <li><a href="{{ path('analytics.settings') }}">{{ 'Settings'|trans }}</a></li>
+        <li><a href="{{ path('analytics.integrations') }}">{{ 'Integrations'|trans }}</a></li>
+        <li><a href="{{ path('analytics.audit_log') }}">{{ 'Audit log'|trans }}</a></li>
+      </ul>
+    {% endif %}
+  </nav>
+{% endblock %}
+
+{% block toolbar %}
+  <div class="toolbar">
+    <form class="toolbar__filters" method="get">
+      <fieldset>
+        <legend>{{ 'Time range'|trans }}</legend>
+        <select name="range">
+          {% for opt in time_range_options %}
+            <option value="{{ opt.value }}" {{ opt.value == filters.range ? 'selected' : '' }}>
+              {{ opt.label|trans }}
+            </option>
+          {% endfor %}
+        </select>
+        {% if filters.range == 'custom' %}
+          {{ datepicker('from', filters.from) }}
+          {{ datepicker('to', filters.to) }}
+        {% endif %}
+      </fieldset>
+
+      <fieldset>
+        <legend>{{ 'Compare to'|trans }}</legend>
+        <select name="compare">
+          {% for opt in compare_options %}
+            <option value="{{ opt.value }}" {{ opt.value == filters.compare ? 'selected' : '' }}>
+              {{ opt.label|trans }}
+            </option>
+          {% endfor %}
+        </select>
+      </fieldset>
+
+      <fieldset>
+        <legend>{{ 'Segment'|trans }}</legend>
+        {% for segment in available_segments %}
+          <label>
+            <input type="checkbox"
+                   name="segment[]"
+                   value="{{ segment.id }}"
+                   {{ segment.id in filters.segment ? 'checked' : '' }}>
+            {{ segment.label|e }}
+          </label>
+        {% endfor %}
+      </fieldset>
+
+      <button type="submit" class="button button--primary">{{ 'Update'|trans }}</button>
+      <a class="button button--ghost" href="{{ path('analytics.overview') }}">{{ 'Reset'|trans }}</a>
+    </form>
+
+    <div class="toolbar__view-mode">
+      {{ segment_filter('view', [
+          {value: 'cards', label: 'Cards', count: 12},
+          {value: 'table', label: 'Table'},
+          {value: 'compact', label: 'Compact'}
+      ], view_mode) }}
+    </div>
+  </div>
+{% endblock %}
+
+{% block content %}
+  <article class="overview" data-page="{{ page.id }}">
+    {{ section_header(page.title, 'High-level analytics across all properties.', page.actions) }}
+
+    <section class="overview__tiles" aria-label="{{ 'Headline metrics'|trans }}">
+      {{ stat_tile('Sessions',         metrics.sessions.value,         metrics.sessions.delta) }}
+      {{ stat_tile('Unique users',     metrics.users.value,            metrics.users.delta) }}
+      {{ stat_tile('Page views',       metrics.page_views.value,       metrics.page_views.delta) }}
+      {{ stat_tile('Bounce rate',      metrics.bounce_rate.value,      metrics.bounce_rate.delta, 'percent') }}
+      {{ stat_tile('Avg. session',     metrics.avg_session.value,      metrics.avg_session.delta, 'duration') }}
+      {{ stat_tile('Conversion rate', metrics.conversion.value,        metrics.conversion.delta, 'percent') }}
+      {{ stat_tile('Revenue',          metrics.revenue.value,          metrics.revenue.delta, 'currency', metrics.revenue.currency) }}
+      {{ stat_tile('AOV',              metrics.aov.value,              metrics.aov.delta, 'currency', metrics.aov.currency) }}
+    </section>
+
+    <section class="overview__primary">
+      <article class="card card--wide">
+        <header class="card__header">
+          <h2>{{ 'Sessions over time'|trans }}</h2>
+          {{ segment_filter('granularity', [
+              {value: 'hour',  label: 'Hourly'},
+              {value: 'day',   label: 'Daily'},
+              {value: 'week',  label: 'Weekly'},
+              {value: 'month', label: 'Monthly'}
+          ], filters.granularity) }}
+        </header>
+        <div class="card__body">
+          {{ line_chart('sessions', sessions_series, {
+              x: 'time',
+              y: 'count',
+              compare_series: sessions_series_compare|default(null),
+              show_legend: true,
+              annotations: events|filter(e => e.kind == 'launch')|map(e => {
+                  at: e.at,
+                  label: e.label,
+                  color: '#5b8def'
+              })
+          }) }}
+        </div>
+      </article>
+
+      <aside class="card">
+        <header class="card__header">
+          <h2>{{ 'Active users (live)'|trans }}</h2>
+        </header>
+        <div class="card__body card__body--centered">
+          <div class="big-number" data-stream="realtime.users">
+            {{ realtime.active_users|default(0)|number_format }}
+          </div>
+          <p class="muted">{{ 'right now'|trans }}</p>
+
+          <ul class="live-feed">
+            {% for evt in realtime.events|slice(0, 8) %}
+              <li class="live-feed__item live-feed__item--{{ evt.kind }}">
+                <time datetime="{{ evt.at|date('c') }}">{{ evt.at|ago }}</time>
+                <span>
+                  {% if evt.kind == 'pageview' %}
+                    {{ '%user% viewed %page%'|trans({'%user%': evt.user_label|e, '%page%': evt.page|e}) }}
+                  {% elseif evt.kind == 'signup' %}
+                    {{ '%user% signed up'|trans({'%user%': evt.user_label|e}) }}
+                  {% elseif evt.kind == 'purchase' %}
+                    {{ '%user% purchased %item% (%amt%)'|trans({
+                        '%user%': evt.user_label|e,
+                        '%item%': evt.item|e,
+                        '%amt%': fmt.money(evt.amount, evt.currency)
+                    })|raw }}
+                  {% else %}
+                    {{ evt.message|e }}
+                  {% endif %}
+                </span>
+              </li>
+            {% else %}
+              <li class="muted">{{ 'No live activity yet.'|trans }}</li>
+            {% endfor %}
+          </ul>
+        </div>
+      </aside>
+    </section>
+
+    <section class="overview__breakdowns">
+      <article class="card">
+        <header class="card__header">
+          <h2>{{ 'Top pages'|trans }}</h2>
+          <a class="link" href="{{ path('analytics.pages') }}">{{ 'View all'|trans }}</a>
+        </header>
+        <div class="card__body">
+          <table class="table table--compact">
+            <thead>
+              <tr>
+                <th>{{ 'Path'|trans }}</th>
+                <th class="num">{{ 'Views'|trans }}</th>
+                <th class="num">{{ 'Avg. time'|trans }}</th>
+                <th class="num">{{ 'Bounce'|trans }}</th>
+                <th class="num">{{ 'Trend'|trans }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for page in top_pages|sort((a, b) => b.views <=> a.views)|slice(0, 15) %}
+                <tr>
+                  <td>
+                    <a href="{{ path('analytics.page', {path: page.path}) }}">
+                      <code>{{ page.path|e }}</code>
+                    </a>
+                    {% if page.title is defined %}
+                      <small class="muted">{{ page.title|e }}</small>
+                    {% endif %}
+                  </td>
+                  <td class="num">{{ page.views|number_format }}</td>
+                  <td class="num">{{ page.avg_time|format_duration }}</td>
+                  <td class="num">{{ page.bounce|number_format(1) }}%</td>
+                  <td class="num">{{ sparkline(page.trend, {width: 80, height: 24}) }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </article>
+
+      <article class="card">
+        <header class="card__header">
+          <h2>{{ 'Top sources'|trans }}</h2>
+          <a class="link" href="{{ path('analytics.sources') }}">{{ 'View all'|trans }}</a>
+        </header>
+        <div class="card__body">
+          {{ bar_chart('top-sources', top_sources|map(s => {label: s.name, value: s.sessions}), {
+              orientation: 'horizontal',
+              max_items: 10,
+              colors: chart_palette
+          }) }}
+        </div>
+      </article>
+
+      <article class="card">
+        <header class="card__header">
+          <h2>{{ 'Devices'|trans }}</h2>
+        </header>
+        <div class="card__body">
+          {{ pie_chart('devices', devices|map(d => {label: d.name, value: d.share}), {
+              donut: true,
+              center_label: ((devices|reduce((acc, d) => acc + d.share, 0))|number_format(0) ~ '%')
+          }) }}
+        </div>
+      </article>
+
+      <article class="card">
+        <header class="card__header">
+          <h2>{{ 'Geography'|trans }}</h2>
+        </header>
+        <div class="card__body">
+          <table class="table table--compact">
+            <thead>
+              <tr>
+                <th>{{ 'Country'|trans }}</th>
+                <th class="num">{{ 'Users'|trans }}</th>
+                <th class="num">{{ 'Sessions'|trans }}</th>
+                <th class="num">{{ 'Conv. rate'|trans }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for country in geography|slice(0, 12) %}
+                <tr>
+                  <td>
+                    <span class="flag flag--{{ country.code|lower }}"></span>
+                    {{ country.name|e }}
+                  </td>
+                  <td class="num">{{ country.users|number_format }}</td>
+                  <td class="num">{{ country.sessions|number_format }}</td>
+                  <td class="num">{{ country.conv_rate|number_format(2) }}%</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </article>
+    </section>
+
+    <section class="overview__funnels">
+      {{ section_header('Conversion funnels', 'Drop-off across the most-watched user journeys.', [
+          {label: 'Manage funnels', icon: 'cog', url: path('funnels.index'), kind: 'secondary'}
+      ]) }}
+
+      <div class="funnels">
+        {% for funnel in funnels %}
+          <article class="funnel-card">
+            <header>
+              <h3>{{ funnel.name|e }}</h3>
+              <small class="muted">
+                {{ funnel.steps|length }} {{ 'steps'|trans }}, {{ funnel.window }} {{ 'window'|trans }}
+              </small>
+            </header>
+            <ol class="funnel">
+              {% for step in funnel.steps %}
+                {% set drop = loop.first ? 0 : ((funnel.steps[loop.index0 - 1].count - step.count) / funnel.steps[loop.index0 - 1].count * 100) %}
+                <li class="funnel__step" style="--width: {{ step.percent_of_total }}%;">
+                  <strong>{{ step.label|trans }}</strong>
+                  <span>{{ step.count|number_format }}</span>
+                  {% if not loop.first %}
+                    <small class="muted">- {{ drop|number_format(1) }}%</small>
+                  {% endif %}
+                </li>
+              {% endfor %}
+            </ol>
+          </article>
+        {% endfor %}
+      </div>
+    </section>
+
+    <section class="overview__cohorts">
+      {{ section_header('Retention by cohort', 'Weekly cohorts for the last 12 weeks.') }}
+
+      <div class="cohort-table-wrap">
+        <table class="cohort-table">
+          <thead>
+            <tr>
+              <th>{{ 'Cohort'|trans }}</th>
+              <th>{{ 'Size'|trans }}</th>
+              {% for week in 0..11 %}
+                <th>W{{ week }}</th>
+              {% endfor %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for cohort in cohorts %}
+              <tr>
+                <td>{{ cohort.label }}</td>
+                <td>{{ cohort.size|number_format }}</td>
+                {% for value in cohort.weeks %}
+                  {% set intensity = (value * 100)|round %}
+                  <td class="cohort-cell"
+                      style="background-color: rgba(91, 141, 239, {{ value|number_format(2) }});"
+                      title="{{ intensity }}%">
+                    {% if value > 0 %}{{ intensity }}%{% endif %}
+                  </td>
+                {% endfor %}
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="overview__heatmap">
+      {{ section_header('Activity heatmap (UTC)', 'Sessions by hour of day and day of week.') }}
+      {{ heatmap('sessions-heatmap', heatmap_data, {
+          x_labels: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+          y_labels: 0..23|map(h => '%02d:00'|format(h)),
+          color_scale: ['#f5f7fb', '#5b8def']
+      }) }}
+    </section>
+
+    {% apply spaceless %}
+      <section class="overview__insights">
+        {{ section_header('Anomaly detection', 'Statistically significant spikes/dips for the chosen range.') }}
+        {% if insights|length == 0 %}
+          <p class="muted">{{ 'No anomalies detected.'|trans }}</p>
+        {% else %}
+          <ul class="insights">
+            {% for insight in insights %}
+              <li class="insight insight--{{ insight.severity }}">
+                <header>
+                  <strong>{{ insight.metric|trans }}</strong>
+                  {{ tag_pill(insight.severity|trans, insight.severity) }}
+                </header>
+                <p>{{ insight.message|trans(insight.params|default({})) }}</p>
+                <footer>
+                  <time>{{ insight.detected_at|ago }}</time>
+                  <span>{{ 'Confidence:'|trans }} {{ insight.confidence|number_format(0) }}%</span>
+                </footer>
+              </li>
+            {% endfor %}
+          </ul>
+        {% endif %}
+      </section>
+    {% endapply %}
+
+    <section class="overview__experiments">
+      {{ section_header('Live experiments', 'A/B tests currently running.', [
+          {label: 'New experiment', icon: 'plus', url: path('experiments.new'), kind: 'primary'}
+      ]) }}
+
+      <div class="experiments">
+        {% for exp in experiments|filter(e => e.status == 'running') %}
+          <article class="experiment-card">
+            <header>
+              <h3><a href="{{ path('experiments.show', {id: exp.id}) }}">{{ exp.name|e }}</a></h3>
+              {{ tag_pill('Running'|trans, 'success') }}
+            </header>
+            <dl>
+              <dt>{{ 'Started'|trans }}</dt><dd>{{ exp.started_at|date('M j') }}</dd>
+              <dt>{{ 'Variants'|trans }}</dt><dd>{{ exp.variants|length }}</dd>
+              <dt>{{ 'Traffic'|trans }}</dt><dd>{{ (exp.traffic * 100)|number_format(0) }}%</dd>
+              <dt>{{ 'Metric'|trans }}</dt><dd><code>{{ exp.primary_metric|e }}</code></dd>
+            </dl>
+            <ul class="variant-bars">
+              {% for variant in exp.variants %}
+                <li>
+                  <span class="variant-bars__label">{{ variant.label|e }}</span>
+                  <span class="variant-bars__bar" style="width: {{ (variant.share * 100)|number_format(0) }}%;"></span>
+                  <span class="variant-bars__value">{{ variant.lift is not null ? (variant.lift * 100)|number_format(2) ~ '%' : '-' }}</span>
+                </li>
+              {% endfor %}
+            </ul>
+            {% if exp.is_significant %}
+              <footer>{{ tag_pill('Statistically significant'|trans, 'attention') }}</footer>
+            {% endif %}
+          </article>
+        {% else %}
+          <p class="muted">{{ 'No experiments are currently running.'|trans }}</p>
+        {% endfor %}
+      </div>
+    </section>
+
+    {% sandbox %}
+      {% include "@user-content/dashboard/footer.html.twig" with {dashboard: page} only %}
+    {% endsandbox %}
+
+    {% if perm.can(current_user, 'analytics.contributors') %}
+      <section class="overview__contributors">
+        {{ section_header('Contributors', 'People who have edited this dashboard recently.') }}
+        {{ avatar_stack(contributors, 8) }}
+      </section>
+    {% endif %}
+
+    <section class="overview__exports">
+      {{ section_header('Recent exports', 'Files generated from this dashboard.') }}
+      <table class="table">
+        <thead>
+          <tr>
+            <th>{{ 'Created'|trans }}</th>
+            <th>{{ 'By'|trans }}</th>
+            <th>{{ 'Format'|trans }}</th>
+            <th>{{ 'Range'|trans }}</th>
+            <th>{{ 'Size'|trans }}</th>
+            <th>{{ 'Status'|trans }}</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for export in exports %}
+            <tr>
+              <td><time datetime="{{ export.created_at|date('c') }}">{{ export.created_at|ago }}</time></td>
+              <td>{{ export.user.name|e }}</td>
+              <td><code>{{ export.format|upper }}</code></td>
+              <td>{{ export.range|e }}</td>
+              <td>{{ fmt.bytes(export.size_bytes) }}</td>
+              <td>
+                {% if export.status == 'ready' %}
+                  {{ tag_pill('Ready'|trans, 'success') }}
+                {% elseif export.status == 'queued' %}
+                  {{ tag_pill('Queued'|trans, 'warning') }}
+                {% elseif export.status == 'failed' %}
+                  {{ tag_pill('Failed'|trans, 'attention') }}
+                {% else %}
+                  {{ tag_pill(export.status|trans) }}
+                {% endif %}
+              </td>
+              <td>
+                {% if export.status == 'ready' %}
+                  <a class="button button--small" href="{{ export.download_url }}">{{ 'Download'|trans }}</a>
+                {% endif %}
+                {% if perm.can(current_user, 'exports.delete') and export.status != 'queued' %}
+                  <form method="post" action="{{ path('exports.delete', {id: export.id}) }}" style="display: inline;">
+                    <input type="hidden" name="_token" value="{{ csrf_token('exports.delete') }}">
+                    <button type="submit" class="button button--small button--danger">{{ 'Delete'|trans }}</button>
+                  </form>
+                {% endif %}
+              </td>
+            </tr>
+          {% else %}
+            <tr><td colspan="7" class="muted">{{ 'Nothing exported yet.'|trans }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+
+    {% embed "@admin/partials/_collapsible.html.twig" with {id: 'raw-data'} %}
+      {% block summary %}{{ 'Raw data sample'|trans }}{% endblock %}
+      {% block content %}
+        <pre class="code-block"><code>{{ raw_sample|json_encode(constant('JSON_PRETTY_PRINT'))|e }}</code></pre>
+      {% endblock %}
+    {% endembed %}
+
+    <section class="overview__definitions">
+      {{ section_header('Definitions') }}
+      <dl class="definitions">
+        {% for term in definitions %}
+          <dt id="def-{{ term.slug }}">{{ term.label|e }}</dt>
+          <dd>{{ term.body|markdown_to_html|raw }}</dd>
+        {% endfor %}
+      </dl>
+    </section>
+
+    {% if deprecation_notices|length > 0 %}
+      {% for notice in deprecation_notices %}
+        {% deprecated 'Metric "%name%" will be removed on %date%.'|trans({'%name%': notice.name, '%date%': notice.removal_date|date('Y-m-d')}) %}
+      {% endfor %}
+    {% endif %}
+
+    {% cache 'analytics.overview.summary.' ~ filters|hash ttl(300) tags(['analytics', 'analytics:overview']) %}
+      <section class="overview__summary">
+        {{ section_header('Auto-summary', 'Generated overview based on the current data.') }}
+        <p>
+          {{ 'In the past %range% you saw %sessions% sessions from %users% unique users (%delta%%, %dir%).'|trans({
+              '%range%': filters.range_label,
+              '%sessions%': metrics.sessions.value|number_format,
+              '%users%': metrics.users.value|number_format,
+              '%delta%': (metrics.sessions.delta|abs)|number_format(1),
+              '%dir%': metrics.sessions.delta >= 0 ? 'up'|trans : 'down'|trans
+          }) }}
+        </p>
+        <p>
+          {{ 'Your top traffic source was %src% (%pct%% of sessions). Your best-performing page was %page% with %views% views.'|trans({
+              '%src%': top_sources|first.name|default('-'),
+              '%pct%': top_sources|first.share|default(0)|number_format(1),
+              '%page%': top_pages|first.path|default('-'),
+              '%views%': top_pages|first.views|default(0)|number_format
+          }) }}
+        </p>
+      </section>
+    {% endcache %}
+
+    {% types {
+        page: 'object',
+        metrics: 'map',
+        filters: 'object'
+    } %}
+
+    {% with {pin_url: path('dashboards.pin', {id: page.id})} only %}
+      <form method="post" action="{{ pin_url }}" class="overview__pin">
+        <input type="hidden" name="_token" value="{{ csrf_token('dashboards.pin') }}">
+        <button type="submit" class="button button--ghost">
+          {{ icon('star') }}
+          {{ 'Pin to home'|trans }}
+        </button>
+      </form>
+    {% endwith %}
+
+    {% do dashboard_view_logged(current_user, page.id) %}
+
+    {% if request.is_initial_load %}
+      {% flush %}
+    {% endif %}
+  </article>
+{% endblock %}
+
+{% block scripts %}
+  {{ parent() }}
+  <script type="application/json" id="dashboard-data">
+    {{ {
+        page: page,
+        filters: filters,
+        metrics: metrics,
+        sessionsSeries: sessions_series,
+        topPages: top_pages,
+        topSources: top_sources,
+        devices: devices,
+        geography: geography,
+        funnels: funnels,
+        cohorts: cohorts,
+        heatmap: heatmap_data,
+        insights: insights,
+        experiments: experiments,
+        realtime: realtime,
+        currentUser: {id: current_user.id, name: current_user.name}
+    }|json_encode|raw }}
+  </script>
+  {% if feature_enabled('analytics.realtime') %}
+    <script type="module">
+      import {connect} from "{{ asset('js/realtime.mjs') }}";
+      connect("{{ realtime_endpoint|e('js') }}", {
+        token: "{{ realtime_token|e('js') }}",
+        topics: ["analytics:overview", "analytics:user:{{ current_user.id }}"]
+      });
+    </script>
+  {% endif %}
+{% endblock %}
+{# vim: set ft=html.twig : #}
+{#
+  Stress-test fixture: a single template that exercises virtually every
+  Twig construct - extends, embed, use, blocks, macros, imports, sets,
+  conditionals, loops, arrow functions, filter pipelines, tests,
+  interpolated strings, named arguments, slices, ranges, hash literals,
+  spread, deeply-nested expressions, autoescape, sandbox, apply, with,
+  guard, cache, types, deprecated, do, flush.
+#}
+{% extends "@admin/layouts/shell.html.twig" %}
+
+{% use "@admin/partials/_card.html.twig" with card as base_card %}
+{% use "@admin/partials/_form.html.twig" %}
+
+{% from "@admin/macros/widgets.html.twig" import button, icon, input, select, textarea, switch, datepicker, file_picker %}
+{% from "@admin/macros/charts.html.twig" import line_chart, bar_chart, pie_chart, sparkline, heatmap %}
+{% from "@admin/macros/tables.html.twig" import data_table, sort_header, paginator, filters_panel, bulk_actions %}
+{% import "@admin/macros/format.html.twig" as fmt %}
+{% import "@admin/macros/perm.html.twig" as perm %}
+
+{% set page = {
+    id: 'analytics-overview',
+    title: 'Analytics Overview',
+    breadcrumbs: [
+        {label: 'Home', url: path('home')},
+        {label: 'Analytics', url: path('analytics.index')},
+        {label: 'Overview'}
+    ],
+    actions: [
+        {label: 'Export CSV', icon: 'download', url: path('analytics.export', {format: 'csv'}), kind: 'secondary'},
+        {label: 'Export JSON', icon: 'download', url: path('analytics.export', {format: 'json'}), kind: 'secondary'},
+        {label: 'Schedule report', icon: 'calendar', url: path('reports.new'), kind: 'primary'}
+    ],
+    sidebar: 'analytics'
+} %}
+
+{% block title %}{{ page.title }} - {{ parent() }}{% endblock %}
+
+{% block meta %}
+  {{ parent() }}
+  <meta name="description" content="{{ ('analytics.overview.description'|trans)|e('html_attr') }}">
+  <meta property="og:title" content="{{ page.title|e('html_attr') }}">
+  <meta property="og:type" content="website">
+  <meta property="og:image" content="{{ absolute_url(asset('img/og/analytics.png')) }}">
+{% endblock %}
+
+{% block head %}
+  {{ parent() }}
+  <link rel="stylesheet" href="{{ asset('css/analytics.css') }}">
+  <link rel="stylesheet" href="{{ asset('css/charts.css') }}">
+  <link rel="preload" href="{{ asset('fonts/inter-var.woff2') }}" as="font" type="font/woff2" crossorigin>
+  <script type="module" src="{{ asset('js/analytics.mjs') }}"></script>
+  {% if feature_enabled('analytics.realtime') %}
+    <link rel="preconnect" href="{{ realtime_endpoint }}">
+  {% endif %}
+{% endblock %}
+
+{% macro stat_tile(label, value, change = null, format = 'number', currency = 'USD') %}
+  {% set tone = change is null ? 'neutral' : (change >= 0 ? 'positive' : 'negative') %}
+  <article class="tile tile--{{ tone }}">
+    <header>
+      <h3>{{ label|trans }}</h3>
+    </header>
+    <div class="tile__value">
+      {% if format == 'currency' %}
+        {{ value|number_format(2, '.', ',') }} {{ currency }}
+      {% elseif format == 'percent' %}
+        {{ value|number_format(1) }}%
+      {% elseif format == 'duration' %}
+        {{ value|format_duration }}
+      {% else %}
+        {{ value|number_format }}
+      {% endif %}
+    </div>
+    {% if change is not null %}
+      <footer class="tile__change">
+        <span>{{ (change|abs)|number_format(1) }}%</span>
+        <small class="muted">{{ 'vs. last period'|trans }}</small>
+      </footer>
+    {% endif %}
+  </article>
+{% endmacro %}
+
+{% macro segment_filter(name, options, current) %}
+  <div class="segment-filter" role="tablist" aria-label="{{ name|trans }}">
+    {% for option in options %}
+      <button type="button"
+              role="tab"
+              data-segment="{{ name }}"
+              data-value="{{ option.value }}"
+              class="{{ option.value == current ? 'is-active' : '' }}">
+        {{ option.label|trans }}
+        {% if option.count is defined %}
+          <span class="muted">({{ option.count }})</span>
+        {% endif %}
+      </button>
+    {% endfor %}
+  </div>
+{% endmacro %}
+
+{% macro tag_pill(label, color = 'neutral') %}
+  <span class="pill pill--{{ color }}">{{ label|e }}</span>
+{% endmacro %}
+
+{% macro avatar_stack(users, max = 5) %}
+  <div class="avatar-stack" data-count="{{ users|length }}">
+    {% for user in users|slice(0, max) %}
+      <span class="avatar-stack__item" title="{{ user.name|e }}">
+        {% if user.avatar_url %}
+          <img src="{{ user.avatar_url }}" alt="{{ user.name|e }}">
+        {% else %}
+          {{ user.name|first|upper }}
+        {% endif %}
+      </span>
+    {% endfor %}
+    {% if users|length > max %}
+      <span class="avatar-stack__overflow">+{{ users|length - max }}</span>
+    {% endif %}
+  </div>
+{% endmacro %}
+
+{% macro section_header(title, subtitle = null, actions = []) %}
+  <header class="section-header">
+    <div>
+      <h2>{{ title|trans }}</h2>
+      {% if subtitle %}
+        <p class="muted">{{ subtitle|trans }}</p>
+      {% endif %}
+    </div>
+    {% if actions|length > 0 %}
+      <div class="section-header__actions">
+        {% for action in actions %}
+          <a class="button button--{{ action.kind|default('secondary') }}" href="{{ action.url }}">
+            {% if action.icon is defined %}{{ icon(action.icon) }}{% endif %}
+            {{ action.label|trans }}
+          </a>
+        {% endfor %}
+      </div>
+    {% endif %}
+  </header>
+{% endmacro %}
+
+{% from _self import stat_tile, segment_filter, tag_pill, avatar_stack, section_header %}
+
+{% block sidebar_nav %}
+  <nav class="side-nav" aria-label="{{ 'Analytics navigation'|trans }}">
+    <ul>
+      {% set nav_items = [
+          {key: 'overview', label: 'Overview', route: 'analytics.overview', icon: 'chart-pie'},
+          {key: 'audience', label: 'Audience', route: 'analytics.audience', icon: 'users'},
+          {key: 'acquisition', label: 'Acquisition', route: 'analytics.acquisition', icon: 'flag'},
+          {key: 'behaviour', label: 'Behaviour', route: 'analytics.behaviour', icon: 'cursor'},
+          {key: 'conversion', label: 'Conversion', route: 'analytics.conversion', icon: 'check-circle'},
+          {key: 'revenue', label: 'Revenue', route: 'analytics.revenue', icon: 'currency-dollar'},
+          {key: 'cohorts', label: 'Cohorts', route: 'analytics.cohorts', icon: 'grid'},
+          {key: 'funnels', label: 'Funnels', route: 'analytics.funnels', icon: 'filter'},
+          {key: 'reports', label: 'Reports', route: 'analytics.reports', icon: 'document-text'}
+      ] %}
+      {% for item in nav_items %}
+        <li class="{{ item.key == active_nav ? 'is-active' : '' }}">
+          <a href="{{ path(item.route) }}">
+            <span class="side-nav__icon">{{ icon(item.icon) }}</span>
+            <span class="side-nav__label">{{ item.label|trans }}</span>
+            {% if item.badge is defined and item.badge %}
+              {{ tag_pill(item.badge, 'info') }}
+            {% endif %}
+          </a>
+        </li>
+      {% endfor %}
+    </ul>
+
+    {% if perm.can(current_user, 'analytics.admin') %}
+      <hr>
+      <h3 class="side-nav__section-title">{{ 'Admin'|trans }}</h3>
+      <ul>
+        <li><a href="{{ path('analytics.settings') }}">{{ 'Settings'|trans }}</a></li>
+        <li><a href="{{ path('analytics.integrations') }}">{{ 'Integrations'|trans }}</a></li>
+        <li><a href="{{ path('analytics.audit_log') }}">{{ 'Audit log'|trans }}</a></li>
+      </ul>
+    {% endif %}
+  </nav>
+{% endblock %}
+
+{% block toolbar %}
+  <div class="toolbar">
+    <form class="toolbar__filters" method="get">
+      <fieldset>
+        <legend>{{ 'Time range'|trans }}</legend>
+        <select name="range">
+          {% for opt in time_range_options %}
+            <option value="{{ opt.value }}" {{ opt.value == filters.range ? 'selected' : '' }}>
+              {{ opt.label|trans }}
+            </option>
+          {% endfor %}
+        </select>
+        {% if filters.range == 'custom' %}
+          {{ datepicker('from', filters.from) }}
+          {{ datepicker('to', filters.to) }}
+        {% endif %}
+      </fieldset>
+
+      <fieldset>
+        <legend>{{ 'Compare to'|trans }}</legend>
+        <select name="compare">
+          {% for opt in compare_options %}
+            <option value="{{ opt.value }}" {{ opt.value == filters.compare ? 'selected' : '' }}>
+              {{ opt.label|trans }}
+            </option>
+          {% endfor %}
+        </select>
+      </fieldset>
+
+      <fieldset>
+        <legend>{{ 'Segment'|trans }}</legend>
+        {% for segment in available_segments %}
+          <label>
+            <input type="checkbox"
+                   name="segment[]"
+                   value="{{ segment.id }}"
+                   {{ segment.id in filters.segment ? 'checked' : '' }}>
+            {{ segment.label|e }}
+          </label>
+        {% endfor %}
+      </fieldset>
+
+      <button type="submit" class="button button--primary">{{ 'Update'|trans }}</button>
+      <a class="button button--ghost" href="{{ path('analytics.overview') }}">{{ 'Reset'|trans }}</a>
+    </form>
+
+    <div class="toolbar__view-mode">
+      {{ segment_filter('view', [
+          {value: 'cards', label: 'Cards', count: 12},
+          {value: 'table', label: 'Table'},
+          {value: 'compact', label: 'Compact'}
+      ], view_mode) }}
+    </div>
+  </div>
+{% endblock %}
+
+{% block content %}
+  <article class="overview" data-page="{{ page.id }}">
+    {{ section_header(page.title, 'High-level analytics across all properties.', page.actions) }}
+
+    <section class="overview__tiles" aria-label="{{ 'Headline metrics'|trans }}">
+      {{ stat_tile('Sessions',         metrics.sessions.value,         metrics.sessions.delta) }}
+      {{ stat_tile('Unique users',     metrics.users.value,            metrics.users.delta) }}
+      {{ stat_tile('Page views',       metrics.page_views.value,       metrics.page_views.delta) }}
+      {{ stat_tile('Bounce rate',      metrics.bounce_rate.value,      metrics.bounce_rate.delta, 'percent') }}
+      {{ stat_tile('Avg. session',     metrics.avg_session.value,      metrics.avg_session.delta, 'duration') }}
+      {{ stat_tile('Conversion rate', metrics.conversion.value,        metrics.conversion.delta, 'percent') }}
+      {{ stat_tile('Revenue',          metrics.revenue.value,          metrics.revenue.delta, 'currency', metrics.revenue.currency) }}
+      {{ stat_tile('AOV',              metrics.aov.value,              metrics.aov.delta, 'currency', metrics.aov.currency) }}
+    </section>
+
+    <section class="overview__primary">
+      <article class="card card--wide">
+        <header class="card__header">
+          <h2>{{ 'Sessions over time'|trans }}</h2>
+          {{ segment_filter('granularity', [
+              {value: 'hour',  label: 'Hourly'},
+              {value: 'day',   label: 'Daily'},
+              {value: 'week',  label: 'Weekly'},
+              {value: 'month', label: 'Monthly'}
+          ], filters.granularity) }}
+        </header>
+        <div class="card__body">
+          {{ line_chart('sessions', sessions_series, {
+              x: 'time',
+              y: 'count',
+              compare_series: sessions_series_compare|default(null),
+              show_legend: true,
+              annotations: events|filter(e => e.kind == 'launch')|map(e => {
+                  at: e.at,
+                  label: e.label,
+                  color: '#5b8def'
+              })
+          }) }}
+        </div>
+      </article>
+
+      <aside class="card">
+        <header class="card__header">
+          <h2>{{ 'Active users (live)'|trans }}</h2>
+        </header>
+        <div class="card__body card__body--centered">
+          <div class="big-number" data-stream="realtime.users">
+            {{ realtime.active_users|default(0)|number_format }}
+          </div>
+          <p class="muted">{{ 'right now'|trans }}</p>
+
+          <ul class="live-feed">
+            {% for evt in realtime.events|slice(0, 8) %}
+              <li class="live-feed__item live-feed__item--{{ evt.kind }}">
+                <time datetime="{{ evt.at|date('c') }}">{{ evt.at|ago }}</time>
+                <span>
+                  {% if evt.kind == 'pageview' %}
+                    {{ '%user% viewed %page%'|trans({'%user%': evt.user_label|e, '%page%': evt.page|e}) }}
+                  {% elseif evt.kind == 'signup' %}
+                    {{ '%user% signed up'|trans({'%user%': evt.user_label|e}) }}
+                  {% elseif evt.kind == 'purchase' %}
+                    {{ '%user% purchased %item% (%amt%)'|trans({
+                        '%user%': evt.user_label|e,
+                        '%item%': evt.item|e,
+                        '%amt%': fmt.money(evt.amount, evt.currency)
+                    })|raw }}
+                  {% else %}
+                    {{ evt.message|e }}
+                  {% endif %}
+                </span>
+              </li>
+            {% else %}
+              <li class="muted">{{ 'No live activity yet.'|trans }}</li>
+            {% endfor %}
+          </ul>
+        </div>
+      </aside>
+    </section>
+
+    <section class="overview__breakdowns">
+      <article class="card">
+        <header class="card__header">
+          <h2>{{ 'Top pages'|trans }}</h2>
+          <a class="link" href="{{ path('analytics.pages') }}">{{ 'View all'|trans }}</a>
+        </header>
+        <div class="card__body">
+          <table class="table table--compact">
+            <thead>
+              <tr>
+                <th>{{ 'Path'|trans }}</th>
+                <th class="num">{{ 'Views'|trans }}</th>
+                <th class="num">{{ 'Avg. time'|trans }}</th>
+                <th class="num">{{ 'Bounce'|trans }}</th>
+                <th class="num">{{ 'Trend'|trans }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for page in top_pages|sort((a, b) => b.views <=> a.views)|slice(0, 15) %}
+                <tr>
+                  <td>
+                    <a href="{{ path('analytics.page', {path: page.path}) }}">
+                      <code>{{ page.path|e }}</code>
+                    </a>
+                    {% if page.title is defined %}
+                      <small class="muted">{{ page.title|e }}</small>
+                    {% endif %}
+                  </td>
+                  <td class="num">{{ page.views|number_format }}</td>
+                  <td class="num">{{ page.avg_time|format_duration }}</td>
+                  <td class="num">{{ page.bounce|number_format(1) }}%</td>
+                  <td class="num">{{ sparkline(page.trend, {width: 80, height: 24}) }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </article>
+
+      <article class="card">
+        <header class="card__header">
+          <h2>{{ 'Top sources'|trans }}</h2>
+          <a class="link" href="{{ path('analytics.sources') }}">{{ 'View all'|trans }}</a>
+        </header>
+        <div class="card__body">
+          {{ bar_chart('top-sources', top_sources|map(s => {label: s.name, value: s.sessions}), {
+              orientation: 'horizontal',
+              max_items: 10,
+              colors: chart_palette
+          }) }}
+        </div>
+      </article>
+
+      <article class="card">
+        <header class="card__header">
+          <h2>{{ 'Devices'|trans }}</h2>
+        </header>
+        <div class="card__body">
+          {{ pie_chart('devices', devices|map(d => {label: d.name, value: d.share}), {
+              donut: true,
+              center_label: ((devices|reduce((acc, d) => acc + d.share, 0))|number_format(0) ~ '%')
+          }) }}
+        </div>
+      </article>
+
+      <article class="card">
+        <header class="card__header">
+          <h2>{{ 'Geography'|trans }}</h2>
+        </header>
+        <div class="card__body">
+          <table class="table table--compact">
+            <thead>
+              <tr>
+                <th>{{ 'Country'|trans }}</th>
+                <th class="num">{{ 'Users'|trans }}</th>
+                <th class="num">{{ 'Sessions'|trans }}</th>
+                <th class="num">{{ 'Conv. rate'|trans }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for country in geography|slice(0, 12) %}
+                <tr>
+                  <td>
+                    <span class="flag flag--{{ country.code|lower }}"></span>
+                    {{ country.name|e }}
+                  </td>
+                  <td class="num">{{ country.users|number_format }}</td>
+                  <td class="num">{{ country.sessions|number_format }}</td>
+                  <td class="num">{{ country.conv_rate|number_format(2) }}%</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </article>
+    </section>
+
+    <section class="overview__funnels">
+      {{ section_header('Conversion funnels', 'Drop-off across the most-watched user journeys.', [
+          {label: 'Manage funnels', icon: 'cog', url: path('funnels.index'), kind: 'secondary'}
+      ]) }}
+
+      <div class="funnels">
+        {% for funnel in funnels %}
+          <article class="funnel-card">
+            <header>
+              <h3>{{ funnel.name|e }}</h3>
+              <small class="muted">
+                {{ funnel.steps|length }} {{ 'steps'|trans }}, {{ funnel.window }} {{ 'window'|trans }}
+              </small>
+            </header>
+            <ol class="funnel">
+              {% for step in funnel.steps %}
+                {% set drop = loop.first ? 0 : ((funnel.steps[loop.index0 - 1].count - step.count) / funnel.steps[loop.index0 - 1].count * 100) %}
+                <li class="funnel__step" style="--width: {{ step.percent_of_total }}%;">
+                  <strong>{{ step.label|trans }}</strong>
+                  <span>{{ step.count|number_format }}</span>
+                  {% if not loop.first %}
+                    <small class="muted">- {{ drop|number_format(1) }}%</small>
+                  {% endif %}
+                </li>
+              {% endfor %}
+            </ol>
+          </article>
+        {% endfor %}
+      </div>
+    </section>
+
+    <section class="overview__cohorts">
+      {{ section_header('Retention by cohort', 'Weekly cohorts for the last 12 weeks.') }}
+
+      <div class="cohort-table-wrap">
+        <table class="cohort-table">
+          <thead>
+            <tr>
+              <th>{{ 'Cohort'|trans }}</th>
+              <th>{{ 'Size'|trans }}</th>
+              {% for week in 0..11 %}
+                <th>W{{ week }}</th>
+              {% endfor %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for cohort in cohorts %}
+              <tr>
+                <td>{{ cohort.label }}</td>
+                <td>{{ cohort.size|number_format }}</td>
+                {% for value in cohort.weeks %}
+                  {% set intensity = (value * 100)|round %}
+                  <td class="cohort-cell"
+                      style="background-color: rgba(91, 141, 239, {{ value|number_format(2) }});"
+                      title="{{ intensity }}%">
+                    {% if value > 0 %}{{ intensity }}%{% endif %}
+                  </td>
+                {% endfor %}
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="overview__heatmap">
+      {{ section_header('Activity heatmap (UTC)', 'Sessions by hour of day and day of week.') }}
+      {{ heatmap('sessions-heatmap', heatmap_data, {
+          x_labels: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+          y_labels: 0..23|map(h => '%02d:00'|format(h)),
+          color_scale: ['#f5f7fb', '#5b8def']
+      }) }}
+    </section>
+
+    {% apply spaceless %}
+      <section class="overview__insights">
+        {{ section_header('Anomaly detection', 'Statistically significant spikes/dips for the chosen range.') }}
+        {% if insights|length == 0 %}
+          <p class="muted">{{ 'No anomalies detected.'|trans }}</p>
+        {% else %}
+          <ul class="insights">
+            {% for insight in insights %}
+              <li class="insight insight--{{ insight.severity }}">
+                <header>
+                  <strong>{{ insight.metric|trans }}</strong>
+                  {{ tag_pill(insight.severity|trans, insight.severity) }}
+                </header>
+                <p>{{ insight.message|trans(insight.params|default({})) }}</p>
+                <footer>
+                  <time>{{ insight.detected_at|ago }}</time>
+                  <span>{{ 'Confidence:'|trans }} {{ insight.confidence|number_format(0) }}%</span>
+                </footer>
+              </li>
+            {% endfor %}
+          </ul>
+        {% endif %}
+      </section>
+    {% endapply %}
+
+    <section class="overview__experiments">
+      {{ section_header('Live experiments', 'A/B tests currently running.', [
+          {label: 'New experiment', icon: 'plus', url: path('experiments.new'), kind: 'primary'}
+      ]) }}
+
+      <div class="experiments">
+        {% for exp in experiments|filter(e => e.status == 'running') %}
+          <article class="experiment-card">
+            <header>
+              <h3><a href="{{ path('experiments.show', {id: exp.id}) }}">{{ exp.name|e }}</a></h3>
+              {{ tag_pill('Running'|trans, 'success') }}
+            </header>
+            <dl>
+              <dt>{{ 'Started'|trans }}</dt><dd>{{ exp.started_at|date('M j') }}</dd>
+              <dt>{{ 'Variants'|trans }}</dt><dd>{{ exp.variants|length }}</dd>
+              <dt>{{ 'Traffic'|trans }}</dt><dd>{{ (exp.traffic * 100)|number_format(0) }}%</dd>
+              <dt>{{ 'Metric'|trans }}</dt><dd><code>{{ exp.primary_metric|e }}</code></dd>
+            </dl>
+            <ul class="variant-bars">
+              {% for variant in exp.variants %}
+                <li>
+                  <span class="variant-bars__label">{{ variant.label|e }}</span>
+                  <span class="variant-bars__bar" style="width: {{ (variant.share * 100)|number_format(0) }}%;"></span>
+                  <span class="variant-bars__value">{{ variant.lift is not null ? (variant.lift * 100)|number_format(2) ~ '%' : '-' }}</span>
+                </li>
+              {% endfor %}
+            </ul>
+            {% if exp.is_significant %}
+              <footer>{{ tag_pill('Statistically significant'|trans, 'attention') }}</footer>
+            {% endif %}
+          </article>
+        {% else %}
+          <p class="muted">{{ 'No experiments are currently running.'|trans }}</p>
+        {% endfor %}
+      </div>
+    </section>
+
+    {% sandbox %}
+      {% include "@user-content/dashboard/footer.html.twig" with {dashboard: page} only %}
+    {% endsandbox %}
+
+    {% if perm.can(current_user, 'analytics.contributors') %}
+      <section class="overview__contributors">
+        {{ section_header('Contributors', 'People who have edited this dashboard recently.') }}
+        {{ avatar_stack(contributors, 8) }}
+      </section>
+    {% endif %}
+
+    <section class="overview__exports">
+      {{ section_header('Recent exports', 'Files generated from this dashboard.') }}
+      <table class="table">
+        <thead>
+          <tr>
+            <th>{{ 'Created'|trans }}</th>
+            <th>{{ 'By'|trans }}</th>
+            <th>{{ 'Format'|trans }}</th>
+            <th>{{ 'Range'|trans }}</th>
+            <th>{{ 'Size'|trans }}</th>
+            <th>{{ 'Status'|trans }}</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for export in exports %}
+            <tr>
+              <td><time datetime="{{ export.created_at|date('c') }}">{{ export.created_at|ago }}</time></td>
+              <td>{{ export.user.name|e }}</td>
+              <td><code>{{ export.format|upper }}</code></td>
+              <td>{{ export.range|e }}</td>
+              <td>{{ fmt.bytes(export.size_bytes) }}</td>
+              <td>
+                {% if export.status == 'ready' %}
+                  {{ tag_pill('Ready'|trans, 'success') }}
+                {% elseif export.status == 'queued' %}
+                  {{ tag_pill('Queued'|trans, 'warning') }}
+                {% elseif export.status == 'failed' %}
+                  {{ tag_pill('Failed'|trans, 'attention') }}
+                {% else %}
+                  {{ tag_pill(export.status|trans) }}
+                {% endif %}
+              </td>
+              <td>
+                {% if export.status == 'ready' %}
+                  <a class="button button--small" href="{{ export.download_url }}">{{ 'Download'|trans }}</a>
+                {% endif %}
+                {% if perm.can(current_user, 'exports.delete') and export.status != 'queued' %}
+                  <form method="post" action="{{ path('exports.delete', {id: export.id}) }}" style="display: inline;">
+                    <input type="hidden" name="_token" value="{{ csrf_token('exports.delete') }}">
+                    <button type="submit" class="button button--small button--danger">{{ 'Delete'|trans }}</button>
+                  </form>
+                {% endif %}
+              </td>
+            </tr>
+          {% else %}
+            <tr><td colspan="7" class="muted">{{ 'Nothing exported yet.'|trans }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+
+    {% embed "@admin/partials/_collapsible.html.twig" with {id: 'raw-data'} %}
+      {% block summary %}{{ 'Raw data sample'|trans }}{% endblock %}
+      {% block content %}
+        <pre class="code-block"><code>{{ raw_sample|json_encode(constant('JSON_PRETTY_PRINT'))|e }}</code></pre>
+      {% endblock %}
+    {% endembed %}
+
+    <section class="overview__definitions">
+      {{ section_header('Definitions') }}
+      <dl class="definitions">
+        {% for term in definitions %}
+          <dt id="def-{{ term.slug }}">{{ term.label|e }}</dt>
+          <dd>{{ term.body|markdown_to_html|raw }}</dd>
+        {% endfor %}
+      </dl>
+    </section>
+
+    {% if deprecation_notices|length > 0 %}
+      {% for notice in deprecation_notices %}
+        {% deprecated 'Metric "%name%" will be removed on %date%.'|trans({'%name%': notice.name, '%date%': notice.removal_date|date('Y-m-d')}) %}
+      {% endfor %}
+    {% endif %}
+
+    {% cache 'analytics.overview.summary.' ~ filters|hash ttl(300) tags(['analytics', 'analytics:overview']) %}
+      <section class="overview__summary">
+        {{ section_header('Auto-summary', 'Generated overview based on the current data.') }}
+        <p>
+          {{ 'In the past %range% you saw %sessions% sessions from %users% unique users (%delta%%, %dir%).'|trans({
+              '%range%': filters.range_label,
+              '%sessions%': metrics.sessions.value|number_format,
+              '%users%': metrics.users.value|number_format,
+              '%delta%': (metrics.sessions.delta|abs)|number_format(1),
+              '%dir%': metrics.sessions.delta >= 0 ? 'up'|trans : 'down'|trans
+          }) }}
+        </p>
+        <p>
+          {{ 'Your top traffic source was %src% (%pct%% of sessions). Your best-performing page was %page% with %views% views.'|trans({
+              '%src%': top_sources|first.name|default('-'),
+              '%pct%': top_sources|first.share|default(0)|number_format(1),
+              '%page%': top_pages|first.path|default('-'),
+              '%views%': top_pages|first.views|default(0)|number_format
+          }) }}
+        </p>
+      </section>
+    {% endcache %}
+
+    {% types {
+        page: 'object',
+        metrics: 'map',
+        filters: 'object'
+    } %}
+
+    {% with {pin_url: path('dashboards.pin', {id: page.id})} only %}
+      <form method="post" action="{{ pin_url }}" class="overview__pin">
+        <input type="hidden" name="_token" value="{{ csrf_token('dashboards.pin') }}">
+        <button type="submit" class="button button--ghost">
+          {{ icon('star') }}
+          {{ 'Pin to home'|trans }}
+        </button>
+      </form>
+    {% endwith %}
+
+    {% do dashboard_view_logged(current_user, page.id) %}
+
+    {% if request.is_initial_load %}
+      {% flush %}
+    {% endif %}
+  </article>
+{% endblock %}
+
+{% block scripts %}
+  {{ parent() }}
+  <script type="application/json" id="dashboard-data">
+    {{ {
+        page: page,
+        filters: filters,
+        metrics: metrics,
+        sessionsSeries: sessions_series,
+        topPages: top_pages,
+        topSources: top_sources,
+        devices: devices,
+        geography: geography,
+        funnels: funnels,
+        cohorts: cohorts,
+        heatmap: heatmap_data,
+        insights: insights,
+        experiments: experiments,
+        realtime: realtime,
+        currentUser: {id: current_user.id, name: current_user.name}
+    }|json_encode|raw }}
+  </script>
+  {% if feature_enabled('analytics.realtime') %}
+    <script type="module">
+      import {connect} from "{{ asset('js/realtime.mjs') }}";
+      connect("{{ realtime_endpoint|e('js') }}", {
+        token: "{{ realtime_token|e('js') }}",
+        topics: ["analytics:overview", "analytics:user:{{ current_user.id }}"]
+      });
+    </script>
+  {% endif %}
+{% endblock %}
+
+{# vim: set ft=html.twig : #}
+{#
+  Stress-test fixture: a single template that exercises virtually every
+  Twig construct - extends, embed, use, blocks, macros, imports, sets,
+  conditionals, loops, arrow functions, filter pipelines, tests,
+  interpolated strings, named arguments, slices, ranges, hash literals,
+  spread, deeply-nested expressions, autoescape, sandbox, apply, with,
+  guard, cache, types, deprecated, do, flush.
+#}
+{% extends "@admin/layouts/shell.html.twig" %}
+
+{% use "@admin/partials/_card.html.twig" with card as base_card %}
+{% use "@admin/partials/_form.html.twig" %}
+
+{% from "@admin/macros/widgets.html.twig" import button, icon, input, select, textarea, switch, datepicker, file_picker %}
+{% from "@admin/macros/charts.html.twig" import line_chart, bar_chart, pie_chart, sparkline, heatmap %}
+{% from "@admin/macros/tables.html.twig" import data_table, sort_header, paginator, filters_panel, bulk_actions %}
+{% import "@admin/macros/format.html.twig" as fmt %}
+{% import "@admin/macros/perm.html.twig" as perm %}
+
+{% set page = {
+    id: 'analytics-overview',
+    title: 'Analytics Overview',
+    breadcrumbs: [
+        {label: 'Home', url: path('home')},
+        {label: 'Analytics', url: path('analytics.index')},
+        {label: 'Overview'}
+    ],
+    actions: [
+        {label: 'Export CSV', icon: 'download', url: path('analytics.export', {format: 'csv'}), kind: 'secondary'},
+        {label: 'Export JSON', icon: 'download', url: path('analytics.export', {format: 'json'}), kind: 'secondary'},
+        {label: 'Schedule report', icon: 'calendar', url: path('reports.new'), kind: 'primary'}
+    ],
+    sidebar: 'analytics'
+} %}
+
+{% block title %}{{ page.title }} - {{ parent() }}{% endblock %}
+
+{% block meta %}
+  {{ parent() }}
+  <meta name="description" content="{{ ('analytics.overview.description'|trans)|e('html_attr') }}">
+  <meta property="og:title" content="{{ page.title|e('html_attr') }}">
+  <meta property="og:type" content="website">
+  <meta property="og:image" content="{{ absolute_url(asset('img/og/analytics.png')) }}">
+{% endblock %}
+
+{% block head %}
+  {{ parent() }}
+  <link rel="stylesheet" href="{{ asset('css/analytics.css') }}">
+  <link rel="stylesheet" href="{{ asset('css/charts.css') }}">
+  <link rel="preload" href="{{ asset('fonts/inter-var.woff2') }}" as="font" type="font/woff2" crossorigin>
+  <script type="module" src="{{ asset('js/analytics.mjs') }}"></script>
+  {% if feature_enabled('analytics.realtime') %}
+    <link rel="preconnect" href="{{ realtime_endpoint }}">
+  {% endif %}
+{% endblock %}
+
+{% macro stat_tile(label, value, change = null, format = 'number', currency = 'USD') %}
+  {% set tone = change is null ? 'neutral' : (change >= 0 ? 'positive' : 'negative') %}
+  <article class="tile tile--{{ tone }}">
+    <header>
+      <h3>{{ label|trans }}</h3>
+    </header>
+    <div class="tile__value">
+      {% if format == 'currency' %}
+        {{ value|number_format(2, '.', ',') }} {{ currency }}
+      {% elseif format == 'percent' %}
+        {{ value|number_format(1) }}%
+      {% elseif format == 'duration' %}
+        {{ value|format_duration }}
+      {% else %}
+        {{ value|number_format }}
+      {% endif %}
+    </div>
+    {% if change is not null %}
+      <footer class="tile__change">
+        <span>{{ (change|abs)|number_format(1) }}%</span>
+        <small class="muted">{{ 'vs. last period'|trans }}</small>
+      </footer>
+    {% endif %}
+  </article>
+{% endmacro %}
+
+{% macro segment_filter(name, options, current) %}
+  <div class="segment-filter" role="tablist" aria-label="{{ name|trans }}">
+    {% for option in options %}
+      <button type="button"
+              role="tab"
+              data-segment="{{ name }}"
+              data-value="{{ option.value }}"
+              class="{{ option.value == current ? 'is-active' : '' }}">
+        {{ option.label|trans }}
+        {% if option.count is defined %}
+          <span class="muted">({{ option.count }})</span>
+        {% endif %}
+      </button>
+    {% endfor %}
+  </div>
+{% endmacro %}
+
+{% macro tag_pill(label, color = 'neutral') %}
+  <span class="pill pill--{{ color }}">{{ label|e }}</span>
+{% endmacro %}
+
+{% macro avatar_stack(users, max = 5) %}
+  <div class="avatar-stack" data-count="{{ users|length }}">
+    {% for user in users|slice(0, max) %}
+      <span class="avatar-stack__item" title="{{ user.name|e }}">
+        {% if user.avatar_url %}
+          <img src="{{ user.avatar_url }}" alt="{{ user.name|e }}">
+        {% else %}
+          {{ user.name|first|upper }}
+        {% endif %}
+      </span>
+    {% endfor %}
+    {% if users|length > max %}
+      <span class="avatar-stack__overflow">+{{ users|length - max }}</span>
+    {% endif %}
+  </div>
+{% endmacro %}
+
+{% macro section_header(title, subtitle = null, actions = []) %}
+  <header class="section-header">
+    <div>
+      <h2>{{ title|trans }}</h2>
+      {% if subtitle %}
+        <p class="muted">{{ subtitle|trans }}</p>
+      {% endif %}
+    </div>
+    {% if actions|length > 0 %}
+      <div class="section-header__actions">
+        {% for action in actions %}
+          <a class="button button--{{ action.kind|default('secondary') }}" href="{{ action.url }}">
+            {% if action.icon is defined %}{{ icon(action.icon) }}{% endif %}
+            {{ action.label|trans }}
+          </a>
+        {% endfor %}
+      </div>
+    {% endif %}
+  </header>
+{% endmacro %}
+
+{% from _self import stat_tile, segment_filter, tag_pill, avatar_stack, section_header %}
+
+{% block sidebar_nav %}
+  <nav class="side-nav" aria-label="{{ 'Analytics navigation'|trans }}">
+    <ul>
+      {% set nav_items = [
+          {key: 'overview', label: 'Overview', route: 'analytics.overview', icon: 'chart-pie'},
+          {key: 'audience', label: 'Audience', route: 'analytics.audience', icon: 'users'},
+          {key: 'acquisition', label: 'Acquisition', route: 'analytics.acquisition', icon: 'flag'},
+          {key: 'behaviour', label: 'Behaviour', route: 'analytics.behaviour', icon: 'cursor'},
+          {key: 'conversion', label: 'Conversion', route: 'analytics.conversion', icon: 'check-circle'},
+          {key: 'revenue', label: 'Revenue', route: 'analytics.revenue', icon: 'currency-dollar'},
+          {key: 'cohorts', label: 'Cohorts', route: 'analytics.cohorts', icon: 'grid'},
+          {key: 'funnels', label: 'Funnels', route: 'analytics.funnels', icon: 'filter'},
+          {key: 'reports', label: 'Reports', route: 'analytics.reports', icon: 'document-text'}
+      ] %}
+      {% for item in nav_items %}
+        <li class="{{ item.key == active_nav ? 'is-active' : '' }}">
+          <a href="{{ path(item.route) }}">
+            <span class="side-nav__icon">{{ icon(item.icon) }}</span>
+            <span class="side-nav__label">{{ item.label|trans }}</span>
+            {% if item.badge is defined and item.badge %}
+              {{ tag_pill(item.badge, 'info') }}
+            {% endif %}
+          </a>
+        </li>
+      {% endfor %}
+    </ul>
+
+    {% if perm.can(current_user, 'analytics.admin') %}
+      <hr>
+      <h3 class="side-nav__section-title">{{ 'Admin'|trans }}</h3>
+      <ul>
+        <li><a href="{{ path('analytics.settings') }}">{{ 'Settings'|trans }}</a></li>
+        <li><a href="{{ path('analytics.integrations') }}">{{ 'Integrations'|trans }}</a></li>
+        <li><a href="{{ path('analytics.audit_log') }}">{{ 'Audit log'|trans }}</a></li>
+      </ul>
+    {% endif %}
+  </nav>
+{% endblock %}
+
+{% block toolbar %}
+  <div class="toolbar">
+    <form class="toolbar__filters" method="get">
+      <fieldset>
+        <legend>{{ 'Time range'|trans }}</legend>
+        <select name="range">
+          {% for opt in time_range_options %}
+            <option value="{{ opt.value }}" {{ opt.value == filters.range ? 'selected' : '' }}>
+              {{ opt.label|trans }}
+            </option>
+          {% endfor %}
+        </select>
+        {% if filters.range == 'custom' %}
+          {{ datepicker('from', filters.from) }}
+          {{ datepicker('to', filters.to) }}
+        {% endif %}
+      </fieldset>
+
+      <fieldset>
+        <legend>{{ 'Compare to'|trans }}</legend>
+        <select name="compare">
+          {% for opt in compare_options %}
+            <option value="{{ opt.value }}" {{ opt.value == filters.compare ? 'selected' : '' }}>
+              {{ opt.label|trans }}
+            </option>
+          {% endfor %}
+        </select>
+      </fieldset>
+
+      <fieldset>
+        <legend>{{ 'Segment'|trans }}</legend>
+        {% for segment in available_segments %}
+          <label>
+            <input type="checkbox"
+                   name="segment[]"
+                   value="{{ segment.id }}"
+                   {{ segment.id in filters.segment ? 'checked' : '' }}>
+            {{ segment.label|e }}
+          </label>
+        {% endfor %}
+      </fieldset>
+
+      <button type="submit" class="button button--primary">{{ 'Update'|trans }}</button>
+      <a class="button button--ghost" href="{{ path('analytics.overview') }}">{{ 'Reset'|trans }}</a>
+    </form>
+
+    <div class="toolbar__view-mode">
+      {{ segment_filter('view', [
+          {value: 'cards', label: 'Cards', count: 12},
+          {value: 'table', label: 'Table'},
+          {value: 'compact', label: 'Compact'}
+      ], view_mode) }}
+    </div>
+  </div>
+{% endblock %}
+
+{% block content %}
+  <article class="overview" data-page="{{ page.id }}">
+    {{ section_header(page.title, 'High-level analytics across all properties.', page.actions) }}
+
+    <section class="overview__tiles" aria-label="{{ 'Headline metrics'|trans }}">
+      {{ stat_tile('Sessions',         metrics.sessions.value,         metrics.sessions.delta) }}
+      {{ stat_tile('Unique users',     metrics.users.value,            metrics.users.delta) }}
+      {{ stat_tile('Page views',       metrics.page_views.value,       metrics.page_views.delta) }}
+      {{ stat_tile('Bounce rate',      metrics.bounce_rate.value,      metrics.bounce_rate.delta, 'percent') }}
+      {{ stat_tile('Avg. session',     metrics.avg_session.value,      metrics.avg_session.delta, 'duration') }}
+      {{ stat_tile('Conversion rate', metrics.conversion.value,        metrics.conversion.delta, 'percent') }}
+      {{ stat_tile('Revenue',          metrics.revenue.value,          metrics.revenue.delta, 'currency', metrics.revenue.currency) }}
+      {{ stat_tile('AOV',              metrics.aov.value,              metrics.aov.delta, 'currency', metrics.aov.currency) }}
+    </section>
+
+    <section class="overview__primary">
+      <article class="card card--wide">
+        <header class="card__header">
+          <h2>{{ 'Sessions over time'|trans }}</h2>
+          {{ segment_filter('granularity', [
+              {value: 'hour',  label: 'Hourly'},
+              {value: 'day',   label: 'Daily'},
+              {value: 'week',  label: 'Weekly'},
+              {value: 'month', label: 'Monthly'}
+          ], filters.granularity) }}
+        </header>
+        <div class="card__body">
+          {{ line_chart('sessions', sessions_series, {
+              x: 'time',
+              y: 'count',
+              compare_series: sessions_series_compare|default(null),
+              show_legend: true,
+              annotations: events|filter(e => e.kind == 'launch')|map(e => {
+                  at: e.at,
+                  label: e.label,
+                  color: '#5b8def'
+              })
+          }) }}
+        </div>
+      </article>
+
+      <aside class="card">
+        <header class="card__header">
+          <h2>{{ 'Active users (live)'|trans }}</h2>
+        </header>
+        <div class="card__body card__body--centered">
+          <div class="big-number" data-stream="realtime.users">
+            {{ realtime.active_users|default(0)|number_format }}
+          </div>
+          <p class="muted">{{ 'right now'|trans }}</p>
+
+          <ul class="live-feed">
+            {% for evt in realtime.events|slice(0, 8) %}
+              <li class="live-feed__item live-feed__item--{{ evt.kind }}">
+                <time datetime="{{ evt.at|date('c') }}">{{ evt.at|ago }}</time>
+                <span>
+                  {% if evt.kind == 'pageview' %}
+                    {{ '%user% viewed %page%'|trans({'%user%': evt.user_label|e, '%page%': evt.page|e}) }}
+                  {% elseif evt.kind == 'signup' %}
+                    {{ '%user% signed up'|trans({'%user%': evt.user_label|e}) }}
+                  {% elseif evt.kind == 'purchase' %}
+                    {{ '%user% purchased %item% (%amt%)'|trans({
+                        '%user%': evt.user_label|e,
+                        '%item%': evt.item|e,
+                        '%amt%': fmt.money(evt.amount, evt.currency)
+                    })|raw }}
+                  {% else %}
+                    {{ evt.message|e }}
+                  {% endif %}
+                </span>
+              </li>
+            {% else %}
+              <li class="muted">{{ 'No live activity yet.'|trans }}</li>
+            {% endfor %}
+          </ul>
+        </div>
+      </aside>
+    </section>
+
+    <section class="overview__breakdowns">
+      <article class="card">
+        <header class="card__header">
+          <h2>{{ 'Top pages'|trans }}</h2>
+          <a class="link" href="{{ path('analytics.pages') }}">{{ 'View all'|trans }}</a>
+        </header>
+        <div class="card__body">
+          <table class="table table--compact">
+            <thead>
+              <tr>
+                <th>{{ 'Path'|trans }}</th>
+                <th class="num">{{ 'Views'|trans }}</th>
+                <th class="num">{{ 'Avg. time'|trans }}</th>
+                <th class="num">{{ 'Bounce'|trans }}</th>
+                <th class="num">{{ 'Trend'|trans }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for page in top_pages|sort((a, b) => b.views <=> a.views)|slice(0, 15) %}
+                <tr>
+                  <td>
+                    <a href="{{ path('analytics.page', {path: page.path}) }}">
+                      <code>{{ page.path|e }}</code>
+                    </a>
+                    {% if page.title is defined %}
+                      <small class="muted">{{ page.title|e }}</small>
+                    {% endif %}
+                  </td>
+                  <td class="num">{{ page.views|number_format }}</td>
+                  <td class="num">{{ page.avg_time|format_duration }}</td>
+                  <td class="num">{{ page.bounce|number_format(1) }}%</td>
+                  <td class="num">{{ sparkline(page.trend, {width: 80, height: 24}) }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </article>
+
+      <article class="card">
+        <header class="card__header">
+          <h2>{{ 'Top sources'|trans }}</h2>
+          <a class="link" href="{{ path('analytics.sources') }}">{{ 'View all'|trans }}</a>
+        </header>
+        <div class="card__body">
+          {{ bar_chart('top-sources', top_sources|map(s => {label: s.name, value: s.sessions}), {
+              orientation: 'horizontal',
+              max_items: 10,
+              colors: chart_palette
+          }) }}
+        </div>
+      </article>
+
+      <article class="card">
+        <header class="card__header">
+          <h2>{{ 'Devices'|trans }}</h2>
+        </header>
+        <div class="card__body">
+          {{ pie_chart('devices', devices|map(d => {label: d.name, value: d.share}), {
+              donut: true,
+              center_label: ((devices|reduce((acc, d) => acc + d.share, 0))|number_format(0) ~ '%')
+          }) }}
+        </div>
+      </article>
+
+      <article class="card">
+        <header class="card__header">
+          <h2>{{ 'Geography'|trans }}</h2>
+        </header>
+        <div class="card__body">
+          <table class="table table--compact">
+            <thead>
+              <tr>
+                <th>{{ 'Country'|trans }}</th>
+                <th class="num">{{ 'Users'|trans }}</th>
+                <th class="num">{{ 'Sessions'|trans }}</th>
+                <th class="num">{{ 'Conv. rate'|trans }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for country in geography|slice(0, 12) %}
+                <tr>
+                  <td>
+                    <span class="flag flag--{{ country.code|lower }}"></span>
+                    {{ country.name|e }}
+                  </td>
+                  <td class="num">{{ country.users|number_format }}</td>
+                  <td class="num">{{ country.sessions|number_format }}</td>
+                  <td class="num">{{ country.conv_rate|number_format(2) }}%</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </article>
+    </section>
+
+    <section class="overview__funnels">
+      {{ section_header('Conversion funnels', 'Drop-off across the most-watched user journeys.', [
+          {label: 'Manage funnels', icon: 'cog', url: path('funnels.index'), kind: 'secondary'}
+      ]) }}
+
+      <div class="funnels">
+        {% for funnel in funnels %}
+          <article class="funnel-card">
+            <header>
+              <h3>{{ funnel.name|e }}</h3>
+              <small class="muted">
+                {{ funnel.steps|length }} {{ 'steps'|trans }}, {{ funnel.window }} {{ 'window'|trans }}
+              </small>
+            </header>
+            <ol class="funnel">
+              {% for step in funnel.steps %}
+                {% set drop = loop.first ? 0 : ((funnel.steps[loop.index0 - 1].count - step.count) / funnel.steps[loop.index0 - 1].count * 100) %}
+                <li class="funnel__step" style="--width: {{ step.percent_of_total }}%;">
+                  <strong>{{ step.label|trans }}</strong>
+                  <span>{{ step.count|number_format }}</span>
+                  {% if not loop.first %}
+                    <small class="muted">- {{ drop|number_format(1) }}%</small>
+                  {% endif %}
+                </li>
+              {% endfor %}
+            </ol>
+          </article>
+        {% endfor %}
+      </div>
+    </section>
+
+    <section class="overview__cohorts">
+      {{ section_header('Retention by cohort', 'Weekly cohorts for the last 12 weeks.') }}
+
+      <div class="cohort-table-wrap">
+        <table class="cohort-table">
+          <thead>
+            <tr>
+              <th>{{ 'Cohort'|trans }}</th>
+              <th>{{ 'Size'|trans }}</th>
+              {% for week in 0..11 %}
+                <th>W{{ week }}</th>
+              {% endfor %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for cohort in cohorts %}
+              <tr>
+                <td>{{ cohort.label }}</td>
+                <td>{{ cohort.size|number_format }}</td>
+                {% for value in cohort.weeks %}
+                  {% set intensity = (value * 100)|round %}
+                  <td class="cohort-cell"
+                      style="background-color: rgba(91, 141, 239, {{ value|number_format(2) }});"
+                      title="{{ intensity }}%">
+                    {% if value > 0 %}{{ intensity }}%{% endif %}
+                  </td>
+                {% endfor %}
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="overview__heatmap">
+      {{ section_header('Activity heatmap (UTC)', 'Sessions by hour of day and day of week.') }}
+      {{ heatmap('sessions-heatmap', heatmap_data, {
+          x_labels: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+          y_labels: 0..23|map(h => '%02d:00'|format(h)),
+          color_scale: ['#f5f7fb', '#5b8def']
+      }) }}
+    </section>
+
+    {% apply spaceless %}
+      <section class="overview__insights">
+        {{ section_header('Anomaly detection', 'Statistically significant spikes/dips for the chosen range.') }}
+        {% if insights|length == 0 %}
+          <p class="muted">{{ 'No anomalies detected.'|trans }}</p>
+        {% else %}
+          <ul class="insights">
+            {% for insight in insights %}
+              <li class="insight insight--{{ insight.severity }}">
+                <header>
+                  <strong>{{ insight.metric|trans }}</strong>
+                  {{ tag_pill(insight.severity|trans, insight.severity) }}
+                </header>
+                <p>{{ insight.message|trans(insight.params|default({})) }}</p>
+                <footer>
+                  <time>{{ insight.detected_at|ago }}</time>
+                  <span>{{ 'Confidence:'|trans }} {{ insight.confidence|number_format(0) }}%</span>
+                </footer>
+              </li>
+            {% endfor %}
+          </ul>
+        {% endif %}
+      </section>
+    {% endapply %}
+
+    <section class="overview__experiments">
+      {{ section_header('Live experiments', 'A/B tests currently running.', [
+          {label: 'New experiment', icon: 'plus', url: path('experiments.new'), kind: 'primary'}
+      ]) }}
+
+      <div class="experiments">
+        {% for exp in experiments|filter(e => e.status == 'running') %}
+          <article class="experiment-card">
+            <header>
+              <h3><a href="{{ path('experiments.show', {id: exp.id}) }}">{{ exp.name|e }}</a></h3>
+              {{ tag_pill('Running'|trans, 'success') }}
+            </header>
+            <dl>
+              <dt>{{ 'Started'|trans }}</dt><dd>{{ exp.started_at|date('M j') }}</dd>
+              <dt>{{ 'Variants'|trans }}</dt><dd>{{ exp.variants|length }}</dd>
+              <dt>{{ 'Traffic'|trans }}</dt><dd>{{ (exp.traffic * 100)|number_format(0) }}%</dd>
+              <dt>{{ 'Metric'|trans }}</dt><dd><code>{{ exp.primary_metric|e }}</code></dd>
+            </dl>
+            <ul class="variant-bars">
+              {% for variant in exp.variants %}
+                <li>
+                  <span class="variant-bars__label">{{ variant.label|e }}</span>
+                  <span class="variant-bars__bar" style="width: {{ (variant.share * 100)|number_format(0) }}%;"></span>
+                  <span class="variant-bars__value">{{ variant.lift is not null ? (variant.lift * 100)|number_format(2) ~ '%' : '-' }}</span>
+                </li>
+              {% endfor %}
+            </ul>
+            {% if exp.is_significant %}
+              <footer>{{ tag_pill('Statistically significant'|trans, 'attention') }}</footer>
+            {% endif %}
+          </article>
+        {% else %}
+          <p class="muted">{{ 'No experiments are currently running.'|trans }}</p>
+        {% endfor %}
+      </div>
+    </section>
+
+    {% sandbox %}
+      {% include "@user-content/dashboard/footer.html.twig" with {dashboard: page} only %}
+    {% endsandbox %}
+
+    {% if perm.can(current_user, 'analytics.contributors') %}
+      <section class="overview__contributors">
+        {{ section_header('Contributors', 'People who have edited this dashboard recently.') }}
+        {{ avatar_stack(contributors, 8) }}
+      </section>
+    {% endif %}
+
+    <section class="overview__exports">
+      {{ section_header('Recent exports', 'Files generated from this dashboard.') }}
+      <table class="table">
+        <thead>
+          <tr>
+            <th>{{ 'Created'|trans }}</th>
+            <th>{{ 'By'|trans }}</th>
+            <th>{{ 'Format'|trans }}</th>
+            <th>{{ 'Range'|trans }}</th>
+            <th>{{ 'Size'|trans }}</th>
+            <th>{{ 'Status'|trans }}</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for export in exports %}
+            <tr>
+              <td><time datetime="{{ export.created_at|date('c') }}">{{ export.created_at|ago }}</time></td>
+              <td>{{ export.user.name|e }}</td>
+              <td><code>{{ export.format|upper }}</code></td>
+              <td>{{ export.range|e }}</td>
+              <td>{{ fmt.bytes(export.size_bytes) }}</td>
+              <td>
+                {% if export.status == 'ready' %}
+                  {{ tag_pill('Ready'|trans, 'success') }}
+                {% elseif export.status == 'queued' %}
+                  {{ tag_pill('Queued'|trans, 'warning') }}
+                {% elseif export.status == 'failed' %}
+                  {{ tag_pill('Failed'|trans, 'attention') }}
+                {% else %}
+                  {{ tag_pill(export.status|trans) }}
+                {% endif %}
+              </td>
+              <td>
+                {% if export.status == 'ready' %}
+                  <a class="button button--small" href="{{ export.download_url }}">{{ 'Download'|trans }}</a>
+                {% endif %}
+                {% if perm.can(current_user, 'exports.delete') and export.status != 'queued' %}
+                  <form method="post" action="{{ path('exports.delete', {id: export.id}) }}" style="display: inline;">
+                    <input type="hidden" name="_token" value="{{ csrf_token('exports.delete') }}">
+                    <button type="submit" class="button button--small button--danger">{{ 'Delete'|trans }}</button>
+                  </form>
+                {% endif %}
+              </td>
+            </tr>
+          {% else %}
+            <tr><td colspan="7" class="muted">{{ 'Nothing exported yet.'|trans }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+
+    {% embed "@admin/partials/_collapsible.html.twig" with {id: 'raw-data'} %}
+      {% block summary %}{{ 'Raw data sample'|trans }}{% endblock %}
+      {% block content %}
+        <pre class="code-block"><code>{{ raw_sample|json_encode(constant('JSON_PRETTY_PRINT'))|e }}</code></pre>
+      {% endblock %}
+    {% endembed %}
+
+    <section class="overview__definitions">
+      {{ section_header('Definitions') }}
+      <dl class="definitions">
+        {% for term in definitions %}
+          <dt id="def-{{ term.slug }}">{{ term.label|e }}</dt>
+          <dd>{{ term.body|markdown_to_html|raw }}</dd>
+        {% endfor %}
+      </dl>
+    </section>
+
+    {% if deprecation_notices|length > 0 %}
+      {% for notice in deprecation_notices %}
+        {% deprecated 'Metric "%name%" will be removed on %date%.'|trans({'%name%': notice.name, '%date%': notice.removal_date|date('Y-m-d')}) %}
+      {% endfor %}
+    {% endif %}
+
+    {% cache 'analytics.overview.summary.' ~ filters|hash ttl(300) tags(['analytics', 'analytics:overview']) %}
+      <section class="overview__summary">
+        {{ section_header('Auto-summary', 'Generated overview based on the current data.') }}
+        <p>
+          {{ 'In the past %range% you saw %sessions% sessions from %users% unique users (%delta%%, %dir%).'|trans({
+              '%range%': filters.range_label,
+              '%sessions%': metrics.sessions.value|number_format,
+              '%users%': metrics.users.value|number_format,
+              '%delta%': (metrics.sessions.delta|abs)|number_format(1),
+              '%dir%': metrics.sessions.delta >= 0 ? 'up'|trans : 'down'|trans
+          }) }}
+        </p>
+        <p>
+          {{ 'Your top traffic source was %src% (%pct%% of sessions). Your best-performing page was %page% with %views% views.'|trans({
+              '%src%': top_sources|first.name|default('-'),
+              '%pct%': top_sources|first.share|default(0)|number_format(1),
+              '%page%': top_pages|first.path|default('-'),
+              '%views%': top_pages|first.views|default(0)|number_format
+          }) }}
+        </p>
+      </section>
+    {% endcache %}
+
+    {% types {
+        page: 'object',
+        metrics: 'map',
+        filters: 'object'
+    } %}
+
+    {% with {pin_url: path('dashboards.pin', {id: page.id})} only %}
+      <form method="post" action="{{ pin_url }}" class="overview__pin">
+        <input type="hidden" name="_token" value="{{ csrf_token('dashboards.pin') }}">
+        <button type="submit" class="button button--ghost">
+          {{ icon('star') }}
+          {{ 'Pin to home'|trans }}
+        </button>
+      </form>
+    {% endwith %}
+
+    {% do dashboard_view_logged(current_user, page.id) %}
+
+    {% if request.is_initial_load %}
+      {% flush %}
+    {% endif %}
+  </article>
+{% endblock %}
+
+{% block scripts %}
+  {{ parent() }}
+  <script type="application/json" id="dashboard-data">
+    {{ {
+        page: page,
+        filters: filters,
+        metrics: metrics,
+        sessionsSeries: sessions_series,
+        topPages: top_pages,
+        topSources: top_sources,
+        devices: devices,
+        geography: geography,
+        funnels: funnels,
+        cohorts: cohorts,
+        heatmap: heatmap_data,
+        insights: insights,
+        experiments: experiments,
+        realtime: realtime,
+        currentUser: {id: current_user.id, name: current_user.name}
+    }|json_encode|raw }}
+  </script>
+  {% if feature_enabled('analytics.realtime') %}
+    <script type="module">
+      import {connect} from "{{ asset('js/realtime.mjs') }}";
+      connect("{{ realtime_endpoint|e('js') }}", {
+        token: "{{ realtime_token|e('js') }}",
+        topics: ["analytics:overview", "analytics:user:{{ current_user.id }}"]
+      });
+    </script>
+  {% endif %}
+{% endblock %}
+

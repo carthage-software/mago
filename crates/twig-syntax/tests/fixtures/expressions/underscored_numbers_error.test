@@ -1,0 +1,8 @@
+--TEST--
+Twig does not allow to use 2 underscored between digits in numbers
+--TEMPLATE--
+{{ 1__2 }}
+--DATA--
+return []
+--EXCEPTION--
+Twig\Error\SyntaxError: Unexpected token "name" of value "__2" ("end of print statement" expected) in "index.twig" at line 2.

@@ -1,0 +1,8 @@
+--TEST--
+"cycle" function returns an error on empty mappings
+--TEMPLATE--
+{{ cycle({}, 0) }}
+--DATA--
+return []
+--EXCEPTION--
+Twig\Error\RuntimeError: The "cycle" function expects a non-empty sequence in "index.twig" at line 2.

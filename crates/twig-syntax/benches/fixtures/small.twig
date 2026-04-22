@@ -1,0 +1,30 @@
+{% extends "base.html.twig" %}
+
+{% block title %}Dashboard — {{ parent() }}{% endblock %}
+
+{% block body %}
+  <h1>Welcome, {{ user.name|e }}!</h1>
+
+  {% if user.is_admin %}
+    <p>You have admin privileges.</p>
+  {% elseif user.is_staff %}
+    <p>Staff-only tools are available below.</p>
+  {% else %}
+    <p>Enjoy your stay.</p>
+  {% endif %}
+
+  <ul class="stats">
+    {% for stat in stats %}
+      <li>{{ stat.label }}: <strong>{{ stat.value|number_format(2, '.', ',') }}</strong></li>
+    {% else %}
+      <li>No statistics available.</li>
+    {% endfor %}
+  </ul>
+
+  {% set greeting %}
+    Hello, {{ user.name }}! You logged in {{ logins }} times.
+  {% endset %}
+  <aside>{{ greeting }}</aside>
+
+  {% include 'partials/footer.html.twig' with { year: "now"|date('Y') } only %}
+{% endblock %}
