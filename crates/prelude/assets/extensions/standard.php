@@ -1517,6 +1517,22 @@ function explode(string $separator, string $string, int $limit = PHP_INT_MAX): a
  * @param array<string>|string $separator
  * @param array<int|string|float|bool|null|Stringable>|null $array
  *
+ * @return (
+ *     $separator is non-empty-string
+ *     ? ($array is non-empty-array
+ *         ? ($array is array<literal-string|literal-int>
+ *             ? ($separator is literal-string ? non-empty-literal-string : non-empty-string)
+ *             : non-empty-string
+ *         )
+ *         : string)
+ *     : ($array is non-empty-array
+ *         ? ($array is array<non-empty-literal-string|non-empty-string>
+ *             ? ($array is array<non-empty-literal-string> ? non-empty-literal-string : non-empty-string)
+ *             : string
+ *         )
+ *         : string)
+ * )
+ *
  * @pure
  */
 function implode(array|string $separator = '', ?array $array = null): string {}
@@ -1524,6 +1540,22 @@ function implode(array|string $separator = '', ?array $array = null): string {}
 /**
  * @param array<string>|string $separator
  * @param array<int|string|float|bool|null|Stringable>|null $array
+ *
+ * @return (
+ *     $separator is non-empty-string
+ *     ? ($array is non-empty-array
+ *         ? ($array is array<literal-string|literal-int>
+ *             ? ($separator is literal-string ? non-empty-literal-string : non-empty-string)
+ *             : non-empty-string
+ *         )
+ *         : string)
+ *     : ($array is non-empty-array
+ *         ? ($array is array<non-empty-literal-string|non-empty-string>
+ *             ? ($array is array<non-empty-literal-string> ? non-empty-literal-string : non-empty-string)
+ *             : string
+ *         )
+ *         : string)
+ * )
  *
  * @pure
  */
