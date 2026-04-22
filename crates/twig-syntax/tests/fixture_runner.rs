@@ -322,7 +322,7 @@ fn excluded_fixtures_are_explicit_and_self_consistent() {
     let relative: Vec<String> = collected
         .excluded
         .iter()
-        .map(|(p, _)| p.strip_prefix(fixtures_dir()).unwrap_or(p).display().to_string())
+        .map(|(p, _)| p.strip_prefix(fixtures_dir()).unwrap_or(p).display().to_string().replace('\\', "/"))
         .collect();
 
     assert_eq!(
